@@ -5,7 +5,7 @@ This module contains self-contained examples demonstrating the Quorus file trans
 ## Available Examples
 
 ### 1. BasicTransferExample
-**File:** `BasicTransferExample.java`  
+**File:** `BasicTransferExample.java`
 **Main Class:** `dev.mars.quorus.examples.BasicTransferExample`
 
 Demonstrates fundamental Quorus capabilities:
@@ -23,6 +23,25 @@ Demonstrates fundamental Quorus capabilities:
 - ✅ Retry logic for failed transfers
 - ✅ Comprehensive error reporting
 
+### 2. InternalNetworkTransferExample
+**File:** `InternalNetworkTransferExample.java`
+**Main Class:** `dev.mars.quorus.examples.InternalNetworkTransferExample`
+
+Demonstrates corporate network transfer scenarios (primary use case):
+- CRM data synchronization to data warehouse
+- Multi-department file distribution
+- High-throughput backup operations
+- Corporate network optimization
+- Enterprise monitoring and compliance
+
+**Features Showcased:**
+- ✅ Corporate network optimized configurations
+- ✅ Multi-department concurrent operations
+- ✅ High-throughput data transfers
+- ✅ Corporate security and compliance logging
+- ✅ Internal network monitoring and reporting
+- ✅ Enterprise-grade error handling and recovery
+
 ## Running the Examples
 
 ### Prerequisites
@@ -34,11 +53,27 @@ Demonstrates fundamental Quorus capabilities:
 
 #### Run the Basic Transfer Example:
 ```bash
-# From the project root
+# From the project root (default example)
 mvn exec:java -pl quorus-integration-examples
 
 # Or with specific main class
 mvn exec:java -pl quorus-integration-examples -Dexec.mainClass="dev.mars.quorus.examples.BasicTransferExample"
+```
+
+#### Run the Internal Network Transfer Example:
+```bash
+# Method 1: Temporarily change the default main class in pom.xml
+# Edit quorus-integration-examples/pom.xml and change:
+# <mainClass>dev.mars.quorus.examples.BasicTransferExample</mainClass>
+# to:
+# <mainClass>dev.mars.quorus.examples.InternalNetworkTransferExample</mainClass>
+# Then run:
+mvn exec:java -pl quorus-integration-examples
+
+# Method 2: Use Java directly after compilation
+mvn compile -pl quorus-integration-examples
+cd quorus-integration-examples
+java -cp "target/classes:../quorus-core/target/classes" dev.mars.quorus.examples.InternalNetworkTransferExample
 ```
 
 #### Run with Maven compile first:
@@ -96,12 +131,27 @@ INFO: === Example completed ===
 
 ## Generated Files
 
-The examples will create a `downloads/` directory in your current working directory with the following files:
+### BasicTransferExample
+Creates a `downloads/` directory with:
 - `basic-example.bin` - 2KB test file
 - `multi-file-512b.bin` - 512 byte test file
 - `multi-file-1024b.bin` - 1KB test file
 - `multi-file-4096b.bin` - 4KB test file
-- `error-example.bin` - Will not be created (404 error example)
+- `slow-response-example.json` - Response from delay test
+
+### InternalNetworkTransferExample
+Creates a `corporate-data/` directory structure with:
+```
+corporate-data/
+├── data-warehouse/
+│   └── crm-customer-export.json - CRM data export
+├── department-shares/
+│   ├── finance-monthly-report.pdf - Finance department report
+│   ├── hr-monthly-report.pdf - HR department report
+│   └── sales-monthly-report.pdf - Sales department report
+└── backup/
+    └── production-backup-[timestamp].tar.gz - Backup operation result
+```
 
 ## Understanding the Examples
 

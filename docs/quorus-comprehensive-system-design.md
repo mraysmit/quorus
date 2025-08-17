@@ -2,7 +2,21 @@
 
 ## Overview
 
-Quorus is an enterprise-grade file transfer system designed for high reliability, scalability, and multi-tenant operation. The system provides both programmatic APIs and declarative YAML-based workflow definitions for complex file transfer orchestration with comprehensive multi-tenancy support.
+Quorus is an enterprise-grade file transfer system designed for high reliability, scalability, and multi-tenant operation within corporate network environments. The system is optimized for internal corporate network transfers, providing both programmatic APIs and declarative YAML-based workflow definitions for complex file transfer orchestration with comprehensive multi-tenancy support.
+
+### Primary Use Cases
+
+Quorus is designed primarily for **internal corporate network file transfers**, including:
+
+- **Data center to data center** transfers within the same organization
+- **Department to department** file sharing and data distribution
+- **Application to application** data synchronization across internal systems
+- **Backup and archival** operations within corporate infrastructure
+- **ETL pipeline** data movement between internal databases and storage systems
+- **Multi-tenant SaaS** file operations within controlled network environments
+- **Hybrid cloud** transfers between on-premises and private cloud infrastructure
+
+The system is architected to leverage the **high bandwidth, low latency, and trusted security** characteristics of internal corporate networks while providing enterprise-grade reliability, monitoring, and governance.
 
 ## System Architecture
 
@@ -111,12 +125,14 @@ The foundation of the system providing basic file transfer capabilities.
 - `ChecksumCalculator`: File integrity verification
 
 **Features:**
-- HTTP/HTTPS protocol support
-- Concurrent transfer management
-- Retry mechanisms with exponential backoff
-- Progress tracking with rate calculation
-- SHA-256 integrity verification
-- Thread-safe operations
+- **Internal network protocols** (HTTP/HTTPS, SMB/CIFS, NFS, FTP/SFTP)
+- **High-throughput transfers** optimized for corporate network bandwidth
+- **Concurrent transfer management** with intelligent scheduling
+- **Retry mechanisms** with exponential backoff for network resilience
+- **Progress tracking** with rate calculation and bandwidth utilization
+- **SHA-256 integrity verification** for data consistency
+- **Thread-safe operations** for multi-tenant environments
+- **Network-aware routing** for optimal internal path selection
 
 ### 2. Multi-Tenant Management (quorus-tenant)
 
@@ -327,12 +343,12 @@ The resolved execution plan after dependency analysis and validation.
 #### Single Transfer Definition
 
 ```yaml
-# transfer-user-data.yaml
+# transfer-internal-data.yaml
 apiVersion: quorus.dev/v1
 kind: Transfer
 metadata:
-  name: user-data-backup
-  description: "Backup user data to archive server"
+  name: internal-data-sync
+  description: "Sync customer data from CRM to data warehouse"
   tenant: acme-corp              # Tenant identifier
   namespace: finance             # Sub-tenant/namespace
   labels:
@@ -341,56 +357,78 @@ metadata:
     team: data-ops
     dataClassification: confidential
     costCenter: "CC-12345"
+    networkZone: "internal-dmz"
   annotations:
     created-by: "john.doe@company.com"
     ticket: "JIRA-12345"
 
 spec:
   source:
-    uri: "https://api.company.com/users/export"
+    # Internal corporate API endpoint
+    uri: "https://crm-internal.acme-corp.local/api/customers/export"
     protocol: https
     authentication:
-      type: tenant-oauth2        # Use tenant's OAuth2 config
-      scopes: ["read:customers"]
+      type: service-account      # Internal service account
+      serviceAccount: "quorus-data-sync"
     headers:
-      Authorization: "${AUTH_TOKEN}"
-      Content-Type: "application/json"
-      X-Tenant-ID: "${tenant.id}"
+      X-Internal-Service: "quorus"
       X-Data-Classification: "${metadata.labels.dataClassification}"
+      X-Network-Zone: "${metadata.labels.networkZone}"
     timeout: 300s
-    
+    # Internal network optimization
+    networkOptimization:
+      useInternalRouting: true
+      preferredDataCenter: "dc-east-1"
+
   destination:
-    path: "${tenant.storage.root}/exports/customers-${date:yyyy-MM-dd}.json"
+    # Internal corporate storage path
+    path: "/corporate-storage/data-warehouse/customers/customers-${date:yyyy-MM-dd}.json"
+    protocol: nfs                # Internal NFS mount
     createDirectories: true
-    permissions: "644"
+    permissions: "640"           # Corporate security standard
+    # Corporate encryption standards
     encryption:
-      enabled: "${tenant.security.dataProtection.encryptionAtRest}"
+      enabled: true
+      algorithm: "AES-256-GCM"
+      keySource: "corporate-kms"
       keyId: "${tenant.security.keyManagement.keyId}"
-    
+
   validation:
-    expectedSize: 
-      min: 1MB
-      max: 100MB
+    expectedSize:
+      min: 10MB                  # Larger internal datasets
+      max: 5GB
     checksum:
-      algorithm: "${tenant.defaults.validation.checksumAlgorithm}"
-      required: "${tenant.defaults.validation.checksumRequired}"
-      expected: "${EXPECTED_CHECKSUM}"
-    
+      algorithm: "SHA-256"
+      required: true
+    # Internal data quality checks
+    dataQuality:
+      validateSchema: true
+      schemaVersion: "v2.1"
+      rejectOnValidationFailure: true
+
   retry:
-    maxAttempts: 3
+    maxAttempts: 5               # More retries for internal reliability
     backoff: exponential
-    initialDelay: 1s
-    maxDelay: 30s
-    
+    initialDelay: 500ms          # Faster retry for internal network
+    maxDelay: 10s
+
+  # Corporate monitoring integration
   monitoring:
-    enabled: "${tenant.defaults.monitoring.metricsEnabled}"
+    enabled: true
     progressReporting: true
     metricsEnabled: true
     alertOnFailure: true
+    # Corporate monitoring systems
+    integrations:
+      splunk: true
+      datadog: true
+      corporateSOC: true
     tags:
       tenant: "${tenant.id}"
       namespace: "${metadata.namespace}"
       costCenter: "${metadata.labels.costCenter}"
+      networkZone: "${metadata.labels.networkZone}"
+      dataClassification: "${metadata.labels.dataClassification}"
 ```
 
 #### Transfer Group Definition
@@ -1075,24 +1113,39 @@ monitoring:
 ## Security Architecture
 
 ### Authentication
-- Support for multiple providers (OAuth2, SAML, LDAP)
-- Tenant-specific authentication configuration
-- API key authentication for programmatic access
+- **Enterprise directory integration** (Active Directory, LDAP)
+- **Single Sign-On (SSO)** with corporate identity providers (SAML, OAuth2)
+- **Service account authentication** for automated internal systems
+- **Certificate-based authentication** for high-security internal transfers
+- **Tenant-specific authentication** configuration for multi-tenant deployments
 
 ### Authorization
-- Role-based access control (RBAC)
-- Tenant-scoped permissions
-- Fine-grained resource access controls
+- **Role-based access control (RBAC)** integrated with corporate directory
+- **Department and team-based** access controls
+- **Data classification-aware** permissions (confidential, internal, public)
+- **Network segment-based** access controls for internal zones
+- **Fine-grained resource access** controls for sensitive data
 
 ### Data Protection
-- Encryption at rest using tenant-specific keys
-- TLS encryption for data in transit
-- Data classification and handling policies
+- **Encryption at rest** using corporate key management systems
+- **TLS encryption** optimized for internal network performance
+- **Data classification** and handling policies for corporate data
+- **Network-level encryption** for high-security internal transfers
+- **Tenant-specific encryption** keys for multi-tenant isolation
+
+### Internal Network Security
+- **Network segmentation** awareness and routing
+- **Corporate firewall** integration and rule management
+- **VPN and private network** support for remote sites
+- **Internal certificate authority** integration
+- **Network monitoring** and intrusion detection integration
 
 ### Audit & Compliance
-- Comprehensive audit logging
-- Tenant-isolated audit trails
-- Compliance framework support (GDPR, HIPAA, SOX)
+- **Corporate audit system** integration
+- **Compliance framework** support (SOX, GDPR, HIPAA, PCI-DSS)
+- **Data lineage tracking** for internal data movement
+- **Regulatory reporting** for internal data governance
+- **Tenant-isolated audit trails** for multi-tenant compliance
 
 ## Configuration Management
 
@@ -1152,52 +1205,61 @@ variables:
 
 ## Deployment Architecture
 
-### Container-Based Deployment
+### Corporate Network Deployment
 
 ```mermaid
 graph TD
-    %% External Traffic
-    EXT[External Traffic] --> LB[Load Balancer]
+    %% Internal Corporate Network Traffic
+    CORP[Corporate Network<br/>Internal Traffic] --> LB[Internal Load Balancer<br/>F5/HAProxy]
 
-    %% Ingress Layer
-    LB --> ING[Ingress Controller]
+    %% Corporate DMZ
+    LB --> ING[Ingress Controller<br/>Corporate DMZ]
 
-    %% Application Services
+    %% Application Services in Corporate Data Center
     ING --> QE[Quorus Engine<br/>Service<br/>3 Replicas]
     ING --> WE[Workflow Engine<br/>Service<br/>2 Replicas]
     ING --> TS[Tenant Service<br/>Service<br/>2 Replicas]
 
-    %% Data Layer Connections
-    QE --> PG[(PostgreSQL<br/>Database)]
+    %% Corporate Data Layer
+    QE --> PG[(Corporate PostgreSQL<br/>Database Cluster)]
     WE --> PG
     TS --> PG
 
-    QE --> REDIS[(Redis<br/>Cache)]
+    QE --> REDIS[(Corporate Redis<br/>Cache Cluster)]
 
-    QE --> PV[Persistent<br/>Volumes]
+    QE --> SAN[Corporate SAN<br/>Storage Array]
 
-    %% External Services
-    TS --> AUTH[External<br/>Auth Provider]
-    QE --> STORAGE[Cloud<br/>Storage]
+    %% Corporate Identity and Storage
+    TS --> AD[Active Directory<br/>Corporate LDAP]
+    QE --> NAS[Corporate NAS<br/>File Storage]
+    QE --> NFS[NFS Mounts<br/>Department Shares]
 
-    %% Monitoring Stack
-    PROM[Prometheus] --> QE
+    %% Corporate Monitoring Stack
+    PROM[Prometheus<br/>Corporate Monitoring] --> QE
     PROM --> WE
     PROM --> TS
 
-    GRAF[Grafana] --> PROM
+    SPLUNK[Splunk<br/>Corporate SIEM] --> PROM
+    GRAF[Grafana<br/>Corporate Dashboards] --> PROM
     ALERT[AlertManager] --> PROM
-    ALERT --> NOTIFY[Notification<br/>Services]
+    ALERT --> EMAIL[Corporate Email<br/>Exchange/O365]
 
-    %% Security Services
-    VAULT[HashiCorp<br/>Vault] --> QE
+    %% Corporate Security Services
+    VAULT[Corporate Vault<br/>Key Management] --> QE
     VAULT --> WE
     VAULT --> TS
 
-    CERT[Cert Manager] --> ING
+    CA[Corporate PKI<br/>Certificate Authority] --> ING
 
-    %% Styling by Layer
-    style EXT fill:#f0f0f0
+    %% Network Zones
+    subgraph "Corporate Network Zones"
+        DMZ[DMZ Zone<br/>Quorus Services]
+        INTERNAL[Internal Zone<br/>Data Sources]
+        SECURE[Secure Zone<br/>Sensitive Data]
+    end
+
+    %% Styling by Corporate Zone
+    style CORP fill:#f0f0f0
     style LB fill:#f0f0f0
     style ING fill:#f0f0f0
 
@@ -1207,18 +1269,20 @@ graph TD
 
     style PG fill:#f3e5f5
     style REDIS fill:#f3e5f5
-    style PV fill:#f3e5f5
+    style SAN fill:#f3e5f5
 
     style PROM fill:#fce4ec
+    style SPLUNK fill:#fce4ec
     style GRAF fill:#fce4ec
     style ALERT fill:#fce4ec
 
     style VAULT fill:#f1f8e9
-    style CERT fill:#f1f8e9
+    style CA fill:#f1f8e9
 
-    style AUTH fill:#fff8e1
-    style STORAGE fill:#fff8e1
-    style NOTIFY fill:#fff8e1
+    style AD fill:#fff8e1
+    style NAS fill:#fff8e1
+    style NFS fill:#fff8e1
+    style EMAIL fill:#fff8e1
 ```
 ```yaml
 # Kubernetes deployment example
@@ -1399,30 +1463,42 @@ CREATE TABLE audit_logs (
 
 ## Design Principles
 
-### 1. Modularity
+### 1. Internal Network Optimization
+- **High-throughput transfers** leveraging corporate network bandwidth
+- **Protocol selection** optimized for internal network characteristics
+- **Network-aware routing** for optimal internal path selection
+- **Corporate infrastructure integration** (AD, PKI, monitoring)
+
+### 2. Modularity
 - Clear separation between core engine and enterprise features
 - Pluggable architecture for protocols and storage
 - Independent module development and testing
+- **Corporate system integration** modules
 
-### 2. Multi-Tenancy
-- Tenant isolation at all levels (data, compute, network)
-- Hierarchical tenant structure with inheritance
-- Resource quotas and usage tracking
+### 3. Multi-Tenancy for Corporate Structure
+- **Department and team-based** tenant isolation
+- **Corporate hierarchy** alignment with organizational structure
+- **Resource quotas** based on business unit allocations
+- **Cost center integration** for chargeback and reporting
 
-### 3. Declarative Configuration
-- YAML-based workflow definitions
-- Infrastructure-as-code approach
-- Version-controlled transfer configurations
+### 4. Declarative Configuration
+- **YAML-based workflow definitions** for corporate data operations
+- **Infrastructure-as-code** approach for corporate governance
+- **Version-controlled** transfer configurations in corporate repositories
+- **Corporate approval workflows** for configuration changes
 
-### 4. Enterprise-Grade Security
-- Authentication and authorization
-- Data encryption at rest and in transit
-- Audit logging and compliance
+### 5. Enterprise-Grade Security
+- **Corporate directory integration** (Active Directory, LDAP)
+- **Certificate-based authentication** using corporate PKI
+- **Network-level security** through corporate firewalls and VLANs
+- **Data classification** and handling for corporate data governance
+- **Audit logging** integrated with corporate SIEM systems
 
-### 5. Observability
-- Comprehensive metrics and monitoring
-- Real-time progress tracking
-- Alerting and notification systems
+### 6. Corporate Observability
+- **Corporate monitoring system** integration (Splunk, DataDog, etc.)
+- **Real-time progress tracking** with corporate dashboard integration
+- **Alerting** through corporate notification systems (Exchange, Teams)
+- **Compliance reporting** for corporate audit requirements
 
 ## Security Architecture
 
@@ -1506,6 +1582,91 @@ graph TD
 - **Row Level Security** - Database-level isolation
 - **Namespace Isolation** - Kubernetes namespace separation
 - **Quota Management** - Resource usage controls
+
+## Internal Network Optimizations
+
+### Corporate Network Characteristics
+
+Quorus is designed to leverage the unique characteristics of internal corporate networks:
+
+#### **High Bandwidth Availability**
+- **Gigabit/10Gb Ethernet** standard in corporate environments
+- **Dedicated network segments** for data transfer operations
+- **Quality of Service (QoS)** policies for prioritizing transfer traffic
+- **Network bandwidth reservation** for critical transfer operations
+
+#### **Low Latency Communications**
+- **Sub-millisecond latency** within data centers
+- **Predictable network paths** through corporate routing
+- **Optimized TCP window sizing** for internal network characteristics
+- **Connection pooling** for frequently accessed internal services
+
+#### **Trusted Network Environment**
+- **Reduced encryption overhead** where appropriate within secure zones
+- **Certificate-based authentication** for internal service-to-service communication
+- **Network-level security** through corporate firewalls and VLANs
+- **Simplified authentication** using corporate directory services
+
+### Internal Protocol Optimizations
+
+#### **SMB/CIFS Protocol Support**
+```yaml
+source:
+  uri: "smb://fileserver.corp.local/shares/data/export.csv"
+  protocol: smb
+  authentication:
+    type: kerberos
+    domain: "CORP"
+  options:
+    smbVersion: "3.1.1"
+    directIO: true
+    largeBuffers: true
+```
+
+#### **NFS Protocol Support**
+```yaml
+source:
+  uri: "nfs://storage.corp.local/exports/data"
+  protocol: nfs
+  options:
+    nfsVersion: "4.1"
+    rsize: 1048576      # 1MB read buffer
+    wsize: 1048576      # 1MB write buffer
+    tcp: true
+```
+
+#### **Internal HTTP Optimizations**
+```yaml
+source:
+  uri: "http://internal-api.corp.local/data/export"
+  protocol: http
+  options:
+    keepAlive: true
+    connectionPoolSize: 50
+    tcpNoDelay: true
+    bufferSize: 65536
+    compressionEnabled: false  # Skip compression on fast internal networks
+```
+
+### Corporate Integration Features
+
+#### **Active Directory Integration**
+- **Seamless authentication** using corporate credentials
+- **Group-based authorization** aligned with corporate structure
+- **Service account management** for automated transfers
+- **Audit trail integration** with corporate security systems
+
+#### **Corporate Storage Integration**
+- **SAN/NAS connectivity** for high-performance storage access
+- **Storage tiering** awareness for optimal placement
+- **Backup integration** with corporate backup systems
+- **Disaster recovery** coordination with corporate DR plans
+
+#### **Network Monitoring Integration**
+- **SNMP integration** with corporate network monitoring
+- **Bandwidth utilization** reporting to network operations
+- **Network path optimization** based on corporate topology
+- **Traffic shaping** coordination with network QoS policies
 
 ## Scalability & Performance
 
