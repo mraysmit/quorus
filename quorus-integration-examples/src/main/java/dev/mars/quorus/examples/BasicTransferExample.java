@@ -4,6 +4,7 @@ import dev.mars.quorus.config.QuorusConfiguration;
 import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferResult;
 import dev.mars.quorus.core.TransferStatus;
+import dev.mars.quorus.examples.util.TestResultLogger;
 import dev.mars.quorus.transfer.SimpleTransferEngine;
 import dev.mars.quorus.transfer.TransferEngine;
 
@@ -64,7 +65,9 @@ public class BasicTransferExample {
             runRetryDemonstrationExample(transferEngine);  // Shows retry logic without scary errors
 
         } catch (Exception e) {
-            logger.severe("Unexpected example failure: " + e.getMessage());
+            // This catch block is for UNEXPECTED errors only
+            TestResultLogger.logUnexpectedError("Basic Transfer Example", e);
+            logger.severe("Full stack trace:");
             e.printStackTrace();
         } finally {
             // Always shutdown transfer engine gracefully
@@ -154,8 +157,10 @@ public class BasicTransferExample {
      *
      * This example shows how the system handles network delays and temporary issues
      * by using httpbin.org's delay endpoint to simulate slow responses.
-     * This demonstrates the system's patience and retry capabilities without
-     * generating scary error messages.
+     * This demonstrates the system's patience and retry capabilities.
+     *
+     * NOTE: This is NOT a failure test - it demonstrates successful handling of slow responses.
+     * The system should complete successfully after waiting for the delayed response.
      */
     private static void runRetryDemonstrationExample(TransferEngine transferEngine) throws Exception {
         logger.info("--- Retry & Resilience Demonstration ---");
@@ -181,7 +186,11 @@ public class BasicTransferExample {
         logger.info("");
         logger.info("Resilience test results:");
         logger.info("  Status: " + result.getFinalStatus());
-        logger.info("  Success: " + (result.isSuccessful() ? "✓" : "✗"));
+        if (result.isSuccessful()) {
+            logger.info("  ✓ SUCCESS: System handled slow response correctly");
+        } else {
+            logger.severe("  ✗ UNEXPECTED: Resilience test failed - this indicates a problem");
+        }
         logger.info("  Total time: " + duration + "ms (includes 2-second server delay)");
         logger.info("  System behavior: Patient waiting for slow responses ✓");
         logger.info("");

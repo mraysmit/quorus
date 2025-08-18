@@ -48,9 +48,10 @@ Self-contained examples demonstrating system usage.
 
 **Includes:**
 - BasicTransferExample - Comprehensive demonstration of core features
-- Multiple file transfer scenarios
-- Error handling examples
-- Progress monitoring demonstrations
+- WorkflowValidationExample - Demonstrates validation with intentional failure tests
+- ComplexWorkflowExample - Advanced workflow features and dependency management
+- InternalNetworkTransferExample - Corporate network transfer scenarios
+- Clear error handling with distinction between expected and unexpected failures
 
 **Dependencies:** quorus-core
 

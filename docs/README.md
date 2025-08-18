@@ -42,6 +42,37 @@ Demonstrates corporate network transfer scenarios (primary use case):
 - ✅ Internal network monitoring and reporting
 - ✅ Enterprise-grade error handling and recovery
 
+### 3. BasicWorkflowExample
+**File:** `BasicWorkflowExample.java`
+**Main Class:** `dev.mars.quorus.examples.BasicWorkflowExample`
+
+Demonstrates YAML-based workflow execution:
+- YAML workflow parsing and validation
+- Variable substitution with `{{variable}}` syntax
+- Virtual run execution for safe demonstration
+- Progress monitoring and result reporting
+
+### 4. ComplexWorkflowExample
+**File:** `ComplexWorkflowExample.java`
+**Main Class:** `dev.mars.quorus.examples.ComplexWorkflowExample`
+
+Shows advanced workflow features:
+- Multi-stage data processing pipeline
+- Complex dependency graphs with parallel execution
+- Multiple execution modes (dry run, virtual run)
+- Dependency graph analysis and visualization
+
+### 5. WorkflowValidationExample
+**File:** `WorkflowValidationExample.java`
+**Main Class:** `dev.mars.quorus.examples.WorkflowValidationExample`
+
+Demonstrates comprehensive workflow validation:
+- YAML schema validation
+- Semantic workflow validation
+- Dependency graph validation (circular dependencies, missing dependencies)
+- Variable resolution validation
+- **Intentional failure tests** to demonstrate validation capabilities
+
 ## Running the Examples
 
 ### Prerequisites
@@ -49,31 +80,29 @@ Demonstrates corporate network transfer scenarios (primary use case):
 - Maven 3.6 or higher
 - Internet connection (examples use httpbin.org for test files)
 
+### Understanding Example Output
+
+The examples use clear visual indicators to help you understand what's happening:
+
+- **✓ EXPECTED:** Indicates successful operations or intentional test failures (validation working correctly)
+- **✗ UNEXPECTED:** Indicates actual problems that need investigation
+- **INTENTIONAL FAILURE TEST:** Clearly marks tests that are supposed to fail to demonstrate validation
+
+For more details, see [INTENTIONAL-FAILURES.md](INTENTIONAL-FAILURES.md).
+
 ### Running from Command Line
 
-#### Run the Basic Transfer Example:
+#### Run Examples:
 ```bash
-# From the project root (default example)
+# Basic Transfer Example (default)
 mvn exec:java -pl quorus-integration-examples
 
-# Or with specific main class
+# Or run specific examples:
 mvn exec:java -pl quorus-integration-examples -Dexec.mainClass="dev.mars.quorus.examples.BasicTransferExample"
-```
-
-#### Run the Internal Network Transfer Example:
-```bash
-# Method 1: Temporarily change the default main class in pom.xml
-# Edit quorus-integration-examples/pom.xml and change:
-# <mainClass>dev.mars.quorus.examples.BasicTransferExample</mainClass>
-# to:
-# <mainClass>dev.mars.quorus.examples.InternalNetworkTransferExample</mainClass>
-# Then run:
-mvn exec:java -pl quorus-integration-examples
-
-# Method 2: Use Java directly after compilation
-mvn compile -pl quorus-integration-examples
-cd quorus-integration-examples
-java -cp "target/classes:../quorus-core/target/classes" dev.mars.quorus.examples.InternalNetworkTransferExample
+mvn exec:java -pl quorus-integration-examples -Dexec.mainClass="dev.mars.quorus.examples.InternalNetworkTransferExample"
+mvn exec:java -pl quorus-integration-examples -Dexec.mainClass="dev.mars.quorus.examples.BasicWorkflowExample"
+mvn exec:java -pl quorus-integration-examples -Dexec.mainClass="dev.mars.quorus.examples.ComplexWorkflowExample"
+mvn exec:java -pl quorus-integration-examples -Dexec.mainClass="dev.mars.quorus.examples.WorkflowValidationExample"
 ```
 
 #### Run with Maven compile first:
