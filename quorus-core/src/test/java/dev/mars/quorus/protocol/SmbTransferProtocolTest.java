@@ -42,7 +42,12 @@ class SmbTransferProtocolTest {
     @BeforeEach
     void setUp() {
         protocol = new SmbTransferProtocol();
-        context = new TransferContext("test-job-123");
+        TransferRequest dummyRequest = TransferRequest.builder()
+                .requestId("test-job-123")
+                .sourceUri(URI.create("http://example.com/test.txt"))
+                .destinationPath(tempDir.resolve("test.txt"))
+                .build();
+        context = new TransferContext(new dev.mars.quorus.core.TransferJob(dummyRequest));
     }
     
     @Test
