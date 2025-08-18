@@ -31,6 +31,13 @@
             <version>${project.version}</version>
         </dependency>
 
+        <!-- Quorus Tenant dependency -->
+        <dependency>
+            <groupId>dev.mars</groupId>
+            <artifactId>quorus-tenant</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
         <!-- Testing dependencies -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>

@@ -15,6 +15,7 @@
     <modules>
         <module>quorus-core</module>
         <module>quorus-workflow</module>
+        <module>quorus-tenant</module>
         <module>quorus-integration-examples</module>
     </modules>
 
