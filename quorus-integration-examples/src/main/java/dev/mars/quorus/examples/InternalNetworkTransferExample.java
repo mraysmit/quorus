@@ -7,12 +7,21 @@ import dev.mars.quorus.core.TransferStatus;
 import dev.mars.quorus.transfer.SimpleTransferEngine;
 import dev.mars.quorus.transfer.TransferEngine;
 
+import dev.mars.quorus.core.exceptions.TransferException;
+
+import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
@@ -34,6 +43,15 @@ import java.util.logging.Logger;
  */
 public class InternalNetworkTransferExample {
     private static final Logger logger = Logger.getLogger(InternalNetworkTransferExample.class.getName());
+
+    // Configuration constants to avoid hardcoded values
+    private static final String[] DEPARTMENTS = {"finance", "hr", "sales"};
+    private static final String[] REPORT_SIZES = {"2048", "4096", "1024"};
+    private static final long TRANSFER_TIMEOUT_SECONDS = 30;
+    private static final long MONITORING_INTERVAL_MS = 500;
+
+    // Thread management for proper resource cleanup
+    private static final List<Thread> monitoringThreads = new ArrayList<>();
     
     public static void main(String[] args) {
         logger.info("=== Quorus Internal Network Transfer Example ===");
@@ -82,14 +100,32 @@ public class InternalNetworkTransferExample {
             runDepartmentFileDistribution(transferEngine, departmentSharesDir);
             runHighThroughputBackupOperation(transferEngine, backupDir);
             
+        } catch (IOException e) {
+            logger.severe("Failed to create corporate directory structure: " + e.getMessage());
+            e.printStackTrace();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            logger.severe("Corporate network transfer example was interrupted: " + e.getMessage());
+        } catch (ExecutionException e) {
+            logger.severe("Corporate network transfer execution failed: " + e.getMessage());
+            e.printStackTrace();
+        } catch (TimeoutException e) {
+            logger.severe("Corporate network transfer timed out: " + e.getMessage());
+        } catch (TransferException e) {
+            logger.severe("Transfer operation failed: " + e.getMessage());
+            e.printStackTrace();
         } catch (Exception e) {
-            logger.severe("Corporate network transfer example failed: " + e.getMessage());
+            logger.severe("Unexpected error in corporate network transfer example: " + e.getMessage());
             e.printStackTrace();
         } finally {
-            // Graceful shutdown with corporate monitoring notification
+            // Graceful shutdown with proper resource cleanup
             logger.info("");
             logger.info("Shutting down transfer engine...");
             logger.info("In corporate environment: Notifying monitoring systems of shutdown");
+
+            // Interrupt and cleanup monitoring threads
+            shutdownMonitoringThreads();
+
             transferEngine.shutdown(10);
             logger.info("=== Corporate network transfer example completed ===");
         }
@@ -119,7 +155,8 @@ public class InternalNetworkTransferExample {
      * Demonstrates CRM data synchronization to corporate data warehouse.
      * Simulates: CRM system -> Data Warehouse ETL process
      */
-    private static void runCrmDataSynchronization(TransferEngine transferEngine, Path dataWarehouseDir) throws Exception {
+    private static void runCrmDataSynchronization(TransferEngine transferEngine, Path dataWarehouseDir)
+            throws IOException, InterruptedException, ExecutionException, TimeoutException, TransferException {
         logger.info("--- CRM Data Synchronization Example ---");
         logger.info("Scenario: Nightly CRM data export to corporate data warehouse");
         logger.info("Simulating: crm-internal.corp.local -> data-warehouse.corp.local");
@@ -140,8 +177,9 @@ public class InternalNetworkTransferExample {
         long startTime = System.currentTimeMillis();
         CompletableFuture<TransferResult> future = transferEngine.submitTransfer(crmExportRequest);
         monitorCorporateTransfer(transferEngine, crmExportRequest.getRequestId(), "CRM Data Sync");
-        
-        TransferResult result = future.get();
+
+        // Wait with timeout to prevent hanging
+        TransferResult result = future.get(TRANSFER_TIMEOUT_SECONDS, TimeUnit.SECONDS);
         long duration = System.currentTimeMillis() - startTime;
         
         logger.info("");
@@ -159,27 +197,27 @@ public class InternalNetworkTransferExample {
      * Demonstrates multi-department file distribution.
      * Simulates: Central file server -> Multiple department shares
      */
-    private static void runDepartmentFileDistribution(TransferEngine transferEngine, Path departmentSharesDir) throws Exception {
+    private static void runDepartmentFileDistribution(TransferEngine transferEngine, Path departmentSharesDir)
+            throws InterruptedException, ExecutionException, TimeoutException, TransferException {
         logger.info("--- Multi-Department File Distribution Example ---");
         logger.info("Scenario: Monthly reports distribution to department shares");
         logger.info("Simulating: fileserver.corp.local -> department network shares");
         
-        // Define department transfer scenarios
-        String[] departments = {"finance", "hr", "sales"};
-        String[] reportSizes = {"2048", "4096", "1024"}; // Different report sizes
-        CompletableFuture<TransferResult>[] futures = new CompletableFuture[departments.length];
+        // Define department transfer scenarios using constants
+        @SuppressWarnings("unchecked") // Safe generic array creation
+        CompletableFuture<TransferResult>[] futures = new CompletableFuture[DEPARTMENTS.length];
         
         logger.info("Distributing reports to departments simultaneously...");
         
         // Submit all department transfers concurrently
-        for (int i = 0; i < departments.length; i++) {
+        for (int i = 0; i < DEPARTMENTS.length; i++) {
             TransferRequest departmentRequest = TransferRequest.builder()
-                    .sourceUri(URI.create("https://httpbin.org/bytes/" + reportSizes[i]))
-                    .destinationPath(departmentSharesDir.resolve(departments[i] + "-monthly-report.pdf"))
+                    .sourceUri(URI.create("https://httpbin.org/bytes/" + REPORT_SIZES[i]))
+                    .destinationPath(departmentSharesDir.resolve(DEPARTMENTS[i] + "-monthly-report.pdf"))
                     .protocol("http")
                     .build();
-            
-            logger.info("  Distributing to " + departments[i].toUpperCase() + " department (" + reportSizes[i] + " bytes)");
+
+            logger.info("  Distributing to " + DEPARTMENTS[i].toUpperCase() + " department (" + REPORT_SIZES[i] + " bytes)");
             futures[i] = transferEngine.submitTransfer(departmentRequest);
         }
         
@@ -188,17 +226,23 @@ public class InternalNetworkTransferExample {
         long startTime = System.currentTimeMillis();
         
         for (int i = 0; i < futures.length; i++) {
-            TransferResult result = futures[i].get();
-            String status = result.isSuccessful() ? "SUCCESS ✓" : "FAILED ✗";
-            logger.info("  " + departments[i].toUpperCase() + " department: " + status + 
-                       " (" + result.getBytesTransferred() + " bytes)");
+            try {
+                TransferResult result = futures[i].get(TRANSFER_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                String status = result.isSuccessful() ? "SUCCESS ✓" : "FAILED ✗";
+                logger.info("  " + DEPARTMENTS[i].toUpperCase() + " department: " + status +
+                           " (" + result.getBytesTransferred() + " bytes)");
+            } catch (TimeoutException e) {
+                logger.warning("  " + DEPARTMENTS[i].toUpperCase() + " department: TIMEOUT ✗ (transfer exceeded " + TRANSFER_TIMEOUT_SECONDS + "s)");
+            } catch (ExecutionException e) {
+                logger.log(Level.WARNING, "  " + DEPARTMENTS[i].toUpperCase() + " department: ERROR ✗", e.getCause());
+            }
         }
         
         long totalDuration = System.currentTimeMillis() - startTime;
         logger.info("");
         logger.info("Multi-Department Distribution Results:");
         logger.info("  Total distribution time: " + totalDuration + "ms");
-        logger.info("  Concurrent transfers: " + departments.length);
+        logger.info("  Concurrent transfers: " + DEPARTMENTS.length);
         logger.info("  Corporate network efficiency: Excellent");
         logger.info("✓ All departments received their monthly reports");
         logger.info("");
@@ -208,7 +252,8 @@ public class InternalNetworkTransferExample {
      * Demonstrates high-throughput backup operations.
      * Simulates: Production data -> Backup storage array
      */
-    private static void runHighThroughputBackupOperation(TransferEngine transferEngine, Path backupDir) throws Exception {
+    private static void runHighThroughputBackupOperation(TransferEngine transferEngine, Path backupDir)
+            throws InterruptedException, ExecutionException, TimeoutException, TransferException {
         logger.info("--- High-Throughput Backup Operation Example ---");
         logger.info("Scenario: Critical data backup to corporate storage array");
         logger.info("Simulating: production-db.corp.local -> backup-storage.corp.local");
@@ -229,8 +274,9 @@ public class InternalNetworkTransferExample {
         long startTime = System.currentTimeMillis();
         CompletableFuture<TransferResult> future = transferEngine.submitTransfer(backupRequest);
         monitorCorporateTransfer(transferEngine, backupRequest.getRequestId(), "Backup Operation");
-        
-        TransferResult result = future.get();
+
+        // Wait with timeout to prevent hanging
+        TransferResult result = future.get(TRANSFER_TIMEOUT_SECONDS, TimeUnit.SECONDS);
         long duration = System.currentTimeMillis() - startTime;
         
         logger.info("");
@@ -246,46 +292,73 @@ public class InternalNetworkTransferExample {
     }
     
     /**
-     * Monitors corporate network transfers with enhanced logging.
+     * Monitors corporate network transfers with enhanced logging and proper resource management.
      */
     private static void monitorCorporateTransfer(TransferEngine transferEngine, String jobId, String operationType) {
         Thread monitorThread = new Thread(() -> {
             try {
                 logger.info("Starting corporate network monitoring for " + operationType + "...");
-                while (true) {
+                while (!Thread.currentThread().isInterrupted()) {
                     var job = transferEngine.getTransferJob(jobId);
                     if (job == null) {
+                        logger.warning("Transfer job not found for ID: " + jobId);
                         break;
                     }
-                    
+
                     if (job.getStatus() == TransferStatus.IN_PROGRESS) {
                         long totalBytes = job.getTotalBytes();
                         String totalDisplay = totalBytes > 0 ? String.valueOf(totalBytes) : "unknown";
-                        logger.info("  Corporate Network Progress: " + 
+                        logger.info("  Corporate Network Progress: " +
                                    String.format("%.1f%% (%d/%s bytes) - %s",
                                    job.getProgressPercentage() * 100,
                                    job.getBytesTransferred(),
                                    totalDisplay,
                                    operationType));
                     }
-                    
+
                     if (job.getStatus().isTerminal()) {
                         logger.info("Corporate network transfer completed: " + operationType);
                         break;
                     }
-                    
-                    Thread.sleep(500); // More frequent updates for corporate monitoring
+
+                    Thread.sleep(MONITORING_INTERVAL_MS);
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 logger.info("Corporate network monitoring interrupted for " + operationType);
+            } catch (Exception e) {
+                logger.log(Level.WARNING, "Error in corporate network monitoring for " + operationType, e);
             }
-        });
-        
+        }, "Monitor-" + operationType);
+
         monitorThread.setDaemon(true);
+        synchronized (monitoringThreads) {
+            monitoringThreads.add(monitorThread);
+        }
         monitorThread.start();
     }
-    
+
+    /**
+     * Properly shuts down monitoring threads to prevent resource leaks.
+     */
+    private static void shutdownMonitoringThreads() {
+        synchronized (monitoringThreads) {
+            logger.info("Shutting down " + monitoringThreads.size() + " monitoring threads...");
+            for (Thread thread : monitoringThreads) {
+                if (thread.isAlive()) {
+                    thread.interrupt();
+                    try {
+                        thread.join(1000); // Wait up to 1 second for thread to finish
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        logger.warning("Interrupted while waiting for monitoring thread to finish");
+                    }
+                }
+            }
+            monitoringThreads.clear();
+        }
+    }
+
     /**
      * Displays transfer results with corporate network context.
      */

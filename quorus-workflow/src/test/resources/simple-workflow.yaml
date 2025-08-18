@@ -1,0 +1,78 @@
+apiVersion: v1
+kind: TransferWorkflow
+metadata:
+  name: simple-file-transfer
+  description: A simple workflow demonstrating basic file transfer capabilities
+  labels:
+    environment: test
+    version: "1.0"
+
+spec:
+  # Global variables available to all transfer groups
+  variables:
+    baseUrl: "https://httpbin.org"
+    outputDir: "/tmp/downloads"
+    
+  # Execution configuration
+  execution:
+    dryRun: false
+    virtualRun: false
+    parallelism: 2
+    timeout: 3600s
+    strategy: sequential
+    
+  # Transfer groups with dependencies
+  transferGroups:
+    # First group - downloads base files
+    - name: download-base-files
+      description: Download basic test files
+      continueOnError: false
+      retryCount: 3
+      variables:
+        fileSize: "1024"
+      transfers:
+        - name: download-test-file-1
+          source: "{{baseUrl}}/bytes/{{fileSize}}"
+          destination: "{{outputDir}}/test-file-1.bin"
+          protocol: http
+          options:
+            timeout: 30s
+            
+        - name: download-test-file-2
+          source: "{{baseUrl}}/bytes/2048"
+          destination: "{{outputDir}}/test-file-2.bin"
+          protocol: http
+          
+    # Second group - depends on first group
+    - name: download-additional-files
+      description: Download additional files after base files complete
+      dependsOn:
+        - download-base-files
+      continueOnError: true
+      retryCount: 2
+      transfers:
+        - name: download-json-data
+          source: "{{baseUrl}}/json"
+          destination: "{{outputDir}}/sample-data.json"
+          protocol: http
+          condition: "success(download-base-files)"
+          
+        - name: download-xml-data
+          source: "{{baseUrl}}/xml"
+          destination: "{{outputDir}}/sample-data.xml"
+          protocol: http
+          
+    # Third group - depends on both previous groups
+    - name: download-final-files
+      description: Final batch of files
+      dependsOn:
+        - download-base-files
+        - download-additional-files
+      transfers:
+        - name: download-large-file
+          source: "{{baseUrl}}/bytes/8192"
+          destination: "{{outputDir}}/large-file.bin"
+          protocol: http
+          options:
+            chunkSize: 1024
+            maxRetries: 5
