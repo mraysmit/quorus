@@ -4,6 +4,7 @@ import dev.mars.quorus.config.QuorusConfiguration;
 import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferResult;
 import dev.mars.quorus.core.TransferStatus;
+import dev.mars.quorus.examples.util.TestResultLogger;
 import dev.mars.quorus.transfer.SimpleTransferEngine;
 import dev.mars.quorus.transfer.TransferEngine;
 
@@ -101,21 +102,32 @@ public class InternalNetworkTransferExample {
             runHighThroughputBackupOperation(transferEngine, backupDir);
             
         } catch (IOException e) {
-            logger.severe("Failed to create corporate directory structure: " + e.getMessage());
+            TestResultLogger.logUnexpectedError("Internal Network Transfer Example (Directory Creation)", e);
+            logger.severe("This indicates a file system or permissions issue.");
+            logger.severe("Full stack trace:");
             e.printStackTrace();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             logger.severe("Corporate network transfer example was interrupted: " + e.getMessage());
+            // No stack trace for interruption - this is expected behavior
         } catch (ExecutionException e) {
-            logger.severe("Corporate network transfer execution failed: " + e.getMessage());
+            TestResultLogger.logUnexpectedError("Internal Network Transfer Example (Execution)", e);
+            logger.severe("This indicates a problem with the transfer execution.");
+            logger.severe("Full stack trace:");
             e.printStackTrace();
         } catch (TimeoutException e) {
             logger.severe("Corporate network transfer timed out: " + e.getMessage());
+            logger.severe("This may indicate network issues or server overload.");
+            // No stack trace for timeout - this is expected behavior in some scenarios
         } catch (TransferException e) {
-            logger.severe("Transfer operation failed: " + e.getMessage());
+            TestResultLogger.logUnexpectedError("Internal Network Transfer Example (Transfer)", e);
+            logger.severe("This indicates a problem with the transfer logic.");
+            logger.severe("Full stack trace:");
             e.printStackTrace();
         } catch (Exception e) {
-            logger.severe("Unexpected error in corporate network transfer example: " + e.getMessage());
+            TestResultLogger.logUnexpectedError("Internal Network Transfer Example", e);
+            logger.severe("This indicates an unforeseen problem.");
+            logger.severe("Full stack trace:");
             e.printStackTrace();
         } finally {
             // Graceful shutdown with proper resource cleanup

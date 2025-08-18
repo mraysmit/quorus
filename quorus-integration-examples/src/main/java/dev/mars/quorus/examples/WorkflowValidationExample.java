@@ -16,6 +16,7 @@
 
 package dev.mars.quorus.examples;
 
+import dev.mars.quorus.examples.util.TestResultLogger;
 import dev.mars.quorus.transfer.TransferEngine;
 import dev.mars.quorus.transfer.SimpleTransferEngine;
 import dev.mars.quorus.workflow.*;
@@ -31,17 +32,29 @@ import java.util.concurrent.CompletableFuture;
  * 4. Dry run execution for validation
  * 5. Variable resolution validation
  * 6. Error handling and reporting
+ *
+ * IMPORTANT: This example intentionally tests failure scenarios to demonstrate
+ * validation capabilities. Expected failures are clearly marked with ✓ symbols
+ * and do not indicate actual problems with the system.
  */
 public class WorkflowValidationExample {
     
     public static void main(String[] args) {
         System.out.println("=== Quorus Workflow Validation Example ===");
-        
+        System.out.println("This example demonstrates validation capabilities by testing both");
+        System.out.println("valid workflows and intentional failure scenarios.");
+        System.out.println("Expected failures are marked with ✓ and are part of the demonstration.");
+        System.out.println();
+
         try {
             WorkflowValidationExample example = new WorkflowValidationExample();
             example.runExample();
+            TestResultLogger.logExampleCompletion("Workflow Validation Example");
         } catch (Exception e) {
-            System.err.println("Example failed: " + e.getMessage());
+            // This catch block is for UNEXPECTED errors only
+            // Intentional test failures are handled within runExample()
+            TestResultLogger.logUnexpectedError("Workflow Validation Example", e);
+            System.err.println("\nFull stack trace:");
             e.printStackTrace();
             System.exit(1);
         }
@@ -53,31 +66,29 @@ public class WorkflowValidationExample {
         SimpleWorkflowEngine workflowEngine = new SimpleWorkflowEngine(transferEngine);
         WorkflowDefinitionParser parser = new YamlWorkflowDefinitionParser();
         
-        System.out.println("1. Testing valid workflow validation...");
+        TestResultLogger.logTestSection("1. Testing valid workflow validation", false);
         testValidWorkflow(parser, workflowEngine);
-        
-        System.out.println("\n2. Testing invalid YAML syntax...");
+
+        TestResultLogger.logTestSection("2. Testing invalid YAML syntax", true);
         testInvalidYamlSyntax(parser);
-        
-        System.out.println("\n3. Testing missing required fields...");
+
+        TestResultLogger.logTestSection("3. Testing missing required fields", true);
         testMissingRequiredFields(parser);
-        
-        System.out.println("\n4. Testing circular dependencies...");
+
+        TestResultLogger.logTestSection("4. Testing circular dependencies", true);
         testCircularDependencies(parser);
-        
-        System.out.println("\n5. Testing missing dependencies...");
+
+        TestResultLogger.logTestSection("5. Testing missing dependencies", true);
         testMissingDependencies(parser);
-        
-        System.out.println("\n6. Testing variable resolution issues...");
+
+        TestResultLogger.logTestSection("6. Testing variable resolution issues", true);
         testVariableResolutionIssues(parser, workflowEngine);
-        
-        System.out.println("\n7. Testing dry run validation...");
+
+        TestResultLogger.logTestSection("7. Testing dry run validation", false);
         testDryRunValidation(parser, workflowEngine);
-        
+
         // Cleanup
         workflowEngine.shutdown();
-        
-        System.out.println("\n=== Validation example completed! ===");
     }
     
     private void testValidWorkflow(WorkflowDefinitionParser parser, SimpleWorkflowEngine workflowEngine) 
@@ -112,27 +123,31 @@ public class WorkflowValidationExample {
             // Validate workflow
             ValidationResult validation = parser.validate(workflow);
             if (validation.isValid()) {
-                System.out.println("   ✓ Workflow validation successful");
+                TestResultLogger.logExpectedSuccess("Workflow validation successful");
             } else {
-                System.out.println("   ✗ Workflow validation failed:");
-                validation.getErrors().forEach(error -> 
+                TestResultLogger.logUnexpectedResult("Workflow validation failed:");
+                validation.getErrors().forEach(error ->
                     System.out.println("     - " + error.getMessage()));
             }
-            
+
             // Test dependency graph
             DependencyGraph graph = parser.buildDependencyGraph(java.util.List.of(workflow));
             ValidationResult graphValidation = graph.validate();
             if (graphValidation.isValid()) {
-                System.out.println("   ✓ Dependency graph validation successful");
+                TestResultLogger.logExpectedSuccess("Dependency graph validation successful");
             } else {
-                System.out.println("   ✗ Dependency graph validation failed");
+                TestResultLogger.logUnexpectedResult("Dependency graph validation failed");
             }
-            
+
         } catch (Exception e) {
-            System.out.println("   ✗ Validation failed: " + e.getMessage());
+            TestResultLogger.logUnexpectedException("Validation failed", e);
         }
     }
     
+    /**
+     * Tests invalid YAML syntax handling.
+     * This is an INTENTIONAL FAILURE TEST - the parser should reject malformed YAML.
+     */
     private void testInvalidYamlSyntax(WorkflowDefinitionParser parser) {
         String invalidYaml = """
                 apiVersion: v1
@@ -143,15 +158,21 @@ public class WorkflowValidationExample {
                 spec:
                   invalid: yaml: syntax
                 """;
-        
+
         try {
             parser.parseFromString(invalidYaml);
-            System.out.println("   ✗ Should have failed but didn't");
+            TestResultLogger.logUnexpectedResult("Should have failed but didn't - this indicates a bug!");
         } catch (WorkflowParseException e) {
-            System.out.println("   ✓ Correctly caught YAML syntax error: " + e.getMessage());
+            TestResultLogger.logExpectedFailure("Correctly caught YAML syntax error", e);
+        } catch (Exception e) {
+            TestResultLogger.logUnexpectedException("Got different exception type", e);
         }
     }
     
+    /**
+     * Tests missing required fields validation.
+     * This is an INTENTIONAL FAILURE TEST - the parser should reject workflows with missing required fields.
+     */
     private void testMissingRequiredFields(WorkflowDefinitionParser parser) {
         String missingFields = """
                 apiVersion: v1
@@ -163,15 +184,21 @@ public class WorkflowValidationExample {
                     parallelism: 1
                   transferGroups: []
                 """;
-        
+
         try {
             WorkflowDefinition workflow = parser.parseFromString(missingFields);
-            System.out.println("   ✗ Should have failed during parsing but didn't");
+            TestResultLogger.logUnexpectedResult("Should have failed during parsing but didn't - this indicates a bug!");
         } catch (WorkflowParseException e) {
-            System.out.println("   ✓ Correctly caught missing required fields: " + e.getMessage());
+            TestResultLogger.logExpectedFailure("Correctly caught missing required fields", e);
+        } catch (Exception e) {
+            TestResultLogger.logUnexpectedException("Got different exception type", e);
         }
     }
     
+    /**
+     * Tests circular dependency detection.
+     * This is an INTENTIONAL FAILURE TEST - the system should detect and reject circular dependencies.
+     */
     private void testCircularDependencies(WorkflowDefinitionParser parser) {
         String circularDeps = """
                 apiVersion: v1
@@ -197,22 +224,28 @@ public class WorkflowValidationExample {
                           source: "http://example.com/file2"
                           destination: "/tmp/file2"
                 """;
-        
+
         try {
             WorkflowDefinition workflow = parser.parseFromString(circularDeps);
             DependencyGraph graph = parser.buildDependencyGraph(java.util.List.of(workflow));
-            
+
             if (graph.hasCycles()) {
-                System.out.println("   ✓ Correctly detected circular dependencies");
+                TestResultLogger.logExpectedFailure("Correctly detected circular dependencies");
             } else {
-                System.out.println("   ✗ Failed to detect circular dependencies");
+                TestResultLogger.logUnexpectedResult("Failed to detect circular dependencies - this indicates a bug!");
             }
-            
+
         } catch (WorkflowParseException e) {
-            System.out.println("   ✓ Correctly caught circular dependency error: " + e.getMessage());
+            TestResultLogger.logExpectedFailure("Correctly caught circular dependency error", e);
+        } catch (Exception e) {
+            TestResultLogger.logUnexpectedException("Got different exception type", e);
         }
     }
     
+    /**
+     * Tests missing dependency detection.
+     * This is an INTENTIONAL FAILURE TEST - the system should detect and reject references to non-existent dependencies.
+     */
     private void testMissingDependencies(WorkflowDefinitionParser parser) {
         String missingDeps = """
                 apiVersion: v1
@@ -231,28 +264,32 @@ public class WorkflowValidationExample {
                           source: "http://example.com/file1"
                           destination: "/tmp/file1"
                 """;
-        
+
         try {
             WorkflowDefinition workflow = parser.parseFromString(missingDeps);
             DependencyGraph graph = parser.buildDependencyGraph(java.util.List.of(workflow));
             ValidationResult validation = graph.validate();
-            
+
             if (!validation.isValid()) {
-                System.out.println("   ✓ Correctly detected missing dependencies:");
-                validation.getErrors().forEach(error -> 
+                TestResultLogger.logExpectedFailure("Correctly detected missing dependencies:");
+                validation.getErrors().forEach(error ->
                     System.out.println("     - " + error.getMessage()));
             } else {
-                System.out.println("   ✗ Failed to detect missing dependencies");
+                TestResultLogger.logUnexpectedResult("Failed to detect missing dependencies - this indicates a bug!");
             }
-            
+
         } catch (Exception e) {
-            System.out.println("   ✓ Correctly caught missing dependency error: " + e.getMessage());
+            TestResultLogger.logExpectedFailure("Correctly caught missing dependency error", e);
         }
     }
     
-    private void testVariableResolutionIssues(WorkflowDefinitionParser parser, SimpleWorkflowEngine workflowEngine) 
+    /**
+     * Tests variable resolution validation.
+     * This is an INTENTIONAL FAILURE TEST - the system should detect and reject undefined variables.
+     */
+    private void testVariableResolutionIssues(WorkflowDefinitionParser parser, SimpleWorkflowEngine workflowEngine)
             throws Exception {
-        
+
         String workflowWithVars = """
                 apiVersion: v1
                 kind: TransferWorkflow
@@ -268,30 +305,30 @@ public class WorkflowValidationExample {
                           source: "{{undefinedVariable}}/file"
                           destination: "{{anotherUndefinedVar}}/file"
                 """;
-        
+
         try {
             WorkflowDefinition workflow = parser.parseFromString(workflowWithVars);
-            
+
             ExecutionContext context = ExecutionContext.builder()
                     .executionId("var-test-" + System.currentTimeMillis())
                     .mode(ExecutionContext.ExecutionMode.DRY_RUN)
                     .variables(Map.of()) // Empty variables - should cause resolution errors
                     .build();
-            
+
             CompletableFuture<WorkflowExecution> future = workflowEngine.dryRun(workflow, context);
             WorkflowExecution execution = future.get();
-            
+
             if (execution.getStatus() == WorkflowStatus.FAILED) {
-                System.out.println("   ✓ Correctly detected variable resolution issues");
+                TestResultLogger.logExpectedFailure("Correctly detected variable resolution issues");
                 if (execution.getErrorMessage().isPresent()) {
                     System.out.println("     Error: " + execution.getErrorMessage().get());
                 }
             } else {
-                System.out.println("   ✗ Failed to detect variable resolution issues");
+                TestResultLogger.logUnexpectedResult("Failed to detect variable resolution issues - this indicates a bug!");
             }
-            
+
         } catch (Exception e) {
-            System.out.println("   ✓ Correctly caught variable resolution error: " + e.getMessage());
+            TestResultLogger.logExpectedFailure("Correctly caught variable resolution error", e);
         }
     }
     
@@ -352,8 +389,8 @@ public class WorkflowValidationExample {
             System.out.println("   Total transfers validated: " + execution.getTotalTransferCount());
             
             if (execution.isSuccessful()) {
-                System.out.println("   ✓ Dry run validation successful");
-                
+                TestResultLogger.logExpectedSuccess("Dry run validation successful");
+
                 // Show what would be executed
                 System.out.println("   Execution plan:");
                 execution.getGroupExecutions().forEach(group -> {
@@ -363,14 +400,14 @@ public class WorkflowValidationExample {
                     });
                 });
             } else {
-                System.out.println("   ✗ Dry run validation failed");
+                TestResultLogger.logUnexpectedResult("Dry run validation failed");
                 if (execution.getErrorMessage().isPresent()) {
                     System.out.println("     Error: " + execution.getErrorMessage().get());
                 }
             }
-            
+
         } catch (Exception e) {
-            System.out.println("   ✗ Dry run failed: " + e.getMessage());
+            TestResultLogger.logUnexpectedException("Dry run failed", e);
         }
     }
 }

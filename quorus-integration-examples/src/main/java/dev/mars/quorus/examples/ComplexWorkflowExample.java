@@ -16,6 +16,7 @@
 
 package dev.mars.quorus.examples;
 
+import dev.mars.quorus.examples.util.TestResultLogger;
 import dev.mars.quorus.transfer.TransferEngine;
 import dev.mars.quorus.transfer.SimpleTransferEngine;
 import dev.mars.quorus.workflow.*;
@@ -39,12 +40,17 @@ public class ComplexWorkflowExample {
     
     public static void main(String[] args) {
         System.out.println("=== Quorus Complex Workflow Example ===");
-        
+        System.out.println("Demonstrating advanced workflow features with multi-stage processing pipeline.");
+        System.out.println();
+
         try {
             ComplexWorkflowExample example = new ComplexWorkflowExample();
             example.runExample();
+            TestResultLogger.logExampleCompletion("Complex Workflow Example");
         } catch (Exception e) {
-            System.err.println("Example failed: " + e.getMessage());
+            // This catch block is for UNEXPECTED errors only
+            TestResultLogger.logUnexpectedError("Complex Workflow Example", e);
+            System.err.println("\nFull stack trace:");
             e.printStackTrace();
             System.exit(1);
         }

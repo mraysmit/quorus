@@ -16,6 +16,7 @@
 
 package dev.mars.quorus.examples;
 
+import dev.mars.quorus.examples.util.TestResultLogger;
 import dev.mars.quorus.transfer.TransferEngine;
 import dev.mars.quorus.transfer.SimpleTransferEngine;
 import dev.mars.quorus.workflow.*;
@@ -42,8 +43,11 @@ public class BasicWorkflowExample {
             // Create the workflow example
             BasicWorkflowExample example = new BasicWorkflowExample();
             example.runExample();
+            TestResultLogger.logExampleCompletion("Basic Workflow Example");
         } catch (Exception e) {
-            System.err.println("Example failed: " + e.getMessage());
+            // This catch block is for UNEXPECTED errors only
+            TestResultLogger.logUnexpectedError("Basic Workflow Example", e);
+            System.err.println("\nFull stack trace:");
             e.printStackTrace();
             System.exit(1);
         }
