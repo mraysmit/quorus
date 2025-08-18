@@ -1831,7 +1831,7 @@ docs/                           # Documentation
 
 ## Related Documents
 
-- **[Implementation Plan](quorus-implementation-plan.md)** - Detailed 52-week development roadmap with Gantt chart timeline, milestones, and deliverables
+- **[Implementation Plan](../quorus-integration-examples/quorus-implementation-plan.md)** - Detailed 52-week development roadmap with Gantt chart timeline, milestones, and deliverables
 - **[API Documentation](api-documentation.md)** - REST API specifications (future)
 
 ## Conclusion

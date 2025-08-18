@@ -1,0 +1,184 @@
+apiVersion: v1
+kind: TransferWorkflow
+metadata:
+  name: data-processing-pipeline
+  description: Multi-stage data processing pipeline with dependencies
+  labels:
+    category: data-processing
+    complexity: advanced
+    environment: production
+
+spec:
+  variables:
+    # Environment configuration
+    environment: "production"
+    batchId: "batch-001"
+    
+    # Data sources
+    sourceUrl: "https://httpbin.org"
+    configUrl: "https://httpbin.org/json"
+    
+    # Processing directories
+    inputDir: "/data/input"
+    workingDir: "/data/working"
+    outputDir: "/data/output"
+    archiveDir: "/data/archive"
+    
+    # Processing parameters
+    maxRetries: "3"
+    timeout: "120s"
+    chunkSize: "2048"
+    
+  execution:
+    dryRun: false
+    virtualRun: false
+    parallelism: 3
+    timeout: 1800s
+    strategy: parallel
+    
+  transferGroups:
+    # Stage 1: Download configuration
+    - name: download-configuration
+      description: Download processing configuration and schemas
+      continueOnError: false
+      retryCount: 3
+      variables:
+        configTimeout: "60s"
+      transfers:
+        - name: download-config
+          source: "{{configUrl}}"
+          destination: "{{inputDir}}/config.json"
+          protocol: http
+          options:
+            timeout: "{{configTimeout}}"
+            
+        - name: download-schema
+          source: "{{sourceUrl}}/xml"
+          destination: "{{inputDir}}/schema.xml"
+          protocol: http
+          options:
+            timeout: "{{configTimeout}}"
+    
+    # Stage 2: Download raw data (parallel with configuration)
+    - name: download-raw-data
+      description: Download raw data files for processing
+      continueOnError: true
+      retryCount: 2
+      variables:
+        dataSize: "4096"
+      transfers:
+        - name: download-dataset-a
+          source: "{{sourceUrl}}/bytes/{{dataSize}}"
+          destination: "{{inputDir}}/dataset-a.bin"
+          protocol: http
+          options:
+            chunkSize: "{{chunkSize}}"
+            maxRetries: "{{maxRetries}}"
+            
+        - name: download-dataset-b
+          source: "{{sourceUrl}}/bytes/8192"
+          destination: "{{inputDir}}/dataset-b.bin"
+          protocol: http
+          options:
+            chunkSize: "{{chunkSize}}"
+            
+        - name: download-dataset-c
+          source: "{{sourceUrl}}/bytes/16384"
+          destination: "{{inputDir}}/dataset-c.bin"
+          protocol: http
+    
+    # Stage 3: Validate data (depends on both config and data)
+    - name: validate-data
+      description: Validate downloaded data against schema
+      dependsOn:
+        - download-configuration
+        - download-raw-data
+      continueOnError: false
+      retryCount: 1
+      transfers:
+        - name: validate-dataset-a
+          source: "{{inputDir}}/dataset-a.bin"
+          destination: "{{workingDir}}/validated-a.bin"
+          protocol: file
+          condition: "file_exists('{{inputDir}}/config.json')"
+          
+        - name: validate-dataset-b
+          source: "{{inputDir}}/dataset-b.bin"
+          destination: "{{workingDir}}/validated-b.bin"
+          protocol: file
+    
+    # Stage 4: Process data (depends on validation)
+    - name: process-data
+      description: Process validated data
+      dependsOn:
+        - validate-data
+      continueOnError: false
+      retryCount: 2
+      variables:
+        processingMode: "batch"
+      transfers:
+        - name: process-dataset-a
+          source: "{{workingDir}}/validated-a.bin"
+          destination: "{{outputDir}}/processed-a-{{batchId}}.bin"
+          protocol: file
+          options:
+            mode: "{{processingMode}}"
+            
+        - name: process-dataset-b
+          source: "{{workingDir}}/validated-b.bin"
+          destination: "{{outputDir}}/processed-b-{{batchId}}.bin"
+          protocol: file
+    
+    # Stage 5: Generate reports (depends on processing)
+    - name: generate-reports
+      description: Generate processing reports and metrics
+      dependsOn:
+        - process-data
+      continueOnError: true
+      transfers:
+        - name: generate-summary
+          source: "{{sourceUrl}}/html"
+          destination: "{{outputDir}}/summary-{{batchId}}.html"
+          protocol: http
+          
+        - name: generate-metrics
+          source: "{{configUrl}}"
+          destination: "{{outputDir}}/metrics-{{batchId}}.json"
+          protocol: http
+    
+    # Stage 6: Archive results (depends on both processing and reports)
+    - name: archive-results
+      description: Archive processed data and reports
+      dependsOn:
+        - process-data
+        - generate-reports
+      continueOnError: false
+      variables:
+        archiveFormat: "tar.gz"
+      transfers:
+        - name: archive-processed-data
+          source: "{{outputDir}}/processed-a-{{batchId}}.bin"
+          destination: "{{archiveDir}}/{{environment}}-{{batchId}}-data.{{archiveFormat}}"
+          protocol: file
+          
+        - name: archive-reports
+          source: "{{outputDir}}/summary-{{batchId}}.html"
+          destination: "{{archiveDir}}/{{environment}}-{{batchId}}-reports.{{archiveFormat}}"
+          protocol: file
+    
+    # Stage 7: Cleanup (depends on archiving)
+    - name: cleanup-temporary-files
+      description: Clean up temporary and working files
+      dependsOn:
+        - archive-results
+      continueOnError: true
+      transfers:
+        - name: cleanup-working-dir
+          source: "{{workingDir}}/validated-a.bin"
+          destination: "/dev/null"
+          protocol: file
+          
+        - name: cleanup-input-dir
+          source: "{{inputDir}}/dataset-a.bin"
+          destination: "/dev/null"
+          protocol: file

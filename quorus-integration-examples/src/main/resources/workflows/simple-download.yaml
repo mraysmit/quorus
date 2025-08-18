@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: TransferWorkflow
+metadata:
+  name: simple-download-workflow
+  description: Simple workflow for downloading files from HTTP sources
+  labels:
+    category: download
+    complexity: basic
+
+spec:
+  # Global variables available to all transfer groups
+  variables:
+    baseUrl: "https://httpbin.org"
+    outputDir: "/tmp/downloads"
+    timeout: "30s"
+    
+  # Execution configuration
+  execution:
+    dryRun: false
+    virtualRun: false
+    parallelism: 1
+    timeout: 300s
+    strategy: sequential
+    
+  # Transfer groups
+  transferGroups:
+    - name: download-files
+      description: Download test files from HTTP source
+      continueOnError: false
+      retryCount: 3
+      transfers:
+        - name: download-json-data
+          source: "{{baseUrl}}/json"
+          destination: "{{outputDir}}/sample-data.json"
+          protocol: http
+          options:
+            timeout: "{{timeout}}"
+            
+        - name: download-xml-data
+          source: "{{baseUrl}}/xml"
+          destination: "{{outputDir}}/sample-data.xml"
+          protocol: http
+          options:
+            timeout: "{{timeout}}"
+            
+        - name: download-binary-data
+          source: "{{baseUrl}}/bytes/1024"
+          destination: "{{outputDir}}/sample-data.bin"
+          protocol: http
+          options:
+            timeout: "{{timeout}}"
+            chunkSize: 256

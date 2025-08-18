@@ -24,6 +24,13 @@
             <version>${project.version}</version>
         </dependency>
 
+        <!-- Quorus Workflow dependency -->
+        <dependency>
+            <groupId>dev.mars</groupId>
+            <artifactId>quorus-workflow</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
         <!-- Testing dependencies -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
