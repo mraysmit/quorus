@@ -40,7 +40,10 @@ public class ProtocolFactory {
      */
     private void registerDefaultProtocols() {
         registerProtocol(new HttpTransferProtocol());
-        logger.info("Registered default transfer protocols");
+        registerProtocol(new SmbTransferProtocol());
+        registerProtocol(new FtpTransferProtocol());
+        registerProtocol(new SftpTransferProtocol());
+        logger.info("Registered default transfer protocols: HTTP/HTTPS, SMB/CIFS, FTP, SFTP");
     }
     
     /**
