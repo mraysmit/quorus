@@ -1,12 +1,11 @@
-apiVersion: v1
-kind: TransferWorkflow
 metadata:
-  name: data-processing-pipeline
-  description: Multi-stage data processing pipeline with dependencies
-  labels:
-    category: data-processing
-    complexity: advanced
-    environment: production
+  name: "Data Processing Pipeline"
+  version: "2.1.0"
+  description: "Multi-stage data processing pipeline with dependencies"
+  type: "data-pipeline-workflow"
+  author: "Quorus Data Engineering Team"
+
+# ============================================================================
 
 spec:
   variables:

@@ -1,11 +1,11 @@
-apiVersion: v1
-kind: TransferWorkflow
 metadata:
-  name: simple-download-workflow
-  description: Simple workflow for downloading files from HTTP sources
-  labels:
-    category: download
-    complexity: basic
+  name: "Simple Download Workflow"
+  version: "1.0.0"
+  description: "Simple workflow for downloading files from HTTP sources"
+  type: "download-workflow"
+  author: "Quorus Development Team"
+
+# ============================================================================
 
 spec:
   # Global variables available to all transfer groups

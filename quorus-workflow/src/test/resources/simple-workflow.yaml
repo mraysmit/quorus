@@ -1,11 +1,11 @@
-apiVersion: v1
-kind: TransferWorkflow
 metadata:
-  name: simple-file-transfer
-  description: A simple workflow demonstrating basic file transfer capabilities
-  labels:
-    environment: test
-    version: "1.0"
+  name: "Simple File Transfer Workflow"
+  version: "1.0.0"
+  description: "A simple workflow demonstrating basic file transfer capabilities"
+  type: "transfer-workflow"
+  author: "Quorus Development Team"
+
+# ============================================================================
 
 spec:
   # Global variables available to all transfer groups
