@@ -33,11 +33,15 @@ class YamlWorkflowDefinitionParserTest {
     @Test
     void testParseSimpleWorkflow() throws WorkflowParseException {
         String yaml = """
-                apiVersion: v1
-                kind: TransferWorkflow
                 metadata:
-                  name: simple-workflow
-                  description: A simple test workflow
+                  name: "Simple Test Workflow"
+                  version: "1.0.0"
+                  description: "A simple test workflow"
+                  type: "test-workflow"
+                  author: "Quorus Test Suite"
+
+                # ============================================================================
+
                 spec:
                   execution:
                     dryRun: false
@@ -58,10 +62,13 @@ class YamlWorkflowDefinitionParserTest {
         WorkflowDefinition definition = parser.parseFromString(yaml);
         
         assertNotNull(definition);
-        assertEquals("v1", definition.getApiVersion());
-        assertEquals("TransferWorkflow", definition.getKind());
-        assertEquals("simple-workflow", definition.getMetadata().getName());
+        assertEquals("v1", definition.getApiVersion()); // Still supported for backward compatibility
+        assertEquals("TransferWorkflow", definition.getKind()); // Still supported for backward compatibility
+        assertEquals("Simple Test Workflow", definition.getMetadata().getName());
+        assertEquals("1.0.0", definition.getMetadata().getVersion());
         assertEquals("A simple test workflow", definition.getMetadata().getDescription());
+        assertEquals("test-workflow", definition.getMetadata().getType());
+        assertEquals("Quorus Test Suite", definition.getMetadata().getAuthor());
         
         assertEquals(1, definition.getSpec().getTransferGroups().size());
         TransferGroup group = definition.getSpec().getTransferGroups().get(0);
@@ -79,10 +86,15 @@ class YamlWorkflowDefinitionParserTest {
     @Test
     void testParseWorkflowWithDependencies() throws WorkflowParseException {
         String yaml = """
-                apiVersion: v1
-                kind: TransferWorkflow
                 metadata:
-                  name: dependency-workflow
+                  name: "Dependency Test Workflow"
+                  version: "1.0.0"
+                  description: "Test workflow with dependencies"
+                  type: "dependency-test-workflow"
+                  author: "Quorus Test Suite"
+
+                # ============================================================================
+
                 spec:
                   execution:
                     parallelism: 2
@@ -114,10 +126,15 @@ class YamlWorkflowDefinitionParserTest {
     @Test
     void testParseWorkflowWithVariables() throws WorkflowParseException {
         String yaml = """
-                apiVersion: v1
-                kind: TransferWorkflow
                 metadata:
-                  name: variable-workflow
+                  name: "Variable Test Workflow"
+                  version: "1.0.0"
+                  description: "Test workflow with variables"
+                  type: "variable-test-workflow"
+                  author: "Quorus Test Suite"
+
+                # ============================================================================
+
                 spec:
                   variables:
                     baseUrl: http://example.com
@@ -148,10 +165,15 @@ class YamlWorkflowDefinitionParserTest {
     @Test
     void testValidateWorkflow() throws WorkflowParseException {
         String yaml = """
-                apiVersion: v1
-                kind: TransferWorkflow
                 metadata:
-                  name: test-workflow
+                  name: "Validation Test Workflow"
+                  version: "1.0.0"
+                  description: "Test workflow for validation"
+                  type: "validation-test-workflow"
+                  author: "Quorus Test Suite"
+
+                # ============================================================================
+
                 spec:
                   execution:
                     parallelism: 1
@@ -191,10 +213,8 @@ class YamlWorkflowDefinitionParserTest {
     @Test
     void testParseInvalidYaml() {
         String invalidYaml = """
-                apiVersion: v1
-                kind: TransferWorkflow
                 metadata:
-                  name: test
+                  name: "Invalid Test"
                   invalid: [unclosed
                 """;
         
@@ -206,10 +226,15 @@ class YamlWorkflowDefinitionParserTest {
     @Test
     void testBuildDependencyGraph() throws WorkflowParseException {
         String yaml = """
-                apiVersion: v1
-                kind: TransferWorkflow
                 metadata:
-                  name: dependency-test
+                  name: "Dependency Graph Test Workflow"
+                  version: "1.0.0"
+                  description: "Test workflow for dependency graph building"
+                  type: "dependency-graph-test-workflow"
+                  author: "Quorus Test Suite"
+
+                # ============================================================================
+
                 spec:
                   execution:
                     parallelism: 1
@@ -253,10 +278,15 @@ class YamlWorkflowDefinitionParserTest {
     @Test
     void testSchemaValidation() {
         String validYaml = """
-                apiVersion: v1
-                kind: TransferWorkflow
                 metadata:
-                  name: test
+                  name: "Schema Validation Test"
+                  version: "1.0.0"
+                  description: "Test workflow for schema validation"
+                  type: "schema-test-workflow"
+                  author: "Quorus Test Suite"
+
+                # ============================================================================
+
                 spec:
                   execution:
                     parallelism: 1

@@ -20,68 +20,73 @@ The system is architected to leverage the **high bandwidth, low latency, and tru
 
 ## System Architecture
 
-### High-Level Architecture
+### High-Level Distributed Architecture
 
 ```mermaid
 graph TD
-    subgraph "YAML Workflow Layer"
-        direction LR
-        TD[Transfer<br/>Definitions]
-        TG[Transfer Group<br/>Orchestration]
-        TW[Transfer<br/>Workflow]
-        TD --- TG --- TW
-    end
+    CLI[CLI Client]
+    API[REST API Client]
+    WEB[Web Dashboard]
+    YAML[YAML Workflows]
 
-    subgraph "Multi-Tenant Management Layer"
-        direction LR
-        TM[Tenant<br/>Management]
-        RM[Resource<br/>Management]
-        SI[Security &<br/>Isolation]
-        TM --- RM --- SI
-    end
+    VIP[Virtual IP Failover]
+    LB[HAProxy/F5 Load Balancer]
 
-    subgraph "Core Transfer Engine"
-        direction LR
-        TE[Transfer<br/>Engine]
-        PH[Protocol<br/>Handlers]
-        PT[Progress<br/>Tracking]
-        TE --- PH --- PT
-    end
+    CL[Controller Leader]
+    CF1[Controller Follower 1]
+    CF2[Controller Follower 2]
 
-    subgraph "Storage & Utilities"
-        direction LR
-        FM[File<br/>Management]
-        CC[Checksum<br/>Calculation]
-        CM[Configuration<br/>Management]
-        FM --- CC --- CM
-    end
+    WS[Workflow Service]
+    TS[Transfer Service]
+    AS[Agent Service]
+    MS[Monitoring Service]
+    TMS[Tenant Service]
 
-    %% Vertical flow between layers
-    TD -.-> TM
-    TG -.-> RM
-    TW -.-> SI
+    AR[(Agent Registry)]
+    HS[(Heartbeat Store)]
+    JS[(Job State)]
+    TS_DB[(Tenant Store)]
 
-    TM -.-> TE
-    RM -.-> PH
-    SI -.-> PT
+    AGENTS[Agent Fleet<br/>100+ Agents<br/>Multi-Protocol<br/>Geographic Distribution]
 
-    TE -.-> FM
-    PH -.-> CC
-    PT -.-> CM
+    CLI --> VIP
+    API --> VIP
+    WEB --> VIP
+    YAML --> VIP
 
-    %% Styling
-    style TD fill:#e8f5e8
-    style TG fill:#e8f5e8
-    style TW fill:#e8f5e8
-    style TM fill:#fff3e0
-    style RM fill:#fff3e0
-    style SI fill:#fff3e0
-    style TE fill:#e3f2fd
-    style PH fill:#e3f2fd
-    style PT fill:#e3f2fd
-    style FM fill:#f3e5f5
-    style CC fill:#f3e5f5
-    style CM fill:#f3e5f5
+    VIP --> LB
+
+    LB --> CL
+    LB --> CF1
+    LB --> CF2
+
+    CL -.->|Raft Consensus| CF1
+    CL -.->|Raft Consensus| CF2
+
+    CL --> WS
+    CL --> TS
+    CL --> AS
+    CL --> MS
+    CL --> TMS
+
+    WS --> AR
+    TS --> JS
+    AS --> AR
+    MS --> HS
+    TMS --> TS_DB
+
+    AS -.->|Job Assignment| AGENTS
+    AGENTS -.->|Heartbeat| AS
+
+    style CL fill:#e3f2fd
+    style CF1 fill:#e8f5e8
+    style CF2 fill:#e8f5e8
+    style WS fill:#fff3e0
+    style TS fill:#fff3e0
+    style AS fill:#fff3e0
+    style MS fill:#fff3e0
+    style TMS fill:#fff3e0
+    style AGENTS fill:#f3e5f5
 ```
 
 ### Module Structure
@@ -111,6 +116,363 @@ graph TD
     style QIE fill:#fce4ec
     style QWE fill:#f1f8e9
 ```
+
+## Controller Quorum Architecture
+
+### Raft Consensus Implementation
+
+The Quorus controller layer implements a distributed consensus system based on the Raft algorithm to ensure high availability, consistency, and fault tolerance across the controller cluster.
+
+```mermaid
+graph TB
+    subgraph "Controller Quorum (3-5 nodes)"
+        C1[Controller 1<br/>Leader]
+        C2[Controller 2<br/>Follower]
+        C3[Controller 3<br/>Follower]
+        C4[Controller 4<br/>Follower]
+        C5[Controller 5<br/>Follower]
+
+        C1 -.->|Raft Consensus| C2
+        C1 -.->|Raft Consensus| C3
+        C1 -.->|Raft Consensus| C4
+        C1 -.->|Raft Consensus| C5
+
+        subgraph "Replicated State"
+            RS1[Agent Registry]
+            RS2[Job Queue]
+            RS3[Tenant Config]
+            RS4[Workflow State]
+        end
+
+        C1 --> RS1
+        C1 --> RS2
+        C1 --> RS3
+        C1 --> RS4
+    end
+
+    subgraph "Agent Fleet (100+ agents)"
+        A1[Agent 1]
+        A2[Agent 2]
+        A3[Agent N...]
+        A100[Agent 100+]
+    end
+
+    C1 -->|Work Distribution| A1
+    C1 -->|Work Distribution| A2
+    C1 -->|Work Distribution| A3
+    C1 -->|Work Distribution| A100
+
+    A1 -->|Heartbeat/Status| C1
+    A2 -->|Heartbeat/Status| C1
+    A3 -->|Heartbeat/Status| C1
+    A100 -->|Heartbeat/Status| C1
+
+    style C1 fill:#e3f2fd
+    style C2 fill:#e8f5e8
+    style C3 fill:#e8f5e8
+    style C4 fill:#e8f5e8
+    style C5 fill:#e8f5e8
+```
+
+**Key Features:**
+- **Leader Election**: Automatic leader election using Raft consensus algorithm
+- **Log Replication**: All state changes replicated across quorum members
+- **Fault Tolerance**: Tolerates (N-1)/2 failures in N-node cluster
+- **Split-Brain Prevention**: Quorum-based decision making prevents split-brain scenarios
+- **Consistent State**: Strong consistency guarantees for all cluster operations
+
+**Quorum Configuration:**
+- **Minimum Nodes**: 3 controllers for basic HA (tolerates 1 failure)
+- **Recommended**: 5 controllers for production environments (tolerates 2 failures)
+- **Odd Numbers**: Always use odd number of controllers for proper quorum
+- **Geographic Distribution**: Controllers distributed across availability zones
+- **Network Partitioning**: Handles network partitions gracefully with majority rule
+
+**Controller Services:**
+- **Workflow Service**: YAML workflow parsing, validation, and orchestration
+- **Transfer Service**: Transfer job management, scheduling, and lifecycle
+- **Agent Service**: Agent registration, heartbeat processing, and lifecycle management
+- **Monitoring Service**: System health monitoring, metrics collection, and alerting
+- **Tenant Service**: Multi-tenant configuration management and isolation
+
+### Leader Election Process
+
+```mermaid
+sequenceDiagram
+    participant C1 as Controller 1
+    participant C2 as Controller 2
+    participant C3 as Controller 3
+    participant C4 as Controller 4
+    participant C5 as Controller 5
+
+    Note over C1,C5: Initial State - All Followers
+    C1->>C1: Election Timeout
+    C1->>C2: RequestVote (Term 1)
+    C1->>C3: RequestVote (Term 1)
+    C1->>C4: RequestVote (Term 1)
+    C1->>C5: RequestVote (Term 1)
+
+    C2->>C1: VoteGranted
+    C3->>C1: VoteGranted
+    C4->>C1: VoteGranted
+    C5->>C1: VoteGranted
+
+    Note over C1,C5: C1 becomes Leader (majority votes)
+    C1->>C2: Heartbeat (Term 1)
+    C1->>C3: Heartbeat (Term 1)
+    C1->>C4: Heartbeat (Term 1)
+    C1->>C5: Heartbeat (Term 1)
+
+    Note over C1,C5: Leader sends periodic heartbeats
+```
+
+## Agent-Controller Communication Protocol
+
+### Agent Registration Protocol
+
+Agents must register with the controller quorum before participating in transfer operations. The registration process establishes agent capabilities, resources, and location information.
+
+```yaml
+# Agent Registration Message
+registration:
+  agentId: "agent-001"
+  hostname: "transfer-agent-001.corp.com"
+  version: "1.0.0"
+  capabilities:
+    protocols: ["http", "https", "sftp", "smb", "ftp"]
+    maxConcurrentTransfers: 10
+    maxBandwidthMbps: 1000
+    supportedFeatures: ["chunked-transfer", "resume", "compression"]
+  resources:
+    cpu:
+      cores: 4
+      architecture: "x86_64"
+    memory:
+      totalMB: 8192
+      availableMB: 6144
+    storage:
+      totalGB: 1024
+      availableGB: 512
+    network:
+      interfaces: ["eth0", "eth1"]
+      totalBandwidthMbps: 1000
+  location:
+    datacenter: "dc-east-1"
+    zone: "zone-a"
+    region: "us-east"
+    tags: ["production", "high-bandwidth"]
+  security:
+    certificateFingerprint: "sha256:abc123..."
+    supportedAuthMethods: ["certificate", "token"]
+```
+
+### Heartbeat Protocol
+
+Agents send regular heartbeat messages to maintain their registration and report current status, capacity, and health metrics.
+
+```yaml
+# Heartbeat Message (every 30 seconds)
+heartbeat:
+  agentId: "agent-001"
+  timestamp: "2024-01-15T10:30:00Z"
+  sequenceNumber: 12345
+  status: "active"  # active, busy, draining, unhealthy
+  currentJobs: 3
+  availableCapacity: 7
+  metrics:
+    cpu:
+      usage: 45.2
+      loadAverage: [1.2, 1.5, 1.8]
+    memory:
+      usage: 62.1
+      available: 3072
+    network:
+      utilization: 23.4
+      bytesTransferred: 1073741824
+    transfers:
+      active: 3
+      completed: 127
+      failed: 2
+  health:
+    diskSpace: "healthy"
+    networkConnectivity: "healthy"
+    systemLoad: "normal"
+  lastJobCompletion: "2024-01-15T10:28:45Z"
+  nextMaintenanceWindow: "2024-01-16T02:00:00Z"
+```
+
+### Communication Flow
+
+```mermaid
+sequenceDiagram
+    participant A as Agent
+    participant LB as Load Balancer
+    participant C1 as Controller Leader
+    participant C2 as Controller Follower
+    participant AR as Agent Registry
+
+    Note over A,AR: Agent Registration & Heartbeat
+    A->>LB: Register Agent (capabilities, resources)
+    LB->>C1: Forward Registration
+    C1->>AR: Store Agent Info
+    C1->>C2: Replicate Agent State
+    C1->>A: Registration ACK
+
+    loop Every 30 seconds
+        A->>LB: Heartbeat (status, metrics, capacity)
+        LB->>C1: Forward Heartbeat
+        C1->>AR: Update Agent Status
+        C1->>A: Heartbeat ACK
+    end
+
+    Note over A,AR: Work Assignment
+    C1->>A: Assign Transfer Job
+    A->>C1: Job Status Updates
+    A->>C1: Job Completion
+
+    Note over A,AR: Failure Detection
+    A--xLB: Heartbeat Timeout
+    C1->>AR: Mark Agent Unhealthy
+    C1->>C1: Redistribute Jobs
+```
+
+### Failure Detection and Recovery
+
+**Heartbeat Monitoring:**
+- **Heartbeat Interval**: 30 seconds
+- **Timeout Threshold**: 90 seconds (3 missed heartbeats)
+- **Grace Period**: 30 seconds for graceful shutdown
+- **Health Checks**: Active health probes every 60 seconds
+
+**Failure Scenarios:**
+- **Agent Failure**: Jobs redistributed to healthy agents
+- **Network Partition**: Agents continue current jobs, new jobs queued
+- **Controller Failure**: Automatic leader election, minimal disruption
+- **Partial Failure**: Degraded mode operation with reduced capacity
+
+**Recovery Mechanisms:**
+- **Automatic Recovery**: Failed jobs automatically redistributed
+- **Graceful Shutdown**: 30-second drain period for active transfers
+- **State Persistence**: Job state persisted for recovery after failures
+- **Backpressure**: Automatic throttling when agents are overloaded
+
+## Agent Fleet Management
+
+### Agent Lifecycle Management
+
+```mermaid
+stateDiagram-v2
+    [*] --> Initializing
+    Initializing --> Registering: Start Agent
+    Registering --> Active: Registration Success
+    Registering --> Failed: Registration Failed
+
+    Active --> Working: Receive Job
+    Active --> Idle: No Jobs
+    Active --> Unhealthy: Health Check Failed
+    Active --> Draining: Graceful Shutdown
+
+    Working --> Active: Job Complete
+    Working --> Failed: Job Failed
+    Working --> Unhealthy: Agent Failure
+    Working --> Draining: Shutdown Request
+
+    Idle --> Working: Receive Job
+    Idle --> Unhealthy: Health Check Failed
+    Idle --> Draining: Shutdown Request
+
+    Draining --> Deregistered: All Jobs Complete
+    Draining --> Deregistered: Timeout
+
+    Unhealthy --> Active: Recovery
+    Unhealthy --> Deregistered: Timeout
+
+    Failed --> Deregistered: Cleanup
+    Deregistered --> [*]
+```
+
+**Agent States:**
+- **Initializing**: Agent starting up, loading configuration
+- **Registering**: Attempting registration with controller quorum
+- **Active**: Ready to receive and execute transfer jobs
+- **Working**: Currently executing one or more transfer jobs
+- **Idle**: No active jobs, available for new work
+- **Draining**: Graceful shutdown in progress, completing current jobs
+- **Unhealthy**: Failed health checks, not receiving new jobs
+- **Deregistered**: Removed from agent registry
+
+### Dynamic Scaling and Load Balancing
+
+**Intelligent Work Distribution:**
+- **Capacity-Based**: Jobs assigned based on available agent capacity
+- **Location-Aware**: Prefer agents closer to source/destination
+- **Protocol-Specific**: Route jobs to agents with required protocol support
+- **Load Balancing**: Even distribution across available agents
+- **Affinity Rules**: Support for agent affinity and anti-affinity
+
+**Scaling Strategies:**
+- **Horizontal Scaling**: Add more agents to increase capacity
+- **Vertical Scaling**: Upgrade agent resources (CPU, memory, bandwidth)
+- **Geographic Scaling**: Deploy agents across multiple data centers
+- **Protocol Scaling**: Specialized agents for specific protocols
+
+**Resource Optimization:**
+- **CPU Utilization**: Monitor and optimize CPU usage across agents
+- **Memory Management**: Efficient memory allocation for concurrent transfers
+- **Bandwidth Utilization**: Maximize network bandwidth usage
+- **Storage Optimization**: Efficient temporary storage management
+
+## Scalability Architecture
+
+### Performance Targets
+
+**Agent Fleet Capacity:**
+- **Agent Support**: 100+ agents per controller quorum
+- **Concurrent Transfers**: 10,000+ simultaneous transfers across fleet
+- **Heartbeat Processing**: 1,000+ heartbeats/second
+- **Job Throughput**: 100+ jobs/second assignment and completion
+- **Geographic Distribution**: Multi-region deployment support
+
+**Controller Quorum Performance:**
+- **Request Throughput**: 10,000+ requests/second
+- **State Replication**: Sub-100ms replication latency
+- **Leader Election**: Sub-5 second failover time
+- **Memory Usage**: Efficient in-memory state management
+- **Disk I/O**: Optimized persistent storage for logs
+
+### Horizontal Scaling Strategies
+
+**Controller Scaling:**
+- **Quorum Expansion**: Add controllers to increase availability
+- **Read Replicas**: Read-only replicas for query load distribution
+- **Sharding**: Partition agents across multiple controller quorums
+- **Federation**: Multiple quorums for different regions/tenants
+
+**Agent Scaling:**
+- **Linear Scaling**: Add agents to linearly increase transfer capacity
+- **Auto-Scaling**: Automatic agent provisioning based on demand
+- **Elastic Scaling**: Dynamic scaling up/down based on workload
+- **Burst Capacity**: Temporary capacity increases for peak loads
+
+**Storage Scaling:**
+- **Distributed Storage**: Scale storage independently of compute
+- **Replication**: Multi-replica storage for high availability
+- **Partitioning**: Partition data across multiple storage nodes
+- **Caching**: Intelligent caching for frequently accessed data
+
+### Network Architecture
+
+**High Availability Networking:**
+- **Load Balancers**: Multiple load balancers with failover
+- **Network Redundancy**: Multiple network paths between components
+- **Bandwidth Aggregation**: Combine multiple network interfaces
+- **Quality of Service**: Network QoS for transfer prioritization
+
+**Security and Isolation:**
+- **Network Segmentation**: Isolated networks for different tenants
+- **Encryption**: End-to-end encryption for all communications
+- **Authentication**: Mutual TLS authentication between components
+- **Authorization**: Fine-grained access control and permissions
 
 ## Core Components
 
@@ -1205,55 +1567,141 @@ variables:
 
 ## Deployment Architecture
 
-### Corporate Network Deployment
+### Corporate Network Deployment with Controller Quorum
 
 ```mermaid
 graph TD
-    %% Internal Corporate Network Traffic
-    CORP[Corporate Network<br/>Internal Traffic] --> LB[Internal Load Balancer<br/>F5/HAProxy]
+    %% External Access Layer
+    CORP[Corporate Network<br/>Internal Traffic] --> VIP[Virtual IP<br/>Failover]
+    VIP --> LB[Internal Load Balancer<br/>F5/HAProxy Cluster]
 
-    %% Corporate DMZ
-    LB --> ING[Ingress Controller<br/>Corporate DMZ]
+    %% Controller Quorum Layer
+    subgraph "Controller Quorum (Multi-AZ)"
+        direction TB
+        LB --> C1[Controller Leader<br/>AZ-1]
+        LB --> C2[Controller Follower<br/>AZ-2]
+        LB --> C3[Controller Follower<br/>AZ-3]
 
-    %% Application Services in Corporate Data Center
-    ING --> QE[Quorus Engine<br/>Service<br/>3 Replicas]
-    ING --> WE[Workflow Engine<br/>Service<br/>2 Replicas]
-    ING --> TS[Tenant Service<br/>Service<br/>2 Replicas]
+        C1 -.->|Raft Consensus| C2
+        C1 -.->|Raft Consensus| C3
+        C2 -.->|Raft Consensus| C3
+    end
 
-    %% Corporate Data Layer
-    QE --> PG[(Corporate PostgreSQL<br/>Database Cluster)]
-    WE --> PG
-    TS --> PG
+    %% Distributed State Layer
+    subgraph "Distributed State (Multi-AZ)"
+        PG[(PostgreSQL Cluster<br/>Primary + 2 Replicas)]
+        REDIS[(Redis Cluster<br/>6 Nodes)]
+        ETCD[(etcd Cluster<br/>Agent Registry)]
+    end
 
-    QE --> REDIS[(Corporate Redis<br/>Cache Cluster)]
+    %% Agent Fleet
+    subgraph "Agent Fleet (Geographic Distribution)"
+        subgraph "DC-East Agents"
+            AE1[Agent E1<br/>HTTP/SFTP]
+            AE2[Agent E2<br/>SMB/FTP]
+            AE3[Agent EN...<br/>Multi-Protocol]
+        end
 
-    QE --> SAN[Corporate SAN<br/>Storage Array]
+        subgraph "DC-West Agents"
+            AW1[Agent W1<br/>HTTP/SFTP]
+            AW2[Agent W2<br/>SMB/FTP]
+            AW3[Agent WN...<br/>Multi-Protocol]
+        end
 
-    %% Corporate Identity and Storage
-    TS --> AD[Active Directory<br/>Corporate LDAP]
-    QE --> NAS[Corporate NAS<br/>File Storage]
-    QE --> NFS[NFS Mounts<br/>Department Shares]
+        subgraph "Cloud Agents"
+            AC1[Agent C1<br/>HTTP/SFTP]
+            AC2[Agent C2<br/>SMB/FTP]
+            AC3[Agent CN...<br/>Multi-Protocol]
+        end
+    end
 
-    %% Corporate Monitoring Stack
-    PROM[Prometheus<br/>Corporate Monitoring] --> QE
-    PROM --> WE
-    PROM --> TS
+    %% Controller to State connections
+    C1 --> PG
+    C1 --> REDIS
+    C1 --> ETCD
+    C2 --> PG
+    C2 --> REDIS
+    C2 --> ETCD
+    C3 --> PG
+    C3 --> REDIS
+    C3 --> ETCD
 
-    SPLUNK[Splunk<br/>Corporate SIEM] --> PROM
-    GRAF[Grafana<br/>Corporate Dashboards] --> PROM
-    ALERT[AlertManager] --> PROM
-    ALERT --> EMAIL[Corporate Email<br/>Exchange/O365]
+    %% Controller to Agent connections
+    C1 -.->|Work Distribution| AE1
+    C1 -.->|Work Distribution| AE2
+    C1 -.->|Work Distribution| AE3
+    C1 -.->|Work Distribution| AW1
+    C1 -.->|Work Distribution| AW2
+    C1 -.->|Work Distribution| AW3
+    C1 -.->|Work Distribution| AC1
+    C1 -.->|Work Distribution| AC2
+    C1 -.->|Work Distribution| AC3
 
-    %% Corporate Security Services
-    VAULT[Corporate Vault<br/>Key Management] --> QE
-    VAULT --> WE
-    VAULT --> TS
+    %% Agent heartbeats
+    AE1 -.->|Heartbeat| LB
+    AE2 -.->|Heartbeat| LB
+    AE3 -.->|Heartbeat| LB
+    AW1 -.->|Heartbeat| LB
+    AW2 -.->|Heartbeat| LB
+    AW3 -.->|Heartbeat| LB
+    AC1 -.->|Heartbeat| LB
+    AC2 -.->|Heartbeat| LB
+    AC3 -.->|Heartbeat| LB
 
-    CA[Corporate PKI<br/>Certificate Authority] --> ING
+    %% Corporate Integration
+    subgraph "Corporate Services"
+        AD[Active Directory<br/>Corporate LDAP]
+        VAULT[Corporate Vault<br/>Key Management]
+        CA[Corporate PKI<br/>Certificate Authority]
+        NAS[Corporate NAS<br/>File Storage]
+        NFS[NFS Mounts<br/>Department Shares]
+    end
 
-    %% Network Zones
-    subgraph "Corporate Network Zones"
-        DMZ[DMZ Zone<br/>Quorus Services]
+    %% Corporate Monitoring
+    subgraph "Corporate Monitoring"
+        PROM[Prometheus<br/>Corporate Monitoring]
+        SPLUNK[Splunk<br/>Corporate SIEM]
+        GRAF[Grafana<br/>Corporate Dashboards]
+        ALERT[AlertManager]
+        EMAIL[Corporate Email<br/>Exchange/O365]
+    end
+
+    %% Integration connections
+    C1 --> AD
+    C1 --> VAULT
+    C1 --> CA
+    AE1 --> NAS
+    AE2 --> NFS
+    AW1 --> NAS
+    AW2 --> NFS
+    AC1 --> NAS
+    AC2 --> NFS
+
+    %% Monitoring connections
+    PROM --> C1
+    PROM --> C2
+    PROM --> C3
+    PROM --> AE1
+    PROM --> AW1
+    PROM --> AC1
+    SPLUNK --> PROM
+    GRAF --> PROM
+    ALERT --> PROM
+    ALERT --> EMAIL
+
+    %% Styling
+    style C1 fill:#e3f2fd
+    style C2 fill:#e8f5e8
+    style C3 fill:#e8f5e8
+    style AE1 fill:#fff3e0
+    style AE2 fill:#fff3e0
+    style AE3 fill:#fff3e0
+    style AW1 fill:#fff3e0
+    style AW2 fill:#fff3e0
+    style AW3 fill:#fff3e0
+    style AC1 fill:#fff3e0
+    style AC2 fill:#fff3e0
+    style AC3 fill:#fff3e0
         INTERNAL[Internal Zone<br/>Data Sources]
         SECURE[Secure Zone<br/>Sensitive Data]
     end
@@ -1316,6 +1764,101 @@ spec:
             fieldRef:
               fieldPath: metadata.labels['tenant']
 ```
+
+### Distributed State Management
+
+The enhanced Quorus architecture implements distributed state management to ensure consistency, availability, and partition tolerance across the controller quorum and agent fleet.
+
+#### State Distribution Strategy
+
+```mermaid
+graph TB
+    subgraph "Controller Quorum State"
+        CL[Controller Leader]
+        CF1[Controller Follower 1]
+        CF2[Controller Follower 2]
+
+        subgraph "Replicated State"
+            RS[Raft Log<br/>Strong Consistency]
+            AS[Agent State<br/>Eventually Consistent]
+            JS[Job State<br/>Strong Consistency]
+            TS[Tenant Config<br/>Strong Consistency]
+        end
+    end
+
+    subgraph "Distributed Storage"
+        PG[(PostgreSQL<br/>Persistent State)]
+        REDIS[(Redis<br/>Cache Layer)]
+        ETCD[(etcd<br/>Agent Registry)]
+        TS_DB[(Time Series DB<br/>Metrics)]
+    end
+
+    subgraph "Agent Fleet State"
+        A1[Agent 1<br/>Local State]
+        A2[Agent 2<br/>Local State]
+        AN[Agent N<br/>Local State]
+    end
+
+    CL --> RS
+    CF1 --> RS
+    CF2 --> RS
+
+    RS --> PG
+    AS --> REDIS
+    JS --> PG
+    TS --> PG
+
+    AS --> ETCD
+
+    CL -.->|Heartbeat Processing| AS
+    A1 -.->|Status Updates| AS
+    A2 -.->|Status Updates| AS
+    AN -.->|Status Updates| AS
+
+    style CL fill:#e3f2fd
+    style CF1 fill:#e8f5e8
+    style CF2 fill:#e8f5e8
+```
+
+**State Categories:**
+
+1. **Strongly Consistent State** (Raft Consensus):
+   - Job assignments and status
+   - Tenant configurations
+   - Workflow definitions
+   - System configuration
+
+2. **Eventually Consistent State** (Gossip/Cache):
+   - Agent heartbeats and status
+   - Performance metrics
+   - Capacity information
+   - Health status
+
+3. **Local State** (Agent-specific):
+   - Active transfer progress
+   - Local resource utilization
+   - Temporary file state
+   - Protocol-specific state
+
+#### High Availability Configuration
+
+**Controller Quorum:**
+- **Minimum**: 3 controllers (tolerates 1 failure)
+- **Recommended**: 5 controllers (tolerates 2 failures)
+- **Geographic Distribution**: Controllers across availability zones
+- **Network Partitioning**: Majority quorum required for operations
+
+**Data Persistence:**
+- **PostgreSQL Cluster**: Primary + 2 synchronous replicas
+- **Redis Cluster**: 6 nodes (3 masters + 3 replicas)
+- **etcd Cluster**: 3-5 nodes for agent registry
+- **Backup Strategy**: Automated backups with point-in-time recovery
+
+**Failure Scenarios:**
+- **Single Controller Failure**: Automatic leader election, <5s downtime
+- **Database Failure**: Automatic failover to replica, <30s downtime
+- **Network Partition**: Majority partition continues operation
+- **Agent Failure**: Jobs redistributed, no data loss
 
 ### Database Schema
 
@@ -1721,21 +2264,122 @@ source:
 
 ## Future Enhancements
 
-### Planned Features
-- Additional protocol support (FTP, SFTP, S3)
-- Advanced workflow features (loops, conditions)
-- Real-time streaming transfers
-- Machine learning for optimization
+### Phase 2 Implementation (Moved from Future to Active Development)
+The following features have been moved from future enhancements to **Phase 2: Service Architecture & REST API** implementation:
 
-### Scalability Improvements
-- Distributed coordination with Raft consensus
-- Advanced clustering capabilities
-- Global load balancing
+**✅ Distributed Controller Architecture** - Now part of Phase 2.1
+- Controller quorum with Raft consensus *(previously listed as "Distributed coordination with Raft consensus")*
+- Agent-based transfer execution with fleet management
+- Horizontal scaling capabilities with intelligent load balancing
+- Multi-region deployment support with geographic distribution
+- Advanced load balancing and failover mechanisms *(previously listed as "Global load balancing")*
 
-### Enterprise Features
-- Advanced governance and compliance
-- Integration with enterprise systems
-- Custom protocol development SDK
+**✅ Agent Fleet Management** - Now part of Phase 2.2
+- Agent registration and heartbeat system
+- Dynamic scaling and capacity management *(previously listed as "Advanced clustering capabilities")*
+- Failure detection and automatic recovery
+- Geographic and resource-aware job scheduling
+- Agent lifecycle management with graceful shutdown
+
+**✅ Enterprise Scalability** - Now part of Phase 2.3
+- Support for 100+ agents per controller quorum
+- 10,000+ concurrent transfers across fleet
+- High-throughput heartbeat processing (1000+ heartbeats/second)
+- Distributed state management with strong consistency
+- Enterprise-grade monitoring and alerting integration
+
+### Phase 3+ Future Features
+
+**Advanced Protocol Support:**
+- Additional protocols (S3, Azure Blob, Google Cloud Storage) *(expanded from "FTP, SFTP, S3")*
+- Protocol-specific optimizations and features
+- Custom protocol plugin architecture *(expanded from "Custom protocol development SDK")*
+- Protocol conversion and transformation
+
+**Advanced Workflow Features:**
+- Conditional execution and loops in workflows *(expanded from "loops, conditions")*
+- Dynamic workflow generation and templating
+- Workflow versioning and rollback capabilities
+- Advanced dependency management with complex conditions
+- Real-time workflow modification and updates
+
+**Machine Learning and AI:**
+- Transfer optimization using machine learning *(expanded from "Machine learning for optimization")*
+- Predictive failure detection and prevention
+- Intelligent routing and path selection
+- Bandwidth optimization algorithms
+- Performance prediction and capacity planning
+
+**Advanced Security and Governance:**
+- End-to-end encryption with key rotation
+- Advanced audit trails and compliance reporting *(expanded from "Advanced governance and compliance")*
+- Integration with enterprise identity systems *(expanded from "Integration with enterprise systems")*
+- Zero-trust security model implementation
+- Advanced threat detection and response
+
+**Performance Optimizations:**
+- Transfer acceleration techniques (compression, deduplication)
+- Intelligent caching and prefetching strategies
+- Advanced bandwidth management and QoS
+- Multi-path transfer optimization
+- Real-time streaming transfers with low latency *(expanded from "Real-time streaming transfers")*
+
+**Cloud-Native Features:**
+- Kubernetes operator for automated deployment
+- Service mesh integration (Istio, Linkerd)
+- Cloud provider native integrations
+- Serverless transfer execution options
+- Container-based agent deployment
+
+## Implementation Roadmap Update
+
+### Phase 2: Service Architecture & REST API (Updated)
+
+The implementation plan has been updated to include the distributed architecture enhancements:
+
+**Milestone 2.1: Distributed Controller Architecture (Weeks 17-19)**
+- Implement Raft consensus algorithm for controller quorum
+- Agent registration and heartbeat system
+- Distributed agent registry with failure detection
+- Load balancer integration for high availability
+- Controller leader election and failover mechanisms
+
+**Milestone 2.2: Agent Fleet Management (Weeks 20-22)**
+- Agent lifecycle management (register, heartbeat, deregister)
+- Intelligent work distribution and load balancing
+- Geographic and resource-aware job scheduling
+- Agent health monitoring and automatic recovery
+- Graceful shutdown and drain procedures
+
+**Milestone 2.3: REST API & Client Integration (Weeks 23-24)**
+- REST API for all controller operations
+- Client SDKs and CLI tools
+- Web dashboard for monitoring and management
+- API documentation and OpenAPI specifications
+- Integration testing with distributed architecture
+
+### Success Criteria for Phase 2
+
+**Scalability Targets:**
+- Support 100+ agents per controller quorum
+- Handle 10,000+ concurrent transfers across fleet
+- Process 1,000+ heartbeats/second
+- Achieve 100+ jobs/second assignment and completion
+- Maintain <5 second failover time for controller failures
+
+**Reliability Targets:**
+- 99.9% uptime for controller quorum
+- <30 second recovery time for agent failures
+- Zero data loss during controller failover
+- Automatic job redistribution on agent failure
+- Graceful handling of network partitions
+
+**Performance Targets:**
+- <100ms latency for job assignment
+- <1 second for agent registration
+- <5 seconds for failure detection
+- <10 seconds for job redistribution
+- Linear scaling with agent additions
 
 ## File Organization
 

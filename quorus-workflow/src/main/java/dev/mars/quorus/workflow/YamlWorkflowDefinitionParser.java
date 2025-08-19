@@ -121,15 +121,23 @@ public class YamlWorkflowDefinitionParser implements WorkflowDefinitionParser {
     }
     
     private WorkflowDefinition parseWorkflowDefinition(Map<String, Object> data) throws WorkflowParseException {
+        // For backward compatibility, support both old and new formats
         String apiVersion = getStringValue(data, "apiVersion", "v1");
         String kind = getStringValue(data, "kind", "TransferWorkflow");
-        
+
         Map<String, Object> metadataMap = getMapValue(data, "metadata");
         WorkflowDefinition.WorkflowMetadata metadata = parseMetadata(metadataMap);
-        
-        Map<String, Object> specMap = getMapValue(data, "spec");
+
+        // Check if spec exists (new format) or if we need to use root level (legacy)
+        Map<String, Object> specMap;
+        if (data.containsKey("spec")) {
+            specMap = getMapValue(data, "spec");
+        } else {
+            // Legacy format - spec fields are at root level
+            specMap = data;
+        }
         WorkflowDefinition.WorkflowSpec spec = parseSpec(specMap);
-        
+
         return new WorkflowDefinition(apiVersion, kind, metadata, spec);
     }
     
@@ -138,11 +146,14 @@ public class YamlWorkflowDefinitionParser implements WorkflowDefinitionParser {
         if (name == null || name.trim().isEmpty()) {
             throw new WorkflowParseException("metadata.name", "Workflow name is required");
         }
-        
+
+        String version = getStringValue(data, "version", "1.0.0");
         String description = getStringValue(data, "description");
+        String type = getStringValue(data, "type", "workflow");
+        String author = getStringValue(data, "author");
         Map<String, String> labels = parseLabels(getMapValue(data, "labels"));
-        
-        return new WorkflowDefinition.WorkflowMetadata(name, description, labels);
+
+        return new WorkflowDefinition.WorkflowMetadata(name, version, description, type, author, labels);
     }
     
     private WorkflowDefinition.WorkflowSpec parseSpec(Map<String, Object> data) throws WorkflowParseException {

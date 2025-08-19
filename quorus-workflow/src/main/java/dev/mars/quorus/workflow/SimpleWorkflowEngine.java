@@ -126,7 +126,14 @@ public class SimpleWorkflowEngine implements WorkflowEngine {
             try {
                 return executeWorkflowInternal(definition, executionContext);
             } catch (Exception e) {
-                logger.log(Level.SEVERE, "Workflow execution failed: " + executionContext.getExecutionId(), e);
+                // Log without stack trace for cleaner output, especially during testing
+                logger.log(Level.SEVERE, "Workflow execution failed: " + executionContext.getExecutionId() + " - " + e.getMessage());
+
+                // Only log full stack trace in debug mode
+                if (logger.isLoggable(Level.FINE)) {
+                    logger.log(Level.FINE, "Workflow execution exception details for: " + executionContext.getExecutionId(), e);
+                }
+
                 return createFailedExecution(definition, executionContext, e);
             }
         }, executorService);
@@ -317,11 +324,18 @@ public class SimpleWorkflowEngine implements WorkflowEngine {
                     }
                     
                 } catch (Exception e) {
-                    logger.log(Level.WARNING, "Transfer execution failed: " + transfer.getName(), e);
+                    // Log without stack trace for cleaner output, especially during testing
+                    logger.log(Level.WARNING, "Transfer execution failed: " + transfer.getName() + " - " + e.getMessage());
+
+                    // Only log full stack trace in debug mode or for unexpected exceptions
+                    if (logger.isLoggable(Level.FINE)) {
+                        logger.log(Level.FINE, "Transfer execution exception details for: " + transfer.getName(), e);
+                    }
+
                     TransferResult failedResult = createMockTransferResult(transfer, false);
                     transferResults.put(transfer.getName(), failedResult);
                     groupSuccess = false;
-                    
+
                     if (!group.isContinueOnError()) {
                         groupError = "Transfer execution failed: " + e.getMessage();
                         break;

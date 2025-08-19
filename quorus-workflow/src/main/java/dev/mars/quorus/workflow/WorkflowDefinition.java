@@ -82,27 +82,50 @@ public class WorkflowDefinition {
     }
     
     /**
-     * Workflow metadata containing name, description, and labels.
+     * Workflow metadata containing name, version, description, type, author, and labels.
      */
     public static class WorkflowMetadata {
         private final String name;
+        private final String version;
         private final String description;
+        private final String type;
+        private final String author;
         private final Map<String, String> labels;
-        
-        public WorkflowMetadata(String name, String description, Map<String, String> labels) {
+
+        public WorkflowMetadata(String name, String version, String description, String type, String author, Map<String, String> labels) {
             this.name = Objects.requireNonNull(name, "Name cannot be null");
+            this.version = version;
             this.description = description;
+            this.type = type;
+            this.author = author;
             this.labels = labels != null ? Map.copyOf(labels) : Map.of();
         }
-        
+
+        // Backward compatibility constructor
+        public WorkflowMetadata(String name, String description, Map<String, String> labels) {
+            this(name, "1.0.0", description, "workflow", null, labels);
+        }
+
         public String getName() {
             return name;
         }
-        
+
+        public String getVersion() {
+            return version;
+        }
+
         public String getDescription() {
             return description;
         }
-        
+
+        public String getType() {
+            return type;
+        }
+
+        public String getAuthor() {
+            return author;
+        }
+
         public Map<String, String> getLabels() {
             return labels;
         }
@@ -113,20 +136,26 @@ public class WorkflowDefinition {
             if (o == null || getClass() != o.getClass()) return false;
             WorkflowMetadata that = (WorkflowMetadata) o;
             return Objects.equals(name, that.name) &&
+                   Objects.equals(version, that.version) &&
                    Objects.equals(description, that.description) &&
+                   Objects.equals(type, that.type) &&
+                   Objects.equals(author, that.author) &&
                    Objects.equals(labels, that.labels);
         }
-        
+
         @Override
         public int hashCode() {
-            return Objects.hash(name, description, labels);
+            return Objects.hash(name, version, description, type, author, labels);
         }
         
         @Override
         public String toString() {
             return "WorkflowMetadata{" +
                    "name='" + name + '\'' +
+                   ", version='" + version + '\'' +
                    ", description='" + description + '\'' +
+                   ", type='" + type + '\'' +
+                   ", author='" + author + '\'' +
                    ", labels=" + labels +
                    '}';
         }

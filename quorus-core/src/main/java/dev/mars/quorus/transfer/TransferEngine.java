@@ -32,7 +32,7 @@ public interface TransferEngine {
     
     /**
      * Submit a transfer request for asynchronous execution.
-     * 
+     *
      * @param request the transfer request containing source, destination, and metadata
      * @return a CompletableFuture that will complete with the transfer result
      * @throws TransferException if the transfer cannot be initiated
@@ -41,7 +41,7 @@ public interface TransferEngine {
     
     /**
      * Get the current status of an active transfer job.
-     * 
+     *
      * @param jobId the unique identifier of the transfer job
      * @return the transfer job if found, null otherwise
      */

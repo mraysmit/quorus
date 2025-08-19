@@ -33,7 +33,7 @@ class TenantTest {
                 .name("Test Tenant")
                 .description("Test description")
                 .parentTenantId("parent-tenant")
-                .active(true)
+                .status(Tenant.TenantStatus.ACTIVE)
                 .createdAt(now)
                 .updatedAt(now)
                 .build();
@@ -60,7 +60,7 @@ class TenantTest {
         assertNull(tenant.getParentTenantId());
         assertTrue(tenant.isActive()); // Default value
         assertNotNull(tenant.getCreatedAt()); // Should be set automatically
-        assertNotNull(tenant.getUpdatedAt()); // Should be set automatically
+        assertNull(tenant.getUpdatedAt()); // Not set automatically, only when updated
     }
     
     @Test
@@ -108,7 +108,7 @@ class TenantTest {
                 .name("Original Name")
                 .description("Original description")
                 .parentTenantId("parent")
-                .active(true)
+                .status(Tenant.TenantStatus.ACTIVE)
                 .createdAt(now)
                 .updatedAt(now)
                 .build();
@@ -116,7 +116,7 @@ class TenantTest {
         Tenant modified = original.toBuilder()
                 .name("Modified Name")
                 .description("Modified description")
-                .active(false)
+                .status(Tenant.TenantStatus.INACTIVE)
                 .build();
         
         // Modified fields
@@ -174,7 +174,7 @@ class TenantTest {
                 .name("Test Tenant")
                 .description("Test description")
                 .parentTenantId("parent")
-                .active(true)
+                .status(Tenant.TenantStatus.ACTIVE)
                 .build();
         
         String toString = tenant.toString();
@@ -183,7 +183,7 @@ class TenantTest {
         assertTrue(toString.contains("test-tenant"));
         assertTrue(toString.contains("Test Tenant"));
         assertTrue(toString.contains("parent"));
-        assertTrue(toString.contains("true"));
+        assertTrue(toString.contains("ACTIVE")); // Status enum value, not boolean
     }
     
     @Test
@@ -196,8 +196,7 @@ class TenantTest {
         // Should have default values
         assertTrue(tenant.isActive());
         assertNotNull(tenant.getCreatedAt());
-        assertNotNull(tenant.getUpdatedAt());
-        
+
         // Should be close to current time
         Instant now = Instant.now();
         assertTrue(tenant.getCreatedAt().isBefore(now.plusSeconds(1)));
@@ -209,7 +208,7 @@ class TenantTest {
         Tenant tenant = Tenant.builder()
                 .tenantId("inactive-tenant")
                 .name("Inactive Tenant")
-                .active(false)
+                .status(Tenant.TenantStatus.INACTIVE)
                 .build();
         
         assertFalse(tenant.isActive());
@@ -279,13 +278,8 @@ class TenantTest {
         
         Instant after = Instant.now();
         
-        // Created and updated timestamps should be between before and after
+        // Created timestamp should be between before and after
         assertTrue(tenant.getCreatedAt().isAfter(before.minusSeconds(1)));
         assertTrue(tenant.getCreatedAt().isBefore(after.plusSeconds(1)));
-        assertTrue(tenant.getUpdatedAt().isAfter(before.minusSeconds(1)));
-        assertTrue(tenant.getUpdatedAt().isBefore(after.plusSeconds(1)));
-        
-        // For new tenants, created and updated should be the same
-        assertEquals(tenant.getCreatedAt(), tenant.getUpdatedAt());
     }
 }
