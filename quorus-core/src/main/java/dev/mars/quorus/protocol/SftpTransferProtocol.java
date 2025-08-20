@@ -65,7 +65,13 @@ public class SftpTransferProtocol implements TransferProtocol {
         try {
             return performSftpTransfer(request, progressTracker);
         } catch (Exception e) {
-            logger.severe("SFTP transfer failed: " + e.getMessage());
+            // Check if this is an intentional test failure
+            if (isIntentionalTestFailure(request.getRequestId())) {
+                logger.info("INTENTIONAL TEST FAILURE: SFTP transfer failed for test case '" +
+                           request.getRequestId() + "': " + e.getMessage());
+            } else {
+                logger.severe("SFTP transfer failed: " + e.getMessage());
+            }
             throw new TransferException(context.getJobId(), "SFTP transfer failed", e);
         }
     }
@@ -125,7 +131,13 @@ public class SftpTransferProtocol implements TransferProtocol {
                     .build();
             
         } catch (Exception e) {
-            logger.severe("SFTP transfer failed for request " + requestId + ": " + e.getMessage());
+            // Check if this is an intentional test failure
+            if (isIntentionalTestFailure(requestId)) {
+                logger.info("INTENTIONAL TEST FAILURE: SFTP transfer failed for test case '" +
+                           requestId + "': " + e.getMessage());
+            } else {
+                logger.severe("SFTP transfer failed for request " + requestId + ": " + e.getMessage());
+            }
             throw new TransferException(requestId, "SFTP transfer failed", e);
         }
     }
@@ -234,9 +246,31 @@ public class SftpTransferProtocol implements TransferProtocol {
         
         return new SftpConnectionInfo(host, port, path, username, password);
     }
-    
 
-    
+    /**
+     * Determines if a request ID indicates an intentional test failure.
+     * This helps distinguish between real errors and expected test failures.
+     */
+    private boolean isIntentionalTestFailure(String requestId) {
+        if (requestId == null) {
+            return false;
+        }
+
+        // Check for common test failure patterns
+        return requestId.startsWith("test-") && (
+            requestId.contains("missing-host") ||
+            requestId.contains("missing-path") ||
+            requestId.contains("invalid-") ||
+            requestId.contains("malformed") ||
+            requestId.contains("error") ||
+            requestId.contains("fail") ||
+            requestId.contains("timeout") ||
+            requestId.contains("exception") ||
+            requestId.contains("nonexistent") ||
+            requestId.contains("unreachable")
+        );
+    }
+
     /**
      * SFTP connection information
      */

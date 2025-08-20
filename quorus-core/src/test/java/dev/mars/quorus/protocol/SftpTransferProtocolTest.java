@@ -137,6 +137,9 @@ class SftpTransferProtocolTest {
     
     @Test
     void testTransferWithInvalidSftpUri() {
+        // INTENTIONAL FAILURE TEST: Testing invalid SFTP URI handling
+        // This test verifies that the protocol correctly rejects malformed URIs
+
         // URI.create("sftp://") throws IllegalArgumentException due to missing authority
         // So we test that URI creation itself throws the exception
         assertThrows(IllegalArgumentException.class, () -> {
@@ -144,6 +147,7 @@ class SftpTransferProtocolTest {
         });
 
         // Test with a malformed but parseable URI that the protocol should reject
+        // Expected behavior: TransferException should be thrown
         TransferRequest request = TransferRequest.builder()
                 .requestId("test-invalid-sftp")
                 .sourceUri(URI.create("sftp://invalid-host-without-path"))
@@ -157,12 +161,16 @@ class SftpTransferProtocolTest {
     
     @Test
     void testTransferWithSftpUriMissingHost() {
+        // INTENTIONAL FAILURE TEST: Testing SFTP URI validation for missing host
+        // This test verifies that the protocol correctly rejects URIs without a hostname
+        // Expected behavior: TransferException should be thrown with clear error message
+
         TransferRequest request = TransferRequest.builder()
                 .requestId("test-missing-host")
-                .sourceUri(URI.create("sftp:///path/file.txt"))
+                .sourceUri(URI.create("sftp:///path/file.txt"))  // Missing hostname
                 .destinationPath(tempDir.resolve("testfile.txt"))
                 .build();
-        
+
         assertThrows(TransferException.class, () -> {
             protocol.transfer(request, context);
         });
@@ -170,12 +178,16 @@ class SftpTransferProtocolTest {
     
     @Test
     void testTransferWithSftpUriMissingPath() {
+        // INTENTIONAL FAILURE TEST: Testing SFTP URI validation for missing path
+        // This test verifies that the protocol correctly rejects URIs without a file path
+        // Expected behavior: TransferException should be thrown with clear error message
+
         TransferRequest request = TransferRequest.builder()
                 .requestId("test-missing-path")
-                .sourceUri(URI.create("sftp://server"))
+                .sourceUri(URI.create("sftp://server"))  // Missing file path
                 .destinationPath(tempDir.resolve("testfile.txt"))
                 .build();
-        
+
         assertThrows(TransferException.class, () -> {
             protocol.transfer(request, context);
         });
@@ -247,17 +259,25 @@ class SftpTransferProtocolTest {
     
     @Test
     void testErrorHandlingWithInvalidScheme() {
+        // INTENTIONAL FAILURE TEST: Testing protocol scheme validation
+        // This test verifies that the protocol correctly rejects non-SFTP schemes
+        // Expected behavior: canHandle() should return false for invalid schemes
+
         TransferRequest request = TransferRequest.builder()
                 .requestId("test-invalid-scheme")
-                .sourceUri(URI.create("invalid://server/path/file.txt"))
+                .sourceUri(URI.create("invalid://server/path/file.txt"))  // Invalid scheme
                 .destinationPath(tempDir.resolve("testfile.txt"))
                 .build();
-        
+
         assertFalse(protocol.canHandle(request));
     }
     
     @Test
     void testTransferExceptionContainsRequestId() {
+        // INTENTIONAL FAILURE TEST: Testing exception context and error messaging
+        // This test verifies that exceptions contain proper context information
+        // Expected behavior: TransferException should include request ID and protocol info
+
         // URI.create("sftp://") throws IllegalArgumentException due to missing authority
         // So we test that URI creation itself throws the exception
         assertThrows(IllegalArgumentException.class, () -> {
@@ -267,7 +287,7 @@ class SftpTransferProtocolTest {
         // Test with a URI that will cause a validation exception (missing path)
         TransferRequest request = TransferRequest.builder()
                 .requestId("test-exception-id")
-                .sourceUri(URI.create("sftp://server"))
+                .sourceUri(URI.create("sftp://server"))  // Missing path
                 .destinationPath(tempDir.resolve("testfile.txt"))
                 .build();
 

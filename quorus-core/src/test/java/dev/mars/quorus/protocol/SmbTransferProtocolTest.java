@@ -134,6 +134,9 @@ class SmbTransferProtocolTest {
     
     @Test
     void testTransferWithInvalidSmbUri() {
+        // INTENTIONAL FAILURE TEST: Testing invalid SMB URI handling
+        // This test verifies that the protocol correctly rejects malformed URIs
+
         // URI.create("smb://") throws IllegalArgumentException due to missing authority
         // So we test that URI creation itself throws the exception
         assertThrows(IllegalArgumentException.class, () -> {
@@ -141,6 +144,7 @@ class SmbTransferProtocolTest {
         });
 
         // Test with a malformed but parseable URI that the protocol should reject
+        // Expected behavior: TransferException should be thrown
         TransferRequest request = TransferRequest.builder()
                 .requestId("test-invalid-smb")
                 .sourceUri(URI.create("smb://invalid-host-without-path"))
@@ -154,12 +158,16 @@ class SmbTransferProtocolTest {
     
     @Test
     void testTransferWithSmbUriMissingHost() {
+        // INTENTIONAL FAILURE TEST: Testing SMB URI validation for missing host
+        // This test verifies that the protocol correctly rejects URIs without a hostname
+        // Expected behavior: TransferException should be thrown with clear error message
+
         TransferRequest request = TransferRequest.builder()
                 .requestId("test-missing-host")
-                .sourceUri(URI.create("smb:///share/file.txt"))
+                .sourceUri(URI.create("smb:///share/file.txt"))  // Missing hostname
                 .destinationPath(tempDir.resolve("testfile.txt"))
                 .build();
-        
+
         assertThrows(TransferException.class, () -> {
             protocol.transfer(request, context);
         });
@@ -167,12 +175,16 @@ class SmbTransferProtocolTest {
     
     @Test
     void testTransferWithSmbUriMissingPath() {
+        // INTENTIONAL FAILURE TEST: Testing SMB URI validation for missing path
+        // This test verifies that the protocol correctly rejects URIs without a file path
+        // Expected behavior: TransferException should be thrown with clear error message
+
         TransferRequest request = TransferRequest.builder()
                 .requestId("test-missing-path")
-                .sourceUri(URI.create("smb://server"))
+                .sourceUri(URI.create("smb://server"))  // Missing file path
                 .destinationPath(tempDir.resolve("testfile.txt"))
                 .build();
-        
+
         assertThrows(TransferException.class, () -> {
             protocol.transfer(request, context);
         });
