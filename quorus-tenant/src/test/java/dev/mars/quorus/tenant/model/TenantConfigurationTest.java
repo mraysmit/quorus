@@ -23,6 +23,12 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+/**
+ * TenantConfigurationTest implementation for the Quorus file transfer system.
+ * 
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @since 1.0
+ */
 public class TenantConfigurationTest {
 
     @Test

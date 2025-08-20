@@ -22,10 +22,6 @@ import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/**
- * Resolves variables in workflow definitions using template substitution.
- * Supports variable references in the format {{variableName}}.
- */
 public class VariableResolver {
     
     private static final Pattern VARIABLE_PATTERN = Pattern.compile("\\{\\{([^}]+)\\}\\}");
@@ -43,10 +39,6 @@ public class VariableResolver {
         this.contextVariables = new HashMap<>();
     }
     
-    /**
-     * Creates a new resolver with additional context variables.
-     * Context variables take precedence over global variables.
-     */
     public VariableResolver withContext(Map<String, Object> contextVariables) {
         VariableResolver resolver = new VariableResolver(this.globalVariables);
         resolver.contextVariables.putAll(this.contextVariables);
@@ -56,13 +48,6 @@ public class VariableResolver {
         return resolver;
     }
     
-    /**
-     * Resolves variables in a string template.
-     * 
-     * @param template the template string containing variable references
-     * @return the resolved string with variables substituted
-     * @throws VariableResolutionException if a variable cannot be resolved
-     */
     public String resolve(String template) throws VariableResolutionException {
         if (template == null) {
             return null;
@@ -86,9 +71,6 @@ public class VariableResolver {
         return result.toString();
     }
     
-    /**
-     * Resolves variables in a transfer group, creating a new instance with resolved values.
-     */
     public TransferGroup resolve(TransferGroup group) throws VariableResolutionException {
         Objects.requireNonNull(group, "Transfer group cannot be null");
         
@@ -116,9 +98,6 @@ public class VariableResolver {
         );
     }
     
-    /**
-     * Resolves variables in a transfer definition, creating a new instance with resolved values.
-     */
     public TransferGroup.TransferDefinition resolve(TransferGroup.TransferDefinition transfer) throws VariableResolutionException {
         Objects.requireNonNull(transfer, "Transfer definition cannot be null");
         
@@ -148,9 +127,6 @@ public class VariableResolver {
         );
     }
     
-    /**
-     * Resolves variables in a complete workflow definition.
-     */
     public WorkflowDefinition resolve(WorkflowDefinition workflow) throws VariableResolutionException {
         Objects.requireNonNull(workflow, "Workflow definition cannot be null");
         
@@ -177,9 +153,6 @@ public class VariableResolver {
         );
     }
     
-    /**
-     * Checks if a template contains any variable references.
-     */
     public boolean hasVariables(String template) {
         if (template == null) {
             return false;
@@ -187,9 +160,6 @@ public class VariableResolver {
         return VARIABLE_PATTERN.matcher(template).find();
     }
     
-    /**
-     * Gets all variable names referenced in a template.
-     */
     public java.util.Set<String> getVariableNames(String template) {
         if (template == null) {
             return java.util.Set.of();
@@ -205,23 +175,14 @@ public class VariableResolver {
         return variables;
     }
     
-    /**
-     * Adds or updates a global variable.
-     */
     public void setGlobalVariable(String name, Object value) {
         globalVariables.put(name, value);
     }
     
-    /**
-     * Adds or updates a context variable.
-     */
     public void setContextVariable(String name, Object value) {
         contextVariables.put(name, value);
     }
     
-    /**
-     * Gets all available variables (context variables override global variables).
-     */
     public Map<String, Object> getAllVariables() {
         Map<String, Object> allVariables = new HashMap<>(globalVariables);
         allVariables.putAll(contextVariables);

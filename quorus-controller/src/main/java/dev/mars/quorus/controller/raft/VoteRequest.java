@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Quorus Project
+ * Copyright 2025 Mark Andrew Ray-Smith Cityline Ltd
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,10 +18,6 @@ package dev.mars.quorus.controller.raft;
 
 import java.io.Serializable;
 
-/**
- * Vote request message used in Raft leader election.
- * Sent by candidates to request votes from other nodess.
- */
 public class VoteRequest implements Serializable {
 
     private static final long serialVersionUID = 1L;
@@ -31,14 +27,6 @@ public class VoteRequest implements Serializable {
     private final long lastLogIndex;
     private final long lastLogTerm;
 
-    /**
-     * Create a new vote request.
-     * 
-     * @param term Candidate's current term
-     * @param candidateId Candidate requesting the vote
-     * @param lastLogIndex Index of candidate's last log entry
-     * @param lastLogTerm Term of candidate's last log entry
-     */
     public VoteRequest(long term, String candidateId, long lastLogIndex, long lastLogTerm) {
         this.term = term;
         this.candidateId = candidateId;
@@ -46,23 +34,14 @@ public class VoteRequest implements Serializable {
         this.lastLogTerm = lastLogTerm;
     }
 
-    /**
-     * Get the candidate's current term.
-     */
     public long getTerm() {
         return term;
     }
 
-    /**
-     * Get the candidate's ID.
-     */
     public String getCandidateId() {
         return candidateId;
     }
 
-    /**
-     * Get the index of the candidate's last log entry.
-     */
     public long getLastLogIndex() {
         return lastLogIndex;
     }

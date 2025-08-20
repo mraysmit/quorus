@@ -28,6 +28,9 @@ import java.util.logging.Logger;
 /**
  * Configuration management for Quorus system.
  * Handles loading and providing access to system configuration parameters.
+ * 
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @since 1.0
  */
 public class QuorusConfiguration {
     private static final Logger logger = Logger.getLogger(QuorusConfiguration.class.getName());

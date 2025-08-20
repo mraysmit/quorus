@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Quorus Project
+ * Copyright 2025 Mark Andrew Ray-Smith Cityline Ltd
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,49 +16,16 @@
 
 package dev.mars.quorus.controller.raft;
 
-/**
- * State machine interface for Raft consensus.
- * Defines how commands are applied to the replicated state machine.
- */
 public interface RaftStateMachine {
 
-    /**
-     * Apply a command to the state machine.
-     * This method is called when a log entry is committed.
-     * 
-     * @param command The command to apply
-     * @return The result of applying the command
-     */
     Object apply(Object command);
 
-    /**
-     * Take a snapshot of the current state.
-     * Used for log compaction.
-     * 
-     * @return Snapshot data
-     */
     byte[] takeSnapshot();
 
-    /**
-     * Restore state from a snapshot.
-     * Used during recovery or when installing snapshots.
-     * 
-     * @param snapshot Snapshot data
-     */
     void restoreSnapshot(byte[] snapshot);
 
-    /**
-     * Get the index of the last applied command.
-     *
-     * @return Last applied index
-     */
     long getLastAppliedIndex();
 
-    /**
-     * Set the index of the last applied command.
-     *
-     * @param index Last applied index
-     */
     void setLastAppliedIndex(long index);
 
     /**

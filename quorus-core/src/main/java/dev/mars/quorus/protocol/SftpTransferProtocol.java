@@ -32,29 +32,6 @@ import java.time.Instant;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Logger;
 
-/**
- * SFTP (SSH File Transfer Protocol) implementation for secure file transfer.
- * 
- * This implementation provides secure file transfer capabilities over SSH,
- * commonly used in enterprise environments for secure file exchange.
- * 
- * Supported URI formats:
- * - sftp://server/path/file.txt
- * - sftp://username:password@server/path/file.txt
- * - sftp://server:22/path/file.txt (custom port)
- * - sftp://username@server/path/file.txt (key-based auth)
- * 
- * Features:
- * - Username/password authentication
- * - SSH key-based authentication
- * - Encrypted file transfer
- * - Progress tracking for large files
- * - Host key verification
- * - Corporate network security
- * 
- * Note: This is a simplified implementation. For production use,
- * consider using a full SSH library like JSch or Apache MINA SSHD.
- */
 public class SftpTransferProtocol implements TransferProtocol {
     
     private static final Logger logger = Logger.getLogger(SftpTransferProtocol.class.getName());

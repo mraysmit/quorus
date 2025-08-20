@@ -20,9 +20,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
 
-/**
- * Represents a network node with its characteristics and performance metrics.
- */
 public class NetworkNode {
     
     private final String hostname;
@@ -54,16 +51,10 @@ public class NetworkNode {
     public NetworkTopologyService.NetworkType getNetworkType() { return networkType; }
     public Instant getLastUpdated() { return lastUpdated; }
     
-    /**
-     * Check if this node information is stale and needs refresh
-     */
     public boolean isStale() {
         return Instant.now().isAfter(lastUpdated.plus(CACHE_DURATION));
     }
     
-    /**
-     * Create a new node with updated bandwidth information
-     */
     public NetworkNode withUpdatedBandwidth(long newBandwidth) {
         return toBuilder()
                 .estimatedBandwidth(newBandwidth)

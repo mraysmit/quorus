@@ -23,157 +23,43 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
-/**
- * Service interface for resource management and quota enforcement.
- * Tracks resource usage, enforces limits, and provides usage analytics.
- */
 public interface ResourceManagementService {
     
-    /**
-     * Record resource usage for a tenant
-     * 
-     * @param usage the resource usage to record
-     * @throws ResourceManagementException if recording fails
-     */
     void recordUsage(ResourceUsage usage) throws ResourceManagementException;
     
-    /**
-     * Get current resource usage for a tenant
-     * 
-     * @param tenantId the tenant ID
-     * @return current resource usage if available
-     */
     Optional<ResourceUsage> getCurrentUsage(String tenantId);
     
-    /**
-     * Get resource usage for a specific date
-     * 
-     * @param tenantId the tenant ID
-     * @param date the date
-     * @return resource usage for the date if available
-     */
     Optional<ResourceUsage> getUsageForDate(String tenantId, LocalDate date);
     
-    /**
-     * Get resource usage history for a tenant
-     * 
-     * @param tenantId the tenant ID
-     * @param fromDate start date (inclusive)
-     * @param toDate end date (inclusive)
-     * @return list of resource usage records
-     */
     List<ResourceUsage> getUsageHistory(String tenantId, LocalDate fromDate, LocalDate toDate);
     
-    /**
-     * Check if a tenant can start a new transfer without exceeding limits
-     * 
-     * @param tenantId the tenant ID
-     * @param transferSizeBytes the size of the transfer in bytes
-     * @param estimatedBandwidth estimated bandwidth usage in bytes per second
-     * @return validation result
-     */
     ResourceValidationResult validateTransferRequest(String tenantId, long transferSizeBytes, long estimatedBandwidth);
     
-    /**
-     * Reserve resources for a transfer
-     * 
-     * @param tenantId the tenant ID
-     * @param transferSizeBytes the size of the transfer in bytes
-     * @param estimatedBandwidth estimated bandwidth usage in bytes per second
-     * @return reservation token
-     * @throws ResourceManagementException if reservation fails
-     */
     String reserveResources(String tenantId, long transferSizeBytes, long estimatedBandwidth) 
             throws ResourceManagementException;
     
-    /**
-     * Release reserved resources
-     * 
-     * @param reservationToken the reservation token
-     * @param actualBytesTransferred actual bytes transferred
-     * @param actualBandwidthUsed actual bandwidth used
-     * @throws ResourceManagementException if release fails
-     */
     void releaseResources(String reservationToken, long actualBytesTransferred, long actualBandwidthUsed) 
             throws ResourceManagementException;
     
-    /**
-     * Update concurrent transfer count for a tenant
-     * 
-     * @param tenantId the tenant ID
-     * @param delta the change in concurrent transfers (positive or negative)
-     * @throws ResourceManagementException if update fails
-     */
     void updateConcurrentTransfers(String tenantId, int delta) throws ResourceManagementException;
     
-    /**
-     * Update bandwidth usage for a tenant
-     * 
-     * @param tenantId the tenant ID
-     * @param bandwidthBytesPerSecond current bandwidth usage
-     * @throws ResourceManagementException if update fails
-     */
     void updateBandwidthUsage(String tenantId, long bandwidthBytesPerSecond) throws ResourceManagementException;
     
-    /**
-     * Update storage usage for a tenant
-     * 
-     * @param tenantId the tenant ID
-     * @param storageBytes current storage usage
-     * @throws ResourceManagementException if update fails
-     */
     void updateStorageUsage(String tenantId, long storageBytes) throws ResourceManagementException;
     
-    /**
-     * Record a completed transfer
-     * 
-     * @param tenantId the tenant ID
-     * @param bytesTransferred bytes transferred
-     * @param successful whether the transfer was successful
-     * @throws ResourceManagementException if recording fails
-     */
     void recordTransferCompletion(String tenantId, long bytesTransferred, boolean successful) 
             throws ResourceManagementException;
     
-    /**
-     * Get resource utilization percentage for a tenant
-     * 
-     * @param tenantId the tenant ID
-     * @return utilization percentages for different resources
-     */
     ResourceUtilization getResourceUtilization(String tenantId);
     
-    /**
-     * Get tenants that are approaching or exceeding their limits
-     * 
-     * @param thresholdPercentage threshold percentage (e.g., 80.0 for 80%)
-     * @return list of tenant IDs approaching limits
-     */
     List<String> getTenantsApproachingLimits(double thresholdPercentage);
     
-    /**
-     * Get tenants that have exceeded their limits
-     * 
-     * @return list of tenant IDs that have exceeded limits
-     */
     List<String> getTenantsExceedingLimits();
     
-    /**
-     * Reset daily usage counters for all tenants
-     * This should be called at the start of each day
-     */
     void resetDailyUsage();
     
-    /**
-     * Get aggregated usage statistics across all tenants
-     * 
-     * @return aggregated usage statistics
-     */
     AggregatedUsageStats getAggregatedUsageStats();
     
-    /**
-     * Exception thrown by resource management operations
-     */
     class ResourceManagementException extends Exception {
         public ResourceManagementException(String message) {
             super(message);
@@ -184,9 +70,6 @@ public interface ResourceManagementService {
         }
     }
     
-    /**
-     * Result of resource validation
-     */
     class ResourceValidationResult {
         private final boolean allowed;
         private final String reason;
@@ -211,9 +94,6 @@ public interface ResourceManagementService {
         }
     }
     
-    /**
-     * Resource utilization information
-     */
     class ResourceUtilization {
         private final String tenantId;
         private final double concurrentTransfersUtilization;

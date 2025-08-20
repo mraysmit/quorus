@@ -35,6 +35,9 @@ import java.util.concurrent.CompletableFuture;
  * 3. Parallel execution capabilities
  * 4. Error handling and retry logic
  * 5. Dependency graph analysis
+ * 
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @since 1.0
  */
 public class ComplexWorkflowExample {
     

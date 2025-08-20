@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Quorus Project
+ * Copyright 2025 Mark Andrew Ray-Smith Cityline Ltd
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,10 +18,6 @@ package dev.mars.quorus.api.dto;
 
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
 
-/**
- * Data Transfer Object for transfer request.
- * Contains the information needed to create a new file transfer.
- */
 @Schema(description = "Transfer request containing source and destination information")
 public class TransferRequestDto {
 
@@ -46,9 +42,6 @@ public class TransferRequestDto {
     @Schema(description = "Timeout in seconds for the transfer", example = "300")
     private Integer timeoutSeconds;
 
-    /**
-     * Default constructor.
-     */
     public TransferRequestDto() {
     }
 

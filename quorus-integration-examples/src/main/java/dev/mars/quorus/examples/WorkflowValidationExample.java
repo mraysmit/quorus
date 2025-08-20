@@ -36,6 +36,9 @@ import java.util.concurrent.CompletableFuture;
  * IMPORTANT: This example intentionally tests failure scenarios to demonstrate
  * validation capabilities. Expected failures are clearly marked with ✓ symbols
  * and do not indicate actual problems with the system.
+ * 
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @since 1.0
  */
 public class WorkflowValidationExample {
     
@@ -144,10 +147,6 @@ public class WorkflowValidationExample {
         }
     }
     
-    /**
-     * Tests invalid YAML syntax handling.
-     * This is an INTENTIONAL FAILURE TEST - the parser should reject malformed YAML.
-     */
     private void testInvalidYamlSyntax(WorkflowDefinitionParser parser) {
         String invalidYaml = """
                 apiVersion: v1
@@ -169,10 +168,6 @@ public class WorkflowValidationExample {
         }
     }
     
-    /**
-     * Tests missing required fields validation.
-     * This is an INTENTIONAL FAILURE TEST - the parser should reject workflows with missing required fields.
-     */
     private void testMissingRequiredFields(WorkflowDefinitionParser parser) {
         String missingFields = """
                 apiVersion: v1
@@ -195,10 +190,6 @@ public class WorkflowValidationExample {
         }
     }
     
-    /**
-     * Tests circular dependency detection.
-     * This is an INTENTIONAL FAILURE TEST - the system should detect and reject circular dependencies.
-     */
     private void testCircularDependencies(WorkflowDefinitionParser parser) {
         String circularDeps = """
                 apiVersion: v1
@@ -242,10 +233,6 @@ public class WorkflowValidationExample {
         }
     }
     
-    /**
-     * Tests missing dependency detection.
-     * This is an INTENTIONAL FAILURE TEST - the system should detect and reject references to non-existent dependencies.
-     */
     private void testMissingDependencies(WorkflowDefinitionParser parser) {
         String missingDeps = """
                 apiVersion: v1

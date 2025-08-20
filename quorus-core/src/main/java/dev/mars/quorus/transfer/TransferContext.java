@@ -23,10 +23,6 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/**
- * Context object that holds state and configuration for an individual transfer operation.
- * Provides a way to pass shared state between different components during a transfer.
- */
 public class TransferContext {
     private final TransferJob job;
     private final Map<String, Object> attributes;
@@ -114,9 +110,6 @@ public class TransferContext {
         this.lastRetryTime = 0;
     }
     
-    /**
-     * Check if the transfer should continue (not cancelled and not paused)
-     */
     public boolean shouldContinue() {
         return !cancelled.get() && !paused.get();
     }

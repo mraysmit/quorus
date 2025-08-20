@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Quorus Project
+ * Copyright 2025 Mark Andrew Ray-Smith Cityline Ltd
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,9 +24,6 @@ import java.io.Serializable;
 import java.time.Instant;
 import java.util.Map;
 
-/**
- * Snapshot of the Quorus state machine for persistence and recovery.
- */
 public class QuorusSnapshot implements Serializable {
 
     private static final long serialVersionUID = 1L;
@@ -36,16 +33,10 @@ public class QuorusSnapshot implements Serializable {
     private long lastAppliedIndex;
     private Instant timestamp;
 
-    /**
-     * Default constructor for JSON deserialization.
-     */
     public QuorusSnapshot() {
         this.timestamp = Instant.now();
     }
 
-    /**
-     * Constructor for JSON deserialization.
-     */
     @JsonCreator
     public QuorusSnapshot(@JsonProperty("transferJobs") Map<String, TransferJobSnapshot> transferJobs,
                          @JsonProperty("systemMetadata") Map<String, String> systemMetadata,
@@ -57,51 +48,30 @@ public class QuorusSnapshot implements Serializable {
         this.timestamp = timestamp != null ? timestamp : Instant.now();
     }
 
-    /**
-     * Get the transfer jobs.
-     */
     public Map<String, TransferJobSnapshot> getTransferJobs() {
         return transferJobs;
     }
 
-    /**
-     * Set the transfer jobs.
-     */
     public void setTransferJobs(Map<String, TransferJobSnapshot> transferJobs) {
         this.transferJobs = transferJobs;
     }
 
-    /**
-     * Get the system metadata.
-     */
     public Map<String, String> getSystemMetadata() {
         return systemMetadata;
     }
 
-    /**
-     * Set the system metadata.
-     */
     public void setSystemMetadata(Map<String, String> systemMetadata) {
         this.systemMetadata = systemMetadata;
     }
 
-    /**
-     * Get the last applied index.
-     */
     public long getLastAppliedIndex() {
         return lastAppliedIndex;
     }
 
-    /**
-     * Set the last applied index.
-     */
     public void setLastAppliedIndex(long lastAppliedIndex) {
         this.lastAppliedIndex = lastAppliedIndex;
     }
 
-    /**
-     * Get the snapshot timestamp.
-     */
     public Instant getTimestamp() {
         return timestamp;
     }

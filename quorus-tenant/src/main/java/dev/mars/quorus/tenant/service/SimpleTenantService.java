@@ -29,6 +29,9 @@ import java.util.stream.Collectors;
  * Simple in-memory implementation of TenantService.
  * This implementation is suitable for development and testing.
  * For production use, consider implementing a persistent storage backend.
+ * 
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @since 1.0
  */
 public class SimpleTenantService implements TenantService {
     

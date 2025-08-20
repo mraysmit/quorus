@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Quorus Project
+ * Copyright 2025 Mark Andrew Ray-Smith Cityline Ltd
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,10 +25,6 @@ import dev.mars.quorus.core.TransferStatus;
 import java.io.Serializable;
 import java.time.Instant;
 
-/**
- * JSON-serializable snapshot of a TransferJob for distributed state storage.
- * This class contains only the essential data needed for consensus replication.
- */
 public class TransferJobSnapshot implements Serializable {
 
     private static final long serialVersionUID = 1L;
@@ -44,9 +40,6 @@ public class TransferJobSnapshot implements Serializable {
     private final String errorMessage;
     private final String description;
 
-    /**
-     * Constructor for JSON deserialization.
-     */
     @JsonCreator
     public TransferJobSnapshot(
             @JsonProperty("jobId") String jobId,
@@ -71,9 +64,6 @@ public class TransferJobSnapshot implements Serializable {
         this.description = description;
     }
 
-    /**
-     * Create a snapshot from a TransferJob.
-     */
     public static TransferJobSnapshot fromTransferJob(TransferJob job) {
         return new TransferJobSnapshot(
                 job.getJobId(),

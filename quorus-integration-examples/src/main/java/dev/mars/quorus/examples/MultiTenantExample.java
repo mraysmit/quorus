@@ -47,6 +47,9 @@ import java.util.List;
  * - Different resource limits and policies per tenant level
  * 
  * Run with: mvn exec:java -Dexec.mainClass="dev.mars.quorus.examples.MultiTenantExample" -pl quorus-integration-examples
+ * 
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @since 1.0
  */
 public class MultiTenantExample {
     

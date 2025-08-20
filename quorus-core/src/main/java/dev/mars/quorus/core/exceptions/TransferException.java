@@ -20,6 +20,9 @@ package dev.mars.quorus.core.exceptions;
 /**
  * Exception thrown when a file transfer operation fails.
  * This includes network errors, file system errors, and protocol-specific failures.
+ *
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @since 1.0
  */
 public class TransferException extends QuorusException {
     

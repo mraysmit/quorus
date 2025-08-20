@@ -19,10 +19,6 @@ package dev.mars.quorus.tenant.model;
 import java.time.Duration;
 import java.util.*;
 
-/**
- * Configuration settings for a tenant, including resource limits,
- * transfer policies, and operational parameters.
- */
 public class TenantConfiguration {
     
     private final ResourceLimits resourceLimits;
@@ -43,9 +39,6 @@ public class TenantConfiguration {
     public SecuritySettings getSecuritySettings() { return securitySettings; }
     public Map<String, Object> getCustomSettings() { return customSettings; }
     
-    /**
-     * Resource limits for the tenant
-     */
     public static class ResourceLimits {
         private final long maxConcurrentTransfers;
         private final long maxBandwidthBytesPerSecond;
@@ -97,9 +90,6 @@ public class TenantConfiguration {
         }
     }
     
-    /**
-     * Transfer policies for the tenant
-     */
     public static class TransferPolicies {
         private final Set<String> allowedProtocols;
         private final Set<String> allowedSourcePatterns;

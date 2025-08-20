@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Quorus Project
+ * Copyright 2025 Mark Andrew Ray-Smith Cityline Ltd
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,10 +24,6 @@ import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
 
-/**
- * In-memory transport implementation for testing Raft consensus.
- * Simulates network communication between nodes in the same JVM.
- */
 public class InMemoryTransport implements RaftTransport {
 
     private static final Logger logger = Logger.getLogger(InMemoryTransport.class.getName());
@@ -40,11 +36,6 @@ public class InMemoryTransport implements RaftTransport {
     private volatile Consumer<Object> messageHandler;
     private volatile boolean running = false;
 
-    /**
-     * Create a new in-memory transport.
-     * 
-     * @param nodeId ID of the local node
-     */
     public InMemoryTransport(String nodeId) {
         this.nodeId = nodeId;
     }
@@ -125,9 +116,6 @@ public class InMemoryTransport implements RaftTransport {
         return running;
     }
 
-    /**
-     * Handle incoming vote request.
-     */
     private VoteResponse handleVoteRequest(VoteRequest request) {
         if (messageHandler != null) {
             messageHandler.accept(request);
@@ -140,9 +128,6 @@ public class InMemoryTransport implements RaftTransport {
         return new VoteResponse(request.getTerm(), voteGranted, nodeId);
     }
 
-    /**
-     * Handle incoming append entries request.
-     */
     private AppendEntriesResponse handleAppendEntries(AppendEntriesRequest request) {
         if (messageHandler != null) {
             messageHandler.accept(request);
@@ -157,9 +142,6 @@ public class InMemoryTransport implements RaftTransport {
         return new AppendEntriesResponse(request.getTerm(), success, nodeId, matchIndex);
     }
 
-    /**
-     * Get all registered transport instances (for testing).
-     */
     public static Map<String, InMemoryTransport> getAllTransports() {
         return new ConcurrentHashMap<>(transports);
     }

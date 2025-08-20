@@ -32,25 +32,6 @@ import java.time.Instant;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Logger;
 
-/**
- * FTP protocol implementation for file transfer.
- * 
- * This implementation provides file transfer capabilities over FTP protocol,
- * commonly used in enterprise environments for file exchange.
- * 
- * Supported URI formats:
- * - ftp://server/path/file.txt
- * - ftp://username:password@server/path/file.txt
- * - ftp://server:21/path/file.txt (custom port)
- * 
- * Features:
- * - Username/password authentication
- * - Passive mode for corporate firewalls
- * - Progress tracking for large files
- * - Binary transfer mode
- * - Connection timeout handling
- * - Corporate network optimization
- */
 public class FtpTransferProtocol implements TransferProtocol {
     
     private static final Logger logger = Logger.getLogger(FtpTransferProtocol.class.getName());
@@ -204,9 +185,6 @@ public class FtpTransferProtocol implements TransferProtocol {
     
 
     
-    /**
-     * Simple FTP client implementation
-     */
     private static class FtpClient {
         private final FtpConnectionInfo connectionInfo;
         private Socket controlSocket;
@@ -391,9 +369,6 @@ public class FtpTransferProtocol implements TransferProtocol {
         }
     }
     
-    /**
-     * FTP connection information
-     */
     private static class FtpConnectionInfo {
         final String host;
         final int port;

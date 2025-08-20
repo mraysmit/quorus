@@ -52,6 +52,9 @@ import java.util.concurrent.CompletableFuture;
  * - Connection reuse and pooling
  * 
  * Run with: mvn exec:java -Dexec.mainClass="dev.mars.quorus.examples.EnterpriseProtocolExample" -pl quorus-integration-examples
+ * 
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @since 1.0
  */
 public class EnterpriseProtocolExample {
     

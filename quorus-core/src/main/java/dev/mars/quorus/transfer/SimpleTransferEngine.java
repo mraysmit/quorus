@@ -33,6 +33,9 @@ import java.util.logging.Logger;
 /**
  * Simple implementation of the TransferEngine interface.
  * Handles basic file transfers with retry logic and progress tracking.
+ * 
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @since 1.0
  */
 public class SimpleTransferEngine implements TransferEngine {
     private static final Logger logger = Logger.getLogger(SimpleTransferEngine.class.getName());

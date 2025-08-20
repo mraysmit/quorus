@@ -41,6 +41,9 @@ import java.util.logging.Logger;
  * - Backup operations between data centers
  * 
  * Run with: mvn exec:java -Dexec.mainClass="dev.mars.quorus.examples.InternalNetworkTransferExample" -pl quorus-integration-examples
+ * 
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @since 1.0
  */
 public class InternalNetworkTransferExample {
     private static final Logger logger = Logger.getLogger(InternalNetworkTransferExample.class.getName());
@@ -143,10 +146,6 @@ public class InternalNetworkTransferExample {
         }
     }
     
-    /**
-     * Creates configuration optimized for corporate network environments.
-     * In real deployment, this would include corporate-specific settings.
-     */
     private static QuorusConfiguration createCorporateNetworkConfiguration() {
         QuorusConfiguration config = new QuorusConfiguration();
 
@@ -163,10 +162,6 @@ public class InternalNetworkTransferExample {
         return config;
     }
     
-    /**
-     * Demonstrates CRM data synchronization to corporate data warehouse.
-     * Simulates: CRM system -> Data Warehouse ETL process
-     */
     private static void runCrmDataSynchronization(TransferEngine transferEngine, Path dataWarehouseDir)
             throws IOException, InterruptedException, ExecutionException, TimeoutException, TransferException {
         logger.info("--- CRM Data Synchronization Example ---");
@@ -205,10 +200,6 @@ public class InternalNetworkTransferExample {
         logger.info("");
     }
     
-    /**
-     * Demonstrates multi-department file distribution.
-     * Simulates: Central file server -> Multiple department shares
-     */
     private static void runDepartmentFileDistribution(TransferEngine transferEngine, Path departmentSharesDir)
             throws InterruptedException, ExecutionException, TimeoutException, TransferException {
         logger.info("--- Multi-Department File Distribution Example ---");
@@ -260,10 +251,6 @@ public class InternalNetworkTransferExample {
         logger.info("");
     }
     
-    /**
-     * Demonstrates high-throughput backup operations.
-     * Simulates: Production data -> Backup storage array
-     */
     private static void runHighThroughputBackupOperation(TransferEngine transferEngine, Path backupDir)
             throws InterruptedException, ExecutionException, TimeoutException, TransferException {
         logger.info("--- High-Throughput Backup Operation Example ---");
@@ -303,9 +290,6 @@ public class InternalNetworkTransferExample {
         logger.info("");
     }
     
-    /**
-     * Monitors corporate network transfers with enhanced logging and proper resource management.
-     */
     private static void monitorCorporateTransfer(TransferEngine transferEngine, String jobId, String operationType) {
         Thread monitorThread = new Thread(() -> {
             try {
@@ -350,9 +334,6 @@ public class InternalNetworkTransferExample {
         monitorThread.start();
     }
 
-    /**
-     * Properly shuts down monitoring threads to prevent resource leaks.
-     */
     private static void shutdownMonitoringThreads() {
         synchronized (monitoringThreads) {
             logger.info("Shutting down " + monitoringThreads.size() + " monitoring threads...");
@@ -371,9 +352,6 @@ public class InternalNetworkTransferExample {
         }
     }
 
-    /**
-     * Displays transfer results with corporate network context.
-     */
     private static void displayCorporateTransferResult(TransferResult result, long duration, String destination) {
         logger.info("  Transfer Status: " + result.getFinalStatus());
         logger.info("  Success: " + (result.isSuccessful() ? "✓" : "✗"));

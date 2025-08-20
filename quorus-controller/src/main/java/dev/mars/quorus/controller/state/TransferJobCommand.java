@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Quorus Project
+ * Copyright 2025 Mark Andrew Ray-Smith Cityline Ltd
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,9 +21,6 @@ import dev.mars.quorus.core.TransferStatus;
 
 import java.io.Serializable;
 
-/**
- * Command for transfer job operations in the distributed state machine.
- */
 public class TransferJobCommand implements Serializable {
 
     private static final long serialVersionUID = 1L;
@@ -39,9 +36,6 @@ public class TransferJobCommand implements Serializable {
     private final TransferJob transferJob;
     private final TransferStatus status;
 
-    /**
-     * Create a new transfer job command.
-     */
     private TransferJobCommand(Type type, String jobId, TransferJob transferJob, TransferStatus status) {
         this.type = type;
         this.jobId = jobId;
@@ -49,44 +43,26 @@ public class TransferJobCommand implements Serializable {
         this.status = status;
     }
 
-    /**
-     * Create a command to create a new transfer job.
-     */
     public static TransferJobCommand create(TransferJob transferJob) {
         return new TransferJobCommand(Type.CREATE, transferJob.getJobId(), transferJob, null);
     }
 
-    /**
-     * Create a command to update transfer job status.
-     */
     public static TransferJobCommand updateStatus(String jobId, TransferStatus status) {
         return new TransferJobCommand(Type.UPDATE_STATUS, jobId, null, status);
     }
 
-    /**
-     * Create a command to delete a transfer job.
-     */
     public static TransferJobCommand delete(String jobId) {
         return new TransferJobCommand(Type.DELETE, jobId, null, null);
     }
 
-    /**
-     * Get the command type.
-     */
     public Type getType() {
         return type;
     }
 
-    /**
-     * Get the job ID.
-     */
     public String getJobId() {
         return jobId;
     }
 
-    /**
-     * Get the transfer job (for CREATE commands).
-     */
     public TransferJob getTransferJob() {
         return transferJob;
     }
