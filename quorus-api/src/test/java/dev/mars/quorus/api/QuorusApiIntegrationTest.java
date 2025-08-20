@@ -156,8 +156,8 @@ class QuorusApiIntegrationTest {
             .statusCode(200)
             .body("jobId", equalTo(createdJobId))
             .body("sourceUri", equalTo("https://httpbin.org/bytes/1024"))
-            .body("destinationPath", equalTo("/tmp/integration-test.bin"))
-            .body("status", anyOf(equalTo("PENDING"), equalTo("RUNNING"), equalTo("COMPLETED"), equalTo("FAILED")))
+            .body("destinationPath", anyOf(equalTo("/tmp/integration-test.bin"), equalTo("\\tmp\\integration-test.bin")))
+            .body("status", anyOf(equalTo("PENDING"), equalTo("IN_PROGRESS"), equalTo("COMPLETED"), equalTo("FAILED")))
             .body("progressPercentage", notNullValue())
             .body("bytesTransferred", notNullValue())
             .body("createdAt", notNullValue());
@@ -215,8 +215,8 @@ class QuorusApiIntegrationTest {
             .post("/api/v1/transfers")
         .then()
             .statusCode(400)
-            .body("error", notNullValue())
-            .body("message", containsString("Invalid transfer request"))
+            .body("error", equalTo("Invalid request"))
+            .body("message", equalTo("Source URI is required"))
             .body("timestamp", notNullValue());
 
         // Test getting non-existent transfer

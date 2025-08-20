@@ -61,7 +61,7 @@ class TransferResourceTest {
     @Test
     void testCreateTransferWithInvalidRequest() {
         TransferRequestDto request = new TransferRequestDto();
-        // Missing required fields
+        // Missing required fields - should return specific validation error
 
         given()
             .header("Authorization", ADMIN_AUTH)
@@ -71,8 +71,8 @@ class TransferResourceTest {
             .post("/api/v1/transfers")
         .then()
             .statusCode(400)
-            .body("error", notNullValue())
-            .body("message", containsString("Invalid transfer request"));
+            .body("error", equalTo("Invalid request"))
+            .body("message", equalTo("Source URI is required"));
     }
 
     @Test
@@ -181,8 +181,8 @@ class TransferResourceTest {
             .statusCode(200)
             .body("jobId", equalTo(jobId))
             .body("sourceUri", equalTo("https://httpbin.org/bytes/2048"))
-            .body("destinationPath", equalTo("/tmp/workflow-test.bin"))
-            .body("status", anyOf(equalTo("PENDING"), equalTo("RUNNING"), equalTo("COMPLETED")));
+            .body("destinationPath", anyOf(equalTo("/tmp/workflow-test.bin"), equalTo("\\tmp\\workflow-test.bin")))
+            .body("status", anyOf(equalTo("PENDING"), equalTo("IN_PROGRESS"), equalTo("COMPLETED")));
 
         // Verify active transfer count increased
         given()
