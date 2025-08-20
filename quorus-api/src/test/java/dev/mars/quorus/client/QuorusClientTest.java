@@ -85,7 +85,9 @@ class QuorusClientTest {
         assertNotNull(statusResponse);
         assertEquals(createResponse.getJobId(), statusResponse.getJobId());
         assertEquals(sourceUri, statusResponse.getSourceUri());
-        assertEquals(destinationPath, statusResponse.getDestinationPath());
+        // Path comparison should be platform-agnostic (Windows vs Unix separators)
+        assertTrue(statusResponse.getDestinationPath().equals(destinationPath) ||
+                   statusResponse.getDestinationPath().equals(destinationPath.replace("/", "\\")));
         assertNotNull(statusResponse.getStatus());
     }
 

@@ -63,10 +63,29 @@ public class TransferResource {
     public Response createTransfer(
             @Parameter(description = "Transfer request details") TransferRequestDto requestDto) {
         try {
+            // Validate input
+            if (requestDto == null) {
+                return Response.status(Response.Status.BAD_REQUEST)
+                        .entity(new ErrorResponse("Invalid request", "Request body is required"))
+                        .build();
+            }
+
+            if (requestDto.getSourceUri() == null || requestDto.getSourceUri().trim().isEmpty()) {
+                return Response.status(Response.Status.BAD_REQUEST)
+                        .entity(new ErrorResponse("Invalid request", "Source URI is required"))
+                        .build();
+            }
+
+            if (requestDto.getDestinationPath() == null || requestDto.getDestinationPath().trim().isEmpty()) {
+                return Response.status(Response.Status.BAD_REQUEST)
+                        .entity(new ErrorResponse("Invalid request", "Destination path is required"))
+                        .build();
+            }
+
             // Convert DTO to TransferRequest
             TransferRequest request = TransferRequest.builder()
-                    .sourceUri(URI.create(requestDto.getSourceUri()))
-                    .destinationPath(Paths.get(requestDto.getDestinationPath()))
+                    .sourceUri(URI.create(requestDto.getSourceUri().trim()))
+                    .destinationPath(Paths.get(requestDto.getDestinationPath().trim()))
                     .build();
 
             // Submit transfer
@@ -89,12 +108,18 @@ public class TransferResource {
         } catch (TransferException e) {
             logger.log(Level.WARNING, "Failed to create transfer", e);
             return Response.status(Response.Status.BAD_REQUEST)
-                    .entity(new ErrorResponse("Invalid transfer request: " + e.getMessage()))
+                    .entity(new ErrorResponse("Error", "Invalid transfer request: " + e.getMessage()))
+                    .build();
+        } catch (IllegalArgumentException e) {
+            // Handle URI creation errors and other validation errors
+            logger.log(Level.WARNING, "Invalid request parameters", e);
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(new ErrorResponse("Invalid request", "Invalid URI or path: " + e.getMessage()))
                     .build();
         } catch (Exception e) {
             logger.log(Level.SEVERE, "Internal error creating transfer", e);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                    .entity(new ErrorResponse("Internal server error"))
+                    .entity(new ErrorResponse("Internal server error", "An unexpected error occurred"))
                     .build();
         }
     }
