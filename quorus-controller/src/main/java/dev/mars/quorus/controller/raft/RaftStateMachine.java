@@ -49,10 +49,17 @@ public interface RaftStateMachine {
 
     /**
      * Get the index of the last applied command.
-     * 
+     *
      * @return Last applied index
      */
     long getLastAppliedIndex();
+
+    /**
+     * Set the index of the last applied command.
+     *
+     * @param index Last applied index
+     */
+    void setLastAppliedIndex(long index);
 
     /**
      * Reset the state machine to initial state.

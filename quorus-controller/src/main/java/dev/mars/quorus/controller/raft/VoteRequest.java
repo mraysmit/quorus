@@ -20,7 +20,7 @@ import java.io.Serializable;
 
 /**
  * Vote request message used in Raft leader election.
- * Sent by candidates to request votes from other nodes.
+ * Sent by candidates to request votes from other nodess.
  */
 public class VoteRequest implements Serializable {
 

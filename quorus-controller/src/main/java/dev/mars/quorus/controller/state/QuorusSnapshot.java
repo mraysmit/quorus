@@ -18,7 +18,7 @@ package dev.mars.quorus.controller.state;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import dev.mars.quorus.core.TransferJob;
+
 
 import java.io.Serializable;
 import java.time.Instant;
@@ -31,7 +31,7 @@ public class QuorusSnapshot implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    private Map<String, TransferJob> transferJobs;
+    private Map<String, TransferJobSnapshot> transferJobs;
     private Map<String, String> systemMetadata;
     private long lastAppliedIndex;
     private Instant timestamp;
@@ -47,7 +47,7 @@ public class QuorusSnapshot implements Serializable {
      * Constructor for JSON deserialization.
      */
     @JsonCreator
-    public QuorusSnapshot(@JsonProperty("transferJobs") Map<String, TransferJob> transferJobs,
+    public QuorusSnapshot(@JsonProperty("transferJobs") Map<String, TransferJobSnapshot> transferJobs,
                          @JsonProperty("systemMetadata") Map<String, String> systemMetadata,
                          @JsonProperty("lastAppliedIndex") long lastAppliedIndex,
                          @JsonProperty("timestamp") Instant timestamp) {
@@ -60,14 +60,14 @@ public class QuorusSnapshot implements Serializable {
     /**
      * Get the transfer jobs.
      */
-    public Map<String, TransferJob> getTransferJobs() {
+    public Map<String, TransferJobSnapshot> getTransferJobs() {
         return transferJobs;
     }
 
     /**
      * Set the transfer jobs.
      */
-    public void setTransferJobs(Map<String, TransferJob> transferJobs) {
+    public void setTransferJobs(Map<String, TransferJobSnapshot> transferJobs) {
         this.transferJobs = transferJobs;
     }
 

@@ -69,7 +69,7 @@ class QuorusStateMachineTest {
         assertEquals(1, stateMachine.getTransferJobCount());
         
         // Verify job is stored
-        TransferJob storedJob = stateMachine.getTransferJob(job.getJobId());
+        TransferJobSnapshot storedJob = stateMachine.getTransferJob(job.getJobId());
         assertNotNull(storedJob);
         assertEquals(job.getJobId(), storedJob.getJobId());
         
@@ -187,7 +187,7 @@ class QuorusStateMachineTest {
         assertEquals(1, stateMachine.getTransferJobCount());
         assertEquals(10, stateMachine.getLastAppliedIndex());
         
-        TransferJob restoredJob = stateMachine.getTransferJob(job.getJobId());
+        TransferJobSnapshot restoredJob = stateMachine.getTransferJob(job.getJobId());
         assertNotNull(restoredJob);
         assertEquals(job.getJobId(), restoredJob.getJobId());
     }
@@ -242,7 +242,7 @@ class QuorusStateMachineTest {
         stateMachine.apply(SystemMetadataCommand.set("region", "us-east-1"));
         
         // Test getTransferJobs
-        Map<String, TransferJob> jobs = stateMachine.getTransferJobs();
+        Map<String, TransferJobSnapshot> jobs = stateMachine.getTransferJobs();
         assertEquals(3, jobs.size());
         
         // Test getSystemMetadata

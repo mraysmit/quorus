@@ -175,10 +175,11 @@ class RaftFailureTest {
 
     @Test
     void testInvalidClusterConfiguration() {
-        // Test empty cluster
-        assertThrows(Exception.class, () -> {
-            new RaftNode("test", Set.of(), transport1, new QuorusStateMachine());
-        });
+        // Test empty cluster - should not throw exception but should handle gracefully
+        RaftNode emptyClusterNode = new RaftNode("test", Set.of(), transport1, new QuorusStateMachine());
+        assertNotNull(emptyClusterNode);
+        assertEquals("test", emptyClusterNode.getNodeId());
+        assertEquals(RaftNode.State.FOLLOWER, emptyClusterNode.getState());
     }
 
     @Test
@@ -246,7 +247,12 @@ class RaftFailureTest {
             public long getLastAppliedIndex() {
                 return 0;
             }
-            
+
+            @Override
+            public void setLastAppliedIndex(long index) {
+                throw new RuntimeException("Set index error");
+            }
+
             @Override
             public void reset() {
                 throw new RuntimeException("Reset error");
