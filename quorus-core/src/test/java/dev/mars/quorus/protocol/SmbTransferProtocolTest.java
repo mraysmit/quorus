@@ -92,12 +92,14 @@ class SmbTransferProtocolTest {
     
     @Test
     void testCannotHandleRequestWithNullUri() {
-        TransferRequest requestWithNullUri = TransferRequest.builder()
-                .sourceUri(null)
-                .destinationPath(tempDir.resolve("file.txt"))
-                .build();
-        
-        assertFalse(protocol.canHandle(requestWithNullUri));
+        // TransferRequest constructor validates that sourceUri cannot be null
+        // So we test that the constructor throws NullPointerException
+        assertThrows(NullPointerException.class, () -> {
+            TransferRequest.builder()
+                    .sourceUri(null)
+                    .destinationPath(tempDir.resolve("file.txt"))
+                    .build();
+        });
     }
     
     @Test
@@ -132,12 +134,19 @@ class SmbTransferProtocolTest {
     
     @Test
     void testTransferWithInvalidSmbUri() {
+        // URI.create("smb://") throws IllegalArgumentException due to missing authority
+        // So we test that URI creation itself throws the exception
+        assertThrows(IllegalArgumentException.class, () -> {
+            URI.create("smb://");
+        });
+
+        // Test with a malformed but parseable URI that the protocol should reject
         TransferRequest request = TransferRequest.builder()
                 .requestId("test-invalid-smb")
-                .sourceUri(URI.create("smb://"))
+                .sourceUri(URI.create("smb://invalid-host-without-path"))
                 .destinationPath(tempDir.resolve("testfile.txt"))
                 .build();
-        
+
         assertThrows(TransferException.class, () -> {
             protocol.transfer(request, context);
         });
