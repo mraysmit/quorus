@@ -90,11 +90,13 @@ public class LogEntry implements Serializable {
         return term == logEntry.term &&
                index == logEntry.index &&
                Objects.equals(command, logEntry.command);
+        // Note: timestamp is intentionally excluded from equality
     }
 
     @Override
     public int hashCode() {
         return Objects.hash(term, index, command);
+        // Note: timestamp is intentionally excluded from hashCode
     }
 
     @Override
