@@ -18,6 +18,7 @@ package dev.mars.quorus.api.health;
 
 import io.quarkus.test.junit.QuarkusTest;
 import org.eclipse.microprofile.health.HealthCheckResponse;
+import org.eclipse.microprofile.health.Readiness;
 import org.junit.jupiter.api.Test;
 
 import jakarta.inject.Inject;
@@ -32,27 +33,30 @@ import static org.junit.jupiter.api.Assertions.*;
 class TransferEngineHealthCheckTest {
 
     @Inject
+    @Readiness
     TransferEngineHealthCheck healthCheck;
 
     @Test
     void testHealthCheckReturnsUp() {
         HealthCheckResponse response = healthCheck.call();
-        
+
         assertNotNull(response);
         assertEquals("transfer-engine", response.getName());
         assertEquals(HealthCheckResponse.Status.UP, response.getStatus());
-        
+
+
+
         // Verify data is present
-        assertTrue(response.getData().isPresent());
+        assertTrue(response.getData().isPresent(), "Health check response should have data");
         assertTrue(response.getData().get().containsKey("activeTransfers"));
         assertTrue(response.getData().get().containsKey("status"));
         assertEquals("operational", response.getData().get().get("status"));
-        
-        // Verify activeTransfers is a valid number
+
+        // Verify activeTransfers is a valid number (can be Integer or Long)
         Object activeTransfers = response.getData().get().get("activeTransfers");
         assertNotNull(activeTransfers);
-        assertTrue(activeTransfers instanceof Integer);
-        assertTrue((Integer) activeTransfers >= 0);
+        assertTrue(activeTransfers instanceof Number, "Expected Number but got " + activeTransfers.getClass().getName());
+        assertTrue(((Number) activeTransfers).longValue() >= 0);
     }
 
     @Test
@@ -73,13 +77,13 @@ class TransferEngineHealthCheckTest {
         assertTrue(data.containsKey("status"));
         
         // Verify data types
-        assertTrue(data.get("activeTransfers") instanceof Integer);
+        assertTrue(data.get("activeTransfers") instanceof Number);
         assertTrue(data.get("status") instanceof String);
-        
+
         // Verify values
         assertEquals("operational", data.get("status"));
-        Integer activeTransfers = (Integer) data.get("activeTransfers");
-        assertTrue(activeTransfers >= 0, "Active transfers should be non-negative");
+        Number activeTransfers = (Number) data.get("activeTransfers");
+        assertTrue(activeTransfers.longValue() >= 0, "Active transfers should be non-negative");
     }
 
     @Test

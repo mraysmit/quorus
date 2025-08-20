@@ -221,6 +221,13 @@ class SimpleTenantServiceTest {
                 .build();
         Tenant created = tenantService.createTenant(original);
 
+        // Add a small delay to ensure different timestamps
+        try {
+            Thread.sleep(1);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
         Tenant updated = created.toBuilder()
                 .name("Updated Name")
                 .description("Updated description")

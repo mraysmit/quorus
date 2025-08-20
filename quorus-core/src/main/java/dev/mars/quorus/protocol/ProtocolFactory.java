@@ -32,16 +32,34 @@ public class ProtocolFactory {
     }
     
     private void registerDefaultProtocols() {
-        registerProtocol(new HttpTransferProtocol());
-        registerProtocol(new SmbTransferProtocol());
+        // Register HTTP protocol for both http and https schemes
+        HttpTransferProtocol httpProtocol = new HttpTransferProtocol();
+        registerProtocol(httpProtocol);
+        registerProtocolAlias("https", httpProtocol);
+
+        // Register SMB protocol for both smb and cifs schemes
+        SmbTransferProtocol smbProtocol = new SmbTransferProtocol();
+        registerProtocol(smbProtocol);
+        registerProtocolAlias("cifs", smbProtocol);
+
+        // Register FTP and SFTP protocols
         registerProtocol(new FtpTransferProtocol());
         registerProtocol(new SftpTransferProtocol());
+
         logger.info("Registered default transfer protocols: HTTP/HTTPS, SMB/CIFS, FTP, SFTP");
     }
     
     public void registerProtocol(TransferProtocol protocol) {
         protocols.put(protocol.getProtocolName().toLowerCase(), protocol);
         logger.info("Registered protocol: " + protocol.getProtocolName());
+    }
+
+    /**
+     * Register a protocol under an alias scheme name
+     */
+    public void registerProtocolAlias(String alias, TransferProtocol protocol) {
+        protocols.put(alias.toLowerCase(), protocol);
+        logger.info("Registered protocol alias: " + alias + " -> " + protocol.getProtocolName());
     }
     
     public TransferProtocol getProtocol(String protocolName) {

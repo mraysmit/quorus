@@ -92,12 +92,14 @@ class SftpTransferProtocolTest {
     
     @Test
     void testCannotHandleRequestWithNullUri() {
-        TransferRequest requestWithNullUri = TransferRequest.builder()
-                .sourceUri(null)
-                .destinationPath(tempDir.resolve("file.txt"))
-                .build();
-        
-        assertFalse(protocol.canHandle(requestWithNullUri));
+        // TransferRequest constructor validates that sourceUri cannot be null
+        // So we test that the constructor throws NullPointerException
+        assertThrows(NullPointerException.class, () -> {
+            TransferRequest.builder()
+                    .sourceUri(null)
+                    .destinationPath(tempDir.resolve("file.txt"))
+                    .build();
+        });
     }
     
     @Test
@@ -135,12 +137,19 @@ class SftpTransferProtocolTest {
     
     @Test
     void testTransferWithInvalidSftpUri() {
+        // URI.create("sftp://") throws IllegalArgumentException due to missing authority
+        // So we test that URI creation itself throws the exception
+        assertThrows(IllegalArgumentException.class, () -> {
+            URI.create("sftp://");
+        });
+
+        // Test with a malformed but parseable URI that the protocol should reject
         TransferRequest request = TransferRequest.builder()
                 .requestId("test-invalid-sftp")
-                .sourceUri(URI.create("sftp://"))
+                .sourceUri(URI.create("sftp://invalid-host-without-path"))
                 .destinationPath(tempDir.resolve("testfile.txt"))
                 .build();
-        
+
         assertThrows(TransferException.class, () -> {
             protocol.transfer(request, context);
         });
@@ -249,16 +258,23 @@ class SftpTransferProtocolTest {
     
     @Test
     void testTransferExceptionContainsRequestId() {
+        // URI.create("sftp://") throws IllegalArgumentException due to missing authority
+        // So we test that URI creation itself throws the exception
+        assertThrows(IllegalArgumentException.class, () -> {
+            URI.create("sftp://");
+        });
+
+        // Test with a URI that will cause a validation exception (missing path)
         TransferRequest request = TransferRequest.builder()
                 .requestId("test-exception-id")
-                .sourceUri(URI.create("sftp://"))
+                .sourceUri(URI.create("sftp://server"))
                 .destinationPath(tempDir.resolve("testfile.txt"))
                 .build();
-        
+
         TransferException exception = assertThrows(TransferException.class, () -> {
             protocol.transfer(request, context);
         });
-        
+
         // The exception should contain context about the transfer
         assertNotNull(exception.getMessage());
         assertTrue(exception.getMessage().contains("SFTP"));
