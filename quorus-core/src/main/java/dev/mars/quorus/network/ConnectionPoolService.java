@@ -23,20 +23,6 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
 
-/**
- * Connection pooling service for optimizing network connections.
- * 
- * This service manages connection pools for different protocols and hosts,
- * providing connection reuse, load balancing, and performance optimization.
- * 
- * Features:
- * - Protocol-specific connection pools
- * - Connection lifecycle management
- * - Load balancing across connections
- * - Connection health monitoring
- * - Automatic connection cleanup
- * - Corporate network optimization
- */
 public class ConnectionPoolService {
     
     private static final Logger logger = Logger.getLogger(ConnectionPoolService.class.getName());
@@ -54,9 +40,6 @@ public class ConnectionPoolService {
         startCleanupTask();
     }
     
-    /**
-     * Get or create a connection pool for the specified URI
-     */
     public ConnectionPool getConnectionPool(URI uri) {
         String poolKey = createPoolKey(uri);
         
@@ -66,26 +49,17 @@ public class ConnectionPoolService {
         });
     }
     
-    /**
-     * Get a connection from the pool
-     */
     public CompletableFuture<PooledConnection> getConnection(URI uri) {
         ConnectionPool pool = getConnectionPool(uri);
         return pool.getConnection();
     }
     
-    /**
-     * Return a connection to the pool
-     */
     public void returnConnection(PooledConnection connection) {
         if (connection != null) {
             connection.getPool().returnConnection(connection);
         }
     }
     
-    /**
-     * Get connection pool statistics
-     */
     public ConnectionPoolStatistics getStatistics() {
         int totalPools = connectionPools.size();
         int totalConnections = connectionPools.values().stream()
@@ -101,9 +75,6 @@ public class ConnectionPoolService {
         return new ConnectionPoolStatistics(totalPools, totalConnections, activeConnections, idleConnections);
     }
     
-    /**
-     * Shutdown the connection pool service
-     */
     public void shutdown() {
         logger.info("Shutting down connection pool service");
         
@@ -164,9 +135,6 @@ public class ConnectionPoolService {
         });
     }
     
-    /**
-     * Connection pool for a specific host/protocol
-     */
     public static class ConnectionPool {
         private final URI uri;
         private final ConnectionPoolConfig config;
@@ -279,9 +247,6 @@ public class ConnectionPoolService {
         }
     }
     
-    /**
-     * Pooled connection wrapper
-     */
     public static class PooledConnection {
         private final URI uri;
         private final ConnectionPool pool;
@@ -321,9 +286,6 @@ public class ConnectionPoolService {
         }
     }
     
-    /**
-     * Connection pool configuration
-     */
     public static class ConnectionPoolConfig {
         private final int maxPoolSize;
         private final Duration connectionTimeout;

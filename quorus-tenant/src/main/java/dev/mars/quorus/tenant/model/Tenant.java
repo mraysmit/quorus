@@ -22,11 +22,6 @@ import jakarta.validation.constraints.NotNull;
 import java.time.Instant;
 import java.util.*;
 
-/**
- * Represents a tenant in the multi-tenant Quorus system.
- * A tenant is a logical isolation boundary representing an organization, 
- * department, or business unit with its own configuration, policies, and resources.
- */
 public class Tenant {
     
     @NotBlank
@@ -53,9 +48,6 @@ public class Tenant {
     
     private final Set<String> childTenantIds;
     
-    /**
-     * Tenant status enumeration
-     */
     public enum TenantStatus {
         ACTIVE,
         SUSPENDED,
@@ -88,30 +80,18 @@ public class Tenant {
     public TenantConfiguration getConfiguration() { return configuration; }
     public Set<String> getChildTenantIds() { return childTenantIds; }
     
-    /**
-     * Check if this tenant is a root tenant (no parent)
-     */
     public boolean isRootTenant() {
         return parentTenantId == null;
     }
     
-    /**
-     * Check if this tenant has child tenants
-     */
     public boolean hasChildren() {
         return !childTenantIds.isEmpty();
     }
     
-    /**
-     * Check if this tenant is active
-     */
     public boolean isActive() {
         return status == TenantStatus.ACTIVE;
     }
     
-    /**
-     * Create a new tenant with updated status
-     */
     public Tenant withStatus(TenantStatus newStatus) {
         return toBuilder()
                 .status(newStatus)
@@ -119,9 +99,6 @@ public class Tenant {
                 .build();
     }
     
-    /**
-     * Create a new tenant with updated configuration
-     */
     public Tenant withConfiguration(TenantConfiguration newConfiguration) {
         return toBuilder()
                 .configuration(newConfiguration)

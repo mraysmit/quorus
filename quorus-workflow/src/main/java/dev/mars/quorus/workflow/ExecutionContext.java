@@ -20,9 +20,6 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
 
-/**
- * Context for workflow execution containing runtime information and variables.
- */
 public class ExecutionContext {
     
     private final String executionId;
@@ -66,9 +63,6 @@ public class ExecutionContext {
         return metadata;
     }
     
-    /**
-     * Creates a new context with additional variables.
-     */
     public ExecutionContext withVariables(Map<String, Object> additionalVariables) {
         if (additionalVariables == null || additionalVariables.isEmpty()) {
             return this;
@@ -80,9 +74,6 @@ public class ExecutionContext {
         return new ExecutionContext(executionId, mode, mergedVariables, userId, metadata);
     }
     
-    /**
-     * Creates a builder for ExecutionContext.
-     */
     public static Builder builder() {
         return new Builder();
     }
@@ -110,9 +101,6 @@ public class ExecutionContext {
                '}';
     }
     
-    /**
-     * Execution mode enumeration.
-     */
     public enum ExecutionMode {
         NORMAL,     // Normal execution with actual transfers
         DRY_RUN,    // Validation only, no actual transfers

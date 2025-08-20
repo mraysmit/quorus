@@ -18,10 +18,6 @@ package dev.mars.quorus.workflow;
 
 import java.util.*;
 
-/**
- * Represents a dependency graph for transfer groups within workflows.
- * Provides methods for topological sorting and cycle detection.
- */
 public class DependencyGraph {
     
     private final Map<String, Set<String>> dependencies;
@@ -32,11 +28,6 @@ public class DependencyGraph {
         this.groups = new HashMap<>();
     }
     
-    /**
-     * Adds a transfer group to the dependency graph.
-     * 
-     * @param group the transfer group to add
-     */
     public void addGroup(TransferGroup group) {
         Objects.requireNonNull(group, "Transfer group cannot be null");
         
@@ -45,31 +36,14 @@ public class DependencyGraph {
         dependencies.put(groupName, new HashSet<>(group.getDependsOn()));
     }
     
-    /**
-     * Gets all transfer groups in the graph.
-     * 
-     * @return map of group names to transfer groups
-     */
     public Map<String, TransferGroup> getGroups() {
         return Map.copyOf(groups);
     }
     
-    /**
-     * Gets the dependencies for a specific group.
-     * 
-     * @param groupName the name of the group
-     * @return set of dependency group names
-     */
     public Set<String> getDependencies(String groupName) {
         return dependencies.getOrDefault(groupName, Set.of());
     }
     
-    /**
-     * Performs topological sort to determine execution order.
-     * 
-     * @return list of transfer groups in execution order
-     * @throws WorkflowParseException if circular dependencies are detected
-     */
     public List<TransferGroup> topologicalSort() throws WorkflowParseException {
         // Kahn's algorithm for topological sorting
         Map<String, Integer> inDegree = calculateInDegree();
@@ -113,11 +87,6 @@ public class DependencyGraph {
         return result;
     }
     
-    /**
-     * Detects circular dependencies in the graph.
-     * 
-     * @return true if circular dependencies exist
-     */
     public boolean hasCycles() {
         try {
             topologicalSort();
@@ -127,11 +96,6 @@ public class DependencyGraph {
         }
     }
     
-    /**
-     * Validates the dependency graph for consistency.
-     * 
-     * @return validation result
-     */
     public ValidationResult validate() {
         ValidationResult result = new ValidationResult();
         

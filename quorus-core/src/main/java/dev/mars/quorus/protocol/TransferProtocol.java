@@ -22,41 +22,16 @@ import dev.mars.quorus.core.TransferResult;
 import dev.mars.quorus.core.exceptions.TransferException;
 import dev.mars.quorus.transfer.TransferContext;
 
-/**
- * Interface for different file transfer protocols.
- * Implementations handle the specific details of transferring files
- * using different protocols (HTTP, FTP, SFTP, etc.).
- */
 public interface TransferProtocol {
     
-    /**
-     * Get the protocol name/identifier
-     */
     String getProtocolName();
     
-    /**
-     * Check if this protocol can handle the given request
-     */
     boolean canHandle(TransferRequest request);
     
-    /**
-     * Execute the file transfer
-     * 
-     * @param request the transfer request
-     * @param context the transfer context for progress tracking and control
-     * @return the transfer result
-     * @throws TransferException if the transfer fails
-     */
     TransferResult transfer(TransferRequest request, TransferContext context) throws TransferException;
     
-    /**
-     * Check if the protocol supports resume functionality
-     */
     boolean supportsResume();
     
-    /**
-     * Check if the protocol supports pause functionality
-     */
     boolean supportsPause();
     
     /**

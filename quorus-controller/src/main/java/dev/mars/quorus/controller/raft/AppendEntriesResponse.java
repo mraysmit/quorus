@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Quorus Project
+ * Copyright 2025 Mark Andrew Ray-Smith Cityline Ltd
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,10 +18,6 @@ package dev.mars.quorus.controller.raft;
 
 import java.io.Serializable;
 
-/**
- * Append entries response message used in Raft log replication.
- * Sent by followers in response to append entries requests.
- */
 public class AppendEntriesResponse implements Serializable {
 
     private static final long serialVersionUID = 1L;
@@ -31,14 +27,6 @@ public class AppendEntriesResponse implements Serializable {
     private final String nodeId;
     private final long matchIndex;
 
-    /**
-     * Create a new append entries response.
-     * 
-     * @param term Current term of the responding node
-     * @param success Whether the append entries request was successful
-     * @param nodeId ID of the responding node
-     * @param matchIndex Index of the highest log entry known to be replicated
-     */
     public AppendEntriesResponse(long term, boolean success, String nodeId, long matchIndex) {
         this.term = term;
         this.success = success;
@@ -46,23 +34,14 @@ public class AppendEntriesResponse implements Serializable {
         this.matchIndex = matchIndex;
     }
 
-    /**
-     * Get the current term of the responding node.
-     */
     public long getTerm() {
         return term;
     }
 
-    /**
-     * Check if the append entries request was successful.
-     */
     public boolean isSuccess() {
         return success;
     }
 
-    /**
-     * Get the ID of the responding node.
-     */
     public String getNodeId() {
         return nodeId;
     }

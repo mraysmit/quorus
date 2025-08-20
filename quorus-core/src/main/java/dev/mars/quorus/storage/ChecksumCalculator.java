@@ -24,10 +24,6 @@ import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
-/**
- * Utility class for calculating file checksums using various algorithms.
- * Supports SHA-256 by default with options for other algorithms.
- */
 public class ChecksumCalculator {
     private static final String DEFAULT_ALGORITHM = "SHA-256";
     private static final int BUFFER_SIZE = 8192;
@@ -48,45 +44,27 @@ public class ChecksumCalculator {
         }
     }
     
-    /**
-     * Update the checksum calculation with new data
-     */
     public void update(byte[] data) {
         digest.update(data);
     }
     
-    /**
-     * Update the checksum calculation with a portion of data
-     */
     public void update(byte[] data, int offset, int length) {
         digest.update(data, offset, length);
     }
     
-    /**
-     * Get the final checksum as a hexadecimal string
-     */
     public String getChecksum() {
         byte[] hash = digest.digest();
         return bytesToHex(hash);
     }
     
-    /**
-     * Reset the calculator for reuse
-     */
     public void reset() {
         digest.reset();
     }
     
-    /**
-     * Calculate checksum for an entire file
-     */
     public static String calculateFileChecksum(Path filePath) throws IOException {
         return calculateFileChecksum(filePath, DEFAULT_ALGORITHM);
     }
     
-    /**
-     * Calculate checksum for an entire file using specified algorithm
-     */
     public static String calculateFileChecksum(Path filePath, String algorithm) throws IOException {
         try {
             MessageDigest digest = MessageDigest.getInstance(algorithm);
@@ -107,16 +85,10 @@ public class ChecksumCalculator {
         }
     }
     
-    /**
-     * Verify if a file matches the expected checksum
-     */
     public static boolean verifyFileChecksum(Path filePath, String expectedChecksum) throws IOException {
         return verifyFileChecksum(filePath, expectedChecksum, DEFAULT_ALGORITHM);
     }
     
-    /**
-     * Verify if a file matches the expected checksum using specified algorithm
-     */
     public static boolean verifyFileChecksum(Path filePath, String expectedChecksum, String algorithm) throws IOException {
         if (expectedChecksum == null || expectedChecksum.trim().isEmpty()) {
             return true; // No checksum to verify
@@ -126,16 +98,10 @@ public class ChecksumCalculator {
         return expectedChecksum.equalsIgnoreCase(actualChecksum);
     }
     
-    /**
-     * Get the algorithm being used
-     */
     public String getAlgorithm() {
         return algorithm;
     }
     
-    /**
-     * Check if an algorithm is supported
-     */
     public static boolean isAlgorithmSupported(String algorithm) {
         try {
             MessageDigest.getInstance(algorithm);
@@ -145,16 +111,10 @@ public class ChecksumCalculator {
         }
     }
     
-    /**
-     * Get list of commonly supported algorithms
-     */
     public static String[] getSupportedAlgorithms() {
         return new String[]{"MD5", "SHA-1", "SHA-256", "SHA-512"};
     }
     
-    /**
-     * Convert byte array to hexadecimal string
-     */
     private static String bytesToHex(byte[] bytes) {
         StringBuilder result = new StringBuilder();
         for (byte b : bytes) {

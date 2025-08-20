@@ -22,10 +22,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-/**
- * Represents a group of related transfers that can be executed together.
- * Transfer groups support dependencies, conditional execution, and shared configuration.
- */
 public class TransferGroup {
     
     private final String name;
@@ -116,9 +112,6 @@ public class TransferGroup {
                '}';
     }
     
-    /**
-     * Represents a single transfer definition within a transfer group.
-     */
     public static class TransferDefinition {
         private final String name;
         private final String source;

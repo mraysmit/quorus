@@ -33,6 +33,9 @@ import java.util.concurrent.CompletableFuture;
  * 1. Parse a YAML workflow definition
  * 2. Execute the workflow with variable substitution
  * 3. Monitor execution progress and results
+ * 
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @since 1.0
  */
 public class BasicWorkflowExample {
     

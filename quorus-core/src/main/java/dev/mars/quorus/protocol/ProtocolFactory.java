@@ -21,10 +21,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Logger;
 
-/**
- * Factory for creating and managing transfer protocol implementations.
- * Provides a registry of available protocols and creates instances as needed.
- */
 public class ProtocolFactory {
     private static final Logger logger = Logger.getLogger(ProtocolFactory.class.getName());
     
@@ -35,9 +31,6 @@ public class ProtocolFactory {
         registerDefaultProtocols();
     }
     
-    /**
-     * Register default protocol implementations
-     */
     private void registerDefaultProtocols() {
         registerProtocol(new HttpTransferProtocol());
         registerProtocol(new SmbTransferProtocol());
@@ -46,17 +39,11 @@ public class ProtocolFactory {
         logger.info("Registered default transfer protocols: HTTP/HTTPS, SMB/CIFS, FTP, SFTP");
     }
     
-    /**
-     * Register a transfer protocol implementation
-     */
     public void registerProtocol(TransferProtocol protocol) {
         protocols.put(protocol.getProtocolName().toLowerCase(), protocol);
         logger.info("Registered protocol: " + protocol.getProtocolName());
     }
     
-    /**
-     * Get a protocol implementation by name
-     */
     public TransferProtocol getProtocol(String protocolName) {
         if (protocolName == null) {
             return null;
@@ -64,16 +51,10 @@ public class ProtocolFactory {
         return protocols.get(protocolName.toLowerCase());
     }
     
-    /**
-     * Check if a protocol is supported
-     */
     public boolean isProtocolSupported(String protocolName) {
         return protocolName != null && protocols.containsKey(protocolName.toLowerCase());
     }
     
-    /**
-     * Get all registered protocol names
-     */
     public String[] getSupportedProtocols() {
         return protocols.keySet().toArray(new String[0]);
     }

@@ -20,9 +20,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-/**
- * Result of workflow validation containing errors and warnings.
- */
 public class ValidationResult {
     
     private final List<ValidationIssue> errors;

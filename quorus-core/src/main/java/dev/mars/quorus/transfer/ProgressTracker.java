@@ -24,6 +24,9 @@ import java.util.concurrent.atomic.AtomicReference;
 /**
  * Tracks progress of a file transfer operation with rate calculation and ETA estimation.
  * Thread-safe implementation for concurrent access during transfers.
+ * 
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @since 1.0
  */
 public class ProgressTracker {
     private final String jobId;

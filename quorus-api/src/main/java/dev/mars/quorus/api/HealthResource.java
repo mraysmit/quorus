@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Quorus Project
+ * Copyright 2025 Mark Andrew Ray-Smith Cityline Ltd
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,10 +32,6 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * REST API Resource for health checks and service discovery.
- * Provides endpoints for monitoring service health and status.
- */
 @Path("/api/v1")
 @Produces(MediaType.APPLICATION_JSON)
 @Tag(name = "Health & Status", description = "Service health and status monitoring API")
@@ -46,9 +42,6 @@ public class HealthResource {
     @Inject
     TransferEngine transferEngine;
 
-    /**
-     * Service discovery endpoint.
-     */
     @GET
     @Path("/info")
     @Operation(summary = "Service Info", description = "Get service information for discovery")

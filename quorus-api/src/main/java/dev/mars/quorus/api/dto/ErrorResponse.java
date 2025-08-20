@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Quorus Project
+ * Copyright 2025 Mark Andrew Ray-Smith Cityline Ltd
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,9 +20,6 @@ import org.eclipse.microprofile.openapi.annotations.media.Schema;
 
 import java.time.LocalDateTime;
 
-/**
- * Standard error response for API endpoints.
- */
 @Schema(description = "Error response containing error details")
 public class ErrorResponse {
 
@@ -38,25 +35,16 @@ public class ErrorResponse {
     @Schema(description = "HTTP status code", example = "400")
     private int status;
 
-    /**
-     * Default constructor.
-     */
     public ErrorResponse() {
         this.timestamp = LocalDateTime.now();
     }
 
-    /**
-     * Constructor with error message.
-     */
     public ErrorResponse(String message) {
         this();
         this.error = "Error";
         this.message = message;
     }
 
-    /**
-     * Constructor with error and message.
-     */
     public ErrorResponse(String error, String message) {
         this();
         this.error = error;

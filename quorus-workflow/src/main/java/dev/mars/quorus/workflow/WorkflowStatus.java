@@ -16,51 +16,24 @@
 
 package dev.mars.quorus.workflow;
 
-/**
- * Enumeration of workflow execution statuses.
- */
 public enum WorkflowStatus {
     
-    /**
-     * Workflow is pending execution.
-     */
     PENDING,
     
-    /**
-     * Workflow is currently running.
-     */
     RUNNING,
     
-    /**
-     * Workflow execution has been paused.
-     */
     PAUSED,
     
-    /**
-     * Workflow has completed successfully.
-     */
     COMPLETED,
     
-    /**
-     * Workflow execution has failed.
-     */
     FAILED,
     
-    /**
-     * Workflow execution has been cancelled.
-     */
     CANCELLED;
     
-    /**
-     * Checks if the status represents a terminal state.
-     */
     public boolean isTerminal() {
         return this == COMPLETED || this == FAILED || this == CANCELLED;
     }
     
-    /**
-     * Checks if the status represents an active state.
-     */
     public boolean isActive() {
         return this == RUNNING || this == PAUSED;
     }

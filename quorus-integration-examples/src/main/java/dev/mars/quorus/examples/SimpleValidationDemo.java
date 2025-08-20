@@ -21,6 +21,9 @@ import dev.mars.quorus.examples.util.TestResultLogger;
 /**
  * Simple demonstration of the improved error handling approach.
  * This shows how intentional failures are now clearly distinguished from actual errors.
+ * 
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @since 1.0
  */
 public class SimpleValidationDemo {
     
@@ -60,9 +63,6 @@ public class SimpleValidationDemo {
         testSuccessfulOperation();
     }
     
-    /**
-     * Tests successful validation - this should work correctly.
-     */
     private void testSuccessfulValidation() {
         try {
             // Simulate successful validation
@@ -77,10 +77,6 @@ public class SimpleValidationDemo {
         }
     }
     
-    /**
-     * Tests invalid input handling.
-     * This is an INTENTIONAL FAILURE TEST - the system should reject invalid input.
-     */
     private void testInvalidInputHandling() {
         try {
             // Simulate invalid input that should be rejected
@@ -96,10 +92,6 @@ public class SimpleValidationDemo {
         }
     }
     
-    /**
-     * Tests missing required data handling.
-     * This is an INTENTIONAL FAILURE TEST - the system should detect missing required fields.
-     */
     private void testMissingRequiredData() {
         try {
             // Simulate missing required field
@@ -114,10 +106,6 @@ public class SimpleValidationDemo {
         }
     }
     
-    /**
-     * Tests boundary conditions.
-     * This is an INTENTIONAL FAILURE TEST - the system should handle boundary conditions properly.
-     */
     private void testBoundaryConditions() {
         try {
             // Simulate boundary condition test

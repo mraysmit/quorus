@@ -25,9 +25,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
-/**
- * Represents the result of a workflow execution.
- */
 public class WorkflowExecution {
     
     private final String executionId;
@@ -106,18 +103,12 @@ public class WorkflowExecution {
         return status == WorkflowStatus.COMPLETED || status == WorkflowStatus.FAILED || status == WorkflowStatus.CANCELLED;
     }
     
-    /**
-     * Gets the total number of transfers across all groups.
-     */
     public int getTotalTransferCount() {
         return groupExecutions.stream()
                 .mapToInt(group -> group.getTransferResults().size())
                 .sum();
     }
     
-    /**
-     * Gets the number of successful transfers.
-     */
     public int getSuccessfulTransferCount() {
         return groupExecutions.stream()
                 .mapToInt(group -> (int) group.getTransferResults().values().stream()
@@ -126,9 +117,6 @@ public class WorkflowExecution {
                 .sum();
     }
     
-    /**
-     * Gets the total bytes transferred across all transfers.
-     */
     public long getTotalBytesTransferred() {
         return groupExecutions.stream()
                 .mapToLong(group -> group.getTransferResults().values().stream()

@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Quorus Project
+ * Copyright 2025 Mark Andrew Ray-Smith Cityline Ltd
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,10 +40,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-/**
- * REST API Resource for file transfer operations.
- * Provides endpoints for creating, monitoring, and managing file transfers.
- */
 @Path("/api/v1/transfers")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
@@ -55,9 +51,6 @@ public class TransferResource {
     @Inject
     TransferEngine transferEngine;
 
-    /**
-     * Create a new file transfer job.
-     */
     @POST
     @RolesAllowed({"ADMIN", "USER"})
     @Operation(summary = "Create Transfer", description = "Create a new file transfer job")
@@ -106,9 +99,6 @@ public class TransferResource {
         }
     }
 
-    /**
-     * Get transfer job status by ID.
-     */
     @GET
     @Path("/{jobId}")
     @RolesAllowed({"ADMIN", "USER"})
@@ -138,9 +128,6 @@ public class TransferResource {
         }
     }
 
-    /**
-     * Cancel a transfer job.
-     */
     @DELETE
     @Path("/{jobId}")
     @RolesAllowed({"ADMIN", "USER"})

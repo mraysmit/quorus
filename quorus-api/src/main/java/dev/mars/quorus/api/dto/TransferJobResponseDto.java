@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Quorus Project
+ * Copyright 2025 Mark Andrew Ray-Smith Cityline Ltd
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,10 +22,6 @@ import org.eclipse.microprofile.openapi.annotations.media.Schema;
 
 import java.time.LocalDateTime;
 
-/**
- * Data Transfer Object for transfer job response.
- * Contains all relevant information about a transfer job for API responses.
- */
 @Schema(description = "Transfer job response containing job details and status")
 public class TransferJobResponseDto {
 
@@ -80,9 +76,6 @@ public class TransferJobResponseDto {
     @Schema(description = "Optional message or description")
     private String message;
 
-    /**
-     * Default constructor for JSON deserialization.
-     */
     public TransferJobResponseDto() {
     }
 

@@ -24,21 +24,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
 
-/**
- * Network topology discovery and analysis service.
- * 
- * This service discovers and maintains information about network topology,
- * including host reachability, latency measurements, and bandwidth estimates.
- * Used for optimizing transfer routes and connection strategies.
- * 
- * Features:
- * - Host reachability testing
- * - Latency measurement and monitoring
- * - Bandwidth estimation
- * - Network path optimization
- * - Corporate network awareness
- * - Route caching and optimization
- */
 public class NetworkTopologyService {
     
     private static final Logger logger = Logger.getLogger(NetworkTopologyService.class.getName());
@@ -47,9 +32,6 @@ public class NetworkTopologyService {
     private final Map<String, NetworkPath> networkPaths = new ConcurrentHashMap<>();
     private final NetworkMetrics networkMetrics = new NetworkMetrics();
     
-    /**
-     * Discover network topology for a given host
-     */
     public CompletableFuture<NetworkNode> discoverNode(String hostname) {
         return CompletableFuture.supplyAsync(() -> {
             try {
@@ -88,9 +70,6 @@ public class NetworkTopologyService {
         });
     }
     
-    /**
-     * Find optimal network path between source and destination
-     */
     public CompletableFuture<NetworkPath> findOptimalPath(String source, String destination) {
         return CompletableFuture.supplyAsync(() -> {
             String pathKey = source + "->" + destination;
@@ -116,9 +95,6 @@ public class NetworkTopologyService {
         });
     }
     
-    /**
-     * Get network recommendations for a transfer
-     */
     public NetworkRecommendations getTransferRecommendations(String hostname, long transferSize) {
         NetworkNode node = networkNodes.get(hostname);
         if (node == null) {
@@ -135,9 +111,6 @@ public class NetworkTopologyService {
                 .build();
     }
     
-    /**
-     * Update network metrics based on actual transfer performance
-     */
     public void updateMetrics(String hostname, long bytesTransferred, Duration actualTime, boolean successful) {
         networkMetrics.recordTransfer(hostname, bytesTransferred, actualTime, successful);
         
@@ -150,9 +123,6 @@ public class NetworkTopologyService {
         }
     }
     
-    /**
-     * Get current network statistics
-     */
     public NetworkStatistics getNetworkStatistics() {
         return NetworkStatistics.builder()
                 .totalNodes(networkNodes.size())
@@ -347,9 +317,6 @@ public class NetworkTopologyService {
                 .sum();
     }
     
-    /**
-     * Network node types
-     */
     public enum NetworkType {
         LOCAL_NETWORK,
         CORPORATE_NETWORK,
@@ -357,18 +324,12 @@ public class NetworkTopologyService {
         UNKNOWN
     }
     
-    /**
-     * Transfer strategies
-     */
     public enum TransferStrategy {
         HIGH_THROUGHPUT,
         HIGH_LATENCY_OPTIMIZED,
         BALANCED
     }
     
-    /**
-     * Network quality assessment
-     */
     public enum NetworkQuality {
         EXCELLENT,
         GOOD,
@@ -378,9 +339,6 @@ public class NetworkTopologyService {
 
     // Supporting classes for network topology service
 
-    /**
-     * Network path information
-     */
     public static class NetworkPath {
         private final String source;
         private final String destination;
@@ -435,9 +393,6 @@ public class NetworkTopologyService {
         }
     }
 
-    /**
-     * Network recommendations for transfers
-     */
     public static class NetworkRecommendations {
         private final int optimalBufferSize;
         private final int recommendedConcurrency;
@@ -478,9 +433,6 @@ public class NetworkTopologyService {
         }
     }
 
-    /**
-     * Network statistics
-     */
     public static class NetworkStatistics {
         private final int totalNodes;
         private final int reachableNodes;

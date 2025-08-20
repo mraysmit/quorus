@@ -20,6 +20,9 @@ package dev.mars.quorus.core.exceptions;
 /**
  * Base exception class for all Quorus-related exceptions.
  * Provides a common hierarchy for error handling throughout the system.
+ *
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @since 1.0
  */
 public class QuorusException extends Exception {
     

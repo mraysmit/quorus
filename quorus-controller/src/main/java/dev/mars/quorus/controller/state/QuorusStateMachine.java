@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Quorus Project
+ * Copyright 2025 Mark Andrew Ray-Smith Cityline Ltd
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,84 +29,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-/**
- * Quorus-specific state machine implementation for Raft consensus-based distributed coordination.
- *
- * <p>This class implements the {@link RaftStateMachine} interface to provide distributed state
- * management for the Quorus file transfer system. It maintains consistent state across the
- * controller cluster using the Raft consensus algorithm, ensuring that all nodes have the
- * same view of transfer jobs and system metadata.</p>
- *
- * <h3>State Management Responsibilities:</h3>
- * <ul>
- *   <li><strong>Transfer Jobs:</strong> Distributed tracking of all transfer job states</li>
- *   <li><strong>System Metadata:</strong> Cluster-wide configuration and operational data</li>
- *   <li><strong>Consistency:</strong> Ensures all nodes have identical state views</li>
- *   <li><strong>Persistence:</strong> Supports snapshots for state recovery and compaction</li>
- * </ul>
- *
- * <h3>Command Processing:</h3>
- * <p>The state machine processes two types of commands:</p>
- * <ul>
- *   <li><strong>TransferJobCommand:</strong> CREATE, UPDATE_STATUS, DELETE operations</li>
- *   <li><strong>SystemMetadataCommand:</strong> SET, DELETE configuration operations</li>
- * </ul>
- *
- * <h3>Thread Safety:</h3>
- * <p>This implementation is thread-safe and designed for concurrent access:</p>
- * <ul>
- *   <li>Uses ConcurrentHashMap for thread-safe collections</li>
- *   <li>Atomic operations for index management</li>
- *   <li>Immutable snapshots for consistent state capture</li>
- *   <li>Defensive copying for external access</li>
- * </ul>
- *
- * <h3>Snapshot and Recovery:</h3>
- * <p>Supports efficient state snapshots for:</p>
- * <ul>
- *   <li><strong>Log Compaction:</strong> Reducing memory usage by compacting old entries</li>
- *   <li><strong>Node Recovery:</strong> Fast state restoration for new or restarted nodes</li>
- *   <li><strong>Backup:</strong> Persistent state backup for disaster recovery</li>
- * </ul>
- *
- * <h3>Integration with Quorus Components:</h3>
- * <ul>
- *   <li><strong>REST API:</strong> Provides consistent state for API responses</li>
- *   <li><strong>Transfer Engine:</strong> Coordinates transfer job state across cluster</li>
- *   <li><strong>Workflow Engine:</strong> Maintains workflow state and dependencies</li>
- *   <li><strong>Monitoring:</strong> Provides cluster-wide metrics and health data</li>
- * </ul>
- *
- * <h3>Performance Characteristics:</h3>
- * <ul>
- *   <li><strong>Memory Usage:</strong> Optimized for typical transfer job workloads</li>
- *   <li><strong>Snapshot Size:</strong> Efficient JSON serialization with compression</li>
- *   <li><strong>Apply Latency:</strong> Sub-millisecond command application</li>
- *   <li><strong>Concurrency:</strong> High read throughput with consistent writes</li>
- * </ul>
- *
- * <h3>Data Model:</h3>
- * <pre>
- * State Machine Contents:
- * ├── Transfer Jobs (Map&lt;String, TransferJobSnapshot&gt;)
- * │   ├── Job ID → Transfer Job State
- * │   ├── Status, Progress, Timing
- * │   └── Error Information
- * ├── System Metadata (Map&lt;String, String&gt;)
- * │   ├── Configuration Parameters
- * │   ├── Cluster Information
- * │   └── Operational Metrics
- * └── Applied Index (long)
- *     └── Last Applied Log Entry
- * </pre>
- *
- * @author Quorus Development Team
- * @since 2.2
- * @see RaftStateMachine
- * @see TransferJobCommand
- * @see SystemMetadataCommand
- * @see dev.mars.quorus.controller.raft.RaftNode
- */
 public class QuorusStateMachine implements RaftStateMachine {
 
     private static final Logger logger = Logger.getLogger(QuorusStateMachine.class.getName());
@@ -123,9 +45,6 @@ public class QuorusStateMachine implements RaftStateMachine {
         objectMapper.registerModule(new JavaTimeModule());
     }
 
-    /**
-     * Create a new Quorus state machine.
-     */
     public QuorusStateMachine() {
         // Initialize with system metadata
         systemMetadata.put("version", "2.0");
@@ -153,9 +72,6 @@ public class QuorusStateMachine implements RaftStateMachine {
         }
     }
 
-    /**
-     * Apply a transfer job command.
-     */
     private Object applyTransferJobCommand(TransferJobCommand command) {
         String jobId = command.getJobId();
         
@@ -207,9 +123,6 @@ public class QuorusStateMachine implements RaftStateMachine {
         }
     }
 
-    /**
-     * Apply a system metadata command.
-     */
     private Object applySystemMetadataCommand(SystemMetadataCommand command) {
         String key = command.getKey();
         
@@ -282,37 +195,22 @@ public class QuorusStateMachine implements RaftStateMachine {
         logger.info("State machine reset");
     }
 
-    /**
-     * Get all transfer jobs (for querying).
-     */
     public Map<String, TransferJobSnapshot> getTransferJobs() {
         return new ConcurrentHashMap<>(transferJobs);
     }
 
-    /**
-     * Get a specific transfer job.
-     */
     public TransferJobSnapshot getTransferJob(String jobId) {
         return transferJobs.get(jobId);
     }
 
-    /**
-     * Get system metadata.
-     */
     public Map<String, String> getSystemMetadata() {
         return new ConcurrentHashMap<>(systemMetadata);
     }
 
-    /**
-     * Get a specific metadata value.
-     */
     public String getMetadata(String key) {
         return systemMetadata.get(key);
     }
 
-    /**
-     * Get the number of transfer jobs.
-     */
     public int getTransferJobCount() {
         return transferJobs.size();
     }

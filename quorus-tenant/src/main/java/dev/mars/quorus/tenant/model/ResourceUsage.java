@@ -20,9 +20,6 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Objects;
 
-/**
- * Tracks resource usage for a tenant, including current usage and historical data.
- */
 public class ResourceUsage {
     
     private final String tenantId;
@@ -73,25 +70,16 @@ public class ResourceUsage {
     public long getTotalBytesTransferred() { return totalBytesTransferred; }
     public long getTotalFailedTransfers() { return totalFailedTransfers; }
     
-    /**
-     * Calculate daily success rate
-     */
     public double getDailySuccessRate() {
         if (dailyTransferCount == 0) return 1.0;
         return (double) (dailyTransferCount - dailyFailedTransfers) / dailyTransferCount;
     }
     
-    /**
-     * Calculate overall success rate
-     */
     public double getOverallSuccessRate() {
         if (totalTransferCount == 0) return 1.0;
         return (double) (totalTransferCount - totalFailedTransfers) / totalTransferCount;
     }
     
-    /**
-     * Check if usage exceeds limits
-     */
     public boolean exceedsLimits(TenantConfiguration.ResourceLimits limits) {
         return currentConcurrentTransfers > limits.getMaxConcurrentTransfers() ||
                currentBandwidthBytesPerSecond > limits.getMaxBandwidthBytesPerSecond() ||
@@ -99,25 +87,16 @@ public class ResourceUsage {
                dailyTransferCount > limits.getMaxTransfersPerDay();
     }
     
-    /**
-     * Get usage percentage for concurrent transfers
-     */
     public double getConcurrentTransfersUsagePercentage(TenantConfiguration.ResourceLimits limits) {
         if (limits.getMaxConcurrentTransfers() == 0) return 0.0;
         return (double) currentConcurrentTransfers / limits.getMaxConcurrentTransfers() * 100.0;
     }
     
-    /**
-     * Get usage percentage for bandwidth
-     */
     public double getBandwidthUsagePercentage(TenantConfiguration.ResourceLimits limits) {
         if (limits.getMaxBandwidthBytesPerSecond() == 0) return 0.0;
         return (double) currentBandwidthBytesPerSecond / limits.getMaxBandwidthBytesPerSecond() * 100.0;
     }
     
-    /**
-     * Get usage percentage for storage
-     */
     public double getStorageUsagePercentage(TenantConfiguration.ResourceLimits limits) {
         if (limits.getMaxStorageBytes() == 0) return 0.0;
         return (double) currentStorageBytes / limits.getMaxStorageBytes() * 100.0;

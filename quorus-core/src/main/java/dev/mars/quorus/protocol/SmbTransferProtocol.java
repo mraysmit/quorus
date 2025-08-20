@@ -31,24 +31,6 @@ import java.time.Instant;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Logger;
 
-/**
- * SMB/CIFS protocol implementation for Windows file sharing.
- * 
- * This implementation provides file transfer capabilities over SMB/CIFS protocol,
- * commonly used in Windows corporate environments for file sharing.
- * 
- * Supported URI formats:
- * - smb://server/share/path/file.txt
- * - smb://domain;username:password@server/share/path/file.txt
- * - smb://server/share/path/ (for directory operations)
- * 
- * Features:
- * - Windows domain authentication
- * - UNC path support
- * - Progress tracking for large files
- * - Integrity verification
- * - Corporate network optimization
- */
 public class SmbTransferProtocol implements TransferProtocol {
     
     private static final Logger logger = Logger.getLogger(SmbTransferProtocol.class.getName());

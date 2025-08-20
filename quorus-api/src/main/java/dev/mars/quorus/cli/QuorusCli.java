@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Quorus Project
+ * Copyright 2025 Mark Andrew Ray-Smith Cityline Ltd
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +25,9 @@ import java.util.Scanner;
 /**
  * Command Line Interface for Quorus File Transfer System.
  * Provides a simple CLI for interacting with the Quorus API.
+ * 
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @since 1.0
  */
 public class QuorusCli {
 

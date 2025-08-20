@@ -20,6 +20,9 @@ package dev.mars.quorus.core.exceptions;
 /**
  * Exception thrown when file integrity verification fails due to checksum mismatch.
  * This indicates potential data corruption during transfer.
+ *
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @since 1.0
  */
 public class ChecksumMismatchException extends TransferException {
     

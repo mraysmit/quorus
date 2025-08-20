@@ -38,6 +38,9 @@ import java.util.logging.Logger;
 /**
  * HTTP/HTTPS transfer protocol implementation.
  * Supports basic HTTP downloads with progress tracking and integrity verification.
+ * 
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @since 1.0
  */
 public class HttpTransferProtocol implements TransferProtocol {
     private static final Logger logger = Logger.getLogger(HttpTransferProtocol.class.getName());

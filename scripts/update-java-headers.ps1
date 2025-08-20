@@ -2,12 +2,12 @@
 
 <#
 .SYNOPSIS
-    Updates comment headers in Java class files with author information.
+    Fixes corrupted Java class headers and standardizes copyright information.
 
 .DESCRIPTION
-    This script scans all Java files in the Quorus file transfer system project and updates
-    their comment headers to include proper copyright notices and author tags with
-    "Mark Andrew Ray-Smith Cityline Ltd".
+    This script fixes Java files in the Quorus file transfer system project that have
+    corrupted headers, inconsistent copyright notices, or incorrect author information.
+    It standardizes all files to use "Mark Andrew Ray-Smith Cityline Ltd" copyright.
 
 .PARAMETER DryRun
     If specified, shows what changes would be made without actually modifying files.
@@ -17,7 +17,7 @@
 
 .EXAMPLE
     .\update-java-headers.ps1
-    Updates all Java files with new headers.
+    Fixes all Java files with corrupted headers.
 
 .EXAMPLE
     .\update-java-headers.ps1 -DryRun
@@ -31,237 +31,112 @@ param(
 
 # Configuration
 $AUTHOR_NAME = "Mark Andrew Ray-Smith Cityline Ltd"
-$COPYRIGHT_YEAR = (Get-Date).Year
+$COPYRIGHT_YEAR = 2025
 $PROJECT_NAME = "Quorus"
 
-# Function to determine the type of Java file (class, interface, enum, annotation)
-function Get-JavaFileType {
-    param([string]$Content)
-    
-    if ($Content -match '\bpublic\s+@interface\s+\w+') { return "annotation" }
-    if ($Content -match '\bpublic\s+interface\s+\w+') { return "interface" }
-    if ($Content -match '\bpublic\s+enum\s+\w+') { return "enum" }
-    if ($Content -match '\bpublic\s+class\s+\w+') { return "class" }
-    if ($Content -match '\bclass\s+\w+') { return "class" }
-    if ($Content -match '\binterface\s+\w+') { return "interface" }
-    if ($Content -match '\benum\s+\w+') { return "enum" }
-    
-    return "class" # Default fallback
-}
 
-# Function to extract existing JavaDoc description
-function Get-ExistingDescription {
-    param([string]$Content)
-    
-    # Look for existing JavaDoc comment
-    if ($Content -match '/\*\*\s*\n\s*\*\s*([^\n]+)') {
-        $description = $matches[1].Trim()
-        # Clean up common patterns
-        $description = $description -replace '^\*\s*', ''
-        $description = $description -replace '\s*\*/$', ''
-        return $description
-    }
-    
-    return $null
-}
 
-# Function to extract class/interface name from file
-function Get-JavaClassName {
-    param([string]$Content)
-
-    # Look for class/interface/enum/@interface declarations with better pattern matching
-    if ($Content -match '\bpublic\s+@interface\s+(\w+)') { return $matches[1] }
-    if ($Content -match '\bpublic\s+interface\s+(\w+)') { return $matches[1] }
-    if ($Content -match '\bpublic\s+enum\s+(\w+)') { return $matches[1] }
-    if ($Content -match '\bpublic\s+class\s+(\w+)') { return $matches[1] }
-    if ($Content -match '\b@interface\s+(\w+)') { return $matches[1] }
-    if ($Content -match '\binterface\s+(\w+)') { return $matches[1] }
-    if ($Content -match '\benum\s+(\w+)') { return $matches[1] }
-    if ($Content -match '\bclass\s+(\w+)') { return $matches[1] }
-
-    return "Unknown"
-}
-
-# Function to generate the new header comment
-function New-JavaHeader {
-    param(
-        [string]$FileType,
-        [string]$ClassName,
-        [string]$ExistingDescription,
-        [string]$FilePath
-    )
-
-    $relativePath = $FilePath -replace [regex]::Escape((Get-Location).Path + "\"), ""
-
-    # Determine appropriate description based on file type
-    $defaultDescription = switch ($FileType) {
-        "interface" { "Interface defining contracts for $ClassName in the Quorus file transfer system." }
-        "enum" { "Enumeration defining $ClassName constants and values for file transfer operations." }
-        "annotation" { "Annotation for $ClassName metadata and configuration in Quorus." }
-        default { "Implementation of $ClassName for the Quorus file transfer system." }
-    }
-
-    $description = if ($ExistingDescription) { $ExistingDescription } else { $defaultDescription }
-
-    $header = @"
-/*
- * Copyright 2025 Mark Andrew Ray-Smith Cityline Ltd
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
-/**
- * $description
- *
- * This $FileType is part of the $PROJECT_NAME file transfer system, providing
- * enterprise-grade file transfer capabilities with progress tracking, integrity
- * verification, and robust error handling with retry mechanisms.
- *
- * @author $AUTHOR_NAME
- * @since $(Get-Date -Format "yyyy-MM-dd")
- * @version 2.0
- */
-"@
-
-    return $header
-}
-
-# Function to process a single Java file
-function Update-JavaFile {
+# Function to repair corrupted Java file headers
+function Repair-JavaFile {
     param(
         [string]$FilePath,
         [switch]$DryRun
     )
-    
+
     if ($Verbose) {
         Write-Host "Processing: $FilePath" -ForegroundColor Cyan
     }
-    
+
     try {
         $content = Get-Content -Path $FilePath -Raw -Encoding UTF8
-        
-        # Skip if file already has our author tag or license header
-        if ($content -match "author.*$([regex]::Escape($AUTHOR_NAME))" -or
-            $content -match "Licensed under the Apache License") {
+        $changed = $false
+
+        # Fix copyright header from "2024 Quorus Project" to "2025 Mark Andrew Ray-Smith Cityline Ltd"
+        if ($content -match "Copyright 2024 Quorus Project") {
+            $content = $content -replace "Copyright 2024 Quorus Project", "Copyright 2025 Mark Andrew Ray-Smith Cityline Ltd"
+            $changed = $true
             if ($Verbose) {
-                Write-Host "  Skipping - already has author tag or license header" -ForegroundColor Yellow
+                Write-Host "  Fixed copyright header" -ForegroundColor Green
             }
-            return $false
         }
-        
-        # Determine file type and extract information
-        $fileType = Get-JavaFileType -Content $content
-        $className = Get-JavaClassName -Content $content
-        $existingDescription = Get-ExistingDescription -Content $content
-        
-        # Generate new header
-        $newHeader = New-JavaHeader -FileType $fileType -ClassName $className -ExistingDescription $existingDescription -FilePath $FilePath
-        
-        # Find insertion point (after package and imports, before class declaration)
+
+        # Fix author tag from "Mark A Ra-Smith" to "Mark Andrew Ray-Smith"
+        if ($content -match "@author Mark A Ra-Smith") {
+            $content = $content -replace "@author Mark A Ra-Smith", "@author Mark Andrew Ray-Smith"
+            $changed = $true
+            if ($Verbose) {
+                Write-Host "  Fixed author tag" -ForegroundColor Green
+            }
+        }
+
+        # Remove duplicate JavaDoc comments (common corruption issue)
+        # Look for pattern where there are two /** */ blocks before class declaration
         $lines = $content -split "`r?`n"
-        $insertIndex = -1
-        $inImports = $false
-        
+        $javadocBlocks = @()
+        $inJavadoc = $false
+        $currentBlock = @()
+
         for ($i = 0; $i -lt $lines.Length; $i++) {
             $line = $lines[$i].Trim()
-            
-            # Skip package declaration
-            if ($line -match '^package\s+') {
-                continue
-            }
-            
-            # Track import section
-            if ($line -match '^import\s+') {
-                $inImports = $true
-                continue
-            }
-            
-            # If we were in imports and hit a non-import, non-empty line
-            if ($inImports -and $line -ne "" -and -not ($line -match '^import\s+')) {
-                $insertIndex = $i
-                break
-            }
-            
-            # If no imports, look for class/interface declaration
-            if (-not $inImports -and $line -ne "" -and -not ($line -match '^package\s+') -and 
-                ($line -match '\b(?:public\s+)?(?:class|interface|enum|@interface)\s+' -or $line -match '^/\*\*')) {
-                $insertIndex = $i
-                break
+
+            if ($line -eq "/**") {
+                $inJavadoc = $true
+                $currentBlock = @($i)
+            } elseif ($inJavadoc -and $line -eq "*/") {
+                $currentBlock += $i
+                $javadocBlocks += ,@($currentBlock[0], $currentBlock[1])
+                $inJavadoc = $false
+                $currentBlock = @()
             }
         }
-        
-        if ($insertIndex -eq -1) {
-            Write-Warning "Could not find insertion point in $FilePath"
+
+        # If there are multiple JavaDoc blocks, remove duplicates
+        if ($javadocBlocks.Count -gt 1) {
+            # Keep the last JavaDoc block (usually the most complete one)
+            $newLines = @()
+            $skipRanges = @()
+
+            # Mark all JavaDoc blocks except the last one for removal
+            for ($i = 0; $i -lt $javadocBlocks.Count - 1; $i++) {
+                $skipRanges += ,@($javadocBlocks[$i][0], $javadocBlocks[$i][1])
+            }
+
+            for ($i = 0; $i -lt $lines.Length; $i++) {
+                $shouldSkip = $false
+                foreach ($range in $skipRanges) {
+                    if ($i -ge $range[0] -and $i -le $range[1]) {
+                        $shouldSkip = $true
+                        break
+                    }
+                }
+                if (-not $shouldSkip) {
+                    $newLines += $lines[$i]
+                }
+            }
+
+            $content = $newLines -join "`n"
+            $changed = $true
+            if ($Verbose) {
+                Write-Host "  Removed duplicate JavaDoc blocks" -ForegroundColor Green
+            }
+        }
+
+        # Write the updated content if changes were made
+        if ($changed) {
+            if ($DryRun) {
+                Write-Host "  Would update: $FilePath" -ForegroundColor Green
+            } else {
+                Set-Content -Path $FilePath -Value $content -Encoding UTF8 -NoNewline
+                Write-Host "  Updated: $FilePath" -ForegroundColor Green
+            }
+            return $true
+        } else {
+            if ($Verbose) {
+                Write-Host "  No changes needed" -ForegroundColor Yellow
+            }
             return $false
         }
-        
-        # Remove existing JavaDoc if present
-        $startRemove = -1
-        $endRemove = -1
-        
-        # Look for existing JavaDoc comment before the class declaration
-        for ($i = $insertIndex; $i -lt $lines.Length; $i++) {
-            $line = $lines[$i].Trim()
-            if ($line -eq "/**") {
-                $startRemove = $i
-            }
-            if ($startRemove -ne -1 -and $line -eq "*/") {
-                $endRemove = $i
-                break
-            }
-            if ($line -match '\b(?:public\s+)?(?:class|interface|enum|@interface)\s+') {
-                break
-            }
-        }
-        
-        # Build new content
-        $newLines = @()
-        
-        # Add lines up to insertion point
-        $newLines += $lines[0..($insertIndex-1)]
-        
-        # Add empty line if needed
-        if ($insertIndex -gt 0 -and $lines[$insertIndex-1].Trim() -ne "") {
-            $newLines += ""
-        }
-        
-        # Add new header
-        $newLines += $newHeader -split "`r?`n"
-        
-        # Skip existing JavaDoc if found
-        $skipTo = if ($endRemove -ne -1) { $endRemove + 1 } else { $insertIndex }
-        
-        # Add remaining lines
-        if ($skipTo -lt $lines.Length) {
-            $newLines += $lines[$skipTo..($lines.Length-1)]
-        }
-        
-        # Write the updated content
-        if ($DryRun) {
-            Write-Host "  Would update: $FilePath" -ForegroundColor Green
-            Write-Host "    File type: $fileType" -ForegroundColor Gray
-            Write-Host "    Class name: $className" -ForegroundColor Gray
-            if ($existingDescription) {
-                Write-Host "    Existing description: $existingDescription" -ForegroundColor Gray
-            }
-        } else {
-            $newContent = $newLines -join "`n"
-            Set-Content -Path $FilePath -Value $newContent -Encoding UTF8 -NoNewline
-            Write-Host "  Updated: $FilePath" -ForegroundColor Green
-        }
-        
-        return $true
-        
+
     } catch {
         Write-Error "Error processing $FilePath`: $_"
         return $false
@@ -269,7 +144,7 @@ function Update-JavaFile {
 }
 
 # Main execution
-Write-Host "Java Header Update Script" -ForegroundColor Magenta
+Write-Host "Java Header Fix Script" -ForegroundColor Magenta
 Write-Host "Author: $AUTHOR_NAME" -ForegroundColor Magenta
 Write-Host "=========================" -ForegroundColor Magenta
 Write-Host ""
@@ -294,7 +169,7 @@ $updatedCount = 0
 $skippedCount = 0
 
 foreach ($file in $javaFiles) {
-    $result = Update-JavaFile -FilePath $file.FullName -DryRun:$DryRun
+    $result = Repair-JavaFile -FilePath $file.FullName -DryRun:$DryRun
     if ($result) {
         $updatedCount++
     } else {

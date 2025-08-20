@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Quorus Project
+ * Copyright 2025 Mark Andrew Ray-Smith Cityline Ltd
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,6 +32,9 @@ import java.util.concurrent.CompletableFuture;
 /**
  * Java client SDK for Quorus File Transfer API.
  * Provides a simple interface for interacting with the Quorus REST API.
+ * 
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @since 1.0
  */
 public class QuorusClient {
 
@@ -40,13 +43,6 @@ public class QuorusClient {
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
 
-    /**
-     * Create a new Quorus client.
-     * 
-     * @param baseUrl Base URL of the Quorus API (e.g., "http://localhost:8080")
-     * @param username Username for authentication
-     * @param password Password for authentication
-     */
     public QuorusClient(String baseUrl, String username, String password) {
         this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
         this.authHeader = "Basic " + Base64.getEncoder().encodeToString((username + ":" + password).getBytes());
@@ -57,27 +53,10 @@ public class QuorusClient {
         this.objectMapper.registerModule(new JavaTimeModule());
     }
 
-    /**
-     * Create a new transfer job.
-     * 
-     * @param sourceUri Source URI for the transfer
-     * @param destinationPath Destination path for the transfer
-     * @return Transfer job response
-     * @throws QuorusClientException if the request fails
-     */
     public TransferJobResponseDto createTransfer(String sourceUri, String destinationPath) throws QuorusClientException {
         return createTransfer(sourceUri, destinationPath, null);
     }
 
-    /**
-     * Create a new transfer job with description.
-     * 
-     * @param sourceUri Source URI for the transfer
-     * @param destinationPath Destination path for the transfer
-     * @param description Optional description for the transfer
-     * @return Transfer job response
-     * @throws QuorusClientException if the request fails
-     */
     public TransferJobResponseDto createTransfer(String sourceUri, String destinationPath, String description) 
             throws QuorusClientException {
         TransferRequestDto request = new TransferRequestDto();
@@ -108,13 +87,6 @@ public class QuorusClient {
         }
     }
 
-    /**
-     * Get the status of a transfer job.
-     * 
-     * @param jobId Transfer job ID
-     * @return Transfer job response
-     * @throws QuorusClientException if the request fails
-     */
     public TransferJobResponseDto getTransferStatus(String jobId) throws QuorusClientException {
         try {
             HttpRequest request = HttpRequest.newBuilder()
@@ -138,13 +110,6 @@ public class QuorusClient {
         }
     }
 
-    /**
-     * Cancel a transfer job.
-     * 
-     * @param jobId Transfer job ID
-     * @return Success message
-     * @throws QuorusClientException if the request fails
-     */
     public String cancelTransfer(String jobId) throws QuorusClientException {
         try {
             HttpRequest request = HttpRequest.newBuilder()
@@ -171,12 +136,6 @@ public class QuorusClient {
         }
     }
 
-    /**
-     * Get the number of active transfers.
-     * 
-     * @return Number of active transfers
-     * @throws QuorusClientException if the request fails
-     */
     public int getActiveTransferCount() throws QuorusClientException {
         try {
             HttpRequest request = HttpRequest.newBuilder()
@@ -199,12 +158,6 @@ public class QuorusClient {
         }
     }
 
-    /**
-     * Get service information.
-     * 
-     * @return Service information as JSON string
-     * @throws QuorusClientException if the request fails
-     */
     public String getServiceInfo() throws QuorusClientException {
         try {
             HttpRequest request = HttpRequest.newBuilder()
@@ -225,13 +178,6 @@ public class QuorusClient {
         }
     }
 
-    /**
-     * Create a transfer asynchronously.
-     * 
-     * @param sourceUri Source URI for the transfer
-     * @param destinationPath Destination path for the transfer
-     * @return CompletableFuture with transfer job response
-     */
     public CompletableFuture<TransferJobResponseDto> createTransferAsync(String sourceUri, String destinationPath) {
         return CompletableFuture.supplyAsync(() -> {
             try {

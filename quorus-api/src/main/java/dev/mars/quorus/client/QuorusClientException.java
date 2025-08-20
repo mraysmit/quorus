@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Quorus Project
+ * Copyright 2025 Mark Andrew Ray-Smith Cityline Ltd
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,24 +18,16 @@ package dev.mars.quorus.client;
 
 /**
  * Exception thrown by the Quorus client when API operations fail.
+ * 
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @since 1.0
  */
 public class QuorusClientException extends Exception {
 
-    /**
-     * Create a new QuorusClientException with a message.
-     * 
-     * @param message Error message
-     */
     public QuorusClientException(String message) {
         super(message);
     }
 
-    /**
-     * Create a new QuorusClientException with a message and cause.
-     * 
-     * @param message Error message
-     * @param cause Underlying cause
-     */
     public QuorusClientException(String message, Throwable cause) {
         super(message, cause);
     }

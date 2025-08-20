@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Quorus Project
+ * Copyright 2025 Mark Andrew Ray-Smith Cityline Ltd
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,10 +18,6 @@ package dev.mars.quorus.controller.raft;
 
 import java.io.Serializable;
 
-/**
- * Vote response message used in Raft leader election.
- * Sent by nodes in response to vote requests.
- */
 public class VoteResponse implements Serializable {
 
     private static final long serialVersionUID = 1L;
@@ -30,29 +26,16 @@ public class VoteResponse implements Serializable {
     private final boolean voteGranted;
     private final String nodeId;
 
-    /**
-     * Create a new vote response.
-     * 
-     * @param term Current term of the responding node
-     * @param voteGranted Whether the vote was granted
-     * @param nodeId ID of the responding node
-     */
     public VoteResponse(long term, boolean voteGranted, String nodeId) {
         this.term = term;
         this.voteGranted = voteGranted;
         this.nodeId = nodeId;
     }
 
-    /**
-     * Get the current term of the responding node.
-     */
     public long getTerm() {
         return term;
     }
 
-    /**
-     * Check if the vote was granted.
-     */
     public boolean isVoteGranted() {
         return voteGranted;
     }

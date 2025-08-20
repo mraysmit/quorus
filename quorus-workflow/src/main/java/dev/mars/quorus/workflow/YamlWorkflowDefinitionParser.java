@@ -30,6 +30,9 @@ import java.util.*;
 /**
  * YAML-based implementation of WorkflowDefinitionParser.
  * Parses YAML workflow definitions using SnakeYAML.
+ * 
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @since 1.0
  */
 public class YamlWorkflowDefinitionParser implements WorkflowDefinitionParser {
     

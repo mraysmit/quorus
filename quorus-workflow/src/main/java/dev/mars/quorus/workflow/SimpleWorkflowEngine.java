@@ -34,6 +34,9 @@ import java.util.logging.Logger;
 /**
  * Simple implementation of WorkflowEngine for basic workflow execution.
  * Supports normal execution, dry run, and virtual run modes.
+ * 
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @since 1.0
  */
 public class SimpleWorkflowEngine implements WorkflowEngine {
     

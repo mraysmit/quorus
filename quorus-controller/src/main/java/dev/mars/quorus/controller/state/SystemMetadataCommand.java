@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Quorus Project
+ * Copyright 2025 Mark Andrew Ray-Smith Cityline Ltd
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,9 +18,6 @@ package dev.mars.quorus.controller.state;
 
 import java.io.Serializable;
 
-/**
- * Command for system metadata operations in the distributed state machine.
- */
 public class SystemMetadataCommand implements Serializable {
 
     private static final long serialVersionUID = 1L;
@@ -34,39 +31,24 @@ public class SystemMetadataCommand implements Serializable {
     private final String key;
     private final String value;
 
-    /**
-     * Create a new system metadata command.
-     */
     private SystemMetadataCommand(Type type, String key, String value) {
         this.type = type;
         this.key = key;
         this.value = value;
     }
 
-    /**
-     * Create a command to set a metadata value.
-     */
     public static SystemMetadataCommand set(String key, String value) {
         return new SystemMetadataCommand(Type.SET, key, value);
     }
 
-    /**
-     * Create a command to delete a metadata value.
-     */
     public static SystemMetadataCommand delete(String key) {
         return new SystemMetadataCommand(Type.DELETE, key, null);
     }
 
-    /**
-     * Get the command type.
-     */
     public Type getType() {
         return type;
     }
 
-    /**
-     * Get the metadata key.
-     */
     public String getKey() {
         return key;
     }

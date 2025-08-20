@@ -25,10 +25,6 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
 
-/**
- * Basic in-memory repository for storing transfer state information.
- * In future iterations, this can be replaced with persistent storage.
- */
 public class TransferStateRepository {
     private static final Logger logger = Logger.getLogger(TransferStateRepository.class.getName());
     
@@ -38,9 +34,6 @@ public class TransferStateRepository {
         this.transferStates = new ConcurrentHashMap<>();
     }
     
-    /**
-     * Save the current state of a transfer job
-     */
     public void saveTransferState(TransferJob job) {
         TransferState state = new TransferState(
                 job.getJobId(),
@@ -57,16 +50,10 @@ public class TransferStateRepository {
         logger.fine("Saved transfer state for job: " + job.getJobId());
     }
     
-    /**
-     * Load the state of a transfer job
-     */
     public TransferState loadTransferState(String jobId) {
         return transferStates.get(jobId);
     }
     
-    /**
-     * Remove transfer state (cleanup after completion)
-     */
     public void removeTransferState(String jobId) {
         TransferState removed = transferStates.remove(jobId);
         if (removed != null) {
@@ -74,39 +61,24 @@ public class TransferStateRepository {
         }
     }
     
-    /**
-     * Check if transfer state exists
-     */
     public boolean hasTransferState(String jobId) {
         return transferStates.containsKey(jobId);
     }
     
-    /**
-     * Get all active transfer states
-     */
     public Map<String, TransferState> getAllTransferStates() {
         return Map.copyOf(transferStates);
     }
     
-    /**
-     * Get count of stored transfer states
-     */
     public int getTransferStateCount() {
         return transferStates.size();
     }
     
-    /**
-     * Clear all transfer states
-     */
     public void clearAll() {
         int count = transferStates.size();
         transferStates.clear();
         logger.info("Cleared " + count + " transfer states");
     }
     
-    /**
-     * Clean up completed or failed transfers older than specified time
-     */
     public void cleanupOldTransfers(long maxAgeMs) {
         Instant cutoff = Instant.now().minusMillis(maxAgeMs);
         

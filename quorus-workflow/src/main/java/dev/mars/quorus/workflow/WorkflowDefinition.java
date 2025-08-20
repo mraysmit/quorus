@@ -21,10 +21,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-/**
- * Represents a complete workflow definition parsed from YAML.
- * Contains metadata, configuration, and the list of transfer groups to execute.
- */
 public class WorkflowDefinition {
     
     private final String apiVersion;
@@ -81,9 +77,6 @@ public class WorkflowDefinition {
                '}';
     }
     
-    /**
-     * Workflow metadata containing name, version, description, type, author, and labels.
-     */
     public static class WorkflowMetadata {
         private final String name;
         private final String version;
@@ -161,9 +154,6 @@ public class WorkflowDefinition {
         }
     }
     
-    /**
-     * Workflow specification containing execution configuration and transfer groups.
-     */
     public static class WorkflowSpec {
         private final Map<String, Object> variables;
         private final ExecutionConfig execution;

@@ -27,6 +27,9 @@ import java.util.logging.Logger;
  * - Checksum verification
  * 
  * Run with: mvn exec:java -pl quorus-integration-examples
+ * 
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @since 1.0
  */
 public class BasicTransferExample {
     private static final Logger logger = Logger.getLogger(BasicTransferExample.class.getName());
@@ -78,15 +81,6 @@ public class BasicTransferExample {
         }
     }
     
-    /**
-     * Demonstrates basic file transfer with progress monitoring.
-     *
-     * This example shows:
-     * - Creating a transfer request using the builder pattern
-     * - Submitting the transfer to the engine
-     * - Real-time progress monitoring
-     * - Retrieving and displaying comprehensive results
-     */
     private static void runBasicTransferExample(TransferEngine transferEngine) throws Exception {
         logger.info("--- Basic Transfer Example ---");
         logger.info("Downloading a 2KB test file from httpbin.org");
@@ -112,15 +106,6 @@ public class BasicTransferExample {
         displayTransferResult(result);
     }
     
-    /**
-     * Demonstrates transferring multiple files concurrently.
-     *
-     * This example shows:
-     * - Submitting multiple transfers simultaneously
-     * - Concurrent execution by the transfer engine
-     * - Waiting for all transfers to complete
-     * - Handling results from multiple operations
-     */
     private static void runMultipleFilesExample(TransferEngine transferEngine) throws Exception {
         logger.info("--- Multiple Files Example ---");
         logger.info("Downloading 3 files of different sizes concurrently");
@@ -152,16 +137,6 @@ public class BasicTransferExample {
         logger.info("All concurrent transfers completed successfully!");
     }
     
-    /**
-     * Demonstrates retry logic and resilience features.
-     *
-     * This example shows how the system handles network delays and temporary issues
-     * by using httpbin.org's delay endpoint to simulate slow responses.
-     * This demonstrates the system's patience and retry capabilities.
-     *
-     * NOTE: This is NOT a failure test - it demonstrates successful handling of slow responses.
-     * The system should complete successfully after waiting for the delayed response.
-     */
     private static void runRetryDemonstrationExample(TransferEngine transferEngine) throws Exception {
         logger.info("--- Retry & Resilience Demonstration ---");
         logger.info("This example shows how Quorus handles network delays gracefully");
@@ -207,15 +182,6 @@ public class BasicTransferExample {
         logger.info("This ensures robust handling of temporary network issues.");
     }
     
-    /**
-     * Monitors transfer progress in real-time using a background daemon thread.
-     *
-     * This demonstrates:
-     * - Real-time progress tracking
-     * - Proper daemon thread usage (won't prevent JVM shutdown)
-     * - Polling the transfer engine for job status
-     * - Graceful thread termination when transfer completes
-     */
     private static void monitorTransferProgress(TransferEngine transferEngine, String jobId) {
         Thread monitorThread = new Thread(() -> {
             try {
@@ -258,9 +224,6 @@ public class BasicTransferExample {
         monitorThread.start();
     }
     
-    /**
-     * Displays comprehensive transfer results
-     */
     private static void displayTransferResult(TransferResult result) {
         logger.info("Transfer Results:");
         logger.info("  Status: " + result.getFinalStatus());

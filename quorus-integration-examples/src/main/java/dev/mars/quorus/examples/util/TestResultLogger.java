@@ -21,55 +21,40 @@ import java.util.logging.Logger;
 /**
  * Utility class for logging test results in examples.
  * Helps distinguish between expected test failures and actual errors.
+ * 
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @since 1.0
  */
 public class TestResultLogger {
     
     private static final Logger logger = Logger.getLogger(TestResultLogger.class.getName());
     
-    /**
-     * Log an expected test success.
-     */
     public static void logExpectedSuccess(String message) {
         System.out.println("   ✓ EXPECTED: " + message);
         logger.info("Expected test success: " + message);
     }
     
-    /**
-     * Log an expected test failure (this is good - the validation worked).
-     */
     public static void logExpectedFailure(String message) {
         System.out.println("   ✓ EXPECTED: " + message);
         logger.info("Expected test failure: " + message);
     }
     
-    /**
-     * Log an unexpected test result (this indicates a bug).
-     */
     public static void logUnexpectedResult(String message) {
         System.out.println("   ✗ UNEXPECTED: " + message);
         logger.warning("Unexpected test result: " + message);
     }
     
-    /**
-     * Log an expected failure with exception details (no stack trace).
-     */
     public static void logExpectedFailure(String message, Exception e) {
         System.out.println("   ✓ EXPECTED: " + message + ": " + e.getMessage());
         logger.info("Expected test failure: " + message + " - " + e.getClass().getSimpleName() + ": " + e.getMessage());
     }
     
-    /**
-     * Log an unexpected exception (this indicates a real problem).
-     */
     public static void logUnexpectedException(String message, Exception e) {
         System.out.println("   ✗ UNEXPECTED: " + message + ": " + e.getClass().getSimpleName() + ": " + e.getMessage());
         logger.severe("Unexpected exception in test: " + message + " - " + e.getClass().getSimpleName() + ": " + e.getMessage());
         // Note: Stack trace should be printed by the caller if needed for debugging
     }
     
-    /**
-     * Log a test section header.
-     */
     public static void logTestSection(String sectionName, boolean isIntentionalFailureTest) {
         if (isIntentionalFailureTest) {
             System.out.println("\n" + sectionName + " (INTENTIONAL FAILURE TEST)...");
@@ -80,9 +65,6 @@ public class TestResultLogger {
         }
     }
     
-    /**
-     * Log an example completion.
-     */
     public static void logExampleCompletion(String exampleName) {
         System.out.println("\n=== " + exampleName + " completed successfully! ===");
         logger.info(exampleName + " completed successfully");

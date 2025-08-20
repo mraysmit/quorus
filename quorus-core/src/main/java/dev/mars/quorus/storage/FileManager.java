@@ -23,16 +23,9 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Instant;
 import java.util.logging.Logger;
 
-/**
- * Utility class for file management operations including
- * creation, deletion, validation, and metadata handling.
- */
 public class FileManager {
     private static final Logger logger = Logger.getLogger(FileManager.class.getName());
     
-    /**
-     * Ensure that the parent directories for a file path exist
-     */
     public static void ensureDirectoryExists(Path filePath) throws IOException {
         Path parentDir = filePath.getParent();
         if (parentDir != null && !Files.exists(parentDir)) {
@@ -41,23 +34,14 @@ public class FileManager {
         }
     }
     
-    /**
-     * Check if a file exists and is readable
-     */
     public static boolean isFileAccessible(Path filePath) {
         return Files.exists(filePath) && Files.isReadable(filePath) && Files.isRegularFile(filePath);
     }
     
-    /**
-     * Check if a directory exists and is writable
-     */
     public static boolean isDirectoryWritable(Path dirPath) {
         return Files.exists(dirPath) && Files.isDirectory(dirPath) && Files.isWritable(dirPath);
     }
     
-    /**
-     * Get file size safely, returning -1 if file doesn't exist or can't be read
-     */
     public static long getFileSize(Path filePath) {
         try {
             return Files.size(filePath);
@@ -67,9 +51,6 @@ public class FileManager {
         }
     }
     
-    /**
-     * Get file last modified time safely
-     */
     public static Instant getLastModifiedTime(Path filePath) {
         try {
             return Files.getLastModifiedTime(filePath).toInstant();
@@ -79,9 +60,6 @@ public class FileManager {
         }
     }
     
-    /**
-     * Create a temporary file in the same directory as the target file
-     */
     public static Path createTempFile(Path targetFile, String suffix) throws IOException {
         Path parentDir = targetFile.getParent();
         if (parentDir == null) {
@@ -97,9 +75,6 @@ public class FileManager {
         return Files.createTempFile(parentDir, baseName + "_", suffix);
     }
     
-    /**
-     * Safely delete a file, logging any errors
-     */
     public static boolean deleteFile(Path filePath) {
         try {
             boolean deleted = Files.deleteIfExists(filePath);
@@ -113,27 +88,18 @@ public class FileManager {
         }
     }
     
-    /**
-     * Move a file atomically, creating parent directories if needed
-     */
     public static void moveFile(Path source, Path target) throws IOException {
         ensureDirectoryExists(target);
         Files.move(source, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
         logger.info("Moved file from " + source + " to " + target);
     }
     
-    /**
-     * Copy a file, creating parent directories if needed
-     */
     public static void copyFile(Path source, Path target) throws IOException {
         ensureDirectoryExists(target);
         Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING);
         logger.info("Copied file from " + source + " to " + target);
     }
     
-    /**
-     * Validate that a path is safe for file operations (basic security check)
-     */
     public static boolean isPathSafe(Path path) {
         if (path == null) {
             return false;
@@ -150,9 +116,6 @@ public class FileManager {
         return true;
     }
     
-    /**
-     * Get available disk space for a path
-     */
     public static long getAvailableSpace(Path path) {
         try {
             FileStore store = Files.getFileStore(path.getParent() != null ? path.getParent() : path);
@@ -163,17 +126,11 @@ public class FileManager {
         }
     }
     
-    /**
-     * Check if there's enough space for a file of given size
-     */
     public static boolean hasEnoughSpace(Path path, long requiredBytes) {
         long availableSpace = getAvailableSpace(path);
         return availableSpace >= 0 && availableSpace >= requiredBytes;
     }
     
-    /**
-     * Get basic file information
-     */
     public static FileInfo getFileInfo(Path filePath) {
         try {
             if (!Files.exists(filePath)) {
