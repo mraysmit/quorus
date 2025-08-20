@@ -1,0 +1,247 @@
+version: '3.8'
+
+# Advanced Network Testing Configuration for Quorus Controller Cluster
+# This configuration supports dynamic network partitioning and realistic network conditions
+
+services:
+  controller1:
+    build:
+      context: .
+      dockerfile: quorus-controller/Dockerfile
+    container_name: quorus-controller1
+    hostname: controller1
+    environment:
+      - NODE_ID=controller1
+      - RAFT_HOST=0.0.0.0
+      - RAFT_PORT=8080
+      - CLUSTER_NODES=controller1=172.20.0.10:8080,controller2=172.20.0.11:8080,controller3=172.20.0.12:8080,controller4=172.20.0.13:8080,controller5=172.20.0.14:8080
+      - ELECTION_TIMEOUT_MS=5000
+      - HEARTBEAT_INTERVAL_MS=1000
+      - JAVA_OPTS=-Xmx256m -Xms128m
+    ports:
+      - "8081:8080"
+    networks:
+      raft-cluster:
+        ipv4_address: 172.20.0.10
+    volumes:
+      - controller1-data:/app/data
+      - controller1-logs:/app/logs
+    cap_add:
+      - NET_ADMIN  # Required for network manipulation (tc, iptables)
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
+  controller2:
+    build:
+      context: .
+      dockerfile: quorus-controller/Dockerfile
+    container_name: quorus-controller2
+    hostname: controller2
+    environment:
+      - NODE_ID=controller2
+      - RAFT_HOST=0.0.0.0
+      - RAFT_PORT=8080
+      - CLUSTER_NODES=controller1=172.20.0.10:8080,controller2=172.20.0.11:8080,controller3=172.20.0.12:8080,controller4=172.20.0.13:8080,controller5=172.20.0.14:8080
+      - ELECTION_TIMEOUT_MS=5000
+      - HEARTBEAT_INTERVAL_MS=1000
+      - JAVA_OPTS=-Xmx256m -Xms128m
+    ports:
+      - "8082:8080"
+    networks:
+      raft-cluster:
+        ipv4_address: 172.20.0.11
+    volumes:
+      - controller2-data:/app/data
+      - controller2-logs:/app/logs
+    cap_add:
+      - NET_ADMIN
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
+  controller3:
+    build:
+      context: .
+      dockerfile: quorus-controller/Dockerfile
+    container_name: quorus-controller3
+    hostname: controller3
+    environment:
+      - NODE_ID=controller3
+      - RAFT_HOST=0.0.0.0
+      - RAFT_PORT=8080
+      - CLUSTER_NODES=controller1=172.20.0.10:8080,controller2=172.20.0.11:8080,controller3=172.20.0.12:8080,controller4=172.20.0.13:8080,controller5=172.20.0.14:8080
+      - ELECTION_TIMEOUT_MS=5000
+      - HEARTBEAT_INTERVAL_MS=1000
+      - JAVA_OPTS=-Xmx256m -Xms128m
+    ports:
+      - "8083:8080"
+    networks:
+      raft-cluster:
+        ipv4_address: 172.20.0.12
+    volumes:
+      - controller3-data:/app/data
+      - controller3-logs:/app/logs
+    cap_add:
+      - NET_ADMIN
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
+  controller4:
+    build:
+      context: .
+      dockerfile: quorus-controller/Dockerfile
+    container_name: quorus-controller4
+    hostname: controller4
+    environment:
+      - NODE_ID=controller4
+      - RAFT_HOST=0.0.0.0
+      - RAFT_PORT=8080
+      - CLUSTER_NODES=controller1=172.20.0.10:8080,controller2=172.20.0.11:8080,controller3=172.20.0.12:8080,controller4=172.20.0.13:8080,controller5=172.20.0.14:8080
+      - ELECTION_TIMEOUT_MS=5000
+      - HEARTBEAT_INTERVAL_MS=1000
+      - JAVA_OPTS=-Xmx256m -Xms128m
+    ports:
+      - "8084:8080"
+    networks:
+      raft-cluster:
+        ipv4_address: 172.20.0.13
+    volumes:
+      - controller4-data:/app/data
+      - controller4-logs:/app/logs
+    cap_add:
+      - NET_ADMIN
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
+  controller5:
+    build:
+      context: .
+      dockerfile: quorus-controller/Dockerfile
+    container_name: quorus-controller5
+    hostname: controller5
+    environment:
+      - NODE_ID=controller5
+      - RAFT_HOST=0.0.0.0
+      - RAFT_PORT=8080
+      - CLUSTER_NODES=controller1=172.20.0.10:8080,controller2=172.20.0.11:8080,controller3=172.20.0.12:8080,controller4=172.20.0.13:8080,controller5=172.20.0.14:8080
+      - ELECTION_TIMEOUT_MS=5000
+      - HEARTBEAT_INTERVAL_MS=1000
+      - JAVA_OPTS=-Xmx256m -Xms128m
+    ports:
+      - "8085:8080"
+    networks:
+      raft-cluster:
+        ipv4_address: 172.20.0.14
+    volumes:
+      - controller5-data:/app/data
+      - controller5-logs:/app/logs
+    cap_add:
+      - NET_ADMIN
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
+  # Network monitoring and testing tools
+  network-monitor:
+    image: nicolaka/netshoot:latest
+    container_name: quorus-network-monitor
+    hostname: network-monitor
+    networks:
+      raft-cluster:
+        ipv4_address: 172.20.0.100
+      raft-partition-a:
+        ipv4_address: 172.21.0.100
+      raft-partition-b:
+        ipv4_address: 172.22.0.100
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: sleep infinity
+    profiles:
+      - monitoring
+
+networks:
+  # Primary cluster network
+  raft-cluster:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.0.0/16
+          gateway: 172.20.0.1
+    driver_opts:
+      com.docker.network.bridge.name: raft-cluster-br
+      com.docker.network.bridge.enable_icc: "true"
+      com.docker.network.bridge.enable_ip_masquerade: "true"
+      com.docker.network.driver.mtu: 1500
+  
+  # Partition network A (for split-brain testing)
+  raft-partition-a:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.21.0.0/16
+          gateway: 172.21.0.1
+    driver_opts:
+      com.docker.network.bridge.name: raft-partition-a-br
+      com.docker.network.bridge.enable_icc: "true"
+  
+  # Partition network B (for complex partition scenarios)
+  raft-partition-b:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.22.0.0/16
+          gateway: 172.22.0.1
+    driver_opts:
+      com.docker.network.bridge.name: raft-partition-b-br
+      com.docker.network.bridge.enable_icc: "true"
+
+volumes:
+  controller1-data:
+    driver: local
+  controller1-logs:
+    driver: local
+  controller2-data:
+    driver: local
+  controller2-logs:
+    driver: local
+  controller3-data:
+    driver: local
+  controller3-logs:
+    driver: local
+  controller4-data:
+    driver: local
+  controller4-logs:
+    driver: local
+  controller5-data:
+    driver: local
+  controller5-logs:
+    driver: local
