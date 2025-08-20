@@ -62,7 +62,13 @@ public class SmbTransferProtocol implements TransferProtocol {
         try {
             return performSmbTransfer(request, progressTracker);
         } catch (Exception e) {
-            logger.severe("SMB transfer failed: " + e.getMessage());
+            // Check if this is an intentional test failure
+            if (isIntentionalTestFailure(request.getRequestId())) {
+                logger.info("INTENTIONAL TEST FAILURE: SMB transfer failed for test case '" +
+                           request.getRequestId() + "': " + e.getMessage());
+            } else {
+                logger.severe("SMB transfer failed: " + e.getMessage());
+            }
             throw new TransferException(context.getJobId(), "SMB transfer failed", e);
         }
     }
@@ -127,7 +133,13 @@ public class SmbTransferProtocol implements TransferProtocol {
                     .build();
             
         } catch (Exception e) {
-            logger.severe("SMB transfer failed for request " + requestId + ": " + e.getMessage());
+            // Check if this is an intentional test failure
+            if (isIntentionalTestFailure(requestId)) {
+                logger.info("INTENTIONAL TEST FAILURE: SMB transfer failed for test case '" +
+                           requestId + "': " + e.getMessage());
+            } else {
+                logger.severe("SMB transfer failed for request " + requestId + ": " + e.getMessage());
+            }
             throw new TransferException(requestId, "SMB transfer failed", e);
         }
     }
@@ -210,7 +222,31 @@ public class SmbTransferProtocol implements TransferProtocol {
         
         return new SmbConnectionInfo(host, path, domain, username, password);
     }
-    
+
+    /**
+     * Determines if a request ID indicates an intentional test failure.
+     * This helps distinguish between real errors and expected test failures.
+     */
+    private boolean isIntentionalTestFailure(String requestId) {
+        if (requestId == null) {
+            return false;
+        }
+
+        // Check for common test failure patterns
+        return requestId.startsWith("test-") && (
+            requestId.contains("missing-host") ||
+            requestId.contains("missing-path") ||
+            requestId.contains("invalid-") ||
+            requestId.contains("malformed") ||
+            requestId.contains("error") ||
+            requestId.contains("fail") ||
+            requestId.contains("timeout") ||
+            requestId.contains("exception") ||
+            requestId.contains("nonexistent") ||
+            requestId.contains("unreachable")
+        );
+    }
+
     private Path convertToUncPath(SmbConnectionInfo connectionInfo) throws TransferException {
         try {
             // Convert SMB path to Windows UNC path

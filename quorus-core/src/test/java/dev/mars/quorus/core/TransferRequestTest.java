@@ -81,11 +81,15 @@ class TransferRequestTest {
     
     @Test
     void testBuilderValidation() {
-        assertThrows(NullPointerException.class, () -> 
-                TransferRequest.builder().destinationPath(Paths.get("/tmp/file.txt")).build());
-        
-        assertThrows(NullPointerException.class, () -> 
-                TransferRequest.builder().sourceUri(URI.create("http://example.com/file.txt")).build());
+        // INTENTIONAL FAILURE TEST: Testing builder validation for required fields
+        // This test verifies that the builder correctly rejects incomplete requests
+        // Expected behavior: NullPointerException should be thrown for missing required fields
+
+        assertThrows(NullPointerException.class, () ->
+                TransferRequest.builder().destinationPath(Paths.get("/tmp/file.txt")).build());  // Missing sourceUri
+
+        assertThrows(NullPointerException.class, () ->
+                TransferRequest.builder().sourceUri(URI.create("http://example.com/file.txt")).build());  // Missing destinationPath
     }
     
     @Test
@@ -125,16 +129,20 @@ class TransferRequestTest {
     
     @Test
     void testMetadataImmutability() {
+        // INTENTIONAL FAILURE TEST: Testing metadata immutability
+        // This test verifies that the metadata map cannot be modified after creation
+        // Expected behavior: UnsupportedOperationException should be thrown for modification attempts
+
         Map<String, String> originalMetadata = Map.of("key1", "value1");
-        
+
         TransferRequest request = TransferRequest.builder()
                 .sourceUri(URI.create("http://example.com/file.txt"))
                 .destinationPath(Paths.get("/tmp/file.txt"))
                 .metadata(originalMetadata)
                 .build();
-        
+
         Map<String, String> retrievedMetadata = request.getMetadata();
-        assertThrows(UnsupportedOperationException.class, () -> 
-                retrievedMetadata.put("key2", "value2"));
+        assertThrows(UnsupportedOperationException.class, () ->
+                retrievedMetadata.put("key2", "value2"));  // Should fail - metadata is immutable
     }
 }

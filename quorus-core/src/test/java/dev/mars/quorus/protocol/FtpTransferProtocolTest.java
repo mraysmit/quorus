@@ -132,6 +132,9 @@ class FtpTransferProtocolTest {
     
     @Test
     void testTransferWithInvalidFtpUri() {
+        // INTENTIONAL FAILURE TEST: Testing invalid FTP URI handling
+        // This test verifies that the protocol correctly rejects malformed URIs
+
         // URI.create("ftp://") throws IllegalArgumentException due to missing authority
         // So we test that URI creation itself throws the exception
         assertThrows(IllegalArgumentException.class, () -> {
@@ -139,6 +142,7 @@ class FtpTransferProtocolTest {
         });
 
         // Test with a malformed but parseable URI that the protocol should reject
+        // Expected behavior: TransferException should be thrown
         TransferRequest request = TransferRequest.builder()
                 .requestId("test-invalid-ftp")
                 .sourceUri(URI.create("ftp://invalid-host-without-path"))
@@ -152,12 +156,16 @@ class FtpTransferProtocolTest {
     
     @Test
     void testTransferWithFtpUriMissingHost() {
+        // INTENTIONAL FAILURE TEST: Testing FTP URI validation for missing host
+        // This test verifies that the protocol correctly rejects URIs without a hostname
+        // Expected behavior: TransferException should be thrown with clear error message
+
         TransferRequest request = TransferRequest.builder()
                 .requestId("test-missing-host")
-                .sourceUri(URI.create("ftp:///path/file.txt"))
+                .sourceUri(URI.create("ftp:///path/file.txt"))  // Missing hostname
                 .destinationPath(tempDir.resolve("testfile.txt"))
                 .build();
-        
+
         assertThrows(TransferException.class, () -> {
             protocol.transfer(request, context);
         });
@@ -165,12 +173,16 @@ class FtpTransferProtocolTest {
     
     @Test
     void testTransferWithFtpUriMissingPath() {
+        // INTENTIONAL FAILURE TEST: Testing FTP URI validation for missing path
+        // This test verifies that the protocol correctly rejects URIs without a file path
+        // Expected behavior: TransferException should be thrown with clear error message
+
         TransferRequest request = TransferRequest.builder()
                 .requestId("test-missing-path")
-                .sourceUri(URI.create("ftp://server"))
+                .sourceUri(URI.create("ftp://server"))  // Missing file path
                 .destinationPath(tempDir.resolve("testfile.txt"))
                 .build();
-        
+
         assertThrows(TransferException.class, () -> {
             protocol.transfer(request, context);
         });
@@ -311,15 +323,18 @@ class FtpTransferProtocolTest {
     
     @Test
     void testConnectionTimeout() {
-        // Test that connection timeouts are handled
+        // INTENTIONAL FAILURE TEST: Testing connection timeout handling
+        // This test verifies that the protocol correctly handles connection timeouts
+        // Expected behavior: TransferException should be thrown for unreachable servers
+
         TransferRequest request = TransferRequest.builder()
                 .requestId("test-timeout")
-                .sourceUri(URI.create("ftp://timeout.server.com/path/file.txt"))
+                .sourceUri(URI.create("ftp://timeout.server.com/path/file.txt"))  // Non-existent server
                 .destinationPath(tempDir.resolve("testfile.txt"))
                 .build();
-        
+
         assertTrue(protocol.canHandle(request));
-        
+
         // Should timeout and throw exception
         assertThrows(TransferException.class, () -> {
             protocol.transfer(request, context);
