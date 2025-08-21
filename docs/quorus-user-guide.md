@@ -25,12 +25,108 @@ Quorus is an enterprise-grade file transfer system designed for internal corpora
 
 ### Key Features
 
-- **Secure File Transfers**: HTTP/HTTPS, FTP, SFTP, SMB protocols
-- **YAML Workflows**: Declarative workflow definitions with complex dependencies
-- **Multi-Tenant Architecture**: Hierarchical tenant isolation and resource management
-- **High Availability**: Raft consensus clustering with automatic failover
-- **Progress Tracking**: Real-time transfer monitoring with ETA calculations
-- **Enterprise Integration**: Corporate directory, SSO, and compliance support
+#### **Secure File Transfers: Enterprise-Grade Protocol Support**
+Quorus provides comprehensive support for multiple transfer protocols, each optimized for specific enterprise use cases:
+
+- **HTTP/HTTPS**: Modern web-based transfers with OAuth2, Bearer tokens, and custom headers. Supports range requests for resume capability, automatic compression (gzip/deflate), and corporate proxy integration. Ideal for API-based data exchanges and cloud service integration.
+
+- **FTP/FTPS**: Traditional file transfer protocol with both active and passive modes. Automatic binary/ASCII mode detection, directory synchronization, and SSL/TLS encryption (FTPS). Perfect for legacy system integration and bulk data transfers.
+
+- **SFTP**: Secure file transfer over SSH with key-based authentication, compression, and multiple concurrent streams. Preserves Unix file permissions and supports directory operations. Essential for secure transfers to Linux/Unix systems.
+
+- **SMB**: Windows file sharing protocol with NTLM/Kerberos authentication, DFS support, and proper file locking. Maintains Windows file attributes and integrates seamlessly with Active Directory. Critical for Windows-based corporate environments.
+
+**Security Features**: All protocols support enterprise authentication methods, certificate validation, and encryption both in transit and at rest. Integration with corporate PKI infrastructure ensures compliance with security policies.
+
+#### **YAML Workflows: Declarative Orchestration Engine**
+Transform complex file transfer operations into maintainable, version-controlled workflow definitions:
+
+- **Declarative Syntax**: Define what you want to achieve, not how to achieve it. YAML-based workflows are human-readable, version-controllable, and self-documenting. No programming knowledge required for basic workflows.
+
+- **Complex Dependencies**: Build sophisticated dependency graphs with parallel execution, conditional logic, and error handling. Support for sequential, parallel, and mixed execution strategies with automatic optimization.
+
+- **Variable Substitution**: Powerful templating system with built-in functions for dates, environment variables, and dynamic values. Enables workflow reuse across different environments and tenants.
+
+- **Execution Modes**:
+  - *Normal Mode*: Full execution with actual file transfers
+  - *Dry Run*: Validation and planning without executing transfers
+  - *Virtual Run*: Simulation mode for testing and training
+
+- **Error Handling**: Configurable error handling strategies including fail-fast, continue-on-error, and custom retry policies. Automatic notification and escalation procedures.
+
+**Business Value**: Reduce operational complexity, improve reliability, and enable self-service file transfer operations for business users.
+
+#### **Multi-Tenant Architecture: Enterprise Isolation and Governance**
+Comprehensive multi-tenancy designed for large organizations with complex hierarchical structures:
+
+- **Hierarchical Tenants**: Support for enterprise → company → department → team structures with inheritance of policies and quotas. Each level can override parent settings while maintaining governance.
+
+- **Resource Isolation**: Multiple isolation strategies:
+  - *Logical Isolation*: Shared infrastructure with namespace separation and access controls
+  - *Physical Isolation*: Dedicated infrastructure for sensitive tenants
+  - *Hybrid Isolation*: Mix of logical and physical based on data sensitivity
+
+- **Quota Management**: Comprehensive resource quotas including concurrent transfers, bandwidth allocation, storage limits, and API rate limits. Support for burst capacity and time-based quotas (daily/monthly limits).
+
+- **Cross-Tenant Operations**: Controlled data sharing between tenants with approval workflows and audit trails. Essential for partner data exchanges and inter-departmental collaboration.
+
+- **Tenant-Specific Configuration**: Custom authentication providers, storage locations, workflow templates, and security policies per tenant. Enables different business units to operate independently while maintaining central governance.
+
+**Governance Benefits**: Centralized management with distributed control, comprehensive audit trails, and compliance with corporate data governance policies.
+
+#### **High Availability: Fault-Tolerant Distributed Architecture**
+Enterprise-grade availability designed to meet stringent SLA requirements:
+
+- **Raft Consensus Clustering**: Distributed consensus algorithm ensuring strong consistency and automatic leader election. Tolerates (N-1)/2 node failures while maintaining service availability.
+
+- **Geographic Distribution**: Multi-availability zone deployment with automatic failover. Supports disaster recovery scenarios including entire data center failures.
+
+- **Zero-Downtime Operations**: Rolling updates, configuration changes, and maintenance operations without service interruption. Graceful node draining and automatic workload redistribution.
+
+- **Split-Brain Prevention**: Quorum-based decision making prevents inconsistent state during network partitions. Minority partitions automatically become read-only to preserve data consistency.
+
+- **Virtual IP Failover**: Seamless client redirection during leader changes with automatic DNS updates and load balancer integration. Clients experience no interruption during failover events.
+
+**Availability Guarantees**: 99.9% uptime SLA with automatic recovery from common failure scenarios and comprehensive monitoring with predictive failure detection.
+
+#### **Progress Tracking: Real-Time Visibility and Analytics**
+Comprehensive monitoring and observability for all transfer operations:
+
+- **Real-Time Metrics**: Sub-second progress updates showing bytes transferred, transfer rates, and completion percentages. Live dashboards for operations teams and end users.
+
+- **Predictive Analytics**: Machine learning-enhanced ETA calculations based on historical transfer patterns, network conditions, and file characteristics. Anomaly detection for unusual transfer behavior.
+
+- **Multi-Level Monitoring**:
+  - *Transfer Level*: Individual file transfer progress and statistics
+  - *Workflow Level*: Overall workflow progress with stage-by-stage breakdown
+  - *System Level*: Cluster health, resource utilization, and performance metrics
+
+- **Performance Insights**: Detailed analysis of transfer performance including network latency, throughput optimization recommendations, and bottleneck identification.
+
+- **Historical Analytics**: Long-term trend analysis for capacity planning, performance optimization, and SLA reporting. Integration with enterprise monitoring and alerting systems.
+
+**Operational Benefits**: Proactive issue detection, performance optimization, and comprehensive reporting for business stakeholders and technical teams.
+
+#### **Enterprise Integration: Seamless Corporate Infrastructure Integration**
+Deep integration with existing enterprise infrastructure and processes:
+
+- **Corporate Directory Integration**: Native support for Active Directory, LDAP, and other enterprise directory services. Automatic user provisioning and group-based access control.
+
+- **Single Sign-On (SSO)**: Integration with corporate identity providers including SAML, OAuth2, OpenID Connect, and Kerberos. Users authenticate once and access all authorized resources.
+
+- **Compliance Frameworks**: Built-in support for SOX, GDPR, HIPAA, PCI-DSS, and other regulatory requirements. Automated compliance reporting and audit trail generation.
+
+- **Security Integration**:
+  - *Certificate Management*: Integration with corporate PKI infrastructure
+  - *Key Management*: Support for enterprise key management systems (KMS)
+  - *Network Security*: Corporate firewall and proxy integration
+  - *Data Classification*: Automatic data classification and handling based on corporate policies
+
+- **Monitoring Integration**: Native integration with enterprise monitoring systems including Prometheus, Grafana, Splunk, and SIEM platforms. Custom metrics and alerting for business-specific requirements.
+
+- **API Integration**: RESTful APIs with OpenAPI documentation for integration with existing business applications, workflow systems, and automation platforms.
+
+**Integration Benefits**: Leverage existing enterprise investments, maintain security and compliance posture, and provide familiar user experience consistent with other corporate applications.
 
 ### System Architecture
 
@@ -1650,156 +1746,2071 @@ public class ProgressEvent {
 
 #### Workflow Definition Model
 
-A **Workflow Definition** is a declarative specification of a complex transfer operation:
+A **Workflow Definition** is a declarative specification that orchestrates file transfer operations. Let's start with simple examples and gradually build to complex enterprise scenarios, explaining each configuration line by line.
+
+##### Basic Workflow Structure - Simple Example
+
+Let's begin with the simplest possible workflow that transfers a single file:
 
 ```yaml
-# Complete workflow structure
+# Line 1: API version - specifies the Quorus workflow schema version
+apiVersion: quorus.dev/v1
+
+# Line 2: Resource type - tells Quorus this is a transfer workflow
+kind: TransferWorkflow
+
+# Lines 3-6: Basic metadata - minimum required information
+metadata:
+  name: simple-file-transfer          # Unique identifier for this workflow
+  description: Transfer a single file # Human-readable description
+
+# Lines 7-15: Workflow specification - the actual work to be done
+spec:
+  transferGroups:                     # Container for groups of related transfers
+    - name: single-transfer           # Name of this transfer group
+      transfers:                      # List of individual file transfers
+        - name: copy-data-file        # Name of this specific transfer
+          source: "https://api.example.com/data.csv"    # Where to get the file
+          destination: "/storage/data.csv"              # Where to put the file
+```
+
+**Line-by-Line Explanation:**
+- **Line 1**: `apiVersion` declares which version of the Quorus workflow schema to use
+- **Line 2**: `kind` specifies this is a TransferWorkflow (vs other resource types)
+- **Line 4**: `name` must be unique within the tenant/namespace and DNS-compliant
+- **Line 5**: `description` provides human-readable documentation
+- **Line 8**: `transferGroups` contains one or more groups of related transfers
+- **Line 9**: Each group has a `name` for identification and dependency management
+- **Line 10**: `transfers` lists the actual file transfer operations
+- **Line 11**: Each transfer has a unique `name` within the group
+- **Line 12**: `source` specifies where to retrieve the file (supports various protocols)
+- **Line 13**: `destination` specifies where to store the file
+
+##### Adding Basic Configuration - Intermediate Example
+
+Now let's add some basic configuration options:
+
+```yaml
 apiVersion: quorus.dev/v1
 kind: TransferWorkflow
+
 metadata:
-  name: enterprise-data-pipeline
-  description: Daily enterprise data synchronization
-  version: "1.2.0"
-  tenant: enterprise
-  namespace: data-ops
+  name: configured-file-transfer
+  description: Transfer with basic configuration options
+  # Line 6: Version helps track workflow changes over time
+  version: "1.0.0"
+
+spec:
+  # Lines 9-11: Global variables that can be reused throughout the workflow
+  variables:
+    sourceUrl: "https://api.example.com"      # Base URL for API calls
+    targetDir: "/storage/daily-imports"       # Base directory for files
+
+  # Lines 13-16: Execution configuration controls how transfers run
+  execution:
+    strategy: sequential    # Run transfers one after another (vs parallel)
+    timeout: 1800          # Maximum time in seconds (30 minutes)
+    parallelism: 1         # Maximum concurrent transfers
+
+  transferGroups:
+    - name: daily-data-import
+      transfers:
+        - name: import-customers
+          # Lines 22-23: Using variables with {{variable}} syntax
+          source: "{{sourceUrl}}/customers/export.csv"
+          destination: "{{targetDir}}/customers.csv"
+          # Lines 24-28: Transfer-specific options
+          options:
+            timeout: 600              # Override global timeout (10 minutes)
+            checksumValidation: true  # Verify file integrity after transfer
+            retryAttempts: 3         # Retry failed transfers up to 3 times
+```
+
+**New Configuration Explained:**
+- **Line 6**: `version` enables tracking of workflow definition changes
+- **Lines 9-11**: `variables` section defines reusable values
+- **Line 10**: Variables can be referenced later using `{{variableName}}` syntax
+- **Lines 13-16**: `execution` section controls workflow-level behavior
+- **Line 14**: `strategy: sequential` means transfers run one at a time
+- **Line 15**: `timeout: 1800` sets maximum workflow execution time (30 minutes)
+- **Line 16**: `parallelism: 1` limits concurrent transfers
+- **Lines 22-23**: `{{sourceUrl}}` and `{{targetDir}}` are replaced with variable values
+- **Lines 24-28**: `options` section provides transfer-specific configuration
+- **Line 26**: `checksumValidation: true` enables integrity verification
+- **Line 27**: `retryAttempts: 3` automatically retries failed transfers
+
+##### Adding Dependencies - Multi-Stage Example
+
+Let's create a workflow with multiple stages that depend on each other:
+
+```yaml
+apiVersion: quorus.dev/v1
+kind: TransferWorkflow
+
+metadata:
+  name: multi-stage-pipeline
+  description: Multi-stage data processing pipeline
+  version: "1.1.0"
+  # Lines 7-10: Labels help categorize and filter workflows
+  labels:
+    environment: production    # Environment designation
+    department: finance       # Owning department
+    schedule: daily          # Execution frequency
+
+spec:
+  variables:
+    # Line 14: Built-in function that returns current date (e.g., "2025-01-20")
+    processingDate: "{{today}}"
+    sourceSystem: "https://erp.company.com"
+    stagingArea: "/staging/finance"
+    finalDestination: "/warehouse/finance"
+
+  execution:
+    # Line 19: Mixed strategy allows some parallel execution within constraints
+    strategy: mixed
+    parallelism: 3
+    timeout: 3600    # 1 hour total
+
+  transferGroups:
+    # Stage 1: Extract raw data from source systems
+    - name: extract-raw-data
+      # Line 26: Description documents the purpose of this stage
+      description: "Extract customer and order data from ERP system"
+      transfers:
+        - name: extract-customers
+          source: "{{sourceSystem}}/api/customers/export?date={{processingDate}}"
+          destination: "{{stagingArea}}/raw-customers-{{processingDate}}.json"
+
+        - name: extract-orders
+          source: "{{sourceSystem}}/api/orders/export?date={{processingDate}}"
+          destination: "{{stagingArea}}/raw-orders-{{processingDate}}.json"
+
+    # Stage 2: Process the extracted data
+    - name: process-data
+      description: "Clean and validate the extracted data"
+      # Line 38: This stage depends on the previous stage completing first
+      dependsOn: [extract-raw-data]
+      transfers:
+        - name: clean-customer-data
+          # Line 41: Using output from previous stage as input
+          source: "{{stagingArea}}/raw-customers-{{processingDate}}.json"
+          destination: "{{stagingArea}}/clean-customers-{{processingDate}}.json"
+
+        - name: clean-order-data
+          source: "{{stagingArea}}/raw-orders-{{processingDate}}.json"
+          destination: "{{stagingArea}}/clean-orders-{{processingDate}}.json"
+
+    # Stage 3: Load processed data to final destination
+    - name: load-final-data
+      description: "Load processed data into data warehouse"
+      # Line 50: This stage depends on data processing completing
+      dependsOn: [process-data]
+      transfers:
+        - name: load-customers
+          source: "{{stagingArea}}/clean-customers-{{processingDate}}.json"
+          destination: "{{finalDestination}}/customers/{{processingDate}}.json"
+
+        - name: load-orders
+          source: "{{stagingArea}}/clean-orders-{{processingDate}}.json"
+          destination: "{{finalDestination}}/orders/{{processingDate}}.json"
+```
+
+**New Concepts Explained:**
+- **Lines 7-10**: `labels` provide metadata for categorization and filtering
+- **Line 14**: `{{today}}` is a built-in function that returns the current date
+- **Line 19**: `strategy: mixed` allows intelligent parallel execution within dependencies
+- **Line 26**: `description` at the group level documents the stage's purpose
+- **Line 38**: `dependsOn: [extract-raw-data]` creates a dependency relationship
+- **Line 41**: Using output from one stage as input to the next creates a data pipeline
+- **Line 50**: Multiple dependencies ensure proper execution order
+
+##### Adding Conditional Logic - Advanced Example
+
+Now let's add conditional execution based on business rules:
+
+```yaml
+apiVersion: quorus.dev/v1
+kind: TransferWorkflow
+
+metadata:
+  name: conditional-business-pipeline
+  description: Business pipeline with conditional processing
+  version: "2.0.0"
   labels:
     environment: production
     criticality: high
-    schedule: daily
-  annotations:
-    owner: "data-team@corp.com"
-    documentation: "https://wiki.corp.com/data-pipeline"
+    compliance: required
 
 spec:
-  # Global workflow configuration
   variables:
-    sourceSystem: "https://erp.corp.internal"
-    targetWarehouse: "/data-warehouse/enterprise"
     processingDate: "{{today}}"
     environment: "production"
+    # Line 16: Built-in function that returns day of month (1-31)
+    dayOfMonth: "{{dayOfMonth}}"
+    # Line 18: Built-in function that returns day of week (1=Monday, 7=Sunday)
+    dayOfWeek: "{{dayOfWeek}}"
+    sourceERP: "https://erp.company.com"
+    stagingArea: "/staging/finance"
 
-  # Execution strategy
+  # Lines 22-32: Global conditions that can be referenced by transfer groups
+  conditions:
+    - name: is-month-end
+      # Line 24: Expression evaluates to true if day of month >= 28
+      expression: "{{dayOfMonth}} >= 28"
+      description: "True during the last few days of the month"
+
+    - name: is-business-day
+      # Line 28: Expression checks if it's Monday through Friday
+      expression: "{{dayOfWeek}} >= 1 && {{dayOfWeek}} <= 5"
+      description: "True on weekdays (Monday-Friday)"
+
+    - name: is-production
+      expression: "{{environment}} == 'production'"
+      description: "True when running in production environment"
+
   execution:
-    strategy: mixed  # sequential, parallel, mixed
+    strategy: mixed
     parallelism: 5
     timeout: 7200    # 2 hours
+
+  transferGroups:
+    # Always run: Daily data extraction
+    - name: daily-extraction
+      description: "Extract daily transaction data"
+      # Line 43: Only run if it's a business day AND we're in production
+      condition: "is-business-day && is-production"
+      transfers:
+        - name: extract-daily-transactions
+          source: "{{sourceERP}}/api/transactions/daily?date={{processingDate}}"
+          destination: "{{stagingArea}}/daily-transactions-{{processingDate}}.json"
+
+    # Conditional: Month-end processing
+    - name: month-end-processing
+      description: "Additional processing required at month-end"
+      dependsOn: [daily-extraction]
+      # Line 52: Only run during month-end periods
+      condition: "is-month-end && is-production"
+      transfers:
+        - name: extract-month-end-adjustments
+          source: "{{sourceERP}}/api/adjustments/month-end?date={{processingDate}}"
+          destination: "{{stagingArea}}/month-end-adjustments-{{processingDate}}.json"
+
+        - name: generate-monthly-report
+          source: "{{stagingArea}}/daily-transactions-{{processingDate}}.json"
+          destination: "/reports/monthly-summary-{{processingDate}}.pdf"
+          # Lines 60-64: Transfer-specific options for report generation
+          options:
+            timeout: 1800        # 30 minutes for report generation
+            reportFormat: "pdf"  # Custom option for report type
+            includeCharts: true  # Custom option for visual elements
+```
+
+**Conditional Logic Explained:**
+- **Lines 22-32**: `conditions` section defines reusable boolean expressions
+- **Line 24**: `{{dayOfMonth}} >= 28` uses a built-in function in an expression
+- **Line 28**: `&&` is the logical AND operator for combining conditions
+- **Line 43**: `condition` field references defined conditions with logical operators
+- **Line 52**: Conditions can be combined with `&&` (AND) and `||` (OR)
+- **Lines 60-64**: Custom options can be passed to specialized transfer handlers
+
+##### Adding Error Handling and Notifications - Production Example
+
+Finally, let's add comprehensive error handling and notifications for production use:
+
+```yaml
+apiVersion: quorus.dev/v1
+kind: TransferWorkflow
+
+metadata:
+  name: production-financial-pipeline
+  description: Production-ready financial data pipeline with full error handling
+  version: "3.0.0"
+  # Line 8: Tenant specifies which organization owns this workflow
+  tenant: acme-corporation
+  # Line 10: Namespace provides additional isolation within the tenant
+  namespace: finance-operations
+  labels:
+    environment: production
+    criticality: high
+    compliance: sox-required
+    # Line 15: Data classification affects security and retention policies
+    dataClassification: confidential
+  # Lines 16-24: Annotations provide extended metadata for governance
+  annotations:
+    owner: "finance-data-team@acme-corp.com"
+    businessOwner: "cfo@acme-corp.com"
+    documentation: "https://wiki.acme-corp.com/finance/daily-pipeline"
+    approvedBy: "finance-director@acme-corp.com"
+    approvalDate: "2025-01-15"
+    complianceReviewed: "2025-01-10"
+
+spec:
+  variables:
+    processingDate: "{{today}}"
+    environment: "production"
+    sourceERP: "https://erp.acme-corp.internal"
+    stagingArea: "/corporate-data/staging/finance"
+    warehouseArea: "/corporate-data/warehouse/finance"
+    # Line 32: Email addresses for different types of notifications
+    opsTeamEmail: "finance-ops@acme-corp.com"
+    managementEmail: "finance-director@acme-corp.com"
+
+  conditions:
+    - name: is-production
+      expression: "{{environment}} == 'production'"
+    - name: is-business-day
+      expression: "{{dayOfWeek}} >= 1 && {{dayOfWeek}} <= 5"
+
+  execution:
+    strategy: mixed
+    parallelism: 3
+    timeout: 14400    # 4 hours maximum
+    # Lines 44-49: Workflow-level retry policy
+    retryPolicy:
+      maxAttempts: 2           # Retry entire workflow up to 2 times
+      backoffMultiplier: 2.0   # Double the wait time between retries
+      initialDelay: 300        # Wait 5 minutes before first retry
+      jitterEnabled: true      # Add randomness to prevent thundering herd
+
+  transferGroups:
+    - name: extract-financial-data
+      description: "Extract daily financial data from ERP system"
+      condition: "is-production && is-business-day"
+      # Line 54: Continue processing other groups even if this one fails
+      continueOnError: false    # Stop workflow if extraction fails (critical data)
+      # Line 56: Maximum parallel transfers within this group
+      maxParallelTransfers: 2
+      transfers:
+        - name: extract-transactions
+          source: "{{sourceERP}}/api/transactions/export?date={{processingDate}}"
+          destination: "{{stagingArea}}/transactions-{{processingDate}}.json"
+          # Lines 61-70: Comprehensive transfer options
+          options:
+            timeout: 1800                    # 30 minutes for this transfer
+            checksumValidation: true         # Verify file integrity
+            checksumAlgorithm: "SHA256"     # Use SHA-256 for checksums
+            retryAttempts: 5                # Retry this transfer up to 5 times
+            retryBackoffMultiplier: 2.0     # Double wait time between retries
+            initialRetryDelay: 60           # Wait 1 minute before first retry
+            compressionEnabled: true        # Enable compression for large files
+          # Lines 68-74: Authentication configuration for secure API access
+          credentials:
+            type: "oauth2"                  # Use OAuth 2.0 authentication
+            tokenEndpoint: "{{sourceERP}}/oauth/token"
+            clientId: "quorus-finance-client"
+            # Line 72: Reference to securely stored client secret
+            clientSecret: "{{vault:erp-client-secret}}"
+            scope: "transactions:read"      # Minimal required permissions
+
+        - name: extract-accounts
+          source: "{{sourceERP}}/api/accounts/export?date={{processingDate}}"
+          destination: "{{stagingArea}}/accounts-{{processingDate}}.json"
+          # Line 78: This transfer depends on transactions completing first
+          dependsOn: [extract-transactions]
+          options:
+            timeout: 900        # 15 minutes (smaller dataset)
+            checksumValidation: true
+            retryAttempts: 3
+
+    - name: validate-and-process
+      description: "Validate data integrity and process for warehouse loading"
+      dependsOn: [extract-financial-data]
+      # Line 87: Continue with other groups even if validation has issues
+      continueOnError: true
+      transfers:
+        - name: validate-data-integrity
+          source: "{{stagingArea}}/transactions-{{processingDate}}.json"
+          destination: "{{stagingArea}}/validation-report-{{processingDate}}.json"
+          options:
+            # Line 93: Custom validation script execution
+            executeScript: true
+            scriptPath: "/scripts/validate-financial-data.py"
+            scriptArguments: ["--date", "{{processingDate}}", "--strict-mode"]
+            timeout: 600        # 10 minutes for validation
+            # Lines 97-102: Error handling for validation failures
+            onError:
+              action: "continue"              # Continue workflow even if validation fails
+              logLevel: "WARN"               # Log validation failures as warnings
+              notification: "{{opsTeamEmail}}" # Notify ops team of validation issues
+              createTicket: true             # Automatically create support ticket
+              ticketPriority: "medium"       # Set ticket priority level
+
+    - name: load-to-warehouse
+      description: "Load processed data into corporate data warehouse"
+      dependsOn: [validate-and-process]
+      continueOnError: false    # Critical final step - must succeed
+      transfers:
+        - name: load-transactions
+          source: "{{stagingArea}}/transactions-{{processingDate}}.json"
+          destination: "{{warehouseArea}}/transactions/{{processingDate}}.parquet"
+          options:
+            timeout: 2700       # 45 minutes for warehouse loading
+            # Line 113: Convert JSON to Parquet format for analytics
+            outputFormat: "parquet"
+            compressionCodec: "snappy"      # Efficient compression for analytics
+            # Line 116: Partition data by date for query performance
+            partitionBy: ["transaction_date"]
+            # Lines 117-122: Warehouse-specific options
+            warehouseOptions:
+              updateMode: "append"          # Add new data without replacing existing
+              createIndexes: true          # Create database indexes for performance
+              updateStatistics: true      # Update table statistics for query optimizer
+              validateSchema: true        # Ensure data matches expected schema
+
+  # Lines 123-150: Comprehensive notification configuration
+  notifications:
+    # Success notifications - sent when workflow completes successfully
+    onSuccess:
+      - type: email
+        # Line 127: Send success notification to operations team
+        recipients: ["{{opsTeamEmail}}"]
+        subject: "✅ Financial Data Pipeline Completed - {{processingDate}}"
+        # Line 130: Use predefined email template
+        template: "workflow-success-template"
+        # Line 132: Include performance metrics in the email
+        includeMetrics: true
+        attachments:
+          - "{{stagingArea}}/validation-report-{{processingDate}}.json"
+
+      - type: slack
+        # Line 137: Also notify via Slack for immediate visibility
+        channel: "#finance-data-ops"
+        message: "✅ Daily financial pipeline completed successfully for {{processingDate}}"
+        # Line 140: Include key metrics in Slack message
+        includeMetrics: true
+
+    # Failure notifications - sent when workflow fails
+    onFailure:
+      - type: email
+        # Line 145: Escalate failures to both ops and management
+        recipients: ["{{opsTeamEmail}}", "{{managementEmail}}"]
+        subject: "🚨 URGENT: Financial Pipeline Failed - {{processingDate}}"
+        template: "workflow-failure-template"
+        # Line 149: Include detailed error information and logs
+        includeErrorDetails: true
+        includeLogs: true
+        # Line 152: Mark as high priority for email filtering
+        priority: "high"
+
+      - type: slack
+        channel: "#finance-data-ops"
+        message: "🚨 CRITICAL: Financial pipeline FAILED for {{processingDate}} - immediate attention required!"
+        # Line 157: Mention specific people for urgent issues
+        mentions: ["@finance-ops-oncall", "@data-team-lead"]
+
+      - type: webhook
+        # Line 160: Integrate with incident management system
+        url: "https://alerts.acme-corp.com/api/incidents"
+        method: "POST"
+        headers:
+          Authorization: "Bearer {{vault:alerting-system-token}}"
+          Content-Type: "application/json"
+        # Lines 165-171: Structured incident data
+        payload:
+          severity: "high"
+          service: "finance-data-pipeline"
+          environment: "{{environment}}"
+          description: "Financial data pipeline execution failed"
+          impact: "Financial reporting may be delayed"
+          urgency: "high"
+
+    # Progress notifications - optional periodic updates
+    onProgress:
+      # Line 174: Enable progress notifications every 30 minutes
+      enabled: true
+      intervalMinutes: 30
+      recipients: ["{{opsTeamEmail}}"]
+      # Line 178: Only send progress updates for long-running workflows
+      minimumDurationMinutes: 60
+
+  # Lines 180-190: Cleanup and maintenance configuration
+  cleanup:
+    enabled: true
+    # Line 183: Keep staging files for 7 days for troubleshooting
+    retainStagingDays: 7
+    # Line 185: Keep detailed logs for 30 days for audit purposes
+    retainLogsDays: 30
+    # Line 187: Automatically archive completed workflow metadata
+    archiveEnabled: true
+    archiveLocation: "/corporate-data/archive/workflows"
+    # Line 190: Compress archived data to save storage space
+    compressionEnabled: true
+
+  # Lines 191-196: Service Level Agreement definitions
+  sla:
+    # Line 193: Maximum acceptable execution time
+    maxExecutionTime: "PT4H"        # 4 hours (ISO 8601 duration format)
+    # Line 195: Target execution time for performance monitoring
+    targetExecutionTime: "PT2H"     # 2 hours target
+    # Line 197: Minimum acceptable success rate
+    availabilityTarget: 99.5        # 99.5% success rate required
+```
+
+**Production Features Explained:**
+- **Lines 8-10**: `tenant` and `namespace` provide multi-tenant isolation
+- **Lines 16-24**: `annotations` provide governance metadata for enterprise compliance
+- **Line 32**: Variables can reference email addresses for dynamic notifications
+- **Lines 44-49**: Workflow-level `retryPolicy` handles transient failures
+- **Line 54**: `continueOnError: false` stops workflow if critical steps fail
+- **Line 56**: `maxParallelTransfers` controls resource usage within groups
+- **Lines 68-74**: `credentials` section handles secure authentication
+- **Line 78**: Transfer-level `dependsOn` creates fine-grained dependencies
+- **Lines 97-102**: `onError` configuration provides granular error handling
+- **Lines 123-150**: Comprehensive `notifications` for different scenarios
+- **Lines 180-190**: `cleanup` configuration manages storage and maintenance
+- **Lines 191-196**: `sla` definitions enable performance monitoring
+
+##### YAML Configuration Learning Path Summary
+
+We've progressed through increasingly complex YAML configurations:
+
+**1. Simple Example (15 lines)**
+- Basic `apiVersion`, `kind`, `metadata`
+- Single transfer group with one transfer
+- Minimal required fields only
+
+**2. Intermediate Example (28 lines)**
+- Added `version` and `variables`
+- Introduced `execution` configuration
+- Transfer `options` for customization
+- Variable substitution with `{{variable}}` syntax
+
+**3. Multi-Stage Example (58 lines)**
+- Multiple transfer groups with `dependsOn` relationships
+- Built-in functions like `{{today}}`
+- `labels` for categorization
+- Data pipeline pattern (extract → process → load)
+
+**4. Conditional Example (64 lines)**
+- Global `conditions` with boolean expressions
+- Conditional execution using `condition` fields
+- Logical operators (`&&`, `||`) in expressions
+- Business rule implementation
+
+**5. Production Example (197 lines)**
+- Complete enterprise metadata with `tenant`, `namespace`, `annotations`
+- Comprehensive error handling with `continueOnError`, `onError`
+- Authentication with `credentials`
+- Multi-channel `notifications` (email, Slack, webhook)
+- Resource management and `cleanup` policies
+- Service Level Agreements (`sla`)
+
+##### Key YAML Configuration Patterns
+
+**Essential Structure Pattern:**
+```yaml
+apiVersion: quorus.dev/v1    # Always required - schema version
+kind: TransferWorkflow       # Always required - resource type
+metadata:                    # Always required - identification
+  name: workflow-name        # Always required - unique identifier
+spec:                        # Always required - workflow definition
+  transferGroups:            # Always required - contains transfers
+    - name: group-name       # Always required - group identifier
+      transfers:             # Always required - list of transfers
+        - name: transfer-name # Always required - transfer identifier
+          source: "..."       # Always required - source location
+          destination: "..."  # Always required - destination location
+```
+
+**Variable Usage Pattern:**
+```yaml
+spec:
+  variables:                 # Define reusable values
+    baseUrl: "https://api.example.com"
+    targetDir: "/storage"
+    date: "{{today}}"        # Built-in functions
+  transferGroups:
+    - name: example
+      transfers:
+        - name: transfer
+          source: "{{baseUrl}}/data.csv"     # Reference variables
+          destination: "{{targetDir}}/{{date}}.csv"  # Combine variables
+```
+
+**Dependency Pattern:**
+```yaml
+transferGroups:
+  - name: stage-1            # First stage - no dependencies
+    transfers: [...]
+
+  - name: stage-2
+    dependsOn: [stage-1]     # Explicit dependency
+    transfers: [...]
+
+  - name: stage-3
+    dependsOn: [stage-1, stage-2]  # Multiple dependencies
+    transfers: [...]
+```
+
+**Conditional Execution Pattern:**
+```yaml
+conditions:                  # Define reusable conditions
+  - name: is-production
+    expression: "{{environment}} == 'production'"
+
+transferGroups:
+  - name: prod-only-group
+    condition: is-production  # Reference condition
+    transfers: [...]
+
+  - name: complex-condition
+    condition: "is-production && {{dayOfWeek}} <= 5"  # Combine conditions
+    transfers: [...]
+```
+
+**Error Handling Pattern:**
+```yaml
+transferGroups:
+  - name: critical-group
+    continueOnError: false   # Stop workflow if this fails
+    transfers:
+      - name: critical-transfer
+        source: "..."
+        destination: "..."
+        options:
+          retryAttempts: 5   # Transfer-level retries
+          onError:           # Transfer-level error handling
+            action: "fail"
+            notification: "admin@company.com"
+
+  - name: optional-group
+    continueOnError: true    # Continue workflow even if this fails
+    transfers: [...]
+```
+
+**Notification Pattern:**
+```yaml
+notifications:
+  onSuccess:                 # Workflow succeeded
+    - type: email
+      recipients: ["ops@company.com"]
+      subject: "Workflow completed"
+
+  onFailure:                 # Workflow failed
+    - type: email
+      recipients: ["ops@company.com", "manager@company.com"]
+      subject: "URGENT: Workflow failed"
+      priority: "high"
+
+    - type: slack
+      channel: "#alerts"
+      message: "Workflow failed - immediate attention required"
+```
+
+##### Best Practices for YAML Configuration
+
+**1. Start Simple, Add Complexity Gradually**
+- Begin with basic transfer requirements
+- Add configuration options as needed
+- Implement error handling and notifications last
+
+**2. Use Meaningful Names**
+```yaml
+# Good - descriptive names
+- name: extract-customer-data
+- name: validate-financial-records
+- name: load-to-data-warehouse
+
+# Bad - generic names
+- name: step1
+- name: transfer
+- name: process
+```
+
+**3. Leverage Variables for Reusability**
+```yaml
+# Good - reusable configuration
+variables:
+  apiBase: "https://api.company.com"
+  targetDir: "/data/{{department}}"
+
+# Bad - hardcoded values repeated
+source: "https://api.company.com/customers"
+source: "https://api.company.com/orders"
+```
+
+**4. Document with Descriptions**
+```yaml
+# Good - well documented
+- name: month-end-processing
+  description: "Additional financial processing required at month-end for regulatory compliance"
+  condition: "{{dayOfMonth}} >= 28"
+
+# Bad - no documentation
+- name: month-end-processing
+  condition: "{{dayOfMonth}} >= 28"
+```
+
+**5. Use Appropriate Error Handling**
+```yaml
+# Critical data - fail fast
+- name: financial-data-extract
+  continueOnError: false
+
+# Optional data - continue on error
+- name: supplementary-data-extract
+  continueOnError: true
+```
+
+This progressive approach helps users understand YAML configuration by building from simple concepts to complex enterprise scenarios, with each example building on the previous one while introducing new concepts gradually.
+
+```yaml
+# API version and resource type declaration
+apiVersion: quorus.dev/v1
+kind: TransferWorkflow
+
+# Metadata section - workflow identification and classification
+metadata:
+  # Unique workflow identifier (must be DNS-compliant)
+  name: enterprise-financial-data-pipeline
+
+  # Human-readable description for documentation
+  description: |
+    Comprehensive daily financial data synchronization pipeline that extracts
+    data from multiple ERP systems, validates data integrity, transforms data
+    for analytics, and loads into the corporate data warehouse with full
+    audit trail and compliance reporting.
+
+  # Semantic version for workflow evolution tracking
+  version: "2.3.1"
+
+  # Tenant and namespace for multi-tenant isolation
+  tenant: acme-corporation
+  namespace: finance-operations
+
+  # Labels for categorization and selection (key-value pairs)
+  labels:
+    environment: production           # Environment designation
+    criticality: high                # Business criticality level
+    schedule: daily                  # Execution frequency
+    department: finance              # Owning department
+    compliance: sox-required         # Compliance requirements
+    dataClassification: confidential # Data sensitivity level
+    automationLevel: full           # Level of automation
+
+  # Annotations for extended metadata (not used for selection)
+  annotations:
+    # Business ownership and contact information
+    owner: "finance-data-team@acme-corp.com"
+    businessOwner: "cfo@acme-corp.com"
+    technicalContact: "data-ops@acme-corp.com"
+
+    # Documentation and reference links
+    documentation: "https://wiki.acme-corp.com/finance/data-pipeline"
+    runbook: "https://runbooks.acme-corp.com/finance/daily-sync"
+    architecture: "https://confluence.acme-corp.com/finance/data-architecture"
+
+    # Approval and governance information
+    approvedBy: "finance-director@acme-corp.com"
+    approvalDate: "2025-01-15"
+    nextReview: "2025-07-15"
+    complianceReviewed: "2025-01-10"
+
+    # Change management
+    lastModified: "2025-01-20T10:30:00Z"
+    modifiedBy: "data-engineer@acme-corp.com"
+    changeTicket: "CHG-2025-001234"
+
+# Workflow specification - the core workflow definition
+spec:
+  # Global variables available to all transfers and conditions
+  variables:
+    # System endpoints and configurations
+    sourceERP: "https://erp.acme-corp.internal"
+    sourceCRM: "https://crm.acme-corp.internal"
+    targetWarehouse: "/corporate-data-warehouse/finance"
+    stagingArea: "/staging/finance"
+    archiveLocation: "/archive/finance"
+
+    # Date and time variables with formatting
+    processingDate: "{{today}}"                    # 2025-01-20
+    processingTimestamp: "{{timestamp}}"           # 2025-01-20T06:00:00Z
+    yearMonth: "{{format(today, 'yyyy-MM')}}"     # 2025-01
+    fiscalQuarter: "{{fiscalQuarter(today)}}"     # Q1-2025
+
+    # Environment and configuration
+    environment: "production"
+    region: "us-east-1"
+    dataCenter: "primary"
+
+    # Business logic variables
+    batchSize: 10000
+    maxRetries: 5
+    timeoutMinutes: 30
+
+    # Notification and alerting
+    primaryNotificationEmail: "finance-ops@acme-corp.com"
+    escalationEmail: "finance-director@acme-corp.com"
+    slackChannel: "#finance-data-ops"
+
+    # Compliance and audit
+    auditRequired: true
+    retentionPeriodDays: 2555  # 7 years for financial data
+    encryptionRequired: true
+
+  # Execution configuration
+  execution:
+    # Execution strategy determines how transfer groups are executed
+    strategy: mixed  # Options: sequential, parallel, mixed
+
+    # Maximum number of parallel transfers across all groups
+    parallelism: 8
+
+    # Global timeout for entire workflow (in seconds)
+    timeout: 14400  # 4 hours
+
+    # Workflow-level retry policy
     retryPolicy:
       maxAttempts: 3
-      backoffMultiplier: 2
-      initialDelay: 60
+      backoffMultiplier: 2.0
+      initialDelay: 300        # 5 minutes
+      maxDelay: 1800          # 30 minutes
+      jitterEnabled: true     # Add randomness to prevent thundering herd
 
-  # Conditional execution
+    # Resource constraints
+    resources:
+      maxMemoryMB: 2048
+      maxCpuCores: 4
+      maxNetworkBandwidthMbps: 100
+
+    # Execution preferences
+    preferences:
+      preferredAgents: ["agent-finance-01", "agent-finance-02"]
+      avoidAgents: ["agent-maintenance"]
+      requireDedicatedAgents: false
+
+  # Global conditions that can be referenced by transfer groups
   conditions:
+    # Environment-based conditions
     - name: production-only
+      description: "Execute only in production environment"
       expression: "{{environment}} == 'production'"
+
     - name: business-hours
+      description: "Execute only during business hours (6 AM - 10 PM EST)"
       expression: "{{hour}} >= 6 && {{hour}} <= 22"
 
-  # Transfer groups with dependencies
+    - name: weekday-only
+      description: "Execute only on weekdays"
+      expression: "{{dayOfWeek}} >= 1 && {{dayOfWeek}} <= 5"
+
+    - name: month-end
+      description: "Execute additional processing at month end"
+      expression: "{{dayOfMonth}} >= 28"
+
+    - name: quarter-end
+      description: "Execute quarterly processing"
+      expression: "{{isQuarterEnd(today)}}"
+
+    # Data availability conditions
+    - name: source-data-available
+      description: "Check if source data is available"
+      expression: "{{checkDataAvailability(sourceERP, processingDate)}}"
+
+  # Transfer groups - logical groupings of related transfers
   transferGroups:
-    - name: data-extraction
-      description: Extract raw data from source systems
+    # Stage 1: Data Extraction from Source Systems
+    - name: extract-master-data
+      description: |
+        Extract master data from ERP and CRM systems including customer
+        information, product catalogs, and organizational hierarchies.
+        This data forms the foundation for all subsequent processing.
+
+      # Execution conditions for this group
       condition: production-only
-      transfers:
-        - name: customer-data
-          source: "{{sourceSystem}}/api/customers/export"
-          destination: "{{targetWarehouse}}/raw/customers/{{processingDate}}.json"
 
+      # Group-level configuration
+      continueOnError: false  # Fail entire group if any transfer fails
+      maxParallelTransfers: 3
+
+      # Individual transfers within the group
+      transfers:
+        - name: extract-customer-master
+          description: "Extract customer master data from ERP system"
+          source: "{{sourceERP}}/api/v2/customers/export"
+          destination: "{{stagingArea}}/raw/customers/{{processingDate}}.json"
+          protocol: https
+
+          # Transfer-specific options
+          options:
+            timeout: 1800  # 30 minutes
+            checksumValidation: true
+            checksumAlgorithm: SHA256
+            retryAttempts: 3
+            chunkSize: 10485760  # 10MB chunks
+            compressionEnabled: true
+
+          # Authentication for this specific transfer
+          credentials:
+            type: oauth2
+            tokenEndpoint: "{{sourceERP}}/oauth/token"
+            clientId: "quorus-finance-client"
+            clientSecret: "{{vault:erp-client-secret}}"
+            scope: "customers:read"
+
+          # Transfer-specific metadata
+          metadata:
+            dataType: "customer-master"
+            sensitivity: "confidential"
+            retention: "{{retentionPeriodDays}}"
+
+        - name: extract-product-catalog
+          description: "Extract product catalog from ERP system"
+          source: "{{sourceERP}}/api/v2/products/export?includeInactive=false"
+          destination: "{{stagingArea}}/raw/products/{{processingDate}}.json"
+          protocol: https
+
+          # This transfer can run in parallel with customer extraction
+          dependsOn: []  # No dependencies within this group
+
+          options:
+            timeout: 900   # 15 minutes (smaller dataset)
+            checksumValidation: true
+            retryAttempts: 3
+
+        - name: extract-chart-of-accounts
+          description: "Extract chart of accounts and GL structure"
+          source: "{{sourceERP}}/api/v2/accounting/coa/export"
+          destination: "{{stagingArea}}/raw/coa/{{processingDate}}.json"
+          protocol: https
+
+          # This should run after customer master for referential integrity
+          dependsOn: [extract-customer-master]
+
+          options:
+            timeout: 600   # 10 minutes
+            checksumValidation: true
+
+    # Stage 2: Transactional Data Extraction
+    - name: extract-transactional-data
+      description: |
+        Extract transactional data including sales orders, invoices, payments,
+        and journal entries. This data depends on master data for referential
+        integrity validation.
+
+      # This group depends on master data extraction
+      dependsOn: [extract-master-data]
+      condition: production-only
+      continueOnError: false
+      maxParallelTransfers: 4
+
+      transfers:
+        - name: extract-sales-orders
+          description: "Extract sales orders for processing date"
+          source: "{{sourceERP}}/api/v2/sales/orders/export?date={{processingDate}}"
+          destination: "{{stagingArea}}/raw/sales-orders/{{processingDate}}.json"
+          protocol: https
+
+          options:
+            timeout: 2700  # 45 minutes (large dataset)
+            checksumValidation: true
+            retryAttempts: 5  # Higher retry for critical data
+
+        - name: extract-invoices
+          description: "Extract invoice data for processing date"
+          source: "{{sourceERP}}/api/v2/accounting/invoices/export?date={{processingDate}}"
+          destination: "{{stagingArea}}/raw/invoices/{{processingDate}}.json"
+          protocol: https
+
+          # Can run in parallel with sales orders
+          dependsOn: []
+
+          options:
+            timeout: 1800  # 30 minutes
+            checksumValidation: true
+
+        - name: extract-payments
+          description: "Extract payment transactions"
+          source: "{{sourceERP}}/api/v2/accounting/payments/export?date={{processingDate}}"
+          destination: "{{stagingArea}}/raw/payments/{{processingDate}}.json"
+          protocol: https
+
+          # Payments should be extracted after invoices for reconciliation
+          dependsOn: [extract-invoices]
+
+        - name: extract-journal-entries
+          description: "Extract general ledger journal entries"
+          source: "{{sourceERP}}/api/v2/accounting/journal/export?date={{processingDate}}"
+          destination: "{{stagingArea}}/raw/journal/{{processingDate}}.json"
+          protocol: https
+
+          # Only extract if month-end processing is required
+          condition: month-end
+
+    # Stage 3: Data Validation and Quality Checks
+    - name: data-validation
+      description: |
+        Perform comprehensive data validation including referential integrity
+        checks, business rule validation, and data quality assessments.
+        Generate validation reports for audit purposes.
+
+      dependsOn: [extract-master-data, extract-transactional-data]
+      condition: production-only
+      continueOnError: true  # Continue even if some validations fail
+
+      transfers:
+        - name: validate-referential-integrity
+          description: "Validate referential integrity between datasets"
+          source: "{{stagingArea}}/scripts/validate-integrity.py"
+          destination: "{{stagingArea}}/validation/integrity-{{processingDate}}.log"
+          protocol: file
+
+          # Custom validation script execution
+          options:
+            executeScript: true
+            scriptArguments:
+              - "--date={{processingDate}}"
+              - "--input-dir={{stagingArea}}/raw"
+              - "--output-dir={{stagingArea}}/validation"
+
+        - name: data-quality-assessment
+          description: "Perform data quality checks and generate metrics"
+          source: "{{stagingArea}}/scripts/quality-check.py"
+          destination: "{{stagingArea}}/quality/quality-report-{{processingDate}}.json"
+          protocol: file
+
+          dependsOn: [validate-referential-integrity]
+
+        - name: generate-audit-report
+          description: "Generate audit report for compliance"
+          source: "{{stagingArea}}/validation"
+          destination: "{{archiveLocation}}/audit/audit-report-{{processingDate}}.pdf"
+          protocol: file
+
+          # Only generate if audit is required
+          condition: "{{auditRequired}} == true"
+
+          options:
+            reportFormat: "pdf"
+            includeMetrics: true
+            digitalSignature: true
+
+    # Stage 4: Data Transformation and Processing
     - name: data-transformation
-      description: Transform and validate extracted data
-      dependsOn: [data-extraction]
-      transfers:
-        - name: process-customers
-          source: "{{targetWarehouse}}/raw/customers/{{processingDate}}.json"
-          destination: "{{targetWarehouse}}/processed/customers/{{processingDate}}.parquet"
+      description: |
+        Transform raw data into analytics-ready format including data
+        cleansing, standardization, enrichment, and aggregation.
 
+      dependsOn: [data-validation]
+      condition: business-hours  # Only during business hours for resource management
+      continueOnError: false
+      maxParallelTransfers: 2  # Resource-intensive operations
+
+      transfers:
+        - name: transform-customer-data
+          description: "Transform and enrich customer data"
+          source: "{{stagingArea}}/raw/customers/{{processingDate}}.json"
+          destination: "{{targetWarehouse}}/processed/customers/{{processingDate}}.parquet"
+          protocol: file
+
+          options:
+            transformationScript: "{{stagingArea}}/transforms/customer-transform.sql"
+            outputFormat: "parquet"
+            compressionCodec: "snappy"
+            partitionBy: ["region", "customer_type"]
+
+        - name: transform-financial-data
+          description: "Transform financial transactions"
+          source: "{{stagingArea}}/raw/invoices/{{processingDate}}.json"
+          destination: "{{targetWarehouse}}/processed/financials/{{processingDate}}.parquet"
+          protocol: file
+
+          dependsOn: [transform-customer-data]  # Needs customer data for enrichment
+
+          options:
+            transformationScript: "{{stagingArea}}/transforms/financial-transform.sql"
+            outputFormat: "parquet"
+
+    # Stage 5: Data Loading and Publishing
     - name: data-loading
-      description: Load processed data into analytics systems
+      description: |
+        Load processed data into analytics systems and publish to
+        downstream consumers including BI tools and reporting systems.
+
       dependsOn: [data-transformation]
       condition: business-hours
+      continueOnError: true  # Some downstream systems may be temporarily unavailable
+
       transfers:
-        - name: load-analytics
-          source: "{{targetWarehouse}}/processed/customers/{{processingDate}}.parquet"
-          destination: "analytics://warehouse/customers/{{processingDate}}"
+        - name: load-data-warehouse
+          description: "Load data into primary data warehouse"
+          source: "{{targetWarehouse}}/processed"
+          destination: "analytics://warehouse/finance/{{processingDate}}"
+          protocol: analytics
+
+          options:
+            loadStrategy: "upsert"  # Update existing, insert new
+            indexing: true
+            statisticsUpdate: true
+
+        - name: publish-to-bi-system
+          description: "Publish data to business intelligence system"
+          source: "{{targetWarehouse}}/processed"
+          destination: "bi://finance-mart/{{processingDate}}"
+          protocol: bi
+
+          # Can run in parallel with data warehouse loading
+          dependsOn: []
+
+        - name: update-data-catalog
+          description: "Update enterprise data catalog with new datasets"
+          source: "{{targetWarehouse}}/processed"
+          destination: "catalog://finance/datasets/{{processingDate}}"
+          protocol: catalog
+
+          options:
+            updateMetadata: true
+            generateLineage: true
+
+  # Workflow-level notifications
+  notifications:
+    # Success notifications
+    onSuccess:
+      - type: email
+        recipients: ["{{primaryNotificationEmail}}"]
+        subject: "Finance Data Pipeline Completed Successfully - {{processingDate}}"
+        template: "workflow-success"
+        includeMetrics: true
+
+      - type: slack
+        channel: "{{slackChannel}}"
+        message: "✅ Finance data pipeline completed successfully for {{processingDate}}"
+
+    # Failure notifications
+    onFailure:
+      - type: email
+        recipients: ["{{primaryNotificationEmail}}", "{{escalationEmail}}"]
+        subject: "URGENT: Finance Data Pipeline Failed - {{processingDate}}"
+        template: "workflow-failure"
+        includeErrorDetails: true
+        includeLogs: true
+
+      - type: slack
+        channel: "{{slackChannel}}"
+        message: "🚨 Finance data pipeline FAILED for {{processingDate}} - immediate attention required"
+
+      - type: webhook
+        url: "https://alerts.acme-corp.com/api/incidents"
+        method: POST
+        headers:
+          Authorization: "Bearer {{vault:alerting-token}}"
+        payload:
+          severity: "high"
+          service: "finance-data-pipeline"
+          description: "Workflow execution failed"
+
+    # Progress notifications (optional)
+    onProgress:
+      enabled: true
+      intervalMinutes: 30
+      recipients: ["{{primaryNotificationEmail}}"]
+
+  # Cleanup and maintenance
+  cleanup:
+    # Automatic cleanup of staging data
+    enabled: true
+    retainStagingDays: 7
+    retainLogsDays: 30
+
+    # Archive completed workflows
+    archiveEnabled: true
+    archiveLocation: "{{archiveLocation}}/workflows"
+
+  # Service Level Agreements
+  sla:
+    maxExecutionTime: "PT4H"      # 4 hours maximum
+    targetExecutionTime: "PT2H"   # 2 hours target
+    availabilityTarget: 99.5      # 99.5% success rate
+
+  # Monitoring and observability
+  monitoring:
+    metricsEnabled: true
+    tracingEnabled: true
+    customMetrics:
+      - name: "records_processed"
+        type: "counter"
+        description: "Number of records processed"
+
+      - name: "data_quality_score"
+        type: "gauge"
+        description: "Overall data quality score"
 ```
 
 #### Dependency Resolution Engine
 
-The **Dependency Resolution Engine** analyzes workflow definitions and creates optimal execution plans:
+The **Dependency Resolution Engine** is a sophisticated system that analyzes workflow definitions, builds dependency graphs, and creates optimal execution plans. It handles complex dependency scenarios while ensuring data consistency and resource optimization.
 
-**Dependency Types:**
-1. **Explicit Dependencies**: Defined via `dependsOn` clauses
-2. **Implicit Dependencies**: Inferred from data flow patterns
-3. **Conditional Dependencies**: Dependencies that apply only under certain conditions
-4. **Resource Dependencies**: Dependencies based on shared resources or quotas
+##### Dependency Types and Analysis
 
-**Dependency Graph Analysis:**
+**1. Explicit Dependencies**
+Explicitly defined via `dependsOn` clauses in the workflow definition:
+
+```yaml
+transferGroups:
+  - name: extract-customers
+    transfers:
+      - name: customer-data
+        source: "{{sourceSystem}}/customers"
+        destination: "{{staging}}/customers.json"
+
+  - name: extract-orders
+    # Explicit dependency - orders need customer data for validation
+    dependsOn: [extract-customers]
+    transfers:
+      - name: order-data
+        source: "{{sourceSystem}}/orders"
+        destination: "{{staging}}/orders.json"
+
+  - name: generate-reports
+    # Multiple explicit dependencies
+    dependsOn: [extract-customers, extract-orders]
+    transfers:
+      - name: customer-order-report
+        source: "{{staging}}/customers.json,{{staging}}/orders.json"
+        destination: "{{reports}}/customer-orders.pdf"
+```
+
+**2. Implicit Dependencies**
+Automatically inferred from data flow patterns:
+
+```yaml
+transferGroups:
+  - name: stage-1
+    transfers:
+      - name: raw-data-extract
+        source: "{{source}}/raw-data.csv"
+        destination: "{{staging}}/raw-data.csv"
+
+  - name: stage-2
+    transfers:
+      - name: process-data
+        # Implicit dependency inferred from source path
+        source: "{{staging}}/raw-data.csv"  # Uses output from stage-1
+        destination: "{{processed}}/clean-data.csv"
+
+  - name: stage-3
+    transfers:
+      - name: final-report
+        # Implicit dependency on processed data
+        source: "{{processed}}/clean-data.csv"  # Uses output from stage-2
+        destination: "{{reports}}/final-report.pdf"
+```
+
+**3. Conditional Dependencies**
+Dependencies that apply only under certain conditions:
+
+```yaml
+conditions:
+  - name: month-end
+    expression: "{{dayOfMonth}} >= 28"
+  - name: quarter-end
+    expression: "{{isQuarterEnd(today)}}"
+
+transferGroups:
+  - name: daily-processing
+    transfers:
+      - name: daily-sales
+        source: "{{source}}/daily-sales.csv"
+        destination: "{{staging}}/daily-sales.csv"
+
+  - name: monthly-processing
+    # Conditional dependency - only runs at month-end
+    dependsOn: [daily-processing]
+    condition: month-end
+    transfers:
+      - name: monthly-aggregation
+        source: "{{staging}}/daily-sales.csv"
+        destination: "{{reports}}/monthly-summary.csv"
+
+  - name: quarterly-processing
+    # Conditional dependency with multiple conditions
+    dependsOn: [daily-processing, monthly-processing]
+    condition: quarter-end
+    transfers:
+      - name: quarterly-report
+        source: "{{reports}}/monthly-summary.csv"
+        destination: "{{reports}}/quarterly-report.pdf"
+```
+
+**4. Resource Dependencies**
+Dependencies based on shared resources or capacity constraints:
+
+```yaml
+transferGroups:
+  - name: high-bandwidth-group-1
+    transfers:
+      - name: large-file-1
+        source: "{{source}}/large-file-1.zip"
+        destination: "{{target}}/large-file-1.zip"
+        options:
+          bandwidthMbps: 500  # Requires significant bandwidth
+
+  - name: high-bandwidth-group-2
+    # Resource dependency - can't run simultaneously due to bandwidth limits
+    resourceDependencies:
+      - type: bandwidth
+        constraint: "total_bandwidth < 1000"
+        conflictsWith: [high-bandwidth-group-1]
+    transfers:
+      - name: large-file-2
+        source: "{{source}}/large-file-2.zip"
+        destination: "{{target}}/large-file-2.zip"
+        options:
+          bandwidthMbps: 600
+```
+
+##### Advanced Dependency Graph Analysis
+
 ```java
-public class DependencyGraph {
-    // Graph construction
-    public void addTransferGroup(TransferGroup group);
-    public void addDependency(String from, String to, DependencyType type);
+public class AdvancedDependencyGraph {
+    private final Map<String, TransferGroup> groups;
+    private final Map<String, Set<String>> dependencies;
+    private final Map<String, Set<String>> conditionalDependencies;
+    private final Map<String, ResourceConstraint> resourceConstraints;
 
-    // Analysis operations
-    public List<TransferGroup> topologicalSort();
-    public boolean hasCycles();
-    public List<List<TransferGroup>> findStronglyConnectedComponents();
-    public int calculateCriticalPath();
+    // Graph construction with validation
+    public void addTransferGroup(TransferGroup group) {
+        validateGroupDefinition(group);
+        groups.put(group.getName(), group);
 
-    // Execution planning
-    public ExecutionPlan createExecutionPlan(ExecutionStrategy strategy);
-    public List<ExecutionStage> getExecutionStages();
-    public Map<String, Set<String>> getParallelizableGroups();
+        // Build explicit dependencies
+        for (String dependency : group.getDependsOn()) {
+            addDependency(dependency, group.getName(), DependencyType.EXPLICIT);
+        }
+
+        // Infer implicit dependencies from data flow
+        inferImplicitDependencies(group);
+
+        // Process conditional dependencies
+        processConditionalDependencies(group);
+
+        // Analyze resource dependencies
+        analyzeResourceDependencies(group);
+    }
+
+    // Implicit dependency inference
+    private void inferImplicitDependencies(TransferGroup group) {
+        for (Transfer transfer : group.getTransfers()) {
+            String sourcePath = transfer.getSource();
+
+            // Find groups that produce this source path
+            for (TransferGroup otherGroup : groups.values()) {
+                if (otherGroup.getName().equals(group.getName())) continue;
+
+                for (Transfer otherTransfer : otherGroup.getTransfers()) {
+                    if (sourcePath.equals(otherTransfer.getDestination())) {
+                        // Implicit dependency found
+                        addDependency(otherGroup.getName(), group.getName(),
+                                    DependencyType.IMPLICIT);
+                        logger.info("Inferred dependency: {} -> {} (data flow)",
+                                  otherGroup.getName(), group.getName());
+                    }
+                }
+            }
+        }
+    }
+
+    // Advanced cycle detection with detailed reporting
+    public CycleAnalysisResult detectCycles() {
+        Set<String> visited = new HashSet<>();
+        Set<String> recursionStack = new HashSet<>();
+        List<List<String>> cycles = new ArrayList<>();
+
+        for (String group : groups.keySet()) {
+            if (!visited.contains(group)) {
+                List<String> currentPath = new ArrayList<>();
+                if (detectCyclesDFS(group, visited, recursionStack, currentPath, cycles)) {
+                    // Cycle detected
+                }
+            }
+        }
+
+        return new CycleAnalysisResult(cycles.isEmpty(), cycles,
+                                     generateCycleResolutionSuggestions(cycles));
+    }
+
+    // Critical path analysis for performance optimization
+    public CriticalPathAnalysis calculateCriticalPath() {
+        Map<String, Integer> distances = new HashMap<>();
+        Map<String, String> predecessors = new HashMap<>();
+
+        // Initialize distances
+        for (String group : groups.keySet()) {
+            distances.put(group, 0);
+        }
+
+        // Calculate longest path (critical path)
+        List<String> topologicalOrder = topologicalSort();
+        for (String group : topologicalOrder) {
+            TransferGroup transferGroup = groups.get(group);
+            int groupDuration = estimateGroupDuration(transferGroup);
+
+            for (String dependent : getDependents(group)) {
+                int newDistance = distances.get(group) + groupDuration;
+                if (newDistance > distances.get(dependent)) {
+                    distances.put(dependent, newDistance);
+                    predecessors.put(dependent, group);
+                }
+            }
+        }
+
+        // Build critical path
+        List<String> criticalPath = buildCriticalPath(distances, predecessors);
+        int totalDuration = distances.values().stream().mapToInt(Integer::intValue).max().orElse(0);
+
+        return new CriticalPathAnalysis(criticalPath, totalDuration,
+                                      identifyBottlenecks(criticalPath));
+    }
+
+    // Intelligent execution planning
+    public ExecutionPlan createOptimalExecutionPlan(ExecutionStrategy strategy,
+                                                   ResourceConstraints constraints) {
+        // Validate dependencies
+        CycleAnalysisResult cycleAnalysis = detectCycles();
+        if (cycleAnalysis.hasCycles()) {
+            throw new DependencyException("Circular dependencies detected: " +
+                                        cycleAnalysis.getCycles());
+        }
+
+        // Calculate critical path
+        CriticalPathAnalysis criticalPath = calculateCriticalPath();
+
+        // Create execution stages based on strategy
+        List<ExecutionStage> stages = switch (strategy) {
+            case SEQUENTIAL -> createSequentialPlan();
+            case PARALLEL -> createParallelPlan(constraints);
+            case MIXED -> createMixedPlan(constraints, criticalPath);
+            case ADAPTIVE -> createAdaptivePlan(constraints, criticalPath);
+        };
+
+        return new ExecutionPlan(stages, criticalPath, estimateTotalDuration(stages));
+    }
+
+    // Mixed execution strategy with intelligent optimization
+    private List<ExecutionStage> createMixedPlan(ResourceConstraints constraints,
+                                               CriticalPathAnalysis criticalPath) {
+        List<ExecutionStage> stages = new ArrayList<>();
+        Set<String> completed = new HashSet<>();
+
+        while (completed.size() < groups.size()) {
+            ExecutionStage stage = new ExecutionStage();
+
+            // Find groups ready for execution
+            Set<String> readyGroups = findReadyGroups(completed);
+
+            // Prioritize critical path groups
+            List<String> prioritizedGroups = prioritizeGroups(readyGroups, criticalPath);
+
+            // Add groups to stage respecting resource constraints
+            for (String group : prioritizedGroups) {
+                if (stage.canAddGroup(groups.get(group), constraints)) {
+                    stage.addGroup(groups.get(group));
+                    completed.add(group);
+                }
+            }
+
+            if (!stage.isEmpty()) {
+                stages.add(stage);
+            } else {
+                // Deadlock detection
+                throw new ExecutionPlanningException("Unable to create execution plan - " +
+                                                   "possible resource deadlock");
+            }
+        }
+
+        return optimizeStages(stages, constraints);
+    }
+}
+
+// Supporting classes for dependency analysis
+public class CycleAnalysisResult {
+    private final boolean hasCycles;
+    private final List<List<String>> cycles;
+    private final List<String> resolutionSuggestions;
+
+    // Methods for cycle analysis and resolution
+}
+
+public class CriticalPathAnalysis {
+    private final List<String> criticalPath;
+    private final int totalDuration;
+    private final List<String> bottlenecks;
+    private final Map<String, Integer> slackTimes;
+
+    // Methods for critical path optimization
+}
+
+public class ExecutionStage {
+    private final List<TransferGroup> groups;
+    private final ResourceRequirements requirements;
+    private final int estimatedDuration;
+
+    public boolean canAddGroup(TransferGroup group, ResourceConstraints constraints) {
+        ResourceRequirements newRequirements = requirements.add(group.getResourceRequirements());
+        return constraints.canAccommodate(newRequirements);
+    }
 }
 ```
 
-**Execution Strategies:**
-- **Sequential**: Execute transfer groups one at a time
-- **Parallel**: Execute all independent groups simultaneously
-- **Mixed**: Optimize based on dependencies and resource constraints
+##### Execution Strategies with Detailed Examples
+
+**1. Sequential Execution**
+Execute transfer groups one at a time in dependency order:
+
+```yaml
+# Workflow configuration
+execution:
+  strategy: sequential
+
+# Results in execution plan:
+# Stage 1: [extract-customers]
+# Stage 2: [extract-orders]
+# Stage 3: [generate-reports]
+```
+
+**Benefits:**
+- Predictable resource usage
+- Simple error handling
+- Guaranteed dependency satisfaction
+
+**Use Cases:**
+- Resource-constrained environments
+- Critical workflows requiring careful control
+- Debugging and testing scenarios
+
+**2. Parallel Execution**
+Execute all independent groups simultaneously:
+
+```yaml
+# Workflow configuration
+execution:
+  strategy: parallel
+  parallelism: 10
+
+# Results in execution plan:
+# Stage 1: [extract-customers, extract-products, extract-vendors]
+# Stage 2: [extract-orders, process-customers, process-products]
+# Stage 3: [generate-reports, update-warehouse]
+```
+
+**Benefits:**
+- Maximum throughput
+- Optimal resource utilization
+- Shortest total execution time
+
+**Use Cases:**
+- High-performance environments
+- Independent data processing
+- Batch processing scenarios
+
+**3. Mixed Execution (Recommended)**
+Intelligent optimization based on dependencies and resources:
+
+```yaml
+# Workflow configuration
+execution:
+  strategy: mixed
+  parallelism: 5
+  resources:
+    maxMemoryMB: 4096
+    maxCpuCores: 8
+    maxNetworkBandwidthMbps: 1000
+
+# Results in optimized execution plan:
+# Stage 1: [extract-customers, extract-products] (parallel, independent)
+# Stage 2: [extract-orders] (depends on customers)
+# Stage 3: [process-customers, process-products] (parallel, sufficient resources)
+# Stage 4: [generate-reports] (depends on all processing)
+```
+
+**Benefits:**
+- Balanced performance and resource usage
+- Intelligent dependency handling
+- Adaptive to resource constraints
+
+**Use Cases:**
+- Production environments
+- Complex workflows with mixed dependencies
+- Resource-aware execution
+
+**4. Adaptive Execution (Advanced)**
+Dynamic optimization based on runtime conditions:
+
+```yaml
+# Workflow configuration
+execution:
+  strategy: adaptive
+  adaptiveSettings:
+    monitorPerformance: true
+    adjustParallelism: true
+    resourceThresholds:
+      cpuUtilization: 80
+      memoryUtilization: 75
+      networkUtilization: 70
+```
+
+**Benefits:**
+- Runtime optimization
+- Self-tuning performance
+- Automatic resource management
+
+**Use Cases:**
+- Long-running workflows
+- Variable resource environments
+- Performance-critical applications
 
 #### Variable Resolution System
 
-The **Variable Resolution System** provides powerful templating and configuration management:
+The **Variable Resolution System** is a sophisticated templating engine that provides dynamic configuration management, enabling workflows to adapt to different environments, dates, and runtime conditions. It supports complex expressions, built-in functions, and hierarchical variable resolution.
 
-**Variable Sources (in precedence order):**
-1. **Runtime Context**: Variables provided at execution time
-2. **Workflow Definition**: Variables defined in the workflow spec
-3. **Tenant Configuration**: Tenant-specific default values
-4. **System Defaults**: Global system default values
-5. **Built-in Functions**: System-provided functions and values
+##### Variable Resolution Hierarchy
 
-**Built-in Functions:**
-```yaml
-variables:
-  # Date/time functions
-  today: "{{today}}"                    # 2025-01-20
-  yesterday: "{{yesterday}}"            # 2025-01-19
-  timestamp: "{{timestamp}}"            # 2025-01-20T10:30:00Z
-  hour: "{{hour}}"                      # 10
+Variables are resolved in the following precedence order (highest to lowest):
 
-  # System functions
-  hostname: "{{hostname}}"              # current-agent-01
-  tenant: "{{tenant}}"                  # current-tenant
-  namespace: "{{namespace}}"            # current-namespace
+**1. Runtime Context Variables**
+Variables provided at workflow execution time:
 
-  # Utility functions
-  uuid: "{{uuid}}"                      # generated UUID
-  random: "{{random(1000)}}"            # random number 0-999
+```bash
+# Command line execution with runtime variables
+quorus-workflow execute daily-sync.yaml \
+  --variable processingDate=2025-01-20 \
+  --variable environment=production \
+  --variable urgentMode=true
 
-  # String functions
-  upper: "{{upper(environment)}}"       # PRODUCTION
-  lower: "{{lower(department)}}"        # finance
-
-  # Conditional functions
-  conditional: "{{if(environment == 'prod', 'production-db', 'test-db')}}"
+# REST API execution with runtime variables
+POST /api/v1/workflows
+{
+  "workflowDefinition": "...",
+  "runtimeVariables": {
+    "processingDate": "2025-01-20",
+    "environment": "production",
+    "urgentMode": true,
+    "customBatchSize": 50000
+  }
+}
 ```
 
-**Variable Validation:**
-- **Type Checking**: Ensure variables match expected types
-- **Range Validation**: Validate numeric ranges and string patterns
-- **Dependency Validation**: Ensure all referenced variables are defined
-- **Circular Reference Detection**: Prevent infinite variable expansion
+**2. Workflow Definition Variables**
+Variables defined in the workflow spec:
+
+```yaml
+spec:
+  variables:
+    # Static configuration
+    sourceSystem: "https://erp.corp.internal"
+    targetWarehouse: "/data-warehouse/finance"
+
+    # Dynamic variables using built-in functions
+    processingDate: "{{today}}"
+    processingTimestamp: "{{timestamp}}"
+
+    # Computed variables using other variables
+    archivePath: "{{targetWarehouse}}/archive/{{processingDate}}"
+    logFile: "{{targetWarehouse}}/logs/workflow-{{processingTimestamp}}.log"
+```
+
+**3. Tenant Configuration Variables**
+Tenant-specific default values:
+
+```yaml
+# Tenant configuration (managed separately)
+tenantDefaults:
+  acme-corp:
+    defaultTimeout: 1800
+    maxRetries: 5
+    notificationEmail: "ops@acme-corp.com"
+    dataRetentionDays: 2555
+    encryptionRequired: true
+```
+
+**4. System Default Variables**
+Global system defaults:
+
+```yaml
+# System defaults (built into Quorus)
+systemDefaults:
+  defaultTimeout: 300
+  maxRetries: 3
+  checksumValidation: true
+  compressionEnabled: false
+  parallelism: 3
+```
+
+**5. Built-in Functions and System Variables**
+System-provided functions and runtime values.
+
+##### Comprehensive Built-in Functions
+
+**Date and Time Functions:**
+```yaml
+variables:
+  # Basic date functions
+  today: "{{today}}"                           # 2025-01-20
+  yesterday: "{{yesterday}}"                   # 2025-01-19
+  tomorrow: "{{tomorrow}}"                     # 2025-01-21
+
+  # Formatted dates
+  todayFormatted: "{{format(today, 'yyyy-MM-dd')}}"      # 2025-01-20
+  monthYear: "{{format(today, 'yyyy-MM')}}"              # 2025-01
+  yearOnly: "{{format(today, 'yyyy')}}"                  # 2025
+
+  # Date arithmetic
+  lastWeek: "{{addDays(today, -7)}}"                     # 2025-01-13
+  nextMonth: "{{addMonths(today, 1)}}"                   # 2025-02-20
+  quarterStart: "{{startOfQuarter(today)}}"              # 2025-01-01
+  monthEnd: "{{endOfMonth(today)}}"                      # 2025-01-31
+
+  # Time components
+  currentHour: "{{hour}}"                      # 14 (2 PM)
+  currentMinute: "{{minute}}"                  # 30
+  dayOfWeek: "{{dayOfWeek}}"                   # 1 (Monday)
+  dayOfMonth: "{{dayOfMonth}}"                 # 20
+  dayOfYear: "{{dayOfYear}}"                   # 20
+  weekOfYear: "{{weekOfYear}}"                 # 3
+
+  # Timestamps
+  timestamp: "{{timestamp}}"                   # 2025-01-20T14:30:00Z
+  timestampMillis: "{{timestampMillis}}"       # 1737379800000
+  isoTimestamp: "{{isoTimestamp}}"             # 2025-01-20T14:30:00.000Z
+
+  # Business date functions
+  isBusinessDay: "{{isBusinessDay(today)}}"    # true/false
+  nextBusinessDay: "{{nextBusinessDay(today)}}" # 2025-01-21
+  businessDaysInMonth: "{{businessDaysInMonth(today)}}" # 22
+
+  # Fiscal calendar functions (configurable fiscal year start)
+  fiscalYear: "{{fiscalYear(today)}}"          # 2025 (if fiscal year starts in January)
+  fiscalQuarter: "{{fiscalQuarter(today)}}"    # Q1-2025
+  fiscalMonth: "{{fiscalMonth(today)}}"        # 1 (first month of fiscal year)
+  isQuarterEnd: "{{isQuarterEnd(today)}}"      # true/false
+  isYearEnd: "{{isYearEnd(today)}}"            # true/false
+```
+
+**System and Environment Functions:**
+```yaml
+variables:
+  # System information
+  hostname: "{{hostname}}"                     # quorus-controller-01
+  ipAddress: "{{ipAddress}}"                   # 10.0.1.100
+  region: "{{region}}"                         # us-east-1
+  availabilityZone: "{{availabilityZone}}"     # us-east-1a
+
+  # Execution context
+  tenant: "{{tenant}}"                         # acme-corp
+  namespace: "{{namespace}}"                   # finance
+  workflowName: "{{workflowName}}"             # daily-financial-sync
+  executionId: "{{executionId}}"               # wf-exec-20250120-001
+
+  # User context
+  executedBy: "{{executedBy}}"                 # user@corp.com
+  executionMode: "{{executionMode}}"           # normal/dry-run/virtual-run
+
+  # Environment detection
+  environment: "{{environment}}"               # production/staging/development
+  isProduction: "{{environment == 'production'}}" # true/false
+  isDevelopment: "{{environment == 'development'}}" # true/false
+```
+
+**Utility and Generation Functions:**
+```yaml
+variables:
+  # Unique identifiers
+  uuid: "{{uuid}}"                             # 550e8400-e29b-41d4-a716-446655440000
+  shortUuid: "{{shortUuid}}"                   # a1b2c3d4
+  correlationId: "{{correlationId}}"           # Unique per workflow execution
+
+  # Random values
+  randomNumber: "{{random(1000)}}"             # 0-999
+  randomString: "{{randomString(8)}}"          # 8-character random string
+  randomAlphanumeric: "{{randomAlphanumeric(12)}}" # 12-character alphanumeric
+
+  # Encoding functions
+  base64Encode: "{{base64Encode('hello world')}}" # aGVsbG8gd29ybGQ=
+  base64Decode: "{{base64Decode('aGVsbG8gd29ybGQ=')}}" # hello world
+  urlEncode: "{{urlEncode('hello world')}}"    # hello%20world
+
+  # Hash functions
+  md5Hash: "{{md5('hello world')}}"            # 5d41402abc4b2a76b9719d911017c592
+  sha256Hash: "{{sha256('hello world')}}"      # b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9
+```
+
+**String Manipulation Functions:**
+```yaml
+variables:
+  # Case conversion
+  upperCase: "{{upper(department)}}"           # FINANCE
+  lowerCase: "{{lower(department)}}"           # finance
+  titleCase: "{{title(department)}}"           # Finance
+  camelCase: "{{camel(department_name)}}"      # departmentName
+
+  # String operations
+  substring: "{{substring(sourceFile, 0, 10)}}" # First 10 characters
+  length: "{{length(sourceFile)}}"             # String length
+  trim: "{{trim(inputString)}}"                # Remove whitespace
+
+  # String replacement
+  replace: "{{replace(sourceFile, '.csv', '.json')}}" # Replace extension
+  replaceRegex: "{{replaceRegex(sourceFile, '[0-9]+', 'XXX')}}" # Replace numbers
+
+  # String splitting and joining
+  split: "{{split(csvList, ',')}}"             # Split into array
+  join: "{{join(arrayVar, '|')}}"              # Join array with delimiter
+
+  # String validation
+  contains: "{{contains(sourceFile, 'customer')}}" # true/false
+  startsWith: "{{startsWith(sourceFile, 'data')}}" # true/false
+  endsWith: "{{endsWith(sourceFile, '.csv')}}"     # true/false
+  matches: "{{matches(sourceFile, '[a-z]+\\.csv')}}" # Regex match
+```
+
+**Mathematical and Logical Functions:**
+```yaml
+variables:
+  # Arithmetic operations
+  sum: "{{add(batchSize, bufferSize)}}"        # Addition
+  difference: "{{subtract(totalRecords, processedRecords)}}" # Subtraction
+  product: "{{multiply(batchSize, parallelism)}}" # Multiplication
+  quotient: "{{divide(totalSize, chunkSize)}}" # Division
+  remainder: "{{mod(totalRecords, batchSize)}}" # Modulo
+
+  # Mathematical functions
+  absolute: "{{abs(difference)}}"              # Absolute value
+  minimum: "{{min(timeout1, timeout2)}}"      # Minimum value
+  maximum: "{{max(retries1, retries2)}}"      # Maximum value
+  round: "{{round(averageSize)}}"              # Round to nearest integer
+  ceiling: "{{ceil(averageSize)}}"             # Round up
+  floor: "{{floor(averageSize)}}"              # Round down
+
+  # Logical operations
+  and: "{{and(isProduction, isBusinessDay)}}" # Logical AND
+  or: "{{or(isUrgent, isHighPriority)}}"      # Logical OR
+  not: "{{not(isTestMode)}}"                   # Logical NOT
+
+  # Comparison functions
+  equals: "{{eq(environment, 'production')}}" # Equality
+  notEquals: "{{ne(status, 'failed')}}"       # Inequality
+  greaterThan: "{{gt(fileSize, maxSize)}}"    # Greater than
+  lessThan: "{{lt(retryCount, maxRetries)}}"  # Less than
+  greaterEqual: "{{gte(progress, 50)}}"       # Greater than or equal
+  lessEqual: "{{lte(errorRate, threshold)}}"  # Less than or equal
+```
+
+**Conditional and Control Flow Functions:**
+```yaml
+variables:
+  # Simple conditional
+  databaseUrl: "{{if(isProduction, 'prod-db.corp.com', 'test-db.corp.com')}}"
+
+  # Multi-condition switch
+  logLevel: "{{switch(environment,
+              'production', 'WARN',
+              'staging', 'INFO',
+              'development', 'DEBUG',
+              'INFO')}}"  # default value
+
+  # Null coalescing
+  timeout: "{{coalesce(customTimeout, defaultTimeout, 300)}}" # First non-null value
+
+  # Default value assignment
+  batchSize: "{{default(configuredBatchSize, 1000)}}" # Use default if null/empty
+
+  # Conditional execution
+  enableAudit: "{{if(and(isProduction, isFinancialData), true, false)}}"
+
+  # Complex conditional logic
+  processingMode: "{{if(isUrgent, 'fast',
+                       if(isLargeDataset, 'batch', 'standard'))}}"
+```
+
+**Data Structure and Collection Functions:**
+```yaml
+variables:
+  # Array operations
+  arrayLength: "{{size(fileList)}}"            # Array size
+  firstItem: "{{first(fileList)}}"             # First element
+  lastItem: "{{last(fileList)}}"               # Last element
+  arrayContains: "{{contains(fileList, 'data.csv')}}" # Contains check
+
+  # Array manipulation
+  sortedArray: "{{sort(fileList)}}"            # Sort array
+  uniqueArray: "{{unique(fileList)}}"          # Remove duplicates
+  reverseArray: "{{reverse(fileList)}}"        # Reverse order
+
+  # Map/object operations
+  mapKeys: "{{keys(configMap)}}"               # Get all keys
+  mapValues: "{{values(configMap)}}"           # Get all values
+  hasKey: "{{hasKey(configMap, 'timeout')}}"   # Check key existence
+  getValue: "{{get(configMap, 'timeout', 300)}}" # Get value with default
+```
+
+**File and Path Functions:**
+```yaml
+variables:
+  # Path manipulation
+  fileName: "{{basename(sourceFile)}}"         # Extract filename
+  directory: "{{dirname(sourceFile)}}"         # Extract directory
+  extension: "{{extension(sourceFile)}}"       # Extract file extension
+  nameWithoutExt: "{{nameWithoutExtension(sourceFile)}}" # Filename without extension
+
+  # Path construction
+  fullPath: "{{joinPath(baseDir, subDir, fileName)}}" # Join path components
+  relativePath: "{{relativePath(basePath, fullPath)}}" # Make relative path
+
+  # File information (if accessible)
+  fileExists: "{{fileExists(sourceFile)}}"    # Check file existence
+  fileSize: "{{fileSize(sourceFile)}}"         # Get file size
+  lastModified: "{{lastModified(sourceFile)}}" # Last modification time
+```
+
+##### Advanced Variable Resolution Examples
+
+**Complex Business Logic:**
+```yaml
+variables:
+  # Dynamic source selection based on business rules
+  primarySource: "{{if(isBusinessDay(today),
+                      'https://erp.corp.com/api/daily',
+                      'https://erp.corp.com/api/weekend')}}"
+
+  # Conditional batch sizing based on data volume
+  batchSize: "{{if(gt(estimatedRecords, 1000000), 50000,
+                if(gt(estimatedRecords, 100000), 10000, 1000))}}"
+
+  # Dynamic timeout based on file size and network conditions
+  transferTimeout: "{{multiply(divide(fileSizeBytes, 1048576),
+                              if(eq(networkQuality, 'high'), 2,
+                                if(eq(networkQuality, 'medium'), 5, 10)))}}"
+
+  # Compliance-based retention calculation
+  retentionDays: "{{if(contains(dataClassification, 'financial'), 2555,
+                    if(contains(dataClassification, 'personal'), 1095, 365)}}"
+```
+
+**Environment-Specific Configuration:**
+```yaml
+variables:
+  # Environment-specific endpoints
+  apiEndpoint: "{{switch(environment,
+                  'production', 'https://api.corp.com',
+                  'staging', 'https://api-staging.corp.com',
+                  'development', 'https://api-dev.corp.com',
+                  'http://localhost:8080')}}"
+
+  # Environment-specific resource limits
+  maxConcurrentTransfers: "{{switch(environment,
+                            'production', 50,
+                            'staging', 20,
+                            'development', 5,
+                            3)}}"
+
+  # Environment-specific notification settings
+  notificationLevel: "{{switch(environment,
+                        'production', 'ERROR',
+                        'staging', 'WARN',
+                        'development', 'DEBUG',
+                        'INFO')}}"
+```
+
+**Date-Based Processing Logic:**
+```yaml
+variables:
+  # Month-end processing flag
+  isMonthEnd: "{{gte(dayOfMonth, 28)}}"
+
+  # Quarter-end additional processing
+  includeQuarterlyReports: "{{isQuarterEnd(today)}}"
+
+  # Business day processing schedule
+  processingSchedule: "{{if(isBusinessDay(today),
+                          if(eq(dayOfWeek, 1), 'monday-full',
+                            if(eq(dayOfWeek, 5), 'friday-eod', 'daily-standard')),
+                          'weekend-maintenance')}}"
+
+  # Fiscal year-based archival
+  archiveLocation: "{{joinPath(baseArchive, fiscalYear(today),
+                               format(today, 'MM'), format(today, 'dd'))}}"
+```
+
+##### Variable Validation and Error Handling
+
+**Type Validation:**
+```java
+public class VariableValidator {
+    public ValidationResult validateVariable(String name, Object value, VariableDefinition definition) {
+        // Type checking
+        if (!isCorrectType(value, definition.getType())) {
+            return ValidationResult.error("Variable '" + name + "' expected type " +
+                                        definition.getType() + " but got " + value.getClass());
+        }
+
+        // Range validation for numbers
+        if (definition.getType() == VariableType.NUMBER) {
+            Number numValue = (Number) value;
+            if (definition.hasMinValue() && numValue.doubleValue() < definition.getMinValue()) {
+                return ValidationResult.error("Variable '" + name + "' value " + numValue +
+                                            " is below minimum " + definition.getMinValue());
+            }
+            if (definition.hasMaxValue() && numValue.doubleValue() > definition.getMaxValue()) {
+                return ValidationResult.error("Variable '" + name + "' value " + numValue +
+                                            " exceeds maximum " + definition.getMaxValue());
+            }
+        }
+
+        // Pattern validation for strings
+        if (definition.getType() == VariableType.STRING && definition.hasPattern()) {
+            String strValue = (String) value;
+            if (!strValue.matches(definition.getPattern())) {
+                return ValidationResult.error("Variable '" + name + "' value '" + strValue +
+                                            "' does not match pattern " + definition.getPattern());
+            }
+        }
+
+        return ValidationResult.success();
+    }
+}
+```
+
+**Circular Reference Detection:**
+```java
+public class CircularReferenceDetector {
+    public void detectCircularReferences(Map<String, String> variables) {
+        Set<String> visiting = new HashSet<>();
+        Set<String> visited = new HashSet<>();
+
+        for (String variable : variables.keySet()) {
+            if (!visited.contains(variable)) {
+                detectCircularReferenceDFS(variable, variables, visiting, visited);
+            }
+        }
+    }
+
+    private void detectCircularReferenceDFS(String variable, Map<String, String> variables,
+                                          Set<String> visiting, Set<String> visited) {
+        if (visiting.contains(variable)) {
+            throw new CircularReferenceException("Circular reference detected involving variable: " + variable);
+        }
+
+        if (visited.contains(variable)) {
+            return;
+        }
+
+        visiting.add(variable);
+
+        // Find all variables referenced by this variable
+        Set<String> referencedVariables = extractVariableReferences(variables.get(variable));
+        for (String referenced : referencedVariables) {
+            if (variables.containsKey(referenced)) {
+                detectCircularReferenceDFS(referenced, variables, visiting, visited);
+            }
+        }
+
+        visiting.remove(variable);
+        visited.add(variable);
+    }
+}
+```
+
+This comprehensive variable resolution system enables workflows to be highly dynamic and adaptable while maintaining type safety and preventing common configuration errors.
 
 ### Multi-Tenancy Concepts
 
@@ -2335,126 +4346,1361 @@ curl http://localhost:8080/api/v1/tenants/acme-corp/usage
 
 ## REST API Usage
 
-### Authentication
+The Quorus REST API provides comprehensive programmatic access to all system functionality. Built on OpenAPI 3.0 specifications, it offers consistent, well-documented endpoints for integration with enterprise applications, automation systems, and custom tooling.
 
-Quorus supports multiple authentication methods for enterprise integration:
+### API Architecture and Design Principles
 
-#### Bearer Token Authentication
+#### RESTful Design Standards
+The Quorus API follows REST architectural principles with:
+- **Resource-Based URLs**: Clear, hierarchical resource paths (`/api/v1/transfers/{id}`)
+- **HTTP Method Semantics**: Proper use of GET, POST, PUT, DELETE, PATCH
+- **Stateless Operations**: Each request contains all necessary information
+- **Consistent Response Formats**: Standardized JSON responses with predictable structure
+- **HATEOAS Support**: Hypermedia links for resource navigation and discovery
 
+#### API Versioning Strategy
 ```bash
-# Obtain token (example with corporate SSO)
-curl -X POST https://sso.corp.com/oauth/token \
-  -d "grant_type=client_credentials" \
-  -d "client_id=quorus-client" \
-  -d "client_secret=your-secret"
+# Current API version
+GET /api/v1/transfers
 
-# Use token in requests
-curl -H "Authorization: Bearer YOUR_TOKEN" \
-  http://localhost:8080/api/v1/transfers
+# Future versions maintain backward compatibility
+GET /api/v2/transfers  # Enhanced features
+GET /api/v1/transfers  # Still supported for existing integrations
 ```
 
-#### Basic Authentication
+**Versioning Approach:**
+- **URL Path Versioning**: Version specified in URL path for clarity
+- **Backward Compatibility**: Previous versions supported for minimum 2 years
+- **Deprecation Notices**: 6-month advance notice for version deprecation
+- **Migration Guides**: Comprehensive guides for version upgrades
+
+### Authentication and Authorization
+
+Quorus supports multiple authentication methods designed for enterprise security requirements:
+
+#### OAuth 2.0 / OpenID Connect Integration
 
 ```bash
-# For development/testing environments
-curl -u "username:password" \
-  http://localhost:8080/api/v1/transfers
+# Step 1: Obtain access token from corporate identity provider
+curl -X POST https://sso.corp.com/oauth/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=client_credentials" \
+  -d "client_id=quorus-api-client" \
+  -d "client_secret=your-client-secret" \
+  -d "scope=quorus:transfers:read quorus:transfers:write quorus:workflows:execute"
+
+# Response
+{
+  "access_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "scope": "quorus:transfers:read quorus:transfers:write quorus:workflows:execute"
+}
+
+# Step 2: Use token in API requests
+curl -X GET http://localhost:8080/api/v1/transfers \
+  -H "Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..." \
+  -H "Accept: application/json"
+```
+
+**OAuth 2.0 Grant Types Supported:**
+- **Client Credentials**: Service-to-service authentication
+- **Authorization Code**: Interactive user authentication
+- **Resource Owner Password**: Legacy system integration (discouraged)
+- **JWT Bearer**: Token exchange for federated scenarios
+
+#### API Key Authentication
+
+```bash
+# API key in header (recommended)
+curl -X GET http://localhost:8080/api/v1/transfers \
+  -H "X-API-Key: qrs_live_1234567890abcdef" \
+  -H "Accept: application/json"
+
+# API key in query parameter (less secure, for testing only)
+curl -X GET "http://localhost:8080/api/v1/transfers?api_key=qrs_live_1234567890abcdef"
+```
+
+**API Key Management:**
+- **Key Rotation**: Automatic key rotation with configurable intervals
+- **Scope Limitation**: Keys can be restricted to specific operations
+- **IP Restrictions**: Limit key usage to specific IP ranges
+- **Usage Monitoring**: Track API key usage and detect anomalies
+
+#### Certificate-Based Authentication (mTLS)
+
+```bash
+# Mutual TLS authentication for high-security environments
+curl -X GET https://localhost:8443/api/v1/transfers \
+  --cert /path/to/client.crt \
+  --key /path/to/client.key \
+  --cacert /path/to/ca.crt \
+  -H "Accept: application/json"
+```
+
+**Certificate Authentication Features:**
+- **Client Certificate Validation**: Verify client certificates against corporate CA
+- **Certificate Revocation**: Support for CRL and OCSP validation
+- **Subject DN Mapping**: Map certificate subjects to user identities
+- **Hardware Security Module**: Support for HSM-stored private keys
+
+#### Basic Authentication (Development/Testing)
+
+```bash
+# Basic authentication for development environments
+curl -X GET http://localhost:8080/api/v1/transfers \
+  -u "username:password" \
+  -H "Accept: application/json"
+
+# With base64 encoding
+curl -X GET http://localhost:8080/api/v1/transfers \
+  -H "Authorization: Basic dXNlcm5hbWU6cGFzc3dvcmQ=" \
+  -H "Accept: application/json"
+```
+
+### Authorization and Role-Based Access Control
+
+#### Permission Model
+```json
+{
+  "permissions": [
+    "transfers:create",
+    "transfers:read:own",
+    "transfers:read:tenant",
+    "transfers:cancel:own",
+    "workflows:execute",
+    "workflows:read",
+    "tenants:read:own",
+    "system:health:read"
+  ]
+}
+```
+
+**Permission Hierarchy:**
+- **System Level**: `system:*` - Administrative operations
+- **Tenant Level**: `tenants:*` - Tenant management operations
+- **Workflow Level**: `workflows:*` - Workflow operations
+- **Transfer Level**: `transfers:*` - Transfer operations
+- **Scope Modifiers**: `:own`, `:tenant`, `:all` - Access scope limitations
+
+#### Role Definitions
+```yaml
+# Standard roles with permission mappings
+roles:
+  admin:
+    permissions: ["*"]
+    description: "Full system administration"
+
+  tenant-admin:
+    permissions:
+      - "tenants:*:own"
+      - "transfers:*:tenant"
+      - "workflows:*:tenant"
+    description: "Tenant administration"
+
+  operator:
+    permissions:
+      - "transfers:create"
+      - "transfers:read:tenant"
+      - "workflows:execute"
+      - "workflows:read"
+    description: "Transfer operations"
+
+  user:
+    permissions:
+      - "transfers:create:own"
+      - "transfers:read:own"
+      - "workflows:execute:own"
+    description: "Basic user operations"
 ```
 
 ### Core API Endpoints
 
 #### Transfer Management
 
+The Transfer Management API provides comprehensive control over file transfer operations with detailed configuration options and real-time monitoring capabilities.
+
+##### Create Transfer Job
+
 ```bash
-# Create transfer job
 POST /api/v1/transfers
+Content-Type: application/json
+Authorization: Bearer {token}
+X-Tenant: acme-corp
+X-Namespace: finance
+
 {
-  "sourceUri": "https://api.corp/data.zip",
-  "destinationPath": "/storage/data.zip",
+  "sourceUri": "https://api.corp.internal/exports/financial-data.zip",
+  "destinationPath": "/corporate-storage/finance/imports/financial-data-2025-01-20.zip",
   "protocol": "https",
+  "metadata": {
+    "description": "Daily financial data import",
+    "tags": ["finance", "daily", "automated"],
+    "businessOwner": "finance-team@corp.com",
+    "priority": "high",
+    "dataClassification": "confidential"
+  },
   "options": {
     "checksumValidation": true,
-    "retryAttempts": 3,
-    "timeout": 300
+    "checksumAlgorithm": "SHA256",
+    "expectedChecksum": "a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3",
+    "retryAttempts": 5,
+    "retryBackoffMultiplier": 2.0,
+    "initialRetryDelay": "PT30S",
+    "maxRetryDelay": "PT10M",
+    "timeout": 1800,
+    "chunkSize": 10485760,
+    "compressionEnabled": true,
+    "resumeSupported": true
+  },
+  "credentials": {
+    "type": "oauth2",
+    "tokenEndpoint": "https://api.corp.internal/oauth/token",
+    "clientId": "quorus-client",
+    "clientSecret": "encrypted:vault:secret-key",
+    "scope": "data:read"
+  },
+  "notifications": {
+    "onSuccess": ["finance-team@corp.com"],
+    "onFailure": ["finance-team@corp.com", "ops-team@corp.com"],
+    "onProgress": {
+      "enabled": true,
+      "intervalSeconds": 300,
+      "recipients": ["finance-ops@corp.com"]
+    }
+  },
+  "scheduling": {
+    "startAfter": "2025-01-20T06:00:00Z",
+    "deadline": "2025-01-20T18:00:00Z",
+    "priority": 8
   }
 }
+```
 
-# Get transfer status
+**Response:**
+```json
+{
+  "jobId": "transfer-20250120-001",
+  "status": "PENDING",
+  "createdAt": "2025-01-20T05:45:00Z",
+  "estimatedStartTime": "2025-01-20T06:00:00Z",
+  "queuePosition": 3,
+  "assignedAgent": null,
+  "links": {
+    "self": "/api/v1/transfers/transfer-20250120-001",
+    "progress": "/api/v1/transfers/transfer-20250120-001/progress",
+    "logs": "/api/v1/transfers/transfer-20250120-001/logs",
+    "cancel": "/api/v1/transfers/transfer-20250120-001"
+  }
+}
+```
+
+##### Get Transfer Status
+
+```bash
 GET /api/v1/transfers/{jobId}
+Authorization: Bearer {token}
+Accept: application/json
 
-# Get transfer progress
+# Example: GET /api/v1/transfers/transfer-20250120-001
+```
+
+**Response:**
+```json
+{
+  "jobId": "transfer-20250120-001",
+  "status": "IN_PROGRESS",
+  "phase": "TRANSFERRING",
+  "createdAt": "2025-01-20T05:45:00Z",
+  "startedAt": "2025-01-20T06:00:00Z",
+  "lastUpdated": "2025-01-20T06:15:30Z",
+  "assignedAgent": "agent-east-01",
+  "sourceUri": "https://api.corp.internal/exports/financial-data.zip",
+  "destinationPath": "/corporate-storage/finance/imports/financial-data-2025-01-20.zip",
+  "fileSize": 157286400,
+  "bytesTransferred": 78643200,
+  "progressPercentage": 50.0,
+  "transferRate": 5242880,
+  "averageTransferRate": 4718592,
+  "estimatedTimeRemaining": "PT2M30S",
+  "checksumStatus": "CALCULATING",
+  "retryAttempts": 0,
+  "lastError": null,
+  "metadata": {
+    "description": "Daily financial data import",
+    "tags": ["finance", "daily", "automated"],
+    "businessOwner": "finance-team@corp.com",
+    "priority": "high"
+  },
+  "links": {
+    "progress": "/api/v1/transfers/transfer-20250120-001/progress",
+    "logs": "/api/v1/transfers/transfer-20250120-001/logs",
+    "cancel": "/api/v1/transfers/transfer-20250120-001"
+  }
+}
+```
+
+##### Get Transfer Progress (Real-time)
+
+```bash
 GET /api/v1/transfers/{jobId}/progress
+Authorization: Bearer {token}
+Accept: application/json
 
-# Cancel transfer
+# Server-Sent Events for real-time updates
+GET /api/v1/transfers/{jobId}/progress/stream
+Accept: text/event-stream
+```
+
+**JSON Response:**
+```json
+{
+  "jobId": "transfer-20250120-001",
+  "timestamp": "2025-01-20T06:15:30Z",
+  "status": "IN_PROGRESS",
+  "phase": "TRANSFERRING",
+  "progress": {
+    "bytesTransferred": 78643200,
+    "totalBytes": 157286400,
+    "progressPercentage": 50.0,
+    "chunksCompleted": 75,
+    "totalChunks": 150
+  },
+  "performance": {
+    "currentTransferRate": 5242880,
+    "averageTransferRate": 4718592,
+    "peakTransferRate": 6291456,
+    "networkLatency": 15,
+    "connectionQuality": "GOOD"
+  },
+  "timing": {
+    "elapsedTime": "PT15M30S",
+    "estimatedTimeRemaining": "PT2M30S",
+    "estimatedCompletionTime": "2025-01-20T06:18:00Z"
+  },
+  "validation": {
+    "checksumStatus": "CALCULATING",
+    "checksumProgress": 50.0,
+    "integrityChecks": {
+      "chunksValidated": 75,
+      "validationErrors": 0
+    }
+  }
+}
+```
+
+**Server-Sent Events Stream:**
+```
+data: {"jobId":"transfer-20250120-001","bytesTransferred":78643200,"progressPercentage":50.0,"transferRate":5242880}
+
+data: {"jobId":"transfer-20250120-001","bytesTransferred":83886080,"progressPercentage":53.3,"transferRate":5242880}
+
+data: {"jobId":"transfer-20250120-001","status":"COMPLETED","bytesTransferred":157286400,"progressPercentage":100.0}
+```
+
+##### Cancel Transfer
+
+```bash
 DELETE /api/v1/transfers/{jobId}
+Authorization: Bearer {token}
+X-Reason: "Business requirement changed"
 
-# List transfers
-GET /api/v1/transfers?status=RUNNING&tenant=acme-corp
+# Graceful cancellation with cleanup
+DELETE /api/v1/transfers/{jobId}?graceful=true&cleanup=true
+```
+
+**Response:**
+```json
+{
+  "jobId": "transfer-20250120-001",
+  "status": "CANCELLING",
+  "message": "Transfer cancellation initiated",
+  "gracefulShutdown": true,
+  "cleanupRequested": true,
+  "estimatedCancellationTime": "2025-01-20T06:16:00Z"
+}
+```
+
+##### List Transfers with Advanced Filtering
+
+```bash
+# Basic listing
+GET /api/v1/transfers
+Authorization: Bearer {token}
+
+# Advanced filtering and pagination
+GET /api/v1/transfers?status=RUNNING,COMPLETED&tenant=acme-corp&namespace=finance&limit=50&offset=0&sort=createdAt:desc
+
+# Filter by date range
+GET /api/v1/transfers?createdAfter=2025-01-20T00:00:00Z&createdBefore=2025-01-20T23:59:59Z
+
+# Filter by metadata tags
+GET /api/v1/transfers?tags=finance,daily&priority=high
+
+# Search by description or source
+GET /api/v1/transfers?search=financial-data&searchFields=description,sourceUri
+```
+
+**Query Parameters:**
+- **status**: Filter by transfer status (PENDING, RUNNING, COMPLETED, FAILED, CANCELLED)
+- **tenant**: Filter by tenant ID
+- **namespace**: Filter by namespace
+- **assignedAgent**: Filter by assigned agent
+- **priority**: Filter by priority level (1-10)
+- **tags**: Filter by metadata tags
+- **createdAfter/createdBefore**: Date range filtering
+- **search**: Full-text search across specified fields
+- **limit/offset**: Pagination controls
+- **sort**: Sort order (field:asc/desc)
+
+**Response:**
+```json
+{
+  "transfers": [
+    {
+      "jobId": "transfer-20250120-001",
+      "status": "COMPLETED",
+      "sourceUri": "https://api.corp.internal/exports/financial-data.zip",
+      "destinationPath": "/corporate-storage/finance/imports/financial-data-2025-01-20.zip",
+      "createdAt": "2025-01-20T05:45:00Z",
+      "completedAt": "2025-01-20T06:18:00Z",
+      "fileSize": 157286400,
+      "duration": "PT33M",
+      "averageTransferRate": 4718592,
+      "priority": "high",
+      "tags": ["finance", "daily", "automated"]
+    }
+  ],
+  "pagination": {
+    "total": 1250,
+    "limit": 50,
+    "offset": 0,
+    "hasNext": true,
+    "hasPrevious": false,
+    "nextOffset": 50,
+    "previousOffset": null
+  },
+  "links": {
+    "self": "/api/v1/transfers?limit=50&offset=0",
+    "next": "/api/v1/transfers?limit=50&offset=50",
+    "first": "/api/v1/transfers?limit=50&offset=0",
+    "last": "/api/v1/transfers?limit=50&offset=1200"
+  }
+}
+```
+
+##### Transfer Logs and Diagnostics
+
+```bash
+# Get transfer logs
+GET /api/v1/transfers/{jobId}/logs
+Authorization: Bearer {token}
+
+# Get logs with filtering
+GET /api/v1/transfers/{jobId}/logs?level=ERROR,WARN&since=2025-01-20T06:00:00Z
+
+# Stream logs in real-time
+GET /api/v1/transfers/{jobId}/logs/stream
+Accept: text/event-stream
+```
+
+**Response:**
+```json
+{
+  "jobId": "transfer-20250120-001",
+  "logs": [
+    {
+      "timestamp": "2025-01-20T06:00:00Z",
+      "level": "INFO",
+      "message": "Transfer started",
+      "component": "TransferManager",
+      "agent": "agent-east-01"
+    },
+    {
+      "timestamp": "2025-01-20T06:00:15Z",
+      "level": "DEBUG",
+      "message": "Connected to source: https://api.corp.internal/exports/financial-data.zip",
+      "component": "HttpProtocolHandler",
+      "details": {
+        "responseCode": 200,
+        "contentLength": 157286400,
+        "contentType": "application/zip"
+      }
+    },
+    {
+      "timestamp": "2025-01-20T06:18:00Z",
+      "level": "INFO",
+      "message": "Transfer completed successfully",
+      "component": "TransferManager",
+      "details": {
+        "bytesTransferred": 157286400,
+        "duration": "PT18M",
+        "averageRate": 4718592,
+        "checksumValid": true
+      }
+    }
+  ],
+  "pagination": {
+    "total": 156,
+    "limit": 100,
+    "offset": 0
+  }
+}
 ```
 
 #### Workflow Management
 
+The Workflow Management API enables submission, monitoring, and control of complex multi-step transfer workflows with comprehensive execution tracking and management capabilities.
+
+##### Submit Workflow
+
 ```bash
-# Submit workflow
 POST /api/v1/workflows
 Content-Type: application/yaml
+Authorization: Bearer {token}
 X-Tenant: acme-corp
+X-Namespace: finance
+X-Execution-Mode: normal  # normal, dry-run, virtual-run
 
-# Get workflow execution
-GET /api/v1/workflows/{executionId}
+# YAML workflow definition
+apiVersion: quorus.dev/v1
+kind: TransferWorkflow
+metadata:
+  name: daily-financial-sync
+  description: Daily synchronization of financial data across systems
+  version: "2.1.0"
+  tenant: acme-corp
+  namespace: finance
+  labels:
+    environment: production
+    schedule: daily
+    criticality: high
+  annotations:
+    owner: "finance-team@corp.com"
+    documentation: "https://wiki.corp.com/finance/data-sync"
+    approvedBy: "finance-director@corp.com"
 
-# List workflow executions
-GET /api/v1/workflows?tenant=acme-corp&status=RUNNING
+spec:
+  variables:
+    sourceSystem: "https://erp.corp.internal"
+    targetWarehouse: "/data-warehouse/finance"
+    processingDate: "{{today}}"
+    environment: "production"
+    notificationEmail: "finance-ops@corp.com"
 
-# Cancel workflow execution
-DELETE /api/v1/workflows/{executionId}
+  execution:
+    strategy: mixed
+    parallelism: 3
+    timeout: 7200
+    retryPolicy:
+      maxAttempts: 3
+      backoffMultiplier: 2
+      initialDelay: 60
+
+  conditions:
+    - name: production-only
+      expression: "{{environment}} == 'production'"
+    - name: business-hours
+      expression: "{{hour}} >= 6 && {{hour}} <= 22"
+
+  transferGroups:
+    - name: extract-master-data
+      description: Extract master data from ERP system
+      condition: production-only
+      transfers:
+        - name: customer-master
+          source: "{{sourceSystem}}/api/customers/export?date={{processingDate}}"
+          destination: "{{targetWarehouse}}/raw/customers/{{processingDate}}.json"
+          options:
+            checksumValidation: true
+            timeout: 1800
+
+    - name: extract-transactional-data
+      description: Extract transactional data
+      dependsOn: [extract-master-data]
+      transfers:
+        - name: sales-transactions
+          source: "{{sourceSystem}}/api/sales/export?date={{processingDate}}"
+          destination: "{{targetWarehouse}}/raw/sales/{{processingDate}}.json"
+
+    - name: data-validation
+      description: Validate extracted data
+      dependsOn: [extract-master-data, extract-transactional-data]
+      condition: business-hours
+      transfers:
+        - name: run-validation
+          source: "{{targetWarehouse}}/scripts/validate-data.py"
+          destination: "{{targetWarehouse}}/validation/{{processingDate}}.log"
+
+  notifications:
+    onSuccess:
+      - email: "{{notificationEmail}}"
+        subject: "Daily financial sync completed successfully"
+    onFailure:
+      - email: "{{notificationEmail}}"
+        subject: "Daily financial sync failed"
+      - webhook: "https://alerts.corp.com/quorus/workflow-failed"
 ```
 
-#### System Information
+**Response:**
+```json
+{
+  "executionId": "wf-exec-20250120-001",
+  "workflowName": "daily-financial-sync",
+  "version": "2.1.0",
+  "status": "PENDING",
+  "executionMode": "normal",
+  "createdAt": "2025-01-20T05:30:00Z",
+  "scheduledStartTime": "2025-01-20T06:00:00Z",
+  "tenant": "acme-corp",
+  "namespace": "finance",
+  "executionPlan": {
+    "totalStages": 3,
+    "estimatedDuration": "PT45M",
+    "parallelizable": true,
+    "criticalPath": ["extract-master-data", "extract-transactional-data", "data-validation"]
+  },
+  "variables": {
+    "sourceSystem": "https://erp.corp.internal",
+    "targetWarehouse": "/data-warehouse/finance",
+    "processingDate": "2025-01-20",
+    "environment": "production",
+    "notificationEmail": "finance-ops@corp.com"
+  },
+  "links": {
+    "self": "/api/v1/workflows/wf-exec-20250120-001",
+    "status": "/api/v1/workflows/wf-exec-20250120-001/status",
+    "progress": "/api/v1/workflows/wf-exec-20250120-001/progress",
+    "logs": "/api/v1/workflows/wf-exec-20250120-001/logs",
+    "cancel": "/api/v1/workflows/wf-exec-20250120-001"
+  }
+}
+```
+
+##### Get Workflow Execution Status
 
 ```bash
-# Service information
-GET /api/v1/info
+GET /api/v1/workflows/{executionId}
+Authorization: Bearer {token}
+Accept: application/json
 
-# Health check
-GET /health
-
-# Metrics
-GET /metrics
-
-# Cluster status
-GET /api/v1/cluster/status
+# Example: GET /api/v1/workflows/wf-exec-20250120-001
 ```
 
-### Error Handling
+**Response:**
+```json
+{
+  "executionId": "wf-exec-20250120-001",
+  "workflowName": "daily-financial-sync",
+  "version": "2.1.0",
+  "status": "IN_PROGRESS",
+  "currentStage": "extract-transactional-data",
+  "createdAt": "2025-01-20T05:30:00Z",
+  "startedAt": "2025-01-20T06:00:00Z",
+  "lastUpdated": "2025-01-20T06:25:00Z",
+  "executionMode": "normal",
+  "tenant": "acme-corp",
+  "namespace": "finance",
+  "progress": {
+    "completedStages": 1,
+    "totalStages": 3,
+    "progressPercentage": 33.3,
+    "currentStageProgress": 75.0
+  },
+  "timing": {
+    "elapsedTime": "PT25M",
+    "estimatedTimeRemaining": "PT20M",
+    "estimatedCompletionTime": "2025-01-20T06:45:00Z"
+  },
+  "stages": [
+    {
+      "name": "extract-master-data",
+      "status": "COMPLETED",
+      "startedAt": "2025-01-20T06:00:00Z",
+      "completedAt": "2025-01-20T06:15:00Z",
+      "duration": "PT15M",
+      "transfers": [
+        {
+          "name": "customer-master",
+          "jobId": "transfer-20250120-002",
+          "status": "COMPLETED",
+          "bytesTransferred": 52428800,
+          "duration": "PT15M"
+        }
+      ]
+    },
+    {
+      "name": "extract-transactional-data",
+      "status": "IN_PROGRESS",
+      "startedAt": "2025-01-20T06:15:00Z",
+      "estimatedCompletionTime": "2025-01-20T06:35:00Z",
+      "transfers": [
+        {
+          "name": "sales-transactions",
+          "jobId": "transfer-20250120-003",
+          "status": "IN_PROGRESS",
+          "bytesTransferred": 78643200,
+          "progressPercentage": 75.0
+        }
+      ]
+    },
+    {
+      "name": "data-validation",
+      "status": "PENDING",
+      "dependsOn": ["extract-master-data", "extract-transactional-data"],
+      "estimatedStartTime": "2025-01-20T06:35:00Z"
+    }
+  ],
+  "variables": {
+    "sourceSystem": "https://erp.corp.internal",
+    "targetWarehouse": "/data-warehouse/finance",
+    "processingDate": "2025-01-20",
+    "environment": "production"
+  },
+  "links": {
+    "progress": "/api/v1/workflows/wf-exec-20250120-001/progress",
+    "logs": "/api/v1/workflows/wf-exec-20250120-001/logs",
+    "cancel": "/api/v1/workflows/wf-exec-20250120-001"
+  }
+}
+```
 
-The API uses standard HTTP status codes and provides detailed error information:
+##### Get Workflow Progress (Real-time)
+
+```bash
+GET /api/v1/workflows/{executionId}/progress
+Authorization: Bearer {token}
+
+# Real-time progress stream
+GET /api/v1/workflows/{executionId}/progress/stream
+Accept: text/event-stream
+```
+
+**Response:**
+```json
+{
+  "executionId": "wf-exec-20250120-001",
+  "timestamp": "2025-01-20T06:25:00Z",
+  "status": "IN_PROGRESS",
+  "currentStage": "extract-transactional-data",
+  "overallProgress": {
+    "completedStages": 1,
+    "totalStages": 3,
+    "progressPercentage": 33.3,
+    "completedTransfers": 1,
+    "totalTransfers": 3,
+    "transferProgressPercentage": 58.3
+  },
+  "stageProgress": [
+    {
+      "stageName": "extract-master-data",
+      "status": "COMPLETED",
+      "progressPercentage": 100.0,
+      "transfers": [
+        {
+          "transferName": "customer-master",
+          "status": "COMPLETED",
+          "progressPercentage": 100.0,
+          "bytesTransferred": 52428800
+        }
+      ]
+    },
+    {
+      "stageName": "extract-transactional-data",
+      "status": "IN_PROGRESS",
+      "progressPercentage": 75.0,
+      "transfers": [
+        {
+          "transferName": "sales-transactions",
+          "status": "IN_PROGRESS",
+          "progressPercentage": 75.0,
+          "bytesTransferred": 78643200,
+          "transferRate": 5242880
+        }
+      ]
+    }
+  ],
+  "performance": {
+    "totalBytesTransferred": 131072000,
+    "averageTransferRate": 4718592,
+    "parallelTransfers": 1,
+    "resourceUtilization": {
+      "cpu": 45.2,
+      "memory": 62.1,
+      "network": 38.7
+    }
+  }
+}
+```
+
+##### List Workflow Executions
+
+```bash
+# Basic listing
+GET /api/v1/workflows
+Authorization: Bearer {token}
+
+# Advanced filtering
+GET /api/v1/workflows?status=RUNNING,COMPLETED&tenant=acme-corp&namespace=finance&workflowName=daily-financial-sync&limit=25&sort=createdAt:desc
+
+# Filter by execution date range
+GET /api/v1/workflows?executedAfter=2025-01-20T00:00:00Z&executedBefore=2025-01-20T23:59:59Z
+
+# Filter by duration and performance
+GET /api/v1/workflows?minDuration=PT30M&maxDuration=PT2H&status=COMPLETED
+```
+
+**Response:**
+```json
+{
+  "executions": [
+    {
+      "executionId": "wf-exec-20250120-001",
+      "workflowName": "daily-financial-sync",
+      "version": "2.1.0",
+      "status": "COMPLETED",
+      "tenant": "acme-corp",
+      "namespace": "finance",
+      "createdAt": "2025-01-20T05:30:00Z",
+      "startedAt": "2025-01-20T06:00:00Z",
+      "completedAt": "2025-01-20T06:42:00Z",
+      "duration": "PT42M",
+      "totalTransfers": 3,
+      "successfulTransfers": 3,
+      "failedTransfers": 0,
+      "totalBytesTransferred": 157286400,
+      "averageTransferRate": 4718592,
+      "executionMode": "normal"
+    }
+  ],
+  "pagination": {
+    "total": 847,
+    "limit": 25,
+    "offset": 0,
+    "hasNext": true
+  },
+  "aggregations": {
+    "statusCounts": {
+      "COMPLETED": 756,
+      "FAILED": 45,
+      "IN_PROGRESS": 12,
+      "PENDING": 34
+    },
+    "averageDuration": "PT38M",
+    "successRate": 94.3,
+    "totalBytesTransferred": 1073741824000
+  }
+}
+```
+
+##### Cancel Workflow Execution
+
+```bash
+DELETE /api/v1/workflows/{executionId}
+Authorization: Bearer {token}
+X-Reason: "Emergency maintenance required"
+
+# Graceful cancellation
+DELETE /api/v1/workflows/{executionId}?graceful=true&waitForCurrentTransfers=true
+```
+
+**Response:**
+```json
+{
+  "executionId": "wf-exec-20250120-001",
+  "status": "CANCELLING",
+  "message": "Workflow cancellation initiated",
+  "gracefulShutdown": true,
+  "waitForCurrentTransfers": true,
+  "currentTransfers": [
+    {
+      "transferName": "sales-transactions",
+      "jobId": "transfer-20250120-003",
+      "status": "IN_PROGRESS",
+      "action": "COMPLETING"
+    }
+  ],
+  "estimatedCancellationTime": "2025-01-20T06:30:00Z"
+}
+```
+
+#### System Information and Monitoring
+
+The System Information API provides comprehensive visibility into system health, performance, and operational status.
+
+##### Service Information
+
+```bash
+GET /api/v1/info
+Authorization: Bearer {token}
+Accept: application/json
+```
+
+**Response:**
+```json
+{
+  "service": {
+    "name": "Quorus File Transfer System",
+    "version": "2.0.1",
+    "buildTime": "2025-01-15T10:30:00Z",
+    "gitCommit": "a1b2c3d4e5f6",
+    "environment": "production"
+  },
+  "api": {
+    "version": "v1",
+    "supportedVersions": ["v1"],
+    "deprecatedVersions": [],
+    "documentation": "https://docs.quorus.dev/api/v1"
+  },
+  "features": {
+    "protocols": ["HTTP", "HTTPS", "FTP", "SFTP", "SMB"],
+    "authentication": ["OAuth2", "API-Key", "mTLS", "Basic"],
+    "multiTenant": true,
+    "clustering": true,
+    "workflows": true
+  },
+  "limits": {
+    "maxFileSize": "10GB",
+    "maxConcurrentTransfers": 1000,
+    "maxWorkflowStages": 50,
+    "apiRateLimit": 10000
+  }
+}
+```
+
+##### Health Check (Comprehensive)
+
+```bash
+# Basic health check
+GET /health
+Accept: application/json
+
+# Detailed health check with dependencies
+GET /health/detailed
+Authorization: Bearer {token}
+
+# Readiness probe (Kubernetes-compatible)
+GET /health/ready
+
+# Liveness probe (Kubernetes-compatible)
+GET /health/live
+```
+
+**Basic Health Response:**
+```json
+{
+  "status": "UP",
+  "timestamp": "2025-01-20T06:30:00Z",
+  "responseTime": "15ms"
+}
+```
+
+**Detailed Health Response:**
+```json
+{
+  "status": "UP",
+  "timestamp": "2025-01-20T06:30:00Z",
+  "checks": [
+    {
+      "name": "database",
+      "status": "UP",
+      "responseTime": "5ms",
+      "details": {
+        "connectionPool": {
+          "active": 8,
+          "idle": 12,
+          "max": 20
+        }
+      }
+    },
+    {
+      "name": "raft-cluster",
+      "status": "UP",
+      "details": {
+        "role": "LEADER",
+        "term": 42,
+        "nodes": 3,
+        "healthyNodes": 3,
+        "lastHeartbeat": "2025-01-20T06:29:58Z"
+      }
+    },
+    {
+      "name": "transfer-agents",
+      "status": "UP",
+      "details": {
+        "totalAgents": 15,
+        "healthyAgents": 14,
+        "degradedAgents": 1,
+        "failedAgents": 0,
+        "averageLoad": 0.65
+      }
+    },
+    {
+      "name": "storage-systems",
+      "status": "UP",
+      "details": {
+        "primaryStorage": "UP",
+        "backupStorage": "UP",
+        "availableSpace": "2.5TB",
+        "usedSpace": "1.2TB"
+      }
+    },
+    {
+      "name": "external-dependencies",
+      "status": "DEGRADED",
+      "details": {
+        "corporateSSO": "UP",
+        "monitoringSystem": "UP",
+        "notificationService": "DEGRADED",
+        "backupService": "UP"
+      }
+    }
+  ],
+  "performance": {
+    "activeTransfers": 45,
+    "queuedTransfers": 12,
+    "transfersPerSecond": 2.3,
+    "averageTransferDuration": "PT5M30S",
+    "systemLoad": {
+      "cpu": 45.2,
+      "memory": 67.8,
+      "disk": 23.1,
+      "network": 34.5
+    }
+  }
+}
+```
+
+##### Metrics (Prometheus-compatible)
+
+```bash
+# Prometheus metrics endpoint
+GET /metrics
+Accept: text/plain
+
+# JSON metrics for custom integrations
+GET /api/v1/metrics
+Authorization: Bearer {token}
+Accept: application/json
+
+# Specific metric categories
+GET /api/v1/metrics/transfers
+GET /api/v1/metrics/workflows
+GET /api/v1/metrics/system
+```
+
+**Prometheus Metrics Sample:**
+```
+# HELP quorus_transfers_total Total number of transfers
+# TYPE quorus_transfers_total counter
+quorus_transfers_total{status="completed",tenant="acme-corp"} 1250
+quorus_transfers_total{status="failed",tenant="acme-corp"} 23
+
+# HELP quorus_transfer_duration_seconds Transfer duration in seconds
+# TYPE quorus_transfer_duration_seconds histogram
+quorus_transfer_duration_seconds_bucket{le="30"} 145
+quorus_transfer_duration_seconds_bucket{le="60"} 234
+quorus_transfer_duration_seconds_bucket{le="300"} 567
+quorus_transfer_duration_seconds_bucket{le="+Inf"} 1250
+
+# HELP quorus_cluster_nodes Number of cluster nodes by status
+# TYPE quorus_cluster_nodes gauge
+quorus_cluster_nodes{status="healthy"} 3
+quorus_cluster_nodes{status="degraded"} 0
+quorus_cluster_nodes{status="failed"} 0
+
+# HELP quorus_agent_capacity_utilization Agent capacity utilization
+# TYPE quorus_agent_capacity_utilization gauge
+quorus_agent_capacity_utilization{agent="agent-east-01"} 0.75
+quorus_agent_capacity_utilization{agent="agent-west-01"} 0.45
+```
+
+##### Cluster Status
+
+```bash
+GET /api/v1/cluster/status
+Authorization: Bearer {token}
+Accept: application/json
+```
+
+**Response:**
+```json
+{
+  "cluster": {
+    "name": "quorus-production",
+    "size": 3,
+    "healthyNodes": 3,
+    "status": "HEALTHY"
+  },
+  "raft": {
+    "currentTerm": 42,
+    "leader": "controller-1",
+    "role": "LEADER",
+    "lastElection": "2025-01-19T14:22:00Z",
+    "logIndex": 15847,
+    "commitIndex": 15847
+  },
+  "nodes": [
+    {
+      "nodeId": "controller-1",
+      "role": "LEADER",
+      "status": "HEALTHY",
+      "address": "controller-1:8080",
+      "lastHeartbeat": "2025-01-20T06:29:58Z",
+      "uptime": "P5DT14H22M",
+      "version": "2.0.1"
+    },
+    {
+      "nodeId": "controller-2",
+      "role": "FOLLOWER",
+      "status": "HEALTHY",
+      "address": "controller-2:8080",
+      "lastHeartbeat": "2025-01-20T06:29:57Z",
+      "uptime": "P5DT14H20M",
+      "version": "2.0.1"
+    },
+    {
+      "nodeId": "controller-3",
+      "role": "FOLLOWER",
+      "status": "HEALTHY",
+      "address": "controller-3:8080",
+      "lastHeartbeat": "2025-01-20T06:29:59Z",
+      "uptime": "P5DT14H18M",
+      "version": "2.0.1"
+    }
+  ],
+  "performance": {
+    "requestsPerSecond": 125.7,
+    "averageResponseTime": "45ms",
+    "leaderElections": 3,
+    "lastLeaderElection": "2025-01-19T14:22:00Z"
+  }
+}
+```
+
+### Error Handling and Response Codes
+
+The Quorus API uses standard HTTP status codes and provides comprehensive error information to help with debugging and automated error handling.
+
+#### HTTP Status Codes
+
+| Status Code | Meaning | Usage |
+|-------------|---------|-------|
+| 200 | OK | Successful GET, PUT, PATCH requests |
+| 201 | Created | Successful POST requests (resource created) |
+| 202 | Accepted | Request accepted for async processing |
+| 204 | No Content | Successful DELETE requests |
+| 400 | Bad Request | Invalid request syntax or parameters |
+| 401 | Unauthorized | Authentication required or failed |
+| 403 | Forbidden | Insufficient permissions |
+| 404 | Not Found | Resource not found |
+| 409 | Conflict | Resource conflict (duplicate, state mismatch) |
+| 422 | Unprocessable Entity | Valid syntax but semantic errors |
+| 429 | Too Many Requests | Rate limit exceeded |
+| 500 | Internal Server Error | Unexpected server error |
+| 502 | Bad Gateway | Upstream service error |
+| 503 | Service Unavailable | Service temporarily unavailable |
+
+#### Error Response Format
+
+All error responses follow a consistent format:
 
 ```json
 {
   "error": {
     "code": "TRANSFER_FAILED",
     "message": "Transfer failed due to network timeout",
+    "timestamp": "2025-01-20T10:30:00Z",
+    "requestId": "req-20250120-12345",
     "details": {
       "jobId": "transfer-123",
       "sourceUri": "https://api.corp/data.zip",
       "errorType": "NETWORK_TIMEOUT",
       "retryable": true,
-      "timestamp": "2025-01-20T10:30:00Z"
+      "retryAfter": 300,
+      "supportReference": "ERR-2025-001234"
+    },
+    "context": {
+      "tenant": "acme-corp",
+      "namespace": "finance",
+      "agent": "agent-east-01",
+      "operation": "file-transfer"
+    },
+    "suggestions": [
+      "Check network connectivity to source system",
+      "Verify firewall rules allow outbound connections",
+      "Consider increasing timeout value for large files"
+    ]
+  }
+}
+```
+
+#### Common Error Codes
+
+**Authentication and Authorization Errors:**
+```json
+{
+  "error": {
+    "code": "INVALID_TOKEN",
+    "message": "The provided authentication token is invalid or expired",
+    "details": {
+      "tokenType": "Bearer",
+      "expiresAt": "2025-01-20T09:00:00Z",
+      "retryable": false
     }
   }
 }
 ```
 
-### Rate Limiting
+**Validation Errors:**
+```json
+{
+  "error": {
+    "code": "VALIDATION_FAILED",
+    "message": "Request validation failed",
+    "details": {
+      "violations": [
+        {
+          "field": "sourceUri",
+          "message": "Invalid URI format",
+          "rejectedValue": "not-a-valid-uri"
+        },
+        {
+          "field": "options.timeout",
+          "message": "Timeout must be between 30 and 7200 seconds",
+          "rejectedValue": 10
+        }
+      ]
+    }
+  }
+}
+```
 
-API requests are subject to rate limiting based on tenant quotas:
+**Resource Errors:**
+```json
+{
+  "error": {
+    "code": "QUOTA_EXCEEDED",
+    "message": "Tenant quota exceeded for concurrent transfers",
+    "details": {
+      "quotaType": "CONCURRENT_TRANSFERS",
+      "currentUsage": 50,
+      "quotaLimit": 50,
+      "retryable": true,
+      "retryAfter": 300
+    }
+  }
+}
+```
+
+**System Errors:**
+```json
+{
+  "error": {
+    "code": "SERVICE_UNAVAILABLE",
+    "message": "Transfer service temporarily unavailable",
+    "details": {
+      "reason": "CLUSTER_LEADER_ELECTION",
+      "retryable": true,
+      "retryAfter": 30,
+      "estimatedRecoveryTime": "2025-01-20T10:32:00Z"
+    }
+  }
+}
+```
+
+### Rate Limiting and Quotas
+
+The API implements comprehensive rate limiting and quota management to ensure fair resource usage and system stability.
+
+#### Rate Limiting Headers
+
+All API responses include rate limiting information:
 
 ```bash
-# Rate limit headers in response
+# Response headers
+HTTP/1.1 200 OK
 X-RateLimit-Limit: 1000
 X-RateLimit-Remaining: 999
 X-RateLimit-Reset: 1642694400
+X-RateLimit-Window: 3600
+X-RateLimit-Policy: sliding-window
+X-Quota-Transfers-Limit: 50
+X-Quota-Transfers-Remaining: 35
+X-Quota-Transfers-Reset: 1642694400
+```
+
+#### Rate Limiting Policies
+
+**API Request Limits:**
+- **Per User**: 1,000 requests per hour
+- **Per Tenant**: 10,000 requests per hour
+- **Per IP Address**: 5,000 requests per hour
+- **Global**: 100,000 requests per hour
+
+**Transfer Operation Limits:**
+- **Concurrent Transfers**: Based on tenant quota
+- **Transfer Volume**: Based on tenant quota
+- **Workflow Executions**: Based on tenant quota
+
+#### Rate Limit Exceeded Response
+
+```json
+{
+  "error": {
+    "code": "RATE_LIMIT_EXCEEDED",
+    "message": "API rate limit exceeded",
+    "details": {
+      "limitType": "API_REQUESTS",
+      "limit": 1000,
+      "window": "1 hour",
+      "retryAfter": 1800,
+      "resetTime": "2025-01-20T11:00:00Z"
+    }
+  }
+}
+```
+
+#### Quota Management
+
+```bash
+# Check current quota usage
+GET /api/v1/quotas/current
+Authorization: Bearer {token}
+
+# Get quota details for specific resource
+GET /api/v1/quotas/transfers
+GET /api/v1/quotas/storage
+GET /api/v1/quotas/bandwidth
+```
+
+**Quota Response:**
+```json
+{
+  "tenant": "acme-corp",
+  "namespace": "finance",
+  "quotas": {
+    "concurrentTransfers": {
+      "limit": 50,
+      "used": 35,
+      "remaining": 15,
+      "utilizationPercentage": 70.0
+    },
+    "monthlyTransferVolume": {
+      "limit": "1TB",
+      "used": "750GB",
+      "remaining": "250GB",
+      "utilizationPercentage": 75.0,
+      "resetDate": "2025-02-01T00:00:00Z"
+    },
+    "storageQuota": {
+      "limit": "500GB",
+      "used": "325GB",
+      "remaining": "175GB",
+      "utilizationPercentage": 65.0
+    }
+  }
+}
 ```
 
 ## Administration Guide
