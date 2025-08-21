@@ -7,126 +7,1099 @@
 
 ## Table of Contents
 
+### **Part I: User Guide (Non-Technical)**
 1. [Introduction](#introduction)
-2. [System Architecture & Design](#system-architecture--design)
-3. [Core Functional Concepts](#core-functional-concepts)
-4. [Getting Started](#getting-started)
+2. [Key Features](#key-features)
+3. [Getting Started](#getting-started)
+4. [YAML Workflows](#yaml-workflows)
 5. [Basic File Transfers](#basic-file-transfers)
-6. [YAML Workflows](#yaml-workflows)
-7. [Multi-Tenant Operations](#multi-tenant-operations)
-8. [REST API Usage](#rest-api-usage)
-9. [Administration Guide](#administration-guide)
+6. [Multi-Tenant Operations](#multi-tenant-operations)
+7. [REST API Usage](#rest-api-usage)
+8. [Administration Guide](#administration-guide)
+9. [Best Practices](#best-practices)
 10. [Troubleshooting](#troubleshooting)
-11. [Best Practices](#best-practices)
+
+### **Part II: Technical Reference (Developers)**
+11. [System Architecture & Design](#system-architecture--design)
+12. [Core Functional Concepts](#core-functional-concepts)
+13. [Java API Reference](#java-api-reference)
+14. [Advanced Configuration](#advanced-configuration)
 
 ## Introduction
 
 Quorus is an enterprise-grade file transfer system designed for internal corporate networks. It provides secure, reliable, and scalable file transfer capabilities with advanced workflow orchestration and multi-tenant support.
 
-### Key Features
+## Key Features
 
-#### **Secure File Transfers: Enterprise-Grade Protocol Support**
-Quorus provides comprehensive support for multiple transfer protocols, each optimized for specific enterprise use cases:
+---
 
-- **HTTP/HTTPS**: Modern web-based transfers with OAuth2, Bearer tokens, and custom headers. Supports range requests for resume capability, automatic compression (gzip/deflate), and corporate proxy integration. Ideal for API-based data exchanges and cloud service integration.
+### **Secure File Transfers**
+*Enterprise-Grade Protocol Support*
 
-- **FTP/FTPS**: Traditional file transfer protocol with both active and passive modes. Automatic binary/ASCII mode detection, directory synchronization, and SSL/TLS encryption (FTPS). Perfect for legacy system integration and bulk data transfers.
+Quorus provides comprehensive support for multiple transfer protocols, each optimized for specific enterprise use cases. Understanding the strengths and limitations of each protocol helps organizations make informed decisions about their file transfer architecture.
 
-- **SFTP**: Secure file transfer over SSH with key-based authentication, compression, and multiple concurrent streams. Preserves Unix file permissions and supports directory operations. Essential for secure transfers to Linux/Unix systems.
+#### **HTTP/HTTPS Protocol**
+*Modern Web-Based Transfers*
 
-- **SMB**: Windows file sharing protocol with NTLM/Kerberos authentication, DFS support, and proper file locking. Maintains Windows file attributes and integrates seamlessly with Active Directory. Critical for Windows-based corporate environments.
+**Capabilities**
+- OAuth2, Bearer tokens, and custom header authentication
+- Range requests for resume capability and partial downloads
+- Automatic compression (gzip/deflate) for bandwidth optimization
+- Corporate proxy integration with authentication passthrough
+- RESTful API integration for programmatic access
 
-**Security Features**: All protocols support enterprise authentication methods, certificate validation, and encryption both in transit and at rest. Integration with corporate PKI infrastructure ensures compliance with security policies.
+**Advantages**
+- **Firewall Friendly**: Uses standard ports (80/443) that are typically open
+- **Modern Authentication**: Supports OAuth2, JWT tokens, and API keys
+- **Cloud Integration**: Native support for AWS S3, Azure Blob, Google Cloud Storage
+- **Resume Capability**: Automatic retry and resume for interrupted transfers
+- **Compression**: Built-in compression reduces bandwidth usage
+- **Monitoring**: Rich HTTP status codes and headers for detailed progress tracking
 
-#### **YAML Workflows: Declarative Orchestration Engine**
-Transform complex file transfer operations into maintainable, version-controlled workflow definitions:
+**Disadvantages**
+- **Overhead**: HTTP headers add protocol overhead for small files
+- **Stateless**: Each request is independent, requiring authentication per request
+- **Limited Directory Operations**: Not optimized for complex directory synchronization
+- **Caching Issues**: HTTP caching can interfere with real-time file updates
 
-- **Declarative Syntax**: Define what you want to achieve, not how to achieve it. YAML-based workflows are human-readable, version-controllable, and self-documenting. No programming knowledge required for basic workflows.
+**Best For**
+- API-based data exchanges and microservices integration
+- Cloud storage integration (S3, Azure, GCS)
+- Web application file uploads/downloads
+- RESTful service integration
 
-- **Complex Dependencies**: Build sophisticated dependency graphs with parallel execution, conditional logic, and error handling. Support for sequential, parallel, and mixed execution strategies with automatic optimization.
+#### **FTP/FTPS Protocol**
+*Traditional File Transfer with Security*
 
-- **Variable Substitution**: Powerful templating system with built-in functions for dates, environment variables, and dynamic values. Enables workflow reuse across different environments and tenants.
+**Capabilities**
+- Active and passive connection modes for firewall compatibility
+- Automatic binary/ASCII mode detection and conversion
+- SSL/TLS encryption (FTPS) for secure data transmission
+- Directory synchronization with timestamp comparison
+- Bandwidth throttling and connection pooling
 
-- **Execution Modes**:
-  - *Normal Mode*: Full execution with actual file transfers
-  - *Dry Run*: Validation and planning without executing transfers
-  - *Virtual Run*: Simulation mode for testing and training
+**Advantages**
+- **Mature Protocol**: Decades of proven reliability and compatibility
+- **Efficient for Bulk Transfers**: Optimized for large file transfers
+- **Directory Operations**: Native support for directory listing and synchronization
+- **Wide Compatibility**: Supported by virtually all systems and devices
+- **Simple Authentication**: Username/password or certificate-based
+- **Bandwidth Control**: Built-in throttling and QoS capabilities
 
-- **Error Handling**: Configurable error handling strategies including fail-fast, continue-on-error, and custom retry policies. Automatic notification and escalation procedures.
+**Disadvantages**
+- **Firewall Complexity**: Requires multiple ports (control + data channels)
+- **Security Concerns**: Plain FTP transmits credentials in clear text
+- **NAT/Proxy Issues**: Active mode can have problems with NAT and firewalls
+- **Limited Metadata**: Basic file attributes only (size, timestamp)
+- **No Atomic Operations**: File transfers are not transactional
 
-**Business Value**: Reduce operational complexity, improve reliability, and enable self-service file transfer operations for business users.
+**Best For**
+- Legacy system integration where FTP is already established
+- Bulk data transfers between known, trusted systems
+- Automated batch processing and ETL operations
+- Systems requiring simple, reliable file transfer
 
-#### **Multi-Tenant Architecture: Enterprise Isolation and Governance**
+#### **SFTP Protocol**
+*Secure File Transfer Over SSH*
+
+**Capabilities**
+- SSH key-based authentication with passphrase protection
+- Built-in compression for bandwidth optimization
+- Multiple concurrent streams for parallel transfers
+- Unix file permissions and ownership preservation
+- Atomic file operations and transactional transfers
+
+**Advantages**
+- **Strong Security**: Uses SSH encryption and authentication
+- **Single Port**: Only requires port 22, firewall-friendly
+- **File Integrity**: Built-in checksums and verification
+- **Unix Integration**: Preserves permissions, ownership, and symbolic links
+- **Atomic Operations**: Supports transactional file operations
+- **Key Management**: Robust public/private key infrastructure
+
+**Disadvantages**
+- **SSH Overhead**: Encryption adds CPU overhead for large transfers
+- **Complexity**: SSH key management can be complex in large environments
+- **Limited Windows Support**: Not natively supported on older Windows systems
+- **No Resume**: Standard SFTP doesn't support resume capability
+- **Performance**: Can be slower than FTP for very large files
+
+**Best For**
+- Secure transfers to Linux/Unix systems
+- Environments requiring strong authentication and encryption
+- Automated scripts and batch processing
+- Systems where SSH is already deployed
+
+#### **SMB Protocol**
+*Windows File Sharing*
+
+**Capabilities**
+- NTLM/Kerberos authentication with Active Directory integration
+- Distributed File System (DFS) support for high availability
+- Opportunistic locking and file caching for performance
+- Windows file attributes and Access Control Lists (ACLs)
+- Network browsing and service discovery
+
+**Advantages**
+- **Native Windows Integration**: Seamless integration with Windows environments
+- **Active Directory**: Leverages existing AD authentication and authorization
+- **File Locking**: Prevents concurrent access conflicts
+- **Rich Metadata**: Full Windows file attributes and security descriptors
+- **Network Browsing**: Automatic discovery of available shares
+- **Performance**: Optimized for Windows-to-Windows transfers
+
+**Disadvantages**
+- **Windows-Centric**: Limited support on non-Windows systems
+- **Network Chattiness**: Protocol generates significant network traffic
+- **Security Complexity**: Requires careful configuration for security
+- **Firewall Issues**: Uses multiple ports and can be blocked by firewalls
+- **Version Compatibility**: Different SMB versions have compatibility issues
+
+**Best For**
+- Windows-based corporate environments
+- Active Directory integrated networks
+- File sharing between Windows servers and workstations
+- Applications requiring Windows file attributes and permissions
+
+#### **Protocol Selection Matrix**
+
+| **Requirement** | **HTTP/HTTPS** | **FTP/FTPS** | **SFTP** | **SMB** |
+|-----------------|----------------|--------------|----------|---------|
+| **Cloud Integration** | ✅ Excellent | ❌ Limited | ❌ Limited | ❌ Poor |
+| **Firewall Friendly** | ✅ Excellent | ⚠️ Moderate | ✅ Excellent | ❌ Poor |
+| **Security** | ✅ Strong | ⚠️ Moderate | ✅ Excellent | ⚠️ Moderate |
+| **Performance** | ⚠️ Moderate | ✅ Excellent | ⚠️ Moderate | ✅ Good |
+| **Resume Capability** | ✅ Yes | ⚠️ Limited | ❌ No | ✅ Yes |
+| **Directory Sync** | ❌ Limited | ✅ Excellent | ✅ Good | ✅ Excellent |
+| **Cross-Platform** | ✅ Excellent | ✅ Excellent | ✅ Good | ❌ Poor |
+| **Enterprise Auth** | ✅ OAuth2/SAML | ⚠️ Basic | ✅ SSH Keys | ✅ AD/Kerberos |
+
+#### **Security Architecture**
+
+Quorus implements a comprehensive security architecture based on industry best practices, military-grade encryption, and enterprise compliance requirements. Security is built into every layer of the system, from network protocols to data storage.
+
+#### **Encryption Standards: Military-Grade Data Protection**
+
+### TLS 1.3: Next-Generation Transport Security
+
+Transport Layer Security 1.3 represents the latest evolution in secure communications, providing significant improvements over previous versions:
+
+**Technical Improvements in TLS 1.3:**
+- **Reduced Handshake**: 1-RTT (Round Trip Time) vs. 2-RTT in TLS 1.2
+- **Perfect Forward Secrecy**: Mandatory for all cipher suites
+- **Simplified Cipher Suites**: Removed vulnerable legacy algorithms
+- **0-RTT Resumption**: Near-instant reconnection for repeat connections
+
+**Cipher Suites Supported:**
+
+**TLS 1.3 Cipher Suites:**
+- **TLS_AES_256_GCM_SHA384** - Recommended for high security
+- **TLS_CHACHA20_POLY1305_SHA256** - Optimized for mobile/IoT
+- **TLS_AES_128_GCM_SHA256** - Balanced performance/security
+
+**Performance Benefits:**
+- **Faster Handshakes**: 33% reduction in connection establishment time
+- **Lower Latency**: Reduced round trips improve user experience
+- **Better Security**: Eliminates known vulnerabilities from TLS 1.2
+- **Future-Proof**: Designed to resist quantum computing attacks
+
+### AES-256: Advanced Encryption Standard
+
+AES-256 provides symmetric encryption with 256-bit keys, offering exceptional security for data protection:
+
+**Technical Specifications:**
+- **Key Length**: 256 bits (2^256 possible keys)
+- **Block Size**: 128 bits
+- **Rounds**: 14 encryption rounds
+- **Algorithm**: Rijndael cipher, NIST-approved
+
+**Security Strength:**
+
+**Brute Force Attack Resistance:**
+- **Time to break with current technology**: > 10^70 years
+- **Quantum resistance**: Requires ~2^128 operations (still secure)
+- **Government approval**: NSA Suite B approved for TOP SECRET
+
+**Implementation Modes:**
+
+| **Mode** | **Use Case** | **Security Level** |
+|----------|--------------|-------------------|
+| **GCM** | Authenticated encryption | Highest (integrity + confidentiality) |
+| **CBC** | Legacy compatibility | High (confidentiality only) |
+| **CTR** | High-performance streaming | High (with separate authentication) |
+
+### RSA/ECDSA: Public Key Cryptography
+
+Quorus supports both RSA and Elliptic Curve Digital Signature Algorithm (ECDSA) for asymmetric cryptography:
+
+**RSA Implementation:**
+- **Key Sizes**: 2048-bit (minimum), 3072-bit (recommended), 4096-bit (high security)
+- **Padding**: OAEP (Optimal Asymmetric Encryption Padding) for encryption
+- **Signatures**: PSS (Probabilistic Signature Scheme) for digital signatures
+- **Use Cases**: Legacy system compatibility, certificate authorities
+
+**ECDSA Implementation:**
+- **Curves**: P-256, P-384, P-521 (NIST curves)
+- **Performance**: 10x faster than equivalent RSA
+- **Key Size**: 256-bit ECDSA ≈ 3072-bit RSA security
+- **Use Cases**: Modern systems, mobile devices, IoT
+
+**Security Comparison:**
+
+| **Algorithm** | **Key Size** | **Security Level** | **Performance** | **Quantum Resistance** |
+|---------------|--------------|-------------------|-----------------|----------------------|
+| **RSA-2048** | 2048 bits | 112-bit equivalent | Baseline | Vulnerable |
+| **RSA-3072** | 3072 bits | 128-bit equivalent | 3x slower | Vulnerable |
+| **ECDSA P-256** | 256 bits | 128-bit equivalent | 10x faster | Vulnerable |
+| **ECDSA P-384** | 384 bits | 192-bit equivalent | 8x faster | Partially resistant |
+
+**Perfect Forward Secrecy (PFS): Future-Proof Security**
+
+Perfect Forward Secrecy ensures that session keys cannot be compromised even if long-term private keys are stolen:
+
+**How PFS Works:**
+
+**Traditional Key Exchange (Vulnerable):**
+1. Client encrypts session key with server's public key
+2. Server decrypts with private key
+3. If private key is stolen later, all past sessions can be decrypted
+
+**PFS Key Exchange (Secure):**
+1. Client and server generate ephemeral key pairs
+2. Perform Diffie-Hellman key exchange
+3. Ephemeral keys are discarded after session
+4. Even if long-term keys are stolen, past sessions remain secure
+
+**PFS Algorithms Supported:**
+- **ECDHE** (Elliptic Curve Diffie-Hellman Ephemeral): Recommended
+- **DHE** (Diffie-Hellman Ephemeral): Legacy compatibility
+- **X25519**: High-performance curve for modern systems
+
+**Business Impact of PFS:**
+- **Regulatory Compliance**: Required by many government standards
+- **Data Breach Protection**: Limits damage from key compromise
+- **Long-term Security**: Protects historical data indefinitely
+- **Customer Trust**: Demonstrates commitment to security best practices
+
+#### **Authentication Methods: Multi-Layered Identity Verification**
+
+**Multi-Factor Authentication (MFA): Defense in Depth**
+
+Multi-Factor Authentication adds additional security layers beyond simple username/password combinations:
+
+**Supported MFA Protocols:**
+
+**RADIUS (Remote Authentication Dial-In User Service)**
+- **Use Case**: Centralized authentication for network access
+- **Integration**: Corporate VPN, wireless networks, and dial-up systems
+- **Features**: Accounting, authorization, and authentication (AAA)
+- **Deployment**: Integrates with existing RADIUS infrastructure
+
+**TACACS+ (Terminal Access Controller Access-Control System Plus)**
+- **Use Case**: Device administration and privileged access
+- **Advantages**: Separates authentication, authorization, and accounting
+- **Security**: Encrypts entire authentication packet (vs. RADIUS password-only)
+- **Cisco Integration**: Native support for Cisco network equipment
+
+**Hardware Token Support:**
+
+| **Token Type** | **Examples** | **Security Level** | **Use Cases** |
+|----------------|--------------|-------------------|---------------|
+| **RSA SecurID** | Software/hardware tokens | High | Executive access, financial systems |
+| **YubiKey** | USB/NFC hardware keys | Very High | Developer access, admin operations |
+| **Smart Cards** | PIV/CAC cards | Very High | Government, defense contractors |
+| **Mobile Apps** | Google Authenticator, Authy | Medium-High | General enterprise use |
+
+**MFA Flow Example:**
+
+**1. User Authentication Request**
+- Username/Password (Something you know)
+- Hardware Token (Something you have)
+- Biometric (Something you are)
+
+**2. RADIUS/TACACS+ Verification**
+- Primary credentials validated
+- Secondary factor requested
+- Token/biometric verified
+
+**3. Access Granted**
+- Session established
+- Permissions applied
+- Activity logged
+
+**Certificate-Based Authentication: Machine Identity**
+
+X.509 certificates provide strong authentication for both users and systems:
+
+**Certificate Types Supported:**
+- **User Certificates**: Personal authentication certificates
+- **Machine Certificates**: Server and client system authentication
+- **Code Signing**: Software integrity verification
+- **Email Certificates**: S/MIME email encryption and signing
+
+**Certificate Authority (CA) Integration:**
+
+**Enterprise PKI Hierarchy:**
+- **Root CA** (Offline, High Security)
+  - **Intermediate CA** (Online, Policy Enforcement)
+    - **User Certificates** (Employee authentication)
+    - **Server Certificates** (System authentication)
+    - **Application Certificates** (Service authentication)
+  - **External CA Trust** (Third-party certificates)
+
+**Certificate Lifecycle Management:**
+- **Enrollment**: Automated certificate request and issuance
+- **Renewal**: Automatic renewal before expiration
+- **Revocation**: Real-time certificate revocation list (CRL) checking
+- **Validation**: OCSP (Online Certificate Status Protocol) support
+
+**API Keys: Programmatic Authentication**
+
+Secure token-based authentication designed for automated systems and integrations:
+
+**API Key Types:**
+
+| **Type** | **Format** | **Security Features** | **Use Cases** |
+|----------|------------|----------------------|---------------|
+| **Bearer Tokens** | JWT (JSON Web Tokens) | Signed, time-limited | REST API access |
+| **API Keys** | Random strings | Rate limiting, scoping | Service integration |
+| **OAuth 2.0** | Access/refresh tokens | Delegated authorization | Third-party apps |
+| **HMAC Signatures** | Cryptographic signatures | Request integrity | High-security APIs |
+
+**JWT Token Structure:**
+```json
+{
+  "header": {
+    "alg": "RS256",
+    "typ": "JWT"
+  },
+  "payload": {
+    "sub": "api-service-account",
+    "iss": "quorus-auth-server",
+    "aud": "quorus-api",
+    "exp": 1640995200,
+    "iat": 1640908800,
+    "scope": ["transfer:read", "workflow:execute"]
+  },
+  "signature": "cryptographic_signature"
+}
+```
+
+**API Security Features:**
+- **Rate Limiting**: Prevents abuse and DoS attacks
+- **Scope Limitation**: Restricts access to specific resources
+- **Time-based Expiration**: Automatic token invalidation
+- **Request Signing**: HMAC verification for critical operations
+
+**Biometric Integration: Advanced Identity Verification**
+
+Modern biometric authentication for high-security environments:
+
+**Supported Biometric Methods:**
+- **Fingerprint Recognition**: USB fingerprint scanners, laptop sensors
+- **Smart Card Integration**: PIV/CAC cards with biometric data
+- **Windows Hello**: Native Windows biometric authentication
+- **FIDO2/WebAuthn**: Modern web-based biometric authentication
+
+**Biometric Security Advantages:**
+- **Non-repudiation**: Difficult to forge or share
+- **Convenience**: No passwords to remember or lose
+- **Speed**: Faster than typing passwords
+- **Audit Trail**: Clear identity verification for compliance
+
+**Implementation Considerations:**
+- **Privacy**: Biometric templates stored locally, not centrally
+- **Fallback**: Alternative authentication methods for system failures
+- **Accessibility**: Support for users unable to use biometric methods
+- **Standards Compliance**: FIDO Alliance and W3C WebAuthn standards
+
+---
+
+#### **Compliance Features: Regulatory and Standards Adherence**
+
+**FIPS 140-2: Federal Information Processing Standard**
+
+FIPS 140-2 is a U.S. government standard for cryptographic modules used in security systems:
+
+**FIPS 140-2 Security Levels:**
+
+| **Level** | **Requirements** | **Quorus Implementation** | **Use Cases** |
+|-----------|------------------|---------------------------|---------------|
+| **Level 1** | Basic cryptographic security | Software cryptography | General business use |
+| **Level 2** | Tamper-evident hardware | Hardware security modules | Financial services |
+| **Level 3** | Tamper-resistant hardware | Certified HSM integration | Government agencies |
+| **Level 4** | Tamper-responsive hardware | Military-grade HSMs | Defense contractors |
+
+**FIPS 140-2 Validated Algorithms:**
+- **AES**: Advanced Encryption Standard (all key sizes)
+- **SHA**: Secure Hash Algorithm (SHA-256, SHA-384, SHA-512)
+- **RSA**: Rivest-Shamir-Adleman (2048-bit minimum)
+- **ECDSA**: Elliptic Curve Digital Signature Algorithm
+- **HMAC**: Hash-based Message Authentication Code
+
+**Compliance Benefits:**
+- **Government Contracts**: Required for federal government systems
+- **Regulatory Approval**: Satisfies many industry regulations
+- **International Recognition**: Accepted globally for security validation
+- **Risk Mitigation**: Reduces liability through validated cryptography
+
+**Common Criteria: International Security Evaluation**
+
+Common Criteria (ISO/IEC 15408) provides a framework for security evaluation of IT products:
+
+**Evaluation Assurance Levels (EAL):**
+
+**EAL1: Functionally Tested**
+- Basic security testing
+- Suitable for low-risk environments
+
+**EAL2: Structurally Tested (Quorus Target)**
+- Developer testing and documentation
+- Independent vulnerability assessment
+- Suitable for commercial environments
+
+**EAL3: Methodically Tested and Checked**
+- Methodical testing and checking
+- Development environment controls
+- Suitable for security-conscious environments
+
+**EAL4+: Higher Assurance Levels**
+- Methodically designed, tested, and reviewed
+- Formal security policy model
+- Suitable for high-risk environments
+
+**Quorus Common Criteria Profile:**
+- **Protection Profile**: Network Infrastructure Device
+- **Security Targets**: File transfer and workflow management
+- **Evaluated Configuration**: Hardened deployment guidelines
+- **Vulnerability Assessment**: Independent security testing
+
+**SOX Compliance: Financial Data Controls**
+
+Sarbanes-Oxley Act compliance for financial data handling and audit requirements:
+
+**SOX Section 404: Internal Controls**
+
+**Financial Data Lifecycle:**
+
+**1. Data Creation**
+- User authentication and authorization
+- Digital signatures for non-repudiation
+- Timestamp validation
+
+**2. Data Processing**
+- Workflow approval processes
+- Segregation of duties enforcement
+- Change management controls
+
+**3. Data Storage**
+- Encryption at rest (AES-256)
+- Access logging and monitoring
+- Retention policy enforcement
+
+**4. Data Archival**
+- Immutable audit trails
+- Long-term storage integrity
+- Compliance reporting
+
+**SOX Control Implementation:**
+
+| **Control Type** | **Implementation** | **Audit Evidence** |
+|------------------|-------------------|-------------------|
+| **Access Controls** | Role-based permissions | User access reports |
+| **Change Management** | Workflow versioning | Change approval logs |
+| **Data Integrity** | Cryptographic checksums | Integrity verification reports |
+| **Audit Trails** | Immutable logging | Complete activity logs |
+
+**GDPR Compliance: Data Protection and Privacy**
+
+General Data Protection Regulation compliance for European data protection:
+
+**GDPR Principles Implementation:**
+- **Lawfulness**: Documented legal basis for data processing
+- **Purpose Limitation**: Data used only for specified purposes
+- **Data Minimization**: Only necessary data is processed
+- **Accuracy**: Data correction and update mechanisms
+- **Storage Limitation**: Automated data retention policies
+- **Security**: Appropriate technical and organizational measures
+
+**Data Subject Rights Support:**
+
+| **Right** | **Implementation** | **Response Time** |
+|-----------|-------------------|-------------------|
+| **Right to Access** | Data export functionality | Within 30 days |
+| **Right to Rectification** | Data correction workflows | Without undue delay |
+| **Right to Erasure** | Secure data deletion | Within 30 days |
+| **Right to Portability** | Structured data export | Within 30 days |
+| **Right to Object** | Processing restriction flags | Immediately |
+
+**Privacy by Design Features:**
+- **Data Encryption**: All personal data encrypted in transit and at rest
+- **Pseudonymization**: Personal identifiers replaced with pseudonyms
+- **Access Logging**: Complete audit trail of data access
+- **Consent Management**: Granular consent tracking and withdrawal
+- **Data Breach Notification**: Automated breach detection and reporting
+
+**Additional Compliance Frameworks:**
+
+**HIPAA (Healthcare)**
+- **Administrative Safeguards**: Access management and training
+- **Physical Safeguards**: Facility access controls and workstation security
+- **Technical Safeguards**: Encryption, audit controls, and integrity controls
+
+**PCI DSS (Payment Card Industry)**
+- **Network Security**: Firewall configuration and secure transmission
+- **Data Protection**: Encryption of cardholder data
+- **Access Control**: Restricted access on business need-to-know basis
+- **Monitoring**: Regular monitoring and testing of networks
+
+**ISO 27001 (Information Security Management)**
+- **Risk Assessment**: Systematic identification and treatment of risks
+- **Security Controls**: Implementation of appropriate security measures
+- **Continuous Improvement**: Regular review and improvement of security posture
+- **Certification**: Third-party validation of security management system
+
+### **YAML Workflows**
+*Declarative Orchestration Engine*
+
+Transform complex file transfer operations into maintainable, version-controlled workflow definitions using YAML as the configuration language.
+
+#### **Why YAML? The Strategic Choice**
+
+**Human-Readable Infrastructure as Code**
+
+YAML (YAML Ain't Markup Language) was chosen as Quorus's configuration format after careful evaluation of alternatives including JSON, XML, and proprietary formats. This decision reflects modern DevOps principles and enterprise operational requirements.
+
+**Comparison with Alternative Formats**
+
+| **Aspect** | **YAML** | **JSON** | **XML** | **Proprietary** |
+|------------|----------|----------|---------|-----------------|
+| **Human Readability** | ✅ Excellent | ⚠️ Moderate | ❌ Poor | ❌ Varies |
+| **Comments Support** | ✅ Native | ❌ None | ✅ Yes | ❌ Usually No |
+| **Version Control** | ✅ Excellent | ⚠️ Moderate | ❌ Poor | ❌ Poor |
+| **Learning Curve** | ✅ Low | ⚠️ Moderate | ❌ High | ❌ High |
+| **Tool Ecosystem** | ✅ Rich | ✅ Rich | ⚠️ Moderate | ❌ Limited |
+| **Multi-line Strings** | ✅ Native | ❌ Escaped | ⚠️ CDATA | ❌ Varies |
+| **Data Types** | ✅ Rich | ⚠️ Limited | ⚠️ String-based | ❌ Varies |
+
+**Key Advantages of YAML for Enterprise Workflows**
+
+1. **Self-Documenting Code**
+   ```yaml
+   # This workflow processes daily sales reports
+   # Runs every morning at 6 AM EST
+   metadata:
+     name: "Daily Sales Report Processing"
+     description: "Automated processing of overnight sales data with validation and distribution"
+   ```
+
+2. **Minimal Syntax Overhead**
+   - No closing tags (unlike XML)
+   - No excessive brackets and quotes (unlike JSON)
+   - Indentation-based structure mirrors logical hierarchy
+
+3. **Native Multi-line Support**
+   ```yaml
+   description: |
+     This workflow handles the complete ETL pipeline for customer data:
+     1. Extract from multiple source systems
+     2. Transform and validate data quality
+     3. Load into the data warehouse
+     4. Generate compliance reports
+   ```
+
+4. **Rich Data Type Support**
+   ```yaml
+   variables:
+     timeout: 300              # Integer
+     retry_enabled: true       # Boolean
+     file_patterns:            # Array
+       - "*.csv"
+       - "*.xlsx"
+     database_config:          # Object
+       host: "db.company.com"
+       port: 5432
+   ```
+
+**Enterprise Operational Benefits**
+
+**Version Control Integration**
+- **Meaningful Diffs**: YAML changes are easily readable in Git/SVN diffs
+- **Merge Conflicts**: Indentation-based structure reduces merge conflicts
+- **Code Reviews**: Business users can participate in workflow reviews
+- **Branching Strategy**: Different environments can have separate workflow branches
+
+**DevOps and GitOps Compatibility**
+- **Infrastructure as Code**: Workflows are treated as code artifacts
+- **CI/CD Integration**: Automated testing and deployment of workflow changes
+- **Configuration Management**: Integration with Ansible, Kubernetes, and other YAML-based tools
+- **Policy as Code**: Compliance rules can be embedded in workflow definitions
+
+**Business User Accessibility**
+- **No Programming Background Required**: Business analysts can create and modify workflows
+- **Self-Service Operations**: Reduce dependency on IT for routine workflow changes
+- **Documentation Integration**: Comments and descriptions are part of the configuration
+- **Training Efficiency**: Faster onboarding for new team members
+
+#### **YAML Best Practices in Quorus**
+
+**Standardized Schema Validation**
+```yaml
+metadata:
+  name: "Customer Data Pipeline"           # Required: Human-readable identifier
+  version: "2.1.0"                        # Required: Semantic versioning
+  description: "Processes customer data from multiple sources for business intelligence and analytics"   # Required: Business purpose (min 10 chars)
+  type: "data-pipeline-workflow"           # Required: Workflow classification
+  author: "data-team@company.com"          # Required: Ownership
+  created: "2025-08-21"                    # Required: Creation date
+  tags: ["customer", "etl", "daily", "business-intelligence"]       # Required: Classification tags
+```
+
+**Hierarchical Organization**
+```yaml
+spec:
+  variables:                    # Global configuration
+    source_db: "prod-db"
+
+  execution:                    # Execution parameters
+    parallelism: 3
+
+  transferGroups:               # Workflow stages
+    - name: extract-data        # Logical grouping
+      transfers:                # Individual operations
+        - name: extract-customers
+```
+
+**Environment-Specific Configuration**
+```yaml
+variables:
+  # Environment-specific values
+  database_host: "{{env.DB_HOST}}"
+  api_endpoint: "{{env.API_URL}}"
+
+  # Environment detection
+  environment: "{{env.ENVIRONMENT | default('development')}}"
+```
+
+#### **Core Capabilities**
+
+| **Feature** | **Description** | **Benefits** |
+|-------------|-----------------|--------------|
+| **Declarative Syntax** | Human-readable YAML definitions | No programming knowledge required |
+| **Complex Dependencies** | Sophisticated dependency graphs with parallel execution | Automatic optimization and conditional logic |
+| **Variable Substitution** | Templating with dates, environment variables, dynamic values | Workflow reuse across environments |
+| **Error Handling** | Configurable strategies: fail-fast, continue-on-error, retry policies | Automatic notification and escalation |
+
+#### **Execution Modes**
+
+```yaml
+execution:
+  mode: normal        # Full execution with actual transfers
+  # mode: dry-run     # Validation and planning only
+  # mode: virtual     # Simulation for testing and training
+```
+
+**Business Value**
+- Reduce operational complexity and improve reliability
+- Enable self-service file transfer operations for business users
+- Version-controlled, auditable workflow definitions
+- Lower total cost of ownership through reduced training and maintenance
+
+---
+
+### **Multi-Tenant Architecture**
+*Enterprise Isolation and Governance*
+
 Comprehensive multi-tenancy designed for large organizations with complex hierarchical structures:
 
-- **Hierarchical Tenants**: Support for enterprise → company → department → team structures with inheritance of policies and quotas. Each level can override parent settings while maintaining governance.
+#### **Tenant Hierarchy**
+```
+Enterprise
+├── Company A
+│   ├── Finance Department
+│   └── IT Department
+└── Company B
+    ├── Sales Team
+    └── Marketing Team
+```
 
-- **Resource Isolation**: Multiple isolation strategies:
-  - *Logical Isolation*: Shared infrastructure with namespace separation and access controls
-  - *Physical Isolation*: Dedicated infrastructure for sensitive tenants
-  - *Hybrid Isolation*: Mix of logical and physical based on data sensitivity
+#### **Isolation Strategies**
 
-- **Quota Management**: Comprehensive resource quotas including concurrent transfers, bandwidth allocation, storage limits, and API rate limits. Support for burst capacity and time-based quotas (daily/monthly limits).
+| **Strategy** | **Infrastructure** | **Use Cases** |
+|--------------|-------------------|---------------|
+| **Logical Isolation** | Shared with namespace separation | Standard business units |
+| **Physical Isolation** | Dedicated infrastructure | Sensitive/regulated data |
+| **Hybrid Isolation** | Mixed based on sensitivity | Flexible security requirements |
 
-- **Cross-Tenant Operations**: Controlled data sharing between tenants with approval workflows and audit trails. Essential for partner data exchanges and inter-departmental collaboration.
+#### **Resource Management**
 
-- **Tenant-Specific Configuration**: Custom authentication providers, storage locations, workflow templates, and security policies per tenant. Enables different business units to operate independently while maintaining central governance.
+| **Resource Type** | **Quota Controls** | **Features** |
+|-------------------|-------------------|--------------|
+| **Concurrent Transfers** | Per-tenant limits | Burst capacity support |
+| **Bandwidth Allocation** | QoS-based throttling | Time-based quotas |
+| **Storage Limits** | Hierarchical quotas | Automatic cleanup policies |
+| **API Rate Limits** | Request throttling | Fair usage enforcement |
 
-**Governance Benefits**: Centralized management with distributed control, comprehensive audit trails, and compliance with corporate data governance policies.
+**Governance Benefits**
+- Centralized management with distributed control
+- Comprehensive audit trails and compliance reporting
+- Cross-tenant data sharing with approval workflows
 
-#### **High Availability: Fault-Tolerant Distributed Architecture**
-Enterprise-grade availability designed to meet stringent SLA requirements:
+---
 
-- **Raft Consensus Clustering**: Distributed consensus algorithm ensuring strong consistency and automatic leader election. Tolerates (N-1)/2 node failures while maintaining service availability.
+### **High Availability**
+*Fault-Tolerant Distributed Architecture*
 
-- **Geographic Distribution**: Multi-availability zone deployment with automatic failover. Supports disaster recovery scenarios including entire data center failures.
+Enterprise-grade availability designed to meet stringent SLA requirements through sophisticated clustering and consensus mechanisms.
 
-- **Zero-Downtime Operations**: Rolling updates, configuration changes, and maintenance operations without service interruption. Graceful node draining and automatic workload redistribution.
+#### **Understanding Distributed Systems and Clustering**
 
-- **Split-Brain Prevention**: Quorum-based decision making prevents inconsistent state during network partitions. Minority partitions automatically become read-only to preserve data consistency.
+**What is Clustering?**
 
-- **Virtual IP Failover**: Seamless client redirection during leader changes with automatic DNS updates and load balancer integration. Clients experience no interruption during failover events.
+Clustering is the practice of connecting multiple independent servers (nodes) to work together as a single, unified system. In the context of file transfer systems, clustering provides redundancy, load distribution, and fault tolerance that single-server deployments cannot achieve.
 
-**Availability Guarantees**: 99.9% uptime SLA with automatic recovery from common failure scenarios and comprehensive monitoring with predictive failure detection.
+**Why Clustering is Essential for Enterprise File Transfers**
 
-#### **Progress Tracking: Real-Time Visibility and Analytics**
+**Single Points of Failure in Traditional Architectures**
+
+Traditional single-server architecture creates critical vulnerabilities:
+
+**Traditional Single-Server Architecture:**
+- File Transfer Server (Single Point of Failure)
+  - All operations stop if this fails
+  - Connected to Storage
+
+**Problems with Single-Server Deployments:**
+- **Complete Service Outage**: Server failure means zero availability
+- **Maintenance Downtime**: Updates require service interruption
+- **Performance Bottlenecks**: Single server limits throughput
+- **Data Loss Risk**: Hardware failure can result in data loss
+- **Scalability Limits**: Cannot handle growing workloads
+
+**Clustered Architecture Benefits**
+
+**Quorus Clustered Architecture:**
+- **Node 1 (Leader)** ↔ **Node 2 (Follower)** ↔ **Node 3 (Follower)**
+- All nodes connected to **Shared Storage**
+- Automatic failover between nodes
+- Load distribution across cluster
+
+**Enterprise Requirements Driving Clustering:**
+
+| **Business Need** | **Clustering Solution** | **Impact** |
+|-------------------|------------------------|------------|
+| **24/7 Operations** | Automatic failover | Zero planned downtime |
+| **Global Presence** | Geographic distribution | Local performance worldwide |
+| **Regulatory Compliance** | Data replication | Disaster recovery compliance |
+| **Performance SLAs** | Load distribution | Consistent response times |
+| **Cost Optimization** | Resource sharing | Better hardware utilization |
+
+#### **Distributed Consensus: The Foundation of Reliability**
+
+**The Consensus Problem**
+
+In distributed systems, multiple nodes must agree on the state of the system. This is challenging because:
+- **Network Partitions**: Nodes may lose communication
+- **Node Failures**: Servers can crash or become unresponsive
+- **Timing Issues**: Messages can be delayed or arrive out of order
+- **Byzantine Failures**: Nodes may behave unpredictably
+
+**Why Consensus Matters for File Transfers**
+- **Workflow State**: All nodes must agree on workflow execution status
+- **Resource Allocation**: Coordinated assignment of transfer tasks
+- **Configuration Changes**: Consistent system configuration across nodes
+- **Leader Election**: Determining which node coordinates operations
+
+#### **Raft Consensus Algorithm: Proven Reliability**
+
+**What is Raft?**
+
+Raft is a consensus algorithm designed to be understandable and practical for real-world systems. It ensures that a cluster of servers maintains consistent state even in the presence of failures.
+
+**Raft's Core Principles**
+
+1. **Strong Leader**: One node acts as the leader, simplifying decision-making
+2. **Leader Election**: Automatic selection of a new leader when needed
+3. **Log Replication**: All changes are recorded and replicated to followers
+4. **Safety**: Guarantees that committed entries are never lost
+
+**Raft Consensus Process**
+
+**Normal Operation (3-node cluster):**
+
+1. **Leader Node A** sends commands to **Follower Node B** and **Follower Node C**
+2. Each node maintains identical log entries:
+   - Command: Start Transfer X
+   - Status: Committed
+3. All nodes stay synchronized through continuous replication
+
+**Leader Election Process**
+
+When a leader fails, Raft automatically elects a new leader:
+
+**Step 1: Leader Failure Detected**
+- Leader Node A fails (❌)
+- Follower Node B and Node C detect the failure
+- Election timeout triggers
+
+**Step 2: Candidate Election**
+- Node B becomes a candidate
+- Node B requests votes: "Vote for me!"
+- Node C responds: "Yes, I'll vote!"
+- Majority vote achieved
+
+**Step 3: New Leader Established**
+- Node B becomes the new leader
+- Node C remains as follower
+- Normal operations resume
+
+**Fault Tolerance Mathematics**
+
+Raft can tolerate **(N-1)/2** node failures where N is the total number of nodes:
+
+| **Cluster Size** | **Failures Tolerated** | **Minimum Nodes for Operation** |
+|------------------|------------------------|--------------------------------|
+| **3 nodes** | 1 failure | 2 nodes (majority) |
+| **5 nodes** | 2 failures | 3 nodes (majority) |
+| **7 nodes** | 3 failures | 4 nodes (majority) |
+
+**Why Odd Numbers?**
+- **Majority Requirement**: Raft requires a majority of nodes to make decisions
+- **Split-Brain Prevention**: Odd numbers prevent equal partitions
+- **Resource Efficiency**: Minimal nodes needed for fault tolerance
+
+#### **Leader Election: Coordinated Decision Making**
+
+**The Role of the Leader**
+
+The leader node in a Raft cluster has specific responsibilities:
+- **Client Requests**: All client requests are handled by the leader
+- **Log Replication**: Leader replicates all changes to followers
+- **Heartbeats**: Regular communication to maintain leadership
+- **Decision Making**: Coordinates all cluster-wide decisions
+
+**Election Triggers**
+
+Leader election occurs when:
+1. **Initial Startup**: No leader exists when cluster starts
+2. **Leader Failure**: Current leader becomes unresponsive
+3. **Network Partition**: Leader loses contact with majority
+4. **Planned Maintenance**: Graceful leader transfer
+
+**Election Timeline**
+
+**Typical Leader Election Timeline:**
+- **0ms**: Leader failure detected
+- **150ms**: Election timeout expires, candidate starts election
+- **200ms**: Votes collected from majority, new leader elected
+- **250ms**: New leader sends heartbeats, cluster operational
+
+**Sub-Second Recovery**
+- **Detection**: 50-150ms to detect leader failure
+- **Election**: 50-100ms to complete election process
+- **Stabilization**: 50-100ms for new leader to establish authority
+- **Total**: Typically under 300ms for complete failover
+
+#### **Advanced Clustering Features**
+
+**Log Replication and Data Consistency**
+
+Every operation in Quorus is recorded in a replicated log that ensures consistency across all nodes:
+
+**Log Replication Process:**
+1. **Client Request**: Client sends "Start Transfer" to Leader
+2. **Leader Logs Entry**: Leader creates log entry
+3. **Replicate to Followers**: Leader replicates entry to all followers
+4. **Commit Entry**: Once majority confirms, operation is committed
+
+**Consistency Guarantees**
+- **Strong Consistency**: All nodes see the same data at the same time
+- **Linearizability**: Operations appear to execute atomically
+- **Durability**: Committed operations survive node failures
+- **ACID Properties**: Database-like guarantees for workflow operations
+
+**Network Partition Handling**
+
+Quorus handles network partitions gracefully using the "majority wins" principle:
+
+**Network Partition Scenario (5-node cluster):**
+
+**Partition A (Majority - 3 nodes):**
+- Node 1 (Leader), Node 2, Node 3
+- Continues normal operations
+- Can elect new leader if needed
+- Maintains write capabilities
+
+**Partition B (Minority - 2 nodes):**
+- Node 4, Node 5
+- Becomes read-only
+- Cannot elect leader
+- Waits for partition to heal
+
+**Network Split Resolution:**
+- When network heals, partitions automatically rejoin
+- Minority partition synchronizes with majority
+- Normal operations resume across all nodes
+
+**Split-Brain Prevention**
+- **Quorum Requirement**: Operations require majority approval
+- **Read-Only Mode**: Minority partitions become read-only
+- **Automatic Recovery**: Partitions automatically rejoin when network heals
+- **Data Integrity**: No conflicting operations can occur
+
+#### **Geographic Distribution and Disaster Recovery**
+
+**Multi-Availability Zone Deployment**
+
+Quorus supports deployment across multiple availability zones for maximum resilience:
+
+**Geographic Distribution (Region: US-East):**
+
+**Availability Zone 1a:**
+- Node 1 (Leader)
+- Storage Replica
+
+**Availability Zone 1b:**
+- Node 2 (Follower)
+- Storage Replica
+
+**Availability Zone 1c:**
+- Node 3 (Follower)
+- Storage Replica
+
+**Benefits:**
+- Survives entire availability zone failures
+- Automatic failover between zones
+- Data replicated across geographic locations
+- Meets disaster recovery requirements
+
+**Disaster Recovery Scenarios**
+
+| **Failure Type** | **Impact** | **Recovery Time** | **Data Loss** |
+|------------------|------------|-------------------|---------------|
+| **Single Node** | None (automatic failover) | < 1 second | None |
+| **Availability Zone** | Temporary performance impact | < 5 seconds | None |
+| **Entire Region** | Service interruption | < 5 minutes | None (with backup) |
+| **Multiple Regions** | Extended outage | Manual intervention | Minimal (last backup) |
+
+**Cross-Region Replication**
+
+```yaml
+disaster_recovery:
+  primary_region: "us-east-1"
+  backup_regions:
+    - region: "us-west-2"
+      replication_mode: "async"
+      rpo: "15 minutes"        # Recovery Point Objective
+      rto: "5 minutes"         # Recovery Time Objective
+    - region: "eu-west-1"
+      replication_mode: "sync"
+      rpo: "0 seconds"
+      rto: "30 seconds"
+```
+
+#### **Clustering & Consensus Technology Stack**
+
+| **Component** | **Technology** | **Fault Tolerance** | **Recovery Time** |
+|---------------|----------------|-------------------|-------------------|
+| **Raft Consensus** | Distributed consensus algorithm | Tolerates (N-1)/2 node failures | < 300ms |
+| **Leader Election** | Automatic failover with voting | Sub-second leader selection | < 200ms |
+| **Log Replication** | Append-only distributed log | Majority replication required | Real-time |
+| **Geographic Distribution** | Multi-AZ deployment | Entire data center failure recovery | < 5 minutes |
+| **Network Partitions** | Quorum-based decisions | Minority partitions read-only | Automatic |
+| **Data Consistency** | Strong consistency model | ACID guarantees | Immediate |
+
+#### **Operational Excellence**
+
+| **Feature** | **Capability** | **Business Impact** |
+|-------------|----------------|-------------------|
+| **Zero-Downtime Updates** | Rolling deployments | No service interruption |
+| **Split-Brain Prevention** | Quorum-based decisions | Data consistency guarantee |
+| **Virtual IP Failover** | Seamless client redirection | Transparent failover |
+
+#### **SLA Guarantees**
+```
+99.9% Uptime SLA
+├── Automatic recovery from common failures
+├── Predictive failure detection
+└── Comprehensive monitoring and alerting
+```
+
+---
+
+### **Progress Tracking**
+*Real-Time Visibility and Analytics*
+
 Comprehensive monitoring and observability for all transfer operations:
 
-- **Real-Time Metrics**: Sub-second progress updates showing bytes transferred, transfer rates, and completion percentages. Live dashboards for operations teams and end users.
+#### **Monitoring Levels**
 
-- **Predictive Analytics**: Machine learning-enhanced ETA calculations based on historical transfer patterns, network conditions, and file characteristics. Anomaly detection for unusual transfer behavior.
+| **Level** | **Metrics** | **Update Frequency** |
+|-----------|-------------|-------------------|
+| **Transfer Level** | Bytes transferred, rates, completion % | Sub-second updates |
+| **Workflow Level** | Stage progress, overall completion | Real-time |
+| **System Level** | Cluster health, resource utilization | Continuous |
 
-- **Multi-Level Monitoring**:
-  - *Transfer Level*: Individual file transfer progress and statistics
-  - *Workflow Level*: Overall workflow progress with stage-by-stage breakdown
-  - *System Level*: Cluster health, resource utilization, and performance metrics
+#### **Analytics & Intelligence**
 
-- **Performance Insights**: Detailed analysis of transfer performance including network latency, throughput optimization recommendations, and bottleneck identification.
+| **Feature** | **Technology** | **Business Value** |
+|-------------|----------------|-------------------|
+| **Predictive ETA** | ML-enhanced calculations | Accurate completion estimates |
+| **Anomaly Detection** | Pattern recognition | Proactive issue identification |
+| **Performance Insights** | Network analysis | Optimization recommendations |
+| **Historical Trends** | Long-term analytics | Capacity planning support |
 
-- **Historical Analytics**: Long-term trend analysis for capacity planning, performance optimization, and SLA reporting. Integration with enterprise monitoring and alerting systems.
+#### **Integration Capabilities**
+```yaml
+monitoring:
+  dashboards: [Grafana, Custom Web UI]
+  metrics: [Prometheus, InfluxDB]
+  alerting: [PagerDuty, Slack, Email]
+  siem: [Splunk, Elastic, QRadar]
+```
 
-**Operational Benefits**: Proactive issue detection, performance optimization, and comprehensive reporting for business stakeholders and technical teams.
+**Operational Benefits**
+- Proactive issue detection and resolution
+- Performance optimization recommendations
+- Comprehensive reporting for stakeholders
 
-#### **Enterprise Integration: Seamless Corporate Infrastructure Integration**
+---
+
+### **Enterprise Integration**
+*Seamless Corporate Infrastructure Integration*
+
 Deep integration with existing enterprise infrastructure and processes:
 
-- **Corporate Directory Integration**: Native support for Active Directory, LDAP, and other enterprise directory services. Automatic user provisioning and group-based access control.
+#### **Identity & Access Management**
 
-- **Single Sign-On (SSO)**: Integration with corporate identity providers including SAML, OAuth2, OpenID Connect, and Kerberos. Users authenticate once and access all authorized resources.
+| **Integration Type** | **Supported Systems** | **Features** |
+|---------------------|----------------------|--------------|
+| **Directory Services** | Active Directory, LDAP | Automatic user provisioning, group-based access |
+| **Single Sign-On** | SAML, OAuth2, OpenID Connect, Kerberos | One-time authentication, seamless access |
+| **Multi-Factor Auth** | RADIUS, TACACS+, RSA SecurID | Enhanced security compliance |
 
-- **Compliance Frameworks**: Built-in support for SOX, GDPR, HIPAA, PCI-DSS, and other regulatory requirements. Automated compliance reporting and audit trail generation.
+#### **Security & Compliance**
 
-- **Security Integration**:
-  - *Certificate Management*: Integration with corporate PKI infrastructure
-  - *Key Management*: Support for enterprise key management systems (KMS)
-  - *Network Security*: Corporate firewall and proxy integration
-  - *Data Classification*: Automatic data classification and handling based on corporate policies
+| **Framework** | **Capabilities** | **Automation** |
+|---------------|------------------|----------------|
+| **SOX** | Financial controls and audit trails | Automated compliance reporting |
+| **GDPR** | Data privacy and protection | Automatic data classification |
+| **HIPAA** | Healthcare data security | Encrypted storage and transmission |
+| **PCI-DSS** | Payment card data protection | Secure data handling workflows |
 
-- **Monitoring Integration**: Native integration with enterprise monitoring systems including Prometheus, Grafana, Splunk, and SIEM platforms. Custom metrics and alerting for business-specific requirements.
+#### **Infrastructure Integration**
 
-- **API Integration**: RESTful APIs with OpenAPI documentation for integration with existing business applications, workflow systems, and automation platforms.
+| **Component** | **Integration Points** | **Benefits** |
+|---------------|----------------------|--------------|
+| **PKI Infrastructure** | Certificate management, key rotation | Automated security operations |
+| **Network Security** | Firewall rules, proxy configuration | Seamless network integration |
+| **Monitoring Systems** | Prometheus, Grafana, Splunk, SIEM | Unified observability |
+| **API Ecosystem** | RESTful APIs, OpenAPI documentation | Custom application integration |
 
-**Integration Benefits**: Leverage existing enterprise investments, maintain security and compliance posture, and provide familiar user experience consistent with other corporate applications.
+**Integration Benefits**
+- Leverage existing enterprise investments
+- Maintain consistent security and compliance posture
+- Provide familiar user experience across corporate applications
 
 ### System Architecture
 
@@ -146,13 +1119,117 @@ graph TB
     AgentN --> StorageN[Data Warehouse]
 ```
 
-## System Architecture & Design
+## Getting Started
 
-### Distributed System Architecture
+### Quick Start Guide
 
-Quorus is built as a **distributed, fault-tolerant system** designed for enterprise-scale file transfer operations. The architecture follows microservices principles with clear separation of concerns and horizontal scalability.
+Welcome to Quorus! This section will help you get started with file transfers and workflow creation using our user-friendly YAML configuration format.
 
-#### Core Components
+#### What You Need
+
+**For Basic File Transfers:**
+- Access to the Quorus web interface or CLI
+- Source and destination locations
+- Appropriate permissions for file access
+
+**For YAML Workflows:**
+- A text editor (VS Code, Notepad++, or any YAML-aware editor)
+- Basic understanding of YAML syntax (we'll guide you through this)
+- Knowledge of your file transfer requirements
+
+#### Your First File Transfer
+
+**Option 1: Using the Web Interface**
+1. **Login** to the Quorus web interface
+2. **Navigate** to "New Transfer"
+3. **Configure** source and destination
+4. **Select** transfer protocol (HTTP, FTP, SFTP, or SMB)
+5. **Start** the transfer and monitor progress
+
+**Option 2: Using YAML Workflow**
+Create a simple workflow file:
+
+```yaml
+metadata:
+  name: "My First Transfer"
+  version: "1.0.0"
+  description: "Simple file transfer from server to local storage for getting started with Quorus"
+  type: "transfer-workflow"
+  author: "your-email@company.com"
+  created: "2025-08-21"
+  tags: ["getting-started", "simple-transfer", "tutorial"]
+
+spec:
+  execution:
+    parallelism: 1
+
+  transferGroups:
+    - name: simple-transfer
+      description: "Transfer a single file"
+      transfers:
+        - name: download-report
+          source: "https://reports.company.com/daily-report.csv"
+          destination: "/local/reports/daily-report.csv"
+          protocol: https
+```
+
+#### Next Steps
+
+1. **Explore YAML Workflows** - Learn how to create more complex workflows
+2. **Try Different Protocols** - Experiment with FTP, SFTP, and SMB transfers
+3. **Set Up Monitoring** - Configure progress tracking and notifications
+4. **Review Security** - Understand authentication and encryption options
+
+*Note: Detailed system architecture and technical implementation details, including all Java code examples, have been moved to [Part II: Technical Reference](#part-ii-technical-reference-developers) for better document organization. The following sections provide user-friendly overviews of system capabilities.*
+
+---
+
+## YAML Workflows
+
+### Introduction to YAML Workflows
+
+YAML workflows are the heart of Quorus, allowing you to define complex file transfer operations using simple, human-readable configuration files. Think of them as recipes that tell Quorus exactly what files to transfer, where to transfer them, and how to handle different scenarios.
+
+### Why YAML?
+
+**Human-Readable**: YAML looks like structured text that anyone can read and understand
+**Version Control Friendly**: Easy to track changes and collaborate with teams
+**Self-Documenting**: Comments and clear structure make workflows self-explanatory
+**Powerful**: Can handle simple transfers or complex multi-step operations
+
+### Basic YAML Workflow Structure
+
+Every Quorus workflow has two main parts:
+
+#### 1. Metadata (Who, What, When)
+```yaml
+metadata:
+  name: "Daily Sales Report Transfer"
+  version: "1.0.0"
+  description: "Transfers daily sales reports from FTP server to data warehouse for business intelligence"
+  type: "data-pipeline-workflow"
+  author: "sales-team@company.com"
+  created: "2025-08-21"
+  tags: ["sales", "daily", "reports", "data-warehouse"]
+```
+
+#### 2. Specification (How)
+```yaml
+spec:
+  execution:
+    parallelism: 2    # Run 2 transfers at once
+
+  transferGroups:
+    - name: sales-data
+      description: "Download sales files"
+      transfers:
+        - name: get-sales-report
+          source: "ftp://sales.company.com/reports/daily.csv"
+          destination: "/warehouse/sales/daily.csv"
+          protocol: ftp
+```
+
+*Note: The following technical sections have been moved to Part II for better organization. Continue reading for user-friendly workflow examples and guides.*
 
 ```mermaid
 graph TB
@@ -210,38 +1287,19 @@ The **Controller Cluster** provides centralized coordination and state managemen
 
 ##### Key Responsibilities
 
-**Job Scheduling: Assigns transfer jobs to available agents**
+### Job Scheduling: Assigns transfer jobs to available agents
 
 The Job Scheduler is responsible for intelligent assignment of transfer jobs to the most appropriate agents in the fleet:
 
-```java
-public class JobScheduler {
-    // Scheduling strategies
-    public enum SchedulingStrategy {
-        ROUND_ROBIN,        // Simple round-robin assignment
-        LEAST_LOADED,       // Assign to agent with lowest current load
-        CAPABILITY_BASED,   // Match job requirements to agent capabilities
-        LOCALITY_AWARE,     // Prefer agents closer to source/destination
-        TENANT_AFFINITY     // Prefer agents dedicated to specific tenants
-    }
+The Job Scheduler supports multiple intelligent scheduling strategies:
 
-    // Scheduling decision factors
-    private SchedulingDecision scheduleJob(TransferJob job) {
-        List<Agent> candidateAgents = findEligibleAgents(job);
+- **Round Robin**: Simple round-robin assignment across available agents
+- **Least Loaded**: Assigns jobs to agents with the lowest current load
+- **Capability Based**: Matches job requirements to agent capabilities
+- **Locality Aware**: Prefers agents closer to source/destination
+- **Tenant Affinity**: Uses agents dedicated to specific tenants
 
-        // Filter by capabilities
-        candidateAgents = filterByCapabilities(candidateAgents, job.getRequiredCapabilities());
-
-        // Filter by tenant quotas
-        candidateAgents = filterByTenantQuotas(candidateAgents, job.getTenant());
-
-        // Apply scheduling strategy
-        Agent selectedAgent = applySchedulingStrategy(candidateAgents, job);
-
-        return new SchedulingDecision(selectedAgent, job, calculatePriority(job));
-    }
-}
-```
+*Note: Detailed Java implementation examples have been moved to [Part II: Technical Reference](#part-ii-technical-reference-developers).*
 
 **Scheduling Factors:**
 - **Agent Capacity**: Current load, available bandwidth, concurrent transfer limits
@@ -278,46 +1336,19 @@ graph LR
     TA --> TQ
 ```
 
-**State Management: Maintains cluster-wide state consistency**
+### State Management: Maintains cluster-wide state consistency
 
-The State Management system ensures all controllers have a consistent view of the system state:
+The State Management system ensures all controllers have a consistent view through:
 
-```java
-public class ClusterStateManager {
-    // Core state components
-    private final Map<String, Agent> registeredAgents;
-    private final Map<String, TransferJob> activeJobs;
-    private final Map<String, WorkflowExecution> runningWorkflows;
-    private final Map<String, TenantConfiguration> tenantConfigs;
-    private final Map<String, ResourceUsage> resourceUsage;
+- **Agent Registry**: Tracks all registered agents and their current status
+- **Job Tracking**: Monitors active transfer jobs and their state transitions
+- **Workflow Execution**: Manages running workflows and their progress
+- **Tenant Configuration**: Maintains tenant-specific settings and quotas
+- **Resource Usage**: Tracks resource consumption across the system
+- **State Synchronization**: Uses Raft consensus to ensure consistency
+- **Consistency Checks**: Validates state consistency across controllers
 
-    // State synchronization
-    public void applyStateChange(StateChangeEvent event) {
-        // Apply change locally
-        applyChangeLocally(event);
-
-        // Replicate to followers via Raft
-        raftNode.appendEntry(event);
-
-        // Update state version
-        incrementStateVersion();
-
-        // Notify state change listeners
-        notifyStateChangeListeners(event);
-    }
-
-    // State consistency checks
-    public StateConsistencyReport checkConsistency() {
-        return StateConsistencyReport.builder()
-            .agentCount(registeredAgents.size())
-            .activeJobCount(activeJobs.size())
-            .workflowCount(runningWorkflows.size())
-            .stateVersion(getCurrentStateVersion())
-            .lastUpdateTime(getLastUpdateTime())
-            .build();
-    }
-}
-```
+*Note: Detailed Java implementation examples have been moved to [Part II: Technical Reference](#part-ii-technical-reference-developers).*
 
 **State Components:**
 - **Agent Registry**: All registered agents with their capabilities and status
@@ -333,7 +1364,7 @@ public class ClusterStateManager {
 - **Durability**: State changes are persisted and survive failures
 - **Partition Tolerance**: System remains consistent during network partitions
 
-**Agent Fleet Management: Monitors and manages transfer agents**
+### Agent Fleet Management: Monitors and manages transfer agents
 
 The Agent Fleet Manager maintains a real-time view of all transfer agents and their health:
 
@@ -395,48 +1426,96 @@ public class AgentFleetManager {
 - **Maintenance Mode**: Gracefully drain agents for maintenance
 - **Failure Recovery**: Reassign jobs from failed agents to healthy ones
 
-**Workflow Orchestration: Coordinates complex multi-step workflows**
+### Workflow Orchestration: Coordinates complex multi-step workflows
 
-The Workflow Orchestrator manages the execution of complex, multi-step transfer workflows:
+The Workflow Orchestrator manages the execution of complex, multi-step transfer workflows. Here are practical YAML examples showing different orchestration patterns:
 
-```java
-public class WorkflowOrchestrator {
-    // Workflow execution engine
-    public String executeWorkflow(WorkflowDefinition definition, ExecutionContext context) {
-        // Parse and validate workflow
-        WorkflowExecutionPlan plan = createExecutionPlan(definition);
+#### **Sequential Workflow Example**
+```yaml
+metadata:
+  name: "Sequential Data Pipeline"
+  version: "1.0.0"
+  description: "Sequential execution where each stage depends on the previous one"
+  type: "sequential-workflow"
+  author: "data-ops@company.com"
+  created: "2025-08-21"
+  tags: ["sequential", "data-pipeline", "etl"]
 
-        // Create execution instance
-        WorkflowExecution execution = new WorkflowExecution(
-            generateExecutionId(),
-            definition,
-            context,
-            plan
-        );
+spec:
+  execution:
+    strategy: sequential    # Execute stages one after another
+    parallelism: 1
+    continueOnError: false  # Stop if any stage fails
 
-        // Start execution
-        return startExecution(execution);
-    }
+  transferGroups:
+    - name: extract-data
+      description: "Extract raw data from source systems"
+      transfers:
+        - name: extract-customers
+          source: "ftp://source.com/customers.csv"
+          destination: "/staging/raw/customers.csv"
+          protocol: ftp
 
-    // Dependency resolution and execution planning
-    private WorkflowExecutionPlan createExecutionPlan(WorkflowDefinition definition) {
-        // Build dependency graph
-        DependencyGraph graph = dependencyResolver.buildGraph(definition);
+    - name: transform-data
+      description: "Clean and validate extracted data"
+      dependsOn: ["extract-data"]  # Wait for extract to complete
+      transfers:
+        - name: clean-customers
+          source: "/staging/raw/customers.csv"
+          destination: "/staging/clean/customers.csv"
+          protocol: file
+          options:
+            processor: "data-cleaner"
+            validationRules: "customer-validation.json"
 
-        // Check for circular dependencies
-        if (graph.hasCycles()) {
-            throw new WorkflowValidationException("Circular dependencies detected");
-        }
+    - name: load-data
+      description: "Load processed data into warehouse"
+      dependsOn: ["transform-data"]  # Wait for transform to complete
+      transfers:
+        - name: load-customers
+          source: "/staging/clean/customers.csv"
+          destination: "/warehouse/customers.csv"
+          protocol: file
+```
 
-        // Create execution stages
-        List<ExecutionStage> stages = graph.topologicalSort()
-            .stream()
-            .map(this::createExecutionStage)
-            .collect(Collectors.toList());
+#### **Parallel Workflow Example**
+```yaml
+metadata:
+  name: "Parallel Backup Workflow"
+  version: "1.0.0"
+  description: "Parallel execution for independent backup operations"
+  type: "parallel-workflow"
+  author: "backup-ops@company.com"
+  created: "2025-08-21"
+  tags: ["parallel", "backup", "independent"]
 
-        return new WorkflowExecutionPlan(stages);
-    }
-}
+spec:
+  execution:
+    strategy: parallel      # Execute all stages simultaneously
+    parallelism: 5          # Up to 5 concurrent transfers
+    continueOnError: true   # Continue even if some backups fail
+
+  transferGroups:
+    - name: backup-databases
+      description: "Backup all database files"
+      transfers:
+        - name: backup-users-db
+          source: "/data/users.db"
+          destination: "s3://backups/databases/users.db"
+          protocol: https
+
+        - name: backup-orders-db
+          source: "/data/orders.db"
+          destination: "s3://backups/databases/orders.db"
+          protocol: https
+
+    - name: backup-logs
+      description: "Backup application logs"
+      transfers:
+        - name: backup-app-logs
+          source: "/logs/application.log"
+          destination: "s3://backups/logs/application.log"
+          protocol: https
 ```
 
 **Workflow Execution Phases:**
@@ -453,7 +1532,7 @@ public class WorkflowOrchestrator {
 - **Progress Tracking**: Real-time workflow and stage-level progress
 - **Resource Management**: Ensure workflows don't exceed tenant quotas
 
-**Resource Allocation: Manages tenant quotas and resource distribution**
+### Resource Allocation: Manages tenant quotas and resource distribution
 
 The Resource Allocator ensures fair distribution of system resources across tenants:
 
@@ -505,7 +1584,7 @@ public class ResourceAllocator {
 
 ##### Raft Consensus Implementation
 
-**Leader Election: Automatic leader selection with (N-1)/2 fault tolerance**
+### Leader Election: Automatic leader selection with (N-1)/2 fault tolerance
 
 The Raft leader election ensures exactly one leader exists at any time:
 
@@ -568,7 +1647,7 @@ public class RaftLeaderElection {
 - **Fault Tolerance**: Tolerates (N-1)/2 node failures
 - **Network Partition**: Majority partition can elect a leader
 
-**Log Replication: Ensures all state changes are consistently replicated**
+### Log Replication: Ensures all state changes are consistently replicated
 
 The Raft log replication mechanism ensures all state changes are durably stored and consistently applied:
 
@@ -629,7 +1708,7 @@ public class RaftLogReplication {
 - **Majority Agreement**: Entries committed only with majority consent
 - **Monotonicity**: Log entries are never removed or reordered
 
-**Split-Brain Prevention: Quorum-based decision making prevents inconsistencies**
+### Split-Brain Prevention: Quorum-based decision making prevents inconsistencies
 
 Raft prevents split-brain scenarios through strict quorum requirements:
 
@@ -675,7 +1754,7 @@ public class QuorumManager {
 - **Automatic Step-Down**: Leaders step down when they lose quorum
 - **Client Request Blocking**: Minority partitions reject client requests
 
-**Network Partition Tolerance: Maintains availability during network issues**
+### Network Partition Tolerance: Maintains availability during network issues
 
 The system handles network partitions gracefully while maintaining consistency:
 
@@ -728,7 +1807,7 @@ public class NetworkPartitionHandler {
 
 ##### High Availability Features
 
-**Virtual IP Failover: Seamless client redirection during leader changes**
+### Virtual IP Failover: Seamless client redirection during leader changes
 
 Virtual IP failover provides transparent leader changes to clients:
 
@@ -786,7 +1865,7 @@ public class VirtualIPManager {
 - **Load Balancer Integration**: Seamless load balancer updates
 - **Client Transparency**: Clients see no interruption
 
-**Geographic Distribution: Multi-AZ deployment for disaster recovery**
+### Geographic Distribution: Multi-AZ deployment for disaster recovery
 
 Geographic distribution provides disaster recovery across multiple availability zones:
 
@@ -838,7 +1917,7 @@ public class GeographicDistribution {
 - **Regulatory Compliance**: Meet data residency requirements
 - **Load Distribution**: Distribute load across geographic regions
 
-**Rolling Updates: Zero-downtime upgrades and maintenance**
+### Rolling Updates: Zero-downtime upgrades and maintenance
 
 Rolling updates enable zero-downtime system upgrades:
 
@@ -886,7 +1965,7 @@ public class RollingUpdateManager {
 4. **Rejoin Verification**: Ensure node successfully rejoins cluster
 5. **Health Validation**: Verify cluster health before next update
 
-**Health Monitoring: Continuous health checks and automatic recovery**
+### Health Monitoring: Continuous health checks and automatic recovery
 
 Comprehensive health monitoring enables proactive issue detection and automatic recovery:
 
@@ -949,7 +2028,7 @@ public class HealthMonitoringSystem {
 
 ##### Agent Capabilities
 
-**Protocol Support: HTTP/HTTPS, FTP, SFTP, SMB, and extensible protocol framework**
+### Protocol Support: HTTP/HTTPS, FTP, SFTP, SMB, and extensible protocol framework
 
 The protocol support system provides a unified interface for different transfer protocols while allowing protocol-specific optimizations:
 
@@ -1052,7 +2131,7 @@ public class HttpProtocolHandler implements ProtocolHandler {
 - **Extended Attributes**: Preserve Windows file attributes and metadata
 - **DFS Support**: Distributed File System path resolution
 
-**Concurrent Transfers: Configurable parallelism based on agent capacity**
+### Concurrent Transfers: Configurable parallelism based on agent capacity
 
 The concurrent transfer system manages multiple simultaneous transfers while respecting resource constraints:
 
@@ -1151,82 +2230,272 @@ public class TransferCapacityCalculator {
 }
 ```
 
-**Progress Tracking: Real-time transfer monitoring with rate calculation**
+### Progress Tracking: Real-time transfer monitoring with rate calculation
 
-The progress tracking system provides comprehensive real-time monitoring of transfer operations:
+The progress tracking system provides comprehensive real-time monitoring of transfer operations. Here are YAML examples showing how to configure progress tracking and monitoring:
 
-```java
-public class ProgressTracker {
-    private final Map<String, TransferProgress> activeTransfers;
-    private final ScheduledExecutorService progressReporter;
-    private final MetricsCollector metricsCollector;
+#### **Basic Progress Tracking Configuration**
+```yaml
+metadata:
+  name: "Progress Tracking Example"
+  version: "1.0.0"
+  description: "Demonstrates progress tracking and monitoring configuration"
+  type: "monitoring-workflow"
+  author: "monitoring-team@company.com"
+  created: "2025-08-21"
+  tags: ["monitoring", "progress", "tracking"]
 
-    // Progress tracking for a transfer
-    public void trackTransfer(String jobId, TransferJob job) {
-        TransferProgress progress = new TransferProgress(jobId, job);
-        activeTransfers.put(jobId, progress);
+spec:
+  # Global progress tracking settings
+  progressTracking:
+    enabled: true
+    reportingInterval: "1s"      # Report progress every second
+    detailedMetrics: true        # Collect detailed transfer metrics
+    predictiveETA: true          # Use ML-enhanced ETA calculations
+    anomalyDetection: true       # Detect unusual transfer patterns
 
-        // Start periodic progress reporting
-        ScheduledFuture<?> reportingTask = progressReporter.scheduleAtFixedRate(
-            () -> reportProgress(jobId),
-            1, 1, TimeUnit.SECONDS
-        );
+  transferGroups:
+    - name: monitored-transfers
+      transfers:
+        - name: large-file-transfer
+          source: "https://data.company.com/large-dataset.zip"
+          destination: "/data/large-dataset.zip"
+          protocol: https
+          progressTracking:
+            enabled: true
+            reportingInterval: "500ms"  # More frequent updates for large files
+            metrics:
+              - "bytes-transferred"
+              - "transfer-rate"
+              - "eta"
+              - "completion-percentage"
+              - "network-latency"
+```
 
-        progress.setReportingTask(reportingTask);
-    }
+#### **Advanced Progress Monitoring**
+```yaml
+metadata:
+  name: "Advanced Progress Monitoring"
+  version: "1.0.0"
+  description: "Advanced progress monitoring with custom metrics and alerting"
+  type: "advanced-monitoring-workflow"
+  author: "ops-team@company.com"
+  created: "2025-08-21"
+  tags: ["monitoring", "advanced", "alerting", "metrics"]
 
-    // Update progress metrics
-    public void updateProgress(String jobId, long bytesTransferred) {
-        TransferProgress progress = activeTransfers.get(jobId);
-        if (progress != null) {
-            progress.updateBytesTransferred(bytesTransferred);
+spec:
+  # Advanced monitoring configuration
+  monitoring:
+    progressTracking:
+      enabled: true
+      reportingInterval: "1s"
+      rateSmoothing:
+        enabled: true
+        windowSize: "30s"        # 30-second moving average
+        algorithm: "exponential" # or "simple", "weighted"
 
-            // Calculate transfer rate
-            long elapsedMs = progress.getElapsedTimeMs();
-            if (elapsedMs > 0) {
-                double transferRate = (double) bytesTransferred / elapsedMs * 1000; // bytes/sec
-                progress.setTransferRate(transferRate);
+    # Custom metrics collection
+    customMetrics:
+      - name: "transfer-efficiency"
+        formula: "bytes-transferred / elapsed-time"
+        unit: "bytes/second"
 
-                // Calculate ETA
-                long remainingBytes = progress.getTotalBytes() - bytesTransferred;
-                if (transferRate > 0) {
-                    long etaSeconds = (long) (remainingBytes / transferRate);
-                    progress.setEstimatedTimeRemaining(Duration.ofSeconds(etaSeconds));
-                }
-            }
+      - name: "network-utilization"
+        formula: "current-rate / max-bandwidth * 100"
+        unit: "percentage"
 
-            // Update metrics
-            metricsCollector.recordProgress(progress);
-        }
-    }
-}
+      - name: "error-rate"
+        formula: "retry-count / total-attempts * 100"
+        unit: "percentage"
 
-public class TransferProgress {
-    private final String jobId;
-    private final long totalBytes;
-    private final Instant startTime;
+    # Alerting configuration
+    alerts:
+      - name: "slow-transfer-alert"
+        condition: "transfer-rate < 1MB/s AND elapsed-time > 60s"
+        action: "notify"
+        channels: ["email", "slack"]
 
-    private volatile long bytesTransferred;
-    private volatile double transferRate; // bytes per second
-    private volatile Duration estimatedTimeRemaining;
-    private volatile TransferPhase currentPhase;
+      - name: "high-error-rate-alert"
+        condition: "error-rate > 10%"
+        action: "escalate"
+        channels: ["pagerduty"]
 
-    // Progress calculations
-    public double getCompletionPercentage() {
-        if (totalBytes == 0) return 0.0;
-        return (double) bytesTransferred / totalBytes * 100.0;
-    }
+      - name: "eta-exceeded-alert"
+        condition: "elapsed-time > eta * 1.5"
+        action: "investigate"
+        channels: ["monitoring-dashboard"]
 
-    public Duration getElapsedTime() {
-        return Duration.between(startTime, Instant.now());
-    }
+  transferGroups:
+    - name: critical-transfers
+      monitoring:
+        priority: "high"
+        detailedLogging: true
+        realTimeAlerts: true
+      transfers:
+        - name: financial-data-transfer
+          source: "sftp://bank.com/daily-transactions.csv"
+          destination: "/finance/transactions.csv"
+          protocol: sftp
+          monitoring:
+            thresholds:
+              minTransferRate: "5MB/s"
+              maxDuration: "300s"
+              maxRetries: 2
+```
 
-    public double getAverageTransferRate() {
-        long elapsedMs = getElapsedTime().toMillis();
-        if (elapsedMs == 0) return 0.0;
-        return (double) bytesTransferred / elapsedMs * 1000;
-    }
-}
+#### **Progress Reporting and Dashboards**
+```yaml
+metadata:
+  name: "Progress Reporting Configuration"
+  version: "1.0.0"
+  description: "Configuration for progress reporting and dashboard integration"
+  type: "reporting-workflow"
+  author: "dashboard-team@company.com"
+  created: "2025-08-21"
+  tags: ["reporting", "dashboard", "visualization"]
+
+spec:
+  # Progress reporting configuration
+  reporting:
+    # Real-time progress updates
+    realTime:
+      enabled: true
+      websocketEndpoint: "wss://monitoring.company.com/progress"
+      updateInterval: "1s"
+
+    # Batch progress reports
+    batch:
+      enabled: true
+      interval: "5m"
+      format: "json"
+      destination: "kafka://metrics.company.com/transfer-progress"
+
+    # Dashboard integration
+    dashboards:
+      - type: "grafana"
+        endpoint: "https://grafana.company.com"
+        datasource: "prometheus"
+        metrics:
+          - "transfer_bytes_total"
+          - "transfer_rate_bytes_per_second"
+          - "transfer_duration_seconds"
+          - "transfer_errors_total"
+
+      - type: "custom"
+        endpoint: "https://dashboard.company.com/api/metrics"
+        format: "json"
+        authentication:
+          type: "bearer"
+          token: "{{env.DASHBOARD_TOKEN}}"
+
+  # Export metrics to external systems
+  metricsExport:
+    prometheus:
+      enabled: true
+      endpoint: "http://prometheus:9090/metrics"
+      labels:
+        environment: "{{environment}}"
+        team: "data-ops"
+
+    influxdb:
+      enabled: true
+      endpoint: "http://influxdb:8086"
+      database: "transfer_metrics"
+      retention: "30d"
+
+  transferGroups:
+    - name: dashboard-monitored-transfers
+      transfers:
+        - name: dashboard-data-sync
+          source: "https://api.company.com/dashboard-data.json"
+          destination: "/dashboards/data.json"
+          protocol: https
+          reporting:
+            includeInDashboard: true
+            customLabels:
+              business_unit: "analytics"
+              criticality: "high"
+              data_type: "dashboard"
+```
+
+#### **Performance Metrics and Analysis**
+```yaml
+metadata:
+  name: "Performance Metrics Collection"
+  version: "1.0.0"
+  description: "Comprehensive performance metrics collection and analysis"
+  type: "performance-workflow"
+  author: "performance-team@company.com"
+  created: "2025-08-21"
+  tags: ["performance", "metrics", "analysis"]
+
+spec:
+  # Performance monitoring configuration
+  performance:
+    metrics:
+      # Transfer volume metrics
+      volume:
+        - "bytes-transferred"
+        - "total-bytes"
+        - "completion-percentage"
+
+      # Rate and throughput metrics
+      throughput:
+        - "current-transfer-rate"
+        - "average-transfer-rate"
+        - "peak-transfer-rate"
+        - "rate-variance"
+
+      # Time-based metrics
+      timing:
+        - "elapsed-time"
+        - "estimated-time-remaining"
+        - "connection-time"
+        - "first-byte-time"
+
+      # Network metrics
+      network:
+        - "network-latency"
+        - "packet-loss"
+        - "bandwidth-utilization"
+        - "connection-quality"
+
+      # Error and reliability metrics
+      reliability:
+        - "retry-count"
+        - "error-rate"
+        - "success-rate"
+        - "failure-reasons"
+
+    # Performance analysis
+    analysis:
+      enabled: true
+      algorithms:
+        - "trend-analysis"      # Identify performance trends
+        - "anomaly-detection"   # Detect unusual patterns
+        - "bottleneck-analysis" # Identify performance bottlenecks
+        - "capacity-planning"   # Predict future capacity needs
+
+    # Performance optimization
+    optimization:
+      autoTuning: true
+      parameters:
+        - "chunk-size"
+        - "concurrent-connections"
+        - "buffer-size"
+        - "compression-level"
+
+  transferGroups:
+    - name: performance-monitored-transfers
+      transfers:
+        - name: performance-test-transfer
+          source: "https://test-data.company.com/performance-test.dat"
+          destination: "/performance/test-data.dat"
+          protocol: https
+          performance:
+            benchmarking: true
+            optimization: true
+            detailedAnalysis: true
 ```
 
 **Progress Metrics Collected:**
@@ -1244,93 +2513,277 @@ public class TransferProgress {
 - **Phase Detection**: Automatic detection of transfer phases
 - **Anomaly Detection**: Identify unusual transfer patterns
 
-**Integrity Verification: SHA-256 checksum validation and corruption detection**
+### Integrity Verification: SHA-256 checksum validation and corruption detection
 
-The integrity verification system ensures data integrity throughout the transfer process:
+The integrity verification system ensures data integrity throughout the transfer process. Here are YAML examples showing how to configure checksum validation and corruption detection:
 
-```java
-public class IntegrityVerifier {
-    private final Map<String, ChecksumCalculator> activeCalculators;
-    private final ChecksumValidationService validationService;
+#### **Basic Integrity Verification**
+```yaml
+metadata:
+  name: "Basic Integrity Verification"
+  version: "1.0.0"
+  description: "Basic checksum validation for ensuring data integrity"
+  type: "integrity-workflow"
+  author: "security-team@company.com"
+  created: "2025-08-21"
+  tags: ["integrity", "checksum", "validation"]
 
-    // Start checksum calculation during transfer
-    public void startChecksumCalculation(String jobId, TransferJob job) {
-        if (job.isChecksumValidationEnabled()) {
-            ChecksumCalculator calculator = new ChecksumCalculator(
-                job.getChecksumAlgorithm(),
-                job.getExpectedChecksum()
-            );
+spec:
+  # Global integrity settings
+  integrity:
+    enabled: true
+    algorithm: "sha256"          # Default checksum algorithm
+    validateOnTransfer: true     # Validate during transfer
+    validateOnCompletion: true   # Validate after completion
+    failOnMismatch: true        # Fail transfer if checksum doesn't match
 
-            activeCalculators.put(jobId, calculator);
-        }
-    }
+  transferGroups:
+    - name: verified-transfers
+      transfers:
+        - name: secure-document-transfer
+          source: "https://secure.company.com/document.pdf"
+          destination: "/secure/document.pdf"
+          protocol: https
+          integrity:
+            enabled: true
+            algorithm: "sha256"
+            expectedChecksum: "a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3"
+```
 
-    // Update checksum with transferred data
-    public void updateChecksum(String jobId, byte[] data, int offset, int length) {
-        ChecksumCalculator calculator = activeCalculators.get(jobId);
-        if (calculator != null) {
-            calculator.update(data, offset, length);
-        }
-    }
+#### **Multiple Checksum Algorithms**
+```yaml
+metadata:
+  name: "Multiple Checksum Algorithms"
+  version: "1.0.0"
+  description: "Using different checksum algorithms for different security requirements"
+  type: "multi-checksum-workflow"
+  author: "security-ops@company.com"
+  created: "2025-08-21"
+  tags: ["integrity", "multi-algorithm", "security"]
 
-    // Validate checksum after transfer completion
-    public ChecksumValidationResult validateChecksum(String jobId) {
-        ChecksumCalculator calculator = activeCalculators.get(jobId);
-        if (calculator == null) {
-            return ChecksumValidationResult.skipped("Checksum validation disabled");
-        }
+spec:
+  transferGroups:
+    - name: high-security-transfers
+      description: "High-security transfers with SHA-256"
+      transfers:
+        - name: financial-data
+          source: "sftp://bank.com/transactions.csv"
+          destination: "/finance/transactions.csv"
+          protocol: sftp
+          integrity:
+            algorithm: "sha256"
+            expectedChecksum: "{{source.metadata.sha256}}"
+            validateChunks: true     # Validate individual chunks
+            chunkSize: "1MB"
 
-        String calculatedChecksum = calculator.getChecksum();
-        String expectedChecksum = calculator.getExpectedChecksum();
+    - name: standard-transfers
+      description: "Standard transfers with SHA-1"
+      transfers:
+        - name: customer-data
+          source: "https://api.company.com/customers.json"
+          destination: "/data/customers.json"
+          protocol: https
+          integrity:
+            algorithm: "sha1"
+            expectedChecksum: "{{response.headers.etag}}"
 
-        if (expectedChecksum != null) {
-            // Compare with expected checksum
-            boolean isValid = calculatedChecksum.equals(expectedChecksum);
-            return new ChecksumValidationResult(isValid, calculatedChecksum, expectedChecksum);
-        } else {
-            // No expected checksum - just record calculated value
-            return ChecksumValidationResult.calculated(calculatedChecksum);
-        }
-    }
-}
+    - name: legacy-transfers
+      description: "Legacy system compatibility with MD5"
+      transfers:
+        - name: legacy-data
+          source: "ftp://legacy.company.com/data.txt"
+          destination: "/legacy/data.txt"
+          protocol: ftp
+          integrity:
+            algorithm: "md5"
+            expectedChecksum: "{{source.sidecar.md5}}"
+            allowWeakAlgorithm: true  # Explicitly allow MD5
+```
 
-public class ChecksumCalculator {
-    private final MessageDigest digest;
-    private final String expectedChecksum;
+#### **Advanced Integrity Verification**
+```yaml
+metadata:
+  name: "Advanced Integrity Verification"
+  version: "1.0.0"
+  description: "Advanced integrity verification with multiple validation methods"
+  type: "advanced-integrity-workflow"
+  author: "data-integrity-team@company.com"
+  created: "2025-08-21"
+  tags: ["integrity", "advanced", "multi-validation"]
 
-    public ChecksumCalculator(ChecksumAlgorithm algorithm, String expectedChecksum) {
-        this.digest = createDigest(algorithm);
-        this.expectedChecksum = expectedChecksum;
-    }
+spec:
+  # Advanced integrity configuration
+  integrity:
+    multipleValidation:
+      enabled: true
+      algorithms: ["sha256", "sha1"]  # Calculate multiple checksums
+      requireAll: false              # At least one must match
 
-    // Streaming checksum calculation
-    public void update(byte[] data, int offset, int length) {
-        digest.update(data, offset, length);
-    }
+    streaming:
+      enabled: true                  # Calculate during transfer
+      bufferSize: "64KB"            # Buffer size for streaming calculation
 
-    public String getChecksum() {
-        byte[] hash = digest.digest();
-        return bytesToHex(hash);
-    }
+    corruption:
+      detection: true                # Enable corruption detection
+      recovery: "retry"              # or "fail", "skip"
+      maxRetries: 3
 
-    // Support for different algorithms
-    private MessageDigest createDigest(ChecksumAlgorithm algorithm) {
-        try {
-            switch (algorithm) {
-                case SHA256:
-                    return MessageDigest.getInstance("SHA-256");
-                case SHA1:
-                    return MessageDigest.getInstance("SHA-1");
-                case MD5:
-                    return MessageDigest.getInstance("MD5");
-                default:
-                    throw new UnsupportedOperationException("Unsupported algorithm: " + algorithm);
-            }
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("Checksum algorithm not available", e);
-        }
-    }
-}
+  transferGroups:
+    - name: critical-data-transfers
+      integrity:
+        strictValidation: true
+        corruptionTolerance: "zero"   # No corruption allowed
+      transfers:
+        - name: database-backup
+          source: "/database/backup.sql"
+          destination: "s3://backups/database/backup.sql"
+          protocol: https
+          integrity:
+            algorithms: ["sha256", "crc32"]
+            expectedChecksums:
+              sha256: "{{source.metadata.sha256}}"
+              crc32: "{{source.metadata.crc32}}"
+            partialValidation:
+              enabled: true
+              chunkSize: "10MB"
+              validateEachChunk: true
+
+    - name: large-file-transfers
+      description: "Large files with chunk-based validation"
+      transfers:
+        - name: video-file-transfer
+          source: "https://media.company.com/video.mp4"
+          destination: "/media/video.mp4"
+          protocol: https
+          integrity:
+            algorithm: "sha256"
+            chunkValidation:
+              enabled: true
+              chunkSize: "100MB"
+              parallelValidation: true
+              resumeOnFailure: true
+```
+
+#### **Checksum Source Integration**
+```yaml
+metadata:
+  name: "Checksum Source Integration"
+  version: "1.0.0"
+  description: "Integration with various checksum sources and metadata"
+  type: "checksum-integration-workflow"
+  author: "integration-team@company.com"
+  created: "2025-08-21"
+  tags: ["integrity", "integration", "metadata"]
+
+spec:
+  transferGroups:
+    - name: http-header-checksums
+      description: "Using HTTP headers for checksum validation"
+      transfers:
+        - name: api-data-with-etag
+          source: "https://api.company.com/data.json"
+          destination: "/data/api-data.json"
+          protocol: https
+          integrity:
+            algorithm: "md5"
+            expectedChecksum: "{{response.headers.content-md5}}"
+
+        - name: api-data-with-custom-header
+          source: "https://api.company.com/secure-data.json"
+          destination: "/data/secure-data.json"
+          protocol: https
+          integrity:
+            algorithm: "sha256"
+            expectedChecksum: "{{response.headers.x-content-sha256}}"
+
+    - name: file-metadata-checksums
+      description: "Using file metadata and sidecar files"
+      transfers:
+        - name: data-with-sidecar
+          source: "ftp://data.company.com/dataset.csv"
+          destination: "/data/dataset.csv"
+          protocol: ftp
+          integrity:
+            algorithm: "sha256"
+            expectedChecksum: "{{sidecar.file('dataset.csv.sha256')}}"
+
+        - name: data-with-extended-attributes
+          source: "/source/data-with-xattr.bin"
+          destination: "/dest/data.bin"
+          protocol: file
+          integrity:
+            algorithm: "sha1"
+            expectedChecksum: "{{source.xattr.user.checksum.sha1}}"
+
+    - name: api-provided-checksums
+      description: "Checksums provided by API responses"
+      transfers:
+        - name: api-with-checksum-response
+          source: "https://secure-api.company.com/download/{{fileId}}"
+          destination: "/downloads/{{fileName}}"
+          protocol: https
+          integrity:
+            algorithm: "sha256"
+            expectedChecksum: "{{api.response.checksum.sha256}}"
+            preValidation:
+              enabled: true
+              endpoint: "https://secure-api.company.com/checksum/{{fileId}}"
+```
+
+#### **Error Handling and Recovery**
+```yaml
+metadata:
+  name: "Integrity Error Handling"
+  version: "1.0.0"
+  description: "Error handling and recovery strategies for integrity failures"
+  type: "integrity-error-handling-workflow"
+  author: "reliability-team@company.com"
+  created: "2025-08-21"
+  tags: ["integrity", "error-handling", "recovery"]
+
+spec:
+  # Global error handling for integrity failures
+  integrity:
+    errorHandling:
+      onChecksumMismatch: "retry"    # or "fail", "quarantine", "notify"
+      onCorruption: "retry"          # or "fail", "skip", "repair"
+      onValidationError: "fail"      # or "skip", "warn"
+
+    recovery:
+      maxRetries: 3
+      retryDelay: "exponential"
+      quarantineLocation: "/quarantine/"
+      notificationChannels: ["email", "slack"]
+
+  transferGroups:
+    - name: resilient-integrity-transfers
+      transfers:
+        - name: self-healing-transfer
+          source: "https://unreliable-source.com/data.zip"
+          destination: "/data/data.zip"
+          protocol: https
+          integrity:
+            algorithm: "sha256"
+            expectedChecksum: "{{source.metadata.sha256}}"
+            errorHandling:
+              onMismatch: "retry-with-different-source"
+              alternativeSources:
+                - "https://backup-source.com/data.zip"
+                - "ftp://mirror.company.com/data.zip"
+              maxRetries: 5
+
+        - name: quarantine-on-failure
+          source: "sftp://external.com/suspicious-file.dat"
+          destination: "/data/suspicious-file.dat"
+          protocol: sftp
+          integrity:
+            algorithm: "sha256"
+            expectedChecksum: "{{external.api.checksum}}"
+            errorHandling:
+              onMismatch: "quarantine"
+              quarantineLocation: "/quarantine/suspicious/"
+              notifySecurityTeam: true
+              generateIncident: true
 ```
 
 **Integrity Verification Features:**
@@ -1348,78 +2801,143 @@ public class ChecksumCalculator {
 - **Pre-calculated**: Checksums calculated before transfer
 - **On-demand**: Calculate if not provided by source
 
-**Retry Logic: Exponential backoff with configurable retry policies**
+### Retry Logic: Exponential backoff with configurable retry policies
 
-The retry system provides intelligent retry logic for handling transient failures:
+The retry system provides intelligent retry logic for handling transient failures. Here are practical YAML examples showing different retry configurations:
 
-```java
-public class RetryManager {
-    // Retry policy configuration
-    public static class RetryPolicy {
-        private final int maxAttempts;
-        private final Duration initialDelay;
-        private final double backoffMultiplier;
-        private final Duration maxDelay;
-        private final Set<Class<? extends Exception>> retryableExceptions;
-        private final Set<Class<? extends Exception>> nonRetryableExceptions;
+#### **Basic Retry Configuration**
+```yaml
+metadata:
+  name: "Basic Retry Example"
+  version: "1.0.0"
+  description: "Simple retry configuration for handling network failures"
+  type: "retry-workflow"
+  author: "ops@company.com"
+  created: "2025-08-21"
+  tags: ["retry", "resilience", "network"]
 
-        // Retry decision logic
-        public boolean shouldRetry(Exception exception, int attemptNumber) {
-            if (attemptNumber >= maxAttempts) {
-                return false;
-            }
+spec:
+  execution:
+    # Global retry policy for all transfers
+    retryPolicy:
+      maxAttempts: 3
+      initialDelay: "1s"
+      maxDelay: "30s"
+      backoffStrategy: exponential
+      backoffMultiplier: 2.0
+      jitter: true  # Add randomness to prevent thundering herd
+      retryOn: ["network-error", "timeout", "connection-refused"]
 
-            // Check if exception is explicitly non-retryable
-            if (isNonRetryableException(exception)) {
-                return false;
-            }
+  transferGroups:
+    - name: resilient-downloads
+      transfers:
+        - name: download-report
+          source: "https://unreliable-api.com/daily-report.csv"
+          destination: "/reports/daily-report.csv"
+          protocol: https
+          options:
+            timeout: "30s"
+```
 
-            // Check if exception is retryable
-            return isRetryableException(exception);
-        }
+#### **Advanced Retry Strategies**
+```yaml
+metadata:
+  name: "Advanced Retry Strategies"
+  version: "1.0.0"
+  description: "Different retry strategies for different types of failures"
+  type: "advanced-retry-workflow"
+  author: "reliability-team@company.com"
+  created: "2025-08-21"
+  tags: ["retry", "advanced", "fault-tolerance"]
 
-        public Duration calculateDelay(int attemptNumber) {
-            double delay = initialDelay.toMillis() * Math.pow(backoffMultiplier, attemptNumber - 1);
+spec:
+  transferGroups:
+    - name: aggressive-retry-group
+      description: "Aggressive retry for critical transfers"
+      retryPolicy:
+        maxAttempts: 5
+        initialDelay: "500ms"
+        maxDelay: "2m"
+        backoffStrategy: exponential
+        backoffMultiplier: 2.0
+        jitter: true
+        retryOn: ["network-error", "timeout", "server-error"]
+      transfers:
+        - name: critical-data-transfer
+          source: "https://critical-api.com/data.json"
+          destination: "/critical/data.json"
+          protocol: https
 
-            // Add jitter to prevent thundering herd
-            delay = delay * (0.5 + Math.random() * 0.5);
+    - name: conservative-retry-group
+      description: "Conservative retry for non-critical transfers"
+      retryPolicy:
+        maxAttempts: 3
+        initialDelay: "5s"
+        maxDelay: "5m"
+        backoffStrategy: exponential
+        backoffMultiplier: 1.5
+        jitter: false
+        retryOn: ["timeout", "connection-refused"]
+      transfers:
+        - name: optional-data-transfer
+          source: "ftp://optional-source.com/data.csv"
+          destination: "/optional/data.csv"
+          protocol: ftp
+```
 
-            // Cap at maximum delay
-            return Duration.ofMillis(Math.min((long) delay, maxDelay.toMillis()));
-        }
-    }
+#### **Per-Transfer Retry Configuration**
+```yaml
+metadata:
+  name: "Per-Transfer Retry Configuration"
+  version: "1.0.0"
+  description: "Individual retry settings for each transfer based on requirements"
+  type: "custom-retry-workflow"
+  author: "integration-team@company.com"
+  created: "2025-08-21"
+  tags: ["retry", "custom", "per-transfer"]
 
-    // Execute with retry logic
-    public <T> T executeWithRetry(Supplier<T> operation, RetryPolicy policy) {
-        Exception lastException = null;
+spec:
+  transferGroups:
+    - name: mixed-retry-requirements
+      transfers:
+        # High-priority transfer with aggressive retry
+        - name: financial-data
+          source: "sftp://bank.com/transactions.csv"
+          destination: "/finance/transactions.csv"
+          protocol: sftp
+          retryPolicy:
+            maxAttempts: 10
+            initialDelay: "100ms"
+            maxDelay: "1m"
+            backoffStrategy: exponential
+            backoffMultiplier: 1.2
+            jitter: true
+            retryOn: ["network-error", "authentication-error", "timeout"]
 
-        for (int attempt = 1; attempt <= policy.getMaxAttempts(); attempt++) {
-            try {
-                return operation.get();
-            } catch (Exception e) {
-                lastException = e;
+        # Medium-priority with standard retry
+        - name: customer-data
+          source: "https://crm.company.com/customers.json"
+          destination: "/customers/data.json"
+          protocol: https
+          retryPolicy:
+            maxAttempts: 3
+            initialDelay: "1s"
+            maxDelay: "30s"
+            backoffStrategy: exponential
+            backoffMultiplier: 2.0
+            retryOn: ["network-error", "server-error"]
 
-                if (!policy.shouldRetry(e, attempt)) {
-                    break;
-                }
-
-                // Calculate delay and wait
-                Duration delay = policy.calculateDelay(attempt);
-                logger.info("Transfer attempt {} failed, retrying in {}: {}",
-                           attempt, delay, e.getMessage());
-
-                try {
-                    Thread.sleep(delay.toMillis());
-                } catch (InterruptedException ie) {
-                    Thread.currentThread().interrupt();
-                    throw new TransferException("Retry interrupted", ie);
-                }
-            }
-        }
-
-        throw new TransferException("Transfer failed after " + policy.getMaxAttempts() + " attempts", lastException);
-    }
-}
+        # Low-priority with minimal retry
+        - name: logs-backup
+          source: "/logs/application.log"
+          destination: "s3://backups/logs/application.log"
+          protocol: https
+          retryPolicy:
+            maxAttempts: 2
+            initialDelay: "5s"
+            maxDelay: "10s"
+            backoffStrategy: fixed
+            retryOn: ["timeout"]
 ```
 
 **Retry Policy Features:**
@@ -1650,11 +3168,103 @@ graph TB
 - **Compliance Frameworks**: SOX, GDPR, HIPAA, PCI-DSS support
 - **Incident Response**: Automated alerting and response procedures
 
-## Core Functional Concepts
+*Note: Detailed core functional concepts and all Java implementation examples have been moved to [Part II: Technical Reference](#part-ii-technical-reference-developers) for better document organization. The following sections provide user-friendly examples and guides.*
 
-### Transfer Engine Concepts
+---
 
-#### Transfer Job Lifecycle
+## Basic File Transfers
+
+### Simple File Transfer Examples
+
+Let's start with some practical examples of common file transfer scenarios using YAML workflows.
+
+#### Example 1: Download a Daily Report
+
+```yaml
+metadata:
+  name: "Download Daily Sales Report"
+  version: "1.0.0"
+  description: "Downloads the daily sales report from our FTP server for business analysis and reporting"
+  type: "download-workflow"
+  author: "sales@company.com"
+  created: "2025-08-21"
+  tags: ["sales", "daily", "ftp", "business-intelligence"]
+
+spec:
+  transferGroups:
+    - name: download-report
+      transfers:
+        - name: get-sales-data
+          source: "ftp://reports.company.com/sales/daily-sales.csv"
+          destination: "/local/reports/sales/daily-sales.csv"
+          protocol: ftp
+          options:
+            username: "sales_user"
+            password: "{{env.FTP_PASSWORD}}"
+```
+
+#### Example 2: Upload Files to Cloud Storage
+
+```yaml
+metadata:
+  name: "Upload Backup Files"
+  version: "1.0.0"
+  description: "Uploads database backup files to cloud storage for disaster recovery and compliance"
+  type: "backup-workflow"
+  author: "backup@company.com"
+  created: "2025-08-21"
+  tags: ["backup", "cloud", "https", "disaster-recovery"]
+
+spec:
+  transferGroups:
+    - name: upload-backups
+      transfers:
+        - name: upload-database-backup
+          source: "/backups/database/daily-backup.sql"
+          destination: "https://storage.company.com/backups/database/daily-backup.sql"
+          protocol: https
+          options:
+            method: "PUT"
+            headers:
+              Authorization: "Bearer {{env.CLOUD_TOKEN}}"
+```
+
+#### Example 3: Synchronize Directories
+
+```yaml
+metadata:
+  name: "Sync Customer Files"
+  version: "1.0.0"
+  description: "Synchronizes customer files between primary and backup servers for data redundancy"
+  type: "sync-workflow"
+  author: "operations@company.com"
+  created: "2025-08-21"
+  tags: ["sync", "customer-data", "sftp", "redundancy"]
+
+spec:
+  transferGroups:
+    - name: sync-customer-data
+      transfers:
+        - name: sync-customer-files
+          source: "sftp://source.company.com/customer-data/"
+          destination: "sftp://backup.company.com/customer-data/"
+          protocol: sftp
+          options:
+            recursive: true
+            preserve_permissions: true
+            ssh_key: "/keys/backup-key.pem"
+```
+
+### Transfer Protocols Quick Reference
+
+| **Protocol** | **Best For** | **Example Use Case** |
+|--------------|--------------|---------------------|
+| **HTTPS** | Cloud APIs, web services | Uploading to cloud storage |
+| **FTP/FTPS** | Legacy systems, bulk transfers | Downloading reports from mainframe |
+| **SFTP** | Secure transfers, Unix systems | Syncing files between Linux servers |
+| **SMB** | Windows networks | Copying files to network shares |
+
+*Note: The following technical sections have been moved to Part II for better organization. Continue reading for multi-tenant operations and administration guides.*
 
 A **Transfer Job** represents a single file transfer operation with the following lifecycle:
 
@@ -1753,18 +3363,17 @@ A **Workflow Definition** is a declarative specification that orchestrates file 
 Let's begin with the simplest possible workflow that transfers a single file:
 
 ```yaml
-# Line 1: API version - specifies the Quorus workflow schema version
-apiVersion: quorus.dev/v1
-
-# Line 2: Resource type - tells Quorus this is a transfer workflow
-kind: TransferWorkflow
-
-# Lines 3-6: Basic metadata - minimum required information
+# Complete metadata section - all required fields for schema validation
 metadata:
-  name: simple-file-transfer          # Unique identifier for this workflow
-  description: Transfer a single file # Human-readable description
+  name: "Simple File Transfer"                      # Required: Human-readable name
+  version: "1.0.0"                                 # Required: Semantic version
+  description: "Transfer a single file from API to storage for data processing"  # Required: Business purpose (min 10 chars)
+  type: "transfer-workflow"                         # Required: Workflow classification
+  author: "data-team@company.com"                   # Required: Ownership/contact
+  created: "2025-08-21"                            # Required: Creation date (ISO format)
+  tags: ["simple", "api", "data-transfer"]          # Required: Classification tags
 
-# Lines 7-15: Workflow specification - the actual work to be done
+# Workflow specification - what actually happens
 spec:
   transferGroups:                     # Container for groups of related transfers
     - name: single-transfer           # Name of this transfer group
@@ -1772,41 +3381,49 @@ spec:
         - name: copy-data-file        # Name of this specific transfer
           source: "https://api.example.com/data.csv"    # Where to get the file
           destination: "/storage/data.csv"              # Where to put the file
+          protocol: https             # Transfer protocol
 ```
 
-**Line-by-Line Explanation:**
-- **Line 1**: `apiVersion` declares which version of the Quorus workflow schema to use
-- **Line 2**: `kind` specifies this is a TransferWorkflow (vs other resource types)
-- **Line 4**: `name` must be unique within the tenant/namespace and DNS-compliant
-- **Line 5**: `description` provides human-readable documentation
-- **Line 8**: `transferGroups` contains one or more groups of related transfers
-- **Line 9**: Each group has a `name` for identification and dependency management
-- **Line 10**: `transfers` lists the actual file transfer operations
-- **Line 11**: Each transfer has a unique `name` within the group
-- **Line 12**: `source` specifies where to retrieve the file (supports various protocols)
-- **Line 13**: `destination` specifies where to store the file
+**Field-by-Field Explanation:**
+
+**Metadata Section (Required for Schema Validation):**
+- **name**: Human-readable workflow identifier (2-100 characters)
+- **version**: Semantic version number (e.g., "1.0.0", "2.1.3")
+- **description**: Business purpose description (10-500 characters)
+- **type**: Workflow classification (e.g., "transfer-workflow", "data-pipeline-workflow")
+- **author**: Contact information (email address or name)
+- **created**: Creation date in ISO format (YYYY-MM-DD)
+- **tags**: Array of classification tags (lowercase, hyphen-separated)
+
+**Specification Section:**
+- **transferGroups**: Contains one or more groups of related transfers
+- **name**: Each group has a unique name for identification and dependency management
+- **transfers**: Lists the actual file transfer operations
+- **source**: Specifies where to retrieve the file (supports various protocols)
+- **destination**: Specifies where to store the file
+- **protocol**: Transfer protocol (https, ftp, sftp, smb)
 
 ##### Adding Basic Configuration - Intermediate Example
 
 Now let's add some basic configuration options:
 
 ```yaml
-apiVersion: quorus.dev/v1
-kind: TransferWorkflow
-
 metadata:
-  name: configured-file-transfer
-  description: Transfer with basic configuration options
-  # Line 6: Version helps track workflow changes over time
+  name: "Configured File Transfer"
   version: "1.0.0"
+  description: "Transfer with basic configuration options including variables and error handling"
+  type: "transfer-workflow"
+  author: "data-team@company.com"
+  created: "2025-08-21"
+  tags: ["configured", "api", "variables", "error-handling"]
 
 spec:
-  # Lines 9-11: Global variables that can be reused throughout the workflow
+  # Global variables that can be reused throughout the workflow
   variables:
     sourceUrl: "https://api.example.com"      # Base URL for API calls
     targetDir: "/storage/daily-imports"       # Base directory for files
 
-  # Lines 13-16: Execution configuration controls how transfers run
+  # Execution configuration controls how transfers run
   execution:
     strategy: sequential    # Run transfers one after another (vs parallel)
     timeout: 1800          # Maximum time in seconds (30 minutes)
@@ -1816,10 +3433,11 @@ spec:
     - name: daily-data-import
       transfers:
         - name: import-customers
-          # Lines 22-23: Using variables with {{variable}} syntax
+          # Using variables with {{variable}} syntax
           source: "{{sourceUrl}}/customers/export.csv"
           destination: "{{targetDir}}/customers.csv"
-          # Lines 24-28: Transfer-specific options
+          protocol: https
+          # Transfer-specific options
           options:
             timeout: 600              # Override global timeout (10 minutes)
             checksumValidation: true  # Verify file integrity after transfer
@@ -1827,10 +3445,11 @@ spec:
 ```
 
 **New Configuration Explained:**
-- **Line 6**: `version` enables tracking of workflow definition changes
-- **Lines 9-11**: `variables` section defines reusable values
-- **Line 10**: Variables can be referenced later using `{{variableName}}` syntax
-- **Lines 13-16**: `execution` section controls workflow-level behavior
+- **Complete Metadata**: All required fields for schema validation are included
+- **Variables Section**: Defines reusable values that can be referenced with `{{variableName}}` syntax
+- **Execution Section**: Controls workflow-level behavior including parallelism and timeouts
+- **Protocol Specification**: Each transfer now explicitly specifies the protocol to use
+- **Enhanced Options**: Transfer-specific options override global settings
 - **Line 14**: `strategy: sequential` means transfers run one at a time
 - **Line 15**: `timeout: 1800` sets maximum workflow execution time (30 minutes)
 - **Line 16**: `parallelism: 1` limits concurrent transfers
@@ -1844,14 +3463,15 @@ spec:
 Let's create a workflow with multiple stages that depend on each other:
 
 ```yaml
-apiVersion: quorus.dev/v1
-kind: TransferWorkflow
-
 metadata:
-  name: multi-stage-pipeline
-  description: Multi-stage data processing pipeline
+  name: "Multi-Stage Data Pipeline"
   version: "1.1.0"
-  # Lines 7-10: Labels help categorize and filter workflows
+  description: "Multi-stage data processing pipeline with extract, transform, and load phases"
+  type: "data-pipeline-workflow"
+  author: "data-engineering@company.com"
+  created: "2025-08-21"
+  tags: ["etl", "multi-stage", "data-warehouse", "sequential"]
+  # Optional labels for additional categorization
   labels:
     environment: production    # Environment designation
     department: finance       # Owning department
@@ -1929,13 +3549,14 @@ spec:
 Now let's add conditional execution based on business rules:
 
 ```yaml
-apiVersion: quorus.dev/v1
-kind: TransferWorkflow
-
 metadata:
-  name: conditional-business-pipeline
-  description: Business pipeline with conditional processing
+  name: "Conditional Business Pipeline"
   version: "2.0.0"
+  description: "Business pipeline with conditional processing based on data validation and business rules"
+  type: "business-workflow"
+  author: "business-intelligence@company.com"
+  created: "2025-08-21"
+  tags: ["conditional", "business-rules", "validation", "intelligent"]
   labels:
     environment: production
     criticality: high
@@ -2018,13 +3639,14 @@ spec:
 Finally, let's add comprehensive error handling and notifications for production use:
 
 ```yaml
-apiVersion: quorus.dev/v1
-kind: TransferWorkflow
-
 metadata:
-  name: production-financial-pipeline
-  description: Production-ready financial data pipeline with full error handling
+  name: "Production Financial Pipeline"
   version: "3.0.0"
+  description: "Production-ready financial data pipeline with comprehensive error handling and compliance features"
+  type: "financial-data-workflow"
+  author: "financial-systems@company.com"
+  created: "2025-08-21"
+  tags: ["production", "financial", "compliance", "error-handling", "sox"]
   # Line 8: Tenant specifies which organization owns this workflow
   tenant: acme-corporation
   # Line 10: Namespace provides additional isolation within the tenant
@@ -2299,10 +3921,14 @@ We've progressed through increasingly complex YAML configurations:
 
 **Essential Structure Pattern:**
 ```yaml
-apiVersion: quorus.dev/v1    # Always required - schema version
-kind: TransferWorkflow       # Always required - resource type
-metadata:                    # Always required - identification
-  name: workflow-name        # Always required - unique identifier
+metadata:                    # Always required - complete identification
+  name: "Workflow Name"      # Always required - human-readable name
+  version: "1.0.0"          # Always required - semantic version
+  description: "Purpose"     # Always required - business description
+  type: "workflow-type"      # Always required - workflow classification
+  author: "owner@company.com" # Always required - contact information
+  created: "2025-08-21"      # Always required - creation date
+  tags: ["tag1", "tag2"]     # Always required - classification tags
 spec:                        # Always required - workflow definition
   transferGroups:            # Always required - contains transfers
     - name: group-name       # Always required - group identifier
@@ -2310,6 +3936,7 @@ spec:                        # Always required - workflow definition
         - name: transfer-name # Always required - transfer identifier
           source: "..."       # Always required - source location
           destination: "..."  # Always required - destination location
+          protocol: https     # Always required - transfer protocol
 ```
 
 **Variable Usage Pattern:**
@@ -2455,14 +4082,16 @@ source: "https://api.company.com/orders"
 This progressive approach helps users understand YAML configuration by building from simple concepts to complex enterprise scenarios, with each example building on the previous one while introducing new concepts gradually.
 
 ```yaml
-# API version and resource type declaration
-apiVersion: quorus.dev/v1
-kind: TransferWorkflow
-
 # Metadata section - workflow identification and classification
 metadata:
-  # Unique workflow identifier (must be DNS-compliant)
-  name: enterprise-financial-data-pipeline
+  # Complete metadata required for schema validation
+  name: "Enterprise Financial Data Pipeline"
+  version: "1.0.0"
+  description: "Comprehensive financial data pipeline for enterprise reporting and compliance"
+  type: "financial-data-workflow"
+  author: "financial-engineering@company.com"
+  created: "2025-08-21"
+  tags: ["enterprise", "financial", "compliance", "reporting"]
 
   # Human-readable description for documentation
   description: |
@@ -3733,81 +5362,181 @@ variables:
 
 ##### Variable Validation and Error Handling
 
-**Type Validation:**
-```java
-public class VariableValidator {
-    public ValidationResult validateVariable(String name, Object value, VariableDefinition definition) {
-        // Type checking
-        if (!isCorrectType(value, definition.getType())) {
-            return ValidationResult.error("Variable '" + name + "' expected type " +
-                                        definition.getType() + " but got " + value.getClass());
-        }
+**Variable Validation in YAML Workflows:**
 
-        // Range validation for numbers
-        if (definition.getType() == VariableType.NUMBER) {
-            Number numValue = (Number) value;
-            if (definition.hasMinValue() && numValue.doubleValue() < definition.getMinValue()) {
-                return ValidationResult.error("Variable '" + name + "' value " + numValue +
-                                            " is below minimum " + definition.getMinValue());
-            }
-            if (definition.hasMaxValue() && numValue.doubleValue() > definition.getMaxValue()) {
-                return ValidationResult.error("Variable '" + name + "' value " + numValue +
-                                            " exceeds maximum " + definition.getMaxValue());
-            }
-        }
+```yaml
+metadata:
+  name: "Variable Validation Example"
+  version: "1.0.0"
+  description: "Demonstrates variable validation patterns and error handling"
+  type: "validation-workflow"
+  author: "config-team@company.com"
+  created: "2025-08-21"
+  tags: ["validation", "variables", "error-handling"]
 
-        // Pattern validation for strings
-        if (definition.getType() == VariableType.STRING && definition.hasPattern()) {
-            String strValue = (String) value;
-            if (!strValue.matches(definition.getPattern())) {
-                return ValidationResult.error("Variable '" + name + "' value '" + strValue +
-                                            "' does not match pattern " + definition.getPattern());
-            }
-        }
+spec:
+  # Variable definitions with validation rules
+  variableDefinitions:
+    # String validation with pattern
+    - name: "environment"
+      type: "string"
+      required: true
+      pattern: "^(production|staging|development)$"
+      description: "Deployment environment"
 
-        return ValidationResult.success();
-    }
-}
+    # Number validation with range
+    - name: "maxConcurrentTransfers"
+      type: "number"
+      required: true
+      minimum: 1
+      maximum: 100
+      description: "Maximum concurrent transfers allowed"
+
+    # Boolean validation
+    - name: "enableRetries"
+      type: "boolean"
+      required: false
+      default: true
+      description: "Whether to enable retry logic"
+
+    # Array validation
+    - name: "allowedProtocols"
+      type: "array"
+      required: true
+      items:
+        type: "string"
+        enum: ["http", "https", "ftp", "sftp", "smb"]
+      description: "List of allowed transfer protocols"
+
+  # Variables with validation
+  variables:
+    environment: "{{env.DEPLOYMENT_ENV | default('development')}}"
+    maxConcurrentTransfers: "{{env.MAX_TRANSFERS | default(10) | toNumber}}"
+    enableRetries: "{{env.ENABLE_RETRIES | default('true') | toBoolean}}"
+    allowedProtocols: ["https", "sftp"]
+
+    # Conditional validation
+    apiEndpoint: "{{if(eq(environment, 'production'),
+                      'https://api.company.com',
+                      if(eq(environment, 'staging'),
+                         'https://api-staging.company.com',
+                         'http://localhost:8080'))}}"
+
+  transferGroups:
+    - name: validated-transfers
+      transfers:
+        - name: environment-aware-transfer
+          source: "{{apiEndpoint}}/data.json"
+          destination: "/data/environment-data.json"
+          protocol: "{{first(allowedProtocols)}}"
+          options:
+            maxRetries: "{{if(enableRetries, 3, 0)}}"
+            concurrency: "{{maxConcurrentTransfers}}"
 ```
 
-**Circular Reference Detection:**
-```java
-public class CircularReferenceDetector {
-    public void detectCircularReferences(Map<String, String> variables) {
-        Set<String> visiting = new HashSet<>();
-        Set<String> visited = new HashSet<>();
+**Error Handling for Variable Issues:**
 
-        for (String variable : variables.keySet()) {
-            if (!visited.contains(variable)) {
-                detectCircularReferenceDFS(variable, variables, visiting, visited);
-            }
-        }
-    }
+```yaml
+metadata:
+  name: "Variable Error Handling"
+  version: "1.0.0"
+  description: "Demonstrates error handling for variable resolution issues"
+  type: "error-handling-workflow"
+  author: "reliability-team@company.com"
+  created: "2025-08-21"
+  tags: ["error-handling", "variables", "fallback"]
 
-    private void detectCircularReferenceDFS(String variable, Map<String, String> variables,
-                                          Set<String> visiting, Set<String> visited) {
-        if (visiting.contains(variable)) {
-            throw new CircularReferenceException("Circular reference detected involving variable: " + variable);
-        }
+spec:
+  variables:
+    # Variable with fallback chain
+    primarySource: "{{env.PRIMARY_SOURCE |
+                     fallback(env.BACKUP_SOURCE) |
+                     fallback('https://default-api.com')}}"
 
-        if (visited.contains(variable)) {
-            return;
-        }
+    # Variable with validation and error message
+    requiredConfig: "{{env.REQUIRED_CONFIG |
+                       required('REQUIRED_CONFIG environment variable must be set')}}"
 
-        visiting.add(variable);
+    # Variable with type conversion and validation
+    numericSetting: "{{env.NUMERIC_SETTING |
+                       toNumber |
+                       validate('must be between 1 and 100', gte(1), lte(100))}}"
 
-        // Find all variables referenced by this variable
-        Set<String> referencedVariables = extractVariableReferences(variables.get(variable));
-        for (String referenced : referencedVariables) {
-            if (variables.containsKey(referenced)) {
-                detectCircularReferenceDFS(referenced, variables, visiting, visited);
-            }
-        }
+    # Safe variable resolution with try-catch
+    optionalFeature: "{{try(env.OPTIONAL_FEATURE | toBoolean, false)}}"
 
-        visiting.remove(variable);
-        visited.add(variable);
-    }
-}
+  # Error handling configuration
+  errorHandling:
+    onVariableError: "fail-fast"  # or "use-default", "skip-transfer"
+    logLevel: "ERROR"
+    notifyOnError: true
+
+  transferGroups:
+    - name: error-resilient-transfers
+      transfers:
+        - name: primary-transfer
+          source: "{{primarySource}}/data.json"
+          destination: "/data/primary.json"
+          protocol: https
+          onError:
+            action: "retry"
+            maxAttempts: 3
+
+        - name: conditional-transfer
+          # Only execute if optional feature is enabled
+          condition: "{{optionalFeature}}"
+          source: "{{primarySource}}/optional.json"
+          destination: "/data/optional.json"
+          protocol: https
+```
+
+**Preventing Circular References:**
+
+```yaml
+metadata:
+  name: "Safe Variable References"
+  version: "1.0.0"
+  description: "Examples of safe variable referencing to avoid circular dependencies"
+  type: "safe-variables-workflow"
+  author: "config-team@company.com"
+  created: "2025-08-21"
+  tags: ["variables", "safe-patterns", "best-practices"]
+
+spec:
+  variables:
+    # ✅ GOOD: Linear dependency chain
+    baseUrl: "https://api.company.com"
+    apiVersion: "v2"
+    fullApiUrl: "{{baseUrl}}/{{apiVersion}}"
+    dataEndpoint: "{{fullApiUrl}}/data"
+
+    # ✅ GOOD: Independent variables
+    environment: "{{env.ENVIRONMENT}}"
+    region: "{{env.AWS_REGION}}"
+
+    # ✅ GOOD: Using built-in functions (no circular risk)
+    today: "{{date.today}}"
+    timestamp: "{{date.now}}"
+
+    # ❌ BAD: Would cause circular reference (detected and prevented)
+    # varA: "{{varB}}/path"
+    # varB: "{{varA}}/other"
+
+    # ✅ GOOD: Conditional logic without circular references
+    sourceType: "{{env.SOURCE_TYPE | default('api')}}"
+    sourceUrl: "{{if(eq(sourceType, 'api'),
+                    'https://api.company.com',
+                    if(eq(sourceType, 'ftp'),
+                       'ftp://files.company.com',
+                       'file:///local/data'))}}"
+
+  transferGroups:
+    - name: safe-variable-usage
+      transfers:
+        - name: data-transfer
+          source: "{{dataEndpoint}}"
+          destination: "/data/{{format(today, 'yyyy-MM-dd')}}/data.json"
+          protocol: https
 ```
 
 This comprehensive variable resolution system enables workflows to be highly dynamic and adaptable while maintaining type safety and preventing common configuration errors.
@@ -4076,11 +5805,15 @@ curl http://localhost:8080/api/v1/transfers/{job-id}/progress
 ### Basic Workflow Structure
 
 ```yaml
-apiVersion: quorus.dev/v1
-kind: TransferWorkflow
 metadata:
-  name: daily-data-sync
-  description: Daily synchronization of corporate data
+  name: "Daily Data Sync"
+  version: "1.0.0"
+  description: "Daily synchronization of corporate data across multiple systems for business intelligence"
+  type: "sync-workflow"
+  author: "data-ops@acme-corp.com"
+  created: "2025-08-21"
+  tags: ["daily", "sync", "corporate", "multi-tenant"]
+  # Multi-tenant specific metadata
   tenant: acme-corp
   namespace: finance
 
@@ -4863,12 +6596,15 @@ X-Namespace: finance
 X-Execution-Mode: normal  # normal, dry-run, virtual-run
 
 # YAML workflow definition
-apiVersion: quorus.dev/v1
-kind: TransferWorkflow
 metadata:
-  name: daily-financial-sync
-  description: Daily synchronization of financial data across systems
+  name: "Daily Financial Sync"
   version: "2.1.0"
+  description: "Daily synchronization of financial data across systems for regulatory reporting and analysis"
+  type: "financial-sync-workflow"
+  author: "financial-ops@acme-corp.com"
+  created: "2025-08-21"
+  tags: ["daily", "financial", "sync", "regulatory"]
+  # Multi-tenant metadata
   tenant: acme-corp
   namespace: finance
   labels:
@@ -6249,6 +7985,65 @@ resources:
 - **Email**: support@quorus.dev
 - **Documentation**: https://docs.quorus.dev
 - **Training**: https://training.quorus.dev
+
+---
+
+# Part II: Technical Reference (Developers)
+
+*This section contains detailed technical information, Java code examples, and implementation details primarily intended for developers and system architects.*
+
+## System Architecture & Design
+
+This section contains the detailed technical architecture information including:
+
+- **Distributed System Architecture** - Controller clusters, agent fleets, and consensus mechanisms
+- **Job Scheduling** - Intelligent assignment algorithms and load balancing strategies
+- **State Management** - Cluster-wide state consistency and synchronization
+- **Agent Fleet Management** - Real-time monitoring and health management
+- **Workflow Orchestration** - Complex multi-step workflow coordination
+- **Resource Allocation** - Tenant quotas and resource distribution
+- **High Availability** - Raft consensus, leader election, and fault tolerance
+- **Geographic Distribution** - Multi-AZ deployment and disaster recovery
+
+*[Detailed technical content and Java examples from the main document will be consolidated here in a future update]*
+
+## Core Functional Concepts
+
+This section contains the detailed functional implementation including:
+
+- **Transfer Engine Concepts** - Job lifecycle and state management
+- **Protocol Support** - HTTP/HTTPS, FTP, SFTP, SMB implementations
+- **Concurrent Transfers** - Parallelism and capacity management
+- **Progress Tracking** - Real-time monitoring and rate calculation
+- **Integrity Verification** - Checksum validation and corruption detection
+- **Retry Logic** - Exponential backoff and configurable retry policies
+- **Variable Resolution** - Template processing and environment substitution
+
+*[Detailed technical content and Java examples from the main document will be consolidated here in a future update]*
+
+## Java API Reference
+
+This section will contain comprehensive Java API documentation including:
+
+- **Core Classes** - TransferEngine, WorkflowOrchestrator, JobScheduler
+- **Configuration APIs** - Programmatic workflow creation and management
+- **Monitoring APIs** - Progress tracking and metrics collection
+- **Extension Points** - Custom protocol handlers and plugins
+- **Integration Examples** - Spring Boot, enterprise framework integration
+
+*[All Java code examples from the main document will be consolidated here in a future update]*
+
+## Advanced Configuration
+
+This section will contain advanced technical configuration including:
+
+- **Cluster Configuration** - Raft settings, network topology, security
+- **Performance Tuning** - JVM settings, resource allocation, optimization
+- **Security Configuration** - TLS, authentication, authorization, compliance
+- **Monitoring Setup** - Metrics, logging, alerting, dashboards
+- **Troubleshooting** - Common issues, debugging, performance analysis
+
+*[Advanced technical configuration will be documented here in a future update]*
 
 ---
 

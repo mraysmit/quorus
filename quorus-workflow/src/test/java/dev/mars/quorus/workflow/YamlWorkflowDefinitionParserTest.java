@@ -168,9 +168,11 @@ class YamlWorkflowDefinitionParserTest {
                 metadata:
                   name: "Validation Test Workflow"
                   version: "1.0.0"
-                  description: "Test workflow for validation"
+                  description: "Test workflow for validation with comprehensive metadata"
                   type: "validation-test-workflow"
-                  author: "Quorus Test Suite"
+                  author: "test@quorus.dev"
+                  created: "2025-08-21"
+                  tags: ["test", "validation", "workflow"]
 
                 # ============================================================================
 
@@ -229,9 +231,11 @@ class YamlWorkflowDefinitionParserTest {
                 metadata:
                   name: "Dependency Graph Test Workflow"
                   version: "1.0.0"
-                  description: "Test workflow for dependency graph building"
+                  description: "Test workflow for dependency graph building with complete metadata"
                   type: "dependency-graph-test-workflow"
-                  author: "Quorus Test Suite"
+                  author: "test@quorus.dev"
+                  created: "2025-08-21"
+                  tags: ["test", "dependency", "graph"]
 
                 # ============================================================================
 
@@ -281,9 +285,11 @@ class YamlWorkflowDefinitionParserTest {
                 metadata:
                   name: "Schema Validation Test"
                   version: "1.0.0"
-                  description: "Test workflow for schema validation"
+                  description: "Test workflow for schema validation with complete metadata"
                   type: "schema-test-workflow"
-                  author: "Quorus Test Suite"
+                  author: "test@quorus.dev"
+                  created: "2025-08-21"
+                  tags: ["test", "schema", "validation"]
 
                 # ============================================================================
 

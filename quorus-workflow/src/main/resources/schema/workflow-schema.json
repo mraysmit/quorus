@@ -1,0 +1,220 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quorus.dev/schemas/workflow-v1.json",
+  "title": "Quorus Workflow Definition Schema",
+  "description": "JSON Schema for validating Quorus workflow YAML definitions",
+  "type": "object",
+  "required": ["metadata", "spec"],
+  "properties": {
+    "apiVersion": {
+      "type": "string",
+      "description": "API version for backward compatibility",
+      "default": "v1",
+      "pattern": "^v[0-9]+$"
+    },
+    "kind": {
+      "type": "string",
+      "description": "Legacy field for backward compatibility - use metadata.type instead",
+      "deprecated": true,
+      "enum": ["TransferWorkflow", "DataPipeline", "Workflow"]
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Standard metadata header for workflow identification and classification",
+      "required": ["name", "version", "description", "type", "author", "created", "tags"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Unique workflow name identifier",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9\\s\\-_]*[a-zA-Z0-9]$"
+        },
+        "version": {
+          "type": "string",
+          "description": "Semantic version number",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-[a-zA-Z0-9\\-]+)?(\\+[a-zA-Z0-9\\-]+)?$"
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable workflow description",
+          "minLength": 10,
+          "maxLength": 500
+        },
+        "type": {
+          "type": "string",
+          "description": "Workflow type classification",
+          "minLength": 1,
+          "maxLength": 50,
+          "pattern": "^[a-z][a-z0-9\\-]*[a-z0-9]$",
+          "examples": [
+            "transfer-workflow",
+            "data-pipeline-workflow", 
+            "download-workflow",
+            "validation-test-workflow",
+            "external-data-config"
+          ]
+        },
+        "author": {
+          "type": "string",
+          "description": "Author contact information (email preferred)",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$|^[a-zA-Z\\s]+$"
+        },
+        "created": {
+          "type": "string",
+          "description": "Creation date in ISO format (YYYY-MM-DD)",
+          "format": "date",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        },
+        "tags": {
+          "type": "array",
+          "description": "Classification tags for categorization and search",
+          "minItems": 1,
+          "maxItems": 20,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 30,
+            "pattern": "^[a-z][a-z0-9\\-]*[a-z0-9]$"
+          },
+          "uniqueItems": true,
+          "examples": [
+            ["examples", "database", "data-sources"],
+            ["production", "etl", "pipeline"],
+            ["test", "validation", "workflow"]
+          ]
+        },
+        "labels": {
+          "type": "object",
+          "description": "Optional key-value metadata for additional classification",
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "maxProperties": 20
+        }
+      },
+      "additionalProperties": false
+    },
+    "spec": {
+      "type": "object",
+      "description": "Workflow specification defining execution behavior",
+      "required": ["execution", "transferGroups"],
+      "properties": {
+        "variables": {
+          "type": "object",
+          "description": "Global variables available to all transfer groups",
+          "additionalProperties": true
+        },
+        "execution": {
+          "type": "object",
+          "description": "Execution configuration",
+          "required": ["parallelism"],
+          "properties": {
+            "dryRun": {
+              "type": "boolean",
+              "default": false
+            },
+            "virtualRun": {
+              "type": "boolean", 
+              "default": false
+            },
+            "parallelism": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "timeout": {
+              "type": "string",
+              "pattern": "^[0-9]+[smh]$"
+            },
+            "strategy": {
+              "type": "string",
+              "enum": ["sequential", "parallel"]
+            }
+          },
+          "additionalProperties": false
+        },
+        "transferGroups": {
+          "type": "array",
+          "description": "List of transfer groups defining workflow steps",
+          "minItems": 0,
+          "items": {
+            "type": "object",
+            "required": ["name"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 50,
+                "pattern": "^[a-zA-Z0-9][a-zA-Z0-9\\-_]*[a-zA-Z0-9]$"
+              },
+              "description": {
+                "type": "string",
+                "maxLength": 200
+              },
+              "dependsOn": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "continueOnError": {
+                "type": "boolean",
+                "default": false
+              },
+              "retryCount": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10
+              },
+              "variables": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "transfers": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["name", "source", "destination"],
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 50
+                    },
+                    "source": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "destination": {
+                      "type": "string", 
+                      "minLength": 1
+                    },
+                    "protocol": {
+                      "type": "string",
+                      "enum": ["http", "https", "file", "ftp", "sftp"]
+                    },
+                    "condition": {
+                      "type": "string"
+                    },
+                    "options": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

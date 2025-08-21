@@ -36,6 +36,21 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+/**
+ * Tests for SimpleWorkflowEngine functionality.
+ *
+ * NOTE: These tests have been updated to comply with the new YAML schema validation requirements.
+ * All test workflows now include complete metadata with required fields:
+ * - name: Descriptive workflow name (2-100 characters)
+ * - version: Semantic version (e.g., "1.0.0")
+ * - description: Workflow description (10-500 characters)
+ * - type: Workflow type (e.g., "validation-test-workflow")
+ * - author: Email address or name
+ * - created: ISO date format (YYYY-MM-DD)
+ * - tags: Array of lowercase tags with hyphens
+ *
+ * Tests that intentionally fail validation are clearly marked and documented.
+ */
 class SimpleWorkflowEngineTest {
     
     @Mock
@@ -225,6 +240,10 @@ class SimpleWorkflowEngineTest {
         assertTrue(execution.getErrorMessage().get().contains("validation failed"));
     }
     
+    /**
+     * Creates a test workflow with complete metadata that satisfies the new schema validation requirements.
+     * All required metadata fields are included to ensure validation passes.
+     */
     private WorkflowDefinition createTestWorkflow() {
         TransferGroup.TransferDefinition transfer = new TransferGroup.TransferDefinition(
                 "test-transfer",
@@ -234,7 +253,7 @@ class SimpleWorkflowEngineTest {
                 Map.of(),
                 null
         );
-        
+
         TransferGroup group = new TransferGroup(
                 "test-group",
                 "Test group",
@@ -245,24 +264,35 @@ class SimpleWorkflowEngineTest {
                 false,
                 0
         );
-        
+
+        // Create metadata with all required fields for schema validation
         WorkflowDefinition.WorkflowMetadata metadata = new WorkflowDefinition.WorkflowMetadata(
-                "test-workflow", "Test workflow", Map.of()
+                "Test Workflow Engine",                    // name - required, descriptive
+                "1.0.0",                                   // version - required, semantic versioning
+                "Test workflow for SimpleWorkflowEngine unit tests", // description - required, min 10 chars
+                "validation-test-workflow",                // type - required, standard type
+                "test@quorus.dev",                         // author - required, email format
+                "2025-08-21",                              // created - required, ISO date
+                List.of("test", "unit-test", "engine"),    // tags - required, valid format
+                Map.of("environment", "test", "suite", "unit") // labels - optional
         );
-        
+
         WorkflowDefinition.ExecutionConfig execution = new WorkflowDefinition.ExecutionConfig(
                 false, false, 1, Duration.ofHours(1), "sequential"
         );
-        
+
         WorkflowDefinition.WorkflowSpec spec = new WorkflowDefinition.WorkflowSpec(
                 Map.of(),
                 execution,
                 List.of(group)
         );
-        
+
         return new WorkflowDefinition("v1", "TransferWorkflow", metadata, spec);
     }
     
+    /**
+     * Creates a test workflow with variables and complete metadata for variable resolution testing.
+     */
     private WorkflowDefinition createWorkflowWithVariables() {
         TransferGroup.TransferDefinition transfer = new TransferGroup.TransferDefinition(
                 "test-transfer",
@@ -272,7 +302,7 @@ class SimpleWorkflowEngineTest {
                 Map.of(),
                 null
         );
-        
+
         TransferGroup group = new TransferGroup(
                 "test-group",
                 "Test group",
@@ -283,39 +313,63 @@ class SimpleWorkflowEngineTest {
                 false,
                 0
         );
-        
+
+        // Create metadata with all required fields for schema validation
         WorkflowDefinition.WorkflowMetadata metadata = new WorkflowDefinition.WorkflowMetadata(
-                "test-workflow", "Test workflow", Map.of()
+                "Variable Resolution Test Workflow",       // name - required, descriptive
+                "1.0.0",                                   // version - required, semantic versioning
+                "Test workflow for variable resolution functionality", // description - required
+                "validation-test-workflow",                // type - required, standard type
+                "test@quorus.dev",                         // author - required, email format
+                "2025-08-21",                              // created - required, ISO date
+                List.of("test", "variables", "resolution"), // tags - required, valid format
+                Map.of("environment", "test", "feature", "variables") // labels - optional
         );
-        
+
         WorkflowDefinition.ExecutionConfig execution = new WorkflowDefinition.ExecutionConfig(
                 false, false, 1, Duration.ofHours(1), "sequential"
         );
-        
+
         WorkflowDefinition.WorkflowSpec spec = new WorkflowDefinition.WorkflowSpec(
                 Map.of("baseUrl", "https://default.com", "outputDir", "/default"),
                 execution,
                 List.of(group)
         );
-        
+
         return new WorkflowDefinition("v1", "TransferWorkflow", metadata, spec);
     }
     
+    /**
+     * Creates an intentionally invalid workflow for testing validation failure scenarios.
+     * This workflow has multiple validation issues:
+     * - Empty name (fails minimum length requirement)
+     * - Missing required metadata fields (version, type, author, created, tags)
+     * - Empty transfer groups
+     *
+     * This test verifies that the validation system correctly rejects invalid workflows.
+     */
     private WorkflowDefinition createInvalidWorkflow() {
         WorkflowDefinition.WorkflowMetadata metadata = new WorkflowDefinition.WorkflowMetadata(
-                "", "Invalid workflow", Map.of() // Empty name should cause validation failure
+                "",                                        // name - INTENTIONALLY INVALID (empty)
+                "",                                        // version - INTENTIONALLY INVALID (empty)
+                "Invalid workflow for testing",            // description - valid
+                "",                                        // type - INTENTIONALLY INVALID (empty)
+                "",                                        // author - INTENTIONALLY INVALID (empty)
+                "",                                        // created - INTENTIONALLY INVALID (empty)
+                List.of(),                                 // tags - INTENTIONALLY INVALID (empty)
+                Map.of()                                   // labels - valid (optional)
         );
-        
+
         WorkflowDefinition.ExecutionConfig execution = new WorkflowDefinition.ExecutionConfig(
                 false, false, 1, Duration.ofHours(1), "sequential"
         );
-        
+
         WorkflowDefinition.WorkflowSpec spec = new WorkflowDefinition.WorkflowSpec(
                 Map.of(),
                 execution,
-                List.of() // Empty transfer groups
+                List.of() // Empty transfer groups - also invalid
         );
-        
+
         return new WorkflowDefinition("v1", "TransferWorkflow", metadata, spec);
     }
     

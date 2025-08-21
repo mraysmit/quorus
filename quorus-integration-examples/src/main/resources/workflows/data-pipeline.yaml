@@ -1,9 +1,11 @@
 metadata:
   name: "Data Processing Pipeline"
   version: "2.1.0"
-  description: "Multi-stage data processing pipeline with dependencies"
+  description: "Multi-stage data processing pipeline with dependencies and parallel execution capabilities"
   type: "data-pipeline-workflow"
-  author: "Quorus Data Engineering Team"
+  author: "data-engineering@quorus.dev"
+  created: "2025-08-21"
+  tags: ["examples", "data-pipeline", "etl", "parallel", "dependencies"]
 
 # ============================================================================
 

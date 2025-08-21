@@ -1,0 +1,126 @@
+metadata:
+  name: "Database Data Sources Example"
+  version: "1.0.0"
+  description: "Example configuration showing different database data source setups with comprehensive validation"
+  type: "external-data-config"
+  author: "apex.examples@company.com"
+  created: "2025-08-21"
+  tags: ["examples", "database", "data-sources", "postgresql", "mysql", "h2"]
+  labels:
+    environment: "production"
+    team: "data-engineering"
+    category: "configuration"
+
+# ============================================================================
+
+spec:
+  variables:
+    # Database connection settings
+    dbHost: "localhost"
+    dbPort: "5432"
+    dbName: "quorus_data"
+    dbUser: "quorus_user"
+    
+    # File paths
+    configDir: "/etc/quorus/config"
+    dataDir: "/var/lib/quorus/data"
+    logDir: "/var/log/quorus"
+    
+    # Processing settings
+    batchSize: "1000"
+    timeout: "300s"
+    retryAttempts: "3"
+    
+  execution:
+    dryRun: false
+    virtualRun: false
+    parallelism: 2
+    timeout: 1800s
+    strategy: sequential
+    
+  transferGroups:
+    # Stage 1: Setup configuration files
+    - name: setup-configuration
+      description: Download and setup database configuration files
+      continueOnError: false
+      retryCount: 3
+      transfers:
+        - name: download-db-config
+          source: "https://config.example.com/database/postgresql.conf"
+          destination: "{{configDir}}/postgresql.conf"
+          protocol: https
+          options:
+            timeout: "{{timeout}}"
+            validateCertificate: true
+            
+        - name: download-connection-config
+          source: "https://config.example.com/database/connections.yaml"
+          destination: "{{configDir}}/connections.yaml"
+          protocol: https
+          options:
+            timeout: "{{timeout}}"
+            
+    # Stage 2: Initialize database schemas
+    - name: initialize-schemas
+      description: Setup database schemas and initial data
+      dependsOn:
+        - setup-configuration
+      continueOnError: false
+      retryCount: 2
+      variables:
+        schemaVersion: "v1.2.0"
+      transfers:
+        - name: download-schema-ddl
+          source: "https://schemas.example.com/{{schemaVersion}}/create_tables.sql"
+          destination: "{{dataDir}}/schema/create_tables.sql"
+          protocol: https
+          condition: "file_exists('{{configDir}}/postgresql.conf')"
+          
+        - name: download-initial-data
+          source: "https://data.example.com/{{schemaVersion}}/initial_data.sql"
+          destination: "{{dataDir}}/schema/initial_data.sql"
+          protocol: https
+          
+    # Stage 3: Load reference data
+    - name: load-reference-data
+      description: Load reference and lookup data
+      dependsOn:
+        - initialize-schemas
+      continueOnError: true
+      retryCount: 1
+      transfers:
+        - name: download-country-codes
+          source: "https://reference.example.com/country_codes.csv"
+          destination: "{{dataDir}}/reference/country_codes.csv"
+          protocol: https
+          options:
+            chunkSize: "{{batchSize}}"
+            
+        - name: download-currency-rates
+          source: "https://reference.example.com/currency_rates.json"
+          destination: "{{dataDir}}/reference/currency_rates.json"
+          protocol: https
+          
+        - name: download-timezone-data
+          source: "https://reference.example.com/timezones.xml"
+          destination: "{{dataDir}}/reference/timezones.xml"
+          protocol: https
+          
+    # Stage 4: Validation and verification
+    - name: validate-setup
+      description: Validate database setup and data integrity
+      dependsOn:
+        - load-reference-data
+      continueOnError: false
+      transfers:
+        - name: download-validation-scripts
+          source: "https://validation.example.com/db_validation.sh"
+          destination: "{{dataDir}}/scripts/db_validation.sh"
+          protocol: https
+          options:
+            executable: true
+            
+        - name: download-test-queries
+          source: "https://validation.example.com/test_queries.sql"
+          destination: "{{dataDir}}/scripts/test_queries.sql"
+          protocol: https

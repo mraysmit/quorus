@@ -1,0 +1,246 @@
+metadata:
+  name: "Monthly Financial Reporting Pipeline"
+  version: "2.0.1"
+  description: "Automated monthly financial report generation with regulatory compliance checks and multi-format output"
+  type: "etl-workflow"
+  author: "finance-automation@company.com"
+  created: "2025-08-21"
+  tags: ["finance", "reporting", "compliance", "monthly", "automated", "regulatory"]
+  labels:
+    environment: "production"
+    team: "finance"
+    schedule: "monthly"
+    compliance: "sox-required"
+    retention: "7-years"
+
+# ============================================================================
+
+spec:
+  variables:
+    # Database connections
+    financialDb: "postgresql://finance:5432/accounting"
+    complianceDb: "postgresql://compliance:5432/regulatory"
+    auditDb: "postgresql://audit:5432/trails"
+    
+    # API endpoints
+    complianceApi: "https://compliance.company.com/api"
+    regulatoryApi: "https://regulatory.gov/api"
+    auditApi: "https://audit.company.com/api"
+    
+    # File paths
+    reportPath: "/reports/monthly"
+    templatePath: "/templates/financial"
+    archivePath: "/archive/reports"
+    compliancePath: "/compliance/submissions"
+    
+    # Report settings
+    reportMonth: "{{current_month}}"
+    reportYear: "{{current_year}}"
+    fiscalQuarter: "{{current_quarter}}"
+    
+    # Processing settings
+    timeout: "300s"
+    retryAttempts: "2"
+    
+  execution:
+    dryRun: false
+    virtualRun: false
+    parallelism: 2
+    timeout: 7200s
+    strategy: sequential
+    
+  transferGroups:
+    # Stage 1: Data Extraction
+    - name: extract-financial-data
+      description: Extract monthly financial data from various sources
+      continueOnError: false
+      retryCount: 3
+      variables:
+        extractionDate: "{{report_date}}"
+      transfers:
+        - name: extract-general-ledger
+          source: "{{financialDb}}/general_ledger"
+          destination: "{{reportPath}}/raw/general-ledger-{{reportMonth}}.csv"
+          protocol: database
+          options:
+            query: "SELECT * FROM general_ledger WHERE month = '{{reportMonth}}' AND year = '{{reportYear}}'"
+            timeout: "{{timeout}}"
+            
+        - name: extract-trial-balance
+          source: "{{financialDb}}/trial_balance"
+          destination: "{{reportPath}}/raw/trial-balance-{{reportMonth}}.csv"
+          protocol: database
+          options:
+            query: "SELECT * FROM trial_balance WHERE period = '{{reportMonth}}-{{reportYear}}'"
+            
+        - name: extract-cash-flows
+          source: "{{financialDb}}/cash_flows"
+          destination: "{{reportPath}}/raw/cash-flows-{{reportMonth}}.csv"
+          protocol: database
+          
+        - name: extract-accounts-receivable
+          source: "{{financialDb}}/accounts_receivable"
+          destination: "{{reportPath}}/raw/ar-{{reportMonth}}.csv"
+          protocol: database
+          
+        - name: extract-accounts-payable
+          source: "{{financialDb}}/accounts_payable"
+          destination: "{{reportPath}}/raw/ap-{{reportMonth}}.csv"
+          protocol: database
+          
+    # Stage 2: Data Transformation and Validation
+    - name: transform-and-validate
+      description: Transform raw data and perform validation checks
+      dependsOn:
+        - extract-financial-data
+      continueOnError: false
+      retryCount: 2
+      transfers:
+        - name: reconcile-accounts
+          source: "{{reportPath}}/raw/general-ledger-{{reportMonth}}.csv"
+          destination: "{{reportPath}}/processed/reconciled-accounts-{{reportMonth}}.csv"
+          protocol: file
+          options:
+            transformation: "reconciliation"
+            
+        - name: calculate-financial-ratios
+          source: "{{reportPath}}/processed/reconciled-accounts-{{reportMonth}}.csv"
+          destination: "{{reportPath}}/processed/financial-ratios-{{reportMonth}}.json"
+          protocol: file
+          
+        - name: validate-balance-sheet
+          source: "{{reportPath}}/processed/reconciled-accounts-{{reportMonth}}.csv"
+          destination: "{{reportPath}}/validation/balance-sheet-validation-{{reportMonth}}.json"
+          protocol: file
+          condition: "success(reconcile-accounts)"
+          
+        - name: validate-income-statement
+          source: "{{reportPath}}/raw/trial-balance-{{reportMonth}}.csv"
+          destination: "{{reportPath}}/validation/income-statement-validation-{{reportMonth}}.json"
+          protocol: file
+          
+    # Stage 3: Compliance Checks
+    - name: compliance-validation
+      description: Perform regulatory compliance checks
+      dependsOn:
+        - transform-and-validate
+      continueOnError: false
+      retryCount: 2
+      transfers:
+        - name: sox-compliance-check
+          source: "{{reportPath}}/processed/reconciled-accounts-{{reportMonth}}.csv"
+          destination: "{{complianceApi}}/sox/validate"
+          protocol: https
+          options:
+            compliance_type: "sox"
+            period: "{{reportMonth}}-{{reportYear}}"
+            
+        - name: gaap-compliance-check
+          source: "{{reportPath}}/processed/financial-ratios-{{reportMonth}}.json"
+          destination: "{{complianceApi}}/gaap/validate"
+          protocol: https
+          
+        - name: regulatory-filing-check
+          source: "{{reportPath}}/validation/balance-sheet-validation-{{reportMonth}}.json"
+          destination: "{{regulatoryApi}}/filing/validate"
+          protocol: https
+          
+        - name: store-compliance-results
+          source: "{{complianceApi}}/sox/validate"
+          destination: "{{complianceDb}}/compliance_results"
+          protocol: database
+          condition: "success(sox-compliance-check)"
+          
+    # Stage 4: Report Generation
+    - name: generate-reports
+      description: Generate financial reports in multiple formats
+      dependsOn:
+        - compliance-validation
+      continueOnError: false
+      retryCount: 1
+      transfers:
+        - name: generate-balance-sheet
+          source: "{{templatePath}}/balance-sheet-template.xlsx"
+          destination: "{{reportPath}}/final/balance-sheet-{{reportMonth}}-{{reportYear}}.xlsx"
+          protocol: file
+          options:
+            template_data: "{{reportPath}}/processed/reconciled-accounts-{{reportMonth}}.csv"
+            
+        - name: generate-income-statement
+          source: "{{templatePath}}/income-statement-template.xlsx"
+          destination: "{{reportPath}}/final/income-statement-{{reportMonth}}-{{reportYear}}.xlsx"
+          protocol: file
+          
+        - name: generate-cash-flow-statement
+          source: "{{templatePath}}/cash-flow-template.xlsx"
+          destination: "{{reportPath}}/final/cash-flow-{{reportMonth}}-{{reportYear}}.xlsx"
+          protocol: file
+          
+        - name: generate-executive-summary
+          source: "{{reportPath}}/processed/financial-ratios-{{reportMonth}}.json"
+          destination: "{{reportPath}}/final/executive-summary-{{reportMonth}}-{{reportYear}}.pdf"
+          protocol: file
+          options:
+            format: "pdf"
+            template: "executive-summary"
+            
+    # Stage 5: Audit Trail and Archival
+    - name: audit-and-archive
+      description: Create audit trails and archive reports
+      dependsOn:
+        - generate-reports
+      continueOnError: true
+      retryCount: 1
+      transfers:
+        - name: create-audit-trail
+          source: "{{reportPath}}/final/balance-sheet-{{reportMonth}}-{{reportYear}}.xlsx"
+          destination: "{{auditApi}}/trail/create"
+          protocol: https
+          options:
+            audit_type: "financial_report"
+            period: "{{reportMonth}}-{{reportYear}}"
+            
+        - name: archive-reports
+          source: "{{reportPath}}/final/"
+          destination: "{{archivePath}}/{{reportYear}}/{{reportMonth}}/"
+          protocol: file
+          options:
+            recursive: true
+            compress: true
+            
+        - name: store-audit-metadata
+          source: "{{auditApi}}/trail/create"
+          destination: "{{auditDb}}/audit_trails"
+          protocol: database
+          
+    # Stage 6: Distribution and Notifications
+    - name: distribute-reports
+      description: Distribute reports to stakeholders
+      dependsOn:
+        - audit-and-archive
+      continueOnError: true
+      retryCount: 1
+      transfers:
+        - name: submit-regulatory-filing
+          source: "{{reportPath}}/final/balance-sheet-{{reportMonth}}-{{reportYear}}.xlsx"
+          destination: "{{regulatoryApi}}/filing/submit"
+          protocol: https
+          condition: "success(regulatory-filing-check)"
+          
+        - name: notify-executives
+          source: "{{reportPath}}/final/executive-summary-{{reportMonth}}-{{reportYear}}.pdf"
+          destination: "email://executives@company.com"
+          protocol: email
+          options:
+            subject: "Monthly Financial Report - {{reportMonth}} {{reportYear}}"
+            
+        - name: notify-compliance-team
+          source: "{{complianceDb}}/compliance_results"
+          destination: "email://compliance@company.com"
+          protocol: email
+          condition: "success(store-compliance-results)"
+          
+        - name: update-dashboard
+          source: "{{reportPath}}/processed/financial-ratios-{{reportMonth}}.json"
+          destination: "https://dashboard.company.com/api/financial/update"
+          protocol: https
