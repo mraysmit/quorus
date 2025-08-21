@@ -1,0 +1,194 @@
+metadata:
+  name: "E-commerce Order Processing Pipeline"
+  version: "3.1.2"
+  description: "Complete order processing pipeline from payment verification to fulfillment with inventory management and customer notifications"
+  type: "data-pipeline-workflow"
+  author: "ecommerce-team@company.com"
+  created: "2025-08-21"
+  tags: ["ecommerce", "orders", "payment", "fulfillment", "inventory", "production"]
+  labels:
+    environment: "production"
+    team: "ecommerce"
+    sla: "15-minutes"
+    criticality: "high"
+    schedule: "continuous"
+
+# ============================================================================
+
+spec:
+  variables:
+    # API endpoints
+    ordersApi: "https://api.company.com/orders"
+    paymentApi: "https://payments.company.com/api"
+    inventoryApi: "https://inventory.company.com/api"
+    fulfillmentApi: "https://fulfillment.company.com/api"
+    notificationApi: "https://notifications.company.com/api"
+    
+    # Database connections
+    ordersDb: "postgresql://orders:5432/ecommerce"
+    inventoryDb: "postgresql://inventory:5432/stock"
+    analyticsDb: "postgresql://analytics:5432/reporting"
+    
+    # File paths
+    dataPath: "/data/ecommerce"
+    archivePath: "/archive/orders"
+    errorPath: "/errors/orders"
+    
+    # Processing settings
+    batchSize: "500"
+    timeout: "30s"
+    retryAttempts: "3"
+    
+  execution:
+    dryRun: false
+    virtualRun: false
+    parallelism: 5
+    timeout: 900s
+    strategy: parallel
+    
+  transferGroups:
+    # Stage 1: Payment Processing
+    - name: process-payments
+      description: Process pending payment verifications
+      continueOnError: false
+      retryCount: 3
+      variables:
+        paymentTimeout: "60s"
+      transfers:
+        - name: fetch-pending-payments
+          source: "{{ordersApi}}/payments/pending"
+          destination: "{{dataPath}}/pending-payments.json"
+          protocol: https
+          options:
+            timeout: "{{paymentTimeout}}"
+            batchSize: "{{batchSize}}"
+            
+        - name: verify-payment-status
+          source: "{{paymentApi}}/verify"
+          destination: "{{dataPath}}/verified-payments.json"
+          protocol: https
+          condition: "file_exists('{{dataPath}}/pending-payments.json')"
+          
+    # Stage 2: Inventory Management
+    - name: manage-inventory
+      description: Update inventory levels and check availability
+      dependsOn:
+        - process-payments
+      continueOnError: false
+      retryCount: 2
+      transfers:
+        - name: check-inventory-levels
+          source: "{{inventoryApi}}/levels"
+          destination: "{{dataPath}}/inventory-levels.json"
+          protocol: https
+          
+        - name: reserve-inventory
+          source: "{{dataPath}}/verified-payments.json"
+          destination: "{{inventoryDb}}/reservations"
+          protocol: database
+          condition: "success(verify-payment-status)"
+          options:
+            transactional: true
+            
+        - name: update-inventory-counts
+          source: "{{inventoryDb}}/reservations"
+          destination: "{{inventoryDb}}/current_stock"
+          protocol: database
+          
+    # Stage 3: Order Fulfillment
+    - name: fulfill-orders
+      description: Process order fulfillment and shipping
+      dependsOn:
+        - manage-inventory
+      continueOnError: true
+      retryCount: 2
+      transfers:
+        - name: create-fulfillment-requests
+          source: "{{dataPath}}/verified-payments.json"
+          destination: "{{fulfillmentApi}}/requests"
+          protocol: https
+          condition: "success(reserve-inventory)"
+          
+        - name: generate-shipping-labels
+          source: "{{fulfillmentApi}}/requests"
+          destination: "{{dataPath}}/shipping-labels.pdf"
+          protocol: https
+          
+        - name: update-order-status
+          source: "{{dataPath}}/shipping-labels.pdf"
+          destination: "{{ordersDb}}/order_status"
+          protocol: database
+          condition: "file_exists('{{dataPath}}/shipping-labels.pdf')"
+          
+    # Stage 4: Customer Notifications
+    - name: notify-customers
+      description: Send order confirmation and tracking notifications
+      dependsOn:
+        - fulfill-orders
+      continueOnError: true
+      retryCount: 1
+      transfers:
+        - name: send-order-confirmations
+          source: "{{ordersDb}}/order_status"
+          destination: "{{notificationApi}}/email/confirmation"
+          protocol: https
+          condition: "success(update-order-status)"
+          
+        - name: send-tracking-notifications
+          source: "{{dataPath}}/shipping-labels.pdf"
+          destination: "{{notificationApi}}/sms/tracking"
+          protocol: https
+          
+        - name: update-customer-history
+          source: "{{ordersDb}}/order_status"
+          destination: "{{ordersDb}}/customer_history"
+          protocol: database
+          
+    # Stage 5: Analytics and Reporting
+    - name: update-analytics
+      description: Update analytics and reporting data
+      dependsOn:
+        - notify-customers
+      continueOnError: true
+      retryCount: 1
+      transfers:
+        - name: extract-order-metrics
+          source: "{{ordersDb}}/order_status"
+          destination: "{{dataPath}}/order-metrics.json"
+          protocol: database
+          
+        - name: load-analytics-data
+          source: "{{dataPath}}/order-metrics.json"
+          destination: "{{analyticsDb}}/daily_orders"
+          protocol: database
+          options:
+            upsert: true
+            
+        - name: trigger-reporting-update
+          source: "{{analyticsDb}}/daily_orders"
+          destination: "{{notificationApi}}/internal/reporting"
+          protocol: https
+          
+    # Stage 6: Cleanup and Archival
+    - name: cleanup-and-archive
+      description: Clean up temporary files and archive processed data
+      dependsOn:
+        - update-analytics
+      continueOnError: true
+      retryCount: 1
+      transfers:
+        - name: archive-processed-orders
+          source: "{{dataPath}}/verified-payments.json"
+          destination: "{{archivePath}}/orders-{{timestamp}}.json"
+          protocol: file
+          
+        - name: cleanup-temp-files
+          source: "{{dataPath}}/pending-payments.json"
+          destination: "/dev/null"
+          protocol: file
+          condition: "success(archive-processed-orders)"
+          
+        - name: log-processing-summary
+          source: "{{analyticsDb}}/daily_orders"
+          destination: "/logs/order-processing-{{timestamp}}.log"
+          protocol: file

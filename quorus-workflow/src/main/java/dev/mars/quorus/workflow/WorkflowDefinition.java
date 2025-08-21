@@ -83,20 +83,32 @@ public class WorkflowDefinition {
         private final String description;
         private final String type;
         private final String author;
+        private final String created;
+        private final List<String> tags;
         private final Map<String, String> labels;
 
-        public WorkflowMetadata(String name, String version, String description, String type, String author, Map<String, String> labels) {
+        public WorkflowMetadata(String name, String version, String description, String type, String author,
+                               String created, List<String> tags, Map<String, String> labels) {
             this.name = Objects.requireNonNull(name, "Name cannot be null");
             this.version = version;
             this.description = description;
             this.type = type;
             this.author = author;
+            this.created = created;
+            this.tags = tags != null ? List.copyOf(tags) : List.of();
             this.labels = labels != null ? Map.copyOf(labels) : Map.of();
         }
 
-        // Backward compatibility constructor
+        // Backward compatibility constructor - deprecated
+        @Deprecated
+        public WorkflowMetadata(String name, String version, String description, String type, String author, Map<String, String> labels) {
+            this(name, version, description, type, author, null, List.of(), labels);
+        }
+
+        // Backward compatibility constructor - deprecated
+        @Deprecated
         public WorkflowMetadata(String name, String description, Map<String, String> labels) {
-            this(name, "1.0.0", description, "workflow", null, labels);
+            this(name, "1.0.0", description, "workflow", null, null, List.of(), labels);
         }
 
         public String getName() {
@@ -117,6 +129,14 @@ public class WorkflowDefinition {
 
         public String getAuthor() {
             return author;
+        }
+
+        public String getCreated() {
+            return created;
+        }
+
+        public List<String> getTags() {
+            return tags;
         }
 
         public Map<String, String> getLabels() {
@@ -149,6 +169,8 @@ public class WorkflowDefinition {
                    ", description='" + description + '\'' +
                    ", type='" + type + '\'' +
                    ", author='" + author + '\'' +
+                   ", created='" + created + '\'' +
+                   ", tags=" + tags +
                    ", labels=" + labels +
                    '}';
         }

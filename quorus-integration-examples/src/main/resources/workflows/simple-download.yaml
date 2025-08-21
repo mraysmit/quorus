@@ -1,9 +1,11 @@
 metadata:
   name: "Simple Download Workflow"
   version: "1.0.0"
-  description: "Simple workflow for downloading files from HTTP sources"
+  description: "Simple workflow for downloading files from HTTP sources with basic error handling"
   type: "download-workflow"
-  author: "Quorus Development Team"
+  author: "development@quorus.dev"
+  created: "2025-08-21"
+  tags: ["examples", "download", "http", "simple"]
 
 # ============================================================================
 

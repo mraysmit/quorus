@@ -1,9 +1,11 @@
 metadata:
   name: "Simple File Transfer Workflow"
   version: "1.0.0"
-  description: "A simple workflow demonstrating basic file transfer capabilities"
+  description: "A simple workflow demonstrating basic file transfer capabilities with dependency management"
   type: "transfer-workflow"
-  author: "Quorus Development Team"
+  author: "testing@quorus.dev"
+  created: "2025-08-21"
+  tags: ["test", "transfer", "dependencies", "sequential"]
 
 # ============================================================================
 

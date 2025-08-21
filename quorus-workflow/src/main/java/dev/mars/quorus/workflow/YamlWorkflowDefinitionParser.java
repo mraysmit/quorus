@@ -105,21 +105,28 @@ public class YamlWorkflowDefinitionParser implements WorkflowDefinitionParser {
     @Override
     public ValidationResult validateSchema(String yamlContent) {
         ValidationResult result = new ValidationResult();
-        
+
         try {
             Map<String, Object> data = yaml.load(yamlContent);
             if (data == null) {
                 result.addError("Empty or invalid YAML content");
                 return result;
             }
-            
-            // Basic schema validation
-            validateRequiredFields(data, result);
-            
+
+            // Use comprehensive schema validator
+            WorkflowSchemaValidator schemaValidator = new WorkflowSchemaValidator();
+            ValidationResult schemaResult = schemaValidator.validateWorkflowSchema(data);
+
+            // Merge results
+            schemaResult.getErrors().forEach(error ->
+                result.addError(error.getFieldPath(), error.getMessage()));
+            schemaResult.getWarnings().forEach(warning ->
+                result.addWarning(warning.getFieldPath(), warning.getMessage()));
+
         } catch (YAMLException e) {
             result.addError("YAML syntax error: " + e.getMessage());
         }
-        
+
         return result;
     }
     
@@ -154,9 +161,11 @@ public class YamlWorkflowDefinitionParser implements WorkflowDefinitionParser {
         String description = getStringValue(data, "description");
         String type = getStringValue(data, "type", "workflow");
         String author = getStringValue(data, "author");
+        String created = getStringValue(data, "created");
+        List<String> tags = parseTagsList(getObjectListValue(data, "tags"));
         Map<String, String> labels = parseLabels(getMapValue(data, "labels"));
 
-        return new WorkflowDefinition.WorkflowMetadata(name, version, description, type, author, labels);
+        return new WorkflowDefinition.WorkflowMetadata(name, version, description, type, author, created, tags, labels);
     }
     
     private WorkflowDefinition.WorkflowSpec parseSpec(Map<String, Object> data) throws WorkflowParseException {
@@ -210,7 +219,7 @@ public class YamlWorkflowDefinitionParser implements WorkflowDefinitionParser {
         }
         
         String description = getStringValue(data, "description");
-        List<String> dependsOn = parseStringList(getListValue(data, "dependsOn"));
+        List<String> dependsOn = parseStringList(getObjectListValue(data, "dependsOn"));
         String condition = getStringValue(data, "condition");
         Map<String, Object> variables = getMapValue(data, "variables");
         boolean continueOnError = getBooleanValue(data, "continueOnError", false);
@@ -328,9 +337,9 @@ public class YamlWorkflowDefinitionParser implements WorkflowDefinitionParser {
         return labels;
     }
     
-    private List<String> parseStringList(List<Map<String, Object>> data) {
+    private List<String> parseStringList(List<Object> data) {
         if (data == null) return List.of();
-        
+
         List<String> result = new ArrayList<>();
         for (Object item : data) {
             if (item != null) {
@@ -376,13 +385,32 @@ public class YamlWorkflowDefinitionParser implements WorkflowDefinitionParser {
         if (metadata.getName() == null || metadata.getName().trim().isEmpty()) {
             result.addError("metadata.name", "Workflow name cannot be empty");
         }
+
+        // Use comprehensive schema validator for detailed validation
+        WorkflowSchemaValidator schemaValidator = new WorkflowSchemaValidator();
+        Map<String, Object> metadataMap = Map.of(
+            "name", metadata.getName() != null ? metadata.getName() : "",
+            "version", metadata.getVersion() != null ? metadata.getVersion() : "",
+            "description", metadata.getDescription() != null ? metadata.getDescription() : "",
+            "type", metadata.getType() != null ? metadata.getType() : "",
+            "author", metadata.getAuthor() != null ? metadata.getAuthor() : "",
+            "created", metadata.getCreated() != null ? metadata.getCreated() : "",
+            "tags", metadata.getTags() != null ? metadata.getTags() : List.of(),
+            "labels", metadata.getLabels() != null ? metadata.getLabels() : Map.of()
+        );
+
+        ValidationResult metadataResult = schemaValidator.validateMetadataSchema(metadataMap);
+        metadataResult.getErrors().forEach(error ->
+            result.addError(error.getFieldPath(), error.getMessage()));
+        metadataResult.getWarnings().forEach(warning ->
+            result.addWarning(warning.getFieldPath(), warning.getMessage()));
     }
     
     private void validateSpec(WorkflowDefinition.WorkflowSpec spec, ValidationResult result) {
         if (spec.getTransferGroups().isEmpty()) {
             result.addWarning("spec.transferGroups", "No transfer groups defined");
         }
-        
+
         // Validate transfer group names are unique
         Set<String> groupNames = new HashSet<>();
         for (TransferGroup group : spec.getTransferGroups()) {
@@ -390,5 +418,22 @@ public class YamlWorkflowDefinitionParser implements WorkflowDefinitionParser {
                 result.addError("spec.transferGroups", "Duplicate transfer group name: " + group.getName());
             }
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Object> getObjectListValue(Map<String, Object> map, String key) {
+        Object value = map.get(key);
+        return value instanceof List ? (List<Object>) value : null;
+    }
+
+    private List<String> parseTagsList(List<Object> tagsList) {
+        if (tagsList == null) {
+            return List.of();
+        }
+
+        return tagsList.stream()
+            .filter(String.class::isInstance)
+            .map(String.class::cast)
+            .toList();
     }
 }
