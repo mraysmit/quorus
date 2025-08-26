@@ -1,0 +1,24 @@
+﻿global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  # - "first_rules.yml"
+  # - "second_rules.yml"
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'quorus-api'
+    static_configs:
+      - targets: ['api:8080']
+    metrics_path: '/q/metrics'
+    scrape_interval: 5s
+
+  - job_name: 'quorus-controllers'
+    static_configs:
+      - targets: ['controller1:8080', 'controller2:8080', 'controller3:8080']
+    metrics_path: '/metrics'
+    scrape_interval: 5s

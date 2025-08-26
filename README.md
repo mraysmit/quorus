@@ -65,14 +65,14 @@ quorus/
 The core implementation of the Quorus file transfer system.
 
 **Key Features:**
-- ✅ HTTP/HTTPS file transfers
-- ✅ Progress tracking with rate calculation and ETA
-- ✅ SHA-256 integrity verification
-- ✅ Concurrent transfer support (configurable)
-- ✅ Retry mechanisms with exponential backoff
-- ✅ Comprehensive error handling
-- ✅ Thread-safe operations
-- ✅ Extensible protocol architecture
+-  HTTP/HTTPS file transfers
+-  Progress tracking with rate calculation and ETA
+-  SHA-256 integrity verification
+-  Concurrent transfer support (configurable)
+-  Retry mechanisms with exponential backoff
+-  Comprehensive error handling
+-  Thread-safe operations
+-  Extensible protocol architecture
 
 **Dependencies:** None (pure Java implementation)
 
@@ -80,14 +80,14 @@ The core implementation of the Quorus file transfer system.
 YAML-based workflow system for complex file transfer orchestration.
 
 **Key Features:**
-- ✅ YAML workflow definitions with metadata headers
-- ✅ Transfer groups with dependency management
-- ✅ Variable substitution with `{{variable}}` syntax
-- ✅ Multiple execution modes (normal, dry run, virtual run)
-- ✅ Dependency graph validation and topological sorting
-- ✅ Error handling with continue-on-error logic
-- ✅ Progress tracking and monitoring
-- ✅ Schema validation and semantic validation
+-  YAML workflow definitions with metadata headers
+-  Transfer groups with dependency management
+-  Variable substitution with `{{variable}}` syntax
+-  Multiple execution modes (normal, dry run, virtual run)
+-  Dependency graph validation and topological sorting
+-  Error handling with continue-on-error logic
+-  Progress tracking and monitoring
+-  Schema validation and semantic validation
 
 **Dependencies:** quorus-core, SnakeYAML
 
@@ -95,13 +95,13 @@ YAML-based workflow system for complex file transfer orchestration.
 REST API service built with Quarkus for enterprise integration.
 
 **Key Features:**
-- ✅ RESTful API with OpenAPI 3.0 specification
-- ✅ Role-based access control (RBAC)
-- ✅ Health monitoring and metrics endpoints
-- ✅ JSON request/response handling
-- ✅ Comprehensive error responses
-- ✅ API versioning support
-- ✅ Fast startup and low memory footprint
+-  RESTful API with OpenAPI 3.0 specification
+-  Role-based access control (RBAC)
+-  Health monitoring and metrics endpoints
+-  JSON request/response handling
+-  Comprehensive error responses
+-  API versioning support
+-  Fast startup and low memory footprint
 
 **Dependencies:** quorus-core, Quarkus, JAX-RS
 
@@ -109,13 +109,13 @@ REST API service built with Quarkus for enterprise integration.
 Distributed controller with Raft consensus for high availability.
 
 **Key Features:**
-- ✅ Raft consensus algorithm implementation
-- ✅ Leader election and failover mechanisms
-- ✅ Distributed state management
-- ✅ Cluster membership management
-- ✅ Strong consistency guarantees
-- ✅ Automatic recovery and healing
-- ✅ Docker containerization support
+-  Raft consensus algorithm implementation
+-  Leader election and failover mechanisms
+-  Distributed state management
+-  Cluster membership management
+-  Strong consistency guarantees
+-  Automatic recovery and healing
+-  Docker containerization support
 
 **Dependencies:** quorus-core, Jackson
 
@@ -123,9 +123,9 @@ Distributed controller with Raft consensus for high availability.
 Multi-tenant support for enterprise deployments.
 
 **Key Features:**
-- ✅ Tenant isolation and resource management
-- ✅ Namespace-based organization
-- ✅ Per-tenant configuration and quotas
+-  Tenant isolation and resource management
+-  Namespace-based organization
+-  Per-tenant configuration and quotas
 
 **Dependencies:** quorus-core
 

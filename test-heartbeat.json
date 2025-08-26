@@ -1,0 +1,20 @@
+{
+  "agentId": "test-agent-002",
+  "timestamp": "2025-08-26T10:22:00Z",
+  "sequenceNumber": 2,
+  "status": "active",
+  "currentJobs": 0,
+  "availableCapacity": 5,
+  "transferMetrics": {
+    "active": 0,
+    "completed": 50,
+    "failed": 1,
+    "successRate": 98.0
+  },
+  "healthStatus": {
+    "diskSpace": "healthy",
+    "networkConnectivity": "healthy",
+    "systemLoad": "normal",
+    "overallHealth": "healthy"
+  }
+}

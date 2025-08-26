@@ -26,6 +26,14 @@ services:
     volumes:
       - controller1-data:/app/data
       - controller1-logs:/app/logs
+    labels:
+      - "logging=promtail"
+      - "service=quorus-controller1"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 10s
@@ -99,6 +107,40 @@ services:
       - controller1
       - controller2
 
+  # API service for agent communication and heartbeat processing
+  api:
+    build:
+      context: .
+      dockerfile: quorus-api/Dockerfile
+    container_name: quorus-api
+    hostname: api
+    environment:
+      - QUARKUS_HTTP_HOST=0.0.0.0
+      - QUARKUS_HTTP_PORT=8080
+      - JAVA_OPTS=-Xmx512m -Xms256m
+    ports:
+      - "8080:8080"
+    networks:
+      raft-cluster:
+        ipv4_address: 172.20.0.20
+    volumes:
+      - api-logs:/app/logs
+    labels:
+      - "logging=promtail"
+      - "service=quorus-api"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/q/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
 networks:
   # Primary cluster network for normal operations
   raft-cluster:
@@ -150,4 +192,6 @@ volumes:
   controller3-data:
     driver: local
   controller3-logs:
+    driver: local
+  api-logs:
     driver: local
