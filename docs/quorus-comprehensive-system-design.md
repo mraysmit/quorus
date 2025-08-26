@@ -1,5 +1,9 @@
 # Quorus Comprehensive System Design
 
+**Version:** 1.0
+**Date:** 25 October 2024
+**Author:** Mark Andrew Ray-Smith Cityline Ltd
+
 ## Overview
 
 Quorus is an enterprise-grade file transfer system designed for high reliability, scalability, and multi-tenant operation within corporate network environments. The system is optimized for internal corporate network transfers, providing both programmatic APIs and declarative YAML-based workflow definitions for complex file transfer orchestration with comprehensive multi-tenancy support.
@@ -197,6 +201,64 @@ graph TB
 
 ### Leader Election Process
 
+The Quorus controller cluster implements the Raft consensus algorithm for leader election, ensuring strong consistency and fault tolerance across the distributed system. The leader election process is critical for maintaining cluster coordination and preventing split-brain scenarios.
+
+#### Election States and Transitions
+
+Each controller node operates in one of three states:
+
+- **Follower**: Default state, receives heartbeats from leader and responds to vote requests
+- **Candidate**: Transitional state during election, requests votes from other nodes
+- **Leader**: Coordinates cluster operations, sends heartbeats to maintain leadership
+
+#### Election Timing and Randomization
+
+**Election Timeout Configuration:**
+- Base election timeout: 150-300ms (configurable)
+- Randomized timeout: `baseTimeout + random(0, baseTimeout)`
+- Heartbeat interval: 50ms (typically 1/3 of election timeout)
+- Purpose: Prevents simultaneous elections and reduces split votes
+
+**Timeout Behavior:**
+- Followers reset their election timer on each valid heartbeat
+- If no heartbeat received within timeout period, follower becomes candidate
+- Random jitter ensures elections are staggered across nodes
+
+#### Detailed Election Algorithm
+
+**Phase 1: Election Initiation**
+1. **Timeout Trigger**: Follower's election timer expires without receiving heartbeat
+2. **State Transition**: Node transitions from FOLLOWER to CANDIDATE
+3. **Term Increment**: Current term is incremented by 1
+4. **Self-Vote**: Candidate votes for itself
+5. **Timer Reset**: New randomized election timeout is set
+
+**Phase 2: Vote Request Process**
+1. **Vote Request Creation**: Candidate creates VoteRequest with:
+   - `term`: Current term number
+   - `candidateId`: Node's unique identifier
+   - `lastLogIndex`: Index of candidate's last log entry
+   - `lastLogTerm`: Term of candidate's last log entry
+
+2. **Parallel Vote Requests**: Candidate sends VoteRequest to all other cluster nodes
+3. **Vote Collection**: Candidate waits for VoteResponse messages
+
+**Phase 3: Vote Evaluation**
+Each node receiving a VoteRequest evaluates:
+1. **Term Validation**: Request term >= current term
+2. **Vote Availability**: Haven't voted for another candidate in this term
+3. **Log Currency**: Candidate's log is at least as up-to-date as receiver's log
+4. **Response**: Send VoteResponse with granted/denied decision
+
+**Phase 4: Leadership Determination**
+1. **Majority Calculation**: Candidate needs `(clusterSize / 2) + 1` votes
+2. **Vote Counting**: Atomic counter tracks received votes
+3. **Leadership Transition**: If majority achieved, candidate becomes LEADER
+4. **State Initialization**: Leader initializes nextIndex and matchIndex for followers
+
+#### Election Scenarios and Edge Cases
+
+**Successful Election:**
 ```mermaid
 sequenceDiagram
     participant C1 as Controller 1
@@ -206,25 +268,155 @@ sequenceDiagram
     participant C5 as Controller 5
 
     Note over C1,C5: Initial State - All Followers
-    C1->>C1: Election Timeout
-    C1->>C2: RequestVote (Term 1)
-    C1->>C3: RequestVote (Term 1)
-    C1->>C4: RequestVote (Term 1)
-    C1->>C5: RequestVote (Term 1)
+    C1->>C1: Election Timeout (Term 1)
+    Note over C1: Becomes Candidate
+    C1->>C2: RequestVote (Term 1, lastLogIndex=5, lastLogTerm=0)
+    C1->>C3: RequestVote (Term 1, lastLogIndex=5, lastLogTerm=0)
+    C1->>C4: RequestVote (Term 1, lastLogIndex=5, lastLogTerm=0)
+    C1->>C5: RequestVote (Term 1, lastLogIndex=5, lastLogTerm=0)
 
-    C2->>C1: VoteGranted
-    C3->>C1: VoteGranted
-    C4->>C1: VoteGranted
-    C5->>C1: VoteGranted
+    C2->>C1: VoteGranted (Term 1)
+    C3->>C1: VoteGranted (Term 1)
+    C4->>C1: VoteGranted (Term 1)
+    Note over C1: Majority achieved (4/5 votes)
+    Note over C1: Becomes Leader
 
-    Note over C1,C5: C1 becomes Leader (majority votes)
-    C1->>C2: Heartbeat (Term 1)
-    C1->>C3: Heartbeat (Term 1)
-    C1->>C4: Heartbeat (Term 1)
-    C1->>C5: Heartbeat (Term 1)
+    C1->>C2: Heartbeat (Term 1, prevLogIndex=5)
+    C1->>C3: Heartbeat (Term 1, prevLogIndex=5)
+    C1->>C4: Heartbeat (Term 1, prevLogIndex=5)
+    C1->>C5: Heartbeat (Term 1, prevLogIndex=5)
 
-    Note over C1,C5: Leader sends periodic heartbeats
+    Note over C1,C5: Leader established, periodic heartbeats maintain leadership
 ```
+
+**Split Vote Scenario:**
+```mermaid
+sequenceDiagram
+    participant C1 as Controller 1
+    participant C2 as Controller 2
+    participant C3 as Controller 3
+    participant C4 as Controller 4
+    participant C5 as Controller 5
+
+    Note over C1,C5: Simultaneous election timeouts
+    C1->>C1: Election Timeout (Term 1)
+    C3->>C3: Election Timeout (Term 1)
+
+    Note over C1,C3: Both become Candidates
+    C1->>C2: RequestVote (Term 1)
+    C1->>C4: RequestVote (Term 1)
+    C3->>C2: RequestVote (Term 1)
+    C3->>C4: RequestVote (Term 1)
+
+    C2->>C1: VoteGranted (Term 1)
+    C4->>C3: VoteGranted (Term 1)
+
+    Note over C1,C5: No majority achieved, new election triggered
+    Note over C1,C5: Random timeouts prevent repeated splits
+```
+
+#### Failure Scenarios and Recovery
+
+**Leader Failure Detection:**
+1. **Heartbeat Monitoring**: Followers expect heartbeats every 50ms
+2. **Failure Detection**: Missing 3+ consecutive heartbeats triggers election
+3. **Automatic Recovery**: New leader elected within 150-300ms
+4. **Service Continuity**: Minimal disruption to ongoing operations
+
+**Network Partition Handling:**
+- **Majority Partition**: Continues normal operations with new leader if needed
+- **Minority Partition**: Cannot elect leader, enters read-only mode
+- **Partition Healing**: Minority nodes automatically rejoin majority partition
+- **Split-Brain Prevention**: Quorum requirement prevents dual leadership
+
+**Node Recovery Process:**
+1. **Rejoining Cluster**: Recovered node starts as follower
+2. **Log Synchronization**: Receives missing log entries from current leader
+3. **State Reconciliation**: Updates local state to match cluster consensus
+4. **Full Participation**: Resumes normal voting and operation handling
+
+#### Implementation Details
+
+**Election Timer Management:**
+```java
+// Randomized election timeout prevents simultaneous elections
+private void resetElectionTimer() {
+    long timeout = electionTimeoutMs + (long) (Math.random() * electionTimeoutMs);
+    electionTimer = scheduler.schedule(this::startElection, timeout, TimeUnit.MILLISECONDS);
+}
+```
+
+**Vote Request Validation:**
+```java
+private boolean shouldGrantVote(VoteRequest request) {
+    // Grant vote if:
+    // 1. Request term >= current term
+    // 2. Haven't voted in this term OR voting for same candidate
+    // 3. Candidate's log is at least as up-to-date as ours
+    return request.getTerm() >= currentTerm.get() &&
+           (votedFor == null || votedFor.equals(request.getCandidateId())) &&
+           isLogUpToDate(request.getLastLogIndex(), request.getLastLogTerm());
+}
+```
+
+**Leadership Establishment:**
+```java
+private synchronized void becomeLeader() {
+    if (state.compareAndSet(State.CANDIDATE, State.LEADER)) {
+        // Initialize leader state for all followers
+        long nextIndexValue = log.size();
+        for (String nodeId : clusterNodes) {
+            nextIndex.put(nodeId, nextIndexValue);
+            matchIndex.put(nodeId, 0L);
+        }
+
+        // Start immediate heartbeats to establish authority
+        startHeartbeats();
+    }
+}
+```
+
+#### Performance Characteristics
+
+**Election Performance Metrics:**
+- **Election Duration**: Typically 150-300ms under normal conditions
+- **Availability Impact**: < 1 second service interruption during leader change
+- **Throughput**: No impact on read operations, brief pause for writes
+- **Scalability**: Election time increases logarithmically with cluster size
+
+**Optimization Strategies:**
+- **Pre-Vote Phase**: Optional pre-election to reduce disruptions
+- **Priority Elections**: Higher priority nodes can trigger faster elections
+- **Lease-Based Leadership**: Reduce election frequency with leader leases
+- **Batch Heartbeats**: Optimize network usage with batched communications
+
+#### Monitoring and Observability
+
+**Key Metrics for Leader Election:**
+- `raft.election.count`: Total number of elections initiated
+- `raft.election.duration_ms`: Time taken for successful elections
+- `raft.leader.changes`: Frequency of leadership changes
+- `raft.vote.requests_sent`: Number of vote requests sent per election
+- `raft.vote.requests_received`: Number of vote requests received
+- `raft.heartbeat.missed`: Count of missed heartbeats per follower
+- `raft.term.current`: Current term number across cluster
+
+**Health Indicators:**
+- **Stable Leadership**: Low frequency of leader changes indicates healthy cluster
+- **Election Frequency**: High election rate may indicate network issues or node instability
+- **Vote Success Rate**: Percentage of successful vote requests indicates network health
+- **Heartbeat Regularity**: Consistent heartbeat intervals show stable leadership
+
+**Alerting Thresholds:**
+- **Critical**: No leader elected for > 5 seconds
+- **Warning**: > 3 leader changes per minute
+- **Info**: Election duration > 1 second
+
+**Troubleshooting Guide:**
+1. **Frequent Elections**: Check network connectivity and node health
+2. **Split Votes**: Verify clock synchronization across nodes
+3. **Slow Elections**: Investigate network latency and node performance
+4. **Failed Elections**: Check quorum size and node availability
 
 ## Agent-Controller Communication Protocol
 

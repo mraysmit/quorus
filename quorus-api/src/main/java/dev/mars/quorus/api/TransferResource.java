@@ -17,6 +17,7 @@
 package dev.mars.quorus.api;
 
 import dev.mars.quorus.api.dto.*;
+import dev.mars.quorus.api.service.DistributedTransferService;
 import dev.mars.quorus.core.TransferJob;
 import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferResult;
@@ -50,6 +51,9 @@ public class TransferResource {
 
     @Inject
     TransferEngine transferEngine;
+
+    @Inject
+    DistributedTransferService distributedTransferService;
 
     @POST
     @RolesAllowed({"ADMIN", "USER"})
@@ -88,21 +92,46 @@ public class TransferResource {
                     .destinationPath(Paths.get(requestDto.getDestinationPath().trim()))
                     .build();
 
-            // Submit transfer
+            // Check if distributed controller is available
+            if (distributedTransferService.isControllerAvailable()) {
+                // Submit transfer through distributed controller
+                CompletableFuture<TransferJob> future = distributedTransferService.submitTransfer(request);
+
+                try {
+                    TransferJob job = future.get(5, java.util.concurrent.TimeUnit.SECONDS);
+
+                    // Create response
+                    TransferJobResponseDto response = new TransferJobResponseDto();
+                    response.setJobId(job.getJobId());
+                    response.setSourceUri(requestDto.getSourceUri());
+                    response.setDestinationPath(requestDto.getDestinationPath());
+                    response.setStatus(job.getStatus());
+                    response.setMessage("Transfer job created successfully via distributed controller");
+
+                    logger.info("Distributed transfer job created: " + job.getJobId());
+                    return Response.status(Response.Status.CREATED).entity(response).build();
+
+                } catch (Exception e) {
+                    logger.log(Level.WARNING, "Distributed transfer submission failed, falling back to local", e);
+                    // Fall through to local processing
+                }
+            }
+
+            // Fallback to local transfer engine
             CompletableFuture<TransferResult> future = transferEngine.submitTransfer(request);
-            
+
             // Get the job ID from the request
             String jobId = request.getRequestId();
-            
+
             // Create response
             TransferJobResponseDto response = new TransferJobResponseDto();
             response.setJobId(jobId);
             response.setSourceUri(requestDto.getSourceUri());
             response.setDestinationPath(requestDto.getDestinationPath());
             response.setStatus(TransferStatus.PENDING);
-            response.setMessage("Transfer job created successfully");
+            response.setMessage("Transfer job created successfully (local fallback)");
 
-            logger.info("Transfer job created: " + jobId);
+            logger.info("Local transfer job created: " + jobId);
             return Response.status(Response.Status.CREATED).entity(response).build();
             
         } catch (TransferException e) {
@@ -136,6 +165,23 @@ public class TransferResource {
     public Response getTransferStatus(
             @PathParam("jobId") @Parameter(description = "Transfer job ID") String jobId) {
         try {
+            // Try distributed controller first
+            if (distributedTransferService.isControllerAvailable()) {
+                try {
+                    CompletableFuture<TransferJob> future = distributedTransferService.getTransferJob(jobId);
+                    TransferJob job = future.get(3, java.util.concurrent.TimeUnit.SECONDS);
+
+                    if (job != null) {
+                        TransferJobResponseDto response = TransferJobResponseDto.fromTransferJob(job);
+                        return Response.ok(response).build();
+                    }
+                } catch (Exception e) {
+                    logger.log(Level.FINE, "Distributed job query failed, trying local", e);
+                    // Fall through to local query
+                }
+            }
+
+            // Fallback to local transfer engine
             TransferJob job = transferEngine.getTransferJob(jobId);
             if (job != null) {
                 TransferJobResponseDto response = TransferJobResponseDto.fromTransferJob(job);
@@ -166,10 +212,27 @@ public class TransferResource {
     public Response cancelTransfer(
             @PathParam("jobId") @Parameter(description = "Transfer job ID") String jobId) {
         try {
+            // Try distributed controller first
+            if (distributedTransferService.isControllerAvailable()) {
+                try {
+                    CompletableFuture<Boolean> future = distributedTransferService.cancelTransfer(jobId);
+                    boolean cancelled = future.get(3, java.util.concurrent.TimeUnit.SECONDS);
+
+                    if (cancelled) {
+                        logger.info("Distributed transfer cancelled: " + jobId);
+                        return Response.ok(new MessageResponse("Transfer cancelled successfully via distributed controller")).build();
+                    }
+                } catch (Exception e) {
+                    logger.log(Level.FINE, "Distributed cancellation failed, trying local", e);
+                    // Fall through to local cancellation
+                }
+            }
+
+            // Fallback to local transfer engine
             boolean cancelled = transferEngine.cancelTransfer(jobId);
             if (cancelled) {
-                logger.info("Transfer cancelled: " + jobId);
-                return Response.ok(new MessageResponse("Transfer cancelled successfully")).build();
+                logger.info("Local transfer cancelled: " + jobId);
+                return Response.ok(new MessageResponse("Transfer cancelled successfully (local)")).build();
             } else {
                 return Response.status(Response.Status.CONFLICT)
                         .entity(new ErrorResponse("Transfer cannot be cancelled or not found"))

@@ -16,6 +16,8 @@
 
 package dev.mars.quorus.api;
 
+import dev.mars.quorus.api.service.DistributedTransferService;
+import dev.mars.quorus.api.service.ClusterStatus;
 import dev.mars.quorus.transfer.TransferEngine;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
@@ -41,6 +43,9 @@ public class HealthResource {
 
     @Inject
     TransferEngine transferEngine;
+
+    @Inject
+    DistributedTransferService distributedTransferService;
 
     @GET
     @Path("/info")
@@ -116,6 +121,26 @@ public class HealthResource {
             status.put("transferEngine", transferMetrics);
         }
         
+        // Distributed controller status
+        try {
+            ClusterStatus clusterStatus = distributedTransferService.getClusterStatus();
+            Map<String, Object> clusterMetrics = new HashMap<>();
+            clusterMetrics.put("available", clusterStatus.isAvailable());
+            clusterMetrics.put("healthy", clusterStatus.isHealthy());
+            clusterMetrics.put("nodeId", clusterStatus.getNodeId());
+            clusterMetrics.put("state", clusterStatus.getState());
+            clusterMetrics.put("term", clusterStatus.getTerm());
+            clusterMetrics.put("isLeader", clusterStatus.isLeader());
+            clusterMetrics.put("knownNodes", clusterStatus.getKnownNodes().size());
+            clusterMetrics.put("statusDescription", clusterStatus.getStatusDescription());
+            status.put("cluster", clusterMetrics);
+        } catch (Exception e) {
+            Map<String, Object> clusterMetrics = new HashMap<>();
+            clusterMetrics.put("available", false);
+            clusterMetrics.put("error", e.getMessage());
+            status.put("cluster", clusterMetrics);
+        }
+
         // System metrics
         Map<String, Object> systemMetrics = new HashMap<>();
         Runtime runtime = Runtime.getRuntime();
@@ -125,7 +150,7 @@ public class HealthResource {
         systemMetrics.put("maxMemory", runtime.maxMemory());
         systemMetrics.put("availableProcessors", runtime.availableProcessors());
         status.put("system", systemMetrics);
-        
+
         return Response.ok(status).build();
     }
 }
