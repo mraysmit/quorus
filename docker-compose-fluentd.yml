@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  # Fluentd for log aggregation
+  fluentd:
+    image: fluent/fluentd:v1.16-debian-1
+    container_name: quorus-fluentd
+    volumes:
+      - ./fluentd/conf:/fluentd/etc
+      - fluentd-logs:/var/log/fluentd
+    ports:
+      - "24224:24224"
+      - "24224:24224/udp"
+    environment:
+      - FLUENTD_CONF=fluent.conf
+    networks:
+      - logging
+
+  # Elasticsearch for storage
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: quorus-elasticsearch-fluentd
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    networks:
+      - logging
+
+  # Kibana for visualization
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.0
+    container_name: quorus-kibana-fluentd
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+    networks:
+      - logging
+
+networks:
+  logging:
+    driver: bridge
+
+volumes:
+  elasticsearch-data:
+    driver: local
+  fluentd-logs:
+    driver: local

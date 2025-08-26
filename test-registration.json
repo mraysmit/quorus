@@ -1,0 +1,16 @@
+{
+  "agentId": "test-agent-002",
+  "hostname": "test-host",
+  "address": "192.168.1.100",
+  "port": 8081,
+  "capabilities": {
+    "maxConcurrentTransfers": 5,
+    "supportedProtocols": ["HTTP", "HTTPS"],
+    "storageCapacityGB": 1000,
+    "compressionSupported": true,
+    "encryptionSupported": true
+  },
+  "version": "2.0.0",
+  "region": "us-east-1",
+  "datacenter": "dc1"
+}
