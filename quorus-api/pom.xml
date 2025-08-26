@@ -51,6 +51,11 @@
             <artifactId>quorus-tenant</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <dependency>
+            <groupId>dev.mars</groupId>
+            <artifactId>quorus-controller</artifactId>
+            <version>${project.version}</version>
+        </dependency>
 
         <!-- Quarkus Dependencies -->
         <dependency>
