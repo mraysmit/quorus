@@ -13,7 +13,7 @@ Write-Host "2. Generating log activity..." -ForegroundColor Yellow
 
 # Register an agent
 Write-Host "   - Registering agent..." -ForegroundColor Cyan
-$regResponse = Invoke-RestMethod -Uri "http://localhost:8080/api/v1/agents/register" -Method POST -Body (Get-Content test-registration.json) -ContentType "application/json" -ErrorAction SilentlyContinue
+$regResponse = Invoke-RestMethod -Uri "http://localhost:8080/api/v1/agents/register" -Method POST -Body (Get-Content ../test-data/test-registration.json) -ContentType "application/json" -ErrorAction SilentlyContinue
 if ($regResponse) {
     Write-Host "     Agent registered: $($regResponse.agentId)" -ForegroundColor Green
 }

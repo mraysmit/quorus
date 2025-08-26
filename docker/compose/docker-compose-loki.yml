@@ -9,7 +9,7 @@ services:
       - "3100:3100"
     command: -config.file=/etc/loki/local-config.yaml
     volumes:
-      - ./loki/config.yml:/etc/loki/local-config.yaml
+      - ../logging/loki/config.yml:/etc/loki/local-config.yaml
       - loki-data:/loki
     networks:
       - logging
@@ -19,7 +19,7 @@ services:
     image: grafana/promtail:2.9.0
     container_name: quorus-promtail
     volumes:
-      - ./promtail/config.yml:/etc/promtail/config.yml
+      - ../logging/promtail/config.yml:/etc/promtail/config.yml
       - /var/log:/var/log:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
@@ -39,7 +39,7 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=admin
     volumes:
       - grafana-data:/var/lib/grafana
-      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ../logging/grafana/provisioning:/etc/grafana/provisioning
     depends_on:
       - loki
     networks:
@@ -52,7 +52,7 @@ services:
     ports:
       - "9090:9090"
     volumes:
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ../logging/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus-data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'

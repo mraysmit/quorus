@@ -185,6 +185,10 @@ public class RaftNode {
         return nodeId;
     }
 
+    public boolean isRunning() {
+        return running.get();
+    }
+
     public boolean isLeader() {
         return state.get() == State.LEADER;
     }
