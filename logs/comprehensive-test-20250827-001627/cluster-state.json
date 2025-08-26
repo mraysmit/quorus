@@ -1,0 +1,27 @@
+{
+  "controller5": {
+    "status": "UP",
+    "nodeId": "controller5",
+    "state": "FOLLOWER"
+  },
+  "controller3": {
+    "status": "UP",
+    "nodeId": "controller3",
+    "state": "FOLLOWER"
+  },
+  "controller2": {
+    "status": "UP",
+    "nodeId": "controller2",
+    "state": "FOLLOWER"
+  },
+  "controller4": {
+    "status": "UP",
+    "nodeId": "controller4",
+    "state": "LEADER"
+  },
+  "controller1": {
+    "status": "UP",
+    "nodeId": "controller1",
+    "state": "FOLLOWER"
+  }
+}

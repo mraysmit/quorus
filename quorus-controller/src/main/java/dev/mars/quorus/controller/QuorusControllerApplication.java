@@ -17,14 +17,15 @@
 package dev.mars.quorus.controller;
 
 import dev.mars.quorus.controller.raft.RaftNode;
-// import dev.mars.quorus.controller.raft.RaftTransport;
-// import dev.mars.quorus.controller.raft.HttpRaftTransport;
-// import dev.mars.quorus.controller.raft.RaftStateMachine;
-// import dev.mars.quorus.controller.state.QuorusStateMachine;
+import dev.mars.quorus.controller.raft.RaftTransport;
+import dev.mars.quorus.controller.raft.HttpRaftTransport;
+import dev.mars.quorus.controller.raft.RaftStateMachine;
 import dev.mars.quorus.controller.http.HttpApiServer;
 
 import java.util.Set;
 import java.util.HashSet;
+import java.util.Map;
+import java.util.HashMap;
 import java.util.logging.Logger;
 import java.util.logging.Level;
 
@@ -124,9 +125,8 @@ public class QuorusControllerApplication {
         logger.info("Starting Quorus Controller...");
 
         try {
-            // For now, create a minimal working version without full Raft implementation
-            // TODO: Implement full Raft consensus later
-            raftNode = createMinimalRaftNode();
+            // Create proper Raft node with HTTP transport
+            raftNode = createRaftNode();
             
             logger.info("Starting Raft consensus engine...");
             raftNode.start();
@@ -226,48 +226,84 @@ public class QuorusControllerApplication {
     }
 
     /**
-     * Create a minimal RaftNode for initial testing.
-     * This is a placeholder until full Raft implementation is complete.
+     * Create a proper RaftNode with HTTP transport and state machine.
      */
-    private RaftNode createMinimalRaftNode() {
-        // Create a minimal RaftNode that can be started/stopped for testing
-        // This will be replaced with proper Raft implementation
-        return new MinimalRaftNode(nodeId);
+    private RaftNode createRaftNode() {
+        // Create cluster node mapping for HTTP transport (using Raft port 9080)
+        Map<String, String> clusterNodeMap = new HashMap<>();
+        for (String node : clusterNodes) {
+            if (node.equals("controller1")) {
+                clusterNodeMap.put(node, "controller1:9080");
+            } else if (node.equals("controller2")) {
+                clusterNodeMap.put(node, "controller2:9080");
+            } else if (node.equals("controller3")) {
+                clusterNodeMap.put(node, "controller3:9080");
+            } else if (node.equals("controller4")) {
+                clusterNodeMap.put(node, "controller4:9080");
+            } else if (node.equals("controller5")) {
+                clusterNodeMap.put(node, "controller5:9080");
+            }
+        }
+
+        // Create HTTP transport
+        HttpRaftTransport transport = new HttpRaftTransport(nodeId, raftHost, raftPort, clusterNodeMap);
+
+        // Create simple state machine
+        RaftStateMachine stateMachine = new SimpleStateMachine();
+
+        // Create RaftNode with proper configuration
+        RaftNode raftNode = new RaftNode(nodeId, clusterNodes, transport, stateMachine, electionTimeoutMs, heartbeatIntervalMs);
+
+        // Set the RaftNode reference in the transport for proper message handling
+        transport.setRaftNode(raftNode);
+
+        return raftNode;
     }
 
     /**
-     * Minimal RaftNode implementation for testing.
+     * Simple state machine implementation for Quorus.
      */
-    private static class MinimalRaftNode extends RaftNode {
-        private volatile boolean running = false;
+    private static class SimpleStateMachine implements RaftStateMachine {
+        private volatile long lastAppliedIndex = 0;
+        private final Map<String, Object> state = new HashMap<>();
 
-        public MinimalRaftNode(String nodeId) {
-            super(nodeId, new HashSet<>(), null, null);
+        @Override
+        public Object apply(Object command) {
+            logger.info("Applying command: " + command);
+            // Simple command processing - just store in state
+            if (command instanceof Map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> cmd = (Map<String, Object>) command;
+                state.putAll(cmd);
+            }
+            return "OK";
         }
 
         @Override
-        public void start() {
-            running = true;
+        public byte[] takeSnapshot() {
+            return state.toString().getBytes();
         }
 
         @Override
-        public void stop() {
-            running = false;
+        public void restoreSnapshot(byte[] snapshot) {
+            // Simple restore - just log it
+            logger.info("Restoring snapshot: " + new String(snapshot));
         }
 
         @Override
-        public boolean isRunning() {
-            return running;
+        public long getLastAppliedIndex() {
+            return lastAppliedIndex;
         }
 
         @Override
-        public String getNodeId() {
-            return super.getNodeId();
+        public void setLastAppliedIndex(long index) {
+            this.lastAppliedIndex = index;
         }
 
         @Override
-        public State getState() {
-            return State.FOLLOWER;
+        public void reset() {
+            state.clear();
+            lastAppliedIndex = 0;
         }
     }
 }

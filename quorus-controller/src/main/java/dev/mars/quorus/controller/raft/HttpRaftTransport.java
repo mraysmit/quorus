@@ -61,6 +61,7 @@ public class HttpRaftTransport implements RaftTransport {
     private HttpServer httpServer;
     private volatile Consumer<Object> messageHandler;
     private volatile boolean running = false;
+    private volatile Object raftNode; // Will be set when transport is started
 
     /**
      * Creates a new HTTP-based Raft transport.
@@ -83,6 +84,10 @@ public class HttpRaftTransport implements RaftTransport {
             t.setDaemon(true);
             return t;
         });
+    }
+
+    public void setRaftNode(Object raftNode) {
+        this.raftNode = raftNode;
     }
 
     @Override
@@ -224,13 +229,20 @@ public class HttpRaftTransport implements RaftTransport {
                 String requestJson = new String(is.readAllBytes(), StandardCharsets.UTF_8);
                 VoteRequest request = objectMapper.readValue(requestJson, VoteRequest.class);
 
-                // Forward to message handler
-                if (messageHandler != null) {
-                    messageHandler.accept(request);
+                // Get response from RaftNode
+                VoteResponse response;
+                if (raftNode != null) {
+                    try {
+                        java.lang.reflect.Method method = raftNode.getClass().getMethod("handleVoteRequest", VoteRequest.class);
+                        response = (VoteResponse) method.invoke(raftNode, request);
+                    } catch (Exception e) {
+                        logger.log(Level.WARNING, "Failed to invoke handleVoteRequest", e);
+                        response = new VoteResponse(request.getTerm(), false, nodeId);
+                    }
+                } else {
+                    response = new VoteResponse(request.getTerm(), false, nodeId);
                 }
 
-                // Create a simple response (in real implementation, this would come from RaftNode)
-                VoteResponse response = new VoteResponse(request.getTerm(), true, nodeId);
                 String responseJson = objectMapper.writeValueAsString(response);
 
                 exchange.getResponseHeaders().set("Content-Type", "application/json");
@@ -265,14 +277,20 @@ public class HttpRaftTransport implements RaftTransport {
                 String requestJson = new String(is.readAllBytes(), StandardCharsets.UTF_8);
                 AppendEntriesRequest request = objectMapper.readValue(requestJson, AppendEntriesRequest.class);
 
-                // Forward to message handler
-                if (messageHandler != null) {
-                    messageHandler.accept(request);
+                // Get response from RaftNode
+                AppendEntriesResponse response;
+                if (raftNode != null) {
+                    try {
+                        java.lang.reflect.Method method = raftNode.getClass().getMethod("handleAppendEntriesRequest", AppendEntriesRequest.class);
+                        response = (AppendEntriesResponse) method.invoke(raftNode, request);
+                    } catch (Exception e) {
+                        logger.log(Level.WARNING, "Failed to invoke handleAppendEntriesRequest", e);
+                        response = new AppendEntriesResponse(request.getTerm(), false, nodeId, 0);
+                    }
+                } else {
+                    response = new AppendEntriesResponse(request.getTerm(), false, nodeId, 0);
                 }
 
-                // Create a simple response (in real implementation, this would come from RaftNode)
-                AppendEntriesResponse response = new AppendEntriesResponse(request.getTerm(), true, nodeId, 
-                    request.getPrevLogIndex() + (request.getEntries() != null ? request.getEntries().size() : 0));
                 String responseJson = objectMapper.writeValueAsString(response);
 
                 exchange.getResponseHeaders().set("Content-Type", "application/json");
