@@ -16,6 +16,8 @@
 
 package dev.mars.quorus.controller.raft;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.io.Serializable;
 
 public class VoteResponse implements Serializable {
@@ -26,7 +28,17 @@ public class VoteResponse implements Serializable {
     private final boolean voteGranted;
     private final String nodeId;
 
-    public VoteResponse(long term, boolean voteGranted, String nodeId) {
+    // Default constructor for Jackson
+    public VoteResponse() {
+        this.term = 0;
+        this.voteGranted = false;
+        this.nodeId = "";
+    }
+
+    @JsonCreator
+    public VoteResponse(@JsonProperty("term") long term,
+                       @JsonProperty("voteGranted") boolean voteGranted,
+                       @JsonProperty("nodeId") String nodeId) {
         this.term = term;
         this.voteGranted = voteGranted;
         this.nodeId = nodeId;

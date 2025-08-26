@@ -545,6 +545,423 @@ private synchronized void becomeLeader() {
 3. **Slow Elections**: Investigate network latency and node performance
 4. **Failed Elections**: Check quorum size and node availability
 
+### Controller Functions and Responsibilities
+
+The Quorus Controller serves as the **distributed coordination engine** for the entire file transfer system. Each controller node is a self-contained application that combines Raft consensus, state management, and HTTP API capabilities.
+
+#### Core Controller Functions
+
+**1. Distributed Consensus (Raft Engine)**
+- **Leader Election**: Automatically elects a leader from the controller cluster
+- **Log Replication**: Ensures all nodes have consistent command logs
+- **Consensus**: Guarantees majority agreement before applying changes
+- **Fault Tolerance**: Continues operating with up to (N-1)/2 node failures
+
+**2. State Machine Management**
+- **Transfer Job Management**: Creates, updates, and tracks file transfer jobs
+- **Agent Fleet Management**: Registers, monitors, and coordinates agents
+- **System Metadata**: Maintains cluster configuration and settings
+- **State Persistence**: Takes snapshots and handles recovery
+
+**3. Job Scheduling & Coordination**
+- **Job Assignment**: Assigns transfer jobs to appropriate agents
+- **Load Balancing**: Distributes work across available agents
+- **Progress Tracking**: Monitors transfer job status and progress
+- **Failure Handling**: Reschedules failed transfers
+
+**4. Agent Fleet Management**
+- **Agent Registration**: Onboards new agents into the fleet
+- **Heartbeat Processing**: Monitors agent health and availability
+- **Capability Management**: Tracks what each agent can do
+- **Fleet Coordination**: Manages the entire agent ecosystem
+
+**5. HTTP API Server**
+- **Health Monitoring**: Provides cluster health and status information
+- **API Endpoints**: Exposes REST APIs for external communication
+- **Cluster Status**: Reports Raft state and leadership information
+- **Metrics**: Provides operational metrics and monitoring data
+
+#### Controller Architecture Diagram
+
+```mermaid
+graph TB
+    subgraph "Controller Core Functions"
+        RAFT[Raft Consensus Engine]
+        SM[State Machine]
+        API[HTTP API Server]
+
+        RAFT --> SM
+        SM --> API
+    end
+
+    subgraph "State Management"
+        TJ[Transfer Jobs]
+        AG[Agent Fleet]
+        SYS[System Metadata]
+        WF[Workflows]
+
+        SM --> TJ
+        SM --> AG
+        SM --> SYS
+        SM --> WF
+    end
+
+    subgraph "Operations"
+        SCHED[Job Scheduling]
+        COORD[Agent Coordination]
+        MON[Health Monitoring]
+        SNAP[Snapshotting]
+
+        TJ --> SCHED
+        AG --> COORD
+        API --> MON
+        SM --> SNAP
+    end
+
+    subgraph "External Interfaces"
+        AGENTS[Agents]
+        APISVR[API Server]
+        CLI[CLI Tools]
+
+        COORD --> AGENTS
+        MON --> APISVR
+        API --> CLI
+    end
+
+    style RAFT fill:#c8e6c9
+    style SM fill:#e1f5fe
+    style API fill:#fff3e0
+```
+
+### Data Protection and Consistency Guarantees
+
+The controller implements comprehensive data protection through Raft consensus, ensuring no loss of critical operational metadata while maintaining strong consistency across the distributed cluster.
+
+#### Data Classification and Protection Levels
+
+```mermaid
+graph TB
+    subgraph "STRONGLY CONSISTENT DATA (Raft Protected)"
+        TJ[Transfer Jobs<br/>• Job ID, Status<br/>• Source/Destination<br/>• Progress, Errors<br/>• Assignment Info]
+        SM[System Metadata<br/>• Configuration<br/>• Version Info<br/>• Cluster Settings]
+        WF[Workflow Definitions<br/>• YAML Configs<br/>• Dependencies<br/>• Execution State]
+        TC[Tenant Config<br/>• Permissions<br/>• Quotas<br/>• Settings]
+    end
+
+    subgraph "EVENTUALLY CONSISTENT DATA (Not Raft Protected)"
+        AH[Agent Heartbeats<br/>• Health Status<br/>• Capacity Info<br/>• Performance Metrics]
+        RT[Real-time Metrics<br/>• Transfer Rates<br/>• Resource Usage<br/>• Temporary Stats]
+    end
+
+    subgraph "Raft Consensus Engine"
+        LOG[Raft Log<br/>Replicated Commands]
+        SNAP[Snapshots<br/>Periodic State Backup]
+    end
+
+    TJ --> LOG
+    SM --> LOG
+    WF --> LOG
+    TC --> LOG
+
+    LOG --> SNAP
+
+    style TJ fill:#c8e6c9
+    style SM fill:#c8e6c9
+    style WF fill:#c8e6c9
+    style TC fill:#c8e6c9
+    style AH fill:#fff3e0
+    style RT fill:#fff3e0
+    style LOG fill:#e1f5fe
+    style SNAP fill:#e1f5fe
+```
+
+#### Strongly Consistent Data (Raft Protected)
+
+**Transfer Job Data:**
+```java
+public class TransferJobSnapshot implements Serializable {
+    private final String jobId;
+    private final String sourceUri;
+    private final String destinationPath;
+    private final TransferStatus status;
+    private final long bytesTransferred;
+    private final long totalBytes;
+    private final Instant startTime;
+    private final String errorMessage;
+}
+```
+
+**Protected Information:**
+- **Job Assignments**: Which agent is handling which transfer
+- **Transfer Status**: PENDING, IN_PROGRESS, COMPLETED, FAILED
+- **Progress Tracking**: Bytes transferred, completion percentage
+- **Error Information**: Failure reasons and recovery state
+- **Metadata**: Source/destination paths, timing information
+
+**System Metadata:**
+- **Configuration**: Cluster settings and operational parameters
+- **Version Information**: System version and compatibility data
+- **Cluster Settings**: Node configurations and network topology
+
+**Workflow Definitions:**
+- **YAML Configurations**: Complete workflow specifications
+- **Dependencies**: Inter-job dependencies and sequencing
+- **Execution State**: Current workflow execution status
+
+#### Data Loss Prevention Mechanisms
+
+**1. Raft Log Replication**
+```java
+// PERSISTENT STATE - In production, persisted to stable storage
+private final AtomicLong currentTerm = new AtomicLong(0);
+private volatile String votedFor = null;
+private final List<LogEntry> log = new CopyOnWriteArrayList<>();
+```
+
+**Process:**
+1. **Command Submission**: All state changes go through Raft as commands
+2. **Log Replication**: Commands are replicated to majority of nodes (3 out of 5)
+3. **Commit Confirmation**: Only committed when majority acknowledges
+4. **State Application**: Commands applied to state machine only after commit
+
+**2. Snapshot Protection**
+```java
+@Override
+public byte[] takeSnapshot() {
+    QuorusSnapshot snapshot = new QuorusSnapshot();
+    snapshot.setTransferJobs(new ConcurrentHashMap<>(transferJobs));
+    snapshot.setSystemMetadata(new ConcurrentHashMap<>(systemMetadata));
+    snapshot.setLastAppliedIndex(lastAppliedIndex.get());
+
+    byte[] data = objectMapper.writeValueAsBytes(snapshot);
+    logger.info("Created snapshot with " + transferJobs.size() + " transfer jobs");
+    return data;
+}
+```
+
+**Benefits:**
+- **Periodic Backups**: Complete state snapshots taken regularly
+- **Fast Recovery**: New nodes can catch up quickly
+- **Log Compaction**: Reduces storage requirements
+- **Consistency**: Snapshots are point-in-time consistent
+
+#### Failure Scenarios and Data Protection
+
+**Scenario 1: Controller Node Failure**
+```
+Before Failure: 5 nodes have transfer job "TJ-123" status = "IN_PROGRESS"
+Node 2 Fails:   4 nodes still have transfer job "TJ-123" status = "IN_PROGRESS"
+Result:         NO DATA LOSS - Majority still has the data
+```
+
+**Scenario 2: Network Partition**
+```
+Partition A: 3 nodes (majority) - Can continue operations
+Partition B: 2 nodes (minority) - Becomes read-only
+Result:      NO DATA LOSS - Majority partition maintains consistency
+```
+
+**Scenario 3: Leader Failure During Write**
+```
+1. Leader receives: "Update TJ-123 status to COMPLETED"
+2. Leader replicates to 2 followers (majority achieved)
+3. Leader fails before responding to client
+4. New leader elected with the committed change
+Result: NO DATA LOSS - Change was committed to majority
+```
+
+#### What Data is NOT Protected
+
+**Important Clarification: File Content is NOT Stored**
+The controllers do **NOT** store the actual file data being transferred. They only store:
+- **Metadata** about transfers
+- **Coordination** information
+- **Status** and progress tracking
+
+**Eventually Consistent Data (Not Raft Protected):**
+- **Agent Heartbeats**: Can be lost and recovered through re-registration
+- **Real-time Performance Metrics**: Can be regenerated from current state
+- **Temporary Status Information**: Rebuilt during normal operations
+- **Cache Data**: Reconstructed as needed
+
+#### Business Impact of Data Protection
+
+**With Raft Protection:**
+- ✅ No lost transfer jobs
+- ✅ No duplicate transfers
+- ✅ Consistent job assignments
+- ✅ Reliable progress tracking
+- ✅ Audit trail preservation
+
+**Without Raft Protection:**
+- ❌ Transfer jobs could disappear
+- ❌ Duplicate transfers possible
+- ❌ Inconsistent job assignments
+- ❌ Lost progress information
+- ❌ Broken audit trails
+
+The controller ensures that the **"brain" of the system** (the coordination and tracking data) is never lost, providing enterprise-grade reliability for file transfer operations while maintaining strong consistency across the distributed cluster.
+
+### API-Controller Relationship and Coupling
+
+The Quorus architecture implements a **loosely coupled** relationship between the API layer and controller cluster, contrary to common assumptions about tight coupling in distributed systems.
+
+#### Architectural Separation
+
+```mermaid
+graph TB
+    subgraph "External Clients"
+        CLI[CLI Client]
+        WEB[Web UI]
+        AGENT[Agents]
+    end
+
+    subgraph "API Layer"
+        API[quorus-api:8080]
+        DS[DistributedTransferService]
+        CDS[ControllerDiscoveryService]
+        API --> DS
+        DS --> CDS
+    end
+
+    subgraph "Controller Cluster"
+        C1[controller1:8081]
+        C2[controller2:8082 - LEADER]
+        C3[controller3:8083]
+        C4[controller4:8084]
+        C5[controller5:8085]
+    end
+
+    subgraph "Communication Mechanisms"
+        HTTP[HTTP REST Calls]
+        SD[Service Discovery]
+        HB[Health Checks]
+        FO[Automatic Failover]
+    end
+
+    CLI --> API
+    WEB --> API
+    AGENT --> API
+
+    CDS -.->|Service Discovery| C1
+    CDS -.->|Service Discovery| C2
+    CDS -.->|Service Discovery| C3
+    CDS -.->|Service Discovery| C4
+    CDS -.->|Service Discovery| C5
+
+    DS -->|Active Connection| C2
+    DS -.->|Failover Ready| C1
+    DS -.->|Failover Ready| C3
+    DS -.->|Failover Ready| C4
+    DS -.->|Failover Ready| C5
+
+    style C2 fill:#c8e6c9
+    style API fill:#e1f5fe
+    style DS fill:#fff3e0
+    style CDS fill:#fff3e0
+```
+
+#### Loose Coupling Characteristics
+
+**1. Dynamic Service Discovery**
+```java
+/**
+ * Service responsible for discovering and maintaining connections to Raft controller nodes.
+ * This service helps the API layer find the current leader and handle failover scenarios.
+ */
+public CompletableFuture<RaftNode> discoverLeader() {
+    // Query all known nodes to find the current leader
+    for (String nodeId : clusterConfig.getNodeIds()) {
+        RaftNode node = getOrCreateNode(nodeId, nodeConfig);
+        if (node != null && node.getState() == RaftNode.State.LEADER) {
+            return node;
+        }
+    }
+}
+```
+
+**2. Automatic Failover**
+```java
+private CompletableFuture<RaftNode> ensureLeaderConnection() {
+    if (controllerNode.getState() == RaftNode.State.LEADER) {
+        return CompletableFuture.completedFuture(controllerNode);
+    }
+
+    logger.info("Current node is not leader, discovering leader...");
+
+    return discoveryService.discoverLeader()
+        .orTimeout(LEADER_DISCOVERY_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+}
+```
+
+**3. Graceful Degradation**
+```java
+// Try distributed controller first
+if (distributedTransferService.isControllerAvailable()) {
+    try {
+        // Use distributed controller
+    } catch (Exception e) {
+        logger.log(Level.FINE, "Distributed operation failed, trying local", e);
+        // Fall through to local operation
+    }
+}
+```
+
+#### Benefits of Loose Coupling
+
+**Resilience:**
+- API can survive controller failures and leadership changes
+- Automatic discovery of new leaders during failover
+- Circuit breaker patterns prevent cascade failures
+
+**Scalability:**
+- Controllers can be added/removed without API changes
+- Independent scaling of API and controller layers
+- Load distribution across multiple controller nodes
+
+**Maintainability:**
+- API and controllers can be developed/deployed independently
+- Clear separation of concerns between layers
+- Protocol-agnostic communication (HTTP REST)
+
+**Testability:**
+- Each layer can be tested in isolation
+- Mock controllers for API testing
+- Independent integration testing
+
+#### Communication Patterns
+
+**Service Discovery Pattern:**
+- API discovers available controllers at runtime
+- Health monitoring of controller endpoints
+- Automatic leader detection and tracking
+
+**Circuit Breaker Pattern:**
+- Prevents cascade failures during controller outages
+- Automatic recovery when controllers become available
+- Graceful degradation to local operations
+
+**Retry and Timeout Patterns:**
+- Configurable retry policies for transient failures
+- Timeout management for long-running operations
+- Exponential backoff for failed requests
+
+#### Architectural Evolution
+
+**Current State: Loosely Coupled**
+- ✅ Service discovery implemented
+- ✅ Automatic failover working
+- ✅ Health monitoring active
+- ✅ Graceful degradation available
+
+**Future Enhancements:**
+- **Multiple API Instances**: Scale API layer independently
+- **Load Balancer Integration**: Distribute client load across API instances
+- **Advanced Circuit Breakers**: More sophisticated failure handling
+- **Metrics and Observability**: Enhanced monitoring of API-Controller interactions
+
+The loose coupling between API and controllers provides a robust foundation for enterprise-grade distributed file transfer operations, ensuring high availability and fault tolerance across all system layers.
+
 ## Reliability and Health Monitoring
 
 ### System Reliability Improvements

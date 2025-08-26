@@ -16,6 +16,8 @@
 
 package dev.mars.quorus.controller.raft;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.io.Serializable;
 
 public class AppendEntriesResponse implements Serializable {
@@ -27,7 +29,19 @@ public class AppendEntriesResponse implements Serializable {
     private final String nodeId;
     private final long matchIndex;
 
-    public AppendEntriesResponse(long term, boolean success, String nodeId, long matchIndex) {
+    // Default constructor for Jackson
+    public AppendEntriesResponse() {
+        this.term = 0;
+        this.success = false;
+        this.nodeId = "";
+        this.matchIndex = 0;
+    }
+
+    @JsonCreator
+    public AppendEntriesResponse(@JsonProperty("term") long term,
+                                @JsonProperty("success") boolean success,
+                                @JsonProperty("nodeId") String nodeId,
+                                @JsonProperty("matchIndex") long matchIndex) {
         this.term = term;
         this.success = success;
         this.nodeId = nodeId;

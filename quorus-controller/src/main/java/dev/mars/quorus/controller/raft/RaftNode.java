@@ -338,28 +338,63 @@ public class RaftNode {
         logger.info("Received message: " + message.getClass().getSimpleName());
 
         if (message instanceof VoteRequest) {
-            handleVoteRequest((VoteRequest) message);
+            VoteResponse response = handleVoteRequest((VoteRequest) message);
+            // Response will be handled by the transport layer
         } else if (message instanceof AppendEntriesRequest) {
-            handleAppendEntriesRequest((AppendEntriesRequest) message);
+            AppendEntriesResponse response = handleAppendEntriesRequest((AppendEntriesRequest) message);
+            // Response will be handled by the transport layer
         }
     }
 
-    private void handleVoteRequest(VoteRequest request) {
-        // Basic vote granting logic - in a full implementation this would be more sophisticated
-        boolean voteGranted = request.getTerm() >= currentTerm.get();
-        if (voteGranted && request.getTerm() > currentTerm.get()) {
+    public VoteResponse handleVoteRequest(VoteRequest request) {
+        logger.info("Handling vote request from " + request.getCandidateId() + " for term " + request.getTerm());
+
+        boolean voteGranted = false;
+        long currentTermValue = currentTerm.get();
+
+        if (request.getTerm() > currentTermValue) {
+            // Higher term, step down and grant vote
             stepDown(request.getTerm());
+            votedFor = request.getCandidateId();
+            voteGranted = true;
+            logger.info("Granted vote to " + request.getCandidateId() + " for term " + request.getTerm());
+        } else if (request.getTerm() == currentTermValue &&
+                   (votedFor == null || votedFor.equals(request.getCandidateId()))) {
+            // Same term, haven't voted yet or already voted for this candidate
+            votedFor = request.getCandidateId();
+            voteGranted = true;
+            logger.info("Granted vote to " + request.getCandidateId() + " for term " + request.getTerm());
+        } else {
+            logger.info("Denied vote to " + request.getCandidateId() + " for term " + request.getTerm() +
+                       " (current term: " + currentTermValue + ", voted for: " + votedFor + ")");
         }
+
+        return new VoteResponse(currentTerm.get(), voteGranted, nodeId);
     }
 
-    private void handleAppendEntriesRequest(AppendEntriesRequest request) {
-        // Reset election timer on valid heartbeat
-        if (request.getTerm() >= currentTerm.get()) {
+    public AppendEntriesResponse handleAppendEntriesRequest(AppendEntriesRequest request) {
+        logger.info("Handling append entries from " + request.getLeaderId() + " for term " + request.getTerm());
+
+        long currentTermValue = currentTerm.get();
+        boolean success = false;
+
+        if (request.getTerm() >= currentTermValue) {
+            // Valid leader, reset election timer
             resetElectionTimer();
-            if (request.getTerm() > currentTerm.get()) {
+
+            if (request.getTerm() > currentTermValue) {
                 stepDown(request.getTerm());
             }
+
+            // For heartbeats (empty entries), just acknowledge
+            if (request.getEntries() == null || request.getEntries().isEmpty()) {
+                success = true;
+                logger.info("Acknowledged heartbeat from leader " + request.getLeaderId());
+            }
         }
+
+        return new AppendEntriesResponse(currentTerm.get(), success, nodeId,
+            request.getPrevLogIndex() + (request.getEntries() != null ? request.getEntries().size() : 0));
     }
 
     /**
