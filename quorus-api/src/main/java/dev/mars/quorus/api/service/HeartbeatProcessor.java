@@ -143,13 +143,19 @@ public class HeartbeatProcessor {
                 }
 
                 // Check sequence number for duplicate detection
+                // Note: Allow sequence number reset after server restart by checking if this is
+                // the first heartbeat we've seen from this agent since startup
                 Long lastSeqNum = lastSequenceNumbers.get(agentId);
                 if (lastSeqNum != null && request.getSequenceNumber() <= lastSeqNum) {
-                    logger.warning("Received duplicate or out-of-order heartbeat from agent: " + 
-                                 agentId + ", seq: " + request.getSequenceNumber() + 
+                    logger.warning("Received duplicate or out-of-order heartbeat from agent: " +
+                                 agentId + ", seq: " + request.getSequenceNumber() +
                                  ", last: " + lastSeqNum);
-                    return AgentHeartbeatResponse.failure(agentId, 
+                    return AgentHeartbeatResponse.failure(agentId,
                         "Duplicate or out-of-order heartbeat", "INVALID_SEQUENCE");
+                } else if (lastSeqNum == null) {
+                    // First heartbeat from this agent since server startup
+                    logger.info("First heartbeat received from agent " + agentId +
+                               " since server startup, sequence: " + request.getSequenceNumber());
                 }
 
                 // Update heartbeat tracking
@@ -350,6 +356,25 @@ public class HeartbeatProcessor {
             
             agentInfo.setStatus(AgentStatus.DEGRADED);
         }
+    }
+
+    /**
+     * Reset sequence number tracking for an agent.
+     * This is useful when an agent reconnects after a server restart.
+     */
+    public void resetAgentSequenceNumber(String agentId) {
+        lastSequenceNumbers.remove(agentId);
+        logger.info("Reset sequence number tracking for agent: " + agentId);
+    }
+
+    /**
+     * Reset sequence number tracking for all agents.
+     * This can be called during server startup to handle restart scenarios.
+     */
+    public void resetAllSequenceNumbers() {
+        int count = lastSequenceNumbers.size();
+        lastSequenceNumbers.clear();
+        logger.info("Reset sequence number tracking for " + count + " agents");
     }
 
     /**

@@ -1,0 +1,183 @@
+version: '3.8'
+
+# Quorus Controller-First Architecture
+# Each controller is a self-contained node with embedded HTTP API
+# This provides natural scaling and fault tolerance
+
+services:
+  # Controller Node 1
+  controller1:
+    build:
+      context: ../..
+      dockerfile: quorus-controller/Dockerfile
+    container_name: quorus-controller1
+    hostname: controller1
+    environment:
+      - NODE_ID=controller1
+      - RAFT_HOST=0.0.0.0
+      - RAFT_PORT=8080
+      - HTTP_PORT=8080
+      - CLUSTER_NODES=controller1=controller1:8080,controller2=controller2:8080,controller3=controller3:8080
+      - ELECTION_TIMEOUT_MS=3000
+      - HEARTBEAT_INTERVAL_MS=500
+      - JAVA_OPTS=-Xmx512m -Xms256m
+    ports:
+      - "8081:8080"  # HTTP API
+    networks:
+      quorus-cluster:
+        ipv4_address: 172.20.0.11
+    volumes:
+      - controller1-data:/app/data
+      - controller1-logs:/app/logs
+    labels:
+      - "logging=promtail"
+      - "service=quorus-controller1"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
+  # Controller Node 2
+  controller2:
+    build:
+      context: ../..
+      dockerfile: quorus-controller/Dockerfile
+    container_name: quorus-controller2
+    hostname: controller2
+    environment:
+      - NODE_ID=controller2
+      - RAFT_HOST=0.0.0.0
+      - RAFT_PORT=8080
+      - HTTP_PORT=8080
+      - CLUSTER_NODES=controller1=controller1:8080,controller2=controller2:8080,controller3=controller3:8080
+      - ELECTION_TIMEOUT_MS=3000
+      - HEARTBEAT_INTERVAL_MS=500
+      - JAVA_OPTS=-Xmx512m -Xms256m
+    ports:
+      - "8082:8080"  # HTTP API
+    networks:
+      quorus-cluster:
+        ipv4_address: 172.20.0.12
+    volumes:
+      - controller2-data:/app/data
+      - controller2-logs:/app/logs
+    labels:
+      - "logging=promtail"
+      - "service=quorus-controller2"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    depends_on:
+      - controller1
+
+  # Controller Node 3
+  controller3:
+    build:
+      context: ../..
+      dockerfile: quorus-controller/Dockerfile
+    container_name: quorus-controller3
+    hostname: controller3
+    environment:
+      - NODE_ID=controller3
+      - RAFT_HOST=0.0.0.0
+      - RAFT_PORT=8080
+      - HTTP_PORT=8080
+      - CLUSTER_NODES=controller1=controller1:8080,controller2=controller2:8080,controller3=controller3:8080
+      - ELECTION_TIMEOUT_MS=3000
+      - HEARTBEAT_INTERVAL_MS=500
+      - JAVA_OPTS=-Xmx512m -Xms256m
+    ports:
+      - "8083:8080"  # HTTP API
+    networks:
+      quorus-cluster:
+        ipv4_address: 172.20.0.13
+    volumes:
+      - controller3-data:/app/data
+      - controller3-logs:/app/logs
+    labels:
+      - "logging=promtail"
+      - "service=quorus-controller3"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    depends_on:
+      - controller1
+      - controller2
+
+  # Load Balancer for High Availability
+  nginx:
+    image: nginx:alpine
+    container_name: quorus-loadbalancer
+    ports:
+      - "8080:80"  # Main API endpoint
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      quorus-cluster:
+        ipv4_address: 172.20.0.10
+    depends_on:
+      - controller1
+      - controller2
+      - controller3
+    labels:
+      - "logging=promtail"
+      - "service=quorus-loadbalancer"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+networks:
+  quorus-cluster:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  controller1-data:
+    driver: local
+  controller1-logs:
+    driver: local
+  controller2-data:
+    driver: local
+  controller2-logs:
+    driver: local
+  controller3-data:
+    driver: local
+  controller3-logs:
+    driver: local

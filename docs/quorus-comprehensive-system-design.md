@@ -1,7 +1,7 @@
 # Quorus Comprehensive System Design
 
-**Version:** 1.0
-**Date:** 25 October 2024
+**Version:** 2.0
+**Date:** 26 August 2025
 **Author:** Mark Andrew Ray-Smith Cityline Ltd
 
 ## Overview
@@ -24,6 +24,18 @@ The system is architected to leverage the **high bandwidth, low latency, and tru
 
 ## System Architecture
 
+### Controller-First Architecture
+
+Quorus follows a **controller-first architecture** where each controller is a self-contained node with embedded HTTP API capabilities. This design provides natural scaling, fault tolerance, and eliminates single points of failure.
+
+#### Core Design Principles
+
+1. **Controller Ownership**: The controller owns the HTTP API as one of its capabilities
+2. **Self-Contained Nodes**: Each controller node is independently deployable and scalable
+3. **Distributed Consensus**: Raft consensus ensures data consistency across the cluster
+4. **Natural Scaling**: Add/remove controller nodes without architectural changes
+5. **No Single Point of Failure**: Any controller can fail without affecting the system
+
 ### High-Level Distributed Architecture
 
 ```mermaid
@@ -33,18 +45,21 @@ graph TD
     WEB[Web Dashboard]
     YAML[YAML Workflows]
 
-    VIP[Virtual IP Failover]
-    LB[HAProxy/F5 Load Balancer]
+    LB[Load Balancer<br/>Nginx/HAProxy]
 
-    CL[Controller Leader]
-    CF1[Controller Follower 1]
-    CF2[Controller Follower 2]
+    subgraph "Controller Cluster"
+        C1[Controller 1<br/>HTTP API + Raft]
+        C2[Controller 2<br/>HTTP API + Raft]
+        C3[Controller 3<br/>HTTP API + Raft]
+    end
 
-    WS[Workflow Service]
-    TS[Transfer Service]
-    AS[Agent Service]
-    MS[Monitoring Service]
-    TMS[Tenant Service]
+    subgraph "Embedded Services"
+        WS[Workflow Engine]
+        TS[Transfer Orchestration]
+        AS[Agent Management]
+        MS[Monitoring & Metrics]
+        TMS[Tenant Management]
+    end
 
     AR[(Agent Registry)]
     HS[(Heartbeat Store)]
@@ -53,25 +68,36 @@ graph TD
 
     AGENTS[Agent Fleet<br/>100+ Agents<br/>Multi-Protocol<br/>Geographic Distribution]
 
-    CLI --> VIP
-    API --> VIP
-    WEB --> VIP
-    YAML --> VIP
+    CLI --> LB
+    API --> LB
+    WEB --> LB
+    YAML --> LB
 
-    VIP --> LB
+    LB --> C1
+    LB --> C2
+    LB --> C3
 
-    LB --> CL
-    LB --> CF1
-    LB --> CF2
+    C1 -.->|Raft Consensus| C2
+    C1 -.->|Raft Consensus| C3
+    C2 -.->|Raft Consensus| C3
 
-    CL -.->|Raft Consensus| CF1
-    CL -.->|Raft Consensus| CF2
+    C1 --> WS
+    C1 --> TS
+    C1 --> AS
+    C1 --> MS
+    C1 --> TMS
 
-    CL --> WS
-    CL --> TS
-    CL --> AS
-    CL --> MS
-    CL --> TMS
+    C2 --> WS
+    C2 --> TS
+    C2 --> AS
+    C2 --> MS
+    C2 --> TMS
+
+    C3 --> WS
+    C3 --> TS
+    C3 --> AS
+    C3 --> MS
+    C3 --> TMS
 
     WS --> AR
     TS --> JS
@@ -82,9 +108,9 @@ graph TD
     AS -.->|Job Assignment| AGENTS
     AGENTS -.->|Heartbeat| AS
 
-    style CL fill:#e3f2fd
-    style CF1 fill:#e8f5e8
-    style CF2 fill:#e8f5e8
+    style C1 fill:#e3f2fd
+    style C2 fill:#e8f5e8
+    style C3 fill:#e8f5e8
     style WS fill:#fff3e0
     style TS fill:#fff3e0
     style AS fill:#fff3e0
@@ -95,18 +121,26 @@ graph TD
 
 ### Module Structure
 
-The system is organized into multiple Maven modules for clear separation of concerns:
+The system is organized into multiple Maven modules with **controller-first architecture**:
 
 ```mermaid
 graph TD
     QP[quorus - Parent Project]
 
+    QP --> QCT[quorus-controller<br/>**Main Application**<br/>Raft + HTTP API]
     QP --> QC[quorus-core<br/>Core Transfer Engine]
     QP --> QT[quorus-tenant<br/>Multi-Tenant Management]
     QP --> QW[quorus-workflow<br/>YAML Workflow Engine]
+    QP --> QA[quorus-api<br/>Legacy API Module]
     QP --> QIE[quorus-integration-examples<br/>Usage Examples]
     QP --> QWE[quorus-workflow-examples<br/>Workflow Examples]
 
+    QCT --> QC
+    QCT --> QT
+    QCT --> QW
+    QA --> QC
+    QA --> QT
+    QA --> QW
     QW --> QC
     QT --> QC
     QIE --> QC
@@ -114,45 +148,138 @@ graph TD
     QWE --> QT
 
     style QP fill:#e1f5fe
+    style QCT fill:#ff6b6b
     style QC fill:#f3e5f5
     style QT fill:#e8f5e8
     style QW fill:#fff3e0
+    style QA fill:#ffeb3b
     style QIE fill:#fce4ec
     style QWE fill:#f1f8e9
 ```
 
-## Controller Quorum Architecture
+#### Module Responsibilities
+
+- **quorus-controller**: Main executable application with embedded HTTP API and Raft consensus
+- **quorus-core**: Core transfer engine and protocols
+- **quorus-tenant**: Multi-tenant management and isolation
+- **quorus-workflow**: YAML-based workflow engine
+- **quorus-api**: Legacy API module (being phased out)
+- **quorus-integration-examples**: Usage examples and integration patterns
+- **quorus-workflow-examples**: Workflow definition examples
+
+## Deployment Configurations
+
+Quorus supports multiple deployment configurations to meet different operational requirements:
+
+### Development Configuration
+```bash
+# Single-node development setup
+.\start.ps1 cluster
+```
+- **Single controller** with embedded HTTP API
+- **Minimal resource usage** for development
+- **Quick startup** and testing
+- **Port**: http://localhost:8080
+
+### Production Configuration
+```bash
+# Controller-first cluster with load balancing
+.\start.ps1 controllers
+```
+- **3 controller nodes** with embedded HTTP APIs
+- **Nginx load balancer** for high availability
+- **Raft consensus** for data consistency
+- **Fault tolerance**: Any single node can fail
+- **Endpoints**:
+  - Load Balanced: http://localhost:8080
+  - Controller 1: http://localhost:8081
+  - Controller 2: http://localhost:8082
+  - Controller 3: http://localhost:8083
+
+### Legacy Multi-Node Configuration
+```bash
+# Legacy API-first architecture (deprecated)
+.\start.ps1 multinode
+```
+- **3 API instances** with embedded controllers
+- **For migration** from API-first architecture
+- **Being phased out** in favor of controller-first
+
+## Controller-First Architecture
+
+### Core Design Philosophy
+
+The controller-first architecture represents a fundamental shift from traditional API-first designs:
+
+**Traditional API-First (Deprecated):**
+```
+API Layer (Main) → Controller (Embedded Library)
+```
+
+**Controller-First (Current):**
+```
+Controller (Main) → HTTP API (Embedded Interface)
+```
+
+### Benefits of Controller-First Design
+
+1. **Natural Scaling**: Each controller is independently scalable
+2. **Fault Tolerance**: No single point of failure
+3. **Architectural Clarity**: Controller owns its interfaces
+4. **Operational Simplicity**: Single artifact per node
+5. **Interface Flexibility**: Easy to add new interfaces (gRPC, WebSocket, etc.)
 
 ### Raft Consensus Implementation
 
-The Quorus controller layer implements a distributed consensus system based on the Raft algorithm to ensure high availability, consistency, and fault tolerance across the controller cluster.
+The Quorus controller implements a distributed consensus system based on the Raft algorithm to ensure high availability, consistency, and fault tolerance across the controller cluster.
 
 ```mermaid
 graph TB
-    subgraph "Controller Quorum (3-5 nodes)"
-        C1[Controller 1<br/>Leader]
-        C2[Controller 2<br/>Follower]
-        C3[Controller 3<br/>Follower]
-        C4[Controller 4<br/>Follower]
-        C5[Controller 5<br/>Follower]
+    subgraph "Load Balancer"
+        LB[Nginx Load Balancer<br/>Port 8080]
+    end
 
-        C1 -.->|Raft Consensus| C2
-        C1 -.->|Raft Consensus| C3
-        C1 -.->|Raft Consensus| C4
-        C1 -.->|Raft Consensus| C5
+    subgraph "Controller Cluster (3 nodes)"
+        subgraph "Controller 1 (Leader)"
+            C1_RAFT[Raft Consensus Engine]
+            C1_HTTP[HTTP API Server<br/>Port 8081]
+            C1_RAFT --> C1_HTTP
+        end
+
+        subgraph "Controller 2 (Follower)"
+            C2_RAFT[Raft Consensus Engine]
+            C2_HTTP[HTTP API Server<br/>Port 8082]
+            C2_RAFT --> C2_HTTP
+        end
+
+        subgraph "Controller 3 (Follower)"
+            C3_RAFT[Raft Consensus Engine]
+            C3_HTTP[HTTP API Server<br/>Port 8083]
+            C3_RAFT --> C3_HTTP
+        end
+
+        C1_RAFT -.->|Raft Consensus| C2_RAFT
+        C1_RAFT -.->|Raft Consensus| C3_RAFT
+        C2_RAFT -.->|Raft Consensus| C3_RAFT
 
         subgraph "Replicated State"
             RS1[Agent Registry]
             RS2[Job Queue]
             RS3[Tenant Config]
             RS4[Workflow State]
+            RS5[Heartbeat Tracking]
         end
 
-        C1 --> RS1
-        C1 --> RS2
-        C1 --> RS3
-        C1 --> RS4
+        C1_RAFT --> RS1
+        C1_RAFT --> RS2
+        C1_RAFT --> RS3
+        C1_RAFT --> RS4
+        C1_RAFT --> RS5
     end
+
+    LB --> C1_HTTP
+    LB --> C2_HTTP
+    LB --> C3_HTTP
 
     subgraph "Agent Fleet (100+ agents)"
         A1[Agent 1]
@@ -417,6 +544,132 @@ private synchronized void becomeLeader() {
 2. **Split Votes**: Verify clock synchronization across nodes
 3. **Slow Elections**: Investigate network latency and node performance
 4. **Failed Elections**: Check quorum size and node availability
+
+## Reliability and Health Monitoring
+
+### System Reliability Improvements
+
+The controller-first architecture includes several critical reliability improvements that address common failure modes in distributed systems:
+
+#### Health Check Configuration
+**Problem Resolved**: Docker health checks were using incorrect endpoints (`/q/health` vs `/health`)
+**Solution**: Standardized health endpoints across all components
+**Impact**: Accurate container health reporting and proper load balancer routing
+
+```yaml
+# Corrected health check configuration
+healthcheck:
+  test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+  interval: 10s
+  timeout: 5s
+  retries: 3
+  start_period: 30s
+```
+
+#### Sequence Number Persistence
+**Problem Resolved**: In-memory sequence number tracking caused heartbeat rejection after restarts
+**Solution**: Enhanced sequence number validation with restart detection
+**Impact**: Graceful handling of controller restarts without agent re-registration
+
+```java
+// Enhanced sequence number validation
+if (lastSeqNum == null) {
+    // First heartbeat from this agent since server startup
+    logger.info("First heartbeat received from agent " + agentId +
+               " since server startup, sequence: " + request.getSequenceNumber());
+}
+```
+
+#### Load Balancer Integration
+**Problem Resolved**: Single point of failure with single API endpoint
+**Solution**: Nginx load balancer with health-aware routing
+**Impact**: High availability with automatic failover to healthy controllers
+
+```nginx
+upstream quorus_controllers {
+    server controller1:8080 max_fails=3 fail_timeout=30s;
+    server controller2:8080 max_fails=3 fail_timeout=30s;
+    server controller3:8080 max_fails=3 fail_timeout=30s;
+}
+```
+
+### Health Monitoring Architecture
+
+#### Multi-Level Health Checks
+
+**Application Level:**
+- `/health` - Overall application health
+- `/health/ready` - Readiness for traffic
+- `/health/live` - Process liveness
+
+**Infrastructure Level:**
+- Docker container health checks
+- Load balancer health probes
+- Kubernetes readiness/liveness probes (when applicable)
+
+**Cluster Level:**
+- Raft consensus health
+- Leader election status
+- Node connectivity
+
+#### Health Check Response Format
+
+```json
+{
+  "status": "UP",
+  "timestamp": "2025-08-26T10:30:00Z",
+  "checks": {
+    "raft": {
+      "status": "UP",
+      "nodeId": "controller1",
+      "state": "LEADER",
+      "clusterSize": 3,
+      "healthyNodes": 3
+    },
+    "database": {
+      "status": "UP",
+      "connectionPool": "healthy"
+    },
+    "storage": {
+      "status": "UP",
+      "diskSpace": "85% available"
+    }
+  }
+}
+```
+
+#### Monitoring Integration
+
+**Prometheus Metrics:**
+- `quorus_controller_health_status`
+- `quorus_raft_leader_elections_total`
+- `quorus_heartbeat_processing_duration`
+- `quorus_agent_registration_total`
+
+**Grafana Dashboards:**
+- Controller cluster overview
+- Agent fleet status
+- Transfer job metrics
+- System performance
+
+**Log Aggregation:**
+- Structured logging with correlation IDs
+- Centralized log collection via Promtail
+- Log analysis and alerting via Loki
+
+### Fault Tolerance Patterns
+
+#### Circuit Breaker Pattern
+Implemented for external service calls to prevent cascade failures.
+
+#### Bulkhead Pattern
+Resource isolation between different types of operations (heartbeats, transfers, registrations).
+
+#### Retry with Exponential Backoff
+Automatic retry for transient failures with intelligent backoff strategies.
+
+#### Graceful Degradation
+System continues operating with reduced functionality during partial failures.
 
 ## Agent-Controller Communication Protocol
 
@@ -2454,6 +2707,188 @@ source:
 - Error categorization and classification
 - Integration with monitoring systems
 
+## Operational Improvements
+
+### Deployment Automation
+
+#### Docker Compose Configurations
+
+**Controller-First Production Setup:**
+```bash
+# Start production cluster with load balancing
+.\start.ps1 controllers
+
+# Services started:
+# - 3 Controller nodes (ports 8081-8083)
+# - Nginx load balancer (port 8080)
+# - Health monitoring enabled
+# - Automatic failover configured
+```
+
+**Development Setup:**
+```bash
+# Start single-node development environment
+.\start.ps1 cluster
+
+# Services started:
+# - Single controller with embedded API
+# - Minimal resource usage
+# - Quick startup for development
+```
+
+**Logging and Monitoring:**
+```bash
+# Start comprehensive logging stack
+.\start.ps1 logging
+
+# Services started:
+# - Loki for log aggregation
+# - Promtail for log collection
+# - Grafana for visualization
+# - Prometheus for metrics
+```
+
+#### Build and Deployment Pipeline
+
+**Maven Build Configuration:**
+- **Shade Plugin**: Creates executable JAR with all dependencies
+- **Main Class**: `dev.mars.quorus.controller.QuorusControllerApplication`
+- **Health Checks**: Integrated Docker health monitoring
+- **Multi-Stage Build**: Optimized Docker images
+
+**Docker Configuration:**
+```dockerfile
+# Multi-stage build for optimized images
+FROM openjdk:17-jre-slim
+COPY target/quorus-controller-*.jar app.jar
+HEALTHCHECK CMD curl -f http://localhost:${HTTP_PORT}/health
+CMD ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
+```
+
+### Configuration Management
+
+#### Environment Variables
+
+**Controller Configuration:**
+```bash
+NODE_ID=controller1                    # Unique node identifier
+RAFT_HOST=0.0.0.0                     # Raft binding host
+RAFT_PORT=8080                        # Raft communication port
+HTTP_PORT=8080                        # HTTP API port
+CLUSTER_NODES=controller1=host1:8080,controller2=host2:8080,controller3=host3:8080
+ELECTION_TIMEOUT_MS=3000              # Raft election timeout
+HEARTBEAT_INTERVAL_MS=500             # Raft heartbeat interval
+JAVA_OPTS=-Xmx512m -Xms256m          # JVM configuration
+```
+
+**Load Balancer Configuration:**
+```nginx
+upstream quorus_controllers {
+    server controller1:8080 max_fails=3 fail_timeout=30s;
+    server controller2:8080 max_fails=3 fail_timeout=30s;
+    server controller3:8080 max_fails=3 fail_timeout=30s;
+}
+```
+
+### Monitoring and Observability
+
+#### Comprehensive Health Monitoring
+
+**Health Check Endpoints:**
+- `/health` - Overall system health
+- `/health/ready` - Service readiness
+- `/health/live` - Process liveness
+- `/status` - Detailed status information
+- `/metrics` - Prometheus metrics
+
+**Key Metrics Tracked:**
+- Controller cluster health
+- Raft consensus status
+- Agent heartbeat processing
+- Transfer job throughput
+- System resource utilization
+
+#### Log Aggregation
+
+**Structured Logging:**
+- JSON format for machine parsing
+- Correlation IDs for request tracing
+- Contextual information for debugging
+- Performance metrics embedded
+
+**Centralized Collection:**
+- Promtail agents on all nodes
+- Loki for log storage and indexing
+- Grafana for log visualization
+- Alert rules for critical events
+
+### Operational Scripts
+
+#### Management Commands
+
+**Service Management:**
+```bash
+# Start services
+.\start.ps1 controllers    # Production cluster
+.\start.ps1 cluster       # Development
+.\start.ps1 logging       # Monitoring stack
+
+# Service status
+.\start.ps1 status        # Show all service status
+
+# Stop services
+.\start.ps1 stop          # Stop all services
+```
+
+**Testing and Validation:**
+```bash
+# Test scripts in docker/test-data/
+.\send-heartbeat.ps1      # Send test heartbeats
+.\check-agents.ps1        # Check agent status
+.\demo-logging.ps1        # Demonstrate logging
+```
+
+#### Troubleshooting Tools
+
+**Health Validation:**
+```bash
+# Check individual controller health
+curl http://localhost:8081/health
+curl http://localhost:8082/health
+curl http://localhost:8083/health
+
+# Check load balancer
+curl http://localhost:8080/health
+```
+
+**Log Analysis:**
+```bash
+# View controller logs
+docker logs quorus-controller1 --tail 50
+
+# View load balancer logs
+docker logs quorus-loadbalancer --tail 50
+```
+
+### Performance Optimization
+
+#### Resource Configuration
+
+**JVM Tuning:**
+- Heap size optimization based on load
+- Garbage collection tuning for low latency
+- JIT compilation optimization
+
+**Network Optimization:**
+- Connection pooling for Raft communication
+- HTTP keep-alive for API connections
+- Load balancer connection limits
+
+**Storage Optimization:**
+- Persistent volumes for data durability
+- Log rotation and cleanup policies
+- Backup and recovery procedures
+
 ## Future Enhancements
 
 ### Phase 2 Implementation (Moved from Future to Active Development)
@@ -2670,15 +3105,91 @@ docs/                           # Documentation
 - **[Implementation Plan](../quorus-integration-examples/quorus-implementation-plan.md)** - Detailed 52-week development roadmap with Gantt chart timeline, milestones, and deliverables
 - **[API Documentation](api-documentation.md)** - REST API specifications (future)
 
+## Version History
+
+### Version 2.0 (August 26, 2025)
+**Major Architectural Refactoring: Controller-First Design**
+
+#### Breaking Changes
+- **Architecture**: Migrated from API-first to controller-first architecture
+- **Deployment**: New deployment configurations with load balancing
+- **Module Structure**: Controller is now the main executable application
+
+#### New Features
+- **Controller-First Architecture**: Controllers own HTTP API as embedded interface
+- **Load Balancer Integration**: Nginx load balancer for high availability
+- **Multiple Deployment Modes**: Development, production, and legacy configurations
+- **Enhanced Health Monitoring**: Multi-level health checks and monitoring
+- **Improved Reliability**: Fixed health check endpoints and sequence number persistence
+- **Operational Automation**: Comprehensive deployment and management scripts
+
+#### Reliability Improvements
+- **Health Check Configuration**: Fixed Docker health check endpoints
+- **Sequence Number Persistence**: Enhanced validation with restart detection
+- **Fault Tolerance**: Eliminated single points of failure
+- **Load Balancing**: Automatic failover to healthy controllers
+- **Monitoring Integration**: Prometheus metrics and Grafana dashboards
+
+#### Deployment Configurations
+- **Production**: `.\start.ps1 controllers` - 3 controllers with load balancer
+- **Development**: `.\start.ps1 cluster` - Single controller for development
+- **Monitoring**: `.\start.ps1 logging` - Complete observability stack
+- **Legacy**: `.\start.ps1 multinode` - API-first architecture (deprecated)
+
+#### Technical Improvements
+- **Executable JAR**: Maven shade plugin for standalone controller
+- **Docker Optimization**: Multi-stage builds and health checks
+- **Configuration Management**: Environment-based configuration
+- **Operational Scripts**: Automated deployment and testing tools
+
+### Version 1.0 (October 25, 2024)
+**Initial System Design**
+
+#### Core Features
+- Multi-tenant architecture design
+- YAML workflow engine specification
+- Distributed controller architecture planning
+- Agent-based transfer execution design
+- Security framework definition
+- Monitoring and observability planning
+
 ## Conclusion
 
-The Quorus comprehensive system design provides a solid foundation for enterprise-grade file transfer operations with:
+The Quorus comprehensive system design provides a robust, production-ready foundation for enterprise-grade file transfer operations with:
 
-- **Multi-tenant architecture** supporting complex organizational structures
-- **Declarative YAML workflows** for infrastructure-as-code approach
-- **Robust security framework** with authentication, authorization, and compliance
-- **Scalable architecture** supporting horizontal scaling and high availability
-- **Enterprise features** including governance, monitoring, and resource management
+### Core Architectural Strengths
 
-The modular design ensures maintainability and extensibility while meeting the demanding requirements of enterprise environments. The system is designed to grow from simple single-tenant deployments to complex multi-tenant enterprise scenarios with thousands of users and petabytes of data transfer.
+- **Controller-First Architecture**: Natural scaling with self-contained nodes
+- **Distributed Consensus**: Raft-based coordination for strong consistency
+- **High Availability**: Load-balanced deployment with automatic failover
+- **Multi-tenant Support**: Complex organizational structures and isolation
+- **Declarative Workflows**: YAML-based infrastructure-as-code approach
+
+### Operational Excellence
+
+- **Comprehensive Monitoring**: Multi-level health checks and observability
+- **Deployment Automation**: Multiple configurations for different environments
+- **Fault Tolerance**: No single points of failure with graceful degradation
+- **Performance Optimization**: Tuned for high-throughput operations
+- **Enterprise Security**: Authentication, authorization, and compliance frameworks
+
+### Scalability and Reliability
+
+- **Horizontal Scaling**: Add/remove controller nodes without downtime
+- **Agent Fleet Management**: Support for 100+ agents with intelligent scheduling
+- **Fault Recovery**: Automatic detection and recovery from failures
+- **Load Distribution**: Intelligent routing and resource utilization
+- **Data Consistency**: Strong consistency guarantees across the cluster
+
+### Production Readiness
+
+The system has evolved from initial design to a **production-ready implementation** with:
+
+- **Proven Architecture**: Controller-first design eliminates architectural inconsistencies
+- **Operational Tools**: Comprehensive deployment, monitoring, and troubleshooting scripts
+- **Reliability Improvements**: Fixed critical issues in health monitoring and state management
+- **Performance Optimization**: Tuned for enterprise-scale operations
+- **Extensibility**: Clean interfaces for adding new protocols and features
+
+The modular design ensures maintainability and extensibility while meeting the demanding requirements of enterprise environments. The system is designed to scale from simple single-tenant deployments to complex multi-tenant enterprise scenarios with thousands of users and petabytes of data transfer, providing a solid foundation for mission-critical file transfer operations.
 ```

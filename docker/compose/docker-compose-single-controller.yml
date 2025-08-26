@@ -1,0 +1,32 @@
+version: '3.8'
+
+networks:
+  quorus-dev:
+    driver: bridge
+
+services:
+  controller:
+    build:
+      context: ../..
+      dockerfile: quorus-controller/Dockerfile
+    container_name: quorus-controller-dev
+    environment:
+      - NODE_ID=controller-dev
+      - RAFT_HOST=0.0.0.0
+      - RAFT_PORT=8080
+      - HTTP_PORT=8080
+      - CLUSTER_NODES=controller-dev=controller:8080
+      - ELECTION_TIMEOUT_MS=3000
+      - HEARTBEAT_INTERVAL_MS=500
+      - JAVA_OPTS=-Xmx512m -Xms256m
+    ports:
+      - "8080:8080"
+    networks:
+      - quorus-dev
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped

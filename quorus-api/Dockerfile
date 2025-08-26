@@ -61,7 +61,7 @@ ENV JAVA_OPTS="-Xmx512m -Xms256m" \
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:${QUARKUS_HTTP_PORT}/q/health || exit 1
+    CMD curl -f http://localhost:${QUARKUS_HTTP_PORT}/health || exit 1
 
 # Entry point script
 COPY --chown=quorus:quorus quorus-api/docker-entrypoint.sh /app/

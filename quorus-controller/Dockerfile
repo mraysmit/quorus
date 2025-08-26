@@ -54,17 +54,19 @@ USER quorus
 # Expose the Raft communication port
 EXPOSE 8080
 
-# Environment variables
+# Environment variables for Quorus Controller
 ENV JAVA_OPTS="-Xmx512m -Xms256m" \
     NODE_ID="" \
     CLUSTER_NODES="" \
     RAFT_PORT=8080 \
     RAFT_HOST=0.0.0.0 \
+    HTTP_PORT=8080 \
     ELECTION_TIMEOUT_MS=5000 \
     HEARTBEAT_INTERVAL_MS=1000
 
-# Health check
+# Health check using controller's health endpoint
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:${RAFT_PORT}/health || exit 1
+    CMD curl -f http://localhost:${HTTP_PORT}/health || exit 1
 
-CMD ["java", "-jar", "app.jar"]
+# Run the Quorus Controller application
+CMD ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

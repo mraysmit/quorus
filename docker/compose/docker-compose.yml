@@ -6,7 +6,7 @@ version: '3.8'
 services:
   controller1:
     build:
-      context: .
+      context: ../..
       dockerfile: quorus-controller/Dockerfile
     container_name: quorus-controller1
     hostname: controller1
@@ -44,7 +44,7 @@ services:
 
   controller2:
     build:
-      context: .
+      context: ../..
       dockerfile: quorus-controller/Dockerfile
     container_name: quorus-controller2
     hostname: controller2
@@ -76,7 +76,7 @@ services:
 
   controller3:
     build:
-      context: .
+      context: ../..
       dockerfile: quorus-controller/Dockerfile
     container_name: quorus-controller3
     hostname: controller3
@@ -110,7 +110,7 @@ services:
   # API service for agent communication and heartbeat processing
   api:
     build:
-      context: .
+      context: ../..
       dockerfile: quorus-api/Dockerfile
     container_name: quorus-api
     hostname: api
@@ -134,7 +134,7 @@ services:
         max-size: "10m"
         max-file: "3"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/q/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 10s
       timeout: 5s
       retries: 3

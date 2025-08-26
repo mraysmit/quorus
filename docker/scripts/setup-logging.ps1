@@ -5,11 +5,11 @@ Write-Host "Setting up Quorus Centralized Logging..." -ForegroundColor Green
 
 # Create necessary directories
 $directories = @(
-    "loki",
-    "promtail", 
-    "grafana/provisioning/datasources",
-    "grafana/provisioning/dashboards",
-    "prometheus"
+    "../logging/loki",
+    "../logging/promtail",
+    "../logging/grafana/provisioning/datasources",
+    "../logging/grafana/provisioning/dashboards",
+    "../logging/prometheus"
 )
 
 foreach ($dir in $directories) {
@@ -47,7 +47,7 @@ scrape_configs:
     scrape_interval: 5s
 "@
 
-$prometheusConfig | Out-File -FilePath "prometheus/prometheus.yml" -Encoding UTF8
+$prometheusConfig | Out-File -FilePath "../logging/prometheus/prometheus.yml" -Encoding UTF8
 
 # Create Grafana dashboard for Quorus logs
 $dashboardConfig = @"
@@ -65,13 +65,13 @@ providers:
       path: /etc/grafana/provisioning/dashboards
 "@
 
-$dashboardConfig | Out-File -FilePath "grafana/provisioning/dashboards/dashboards.yml" -Encoding UTF8
+$dashboardConfig | Out-File -FilePath "../logging/grafana/provisioning/dashboards/dashboards.yml" -Encoding UTF8
 
 Write-Host "Configuration files created successfully!" -ForegroundColor Green
 
 # Start the logging stack
 Write-Host "Starting Grafana Loki logging stack..." -ForegroundColor Green
-docker-compose -f docker-compose-loki.yml up -d
+docker-compose -f ../compose/docker-compose-loki.yml up -d
 
 Write-Host ""
 Write-Host "Logging stack is starting up..." -ForegroundColor Green
