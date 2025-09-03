@@ -216,6 +216,13 @@ public class QuorusStateMachine implements RaftStateMachine {
     }
 
     /**
+     * Check if a transfer job exists in the state machine.
+     */
+    public boolean hasTransferJob(String jobId) {
+        return transferJobs.containsKey(jobId);
+    }
+
+    /**
      * Update the last applied index.
      */
     public void setLastAppliedIndex(long index) {

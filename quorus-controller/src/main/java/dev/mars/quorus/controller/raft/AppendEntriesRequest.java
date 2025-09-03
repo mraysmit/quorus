@@ -16,8 +16,11 @@
 
 package dev.mars.quorus.controller.raft;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.io.Serializable;
 import java.util.List;
+import java.util.ArrayList;
 
 public class AppendEntriesRequest implements Serializable {
 
@@ -30,8 +33,23 @@ public class AppendEntriesRequest implements Serializable {
     private final List<LogEntry> entries;
     private final long leaderCommit;
 
-    public AppendEntriesRequest(long term, String leaderId, long prevLogIndex, long prevLogTerm,
-                               List<LogEntry> entries, long leaderCommit) {
+    // Default constructor for Jackson
+    public AppendEntriesRequest() {
+        this.term = 0;
+        this.leaderId = "";
+        this.prevLogIndex = 0;
+        this.prevLogTerm = 0;
+        this.entries = new ArrayList<>();
+        this.leaderCommit = 0;
+    }
+
+    @JsonCreator
+    public AppendEntriesRequest(@JsonProperty("term") long term,
+                               @JsonProperty("leaderId") String leaderId,
+                               @JsonProperty("prevLogIndex") long prevLogIndex,
+                               @JsonProperty("prevLogTerm") long prevLogTerm,
+                               @JsonProperty("entries") List<LogEntry> entries,
+                               @JsonProperty("leaderCommit") long leaderCommit) {
         this.term = term;
         this.leaderId = leaderId;
         this.prevLogIndex = prevLogIndex;

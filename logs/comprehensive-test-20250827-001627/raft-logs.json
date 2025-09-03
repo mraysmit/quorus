@@ -1,0 +1,259 @@
+{
+  "count": 28,
+  "query": "{job=\"docker\"}",
+  "entries": [
+    {
+      "labels": {
+        "filename": "/var/lib/docker/containers/c2aaae53f37d78ca1ceec0faee87dda82dc92f5d49925dd826abce1a51eb7037/c2aaae53f37d78ca1ceec0faee87dda82dc92f5d49925dd826abce1a51eb7037-json.log",
+        "job": "docker",
+        "stream": "stderr"
+      },
+      "timestamp": "1756225025324037760",
+      "line": "Aug 26, 2025 4:17:05 PM dev.mars.quorus.controller.raft.RaftNode handleVoteRequest\n"
+    },
+    {
+      "labels": {
+        "filename": "/var/lib/docker/containers/c2aaae53f37d78ca1ceec0faee87dda82dc92f5d49925dd826abce1a51eb7037/c2aaae53f37d78ca1ceec0faee87dda82dc92f5d49925dd826abce1a51eb7037-json.log",
+        "job": "docker",
+        "stream": "stderr"
+      },
+      "timestamp": "1756225025324095863",
+      "line": "INFO: Handling vote request from controller4 for term 1008\n"
+    },
+    {
+      "labels": {
+        "filename": "/var/lib/docker/containers/c2aaae53f37d78ca1ceec0faee87dda82dc92f5d49925dd826abce1a51eb7037/c2aaae53f37d78ca1ceec0faee87dda82dc92f5d49925dd826abce1a51eb7037-json.log",
+        "job": "docker",
+        "stream": "stderr"
+      },
+      "timestamp": "1756225025324111864",
+      "line": "Aug 26, 2025 4:17:05 PM dev.mars.quorus.controller.raft.RaftNode stepDown\n"
+    },
+    {
+      "labels": {
+        "filename": "/var/lib/docker/containers/c2aaae53f37d78ca1ceec0faee87dda82dc92f5d49925dd826abce1a51eb7037/c2aaae53f37d78ca1ceec0faee87dda82dc92f5d49925dd826abce1a51eb7037-json.log",
+        "job": "docker",
+        "stream": "stderr"
+      },
+      "timestamp": "1756225025324120364",
+      "line": "INFO: Node controller3 stepping down. New term: 1008\n"
+    },
+    {
+      "labels": {
+        "filename": "/var/lib/docker/containers/c2aaae53f37d78ca1ceec0faee87dda82dc92f5d49925dd826abce1a51eb7037/c2aaae53f37d78ca1ceec0faee87dda82dc92f5d49925dd826abce1a51eb7037-json.log",
+        "job": "docker",
+        "stream": "stderr"
+      },
+      "timestamp": "1756225025324125664",
+      "line": "Aug 26, 2025 4:17:05 PM dev.mars.quorus.controller.raft.RaftNode handleVoteRequest\n"
+    },
+    {
+      "labels": {
+        "filename": "/var/lib/docker/containers/c2aaae53f37d78ca1ceec0faee87dda82dc92f5d49925dd826abce1a51eb7037/c2aaae53f37d78ca1ceec0faee87dda82dc92f5d49925dd826abce1a51eb7037-json.log",
+        "job": "docker",
+        "stream": "stderr"
+      },
+      "timestamp": "1756225025324130565",
+      "line": "INFO: Granted vote to controller4 for term 1008\n"
+    },
+    {
+      "labels": {
+        "filename": "/var/lib/docker/containers/3a5870bf0a257c89574b0f604c19737f841a60dd8a2caef56bd75592739e29b3/3a5870bf0a257c89574b0f604c19737f841a60dd8a2caef56bd75592739e29b3-json.log",
+        "job": "docker",
+        "stream": "stderr"
+      },
+      "timestamp": "1756225025330275689",
+      "line": "Aug 26, 2025 4:17:05 PM dev.mars.quorus.controller.raft.RaftNode handleVoteRequest\n"
+    },
+    {
+      "labels": {
+        "filename": "/var/lib/docker/containers/3a5870bf0a257c89574b0f604c19737f841a60dd8a2caef56bd75592739e29b3/3a5870bf0a257c89574b0f604c19737f841a60dd8a2caef56bd75592739e29b3-json.log",
+        "job": "docker",
+        "stream": "stderr"
+      },
+      "timestamp": "1756225025330278189",
+      "line": "INFO: Handling vote request from controller4 for term 1008\n"
+    },
+    {
+      "labels": {
+        "filename": "/var/lib/docker/containers/3a5870bf0a257c89574b0f604c19737f841a60dd8a2caef56bd75592739e29b3/3a5870bf0a257c89574b0f604c19737f841a60dd8a2caef56bd75592739e29b3-json.log",
+        "job": "docker",
+        "stream": "stderr"
+      },
+      "timestamp": "1756225025330286189",
+      "line": "Aug 26, 2025 4:17:05 PM dev.mars.quorus.controller.raft.RaftNode stepDown\n"
+    },
+    {
+      "labels": {
+        "filename": "/var/lib/docker/containers/3a5870bf0a257c89574b0f604c19737f841a60dd8a2caef56bd75592739e29b3/3a5870bf0a257c89574b0f604c19737f841a60dd8a2caef56bd75592739e29b3-json.log",
+        "job": "docker",
+        "stream": "stderr"
+      },
+      "timestamp": "1756225025330290390",
+      "line": "INFO: Node controller5 stepping down. New term: 1008\n"
+    },
+    {
+      "labels": {
+        "filename": "/var/lib/docker/containers/3a5870bf0a257c89574b0f604c19737f841a60dd8a2caef56bd75592739e29b3/3a5870bf0a257c89574b0f604c19737f841a60dd8a2caef56bd75592739e29b3-json.log",
+        "job": "docker",
+        "stream": "stderr"
+      },
+      "timestamp": "1756225025330292890",
+      "line": "Aug 26, 2025 4:17:05 PM dev.mars.quorus.controller.raft.RaftNode handleVoteRequest\n"
+    },
+    {
+      "labels": {
+        "filename": "/var/lib/docker/containers/3a5870bf0a257c89574b0f604c19737f841a60dd8a2caef56bd75592739e29b3/3a5870bf0a257c89574b0f604c19737f841a60dd8a2caef56bd75592739e29b3-json.log",
+        "job": "docker",
+        "stream": "stderr"
+      },
+      "timestamp": "1756225025330295590",
+      "line": "INFO: Granted vote to controller4 for term 1008\n"
+    },
+    {
+      "labels": {
+        "filename": "/var/lib/docker/containers/623764d0a34e36cf6ea2f966cf33e8211c68e4a0767f6d95360d8b8dffe1acbc/623764d0a34e36cf6ea2f966cf33e8211c68e4a0767f6d95360d8b8dffe1acbc-json.log",
+        "job": "docker",
+        "stream": "stderr"
+      },
+      "timestamp": "1756225025330384795",
+      "line": "Aug 26, 2025 4:17:05 PM dev.mars.quorus.controller.raft.RaftNode handleVoteRequest\n"
+    },
+    {
+      "labels": {
+        "filename": "/var/lib/docker/containers/623764d0a34e36cf6ea2f966cf33e8211c68e4a0767f6d95360d8b8dffe1acbc/623764d0a34e36cf6ea2f966cf33e8211c68e4a0767f6d95360d8b8dffe1acbc-json.log",
+        "job": "docker",
+        "stream": "stderr"
+      },
+      "timestamp": "1756225025330385595",
+      "line": "INFO: Handling vote request from controller4 for term 1008\n"
+    },
+    {
+      "labels": {
+        "filename": "/var/lib/docker/containers/623764d0a34e36cf6ea2f966cf33e8211c68e4a0767f6d95360d8b8dffe1acbc/623764d0a34e36cf6ea2f966cf33e8211c68e4a0767f6d95360d8b8dffe1acbc-json.log",
+        "job": "docker",
+        "stream": "stderr"
+      },
+      "timestamp": "1756225025330387895",
+      "line": "Aug 26, 2025 4:17:05 PM dev.mars.quorus.controller.raft.RaftNode stepDown\n"
+    },
+    {
+      "labels": {
+        "filename": "/var/lib/docker/containers/be6aa52f239031f977cbad6fe9ff6710ae92b7afca4e4e0153e40fb0c7c49458/be6aa52f239031f977cbad6fe9ff6710ae92b7afca4e4e0153e40fb0c7c49458-json.log",
+        "job": "docker",
+        "stream": "stderr"
+      },
+      "timestamp": "1756225025330394995",
+      "line": "Aug 26, 2025 4:17:05 PM dev.mars.quorus.controller.raft.RaftNode handleVoteRequest\n"
+    },
+    {
+      "labels": {
+        "filename": "/var/lib/docker/containers/be6aa52f239031f977cbad6fe9ff6710ae92b7afca4e4e0153e40fb0c7c49458/be6aa52f239031f977cbad6fe9ff6710ae92b7afca4e4e0153e40fb0c7c49458-json.log",
+        "job": "docker",
+        "stream": "stderr"
+      },
+      "timestamp": "1756225025330395695",
+      "line": "INFO: Handling vote request from controller4 for term 1008\n"
+    },
+    {
+      "labels": {
+        "filename": "/var/lib/docker/containers/be6aa52f239031f977cbad6fe9ff6710ae92b7afca4e4e0153e40fb0c7c49458/be6aa52f239031f977cbad6fe9ff6710ae92b7afca4e4e0153e40fb0c7c49458-json.log",
+        "job": "docker",
+        "stream": "stderr"
+      },
+      "timestamp": "1756225025330397695",
+      "line": "Aug 26, 2025 4:17:05 PM dev.mars.quorus.controller.raft.RaftNode stepDown\n"
+    },
+    {
+      "labels": {
+        "filename": "/var/lib/docker/containers/623764d0a34e36cf6ea2f966cf33e8211c68e4a0767f6d95360d8b8dffe1acbc/623764d0a34e36cf6ea2f966cf33e8211c68e4a0767f6d95360d8b8dffe1acbc-json.log",
+        "job": "docker",
+        "stream": "stderr"
+      },
+      "timestamp": "1756225025330400296",
+      "line": "INFO: Node controller1 stepping down. New term: 1008\n"
+    },
+    {
+      "labels": {
+        "filename": "/var/lib/docker/containers/623764d0a34e36cf6ea2f966cf33e8211c68e4a0767f6d95360d8b8dffe1acbc/623764d0a34e36cf6ea2f966cf33e8211c68e4a0767f6d95360d8b8dffe1acbc-json.log",
+        "job": "docker",
+        "stream": "stderr"
+      },
+      "timestamp": "1756225025330402496",
+      "line": "Aug 26, 2025 4:17:05 PM dev.mars.quorus.controller.raft.RaftNode handleVoteRequest\n"
+    },
+    {
+      "labels": {
+        "filename": "/var/lib/docker/containers/be6aa52f239031f977cbad6fe9ff6710ae92b7afca4e4e0153e40fb0c7c49458/be6aa52f239031f977cbad6fe9ff6710ae92b7afca4e4e0153e40fb0c7c49458-json.log",
+        "job": "docker",
+        "stream": "stderr"
+      },
+      "timestamp": "1756225025330404196",
+      "line": "INFO: Node controller2 stepping down. New term: 1008\n"
+    },
+    {
+      "labels": {
+        "filename": "/var/lib/docker/containers/623764d0a34e36cf6ea2f966cf33e8211c68e4a0767f6d95360d8b8dffe1acbc/623764d0a34e36cf6ea2f966cf33e8211c68e4a0767f6d95360d8b8dffe1acbc-json.log",
+        "job": "docker",
+        "stream": "stderr"
+      },
+      "timestamp": "1756225025330406096",
+      "line": "INFO: Granted vote to controller4 for term 1008\n"
+    },
+    {
+      "labels": {
+        "filename": "/var/lib/docker/containers/be6aa52f239031f977cbad6fe9ff6710ae92b7afca4e4e0153e40fb0c7c49458/be6aa52f239031f977cbad6fe9ff6710ae92b7afca4e4e0153e40fb0c7c49458-json.log",
+        "job": "docker",
+        "stream": "stderr"
+      },
+      "timestamp": "1756225025330410796",
+      "line": "Aug 26, 2025 4:17:05 PM dev.mars.quorus.controller.raft.RaftNode handleVoteRequest\n"
+    },
+    {
+      "labels": {
+        "filename": "/var/lib/docker/containers/f240ad9ca5daaab72ad6826cb79a2c1ec63a3d0cf02230c9955b04347befc50b/f240ad9ca5daaab72ad6826cb79a2c1ec63a3d0cf02230c9955b04347befc50b-json.log",
+        "job": "docker",
+        "stream": "stderr"
+      },
+      "timestamp": "1756225025330422597",
+      "line": "Aug 26, 2025 4:17:05 PM dev.mars.quorus.controller.raft.RaftNode startElection\n"
+    },
+    {
+      "labels": {
+        "filename": "/var/lib/docker/containers/f240ad9ca5daaab72ad6826cb79a2c1ec63a3d0cf02230c9955b04347befc50b/f240ad9ca5daaab72ad6826cb79a2c1ec63a3d0cf02230c9955b04347befc50b-json.log",
+        "job": "docker",
+        "stream": "stderr"
+      },
+      "timestamp": "1756225025330423697",
+      "line": "INFO: Starting election for node: controller4\n"
+    },
+    {
+      "labels": {
+        "filename": "/var/lib/docker/containers/f240ad9ca5daaab72ad6826cb79a2c1ec63a3d0cf02230c9955b04347befc50b/f240ad9ca5daaab72ad6826cb79a2c1ec63a3d0cf02230c9955b04347befc50b-json.log",
+        "job": "docker",
+        "stream": "stderr"
+      },
+      "timestamp": "1756225025330426797",
+      "line": "Aug 26, 2025 4:17:05 PM dev.mars.quorus.controller.raft.RaftNode becomeLeader\n"
+    },
+    {
+      "labels": {
+        "filename": "/var/lib/docker/containers/be6aa52f239031f977cbad6fe9ff6710ae92b7afca4e4e0153e40fb0c7c49458/be6aa52f239031f977cbad6fe9ff6710ae92b7afca4e4e0153e40fb0c7c49458-json.log",
+        "job": "docker",
+        "stream": "stderr"
+      },
+      "timestamp": "1756225025330452498",
+      "line": "INFO: Granted vote to controller4 for term 1008\n"
+    },
+    {
+      "labels": {
+        "filename": "/var/lib/docker/containers/f240ad9ca5daaab72ad6826cb79a2c1ec63a3d0cf02230c9955b04347befc50b/f240ad9ca5daaab72ad6826cb79a2c1ec63a3d0cf02230c9955b04347befc50b-json.log",
+        "job": "docker",
+        "stream": "stderr"
+      },
+      "timestamp": "1756225025330456198",
+      "line": "INFO: Node controller4 became leader for term 1008\n"
+    }
+  ],
+  "timestamp": "2025-08-27 00:17:08"
+}
