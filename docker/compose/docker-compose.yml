@@ -1,7 +1,9 @@
 version: '3.8'
 
 # Quorus Controller Cluster for Testing
-# This configuration sets up a 3-node Raft cluster for integration testing
+# This configuration sets up a 5-node Raft cluster for integration testing
+
+name: quorus
 
 services:
   controller1:
@@ -13,8 +15,9 @@ services:
     environment:
       - NODE_ID=controller1
       - RAFT_HOST=0.0.0.0
-      - RAFT_PORT=8080
-      - CLUSTER_NODES=controller1=controller1:8080,controller2=controller2:8080,controller3=controller3:8080
+      - RAFT_PORT=9080
+      - HTTP_PORT=8080
+      - CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080,controller4=controller4:9080,controller5=controller5:9080
       - ELECTION_TIMEOUT_MS=3000
       - HEARTBEAT_INTERVAL_MS=500
       - JAVA_OPTS=-Xmx256m -Xms128m
@@ -51,8 +54,9 @@ services:
     environment:
       - NODE_ID=controller2
       - RAFT_HOST=0.0.0.0
-      - RAFT_PORT=8080
-      - CLUSTER_NODES=controller1=controller1:8080,controller2=controller2:8080,controller3=controller3:8080
+      - RAFT_PORT=9080
+      - HTTP_PORT=8080
+      - CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080,controller4=controller4:9080,controller5=controller5:9080
       - ELECTION_TIMEOUT_MS=3000
       - HEARTBEAT_INTERVAL_MS=500
       - JAVA_OPTS=-Xmx256m -Xms128m
@@ -64,6 +68,9 @@ services:
     volumes:
       - controller2-data:/app/data
       - controller2-logs:/app/logs
+    labels:
+      - "logging=promtail"
+      - "service=quorus-controller2"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 10s
@@ -83,8 +90,9 @@ services:
     environment:
       - NODE_ID=controller3
       - RAFT_HOST=0.0.0.0
-      - RAFT_PORT=8080
-      - CLUSTER_NODES=controller1=controller1:8080,controller2=controller2:8080,controller3=controller3:8080
+      - RAFT_PORT=9080
+      - HTTP_PORT=8080
+      - CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080,controller4=controller4:9080,controller5=controller5:9080
       - ELECTION_TIMEOUT_MS=3000
       - HEARTBEAT_INTERVAL_MS=500
       - JAVA_OPTS=-Xmx256m -Xms128m
@@ -96,6 +104,9 @@ services:
     volumes:
       - controller3-data:/app/data
       - controller3-logs:/app/logs
+    labels:
+      - "logging=promtail"
+      - "service=quorus-controller3"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 10s
@@ -106,6 +117,83 @@ services:
     depends_on:
       - controller1
       - controller2
+
+  controller4:
+    build:
+      context: ../..
+      dockerfile: quorus-controller/Dockerfile
+    container_name: quorus-controller4
+    hostname: controller4
+    environment:
+      - NODE_ID=controller4
+      - RAFT_HOST=0.0.0.0
+      - RAFT_PORT=9080
+      - HTTP_PORT=8080
+      - CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080,controller4=controller4:9080,controller5=controller5:9080
+      - ELECTION_TIMEOUT_MS=3000
+      - HEARTBEAT_INTERVAL_MS=500
+      - JAVA_OPTS=-Xmx256m -Xms128m
+    ports:
+      - "8084:8080"
+    networks:
+      raft-cluster:
+        ipv4_address: 172.20.0.13
+    volumes:
+      - controller4-data:/app/data
+      - controller4-logs:/app/logs
+    labels:
+      - "logging=promtail"
+      - "service=quorus-controller4"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    depends_on:
+      - controller1
+      - controller2
+      - controller3
+
+  controller5:
+    build:
+      context: ../..
+      dockerfile: quorus-controller/Dockerfile
+    container_name: quorus-controller5
+    hostname: controller5
+    environment:
+      - NODE_ID=controller5
+      - RAFT_HOST=0.0.0.0
+      - RAFT_PORT=9080
+      - HTTP_PORT=8080
+      - CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080,controller4=controller4:9080,controller5=controller5:9080
+      - ELECTION_TIMEOUT_MS=3000
+      - HEARTBEAT_INTERVAL_MS=500
+      - JAVA_OPTS=-Xmx256m -Xms128m
+    ports:
+      - "8085:8080"
+    networks:
+      raft-cluster:
+        ipv4_address: 172.20.0.14
+    volumes:
+      - controller5-data:/app/data
+      - controller5-logs:/app/logs
+    labels:
+      - "logging=promtail"
+      - "service=quorus-controller5"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    depends_on:
+      - controller1
+      - controller2
+      - controller3
+      - controller4
 
   # API service for agent communication and heartbeat processing
   api:
@@ -192,6 +280,14 @@ volumes:
   controller3-data:
     driver: local
   controller3-logs:
+    driver: local
+  controller4-data:
+    driver: local
+  controller4-logs:
+    driver: local
+  controller5-data:
+    driver: local
+  controller5-logs:
     driver: local
   api-logs:
     driver: local
