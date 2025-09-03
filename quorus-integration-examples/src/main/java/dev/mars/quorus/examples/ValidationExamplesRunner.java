@@ -17,6 +17,7 @@
 package dev.mars.quorus.examples;
 
 import dev.mars.quorus.workflow.*;
+import dev.mars.quorus.examples.util.TestResultLogger;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
