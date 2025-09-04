@@ -1,12 +1,17 @@
-# Docker-Based Raft Cluster Testing
+# Docker-Based Testing Infrastructure
 
-This document describes the Docker-based testing infrastructure for the Quorus Raft cluster manager, which provides realistic network testing scenarios using actual containers and HTTP communication.
+This document describes the comprehensive Docker-based testing infrastructure for the Quorus distributed file transfer system, including Raft cluster testing, full network simulation with agents, and realistic file transfer scenarios.
 
 ## Overview
 
-The Docker testing infrastructure replaces in-memory testing with real containerized nodes that communicate over HTTP, providing:
+The Docker testing infrastructure provides comprehensive testing capabilities for the Quorus distributed file transfer system, including:
 
-- **Real network communication** between Raft nodes
+### Core Testing Capabilities
+
+- **Raft Cluster Testing** - Real containerized nodes with HTTP communication
+- **Full Network Simulation** - Complete file transfer network with agents and servers
+- **Multi-Protocol Support** - Real SFTP, FTP, HTTP, and SMB implementations
+- **Agent Network Testing** - Multi-region agents with different capabilities
 - **Container lifecycle management** (start/stop/restart scenarios)
 - **Network partition simulation** using Docker network manipulation
 - **Configurable test scenarios** for different cluster sizes and conditions
@@ -14,19 +19,34 @@ The Docker testing infrastructure replaces in-memory testing with real container
 - **Centralized log aggregation** using Grafana Loki stack
 - **Real-time monitoring and alerting** across all distributed components
 
+### Test Environments
+
+1. **Raft Cluster Testing** - Controller cluster validation
+2. **Full Network Testing** - Complete file transfer network simulation
+3. **Protocol Testing** - Real file transfer server implementations
+4. **Agent Testing** - Multi-region agent deployment and coordination
+
 ## Architecture
 
 ### Components
 
+#### Core Infrastructure
 1. **HttpRaftTransport** - HTTP-based transport implementation
-2. **Docker Compose Configurations** - 3-node and 5-node cluster setups with custom networks
+2. **Docker Compose Configurations** - Multiple environment setups
 3. **TestContainers Integration** - Automated container orchestration
-4. **Network Testing Utils** - Network partition and failure simulation using Docker networks
-5. **Test Configuration Management** - Predefined test scenarios
-6. **Custom Docker Networks** - Realistic network topology with static IP addresses
-7. **Network Test Helper Script** - Command-line utilities for network manipulation
-8. **Log Aggregation Stack** - Grafana Loki for centralized logging and monitoring
-9. **Real-time Observability** - Structured logging, metrics, and alerting capabilities
+4. **Network Testing Utils** - Network partition and failure simulation
+5. **Custom Docker Networks** - Realistic network topology with static IP addresses
+
+#### Full Network Components
+6. **Quorus Agents** - Standalone agent implementation with real protocol support
+7. **File Transfer Servers** - Real FTP, SFTP, HTTP, and SMB servers
+8. **Multi-Region Simulation** - Agents deployed across different geographic regions
+9. **Protocol Testing Infrastructure** - Real network file transfer testing
+
+#### Monitoring and Observability
+10. **Log Aggregation Stack** - Grafana Loki for centralized logging and monitoring
+11. **Real-time Observability** - Structured logging, metrics, and alerting capabilities
+12. **Health Monitoring** - Service health checks and status reporting
 
 ### File Structure
 
@@ -49,23 +69,99 @@ quorus-controller/
 docker/                                   # Docker infrastructure directory
 ├── compose/                              # Docker Compose configurations
 │   ├── docker-compose.yml               # 3-node cluster with custom networks
+│   ├── docker-compose-full-network.yml  # Complete test network with agents and servers
 │   ├── docker-compose-5node.yml         # 5-node cluster configuration
 │   ├── docker-compose-network-test.yml  # Advanced network testing setup
 │   └── docker-compose-loki.yml          # Log aggregation stack
+├── agents/                               # Quorus Agent implementation
+│   ├── Dockerfile                       # Agent container image
+│   ├── pom.xml                         # Agent Maven configuration
+│   ├── docker-entrypoint.sh           # Agent startup script
+│   ├── src/                            # Agent source code
+│   └── config/                         # Agent configuration files
 ├── logging/                              # Log aggregation configurations
 │   ├── loki/config.yml                  # Loki storage configuration
 │   ├── promtail/config.yml              # Log collection configuration
 │   ├── grafana/provisioning/            # Grafana datasource setup
 │   └── prometheus/prometheus.yml        # Metrics collection setup
 ├── scripts/                              # Docker automation scripts
+│   ├── start-full-network.ps1          # Start complete test environment
+│   ├── test-transfers.ps1              # Test file transfer scenarios
 │   ├── setup-logging.ps1               # Log aggregation setup script
 │   └── demo-logging.ps1                # Log aggregation demo script
 └── test-data/                            # Test data and utilities
+    ├── nginx.conf                      # HTTP server configuration
     ├── test-heartbeat.json             # Sample heartbeat payload
     ├── test-registration.json          # Sample agent registration
     └── send-heartbeat.ps1              # Heartbeat testing script
 scripts/network-test-helper.sh             # Network testing utilities
 ```
+
+## 🚀 Full Network Test Environment
+
+### Complete File Transfer Network
+
+The `docker-compose-full-network.yml` configuration provides a comprehensive test environment that simulates a realistic Quorus file transfer network:
+
+**Architecture:**
+- **Control Plane (172.20.0.0/16)**: 3 Raft controllers + API service
+- **Agent Network (172.21.0.0/16)**: 3 agents in different regions (NYC, London, Tokyo)
+- **File Transfer Servers (172.22.0.0/16)**: FTP, SFTP, HTTP servers with test data
+- **Test Infrastructure**: File generators, monitoring, and health checks
+
+**Network Topology:**
+```
+Control Plane (172.20.0.0/16)
+├── Controller 1-3 (Raft cluster)
+└── API Service (agent communication)
+
+Agent Network (172.21.0.0/16)
+├── Agent NYC (US East) - HTTP,HTTPS,FTP,SFTP
+├── Agent London (EU West) - HTTP,HTTPS,SFTP,SMB
+└── Agent Tokyo (AP Northeast) - HTTP,HTTPS,FTP
+
+Transfer Servers (172.22.0.0/16)
+├── FTP Server (port 21) - testuser/testpass
+├── SFTP Server (port 2222) - testuser/testpass
+├── HTTP Server (port 8090)
+└── File Generator (test data)
+```
+
+### Quick Start - Full Network
+
+```powershell
+# Start the complete test environment
+.\docker\scripts\start-full-network.ps1 -Build
+
+# Test agent registration and transfers
+.\docker\scripts\test-transfers.ps1
+
+# Monitor the environment
+docker-compose -f docker/compose/docker-compose-full-network.yml logs -f
+
+# Stop the environment
+docker-compose -f docker/compose/docker-compose-full-network.yml down
+```
+
+### Service Endpoints
+
+| Service | URL | Credentials | Purpose |
+|---------|-----|-------------|---------|
+| API Service | http://localhost:8080 | - | Agent registration and job management |
+| Controller 1 | http://localhost:8081 | - | Raft cluster node |
+| Controller 2 | http://localhost:8082 | - | Raft cluster node |
+| Controller 3 | http://localhost:8083 | - | Raft cluster node |
+| HTTP Server | http://localhost:8090 | - | File download testing |
+| FTP Server | ftp://localhost:21 | testuser/testpass | FTP transfer testing |
+| SFTP Server | sftp://localhost:2222 | testuser/testpass | SFTP transfer testing |
+
+### Agent Configuration
+
+| Agent | Region | Protocols | Max Transfers | IP Address |
+|-------|--------|-----------|---------------|------------|
+| NYC | us-east-1 | HTTP,HTTPS,FTP,SFTP | 5 | 172.21.0.10 |
+| London | eu-west-1 | HTTP,HTTPS,SFTP,SMB | 3 | 172.21.0.11 |
+| Tokyo | ap-northeast-1 | HTTP,HTTPS,FTP | 4 | 172.21.0.12 |
 
 ## Quick Start
 
@@ -73,7 +169,7 @@ scripts/network-test-helper.sh             # Network testing utilities
 
 - Docker and Docker Compose installed
 - Java 21+ and Maven 3.9+
-- At least 2GB RAM available for containers
+- At least 4GB RAM available for containers (full network) or 2GB (basic cluster)
 
 ### Running Basic Tests
 
@@ -101,6 +197,84 @@ scripts/network-test-helper.sh             # Network testing utilities
    ```bash
    mvn test -Dtest=AdvancedNetworkTest
    ```
+
+### Full Network Testing Scenarios
+
+#### 1. Agent Registration Testing
+```powershell
+# Start the full network
+.\docker\scripts\start-full-network.ps1
+
+# Check agent registration
+curl http://localhost:8080/api/v1/agents
+
+# Expected: 3 agents registered with different capabilities
+```
+
+#### 2. Multi-Protocol Transfer Testing
+```powershell
+# Test HTTP transfer
+curl -X POST http://localhost:8080/api/v1/transfers \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sourceUri": "http://http-server:8090/shared/timestamp.txt",
+    "destinationPath": "/tmp/downloads/http-test.txt",
+    "protocol": "http"
+  }'
+
+# Test SFTP transfer
+curl -X POST http://localhost:8080/api/v1/transfers \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sourceUri": "sftp://testuser:testpass@sftp-server/shared/timestamp.txt",
+    "destinationPath": "/tmp/downloads/sftp-test.txt",
+    "protocol": "sftp"
+  }'
+
+# Test FTP transfer
+curl -X POST http://localhost:8080/api/v1/transfers \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sourceUri": "ftp://testuser:testpass@ftp-server/shared/timestamp.txt",
+    "destinationPath": "/tmp/downloads/ftp-test.txt",
+    "protocol": "ftp"
+  }'
+```
+
+#### 3. Load Balancing and Regional Testing
+```powershell
+# Submit multiple transfers to test load distribution
+.\docker\scripts\test-transfers.ps1
+
+# Monitor which agents handle which transfers
+docker logs quorus-agent-nyc -f
+docker logs quorus-agent-london -f
+docker logs quorus-agent-tokyo -f
+```
+
+#### 4. Failure and Recovery Testing
+```powershell
+# Test agent failure
+docker stop quorus-agent-nyc
+
+# Submit transfers and verify other agents handle them
+.\docker\scripts\test-transfers.ps1
+
+# Restart agent and verify it re-registers
+docker start quorus-agent-nyc
+```
+
+#### 5. Controller Failover Testing
+```powershell
+# Stop primary controller
+docker stop quorus-controller1
+
+# Verify agents continue working with remaining controllers
+curl http://localhost:8080/api/v1/agents
+
+# Submit transfers to verify system continues operating
+.\docker\scripts\test-transfers.ps1
+```
 
 ### Manual Cluster Testing
 
@@ -884,3 +1058,582 @@ curl http://localhost:3100/metrics
 ```
 
 This comprehensive log aggregation system provides enterprise-grade observability for the Quorus distributed system, enabling effective monitoring, debugging, and operational insights across all components.
+
+## Quorus Agent Integration Architecture
+
+### Overview
+
+The Docker test environment provides a complete integration between the Quorus control plane and distributed agents, simulating a realistic production deployment with multi-region agents, real protocol implementations, and comprehensive monitoring.
+
+### Agent Integration Components
+
+#### 1. Agent Registration & Discovery
+
+**Agent Startup Process:**
+```bash
+# Agent reads environment configuration
+AGENT_ID=agent-nyc-001
+AGENT_REGION=us-east-1
+AGENT_DATACENTER=nyc-dc1
+CONTROLLER_URL=http://api:8080/api/v1
+SUPPORTED_PROTOCOLS=HTTP,HTTPS,FTP,SFTP
+MAX_CONCURRENT_TRANSFERS=5
+HEARTBEAT_INTERVAL=30000
+```
+
+**Registration Flow:**
+1. **Agent → API Service**: `POST /agents/register`
+2. **API → Raft Controllers**: Submit `AgentCommand.register()`
+3. **Raft Consensus**: Agent info replicated across controller cluster
+4. **API → Agent**: Registration confirmation with heartbeat interval
+
+**Registration Payload:**
+```json
+{
+  "agentId": "agent-nyc-001",
+  "hostname": "agent-nyc",
+  "address": "172.21.0.10",
+  "port": 8080,
+  "version": "1.0.0",
+  "region": "us-east-1",
+  "datacenter": "nyc-dc1",
+  "capabilities": {
+    "supportedProtocols": ["HTTP", "HTTPS", "FTP", "SFTP"],
+    "maxConcurrentTransfers": 5,
+    "maxTransferSize": 9223372036854775807,
+    "systemInfo": {
+      "operatingSystem": "Linux",
+      "architecture": "amd64",
+      "javaVersion": "21.0.1",
+      "cpuCores": 4,
+      "totalMemory": 268435456,
+      "availableMemory": 134217728
+    },
+    "networkInfo": {
+      "hostname": "agent-nyc",
+      "ipAddress": "172.21.0.10",
+      "port": 8080
+    }
+  }
+}
+```
+
+#### 2. Heartbeat & Health Monitoring
+
+**Continuous Health Monitoring:**
+```json
+{
+  "agentId": "agent-nyc-001",
+  "timestamp": "2025-09-04T14:30:00Z",
+  "sequenceNumber": 1234,
+  "status": "active",
+  "currentJobs": 2,
+  "availableCapacity": 3,
+  "metrics": {
+    "memoryUsed": 134217728,
+    "memoryTotal": 268435456,
+    "memoryMax": 536870912,
+    "cpuCores": 4
+  }
+}
+```
+
+**Agent Health States:**
+- ✅ **HEALTHY**: Ready for new jobs (priority: 8)
+- 🟢 **IDLE**: No active jobs (priority: 10)
+- 🟡 **ACTIVE**: Currently executing transfers (priority: 6)
+- ⚠️ **DEGRADED**: Limited capacity (priority: 3)
+- 🔴 **OVERLOADED**: At maximum capacity (priority: 0)
+- ❌ **UNREACHABLE**: No heartbeat received (priority: 0)
+- 🔄 **MAINTENANCE**: Temporarily unavailable (priority: 0)
+
+#### 3. Job Assignment & Load Balancing
+
+**Agent Capability Matrix:**
+| Agent | Region | Protocols | Max Transfers | IP Address |
+|-------|--------|-----------|---------------|------------|
+| NYC | us-east-1 | HTTP,HTTPS,FTP,SFTP | 5 | 172.21.0.10 |
+| London | eu-west-1 | HTTP,HTTPS,SFTP,SMB | 3 | 172.21.0.11 |
+| Tokyo | ap-northeast-1 | HTTP,HTTPS,FTP | 4 | 172.21.0.12 |
+
+**Job Assignment Logic:**
+```java
+// Job assignment considers:
+// 1. Protocol compatibility
+// 2. Current load (available capacity)
+// 3. Geographic proximity (region matching)
+// 4. Agent health status (priority scoring)
+// 5. Historical performance metrics
+
+// Example assignment decision:
+TransferRequest sftpJob = {
+  protocol: "sftp",
+  sourceUri: "sftp://server/file.txt"
+}
+
+// Eligible agents: NYC (5 slots), London (3 slots)
+// Tokyo excluded (no SFTP support)
+// Assignment: Agent with highest priority score
+```
+
+**Job Polling Mechanism:**
+```java
+// Every 10 seconds, agents poll for new jobs
+GET /api/v1/agents/{agentId}/jobs
+→ Returns jobs matching agent capabilities
+→ Agent evaluates job compatibility
+→ Agent accepts suitable jobs
+→ Executes transfers using real protocol implementations
+
+// Polling request includes current capacity
+GET /api/v1/agents/agent-nyc-001/jobs?capacity=3&protocols=HTTP,FTP,SFTP
+```
+
+#### 4. Transfer Execution Integration
+
+**Real Protocol Implementations:**
+```java
+// Agent receives job and executes using real protocols
+TransferRequest request = {
+  requestId: "transfer-12345",
+  sourceUri: "sftp://sftp-server:22/shared/file.txt",
+  destinationPath: "/tmp/downloads/file.txt",
+  protocol: "sftp"
+}
+
+// Agent uses real SFTP implementation (JSch library)
+SftpTransferProtocol protocol = new SftpTransferProtocol();
+TransferContext context = new TransferContext(job);
+TransferResult result = protocol.transfer(request, context);
+
+// Real network connection established:
+// 1. SSH handshake with sftp-server:22
+// 2. Authentication using testuser/testpass
+// 3. SFTP session establishment
+// 4. File download with progress tracking
+// 5. Local file write to destination
+```
+
+**Multi-Protocol Support:**
+- **SFTP**: Real SSH connections using JSch library
+  - SSH key authentication support
+  - Progress tracking and resume capability
+  - Error handling and retry logic
+- **FTP**: Socket-based FTP client implementation
+  - Active and passive mode support
+  - Binary and ASCII transfer modes
+  - Connection pooling and reuse
+- **HTTP/HTTPS**: Standard HTTP client for file downloads
+  - Range request support for resume
+  - Authentication headers
+  - SSL/TLS certificate validation
+- **SMB**: (Future) Windows file sharing protocol
+  - NTLM authentication
+  - Share enumeration and access
+
+**Transfer Execution Flow:**
+```java
+// 1. Job acceptance
+agent.acceptJob(jobId);
+
+// 2. Protocol selection
+TransferProtocol protocol = protocolFactory.getProtocol(request.getProtocol());
+
+// 3. Transfer execution with retry logic
+for (int attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+        TransferResult result = protocol.transfer(request, context);
+        if (result.isSuccessful()) {
+            agent.reportSuccess(jobId, result);
+            break;
+        }
+    } catch (Exception e) {
+        if (attempt == maxRetries) {
+            agent.reportFailure(jobId, e);
+        } else {
+            Thread.sleep(retryDelay * attempt); // Exponential backoff
+        }
+    }
+}
+```
+
+#### 5. Network Topology & Isolation
+
+**Segmented Networks:**
+```yaml
+# Control Plane Network (172.20.0.0/16)
+control-plane:
+  - Controllers: Raft consensus and state management
+  - API Service: Agent communication hub
+  - Isolated from direct file server access
+
+# Agent Network (172.21.0.0/16)
+agent-network:
+  - Agents: Distributed execution nodes
+  - Regional deployment simulation
+  - Cross-network communication to control plane and file servers
+
+# Transfer Servers Network (172.22.0.0/16)
+transfer-servers:
+  - File servers: Real protocol endpoints (FTP, SFTP, HTTP)
+  - Test data generation and management
+  - Isolated from control plane for security
+```
+
+**Network Security & Communication:**
+```yaml
+# Agent network configuration
+networks:
+  agent-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16
+          gateway: 172.21.0.1
+
+# Agents can communicate with:
+# 1. Control plane (API service) - for registration, heartbeat, job polling
+# 2. Transfer servers - for file transfer operations
+# 3. Other agents - for future peer-to-peer capabilities
+```
+
+**Service Discovery:**
+```bash
+# Agents discover services through Docker DNS
+API_SERVICE=http://api:8080/api/v1
+FTP_SERVER=ftp://ftp-server:21
+SFTP_SERVER=sftp://sftp-server:22
+HTTP_SERVER=http://http-server:8090
+
+# Static IP addressing for predictable networking
+agent-nyc:     172.21.0.10
+agent-london:  172.21.0.11
+agent-tokyo:   172.21.0.12
+```
+
+#### 6. Monitoring & Observability
+
+**Agent-Specific Logging:**
+```bash
+# Agent startup and registration
+2025-09-04 14:30:15 INFO [AgentRegistrationService] Agent agent-nyc-001 registered successfully
+2025-09-04 14:30:15 INFO [HealthService] Health service started on port 8080
+2025-09-04 14:30:15 INFO [TransferExecutionService] Transfer execution service started with 5 max concurrent transfers
+
+# Heartbeat monitoring
+2025-09-04 14:30:45 INFO [HeartbeatService] Heartbeat sent successfully for agent agent-nyc-001
+2025-09-04 14:30:45 DEBUG [HeartbeatService] Agent metrics: memory=134MB, cpu=4 cores, jobs=2/5
+
+# Job execution
+2025-09-04 14:31:00 INFO [QuorusAgent] Polling for new transfer jobs...
+2025-09-04 14:31:05 INFO [TransferExecutionService] Executing transfer: sftp://sftp-server/file.txt -> /tmp/downloads/file.txt
+2025-09-04 14:31:07 INFO [SftpTransferProtocol] SFTP transfer completed successfully: 1024 bytes in 2.1s
+```
+
+**Health Endpoints:**
+```bash
+# Agent health check
+curl http://agent-nyc:8080/health
+{
+  "status": "UP",
+  "timestamp": "2025-09-04T14:30:00Z",
+  "agentId": "agent-nyc-001",
+  "uptime": 3600000
+}
+
+# Detailed agent status
+curl http://agent-nyc:8080/status
+{
+  "agentId": "agent-nyc-001",
+  "hostname": "agent-nyc",
+  "region": "us-east-1",
+  "datacenter": "nyc-dc1",
+  "version": "1.0.0",
+  "supportedProtocols": ["HTTP", "HTTPS", "FTP", "SFTP"],
+  "maxConcurrentTransfers": 5,
+  "startTime": "2025-09-04T14:00:00Z",
+  "currentTime": "2025-09-04T14:30:00Z",
+  "runtime": {
+    "totalMemory": 268435456,
+    "freeMemory": 134217728,
+    "maxMemory": 536870912,
+    "availableProcessors": 4
+  }
+}
+```
+
+**Centralized Agent Monitoring:**
+```bash
+# View all registered agents
+curl http://localhost:8080/api/v1/agents
+[
+  {
+    "agentId": "agent-nyc-001",
+    "status": "HEALTHY",
+    "region": "us-east-1",
+    "capabilities": {...},
+    "lastHeartbeat": "2025-09-04T14:30:00Z"
+  },
+  {
+    "agentId": "agent-lon-001",
+    "status": "ACTIVE",
+    "region": "eu-west-1",
+    "capabilities": {...},
+    "lastHeartbeat": "2025-09-04T14:29:58Z"
+  }
+]
+```
+
+### Real-World Testing Scenarios
+
+#### 1. Multi-Region Load Balancing
+
+**Test Case: Protocol-Based Assignment**
+```bash
+# Submit SFTP transfer
+curl -X POST http://localhost:8080/api/v1/transfers \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sourceUri": "sftp://sftp-server/shared/test.txt",
+    "destinationPath": "/tmp/downloads/sftp-test.txt",
+    "protocol": "sftp"
+  }'
+
+# Expected: Assigned to NYC or London agent (both support SFTP)
+# Tokyo agent excluded (no SFTP capability)
+
+# Submit FTP transfer
+curl -X POST http://localhost:8080/api/v1/transfers \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sourceUri": "ftp://testuser:testpass@ftp-server/shared/test.txt",
+    "destinationPath": "/tmp/downloads/ftp-test.txt",
+    "protocol": "ftp"
+  }'
+
+# Expected: Assigned to NYC or Tokyo agent (both support FTP)
+# London agent excluded (no FTP capability)
+```
+
+**Test Case: Capacity-Based Assignment**
+```bash
+# Submit multiple HTTP transfers to test load balancing
+for i in {1..10}; do
+  curl -X POST http://localhost:8080/api/v1/transfers \
+    -H "Content-Type: application/json" \
+    -d "{
+      \"sourceUri\": \"http://http-server/shared/file-${i}.txt\",
+      \"destinationPath\": \"/tmp/downloads/http-${i}.txt\",
+      \"protocol\": \"http\"
+    }"
+done
+
+# Expected distribution:
+# - NYC agent: 5 transfers (max capacity)
+# - London agent: 3 transfers (max capacity)
+# - Tokyo agent: 2 transfers (remaining)
+```
+
+#### 2. Failure Recovery Testing
+
+**Test Case: Agent Failure**
+```bash
+# Stop NYC agent
+docker stop quorus-agent-nyc
+
+# Submit new transfers
+curl -X POST http://localhost:8080/api/v1/transfers \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sourceUri": "sftp://sftp-server/shared/test.txt",
+    "destinationPath": "/tmp/downloads/test.txt",
+    "protocol": "sftp"
+  }'
+
+# Expected: Job assigned to London agent (only remaining SFTP-capable agent)
+# NYC agent marked as UNREACHABLE after heartbeat timeout
+
+# Restart NYC agent
+docker start quorus-agent-nyc
+
+# Expected: Agent re-registers and becomes available for new jobs
+```
+
+**Test Case: Controller Failover**
+```bash
+# Stop primary controller
+docker stop quorus-controller1
+
+# Verify agents continue working
+curl http://localhost:8080/api/v1/agents
+
+# Submit transfers to verify system continues operating
+.\docker\scripts\test-transfers.ps1
+
+# Expected:
+# - Remaining controllers elect new leader
+# - Agents seamlessly switch to new leader
+# - No transfer interruption
+```
+
+**Test Case: Network Partition**
+```bash
+# Create network partition (isolate one controller)
+docker network disconnect quorus_control-plane quorus-controller3
+
+# Monitor cluster behavior
+curl http://localhost:8081/raft/status  # Controller 1
+curl http://localhost:8082/raft/status  # Controller 2
+curl http://localhost:8083/raft/status  # Controller 3 (isolated)
+
+# Expected:
+# - Controllers 1&2 maintain quorum and continue operating
+# - Controller 3 becomes follower (no quorum)
+# - Agents continue working with available controllers
+
+# Restore network
+docker network connect quorus_control-plane quorus-controller3
+
+# Expected: Controller 3 rejoins cluster and syncs state
+```
+
+#### 3. Performance and Scalability Testing
+
+**Test Case: Concurrent Transfer Load**
+```bash
+# Generate high transfer load
+for protocol in http ftp sftp; do
+  for i in {1..20}; do
+    curl -X POST http://localhost:8080/api/v1/transfers \
+      -H "Content-Type: application/json" \
+      -d "{
+        \"sourceUri\": \"${protocol}://server/shared/load-test-${i}.txt\",
+        \"destinationPath\": \"/tmp/downloads/${protocol}-${i}.txt\",
+        \"protocol\": \"${protocol}\"
+      }" &
+  done
+done
+
+# Monitor agent performance
+docker stats quorus-agent-nyc quorus-agent-london quorus-agent-tokyo
+
+# Expected:
+# - Jobs distributed based on protocol capabilities
+# - Agents respect max concurrent transfer limits
+# - Queue management for excess jobs
+# - Performance metrics collected
+```
+
+**Test Case: Resource Monitoring**
+```bash
+# Monitor agent resource usage during load
+watch -n 1 'curl -s http://agent-nyc:8080/status | jq .runtime'
+
+# Monitor transfer queue depth
+watch -n 1 'curl -s http://localhost:8080/api/v1/agents | jq ".[].currentJobs"'
+
+# Expected:
+# - Memory usage increases with active transfers
+# - CPU utilization correlates with transfer activity
+# - Queue depth managed within agent capacity
+```
+
+### Integration Benefits
+
+#### Production-Like Behavior
+- ✅ **Real Network Communication**: HTTP/REST between all components
+- ✅ **Actual Protocol Implementations**: No mocks or simulations
+- ✅ **Distributed State Management**: Raft consensus for agent registry
+- ✅ **Load Balancing**: Intelligent job distribution based on capabilities
+- ✅ **Fault Tolerance**: Agent and controller failure handling
+- ✅ **Monitoring**: Complete observability stack with metrics and logs
+
+#### Scalability Validation
+- ✅ **Horizontal Scaling**: Add more agents easily with Docker Compose
+- ✅ **Regional Distribution**: Multi-datacenter simulation with network isolation
+- ✅ **Protocol Diversity**: Different agents support different protocol combinations
+- ✅ **Capacity Planning**: Test various load scenarios and resource limits
+- ✅ **Performance Profiling**: Real-world performance characteristics
+
+#### Development Benefits
+- ✅ **Rapid Iteration**: Quick environment startup and teardown
+- ✅ **Isolated Testing**: Each test run uses fresh containers
+- ✅ **Debugging Support**: Full logging and monitoring capabilities
+- ✅ **Configuration Flexibility**: Easy environment variable changes
+- ✅ **CI/CD Integration**: Automated testing in build pipelines
+
+### Usage Examples
+
+#### Quick Start
+```powershell
+# Start the complete environment
+.\docker\scripts\start-full-network.ps1 -Build
+
+# Wait for all services to be ready (about 2 minutes)
+# Check service health
+curl http://localhost:8080/health  # API service
+curl http://localhost:8081/health  # Controller 1
+curl http://localhost:8090/health  # HTTP server
+
+# Verify agent registration
+curl http://localhost:8080/api/v1/agents
+```
+
+#### Test Agent Integration
+```powershell
+# Run comprehensive transfer tests
+.\docker\scripts\test-transfers.ps1
+
+# Monitor agent logs in real-time
+docker logs quorus-agent-nyc -f
+
+# Check transfer status
+curl http://localhost:8080/api/v1/transfers/{transferId}
+```
+
+#### Manual Testing
+```bash
+# Submit SFTP transfer
+curl -X POST http://localhost:8080/api/v1/transfers \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sourceUri": "sftp://testuser:testpass@sftp-server/shared/timestamp.txt",
+    "destinationPath": "/tmp/downloads/sftp-timestamp.txt",
+    "protocol": "sftp"
+  }'
+
+# Submit FTP transfer
+curl -X POST http://localhost:8080/api/v1/transfers \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sourceUri": "ftp://testuser:testpass@ftp-server/shared/timestamp.txt",
+    "destinationPath": "/tmp/downloads/ftp-timestamp.txt",
+    "protocol": "ftp"
+  }'
+
+# Submit HTTP transfer
+curl -X POST http://localhost:8080/api/v1/transfers \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sourceUri": "http://http-server/shared/timestamp.txt",
+    "destinationPath": "/tmp/downloads/http-timestamp.txt",
+    "protocol": "http"
+  }'
+```
+
+#### Environment Management
+```powershell
+# Stop the environment
+docker-compose -f docker/compose/docker-compose-full-network.yml down
+
+# Clean up volumes (fresh start)
+docker-compose -f docker/compose/docker-compose-full-network.yml down -v
+
+# View all container logs
+docker-compose -f docker/compose/docker-compose-full-network.yml logs -f
+
+# Scale agents (add more instances)
+docker-compose -f docker/compose/docker-compose-full-network.yml up -d --scale agent-nyc=2
+```
+
+This comprehensive agent integration provides a **complete, production-like test environment** where you can validate the entire Quorus system end-to-end, from agent registration through job execution with real file transfer protocols, distributed state management, and fault tolerance capabilities.

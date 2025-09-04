@@ -30,6 +30,64 @@ docker/
     └── check-agents.ps1            # Agent status checking script
 ```
 
+## 🚀 Complete Test Network Environment
+
+### Full Network Test Environment
+
+The `docker-compose-full-network.yml` configuration provides a comprehensive test environment that simulates a realistic Quorus file transfer network:
+
+**Architecture:**
+- **Control Plane**: 3 Raft controllers + API service
+- **Agent Network**: 3 agents in different regions (NYC, London, Tokyo)
+- **File Transfer Servers**: FTP, SFTP, HTTP, and SMB servers
+- **Test Utilities**: File generators and monitoring tools
+
+**Network Topology:**
+```
+Control Plane (172.20.0.0/16)
+├── Controller 1-3 (Raft cluster)
+└── API Service (agent communication)
+
+Agent Network (172.21.0.0/16)
+├── Agent NYC (US East)
+├── Agent London (EU West)
+└── Agent Tokyo (AP Northeast)
+
+Transfer Servers (172.22.0.0/16)
+├── FTP Server (port 21)
+├── SFTP Server (port 2222)
+├── HTTP Server (port 8090)
+└── File Generator (test data)
+```
+
+### Quick Start - Full Network
+
+```powershell
+# Start the complete test environment
+.\scripts\start-full-network.ps1 -Build
+
+# Test agent registration and transfers
+.\scripts\test-transfers.ps1
+
+# Monitor the environment
+docker-compose -f compose/docker-compose-full-network.yml logs -f
+
+# Stop the environment
+docker-compose -f compose/docker-compose-full-network.yml down
+```
+
+### Service Endpoints
+
+| Service | URL | Credentials |
+|---------|-----|-------------|
+| API Service | http://localhost:8080 | - |
+| Controller 1 | http://localhost:8081 | - |
+| Controller 2 | http://localhost:8082 | - |
+| Controller 3 | http://localhost:8083 | - |
+| HTTP Server | http://localhost:8090 | - |
+| FTP Server | ftp://localhost:21 | testuser/testpass |
+| SFTP Server | sftp://localhost:2222 | testuser/testpass |
+
 ## Quick Start
 
 ### 1. Basic Cluster Setup

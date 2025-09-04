@@ -210,6 +210,7 @@ public class EnterpriseProtocolExample {
                     .requestId("sftp-transfer-" + System.currentTimeMillis())
                     .sourceUri(sftpUri)
                     .destinationPath(destination)
+                    .protocol("sftp")
                     .build();
 
             // Execute transfer (simulation)

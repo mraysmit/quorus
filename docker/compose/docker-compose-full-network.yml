@@ -1,0 +1,362 @@
+version: '3.8'
+
+# Complete Quorus Network Test Environment
+# This configuration creates a realistic multi-region file transfer network
+# with controllers, agents, and various file transfer servers
+
+name: quorus-network
+
+services:
+  # ============================================================================
+  # CONTROL PLANE - Quorus Controllers and API
+  # ============================================================================
+  
+  controller1:
+    build:
+      context: ../..
+      dockerfile: quorus-controller/Dockerfile
+    container_name: quorus-controller1
+    hostname: controller1
+    environment:
+      - NODE_ID=controller1
+      - RAFT_HOST=0.0.0.0
+      - RAFT_PORT=9080
+      - HTTP_PORT=8080
+      - CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080
+      - ELECTION_TIMEOUT_MS=3000
+      - HEARTBEAT_INTERVAL_MS=500
+      - JAVA_OPTS=-Xmx256m -Xms128m
+    ports:
+      - "8081:8080"
+    networks:
+      control-plane:
+        ipv4_address: 172.20.0.10
+    volumes:
+      - controller1-data:/app/data
+      - controller1-logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
+  controller2:
+    build:
+      context: ../..
+      dockerfile: quorus-controller/Dockerfile
+    container_name: quorus-controller2
+    hostname: controller2
+    environment:
+      - NODE_ID=controller2
+      - RAFT_HOST=0.0.0.0
+      - RAFT_PORT=9080
+      - HTTP_PORT=8080
+      - CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080
+      - ELECTION_TIMEOUT_MS=3000
+      - HEARTBEAT_INTERVAL_MS=500
+      - JAVA_OPTS=-Xmx256m -Xms128m
+    ports:
+      - "8082:8080"
+    networks:
+      control-plane:
+        ipv4_address: 172.20.0.11
+    volumes:
+      - controller2-data:/app/data
+      - controller2-logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    depends_on:
+      - controller1
+
+  controller3:
+    build:
+      context: ../..
+      dockerfile: quorus-controller/Dockerfile
+    container_name: quorus-controller3
+    hostname: controller3
+    environment:
+      - NODE_ID=controller3
+      - RAFT_HOST=0.0.0.0
+      - RAFT_PORT=9080
+      - HTTP_PORT=8080
+      - CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080
+      - ELECTION_TIMEOUT_MS=3000
+      - HEARTBEAT_INTERVAL_MS=500
+      - JAVA_OPTS=-Xmx256m -Xms128m
+    ports:
+      - "8083:8080"
+    networks:
+      control-plane:
+        ipv4_address: 172.20.0.12
+    volumes:
+      - controller3-data:/app/data
+      - controller3-logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    depends_on:
+      - controller1
+      - controller2
+
+  # API service for agent communication
+  api:
+    build:
+      context: ../..
+      dockerfile: quorus-api/Dockerfile
+    container_name: quorus-api
+    hostname: api
+    environment:
+      - QUARKUS_HTTP_HOST=0.0.0.0
+      - QUARKUS_HTTP_PORT=8080
+      - JAVA_OPTS=-Xmx512m -Xms256m
+    ports:
+      - "8080:8080"
+    networks:
+      control-plane:
+        ipv4_address: 172.20.0.20
+      agent-network:
+        ipv4_address: 172.21.0.20
+    volumes:
+      - api-logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    depends_on:
+      - controller1
+      - controller2
+      - controller3
+
+  # ============================================================================
+  # AGENT NETWORK - Quorus Agents in different regions
+  # ============================================================================
+  
+  agent-nyc:
+    build:
+      context: ../..
+      dockerfile: docker/agents/Dockerfile
+    container_name: quorus-agent-nyc
+    hostname: agent-nyc
+    environment:
+      - AGENT_ID=agent-nyc-001
+      - AGENT_REGION=us-east-1
+      - AGENT_DATACENTER=nyc-dc1
+      - CONTROLLER_URL=http://api:8080/api/v1
+      - SUPPORTED_PROTOCOLS=HTTP,HTTPS,FTP,SFTP
+      - MAX_CONCURRENT_TRANSFERS=5
+      - HEARTBEAT_INTERVAL=30000
+      - JAVA_OPTS=-Xmx256m -Xms128m
+    networks:
+      agent-network:
+        ipv4_address: 172.21.0.10
+      transfer-servers:
+        ipv4_address: 172.22.0.100
+    volumes:
+      - agent-nyc-data:/app/data
+      - agent-nyc-logs:/app/logs
+      - shared-files:/shared
+    restart: unless-stopped
+    depends_on:
+      - api
+
+  agent-london:
+    build:
+      context: ../..
+      dockerfile: docker/agents/Dockerfile
+    container_name: quorus-agent-london
+    hostname: agent-london
+    environment:
+      - AGENT_ID=agent-lon-001
+      - AGENT_REGION=eu-west-1
+      - AGENT_DATACENTER=lon-dc1
+      - CONTROLLER_URL=http://api:8080/api/v1
+      - SUPPORTED_PROTOCOLS=HTTP,HTTPS,SFTP,SMB
+      - MAX_CONCURRENT_TRANSFERS=3
+      - HEARTBEAT_INTERVAL=30000
+      - JAVA_OPTS=-Xmx256m -Xms128m
+    networks:
+      agent-network:
+        ipv4_address: 172.21.0.11
+      transfer-servers:
+        ipv4_address: 172.22.0.101
+    volumes:
+      - agent-london-data:/app/data
+      - agent-london-logs:/app/logs
+      - shared-files:/shared
+    restart: unless-stopped
+    depends_on:
+      - api
+
+  agent-tokyo:
+    build:
+      context: ../..
+      dockerfile: docker/agents/Dockerfile
+    container_name: quorus-agent-tokyo
+    hostname: agent-tokyo
+    environment:
+      - AGENT_ID=agent-tky-001
+      - AGENT_REGION=ap-northeast-1
+      - AGENT_DATACENTER=tky-dc1
+      - CONTROLLER_URL=http://api:8080/api/v1
+      - SUPPORTED_PROTOCOLS=HTTP,HTTPS,FTP
+      - MAX_CONCURRENT_TRANSFERS=4
+      - HEARTBEAT_INTERVAL=30000
+      - JAVA_OPTS=-Xmx256m -Xms128m
+    networks:
+      agent-network:
+        ipv4_address: 172.21.0.12
+      transfer-servers:
+        ipv4_address: 172.22.0.102
+    volumes:
+      - agent-tokyo-data:/app/data
+      - agent-tokyo-logs:/app/logs
+      - shared-files:/shared
+    restart: unless-stopped
+    depends_on:
+      - api
+
+  # ============================================================================
+  # FILE TRANSFER SERVERS - Various protocol endpoints
+  # ============================================================================
+  
+  ftp-server:
+    image: stilliard/pure-ftpd:hardened
+    container_name: quorus-ftp-server
+    hostname: ftp-server
+    environment:
+      - PUBLICHOST=172.22.0.10
+      - FTP_USER_NAME=testuser
+      - FTP_USER_PASS=testpass
+      - FTP_USER_HOME=/home/testuser
+    ports:
+      - "21:21"
+      - "30000-30009:30000-30009"
+    networks:
+      transfer-servers:
+        ipv4_address: 172.22.0.10
+    volumes:
+      - ftp-data:/home/testuser
+      - shared-files:/home/testuser/shared
+    restart: unless-stopped
+
+  sftp-server:
+    image: atmoz/sftp:latest
+    container_name: quorus-sftp-server
+    hostname: sftp-server
+    command: testuser:testpass:1001
+    ports:
+      - "2222:22"
+    networks:
+      transfer-servers:
+        ipv4_address: 172.22.0.11
+    volumes:
+      - sftp-data:/home/testuser
+      - shared-files:/home/testuser/shared
+    restart: unless-stopped
+
+  http-server:
+    image: nginx:alpine
+    container_name: quorus-http-server
+    hostname: http-server
+    ports:
+      - "8090:80"
+    networks:
+      transfer-servers:
+        ipv4_address: 172.22.0.12
+    volumes:
+      - ./test-data/nginx.conf:/etc/nginx/nginx.conf:ro
+      - http-data:/usr/share/nginx/html
+      - shared-files:/usr/share/nginx/html/shared
+    restart: unless-stopped
+
+  # ============================================================================
+  # TEST DATA AND UTILITIES
+  # ============================================================================
+  
+  file-generator:
+    image: alpine:latest
+    container_name: quorus-file-generator
+    hostname: file-generator
+    command: |
+      sh -c "
+        apk add --no-cache curl
+        while true; do
+          echo 'Generating test files...'
+          dd if=/dev/urandom of=/shared/random-1mb.bin bs=1M count=1 2>/dev/null
+          dd if=/dev/urandom of=/shared/random-10mb.bin bs=1M count=10 2>/dev/null
+          echo 'Test file generated at $(date)' > /shared/timestamp.txt
+          sleep 300
+        done
+      "
+    networks:
+      transfer-servers:
+        ipv4_address: 172.22.0.50
+    volumes:
+      - shared-files:/shared
+    restart: unless-stopped
+
+networks:
+  # Control plane network for controllers and API
+  control-plane:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.0.0/16
+          gateway: 172.20.0.1
+
+  # Agent network for agent communication
+  agent-network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.21.0.0/16
+          gateway: 172.21.0.1
+
+  # Transfer servers network
+  transfer-servers:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.22.0.0/16
+          gateway: 172.22.0.1
+
+volumes:
+  # Controller data
+  controller1-data:
+  controller1-logs:
+  controller2-data:
+  controller2-logs:
+  controller3-data:
+  controller3-logs:
+  api-logs:
+  
+  # Agent data
+  agent-nyc-data:
+  agent-nyc-logs:
+  agent-london-data:
+  agent-london-logs:
+  agent-tokyo-data:
+  agent-tokyo-logs:
+  
+  # Transfer server data
+  ftp-data:
+  sftp-data:
+  http-data:
+  shared-files:
