@@ -23,13 +23,14 @@ import dev.mars.quorus.core.exceptions.TransferException;
 import dev.mars.quorus.transfer.TransferContext;
 import dev.mars.quorus.transfer.ProgressTracker;
 
+import com.jcraft.jsch.*;
+
 import java.io.*;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.concurrent.CompletableFuture;
 import java.util.logging.Logger;
 
 public class SftpTransferProtocol implements TransferProtocol {
@@ -91,45 +92,61 @@ public class SftpTransferProtocol implements TransferProtocol {
         return -1; // No specific limit for SFTP
     }
     
-    private TransferResult performSftpTransfer(TransferRequest request, ProgressTracker progressTracker) 
+    private TransferResult performSftpTransfer(TransferRequest request, ProgressTracker progressTracker)
             throws TransferException {
-        
+
         Instant startTime = Instant.now();
         String requestId = request.getRequestId();
-        
+
         try {
             logger.info("Starting SFTP transfer: " + request.getSourceUri() + " -> " + request.getDestinationPath());
-            
+
             // Parse SFTP URI and extract connection details
             SftpConnectionInfo connectionInfo = parseSftpUri(request.getSourceUri());
-            
-            // For this simplified implementation, we'll simulate SFTP transfer
-            // In production, you would use a proper SSH/SFTP library
-            long bytesTransferred = simulateSftpTransfer(connectionInfo, request, progressTracker);
-            
-            // Calculate checksum if required
-            String checksum = null;
-            if (request.getExpectedChecksum() != null) {
-                logger.info("Calculating checksum for transferred file");
-                // For demo purposes, we'll skip actual checksum calculation
-                checksum = "demo-checksum-" + bytesTransferred;
+
+            // Create SFTP client and perform transfer
+            SftpClient sftpClient = new SftpClient(connectionInfo);
+
+            try {
+                sftpClient.connect();
+
+                // Get file size for progress tracking
+                long fileSize = sftpClient.getFileSize(connectionInfo.path);
+
+                // Ensure destination directory exists
+                Files.createDirectories(request.getDestinationPath().getParent());
+
+                // Perform the file transfer
+                long bytesTransferred = sftpClient.downloadFile(connectionInfo.path,
+                        request.getDestinationPath(), progressTracker, fileSize);
+
+                // Calculate checksum if required
+                String checksum = null;
+                if (request.getExpectedChecksum() != null) {
+                    logger.info("Calculating checksum for transferred file");
+                    // For demo purposes, we'll skip actual checksum calculation
+                    checksum = "demo-checksum-" + bytesTransferred;
+                }
+
+                Instant endTime = Instant.now();
+                Duration transferTime = Duration.between(startTime, endTime);
+
+                logger.info("SFTP transfer completed successfully: " + bytesTransferred + " bytes in " +
+                           transferTime.toMillis() + "ms");
+
+                return TransferResult.builder()
+                        .requestId(requestId)
+                        .finalStatus(TransferStatus.COMPLETED)
+                        .bytesTransferred(bytesTransferred)
+                        .startTime(startTime)
+                        .endTime(endTime)
+                        .actualChecksum(checksum)
+                        .build();
+
+            } finally {
+                sftpClient.disconnect();
             }
-            
-            Instant endTime = Instant.now();
-            Duration transferTime = Duration.between(startTime, endTime);
-            
-            logger.info("SFTP transfer completed successfully: " + bytesTransferred + " bytes in " + 
-                       transferTime.toMillis() + "ms");
-            
-            return TransferResult.builder()
-                    .requestId(requestId)
-                    .finalStatus(TransferStatus.COMPLETED)
-                    .bytesTransferred(bytesTransferred)
-                    .startTime(startTime)
-                    .endTime(endTime)
-                    .actualChecksum(checksum)
-                    .build();
-            
+
         } catch (Exception e) {
             // Check if this is an intentional test failure
             if (isIntentionalTestFailure(requestId)) {
@@ -142,71 +159,113 @@ public class SftpTransferProtocol implements TransferProtocol {
         }
     }
     
-    private long simulateSftpTransfer(SftpConnectionInfo connectionInfo, TransferRequest request, 
-                                     ProgressTracker progressTracker) throws IOException, TransferException {
-        
-        logger.info("Simulating SFTP connection to " + connectionInfo.host + ":" + connectionInfo.port);
-        logger.info("SFTP authentication: " + (connectionInfo.hasAuthentication() ? "credentials provided" : "anonymous"));
-        logger.info("SFTP remote path: " + connectionInfo.path);
-        
-        // Simulate connection establishment
-        try {
-            Thread.sleep(100); // Simulate connection time
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new TransferException(request.getRequestId(), "Transfer interrupted", e);
+    /**
+     * Real SFTP client implementation using JSch
+     */
+    private static class SftpClient {
+        private final SftpConnectionInfo connectionInfo;
+        private JSch jsch;
+        private Session session;
+        private ChannelSftp sftpChannel;
+
+        SftpClient(SftpConnectionInfo connectionInfo) {
+            this.connectionInfo = connectionInfo;
+            this.jsch = new JSch();
         }
-        
-        // For demonstration, we'll create a sample file to transfer
-        // In production, this would connect to the actual SFTP server
-        long fileSize = createSampleFile(request.getDestinationPath());
-        
-        // Simulate progress updates during transfer
-        simulateProgressUpdates(progressTracker, fileSize);
-        
-        logger.info("SFTP transfer simulation completed");
-        return fileSize;
-    }
-    
-    private long createSampleFile(java.nio.file.Path destinationPath) throws IOException {
-        // Create a sample file for demonstration
-        // In production, this would download from the SFTP server
-        Files.createDirectories(destinationPath.getParent());
-        
-        String sampleContent = "SFTP Transfer Simulation\n" +
-                              "This file demonstrates SFTP protocol support in Quorus.\n" +
-                              "In production, this would be downloaded from an SFTP server.\n" +
-                              "Timestamp: " + Instant.now() + "\n";
-        
-        Files.write(destinationPath, sampleContent.getBytes(), 
-                   StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING);
-        
-        return Files.size(destinationPath);
-    }
-    
-    private void simulateProgressUpdates(ProgressTracker progressTracker, long totalBytes) {
-        try {
-            // Simulate transfer progress
-            long bytesTransferred = 0;
-            int chunks = 10;
-            long chunkSize = totalBytes / chunks;
-            
-            for (int i = 0; i <= chunks; i++) {
-                bytesTransferred = Math.min(i * chunkSize, totalBytes);
-                progressTracker.updateProgress(bytesTransferred);
-                
-                if (i < chunks) {
-                    Thread.sleep(50); // Simulate transfer time
-                }
-                
-                // Check for cancellation
-                if (Thread.currentThread().isInterrupted()) {
-                    throw new RuntimeException("Transfer was cancelled");
-                }
+
+        void connect() throws JSchException {
+            logger.info("Connecting to SFTP server: " + connectionInfo.host + ":" + connectionInfo.port);
+
+            // Create session
+            session = jsch.getSession(connectionInfo.username, connectionInfo.host, connectionInfo.port);
+
+            if (connectionInfo.password != null) {
+                session.setPassword(connectionInfo.password);
             }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException("Transfer was interrupted", e);
+
+            // Configure session properties
+            session.setConfig("StrictHostKeyChecking", "no"); // For demo purposes
+            session.setTimeout((int) CONNECTION_TIMEOUT.toMillis());
+
+            // Connect session
+            session.connect();
+
+            // Open SFTP channel
+            sftpChannel = (ChannelSftp) session.openChannel("sftp");
+            sftpChannel.connect();
+
+            logger.info("SFTP connection established successfully");
+        }
+
+        long getFileSize(String remotePath) throws SftpException {
+            try {
+                SftpATTRS attrs = sftpChannel.stat(remotePath);
+                return attrs.getSize();
+            } catch (SftpException e) {
+                logger.warning("Could not get file size for " + remotePath + ": " + e.getMessage());
+                return -1; // Unknown size
+            }
+        }
+
+        long downloadFile(String remotePath, java.nio.file.Path localPath,
+                         ProgressTracker progressTracker, long fileSize) throws SftpException, IOException {
+
+            long bytesTransferred = 0;
+
+            try (OutputStream fileOutput = Files.newOutputStream(localPath,
+                    StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING);
+                 BufferedOutputStream bufferedOutput = new BufferedOutputStream(fileOutput, DEFAULT_BUFFER_SIZE)) {
+
+                // Create progress monitor
+                SftpProgressMonitor progressMonitor = new SftpProgressMonitor() {
+                    private long transferred = 0;
+
+                    @Override
+                    public void init(int op, String src, String dest, long max) {
+                        transferred = 0;
+                    }
+
+                    @Override
+                    public boolean count(long count) {
+                        transferred += count;
+                        progressTracker.updateProgress(transferred);
+
+                        // Check for cancellation
+                        return !Thread.currentThread().isInterrupted();
+                    }
+
+                    @Override
+                    public void end() {
+                        // Transfer completed
+                    }
+                };
+
+                // Download file with progress monitoring
+                sftpChannel.get(remotePath, bufferedOutput, progressMonitor);
+                bufferedOutput.flush();
+
+                bytesTransferred = Files.size(localPath);
+            }
+
+            return bytesTransferred;
+        }
+
+        void disconnect() {
+            try {
+                if (sftpChannel != null && sftpChannel.isConnected()) {
+                    sftpChannel.disconnect();
+                }
+            } catch (Exception e) {
+                logger.warning("Error disconnecting SFTP channel: " + e.getMessage());
+            }
+
+            try {
+                if (session != null && session.isConnected()) {
+                    session.disconnect();
+                }
+            } catch (Exception e) {
+                logger.warning("Error disconnecting SFTP session: " + e.getMessage());
+            }
         }
     }
     

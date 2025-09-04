@@ -51,7 +51,7 @@
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>exec-maven-plugin</artifactId>
                 <configuration>
-                    <mainClass>dev.mars.quorus.examples.EnterpriseProtocolExample</mainClass>
+                    <mainClass>dev.mars.quorus.examples.SftpFtpRealImplementationDemo</mainClass>
                 </configuration>
             </plugin>
         </plugins>

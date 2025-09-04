@@ -1,0 +1,4 @@
+SFTP Transfer Simulation
+This file demonstrates SFTP protocol support in Quorus.
+In production, this would be downloaded from an SFTP server.
+Timestamp: 2025-09-04T06:18:03.744292200Z
