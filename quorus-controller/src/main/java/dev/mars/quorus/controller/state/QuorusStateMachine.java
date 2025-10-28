@@ -18,11 +18,15 @@ package dev.mars.quorus.controller.state;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import dev.mars.quorus.agent.AgentInfo;
+import dev.mars.quorus.agent.AgentStatus;
+import dev.mars.quorus.agent.AgentCapabilities;
 import dev.mars.quorus.controller.raft.RaftStateMachine;
 import dev.mars.quorus.core.TransferJob;
 import dev.mars.quorus.core.TransferStatus;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -35,6 +39,7 @@ public class QuorusStateMachine implements RaftStateMachine {
 
     // State data
     private final Map<String, TransferJobSnapshot> transferJobs = new ConcurrentHashMap<>();
+    private final Map<String, AgentInfo> agents = new ConcurrentHashMap<>();
     private final Map<String, String> systemMetadata = new ConcurrentHashMap<>();
     private final AtomicLong lastAppliedIndex = new AtomicLong(0);
 
@@ -48,7 +53,7 @@ public class QuorusStateMachine implements RaftStateMachine {
     public QuorusStateMachine() {
         // Initialize with system metadata
         systemMetadata.put("version", "2.0");
-        systemMetadata.put("phase", "2.2 - Controller Quorum Architecture");
+        systemMetadata.put("phase", "2.3 - Agent Fleet Management");
     }
 
     @Override
@@ -60,6 +65,8 @@ public class QuorusStateMachine implements RaftStateMachine {
         try {
             if (command instanceof TransferJobCommand) {
                 return applyTransferJobCommand((TransferJobCommand) command);
+            } else if (command instanceof AgentCommand) {
+                return applyAgentCommand((AgentCommand) command);
             } else if (command instanceof SystemMetadataCommand) {
                 return applySystemMetadataCommand((SystemMetadataCommand) command);
             } else {
@@ -123,20 +130,90 @@ public class QuorusStateMachine implements RaftStateMachine {
         }
     }
 
+    private Object applyAgentCommand(AgentCommand command) {
+        String agentId = command.getAgentId();
+
+        switch (command.getType()) {
+            case REGISTER:
+                AgentInfo agentInfo = command.getAgentInfo();
+                agents.put(agentId, agentInfo);
+                logger.info("Registered agent: " + agentId + " at " + agentInfo.getEndpoint());
+                return agentInfo;
+
+            case DEREGISTER:
+                AgentInfo removedAgent = agents.remove(agentId);
+                if (removedAgent != null) {
+                    logger.info("Deregistered agent: " + agentId);
+                    return removedAgent;
+                } else {
+                    logger.warning("Agent not found for deregistration: " + agentId);
+                    return null;
+                }
+
+            case UPDATE_STATUS:
+                AgentInfo existingAgent = agents.get(agentId);
+                if (existingAgent != null) {
+                    AgentStatus newStatus = command.getNewStatus();
+                    existingAgent.setStatus(newStatus);
+                    existingAgent.setLastHeartbeat(Instant.now());
+                    agents.put(agentId, existingAgent);
+                    logger.info("Updated agent status: " + agentId + " -> " + newStatus);
+                    return existingAgent;
+                } else {
+                    logger.warning("Agent not found for status update: " + agentId);
+                    return null;
+                }
+
+            case UPDATE_CAPABILITIES:
+                AgentInfo agentToUpdate = agents.get(agentId);
+                if (agentToUpdate != null) {
+                    AgentCapabilities newCapabilities = command.getNewCapabilities();
+                    agentToUpdate.setCapabilities(newCapabilities);
+                    agentToUpdate.setLastHeartbeat(Instant.now());
+                    agents.put(agentId, agentToUpdate);
+                    logger.info("Updated agent capabilities: " + agentId);
+                    return agentToUpdate;
+                } else {
+                    logger.warning("Agent not found for capabilities update: " + agentId);
+                    return null;
+                }
+
+            case HEARTBEAT:
+                AgentInfo agentForHeartbeat = agents.get(agentId);
+                if (agentForHeartbeat != null) {
+                    agentForHeartbeat.setLastHeartbeat(Instant.now());
+                    // Update status to HEALTHY if it was in a transitional state
+                    if (agentForHeartbeat.getStatus() == AgentStatus.REGISTERING) {
+                        agentForHeartbeat.setStatus(AgentStatus.HEALTHY);
+                    }
+                    agents.put(agentId, agentForHeartbeat);
+                    logger.fine("Heartbeat received from agent: " + agentId);
+                    return agentForHeartbeat;
+                } else {
+                    logger.warning("Agent not found for heartbeat: " + agentId);
+                    return null;
+                }
+
+            default:
+                logger.warning("Unknown agent command type: " + command.getType());
+                return null;
+        }
+    }
+
     private Object applySystemMetadataCommand(SystemMetadataCommand command) {
         String key = command.getKey();
-        
+
         switch (command.getType()) {
             case SET:
                 String oldValue = systemMetadata.put(key, command.getValue());
                 logger.info("Set system metadata: " + key + " = " + command.getValue());
                 return oldValue;
-                
+
             case DELETE:
                 String removedValue = systemMetadata.remove(key);
                 logger.info("Deleted system metadata: " + key);
                 return removedValue;
-                
+
             default:
                 logger.warning("Unknown system metadata command type: " + command.getType());
                 return null;
@@ -148,11 +225,12 @@ public class QuorusStateMachine implements RaftStateMachine {
         try {
             QuorusSnapshot snapshot = new QuorusSnapshot();
             snapshot.setTransferJobs(new ConcurrentHashMap<>(transferJobs));
+            snapshot.setAgents(new ConcurrentHashMap<>(agents));
             snapshot.setSystemMetadata(new ConcurrentHashMap<>(systemMetadata));
             snapshot.setLastAppliedIndex(lastAppliedIndex.get());
-            
+
             byte[] data = objectMapper.writeValueAsBytes(snapshot);
-            logger.info("Created snapshot with " + transferJobs.size() + " transfer jobs");
+            logger.info("Created snapshot with " + transferJobs.size() + " transfer jobs and " + agents.size() + " agents");
             return data;
         } catch (IOException e) {
             logger.log(Level.SEVERE, "Failed to create snapshot", e);
@@ -164,16 +242,21 @@ public class QuorusStateMachine implements RaftStateMachine {
     public void restoreSnapshot(byte[] snapshot) {
         try {
             QuorusSnapshot restoredSnapshot = objectMapper.readValue(snapshot, QuorusSnapshot.class);
-            
+
             transferJobs.clear();
             transferJobs.putAll(restoredSnapshot.getTransferJobs());
-            
+
+            agents.clear();
+            if (restoredSnapshot.getAgents() != null) {
+                agents.putAll(restoredSnapshot.getAgents());
+            }
+
             systemMetadata.clear();
             systemMetadata.putAll(restoredSnapshot.getSystemMetadata());
-            
+
             lastAppliedIndex.set(restoredSnapshot.getLastAppliedIndex());
-            
-            logger.info("Restored snapshot with " + transferJobs.size() + " transfer jobs");
+
+            logger.info("Restored snapshot with " + transferJobs.size() + " transfer jobs and " + agents.size() + " agents");
         } catch (IOException e) {
             logger.log(Level.SEVERE, "Failed to restore snapshot", e);
             throw new RuntimeException("Failed to restore snapshot", e);
@@ -188,9 +271,10 @@ public class QuorusStateMachine implements RaftStateMachine {
     @Override
     public void reset() {
         transferJobs.clear();
+        agents.clear();
         systemMetadata.clear();
         systemMetadata.put("version", "2.0");
-        systemMetadata.put("phase", "2.2 - Controller Quorum Architecture");
+        systemMetadata.put("phase", "2.3 - Agent Fleet Management");
         lastAppliedIndex.set(0);
         logger.info("State machine reset");
     }
