@@ -24,6 +24,8 @@ import dev.mars.quorus.agent.AgentCapabilities;
 import dev.mars.quorus.controller.raft.RaftStateMachine;
 import dev.mars.quorus.core.TransferJob;
 import dev.mars.quorus.core.TransferStatus;
+import dev.mars.quorus.core.JobAssignment;
+import dev.mars.quorus.core.QueuedJob;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -41,6 +43,8 @@ public class QuorusStateMachine implements RaftStateMachine {
     private final Map<String, TransferJobSnapshot> transferJobs = new ConcurrentHashMap<>();
     private final Map<String, AgentInfo> agents = new ConcurrentHashMap<>();
     private final Map<String, String> systemMetadata = new ConcurrentHashMap<>();
+    private final Map<String, JobAssignment> jobAssignments = new ConcurrentHashMap<>();
+    private final Map<String, QueuedJob> jobQueue = new ConcurrentHashMap<>();
     private final AtomicLong lastAppliedIndex = new AtomicLong(0);
 
     // JSON serialization
@@ -69,6 +73,10 @@ public class QuorusStateMachine implements RaftStateMachine {
                 return applyAgentCommand((AgentCommand) command);
             } else if (command instanceof SystemMetadataCommand) {
                 return applySystemMetadataCommand((SystemMetadataCommand) command);
+            } else if (command instanceof JobAssignmentCommand) {
+                return applyJobAssignmentCommand((JobAssignmentCommand) command);
+            } else if (command instanceof JobQueueCommand) {
+                return applyJobQueueCommand((JobQueueCommand) command);
             } else {
                 logger.warning("Unknown command type: " + command.getClass().getName());
                 return null;
@@ -216,6 +224,164 @@ public class QuorusStateMachine implements RaftStateMachine {
 
             default:
                 logger.warning("Unknown system metadata command type: " + command.getType());
+                return null;
+        }
+    }
+
+    private Object applyJobAssignmentCommand(JobAssignmentCommand command) {
+        String assignmentId = command.getAssignmentId();
+
+        switch (command.getType()) {
+            case ASSIGN:
+                JobAssignment assignment = command.getJobAssignment();
+                jobAssignments.put(assignmentId, assignment);
+                logger.info("Created job assignment: " + assignmentId + " (job: " +
+                           assignment.getJobId() + " -> agent: " + assignment.getAgentId() + ")");
+                return assignment;
+
+            case ACCEPT:
+                JobAssignment existing = jobAssignments.get(assignmentId);
+                if (existing != null) {
+                    JobAssignment updated = existing.withStatusAndTimestamp(command.getNewStatus(), command.getTimestamp());
+                    jobAssignments.put(assignmentId, updated);
+                    logger.info("Job assignment accepted: " + assignmentId);
+                    return updated;
+                } else {
+                    logger.warning("Job assignment not found for accept: " + assignmentId);
+                    return null;
+                }
+
+            case REJECT:
+                JobAssignment rejectedAssignment = jobAssignments.get(assignmentId);
+                if (rejectedAssignment != null) {
+                    JobAssignment updated = rejectedAssignment.withStatusAndTimestamp(command.getNewStatus(), command.getTimestamp());
+                    jobAssignments.put(assignmentId, updated);
+                    logger.info("Job assignment rejected: " + assignmentId +
+                               (command.getReason() != null ? " (reason: " + command.getReason() + ")" : ""));
+                    return updated;
+                } else {
+                    logger.warning("Job assignment not found for reject: " + assignmentId);
+                    return null;
+                }
+
+            case UPDATE_STATUS:
+                JobAssignment statusAssignment = jobAssignments.get(assignmentId);
+                if (statusAssignment != null) {
+                    JobAssignment updated = statusAssignment.withStatusAndTimestamp(command.getNewStatus(), command.getTimestamp());
+                    jobAssignments.put(assignmentId, updated);
+                    logger.info("Updated job assignment status: " + assignmentId + " -> " + command.getNewStatus());
+                    return updated;
+                } else {
+                    logger.warning("Job assignment not found for status update: " + assignmentId);
+                    return null;
+                }
+
+            case TIMEOUT:
+                JobAssignment timeoutAssignment = jobAssignments.get(assignmentId);
+                if (timeoutAssignment != null) {
+                    JobAssignment updated = timeoutAssignment.withStatusAndTimestamp(command.getNewStatus(), command.getTimestamp());
+                    jobAssignments.put(assignmentId, updated);
+                    logger.info("Job assignment timed out: " + assignmentId);
+                    return updated;
+                } else {
+                    logger.warning("Job assignment not found for timeout: " + assignmentId);
+                    return null;
+                }
+
+            case CANCEL:
+                JobAssignment cancelAssignment = jobAssignments.get(assignmentId);
+                if (cancelAssignment != null) {
+                    JobAssignment updated = cancelAssignment.withStatusAndTimestamp(command.getNewStatus(), command.getTimestamp());
+                    jobAssignments.put(assignmentId, updated);
+                    logger.info("Job assignment cancelled: " + assignmentId +
+                               (command.getReason() != null ? " (reason: " + command.getReason() + ")" : ""));
+                    return updated;
+                } else {
+                    logger.warning("Job assignment not found for cancel: " + assignmentId);
+                    return null;
+                }
+
+            case REMOVE:
+                JobAssignment removed = jobAssignments.remove(assignmentId);
+                if (removed != null) {
+                    logger.info("Removed job assignment: " + assignmentId);
+                    return removed;
+                } else {
+                    logger.warning("Job assignment not found for removal: " + assignmentId);
+                    return null;
+                }
+
+            default:
+                logger.warning("Unknown job assignment command type: " + command.getType());
+                return null;
+        }
+    }
+
+    private Object applyJobQueueCommand(JobQueueCommand command) {
+        String jobId = command.getJobId();
+
+        switch (command.getType()) {
+            case ENQUEUE:
+                QueuedJob queuedJob = command.getQueuedJob();
+                jobQueue.put(jobId, queuedJob);
+                logger.info("Enqueued job: " + jobId + " (priority: " + queuedJob.getPriority() + ")");
+                return queuedJob;
+
+            case DEQUEUE:
+                QueuedJob dequeuedJob = jobQueue.remove(jobId);
+                if (dequeuedJob != null) {
+                    logger.info("Dequeued job: " + jobId + " for assignment");
+                    return dequeuedJob;
+                } else {
+                    logger.warning("Job not found in queue for dequeue: " + jobId);
+                    return null;
+                }
+
+            case PRIORITIZE:
+                QueuedJob existingJob = jobQueue.get(jobId);
+                if (existingJob != null) {
+                    QueuedJob updatedJob = existingJob.withPriority(command.getNewPriority());
+                    jobQueue.put(jobId, updatedJob);
+                    logger.info("Updated job priority: " + jobId + " -> " + command.getNewPriority() +
+                               (command.getReason() != null ? " (reason: " + command.getReason() + ")" : ""));
+                    return updatedJob;
+                } else {
+                    logger.warning("Job not found in queue for prioritize: " + jobId);
+                    return null;
+                }
+
+            case REMOVE:
+                QueuedJob removedJob = jobQueue.remove(jobId);
+                if (removedJob != null) {
+                    logger.info("Removed job from queue: " + jobId +
+                               (command.getReason() != null ? " (reason: " + command.getReason() + ")" : ""));
+                    return removedJob;
+                } else {
+                    logger.warning("Job not found in queue for removal: " + jobId);
+                    return null;
+                }
+
+            case EXPEDITE:
+                QueuedJob expediteJob = jobQueue.get(jobId);
+                if (expediteJob != null) {
+                    // For expedite, we could implement special logic to move to front
+                    // For now, we'll just log it - actual queue ordering would be handled by the queue service
+                    logger.info("Expedited job: " + jobId +
+                               (command.getReason() != null ? " (reason: " + command.getReason() + ")" : ""));
+                    return expediteJob;
+                } else {
+                    logger.warning("Job not found in queue for expedite: " + jobId);
+                    return null;
+                }
+
+            case UPDATE_REQUIREMENTS:
+                QueuedJob updatedJob = command.getQueuedJob();
+                jobQueue.put(jobId, updatedJob);
+                logger.info("Updated job requirements: " + jobId);
+                return updatedJob;
+
+            default:
+                logger.warning("Unknown job queue command type: " + command.getType());
                 return null;
         }
     }

@@ -18,7 +18,7 @@ package dev.mars.quorus.controller.state;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-
+import dev.mars.quorus.agent.AgentInfo;
 
 import java.io.Serializable;
 import java.time.Instant;
@@ -29,6 +29,7 @@ public class QuorusSnapshot implements Serializable {
     private static final long serialVersionUID = 1L;
 
     private Map<String, TransferJobSnapshot> transferJobs;
+    private Map<String, AgentInfo> agents;
     private Map<String, String> systemMetadata;
     private long lastAppliedIndex;
     private Instant timestamp;
@@ -39,10 +40,12 @@ public class QuorusSnapshot implements Serializable {
 
     @JsonCreator
     public QuorusSnapshot(@JsonProperty("transferJobs") Map<String, TransferJobSnapshot> transferJobs,
+                         @JsonProperty("agents") Map<String, AgentInfo> agents,
                          @JsonProperty("systemMetadata") Map<String, String> systemMetadata,
                          @JsonProperty("lastAppliedIndex") long lastAppliedIndex,
                          @JsonProperty("timestamp") Instant timestamp) {
         this.transferJobs = transferJobs;
+        this.agents = agents;
         this.systemMetadata = systemMetadata;
         this.lastAppliedIndex = lastAppliedIndex;
         this.timestamp = timestamp != null ? timestamp : Instant.now();
@@ -54,6 +57,14 @@ public class QuorusSnapshot implements Serializable {
 
     public void setTransferJobs(Map<String, TransferJobSnapshot> transferJobs) {
         this.transferJobs = transferJobs;
+    }
+
+    public Map<String, AgentInfo> getAgents() {
+        return agents;
+    }
+
+    public void setAgents(Map<String, AgentInfo> agents) {
+        this.agents = agents;
     }
 
     public Map<String, String> getSystemMetadata() {
@@ -87,6 +98,7 @@ public class QuorusSnapshot implements Serializable {
     public String toString() {
         return "QuorusSnapshot{" +
                 "transferJobs=" + (transferJobs != null ? transferJobs.size() : 0) + " jobs" +
+                ", agents=" + (agents != null ? agents.size() : 0) + " agents" +
                 ", systemMetadata=" + (systemMetadata != null ? systemMetadata.size() : 0) + " entries" +
                 ", lastAppliedIndex=" + lastAppliedIndex +
                 ", timestamp=" + timestamp +

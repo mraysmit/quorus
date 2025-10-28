@@ -127,9 +127,6 @@
                 <configuration>
                     <source>17</source>
                     <target>17</target>
-                    <testExcludes>
-                        <exclude>**/*Test.java</exclude>
-                    </testExcludes>
                 </configuration>
             </plugin>
 
