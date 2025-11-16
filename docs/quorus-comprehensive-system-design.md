@@ -8,6 +8,23 @@
 
 Quorus is an enterprise-grade file transfer system designed for high reliability, scalability, and multi-tenant operation within corporate network environments. The system is optimized for internal corporate network transfers, providing both programmatic APIs and declarative YAML-based workflow definitions for complex file transfer orchestration with comprehensive multi-tenancy support.
 
+## Executive Synopsis
+
+- **Mission & Scope**: Provide secure, controller-first orchestration for high-throughput, internal corporate transfers spanning data-center sync, departmental distribution, ETL staging, and compliance-driven backups. Reliability is anchored by Raft consensus, while extensibility comes from REST APIs plus declarative YAML workflows.
+- **Platform Pillars**: (1) Workflow engine with dependency graphs, dry/virtual runs, and templating. (2) Multi-tenant governance with hierarchical quotas and policy inheritance. (3) Real-time observability through Prometheus/Grafana/Splunk hooks, predictive ETAs, and Loki-based log aggregation. (4) Zero-trust security posture using TLS 1.3, AES-256, OAuth2/JWT, MFA, PKI, and audit-ready telemetry that maps to SOX, GDPR, HIPAA, PCI, and ISO 27001 controls.
+- **Controller-First Architecture**: Every controller node embeds the HTTP API, Raft engine, scheduler, and state machine—removing the API-first bottleneck, offering sub-second failover, and enabling horizontal scale by simply adding nodes to the quorum.
+- **Module Snapshot**:
+  | Module | Purpose | Notes |
+  |--------|---------|-------|
+  | `quorus-core` | Transfer primitives, protocol adapters, progress/integrity services | Powers both controller and agent execution paths |
+  | `quorus-workflow` | YAML parsing, validation, dependency resolution, execution planning | Supports sequential/parallel strategies and dry/virtual modes |
+  | `quorus-tenant` | Tenant registry, quotas, RBAC integration, encryption policy plumbing | Enforces logical/physical isolation per enterprise policy |
+  | `quorus-controller` | Main runtime with Raft consensus, job scheduler, agent fleet manager, resource allocator, and HTTP API | Acts as both control plane and API surface |
+  | `quorus-api` | Compatibility REST layer with service discovery, RBAC, OpenAPI | Bridges legacy API-first clients while controller-first rollout completes |
+  | `quorus-integration-examples` | Runnable demos for transfers, workflows, validation scenarios | Generates representative corporate datasets for testing |
+  | `docker/agents` & `docker/compose/*` | Production-like agent fleet, transfer servers, and observability stack | Validates multi-region agents, real protocols (FTP/SFTP/HTTP/SMB), and failover |
+- **Implementation Status (Oct 2025)**: Phase 1 of the implementation plan is complete ahead of schedule (core engine, workflows, multi-tenancy, >147 automated tests). Phase 2 is ~60% done—REST API foundation and Raft controller are substantially implemented, while agent fleet management (registration, heartbeats, job polling) is the next active milestone.
+
 ### Primary Use Cases
 
 Quorus is designed primarily for **internal corporate network file transfers**, including:
