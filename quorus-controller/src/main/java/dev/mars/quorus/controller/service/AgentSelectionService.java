@@ -121,9 +121,14 @@ public class AgentSelectionService {
         // Check protocol compatibility
         String sourceProtocol = extractProtocol(request.getSourceUri());
         String destProtocol = extractProtocolFromPath(request.getDestinationPath());
-        
-        if (!agent.getCapabilities().supportsProtocol(sourceProtocol) || 
-            !agent.getCapabilities().supportsProtocol(destProtocol)) {
+
+        // Check source protocol support
+        if (!agent.getCapabilities().supportsProtocol(sourceProtocol)) {
+            return false;
+        }
+
+        // Check destination protocol support (file protocol is always supported for local writes)
+        if (!"file".equals(destProtocol) && !agent.getCapabilities().supportsProtocol(destProtocol)) {
             return false;
         }
         

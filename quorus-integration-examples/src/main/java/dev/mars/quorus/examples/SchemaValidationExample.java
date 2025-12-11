@@ -16,6 +16,7 @@
 
 package dev.mars.quorus.examples;
 
+import dev.mars.quorus.examples.util.TestResultLogger;
 import dev.mars.quorus.workflow.*;
 
 /**

@@ -57,7 +57,7 @@ public class QuorusStateMachine implements RaftStateMachine {
     public QuorusStateMachine() {
         // Initialize with system metadata
         systemMetadata.put("version", "2.0");
-        systemMetadata.put("phase", "2.3 - Agent Fleet Management");
+        systemMetadata.put("phase", "2.2 - Controller Quorum Architecture");
     }
 
     @Override
