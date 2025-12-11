@@ -334,21 +334,19 @@ class SchemaValidationIntegrationTest {
 
             // Generate 50 transfer groups with 10 transfers each
             for (int i = 1; i <= 50; i++) {
-                largeWorkflow.append(String.format("""
-                        - name: group-%d
-                          description: "Transfer group %d for performance testing"
-                          continueOnError: true
-                          retryCount: 2
-                          transfers:
-                        """, i, i));
+                largeWorkflow.append(String.format(
+                        "        - name: group-%d\n" +
+                        "          description: \"Transfer group %d for performance testing\"\n" +
+                        "          continueOnError: true\n" +
+                        "          retryCount: 2\n" +
+                        "          transfers:\n", i, i));
 
                 for (int j = 1; j <= 10; j++) {
-                    largeWorkflow.append(String.format("""
-                            - name: transfer-%d-%d
-                              source: "{{baseUrl}}/data/%d/%d"
-                              destination: "/tmp/data-%d-%d.json"
-                              protocol: https
-                        """, i, j, i, j, i, j));
+                    largeWorkflow.append(String.format(
+                            "            - name: transfer-%d-%d\n" +
+                            "              source: \"{{baseUrl}}/data/%d/%d\"\n" +
+                            "              destination: \"/tmp/data-%d-%d.json\"\n" +
+                            "              protocol: https\n", i, j, i, j, i, j));
                 }
             }
 
@@ -359,7 +357,7 @@ class SchemaValidationIntegrationTest {
             ValidationResult result = parser.validateSchema(workflowYaml);
             long validationTime = System.currentTimeMillis() - startTime;
 
-            assertTrue(result.isValid(), "Large workflow should be valid");
+            assertTrue(result.isValid(), () -> "Large workflow should be valid. Errors: " + result.getErrors());
             assertTrue(validationTime < 5000, "Validation should complete within 5 seconds");
 
             // Measure parsing performance

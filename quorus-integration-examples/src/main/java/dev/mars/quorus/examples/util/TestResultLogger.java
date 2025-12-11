@@ -79,4 +79,28 @@ public class TestResultLogger {
         System.err.println("This indicates a real problem with the example execution.");
         logger.severe("Unexpected error in " + exampleName + ": " + e.getMessage());
     }
+
+    /**
+     * Log a test header for starting a test suite.
+     */
+    public static void logTestHeader(String header) {
+        System.out.println("\n=== " + header + " ===\n");
+        logger.info("Starting test suite: " + header);
+    }
+
+    /**
+     * Log a test footer for completing a test suite.
+     */
+    public static void logTestFooter(String footer) {
+        System.out.println("\n" + footer);
+        logger.info("Test suite completed: " + footer);
+    }
+
+    /**
+     * Log a simple success message.
+     */
+    public static void logSuccess(String message) {
+        System.out.println("   ✓ SUCCESS: " + message);
+        logger.info("Success: " + message);
+    }
 }

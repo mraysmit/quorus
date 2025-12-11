@@ -58,12 +58,7 @@
             <version>5.2.2</version>
         </dependency>
 
-        <!-- Embedded HTTP Server for Raft Transport -->
-        <dependency>
-            <groupId>com.sun.net.httpserver</groupId>
-            <artifactId>http</artifactId>
-            <version>20070405</version>
-        </dependency>
+        <!-- Embedded HTTP Server comes from the JDK (module jdk.httpserver); no external dependency needed. -->
 
         <!-- Concurrent Collections -->
         <dependency>
@@ -115,6 +110,10 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
                     <skipTests>false</skipTests>
+                    <!-- Avoid JPMS module-path for tests to prevent missing JDK modules in graph -->
+                    <useModulePath>false</useModulePath>
+                    <!-- Ensure required JDK modules are available at test runtime -->
+                    <argLine>--add-modules java.net.http,java.logging</argLine>
                     <systemPropertyVariables>
                         <java.util.logging.manager>java.util.logging.LogManager</java.util.logging.manager>
                     </systemPropertyVariables>
@@ -127,6 +126,11 @@
                 <configuration>
                     <source>17</source>
                     <target>17</target>
+                    <!-- Make sure JDK modules used by tests (and any main code) are on the module graph during compilation -->
+                    <compilerArgs>
+                        <arg>--add-modules</arg>
+                        <arg>java.net.http,java.logging</arg>
+                    </compilerArgs>
                 </configuration>
             </plugin>
 
