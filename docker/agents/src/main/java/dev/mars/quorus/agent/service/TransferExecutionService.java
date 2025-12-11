@@ -47,7 +47,11 @@ public class TransferExecutionService {
     
     public TransferExecutionService(AgentConfiguration config) {
         this.config = config;
-        this.transferEngine = new SimpleTransferEngine(config.getMaxConcurrentTransfers());
+        this.transferEngine = new SimpleTransferEngine(
+                config.getMaxConcurrentTransfers(),
+                3,      // maxRetryAttempts
+                1000    // retryDelayMs
+        );
         this.executorService = Executors.newFixedThreadPool(config.getMaxConcurrentTransfers());
     }
     
@@ -62,25 +66,33 @@ public class TransferExecutionService {
             return CompletableFuture.failedFuture(
                 new IllegalStateException("Transfer execution service is not running"));
         }
-        
-        logger.info("Executing transfer: {} -> {}", 
+
+        logger.info("Executing transfer: {} -> {}",
                    request.getSourceUri(), request.getDestinationPath());
-        
-        return transferEngine.submitTransfer(request)
-            .whenComplete((result, throwable) -> {
-                if (throwable != null) {
-                    logger.error("Transfer failed: " + request.getRequestId(), throwable);
-                } else if (result.isSuccessful()) {
-                    logger.info("Transfer completed successfully: {} ({} bytes in {}ms)", 
-                               request.getRequestId(), 
-                               result.getBytesTransferred(),
-                               result.getTransferDuration().toMillis());
-                } else {
-                    logger.warn("Transfer failed: {} - {}", 
-                               request.getRequestId(), 
-                               result.getErrorMessage().orElse("Unknown error"));
-                }
-            });
+
+        try {
+            return transferEngine.submitTransfer(request)
+                .whenComplete((result, throwable) -> {
+                    if (throwable != null) {
+                        logger.error("Transfer failed: " + request.getRequestId(), throwable);
+                    } else if (result.isSuccessful()) {
+                        String durationStr = result.getDuration()
+                                .map(d -> d.toMillis() + "ms")
+                                .orElse("unknown");
+                        logger.info("Transfer completed successfully: {} ({} bytes in {})",
+                                   request.getRequestId(),
+                                   result.getBytesTransferred(),
+                                   durationStr);
+                    } else {
+                        logger.warn("Transfer failed: {} - {}",
+                                   request.getRequestId(),
+                                   result.getErrorMessage().orElse("Unknown error"));
+                    }
+                });
+        } catch (Exception e) {
+            logger.error("Failed to submit transfer: " + request.getRequestId(), e);
+            return CompletableFuture.failedFuture(e);
+        }
     }
     
     public boolean canAcceptTransfer() {
@@ -114,9 +126,7 @@ public class TransferExecutionService {
             }
             
             // Shutdown transfer engine
-            if (transferEngine instanceof SimpleTransferEngine) {
-                ((SimpleTransferEngine) transferEngine).shutdown();
-            }
+            transferEngine.shutdown(30); // 30 seconds timeout
             
             logger.info("Transfer execution service shutdown complete");
             

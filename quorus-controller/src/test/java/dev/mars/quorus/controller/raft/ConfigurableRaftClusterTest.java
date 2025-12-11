@@ -131,27 +131,25 @@ public class ConfigurableRaftClusterTest {
     }
 
     @Test
-    void testWithStandardConfiguration() {
-        setupWithConfiguration(TestClusterConfiguration.standardTest(), 
-                              () -> "testWithStandardConfiguration");
-        
+    void testWithStandardConfiguration(TestInfo testInfo) {
+        setupWithConfiguration(TestClusterConfiguration.standardTest(), testInfo);
+
         // Run basic cluster tests
         testBasicClusterFunctionality();
     }
 
     @Test
-    void testWithFastConfiguration() {
-        setupWithConfiguration(TestClusterConfiguration.fastTest(), 
-                              () -> "testWithFastConfiguration");
-        
+    void testWithFastConfiguration(TestInfo testInfo) {
+        setupWithConfiguration(TestClusterConfiguration.fastTest(), testInfo);
+
         // Run quick tests suitable for fast configuration
         testQuickLeaderElection();
     }
 
     @ParameterizedTest
     @MethodSource("testConfigurations")
-    void testLeaderElectionWithDifferentConfigs(TestClusterConfiguration config) {
-        setupWithConfiguration(config, () -> "testLeaderElectionWithDifferentConfigs");
+    void testLeaderElectionWithDifferentConfigs(TestClusterConfiguration config, TestInfo testInfo) {
+        setupWithConfiguration(config, testInfo);
         
         // Wait for leader election with configuration-specific timeout
         await().atMost(config.getTestTimeout())
@@ -169,8 +167,8 @@ public class ConfigurableRaftClusterTest {
 
     @ParameterizedTest
     @MethodSource("partitionTestConfigurations")
-    void testPartitionToleranceWithDifferentConfigs(TestClusterConfiguration config) {
-        setupWithConfiguration(config, () -> "testPartitionToleranceWithDifferentConfigs");
+    void testPartitionToleranceWithDifferentConfigs(TestClusterConfiguration config, TestInfo testInfo) {
+        setupWithConfiguration(config, testInfo);
         
         if (!config.getNetworkConfig().isPartitionTestingEnabled()) {
             logger.info("Skipping partition test - not enabled for this configuration");
@@ -194,9 +192,8 @@ public class ConfigurableRaftClusterTest {
     }
 
     @Test
-    void testStressConfiguration() {
-        setupWithConfiguration(TestClusterConfiguration.stressTest(), 
-                              () -> "testStressConfiguration");
+    void testStressConfiguration(TestInfo testInfo) {
+        setupWithConfiguration(TestClusterConfiguration.stressTest(), testInfo);
         
         // Apply network stress conditions
         applyNetworkStress();

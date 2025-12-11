@@ -21,9 +21,14 @@ import dev.mars.quorus.agent.service.AgentRegistrationService;
 import dev.mars.quorus.agent.service.HeartbeatService;
 import dev.mars.quorus.agent.service.TransferExecutionService;
 import dev.mars.quorus.agent.service.HealthService;
+import dev.mars.quorus.agent.service.JobPollingService;
+import dev.mars.quorus.agent.service.JobStatusReportingService;
+import dev.mars.quorus.core.TransferRequest;
+import dev.mars.quorus.core.TransferResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -45,21 +50,25 @@ public class QuorusAgent {
     private final HeartbeatService heartbeatService;
     private final TransferExecutionService transferService;
     private final HealthService healthService;
+    private final JobPollingService jobPollingService;
+    private final JobStatusReportingService jobStatusReportingService;
     private final ScheduledExecutorService scheduler;
-    
+
     private volatile boolean running = false;
     private final CountDownLatch shutdownLatch = new CountDownLatch(1);
-    
+
     public QuorusAgent(AgentConfiguration config) {
         this.config = config;
         this.scheduler = Executors.newScheduledThreadPool(4);
-        
+
         // Initialize services
         this.registrationService = new AgentRegistrationService(config);
         this.heartbeatService = new HeartbeatService(config, registrationService);
         this.transferService = new TransferExecutionService(config);
         this.healthService = new HealthService(config);
-        
+        this.jobPollingService = new JobPollingService(config);
+        this.jobStatusReportingService = new JobStatusReportingService(config);
+
         logger.info("Quorus Agent initialized: {}", config.getAgentId());
     }
     
@@ -153,7 +162,9 @@ public class QuorusAgent {
             transferService.shutdown();
             heartbeatService.shutdown();
             healthService.shutdown();
-            
+            jobPollingService.shutdown();
+            jobStatusReportingService.shutdown();
+
             // Deregister from controller
             registrationService.deregister();
             
@@ -174,21 +185,74 @@ public class QuorusAgent {
         if (!running) {
             return;
         }
-        
+
         try {
             // Poll controller for new jobs
-            // This would typically make an HTTP request to the controller
-            // For now, we'll just log that we're polling
-            logger.debug("Polling for new transfer jobs...");
-            
-            // In a real implementation, this would:
-            // 1. Make HTTP request to controller: GET /api/v1/agents/{agentId}/jobs
-            // 2. Process any returned jobs
-            // 3. Execute transfers using transferService
-            
+            List<JobPollingService.PendingJob> pendingJobs = jobPollingService.pollForJobs();
+
+            if (pendingJobs.isEmpty()) {
+                logger.debug("No pending jobs found");
+                return;
+            }
+
+            logger.info("Found {} pending job(s)", pendingJobs.size());
+
+            // Process each pending job
+            for (JobPollingService.PendingJob pendingJob : pendingJobs) {
+                processJob(pendingJob);
+            }
+
         } catch (Exception e) {
             logger.warn("Error polling for jobs", e);
         }
+    }
+
+    private void processJob(JobPollingService.PendingJob pendingJob) {
+        String jobId = pendingJob.getJobId();
+
+        try {
+            logger.info("Processing job: {} ({})", jobId, pendingJob.getDescription());
+
+            // Report that we've accepted the job
+            jobStatusReportingService.reportAccepted(jobId);
+
+            // Convert to transfer request
+            TransferRequest request = pendingJob.toTransferRequest();
+
+            // Execute the transfer
+            transferService.executeTransfer(request)
+                    .thenAccept(result -> handleTransferComplete(jobId, result))
+                    .exceptionally(throwable -> {
+                        handleTransferError(jobId, throwable);
+                        return null;
+                    });
+
+        } catch (Exception e) {
+            logger.error("Error processing job: {}", jobId, e);
+            jobStatusReportingService.reportFailed(jobId, e.getMessage());
+        }
+    }
+
+    private void handleTransferComplete(String jobId, TransferResult result) {
+        if (result.isSuccessful()) {
+            String durationStr = result.getDuration()
+                    .map(d -> d.toMillis() + "ms")
+                    .orElse("unknown");
+            logger.info("Transfer completed successfully: {} ({} bytes in {})",
+                       jobId,
+                       result.getBytesTransferred(),
+                       durationStr);
+            jobStatusReportingService.reportCompleted(jobId, result.getBytesTransferred());
+        } else {
+            String errorMessage = result.getErrorMessage().orElse("Unknown error");
+            logger.warn("Transfer failed: {} - {}", jobId, errorMessage);
+            jobStatusReportingService.reportFailed(jobId, errorMessage);
+        }
+    }
+
+    private void handleTransferError(String jobId, Throwable throwable) {
+        logger.error("Transfer error: {}", jobId, throwable);
+        jobStatusReportingService.reportFailed(jobId, throwable.getMessage());
     }
     
     public boolean isRunning() {

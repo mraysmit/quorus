@@ -28,16 +28,16 @@
     <dependencies>
         <!-- Quorus Core -->
         <dependency>
-            <groupId>dev.mars.quorus</groupId>
+            <groupId>dev.mars</groupId>
             <artifactId>quorus-core</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
+            <version>1.0-SNAPSHOT</version>
         </dependency>
 
         <!-- Quorus Workflow -->
         <dependency>
-            <groupId>dev.mars.quorus</groupId>
+            <groupId>dev.mars</groupId>
             <artifactId>quorus-workflow</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
+            <version>1.0-SNAPSHOT</version>
         </dependency>
 
         <!-- HTTP Client -->

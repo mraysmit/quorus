@@ -250,4 +250,4 @@ docker-compose -f docker/compose/docker-compose.yml logs controller1
 docker network inspect quorus_raft-cluster
 ```
 
-For detailed documentation, see [README-DOCKER-TESTING.md](../docs/README-DOCKER-TESTING.md).
+For detailed documentation, see [README-DOCKER-TESTING.md](../docs/QUORUS-DOCKER-TESTING-README.md).
