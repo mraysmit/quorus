@@ -130,29 +130,33 @@ public class HttpApiServer {
         httpServer.createContext("/health/live", new LivenessHandler(raftNode));
         httpServer.createContext("/status", new StatusHandler(raftNode));
 
-        // TODO: Add remaining endpoints as handlers are implemented
         // Agent management endpoints
-        // httpServer.createContext("/api/v1/agents/register", new AgentRegistrationHandler(raftNode));
-        // httpServer.createContext("/api/v1/agents/heartbeat", new HeartbeatHandler(raftNode));
-        // httpServer.createContext("/api/v1/agents", new AgentListHandler(raftNode));
+        httpServer.createContext("/api/v1/agents/register", new AgentRegistrationHandler(raftNode));
+        httpServer.createContext("/api/v1/agents/heartbeat", new HeartbeatHandler(raftNode));
+        httpServer.createContext("/api/v1/agents/jobs", new AgentJobsHandler(raftNode));
+        httpServer.createContext("/api/v1/agents", new AgentListHandler(raftNode));
 
         // Transfer management endpoints
-        // httpServer.createContext("/api/v1/transfers", new TransferHandler(raftNode));
+        httpServer.createContext("/api/v1/transfers", new TransferHandler(raftNode));
+
+        // Job status updates
+        httpServer.createContext("/api/v1/jobs", new JobStatusHandler(raftNode));
 
         // Cluster management endpoints
-        // httpServer.createContext("/api/v1/cluster", new ClusterHandler(raftNode));
+        httpServer.createContext("/api/v1/cluster", new ClusterHandler(raftNode));
 
         // Metrics endpoint
-        // httpServer.createContext("/metrics", new MetricsHandler(raftNode));
+        httpServer.createContext("/metrics", new MetricsHandler(raftNode));
 
         // API info endpoint
-        // httpServer.createContext("/api/v1/info", new InfoHandler(raftNode));
+        httpServer.createContext("/api/v1/info", new InfoHandler(raftNode));
 
         logger.info("Registered HTTP API endpoints:");
         logger.info("  - Health: /health, /health/ready, /health/live");
         logger.info("  - Status: /status");
-        logger.info("  - Agents: /api/v1/agents/*");
+        logger.info("  - Agents: /api/v1/agents/register, /api/v1/agents/heartbeat, /api/v1/agents/{agentId}/jobs, /api/v1/agents");
         logger.info("  - Transfers: /api/v1/transfers");
+        logger.info("  - Jobs: /api/v1/jobs/{jobId}/status");
         logger.info("  - Cluster: /api/v1/cluster");
         logger.info("  - Metrics: /metrics");
         logger.info("  - Info: /api/v1/info");

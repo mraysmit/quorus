@@ -198,6 +198,10 @@ public class RaftNode {
         return isLeader() ? nodeId : null;
     }
 
+    public RaftStateMachine getStateMachine() {
+        return stateMachine;
+    }
+
     private void resetElectionTimer() {
         if (electionTimer != null) {
             electionTimer.cancel(false);

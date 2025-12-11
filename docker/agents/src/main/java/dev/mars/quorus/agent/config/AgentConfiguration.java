@@ -126,9 +126,8 @@ public class AgentConfiguration {
         
         // Set network info
         AgentNetworkInfo networkInfo = new AgentNetworkInfo();
-        networkInfo.setHostname(hostname);
-        networkInfo.setIpAddress(address);
-        networkInfo.setPort(agentPort);
+        networkInfo.setPublicIpAddress(address);
+        networkInfo.setPrivateIpAddress(address);
         capabilities.setNetworkInfo(networkInfo);
         
         return capabilities;

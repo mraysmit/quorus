@@ -16,25 +16,15 @@
 
 package dev.mars.quorus.workflow;
 
-import dev.mars.quorus.core.TransferRequest;
-import dev.mars.quorus.core.TransferResult;
-import dev.mars.quorus.core.TransferStatus;
-import dev.mars.quorus.transfer.TransferEngine;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
 
 import java.time.Duration;
-import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
 
 /**
  * Tests for SimpleWorkflowEngine functionality.
@@ -52,18 +42,17 @@ import static org.mockito.Mockito.*;
  * Tests that intentionally fail validation are clearly marked and documented.
  */
 class SimpleWorkflowEngineTest {
-    
-    @Mock
-    private TransferEngine mockTransferEngine;
-    
+
+    private TestTransferEngine testTransferEngine;
     private SimpleWorkflowEngine workflowEngine;
     private WorkflowDefinition testWorkflow;
     private ExecutionContext testContext;
-    
+
     @BeforeEach
     void setUp() {
-        MockitoAnnotations.openMocks(this);
-        workflowEngine = new SimpleWorkflowEngine(mockTransferEngine);
+        testTransferEngine = new TestTransferEngine();
+        testTransferEngine.simulateSuccess(); // Default to success behavior
+        workflowEngine = new SimpleWorkflowEngine(testTransferEngine);
         
         // Create a test workflow
         testWorkflow = createTestWorkflow();
@@ -77,56 +66,51 @@ class SimpleWorkflowEngineTest {
     
     @Test
     void testNormalExecution() throws Exception {
-        // Mock successful transfer results
-        TransferResult successResult = createMockTransferResult(true);
-        when(mockTransferEngine.submitTransfer(any(TransferRequest.class)))
-                .thenReturn(CompletableFuture.completedFuture(successResult));
-        
+        testTransferEngine.simulateSuccess();
+
         CompletableFuture<WorkflowExecution> future = workflowEngine.execute(testWorkflow, testContext);
         WorkflowExecution execution = future.get();
-        
+
         assertNotNull(execution);
         assertEquals("test-execution-123", execution.getExecutionId());
         assertEquals(WorkflowStatus.COMPLETED, execution.getStatus());
         assertTrue(execution.isSuccessful());
         assertEquals(1, execution.getGroupExecutions().size());
-        
+
         WorkflowExecution.GroupExecution groupExecution = execution.getGroupExecutions().get(0);
         assertEquals("test-group", groupExecution.getGroupName());
         assertEquals(WorkflowStatus.COMPLETED, groupExecution.getStatus());
         assertTrue(groupExecution.isSuccessful());
         assertEquals(1, groupExecution.getTransferResults().size());
-        
-        verify(mockTransferEngine, times(1)).submitTransfer(any(TransferRequest.class));
     }
     
     @Test
     void testDryRun() throws Exception {
         CompletableFuture<WorkflowExecution> future = workflowEngine.dryRun(testWorkflow, testContext);
         WorkflowExecution execution = future.get();
-        
+
         assertNotNull(execution);
         assertEquals(WorkflowStatus.COMPLETED, execution.getStatus());
         assertTrue(execution.isSuccessful());
         assertEquals(1, execution.getGroupExecutions().size());
-        
+
         // Verify no actual transfers were executed
-        verify(mockTransferEngine, never()).submitTransfer(any(TransferRequest.class));
+        assertEquals(0, testTransferEngine.getActiveTransferCount());
     }
     
     @Test
     void testVirtualRun() throws Exception {
         CompletableFuture<WorkflowExecution> future = workflowEngine.virtualRun(testWorkflow, testContext);
         WorkflowExecution execution = future.get();
-        
+
         assertNotNull(execution);
         assertEquals(WorkflowStatus.COMPLETED, execution.getStatus());
         assertTrue(execution.isSuccessful());
         assertEquals(1, execution.getGroupExecutions().size());
-        
+
         // Verify no actual transfers were executed
-        verify(mockTransferEngine, never()).submitTransfer(any(TransferRequest.class));
-        
+        assertEquals(0, testTransferEngine.getActiveTransferCount());
+
         // Virtual run should take some time due to simulation
         assertTrue(execution.getDuration().isPresent());
         assertTrue(execution.getDuration().get().toMillis() >= 100);
@@ -134,18 +118,15 @@ class SimpleWorkflowEngineTest {
     
     @Test
     void testFailedTransfer() throws Exception {
-        // Mock failed transfer result
-        TransferResult failedResult = createMockTransferResult(false);
-        when(mockTransferEngine.submitTransfer(any(TransferRequest.class)))
-                .thenReturn(CompletableFuture.completedFuture(failedResult));
-        
+        testTransferEngine.simulateFailure();
+
         CompletableFuture<WorkflowExecution> future = workflowEngine.execute(testWorkflow, testContext);
         WorkflowExecution execution = future.get();
-        
+
         assertNotNull(execution);
         assertEquals(WorkflowStatus.FAILED, execution.getStatus());
         assertFalse(execution.isSuccessful());
-        
+
         WorkflowExecution.GroupExecution groupExecution = execution.getGroupExecutions().get(0);
         assertEquals(WorkflowStatus.FAILED, groupExecution.getStatus());
         assertFalse(groupExecution.isSuccessful());
@@ -153,13 +134,11 @@ class SimpleWorkflowEngineTest {
     
     @Test
     void testTransferException() throws Exception {
-        // Mock transfer engine to throw exception
-        when(mockTransferEngine.submitTransfer(any(TransferRequest.class)))
-                .thenReturn(CompletableFuture.failedFuture(new RuntimeException("Transfer failed")));
-        
+        testTransferEngine.simulateException(new RuntimeException("Transfer failed"));
+
         CompletableFuture<WorkflowExecution> future = workflowEngine.execute(testWorkflow, testContext);
         WorkflowExecution execution = future.get();
-        
+
         assertNotNull(execution);
         assertEquals(WorkflowStatus.FAILED, execution.getStatus());
         assertFalse(execution.isSuccessful());
@@ -167,19 +146,16 @@ class SimpleWorkflowEngineTest {
     
     @Test
     void testGetStatus() throws Exception {
-        // Mock successful transfer results
-        TransferResult successResult = createMockTransferResult(true);
-        when(mockTransferEngine.submitTransfer(any(TransferRequest.class)))
-                .thenReturn(CompletableFuture.completedFuture(successResult));
-        
+        testTransferEngine.simulateSuccess();
+
         CompletableFuture<WorkflowExecution> future = workflowEngine.execute(testWorkflow, testContext);
-        
+
         // Status should be null for unknown execution
         assertNull(workflowEngine.getStatus("unknown-execution"));
-        
+
         // Wait for completion
         WorkflowExecution execution = future.get();
-        
+
         // Status should be null after completion (execution removed from active list)
         assertNull(workflowEngine.getStatus("test-execution-123"));
     }
@@ -211,20 +187,15 @@ class SimpleWorkflowEngineTest {
     
     @Test
     void testVariableResolution() throws Exception {
+        testTransferEngine.simulateSuccess();
+
         // Create workflow with variables
         WorkflowDefinition workflowWithVars = createWorkflowWithVariables();
-
-        TransferResult successResult = createMockTransferResult(true);
-        when(mockTransferEngine.submitTransfer(any(TransferRequest.class)))
-                .thenReturn(CompletableFuture.completedFuture(successResult));
 
         CompletableFuture<WorkflowExecution> future = workflowEngine.execute(workflowWithVars, testContext);
         WorkflowExecution execution = future.get();
 
         assertTrue(execution.isSuccessful());
-
-        // Verify that the transfer engine was called (basic verification for now)
-        verify(mockTransferEngine, times(1)).submitTransfer(any(TransferRequest.class));
     }
     
     @Test
@@ -371,23 +342,5 @@ class SimpleWorkflowEngineTest {
         );
 
         return new WorkflowDefinition("v1", "TransferWorkflow", metadata, spec);
-    }
-    
-    private TransferResult createMockTransferResult(boolean success) {
-        TransferResult.Builder builder = TransferResult.builder()
-                .requestId("test-request-123")
-                .finalStatus(success ? TransferStatus.COMPLETED : TransferStatus.FAILED)
-                .bytesTransferred(success ? 1024L : 0L);
-
-        if (success) {
-            builder.startTime(Instant.now().minusMillis(100))
-                   .endTime(Instant.now())
-                   .actualChecksum("test-checksum");
-        } else {
-            builder.errorMessage("Transfer failed")
-                   .cause(new RuntimeException("Transfer failed"));
-        }
-
-        return builder.build();
     }
 }

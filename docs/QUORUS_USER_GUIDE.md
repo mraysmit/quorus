@@ -7971,10 +7971,10 @@ resources:
 ## Support and Resources
 
 ### Documentation
-- [System Design](quorus-comprehensive-system-design.md)
-- [Implementation Plan](quorus-implementation-plan.md)
-- [Workflow Examples](README-WORKFLOWS.md)
-- [Docker Testing](README-DOCKER-TESTING.md)
+- [System Design](QUORUS_SYSTEM_DESIGN.md)
+- [Implementation Plan](QUORUS_IMPLEMENTATION_PLAN.md)
+- [Workflow Examples](QUORUS_WORKFLOWS_README.md)
+- [Docker Testing](QUORUS-DOCKER-TESTING-README.md)
 
 ### Community
 - **GitHub**: https://github.com/your-org/quorus

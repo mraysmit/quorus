@@ -453,6 +453,18 @@ public class QuorusStateMachine implements RaftStateMachine {
         return transferJobs.get(jobId);
     }
 
+    public Map<String, AgentInfo> getAgents() {
+        return new ConcurrentHashMap<>(agents);
+    }
+
+    public AgentInfo getAgent(String agentId) {
+        return agents.get(agentId);
+    }
+
+    public int getAgentCount() {
+        return agents.size();
+    }
+
     public Map<String, String> getSystemMetadata() {
         return new ConcurrentHashMap<>(systemMetadata);
     }
@@ -477,5 +489,33 @@ public class QuorusStateMachine implements RaftStateMachine {
      */
     public void setLastAppliedIndex(long index) {
         lastAppliedIndex.set(index);
+    }
+
+    /**
+     * Get all job assignments.
+     */
+    public Map<String, JobAssignment> getJobAssignments() {
+        return new ConcurrentHashMap<>(jobAssignments);
+    }
+
+    /**
+     * Get a specific job assignment.
+     */
+    public JobAssignment getJobAssignment(String assignmentId) {
+        return jobAssignments.get(assignmentId);
+    }
+
+    /**
+     * Get all queued jobs.
+     */
+    public Map<String, QueuedJob> getJobQueue() {
+        return new ConcurrentHashMap<>(jobQueue);
+    }
+
+    /**
+     * Get a specific queued job.
+     */
+    public QueuedJob getQueuedJob(String jobId) {
+        return jobQueue.get(jobId);
     }
 }

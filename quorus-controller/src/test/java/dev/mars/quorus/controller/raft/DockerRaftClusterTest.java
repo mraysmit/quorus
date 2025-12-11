@@ -97,8 +97,9 @@ public class DockerRaftClusterTest {
     void testClusterStartupAndHealthCheck() {
         // Verify all nodes are running and healthy
         for (int i = 0; i < nodeEndpoints.size(); i++) {
+            final int nodeIndex = i;
             String endpoint = nodeEndpoints.get(i);
-            
+
             assertDoesNotThrow(() -> {
                 HttpRequest request = HttpRequest.newBuilder()
                         .uri(URI.create(endpoint + "/health"))
@@ -107,12 +108,12 @@ public class DockerRaftClusterTest {
 
                 HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
                 assertEquals(200, response.statusCode());
-                
+
                 JsonNode healthData = objectMapper.readTree(response.body());
                 assertEquals("healthy", healthData.get("status").asText());
-                assertEquals("controller" + (i + 1), healthData.get("nodeId").asText());
-                
-                logger.info("Node " + (i + 1) + " health check passed");
+                assertEquals("controller" + (nodeIndex + 1), healthData.get("nodeId").asText());
+
+                logger.info("Node " + (nodeIndex + 1) + " health check passed");
             });
         }
     }
