@@ -23,15 +23,14 @@ import dev.mars.quorus.api.dto.AgentHeartbeatResponse;
 import dev.mars.quorus.controller.raft.RaftNode;
 import dev.mars.quorus.controller.state.AgentCommand;
 
+import io.vertx.core.Vertx;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.time.Instant;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -39,7 +38,10 @@ import java.util.logging.Logger;
  * Service responsible for processing agent heartbeats and managing agent health.
  * This service handles incoming heartbeat messages, updates agent status,
  * and detects failed agents based on missed heartbeats.
- * 
+ *
+ * <p>Vert.x 5 Migration: Converted from ScheduledExecutorService to Vert.x timers
+ * for better integration with the event loop and reduced thread overhead.</p>
+ *
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @since 2.0
  */
@@ -47,12 +49,15 @@ import java.util.logging.Logger;
 public class HeartbeatProcessor {
 
     private static final Logger logger = Logger.getLogger(HeartbeatProcessor.class.getName());
-    
+
     // Configuration constants
     private static final long DEFAULT_HEARTBEAT_INTERVAL_MS = 30000; // 30 seconds
     private static final long AGENT_TIMEOUT_MS = 90000; // 90 seconds (3 missed heartbeats)
     private static final long FAILURE_CHECK_INTERVAL_MS = 15000; // Check every 15 seconds
     private static final long DEGRADED_THRESHOLD_MS = 60000; // 60 seconds for degraded status
+
+    @Inject
+    Vertx vertx;
 
     @Inject
     RaftNode raftNode;
@@ -62,61 +67,78 @@ public class HeartbeatProcessor {
 
     // Track last heartbeat times for failure detection
     private final ConcurrentHashMap<String, Instant> lastHeartbeatTimes = new ConcurrentHashMap<>();
-    
+
     // Track heartbeat sequence numbers to detect duplicates/out-of-order
     private final ConcurrentHashMap<String, Long> lastSequenceNumbers = new ConcurrentHashMap<>();
 
-    // Scheduled executor for failure detection
-    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
-    
+    // Vert.x timer ID for failure detection (replaces ScheduledExecutorService)
+    private long failureCheckTimerId = 0;
+
+    // Shutdown coordination
+    private final AtomicBoolean closed = new AtomicBoolean(false);
     private volatile boolean started = false;
 
     /**
      * Start the heartbeat processor.
-     * This initializes the failure detection monitoring.
+     * This initializes the failure detection monitoring using Vert.x timers.
      */
     public void start() {
+        if (closed.get()) {
+            throw new IllegalStateException("HeartbeatProcessor is closed, cannot start");
+        }
+
         if (started) {
             logger.warning("HeartbeatProcessor already started");
             return;
         }
 
-        logger.info("Starting HeartbeatProcessor");
-        
-        // Start failure detection monitoring
-        scheduler.scheduleAtFixedRate(
-            this::checkForFailedAgents,
+        logger.info("Starting HeartbeatProcessor (Vert.x reactive mode)");
+
+        // Start failure detection monitoring using Vert.x timer (no ScheduledExecutorService!)
+        failureCheckTimerId = vertx.setPeriodic(
             FAILURE_CHECK_INTERVAL_MS,
-            FAILURE_CHECK_INTERVAL_MS,
-            TimeUnit.MILLISECONDS
+            id -> {
+                if (!closed.get() && started) {
+                    try {
+                        checkForFailedAgents();
+                    } catch (Exception e) {
+                        logger.log(Level.WARNING, "Error in failure detection check", e);
+                    }
+                }
+            }
         );
-        
+
         started = true;
-        logger.info("HeartbeatProcessor started successfully");
+        logger.info("HeartbeatProcessor started successfully [Vert.x timer ID: " + failureCheckTimerId + "] (0 extra threads)");
     }
 
     /**
      * Stop the heartbeat processor.
+     * Idempotent shutdown with proper timer cancellation.
      */
     public void stop() {
-        if (!started) {
+        // Idempotent shutdown
+        if (closed.getAndSet(true)) {
+            logger.info("HeartbeatProcessor already closed");
             return;
         }
 
-        logger.info("Stopping HeartbeatProcessor");
-        scheduler.shutdown();
-        
-        try {
-            if (!scheduler.awaitTermination(5, TimeUnit.SECONDS)) {
-                scheduler.shutdownNow();
-            }
-        } catch (InterruptedException e) {
-            scheduler.shutdownNow();
-            Thread.currentThread().interrupt();
+        if (!started) {
+            logger.info("HeartbeatProcessor not started, skipping stop");
+            return;
         }
-        
+
+        logger.info("Stopping HeartbeatProcessor (reactive mode)");
+
+        // Cancel Vert.x timer (no ScheduledExecutorService to shutdown!)
+        if (failureCheckTimerId != 0) {
+            boolean cancelled = vertx.cancelTimer(failureCheckTimerId);
+            logger.info("Failure check timer cancelled: " + cancelled + " [ID: " + failureCheckTimerId + "]");
+            failureCheckTimerId = 0;
+        }
+
         started = false;
-        logger.info("HeartbeatProcessor stopped");
+        logger.info("HeartbeatProcessor stopped (0 threads to cleanup)");
     }
 
     /**

@@ -20,6 +20,7 @@
         <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
         <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
         <quarkus.platform.version>3.15.1</quarkus.platform.version>
+        <vertx.version>5.0.0.CR2</vertx.version>
     </properties>
 
     <dependencyManagement>
@@ -55,6 +56,13 @@
             <groupId>dev.mars</groupId>
             <artifactId>quorus-controller</artifactId>
             <version>${project.version}</version>
+        </dependency>
+
+        <!-- Vert.x Dependencies -->
+        <dependency>
+            <groupId>io.vertx</groupId>
+            <artifactId>vertx-core</artifactId>
+            <version>${vertx.version}</version>
         </dependency>
 
         <!-- Quarkus Dependencies -->
