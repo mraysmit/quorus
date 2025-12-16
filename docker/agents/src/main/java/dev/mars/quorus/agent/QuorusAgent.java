@@ -25,26 +25,31 @@ import dev.mars.quorus.agent.service.JobPollingService;
 import dev.mars.quorus.agent.service.JobStatusReportingService;
 import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferResult;
+import io.vertx.core.Vertx;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Main class for the Quorus Agent.
  * This agent registers with the Quorus controller cluster and executes file transfer tasks.
- * 
+ *
+ * <p>Vert.x 5 Migration: Refactored to use Vert.x dependency injection and reactive patterns.
+ * Eliminates ScheduledExecutorService in favor of Vert.x timers for better integration
+ * with the event loop and reduced thread overhead.</p>
+ *
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @since 1.0
  */
 public class QuorusAgent {
-    
+
     private static final Logger logger = LoggerFactory.getLogger(QuorusAgent.class);
-    
+
+    private final Vertx vertx;
     private final AgentConfiguration config;
     private final AgentRegistrationService registrationService;
     private final HeartbeatService heartbeatService;
@@ -52,14 +57,29 @@ public class QuorusAgent {
     private final HealthService healthService;
     private final JobPollingService jobPollingService;
     private final JobStatusReportingService jobStatusReportingService;
-    private final ScheduledExecutorService scheduler;
 
+    // Vert.x timer IDs for proper cleanup
+    private long heartbeatTimerId = 0;
+    private long jobPollingTimerId = 0;
+
+    // Shutdown coordination
+    private final AtomicBoolean closed = new AtomicBoolean(false);
     private volatile boolean running = false;
     private final CountDownLatch shutdownLatch = new CountDownLatch(1);
 
-    public QuorusAgent(AgentConfiguration config) {
-        this.config = config;
-        this.scheduler = Executors.newScheduledThreadPool(4);
+    /**
+     * Creates a QuorusAgent with Vert.x dependency injection.
+     *
+     * @param vertx the Vert.x instance (must not be null)
+     * @param config the agent configuration (must not be null)
+     * @throws NullPointerException if vertx or config is null
+     */
+    public QuorusAgent(Vertx vertx, AgentConfiguration config) {
+        this.vertx = Objects.requireNonNull(vertx, "Vertx instance cannot be null");
+        this.config = Objects.requireNonNull(config, "AgentConfiguration cannot be null");
+
+        logger.info("Creating QuorusAgent with Vert.x instance: {} (using Vert.x timers, no ScheduledExecutorService)",
+                    System.identityHashCode(vertx));
 
         // Initialize services
         this.registrationService = new AgentRegistrationService(config);
@@ -69,95 +89,156 @@ public class QuorusAgent {
         this.jobPollingService = new JobPollingService(config);
         this.jobStatusReportingService = new JobStatusReportingService(config);
 
-        logger.info("Quorus Agent initialized: {}", config.getAgentId());
+        logger.info("Quorus Agent initialized: {} (reactive mode)", config.getAgentId());
+    }
+
+    /**
+     * Legacy constructor for backward compatibility.
+     * Creates a new Vert.x instance internally.
+     *
+     * @param config the agent configuration
+     * @deprecated Use {@link #QuorusAgent(Vertx, AgentConfiguration)} instead to share Vert.x instance
+     */
+    @Deprecated(since = "1.0", forRemoval = true)
+    public QuorusAgent(AgentConfiguration config) {
+        this(Vertx.vertx(), config);
+        logger.warn("Using deprecated constructor - consider passing shared Vert.x instance");
     }
     
     public static void main(String[] args) {
         logger.info("Starting Quorus Agent...");
-        
+
+        // Create shared Vert.x instance
+        Vertx vertx = Vertx.vertx();
+        logger.info("Created Vert.x instance: {}", System.identityHashCode(vertx));
+
         try {
             // Load configuration from environment
             AgentConfiguration config = AgentConfiguration.fromEnvironment();
-            
-            // Create and start agent
-            QuorusAgent agent = new QuorusAgent(config);
-            
+
+            // Create and start agent with Vert.x instance
+            QuorusAgent agent = new QuorusAgent(vertx, config);
+
             // Setup shutdown hook
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 logger.info("Shutdown signal received");
                 agent.shutdown();
+
+                // Close Vert.x instance
+                vertx.close().onComplete(ar -> {
+                    if (ar.succeeded()) {
+                        logger.info("Vert.x instance closed successfully");
+                    } else {
+                        logger.error("Error closing Vert.x instance", ar.cause());
+                    }
+                });
             }));
-            
+
             // Start the agent
             agent.start();
-            
+
             // Wait for shutdown
             agent.awaitShutdown();
-            
+
         } catch (Exception e) {
             logger.error("Failed to start Quorus Agent", e);
+            vertx.close();
             System.exit(1);
         }
-        
+
         logger.info("Quorus Agent stopped");
     }
     
     public void start() throws Exception {
-        logger.info("Starting Quorus Agent services...");
-        
+        if (closed.get()) {
+            throw new IllegalStateException("Agent is closed, cannot start");
+        }
+
+        logger.info("Starting Quorus Agent services (Vert.x reactive mode)...");
+
         running = true;
-        
+
         // Start health service first
         healthService.start();
         logger.info("Health service started on port {}", config.getAgentPort());
-        
+
         // Register with controller
         boolean registered = registrationService.register();
         if (!registered) {
             throw new RuntimeException("Failed to register with controller");
         }
         logger.info("Agent registered successfully with controller");
-        
-        // Start heartbeat service
-        scheduler.scheduleAtFixedRate(
-            heartbeatService::sendHeartbeat,
-            0,
+
+        // Start heartbeat service using Vert.x timer (no ScheduledExecutorService!)
+        heartbeatTimerId = vertx.setPeriodic(
             config.getHeartbeatInterval(),
-            TimeUnit.MILLISECONDS
+            id -> {
+                if (!closed.get() && running) {
+                    try {
+                        heartbeatService.sendHeartbeat();
+                    } catch (Exception e) {
+                        logger.error("Error sending heartbeat", e);
+                    }
+                }
+            }
         );
-        logger.info("Heartbeat service started (interval: {}ms)", config.getHeartbeatInterval());
-        
+        logger.info("Heartbeat service started (interval: {}ms) [Vert.x timer ID: {}]",
+                    config.getHeartbeatInterval(), heartbeatTimerId);
+
         // Start transfer execution service
         transferService.start();
         logger.info("Transfer execution service started");
-        
-        // Start job polling
-        scheduler.scheduleAtFixedRate(
-            this::pollForJobs,
-            5000, // Initial delay
-            10000, // Poll every 10 seconds
-            TimeUnit.MILLISECONDS
-        );
-        logger.info("Job polling started");
-        
-        logger.info("Quorus Agent started successfully");
+
+        // Start job polling using Vert.x timer (no ScheduledExecutorService!)
+        // Initial delay of 5 seconds, then poll every 10 seconds
+        vertx.setTimer(5000, initialId -> {
+            if (!closed.get() && running) {
+                jobPollingTimerId = vertx.setPeriodic(10000, id -> {
+                    if (!closed.get() && running) {
+                        try {
+                            pollForJobs();
+                        } catch (Exception e) {
+                            logger.error("Error polling for jobs", e);
+                        }
+                    }
+                });
+                logger.info("Job polling started (interval: 10s) [Vert.x timer ID: {}]", jobPollingTimerId);
+            }
+        });
+
+        logger.info("Quorus Agent started successfully (reactive mode, 0 extra threads)");
     }
     
     public void shutdown() {
-        if (!running) {
+        // Idempotent shutdown with AtomicBoolean
+        if (closed.getAndSet(true)) {
+            logger.info("Agent already closed, skipping shutdown");
             return;
         }
-        
-        logger.info("Shutting down Quorus Agent...");
+
+        if (!running) {
+            logger.info("Agent not running, performing cleanup only");
+            shutdownLatch.countDown();
+            return;
+        }
+
+        logger.info("Shutting down Quorus Agent (reactive mode)...");
         running = false;
-        
+
         try {
-            // Stop job polling
-            scheduler.shutdown();
-            if (!scheduler.awaitTermination(10, TimeUnit.SECONDS)) {
-                scheduler.shutdownNow();
+            // Cancel Vert.x timers (no ScheduledExecutorService to shutdown!)
+            if (heartbeatTimerId != 0) {
+                boolean cancelled = vertx.cancelTimer(heartbeatTimerId);
+                logger.info("Heartbeat timer cancelled: {} [ID: {}]", cancelled, heartbeatTimerId);
+                heartbeatTimerId = 0;
             }
-            
+
+            if (jobPollingTimerId != 0) {
+                boolean cancelled = vertx.cancelTimer(jobPollingTimerId);
+                logger.info("Job polling timer cancelled: {} [ID: {}]", cancelled, jobPollingTimerId);
+                jobPollingTimerId = 0;
+            }
+
             // Stop services
             transferService.shutdown();
             heartbeatService.shutdown();
@@ -167,9 +248,9 @@ public class QuorusAgent {
 
             // Deregister from controller
             registrationService.deregister();
-            
-            logger.info("Quorus Agent shutdown complete");
-            
+
+            logger.info("Quorus Agent shutdown complete (0 threads to cleanup)");
+
         } catch (Exception e) {
             logger.error("Error during shutdown", e);
         } finally {

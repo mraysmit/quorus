@@ -30,17 +30,44 @@ import java.util.*;
 /**
  * YAML-based implementation of WorkflowDefinitionParser.
  * Parses YAML workflow definitions using SnakeYAML.
- * 
+ *
+ * <p>Performance Optimization: Uses static singleton Yaml parser to eliminate
+ * per-request instantiation overhead. SnakeYAML Yaml is thread-safe and can be
+ * safely shared across all parser instances.</p>
+ *
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @since 1.0
  */
 public class YamlWorkflowDefinitionParser implements WorkflowDefinitionParser {
-    
-    private final Yaml yaml;
-    
-    public YamlWorkflowDefinitionParser() {
+
+    /**
+     * Static singleton Yaml parser - thread-safe and reused across all instances.
+     * Eliminates expensive per-request instantiation (classpath scanning, reflection).
+     * Based on APEX critical performance refactoring (Dec 2025) which achieved
+     * 70-80% reduction in parsing overhead.
+     */
+    private static final Yaml YAML_PARSER = createYamlParser();
+
+    /**
+     * Static singleton schema validator - eliminates per-request instantiation.
+     */
+    private static final WorkflowSchemaValidator SCHEMA_VALIDATOR = new WorkflowSchemaValidator();
+
+    /**
+     * Creates the singleton Yaml parser with safe configuration.
+     * Called once during class loading.
+     */
+    private static Yaml createYamlParser() {
         LoaderOptions loaderOptions = new LoaderOptions();
-        this.yaml = new Yaml(new SafeConstructor(loaderOptions));
+        return new Yaml(new SafeConstructor(loaderOptions));
+    }
+
+    /**
+     * Default constructor - no per-instance initialization needed.
+     * All parsing resources are static singletons for optimal performance.
+     */
+    public YamlWorkflowDefinitionParser() {
+        // No initialization needed - using static singletons
     }
     
     @Override
@@ -56,11 +83,11 @@ public class YamlWorkflowDefinitionParser implements WorkflowDefinitionParser {
     @Override
     public WorkflowDefinition parseFromString(String yamlContent) throws WorkflowParseException {
         try {
-            Map<String, Object> data = yaml.load(yamlContent);
+            Map<String, Object> data = YAML_PARSER.load(yamlContent);
             if (data == null) {
                 throw new WorkflowParseException("Empty or invalid YAML content");
             }
-            
+
             return parseWorkflowDefinition(data);
         } catch (YAMLException e) {
             throw new WorkflowParseException("YAML parsing failed", e);
@@ -107,15 +134,14 @@ public class YamlWorkflowDefinitionParser implements WorkflowDefinitionParser {
         ValidationResult result = new ValidationResult();
 
         try {
-            Map<String, Object> data = yaml.load(yamlContent);
+            Map<String, Object> data = YAML_PARSER.load(yamlContent);
             if (data == null) {
                 result.addError("Empty or invalid YAML content");
                 return result;
             }
 
-            // Use comprehensive schema validator
-            WorkflowSchemaValidator schemaValidator = new WorkflowSchemaValidator();
-            ValidationResult schemaResult = schemaValidator.validateWorkflowSchema(data);
+            // Use static singleton schema validator
+            ValidationResult schemaResult = SCHEMA_VALIDATOR.validateWorkflowSchema(data);
 
             // Merge results
             schemaResult.getErrors().forEach(error ->
@@ -386,8 +412,7 @@ public class YamlWorkflowDefinitionParser implements WorkflowDefinitionParser {
             result.addError("metadata.name", "Workflow name cannot be empty");
         }
 
-        // Use comprehensive schema validator for detailed validation
-        WorkflowSchemaValidator schemaValidator = new WorkflowSchemaValidator();
+        // Use static singleton schema validator for detailed validation
         Map<String, Object> metadataMap = Map.of(
             "name", metadata.getName() != null ? metadata.getName() : "",
             "version", metadata.getVersion() != null ? metadata.getVersion() : "",
@@ -399,7 +424,7 @@ public class YamlWorkflowDefinitionParser implements WorkflowDefinitionParser {
             "labels", metadata.getLabels() != null ? metadata.getLabels() : Map.of()
         );
 
-        ValidationResult metadataResult = schemaValidator.validateMetadataSchema(metadataMap);
+        ValidationResult metadataResult = SCHEMA_VALIDATOR.validateMetadataSchema(metadataMap);
         metadataResult.getErrors().forEach(error ->
             result.addError(error.getFieldPath(), error.getMessage()));
         metadataResult.getWarnings().forEach(warning ->

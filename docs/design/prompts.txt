@@ -1,0 +1,875 @@
+I want to create new tests in the lookup package that load data from xml and json files and performa enrichment. Keep these test simple and focused on the requirement. Remember all the lookup and enrichment processing for these tests must be confugred only in yaml files. Look for existing examples - there are many - for how this works currently. Do not reinvent the wheel - all the processing exists in apex-core so make sure you fully understand the codebase before making code changes. Do not reinvent the wheel as you are to do. Work incrementally and test after each small incremental change. When testing make sure you scan the test logs properly for test errors, do not rely on the exit code as that is largely meaningless. 
+
+Do not hallucinate new APEX yaml keywrords. 
+
+----------
+
+I want to create a new lookup demo that loads data from a file on the file system. The file can be json, csv, or xml. The demo should be in the lookup package and named FileSystemLookupDemo. The yaml file should be named file-system-lookup.yaml and be placed in the lookup folder. The demo should load the file using the file-system dataset type and perform a simple enrichment. The demo should be well documented and include a README.md file. The yaml
+
+-----
+
+Based on the mistakes I made during this refactoring work, here are the key coding principles I would suggest:
+
+Investigation Before Implementation
+Principle: "Understand Before You Change"
+My Mistake: I initially added graceful error handling to SystemPropertiesIntegrationTest without investigating why it was failing
+Better Approach: Always investigate the root cause first
+Code Practice:
+// BAD: Catching and hiding errors without understanding
+try {
+    // database operation
+} catch (Exception e) {
+    logger.warn("Expected failure, skipping...");
+    return; // Hide the real problem
+}
+
+// GOOD: Investigate and fix the root cause
+@Container
+static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:15")
+    .withDatabaseName("test_db");
+Learn From Existing Patterns
+Principle: "Follow Established Conventions"
+My Mistake: I didn't check how other integration tests in the project were structured
+Better Approach: Always examine existing patterns before creating new ones
+Code Practice:
+// Research existing patterns first
+@Testcontainers  // ← Found this pattern in other tests
+class MyIntegrationTest {
+    @Container
+    static PostgreSQLContainer<?> postgres = // ← Consistent setup
+}
+Verify Assumptions
+Principle: "Test Your Understanding"
+My Mistake: I assumed the test was "working as intended" without carefully reading the logs
+Better Approach: Always verify that tests are actually doing what you think they're doing
+Code Practice:
+// Don't assume - verify with explicit logging
+@Test
+void testDatabaseConnection() {
+    logger.info("Testing with database: {}:{}", 
+        postgres.getHost(), postgres.getFirstMappedPort());
+    // Explicit verification of what's happening
+}
+Precise Problem Identification
+Principle: "Fix the Cause, Not the Symptom"
+My Mistake: I treated database connection failures as "expected behavior" instead of missing TestContainers setup
+Better Approach: Distinguish between legitimate failures and configuration issues
+Code Practice:
+// BAD: Masking configuration problems
+if (databaseConnectionFailed) {
+    logger.warn("Expected failure in test environment");
+    return; // Wrong - this hides real issues
+}
+
+// GOOD: Proper test infrastructure
+@BeforeEach
+void configureDatabase() {
+    System.setProperty("db.host", postgres.getHost());
+    System.setProperty("db.port", String.valueOf(postgres.getFirstMappedPort()));
+}
+Clear Documentation Standards
+Principle: "Document Intent, Not Just Implementation"
+My Mistake: I wrote misleading comments about "expected behavior" when the real issue was missing setup
+Better Approach: Document the actual purpose and requirements
+Code Practice:
+/**
+ * Integration test that validates system properties with a real database.
+ * Uses TestContainers to provide PostgreSQL for testing.
+ * 
+ * Requirements:
+ * - Docker must be available for TestContainers
+ * - Test validates actual database connectivity
+ */
+@Testcontainers
+class SystemPropertiesIntegrationTest {
+Iterative Validation
+Principle: "Validate Each Step"
+My Mistake: I made multiple changes without validating each one individually
+Better Approach: Make small changes and verify each step works
+Code Practice:
+// Step 1: Add TestContainers - verify it starts
+@Container
+static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:15");
+
+// Step 2: Configure connection - verify it connects
+System.setProperty("db.host", postgres.getHost());
+
+// Step 3: Test actual functionality - verify it works
+Test Classification
+Principle: "Clearly Distinguish Test Types"
+My Mistake: I confused integration tests (which should have real infrastructure) with unit tests (which can mock)
+Better Approach: Be explicit about what each test requires
+Code Practice:
+// Unit Test - No external dependencies
+@ExtendWith(MockitoExtension.class)
+class ConfigurationUnitTest {
+    @Mock private DatabaseService mockDb;
+}
+
+// Integration Test - Real infrastructure required
+@Testcontainers
+class ConfigurationIntegrationTest {
+    @Container static PostgreSQLContainer<?> postgres;
+}
+
+Do not use use mockito without asking for permission.
+Honest Error Handling
+Principle: "Fail Fast, Fail Clearly"
+My Mistake: I tried to make tests "pass gracefully" when they should have been fixed to work properly
+Better Approach: Let tests fail when there are real problems, fix the problems
+Code Practice:
+// BAD: Hiding real failures
+try {
+    realOperation();
+} catch (Exception e) {
+    logger.warn("Skipping due to environment");
+    return; // Test "passes" but doesn't test anything
+}
+
+// GOOD: Proper setup so tests can succeed
+@Container
+static PostgreSQLContainer<?> postgres = // Provide real infrastructure
+Log Analysis Skills
+Principle: "Read Logs Carefully"
+My Mistake: I didn't carefully analyze what the error logs were actually telling me
+Better Approach: Parse error messages to understand the real problem
+Code Practice:
+// When you see: "UnknownHostException: test-host"
+// Don't think: "Expected failure in test environment"
+// Think: "This test needs a real database host"
+
+// Solution: Provide the real host via TestContainers
+System.setProperty("db.host", postgres.getHost());
+Summary: Core Principles
+Investigate First: Understand the problem before implementing solutions
+Follow Patterns: Learn from existing code in the same project
+Verify Assumptions: Don't assume tests are working - check the logs
+Fix Root Causes: Address configuration issues, don't mask them
+Document Honestly: Write comments that reflect actual behavior
+Validate Incrementally: Test each change before moving to the next
+Classify Tests Clearly: Know whether you're writing unit or integration tests
+Fail Honestly: Let tests fail when there are real problems to fix
+Read Logs Carefully: Error messages usually tell you exactly what's wrong
+Do not reinvent the wheel as you are to do. Work incrementally and test after each small incremental change. When testing make sure you scan the test logs properly for test errors, do not rely on the exit code as that is largely meaningless.
+
+
+
+
+read the document APEX_RULES_ENGINE_USER_GUIDE.md and the document  RULE_REFERENCES_FEATURE_SUMMARY.md. APEX Rule Groups can refer to Rules that are in the same yaml file or in separate yaml files on the classpath. The APEX engine should resolve those external file references and be able to run the Rule Group Successfully. Please enhance the RULE_REFERENCES_FEATURE_SUMMARY document with a desription of this functionality. 
+
+
+
+# **APEX Test Writing Instructions**
+
+## **Core Principles**
+- **Never validate YAML syntax** - there are already dedicated YAML validation tests
+- **Always test actual functionality** - execute real APEX operations, not configuration parsing
+- **Follow existing working patterns** - model after `MultiParameterLookupTest.java` and `JsonFileLookupTest.java`
+
+## **Required Test Structure**
+- **Set up real data sources** (H2 database, JSON files, etc.)
+- **Execute actual APEX enrichment operations** using `enrichmentService.enrichObject(config, result)`
+- **Validate functional results** with specific assertions on enriched data
+- **Test end-to-end workflows** from data setup through enrichment to result validation
+
+## **Database Tests Must**
+- **Create real H2 tables** with actual test data using SQL INSERT statements
+- **Use real database connections** and execute actual queries
+- **Test parameter binding** with different parameter values
+- **Validate query results** contain expected data fields
+
+## **Performance/Caching Tests Must**
+- **Measure actual response times** to prove performance improvements
+- **Execute same operations multiple times** to test cache hit/miss behavior
+- **Test with different parameters** to validate parameter-aware caching
+- **Assert performance improvements** (e.g., second call faster than first)
+
+## **What NOT To Do**
+- **Never create tests that only validate YAML parsing**
+- **Never use hardcoded simulations or switch statements**
+- **Never test configuration properties without testing functionality**
+- **Never duplicate existing YAML validation functionality**
+
+## **Imports and Dependencies**
+- **Use existing APEX services** - `EnrichmentService`, `YamlConfigurationLoader`, etc.
+- **Extend `DemoTestBase`** for consistent test setup
+- **Import only what you actually use** - remove unused imports
+
+## **Test Validation**
+- **Assert on actual enriched data** - `assertEquals(expected, result.get("fieldName"))`
+- **Test with real data** that exists in your test database/files
+- **Validate specific business logic** - customer names, IDs, calculated fields
+- **Prove the YAML configuration produces working functionality**
+
+
+
+## 🎯 **CRITICAL LESSONS LEARNED - CONCISE BULLET POINTS**
+
+### **X MAJOR MISTAKES I MADE:**
+- **Failed to validate ALL business logic operations** - Only tested 4 out of 5 enrichments initially
+- **Assumed tests were comprehensive** without verifying each YAML business operation was executed
+- **Missed currency conversion validation** in multi-asset test due to missing test data fields
+- **Did not read logs carefully enough** - "Processed: 4 out of 5" should have been a red flag
+
+### **✅ MANDATORY VALIDATION CHECKLIST:**
+
+**BEFORE claiming tests are complete:**
+1. **Count enrichments in YAML** - Know exactly how many business operations exist
+2. **Verify log shows "Processed: X out of X"** - Must be 100% execution rate
+3. **Check EVERY enrichment condition** - Ensure test data triggers ALL conditions
+4. **Validate EVERY business calculation** - Test mathematical formulas, not just strings
+5. **Assert ALL enrichment results** - Every `result-field` must have a corresponding `assertEquals`
+
+**BUSINESS LOGIC VALIDATION MEANS:**
+- ✅ **Mathematical calculations** (risk thresholds, currency rates)
+- ✅ **Conditional logic** (market-specific rules, asset class rules)  
+- ✅ **Data transformations** (field mappings, expressions)
+- X **NOT YAML syntax validation**
+- X **NOT just string concatenation**
+
+**TESTING DISCIPLINE:**
+- **Read logs line by line** - "Processed: X out of Y" tells the truth
+- **Test data must match YAML conditions** - Missing fields = missing business logic
+- **Every assertion must validate actual business outcomes**
+- **Never assume - always verify execution counts**
+
+### **🔧 IMMEDIATE ACTION FOR EVERY CONVERSION:**
+1. **Analyze YAML** → Count all enrichments and their conditions
+2. **Design test data** → Ensure ALL conditions are triggered  
+3. **Run test** → Read logs to confirm "Processed: X out of X" = 100%
+4. **Validate results** → Assert every business calculation outcome
+5. **Only then proceed** to next conversion
+
+**Key Reminder: BUSINESS LOGIC ≠ YAML SYNTAX**
+
+remember there are dozens of examples already of how to use apex 
+
+Do not guess. 
+
+Use the coding principles. 
+
+Test after every change. 
+
+Read the test log output.
+
+Do not continue with the next step until the tests are passing.
+
+rememeber the dependent peegeeq modules need to be installed to the local Maven repository first. 
+
+we are coding on a windows  machine
+
+# **YAML Operations Validation Methodology**
+
+## **🎯 Core Validation Philosophy**
+YAML operations in APEX are validated through **multi-layer comprehensive testing** that ensures every operation coded in YAML files is proven to work correctly in real-world scenarios.
+
+## **📋 Multi-Layer Validation Strategy**
+
+### **Layer 1: Syntax Validation**
+```java
+// YAML Configuration Loading Validation
+var config = yamlLoader.loadFromFile("config.yaml");
+assertNotNull(config, "YAML configuration should not be null");
+```
+
+### **Layer 2: Semantic Validation**
+```java
+// Validate YAML structure and required fields
+assertNotNull(config.getRules(), "APEX validation rules should be loaded");
+assertEquals(3, config.getRules().size(), "Should have exactly 3 validation rules");
+```
+
+### **Layer 3: Runtime Execution Validation**
+```java
+// Execute and validate actual results
+var result = enrichmentService.enrichObject(testData, config);
+assertNotNull(result, "Enrichment result should not be null");
+```
+
+### **Layer 4: Business Logic Validation**
+```java
+// Validate specific business calculations and transformations
+assertEquals(expectedValue, enrichedData.get("calculatedField"));
+assertTrue(stringField.contains("expectedContent"), "Field should contain expected content");
+```
+
+## **🔧 Specific YAML Operation Validation Patterns**
+
+### **A. SpEL Expression Validation**
+**YAML Operation:**
+```yaml
+calculation-config:
+  expression: "T(java.lang.Double).parseDouble(#barrierTerms['barrierLevel']) - T(java.lang.Double).parseDouble(#pricingTerms['strikePrice'])"
+  result-field: "apexBarrierSpread"
+```
+**Test Validation:**
+```java
+assertNotNull(enrichedData.get("apexBarrierSpread"), "APEX should calculate barrier spread");
+assertEquals(150.0, Double.parseDouble(enrichedData.get("apexBarrierSpread").toString()),
+            "APEX should calculate: barrierLevel (2300) - strikePrice (2150) = 150");
+```
+
+### **B. Database Query Validation**
+**YAML Operation:**
+```yaml
+query: |
+  SELECT si.instruction_id, cp.counterparty_name
+  FROM settlement_instructions si
+  LEFT JOIN counterparties cp ON si.counterparty_id = cp.counterparty_id
+  WHERE si.counterparty_id = :counterpartyId
+    AND (CAST(:minAmount AS DECIMAL) IS NULL OR si.min_amount <= CAST(:minAmount AS DECIMAL))
+```
+**Test Validation:**
+```java
+assertNotNull(enrichedData.get("settlementInstructionId"), "Settlement instruction ID should be enriched");
+assertEquals("Goldman Sachs", enrichedData.get("counterpartyName"));
+assertEquals("DVP", enrichedData.get("settlementMethod"));
+```
+
+### **C. Field Mapping Validation**
+**YAML Operation:**
+```yaml
+field-mappings:
+  - source-field: "employee_count"
+    target-field: "customerEmployeeCount"
+    transformation: "#value != null ? T(java.lang.Integer).parseInt(#value.toString()) : 0"
+```
+**Test Validation:**
+```java
+if (enrichedData.get("customerEmployeeCount") != null) {
+    assertEquals(5000, enrichedData.get("customerEmployeeCount"));
+}
+```
+
+### **D. Condition Expression Validation**
+**YAML Operation:**
+```yaml
+condition: "#currencyCode != null && #currencyCode.length() == 3"
+```
+**Test Validation:**
+```java
+assertTrue(rules.get(0).getCondition().contains("currencyCode") && rules.get(0).getCondition().contains("length"),
+          "Rule should validate currency code format");
+```
+
+### **E. Lookup Key Expression Validation**
+**YAML Operation:**
+```yaml
+lookup-key: "{'counterpartyId': #counterpartyId, 'instrumentType': #instrumentType, 'currency': #currency}"
+```
+**Test Validation:**
+```java
+Map<String, Object> testData = Map.of(
+    "counterpartyId", "CP001",
+    "instrumentType", "EQUITY_US",
+    "currency", "USD"
+);
+var result = enrichmentService.enrichObject(testData, config);
+assertNotNull(result, "Multi-parameter lookup should succeed");
+```
+
+## **🏆 Validation Best Practices**
+
+### **1. Comprehensive Test Data**
+- Create test data that exercises ALL code paths in YAML
+- Test with valid data, edge cases, null values, boundary conditions
+- Ensure test data triggers every condition and enrichment
+
+### **2. Explicit Validation Messages**
+```java
+assertEquals(expectedValue, actualValue,
+    "APEX should calculate: barrierLevel (2300) - strikePrice (2150) = 150");
+```
+
+### **3. Multi-Scenario Testing**
+```java
+for (String testCase : testCases) {
+    var result = enrichmentService.enrichObject(createTestData(testCase), config);
+    validateResults(result, testCase);
+}
+```
+
+### **4. Performance Validation**
+```java
+long startTime = System.currentTimeMillis();
+var result = enrichmentService.enrichObject(testData, config);
+long responseTime = System.currentTimeMillis() - startTime;
+assertTrue(responseTime < maxTimeMs, "Response time should be acceptable");
+```
+
+-------------------------------------------------------
+
+## **🎯 Key Validation Principles**
+
+1. **🔍 Test Every Operation**: Every SpEL expression, database query, field mapping, and transformation in YAML has corresponding test validation
+2. **📊 Validate Actual Results**: Don't just test that operations execute - validate they produce correct business results
+3. **🚀 Real Service Integration**: Use actual databases, files, and services rather than mocks to validate YAML operations work in real environments
+4. **⚡ Performance Monitoring**: Ensure YAML operations meet performance requirements under realistic conditions
+5. **🛡️ Error Resilience**: Test how YAML operations handle edge cases, null values, and error conditions
+6. **📝 Clear Documentation**: Every validation includes descriptive messages explaining what business logic is being verified
+
+## **✅ Validation Categories**
+
+### **Correctness Validation**
+- Expected Value Testing: `assertEquals(expectedValue, actualValue)`
+- Null Safety Testing: `assertNotNull(result, "Result should not be null")`
+- Type Validation: `assertTrue(result instanceof ExpectedType)`
+
+### **Business Logic Validation**
+- Calculation Accuracy: Mathematical operations produce correct results
+- Data Transformation: Field mappings work as specified
+- Conditional Logic: Conditions trigger correctly based on input data
+
+### **Integration Validation**
+- Database Connectivity: Real database queries execute successfully
+- External Service Integration: APIs and file systems work correctly
+- Performance Requirements: Response times meet specifications
+
+### **Error Handling Validation**
+- Graceful Degradation: System handles missing/null data appropriately
+- Exception Handling: Invalid operations fail with proper error messages
+- Recovery Mechanisms: System continues processing after recoverable errors
+
+This comprehensive validation approach ensures that **every operation coded in YAML files is thoroughly tested and verified** to work correctly in real-world scenarios, providing confidence that the YAML configurations will perform as expected in production environments.
+
+
+🎯 CODING PRINCIPLES REMINDER
+Before implementing REST API support, let me remind myself of the key coding principles:
+APEX Architecture Principles
+YAML First: ALL business logic must be in YAML configurations, Java only handles infrastructure
+No Mocking: Use real services, databases, and APIs - no mocks or simulations
+Reuse Existing Infrastructure: Leverage existing APEX components rather than duplicating functionality
+Conservative Approach: Respect the codebase, make minimal changes, follow established patterns
+Package Manager Usage: Always use appropriate package managers for dependencies
+Implementation Principles
+Follow Existing Patterns: Mirror the structure of createDatabaseDatasetService() exactly
+Comprehensive Error Handling: Proper validation and meaningful error messages
+Incremental Development: Break down into small, testable chunks
+Parallel Tool Calls: Use multiple tools simultaneously when possible
+Detailed Information Gathering: Always call codebase-retrieval before making edits
+Testing Principles
+Write Tests First: Create comprehensive unit tests for new functionality
+Real Data Sources: Tests must use actual REST APIs, not inline data simulations
+Step-by-Step Validation: Test each component individually before integration
+
+# **🚨 CRITICAL ERROR HANDLING PRINCIPLES**
+
+## **Distinguish Between Configuration Errors and Business Logic Failures**
+
+### **Core Principle: Different Error Types Require Different Handling Strategies**
+
+---
+
+## **1️⃣ Configuration Errors → Graceful Degradation (Log Warnings, Continue)**
+
+**RULE: Configuration errors should NEVER throw exceptions that break application flow.**
+
+### **What Are Configuration Errors?**
+Configuration errors are issues with YAML setup, missing optional fields, or user-correctable problems that don't represent fundamental system failures.
+
+### **Examples of Configuration Errors:**
+- Missing **optional** fields in lookup results
+- Invalid field mappings in YAML (user can fix)
+- Null or empty lookup keys (expected in some scenarios)
+- Invalid data type conversions (can use defaults)
+- Missing optional YAML configuration sections
+- Validation failures where user can correct input (e.g., invalid email format)
+- "No results found" scenarios (expected outcome)
+
+### **❌ WRONG APPROACH - Throwing Exceptions:**
+```java
+// BAD: Throwing exceptions for configuration issues
+if (optionalField == null) {
+    throw new EnrichmentException("Optional field 'market' is missing from lookup result");
+}
+```
+
+### **✅ CORRECT APPROACH - Graceful Error Reporting:**
+```java
+// GOOD: Log warnings and continue processing
+if (optionalField == null) {
+    logger.warn("Optional field 'market' is missing from lookup result for key: {}. Using default.", lookupKey);
+    return getDefaultValue(); // or return null, or Optional.empty()
+}
+```
+
+### **Implementation Pattern for Configuration Errors:**
+```java
+try {
+    // Attempt configuration operation
+    return processConfiguration(config);
+} catch (ConfigurationException e) {
+    logger.warn("Configuration issue detected: {}. Using default behavior.", e.getMessage());
+    return getDefaultValue();
+} catch (Exception e) {
+    logger.warn("Unexpected configuration error: {}. Continuing with defaults.", e.getMessage());
+    return getFailSafeValue();
+}
+```
+
+---
+
+## **2️⃣ Business Logic Failures → Return Error Results (Track Failures, Propagate)**
+
+**RULE: Business logic failures should return structured error results (like RuleResult.error()) that allow callers to detect and handle failures programmatically.**
+
+### **What Are Business Logic Failures?**
+Business logic failures are fundamental errors in processing that represent actual system failures, not user-correctable configuration issues.
+
+### **Examples of Business Logic Failures:**
+- **Required** enrichment failed (system cannot proceed without this data)
+- Database connection failures (infrastructure problem, not user error)
+- File not found errors for **required** system files
+- Transformation processing errors (SpEL expression evaluation failed)
+- Rule evaluation errors (condition evaluation threw exception)
+- Data source unavailable (external API down)
+- Critical field mapping errors for **required** fields
+
+### **Key Distinction:**
+**When to avoid throwing exceptions for business logic failures:**
+- **Expected and recoverable conditions**: If the "failure" is a common and anticipated outcome that can be handled gracefully within normal program flow
+- **Validation failures where user can correct input**: Invalid email format in registration form
+- **"No results found" scenarios**: Querying database with no matching records
+- **Conditional outcomes in expected business flow**: Method attempts discount, returns true/false
+
+**When to return error results (not throw exceptions):**
+- Use `RuleResult.error()` or similar structured result objects
+- Track failure details in `failureMessages` list
+- Set appropriate severity (`SeverityConstants.ERROR`)
+- Allow caller to check `resultType == ERROR` and handle appropriately
+
+### **❌ WRONG APPROACH - Swallowing Errors:**
+```java
+// BAD: Catching and hiding business logic failures
+try {
+    processRequiredEnrichment(data);
+} catch (Exception e) {
+    logger.warn("Enrichment failed, continuing anyway...");
+    // ERROR IS LOST - caller has no way to detect failure!
+}
+```
+
+### **✅ CORRECT APPROACH - Return Structured Error Results:**
+```java
+// GOOD: Return error result that caller can check
+public RuleResult processEnrichmentWithResult(Enrichment enrichment, Object data) {
+    try {
+        Object result = processEnrichment(enrichment, data);
+        return RuleResult.enrichmentSuccess(result);
+    } catch (Exception e) {
+        logger.error("CRITICAL: Required enrichment failed: {}", enrichment.getId(), e);
+        return RuleResult.error(
+            "enrichment:" + enrichment.getId(),
+            "Enrichment processing failed: " + e.getMessage(),
+            SeverityConstants.ERROR
+        );
+    }
+}
+
+// Caller can now detect and handle the failure:
+RuleResult result = processor.processEnrichmentWithResult(enrichment, data);
+if (result.getResultType() == ResultType.ERROR) {
+    // Handle the failure appropriately (log, return HTTP 500, etc.)
+    return ResponseEntity.status(500).body(result.getFailureMessages());
+}
+```
+
+### **Implementation Pattern for Business Logic Failures:**
+```java
+public RuleResult processBusinessOperation(Config config, Object data) {
+    List<String> failureMessages = new ArrayList<>();
+
+    try {
+        // Attempt critical business operation
+        Object result = performCriticalOperation(config, data);
+        return RuleResult.match("operation", "Success", SeverityConstants.INFO);
+    } catch (Exception e) {
+        // Log as ERROR (not warning) - this is a real failure
+        logger.error("CRITICAL: Business operation failed: {}", config.getId(), e);
+
+        // Return structured error result (don't throw exception)
+        return RuleResult.error(
+            "operation:" + config.getId(),
+            "Operation failed: " + e.getMessage(),
+            SeverityConstants.ERROR
+        );
+    }
+}
+```
+
+---
+
+## **3️⃣ Decision Matrix: Configuration Error vs. Business Logic Failure**
+
+| Scenario | Type | Handling Strategy | Example |
+|----------|------|-------------------|---------|
+| Missing **optional** field in lookup result | Configuration Error | Log warning, use default, continue | `logger.warn()` + return default |
+| Missing **required** field for critical enrichment | Business Logic Failure | Return `RuleResult.error()`, track failure | `RuleResult.error()` |
+| Invalid email format (user input) | Configuration Error | Return validation result, user can fix | Return `false` or validation object |
+| Database connection failed | Business Logic Failure | Return `RuleResult.error()`, propagate | `RuleResult.error()` |
+| No results found in query | Expected Outcome | Return empty result, not an error | Return `Optional.empty()` or `null` |
+| SpEL expression evaluation failed | Business Logic Failure | Return `RuleResult.error()`, track failure | `RuleResult.error()` |
+| Invalid YAML syntax | Configuration Error | Log warning, skip section, continue | `logger.warn()` + skip |
+| Transformation processing error | Business Logic Failure | Return `RuleResult.error()`, fail fast | `RuleResult.error()` |
+
+---
+
+## **4️⃣ Key Principles Summary**
+
+### **Configuration Errors:**
+1. **Log, Don't Throw**: Log as warnings, not exceptions
+2. **Graceful Degradation**: Continue with reasonable defaults
+3. **User-Friendly**: Provide clear messages to help users fix configurations
+4. **Fail-Safe**: Don't break entire process for optional field issues
+5. **Defensive Programming**: Assume configurations might be incomplete
+
+### **Business Logic Failures:**
+1. **Return Structured Results**: Use `RuleResult.error()` or similar
+2. **Track Failure Details**: Populate `failureMessages` list
+3. **Log as ERROR**: Use `logger.error()` for critical failures
+4. **Enable Detection**: Caller must be able to check for failures
+5. **Propagate Appropriately**: REST API returns HTTP 500 on errors
+6. **Don't Throw Exceptions**: Return error results instead (unless truly exceptional)
+
+---
+
+## **5️⃣ REST API Error Propagation**
+
+### **For Business Logic Failures:**
+```java
+// REST Controller should check RuleResult and return appropriate HTTP status
+RuleResult result = rulesEngine.processWithResult(config, data);
+
+if (result.getResultType() == ResultType.ERROR) {
+    // Business logic failure → HTTP 500
+    return ResponseEntity.status(500).body(Map.of(
+        "error", "Processing failed",
+        "details", result.getFailureMessages()
+    ));
+}
+
+// Success → HTTP 200
+return ResponseEntity.ok(result.getEnrichedData());
+```
+
+### **For Configuration Errors:**
+```java
+// Configuration errors are handled gracefully, processing continues
+// REST API returns HTTP 200 with partial results and warnings
+return ResponseEntity.ok(Map.of(
+    "data", result.getEnrichedData(),
+    "warnings", result.getWarningMessages() // if available
+));
+```
+
+run all the tests again
+Do not guess.
+Use the coding principles.
+Test after every change.
+Read the test log output.
+Do not continue with the next step until the tests are passing.
+rememeber the dependent  modules need to be installed to the local Maven repository first.
+we are coding on a windows  machine
+
+**Remember: The system should be resilient to configuration errors and provide helpful feedback to users without breaking the application flow.**
+
+# **🚨 CRITICAL APEX YAML SYNTAX VALIDATION RULES**
+
+## **FUNDAMENTAL PROBLEM: LLMs HALLUCINATE INVALID YAML SYNTAX**
+
+**CORE ISSUE**: LLMs consistently add sections to APEX YAML files that seem logical but are NOT part of the official APEX specification. This creates files that appear correct but contain invalid syntax.
+
+### **❌ COMMON INVALID SECTIONS THAT LLMs ADD:**
+- `monitoring:` - Not a valid APEX top-level section
+- `test-scenarios:` - Not a valid APEX top-level section
+- `demo-info:` - Not a valid APEX top-level section
+- `performance:` - Not a valid APEX top-level section
+- `business-info:` - Not a valid APEX top-level section
+- `documentation:` - Not a valid APEX top-level section
+- `test-notes:` - Not a valid field in enrichments or rules
+- `type: "demo"` - Not a valid APEX document type
+
+### **✅ ONLY VALID APEX YAML TOP-LEVEL SECTIONS:**
+Based on official APEX documentation, these are the ONLY valid top-level sections:
+
+**For `rule-config` documents:**
+- `metadata:` (required)
+- `rules:` (at least one of rules/enrichments required)
+- `enrichments:` (at least one of rules/enrichments required)
+- `rule-groups:` (optional)
+- `error-recovery:` (optional)
+
+**For other document types:**
+- `metadata:` (always required)
+- Document-specific sections as defined in APEX_YAML_REFERENCE.md
+
+### **✅ ONLY VALID APEX DOCUMENT TYPES:**
+- `rule-config`
+- `enrichment`
+- `dataset`
+- `scenario`
+- `scenario-registry`
+- `bootstrap`
+- `rule-chain`
+- `external-data-config`
+- `pipeline-config`
+
+### **🛡️ MANDATORY VALIDATION PROCESS:**
+
+**BEFORE creating or modifying ANY APEX YAML file:**
+
+1. **Check APEX_YAML_REFERENCE.md** - Verify every section against official documentation
+2. **Use codebase-retrieval** - Search for "APEX YAML configuration schema" to get valid fields
+3. **Test against APEX compiler** - Run the test to ensure YAML loads successfully
+4. **Never assume** - If a section seems logical, verify it's actually valid in APEX
+
+### **🔧 CORRECTIVE ACTIONS:**
+
+**When you find yourself adding sections like:**
+- `monitoring:`, `test-scenarios:`, `demo-info:`, `performance:`, etc.
+
+**STOP IMMEDIATELY and:**
+1. Remove the invalid section
+2. Move any useful information to valid fields (like `description:` in metadata or rule groups)
+3. Test the corrected YAML against the APEX compiler
+4. Only proceed when the YAML is confirmed valid
+
+### **📋 VALIDATION CHECKLIST:**
+
+Before submitting any APEX YAML file:
+- [ ] All top-level sections are in the official APEX specification
+- [ ] Document type is one of the 9 valid types listed above
+- [ ] All field names within sections are valid APEX fields
+- [ ] No custom/invented sections that "seem logical"
+- [ ] File successfully loads through APEX compiler (test passes)
+
+### **🎯 KEY PRINCIPLE:**
+
+**"APEX YAML syntax is STRICTLY DEFINED - there is NO room for creative interpretation or logical extensions. Only use sections and fields that are explicitly documented in the APEX specification."**
+
+### **⚠️ WARNING SIGNS:**
+
+If you find yourself thinking:
+- "This section would be useful for documentation"
+- "This makes logical sense for a demo file"
+- "This would help organize the configuration"
+
+**STOP** - You are about to add invalid YAML syntax. Stick to the official specification only.
+
+## **🚨 CRITICAL: APEX YAML KEYWORD HALLUCINATION PROBLEM**
+
+### **THE PROBLEM:**
+I have a serious problem with hallucinating non-existent APEX YAML keywords like `compliance-reviewed` and `risk-approved` - these are NOT valid APEX DSL directives and I must never fabricate APEX syntax or functionality that doesn't exist in the actual codebase.
+
+### **THE SOLUTION:**
+- APEX YAML is a complex DSL with specific syntax and vocabulary defined in the codebase
+- I must ONLY use keywords that actually exist and are validated by the system
+- Before suggesting any APEX YAML keywords, I must verify they exist in the actual APEX lexical validator, configuration loader, or other validation code
+- I must never add non-existent keywords to YAML test files or documentation examples
+
+### **VERIFICATION SOURCES:**
+- `apex-compiler/src/main/java/dev/mars/apex/compiler/lexical/ApexYamlLexicalValidator.java`
+- `apex-core/src/main/java/dev/mars/apex/core/config/yaml/YamlConfigurationLoader.java`
+- `docs/APEX_YAML_REFERENCE.md`
+
+### **NEVER FABRICATE:**
+- Governance fields like `compliance-reviewed`, `risk-approved`
+- Metadata fields that "seem logical" but don't exist
+- Any YAML structure not explicitly defined in the APEX specification
+
+---
+
+## **📋 APEX YAML Configuration Requirements - Key Learnings**
+
+### **Required Fields for APEX YAML Sections**
+
+Based on actual APEX validation requirements (from `YamlConfigurationLoader.java`):
+
+#### **Enrichments** (validated at line 1250)
+Required fields:
+- `id` - Unique identifier for the enrichment
+- `name` - Human-readable name for the enrichment
+- `type` - Enrichment type (e.g., `"lookup-enrichment"`)
+- `lookup-config` - Configuration for lookup operations
+  - Must specify either `lookup-service` OR `lookup-dataset`
+  - For inline data: use `lookup-dataset` with `type: "inline"`, `key-field`, and `data` array
+
+Example:
+```yaml
+enrichments:
+  - id: "enrich-customer-tier"
+    name: "Enrich Customer Tier"
+    type: "lookup-enrichment"
+    condition: "#customerId != null"
+    lookup-config:
+      lookup-key: "#customerId"
+      lookup-dataset:
+        type: "inline"
+        key-field: "customerId"
+        data:
+          - customerId: "CUST001"
+            tier: "GOLD"
+    field-mappings:
+      - source-field: "tier"
+        target-field: "customerTier"
+```
+
+#### **Rules** (validated at line 761)
+Required fields:
+- `id` - Unique identifier for the rule
+- `name` - Human-readable name for the rule
+- `condition` - Expression to evaluate (e.g., `"#customerTier != null"`)
+- `message` - Message to display when rule triggers
+- `severity` - Severity level (`"ERROR"`, `"WARNING"`, `"INFO"`)
+- `priority` - Numeric priority for rule execution order
+
+Example:
+```yaml
+rules:
+  - id: "validate-tier-exists"
+    name: "Validate Tier Exists"
+    condition: "#customerTier != null"
+    message: "Customer tier must be enriched"
+    severity: "ERROR"
+    priority: 1
+```
+
+#### **Rule-Groups**
+Required fields:
+- `id` - Unique identifier for the rule group
+- `name` - Human-readable name for the rule group
+- `operator` - Logic operator (`"AND"` or `"OR"`)
+- `rule-ids` - Array of rule IDs to include in the group
+
+Example:
+```yaml
+rule-groups:
+  - id: "tier-validation-group"
+    name: "Tier Validation Group"
+    operator: "AND"
+    rule-ids:
+      - "validate-tier-exists"
+      - "validate-tier-gold"
+```
+
+#### **Data Sources** (validated at line 961)
+Required fields:
+- `name` - Name of the data source (required even if `id` is present)
+
+### **Best Practices for Test YAML Configurations**
+
+1. **Inline Datasets for Simple Tests**
+   - Embed datasets directly in enrichment's `lookup-config.lookup-dataset`
+   - Simpler than separate `data-sources` section
+   - Better for unit tests and demos
+   - Pattern: `lookup-dataset` → `type: "inline"` → `key-field` → `data` array
+
+2. **Separate Data Sources for Complex Tests**
+   - Use separate `data-sources` section for reusable datasets
+   - Reference via `data-source-id` in lookup-config
+   - Better for integration tests with shared data
+
+3. **Always Validate YAML Before Use**
+   - APEX has strict validation requirements
+   - Missing required fields cause `YamlConfigurationException`
+   - Check validation code in `YamlConfigurationLoader.java` when in doubt

@@ -26,10 +26,20 @@
         <maven.compiler.target>21</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <junit.version>5.10.1</junit.version>
+        <vertx.version>5.0.0.CR2</vertx.version>
     </properties>
 
     <dependencyManagement>
         <dependencies>
+            <!-- Vert.x 5 BOM -->
+            <dependency>
+                <groupId>io.vertx</groupId>
+                <artifactId>vertx-dependencies</artifactId>
+                <version>${vertx.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
             <!-- Testing dependencies -->
             <dependency>
                 <groupId>org.junit.jupiter</groupId>
