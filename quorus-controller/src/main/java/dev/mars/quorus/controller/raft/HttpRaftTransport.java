@@ -61,7 +61,7 @@ public class HttpRaftTransport implements RaftTransport {
     private HttpServer httpServer;
     private volatile Consumer<Object> messageHandler;
     private volatile boolean running = false;
-    private volatile Object raftNode; // Will be set when transport is started
+    private volatile RaftNode raftNode; // Will be set when transport is started
 
     /**
      * Creates a new HTTP-based Raft transport.
@@ -86,7 +86,7 @@ public class HttpRaftTransport implements RaftTransport {
         });
     }
 
-    public void setRaftNode(Object raftNode) {
+    public void setRaftNode(RaftNode raftNode) {
         this.raftNode = raftNode;
     }
 
@@ -158,7 +158,8 @@ public class HttpRaftTransport implements RaftTransport {
 
                 try (CloseableHttpResponse response = httpClient.execute(httpPost)) {
                     if (response.getCode() == 200) {
-                        String responseJson = new String(response.getEntity().getContent().readAllBytes(), StandardCharsets.UTF_8);
+                        String responseJson = new String(response.getEntity().getContent().readAllBytes(),
+                                StandardCharsets.UTF_8);
                         return objectMapper.readValue(responseJson, VoteResponse.class);
                     } else {
                         throw new RuntimeException("HTTP error: " + response.getCode());
@@ -173,7 +174,8 @@ public class HttpRaftTransport implements RaftTransport {
     }
 
     @Override
-    public CompletableFuture<AppendEntriesResponse> sendAppendEntries(String targetNodeId, AppendEntriesRequest request) {
+    public CompletableFuture<AppendEntriesResponse> sendAppendEntries(String targetNodeId,
+            AppendEntriesRequest request) {
         return CompletableFuture.supplyAsync(() -> {
             try {
                 String targetAddress = clusterNodes.get(targetNodeId);
@@ -189,7 +191,8 @@ public class HttpRaftTransport implements RaftTransport {
 
                 try (CloseableHttpResponse response = httpClient.execute(httpPost)) {
                     if (response.getCode() == 200) {
-                        String responseJson = new String(response.getEntity().getContent().readAllBytes(), StandardCharsets.UTF_8);
+                        String responseJson = new String(response.getEntity().getContent().readAllBytes(),
+                                StandardCharsets.UTF_8);
                         return objectMapper.readValue(responseJson, AppendEntriesResponse.class);
                     } else {
                         throw new RuntimeException("HTTP error: " + response.getCode());
@@ -233,8 +236,7 @@ public class HttpRaftTransport implements RaftTransport {
                 VoteResponse response;
                 if (raftNode != null) {
                     try {
-                        java.lang.reflect.Method method = raftNode.getClass().getMethod("handleVoteRequest", VoteRequest.class);
-                        response = (VoteResponse) method.invoke(raftNode, request);
+                        response = raftNode.handleVoteRequest(request);
                     } catch (Exception e) {
                         logger.log(Level.WARNING, "Failed to invoke handleVoteRequest", e);
                         response = new VoteResponse(request.getTerm(), false, nodeId);
@@ -281,8 +283,7 @@ public class HttpRaftTransport implements RaftTransport {
                 AppendEntriesResponse response;
                 if (raftNode != null) {
                     try {
-                        java.lang.reflect.Method method = raftNode.getClass().getMethod("handleAppendEntriesRequest", AppendEntriesRequest.class);
-                        response = (AppendEntriesResponse) method.invoke(raftNode, request);
+                        response = raftNode.handleAppendEntriesRequest(request);
                     } catch (Exception e) {
                         logger.log(Level.WARNING, "Failed to invoke handleAppendEntriesRequest", e);
                         response = new AppendEntriesResponse(request.getTerm(), false, nodeId, 0);
