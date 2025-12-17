@@ -16,23 +16,16 @@
 
 package dev.mars.quorus.api.dto;
 
-import org.eclipse.microprofile.openapi.annotations.media.Schema;
-
 import java.time.LocalDateTime;
 
-@Schema(description = "Error response containing error details")
+/**
+ * Error response containing error details.
+ */
 public class ErrorResponse {
 
-    @Schema(description = "Error message", example = "Invalid transfer request")
     private String error;
-
-    @Schema(description = "Detailed error message", example = "Source URI is required")
     private String message;
-
-    @Schema(description = "Timestamp when the error occurred")
     private LocalDateTime timestamp;
-
-    @Schema(description = "HTTP status code", example = "400")
     private int status;
 
     public ErrorResponse() {

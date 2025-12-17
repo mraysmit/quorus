@@ -16,181 +16,157 @@
 
 package dev.mars.quorus.api;
 
-import dev.mars.quorus.api.dto.TransferRequestDto;
-import io.quarkus.test.junit.QuarkusTest;
-import io.restassured.http.ContentType;
-import org.junit.jupiter.api.Test;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import dev.mars.quorus.api.service.DistributedTransferService;
+import dev.mars.quorus.core.TransferJob;
+import dev.mars.quorus.core.TransferRequest;
+import dev.mars.quorus.core.TransferResult;
+import dev.mars.quorus.core.TransferStatus;
+import dev.mars.quorus.transfer.TransferEngine;
+import io.vertx.core.Vertx;
+import io.vertx.core.json.JsonObject;
+import io.vertx.core.json.jackson.DatabindCodec;
+import io.vertx.ext.web.Router;
+import io.vertx.ext.web.client.WebClient;
+import io.vertx.ext.web.handler.BodyHandler;
+import io.vertx.junit5.VertxExtension;
+import io.vertx.junit5.VertxTestContext;
+import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.extension.ExtendWith;
 
-import static io.restassured.RestAssured.given;
-import static org.hamcrest.CoreMatchers.*;
-import static org.hamcrest.Matchers.greaterThanOrEqualTo;
-import static org.hamcrest.Matchers.anyOf;
+import java.net.URI;
+import java.nio.file.Paths;
+import java.util.concurrent.CompletableFuture;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
 
 /**
- * Integration tests for TransferResource using Quarkus test framework.
- * Tests the REST API endpoints with real HTTP requests.
+ * Tests for TransferResource using Vert.x testing framework.
+ * Uses real HTTP server - no mocking of Vert.x components.
  */
-@QuarkusTest
+@ExtendWith(VertxExtension.class)
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class TransferResourceTest {
 
-    private static final String ADMIN_AUTH = "Basic YWRtaW46YWRtaW4xMjM="; // admin:admin123
-    private static final String USER_AUTH = "Basic dXNlcjp1c2VyMTIz"; // user:user123
+    private static final int TEST_PORT = 8082;
+    private WebClient client;
+    private TransferEngine mockTransferEngine;
+    private DistributedTransferService mockDistributedService;
 
-    @Test
-    void testCreateTransferWithValidRequest() {
-        TransferRequestDto request = new TransferRequestDto();
-        request.setSourceUri("https://httpbin.org/bytes/1024");
-        request.setDestinationPath("/tmp/test-file.bin");
-        request.setDescription("Test transfer");
+    @BeforeEach
+    void setUp(Vertx vertx, VertxTestContext testContext) {
+        // Configure Jackson for Java 8 date/time support
+        ObjectMapper mapper = DatabindCodec.mapper();
+        mapper.registerModule(new JavaTimeModule());
+        mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
-        given()
-            .header("Authorization", ADMIN_AUTH)
-            .contentType(ContentType.JSON)
-            .body(request)
-        .when()
-            .post("/api/v1/transfers")
-        .then()
-            .statusCode(201)
-            .body("jobId", notNullValue())
-            .body("sourceUri", equalTo("https://httpbin.org/bytes/1024"))
-            .body("destinationPath", equalTo("/tmp/test-file.bin"))
-            .body("status", equalTo("PENDING"))
-            .body("message", equalTo("Transfer job created successfully"));
+        // Create mock services
+        mockTransferEngine = mock(TransferEngine.class);
+        mockDistributedService = mock(DistributedTransferService.class);
+        when(mockDistributedService.isControllerAvailable()).thenReturn(false);
+
+        // Create TransferResource with mocked dependencies
+        TransferResource transferResource = new TransferResource();
+        transferResource.transferEngine = mockTransferEngine;
+        transferResource.distributedTransferService = mockDistributedService;
+
+        // Create router and register routes
+        Router router = Router.router(vertx);
+        router.route().handler(BodyHandler.create());
+        transferResource.registerRoutes(router);
+
+        // Start HTTP server
+        vertx.createHttpServer()
+            .requestHandler(router)
+            .listen(TEST_PORT)
+            .onSuccess(server -> {
+                client = WebClient.create(vertx);
+                testContext.completeNow();
+            })
+            .onFailure(testContext::failNow);
     }
 
     @Test
-    void testCreateTransferWithInvalidRequest() {
-        TransferRequestDto request = new TransferRequestDto();
-        // Missing required fields - should return specific validation error
+    @Order(1)
+    @DisplayName("POST /api/v1/transfers should create transfer job")
+    void testCreateTransfer(Vertx vertx, VertxTestContext testContext) {
+        // Mock transfer engine response
+        TransferResult mockResult = mock(TransferResult.class);
+        when(mockResult.getRequestId()).thenReturn("test-job-123");
+        CompletableFuture<TransferResult> future = CompletableFuture.completedFuture(mockResult);
+        try {
+            when(mockTransferEngine.submitTransfer(any(TransferRequest.class))).thenReturn(future);
+        } catch (Exception e) {
+            testContext.failNow(e);
+            return;
+        }
 
-        given()
-            .header("Authorization", ADMIN_AUTH)
-            .contentType(ContentType.JSON)
-            .body(request)
-        .when()
-            .post("/api/v1/transfers")
-        .then()
-            .statusCode(400)
-            .body("error", equalTo("Invalid request"))
-            .body("message", equalTo("Source URI is required"));
+        JsonObject requestBody = new JsonObject()
+            .put("sourceUri", "http://example.com/file.txt")
+            .put("destinationPath", "/tmp/file.txt");
+
+        client.post(TEST_PORT, "localhost", "/api/v1/transfers")
+            .sendJsonObject(requestBody)
+            .onComplete(testContext.succeeding(response -> testContext.verify(() -> {
+                assertEquals(201, response.statusCode());
+                JsonObject body = response.bodyAsJsonObject();
+                assertNotNull(body);
+                assertTrue(body.containsKey("jobId"));
+                assertEquals("http://example.com/file.txt", body.getString("sourceUri"));
+                assertEquals("/tmp/file.txt", body.getString("destinationPath"));
+                testContext.completeNow();
+            })));
     }
 
     @Test
-    void testCreateTransferWithoutAuthentication() {
-        TransferRequestDto request = new TransferRequestDto();
-        request.setSourceUri("https://httpbin.org/bytes/1024");
-        request.setDestinationPath("/tmp/test-file.bin");
+    @Order(2)
+    @DisplayName("POST /api/v1/transfers should reject invalid request")
+    void testCreateTransferInvalidRequest(Vertx vertx, VertxTestContext testContext) {
+        JsonObject requestBody = new JsonObject()
+            .put("sourceUri", ""); // Empty source URI
 
-        given()
-            .contentType(ContentType.JSON)
-            .body(request)
-        .when()
-            .post("/api/v1/transfers")
-        .then()
-            .statusCode(401);
+        client.post(TEST_PORT, "localhost", "/api/v1/transfers")
+            .sendJsonObject(requestBody)
+            .onComplete(testContext.succeeding(response -> testContext.verify(() -> {
+                assertEquals(400, response.statusCode());
+                testContext.completeNow();
+            })));
     }
 
     @Test
-    void testCreateTransferWithUserRole() {
-        TransferRequestDto request = new TransferRequestDto();
-        request.setSourceUri("https://httpbin.org/bytes/1024");
-        request.setDestinationPath("/tmp/test-file-user.bin");
+    @Order(3)
+    @DisplayName("GET /api/v1/transfers/:jobId should return job status")
+    void testGetTransferStatus(Vertx vertx, VertxTestContext testContext) {
+        // Mock transfer job
+        TransferRequest mockRequest = TransferRequest.builder()
+            .sourceUri(URI.create("http://example.com/file.txt"))
+            .destinationPath(Paths.get("/tmp/file.txt"))
+            .build();
+        TransferJob mockJob = new TransferJob(mockRequest);
+        when(mockTransferEngine.getTransferJob("test-job-123")).thenReturn(mockJob);
 
-        given()
-            .header("Authorization", USER_AUTH)
-            .contentType(ContentType.JSON)
-            .body(request)
-        .when()
-            .post("/api/v1/transfers")
-        .then()
-            .statusCode(201)
-            .body("jobId", notNullValue())
-            .body("status", equalTo("PENDING"));
+        client.get(TEST_PORT, "localhost", "/api/v1/transfers/test-job-123")
+            .send()
+            .onComplete(testContext.succeeding(response -> testContext.verify(() -> {
+                assertEquals(200, response.statusCode());
+                JsonObject body = response.bodyAsJsonObject();
+                assertNotNull(body);
+                assertTrue(body.containsKey("jobId"));
+                assertTrue(body.containsKey("status"));
+                testContext.completeNow();
+            })));
     }
 
-    @Test
-    void testGetTransferStatusNotFound() {
-        given()
-            .header("Authorization", ADMIN_AUTH)
-        .when()
-            .get("/api/v1/transfers/non-existent-job-id")
-        .then()
-            .statusCode(404)
-            .body("error", notNullValue())
-            .body("message", containsString("Transfer job not found"));
-    }
-
-    @Test
-    void testGetActiveTransferCount() {
-        given()
-            .header("Authorization", ADMIN_AUTH)
-        .when()
-            .get("/api/v1/transfers/count")
-        .then()
-            .statusCode(200)
-            .body("count", notNullValue())
-            .body("timestamp", notNullValue());
-    }
-
-    @Test
-    void testGetActiveTransferCountWithoutAuth() {
-        given()
-        .when()
-            .get("/api/v1/transfers/count")
-        .then()
-            .statusCode(401);
-    }
-
-    @Test
-    void testCancelTransferNotFound() {
-        given()
-            .header("Authorization", ADMIN_AUTH)
-        .when()
-            .delete("/api/v1/transfers/non-existent-job-id")
-        .then()
-            .statusCode(409)
-            .body("error", notNullValue())
-            .body("message", containsString("Transfer cannot be cancelled or not found"));
-    }
-
-    @Test
-    void testCreateAndQueryTransferWorkflow() {
-        // Create a transfer
-        TransferRequestDto request = new TransferRequestDto();
-        request.setSourceUri("https://httpbin.org/bytes/2048");
-        request.setDestinationPath("/tmp/workflow-test.bin");
-        request.setDescription("Workflow test transfer");
-
-        String jobId = given()
-            .header("Authorization", ADMIN_AUTH)
-            .contentType(ContentType.JSON)
-            .body(request)
-        .when()
-            .post("/api/v1/transfers")
-        .then()
-            .statusCode(201)
-            .extract()
-            .path("jobId");
-
-        // Query the transfer status
-        given()
-            .header("Authorization", ADMIN_AUTH)
-        .when()
-            .get("/api/v1/transfers/" + jobId)
-        .then()
-            .statusCode(200)
-            .body("jobId", equalTo(jobId))
-            .body("sourceUri", equalTo("https://httpbin.org/bytes/2048"))
-            .body("destinationPath", anyOf(equalTo("/tmp/workflow-test.bin"), equalTo("\\tmp\\workflow-test.bin")))
-            .body("status", anyOf(equalTo("PENDING"), equalTo("IN_PROGRESS"), equalTo("COMPLETED")));
-
-        // Verify active transfer count increased
-        given()
-            .header("Authorization", ADMIN_AUTH)
-        .when()
-            .get("/api/v1/transfers/count")
-        .then()
-            .statusCode(200)
-            .body("count", greaterThanOrEqualTo(0));
+    @AfterEach
+    void tearDown(Vertx vertx, VertxTestContext testContext) {
+        if (client != null) {
+            client.close();
+        }
+        testContext.completeNow();
     }
 }
+

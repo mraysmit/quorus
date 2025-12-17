@@ -19,26 +19,26 @@ package dev.mars.quorus.api;
 import dev.mars.quorus.api.service.DistributedTransferService;
 import dev.mars.quorus.api.service.ClusterStatus;
 import dev.mars.quorus.transfer.TransferEngine;
-import org.eclipse.microprofile.openapi.annotations.Operation;
-import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
-import org.eclipse.microprofile.openapi.annotations.responses.APIResponses;
-import org.eclipse.microprofile.openapi.annotations.tags.Tag;
-
+import io.vertx.core.json.JsonObject;
+import io.vertx.ext.web.Router;
+import io.vertx.ext.web.RoutingContext;
+import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import jakarta.ws.rs.GET;
-import jakarta.ws.rs.Path;
-import jakarta.ws.rs.Produces;
-import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.Response;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
-@Path("/api/v1")
-@Produces(MediaType.APPLICATION_JSON)
-@Tag(name = "Health & Status", description = "Service health and status monitoring API")
+/**
+ * Health and status monitoring endpoints.
+ * Converted from JAX-RS to Vert.x Web for Vert.x 5.x migration.
+ */
+@ApplicationScoped
 public class HealthResource {
 
+    private static final Logger logger = LoggerFactory.getLogger(HealthResource.class);
     private final LocalDateTime startTime = LocalDateTime.now();
 
     @Inject
@@ -47,110 +47,127 @@ public class HealthResource {
     @Inject
     DistributedTransferService distributedTransferService;
 
-    @GET
-    @Path("/info")
-    @Operation(summary = "Service Info", description = "Get service information for discovery")
-    @APIResponses(value = {
-        @APIResponse(responseCode = "200", description = "Service information retrieved successfully")
-    })
-    public Response info() {
-        Map<String, Object> info = new HashMap<>();
-        
-        info.put("name", "quorus-api");
-        info.put("version", "2.0");
-        info.put("description", "Enterprise-grade file transfer system REST API");
-        info.put("phase", "2.1 - Basic Service Architecture");
-        info.put("framework", "Quarkus");
-        info.put("capabilities", new String[]{
-            "file-transfer",
-            "progress-tracking",
-            "multi-protocol",
-            "rest-api",
-            "health-monitoring",
-            "openapi-documentation"
-        });
-        info.put("protocols", new String[]{
-            "http",
-            "https",
-            "ftp",
-            "sftp",
-            "smb"
-        });
-        info.put("endpoints", new String[]{
-            "/api/v1/transfers",
-            "/api/v1/info",
-            "/api/v1/status",
-            "/health",
-            "/metrics"
-        });
-        
-        return Response.ok(info).build();
+    /**
+     * Register routes with the Vert.x router.
+     */
+    public void registerRoutes(Router router) {
+        router.get("/api/v1/info").handler(this::handleInfo);
+        router.get("/api/v1/status").handler(this::handleStatus);
     }
 
     /**
-     * Detailed service status endpoint.
+     * GET /api/v1/info - Service information for discovery
      */
-    @GET
-    @Path("/status")
-    @Operation(summary = "Service Status", description = "Get detailed service status and metrics")
-    @APIResponses(value = {
-        @APIResponse(responseCode = "200", description = "Service status retrieved successfully"),
-        @APIResponse(responseCode = "401", description = "Unauthorized")
-    })
-    public Response status() {
-        Map<String, Object> status = new HashMap<>();
-        
-        status.put("service", "quorus-api");
-        status.put("version", "2.0");
-        status.put("phase", "2.1 - Basic Service Architecture");
-        status.put("framework", "Quarkus");
-        status.put("timestamp", LocalDateTime.now());
-        status.put("startTime", startTime);
-        status.put("uptime", java.time.Duration.between(startTime, LocalDateTime.now()).toString());
-        
-        // Transfer engine metrics
+    private void handleInfo(RoutingContext ctx) {
         try {
-            Map<String, Object> transferMetrics = new HashMap<>();
-            transferMetrics.put("activeTransfers", transferEngine.getActiveTransferCount());
-            transferMetrics.put("engineStatus", "operational");
-            status.put("transferEngine", transferMetrics);
+            Map<String, Object> info = new HashMap<>();
+
+            info.put("name", "quorus-api");
+            info.put("version", "2.0");
+            info.put("description", "Enterprise-grade file transfer system REST API");
+            info.put("phase", "2.1 - Vert.x 5.x Migration");
+            info.put("framework", "Vert.x 5.x + Weld CDI");
+            info.put("capabilities", new String[]{
+                "file-transfer",
+                "progress-tracking",
+                "multi-protocol",
+                "rest-api",
+                "health-monitoring",
+                "reactive-architecture"
+            });
+            info.put("protocols", new String[]{
+                "http",
+                "https",
+                "ftp",
+                "sftp",
+                "smb"
+            });
+            info.put("endpoints", new String[]{
+                "/api/v1/transfers",
+                "/api/v1/agents",
+                "/api/v1/info",
+                "/api/v1/status"
+            });
+
+            ctx.json(info);
         } catch (Exception e) {
-            Map<String, Object> transferMetrics = new HashMap<>();
-            transferMetrics.put("engineStatus", "error");
-            transferMetrics.put("error", e.getMessage());
-            status.put("transferEngine", transferMetrics);
+            logger.error("Error generating service info", e);
+            ctx.response()
+                .setStatusCode(500)
+                .end(new JsonObject()
+                    .put("error", "Internal server error")
+                    .put("message", e.getMessage())
+                    .encode());
         }
-        
-        // Distributed controller status
+    }
+
+    /**
+     * GET /api/v1/status - Detailed service status and metrics
+     */
+    private void handleStatus(RoutingContext ctx) {
         try {
-            ClusterStatus clusterStatus = distributedTransferService.getClusterStatus();
-            Map<String, Object> clusterMetrics = new HashMap<>();
-            clusterMetrics.put("available", clusterStatus.isAvailable());
-            clusterMetrics.put("healthy", clusterStatus.isHealthy());
-            clusterMetrics.put("nodeId", clusterStatus.getNodeId());
-            clusterMetrics.put("state", clusterStatus.getState());
-            clusterMetrics.put("term", clusterStatus.getTerm());
-            clusterMetrics.put("isLeader", clusterStatus.isLeader());
-            clusterMetrics.put("knownNodes", clusterStatus.getKnownNodes().size());
-            clusterMetrics.put("statusDescription", clusterStatus.getStatusDescription());
-            status.put("cluster", clusterMetrics);
+            Map<String, Object> status = new HashMap<>();
+
+            status.put("service", "quorus-api");
+            status.put("version", "2.0");
+            status.put("phase", "2.1 - Vert.x 5.x Migration");
+            status.put("framework", "Vert.x 5.x + Weld CDI");
+            status.put("timestamp", LocalDateTime.now());
+            status.put("startTime", startTime);
+            status.put("uptime", java.time.Duration.between(startTime, LocalDateTime.now()).toString());
+
+            // Transfer engine metrics
+            try {
+                Map<String, Object> transferMetrics = new HashMap<>();
+                transferMetrics.put("activeTransfers", transferEngine.getActiveTransferCount());
+                transferMetrics.put("engineStatus", "operational");
+                status.put("transferEngine", transferMetrics);
+            } catch (Exception e) {
+                Map<String, Object> transferMetrics = new HashMap<>();
+                transferMetrics.put("engineStatus", "error");
+                transferMetrics.put("error", e.getMessage());
+                status.put("transferEngine", transferMetrics);
+            }
+
+            // Distributed controller status
+            try {
+                ClusterStatus clusterStatus = distributedTransferService.getClusterStatus();
+                Map<String, Object> clusterMetrics = new HashMap<>();
+                clusterMetrics.put("available", clusterStatus.isAvailable());
+                clusterMetrics.put("healthy", clusterStatus.isHealthy());
+                clusterMetrics.put("nodeId", clusterStatus.getNodeId());
+                clusterMetrics.put("state", clusterStatus.getState());
+                clusterMetrics.put("term", clusterStatus.getTerm());
+                clusterMetrics.put("isLeader", clusterStatus.isLeader());
+                clusterMetrics.put("knownNodes", clusterStatus.getKnownNodes().size());
+                clusterMetrics.put("statusDescription", clusterStatus.getStatusDescription());
+                status.put("cluster", clusterMetrics);
+            } catch (Exception e) {
+                Map<String, Object> clusterMetrics = new HashMap<>();
+                clusterMetrics.put("available", false);
+                clusterMetrics.put("error", e.getMessage());
+                status.put("cluster", clusterMetrics);
+            }
+
+            // System metrics
+            Map<String, Object> systemMetrics = new HashMap<>();
+            Runtime runtime = Runtime.getRuntime();
+            systemMetrics.put("totalMemory", runtime.totalMemory());
+            systemMetrics.put("freeMemory", runtime.freeMemory());
+            systemMetrics.put("usedMemory", runtime.totalMemory() - runtime.freeMemory());
+            systemMetrics.put("maxMemory", runtime.maxMemory());
+            systemMetrics.put("availableProcessors", runtime.availableProcessors());
+            status.put("system", systemMetrics);
+
+            ctx.json(status);
         } catch (Exception e) {
-            Map<String, Object> clusterMetrics = new HashMap<>();
-            clusterMetrics.put("available", false);
-            clusterMetrics.put("error", e.getMessage());
-            status.put("cluster", clusterMetrics);
+            logger.error("Error generating service status", e);
+            ctx.response()
+                .setStatusCode(500)
+                .end(new JsonObject()
+                    .put("error", "Internal server error")
+                    .put("message", e.getMessage())
+                    .encode());
         }
-
-        // System metrics
-        Map<String, Object> systemMetrics = new HashMap<>();
-        Runtime runtime = Runtime.getRuntime();
-        systemMetrics.put("totalMemory", runtime.totalMemory());
-        systemMetrics.put("freeMemory", runtime.freeMemory());
-        systemMetrics.put("usedMemory", runtime.totalMemory() - runtime.freeMemory());
-        systemMetrics.put("maxMemory", runtime.maxMemory());
-        systemMetrics.put("availableProcessors", runtime.availableProcessors());
-        status.put("system", systemMetrics);
-
-        return Response.ok(status).build();
     }
 }

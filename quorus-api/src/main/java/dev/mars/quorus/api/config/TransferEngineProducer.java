@@ -18,37 +18,71 @@ package dev.mars.quorus.api.config;
 
 import dev.mars.quorus.transfer.SimpleTransferEngine;
 import dev.mars.quorus.transfer.TransferEngine;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
-
+import io.vertx.core.Vertx;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Produces;
+import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+/**
+ * CDI producer for TransferEngine.
+ * Converted from MicroProfile Config to simple configuration for Vert.x 5.x migration.
+ * Updated to inject Vertx (Phase 1.5 - Dec 2025).
+ */
 @ApplicationScoped
 public class TransferEngineProducer {
 
-    private static final Logger logger = Logger.getLogger(TransferEngineProducer.class.getName());
+    private static final Logger logger = LoggerFactory.getLogger(TransferEngineProducer.class);
 
-    @ConfigProperty(name = "quorus.transfer.max-concurrent-transfers", defaultValue = "10")
-    int maxConcurrentTransfers;
+    @Inject
+    Vertx vertx;
 
-    @ConfigProperty(name = "quorus.transfer.max-retry-attempts", defaultValue = "3")
-    int maxRetryAttempts;
-
-    @ConfigProperty(name = "quorus.transfer.retry-delay-ms", defaultValue = "1000")
-    long retryDelayMs;
+    // Configuration values - can be made configurable via system properties or environment variables
+    private static final int MAX_CONCURRENT_TRANSFERS = getIntProperty("quorus.transfer.max-concurrent-transfers", 10);
+    private static final int MAX_RETRY_ATTEMPTS = getIntProperty("quorus.transfer.max-retry-attempts", 3);
+    private static final long RETRY_DELAY_MS = getLongProperty("quorus.transfer.retry-delay-ms", 1000L);
 
     /**
-     * Produces a singleton TransferEngine instance.
+     * Produces a singleton TransferEngine instance with Vert.x dependency injection.
      */
     @Produces
     @Singleton
     public TransferEngine createTransferEngine() {
-        logger.info("Creating TransferEngine with maxConcurrentTransfers=" + maxConcurrentTransfers + 
-                   ", maxRetryAttempts=" + maxRetryAttempts + 
-                   ", retryDelayMs=" + retryDelayMs);
-        
-        return new SimpleTransferEngine(maxConcurrentTransfers, maxRetryAttempts, retryDelayMs);
+        logger.info("Creating TransferEngine with Vertx, maxConcurrentTransfers={}, maxRetryAttempts={}, retryDelayMs={}",
+                   MAX_CONCURRENT_TRANSFERS, MAX_RETRY_ATTEMPTS, RETRY_DELAY_MS);
+
+        return new SimpleTransferEngine(vertx, MAX_CONCURRENT_TRANSFERS, MAX_RETRY_ATTEMPTS, RETRY_DELAY_MS);
+    }
+
+    /**
+     * Get integer property from system properties or environment variables.
+     */
+    private static int getIntProperty(String key, int defaultValue) {
+        String value = System.getProperty(key, System.getenv(key.replace('.', '_').toUpperCase()));
+        if (value != null) {
+            try {
+                return Integer.parseInt(value);
+            } catch (NumberFormatException e) {
+                logger.warn("Invalid integer value for {}: {}, using default: {}", key, value, defaultValue);
+            }
+        }
+        return defaultValue;
+    }
+
+    /**
+     * Get long property from system properties or environment variables.
+     */
+    private static long getLongProperty(String key, long defaultValue) {
+        String value = System.getProperty(key, System.getenv(key.replace('.', '_').toUpperCase()));
+        if (value != null) {
+            try {
+                return Long.parseLong(value);
+            } catch (NumberFormatException e) {
+                logger.warn("Invalid long value for {}: {}, using default: {}", key, value, defaultValue);
+            }
+        }
+        return defaultValue;
     }
 }

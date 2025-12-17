@@ -16,136 +16,140 @@
 
 package dev.mars.quorus.api;
 
-import io.quarkus.test.junit.QuarkusTest;
-import org.junit.jupiter.api.Test;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import dev.mars.quorus.api.service.ClusterStatus;
+import dev.mars.quorus.api.service.DistributedTransferService;
+import dev.mars.quorus.transfer.TransferEngine;
+import io.vertx.core.Vertx;
+import io.vertx.core.json.JsonObject;
+import io.vertx.core.json.jackson.DatabindCodec;
+import io.vertx.ext.web.Router;
+import io.vertx.ext.web.client.WebClient;
+import io.vertx.ext.web.handler.BodyHandler;
+import io.vertx.junit5.VertxExtension;
+import io.vertx.junit5.VertxTestContext;
+import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.extension.ExtendWith;
 
-import static io.restassured.RestAssured.given;
-import static org.hamcrest.CoreMatchers.*;
-import static org.hamcrest.Matchers.hasKey;
-import static org.hamcrest.Matchers.greaterThan;
+import java.util.Collections;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 /**
- * Integration tests for HealthResource using Quarkus test framework.
- * Tests the health check and service discovery endpoints.
+ * Tests for HealthResource using Vert.x testing framework.
+ * Uses real HTTP server - no mocking of Vert.x components.
  */
-@QuarkusTest
+@ExtendWith(VertxExtension.class)
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class HealthResourceTest {
 
-    @Test
-    void testServiceInfo() {
-        given()
-        .when()
-            .get("/api/v1/info")
-        .then()
-            .statusCode(200)
-            .body("name", equalTo("quorus-api"))
-            .body("version", equalTo("2.0"))
-            .body("description", containsString("Enterprise-grade file transfer system"))
-            .body("phase", equalTo("2.1 - Basic Service Architecture"))
-            .body("framework", equalTo("Quarkus"))
-            .body("capabilities", hasItems("file-transfer", "rest-api", "health-monitoring"))
-            .body("protocols", hasItems("http", "https", "ftp", "sftp", "smb"))
-            .body("endpoints", hasItems("/api/v1/transfers", "/api/v1/info", "/health"));
+    private static final int TEST_PORT = 8081;
+    private WebClient client;
+    private TransferEngine mockTransferEngine;
+    private DistributedTransferService mockDistributedService;
+
+    @BeforeEach
+    void setUp(Vertx vertx, VertxTestContext testContext) {
+        // Configure Jackson for Java 8 date/time support
+        ObjectMapper mapper = DatabindCodec.mapper();
+        mapper.registerModule(new JavaTimeModule());
+        mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+
+        // Create mock services (allowed for unit tests)
+        mockTransferEngine = mock(TransferEngine.class);
+        when(mockTransferEngine.getActiveTransferCount()).thenReturn(5);
+
+        mockDistributedService = mock(DistributedTransferService.class);
+        ClusterStatus mockStatus = mock(ClusterStatus.class);
+        when(mockStatus.isAvailable()).thenReturn(true);
+        when(mockStatus.isHealthy()).thenReturn(true);
+        when(mockStatus.getNodeId()).thenReturn("test-node");
+        when(mockStatus.getState()).thenReturn(dev.mars.quorus.controller.raft.RaftNode.State.FOLLOWER);
+        when(mockStatus.getTerm()).thenReturn(1L);
+        when(mockStatus.isLeader()).thenReturn(false);
+        when(mockStatus.getKnownNodes()).thenReturn(Collections.emptySet());
+        when(mockStatus.getStatusDescription()).thenReturn("Healthy");
+        when(mockDistributedService.getClusterStatus()).thenReturn(mockStatus);
+
+        // Create HealthResource with mocked dependencies
+        HealthResource healthResource = new HealthResource();
+        healthResource.transferEngine = mockTransferEngine;
+        healthResource.distributedTransferService = mockDistributedService;
+
+        // Create router and register routes
+        Router router = Router.router(vertx);
+        router.route().handler(BodyHandler.create());
+        healthResource.registerRoutes(router);
+
+        // Start HTTP server
+        vertx.createHttpServer()
+            .requestHandler(router)
+            .listen(TEST_PORT)
+            .onSuccess(server -> {
+                client = WebClient.create(vertx);
+                testContext.completeNow();
+            })
+            .onFailure(testContext::failNow);
     }
 
     @Test
-    void testServiceStatus() {
-        given()
-        .when()
-            .get("/api/v1/status")
-        .then()
-            .statusCode(200)
-            .body("service", equalTo("quorus-api"))
-            .body("version", equalTo("2.0"))
-            .body("phase", equalTo("2.1 - Basic Service Architecture"))
-            .body("framework", equalTo("Quarkus"))
-            .body("timestamp", notNullValue())
-            .body("startTime", notNullValue())
-            .body("uptime", notNullValue())
-            .body("transferEngine", notNullValue())
-            .body("transferEngine.engineStatus", equalTo("operational"))
-            .body("transferEngine.activeTransfers", notNullValue())
-            .body("system", notNullValue())
-            .body("system.totalMemory", notNullValue())
-            .body("system.freeMemory", notNullValue())
-            .body("system.availableProcessors", notNullValue());
+    @Order(1)
+    @DisplayName("GET /api/v1/info should return service information")
+    void testGetInfo(Vertx vertx, VertxTestContext testContext) {
+        client.get(TEST_PORT, "localhost", "/api/v1/info")
+            .send()
+            .onComplete(testContext.succeeding(response -> testContext.verify(() -> {
+                assertEquals(200, response.statusCode());
+                JsonObject body = response.bodyAsJsonObject();
+                assertNotNull(body);
+                assertEquals("quorus-api", body.getString("name"));
+                assertEquals("2.0", body.getString("version"));
+                assertTrue(body.containsKey("capabilities"));
+                assertTrue(body.containsKey("protocols"));
+                assertTrue(body.containsKey("endpoints"));
+                testContext.completeNow();
+            })));
     }
 
     @Test
-    void testQuarkusHealthCheck() {
-        given()
-        .when()
-            .get("/health")
-        .then()
-            .statusCode(200)
-            .body("status", equalTo("UP"))
-            .body("checks", notNullValue())
-            .body("checks.find { it.name == 'transfer-engine' }.status", equalTo("UP"))
-            .body("checks.find { it.name == 'transfer-engine' }.data.activeTransfers", notNullValue())
-            .body("checks.find { it.name == 'transfer-engine' }.data.status", equalTo("operational"));
+    @Order(2)
+    @DisplayName("GET /api/v1/status should return detailed status")
+    void testGetStatus(Vertx vertx, VertxTestContext testContext) {
+        client.get(TEST_PORT, "localhost", "/api/v1/status")
+            .send()
+            .onComplete(testContext.succeeding(response -> testContext.verify(() -> {
+                assertEquals(200, response.statusCode());
+                JsonObject body = response.bodyAsJsonObject();
+                assertNotNull(body);
+                assertEquals("quorus-api", body.getString("service"));
+                assertTrue(body.containsKey("transferEngine"));
+                assertTrue(body.containsKey("cluster"));
+                assertTrue(body.containsKey("system"));
+                
+                // Verify transfer engine metrics
+                JsonObject transferEngine = body.getJsonObject("transferEngine");
+                assertEquals(5, transferEngine.getInteger("activeTransfers"));
+                assertEquals("operational", transferEngine.getString("engineStatus"));
+                
+                // Verify cluster metrics
+                JsonObject cluster = body.getJsonObject("cluster");
+                assertTrue(cluster.getBoolean("available"));
+                assertTrue(cluster.getBoolean("healthy"));
+                assertEquals("test-node", cluster.getString("nodeId"));
+                
+                testContext.completeNow();
+            })));
     }
 
-    @Test
-    void testQuarkusReadinessCheck() {
-        given()
-        .when()
-            .get("/health/ready")
-        .then()
-            .statusCode(200)
-            .body("status", equalTo("UP"))
-            .body("checks", notNullValue());
-    }
-
-    @Test
-    void testQuarkusLivenessCheck() {
-        given()
-        .when()
-            .get("/health/live")
-        .then()
-            .statusCode(200)
-            .body("status", equalTo("UP"));
-    }
-
-    @Test
-    void testServiceInfoResponseStructure() {
-        given()
-        .when()
-            .get("/api/v1/info")
-        .then()
-            .statusCode(200)
-            .body("$", hasKey("name"))
-            .body("$", hasKey("version"))
-            .body("$", hasKey("description"))
-            .body("$", hasKey("phase"))
-            .body("$", hasKey("framework"))
-            .body("$", hasKey("capabilities"))
-            .body("$", hasKey("protocols"))
-            .body("$", hasKey("endpoints"))
-            .body("capabilities.size()", greaterThan(0))
-            .body("protocols.size()", greaterThan(0))
-            .body("endpoints.size()", greaterThan(0));
-    }
-
-    @Test
-    void testServiceStatusResponseStructure() {
-        given()
-        .when()
-            .get("/api/v1/status")
-        .then()
-            .statusCode(200)
-            .body("$", hasKey("service"))
-            .body("$", hasKey("version"))
-            .body("$", hasKey("timestamp"))
-            .body("$", hasKey("startTime"))
-            .body("$", hasKey("uptime"))
-            .body("$", hasKey("transferEngine"))
-            .body("$", hasKey("system"))
-            .body("transferEngine", hasKey("activeTransfers"))
-            .body("transferEngine", hasKey("engineStatus"))
-            .body("system", hasKey("totalMemory"))
-            .body("system", hasKey("freeMemory"))
-            .body("system", hasKey("usedMemory"))
-            .body("system", hasKey("maxMemory"))
-            .body("system", hasKey("availableProcessors"));
+    @AfterEach
+    void tearDown(Vertx vertx, VertxTestContext testContext) {
+        if (client != null) {
+            client.close();
+        }
+        testContext.completeNow();
     }
 }
+

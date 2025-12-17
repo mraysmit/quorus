@@ -17,26 +17,25 @@
 package dev.mars.quorus.api.service;
 
 import dev.mars.quorus.controller.raft.RaftNode;
-
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
-import io.quarkus.runtime.StartupEvent;
-import io.quarkus.runtime.ShutdownEvent;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Service responsible for starting and stopping agent fleet management services.
  * This service ensures that the heartbeat processor and other fleet management
  * components are properly initialized when the application starts.
- * 
+ *
+ * Converted from Quarkus lifecycle events to explicit lifecycle methods for Vert.x 5.x migration.
+ *
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @since 2.0
  */
 @ApplicationScoped
 public class AgentFleetStartupService {
 
-    private static final Logger logger = Logger.getLogger(AgentFleetStartupService.class.getName());
+    private static final Logger logger = LoggerFactory.getLogger(AgentFleetStartupService.class);
 
     @Inject
     HeartbeatProcessor heartbeatProcessor;
@@ -45,42 +44,42 @@ public class AgentFleetStartupService {
     RaftNode raftNode;
 
     /**
-     * Handle application startup.
-     * Initialize agent fleet management services.
+     * Start agent fleet management services.
+     * This method should be called explicitly during application startup.
      */
-    void onStart(@Observes StartupEvent ev) {
+    public void start() {
         logger.info("Starting Agent Fleet Management services...");
-        
+
         try {
             // Wait for Raft node to be ready
             waitForRaftNodeReady();
-            
+
             // Start heartbeat processor
             heartbeatProcessor.start();
-            
+
             logger.info("Agent Fleet Management services started successfully");
-            
+
         } catch (Exception e) {
-            logger.severe("Failed to start Agent Fleet Management services: " + e.getMessage());
+            logger.error("Failed to start Agent Fleet Management services: {}", e.getMessage(), e);
             throw new RuntimeException("Failed to start Agent Fleet Management services", e);
         }
     }
 
     /**
-     * Handle application shutdown.
-     * Gracefully stop agent fleet management services.
+     * Stop agent fleet management services.
+     * This method should be called explicitly during application shutdown.
      */
-    void onStop(@Observes ShutdownEvent ev) {
+    public void stop() {
         logger.info("Stopping Agent Fleet Management services...");
-        
+
         try {
             // Stop heartbeat processor
             heartbeatProcessor.stop();
-            
+
             logger.info("Agent Fleet Management services stopped successfully");
-            
+
         } catch (Exception e) {
-            logger.warning("Error during Agent Fleet Management services shutdown: " + e.getMessage());
+            logger.warn("Error during Agent Fleet Management services shutdown: {}", e.getMessage(), e);
         }
     }
 
@@ -102,7 +101,7 @@ public class AgentFleetStartupService {
                     return;
                 }
             } catch (Exception e) {
-                logger.fine("Raft node not ready yet: " + e.getMessage());
+                logger.debug("Raft node not ready yet: {}", e.getMessage());
             }
             
             Thread.sleep(1000); // Wait 1 second

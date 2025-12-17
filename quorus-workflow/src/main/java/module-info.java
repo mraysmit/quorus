@@ -1,6 +1,7 @@
 module dev.mars.quorus.workflow {
     requires java.logging;
     requires transitive dev.mars.quorus.core;
+    requires io.vertx.core;
 
     // Third-party libraries used in main sources
     requires org.yaml.snakeyaml;

@@ -21,43 +21,68 @@ import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferResult;
 import dev.mars.quorus.transfer.SimpleTransferEngine;
 import dev.mars.quorus.transfer.TransferEngine;
+import io.vertx.core.Vertx;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Service for executing file transfer operations.
- * 
+ * Converted to Vert.x reactive patterns (Phase 1.5 - Dec 2025).
+ *
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @since 1.0
  */
 public class TransferExecutionService {
-    
+
     private static final Logger logger = LoggerFactory.getLogger(TransferExecutionService.class);
-    
+
+    private final Vertx vertx;
     private final AgentConfiguration config;
     private final TransferEngine transferEngine;
-    private final ExecutorService executorService;
-    
+
+    private final AtomicBoolean closed = new AtomicBoolean(false);
     private volatile boolean running = false;
-    
-    public TransferExecutionService(AgentConfiguration config) {
-        this.config = config;
+
+    /**
+     * Constructor with Vert.x dependency injection.
+     *
+     * @param vertx Vert.x instance for reactive operations
+     * @param config Agent configuration
+     */
+    public TransferExecutionService(Vertx vertx, AgentConfiguration config) {
+        this.vertx = Objects.requireNonNull(vertx, "Vertx cannot be null");
+        this.config = Objects.requireNonNull(config, "AgentConfiguration cannot be null");
         this.transferEngine = new SimpleTransferEngine(
+                vertx,  // Pass Vertx to SimpleTransferEngine
                 config.getMaxConcurrentTransfers(),
                 3,      // maxRetryAttempts
                 1000    // retryDelayMs
         );
-        this.executorService = Executors.newFixedThreadPool(config.getMaxConcurrentTransfers());
+
+        logger.info("TransferExecutionService initialized (Vert.x reactive mode)");
+    }
+
+    /**
+     * Legacy constructor for backward compatibility.
+     * @deprecated Use {@link #TransferExecutionService(Vertx, AgentConfiguration)} instead
+     */
+    @Deprecated
+    public TransferExecutionService(AgentConfiguration config) {
+        this(Vertx.vertx(), config);
+        logger.warn("Using deprecated constructor - Vert.x instance created internally");
     }
     
     public void start() {
+        if (closed.get()) {
+            throw new IllegalStateException("TransferExecutionService is closed");
+        }
+
         running = true;
-        logger.info("Transfer execution service started with {} max concurrent transfers", 
+        logger.info("Transfer execution service started with {} max concurrent transfers",
                    config.getMaxConcurrentTransfers());
     }
     
@@ -111,27 +136,16 @@ public class TransferExecutionService {
     }
     
     public void shutdown() {
-        if (!running) {
-            return;
+        if (closed.getAndSet(true)) {
+            return; // Already shutdown
         }
-        
+
         logger.info("Shutting down transfer execution service...");
         running = false;
-        
-        try {
-            // Shutdown executor service
-            executorService.shutdown();
-            if (!executorService.awaitTermination(30, TimeUnit.SECONDS)) {
-                executorService.shutdownNow();
-            }
-            
-            // Shutdown transfer engine
-            transferEngine.shutdown(30); // 30 seconds timeout
-            
-            logger.info("Transfer execution service shutdown complete");
-            
-        } catch (Exception e) {
-            logger.error("Error during transfer execution service shutdown", e);
-        }
+
+        // Shutdown transfer engine (which will close Vert.x WorkerExecutor)
+        transferEngine.shutdown(30); // 30 seconds timeout
+
+        logger.info("Transfer execution service shutdown complete");
     }
 }

@@ -29,48 +29,57 @@ import java.util.stream.Collectors;
  * Simple in-memory implementation of TenantService.
  * This implementation is suitable for development and testing.
  * For production use, consider implementing a persistent storage backend.
- * 
+ *
+ * <p>Vert.x 5 Migration (Phase 3): Removed synchronized(lock) blocks.
+ * ConcurrentHashMap provides thread-safety for individual operations.
+ * For compound operations, this service should be deployed as a Verticle
+ * which runs on a single event loop thread, eliminating the need for
+ * explicit synchronization.</p>
+ *
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @since 1.0
  */
 public class SimpleTenantService implements TenantService {
-    
+
     private static final Logger logger = Logger.getLogger(SimpleTenantService.class.getName());
-    
+
+    // ConcurrentHashMap provides thread-safety for individual operations
+    // When deployed as a Verticle, all operations run on single event loop thread
     private final Map<String, Tenant> tenants = new ConcurrentHashMap<>();
-    private final Object lock = new Object();
     
     @Override
     public Tenant createTenant(Tenant tenant) throws TenantServiceException {
-        synchronized (lock) {
-            // Validate tenant
-            validateTenantForCreation(tenant);
-            
-            // Check if tenant ID already exists
-            if (tenants.containsKey(tenant.getTenantId())) {
-                throw new TenantServiceException("Tenant with ID '" + tenant.getTenantId() + "' already exists");
-            }
-            
-            // Validate hierarchy constraints
-            validateTenantHierarchy(tenant);
-            
-            // Create tenant with timestamps
-            Tenant newTenant = tenant.toBuilder()
-                    .createdAt(Instant.now())
-                    .updatedAt(Instant.now())
-                    .build();
-            
-            // Store tenant
-            tenants.put(newTenant.getTenantId(), newTenant);
-            
-            // Update parent's child list if this is not a root tenant
-            if (newTenant.getParentTenantId() != null) {
-                updateParentChildList(newTenant.getParentTenantId(), newTenant.getTenantId(), true);
-            }
-            
-            logger.info("Created tenant: " + newTenant.getTenantId() + " (" + newTenant.getName() + ")");
-            return newTenant;
+        // Validate tenant
+        validateTenantForCreation(tenant);
+
+        // Check if tenant ID already exists (putIfAbsent provides atomicity)
+        Tenant existingCheck = tenants.get(tenant.getTenantId());
+        if (existingCheck != null) {
+            throw new TenantServiceException("Tenant with ID '" + tenant.getTenantId() + "' already exists");
         }
+
+        // Validate hierarchy constraints
+        validateTenantHierarchy(tenant);
+
+        // Create tenant with timestamps
+        Tenant newTenant = tenant.toBuilder()
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
+                .build();
+
+        // Store tenant atomically
+        Tenant previous = tenants.putIfAbsent(newTenant.getTenantId(), newTenant);
+        if (previous != null) {
+            throw new TenantServiceException("Tenant with ID '" + newTenant.getTenantId() + "' already exists");
+        }
+
+        // Update parent's child list if this is not a root tenant
+        if (newTenant.getParentTenantId() != null) {
+            updateParentChildList(newTenant.getParentTenantId(), newTenant.getTenantId(), true);
+        }
+
+        logger.info("Created tenant: " + newTenant.getTenantId() + " (" + newTenant.getName() + ")");
+        return newTenant;
     }
     
     @Override
@@ -84,73 +93,69 @@ public class SimpleTenantService implements TenantService {
     
     @Override
     public Tenant updateTenant(Tenant tenant) throws TenantServiceException {
-        synchronized (lock) {
-            if (!tenants.containsKey(tenant.getTenantId())) {
-                throw new TenantServiceException("Tenant not found: " + tenant.getTenantId());
-            }
-            
-            Tenant existingTenant = tenants.get(tenant.getTenantId());
-            if (existingTenant.getStatus() == Tenant.TenantStatus.DELETED) {
-                throw new TenantServiceException("Cannot update deleted tenant: " + tenant.getTenantId());
-            }
-            
-            // Validate hierarchy constraints if parent changed
-            if (!Objects.equals(existingTenant.getParentTenantId(), tenant.getParentTenantId())) {
-                validateTenantHierarchy(tenant);
-                
-                // Update old parent's child list
-                if (existingTenant.getParentTenantId() != null) {
-                    updateParentChildList(existingTenant.getParentTenantId(), tenant.getTenantId(), false);
-                }
-                
-                // Update new parent's child list
-                if (tenant.getParentTenantId() != null) {
-                    updateParentChildList(tenant.getParentTenantId(), tenant.getTenantId(), true);
-                }
-            }
-            
-            // Update tenant with new timestamp
-            Tenant updatedTenant = tenant.toBuilder()
-                    .createdAt(existingTenant.getCreatedAt()) // Preserve creation time
-                    .updatedAt(Instant.now())
-                    .build();
-            
-            tenants.put(updatedTenant.getTenantId(), updatedTenant);
-            
-            logger.info("Updated tenant: " + updatedTenant.getTenantId());
-            return updatedTenant;
+        if (!tenants.containsKey(tenant.getTenantId())) {
+            throw new TenantServiceException("Tenant not found: " + tenant.getTenantId());
         }
+
+        Tenant existingTenant = tenants.get(tenant.getTenantId());
+        if (existingTenant.getStatus() == Tenant.TenantStatus.DELETED) {
+            throw new TenantServiceException("Cannot update deleted tenant: " + tenant.getTenantId());
+        }
+
+        // Validate hierarchy constraints if parent changed
+        if (!Objects.equals(existingTenant.getParentTenantId(), tenant.getParentTenantId())) {
+            validateTenantHierarchy(tenant);
+
+            // Update old parent's child list
+            if (existingTenant.getParentTenantId() != null) {
+                updateParentChildList(existingTenant.getParentTenantId(), tenant.getTenantId(), false);
+            }
+
+            // Update new parent's child list
+            if (tenant.getParentTenantId() != null) {
+                updateParentChildList(tenant.getParentTenantId(), tenant.getTenantId(), true);
+            }
+        }
+
+        // Update tenant with new timestamp
+        Tenant updatedTenant = tenant.toBuilder()
+                .createdAt(existingTenant.getCreatedAt()) // Preserve creation time
+                .updatedAt(Instant.now())
+                .build();
+
+        tenants.put(updatedTenant.getTenantId(), updatedTenant);
+
+        logger.info("Updated tenant: " + updatedTenant.getTenantId());
+        return updatedTenant;
     }
     
     @Override
     public void deleteTenant(String tenantId) throws TenantServiceException {
-        synchronized (lock) {
-            Tenant tenant = tenants.get(tenantId);
-            if (tenant == null) {
-                throw new TenantServiceException("Tenant not found: " + tenantId);
-            }
-            
-            if (tenant.getStatus() == Tenant.TenantStatus.DELETED) {
-                return; // Already deleted
-            }
-            
-            // Check if tenant has active children
-            List<Tenant> children = getChildTenants(tenantId);
-            if (!children.isEmpty()) {
-                throw new TenantServiceException("Cannot delete tenant with active children: " + tenantId);
-            }
-            
-            // Mark as deleted
-            Tenant deletedTenant = tenant.withStatus(Tenant.TenantStatus.DELETED);
-            tenants.put(tenantId, deletedTenant);
-            
-            // Remove from parent's child list
-            if (tenant.getParentTenantId() != null) {
-                updateParentChildList(tenant.getParentTenantId(), tenantId, false);
-            }
-            
-            logger.info("Deleted tenant: " + tenantId);
+        Tenant tenant = tenants.get(tenantId);
+        if (tenant == null) {
+            throw new TenantServiceException("Tenant not found: " + tenantId);
         }
+
+        if (tenant.getStatus() == Tenant.TenantStatus.DELETED) {
+            return; // Already deleted
+        }
+
+        // Check if tenant has active children
+        List<Tenant> children = getChildTenants(tenantId);
+        if (!children.isEmpty()) {
+            throw new TenantServiceException("Cannot delete tenant with active children: " + tenantId);
+        }
+
+        // Mark as deleted
+        Tenant deletedTenant = tenant.withStatus(Tenant.TenantStatus.DELETED);
+        tenants.put(tenantId, deletedTenant);
+
+        // Remove from parent's child list
+        if (tenant.getParentTenantId() != null) {
+            updateParentChildList(tenant.getParentTenantId(), tenantId, false);
+        }
+
+        logger.info("Deleted tenant: " + tenantId);
     }
     
     @Override
@@ -215,24 +220,22 @@ public class SimpleTenantService implements TenantService {
     }
     
     @Override
-    public Tenant updateTenantConfiguration(String tenantId, TenantConfiguration configuration) 
+    public Tenant updateTenantConfiguration(String tenantId, TenantConfiguration configuration)
             throws TenantServiceException {
-        synchronized (lock) {
-            Tenant tenant = tenants.get(tenantId);
-            if (tenant == null) {
-                throw new TenantServiceException("Tenant not found: " + tenantId);
-            }
-            
-            if (tenant.getStatus() == Tenant.TenantStatus.DELETED) {
-                throw new TenantServiceException("Cannot update configuration for deleted tenant: " + tenantId);
-            }
-            
-            Tenant updatedTenant = tenant.withConfiguration(configuration);
-            tenants.put(tenantId, updatedTenant);
-            
-            logger.info("Updated configuration for tenant: " + tenantId);
-            return updatedTenant;
+        Tenant tenant = tenants.get(tenantId);
+        if (tenant == null) {
+            throw new TenantServiceException("Tenant not found: " + tenantId);
         }
+
+        if (tenant.getStatus() == Tenant.TenantStatus.DELETED) {
+            throw new TenantServiceException("Cannot update configuration for deleted tenant: " + tenantId);
+        }
+
+        Tenant updatedTenant = tenant.withConfiguration(configuration);
+        tenants.put(tenantId, updatedTenant);
+
+        logger.info("Updated configuration for tenant: " + tenantId);
+        return updatedTenant;
     }
     
     @Override
@@ -332,21 +335,19 @@ public class SimpleTenantService implements TenantService {
     }
     
     private void updateTenantStatus(String tenantId, Tenant.TenantStatus status) throws TenantServiceException {
-        synchronized (lock) {
-            Tenant tenant = tenants.get(tenantId);
-            if (tenant == null) {
-                throw new TenantServiceException("Tenant not found: " + tenantId);
-            }
-            
-            if (tenant.getStatus() == Tenant.TenantStatus.DELETED) {
-                throw new TenantServiceException("Cannot update status for deleted tenant: " + tenantId);
-            }
-            
-            Tenant updatedTenant = tenant.withStatus(status);
-            tenants.put(tenantId, updatedTenant);
-            
-            logger.info("Updated tenant status: " + tenantId + " -> " + status);
+        Tenant tenant = tenants.get(tenantId);
+        if (tenant == null) {
+            throw new TenantServiceException("Tenant not found: " + tenantId);
         }
+
+        if (tenant.getStatus() == Tenant.TenantStatus.DELETED) {
+            throw new TenantServiceException("Cannot update status for deleted tenant: " + tenantId);
+        }
+
+        Tenant updatedTenant = tenant.withStatus(status);
+        tenants.put(tenantId, updatedTenant);
+
+        logger.info("Updated tenant status: " + tenantId + " -> " + status);
     }
     
     private boolean wouldCreateCircularReference(String tenantId, String parentTenantId) {
