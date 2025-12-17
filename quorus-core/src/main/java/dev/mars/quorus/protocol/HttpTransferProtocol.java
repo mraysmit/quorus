@@ -24,6 +24,11 @@ import dev.mars.quorus.core.exceptions.TransferException;
 import dev.mars.quorus.storage.ChecksumCalculator;
 import dev.mars.quorus.transfer.ProgressTracker;
 import dev.mars.quorus.transfer.TransferContext;
+import io.vertx.core.Vertx;
+import io.vertx.core.buffer.Buffer;
+import io.vertx.ext.web.client.HttpResponse;
+import io.vertx.ext.web.client.WebClient;
+import io.vertx.ext.web.client.WebClientOptions;
 
 import java.io.*;
 import java.net.HttpURLConnection;
@@ -32,35 +37,70 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.time.Instant;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
  * HTTP/HTTPS transfer protocol implementation.
- * Supports basic HTTP downloads with progress tracking and integrity verification.
- * 
+ * Supports both reactive (Vert.x Web Client) and blocking (HttpURLConnection) modes.
+ * Phase 2 migration: Uses Vert.x Web Client when Vertx instance is available.
+ *
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @since 1.0
  */
 public class HttpTransferProtocol implements TransferProtocol {
     private static final Logger logger = Logger.getLogger(HttpTransferProtocol.class.getName());
-    
+
     private static final int BUFFER_SIZE = 8192; // 8KB buffer
     private static final int CONNECTION_TIMEOUT_MS = 30000; // 30 seconds
     private static final int READ_TIMEOUT_MS = 60000; // 60 seconds
     private static final long MAX_FILE_SIZE = 10L * 1024 * 1024 * 1024; // 10GB
-    
+
+    private final Vertx vertx;
+    private final WebClient webClient;
+
+    /**
+     * Constructor without Vertx for backward compatibility (uses blocking I/O).
+     * @deprecated Use {@link #HttpTransferProtocol(Vertx)} instead
+     */
+    @Deprecated
+    public HttpTransferProtocol() {
+        this.vertx = null;
+        this.webClient = null;
+        logger.warning("HttpTransferProtocol created without Vert.x - using blocking HttpURLConnection");
+    }
+
+    /**
+     * Constructor with Vert.x dependency injection (recommended - uses reactive Web Client).
+     * @param vertx Vert.x instance for reactive HTTP operations
+     */
+    public HttpTransferProtocol(Vertx vertx) {
+        this.vertx = vertx;
+        if (vertx != null) {
+            this.webClient = WebClient.create(vertx, new WebClientOptions()
+                .setConnectTimeout(CONNECTION_TIMEOUT_MS)
+                .setIdleTimeout(READ_TIMEOUT_MS)
+                .setUserAgent("Quorus/1.0"));
+            logger.info("HttpTransferProtocol created with Vert.x Web Client (reactive mode)");
+        } else {
+            this.webClient = null;
+            logger.warning("HttpTransferProtocol created with null Vert.x - using blocking HttpURLConnection");
+        }
+    }
+
     @Override
     public String getProtocolName() {
         return "http";
     }
-    
+
     @Override
     public boolean canHandle(TransferRequest request) {
         if (request == null || request.getSourceUri() == null) {
             return false;
         }
-        
+
         String scheme = request.getSourceUri().getScheme();
         return "http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme);
     }
@@ -68,53 +108,180 @@ public class HttpTransferProtocol implements TransferProtocol {
     @Override
     public TransferResult transfer(TransferRequest request, TransferContext context) throws TransferException {
         logger.info("Starting HTTP transfer for job: " + context.getJobId());
-        
+
+        // Use reactive Web Client if available, otherwise fall back to blocking I/O
+        if (webClient != null) {
+            return transferWithWebClient(request, context);
+        } else {
+            return transferWithHttpURLConnection(request, context);
+        }
+    }
+
+    /**
+     * Reactive transfer using Vert.x Web Client (Phase 2 - preferred method).
+     */
+    private TransferResult transferWithWebClient(TransferRequest request, TransferContext context) throws TransferException {
         Instant startTime = Instant.now();
         ProgressTracker progressTracker = new ProgressTracker(context.getJobId());
         progressTracker.start();
-        
+
         try {
             // Validate request
             validateRequest(request);
-            
+
+            // Create destination directory if needed
+            Path destinationPath = request.getDestinationPath();
+            Files.createDirectories(destinationPath.getParent());
+
+            // Create temporary file for download
+            Path tempFile = destinationPath.resolveSibling(destinationPath.getFileName() + ".tmp");
+
+            // Parse URL
+            String url = request.getSourceUri().toString();
+
+            // Perform reactive transfer and wait for completion
+            CompletableFuture<TransferResult> future = new CompletableFuture<>();
+
+            webClient.getAbs(url)
+                .timeout(READ_TIMEOUT_MS)
+                .send()
+                .onSuccess(response -> {
+                    try {
+                        if (response.statusCode() != 200) {
+                            future.completeExceptionally(new TransferException(context.getJobId(),
+                                "HTTP " + response.statusCode() + ": " + response.statusMessage()));
+                            return;
+                        }
+
+                        // Get response body
+                        Buffer body = response.body();
+                        if (body == null) {
+                            future.completeExceptionally(new TransferException(context.getJobId(),
+                                "Empty response body"));
+                            return;
+                        }
+
+                        // Update progress
+                        long bytesTransferred = body.length();
+                        progressTracker.setTotalBytes(bytesTransferred);
+                        progressTracker.updateProgress(bytesTransferred);
+                        context.getJob().setTotalBytes(bytesTransferred);
+                        context.getJob().updateProgress(bytesTransferred);
+
+                        // Calculate checksum
+                        ChecksumCalculator checksumCalculator = new ChecksumCalculator();
+                        checksumCalculator.update(body.getBytes(), 0, body.length());
+                        String actualChecksum = checksumCalculator.getChecksum();
+
+                        // Verify checksum if provided
+                        if (request.getExpectedChecksum() != null && !request.getExpectedChecksum().isEmpty()) {
+                            if (!request.getExpectedChecksum().equals(actualChecksum)) {
+                                future.completeExceptionally(new TransferException(context.getJobId(),
+                                    "Checksum mismatch - expected: " + request.getExpectedChecksum() +
+                                    ", actual: " + actualChecksum));
+                                return;
+                            }
+                        }
+
+                        // Write to temp file
+                        Files.write(tempFile, body.getBytes());
+
+                        // Move temp file to final destination
+                        Files.move(tempFile, destinationPath, StandardCopyOption.REPLACE_EXISTING);
+
+                        // Complete the job
+                        context.getJob().complete(actualChecksum);
+
+                        logger.info("HTTP transfer completed successfully for job: " + context.getJobId());
+
+                        future.complete(TransferResult.builder()
+                            .requestId(context.getJobId())
+                            .finalStatus(TransferStatus.COMPLETED)
+                            .bytesTransferred(bytesTransferred)
+                            .startTime(startTime)
+                            .endTime(Instant.now())
+                            .actualChecksum(actualChecksum)
+                            .build());
+
+                    } catch (Exception e) {
+                        future.completeExceptionally(e);
+                    }
+                })
+                .onFailure(err -> {
+                    logger.log(Level.SEVERE, "HTTP transfer failed for job: " + context.getJobId(), err);
+                    future.completeExceptionally(err);
+                });
+
+            // Wait for completion (blocking in worker thread is OK)
+            return future.get(READ_TIMEOUT_MS + 10000, TimeUnit.MILLISECONDS);
+
+        } catch (Exception e) {
+            logger.log(Level.SEVERE, "HTTP transfer failed for job: " + context.getJobId(), e);
+
+            return TransferResult.builder()
+                .requestId(context.getJobId())
+                .finalStatus(TransferStatus.FAILED)
+                .bytesTransferred(progressTracker.getTransferredBytes())
+                .startTime(startTime)
+                .endTime(Instant.now())
+                .errorMessage(e.getMessage())
+                .cause(e)
+                .build();
+        }
+    }
+
+    /**
+     * Blocking transfer using HttpURLConnection (backward compatibility).
+     * @deprecated Use {@link #transferWithWebClient} instead
+     */
+    @Deprecated
+    private TransferResult transferWithHttpURLConnection(TransferRequest request, TransferContext context) throws TransferException {
+        Instant startTime = Instant.now();
+        ProgressTracker progressTracker = new ProgressTracker(context.getJobId());
+        progressTracker.start();
+
+        try {
+            // Validate request
+            validateRequest(request);
+
             // Create connection
             HttpURLConnection connection = createConnection(request);
-            
+
             // Get file size
             long contentLength = connection.getContentLengthLong();
             if (contentLength > 0) {
                 progressTracker.setTotalBytes(contentLength);
                 context.getJob().setTotalBytes(contentLength);
             }
-            
+
             // Create destination directory if needed
             Path destinationPath = request.getDestinationPath();
             Files.createDirectories(destinationPath.getParent());
-            
+
             // Create temporary file for download
             Path tempFile = destinationPath.resolveSibling(destinationPath.getFileName() + ".tmp");
-            
+
             // Perform the transfer
             String actualChecksum = performTransfer(connection, tempFile, context, progressTracker);
-            
+
             // Verify checksum if provided
             if (request.getExpectedChecksum() != null && !request.getExpectedChecksum().isEmpty()) {
                 if (!request.getExpectedChecksum().equals(actualChecksum)) {
                     Files.deleteIfExists(tempFile);
-                    throw new TransferException(context.getJobId(), 
-                            "Checksum mismatch - expected: " + request.getExpectedChecksum() + 
+                    throw new TransferException(context.getJobId(),
+                            "Checksum mismatch - expected: " + request.getExpectedChecksum() +
                             ", actual: " + actualChecksum);
                 }
             }
-            
+
             // Move temp file to final destination
             Files.move(tempFile, destinationPath, StandardCopyOption.REPLACE_EXISTING);
-            
+
             // Complete the job
             context.getJob().complete(actualChecksum);
-            
+
             logger.info("HTTP transfer completed successfully for job: " + context.getJobId());
-            
+
             return TransferResult.builder()
                     .requestId(context.getJobId())
                     .finalStatus(TransferStatus.COMPLETED)
@@ -123,10 +290,10 @@ public class HttpTransferProtocol implements TransferProtocol {
                     .endTime(Instant.now())
                     .actualChecksum(actualChecksum)
                     .build();
-                    
+
         } catch (Exception e) {
             logger.log(Level.SEVERE, "HTTP transfer failed for job: " + context.getJobId(), e);
-            
+
             return TransferResult.builder()
                     .requestId(context.getJobId())
                     .finalStatus(TransferStatus.FAILED)

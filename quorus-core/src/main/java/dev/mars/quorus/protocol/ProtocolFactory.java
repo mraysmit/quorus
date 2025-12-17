@@ -17,23 +17,43 @@ package dev.mars.quorus.protocol;
  */
 
 
+import io.vertx.core.Vertx;
+
 import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Logger;
 
 public class ProtocolFactory {
     private static final Logger logger = Logger.getLogger(ProtocolFactory.class.getName());
-    
+
     private final Map<String, TransferProtocol> protocols;
-    
+    private final Vertx vertx;
+
+    /**
+     * Constructor without Vertx for backward compatibility.
+     * @deprecated Use {@link #ProtocolFactory(Vertx)} instead
+     */
+    @Deprecated
     public ProtocolFactory() {
+        this(null);
+        logger.warning("Using deprecated constructor - HTTP protocol will use blocking I/O");
+    }
+
+    /**
+     * Constructor with Vert.x dependency injection (recommended).
+     * @param vertx Vert.x instance for reactive HTTP protocol
+     */
+    public ProtocolFactory(Vertx vertx) {
+        this.vertx = vertx;
         this.protocols = new HashMap<>();
         registerDefaultProtocols();
     }
-    
+
     private void registerDefaultProtocols() {
         // Register HTTP protocol for both http and https schemes
-        HttpTransferProtocol httpProtocol = new HttpTransferProtocol();
+        HttpTransferProtocol httpProtocol = vertx != null
+            ? new HttpTransferProtocol(vertx)
+            : new HttpTransferProtocol();
         registerProtocol(httpProtocol);
         registerProtocolAlias("https", httpProtocol);
 

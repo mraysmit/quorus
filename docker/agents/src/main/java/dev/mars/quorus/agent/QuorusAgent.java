@@ -84,7 +84,7 @@ public class QuorusAgent {
         // Initialize services
         this.registrationService = new AgentRegistrationService(config);
         this.heartbeatService = new HeartbeatService(config, registrationService);
-        this.transferService = new TransferExecutionService(config);
+        this.transferService = new TransferExecutionService(vertx, config);  // Pass Vertx
         this.healthService = new HealthService(config);
         this.jobPollingService = new JobPollingService(config);
         this.jobStatusReportingService = new JobStatusReportingService(config);

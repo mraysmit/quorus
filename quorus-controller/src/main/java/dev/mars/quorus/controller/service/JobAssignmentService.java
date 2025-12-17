@@ -22,45 +22,64 @@ import dev.mars.quorus.core.TransferJob;
 import dev.mars.quorus.controller.state.JobAssignmentCommand;
 import dev.mars.quorus.controller.state.JobQueueCommand;
 import dev.mars.quorus.controller.raft.RaftNode;
+import io.vertx.core.Vertx;
 
 import java.time.Instant;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Logger;
 
 /**
  * Service responsible for orchestrating job assignments in the distributed file transfer system.
  * Handles the complete lifecycle from job queuing to agent assignment and monitoring.
- * 
+ *
+ * <p>Vert.x 5 Migration: Converted from ScheduledExecutorService to Vert.x timers
+ * for better integration with the event loop and reduced thread overhead.</p>
+ *
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @since 2.0
  */
 public class JobAssignmentService {
-    
+
     private static final Logger logger = Logger.getLogger(JobAssignmentService.class.getName());
-    
+
+    private final Vertx vertx;
     private final RaftNode raftNode;
     private final AgentSelectionService agentSelectionService;
-    private final ScheduledExecutorService scheduler;
-    
+    private final AtomicBoolean closed = new AtomicBoolean(false);
+
+    // Vert.x timer IDs (replacing ScheduledExecutorService)
+    private long assignmentProcessorTimerId = 0;
+    private long timeoutMonitorTimerId = 0;
+
     // In-memory caches for performance (synchronized with Raft state)
     private final Map<String, QueuedJob> jobQueue = new ConcurrentHashMap<>();
     private final Map<String, JobAssignment> activeAssignments = new ConcurrentHashMap<>();
     private final Map<String, AgentInfo> availableAgents = new ConcurrentHashMap<>();
     private final Map<String, AgentLoad> agentLoads = new ConcurrentHashMap<>();
-    
-    public JobAssignmentService(RaftNode raftNode, AgentSelectionService agentSelectionService) {
-        this.raftNode = raftNode;
-        this.agentSelectionService = agentSelectionService;
-        this.scheduler = Executors.newScheduledThreadPool(2);
-        
+
+    /**
+     * Create a new JobAssignmentService with Vert.x integration (recommended).
+     *
+     * @param vertx the Vert.x instance for reactive operations
+     * @param raftNode the Raft node for distributed consensus
+     * @param agentSelectionService the agent selection service
+     */
+    public JobAssignmentService(Vertx vertx, RaftNode raftNode, AgentSelectionService agentSelectionService) {
+        this.vertx = Objects.requireNonNull(vertx, "Vertx cannot be null");
+        this.raftNode = Objects.requireNonNull(raftNode, "RaftNode cannot be null");
+        this.agentSelectionService = Objects.requireNonNull(agentSelectionService, "AgentSelectionService cannot be null");
+
+        logger.info("Creating JobAssignmentService with Vert.x instance: " +
+                   System.identityHashCode(vertx) + " (using Vert.x timers, no ScheduledExecutorService)");
+
         // Start background assignment processor
         startAssignmentProcessor();
-        
+
         // Start assignment timeout monitor
         startTimeoutMonitor();
     }
@@ -291,28 +310,46 @@ public class JobAssignmentService {
     
     /**
      * Start background processor for automatic job assignment.
+     * Uses Vert.x periodic timer instead of ScheduledExecutorService.
      */
     private void startAssignmentProcessor() {
-        scheduler.scheduleWithFixedDelay(() -> {
-            try {
-                processQueuedJobs();
-            } catch (Exception e) {
-                logger.warning("Error in assignment processor: " + e.getMessage());
+        // Initial delay: 5 seconds, then every 10 seconds
+        vertx.setTimer(5000, id -> {
+            if (!closed.get()) {
+                assignmentProcessorTimerId = vertx.setPeriodic(10000, timerId -> {
+                    if (!closed.get()) {
+                        try {
+                            processQueuedJobs();
+                        } catch (Exception e) {
+                            logger.warning("Error in assignment processor: " + e.getMessage());
+                        }
+                    }
+                });
             }
-        }, 5, 10, TimeUnit.SECONDS); // Process every 10 seconds
+        });
+        logger.info("Assignment processor started (Vert.x timer, 10s interval)");
     }
-    
+
     /**
      * Start monitor for assignment timeouts.
+     * Uses Vert.x periodic timer instead of ScheduledExecutorService.
      */
     private void startTimeoutMonitor() {
-        scheduler.scheduleWithFixedDelay(() -> {
-            try {
-                checkAssignmentTimeouts();
-            } catch (Exception e) {
-                logger.warning("Error in timeout monitor: " + e.getMessage());
+        // Initial delay: 30 seconds, then every 30 seconds
+        vertx.setTimer(30000, id -> {
+            if (!closed.get()) {
+                timeoutMonitorTimerId = vertx.setPeriodic(30000, timerId -> {
+                    if (!closed.get()) {
+                        try {
+                            checkAssignmentTimeouts();
+                        } catch (Exception e) {
+                            logger.warning("Error in timeout monitor: " + e.getMessage());
+                        }
+                    }
+                });
             }
-        }, 30, 30, TimeUnit.SECONDS); // Check every 30 seconds
+        });
+        logger.info("Timeout monitor started (Vert.x timer, 30s interval)");
     }
     
     /**
@@ -369,16 +406,35 @@ public class JobAssignmentService {
     
     /**
      * Shutdown the service.
+     * Cancels all Vert.x timers and clears caches.
      */
     public void shutdown() {
-        scheduler.shutdown();
-        try {
-            if (!scheduler.awaitTermination(10, TimeUnit.SECONDS)) {
-                scheduler.shutdownNow();
-            }
-        } catch (InterruptedException e) {
-            scheduler.shutdownNow();
-            Thread.currentThread().interrupt();
+        if (closed.getAndSet(true)) {
+            logger.info("JobAssignmentService already shutdown (idempotent)");
+            return; // Already shutdown (idempotent)
         }
+
+        logger.info("Shutting down JobAssignmentService...");
+
+        // Cancel Vert.x timers
+        if (assignmentProcessorTimerId != 0) {
+            vertx.cancelTimer(assignmentProcessorTimerId);
+            assignmentProcessorTimerId = 0;
+            logger.info("Assignment processor timer cancelled");
+        }
+
+        if (timeoutMonitorTimerId != 0) {
+            vertx.cancelTimer(timeoutMonitorTimerId);
+            timeoutMonitorTimerId = 0;
+            logger.info("Timeout monitor timer cancelled");
+        }
+
+        // Clear caches
+        jobQueue.clear();
+        activeAssignments.clear();
+        availableAgents.clear();
+        agentLoads.clear();
+
+        logger.info("JobAssignmentService shutdown complete");
     }
 }

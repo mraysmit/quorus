@@ -18,6 +18,7 @@ package dev.mars.quorus.api;
 
 import dev.mars.quorus.agent.AgentInfo;
 import dev.mars.quorus.agent.AgentCapabilities;
+import dev.mars.quorus.agent.AgentStatus;
 import dev.mars.quorus.api.dto.AgentRegistrationRequest;
 import dev.mars.quorus.api.dto.AgentRegistrationResponse;
 import dev.mars.quorus.api.dto.AgentHeartbeatRequest;
@@ -25,39 +26,30 @@ import dev.mars.quorus.api.dto.AgentHeartbeatResponse;
 import dev.mars.quorus.api.dto.ErrorResponse;
 import dev.mars.quorus.api.service.AgentRegistryService;
 import dev.mars.quorus.api.service.HeartbeatProcessor;
-
-import org.eclipse.microprofile.openapi.annotations.Operation;
-import org.eclipse.microprofile.openapi.annotations.parameters.Parameter;
-import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
-import org.eclipse.microprofile.openapi.annotations.responses.APIResponses;
-import org.eclipse.microprofile.openapi.annotations.tags.Tag;
-
+import io.vertx.core.json.JsonObject;
+import io.vertx.ext.web.Router;
+import io.vertx.ext.web.RoutingContext;
+import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import jakarta.validation.Valid;
-import jakarta.ws.rs.*;
-import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.Response;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * REST API for agent registration and fleet management.
- * Provides endpoints for agents to register, update capabilities, and deregister.
- * 
+ * Converted from JAX-RS to Vert.x Web for Vert.x 5.x migration.
+ *
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @since 2.0
  */
-@Path("/api/v1/agents")
-@Produces(MediaType.APPLICATION_JSON)
-@Consumes(MediaType.APPLICATION_JSON)
-@Tag(name = "Agent Registration", description = "Agent fleet registration and management")
+@ApplicationScoped
 public class AgentRegistrationResource {
 
-    private static final Logger logger = Logger.getLogger(AgentRegistrationResource.class.getName());
-    
+    private static final Logger logger = LoggerFactory.getLogger(AgentRegistrationResource.class);
+
     private static final long DEFAULT_HEARTBEAT_INTERVAL_MS = 30000; // 30 seconds
 
     @Inject
@@ -67,313 +59,230 @@ public class AgentRegistrationResource {
     HeartbeatProcessor heartbeatProcessor;
 
     /**
-     * Register a new agent with the fleet.
-     * 
-     * @param request the agent registration request
-     * @return the registration response
+     * Register routes with the Vert.x router.
      */
-    @POST
-    @Path("/register")
-    @Operation(summary = "Register a new agent", 
-               description = "Register a new agent with the Quorus fleet")
-    @APIResponses({
-        @APIResponse(responseCode = "201", description = "Agent registered successfully"),
-        @APIResponse(responseCode = "400", description = "Invalid registration request"),
-        @APIResponse(responseCode = "409", description = "Agent ID already exists"),
-        @APIResponse(responseCode = "500", description = "Internal server error")
-    })
-    public Response registerAgent(@Valid AgentRegistrationRequest request) {
+    public void registerRoutes(Router router) {
+        router.post("/api/v1/agents/register").handler(this::handleRegisterAgent);
+        router.post("/api/v1/agents/heartbeat").handler(this::handleHeartbeat);
+        router.delete("/api/v1/agents/:agentId").handler(this::handleDeregisterAgent);
+        router.get("/api/v1/agents/:agentId").handler(this::handleGetAgent);
+        router.get("/api/v1/agents").handler(this::handleListAgents);
+        router.put("/api/v1/agents/:agentId/capabilities").handler(this::handleUpdateCapabilities);
+        router.get("/api/v1/agents/count").handler(this::handleGetAgentCount);
+        router.get("/api/v1/agents/status/:status").handler(this::handleGetAgentsByStatus);
+    }
+
+    /**
+     * POST /api/v1/agents/register - Register a new agent with the fleet
+     */
+    private void handleRegisterAgent(RoutingContext ctx) {
         try {
-            logger.info("Received agent registration request: " + request.getAgentId());
-            
+            AgentRegistrationRequest request = ctx.body().asPojo(AgentRegistrationRequest.class);
+            logger.info("Received agent registration request: {}", request.getAgentId());
+
             // Register the agent
             CompletableFuture<AgentInfo> future = agentRegistryService.registerAgent(request);
             AgentInfo agentInfo = future.get(); // Block for registration
-            
+
             // Create successful response
             AgentRegistrationResponse response = AgentRegistrationResponse.success(
-                agentInfo, 
+                agentInfo,
                 DEFAULT_HEARTBEAT_INTERVAL_MS,
                 getControllerEndpoint()
             );
-            
-            logger.info("Agent registered successfully: " + agentInfo.getAgentId());
-            return Response.status(Response.Status.CREATED).entity(response).build();
-            
+
+            logger.info("Agent registered successfully: {}", agentInfo.getAgentId());
+            ctx.response().setStatusCode(201).end(JsonObject.mapFrom(response).encode());
+
         } catch (IllegalArgumentException e) {
-            logger.log(Level.WARNING, "Invalid registration request", e);
+            logger.warn("Invalid registration request", e);
             AgentRegistrationResponse response = AgentRegistrationResponse.failure(
                 e.getMessage(), "INVALID_REQUEST");
-            return Response.status(Response.Status.BAD_REQUEST).entity(response).build();
-            
+            ctx.response().setStatusCode(400).end(JsonObject.mapFrom(response).encode());
+
         } catch (Exception e) {
-            logger.log(Level.SEVERE, "Agent registration failed", e);
-            
+            logger.error("Agent registration failed", e);
+
             if (e.getMessage() != null && e.getMessage().contains("already exists")) {
                 AgentRegistrationResponse response = AgentRegistrationResponse.failure(
                     "Agent ID already exists", "DUPLICATE_AGENT_ID");
-                return Response.status(Response.Status.CONFLICT).entity(response).build();
+                ctx.response().setStatusCode(409).end(JsonObject.mapFrom(response).encode());
+            } else {
+                AgentRegistrationResponse response = AgentRegistrationResponse.failure(
+                    "Internal server error", "INTERNAL_ERROR");
+                ctx.response().setStatusCode(500).end(JsonObject.mapFrom(response).encode());
             }
-            
-            AgentRegistrationResponse response = AgentRegistrationResponse.failure(
-                "Internal server error", "INTERNAL_ERROR");
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(response).build();
         }
     }
 
     /**
-     * Deregister an agent from the fleet.
-     * 
-     * @param agentId the agent ID to deregister
-     * @return the response
+     * POST /api/v1/agents/heartbeat - Process agent heartbeat
      */
-    @DELETE
-    @Path("/{agentId}")
-    @Operation(summary = "Deregister an agent", 
-               description = "Remove an agent from the Quorus fleet")
-    @APIResponses({
-        @APIResponse(responseCode = "200", description = "Agent deregistered successfully"),
-        @APIResponse(responseCode = "404", description = "Agent not found"),
-        @APIResponse(responseCode = "500", description = "Internal server error")
-    })
-    public Response deregisterAgent(
-            @PathParam("agentId") @Parameter(description = "Agent ID") String agentId) {
+    private void handleHeartbeat(RoutingContext ctx) {
         try {
-            logger.info("Deregistering agent: " + agentId);
-            
+            AgentHeartbeatRequest request = ctx.body().asPojo(AgentHeartbeatRequest.class);
+
+            if (request == null || request.getAgentId() == null) {
+                ctx.response().setStatusCode(400)
+                    .end(JsonObject.mapFrom(new ErrorResponse("Invalid request", "Agent ID is required")).encode());
+                return;
+            }
+
+            logger.debug("Processing heartbeat from agent: {}", request.getAgentId());
+
+            // Process heartbeat
+            heartbeatProcessor.processHeartbeat(request).join();
+
+            // Create response
+            AgentHeartbeatResponse response = new AgentHeartbeatResponse();
+            response.setSuccess(true);
+            response.setMessage("Heartbeat processed successfully");
+            response.setNextHeartbeatInterval(DEFAULT_HEARTBEAT_INTERVAL_MS);
+
+            ctx.json(response);
+
+        } catch (Exception e) {
+            logger.error("Error processing heartbeat", e);
+            ctx.response().setStatusCode(500)
+                .end(JsonObject.mapFrom(new ErrorResponse("Internal server error", e.getMessage())).encode());
+        }
+    }
+
+
+
+
+    /**
+     * DELETE /api/v1/agents/:agentId - Deregister an agent from the fleet
+     */
+    private void handleDeregisterAgent(RoutingContext ctx) {
+        try {
+            String agentId = ctx.pathParam("agentId");
+            logger.info("Deregistering agent: {}", agentId);
+
             // Check if agent exists
             AgentInfo agentInfo = agentRegistryService.getAgent(agentId);
             if (agentInfo == null) {
-                return Response.status(Response.Status.NOT_FOUND)
-                        .entity(new ErrorResponse("Agent not found: " + agentId))
-                        .build();
+                ctx.response().setStatusCode(404)
+                    .end(JsonObject.mapFrom(new ErrorResponse("Agent not found: " + agentId)).encode());
+                return;
             }
-            
+
             // Deregister the agent
-            CompletableFuture<Void> future = agentRegistryService.deregisterAgent(agentId);
-            future.get(); // Block for deregistration
-            
-            logger.info("Agent deregistered successfully: " + agentId);
-            return Response.ok().entity(Map.of("message", "Agent deregistered successfully")).build();
-            
+            agentRegistryService.deregisterAgent(agentId);
+
+            logger.info("Agent deregistered successfully: {}", agentId);
+            ctx.json(Map.of("message", "Agent deregistered successfully", "agentId", agentId));
+
         } catch (Exception e) {
-            logger.log(Level.SEVERE, "Agent deregistration failed", e);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                    .entity(new ErrorResponse("Internal server error"))
-                    .build();
+            logger.error("Error deregistering agent", e);
+            ctx.response().setStatusCode(500)
+                .end(JsonObject.mapFrom(new ErrorResponse("Internal server error")).encode());
         }
     }
 
     /**
-     * Update agent capabilities.
-     * 
-     * @param agentId the agent ID
-     * @param capabilities the new capabilities
-     * @return the response
+     * GET /api/v1/agents/:agentId - Get agent information
      */
-    @PUT
-    @Path("/{agentId}/capabilities")
-    @Operation(summary = "Update agent capabilities", 
-               description = "Update the capabilities of an existing agent")
-    @APIResponses({
-        @APIResponse(responseCode = "200", description = "Capabilities updated successfully"),
-        @APIResponse(responseCode = "404", description = "Agent not found"),
-        @APIResponse(responseCode = "500", description = "Internal server error")
-    })
-    public Response updateCapabilities(
-            @PathParam("agentId") @Parameter(description = "Agent ID") String agentId,
-            @Valid AgentCapabilities capabilities) {
+    private void handleGetAgent(RoutingContext ctx) {
         try {
-            logger.info("Updating capabilities for agent: " + agentId);
-            
-            // Update capabilities
-            CompletableFuture<AgentInfo> future = agentRegistryService.updateAgentCapabilities(agentId, capabilities);
-            AgentInfo agentInfo = future.get(); // Block for update
-            
-            logger.info("Agent capabilities updated successfully: " + agentId);
-            return Response.ok().entity(agentInfo).build();
-            
-        } catch (RuntimeException e) {
-            if (e.getMessage() != null && e.getMessage().contains("not found")) {
-                return Response.status(Response.Status.NOT_FOUND)
-                        .entity(new ErrorResponse("Agent not found: " + agentId))
-                        .build();
-            }
-            
-            logger.log(Level.SEVERE, "Agent capabilities update failed", e);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                    .entity(new ErrorResponse("Internal server error"))
-                    .build();
-        } catch (Exception e) {
-            logger.log(Level.SEVERE, "Agent capabilities update failed", e);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                    .entity(new ErrorResponse("Internal server error"))
-                    .build();
-        }
-    }
-
-    /**
-     * Get agent information.
-     * 
-     * @param agentId the agent ID
-     * @return the agent information
-     */
-    @GET
-    @Path("/{agentId}")
-    @Operation(summary = "Get agent information", 
-               description = "Retrieve information about a specific agent")
-    @APIResponses({
-        @APIResponse(responseCode = "200", description = "Agent information retrieved"),
-        @APIResponse(responseCode = "404", description = "Agent not found")
-    })
-    public Response getAgent(
-            @PathParam("agentId") @Parameter(description = "Agent ID") String agentId) {
-        try {
+            String agentId = ctx.pathParam("agentId");
             AgentInfo agentInfo = agentRegistryService.getAgent(agentId);
+
             if (agentInfo == null) {
-                return Response.status(Response.Status.NOT_FOUND)
-                        .entity(new ErrorResponse("Agent not found: " + agentId))
-                        .build();
+                ctx.response().setStatusCode(404)
+                    .end(JsonObject.mapFrom(new ErrorResponse("Agent not found: " + agentId)).encode());
+            } else {
+                ctx.json(agentInfo);
             }
-            
-            return Response.ok().entity(agentInfo).build();
-            
         } catch (Exception e) {
-            logger.log(Level.SEVERE, "Failed to retrieve agent information", e);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                    .entity(new ErrorResponse("Internal server error"))
-                    .build();
+            logger.error("Error retrieving agent information", e);
+            ctx.response().setStatusCode(500)
+                .end(JsonObject.mapFrom(new ErrorResponse("Internal server error")).encode());
         }
     }
 
     /**
-     * Get all agents in the fleet.
-     * 
-     * @return list of all agents
+     * GET /api/v1/agents - Get all agents in the fleet
      */
-    @GET
-    @Operation(summary = "Get all agents", 
-               description = "Retrieve information about all agents in the fleet")
-    @APIResponses({
-        @APIResponse(responseCode = "200", description = "Agent list retrieved")
-    })
-    public Response getAllAgents() {
+    private void handleListAgents(RoutingContext ctx) {
         try {
             List<AgentInfo> agents = agentRegistryService.getAllAgents();
-            return Response.ok().entity(agents).build();
-            
+            ctx.json(agents);
         } catch (Exception e) {
-            logger.log(Level.SEVERE, "Failed to retrieve agent list", e);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                    .entity(new ErrorResponse("Internal server error"))
-                    .build();
+            logger.error("Error retrieving agent list", e);
+            ctx.response().setStatusCode(500)
+                .end(JsonObject.mapFrom(new ErrorResponse("Internal server error")).encode());
         }
     }
 
     /**
-     * Get fleet statistics.
-     * 
-     * @return fleet statistics
+     * PUT /api/v1/agents/:agentId/capabilities - Update agent capabilities
      */
-    @GET
-    @Path("/statistics")
-    @Operation(summary = "Get fleet statistics", 
-               description = "Retrieve statistics about the agent fleet")
-    @APIResponses({
-        @APIResponse(responseCode = "200", description = "Fleet statistics retrieved")
-    })
-    public Response getFleetStatistics() {
+    private void handleUpdateCapabilities(RoutingContext ctx) {
         try {
-            AgentRegistryService.FleetStatistics stats = agentRegistryService.getFleetStatistics();
-            return Response.ok().entity(stats).build();
-            
+            String agentId = ctx.pathParam("agentId");
+            AgentCapabilities capabilities = ctx.body().asPojo(AgentCapabilities.class);
+
+            logger.info("Updating capabilities for agent: {}", agentId);
+
+            // Update capabilities
+            agentRegistryService.updateAgentCapabilities(agentId, capabilities).join();
+
+            logger.info("Capabilities updated successfully for agent: {}", agentId);
+            ctx.json(Map.of("message", "Capabilities updated successfully", "agentId", agentId));
+
+        } catch (IllegalArgumentException e) {
+            logger.warn("Agent not found", e);
+            ctx.response().setStatusCode(404)
+                .end(JsonObject.mapFrom(new ErrorResponse("Agent not found")).encode());
         } catch (Exception e) {
-            logger.log(Level.SEVERE, "Failed to retrieve fleet statistics", e);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                    .entity(new ErrorResponse("Internal server error"))
-                    .build();
+            logger.error("Error updating capabilities", e);
+            ctx.response().setStatusCode(500)
+                .end(JsonObject.mapFrom(new ErrorResponse("Internal server error")).encode());
         }
     }
 
     /**
-     * Process agent heartbeat.
-     *
-     * @param request the heartbeat request
-     * @return the heartbeat response
+     * GET /api/v1/agents/count - Get agent count
      */
-    @POST
-    @Path("/heartbeat")
-    @Operation(summary = "Process agent heartbeat",
-               description = "Process a heartbeat message from an agent and return acknowledgment")
-    @APIResponses({
-        @APIResponse(responseCode = "200", description = "Heartbeat processed successfully"),
-        @APIResponse(responseCode = "400", description = "Invalid heartbeat request"),
-        @APIResponse(responseCode = "404", description = "Agent not found"),
-        @APIResponse(responseCode = "500", description = "Internal server error")
-    })
-    public Response processHeartbeat(@Valid AgentHeartbeatRequest request) {
+    private void handleGetAgentCount(RoutingContext ctx) {
         try {
-            logger.info("Received heartbeat from agent: " + request.getAgentId());
-
-            // Process the heartbeat
-            CompletableFuture<AgentHeartbeatResponse> future = heartbeatProcessor.processHeartbeat(request);
-            AgentHeartbeatResponse response = future.get(); // Block for processing
-
-            if (response.isSuccess()) {
-                logger.fine("Heartbeat processed successfully for agent: " + request.getAgentId());
-                return Response.ok(response).build();
-            } else {
-                logger.warning("Heartbeat processing failed for agent: " + request.getAgentId() +
-                             " - " + response.getMessage());
-                return Response.status(Response.Status.BAD_REQUEST).entity(response).build();
-            }
-
+            int count = agentRegistryService.getAllAgents().size();
+            ctx.json(Map.of("count", count));
         } catch (Exception e) {
-            logger.log(Level.SEVERE, "Failed to process heartbeat from agent: " +
-                      (request != null ? request.getAgentId() : "unknown"), e);
-
-            AgentHeartbeatResponse errorResponse = AgentHeartbeatResponse.failure(
-                request != null ? request.getAgentId() : "unknown",
-                "Internal server error: " + e.getMessage(),
-                "INTERNAL_ERROR"
-            );
-
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                          .entity(errorResponse)
-                          .build();
+            logger.error("Error retrieving agent count", e);
+            ctx.response().setStatusCode(500)
+                .end(JsonObject.mapFrom(new ErrorResponse("Internal server error")).encode());
         }
     }
 
     /**
-     * Get heartbeat statistics.
-     *
-     * @return heartbeat statistics
+     * GET /api/v1/agents/status/:status - Get agents by status
      */
-    @GET
-    @Path("/heartbeat/stats")
-    @Operation(summary = "Get heartbeat statistics",
-               description = "Get statistics about agent heartbeats and health")
-    @APIResponse(responseCode = "200", description = "Statistics retrieved successfully")
-    public Response getHeartbeatStatistics() {
+    private void handleGetAgentsByStatus(RoutingContext ctx) {
         try {
-            HeartbeatProcessor.HeartbeatStatistics stats = heartbeatProcessor.getHeartbeatStatistics();
-            return Response.ok(stats).build();
-
+            String statusParam = ctx.pathParam("status");
+            AgentStatus status = AgentStatus.valueOf(statusParam.toUpperCase());
+            List<AgentInfo> agents = agentRegistryService.getAllAgents().stream()
+                .filter(agent -> agent.getStatus() == status)
+                .collect(java.util.stream.Collectors.toList());
+            ctx.json(agents);
+        } catch (IllegalArgumentException e) {
+            logger.warn("Invalid status parameter: {}", ctx.pathParam("status"));
+            ctx.response().setStatusCode(400)
+                .end(JsonObject.mapFrom(new ErrorResponse("Invalid status")).encode());
         } catch (Exception e) {
-            logger.log(Level.SEVERE, "Failed to get heartbeat statistics", e);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                          .entity(new ErrorResponse("Failed to get heartbeat statistics", e.getMessage()))
-                          .build();
+            logger.error("Error retrieving agents by status", e);
+            ctx.response().setStatusCode(500)
+                .end(JsonObject.mapFrom(new ErrorResponse("Internal server error")).encode());
         }
     }
 
     /**
-     * Get the controller endpoint for agent communication.
-     *
-     * @return the controller endpoint
+     * Get the controller endpoint URL.
      */
     private String getControllerEndpoint() {
         // TODO: Make this configurable
-        return "http://localhost:8080/api/v1";
+        return "http://localhost:8080";
     }
 }

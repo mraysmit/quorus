@@ -16,30 +16,17 @@
 
 package dev.mars.quorus.api.dto;
 
-import org.eclipse.microprofile.openapi.annotations.media.Schema;
-
-@Schema(description = "Transfer request containing source and destination information")
+/**
+ * DTO for transfer request.
+ */
 public class TransferRequestDto {
 
-    @Schema(description = "Source URI for the transfer", example = "https://example.com/file.txt", required = true)
     private String sourceUri;
-
-    @Schema(description = "Destination path for the transfer", example = "/tmp/file.txt", required = true)
     private String destinationPath;
-
-    @Schema(description = "Optional tenant ID for multi-tenant environments", example = "tenant-123")
     private String tenantId;
-
-    @Schema(description = "Optional description for the transfer", example = "Monthly report download")
     private String description;
-
-    @Schema(description = "Transfer priority (1-10, higher is more important)", example = "5")
     private Integer priority;
-
-    @Schema(description = "Maximum number of retry attempts", example = "3")
     private Integer maxRetries;
-
-    @Schema(description = "Timeout in seconds for the transfer", example = "300")
     private Integer timeoutSeconds;
 
     public TransferRequestDto() {

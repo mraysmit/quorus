@@ -5,11 +5,8 @@ module dev.mars.quorus.controller {
 
     requires com.fasterxml.jackson.annotation;
     requires com.fasterxml.jackson.databind;
-    requires com.fasterxml.jackson.datatype.jsr310;
 
-    // Apache HttpComponents (Automatic module names derived from JAR filenames)
-    requires org.apache.httpcomponents.client5.httpclient5;
-    requires org.apache.httpcomponents.core5.httpcore5;
+    requires io.vertx.core;  // Vert.x 5.x for reactive timers
 
     requires dev.mars.quorus.core;
     requires dev.mars.quorus.workflow;

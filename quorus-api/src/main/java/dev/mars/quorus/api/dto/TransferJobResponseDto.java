@@ -18,63 +18,8 @@ package dev.mars.quorus.api.dto;
 
 import dev.mars.quorus.core.TransferJob;
 import dev.mars.quorus.core.TransferStatus;
-import org.eclipse.microprofile.openapi.annotations.media.Schema;
 
-import java.time.LocalDateTime;
-
-@Schema(description = "Transfer job response containing job details and status")
-public class TransferJobResponseDto {
-
-    @Schema(description = "Unique transfer job identifier", example = "550e8400-e29b-41d4-a716-446655440000")
-    private String jobId;
-
-    @Schema(description = "Source URI for the transfer", example = "https://example.com/file.txt")
-    private String sourceUri;
-
-    @Schema(description = "Destination path for the transfer", example = "/tmp/file.txt")
-    private String destinationPath;
-
-    @Schema(description = "Current status of the transfer")
-    private TransferStatus status;
-
-    @Schema(description = "Transfer progress percentage", example = "75.5")
-    private double progressPercentage;
-
-    @Schema(description = "Number of bytes transferred", example = "1048576")
-    private long bytesTransferred;
-
-    @Schema(description = "Total number of bytes to transfer", example = "4194304")
-    private long totalBytes;
-
-    @Schema(description = "Current transfer rate in bytes per second", example = "1048576")
-    private long transferRateBytesPerSecond;
-
-    @Schema(description = "Estimated time remaining in seconds", example = "30")
-    private long estimatedTimeRemainingSeconds;
-
-    @Schema(description = "When the transfer was created")
-    private LocalDateTime createdAt;
-
-    @Schema(description = "When the transfer was started")
-    private LocalDateTime startedAt;
-
-    @Schema(description = "When the transfer was completed")
-    private LocalDateTime completedAt;
-
-    @Schema(description = "Error message if transfer failed")
-    private String errorMessage;
-
-    @Schema(description = "Number of retry attempts", example = "2")
-    private int retryCount;
-
-    @Schema(description = "Maximum number of retry attempts allowed", example = "3")
-    private int maxRetries;
-
-    @Schema(description = "Tenant ID associated with this transfer", example = "tenant-123")
-    private String tenantId;
-
-    @Schema(description = "Optional message or description")
-    private String message;
+import java.time.LocalDateTime;public class TransferJobResponseDto {    private String jobId;    private String sourceUri;    private String destinationPath;    private TransferStatus status;    private double progressPercentage;    private long bytesTransferred;    private long totalBytes;    private long transferRateBytesPerSecond;    private long estimatedTimeRemainingSeconds;    private LocalDateTime createdAt;    private LocalDateTime startedAt;    private LocalDateTime completedAt;    private String errorMessage;    private int retryCount;    private int maxRetries;    private String tenantId;    private String message;
 
     public TransferJobResponseDto() {
     }

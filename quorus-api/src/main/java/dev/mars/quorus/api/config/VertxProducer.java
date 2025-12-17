@@ -16,15 +16,12 @@
 
 package dev.mars.quorus.api.config;
 
-import io.quarkus.runtime.ShutdownEvent;
-import io.quarkus.runtime.StartupEvent;
 import io.vertx.core.Vertx;
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.enterprise.event.Observes;
 import jakarta.enterprise.inject.Produces;
 import jakarta.inject.Singleton;
-
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * CDI producer for Vert.x instance.
@@ -41,45 +38,38 @@ import java.util.logging.Logger;
 @ApplicationScoped
 public class VertxProducer {
 
-    private static final Logger logger = Logger.getLogger(VertxProducer.class.getName());
-    
+    private static final Logger logger = LoggerFactory.getLogger(VertxProducer.class);
+
     private Vertx vertx;
 
     /**
      * Produces a singleton Vert.x instance.
      * This instance is shared across all services in the application.
-     * 
+     *
      * @return the Vert.x instance
      */
     @Produces
     @Singleton
     public Vertx vertx() {
         if (vertx == null) {
-            logger.info("Creating shared Vert.x instance");
+            logger.info("Creating shared Vert.x 5.x instance");
             vertx = Vertx.vertx();
-            logger.info("Vert.x instance created: " + System.identityHashCode(vertx));
+            logger.info("Vert.x instance created: {}", System.identityHashCode(vertx));
         }
         return vertx;
     }
 
     /**
-     * Initialize Vert.x on application startup.
+     * Shutdown method to be called when CDI container is destroyed.
+     * This will be invoked by the application shutdown hook.
      */
-    void onStart(@Observes StartupEvent ev) {
-        logger.info("Initializing Vert.x on application startup");
-        // Ensure Vert.x is created
-        vertx();
-    }
-
-    /**
-     * Close Vert.x on application shutdown.
-     */
-    void onStop(@Observes ShutdownEvent ev) {
+    public void shutdown() {
         if (vertx != null) {
-            logger.info("Closing Vert.x instance on application shutdown");
+            logger.info("Closing Vert.x instance");
             vertx.close()
                     .onSuccess(v -> logger.info("Vert.x instance closed successfully"))
-                    .onFailure(err -> logger.severe("Error closing Vert.x: " + err.getMessage()));
+                    .onFailure(err -> logger.error("Error closing Vert.x", err));
+            vertx = null;
         }
     }
 }

@@ -16,17 +16,14 @@
 
 package dev.mars.quorus.api.dto;
 
-import org.eclipse.microprofile.openapi.annotations.media.Schema;
-
 import java.time.LocalDateTime;
 
-@Schema(description = "Count response")
+/**
+ * Count response.
+ */
 public class CountResponse {
 
-    @Schema(description = "Count value", example = "5")
     private int count;
-
-    @Schema(description = "Timestamp when the count was retrieved")
     private LocalDateTime timestamp;
 
     public CountResponse() {

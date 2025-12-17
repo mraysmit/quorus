@@ -24,30 +24,26 @@ import dev.mars.quorus.core.TransferResult;
 import dev.mars.quorus.core.TransferStatus;
 import dev.mars.quorus.core.exceptions.TransferException;
 import dev.mars.quorus.transfer.TransferEngine;
-import org.eclipse.microprofile.openapi.annotations.Operation;
-import org.eclipse.microprofile.openapi.annotations.parameters.Parameter;
-import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
-import org.eclipse.microprofile.openapi.annotations.responses.APIResponses;
-import org.eclipse.microprofile.openapi.annotations.tags.Tag;
-
-import jakarta.annotation.security.RolesAllowed;
+import io.vertx.core.json.JsonObject;
+import io.vertx.ext.web.Router;
+import io.vertx.ext.web.RoutingContext;
+import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import jakarta.ws.rs.*;
-import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.Response;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.net.URI;
 import java.nio.file.Paths;
 import java.util.concurrent.CompletableFuture;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
-@Path("/api/v1/transfers")
-@Produces(MediaType.APPLICATION_JSON)
-@Consumes(MediaType.APPLICATION_JSON)
-@Tag(name = "Transfer Operations", description = "File transfer management API")
+/**
+ * Transfer operations REST API.
+ * Converted from JAX-RS to Vert.x Web for Vert.x 5.x migration.
+ */
+@ApplicationScoped
 public class TransferResource {
 
-    private static final Logger logger = Logger.getLogger(TransferResource.class.getName());
+    private static final Logger logger = LoggerFactory.getLogger(TransferResource.class);
 
     @Inject
     TransferEngine transferEngine;
@@ -55,35 +51,41 @@ public class TransferResource {
     @Inject
     DistributedTransferService distributedTransferService;
 
-    @POST
-    @RolesAllowed({"ADMIN", "USER"})
-    @Operation(summary = "Create Transfer", description = "Create a new file transfer job")
-    @APIResponses(value = {
-        @APIResponse(responseCode = "201", description = "Transfer job created successfully"),
-        @APIResponse(responseCode = "400", description = "Invalid transfer request"),
-        @APIResponse(responseCode = "401", description = "Unauthorized"),
-        @APIResponse(responseCode = "500", description = "Internal server error")
-    })
-    public Response createTransfer(
-            @Parameter(description = "Transfer request details") TransferRequestDto requestDto) {
+    /**
+     * Register routes with the Vert.x router.
+     */
+    public void registerRoutes(Router router) {
+        router.post("/api/v1/transfers").handler(this::handleCreateTransfer);
+        router.get("/api/v1/transfers/:jobId").handler(this::handleGetTransferStatus);
+        router.delete("/api/v1/transfers/:jobId").handler(this::handleCancelTransfer);
+        router.get("/api/v1/transfers/count").handler(this::handleGetActiveTransferCount);
+    }
+
+    /**
+     * POST /api/v1/transfers - Create a new file transfer job
+     */
+    private void handleCreateTransfer(RoutingContext ctx) {
         try {
+            // Parse request body
+            TransferRequestDto requestDto = ctx.body().asPojo(TransferRequestDto.class);
+
             // Validate input
             if (requestDto == null) {
-                return Response.status(Response.Status.BAD_REQUEST)
-                        .entity(new ErrorResponse("Invalid request", "Request body is required"))
-                        .build();
+                ctx.response().setStatusCode(400)
+                    .end(JsonObject.mapFrom(new ErrorResponse("Invalid request", "Request body is required")).encode());
+                return;
             }
 
             if (requestDto.getSourceUri() == null || requestDto.getSourceUri().trim().isEmpty()) {
-                return Response.status(Response.Status.BAD_REQUEST)
-                        .entity(new ErrorResponse("Invalid request", "Source URI is required"))
-                        .build();
+                ctx.response().setStatusCode(400)
+                    .end(JsonObject.mapFrom(new ErrorResponse("Invalid request", "Source URI is required")).encode());
+                return;
             }
 
             if (requestDto.getDestinationPath() == null || requestDto.getDestinationPath().trim().isEmpty()) {
-                return Response.status(Response.Status.BAD_REQUEST)
-                        .entity(new ErrorResponse("Invalid request", "Destination path is required"))
-                        .build();
+                ctx.response().setStatusCode(400)
+                    .end(JsonObject.mapFrom(new ErrorResponse("Invalid request", "Destination path is required")).encode());
+                return;
             }
 
             // Convert DTO to TransferRequest
@@ -108,11 +110,13 @@ public class TransferResource {
                     response.setStatus(job.getStatus());
                     response.setMessage("Transfer job created successfully via distributed controller");
 
-                    logger.info("Distributed transfer job created: " + job.getJobId());
-                    return Response.status(Response.Status.CREATED).entity(response).build();
+                    logger.info("Distributed transfer job created: {}", job.getJobId());
+                    ctx.response().setStatusCode(201)
+                        .end(JsonObject.mapFrom(response).encode());
+                    return;
 
                 } catch (Exception e) {
-                    logger.log(Level.WARNING, "Distributed transfer submission failed, falling back to local", e);
+                    logger.warn("Distributed transfer submission failed, falling back to local", e);
                     // Fall through to local processing
                 }
             }
@@ -131,40 +135,33 @@ public class TransferResource {
             response.setStatus(TransferStatus.PENDING);
             response.setMessage("Transfer job created successfully (local fallback)");
 
-            logger.info("Local transfer job created: " + jobId);
-            return Response.status(Response.Status.CREATED).entity(response).build();
-            
+            logger.info("Local transfer job created: {}", jobId);
+            ctx.response().setStatusCode(201)
+                .end(JsonObject.mapFrom(response).encode());
+
         } catch (TransferException e) {
-            logger.log(Level.WARNING, "Failed to create transfer", e);
-            return Response.status(Response.Status.BAD_REQUEST)
-                    .entity(new ErrorResponse("Error", "Invalid transfer request: " + e.getMessage()))
-                    .build();
+            logger.warn("Failed to create transfer", e);
+            ctx.response().setStatusCode(400)
+                .end(JsonObject.mapFrom(new ErrorResponse("Error", "Invalid transfer request: " + e.getMessage())).encode());
         } catch (IllegalArgumentException e) {
             // Handle URI creation errors and other validation errors
-            logger.log(Level.WARNING, "Invalid request parameters", e);
-            return Response.status(Response.Status.BAD_REQUEST)
-                    .entity(new ErrorResponse("Invalid request", "Invalid URI or path: " + e.getMessage()))
-                    .build();
+            logger.warn("Invalid request parameters", e);
+            ctx.response().setStatusCode(400)
+                .end(JsonObject.mapFrom(new ErrorResponse("Invalid request", "Invalid URI or path: " + e.getMessage())).encode());
         } catch (Exception e) {
-            logger.log(Level.SEVERE, "Internal error creating transfer", e);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                    .entity(new ErrorResponse("Internal server error", "An unexpected error occurred"))
-                    .build();
+            logger.error("Internal error creating transfer", e);
+            ctx.response().setStatusCode(500)
+                .end(JsonObject.mapFrom(new ErrorResponse("Internal server error", "An unexpected error occurred")).encode());
         }
     }
 
-    @GET
-    @Path("/{jobId}")
-    @RolesAllowed({"ADMIN", "USER"})
-    @Operation(summary = "Get Transfer Status", description = "Get the status of a specific transfer job")
-    @APIResponses(value = {
-        @APIResponse(responseCode = "200", description = "Transfer status retrieved successfully"),
-        @APIResponse(responseCode = "404", description = "Transfer job not found"),
-        @APIResponse(responseCode = "401", description = "Unauthorized")
-    })
-    public Response getTransferStatus(
-            @PathParam("jobId") @Parameter(description = "Transfer job ID") String jobId) {
+    /**
+     * GET /api/v1/transfers/:jobId - Get the status of a specific transfer job
+     */
+    private void handleGetTransferStatus(RoutingContext ctx) {
         try {
+            String jobId = ctx.pathParam("jobId");
+
             // Try distributed controller first
             if (distributedTransferService.isControllerAvailable()) {
                 try {
@@ -173,10 +170,11 @@ public class TransferResource {
 
                     if (job != null) {
                         TransferJobResponseDto response = TransferJobResponseDto.fromTransferJob(job);
-                        return Response.ok(response).build();
+                        ctx.json(response);
+                        return;
                     }
                 } catch (Exception e) {
-                    logger.log(Level.FINE, "Distributed job query failed, trying local", e);
+                    logger.debug("Distributed job query failed, trying local", e);
                     // Fall through to local query
                 }
             }
@@ -185,33 +183,25 @@ public class TransferResource {
             TransferJob job = transferEngine.getTransferJob(jobId);
             if (job != null) {
                 TransferJobResponseDto response = TransferJobResponseDto.fromTransferJob(job);
-                return Response.ok(response).build();
+                ctx.json(response);
             } else {
-                return Response.status(Response.Status.NOT_FOUND)
-                        .entity(new ErrorResponse("Transfer job not found: " + jobId))
-                        .build();
+                ctx.response().setStatusCode(404)
+                    .end(JsonObject.mapFrom(new ErrorResponse("Transfer job not found: " + jobId)).encode());
             }
         } catch (Exception e) {
-            logger.log(Level.SEVERE, "Error retrieving transfer status", e);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                    .entity(new ErrorResponse("Internal server error"))
-                    .build();
+            logger.error("Error retrieving transfer status", e);
+            ctx.response().setStatusCode(500)
+                .end(JsonObject.mapFrom(new ErrorResponse("Internal server error")).encode());
         }
     }
 
-    @DELETE
-    @Path("/{jobId}")
-    @RolesAllowed({"ADMIN", "USER"})
-    @Operation(summary = "Cancel Transfer", description = "Cancel a running transfer job")
-    @APIResponses(value = {
-        @APIResponse(responseCode = "200", description = "Transfer cancelled successfully"),
-        @APIResponse(responseCode = "404", description = "Transfer job not found"),
-        @APIResponse(responseCode = "409", description = "Transfer cannot be cancelled"),
-        @APIResponse(responseCode = "401", description = "Unauthorized")
-    })
-    public Response cancelTransfer(
-            @PathParam("jobId") @Parameter(description = "Transfer job ID") String jobId) {
+    /**
+     * DELETE /api/v1/transfers/:jobId - Cancel a running transfer job
+     */
+    private void handleCancelTransfer(RoutingContext ctx) {
         try {
+            String jobId = ctx.pathParam("jobId");
+
             // Try distributed controller first
             if (distributedTransferService.isControllerAvailable()) {
                 try {
@@ -219,11 +209,12 @@ public class TransferResource {
                     boolean cancelled = future.get(3, java.util.concurrent.TimeUnit.SECONDS);
 
                     if (cancelled) {
-                        logger.info("Distributed transfer cancelled: " + jobId);
-                        return Response.ok(new MessageResponse("Transfer cancelled successfully via distributed controller")).build();
+                        logger.info("Distributed transfer cancelled: {}", jobId);
+                        ctx.json(new MessageResponse("Transfer cancelled successfully via distributed controller"));
+                        return;
                     }
                 } catch (Exception e) {
-                    logger.log(Level.FINE, "Distributed cancellation failed, trying local", e);
+                    logger.debug("Distributed cancellation failed, trying local", e);
                     // Fall through to local cancellation
                 }
             }
@@ -231,41 +222,30 @@ public class TransferResource {
             // Fallback to local transfer engine
             boolean cancelled = transferEngine.cancelTransfer(jobId);
             if (cancelled) {
-                logger.info("Local transfer cancelled: " + jobId);
-                return Response.ok(new MessageResponse("Transfer cancelled successfully (local)")).build();
+                logger.info("Local transfer cancelled: {}", jobId);
+                ctx.json(new MessageResponse("Transfer cancelled successfully (local)"));
             } else {
-                return Response.status(Response.Status.CONFLICT)
-                        .entity(new ErrorResponse("Transfer cannot be cancelled or not found"))
-                        .build();
+                ctx.response().setStatusCode(409)
+                    .end(JsonObject.mapFrom(new ErrorResponse("Transfer cannot be cancelled or not found")).encode());
             }
         } catch (Exception e) {
-            logger.log(Level.SEVERE, "Error cancelling transfer", e);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                    .entity(new ErrorResponse("Internal server error"))
-                    .build();
+            logger.error("Error cancelling transfer", e);
+            ctx.response().setStatusCode(500)
+                .end(JsonObject.mapFrom(new ErrorResponse("Internal server error")).encode());
         }
     }
 
     /**
-     * Get active transfer count.
+     * GET /api/v1/transfers/count - Get the number of currently active transfers
      */
-    @GET
-    @Path("/count")
-    @RolesAllowed({"ADMIN", "USER"})
-    @Operation(summary = "Get Active Transfer Count", description = "Get the number of currently active transfers")
-    @APIResponses(value = {
-        @APIResponse(responseCode = "200", description = "Active transfer count retrieved successfully"),
-        @APIResponse(responseCode = "401", description = "Unauthorized")
-    })
-    public Response getActiveTransferCount() {
+    private void handleGetActiveTransferCount(RoutingContext ctx) {
         try {
             int count = transferEngine.getActiveTransferCount();
-            return Response.ok(new CountResponse(count)).build();
+            ctx.json(new CountResponse(count));
         } catch (Exception e) {
-            logger.log(Level.SEVERE, "Error retrieving active transfer count", e);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                    .entity(new ErrorResponse("Internal server error"))
-                    .build();
+            logger.error("Error retrieving active transfer count", e);
+            ctx.response().setStatusCode(500)
+                .end(JsonObject.mapFrom(new ErrorResponse("Internal server error")).encode());
         }
     }
 }

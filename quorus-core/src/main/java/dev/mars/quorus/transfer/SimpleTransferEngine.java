@@ -22,9 +22,20 @@ import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferResult;
 import dev.mars.quorus.core.TransferStatus;
 import dev.mars.quorus.core.exceptions.TransferException;
+import dev.mars.quorus.monitoring.ProtocolHealthCheck;
+import dev.mars.quorus.monitoring.TransferEngineHealthCheck;
+import dev.mars.quorus.monitoring.TransferMetrics;
 import dev.mars.quorus.protocol.ProtocolFactory;
 import dev.mars.quorus.protocol.TransferProtocol;
+import io.vertx.core.Promise;
+import io.vertx.core.Vertx;
+import io.vertx.core.WorkerExecutor;
 
+import java.time.Duration;
+import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
@@ -33,53 +44,89 @@ import java.util.logging.Logger;
 /**
  * Simple implementation of the TransferEngine interface.
  * Handles basic file transfers with retry logic and progress tracking.
- * 
+ * Converted to Vert.x WorkerExecutor (Phase 1.5 - Dec 2025).
+ *
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @since 1.0
  */
 public class SimpleTransferEngine implements TransferEngine {
     private static final Logger logger = Logger.getLogger(SimpleTransferEngine.class.getName());
-    
-    private final ExecutorService executorService;
+
+    private final Vertx vertx;
+    private final WorkerExecutor workerExecutor;
     private final ConcurrentHashMap<String, TransferJob> activeJobs;
     private final ConcurrentHashMap<String, TransferContext> activeContexts;
     private final ConcurrentHashMap<String, CompletableFuture<TransferResult>> activeFutures;
     private final ProtocolFactory protocolFactory;
     private final AtomicBoolean shutdown;
-    
+
     // Configuration
     private final int maxConcurrentTransfers;
     private final int maxRetryAttempts;
     private final long retryDelayMs;
-    
+
+    // Monitoring (Phase 2 - Dec 2025)
+    private final Instant startTime;
+    private final Map<String, TransferMetrics> protocolMetrics;
+
+    /**
+     * Default constructor - creates internal Vert.x instance.
+     * @deprecated Use {@link #SimpleTransferEngine(Vertx, int, int, long)} instead
+     */
+    @Deprecated
     public SimpleTransferEngine() {
-        this(10, 3, 1000); // Default: 10 concurrent, 3 retries, 1s delay
+        this(Vertx.vertx(), 10, 3, 1000);
+        logger.warning("Using deprecated constructor - Vert.x instance created internally");
     }
-    
+
+    /**
+     * Constructor without Vertx for backward compatibility.
+     * @deprecated Use {@link #SimpleTransferEngine(Vertx, int, int, long)} instead
+     */
+    @Deprecated
     public SimpleTransferEngine(int maxConcurrentTransfers, int maxRetryAttempts, long retryDelayMs) {
+        this(Vertx.vertx(), maxConcurrentTransfers, maxRetryAttempts, retryDelayMs);
+        logger.warning("Using deprecated constructor - Vert.x instance created internally");
+    }
+
+    /**
+     * Constructor with Vert.x dependency injection (recommended).
+     *
+     * @param vertx Vert.x instance for reactive operations
+     * @param maxConcurrentTransfers Maximum number of concurrent transfers
+     * @param maxRetryAttempts Maximum retry attempts per transfer
+     * @param retryDelayMs Base delay between retries in milliseconds
+     */
+    public SimpleTransferEngine(Vertx vertx, int maxConcurrentTransfers, int maxRetryAttempts, long retryDelayMs) {
+        this.vertx = Objects.requireNonNull(vertx, "Vertx cannot be null");
         this.maxConcurrentTransfers = maxConcurrentTransfers;
         this.maxRetryAttempts = maxRetryAttempts;
         this.retryDelayMs = retryDelayMs;
-        
-        this.executorService = new ThreadPoolExecutor(
-                Math.min(4, maxConcurrentTransfers),
+
+        // Create Vert.x worker executor instead of ExecutorService
+        this.workerExecutor = vertx.createSharedWorkerExecutor(
+                "quorus-transfer-pool",
                 maxConcurrentTransfers,
-                60L, TimeUnit.SECONDS,
-                new LinkedBlockingQueue<>(),
-                r -> {
-                    Thread t = new Thread(r, "quorus-transfer-" + System.currentTimeMillis());
-                    t.setDaemon(true);
-                    return t;
-                }
+                TimeUnit.MINUTES.toNanos(10)  // 10 minute max execution time
         );
-        
+
         this.activeJobs = new ConcurrentHashMap<>();
         this.activeContexts = new ConcurrentHashMap<>();
         this.activeFutures = new ConcurrentHashMap<>();
-        this.protocolFactory = new ProtocolFactory();
+        this.protocolFactory = new ProtocolFactory(vertx);  // Pass Vertx to ProtocolFactory
         this.shutdown = new AtomicBoolean(false);
-        
-        logger.info("SimpleTransferEngine initialized with " + maxConcurrentTransfers + " max concurrent transfers");
+
+        // Initialize monitoring (Phase 2 - Dec 2025)
+        this.startTime = Instant.now();
+        this.protocolMetrics = new ConcurrentHashMap<>();
+        // Initialize metrics for all supported protocols
+        protocolMetrics.put("http", new TransferMetrics("http"));
+        protocolMetrics.put("ftp", new TransferMetrics("ftp"));
+        protocolMetrics.put("sftp", new TransferMetrics("sftp"));
+        protocolMetrics.put("smb", new TransferMetrics("smb"));
+
+        logger.info("SimpleTransferEngine initialized with " + maxConcurrentTransfers +
+                   " max concurrent transfers (Vert.x WorkerExecutor mode)");
     }
     
     @Override
@@ -100,8 +147,11 @@ public class SimpleTransferEngine implements TransferEngine {
         activeJobs.put(job.getJobId(), job);
         activeContexts.put(job.getJobId(), context);
         
-        // Create and submit the transfer task
-        CompletableFuture<TransferResult> future = CompletableFuture.supplyAsync(() -> {
+        // Create promise to bridge Vert.x Future to CompletableFuture
+        Promise<TransferResult> promise = Promise.promise();
+
+        // Execute transfer on Vert.x worker pool
+        workerExecutor.<TransferResult>executeBlocking(() -> {
             try {
                 return executeTransfer(context);
             } catch (Exception e) {
@@ -114,10 +164,21 @@ public class SimpleTransferEngine implements TransferEngine {
                 activeContexts.remove(job.getJobId());
                 activeFutures.remove(job.getJobId());
             }
-        }, executorService);
-        
+        }).onComplete(ar -> {
+            if (ar.succeeded()) {
+                promise.complete(ar.result());
+            } else {
+                promise.fail(ar.cause());
+            }
+        });
+
+        // Convert Vert.x Future to CompletableFuture
+        CompletableFuture<TransferResult> future = promise.future()
+                .toCompletionStage()
+                .toCompletableFuture();
+
         activeFutures.put(job.getJobId(), future);
-        
+
         logger.info("Transfer submitted: " + job.getJobId());
         return future;
     }
@@ -185,41 +246,116 @@ public class SimpleTransferEngine implements TransferEngine {
         if (shutdown.getAndSet(true)) {
             return true; // Already shutdown
         }
-        
+
         logger.info("Shutting down transfer engine...");
-        
+
         // Cancel all active transfers
         activeContexts.values().forEach(TransferContext::cancel);
-        
-        // Shutdown executor
-        executorService.shutdown();
-        
-        try {
-            boolean terminated = executorService.awaitTermination(timeoutSeconds, TimeUnit.SECONDS);
-            if (!terminated) {
-                logger.warning("Transfer engine shutdown timed out, forcing shutdown");
-                executorService.shutdownNow();
-                return false;
-            }
-            logger.info("Transfer engine shutdown completed");
-            return true;
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            executorService.shutdownNow();
-            return false;
-        }
+
+        // Close Vert.x worker executor (non-blocking)
+        workerExecutor.close();
+
+        logger.info("Transfer engine shutdown completed (Vert.x WorkerExecutor closed)");
+        return true;
     }
-    
+
+    @Override
+    public TransferEngineHealthCheck getHealthCheck() {
+        TransferEngineHealthCheck.Builder builder = TransferEngineHealthCheck.builder();
+
+        // Check if engine is shutdown
+        if (shutdown.get()) {
+            return builder
+                    .down()
+                    .message("Transfer engine is shutdown")
+                    .build();
+        }
+
+        // Check protocol health
+        boolean allProtocolsHealthy = true;
+        for (String protocolName : protocolMetrics.keySet()) {
+            ProtocolHealthCheck.Builder protocolBuilder = ProtocolHealthCheck.builder(protocolName);
+
+            TransferMetrics metrics = protocolMetrics.get(protocolName);
+            Map<String, Object> metricsMap = metrics.toMap();
+
+            // Determine protocol health based on metrics
+            long totalTransfers = (long) metricsMap.get("totalTransfers");
+            long failedTransfers = (long) metricsMap.get("failedTransfers");
+
+            if (totalTransfers > 0) {
+                double failureRate = (failedTransfers * 100.0) / totalTransfers;
+                if (failureRate > 50) {
+                    protocolBuilder.down()
+                            .message("High failure rate: " + String.format("%.2f%%", failureRate));
+                    allProtocolsHealthy = false;
+                } else if (failureRate > 20) {
+                    protocolBuilder.degraded()
+                            .message("Elevated failure rate: " + String.format("%.2f%%", failureRate));
+                    allProtocolsHealthy = false;
+                } else {
+                    protocolBuilder.up()
+                            .message("Protocol operational");
+                }
+            } else {
+                protocolBuilder.up()
+                        .message("No transfers yet");
+            }
+
+            protocolBuilder.detail("totalTransfers", totalTransfers)
+                    .detail("failedTransfers", failedTransfers)
+                    .detail("activeTransfers", metricsMap.get("activeTransfers"));
+
+            builder.addProtocolHealthCheck(protocolBuilder.build());
+        }
+
+        // System metrics
+        Runtime runtime = Runtime.getRuntime();
+        builder.systemMetric("activeTransfers", activeJobs.size())
+                .systemMetric("maxConcurrentTransfers", maxConcurrentTransfers)
+                .systemMetric("uptime", Duration.between(startTime, Instant.now()).toString())
+                .systemMetric("memoryUsedMB", (runtime.totalMemory() - runtime.freeMemory()) / (1024 * 1024))
+                .systemMetric("memoryTotalMB", runtime.totalMemory() / (1024 * 1024))
+                .systemMetric("memoryMaxMB", runtime.maxMemory() / (1024 * 1024));
+
+        // Overall status
+        if (allProtocolsHealthy) {
+            builder.up().message("All systems operational");
+        } else {
+            builder.degraded().message("Some protocols experiencing issues");
+        }
+
+        return builder.build();
+    }
+
+    @Override
+    public TransferMetrics getProtocolMetrics(String protocolName) {
+        return protocolMetrics.get(protocolName);
+    }
+
+    @Override
+    public Map<String, TransferMetrics> getAllProtocolMetrics() {
+        return new HashMap<>(protocolMetrics);
+    }
+
     private TransferResult executeTransfer(TransferContext context) {
         TransferJob job = context.getJob();
         TransferRequest request = job.getRequest();
-        
+
         logger.info("Starting transfer: " + job.getJobId());
         job.start();
-        
+
+        // Record transfer start in metrics
+        String protocolName = request.getProtocol();
+        TransferMetrics metrics = protocolMetrics.get(protocolName);
+        if (metrics != null) {
+            metrics.recordTransferStart();
+        }
+
+        Instant transferStartTime = Instant.now();
         int attempt = 0;
         Exception lastException = null;
-        
+
         while (attempt <= maxRetryAttempts && context.shouldContinue()) {
             try {
                 // Get appropriate protocol
@@ -227,25 +363,33 @@ public class SimpleTransferEngine implements TransferEngine {
                 if (protocol == null) {
                     throw new TransferException(job.getJobId(), "Unsupported protocol: " + request.getProtocol());
                 }
-                
+
                 // Execute the transfer
                 TransferResult result = protocol.transfer(request, context);
-                
+
                 if (result.isSuccessful()) {
                     logger.info("Transfer completed successfully: " + job.getJobId());
+
+                    // Record success in metrics
+                    if (metrics != null) {
+                        Duration duration = Duration.between(transferStartTime, Instant.now());
+                        long bytesTransferred = result.getBytesTransferred();
+                        metrics.recordTransferSuccess(bytesTransferred, duration);
+                    }
+
                     return result;
                 } else {
                     throw new TransferException(job.getJobId(), "Transfer failed: " + result.getErrorMessage().orElse("Unknown error"));
                 }
-                
+
             } catch (Exception e) {
                 lastException = e;
                 attempt++;
                 context.incrementRetryCount();
-                
-                logger.log(Level.WARNING, String.format("Transfer attempt %d failed for job %s: %s", 
+
+                logger.log(Level.WARNING, String.format("Transfer attempt %d failed for job %s: %s",
                         attempt, job.getJobId(), e.getMessage()), e);
-                
+
                 if (attempt <= maxRetryAttempts && context.shouldContinue()) {
                     try {
                         Thread.sleep(retryDelayMs * attempt); // Exponential backoff
@@ -257,11 +401,17 @@ public class SimpleTransferEngine implements TransferEngine {
                 }
             }
         }
-        
+
         // All attempts failed
         String errorMessage = lastException != null ? lastException.getMessage() : "Transfer failed after " + maxRetryAttempts + " attempts";
         job.fail(errorMessage, lastException);
-        
+
+        // Record failure in metrics
+        if (metrics != null) {
+            String errorType = lastException != null ? lastException.getClass().getSimpleName() : "UnknownError";
+            metrics.recordTransferFailure(errorType);
+        }
+
         logger.severe("Transfer failed permanently: " + job.getJobId() + " - " + errorMessage);
         return job.toResult();
     }

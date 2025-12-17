@@ -202,6 +202,11 @@ public class LocalHttpTestServer {
                 }
 
                 // Delay the response
+                // NOTE: Thread.sleep is acceptable here because:
+                // 1. This is test infrastructure, not production code
+                // 2. Runs in HttpServer's own thread pool (not Vert.x event loop)
+                // 3. Purpose is to simulate slow network responses for testing
+                // (Phase 2 - Dec 2025: Reviewed and approved for test code)
                 Thread.sleep(delaySeconds * 1000L);
 
                 String message = "Delayed " + delaySeconds + " seconds";

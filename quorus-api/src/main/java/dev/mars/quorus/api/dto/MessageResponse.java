@@ -16,17 +16,14 @@
 
 package dev.mars.quorus.api.dto;
 
-import org.eclipse.microprofile.openapi.annotations.media.Schema;
-
 import java.time.LocalDateTime;
 
-@Schema(description = "Success message response")
+/**
+ * Success message response.
+ */
 public class MessageResponse {
 
-    @Schema(description = "Success message", example = "Transfer cancelled successfully")
     private String message;
-
-    @Schema(description = "Timestamp when the response was created")
     private LocalDateTime timestamp;
 
     public MessageResponse() {
