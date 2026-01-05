@@ -29,7 +29,6 @@ import org.junit.jupiter.api.DisplayName;
 import java.net.URI;
 import java.nio.file.Paths;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
@@ -119,10 +118,10 @@ public class MetadataPersistenceTest {
         
         // Submit metadata to leader
         logger.info("Submitting transfer job metadata to leader: " + testJob.getJobId());
-        CompletableFuture<Object> result = leader.submitCommand(command);
+        io.vertx.core.Future<Object> result = leader.submitCommand(command);
         
         // Wait for command to be processed
-        Object response = result.get(5, TimeUnit.SECONDS);
+        Object response = result.toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
         assertNotNull(response, "Command should be processed successfully");
         logger.info("Command processed successfully: " + response);
         
@@ -158,8 +157,8 @@ public class MetadataPersistenceTest {
             testJobs.add(job);
             
             TransferJobCommand command = TransferJobCommand.create(job);
-            CompletableFuture<Object> result = originalLeader.submitCommand(command);
-            result.get(5, TimeUnit.SECONDS);
+            io.vertx.core.Future<Object> result = originalLeader.submitCommand(command);
+            result.toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
             logger.info("Submitted job " + job.getJobId() + " to original leader");
         }
         
@@ -206,8 +205,8 @@ public class MetadataPersistenceTest {
         // Submit new job to new leader to prove it's functional
         TransferJob newJob = createTestTransferJob("job-new", "Post leader change test");
         TransferJobCommand newCommand = TransferJobCommand.create(newJob);
-        CompletableFuture<Object> newResult = newLeader.submitCommand(newCommand);
-        newResult.get(5, TimeUnit.SECONDS);
+        io.vertx.core.Future<Object> newResult = newLeader.submitCommand(newCommand);
+        newResult.toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
         logger.info("Successfully submitted new job to new leader: " + newJob.getJobId());
         
         // Wait for replication
@@ -252,8 +251,8 @@ public class MetadataPersistenceTest {
             jobsWhileDown.add(job);
             
             TransferJobCommand command = TransferJobCommand.create(job);
-            CompletableFuture<Object> result = leader.submitCommand(command);
-            result.get(5, TimeUnit.SECONDS);
+            io.vertx.core.Future<Object> result = leader.submitCommand(command);
+            result.toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
             logger.info("Submitted job " + job.getJobId() + " while follower was down");
         }
         

@@ -27,6 +27,7 @@ import dev.mars.quorus.controller.state.TransferJobSnapshot;
 import dev.mars.quorus.core.TransferJob;
 import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferStatus;
+import io.vertx.core.Future;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -114,10 +115,10 @@ public class TransferHandler implements HttpHandler {
 
         // Submit to Raft
         TransferJobCommand command = TransferJobCommand.create(job);
-        CompletableFuture<Object> future = raftNode.submitCommand(command);
+        Future<Object> future = raftNode.submitCommand(command);
 
         // Wait for consensus
-        Object result = future.get(5, TimeUnit.SECONDS);
+        Object result = future.toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
 
         if (result instanceof TransferJob) {
             TransferJob createdJob = (TransferJob) result;
@@ -207,10 +208,10 @@ public class TransferHandler implements HttpHandler {
 
         // Submit delete command to Raft
         TransferJobCommand command = TransferJobCommand.delete(jobId);
-        CompletableFuture<Object> future = raftNode.submitCommand(command);
+        Future<Object> future = raftNode.submitCommand(command);
 
         // Wait for consensus
-        Object result = future.get(5, TimeUnit.SECONDS);
+        Object result = future.toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
 
         if (result instanceof TransferJobSnapshot) {
             TransferJobSnapshot deletedJob = (TransferJobSnapshot) result;

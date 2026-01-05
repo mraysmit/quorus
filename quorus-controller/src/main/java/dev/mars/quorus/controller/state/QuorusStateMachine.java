@@ -122,6 +122,30 @@ public class QuorusStateMachine implements RaftStateMachine {
                     return null;
                 }
                 
+            case UPDATE_PROGRESS:
+                TransferJobSnapshot progressJob = transferJobs.get(jobId);
+                if (progressJob != null) {
+                    // Create updated snapshot with new bytes transferred
+                    TransferJobSnapshot updatedJob = new TransferJobSnapshot(
+                            progressJob.getJobId(),
+                            progressJob.getSourceUri(),
+                            progressJob.getDestinationPath(),
+                            progressJob.getStatus(),
+                            command.getBytesTransferred(),
+                            progressJob.getTotalBytes(),
+                            progressJob.getStartTime(),
+                            java.time.Instant.now(),
+                            progressJob.getErrorMessage(),
+                            progressJob.getDescription()
+                    );
+                    transferJobs.put(jobId, updatedJob);
+                    logger.info("Updated transfer job progress: " + jobId + " -> " + command.getBytesTransferred() + " bytes");
+                    return updatedJob;
+                } else {
+                    logger.warning("Transfer job not found for progress update: " + jobId);
+                    return null;
+                }
+                
             case DELETE:
                 TransferJobSnapshot removedJob = transferJobs.remove(jobId);
                 if (removedJob != null) {

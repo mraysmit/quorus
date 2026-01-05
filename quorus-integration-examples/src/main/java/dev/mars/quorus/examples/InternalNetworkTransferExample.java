@@ -18,7 +18,7 @@ import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
+import io.vertx.core.Future;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -182,11 +182,11 @@ public class InternalNetworkTransferExample {
         
         // Monitor corporate network transfer
         long startTime = System.currentTimeMillis();
-        CompletableFuture<TransferResult> future = transferEngine.submitTransfer(crmExportRequest);
+        Future<TransferResult> future = transferEngine.submitTransfer(crmExportRequest);
         monitorCorporateTransfer(transferEngine, crmExportRequest.getRequestId(), "CRM Data Sync");
 
         // Wait with timeout to prevent hanging
-        TransferResult result = future.get(TRANSFER_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        TransferResult result = future.toCompletionStage().toCompletableFuture().get(TRANSFER_TIMEOUT_SECONDS, TimeUnit.SECONDS);
         long duration = System.currentTimeMillis() - startTime;
         
         logger.info("");
@@ -208,7 +208,7 @@ public class InternalNetworkTransferExample {
         
         // Define department transfer scenarios using constants
         @SuppressWarnings("unchecked") // Safe generic array creation
-        CompletableFuture<TransferResult>[] futures = new CompletableFuture[DEPARTMENTS.length];
+        Future<TransferResult>[] futures = new Future[DEPARTMENTS.length];
         
         logger.info("Distributing reports to departments simultaneously...");
         
@@ -271,11 +271,11 @@ public class InternalNetworkTransferExample {
         
         // Monitor high-throughput transfer
         long startTime = System.currentTimeMillis();
-        CompletableFuture<TransferResult> future = transferEngine.submitTransfer(backupRequest);
+        Future<TransferResult> future = transferEngine.submitTransfer(backupRequest);
         monitorCorporateTransfer(transferEngine, backupRequest.getRequestId(), "Backup Operation");
 
         // Wait with timeout to prevent hanging
-        TransferResult result = future.get(TRANSFER_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        TransferResult result = future.toCompletionStage().toCompletableFuture().get(TRANSFER_TIMEOUT_SECONDS, TimeUnit.SECONDS);
         long duration = System.currentTimeMillis() - startTime;
         
         logger.info("");

@@ -20,11 +20,17 @@ package dev.mars.quorus.core;
 import java.io.Serializable;
 import java.net.URI;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+@JsonDeserialize(builder = TransferRequest.Builder.class)
 public final class TransferRequest implements Serializable {
 
     private static final long serialVersionUID = 1L;
@@ -81,6 +87,7 @@ public final class TransferRequest implements Serializable {
         return new Builder();
     }
 
+    @JsonPOJOBuilder(withPrefix = "")
     public static class Builder {
         /** Unique identifier for the transfer request (auto-generated if not set) */
         private String requestId;
@@ -118,6 +125,12 @@ public final class TransferRequest implements Serializable {
 
         public Builder destinationPath(Path destinationPath) {
             this.destinationPath = destinationPath;
+            return this;
+        }
+
+        @JsonProperty("destinationPath")
+        public Builder destinationPath(String destinationPath) {
+            this.destinationPath = Paths.get(destinationPath);
             return this;
         }
 

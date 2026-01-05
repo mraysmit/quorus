@@ -22,7 +22,7 @@ import dev.mars.quorus.transfer.SimpleTransferEngine;
 import dev.mars.quorus.workflow.*;
 
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
+import io.vertx.core.Future;
 
 /**
  * Workflow validation example demonstrating:
@@ -302,8 +302,8 @@ public class WorkflowValidationExample {
                     .variables(Map.of()) // Empty variables - should cause resolution errors
                     .build();
 
-            CompletableFuture<WorkflowExecution> future = workflowEngine.dryRun(workflow, context);
-            WorkflowExecution execution = future.get();
+            Future<WorkflowExecution> future = workflowEngine.dryRun(workflow, context);
+            WorkflowExecution execution = future.toCompletionStage().toCompletableFuture().get();
 
             if (execution.getStatus() == WorkflowStatus.FAILED) {
                 TestResultLogger.logExpectedFailure("Correctly detected variable resolution issues");
@@ -368,8 +368,8 @@ public class WorkflowValidationExample {
                     .build();
             
             System.out.println("   Performing dry run validation...");
-            CompletableFuture<WorkflowExecution> future = workflowEngine.dryRun(workflow, context);
-            WorkflowExecution execution = future.get();
+            Future<WorkflowExecution> future = workflowEngine.dryRun(workflow, context);
+            WorkflowExecution execution = future.toCompletionStage().toCompletableFuture().get();
             
             System.out.println("   Dry run status: " + execution.getStatus());
             System.out.println("   Groups validated: " + execution.getGroupExecutions().size());

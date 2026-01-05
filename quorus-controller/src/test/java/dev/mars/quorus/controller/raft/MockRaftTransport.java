@@ -18,10 +18,11 @@ import dev.mars.quorus.controller.raft.grpc.AppendEntriesRequest;
 import dev.mars.quorus.controller.raft.grpc.AppendEntriesResponse;
 import dev.mars.quorus.controller.raft.grpc.VoteRequest;
 import dev.mars.quorus.controller.raft.grpc.VoteResponse;
+import io.vertx.core.Future;
+import io.vertx.core.Promise;
 
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
@@ -35,7 +36,7 @@ public class MockRaftTransport implements RaftTransport {
     private static final Logger logger = Logger.getLogger(MockRaftTransport.class.getName());
 
     private final String nodeId;
-    private final Executor executor = Executors.newCachedThreadPool();
+    private final ExecutorService executor = Executors.newCachedThreadPool();
     private volatile Consumer<Object> messageHandler;
     private volatile boolean running = false;
     private Map<String, MockRaftTransport> transports;
@@ -80,59 +81,79 @@ public class MockRaftTransport implements RaftTransport {
     }
 
     @Override
-    public CompletableFuture<VoteResponse> sendVoteRequest(String targetNodeId, VoteRequest request) {
-        return CompletableFuture.supplyAsync(() -> {
-            MockRaftTransport targetTransport = transports.get(targetNodeId);
-            if (targetTransport == null || !targetTransport.running) {
-                throw new RuntimeException("Target node not available: " + targetNodeId);
-            }
-
-            // Simulate network delay
+    public Future<VoteResponse> sendVoteRequest(String targetNodeId, VoteRequest request) {
+        Promise<VoteResponse> promise = Promise.promise();
+        
+        executor.submit(() -> {
             try {
-                Thread.sleep(10 + (long) (Math.random() * 20)); // 10-30ms delay
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new RuntimeException(e);
-            }
+                MockRaftTransport targetTransport = transports.get(targetNodeId);
+                if (targetTransport == null || !targetTransport.running) {
+                    promise.fail(new RuntimeException("Target node not available: " + targetNodeId));
+                    return;
+                }
 
-            // Process vote request
-            VoteResponse response = targetTransport.handleVoteRequest(request);
-            logger.fine("Vote request from " + nodeId + " to " + targetNodeId + 
-                       ": " + response.getVoteGranted());
-            
-            return response;
-        }, executor);
+                // Simulate network delay
+                try {
+                    Thread.sleep(10 + (long) (Math.random() * 20)); // 10-30ms delay
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    promise.fail(new RuntimeException(e));
+                    return;
+                }
+
+                // Process vote request
+                VoteResponse response = targetTransport.handleVoteRequest(request);
+                logger.fine("Vote request from " + nodeId + " to " + targetNodeId + 
+                           ": " + response.getVoteGranted());
+                
+                promise.complete(response);
+            } catch (Exception e) {
+                promise.fail(e);
+            }
+        });
+        
+        return promise.future();
     }
 
     @Override
-    public CompletableFuture<AppendEntriesResponse> sendAppendEntries(String targetNodeId, 
+    public Future<AppendEntriesResponse> sendAppendEntries(String targetNodeId, 
                                                                      AppendEntriesRequest request) {
-        return CompletableFuture.supplyAsync(() -> {
-            MockRaftTransport targetTransport = transports.get(targetNodeId);
-            if (targetTransport == null || !targetTransport.running) {
-                throw new RuntimeException("Target node not available: " + targetNodeId);
-            }
-
-            // Simulate network delay
+        Promise<AppendEntriesResponse> promise = Promise.promise();
+        
+        executor.submit(() -> {
             try {
-                Thread.sleep(5 + (long) (Math.random() * 10)); // 5-15ms delay
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new RuntimeException(e);
-            }
+                MockRaftTransport targetTransport = transports.get(targetNodeId);
+                if (targetTransport == null || !targetTransport.running) {
+                    promise.fail(new RuntimeException("Target node not available: " + targetNodeId));
+                    return;
+                }
 
-            // Process append entries request
-            AppendEntriesResponse response = targetTransport.handleAppendEntries(request);
-            logger.fine("Append entries from " + nodeId + " to " + targetNodeId + 
-                       ": " + response.getSuccess());
-            
-            return response;
-        }, executor);
+                // Simulate network delay
+                try {
+                    Thread.sleep(5 + (long) (Math.random() * 10)); // 5-15ms delay
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    promise.fail(new RuntimeException(e));
+                    return;
+                }
+
+                // Process append entries request
+                AppendEntriesResponse response = targetTransport.handleAppendEntries(request);
+                logger.fine("Append entries from " + nodeId + " to " + targetNodeId + 
+                           ": " + response.getSuccess());
+                
+                promise.complete(response);
+            } catch (Exception e) {
+                promise.fail(e);
+            }
+        });
+        
+        return promise.future();
     }
 
     private VoteResponse handleVoteRequest(VoteRequest request) {
         if (raftNode != null) {
-            return raftNode.handleVoteRequest(request);
+            return raftNode.handleVoteRequest(request).toCompletionStage().toCompletableFuture().join();
         }
         
         if (messageHandler != null) {
@@ -150,7 +171,7 @@ public class MockRaftTransport implements RaftTransport {
 
     private AppendEntriesResponse handleAppendEntries(AppendEntriesRequest request) {
         if (raftNode != null) {
-            return raftNode.handleAppendEntriesRequest(request);
+            return raftNode.handleAppendEntriesRequest(request).toCompletionStage().toCompletableFuture().join();
         }
 
         if (messageHandler != null) {

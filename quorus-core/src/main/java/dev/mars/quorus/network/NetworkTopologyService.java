@@ -16,11 +16,12 @@
 
 package dev.mars.quorus.network;
 
+import io.vertx.core.Future;
+import io.vertx.core.Vertx;
 import java.net.InetAddress;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
 
@@ -28,87 +29,91 @@ public class NetworkTopologyService {
     
     private static final Logger logger = Logger.getLogger(NetworkTopologyService.class.getName());
     
+    private final Vertx vertx;
     private final Map<String, NetworkNode> networkNodes = new ConcurrentHashMap<>();
     private final Map<String, NetworkPath> networkPaths = new ConcurrentHashMap<>();
     private final NetworkMetrics networkMetrics = new NetworkMetrics();
+
+    public NetworkTopologyService(Vertx vertx) {
+        this.vertx = vertx;
+    }
     
-    public CompletableFuture<NetworkNode> discoverNode(String hostname) {
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                logger.info("Discovering network topology for host: " + hostname);
-                
-                // Check if we already have cached information
-                NetworkNode cachedNode = networkNodes.get(hostname);
-                if (cachedNode != null && !cachedNode.isStale()) {
-                    logger.fine("Using cached network information for: " + hostname);
-                    return cachedNode;
-                }
-                
-                // Perform network discovery
-                NetworkNode node = performNetworkDiscovery(hostname);
+    public Future<NetworkNode> discoverNode(String hostname) {
+        logger.info("Discovering network topology for host: " + hostname);
+        
+        // Check if we already have cached information
+        NetworkNode cachedNode = networkNodes.get(hostname);
+        if (cachedNode != null && !cachedNode.isStale()) {
+            logger.fine("Using cached network information for: " + hostname);
+            return Future.succeededFuture(cachedNode);
+        }
+        
+        // Perform network discovery (blocking)
+        return vertx.executeBlocking(() -> performNetworkDiscovery(hostname))
+            .onSuccess(node -> {
                 networkNodes.put(hostname, node);
-                
                 logger.info("Network discovery completed for " + hostname + 
                            " - Latency: " + node.getLatency().toMillis() + "ms, " +
                            "Bandwidth: " + node.getEstimatedBandwidth() / (1024 * 1024) + " MB/s");
-                
-                return node;
-                
-            } catch (Exception e) {
-                logger.warning("Network discovery failed for " + hostname + ": " + e.getMessage());
-                
+            })
+            .onFailure(err -> {
+                logger.warning("Network discovery failed for " + hostname + ": " + err.getMessage());
+            })
+            .recover(err -> {
                 // Return a default node with conservative estimates
-                return NetworkNode.builder()
+                return Future.succeededFuture(NetworkNode.builder()
                         .hostname(hostname)
                         .reachable(false)
                         .latency(Duration.ofSeconds(1))
                         .estimatedBandwidth(1024 * 1024) // 1 MB/s default
                         .networkType(NetworkType.UNKNOWN)
                         .lastUpdated(Instant.now())
-                        .build();
-            }
-        });
+                        .build());
+            });
     }
     
-    public CompletableFuture<NetworkPath> findOptimalPath(String source, String destination) {
-        return CompletableFuture.supplyAsync(() -> {
-            String pathKey = source + "->" + destination;
-            
-            // Check cached path
-            NetworkPath cachedPath = networkPaths.get(pathKey);
-            if (cachedPath != null && !cachedPath.isStale()) {
-                return cachedPath;
-            }
-            
-            // Discover both nodes
-            NetworkNode sourceNode = discoverNode(source).join();
-            NetworkNode destNode = discoverNode(destination).join();
-            
-            // Calculate optimal path
-            NetworkPath path = calculateOptimalPath(sourceNode, destNode);
-            networkPaths.put(pathKey, path);
-            
-            logger.info("Optimal path calculated: " + source + " -> " + destination + 
-                       " (Quality: " + path.getQualityScore() + ")");
-            
-            return path;
-        });
-    }
-    
-    public NetworkRecommendations getTransferRecommendations(String hostname, long transferSize) {
-        NetworkNode node = networkNodes.get(hostname);
-        if (node == null) {
-            // Perform synchronous discovery for immediate recommendations
-            node = discoverNode(hostname).join();
+    public Future<NetworkPath> findOptimalPath(String source, String destination) {
+        String pathKey = source + "->" + destination;
+        
+        // Check cached path
+        NetworkPath cachedPath = networkPaths.get(pathKey);
+        if (cachedPath != null && !cachedPath.isStale()) {
+            return Future.succeededFuture(cachedPath);
         }
         
-        return NetworkRecommendations.builder()
-                .optimalBufferSize(calculateOptimalBufferSize(node, transferSize))
-                .recommendedConcurrency(calculateOptimalConcurrency(node, transferSize))
-                .estimatedTransferTime(estimateTransferTime(node, transferSize))
-                .networkQuality(assessNetworkQuality(node))
-                .useCompression(shouldUseCompression(node, transferSize))
-                .build();
+        // Discover both nodes
+        return Future.all(discoverNode(source), discoverNode(destination))
+            .map(composite -> {
+                NetworkNode sourceNode = composite.resultAt(0);
+                NetworkNode destNode = composite.resultAt(1);
+                
+                // Calculate optimal path
+                NetworkPath path = calculateOptimalPath(sourceNode, destNode);
+                networkPaths.put(pathKey, path);
+                
+                logger.info("Optimal path calculated: " + source + " -> " + destination + 
+                           " (Quality: " + path.getQualityScore() + ")");
+                return path;
+            });
+    }
+    
+    public Future<NetworkRecommendations> getTransferRecommendations(String hostname, long transferSize) {
+        NetworkNode node = networkNodes.get(hostname);
+        Future<NetworkNode> nodeFuture;
+        
+        if (node == null) {
+            nodeFuture = discoverNode(hostname);
+        } else {
+            nodeFuture = Future.succeededFuture(node);
+        }
+        
+        return nodeFuture.map(n -> NetworkRecommendations.builder()
+                .optimalBufferSize(calculateOptimalBufferSize(n, transferSize))
+                .recommendedConcurrency(calculateOptimalConcurrency(n, transferSize))
+                .estimatedTransferTime(estimateTransferTime(n, transferSize))
+                .networkQuality(assessNetworkQuality(n))
+                .useCompression(shouldUseCompression(n, transferSize))
+                .build());
     }
     
     public void updateMetrics(String hostname, long bytesTransferred, Duration actualTime, boolean successful) {

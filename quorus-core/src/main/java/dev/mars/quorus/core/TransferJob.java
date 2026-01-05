@@ -18,10 +18,14 @@ package dev.mars.quorus.core;
 
 
 import java.io.Serializable;
+import java.net.URI;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 public class TransferJob implements Serializable {
 
@@ -54,6 +58,27 @@ public class TransferJob implements Serializable {
         this.errorMessage = new AtomicReference<>();
         this.lastError = new AtomicReference<>();
         this.totalBytes = request.getExpectedSize();
+    }
+
+    @JsonCreator
+    public static TransferJob create(
+            @JsonProperty("jobId") String jobId,
+            @JsonProperty("sourceUri") URI sourceUri,
+            @JsonProperty("destinationPath") String destinationPath,
+            @JsonProperty("totalBytes") long totalBytes,
+            @JsonProperty("description") String description) {
+        
+        TransferRequest.Builder builder = TransferRequest.builder()
+                .requestId(jobId)
+                .sourceUri(sourceUri)
+                .destinationPath(destinationPath)
+                .expectedSize(totalBytes);
+                
+        if (description != null) {
+            builder.metadata("description", description);
+        }
+        
+        return new TransferJob(builder.build());
     }
 
     // ========== GETTER METHODS ==========

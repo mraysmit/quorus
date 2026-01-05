@@ -21,6 +21,7 @@ import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferResult;
 import dev.mars.quorus.core.exceptions.TransferException;
 import dev.mars.quorus.transfer.TransferContext;
+import io.vertx.core.Future;
 
 public interface TransferProtocol {
     
@@ -28,7 +29,26 @@ public interface TransferProtocol {
     
     boolean canHandle(TransferRequest request);
     
+    /**
+     * Execute transfer synchronously (blocking).
+     * @deprecated Use {@link #transferReactive(TransferRequest, TransferContext)} instead.
+     */
+    @Deprecated
     TransferResult transfer(TransferRequest request, TransferContext context) throws TransferException;
+
+    /**
+     * Execute transfer asynchronously (reactive).
+     * Default implementation wraps the blocking transfer method.
+     */
+    default Future<TransferResult> transferReactive(TransferRequest request, TransferContext context) {
+        return Future.future(promise -> {
+            try {
+                promise.complete(transfer(request, context));
+            } catch (Exception e) {
+                promise.fail(e);
+            }
+        });
+    }
     
     boolean supportsResume();
     

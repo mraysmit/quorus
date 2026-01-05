@@ -16,15 +16,15 @@
 
 package dev.mars.quorus.workflow;
 
-import java.util.concurrent.CompletableFuture;
+import io.vertx.core.Future;
 
 public interface WorkflowEngine {
     
-    CompletableFuture<WorkflowExecution> execute(WorkflowDefinition definition, ExecutionContext context);
+    Future<WorkflowExecution> execute(WorkflowDefinition definition, ExecutionContext context);
     
-    CompletableFuture<WorkflowExecution> dryRun(WorkflowDefinition definition, ExecutionContext context);
+    Future<WorkflowExecution> dryRun(WorkflowDefinition definition, ExecutionContext context);
     
-    CompletableFuture<WorkflowExecution> virtualRun(WorkflowDefinition definition, ExecutionContext context);
+    Future<WorkflowExecution> virtualRun(WorkflowDefinition definition, ExecutionContext context);
     
     WorkflowStatus getStatus(String executionId);
     
