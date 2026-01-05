@@ -16,6 +16,11 @@
 
 package dev.mars.quorus.controller.raft;
 
+import dev.mars.quorus.controller.raft.grpc.AppendEntriesRequest;
+import dev.mars.quorus.controller.raft.grpc.AppendEntriesResponse;
+import dev.mars.quorus.controller.raft.grpc.VoteRequest;
+import dev.mars.quorus.controller.raft.grpc.VoteResponse;
+
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -74,7 +79,7 @@ public class InMemoryTransport implements RaftTransport {
             // Process vote request
             VoteResponse response = targetTransport.handleVoteRequest(request);
             logger.fine("Vote request from " + nodeId + " to " + targetNodeId + 
-                       ": " + response.isVoteGranted());
+                       ": " + response.getVoteGranted());
             
             return response;
         }, executor);
@@ -100,20 +105,10 @@ public class InMemoryTransport implements RaftTransport {
             // Process append entries request
             AppendEntriesResponse response = targetTransport.handleAppendEntries(request);
             logger.fine("Append entries from " + nodeId + " to " + targetNodeId + 
-                       ": " + response.isSuccess());
+                       ": " + response.getSuccess());
             
             return response;
         }, executor);
-    }
-
-    @Override
-    public String getLocalNodeId() {
-        return nodeId;
-    }
-
-    @Override
-    public boolean isRunning() {
-        return running;
     }
 
     private VoteResponse handleVoteRequest(VoteRequest request) {
@@ -125,7 +120,10 @@ public class InMemoryTransport implements RaftTransport {
         // In a real implementation, this would be handled by the RaftNode
         boolean voteGranted = Math.random() > 0.1; // Grant 90% of votes for testing
         
-        return new VoteResponse(request.getTerm(), voteGranted, nodeId);
+        return VoteResponse.newBuilder()
+                .setTerm(request.getTerm())
+                .setVoteGranted(voteGranted)
+                .build();
     }
 
     private AppendEntriesResponse handleAppendEntries(AppendEntriesRequest request) {
@@ -137,9 +135,13 @@ public class InMemoryTransport implements RaftTransport {
         // In a real implementation, this would be handled by the RaftNode
         boolean success = Math.random() > 0.05; // 95% success rate for testing
         long matchIndex = request.getPrevLogIndex() + 
-                         (request.getEntries() != null ? request.getEntries().size() : 0);
+                         (request.getEntriesCount());
         
-        return new AppendEntriesResponse(request.getTerm(), success, nodeId, matchIndex);
+        return AppendEntriesResponse.newBuilder()
+                .setTerm(request.getTerm())
+                .setSuccess(success)
+                .setMatchIndex(matchIndex)
+                .build();
     }
 
     public static Map<String, InMemoryTransport> getAllTransports() {

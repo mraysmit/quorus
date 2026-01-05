@@ -123,6 +123,18 @@ public class RaftNode {
     }
 
     // ... Getters ...
+    public boolean isRunning() {
+        return running;
+    }
+
+    public String getLeaderId() {
+        return state == State.LEADER ? nodeId : votedFor;
+    }
+
+    public RaftStateMachine getStateMachine() {
+        return stateMachine;
+    }
+
     public State getState() {
         return state;
     }
@@ -185,7 +197,12 @@ public class RaftNode {
 
         for (String peerId : clusterNodes) {
             if (!peerId.equals(nodeId)) {
-                VoteRequest request = new VoteRequest(term, nodeId, lastLogIndex, lastLogTerm);
+                VoteRequest request = VoteRequest.newBuilder()
+                        .setTerm(term)
+                        .setCandidateId(nodeId)
+                        .setLastLogIndex(lastLogIndex)
+                        .setLastLogTerm(lastLogTerm)
+                        .build();
 
                 // Using transport (Wait for Future integration)
                 transport.sendVoteRequest(peerId, request)
@@ -207,8 +224,9 @@ public class RaftNode {
             return;
         }
 
-        if (response.isVoteGranted()) {
-            if (voteCount.incrementAndGet() > clusterNodes.size() / 2) {
+        if (response.getVoteGranted()) {
+            long votes = voteCount.incrementAndGet();
+            if (votes > clusterNodes.size() / 2) {
                 becomeLeader();
             }
         }
@@ -299,7 +317,10 @@ public class RaftNode {
             resetElectionTimer(); // Reset election timer if we vote
         }
 
-        return new VoteResponse(currentTerm, grant, nodeId);
+        return VoteResponse.newBuilder()
+                .setTerm(currentTerm)
+                .setVoteGranted(grant)
+                .build();
     }
 
     public AppendEntriesResponse handleAppendEntriesRequest(AppendEntriesRequest request) {
@@ -309,7 +330,11 @@ public class RaftNode {
         }
 
         // Simulating success
-        return new AppendEntriesResponse(currentTerm, true, nodeId, log.size());
+        return AppendEntriesResponse.newBuilder()
+                .setTerm(currentTerm)
+                .setSuccess(true)
+                .setMatchIndex(log.size())
+                .build();
     }
 
     private void sendAppendEntries(String target, boolean heartbeat) {

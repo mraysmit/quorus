@@ -39,11 +39,8 @@ public class HttpApiServer {
 
         router.post("/api/v1/command").respond(ctx -> {
             io.vertx.core.json.JsonObject body = ctx.body().asJsonObject();
-            return raftNode.submitCommand(body.getMap())
-                    .thenApply(res -> new io.vertx.core.json.JsonObject().put("result", "OK").put("data", res))
-                    .toCompletableFuture() // Ideal world: RaftNode returns Vert.x Future
-                    // For now, wrapper as simplified text:
-                    .thenApply(json -> (io.vertx.core.json.JsonObject) json);
+            return Future.fromCompletionStage(raftNode.submitCommand(body.getMap()))
+                    .map(res -> new io.vertx.core.json.JsonObject().put("result", "OK").put("data", res));
         });
 
         httpServer = vertx.createHttpServer()

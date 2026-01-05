@@ -5,8 +5,24 @@ module dev.mars.quorus.controller {
 
     requires com.fasterxml.jackson.annotation;
     requires com.fasterxml.jackson.databind;
+    requires com.fasterxml.jackson.datatype.jsr310;
 
-    requires io.vertx.core;  // Vert.x 5.x for reactive timers
+    requires io.vertx.core;
+    requires io.vertx.web;
+    requires io.vertx.grpc.client;
+    requires io.vertx.grpc.server;
+
+    requires org.slf4j;
+    requires org.apache.httpcomponents.client5.httpclient5;
+    requires org.apache.httpcomponents.core5.http;
+    requires io.grpc;
+    requires io.grpc.stub;
+    requires io.grpc.protobuf;
+    requires io.grpc.netty;
+    requires com.google.common;
+    requires protobuf.java;
+    requires protobuf.java.util;
+    requires java.annotation;
 
     requires dev.mars.quorus.core;
     requires dev.mars.quorus.workflow;
