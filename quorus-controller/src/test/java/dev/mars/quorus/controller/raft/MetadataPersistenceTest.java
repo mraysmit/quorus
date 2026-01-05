@@ -46,6 +46,7 @@ public class MetadataPersistenceTest {
     
     private List<RaftNode> cluster;
     private Map<String, MockRaftTransport> transports;
+    private io.vertx.core.Vertx vertx;
     private static final int CLUSTER_SIZE = 5;
     private static final String[] NODE_IDS = {"node1", "node2", "node3", "node4", "node5"};
 
@@ -53,6 +54,7 @@ public class MetadataPersistenceTest {
     void setUp() {
         logger.info("=== SETTING UP METADATA PERSISTENCE TEST ===");
         
+        vertx = io.vertx.core.Vertx.vertx();
         cluster = new ArrayList<>();
         transports = new HashMap<>();
         
@@ -70,7 +72,8 @@ public class MetadataPersistenceTest {
         Set<String> clusterNodes = Set.of(NODE_IDS);
         for (String nodeId : NODE_IDS) {
             QuorusStateMachine stateMachine = new QuorusStateMachine();
-            RaftNode node = new RaftNode(nodeId, clusterNodes, transports.get(nodeId), stateMachine);
+            // Use shorter timeouts for testing: 1000ms election, 200ms heartbeat
+            RaftNode node = new RaftNode(vertx, nodeId, clusterNodes, transports.get(nodeId), stateMachine, 1000, 200);
             cluster.add(node);
         }
         
@@ -94,6 +97,9 @@ public class MetadataPersistenceTest {
                     logger.warning("Error stopping node " + node.getNodeId() + ": " + e.getMessage());
                 }
             }
+        }
+        if (vertx != null) {
+            vertx.close();
         }
     }
 
@@ -300,10 +306,9 @@ public class MetadataPersistenceTest {
                 .sourceUri(URI.create("file:///test/source/" + jobId + ".txt"))
                 .destinationPath(Paths.get("/test/dest/" + jobId + ".txt"))
                 .expectedSize(1024L)
+                .metadata("description", description)
+                .metadata("testId", jobId)
                 .build();
-            
-            request.getMetadata().put("description", description);
-            request.getMetadata().put("testId", jobId);
             
             return new TransferJob(request);
         } catch (Exception e) {

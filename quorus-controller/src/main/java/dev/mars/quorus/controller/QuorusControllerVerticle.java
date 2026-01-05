@@ -69,17 +69,20 @@ public class QuorusControllerVerticle extends AbstractVerticle {
             transport.setRaftNode(raftNode);
 
             // 4. Start Raft
-            raftNode.start();
+            raftNode.start().thenAccept(v -> {
+                // 5. Start HTTP API
+                this.apiServer = new HttpApiServer(vertx, port, raftNode);
 
-            // 5. Start HTTP API
-            this.apiServer = new HttpApiServer(vertx, port, raftNode);
-
-            apiServer.start()
-                    .onSuccess(v -> {
-                        logger.info("QuorusControllerVerticle started successfully");
-                        startPromise.complete();
-                    })
-                    .onFailure(startPromise::fail);
+                apiServer.start()
+                        .onSuccess(server -> {
+                            logger.info("QuorusControllerVerticle started successfully");
+                            startPromise.complete();
+                        })
+                        .onFailure(startPromise::fail);
+            }).exceptionally(e -> {
+                startPromise.fail(e);
+                return null;
+            });
 
         } catch (Exception e) {
             startPromise.fail(e);

@@ -17,12 +17,15 @@ package dev.mars.quorus.core;
  */
 
 
+import java.io.Serializable;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
-public class TransferJob {
+public class TransferJob implements Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     private final TransferRequest request;
 

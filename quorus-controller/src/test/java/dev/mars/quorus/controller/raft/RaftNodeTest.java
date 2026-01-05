@@ -16,9 +16,12 @@
 
 package dev.mars.quorus.controller.raft;
 
+import dev.mars.quorus.controller.raft.grpc.VoteRequest;
+import dev.mars.quorus.controller.raft.grpc.VoteResponse;
 import dev.mars.quorus.controller.state.QuorusStateMachine;
 import dev.mars.quorus.controller.state.SystemMetadataCommand;
 import org.awaitility.Awaitility;
+import static org.awaitility.Awaitility.await;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -35,6 +38,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class RaftNodeTest {
 
+    private io.vertx.core.Vertx vertx;
     private RaftNode node1;
     private RaftNode node2;
     private RaftNode node3;
@@ -47,6 +51,7 @@ class RaftNodeTest {
 
     @BeforeEach
     void setUp() {
+        vertx = io.vertx.core.Vertx.vertx();
         // Clear any existing transports
         InMemoryTransport.clearAllTransports();
 
@@ -64,9 +69,9 @@ class RaftNodeTest {
         stateMachine3 = new QuorusStateMachine();
 
         // Create Raft nodes with shorter timeouts for testing
-        node1 = new RaftNode("node1", clusterNodes, transport1, stateMachine1, 1000, 200);
-        node2 = new RaftNode("node2", clusterNodes, transport2, stateMachine2, 1000, 200);
-        node3 = new RaftNode("node3", clusterNodes, transport3, stateMachine3, 1000, 200);
+        node1 = new RaftNode(vertx, "node1", clusterNodes, transport1, stateMachine1, 1000, 200);
+        node2 = new RaftNode(vertx, "node2", clusterNodes, transport2, stateMachine2, 1000, 200);
+        node3 = new RaftNode(vertx, "node3", clusterNodes, transport3, stateMachine3, 1000, 200);
     }
 
     @AfterEach
@@ -74,6 +79,7 @@ class RaftNodeTest {
         if (node1 != null) node1.stop();
         if (node2 != null) node2.stop();
         if (node3 != null) node3.stop();
+        if (vertx != null) vertx.close();
         InMemoryTransport.clearAllTransports();
     }
 
@@ -89,11 +95,11 @@ class RaftNodeTest {
     void testNodeStartAndStop() {
         assertFalse(transport1.isRunning());
         
-        node1.start();
+        node1.start().join();
         assertTrue(transport1.isRunning());
         assertEquals(RaftNode.State.FOLLOWER, node1.getState());
         
-        node1.stop();
+        node1.stop().join();
         assertFalse(transport1.isRunning());
     }
 
@@ -101,7 +107,7 @@ class RaftNodeTest {
     void testSingleNodeElection() {
         // Create a single-node cluster
         Set<String> singleNodeCluster = Set.of("node1");
-        RaftNode singleNode = new RaftNode("node1", singleNodeCluster, transport1, stateMachine1, 500, 100);
+        RaftNode singleNode = new RaftNode(vertx, "node1", singleNodeCluster, transport1, stateMachine1, 500, 100);
         
         singleNode.start();
         
@@ -148,14 +154,12 @@ class RaftNodeTest {
 
     @Test
     void testCommandSubmissionToNonLeader() {
-        node1.start();
+        node1.start().join();
         
         // Node starts as follower, command submission should fail
         SystemMetadataCommand command = SystemMetadataCommand.set("test-key", "test-value");
         
         CompletableFuture<Object> future = node1.submitCommand(command);
-        
-        assertTrue(future.isCompletedExceptionally());
         
         // Verify the exception
         assertThrows(Exception.class, () -> {
@@ -206,13 +210,17 @@ class RaftNodeTest {
         assertTrue(transport2.isRunning());
         
         // Test vote request
-        VoteRequest voteRequest = new VoteRequest(1, "node1", 0, 0);
+        VoteRequest voteRequest = VoteRequest.newBuilder()
+                .setTerm(1)
+                .setCandidateId("node1")
+                .setLastLogIndex(0)
+                .setLastLogTerm(0)
+                .build();
         CompletableFuture<VoteResponse> future = transport1.sendVoteRequest("node2", voteRequest);
         
         assertDoesNotThrow(() -> {
             VoteResponse response = future.get(1, TimeUnit.SECONDS);
             assertNotNull(response);
-            assertEquals("node2", response.getNodeId());
             assertEquals(1, response.getTerm());
         });
     }
@@ -235,16 +243,23 @@ class RaftNodeTest {
 
     @Test
     void testVoteRequestResponse() {
-        VoteRequest request = new VoteRequest(2, "candidate1", 10, 1);
+        VoteRequest request = VoteRequest.newBuilder()
+                .setTerm(2)
+                .setCandidateId("candidate1")
+                .setLastLogIndex(10)
+                .setLastLogTerm(1)
+                .build();
         assertEquals(2, request.getTerm());
         assertEquals("candidate1", request.getCandidateId());
         assertEquals(10, request.getLastLogIndex());
         assertEquals(1, request.getLastLogTerm());
         
-        VoteResponse response = new VoteResponse(2, true, "voter1");
+        VoteResponse response = VoteResponse.newBuilder()
+                .setTerm(2)
+                .setVoteGranted(true)
+                .build();
         assertEquals(2, response.getTerm());
-        assertTrue(response.isVoteGranted());
-        assertEquals("voter1", response.getNodeId());
+        assertTrue(response.getVoteGranted());
     }
 
     @Test
@@ -256,7 +271,7 @@ class RaftNodeTest {
         
         // After election timeout, should become candidate (in a single node cluster)
         Set<String> singleNodeCluster = Set.of("node1");
-        RaftNode singleNode = new RaftNode("node1", singleNodeCluster, 
+        RaftNode singleNode = new RaftNode(vertx, "node1", singleNodeCluster, 
                                           new InMemoryTransport("node1"), 
                                           new QuorusStateMachine(), 500, 100);
         singleNode.start();

@@ -14,6 +14,11 @@
 
 package dev.mars.quorus.controller.raft;
 
+import dev.mars.quorus.controller.raft.grpc.AppendEntriesRequest;
+import dev.mars.quorus.controller.raft.grpc.AppendEntriesResponse;
+import dev.mars.quorus.controller.raft.grpc.VoteRequest;
+import dev.mars.quorus.controller.raft.grpc.VoteResponse;
+
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
@@ -34,6 +39,7 @@ public class MockRaftTransport implements RaftTransport {
     private volatile Consumer<Object> messageHandler;
     private volatile boolean running = false;
     private Map<String, MockRaftTransport> transports;
+    private RaftNode raftNode;
 
     public MockRaftTransport(String nodeId) {
         this.nodeId = nodeId;
@@ -45,6 +51,11 @@ public class MockRaftTransport implements RaftTransport {
      */
     public void setTransports(Map<String, MockRaftTransport> transports) {
         this.transports = transports;
+    }
+
+    @Override
+    public void setRaftNode(RaftNode node) {
+        this.raftNode = node;
     }
 
     @Override
@@ -60,12 +71,10 @@ public class MockRaftTransport implements RaftTransport {
         logger.info("Stopped mock transport for node: " + nodeId);
     }
 
-    @Override
     public boolean isRunning() {
         return running;
     }
 
-    @Override
     public String getLocalNodeId() {
         return nodeId;
     }
@@ -89,7 +98,7 @@ public class MockRaftTransport implements RaftTransport {
             // Process vote request
             VoteResponse response = targetTransport.handleVoteRequest(request);
             logger.fine("Vote request from " + nodeId + " to " + targetNodeId + 
-                       ": " + response.isVoteGranted());
+                       ": " + response.getVoteGranted());
             
             return response;
         }, executor);
@@ -115,36 +124,48 @@ public class MockRaftTransport implements RaftTransport {
             // Process append entries request
             AppendEntriesResponse response = targetTransport.handleAppendEntries(request);
             logger.fine("Append entries from " + nodeId + " to " + targetNodeId + 
-                       ": " + response.isSuccess());
+                       ": " + response.getSuccess());
             
             return response;
         }, executor);
     }
 
     private VoteResponse handleVoteRequest(VoteRequest request) {
+        if (raftNode != null) {
+            return raftNode.handleVoteRequest(request);
+        }
+        
         if (messageHandler != null) {
             messageHandler.accept(request);
         }
         
-        // Simple vote granting logic for testing
-        // In a real implementation, this would be handled by the RaftNode
-        boolean voteGranted = Math.random() > 0.1; // Grant 90% of votes for testing
+        // Fallback if RaftNode is not set (should not happen in correct setup)
+        boolean voteGranted = Math.random() > 0.1; 
         
-        return new VoteResponse(request.getTerm(), voteGranted, nodeId);
+        return VoteResponse.newBuilder()
+                .setTerm(request.getTerm())
+                .setVoteGranted(voteGranted)
+                .build();
     }
 
     private AppendEntriesResponse handleAppendEntries(AppendEntriesRequest request) {
+        if (raftNode != null) {
+            return raftNode.handleAppendEntriesRequest(request);
+        }
+
         if (messageHandler != null) {
             messageHandler.accept(request);
         }
         
-        // Simple success logic for testing
-        // In a real implementation, this would be handled by the RaftNode
-        boolean success = Math.random() > 0.05; // 95% success rate for testing
-        long matchIndex = request.getPrevLogIndex() + 
-                         (request.getEntries() != null ? request.getEntries().size() : 0);
+        // Fallback if RaftNode is not set
+        boolean success = Math.random() > 0.05; 
+        long matchIndex = request.getPrevLogIndex() + request.getEntriesCount();
         
-        return new AppendEntriesResponse(request.getTerm(), success, nodeId, matchIndex);
+        return AppendEntriesResponse.newBuilder()
+                .setTerm(request.getTerm())
+                .setSuccess(success)
+                .setMatchIndex(matchIndex)
+                .build();
     }
 }
 

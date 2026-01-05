@@ -155,7 +155,7 @@ public class InMemoryTransport implements RaftTransport {
 
     private VoteResponse handleVoteRequest(VoteRequest request) {
         if (raftNode != null) {
-            return raftNode.handleVoteRequest(request);
+            return raftNode.handleVoteRequest(request).join();
         }
         
         if (messageHandler != null) {
@@ -171,7 +171,7 @@ public class InMemoryTransport implements RaftTransport {
 
     private AppendEntriesResponse handleAppendEntries(AppendEntriesRequest request) {
         if (raftNode != null) {
-            return raftNode.handleAppendEntriesRequest(request);
+            return raftNode.handleAppendEntriesRequest(request).join();
         }
 
         if (messageHandler != null) {

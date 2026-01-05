@@ -4,10 +4,12 @@ import dev.mars.quorus.controller.raft.grpc.AppendEntriesRequest;
 import dev.mars.quorus.controller.raft.grpc.AppendEntriesResponse;
 import dev.mars.quorus.controller.raft.grpc.VoteRequest;
 import dev.mars.quorus.controller.raft.grpc.VoteResponse;
+import com.google.protobuf.ByteString;
 import io.vertx.core.Vertx;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.*;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -38,21 +40,22 @@ public class RaftNode {
     private final RaftStateMachine stateMachine;
 
     // ========== PERSISTENT STATE ==========
-    private long currentTerm = 0;
+    private volatile long currentTerm = 0;
     private String votedFor = null;
     private final List<LogEntry> log = new ArrayList<>();
 
     // ========== VOLATILE STATE ==========
-    private State state = State.FOLLOWER;
-    private long commitIndex = 0;
-    private long lastApplied = 0;
+    private volatile State state = State.FOLLOWER;
+    private volatile long commitIndex = 0;
+    private volatile long lastApplied = 0;
 
     // ========== LEADER STATE ==========
     private final Map<String, Long> nextIndex = new HashMap<>();
     private final Map<String, Long> matchIndex = new HashMap<>();
+    private final Map<Long, CompletableFuture<Object>> pendingCommands = new ConcurrentHashMap<>();
 
     // ========== TIMING AND CONTROL ==========
-    private boolean running = false;
+    private volatile boolean running = false;
     private long electionTimerId = -1;
     private long heartbeatTimerId = -1;
 
@@ -79,45 +82,88 @@ public class RaftNode {
         log.add(new LogEntry(0, 0, null));
     }
 
-    public void start() {
-        if (running)
-            return;
-        running = true;
+    public CompletableFuture<Void> start() {
+        CompletableFuture<Void> future = new CompletableFuture<>();
+        vertx.runOnContext(v -> {
+            try {
+                if (running) {
+                    future.complete(null);
+                    return;
+                }
 
-        logger.info("Starting Raft node: {}", nodeId);
+                logger.info("Starting Raft node: {}", nodeId);
 
-        // Start transport listener
-        transport.start(this::handleMessage);
+                // Set reference to this node in transport
+                transport.setRaftNode(this);
 
-        // Start election timer
-        resetElectionTimer();
+                // Start transport listener
+                transport.start(this::handleMessage);
+
+                // Start election timer
+                resetElectionTimer();
+                
+                running = true;
+                future.complete(null);
+            } catch (Exception e) {
+                logger.error("Failed to start Raft node", e);
+                future.completeExceptionally(e);
+            }
+        });
+        return future;
     }
 
-    public void stop() {
-        if (!running)
-            return;
-        running = false;
+    public CompletableFuture<Void> stop() {
+        CompletableFuture<Void> future = new CompletableFuture<>();
+        vertx.runOnContext(v -> {
+            try {
+                if (!running) {
+                    future.complete(null);
+                    return;
+                }
+                running = false;
+                state = State.FOLLOWER;
 
-        cancelTimers();
-        transport.stop();
-        logger.info("Raft node stopped: {}", nodeId);
+                cancelTimers();
+                transport.stop();
+                logger.info("Raft node stopped: {}", nodeId);
+                future.complete(null);
+            } catch (Exception e) {
+                logger.error("Failed to stop Raft node", e);
+                future.completeExceptionally(e);
+            }
+        });
+        return future;
     }
 
     public CompletableFuture<Object> submitCommand(Object command) {
-        if (state != State.LEADER) {
-            return CompletableFuture.failedFuture(
-                    new IllegalStateException("Not the leader. Current state: " + state));
-        }
-
-        // Create log entry
-        LogEntry entry = new LogEntry(currentTerm, log.size(), command);
-        log.add(entry);
-
-        logger.info("Command submitted at index {} term {}", entry.getIndex(), entry.getTerm());
-
-        // Start replication
         CompletableFuture<Object> future = new CompletableFuture<>();
-        replicateEntry(entry, future);
+
+        vertx.runOnContext(v -> {
+            if (state != State.LEADER) {
+                future.completeExceptionally(
+                        new IllegalStateException("Not the leader. Current state: " + state));
+                return;
+            }
+
+            // Create log entry
+            LogEntry entry = new LogEntry(currentTerm, log.size(), command);
+            log.add(entry);
+            
+            // Register future
+            pendingCommands.put(entry.getIndex(), future);
+
+            logger.info("Command submitted at index {} term {}", entry.getIndex(), entry.getTerm());
+
+            // Trigger replication
+            for (String peer : clusterNodes) {
+                if (!peer.equals(nodeId)) {
+                    sendAppendEntries(peer, false);
+                }
+            }
+            
+            // Try to commit immediately (crucial for single-node clusters)
+            updateCommitIndex();
+        });
 
         return future;
     }
@@ -267,7 +313,7 @@ public class RaftNode {
 
         for (String peer : clusterNodes) {
             if (!peer.equals(nodeId)) {
-                sendAppendEntries(peer, true);
+                sendAppendEntries(peer, false);
             }
         }
     }
@@ -300,56 +346,217 @@ public class RaftNode {
         }
     }
 
-    public VoteResponse handleVoteRequest(VoteRequest request) {
-        // Only updates logic...
-        // Simplified for brevity, assume similar logic to original but without
-        // synchronized
-        long reqTerm = request.getTerm();
-        boolean grant = false;
-
-        if (reqTerm > currentTerm) {
-            stepDown(reqTerm);
-        }
-
-        if (reqTerm == currentTerm && (votedFor == null || votedFor.equals(request.getCandidateId()))) {
-            votedFor = request.getCandidateId();
-            grant = true;
-            resetElectionTimer(); // Reset election timer if we vote
-        }
-
-        return VoteResponse.newBuilder()
-                .setTerm(currentTerm)
-                .setVoteGranted(grant)
-                .build();
-    }
-
-    public AppendEntriesResponse handleAppendEntriesRequest(AppendEntriesRequest request) {
-        if (request.getTerm() >= currentTerm) {
-            stepDown(request.getTerm());
-            resetElectionTimer(); // Valid leader
-        }
-
-        // Simulating success
-        return AppendEntriesResponse.newBuilder()
-                .setTerm(currentTerm)
-                .setSuccess(true)
-                .setMatchIndex(log.size())
-                .build();
-    }
-
-    private void sendAppendEntries(String target, boolean heartbeat) {
-        // Implementation
-    }
-
-    private void replicateEntry(LogEntry entry, CompletableFuture<Object> future) {
-        // Mock replication
-        vertx.setTimer(50, id -> {
+    public CompletableFuture<VoteResponse> handleVoteRequest(VoteRequest request) {
+        CompletableFuture<VoteResponse> future = new CompletableFuture<>();
+        vertx.runOnContext(v -> {
             try {
-                Object res = stateMachine.apply(entry.getCommand());
-                future.complete(res);
+                long reqTerm = request.getTerm();
+                boolean grant = false;
+
+                if (reqTerm > currentTerm) {
+                    stepDown(reqTerm);
+                }
+
+                if (reqTerm == currentTerm && (votedFor == null || votedFor.equals(request.getCandidateId()))) {
+                    votedFor = request.getCandidateId();
+                    grant = true;
+                    resetElectionTimer(); // Reset election timer if we vote
+                }
+
+                future.complete(VoteResponse.newBuilder()
+                        .setTerm(currentTerm)
+                        .setVoteGranted(grant)
+                        .build());
             } catch (Exception e) {
+                logger.error("Error handling vote request", e);
                 future.completeExceptionally(e);
             }
         });
+        return future;
+    }
+
+    public CompletableFuture<AppendEntriesResponse> handleAppendEntriesRequest(AppendEntriesRequest request) {
+        CompletableFuture<AppendEntriesResponse> future = new CompletableFuture<>();
+        vertx.runOnContext(v -> {
+            try {
+                if (request.getTerm() < currentTerm) {
+                    future.complete(AppendEntriesResponse.newBuilder()
+                            .setTerm(currentTerm)
+                            .setSuccess(false)
+                            .build());
+                    return;
+                }
+
+                if (request.getTerm() > currentTerm) {
+                    stepDown(request.getTerm());
+                }
+                
+                resetElectionTimer();
+
+                // Consistency check
+                if (log.size() <= request.getPrevLogIndex() ||
+                    log.get((int) request.getPrevLogIndex()).getTerm() != request.getPrevLogTerm()) {
+                    future.complete(AppendEntriesResponse.newBuilder()
+                            .setTerm(currentTerm)
+                            .setSuccess(false)
+                            .setMatchIndex(log.size() - 1) // Hint for leader
+                            .build());
+                    return;
+                }
+
+                // Append new entries
+                long currentIndex = request.getPrevLogIndex() + 1;
+                for (dev.mars.quorus.controller.raft.grpc.LogEntry entryProto : request.getEntriesList()) {
+                    // Deserialize command
+                    Object command = deserialize(entryProto.getData());
+                    LogEntry newEntry = new LogEntry(entryProto.getTerm(), currentIndex, command);
+                    
+                    if (log.size() > currentIndex) {
+                        if (log.get((int) currentIndex).getTerm() != entryProto.getTerm()) {
+                            // Conflict, delete existing and following
+                            log.subList((int) currentIndex, log.size()).clear();
+                            log.add(newEntry);
+                        }
+                        // Else matches, skip
+                    } else {
+                        log.add(newEntry);
+                    }
+                    currentIndex++;
+                }
+
+                // Update commit index
+                if (request.getLeaderCommit() > commitIndex) {
+                    commitIndex = Math.min(request.getLeaderCommit(), log.size() - 1);
+                    applyLog();
+                }
+
+                future.complete(AppendEntriesResponse.newBuilder()
+                        .setTerm(currentTerm)
+                        .setSuccess(true)
+                        .setMatchIndex(log.size() - 1)
+                        .build());
+            } catch (Exception e) {
+                logger.error("Error handling append entries request", e);
+                future.completeExceptionally(e);
+            }
+        });
+        return future;
+    }
+
+    private void sendAppendEntries(String target, boolean heartbeat) {
+        long nextIdx = nextIndex.getOrDefault(target, 1L);
+        long prevLogIndex = nextIdx - 1;
+        long prevLogTerm = 0;
+        if (prevLogIndex >= 0 && prevLogIndex < log.size()) {
+            prevLogTerm = log.get((int) prevLogIndex).getTerm();
+        }
+
+        AppendEntriesRequest.Builder builder = AppendEntriesRequest.newBuilder()
+                .setTerm(currentTerm)
+                .setLeaderId(nodeId)
+                .setPrevLogIndex(prevLogIndex)
+                .setPrevLogTerm(prevLogTerm)
+                .setLeaderCommit(commitIndex);
+
+        if (!heartbeat) {
+            for (int i = (int) nextIdx; i < log.size(); i++) {
+                LogEntry entry = log.get(i);
+                builder.addEntries(dev.mars.quorus.controller.raft.grpc.LogEntry.newBuilder()
+                        .setTerm(entry.getTerm())
+                        .setIndex(entry.getIndex())
+                        .setData(serialize(entry.getCommand()))
+                        .build());
+            }
+        }
+
+        transport.sendAppendEntries(target, builder.build())
+                .thenAccept(response -> vertx.runOnContext(v -> handleAppendEntriesResponse(target, response)))
+                .exceptionally(e -> {
+                    logger.warn("Failed to send AppendEntries to {}", target);
+                    return null;
+                });
+    }
+
+    private void handleAppendEntriesResponse(String peerId, AppendEntriesResponse response) {
+        if (state != State.LEADER) return;
+
+        if (response.getTerm() > currentTerm) {
+            stepDown(response.getTerm());
+            return;
+        }
+
+        if (response.getSuccess()) {
+            matchIndex.put(peerId, response.getMatchIndex());
+            nextIndex.put(peerId, response.getMatchIndex() + 1);
+            updateCommitIndex();
+        } else {
+            // Backtrack
+            long next = nextIndex.getOrDefault(peerId, 1L);
+            nextIndex.put(peerId, Math.max(1, next - 1));
+            // Retry immediately? Or wait for next heartbeat/trigger?
+            // For simplicity, let next heartbeat handle it or trigger retry
+        }
+    }
+
+    private void updateCommitIndex() {
+        // If there exists an N such that N > commitIndex, a majority of matchIndex[i] >= N, 
+        // and log[N].term == currentTerm: set commitIndex = N
+        
+        List<Long> indices = new ArrayList<>(matchIndex.values());
+        indices.add(log.size() - 1L); // Leader's match index
+        Collections.sort(indices);
+        long N = indices.get(indices.size() / 2); // Majority index
+        
+        if (N > commitIndex && log.get((int) N).getTerm() == currentTerm) {
+            commitIndex = N;
+            applyLog();
+        }
+    }
+
+    private void applyLog() {
+        while (lastApplied < commitIndex) {
+            lastApplied++;
+            LogEntry entry = log.get((int) lastApplied);
+            Object result = null;
+            Exception exception = null;
+            
+            if (entry.getCommand() != null) {
+                try {
+                    result = stateMachine.apply(entry.getCommand());
+                } catch (Exception e) {
+                    logger.error("Failed to apply command at index {}", lastApplied, e);
+                    exception = e;
+                }
+            }
+            
+            // Complete future if this node is leader
+            CompletableFuture<Object> future = pendingCommands.remove(lastApplied);
+            if (future != null) {
+                if (exception != null) {
+                    future.completeExceptionally(exception);
+                } else {
+                    future.complete(result);
+                }
+            }
+        }
+    }
+
+    private ByteString serialize(Object obj) {
+        try (ByteArrayOutputStream bos = new ByteArrayOutputStream();
+             ObjectOutputStream out = new ObjectOutputStream(bos)) {
+            out.writeObject(obj);
+            return ByteString.copyFrom(bos.toByteArray());
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to serialize command", e);
+        }
+    }
+
+    private Object deserialize(ByteString data) {
+        try (ByteArrayInputStream bis = new ByteArrayInputStream(data.toByteArray());
+             ObjectInputStream in = new ObjectInputStream(bis)) {
+            return in.readObject();
+        } catch (IOException | ClassNotFoundException e) {
+            throw new RuntimeException("Failed to deserialize command", e);
+        }
     }
 }
