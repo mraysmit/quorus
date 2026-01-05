@@ -4,8 +4,8 @@ import dev.mars.quorus.controller.raft.grpc.AppendEntriesRequest;
 import dev.mars.quorus.controller.raft.grpc.AppendEntriesResponse;
 import dev.mars.quorus.controller.raft.grpc.VoteRequest;
 import dev.mars.quorus.controller.raft.grpc.VoteResponse;
+import io.vertx.core.Future;
 
-import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
 /**
@@ -17,9 +17,9 @@ public interface RaftTransport {
 
     void stop();
 
-    CompletableFuture<VoteResponse> sendVoteRequest(String targetId, VoteRequest request);
+    Future<VoteResponse> sendVoteRequest(String targetId, VoteRequest request);
 
-    CompletableFuture<AppendEntriesResponse> sendAppendEntries(String targetId, AppendEntriesRequest request);
+    Future<AppendEntriesResponse> sendAppendEntries(String targetId, AppendEntriesRequest request);
 
     // Helper to set RaftNode reference
     default void setRaftNode(RaftNode node) {
