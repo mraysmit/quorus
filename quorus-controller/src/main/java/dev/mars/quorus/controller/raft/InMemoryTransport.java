@@ -20,12 +20,13 @@ import dev.mars.quorus.controller.raft.grpc.AppendEntriesRequest;
 import dev.mars.quorus.controller.raft.grpc.AppendEntriesResponse;
 import dev.mars.quorus.controller.raft.grpc.VoteRequest;
 import dev.mars.quorus.controller.raft.grpc.VoteResponse;
+import io.vertx.core.Future;
+import io.vertx.core.Promise;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Map;
 import java.util.Random;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
@@ -91,69 +92,86 @@ public class InMemoryTransport implements RaftTransport {
     }
 
     @Override
-    public CompletableFuture<VoteResponse> sendVoteRequest(String targetNodeId, VoteRequest request) {
-        return CompletableFuture.supplyAsync(() -> {
-            // Simulate Packet Drop
-            if (dropRate > 0 && random.nextDouble() < dropRate) {
-                logger.debug("Dropped VoteRequest from {} to {}", nodeId, targetNodeId);
-                throw new RuntimeException("Network packet dropped (Chaos)");
-            }
-
-            InMemoryTransport targetTransport = transports.get(targetNodeId);
-            if (targetTransport == null || !targetTransport.running) {
-                throw new RuntimeException("Target node not available: " + targetNodeId);
-            }
-
-            // Simulate network delay
+    public Future<VoteResponse> sendVoteRequest(String targetNodeId, VoteRequest request) {
+        Promise<VoteResponse> promise = Promise.promise();
+        executor.execute(() -> {
             try {
-                long delay = minLatencyMs + random.nextInt(Math.max(1, maxLatencyMs - minLatencyMs + 1));
-                Thread.sleep(delay);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new RuntimeException(e);
-            }
+                // Simulate Packet Drop
+                if (dropRate > 0 && random.nextDouble() < dropRate) {
+                    logger.debug("Dropped VoteRequest from {} to {}", nodeId, targetNodeId);
+                    throw new RuntimeException("Network packet dropped (Chaos)");
+                }
 
-            // Process vote request
-            VoteResponse response = targetTransport.handleVoteRequest(request);
-            logger.debug("Vote request from {} to {}: {}", nodeId, targetNodeId, response.getVoteGranted());
-            
-            return response;
-        }, executor);
+                InMemoryTransport targetTransport = transports.get(targetNodeId);
+                if (targetTransport == null || !targetTransport.running) {
+                    throw new RuntimeException("Target node not available: " + targetNodeId);
+                }
+
+                // Simulate network delay
+                try {
+                    long delay = minLatencyMs + random.nextInt(Math.max(1, maxLatencyMs - minLatencyMs + 1));
+                    Thread.sleep(delay);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException(e);
+                }
+
+                // Process vote request
+                targetTransport.handleVoteRequest(request)
+                        .onSuccess(response -> {
+                            logger.debug("Vote request from {} to {}: {}", nodeId, targetNodeId, response.getVoteGranted());
+                            promise.complete(response);
+                        })
+                        .onFailure(promise::fail);
+
+            } catch (Exception e) {
+                promise.fail(e);
+            }
+        });
+        return promise.future();
     }
 
     @Override
-    public CompletableFuture<AppendEntriesResponse> sendAppendEntries(String targetNodeId, 
+    public Future<AppendEntriesResponse> sendAppendEntries(String targetNodeId, 
                                                                      AppendEntriesRequest request) {
-        return CompletableFuture.supplyAsync(() -> {
-            // Simulate Packet Drop
-            if (dropRate > 0 && random.nextDouble() < dropRate) {
-                logger.debug("Dropped AppendEntries from {} to {}", nodeId, targetNodeId);
-                throw new RuntimeException("Network packet dropped (Chaos)");
-            }
-
-            InMemoryTransport targetTransport = transports.get(targetNodeId);
-            if (targetTransport == null || !targetTransport.running) {
-                throw new RuntimeException("Target node not available: " + targetNodeId);
-            }
-
-            // Simulate network delay
+        Promise<AppendEntriesResponse> promise = Promise.promise();
+        executor.execute(() -> {
             try {
-                long delay = minLatencyMs + random.nextInt(Math.max(1, maxLatencyMs - minLatencyMs + 1));
-                Thread.sleep(delay);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new RuntimeException(e);
-            }
+                // Simulate Packet Drop
+                if (dropRate > 0 && random.nextDouble() < dropRate) {
+                    logger.debug("Dropped AppendEntries from {} to {}", nodeId, targetNodeId);
+                    throw new RuntimeException("Network packet dropped (Chaos)");
+                }
 
-            // Process append entries request
-            AppendEntriesResponse response = targetTransport.handleAppendEntries(request);
-            logger.debug("Append entries from {} to {}: {}", nodeId, targetNodeId, response.getSuccess());
-            
-            return response;
-        }, executor);
+                InMemoryTransport targetTransport = transports.get(targetNodeId);
+                if (targetTransport == null || !targetTransport.running) {
+                    throw new RuntimeException("Target node not available: " + targetNodeId);
+                }
+
+                // Simulate network delay
+                try {
+                    long delay = minLatencyMs + random.nextInt(Math.max(1, maxLatencyMs - minLatencyMs + 1));
+                    Thread.sleep(delay);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException(e);
+                }
+
+                // Process append entries request
+                targetTransport.handleAppendEntries(request)
+                        .onSuccess(response -> {
+                            logger.debug("Append entries from {} to {}: {}", nodeId, targetNodeId, response.getSuccess());
+                            promise.complete(response);
+                        })
+                        .onFailure(promise::fail);
+            } catch (Exception e) {
+                promise.fail(e);
+            }
+        });
+        return promise.future();
     }
 
-    private VoteResponse handleVoteRequest(VoteRequest request) {
+    private Future<VoteResponse> handleVoteRequest(VoteRequest request) {
         if (raftNode != null) {
             return raftNode.handleVoteRequest(request);
         }
@@ -163,13 +181,13 @@ public class InMemoryTransport implements RaftTransport {
         }
         
         logger.warn("RaftNode not set for transport {}, returning failure", nodeId);
-        return VoteResponse.newBuilder()
+        return Future.succeededFuture(VoteResponse.newBuilder()
                 .setTerm(request.getTerm())
                 .setVoteGranted(false)
-                .build();
+                .build());
     }
 
-    private AppendEntriesResponse handleAppendEntries(AppendEntriesRequest request) {
+    private Future<AppendEntriesResponse> handleAppendEntries(AppendEntriesRequest request) {
         if (raftNode != null) {
             return raftNode.handleAppendEntriesRequest(request);
         }
@@ -179,10 +197,10 @@ public class InMemoryTransport implements RaftTransport {
         }
         
         logger.warn("RaftNode not set for transport {}, returning failure", nodeId);
-        return AppendEntriesResponse.newBuilder()
+        return Future.succeededFuture(AppendEntriesResponse.newBuilder()
                 .setTerm(request.getTerm())
                 .setSuccess(false)
-                .build();
+                .build());
     }
 
     public static Map<String, InMemoryTransport> getAllTransports() {

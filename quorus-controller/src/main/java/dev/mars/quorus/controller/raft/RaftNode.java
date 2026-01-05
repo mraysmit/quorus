@@ -5,6 +5,8 @@ import dev.mars.quorus.controller.raft.grpc.AppendEntriesResponse;
 import dev.mars.quorus.controller.raft.grpc.VoteRequest;
 import dev.mars.quorus.controller.raft.grpc.VoteResponse;
 import com.google.protobuf.ByteString;
+import io.vertx.core.Future;
+import io.vertx.core.Promise;
 import io.vertx.core.Vertx;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,7 +14,6 @@ import org.slf4j.LoggerFactory;
 import java.io.*;
 import java.time.Instant;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -252,11 +253,8 @@ public class RaftNode {
 
                 // Using transport (Wait for Future integration)
                 transport.sendVoteRequest(peerId, request)
-                        .thenAccept(response -> vertx.runOnContext(v -> handleVoteResponse(response, term, voteCount)))
-                        .exceptionally(e -> {
-                            logger.warn("Failed to retrieve vote from {}", peerId);
-                            return null;
-                        });
+                        .onSuccess(response -> vertx.runOnContext(v -> handleVoteResponse(response, term, voteCount)))
+                        .onFailure(e -> logger.warn("Failed to retrieve vote from {}", peerId));
             }
         }
     }
@@ -346,8 +344,8 @@ public class RaftNode {
         }
     }
 
-    public CompletableFuture<VoteResponse> handleVoteRequest(VoteRequest request) {
-        CompletableFuture<VoteResponse> future = new CompletableFuture<>();
+    public Future<VoteResponse> handleVoteRequest(VoteRequest request) {
+        Promise<VoteResponse> promise = Promise.promise();
         vertx.runOnContext(v -> {
             try {
                 long reqTerm = request.getTerm();
@@ -363,24 +361,24 @@ public class RaftNode {
                     resetElectionTimer(); // Reset election timer if we vote
                 }
 
-                future.complete(VoteResponse.newBuilder()
+                promise.complete(VoteResponse.newBuilder()
                         .setTerm(currentTerm)
                         .setVoteGranted(grant)
                         .build());
             } catch (Exception e) {
                 logger.error("Error handling vote request", e);
-                future.completeExceptionally(e);
+                promise.fail(e);
             }
         });
-        return future;
+        return promise.future();
     }
 
-    public CompletableFuture<AppendEntriesResponse> handleAppendEntriesRequest(AppendEntriesRequest request) {
-        CompletableFuture<AppendEntriesResponse> future = new CompletableFuture<>();
+    public Future<AppendEntriesResponse> handleAppendEntriesRequest(AppendEntriesRequest request) {
+        Promise<AppendEntriesResponse> promise = Promise.promise();
         vertx.runOnContext(v -> {
             try {
                 if (request.getTerm() < currentTerm) {
-                    future.complete(AppendEntriesResponse.newBuilder()
+                    promise.complete(AppendEntriesResponse.newBuilder()
                             .setTerm(currentTerm)
                             .setSuccess(false)
                             .build());
@@ -396,7 +394,7 @@ public class RaftNode {
                 // Consistency check
                 if (log.size() <= request.getPrevLogIndex() ||
                     log.get((int) request.getPrevLogIndex()).getTerm() != request.getPrevLogTerm()) {
-                    future.complete(AppendEntriesResponse.newBuilder()
+                    promise.complete(AppendEntriesResponse.newBuilder()
                             .setTerm(currentTerm)
                             .setSuccess(false)
                             .setMatchIndex(log.size() - 1) // Hint for leader
@@ -430,17 +428,17 @@ public class RaftNode {
                     applyLog();
                 }
 
-                future.complete(AppendEntriesResponse.newBuilder()
+                promise.complete(AppendEntriesResponse.newBuilder()
                         .setTerm(currentTerm)
                         .setSuccess(true)
                         .setMatchIndex(log.size() - 1)
                         .build());
             } catch (Exception e) {
                 logger.error("Error handling append entries request", e);
-                future.completeExceptionally(e);
+                promise.fail(e);
             }
         });
-        return future;
+        return promise.future();
     }
 
     private void sendAppendEntries(String target, boolean heartbeat) {
@@ -470,11 +468,8 @@ public class RaftNode {
         }
 
         transport.sendAppendEntries(target, builder.build())
-                .thenAccept(response -> vertx.runOnContext(v -> handleAppendEntriesResponse(target, response)))
-                .exceptionally(e -> {
-                    logger.warn("Failed to send AppendEntries to {}", target);
-                    return null;
-                });
+                .onSuccess(response -> vertx.runOnContext(v -> handleAppendEntriesResponse(target, response)))
+                .onFailure(e -> logger.warn("Failed to send AppendEntries to {}", target));
     }
 
     private void handleAppendEntriesResponse(String peerId, AppendEntriesResponse response) {
