@@ -18,6 +18,7 @@ package dev.mars.quorus.controller.raft;
 
 import dev.mars.quorus.controller.raft.grpc.AppendEntriesRequest;
 import dev.mars.quorus.controller.raft.grpc.AppendEntriesResponse;
+import io.vertx.core.Future;
 import dev.mars.quorus.controller.raft.grpc.VoteRequest;
 import dev.mars.quorus.controller.raft.grpc.VoteResponse;
 import dev.mars.quorus.controller.state.QuorusStateMachine;
@@ -29,7 +30,6 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
@@ -82,11 +82,11 @@ class RaftFailureTest {
         
         // Try to submit command to follower
         SystemMetadataCommand command = SystemMetadataCommand.set("key", "value");
-        CompletableFuture<Object> future = node1.submitCommand(command);
+        Future<Object> future = node1.submitCommand(command);
         
         // Should fail
         ExecutionException exception = assertThrows(ExecutionException.class, () -> {
-            future.get(1, TimeUnit.SECONDS);
+            future.toCompletionStage().toCompletableFuture().get(1, TimeUnit.SECONDS);
         });
         
         assertTrue(exception.getCause() instanceof IllegalStateException);
@@ -96,28 +96,28 @@ class RaftFailureTest {
     @Test
     void testDoubleStartStop() {
         // Test double start
-        node1.start().join();
+        node1.start().toCompletionStage().toCompletableFuture().join();
         assertTrue(transport1.isRunning());
         
         // Second start should be safe
-        node1.start().join();
+        node1.start().toCompletionStage().toCompletableFuture().join();
         assertTrue(transport1.isRunning());
         
         // Test double stop
-        node1.stop().join();
+        node1.stop().toCompletionStage().toCompletableFuture().join();
         assertFalse(transport1.isRunning());
         
         // Second stop should be safe
-        node1.stop().join();
+        node1.stop().toCompletionStage().toCompletableFuture().join();
         assertFalse(transport1.isRunning());
     }
 
     @Test
     void testLeaderFailureAndRecovery() {
         // Start all nodes
-        node1.start().join();
-        node2.start().join();
-        node3.start().join();
+        node1.start().toCompletionStage().toCompletableFuture().join();
+        node2.start().toCompletionStage().toCompletableFuture().join();
+        node3.start().toCompletionStage().toCompletableFuture().join();
         
         // Wait for leader election
         Awaitility.await()
@@ -132,7 +132,7 @@ class RaftFailureTest {
                 .orElse(null);
         
         assertNotNull(leader);
-        leader.stop().join();
+        leader.stop().toCompletionStage().toCompletableFuture().join();
         
         // Wait for new leader election among remaining nodes
         Set<RaftNode> remainingNodes = Set.of(node1, node2, node3).stream()
@@ -154,9 +154,9 @@ class RaftFailureTest {
     @Test
     void testNetworkPartition() {
         // Start all nodes
-        node1.start().join();
-        node2.start().join();
-        node3.start().join();
+        node1.start().toCompletionStage().toCompletableFuture().join();
+        node2.start().toCompletionStage().toCompletableFuture().join();
+        node3.start().toCompletionStage().toCompletableFuture().join();
         
         // Wait for initial leader
         Awaitility.await()
@@ -165,7 +165,7 @@ class RaftFailureTest {
                         .anyMatch(RaftNode::isLeader));
         
         // Simulate network partition by stopping one node
-        node3.stop().join();
+        node3.stop().toCompletionStage().toCompletableFuture().join();
         
         // Remaining nodes should still have a leader (majority)
         Awaitility.await()
@@ -201,13 +201,13 @@ class RaftFailureTest {
             public void stop() {}
             
             @Override
-            public CompletableFuture<VoteResponse> sendVoteRequest(String nodeId, VoteRequest request) {
-                return CompletableFuture.failedFuture(new RuntimeException("Network error"));
+            public Future<VoteResponse> sendVoteRequest(String nodeId, VoteRequest request) {
+                return Future.failedFuture(new RuntimeException("Network error"));
             }
             
             @Override
-            public CompletableFuture<AppendEntriesResponse> sendAppendEntries(String nodeId, AppendEntriesRequest request) {
-                return CompletableFuture.failedFuture(new RuntimeException("Network error"));
+            public Future<AppendEntriesResponse> sendAppendEntries(String nodeId, AppendEntriesRequest request) {
+                return Future.failedFuture(new RuntimeException("Network error"));
             }
             
             public String getLocalNodeId() {
@@ -223,10 +223,10 @@ class RaftFailureTest {
                 failingTransport, new QuorusStateMachine());
         
         // Should handle transport failure gracefully
-        CompletableFuture<Void> future = failingNode.start();
+        Future<Void> future = failingNode.start();
         
         ExecutionException exception = assertThrows(ExecutionException.class, () -> {
-            future.get(1, TimeUnit.SECONDS);
+            future.toCompletionStage().toCompletableFuture().get(1, TimeUnit.SECONDS);
         });
         
         assertTrue(exception.getCause() instanceof RuntimeException);

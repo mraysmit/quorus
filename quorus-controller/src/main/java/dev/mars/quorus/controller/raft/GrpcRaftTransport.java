@@ -10,13 +10,14 @@ import dev.mars.quorus.controller.raft.grpc.VoteRequest;
 import dev.mars.quorus.controller.raft.grpc.VoteResponse;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+import io.vertx.core.Future;
+import io.vertx.core.Promise;
 import io.vertx.core.Vertx;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.SocketAddress;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
@@ -61,13 +62,13 @@ public class GrpcRaftTransport implements RaftTransport {
     }
 
     @Override
-    public CompletableFuture<VoteResponse> sendVoteRequest(String targetId, VoteRequest request) {
-        return toCompletableFuture(getStub(targetId).requestVote(request));
+    public Future<VoteResponse> sendVoteRequest(String targetId, VoteRequest request) {
+        return toVertxFuture(getStub(targetId).requestVote(request));
     }
 
     @Override
-    public CompletableFuture<AppendEntriesResponse> sendAppendEntries(String targetId, AppendEntriesRequest request) {
-        return toCompletableFuture(getStub(targetId).appendEntries(request));
+    public Future<AppendEntriesResponse> sendAppendEntries(String targetId, AppendEntriesRequest request) {
+        return toVertxFuture(getStub(targetId).appendEntries(request));
     }
 
     private RaftServiceGrpc.RaftServiceFutureStub getStub(String targetId) {
@@ -87,19 +88,19 @@ public class GrpcRaftTransport implements RaftTransport {
         });
     }
 
-    private <T> CompletableFuture<T> toCompletableFuture(ListenableFuture<T> listenableFuture) {
-        CompletableFuture<T> completableFuture = new CompletableFuture<>();
+    private <T> Future<T> toVertxFuture(ListenableFuture<T> listenableFuture) {
+        Promise<T> promise = Promise.promise();
         Futures.addCallback(listenableFuture, new FutureCallback<T>() {
             @Override
             public void onSuccess(T result) {
-                completableFuture.complete(result);
+                vertx.runOnContext(v -> promise.complete(result));
             }
 
             @Override
             public void onFailure(Throwable t) {
-                completableFuture.completeExceptionally(t);
+                vertx.runOnContext(v -> promise.fail(t));
             }
         }, executor);
-        return completableFuture;
+        return promise.future();
     }
 }

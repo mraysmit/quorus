@@ -25,7 +25,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
+import io.vertx.core.Future;
 
 /**
  * Basic example demonstrating YAML workflow execution with the Quorus transfer engine.
@@ -109,11 +109,11 @@ public class BasicWorkflowExample {
         
         // 7. Execute the workflow
         System.out.println("7. Executing workflow...");
-        CompletableFuture<WorkflowExecution> future = workflowEngine.execute(workflow, context);
+        Future<WorkflowExecution> future = workflowEngine.execute(workflow, context);
         
         // 8. Wait for completion and display results
         System.out.println("8. Waiting for completion...");
-        WorkflowExecution execution = future.get();
+        WorkflowExecution execution = future.toCompletionStage().toCompletableFuture().get();
         
         displayResults(execution);
         

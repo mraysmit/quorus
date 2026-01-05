@@ -21,6 +21,8 @@ import dev.mars.quorus.controller.state.TransferJobCommand;
 import dev.mars.quorus.core.TransferJob;
 import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferStatus;
+import io.vertx.core.CompositeFuture;
+import io.vertx.core.Future;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -31,7 +33,6 @@ import org.slf4j.LoggerFactory;
 import java.net.URI;
 import java.nio.file.Paths;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -76,11 +77,12 @@ public class RaftChaosTest {
         }
         
         // Start all nodes
-        List<CompletableFuture<Void>> futures = new ArrayList<>();
+        List<Future<Void>> futures = new ArrayList<>();
         for (RaftNode node : cluster) {
             futures.add(node.start());
         }
-        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+        Future.all(futures)
+            .toCompletionStage().toCompletableFuture().join();
         
         logger.info("Cluster started with {} nodes", CLUSTER_SIZE);
     }
@@ -90,7 +92,7 @@ public class RaftChaosTest {
         logger.info("=== TEARING DOWN RAFT CHAOS TEST ===");
         
         if (cluster != null) {
-            List<CompletableFuture<Void>> futures = new ArrayList<>();
+            List<io.vertx.core.Future<Void>> futures = new ArrayList<>();
             for (RaftNode node : cluster) {
                 try {
                     futures.add(node.stop());
@@ -99,7 +101,8 @@ public class RaftChaosTest {
                 }
             }
             try {
-                CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+                Future.all(futures)
+                    .toCompletionStage().toCompletableFuture().join();
             } catch (Exception e) {
                 logger.warn("Error waiting for nodes to stop", e);
             }
@@ -139,11 +142,11 @@ public class RaftChaosTest {
         TransferJobCommand command = TransferJobCommand.create(job);
         
         logger.info("Submitting job {} to leader", jobId);
-        CompletableFuture<Object> future = leader.submitCommand(command);
+        Future<Object> future = leader.submitCommand(command);
         
         // Wait for commit (might take longer)
         try {
-            future.get(10, TimeUnit.SECONDS);
+            future.toCompletionStage().toCompletableFuture().get(10, TimeUnit.SECONDS);
             logger.info("Job committed successfully");
         } catch (Exception e) {
             fail("Failed to commit job under packet loss conditions: " + e.getMessage());
@@ -190,7 +193,7 @@ public class RaftChaosTest {
         
         // Submit multiple jobs to stress the latency
         int jobCount = 5;
-        List<CompletableFuture<Object>> futures = new ArrayList<>();
+        List<Future<Object>> futures = new ArrayList<>();
         
         for (int i = 0; i < jobCount; i++) {
             String jobId = UUID.randomUUID().toString();
@@ -210,7 +213,9 @@ public class RaftChaosTest {
         
         // Wait for all to commit
         try {
-            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).get(20, TimeUnit.SECONDS);
+            for (Future<Object> future : futures) {
+                future.toCompletionStage().toCompletableFuture().get(20, TimeUnit.SECONDS);
+            }
             logger.info("All jobs committed successfully");
         } catch (Exception e) {
             fail("Failed to commit jobs under high latency conditions: " + e.getMessage());

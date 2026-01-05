@@ -22,6 +22,7 @@ import dev.mars.quorus.controller.state.TransferJobCommand;
 import dev.mars.quorus.core.TransferJob;
 import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferStatus;
+import io.vertx.core.Future;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,7 +32,6 @@ import java.net.URI;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -141,10 +141,10 @@ class RaftConsensusTest {
         TransferJob job = new TransferJob(request);
         TransferJobCommand command = TransferJobCommand.create(job);
 
-        CompletableFuture<Object> future = currentLeader.submitCommand(command);
+        Future<Object> future = currentLeader.submitCommand(command);
         
         // Command should complete successfully
-        Object result = future.get(2, TimeUnit.SECONDS);
+        Object result = future.toCompletionStage().toCompletableFuture().get(2, TimeUnit.SECONDS);
         assertNotNull(result);
         assertTrue(result instanceof TransferJob);
         
@@ -159,7 +159,7 @@ class RaftConsensusTest {
         RaftNode single = new RaftNode(vertx, "single", singleNode, 
                 new InMemoryTransport("single"), new QuorusStateMachine(), 500, 100);
         
-        single.start().join();
+        single.start().toCompletionStage().toCompletableFuture().join();
         
         // Wait for leadership
         Awaitility.await()
@@ -171,18 +171,15 @@ class RaftConsensusTest {
         SystemMetadataCommand cmd2 = SystemMetadataCommand.set("key2", "value2");
         SystemMetadataCommand cmd3 = SystemMetadataCommand.set("key3", "value3");
 
-        CompletableFuture<Object> future1 = single.submitCommand(cmd1);
-        CompletableFuture<Object> future2 = single.submitCommand(cmd2);
-        CompletableFuture<Object> future3 = single.submitCommand(cmd3);
+        Future<Object> future1 = single.submitCommand(cmd1);
+        Future<Object> future2 = single.submitCommand(cmd2);
+        Future<Object> future3 = single.submitCommand(cmd3);
+        
+        future1.toCompletionStage().toCompletableFuture().get(1, TimeUnit.SECONDS);
+        future2.toCompletionStage().toCompletableFuture().get(1, TimeUnit.SECONDS);
+        future3.toCompletionStage().toCompletableFuture().get(1, TimeUnit.SECONDS);
 
-        // All should complete
-        assertDoesNotThrow(() -> {
-            future1.get(1, TimeUnit.SECONDS);
-            future2.get(1, TimeUnit.SECONDS);
-            future3.get(1, TimeUnit.SECONDS);
-        });
-
-        single.stop().join();
+        single.stop().toCompletionStage().toCompletableFuture().join();
     }
 
     @Test

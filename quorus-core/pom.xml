@@ -21,14 +21,21 @@
         <dependency>
             <groupId>io.vertx</groupId>
             <artifactId>vertx-core</artifactId>
-            <version>5.0.0.CR2</version>
+            <version>5.0.2</version>
         </dependency>
 
         <!-- Vert.x Web Client for HTTP protocol (Phase 2 - Dec 2025) -->
         <dependency>
             <groupId>io.vertx</groupId>
             <artifactId>vertx-web-client</artifactId>
-            <version>5.0.0.CR2</version>
+            <version>5.0.2</version>
+        </dependency>
+
+        <!-- Vert.x PostgreSQL Client (Phase 4 - Jan 2026) -->
+        <dependency>
+            <groupId>io.vertx</groupId>
+            <artifactId>vertx-pg-client</artifactId>
+            <version>5.0.2</version>
         </dependency>
 
         <!-- Jackson for JSON serialization -->
@@ -56,6 +63,12 @@
         </dependency>
 
         <!-- Testing dependencies -->
+        <dependency>
+            <groupId>io.vertx</groupId>
+            <artifactId>vertx-junit5</artifactId>
+            <version>5.0.2</version>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>

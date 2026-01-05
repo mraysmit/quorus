@@ -13,7 +13,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
-import java.util.concurrent.CompletableFuture;
+import io.vertx.core.Future;
 import java.util.logging.Logger;
 
 /**
@@ -96,13 +96,13 @@ public class BasicTransferExample {
         logger.info("Transfer destination: " + request.getDestinationPath());
 
         // Submit transfer and get future for result
-        CompletableFuture<TransferResult> future = transferEngine.submitTransfer(request);
+        Future<TransferResult> future = transferEngine.submitTransfer(request);
 
         // Start real-time progress monitoring in background thread
         monitorTransferProgress(transferEngine, request.getRequestId());
 
         // Wait for transfer completion and get results
-        TransferResult result = future.get();
+        TransferResult result = future.toCompletionStage().toCompletableFuture().get();
         displayTransferResult(result);
     }
     
@@ -111,7 +111,7 @@ public class BasicTransferExample {
         logger.info("Downloading 3 files of different sizes concurrently");
 
         String[] fileSizes = {"512", "1024", "4096"}; // Different file sizes in bytes
-        CompletableFuture<TransferResult>[] futures = new CompletableFuture[fileSizes.length];
+        Future<TransferResult>[] futures = new Future[fileSizes.length];
 
         // Submit all transfers simultaneously to demonstrate concurrency
         logger.info("Submitting all transfers simultaneously...");
@@ -129,7 +129,7 @@ public class BasicTransferExample {
         // Wait for all transfers to complete and collect results
         logger.info("All transfers submitted. Waiting for completion...");
         for (int i = 0; i < futures.length; i++) {
-            TransferResult result = futures[i].get();
+            TransferResult result = futures[i].toCompletionStage().toCompletableFuture().get();
             String status = result.isSuccessful() ? "SUCCESS ✓" : "FAILED ✗";
             logger.info("  Transfer " + (i + 1) + " result: " + status +
                        " (" + result.getBytesTransferred() + " bytes)");
@@ -154,8 +154,8 @@ public class BasicTransferExample {
         logger.info("This demonstrates how Quorus waits patiently for slow responses");
 
         long startTime = System.currentTimeMillis();
-        CompletableFuture<TransferResult> future = transferEngine.submitTransfer(slowRequest);
-        TransferResult result = future.get();
+        Future<TransferResult> future = transferEngine.submitTransfer(slowRequest);
+        TransferResult result = future.toCompletionStage().toCompletableFuture().get();
         long duration = System.currentTimeMillis() - startTime;
 
         logger.info("");

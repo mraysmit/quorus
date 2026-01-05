@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import java.io.*;
 import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -83,12 +84,12 @@ public class RaftNode {
         log.add(new LogEntry(0, 0, null));
     }
 
-    public CompletableFuture<Void> start() {
-        CompletableFuture<Void> future = new CompletableFuture<>();
+    public Future<Void> start() {
+        Promise<Void> promise = Promise.promise();
         vertx.runOnContext(v -> {
             try {
                 if (running) {
-                    future.complete(null);
+                    promise.complete();
                     return;
                 }
 
@@ -104,21 +105,21 @@ public class RaftNode {
                 resetElectionTimer();
                 
                 running = true;
-                future.complete(null);
+                promise.complete();
             } catch (Exception e) {
                 logger.error("Failed to start Raft node", e);
-                future.completeExceptionally(e);
+                promise.fail(e);
             }
         });
-        return future;
+        return promise.future();
     }
 
-    public CompletableFuture<Void> stop() {
-        CompletableFuture<Void> future = new CompletableFuture<>();
+    public Future<Void> stop() {
+        Promise<Void> promise = Promise.promise();
         vertx.runOnContext(v -> {
             try {
                 if (!running) {
-                    future.complete(null);
+                    promise.complete();
                     return;
                 }
                 running = false;
@@ -127,21 +128,21 @@ public class RaftNode {
                 cancelTimers();
                 transport.stop();
                 logger.info("Raft node stopped: {}", nodeId);
-                future.complete(null);
+                promise.complete();
             } catch (Exception e) {
                 logger.error("Failed to stop Raft node", e);
-                future.completeExceptionally(e);
+                promise.fail(e);
             }
         });
-        return future;
+        return promise.future();
     }
 
-    public CompletableFuture<Object> submitCommand(Object command) {
-        CompletableFuture<Object> future = new CompletableFuture<>();
+    public Future<Object> submitCommand(Object command) {
+        Promise<Object> promise = Promise.promise();
 
         vertx.runOnContext(v -> {
             if (state != State.LEADER) {
-                future.completeExceptionally(
+                promise.fail(
                         new IllegalStateException("Not the leader. Current state: " + state));
                 return;
             }
@@ -150,8 +151,9 @@ public class RaftNode {
             LogEntry entry = new LogEntry(currentTerm, log.size(), command);
             log.add(entry);
             
-            // Register future
-            pendingCommands.put(entry.getIndex(), future);
+            // Register promise (convert to CompletableFuture for internal storage)
+            CompletableFuture<Object> cf = promise.future().toCompletionStage().toCompletableFuture();
+            pendingCommands.put(entry.getIndex(), cf);
 
             logger.info("Command submitted at index {} term {}", entry.getIndex(), entry.getTerm());
 
@@ -166,7 +168,7 @@ public class RaftNode {
             updateCommitIndex();
         });
 
-        return future;
+        return promise.future();
     }
 
     // ... Getters ...
@@ -502,7 +504,7 @@ public class RaftNode {
         Collections.sort(indices);
         long N = indices.get(indices.size() / 2); // Majority index
         
-        if (N > commitIndex && log.get((int) N).getTerm() == currentTerm) {
+        if (N > commitIndex && N < log.size() && log.get((int) N).getTerm() == currentTerm) {
             commitIndex = N;
             applyLog();
         }
