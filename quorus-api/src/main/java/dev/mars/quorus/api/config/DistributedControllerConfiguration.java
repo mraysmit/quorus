@@ -70,7 +70,7 @@ public class DistributedControllerConfiguration {
      */
     @Produces
     @Singleton
-    public RaftNode raftNode(RaftClusterConfig clusterConfig) {
+    public RaftNode raftNode(io.vertx.core.Vertx vertx, RaftClusterConfig clusterConfig) {
         logger.info("Creating Raft node");
         
         // Use the configured node ID for single-node cluster
@@ -87,6 +87,7 @@ public class DistributedControllerConfiguration {
         
         // Create and configure the Raft node
         RaftNode node = new RaftNode(
+            vertx,
             nodeId,
             clusterNodes,
             transport,

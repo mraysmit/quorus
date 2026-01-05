@@ -1,27 +1,29 @@
 package dev.mars.quorus.controller.raft;
 
-import dev.mars.quorus.controller.raft.grpc.RaftProto;
+import com.google.common.util.concurrent.FutureCallback;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
+import dev.mars.quorus.controller.raft.grpc.AppendEntriesRequest;
+import dev.mars.quorus.controller.raft.grpc.AppendEntriesResponse;
 import dev.mars.quorus.controller.raft.grpc.RaftServiceGrpc;
 import dev.mars.quorus.controller.raft.grpc.VoteRequest;
 import dev.mars.quorus.controller.raft.grpc.VoteResponse;
-import dev.mars.quorus.controller.raft.grpc.AppendEntriesRequest;
-import dev.mars.quorus.controller.raft.grpc.AppendEntriesResponse;
-import dev.mars.quorus.controller.raft.grpc.LogEntry;
 import io.grpc.ManagedChannel;
-import io.vertx.core.Future;
+import io.grpc.ManagedChannelBuilder;
 import io.vertx.core.Vertx;
-import io.vertx.grpc.client.GrpcClient;
-import io.vertx.grpc.client.GrpcClientChannel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.SocketAddress;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+import java.util.function.Consumer;
 
 /**
- * gRPC implementation of RaftTransport using Vert.x 5 gRPC client.
+ * gRPC implementation of RaftTransport using standard gRPC Netty client.
  */
 public class GrpcRaftTransport implements RaftTransport {
 
@@ -29,17 +31,16 @@ public class GrpcRaftTransport implements RaftTransport {
 
     private final Vertx vertx;
     private final String selfId;
-    private final Map<String, SocketAddress> clusterNodes;
+    private final Map<String, String> clusterNodes; // nodeId -> host:port
     private final Map<String, RaftServiceGrpc.RaftServiceFutureStub> clients = new ConcurrentHashMap<>();
-    private final GrpcClient grpcClient;
+    private final Executor executor = Executors.newCachedThreadPool();
 
     private RaftNode raftNode; // Circular dependency injection
 
-    public GrpcRaftTransport(Vertx vertx, String selfId, Map<String, SocketAddress> clusterNodes) {
+    public GrpcRaftTransport(Vertx vertx, String selfId, Map<String, String> clusterNodes) {
         this.vertx = vertx;
         this.selfId = selfId;
         this.clusterNodes = clusterNodes;
-        this.grpcClient = GrpcClient.client(vertx);
     }
 
     public void setRaftNode(RaftNode raftNode) {
@@ -47,7 +48,7 @@ public class GrpcRaftTransport implements RaftTransport {
     }
 
     @Override
-    public void start(java.util.function.Consumer<Object> messageHandler) {
+    public void start(Consumer<Object> messageHandler) {
         // Server side should be started in the Verticle separately (GrpcRaftServer)
         // Client side just needs to be ready
         logger.info("GrpcRaftTransport initialized for node: {}", selfId);
@@ -60,79 +61,45 @@ public class GrpcRaftTransport implements RaftTransport {
     }
 
     @Override
-    public java.util.concurrent.CompletableFuture<dev.mars.quorus.controller.raft.VoteResponse> sendVoteRequest(
-            String targetId, dev.mars.quorus.controller.raft.VoteRequest request) {
-
-        // Convert domain object to Proto
-        VoteRequest protoReq = VoteRequest.newBuilder()
-                .setTerm(request.getTerm())
-                .setCandidateId(request.getCandidateId())
-                .setLastLogIndex(request.getLastLogIndex())
-                .setLastLogTerm(request.getLastLogTerm())
-                .build();
-
-        return getStub(targetId)
-                .requestVote(protoReq)
-                .toCompletableFuture() // Bridge to legacy CompletableFuture for now, or refactor RaftNode to use
-                                       // Future
-                .thenApply(this::fromProto);
+    public CompletableFuture<VoteResponse> sendVoteRequest(String targetId, VoteRequest request) {
+        return toCompletableFuture(getStub(targetId).requestVote(request));
     }
 
     @Override
-    public java.util.concurrent.CompletableFuture<dev.mars.quorus.controller.raft.AppendEntriesResponse> sendAppendEntries(
-            String targetId, dev.mars.quorus.controller.raft.AppendEntriesRequest request) {
-
-        AppendEntriesRequest.Builder builder = AppendEntriesRequest.newBuilder()
-                .setTerm(request.getTerm())
-                .setLeaderId(request.getLeaderId())
-                .setPrevLogIndex(request.getPrevLogIndex())
-                .setPrevLogTerm(request.getPrevLogTerm())
-                .setLeaderCommit(request.getLeaderCommit());
-
-        if (request.getEntries() != null) {
-            for (dev.mars.quorus.controller.raft.LogEntry entry : request.getEntries()) {
-                builder.addEntries(LogEntry.newBuilder()
-                        .setTerm(entry.getTerm())
-                        .setIndex(entry.getIndex())
-                        // .setData(...) // Serialize command payload
-                        .build());
-            }
-        }
-
-        return getStub(targetId)
-                .appendEntries(builder.build())
-                .toCompletableFuture()
-                .thenApply(this::fromProto);
+    public CompletableFuture<AppendEntriesResponse> sendAppendEntries(String targetId, AppendEntriesRequest request) {
+        return toCompletableFuture(getStub(targetId).appendEntries(request));
     }
 
     private RaftServiceGrpc.RaftServiceFutureStub getStub(String targetId) {
         return clients.computeIfAbsent(targetId, id -> {
-            SocketAddress addr = clusterNodes.get(id);
+            String addr = clusterNodes.get(id);
             if (addr == null) {
                 throw new IllegalArgumentException("Unknown node: " + id);
             }
-            // Create a channel using Vert.x gRPC client
-            ManagedChannel channel = new GrpcClientChannel(grpcClient, addr);
+            String[] parts = addr.split(":");
+            String host = parts[0];
+            int port = Integer.parseInt(parts[1]);
+
+            ManagedChannel channel = ManagedChannelBuilder.forAddress(host, port)
+                    .usePlaintext()
+                    .build();
             return RaftServiceGrpc.newFutureStub(channel);
         });
     }
 
-    // Converters
+    private <T> CompletableFuture<T> toCompletableFuture(ListenableFuture<T> listenableFuture) {
+        CompletableFuture<T> completableFuture = new CompletableFuture<>();
+        Futures.addCallback(listenableFuture, new FutureCallback<T>() {
+            @Override
+            public void onSuccess(T result) {
+                completableFuture.complete(result);
+            }
 
-    private dev.mars.quorus.controller.raft.VoteResponse fromProto(VoteResponse proto) {
-        return new dev.mars.quorus.controller.raft.VoteResponse(
-                proto.getTerm(),
-                proto.getVoteGranted(),
-                selfId // Note: The response doesn't carry the sender ID in standard Raft, implied by
-                       // connection
-        );
-    }
-
-    private dev.mars.quorus.controller.raft.AppendEntriesResponse fromProto(AppendEntriesResponse proto) {
-        return new dev.mars.quorus.controller.raft.AppendEntriesResponse(
-                proto.getTerm(),
-                proto.getSuccess(),
-                selfId,
-                proto.getMatchIndex());
+            @Override
+            public void onFailure(Throwable t) {
+                completableFuture.completeExceptionally(t);
+            }
+        }, executor);
+        return completableFuture;
     }
 }

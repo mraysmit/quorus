@@ -16,11 +16,14 @@
 
 package dev.mars.quorus.controller.raft;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.google.protobuf.util.JsonFormat;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
+import dev.mars.quorus.controller.raft.grpc.AppendEntriesRequest;
+import dev.mars.quorus.controller.raft.grpc.AppendEntriesResponse;
+import dev.mars.quorus.controller.raft.grpc.VoteRequest;
+import dev.mars.quorus.controller.raft.grpc.VoteResponse;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
@@ -54,7 +57,6 @@ public class HttpRaftTransport implements RaftTransport {
     private final String host;
     private final int port;
     private final Map<String, String> clusterNodes; // nodeId -> host:port
-    private final ObjectMapper objectMapper;
     private final CloseableHttpClient httpClient;
     private final Executor executor;
 
@@ -76,8 +78,6 @@ public class HttpRaftTransport implements RaftTransport {
         this.host = host;
         this.port = port;
         this.clusterNodes = new ConcurrentHashMap<>(clusterNodes);
-        this.objectMapper = new ObjectMapper();
-        this.objectMapper.registerModule(new JavaTimeModule());
         this.httpClient = HttpClients.createDefault();
         this.executor = Executors.newCachedThreadPool(r -> {
             Thread t = new Thread(r, "HttpRaftTransport-" + nodeId);
@@ -151,7 +151,7 @@ public class HttpRaftTransport implements RaftTransport {
                 }
 
                 String url = "http://" + targetAddress + "/raft/vote";
-                String requestJson = objectMapper.writeValueAsString(request);
+                String requestJson = JsonFormat.printer().print(request);
 
                 HttpPost httpPost = new HttpPost(url);
                 httpPost.setEntity(new StringEntity(requestJson, ContentType.APPLICATION_JSON));
@@ -160,7 +160,9 @@ public class HttpRaftTransport implements RaftTransport {
                     if (response.getCode() == 200) {
                         String responseJson = new String(response.getEntity().getContent().readAllBytes(),
                                 StandardCharsets.UTF_8);
-                        return objectMapper.readValue(responseJson, VoteResponse.class);
+                        VoteResponse.Builder builder = VoteResponse.newBuilder();
+                        JsonFormat.parser().merge(responseJson, builder);
+                        return builder.build();
                     } else {
                         throw new RuntimeException("HTTP error: " + response.getCode());
                     }
@@ -184,7 +186,7 @@ public class HttpRaftTransport implements RaftTransport {
                 }
 
                 String url = "http://" + targetAddress + "/raft/append";
-                String requestJson = objectMapper.writeValueAsString(request);
+                String requestJson = JsonFormat.printer().print(request);
 
                 HttpPost httpPost = new HttpPost(url);
                 httpPost.setEntity(new StringEntity(requestJson, ContentType.APPLICATION_JSON));
@@ -193,7 +195,9 @@ public class HttpRaftTransport implements RaftTransport {
                     if (response.getCode() == 200) {
                         String responseJson = new String(response.getEntity().getContent().readAllBytes(),
                                 StandardCharsets.UTF_8);
-                        return objectMapper.readValue(responseJson, AppendEntriesResponse.class);
+                        AppendEntriesResponse.Builder builder = AppendEntriesResponse.newBuilder();
+                        JsonFormat.parser().merge(responseJson, builder);
+                        return builder.build();
                     } else {
                         throw new RuntimeException("HTTP error: " + response.getCode());
                     }
@@ -206,12 +210,10 @@ public class HttpRaftTransport implements RaftTransport {
         }, executor);
     }
 
-    @Override
     public String getLocalNodeId() {
         return nodeId;
     }
 
-    @Override
     public boolean isRunning() {
         return running;
     }
@@ -230,7 +232,9 @@ public class HttpRaftTransport implements RaftTransport {
 
             try (InputStream is = exchange.getRequestBody()) {
                 String requestJson = new String(is.readAllBytes(), StandardCharsets.UTF_8);
-                VoteRequest request = objectMapper.readValue(requestJson, VoteRequest.class);
+                VoteRequest.Builder builder = VoteRequest.newBuilder();
+                JsonFormat.parser().merge(requestJson, builder);
+                VoteRequest request = builder.build();
 
                 // Get response from RaftNode
                 VoteResponse response;
@@ -239,13 +243,13 @@ public class HttpRaftTransport implements RaftTransport {
                         response = raftNode.handleVoteRequest(request);
                     } catch (Exception e) {
                         logger.log(Level.WARNING, "Failed to invoke handleVoteRequest", e);
-                        response = new VoteResponse(request.getTerm(), false, nodeId);
+                        response = VoteResponse.newBuilder().setVoteGranted(false).build();
                     }
                 } else {
-                    response = new VoteResponse(request.getTerm(), false, nodeId);
+                    response = VoteResponse.newBuilder().setVoteGranted(false).build();
                 }
 
-                String responseJson = objectMapper.writeValueAsString(response);
+                String responseJson = JsonFormat.printer().print(response);
 
                 exchange.getResponseHeaders().set("Content-Type", "application/json");
                 exchange.sendResponseHeaders(200, responseJson.getBytes(StandardCharsets.UTF_8).length);
@@ -277,7 +281,9 @@ public class HttpRaftTransport implements RaftTransport {
 
             try (InputStream is = exchange.getRequestBody()) {
                 String requestJson = new String(is.readAllBytes(), StandardCharsets.UTF_8);
-                AppendEntriesRequest request = objectMapper.readValue(requestJson, AppendEntriesRequest.class);
+                AppendEntriesRequest.Builder builder = AppendEntriesRequest.newBuilder();
+                JsonFormat.parser().merge(requestJson, builder);
+                AppendEntriesRequest request = builder.build();
 
                 // Get response from RaftNode
                 AppendEntriesResponse response;
@@ -286,13 +292,13 @@ public class HttpRaftTransport implements RaftTransport {
                         response = raftNode.handleAppendEntriesRequest(request);
                     } catch (Exception e) {
                         logger.log(Level.WARNING, "Failed to invoke handleAppendEntriesRequest", e);
-                        response = new AppendEntriesResponse(request.getTerm(), false, nodeId, 0);
+                        response = AppendEntriesResponse.newBuilder().setSuccess(false).build();
                     }
                 } else {
-                    response = new AppendEntriesResponse(request.getTerm(), false, nodeId, 0);
+                    response = AppendEntriesResponse.newBuilder().setSuccess(false).build();
                 }
 
-                String responseJson = objectMapper.writeValueAsString(response);
+                String responseJson = JsonFormat.printer().print(response);
 
                 exchange.getResponseHeaders().set("Content-Type", "application/json");
                 exchange.sendResponseHeaders(200, responseJson.getBytes(StandardCharsets.UTF_8).length);
