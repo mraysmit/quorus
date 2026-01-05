@@ -20,7 +20,7 @@ import dev.mars.quorus.controller.raft.RaftClusterConfig;
 import dev.mars.quorus.controller.raft.RaftNode;
 import dev.mars.quorus.controller.raft.RaftStateMachine;
 import dev.mars.quorus.controller.raft.RaftTransport;
-import dev.mars.quorus.controller.raft.InMemoryTransport;
+import dev.mars.quorus.controller.raft.HttpRaftTransport;
 import dev.mars.quorus.controller.state.QuorusStateMachine;
 
 import jakarta.enterprise.context.ApplicationScoped;
@@ -79,8 +79,16 @@ public class DistributedControllerConfiguration {
         // Get cluster node IDs
         Set<String> clusterNodes = clusterConfig.getNodeIds();
         
-        // Create transport (in-memory for now)
-        RaftTransport transport = new InMemoryTransport(nodeId);
+        // Get local node configuration
+        RaftClusterConfig.NodeConfig nodeConfig = clusterConfig.getNodeConfig(nodeId);
+        
+        // Create transport (HTTP for real communication)
+        RaftTransport transport = new HttpRaftTransport(
+            nodeId, 
+            nodeConfig.getHost(), 
+            nodeConfig.getPort(), 
+            clusterConfig.getClusterAddresses()
+        );
 
         // Create state machine for transfer jobs
         RaftStateMachine stateMachine = new QuorusStateMachine();

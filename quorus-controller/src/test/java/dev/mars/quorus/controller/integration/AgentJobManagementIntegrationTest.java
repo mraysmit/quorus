@@ -41,6 +41,7 @@ class AgentJobManagementIntegrationTest {
     private static HttpApiServer httpServer;
     private static HttpClient httpClient;
     private static ObjectMapper objectMapper;
+    private static io.vertx.core.Vertx vertx;
 
     private static String testAgentId;
     private static String testJobId;
@@ -49,6 +50,8 @@ class AgentJobManagementIntegrationTest {
     @BeforeAll
     static void setUp() throws Exception {
         logger.info("Setting up Agent Job Management Integration Test");
+
+        vertx = io.vertx.core.Vertx.vertx();
 
         // Initialize object mapper
         objectMapper = new ObjectMapper();
@@ -67,7 +70,7 @@ class AgentJobManagementIntegrationTest {
 
         // Initialize Raft node (single node cluster for testing with short election timeout)
         Set<String> clusterNodes = Set.of("test-node-1");
-        raftNode = new RaftNode("test-node-1", clusterNodes, transport, stateMachine, 500, 100);
+        raftNode = new RaftNode(vertx, "test-node-1", clusterNodes, transport, stateMachine, 500, 100);
         raftNode.start();
 
         // Wait for node to become leader (election timeout is 500-1000ms)
@@ -81,7 +84,7 @@ class AgentJobManagementIntegrationTest {
         assertTrue(raftNode.isLeader(), "Node should become leader");
 
         // Start HTTP API server
-        httpServer = new HttpApiServer(HTTP_PORT, raftNode);
+        httpServer = new HttpApiServer(vertx, HTTP_PORT, raftNode);
         httpServer.start();
 
         // Wait for server to be ready
@@ -97,6 +100,9 @@ class AgentJobManagementIntegrationTest {
         }
         if (raftNode != null) {
             raftNode.stop();
+        }
+        if (vertx != null) {
+            vertx.close();
         }
         // Clear the InMemoryTransport registry
         InMemoryTransport.clearAllTransports();

@@ -17,6 +17,7 @@ package dev.mars.quorus.core;
  */
 
 
+import java.io.Serializable;
 import java.net.URI;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -24,13 +25,15 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
-public final class TransferRequest {
+public final class TransferRequest implements Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     private final String requestId;
 
     private final URI sourceUri;
 
-    private final Path destinationPath;
+    private final String destinationPath;
 
     private final String protocol;
 
@@ -48,7 +51,7 @@ public final class TransferRequest {
 
         // Validate and set required fields
         this.sourceUri = Objects.requireNonNull(builder.sourceUri, "Source URI cannot be null");
-        this.destinationPath = Objects.requireNonNull(builder.destinationPath, "Destination path cannot be null");
+        this.destinationPath = Objects.requireNonNull(builder.destinationPath, "Destination path cannot be null").toString();
 
         // Set optional fields with defaults
         this.protocol = builder.protocol != null ? builder.protocol : "http";
@@ -62,7 +65,7 @@ public final class TransferRequest {
 
     public URI getSourceUri() { return sourceUri; }
 
-    public Path getDestinationPath() { return destinationPath; }
+    public Path getDestinationPath() { return Path.of(destinationPath); }
 
     public String getProtocol() { return protocol; }
 

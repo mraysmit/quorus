@@ -55,13 +55,13 @@ class AgentSelectionServiceTest {
         
         // Agent 2: US West, Multi-protocol, medium load
         AgentInfo agent2 = createAgent("agent-002", "us-west-2", "datacenter-2", 
-                Set.of("sftp", "ftp", "smb", "http"), 15, 2000000000L); // 2GB max transfer
+                Set.of("sftp", "ftp", "smb", "http", "https"), 15, 2000000000L); // 2GB max transfer
         availableAgents.put("agent-002", agent2);
         agentLoads.put("agent-002", createAgentLoad("agent-002", 8, 15, 0.6, 0.5, 0.4));
         
         // Agent 3: EU West, High capacity, high load
         AgentInfo agent3 = createAgent("agent-003", "eu-west-1", "datacenter-3", 
-                Set.of("sftp", "http", "s3"), 20, 5000000000L); // 5GB max transfer
+                Set.of("sftp", "http", "https", "s3"), 20, 5000000000L); // 5GB max transfer
         availableAgents.put("agent-003", agent3);
         agentLoads.put("agent-003", createAgentLoad("agent-003", 18, 20, 0.9, 0.8, 0.7));
         
@@ -105,7 +105,7 @@ class AgentSelectionServiceTest {
     @Test
     void testCapabilityBasedSelection() {
         // Job requiring S3 protocol (only agent-003 supports it)
-        QueuedJob job = createJob("job-003", "https://source.com/data.json", "/bucket/data.json",
+        QueuedJob job = createJob("job-003", "s3://source.com/data.json", "/bucket/data.json",
                 JobRequirements.SelectionStrategy.CAPABILITY_BASED, null);
         
         String selected = selectionService.selectAgent(job, availableAgents, agentLoads);

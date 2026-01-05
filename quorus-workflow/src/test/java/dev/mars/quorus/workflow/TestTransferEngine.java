@@ -156,6 +156,24 @@ class TestTransferEngine implements TransferEngine {
         return true;
     }
 
+    @Override
+    public dev.mars.quorus.monitoring.TransferEngineHealthCheck getHealthCheck() {
+        return dev.mars.quorus.monitoring.TransferEngineHealthCheck.builder()
+                .up()
+                .message("Test Transfer Engine is healthy")
+                .build();
+    }
+
+    @Override
+    public dev.mars.quorus.monitoring.TransferMetrics getProtocolMetrics(String protocolName) {
+        return new dev.mars.quorus.monitoring.TransferMetrics(protocolName);
+    }
+
+    @Override
+    public java.util.Map<String, dev.mars.quorus.monitoring.TransferMetrics> getAllProtocolMetrics() {
+        return java.util.Collections.emptyMap();
+    }
+
     // Helper methods to create transfer results
 
     private TransferResult createSuccessResult(String requestId) {

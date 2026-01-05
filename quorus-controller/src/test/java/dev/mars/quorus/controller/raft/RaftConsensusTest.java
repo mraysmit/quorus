@@ -50,9 +50,11 @@ class RaftConsensusTest {
     private QuorusStateMachine stateMachine1;
     private QuorusStateMachine stateMachine2;
     private QuorusStateMachine stateMachine3;
+    private io.vertx.core.Vertx vertx;
 
     @BeforeEach
     void setUp() {
+        vertx = io.vertx.core.Vertx.vertx();
         InMemoryTransport.clearAllTransports();
 
         Set<String> clusterNodes = Set.of("leader", "follower1", "follower2");
@@ -65,9 +67,9 @@ class RaftConsensusTest {
         stateMachine2 = new QuorusStateMachine();
         stateMachine3 = new QuorusStateMachine();
 
-        leader = new RaftNode("leader", clusterNodes, transport1, stateMachine1, 800, 150);
-        follower1 = new RaftNode("follower1", clusterNodes, transport2, stateMachine2, 800, 150);
-        follower2 = new RaftNode("follower2", clusterNodes, transport3, stateMachine3, 800, 150);
+        leader = new RaftNode(vertx, "leader", clusterNodes, transport1, stateMachine1, 800, 150);
+        follower1 = new RaftNode(vertx, "follower1", clusterNodes, transport2, stateMachine2, 800, 150);
+        follower2 = new RaftNode(vertx, "follower2", clusterNodes, transport3, stateMachine3, 800, 150);
     }
 
     @AfterEach
@@ -75,6 +77,7 @@ class RaftConsensusTest {
         if (leader != null) leader.stop();
         if (follower1 != null) follower1.stop();
         if (follower2 != null) follower2.stop();
+        if (vertx != null) vertx.close();
         InMemoryTransport.clearAllTransports();
     }
 
@@ -153,10 +156,10 @@ class RaftConsensusTest {
     void testMultipleCommandSubmission() throws Exception {
         // Start single node for simplicity
         Set<String> singleNode = Set.of("single");
-        RaftNode single = new RaftNode("single", singleNode, 
+        RaftNode single = new RaftNode(vertx, "single", singleNode, 
                 new InMemoryTransport("single"), new QuorusStateMachine(), 500, 100);
         
-        single.start();
+        single.start().join();
         
         // Wait for leadership
         Awaitility.await()
@@ -179,7 +182,7 @@ class RaftConsensusTest {
             future3.get(1, TimeUnit.SECONDS);
         });
 
-        single.stop();
+        single.stop().join();
     }
 
     @Test
@@ -195,7 +198,7 @@ class RaftConsensusTest {
         
         // After some time, should attempt election (single node cluster behavior)
         Set<String> singleNode = Set.of("test");
-        RaftNode testNode = new RaftNode("test", singleNode, 
+        RaftNode testNode = new RaftNode(vertx, "test", singleNode, 
                 new InMemoryTransport("test"), new QuorusStateMachine(), 300, 100);
         
         testNode.start();

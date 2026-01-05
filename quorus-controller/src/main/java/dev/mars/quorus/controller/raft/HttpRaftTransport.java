@@ -240,7 +240,7 @@ public class HttpRaftTransport implements RaftTransport {
                 VoteResponse response;
                 if (raftNode != null) {
                     try {
-                        response = raftNode.handleVoteRequest(request);
+                        response = raftNode.handleVoteRequest(request).join();
                     } catch (Exception e) {
                         logger.log(Level.WARNING, "Failed to invoke handleVoteRequest", e);
                         response = VoteResponse.newBuilder().setVoteGranted(false).build();
@@ -289,7 +289,7 @@ public class HttpRaftTransport implements RaftTransport {
                 AppendEntriesResponse response;
                 if (raftNode != null) {
                     try {
-                        response = raftNode.handleAppendEntriesRequest(request);
+                        response = raftNode.handleAppendEntriesRequest(request).join();
                     } catch (Exception e) {
                         logger.log(Level.WARNING, "Failed to invoke handleAppendEntriesRequest", e);
                         response = AppendEntriesResponse.newBuilder().setSuccess(false).build();
