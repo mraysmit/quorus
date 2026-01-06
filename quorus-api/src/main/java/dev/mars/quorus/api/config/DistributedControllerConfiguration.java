@@ -20,7 +20,7 @@ import dev.mars.quorus.controller.raft.RaftClusterConfig;
 import dev.mars.quorus.controller.raft.RaftNode;
 import dev.mars.quorus.controller.raft.RaftStateMachine;
 import dev.mars.quorus.controller.raft.RaftTransport;
-import dev.mars.quorus.controller.raft.HttpRaftTransport;
+import dev.mars.quorus.controller.raft.GrpcRaftTransport;
 import dev.mars.quorus.controller.state.QuorusStateMachine;
 
 import jakarta.enterprise.context.ApplicationScoped;
@@ -83,11 +83,10 @@ public class DistributedControllerConfiguration {
         // Get local node configuration
         RaftClusterConfig.NodeConfig nodeConfig = clusterConfig.getNodeConfig(nodeId);
         
-        // Create transport (HTTP for real communication)
-        RaftTransport transport = new HttpRaftTransport(
+        // Create transport (gRPC for real communication)
+        RaftTransport transport = new GrpcRaftTransport(
+            vertx,
             nodeId, 
-            nodeConfig.getHost(), 
-            nodeConfig.getPort(), 
             clusterConfig.getClusterAddresses()
         );
 

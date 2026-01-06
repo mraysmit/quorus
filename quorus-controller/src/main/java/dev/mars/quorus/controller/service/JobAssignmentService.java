@@ -22,12 +22,12 @@ import dev.mars.quorus.core.TransferJob;
 import dev.mars.quorus.controller.state.JobAssignmentCommand;
 import dev.mars.quorus.controller.state.JobQueueCommand;
 import dev.mars.quorus.controller.raft.RaftNode;
+import io.vertx.core.Future;
 import io.vertx.core.Vertx;
 
 import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -93,10 +93,10 @@ public class JobAssignmentService {
      * @param priority job priority level
      * @return future containing the queued job
      */
-    public CompletableFuture<QueuedJob> submitJob(TransferRequest transferRequest, 
+    public Future<QueuedJob> submitJob(TransferRequest transferRequest, 
                                                  JobRequirements requirements, 
                                                  JobPriority priority) {
-        return CompletableFuture.supplyAsync(() -> {
+        return vertx.executeBlocking(() -> {
             try {
                 // Create transfer job first
                 TransferJob transferJob = new TransferJob(transferRequest);
@@ -138,8 +138,8 @@ public class JobAssignmentService {
      * @param agentId the target agent (null for automatic selection)
      * @return future containing the job assignment
      */
-    public CompletableFuture<JobAssignment> assignJob(String jobId, String agentId) {
-        return CompletableFuture.supplyAsync(() -> {
+    public Future<JobAssignment> assignJob(String jobId, String agentId) {
+        return vertx.executeBlocking(() -> {
             try {
                 QueuedJob queuedJob = jobQueue.get(jobId);
                 if (queuedJob == null) {
@@ -203,8 +203,8 @@ public class JobAssignmentService {
      * @param newStatus the new status
      * @return future containing the updated assignment
      */
-    public CompletableFuture<JobAssignment> updateAssignmentStatus(String jobId, JobAssignmentStatus newStatus) {
-        return CompletableFuture.supplyAsync(() -> {
+    public Future<JobAssignment> updateAssignmentStatus(String jobId, JobAssignmentStatus newStatus) {
+        return vertx.executeBlocking(() -> {
             try {
                 JobAssignment existing = activeAssignments.get(jobId);
                 if (existing == null) {
@@ -246,8 +246,8 @@ public class JobAssignmentService {
      * @param jobId the job to cancel
      * @return future indicating completion
      */
-    public CompletableFuture<Void> cancelAssignment(String jobId) {
-        return CompletableFuture.runAsync(() -> {
+    public Future<Void> cancelAssignment(String jobId) {
+        return vertx.executeBlocking(() -> {
             try {
                 JobAssignment existing = activeAssignments.get(jobId);
                 if (existing != null) {
@@ -265,6 +265,7 @@ public class JobAssignmentService {
                 }
                 
                 logger.info("Job cancelled: " + jobId);
+                return null;
                 
             } catch (Exception e) {
                 logger.severe("Error cancelling job " + jobId + ": " + e.getMessage());

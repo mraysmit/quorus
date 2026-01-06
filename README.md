@@ -4,7 +4,7 @@
 # Quorus File Transfer System
 
   [![Java](https://img.shields.io/badge/Java-21+-orange.svg)](https://openjdk.java.net/projects/jdk/21/)
-  [![Vert.x](https://img.shields.io/badge/Vert.x-4.5.11-purple.svg)](https://vertx.io/)
+  [![Vert.x](https://img.shields.io/badge/Vert.x-5.0.2-purple.svg)](https://vertx.io/)
   [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com/)
   [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 </div>

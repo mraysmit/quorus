@@ -35,6 +35,7 @@ public class TransferJobCommand implements Serializable {
     public enum Type {
         CREATE,
         UPDATE_STATUS,
+        UPDATE_PROGRESS,
         DELETE
     }
 
@@ -42,24 +43,30 @@ public class TransferJobCommand implements Serializable {
     private final String jobId;
     private final TransferJob transferJob;
     private final TransferStatus status;
+    private final Long bytesTransferred;
 
-    private TransferJobCommand(Type type, String jobId, TransferJob transferJob, TransferStatus status) {
+    private TransferJobCommand(Type type, String jobId, TransferJob transferJob, TransferStatus status, Long bytesTransferred) {
         this.type = type;
         this.jobId = jobId;
         this.transferJob = transferJob;
         this.status = status;
+        this.bytesTransferred = bytesTransferred;
     }
 
     public static TransferJobCommand create(TransferJob transferJob) {
-        return new TransferJobCommand(Type.CREATE, transferJob.getJobId(), transferJob, null);
+        return new TransferJobCommand(Type.CREATE, transferJob.getJobId(), transferJob, null, null);
     }
 
     public static TransferJobCommand updateStatus(String jobId, TransferStatus status) {
-        return new TransferJobCommand(Type.UPDATE_STATUS, jobId, null, status);
+        return new TransferJobCommand(Type.UPDATE_STATUS, jobId, null, status, null);
+    }
+    
+    public static TransferJobCommand updateProgress(String jobId, long bytesTransferred) {
+        return new TransferJobCommand(Type.UPDATE_PROGRESS, jobId, null, null, bytesTransferred);
     }
 
     public static TransferJobCommand delete(String jobId) {
-        return new TransferJobCommand(Type.DELETE, jobId, null, null);
+        return new TransferJobCommand(Type.DELETE, jobId, null, null, null);
     }
 
     public Type getType() {
@@ -80,6 +87,13 @@ public class TransferJobCommand implements Serializable {
     public TransferStatus getStatus() {
         return status;
     }
+    
+    /**
+     * Get the bytes transferred (for UPDATE_PROGRESS commands).
+     */
+    public Long getBytesTransferred() {
+        return bytesTransferred;
+    }
 
     @Override
     public String toString() {
@@ -87,6 +101,7 @@ public class TransferJobCommand implements Serializable {
                 "type=" + type +
                 ", jobId='" + jobId + '\'' +
                 ", status=" + status +
+                ", bytesTransferred=" + bytesTransferred +
                 '}';
     }
 }

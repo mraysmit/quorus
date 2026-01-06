@@ -98,7 +98,13 @@ public class QuorusControllerVerticle extends AbstractVerticle {
                             startPromise.complete();
                         })
                         .onFailure(startPromise::fail);
+<<<<<<< HEAD
             }).onFailure(startPromise::fail);
+=======
+            }).onFailure(e -> {
+                startPromise.fail(e);
+            });
+>>>>>>> 99ead9a4bf7a397233245aa6831aa3ff67de12ca
 
         } catch (Exception e) {
             startPromise.fail(e);

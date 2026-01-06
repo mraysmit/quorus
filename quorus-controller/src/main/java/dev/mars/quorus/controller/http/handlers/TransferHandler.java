@@ -27,6 +27,7 @@ import dev.mars.quorus.controller.state.TransferJobSnapshot;
 import dev.mars.quorus.core.TransferJob;
 import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferStatus;
+import io.vertx.core.Future;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -115,10 +116,14 @@ public class TransferHandler implements HttpHandler {
 
         // Submit to Raft
         TransferJobCommand command = TransferJobCommand.create(job);
+<<<<<<< HEAD
         CompletableFuture<Object> future = raftNode.submitCommand(command).toCompletionStage().toCompletableFuture();
+=======
+        Future<Object> future = raftNode.submitCommand(command);
+>>>>>>> 99ead9a4bf7a397233245aa6831aa3ff67de12ca
 
         // Wait for consensus
-        Object result = future.get(5, TimeUnit.SECONDS);
+        Object result = future.toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
 
         if (result instanceof TransferJob) {
             TransferJob createdJob = (TransferJob) result;
@@ -208,10 +213,14 @@ public class TransferHandler implements HttpHandler {
 
         // Submit delete command to Raft
         TransferJobCommand command = TransferJobCommand.delete(jobId);
+<<<<<<< HEAD
         CompletableFuture<Object> future = raftNode.submitCommand(command).toCompletionStage().toCompletableFuture();
+=======
+        Future<Object> future = raftNode.submitCommand(command);
+>>>>>>> 99ead9a4bf7a397233245aa6831aa3ff67de12ca
 
         // Wait for consensus
-        Object result = future.get(5, TimeUnit.SECONDS);
+        Object result = future.toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
 
         if (result instanceof TransferJobSnapshot) {
             TransferJobSnapshot deletedJob = (TransferJobSnapshot) result;

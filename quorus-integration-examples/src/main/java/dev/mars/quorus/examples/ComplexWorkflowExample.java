@@ -26,7 +26,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
+import io.vertx.core.Future;
 
 /**
  * Complex workflow example demonstrating advanced features:
@@ -110,8 +110,8 @@ public class ComplexWorkflowExample {
                 .userId(baseContext.getUserId())
                 .build();
         
-        CompletableFuture<WorkflowExecution> dryRunFuture = workflowEngine.dryRun(workflow, dryRunContext);
-        WorkflowExecution dryRunResult = dryRunFuture.get();
+        Future<WorkflowExecution> dryRunFuture = workflowEngine.dryRun(workflow, dryRunContext);
+        WorkflowExecution dryRunResult = dryRunFuture.toCompletionStage().toCompletableFuture().get();
         
         System.out.println("   Dry run completed: " + dryRunResult.getStatus());
         System.out.println("   Groups validated: " + dryRunResult.getGroupExecutions().size());
@@ -125,8 +125,8 @@ public class ComplexWorkflowExample {
                 .userId(baseContext.getUserId())
                 .build();
         
-        CompletableFuture<WorkflowExecution> virtualRunFuture = workflowEngine.virtualRun(workflow, virtualRunContext);
-        WorkflowExecution virtualRunResult = virtualRunFuture.get();
+        Future<WorkflowExecution> virtualRunFuture = workflowEngine.virtualRun(workflow, virtualRunContext);
+        WorkflowExecution virtualRunResult = virtualRunFuture.toCompletionStage().toCompletableFuture().get();
         
         System.out.println("   Virtual run completed: " + virtualRunResult.getStatus());
         displayDetailedResults(virtualRunResult);

@@ -26,7 +26,7 @@
         <maven.compiler.target>21</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <junit.version>5.10.1</junit.version>
-        <vertx.version>5.0.0.CR2</vertx.version>
+        <vertx.version>5.0.2</vertx.version>
     </properties>
 
     <dependencyManagement>

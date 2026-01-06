@@ -28,7 +28,6 @@ import io.vertx.core.WorkerExecutor;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -91,17 +90,17 @@ public class SimpleWorkflowEngine implements WorkflowEngine {
     }
     
     @Override
-    public CompletableFuture<WorkflowExecution> execute(WorkflowDefinition definition, ExecutionContext context) {
+    public Future<WorkflowExecution> execute(WorkflowDefinition definition, ExecutionContext context) {
         return executeWorkflow(definition, context, ExecutionContext.ExecutionMode.NORMAL);
     }
     
     @Override
-    public CompletableFuture<WorkflowExecution> dryRun(WorkflowDefinition definition, ExecutionContext context) {
+    public Future<WorkflowExecution> dryRun(WorkflowDefinition definition, ExecutionContext context) {
         return executeWorkflow(definition, context, ExecutionContext.ExecutionMode.DRY_RUN);
     }
     
     @Override
-    public CompletableFuture<WorkflowExecution> virtualRun(WorkflowDefinition definition, ExecutionContext context) {
+    public Future<WorkflowExecution> virtualRun(WorkflowDefinition definition, ExecutionContext context) {
         return executeWorkflow(definition, context, ExecutionContext.ExecutionMode.VIRTUAL_RUN);
     }
     
@@ -147,11 +146,11 @@ public class SimpleWorkflowEngine implements WorkflowEngine {
         logger.info("SimpleWorkflowEngine shutdown completed (Vert.x WorkerExecutor closed)");
     }
     
-    private CompletableFuture<WorkflowExecution> executeWorkflow(WorkflowDefinition definition,
+    private Future<WorkflowExecution> executeWorkflow(WorkflowDefinition definition,
                                                                ExecutionContext context,
                                                                ExecutionContext.ExecutionMode mode) {
         if (shutdown.get()) {
-            return CompletableFuture.failedFuture(
+            return Future.failedFuture(
                     new IllegalStateException("Workflow engine is shutdown"));
         }
 
@@ -189,7 +188,7 @@ public class SimpleWorkflowEngine implements WorkflowEngine {
             }
         });
 
-        return promise.future().toCompletionStage().toCompletableFuture();
+        return promise.future();
     }
     
     private WorkflowExecution executeWorkflowInternal(WorkflowDefinition definition, ExecutionContext context) 
@@ -386,20 +385,10 @@ public class SimpleWorkflowEngine implements WorkflowEngine {
                     .map(transfer -> {
                         try {
                             TransferRequest request = transfer.toTransferRequest();
-                            CompletableFuture<TransferResult> cf = transferEngine.submitTransfer(request);
-
-                            // Convert CompletableFuture to Vert.x Future
-                            Promise<TransferResult> promise = Promise.promise();
-                            cf.whenComplete((result, error) -> {
-                                if (error != null) {
-                                    promise.fail(error);
-                                } else {
-                                    promise.complete(result);
-                                }
-                            });
+                            Future<TransferResult> transferFuture = transferEngine.submitTransfer(request);
 
                             // Map to entry with transfer name
-                            return promise.future()
+                            return transferFuture
                                     .recover(error -> {
                                         logger.log(Level.WARNING, "Transfer execution failed: " + transfer.getName() + " - " + error.getMessage());
                                         if (logger.isLoggable(Level.FINE)) {

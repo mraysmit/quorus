@@ -20,6 +20,10 @@ import java.io.Serializable;
 import java.time.Instant;
 import java.util.Objects;
 
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 /**
  * Represents the assignment of a transfer job to a specific agent.
  * This class tracks the complete lifecycle of a job assignment from
@@ -29,6 +33,8 @@ import java.util.Objects;
  * @since 2025-10-28
  * @version 1.0
  */
+@JsonDeserialize(builder = JobAssignment.Builder.class)
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class JobAssignment implements Serializable {
     
     private static final long serialVersionUID = 1L;
@@ -226,6 +232,8 @@ public class JobAssignment implements Serializable {
     /**
      * Builder for creating JobAssignment instances.
      */
+    @JsonPOJOBuilder(withPrefix = "")
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Builder {
         private String jobId;
         private String agentId;
