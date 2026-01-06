@@ -44,7 +44,8 @@ import java.util.logging.Logger;
  * Allows agents to update the status of their assigned jobs.
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @since 2.0
+ * @since 2025-12-11
+ * @version 1.0
  */
 public class JobStatusHandler implements HttpHandler {
 

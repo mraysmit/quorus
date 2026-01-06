@@ -37,7 +37,8 @@ import java.util.stream.Collectors;
  * explicit synchronization.</p>
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @since 1.0
+ * @since 2025-08-18
+ * @version 1.0
  */
 public class SimpleTenantService implements TenantService {
 

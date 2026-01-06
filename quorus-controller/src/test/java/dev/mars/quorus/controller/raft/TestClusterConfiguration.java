@@ -23,6 +23,9 @@ import java.util.Map;
 /**
  * Configuration management for Raft cluster testing scenarios.
  * Provides predefined configurations for different test types.
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-20
  */
 public class TestClusterConfiguration {
 

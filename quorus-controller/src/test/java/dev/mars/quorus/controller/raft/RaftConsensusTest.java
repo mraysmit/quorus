@@ -38,6 +38,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Additional tests for Raft consensus focusing on edge cases and failure scenarios.
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-20
  */
 class RaftConsensusTest {
 

@@ -22,6 +22,13 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+/**
+ * Description for TransferJob
+ *
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-17
+ */
 
 public class TransferJob implements Serializable {
 

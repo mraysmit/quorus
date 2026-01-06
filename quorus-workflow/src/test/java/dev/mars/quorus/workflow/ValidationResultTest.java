@@ -21,6 +21,13 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
+/**
+ * Description for ValidationResultTest
+ *
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-20
+ */
 
 class ValidationResultTest {
     

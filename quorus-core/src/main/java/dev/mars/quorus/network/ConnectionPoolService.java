@@ -26,6 +26,13 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
+/**
+ * Description for ConnectionPoolService
+ *
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-18
+ */
 
 public class ConnectionPoolService {
 

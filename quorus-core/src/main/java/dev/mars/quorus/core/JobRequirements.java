@@ -26,8 +26,9 @@ import java.util.Set;
  * This class defines what kind of agent is needed to execute a job,
  * including capabilities, geographic preferences, and assignment strategies.
  * 
- * @author Quorus Team
- * @since 1.0.0
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @since 2025-10-28
+ * @version 1.0
  */
 public class JobRequirements implements Serializable {
     

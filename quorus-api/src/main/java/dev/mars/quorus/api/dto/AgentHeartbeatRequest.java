@@ -33,7 +33,8 @@ import java.util.HashMap;
  * Contains current agent status, metrics, and health information.
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @since 2.0
+ * @since 2025-08-26
+ * @version 1.0
  */
 public class AgentHeartbeatRequest {
 

@@ -26,7 +26,8 @@ import java.util.Objects;
  * Provides detailed health status and diagnostic information.
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @since 2.0 (Phase 2 - Dec 2025)
+ * @since 2025-12-17
+ * @version 1.0
  */
 public class ProtocolHealthCheck {
     

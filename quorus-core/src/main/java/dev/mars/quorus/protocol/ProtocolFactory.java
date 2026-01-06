@@ -22,6 +22,13 @@ import io.vertx.core.Vertx;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Logger;
+/**
+ * Description for ProtocolFactory
+ *
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-17
+ */
 
 public class ProtocolFactory {
     private static final Logger logger = Logger.getLogger(ProtocolFactory.class.getName());

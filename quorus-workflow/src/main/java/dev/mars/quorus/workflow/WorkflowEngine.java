@@ -17,6 +17,13 @@
 package dev.mars.quorus.workflow;
 
 import java.util.concurrent.CompletableFuture;
+/**
+ * Description for WorkflowEngine
+ *
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-18
+ */
 
 public interface WorkflowEngine {
     

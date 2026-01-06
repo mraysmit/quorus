@@ -23,7 +23,8 @@ import dev.mars.quorus.examples.util.TestResultLogger;
  * This shows how intentional failures are now clearly distinguished from actual errors.
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @since 1.0
+ * @since 2025-08-18
+ * @version 1.0
  */
 public class SimpleValidationDemo {
     

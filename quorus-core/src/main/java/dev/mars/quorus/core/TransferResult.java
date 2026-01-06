@@ -21,6 +21,13 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
+/**
+ * Description for TransferResult
+ *
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-17
+ */
 
 public final class TransferResult {
 

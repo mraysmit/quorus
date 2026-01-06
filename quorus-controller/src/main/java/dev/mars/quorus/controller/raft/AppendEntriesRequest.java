@@ -21,6 +21,13 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.io.Serializable;
 import java.util.List;
 import java.util.ArrayList;
+/**
+ * Description for AppendEntriesRequest
+ *
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-20
+ */
 
 public class AppendEntriesRequest implements Serializable {
 

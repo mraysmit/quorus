@@ -22,6 +22,13 @@ import dev.mars.quorus.tenant.model.TenantConfiguration;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+/**
+ * Description for ResourceManagementService
+ *
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-18
+ */
 
 public interface ResourceManagementService {
     

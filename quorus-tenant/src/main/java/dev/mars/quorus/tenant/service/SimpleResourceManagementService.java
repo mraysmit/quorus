@@ -32,7 +32,8 @@ import java.util.stream.Collectors;
  * For production use, consider implementing a persistent storage backend.
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @since 1.0
+ * @since 2025-08-18
+ * @version 1.0
  */
 public class SimpleResourceManagementService implements ResourceManagementService {
     

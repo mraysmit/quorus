@@ -19,6 +19,13 @@ package dev.mars.quorus.workflow;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+/**
+ * Description for ValidationResult
+ *
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-18
+ */
 
 public class ValidationResult {
     

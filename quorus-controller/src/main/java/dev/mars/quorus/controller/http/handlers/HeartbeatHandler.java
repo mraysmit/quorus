@@ -46,7 +46,8 @@ import java.util.logging.Logger;
  * Updates the agent's last heartbeat timestamp and optionally status.
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @since 2.0
+ * @since 2025-12-11
+ * @version 1.0
  */
 public class HeartbeatHandler implements HttpHandler {
 
@@ -112,7 +113,7 @@ public class HeartbeatHandler implements HttpHandler {
                 command = AgentCommand.heartbeat(agentId);
             }
             
-            CompletableFuture<Object> future = raftNode.submitCommand(command);
+            CompletableFuture<Object> future = raftNode.submitCommand(command).toCompletionStage().toCompletableFuture();
 
             // Wait for consensus (with timeout)
             Object result = future.get(5, TimeUnit.SECONDS);

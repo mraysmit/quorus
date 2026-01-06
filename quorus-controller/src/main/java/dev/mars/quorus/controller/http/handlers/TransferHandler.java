@@ -52,7 +52,8 @@ import java.util.logging.Logger;
  * All operations are submitted to Raft for distributed consensus.
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @since 2.0
+ * @since 2025-12-11
+ * @version 1.0
  */
 public class TransferHandler implements HttpHandler {
 
@@ -114,7 +115,7 @@ public class TransferHandler implements HttpHandler {
 
         // Submit to Raft
         TransferJobCommand command = TransferJobCommand.create(job);
-        CompletableFuture<Object> future = raftNode.submitCommand(command);
+        CompletableFuture<Object> future = raftNode.submitCommand(command).toCompletionStage().toCompletableFuture();
 
         // Wait for consensus
         Object result = future.get(5, TimeUnit.SECONDS);
@@ -207,7 +208,7 @@ public class TransferHandler implements HttpHandler {
 
         // Submit delete command to Raft
         TransferJobCommand command = TransferJobCommand.delete(jobId);
-        CompletableFuture<Object> future = raftNode.submitCommand(command);
+        CompletableFuture<Object> future = raftNode.submitCommand(command).toCompletionStage().toCompletableFuture();
 
         // Wait for consensus
         Object result = future.get(5, TimeUnit.SECONDS);

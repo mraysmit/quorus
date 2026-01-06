@@ -30,7 +30,8 @@ import org.slf4j.LoggerFactory;
  * Converted from Quarkus lifecycle events to explicit lifecycle methods for Vert.x 5.x migration.
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @since 2.0
+ * @since 2025-08-26
+ * @version 1.0
  */
 @ApplicationScoped
 public class AgentFleetStartupService {

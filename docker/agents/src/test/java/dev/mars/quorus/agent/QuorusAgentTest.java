@@ -39,6 +39,9 @@ import static org.junit.jupiter.api.Assertions.*;
  * - No mocking (uses real Vert.x HTTP server)
  * - Real implementations only
  * - Integration testing with actual HTTP communication
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-12-16
  */
 @ExtendWith(VertxExtension.class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)

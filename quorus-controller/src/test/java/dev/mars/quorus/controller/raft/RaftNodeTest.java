@@ -35,6 +35,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Tests for RaftNode implementation using real components (no mocking).
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-20
  */
 class RaftNodeTest {
 

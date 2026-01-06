@@ -34,7 +34,8 @@ import java.util.concurrent.CompletableFuture;
  * Provides a simple interface for interacting with the Quorus REST API.
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @since 1.0
+ * @since 2025-08-20
+ * @version 1.0
  */
 public class QuorusClient {
 

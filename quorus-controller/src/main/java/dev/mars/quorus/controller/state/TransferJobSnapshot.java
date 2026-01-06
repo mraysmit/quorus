@@ -24,6 +24,13 @@ import dev.mars.quorus.core.TransferStatus;
 
 import java.io.Serializable;
 import java.time.Instant;
+/**
+ * Description for TransferJobSnapshot
+ *
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-20
+ */
 
 public class TransferJobSnapshot implements Serializable {
 

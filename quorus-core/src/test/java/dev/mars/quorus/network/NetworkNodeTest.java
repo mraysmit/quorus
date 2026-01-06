@@ -22,6 +22,13 @@ import java.time.Duration;
 import java.time.Instant;
 
 import static org.junit.jupiter.api.Assertions.*;
+/**
+ * Description for NetworkNodeTest
+ *
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-18
+ */
 
 class NetworkNodeTest {
     

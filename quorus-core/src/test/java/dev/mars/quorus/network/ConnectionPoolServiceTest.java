@@ -36,6 +36,9 @@ import static org.junit.jupiter.api.Assertions.*;
  * - Wait queue backpressure handling
  * - Pool statistics and monitoring
  * - Performance characteristics
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-12-17
  */
 class ConnectionPoolServiceTest {
 

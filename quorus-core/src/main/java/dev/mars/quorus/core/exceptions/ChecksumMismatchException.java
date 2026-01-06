@@ -22,7 +22,8 @@ package dev.mars.quorus.core.exceptions;
  * This indicates potential data corruption during transfer.
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @since 1.0
+ * @since 2025-08-17
+ * @version 1.0
  */
 public class ChecksumMismatchException extends TransferException {
     

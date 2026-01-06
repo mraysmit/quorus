@@ -25,6 +25,9 @@ import java.util.logging.Logger;
 /**
  * Utility class for network manipulation in Raft cluster tests.
  * Provides methods to simulate network partitions, latency, and failures.
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-20
  */
 public class NetworkTestUtils {
 

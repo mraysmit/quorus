@@ -28,8 +28,9 @@ package dev.mars.quorus.core;
  * Any state -> CANCELLED (manual cancellation)
  * IN_PROGRESS -> FAILED (execution failure)
  * 
- * @author Quorus Team
- * @since 1.0.0
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @since 2025-10-28
+ * @version 1.0
  */
 public enum JobAssignmentStatus {
     

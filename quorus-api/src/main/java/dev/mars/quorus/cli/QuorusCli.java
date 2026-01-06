@@ -27,7 +27,8 @@ import java.util.Scanner;
  * Provides a simple CLI for interacting with the Quorus API.
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @since 1.0
+ * @since 2025-08-20
+ * @version 1.0
  */
 public class QuorusCli {
 

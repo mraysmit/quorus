@@ -30,6 +30,9 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Integration tests for the complete YAML schema validation pipeline,
  * testing the interaction between parsing, validation, and workflow creation.
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-21
  */
 class SchemaValidationIntegrationTest {
 

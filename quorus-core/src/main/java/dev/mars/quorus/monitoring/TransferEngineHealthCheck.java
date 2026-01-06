@@ -27,7 +27,8 @@ import java.util.Map;
  * Aggregates health status from all protocols and provides system-level diagnostics.
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @since 2.0 (Phase 2 - Dec 2025)
+ * @since 2025-12-17
+ * @version 1.0
  */
 public class TransferEngineHealthCheck {
     

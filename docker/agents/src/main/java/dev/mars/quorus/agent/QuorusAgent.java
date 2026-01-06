@@ -43,7 +43,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * with the event loop and reduced thread overhead.</p>
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @since 1.0
+ * @since 2025-09-04
+ * @version 1.0
  */
 public class QuorusAgent {
 

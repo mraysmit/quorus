@@ -21,6 +21,13 @@ import jakarta.validation.constraints.NotNull;
 
 import java.time.Instant;
 import java.util.*;
+/**
+ * Description for Tenant
+ *
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-18
+ */
 
 public class Tenant {
     

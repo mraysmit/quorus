@@ -30,6 +30,9 @@ import org.slf4j.LoggerFactory;
  * CDI producer for TransferEngine.
  * Converted from MicroProfile Config to simple configuration for Vert.x 5.x migration.
  * Updated to inject Vertx (Phase 1.5 - Dec 2025).
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-20
  */
 @ApplicationScoped
 public class TransferEngineProducer {

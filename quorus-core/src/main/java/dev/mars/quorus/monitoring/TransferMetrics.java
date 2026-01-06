@@ -29,7 +29,8 @@ import java.util.concurrent.atomic.LongAdder;
  * Thread-safe metrics tracking for protocol performance monitoring.
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @since 2.0 (Phase 2 - Dec 2025)
+ * @since 2025-12-17
+ * @version 1.0
  */
 public class TransferMetrics {
     

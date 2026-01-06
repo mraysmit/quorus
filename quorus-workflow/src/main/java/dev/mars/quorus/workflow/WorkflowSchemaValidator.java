@@ -29,7 +29,8 @@ import java.util.regex.Pattern;
  * Validates metadata according to the standard schema requirements.
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @since 2.0
+ * @since 2025-08-21
+ * @version 1.0
  */
 public class WorkflowSchemaValidator {
     

@@ -23,6 +23,13 @@ import dev.mars.quorus.agent.AgentInfo;
 import java.io.Serializable;
 import java.time.Instant;
 import java.util.Map;
+/**
+ * Description for QuorusSnapshot
+ *
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-20
+ */
 
 public class QuorusSnapshot implements Serializable {
 

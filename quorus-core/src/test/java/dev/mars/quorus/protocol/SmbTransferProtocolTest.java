@@ -30,6 +30,13 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 
 import static org.junit.jupiter.api.Assertions.*;
+/**
+ * Description for SmbTransferProtocolTest
+ *
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-18
+ */
 
 class SmbTransferProtocolTest {
     

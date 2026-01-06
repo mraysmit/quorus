@@ -37,6 +37,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Tests for Raft failure scenarios and edge cases.
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-20
  */
 class RaftFailureTest {
 

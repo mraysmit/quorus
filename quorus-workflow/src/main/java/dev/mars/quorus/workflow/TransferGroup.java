@@ -21,6 +21,13 @@ import dev.mars.quorus.core.TransferRequest;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+/**
+ * Description for TransferGroup
+ *
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-18
+ */
 
 public class TransferGroup {
     

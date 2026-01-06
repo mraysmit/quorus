@@ -24,6 +24,13 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+/**
+ * Description for ChecksumCalculatorTest
+ *
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-17
+ */
 
 class ChecksumCalculatorTest {
     

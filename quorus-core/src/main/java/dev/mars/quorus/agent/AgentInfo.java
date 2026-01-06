@@ -29,7 +29,8 @@ import java.util.Objects;
  * This class contains all the metadata needed to manage and communicate with an agent.
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @since 2.0
+ * @since 2025-08-26
+ * @version 1.0
  */
 public class AgentInfo {
 

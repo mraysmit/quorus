@@ -28,8 +28,9 @@ import java.util.Set;
 /**
  * Test suite for job assignment model classes.
  * 
- * @author Quorus Team
- * @since 1.0.0
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @since 2025-10-28
+ * @version 1.0
  */
 class JobAssignmentModelsTest {
     

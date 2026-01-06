@@ -47,7 +47,8 @@ import java.util.logging.Logger;
  * Converted to Vert.x WorkerExecutor (Phase 1.5 - Dec 2025).
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @since 1.0
+ * @since 2025-08-17
+ * @version 1.0
  */
 public class SimpleTransferEngine implements TransferEngine {
     private static final Logger logger = Logger.getLogger(SimpleTransferEngine.class.getName());

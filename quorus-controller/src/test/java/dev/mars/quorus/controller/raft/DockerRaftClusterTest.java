@@ -44,6 +44,9 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Integration tests for Raft cluster using Docker Compose.
  * Tests real network communication and cluster behavior.
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-20
  */
 @Testcontainers
 public class DockerRaftClusterTest {

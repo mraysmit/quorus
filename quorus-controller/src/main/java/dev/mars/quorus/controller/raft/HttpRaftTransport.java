@@ -24,6 +24,9 @@ import dev.mars.quorus.controller.raft.grpc.AppendEntriesRequest;
 import dev.mars.quorus.controller.raft.grpc.AppendEntriesResponse;
 import dev.mars.quorus.controller.raft.grpc.VoteRequest;
 import dev.mars.quorus.controller.raft.grpc.VoteResponse;
+import io.vertx.core.Future;
+import io.vertx.core.Promise;
+
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
@@ -48,6 +51,9 @@ import java.util.logging.Logger;
 /**
  * HTTP-based implementation of RaftTransport for real network communication.
  * This transport uses HTTP REST endpoints for inter-node communication.
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-20
  */
 public class HttpRaftTransport implements RaftTransport {
 
@@ -142,8 +148,8 @@ public class HttpRaftTransport implements RaftTransport {
     }
 
     @Override
-    public CompletableFuture<VoteResponse> sendVoteRequest(String targetNodeId, VoteRequest request) {
-        return CompletableFuture.supplyAsync(() -> {
+    public Future<VoteResponse> sendVoteRequest(String targetNodeId, VoteRequest request) {
+        CompletableFuture<VoteResponse> cf = CompletableFuture.supplyAsync(() -> {
             try {
                 String targetAddress = clusterNodes.get(targetNodeId);
                 if (targetAddress == null) {
@@ -173,12 +179,14 @@ public class HttpRaftTransport implements RaftTransport {
                 throw new RuntimeException("Vote request failed", e);
             }
         }, executor);
+        
+        return Future.fromCompletionStage(cf);
     }
 
     @Override
-    public CompletableFuture<AppendEntriesResponse> sendAppendEntries(String targetNodeId,
+    public Future<AppendEntriesResponse> sendAppendEntries(String targetNodeId,
             AppendEntriesRequest request) {
-        return CompletableFuture.supplyAsync(() -> {
+        CompletableFuture<AppendEntriesResponse> cf = CompletableFuture.supplyAsync(() -> {
             try {
                 String targetAddress = clusterNodes.get(targetNodeId);
                 if (targetAddress == null) {
@@ -208,6 +216,8 @@ public class HttpRaftTransport implements RaftTransport {
                 throw new RuntimeException("Append entries failed", e);
             }
         }, executor);
+
+        return Future.fromCompletionStage(cf);
     }
 
     public String getLocalNodeId() {
@@ -240,7 +250,7 @@ public class HttpRaftTransport implements RaftTransport {
                 VoteResponse response;
                 if (raftNode != null) {
                     try {
-                        response = raftNode.handleVoteRequest(request).join();
+                        response = raftNode.handleVoteRequest(request).toCompletionStage().toCompletableFuture().join();
                     } catch (Exception e) {
                         logger.log(Level.WARNING, "Failed to invoke handleVoteRequest", e);
                         response = VoteResponse.newBuilder().setVoteGranted(false).build();
@@ -289,7 +299,7 @@ public class HttpRaftTransport implements RaftTransport {
                 AppendEntriesResponse response;
                 if (raftNode != null) {
                     try {
-                        response = raftNode.handleAppendEntriesRequest(request).join();
+                        response = raftNode.handleAppendEntriesRequest(request).toCompletionStage().toCompletableFuture().join();
                     } catch (Exception e) {
                         logger.log(Level.WARNING, "Failed to invoke handleAppendEntriesRequest", e);
                         response = AppendEntriesResponse.newBuilder().setSuccess(false).build();

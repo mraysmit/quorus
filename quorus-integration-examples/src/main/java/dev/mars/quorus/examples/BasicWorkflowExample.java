@@ -35,7 +35,8 @@ import java.util.concurrent.CompletableFuture;
  * 3. Monitor execution progress and results
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @since 1.0
+ * @since 2025-08-18
+ * @version 1.0
  */
 public class BasicWorkflowExample {
     

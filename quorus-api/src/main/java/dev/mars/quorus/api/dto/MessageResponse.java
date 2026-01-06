@@ -20,6 +20,9 @@ import java.time.LocalDateTime;
 
 /**
  * Success message response.
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-20
  */
 public class MessageResponse {
 

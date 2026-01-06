@@ -23,6 +23,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+/**
+ * Description for ChecksumCalculator
+ *
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-17
+ */
 
 public class ChecksumCalculator {
     private static final String DEFAULT_ALGORITHM = "SHA-256";

@@ -45,7 +45,8 @@ import java.util.logging.Logger;
  * Includes Raft cluster metrics, agent fleet metrics, and transfer job metrics.
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @since 2.0
+ * @since 2025-12-11
+ * @version 1.0
  */
 public class MetricsHandler implements HttpHandler {
 

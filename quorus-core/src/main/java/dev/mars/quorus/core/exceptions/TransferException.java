@@ -22,7 +22,8 @@ package dev.mars.quorus.core.exceptions;
  * This includes network errors, file system errors, and protocol-specific failures.
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @since 1.0
+ * @since 2025-08-17
+ * @version 1.0
  */
 public class TransferException extends QuorusException {
     

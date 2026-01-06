@@ -31,6 +31,13 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
+/**
+ * Description for InMemoryTransport
+ *
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-20
+ */
 
 public class InMemoryTransport implements RaftTransport {
 

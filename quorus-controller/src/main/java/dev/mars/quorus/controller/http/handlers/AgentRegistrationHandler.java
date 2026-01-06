@@ -41,7 +41,8 @@ import java.util.logging.Logger;
  * Accepts AgentInfo JSON and submits registration command to Raft for distributed consensus.
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @since 2.0
+ * @since 2025-12-11
+ * @version 1.0
  */
 public class AgentRegistrationHandler implements HttpHandler {
 
@@ -77,7 +78,7 @@ public class AgentRegistrationHandler implements HttpHandler {
 
             // Create and submit registration command to Raft
             AgentCommand command = AgentCommand.register(agentInfo);
-            CompletableFuture<Object> future = raftNode.submitCommand(command);
+            CompletableFuture<Object> future = raftNode.submitCommand(command).toCompletionStage().toCompletableFuture();
 
             // Wait for consensus (with timeout)
             Object result = future.get(5, TimeUnit.SECONDS);

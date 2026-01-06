@@ -38,6 +38,9 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Integration tests for the basic transfer engine functionality.
  * Tests end-to-end file transfer scenarios using a local HTTP test server.
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-17
  */
 class BasicTransferIntegrationTest {
 

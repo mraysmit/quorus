@@ -18,6 +18,9 @@ package dev.mars.quorus.api.dto;
 
 /**
  * DTO for transfer request.
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-20
  */
 public class TransferRequestDto {
 

@@ -25,8 +25,9 @@ import java.util.Objects;
  * This class tracks the complete lifecycle of a job assignment from
  * initial assignment through completion or failure.
  * 
- * @author Quorus Team
- * @since 1.0.0
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @since 2025-10-28
+ * @version 1.0
  */
 public class JobAssignment implements Serializable {
     

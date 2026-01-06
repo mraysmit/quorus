@@ -33,6 +33,13 @@ import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.logging.Logger;
+/**
+ * Description for SftpTransferProtocol
+ *
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-18
+ */
 
 public class SftpTransferProtocol implements TransferProtocol {
     
