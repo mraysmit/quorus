@@ -43,6 +43,9 @@ import static org.junit.jupiter.api.Assertions.*;
  * Advanced network testing for Raft cluster using custom Docker networks.
  * Tests realistic network scenarios including geographic distribution,
  * network partitions, and complex failure modes.
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-20
  */
 @Testcontainers
 public class AdvancedNetworkTest {

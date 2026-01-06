@@ -39,6 +39,9 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Chaos testing for the Raft cluster using InMemoryTransport's fault injection capabilities.
  * Tests resilience against packet loss and high latency.
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2026-01-05
  */
 public class RaftChaosTest {
 

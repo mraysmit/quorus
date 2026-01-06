@@ -37,7 +37,8 @@ import java.util.Map;
  * Service for polling the controller for new job assignments.
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @since 2.0
+ * @since 2025-12-11
+ * @version 1.0
  */
 public class JobPollingService {
 

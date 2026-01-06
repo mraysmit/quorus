@@ -39,7 +39,8 @@ import java.util.stream.Collectors;
  * This service handles agent lifecycle operations and maintains the distributed agent registry.
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @since 2.0
+ * @since 2025-08-26
+ * @version 1.0
  */
 @ApplicationScoped
 public class AgentRegistryService {

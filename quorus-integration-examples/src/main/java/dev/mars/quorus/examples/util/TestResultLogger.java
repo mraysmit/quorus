@@ -23,7 +23,8 @@ import java.util.logging.Logger;
  * Helps distinguish between expected test failures and actual errors.
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @since 1.0
+ * @since 2025-08-18
+ * @version 1.0
  */
 public class TestResultLogger {
     

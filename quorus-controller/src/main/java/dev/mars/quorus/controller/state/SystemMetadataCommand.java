@@ -17,6 +17,13 @@
 package dev.mars.quorus.controller.state;
 
 import java.io.Serializable;
+/**
+ * Description for SystemMetadataCommand
+ *
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-20
+ */
 
 public class SystemMetadataCommand implements Serializable {
 

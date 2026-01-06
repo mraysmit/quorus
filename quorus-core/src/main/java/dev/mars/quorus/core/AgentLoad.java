@@ -27,8 +27,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * This class tracks active jobs, resource utilization, and performance metrics
  * to enable intelligent load balancing and job assignment decisions.
  * 
- * @author Quorus Team
- * @since 1.0.0
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @since 2025-10-28
+ * @version 1.0
  */
 public class AgentLoad implements Serializable {
     

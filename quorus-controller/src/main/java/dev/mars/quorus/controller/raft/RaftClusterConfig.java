@@ -24,6 +24,9 @@ import java.util.Set;
 /**
  * Configuration class for Raft cluster setup.
  * Manages node addresses, ports, and cluster topology.
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-20
  */
 public class RaftClusterConfig {
 

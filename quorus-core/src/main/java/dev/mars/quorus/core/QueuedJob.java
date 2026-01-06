@@ -25,8 +25,9 @@ import java.util.Objects;
  * This class wraps a TransferJob with additional queuing metadata such as
  * priority, queue time, and assignment requirements.
  * 
- * @author Quorus Team
- * @since 1.0.0
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @since 2025-10-28
+ * @version 1.0
  */
 public class QueuedJob implements Serializable, Comparable<QueuedJob> {
     

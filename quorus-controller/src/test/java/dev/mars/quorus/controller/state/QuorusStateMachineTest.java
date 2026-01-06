@@ -30,6 +30,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Comprehensive tests for QuorusStateMachine.
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-20
  */
 class QuorusStateMachineTest {
 

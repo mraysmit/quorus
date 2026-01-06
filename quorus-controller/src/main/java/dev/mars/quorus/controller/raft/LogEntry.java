@@ -19,6 +19,13 @@ package dev.mars.quorus.controller.raft;
 import java.io.Serializable;
 import java.time.Instant;
 import java.util.Objects;
+/**
+ * Description for LogEntry
+ *
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-20
+ */
 
 public class LogEntry implements Serializable {
 

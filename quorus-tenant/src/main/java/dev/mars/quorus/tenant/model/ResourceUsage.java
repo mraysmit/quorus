@@ -19,6 +19,13 @@ package dev.mars.quorus.tenant.model;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Objects;
+/**
+ * Description for ResourceUsage
+ *
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-18
+ */
 
 public class ResourceUsage {
     

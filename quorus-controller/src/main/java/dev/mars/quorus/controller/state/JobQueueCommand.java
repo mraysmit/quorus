@@ -29,7 +29,8 @@ import java.util.Objects;
  * for managing the job queue and job prioritization.
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @since 2.0
+ * @since 2025-10-28
+ * @version 1.0
  */
 public class JobQueueCommand implements Serializable {
 

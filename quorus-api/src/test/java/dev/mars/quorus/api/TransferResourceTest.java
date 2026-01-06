@@ -47,6 +47,9 @@ import static org.mockito.Mockito.*;
 /**
  * Tests for TransferResource using Vert.x testing framework.
  * Uses real HTTP server - no mocking of Vert.x components.
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-20
  */
 @ExtendWith(VertxExtension.class)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)

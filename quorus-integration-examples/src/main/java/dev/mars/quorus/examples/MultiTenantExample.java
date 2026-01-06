@@ -49,7 +49,8 @@ import java.util.List;
  * Run with: mvn exec:java -Dexec.mainClass="dev.mars.quorus.examples.MultiTenantExample" -pl quorus-integration-examples
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @since 1.0
+ * @since 2025-08-18
+ * @version 1.0
  */
 public class MultiTenantExample {
     

@@ -48,7 +48,8 @@ import java.util.logging.Logger;
  * Phase 2 migration: Uses Vert.x Web Client when Vertx instance is available.
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @since 1.0
+ * @since 2025-08-17
+ * @version 1.0
  */
 public class HttpTransferProtocol implements TransferProtocol {
     private static final Logger logger = Logger.getLogger(HttpTransferProtocol.class.getName());

@@ -1,3 +1,19 @@
+/*
+ * Copyright 2025 Mark Andrew Ray-Smith Cityline Ltd
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package dev.mars.quorus.controller.raft;
 
 import com.google.common.util.concurrent.FutureCallback;
@@ -10,6 +26,8 @@ import dev.mars.quorus.controller.raft.grpc.VoteRequest;
 import dev.mars.quorus.controller.raft.grpc.VoteResponse;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+import io.vertx.core.Future;
+import io.vertx.core.Promise;
 import io.vertx.core.Vertx;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,6 +42,9 @@ import java.util.function.Consumer;
 
 /**
  * gRPC implementation of RaftTransport using standard gRPC Netty client.
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-12-16
  */
 public class GrpcRaftTransport implements RaftTransport {
 
@@ -61,13 +82,13 @@ public class GrpcRaftTransport implements RaftTransport {
     }
 
     @Override
-    public CompletableFuture<VoteResponse> sendVoteRequest(String targetId, VoteRequest request) {
-        return toCompletableFuture(getStub(targetId).requestVote(request));
+    public Future<VoteResponse> sendVoteRequest(String targetId, VoteRequest request) {
+        return toVertxFuture(getStub(targetId).requestVote(request));
     }
 
     @Override
-    public CompletableFuture<AppendEntriesResponse> sendAppendEntries(String targetId, AppendEntriesRequest request) {
-        return toCompletableFuture(getStub(targetId).appendEntries(request));
+    public Future<AppendEntriesResponse> sendAppendEntries(String targetId, AppendEntriesRequest request) {
+        return toVertxFuture(getStub(targetId).appendEntries(request));
     }
 
     private RaftServiceGrpc.RaftServiceFutureStub getStub(String targetId) {
@@ -87,19 +108,19 @@ public class GrpcRaftTransport implements RaftTransport {
         });
     }
 
-    private <T> CompletableFuture<T> toCompletableFuture(ListenableFuture<T> listenableFuture) {
-        CompletableFuture<T> completableFuture = new CompletableFuture<>();
+    private <T> Future<T> toVertxFuture(ListenableFuture<T> listenableFuture) {
+        Promise<T> promise = Promise.promise();
         Futures.addCallback(listenableFuture, new FutureCallback<T>() {
             @Override
             public void onSuccess(T result) {
-                completableFuture.complete(result);
+                promise.complete(result);
             }
 
             @Override
             public void onFailure(Throwable t) {
-                completableFuture.completeExceptionally(t);
+                promise.fail(t);
             }
         }, executor);
-        return completableFuture;
+        return promise.future();
     }
 }

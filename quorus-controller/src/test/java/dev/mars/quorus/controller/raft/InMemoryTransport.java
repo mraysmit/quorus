@@ -20,6 +20,7 @@ import dev.mars.quorus.controller.raft.grpc.AppendEntriesRequest;
 import dev.mars.quorus.controller.raft.grpc.AppendEntriesResponse;
 import dev.mars.quorus.controller.raft.grpc.VoteRequest;
 import dev.mars.quorus.controller.raft.grpc.VoteResponse;
+import io.vertx.core.Future;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,6 +31,13 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
+/**
+ * Description for InMemoryTransport
+ *
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2026-01-05
+ */
 
 public class InMemoryTransport implements RaftTransport {
 
@@ -91,8 +99,8 @@ public class InMemoryTransport implements RaftTransport {
     }
 
     @Override
-    public CompletableFuture<VoteResponse> sendVoteRequest(String targetNodeId, VoteRequest request) {
-        return CompletableFuture.supplyAsync(() -> {
+    public Future<VoteResponse> sendVoteRequest(String targetNodeId, VoteRequest request) {
+        return Future.fromCompletionStage(CompletableFuture.supplyAsync(() -> {
             // Simulate Packet Drop
             if (dropRate > 0 && random.nextDouble() < dropRate) {
                 logger.debug("Dropped VoteRequest from {} to {}", nodeId, targetNodeId);
@@ -118,13 +126,13 @@ public class InMemoryTransport implements RaftTransport {
             logger.debug("Vote request from {} to {}: {}", nodeId, targetNodeId, response.getVoteGranted());
             
             return response;
-        }, executor);
+        }, executor));
     }
 
     @Override
-    public CompletableFuture<AppendEntriesResponse> sendAppendEntries(String targetNodeId, 
+    public Future<AppendEntriesResponse> sendAppendEntries(String targetNodeId, 
                                                                      AppendEntriesRequest request) {
-        return CompletableFuture.supplyAsync(() -> {
+        return Future.fromCompletionStage(CompletableFuture.supplyAsync(() -> {
             // Simulate Packet Drop
             if (dropRate > 0 && random.nextDouble() < dropRate) {
                 logger.debug("Dropped AppendEntries from {} to {}", nodeId, targetNodeId);
@@ -150,12 +158,12 @@ public class InMemoryTransport implements RaftTransport {
             logger.debug("Append entries from {} to {}: {}", nodeId, targetNodeId, response.getSuccess());
             
             return response;
-        }, executor);
+        }, executor));
     }
 
     private VoteResponse handleVoteRequest(VoteRequest request) {
         if (raftNode != null) {
-            return raftNode.handleVoteRequest(request).join();
+            return raftNode.handleVoteRequest(request).toCompletionStage().toCompletableFuture().join();
         }
         
         if (messageHandler != null) {
@@ -171,7 +179,7 @@ public class InMemoryTransport implements RaftTransport {
 
     private AppendEntriesResponse handleAppendEntries(AppendEntriesRequest request) {
         if (raftNode != null) {
-            return raftNode.handleAppendEntriesRequest(request).join();
+            return raftNode.handleAppendEntriesRequest(request).toCompletionStage().toCompletableFuture().join();
         }
 
         if (messageHandler != null) {

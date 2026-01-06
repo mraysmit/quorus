@@ -20,7 +20,8 @@ package dev.mars.quorus.workflow;
  * Exception thrown when workflow parsing or validation fails.
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @since 1.0
+ * @since 2025-08-18
+ * @version 1.0
  */
 public class WorkflowParseException extends Exception {
     

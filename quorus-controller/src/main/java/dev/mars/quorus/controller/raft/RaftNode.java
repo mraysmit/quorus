@@ -1,3 +1,19 @@
+/*
+ * Copyright 2025 Mark Andrew Ray-Smith Cityline Ltd
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package dev.mars.quorus.controller.raft;
 
 import dev.mars.quorus.controller.raft.grpc.AppendEntriesRequest;
@@ -21,6 +37,9 @@ import java.util.concurrent.atomic.AtomicLong;
  * Reactive Raft Node implementation.
  * Runs on the Vert.x Event Loop (Single Threaded), removing the need for
  * synchronization.
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-20
  */
 public class RaftNode {
 
@@ -53,7 +72,7 @@ public class RaftNode {
     // ========== LEADER STATE ==========
     private final Map<String, Long> nextIndex = new HashMap<>();
     private final Map<String, Long> matchIndex = new HashMap<>();
-    private final Map<Long, CompletableFuture<Object>> pendingCommands = new ConcurrentHashMap<>();
+    private final Map<Long, Promise<Object>> pendingCommands = new ConcurrentHashMap<>();
 
     // ========== TIMING AND CONTROL ==========
     private volatile boolean running = false;
@@ -83,12 +102,12 @@ public class RaftNode {
         log.add(new LogEntry(0, 0, null));
     }
 
-    public CompletableFuture<Void> start() {
-        CompletableFuture<Void> future = new CompletableFuture<>();
+    public Future<Void> start() {
+        Promise<Void> promise = Promise.promise();
         vertx.runOnContext(v -> {
             try {
                 if (running) {
-                    future.complete(null);
+                    promise.complete(null);
                     return;
                 }
 
@@ -104,21 +123,21 @@ public class RaftNode {
                 resetElectionTimer();
                 
                 running = true;
-                future.complete(null);
+                promise.complete(null);
             } catch (Exception e) {
                 logger.error("Failed to start Raft node", e);
-                future.completeExceptionally(e);
+                promise.fail(e);
             }
         });
-        return future;
+        return promise.future();
     }
 
-    public CompletableFuture<Void> stop() {
-        CompletableFuture<Void> future = new CompletableFuture<>();
+    public Future<Void> stop() {
+        Promise<Void> promise = Promise.promise();
         vertx.runOnContext(v -> {
             try {
                 if (!running) {
-                    future.complete(null);
+                    promise.complete(null);
                     return;
                 }
                 running = false;
@@ -127,21 +146,21 @@ public class RaftNode {
                 cancelTimers();
                 transport.stop();
                 logger.info("Raft node stopped: {}", nodeId);
-                future.complete(null);
+                promise.complete(null);
             } catch (Exception e) {
                 logger.error("Failed to stop Raft node", e);
-                future.completeExceptionally(e);
+                promise.fail(e);
             }
         });
-        return future;
+        return promise.future();
     }
 
-    public CompletableFuture<Object> submitCommand(Object command) {
-        CompletableFuture<Object> future = new CompletableFuture<>();
+    public Future<Object> submitCommand(Object command) {
+        Promise<Object> promise = Promise.promise();
 
         vertx.runOnContext(v -> {
             if (state != State.LEADER) {
-                future.completeExceptionally(
+                promise.fail(
                         new IllegalStateException("Not the leader. Current state: " + state));
                 return;
             }
@@ -151,7 +170,7 @@ public class RaftNode {
             log.add(entry);
             
             // Register future
-            pendingCommands.put(entry.getIndex(), future);
+            pendingCommands.put(entry.getIndex(), promise);
 
             logger.info("Command submitted at index {} term {}", entry.getIndex(), entry.getTerm());
 
@@ -166,7 +185,7 @@ public class RaftNode {
             updateCommitIndex();
         });
 
-        return future;
+        return promise.future();
     }
 
     // ... Getters ...
@@ -525,12 +544,12 @@ public class RaftNode {
             }
             
             // Complete future if this node is leader
-            CompletableFuture<Object> future = pendingCommands.remove(lastApplied);
-            if (future != null) {
+            Promise<Object> promise = pendingCommands.remove(lastApplied);
+            if (promise != null) {
                 if (exception != null) {
-                    future.completeExceptionally(exception);
+                    promise.fail(exception);
                 } else {
-                    future.complete(result);
+                    promise.complete(result);
                 }
             }
         }

@@ -26,7 +26,8 @@ import org.slf4j.LoggerFactory;
  * bootstraps the Vert.x reactive runtime and deploys the main Verticle.
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @since 3.0 (Vert.x Migration)
+ * @since 2025-08-26
+ * @version 1.0
  */
 public class QuorusControllerApplication {
 

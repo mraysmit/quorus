@@ -26,6 +26,13 @@ import dev.mars.quorus.monitoring.TransferMetrics;
 
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+/**
+ * Description for TransferEngine
+ *
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-17
+ */
 
 public interface TransferEngine {
 

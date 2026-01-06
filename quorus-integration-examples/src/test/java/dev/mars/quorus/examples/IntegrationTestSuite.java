@@ -42,6 +42,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Integration test suite that verifies end-to-end functionality across all modules.
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-19
  */
 class IntegrationTestSuite {
     

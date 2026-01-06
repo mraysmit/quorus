@@ -34,6 +34,9 @@ import java.util.Map;
 /**
  * Health and status monitoring endpoints.
  * Converted from JAX-RS to Vert.x Web for Vert.x 5.x migration.
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-20
  */
 @ApplicationScoped
 public class HealthResource {

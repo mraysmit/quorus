@@ -45,7 +45,8 @@ import java.util.stream.Collectors;
  * Transfers within a group now execute in parallel using Vert.x reactive patterns.</p>
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @since 1.0
+ * @since 2025-08-18
+ * @version 1.0
  */
 public class SimpleWorkflowEngine implements WorkflowEngine {
 

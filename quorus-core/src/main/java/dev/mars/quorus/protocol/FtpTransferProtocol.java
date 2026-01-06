@@ -31,6 +31,13 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Logger;
+/**
+ * Description for FtpTransferProtocol
+ *
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-18
+ */
 
 public class FtpTransferProtocol implements TransferProtocol {
     

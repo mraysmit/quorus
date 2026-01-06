@@ -41,7 +41,8 @@ import java.util.logging.Logger;
  * for better integration with the event loop and reduced thread overhead.</p>
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @since 2.0
+ * @since 2025-10-28
+ * @version 1.0
  */
 public class JobAssignmentService {
 

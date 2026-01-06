@@ -34,7 +34,8 @@ import org.slf4j.LoggerFactory;
  * This replaces the Quarkus runtime with a standalone Vert.x 5.x + Weld CDI application.
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @since 2.0
+ * @version 1.0
+ * @since 2025-12-17
  */
 public class QuorusApiApplication {
 

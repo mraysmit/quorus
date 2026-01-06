@@ -27,7 +27,8 @@ import java.nio.file.Paths;
  * Shows practical usage scenarios and best practices for workflow validation.
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @since 2.0
+ * @since 2025-08-21
+ * @version 1.0
  */
 public class ValidationExamplesRunner {
 

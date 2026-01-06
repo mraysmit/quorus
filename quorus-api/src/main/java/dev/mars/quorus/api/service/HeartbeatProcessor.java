@@ -43,7 +43,8 @@ import java.util.logging.Logger;
  * for better integration with the event loop and reduced thread overhead.</p>
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @since 2.0
+ * @since 2025-08-26
+ * @version 1.0
  */
 @ApplicationScoped
 public class HeartbeatProcessor {

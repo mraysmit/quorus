@@ -42,7 +42,8 @@ import java.util.stream.Collectors;
  * Returns pending job assignments for a specific agent.
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @since 2.0
+ * @since 2025-12-11
+ * @version 1.0
  */
 public class AgentJobsHandler implements HttpHandler {
 

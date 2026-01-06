@@ -34,7 +34,8 @@ import java.util.logging.Logger;
  * This class provides CDI beans for the Raft cluster configuration and node.
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @since 2.0
+ * @since 2025-08-26
+ * @version 1.0
  */
 @ApplicationScoped
 public class DistributedControllerConfiguration {

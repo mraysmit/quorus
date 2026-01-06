@@ -26,7 +26,8 @@ import java.util.concurrent.atomic.AtomicReference;
  * Thread-safe implementation for concurrent access during transfers.
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @since 1.0
+ * @since 2025-08-17
+ * @version 1.0
  */
 public class ProgressTracker {
     private final String jobId;

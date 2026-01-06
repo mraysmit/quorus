@@ -23,7 +23,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * Contains hardware and OS details used for capacity planning and job assignment.
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @since 2.0
+ * @since 2025-08-26
+ * @version 1.0
  */
 public class AgentSystemInfo {
 

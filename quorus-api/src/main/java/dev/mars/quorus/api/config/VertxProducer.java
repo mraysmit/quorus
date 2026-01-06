@@ -33,7 +33,8 @@ import org.slf4j.LoggerFactory;
  * - CDI integration for dependency injection
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @since 2.0
+ * @since 2025-12-16
+ * @version 1.0
  */
 @ApplicationScoped
 public class VertxProducer {

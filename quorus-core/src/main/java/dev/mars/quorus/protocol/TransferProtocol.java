@@ -21,6 +21,13 @@ import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferResult;
 import dev.mars.quorus.core.exceptions.TransferException;
 import dev.mars.quorus.transfer.TransferContext;
+/**
+ * Description for TransferProtocol
+ *
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-17
+ */
 
 public interface TransferProtocol {
     

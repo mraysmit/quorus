@@ -30,7 +30,8 @@ import org.slf4j.LoggerFactory;
  * Configures the global Jackson ObjectMapper used by Vert.x to support Java 8 date/time types.
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @since 2.0
+ * @since 2025-12-17
+ * @version 1.0
  */
 @ApplicationScoped
 public class JacksonConfig {

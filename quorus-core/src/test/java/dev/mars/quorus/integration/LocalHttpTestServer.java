@@ -39,7 +39,8 @@ import java.util.logging.Logger;
  * </ul>
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @since 1.0
+ * @since 2025-12-11
+ * @version 1.0
  */
 public class LocalHttpTestServer {
 

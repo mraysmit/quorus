@@ -45,6 +45,9 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Configurable Raft cluster tests using different test configurations.
  * Demonstrates how to run the same tests with different cluster setups.
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-20
  */
 @Testcontainers
 public class ConfigurableRaftClusterTest {

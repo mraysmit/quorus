@@ -19,6 +19,13 @@ package dev.mars.quorus.controller.raft;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.io.Serializable;
+/**
+ * Description for VoteResponse
+ *
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-20
+ */
 
 public class VoteResponse implements Serializable {
 

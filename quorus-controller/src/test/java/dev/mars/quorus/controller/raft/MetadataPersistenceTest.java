@@ -39,6 +39,9 @@ import static org.junit.jupiter.api.Assertions.*;
  * Comprehensive test to prove that metadata is properly transferred and preserved
  * during Raft leader changes. This test demonstrates the core data consistency
  * guarantees of the Quorus distributed controller architecture.
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-27
  */
 public class MetadataPersistenceTest {
 

@@ -20,6 +20,13 @@ import dev.mars.quorus.core.TransferJob;
 import dev.mars.quorus.core.TransferStatus;
 
 import java.io.Serializable;
+/**
+ * Description for TransferJobCommand
+ *
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-20
+ */
 
 public class TransferJobCommand implements Serializable {
 

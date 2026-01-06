@@ -30,6 +30,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Test suite for AgentSelectionService covering real-world distributed file transfer scenarios.
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-10-28
  */
 class AgentSelectionServiceTest {
     

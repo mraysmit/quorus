@@ -31,6 +31,9 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Performance benchmark tests for ConnectionPoolService.
  * Validates the expected 100-400% performance improvement from PeeGeeQ research.
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-12-17
  */
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class ConnectionPoolBenchmarkTest {

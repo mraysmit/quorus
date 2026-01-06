@@ -24,6 +24,13 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
+/**
+ * Description for TransferStateRepository
+ *
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-17
+ */
 
 public class TransferStateRepository {
     private static final Logger logger = Logger.getLogger(TransferStateRepository.class.getName());

@@ -20,7 +20,8 @@ package dev.mars.quorus.client;
  * Exception thrown by the Quorus client when API operations fail.
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @since 1.0
+ * @since 2025-08-20
+ * @version 1.0
  */
 public class QuorusClientException extends Exception {
 

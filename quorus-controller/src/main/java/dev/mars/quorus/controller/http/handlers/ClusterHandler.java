@@ -38,7 +38,8 @@ import java.util.logging.Logger;
  * Returns information about the Raft cluster including leader, term, and node status.
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @since 2.0
+ * @since 2025-12-11
+ * @version 1.0
  */
 public class ClusterHandler implements HttpHandler {
 

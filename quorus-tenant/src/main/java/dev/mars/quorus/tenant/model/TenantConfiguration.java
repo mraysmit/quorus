@@ -18,6 +18,13 @@ package dev.mars.quorus.tenant.model;
 
 import java.time.Duration;
 import java.util.*;
+/**
+ * Description for TenantConfiguration
+ *
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-18
+ */
 
 public class TenantConfiguration {
     

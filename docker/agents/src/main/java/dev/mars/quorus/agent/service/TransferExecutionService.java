@@ -34,7 +34,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * Converted to Vert.x reactive patterns (Phase 1.5 - Dec 2025).
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @since 1.0
+ * @since 2025-09-04
+ * @version 1.0
  */
 public class TransferExecutionService {
 

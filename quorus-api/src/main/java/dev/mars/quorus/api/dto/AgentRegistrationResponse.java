@@ -28,7 +28,8 @@ import java.util.Map;
  * Contains the result of an agent registration attempt.
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @since 2.0
+ * @since 2025-08-26
+ * @version 1.0
  */
 public class AgentRegistrationResponse {
 

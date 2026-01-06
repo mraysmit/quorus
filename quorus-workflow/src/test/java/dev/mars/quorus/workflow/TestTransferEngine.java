@@ -31,6 +31,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * Test implementation of TransferEngine for use in unit tests.
  * This is a real implementation (not a mock) that simulates transfer behavior.
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-12-11
  */
 class TestTransferEngine implements TransferEngine {
     

@@ -18,6 +18,13 @@ package dev.mars.quorus.workflow;
 
 import java.nio.file.Path;
 import java.util.List;
+/**
+ * Description for WorkflowDefinitionParser
+ *
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-18
+ */
 
 public interface WorkflowDefinitionParser {
     

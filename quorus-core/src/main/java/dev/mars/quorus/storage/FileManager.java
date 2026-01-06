@@ -22,6 +22,13 @@ import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Instant;
 import java.util.logging.Logger;
+/**
+ * Description for FileManager
+ *
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-17
+ */
 
 public class FileManager {
     private static final Logger logger = Logger.getLogger(FileManager.class.getName());

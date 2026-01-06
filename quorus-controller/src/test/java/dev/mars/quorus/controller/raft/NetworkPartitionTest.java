@@ -42,6 +42,9 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Advanced network partition testing for Raft cluster.
  * Tests split-brain prevention and network recovery scenarios.
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-20
  */
 @Testcontainers
 public class NetworkPartitionTest {

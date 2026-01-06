@@ -29,6 +29,9 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Comprehensive test suite for YAML schema validation covering all edge cases,
  * error conditions, and validation scenarios.
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-21
  */
 class ComprehensiveSchemaValidationTest {
 

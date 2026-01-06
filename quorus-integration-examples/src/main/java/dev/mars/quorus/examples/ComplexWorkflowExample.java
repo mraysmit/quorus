@@ -37,7 +37,8 @@ import java.util.concurrent.CompletableFuture;
  * 5. Dependency graph analysis
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @since 1.0
+ * @since 2025-08-18
+ * @version 1.0
  */
 public class ComplexWorkflowExample {
     

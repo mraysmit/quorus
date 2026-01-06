@@ -24,7 +24,8 @@ import dev.mars.quorus.client.QuorusClientException;
  * Example demonstrating how to use the Quorus Java Client SDK.
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @since 1.0
+ * @since 2025-08-20
+ * @version 1.0
  */
 public class ClientExample {
 

@@ -40,6 +40,9 @@ import static org.junit.jupiter.api.Assertions.*;
  * - tags: Array of lowercase tags with hyphens
  *
  * Tests that intentionally fail validation are clearly marked and documented.
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 1.0
+ * @since 2025-08-18
  */
 class SimpleWorkflowEngineTest {
 

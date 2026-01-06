@@ -27,7 +27,8 @@ import java.util.Set;
  * This class provides information about cluster health, leadership, and node states.
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @since 2.0
+ * @since 2025-08-26
+ * @version 1.0
  */
 public class ClusterStatus {
 

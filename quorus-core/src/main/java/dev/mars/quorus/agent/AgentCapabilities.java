@@ -28,7 +28,8 @@ import java.util.Set;
  * This information is used for intelligent job assignment and load balancing.
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @since 2.0
+ * @since 2025-08-26
+ * @version 1.0
  */
 public class AgentCapabilities {
 

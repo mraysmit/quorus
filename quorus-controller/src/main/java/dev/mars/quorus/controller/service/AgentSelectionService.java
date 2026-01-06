@@ -36,7 +36,8 @@ import java.util.stream.Collectors;
  * Implements multiple selection strategies optimized for distributed file transfer scenarios.
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @since 2.0
+ * @since 2025-10-28
+ * @version 1.0
  */
 public class AgentSelectionService {
     
