@@ -25,6 +25,7 @@ import dev.mars.quorus.agent.AgentStatus;
 import dev.mars.quorus.controller.raft.RaftNode;
 import dev.mars.quorus.controller.state.AgentCommand;
 import dev.mars.quorus.controller.state.QuorusStateMachine;
+import io.vertx.core.Future;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -113,10 +114,14 @@ public class HeartbeatHandler implements HttpHandler {
                 command = AgentCommand.heartbeat(agentId);
             }
             
+<<<<<<< HEAD
             CompletableFuture<Object> future = raftNode.submitCommand(command).toCompletionStage().toCompletableFuture();
+=======
+            Future<Object> future = raftNode.submitCommand(command);
+>>>>>>> 99ead9a4bf7a397233245aa6831aa3ff67de12ca
 
             // Wait for consensus (with timeout)
-            Object result = future.get(5, TimeUnit.SECONDS);
+            Object result = future.toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
 
             if (result instanceof AgentInfo) {
                 AgentInfo updatedAgent = (AgentInfo) result;

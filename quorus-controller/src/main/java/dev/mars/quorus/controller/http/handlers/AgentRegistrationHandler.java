@@ -23,6 +23,7 @@ import com.sun.net.httpserver.HttpHandler;
 import dev.mars.quorus.agent.AgentInfo;
 import dev.mars.quorus.controller.raft.RaftNode;
 import dev.mars.quorus.controller.state.AgentCommand;
+import io.vertx.core.Future;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -78,10 +79,14 @@ public class AgentRegistrationHandler implements HttpHandler {
 
             // Create and submit registration command to Raft
             AgentCommand command = AgentCommand.register(agentInfo);
+<<<<<<< HEAD
             CompletableFuture<Object> future = raftNode.submitCommand(command).toCompletionStage().toCompletableFuture();
+=======
+            Future<Object> future = raftNode.submitCommand(command);
+>>>>>>> 99ead9a4bf7a397233245aa6831aa3ff67de12ca
 
             // Wait for consensus (with timeout)
-            Object result = future.get(5, TimeUnit.SECONDS);
+            Object result = future.toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
 
             if (result instanceof AgentInfo) {
                 AgentInfo registeredAgent = (AgentInfo) result;

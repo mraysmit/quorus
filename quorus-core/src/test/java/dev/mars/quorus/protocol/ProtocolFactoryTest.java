@@ -17,6 +17,8 @@
 package dev.mars.quorus.protocol;
 
 import dev.mars.quorus.core.TransferRequest;
+import io.vertx.core.Vertx;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -37,13 +39,20 @@ import static org.junit.jupiter.api.Assertions.*;
 class ProtocolFactoryTest {
     
     private ProtocolFactory factory;
+    private Vertx vertx;
     
     @TempDir
     Path tempDir;
     
     @BeforeEach
     void setUp() {
-        factory = new ProtocolFactory();
+        vertx = Vertx.vertx();
+        factory = new ProtocolFactory(vertx);
+    }
+
+    @AfterEach
+    void tearDown() {
+        vertx.close();
     }
     
     @Test

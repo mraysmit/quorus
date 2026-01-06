@@ -30,8 +30,8 @@ import org.junit.jupiter.api.io.TempDir;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import io.vertx.core.Future;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -80,8 +80,8 @@ class BasicTransferIntegrationTest {
                 .protocol("http")
                 .build();
 
-        CompletableFuture<TransferResult> future = transferEngine.submitTransfer(request);
-        TransferResult result = future.get(30, TimeUnit.SECONDS);
+        Future<TransferResult> future = transferEngine.submitTransfer(request);
+        TransferResult result = future.toCompletionStage().toCompletableFuture().get(30, TimeUnit.SECONDS);
 
         // Verify result
         assertNotNull(result);
@@ -108,8 +108,8 @@ class BasicTransferIntegrationTest {
                 .protocol("http")
                 .build();
 
-        CompletableFuture<TransferResult> future = transferEngine.submitTransfer(request);
-        TransferResult result = future.get(30, TimeUnit.SECONDS);
+        Future<TransferResult> future = transferEngine.submitTransfer(request);
+        TransferResult result = future.toCompletionStage().toCompletableFuture().get(30, TimeUnit.SECONDS);
 
         assertTrue(result.isSuccessful());
         assertEquals(100, result.getBytesTransferred());
@@ -128,8 +128,8 @@ class BasicTransferIntegrationTest {
                 .protocol("http")
                 .build();
 
-        CompletableFuture<TransferResult> future = transferEngine.submitTransfer(request);
-        TransferResult result = future.get(30, TimeUnit.SECONDS);
+        Future<TransferResult> future = transferEngine.submitTransfer(request);
+        TransferResult result = future.toCompletionStage().toCompletableFuture().get(30, TimeUnit.SECONDS);
 
         assertTrue(result.isSuccessful());
         assertEquals(10240, result.getBytesTransferred());
@@ -149,7 +149,7 @@ class BasicTransferIntegrationTest {
                 .protocol("http")
                 .build();
 
-        CompletableFuture<TransferResult> future = transferEngine.submitTransfer(request);
+        Future<TransferResult> future = transferEngine.submitTransfer(request);
 
         // Monitor progress
         String jobId = request.getRequestId();
@@ -162,7 +162,7 @@ class BasicTransferIntegrationTest {
             foundPending = true;
         }
 
-        while (!future.isDone()) {
+        while (!future.toCompletionStage().toCompletableFuture().isDone()) {
             var job = transferEngine.getTransferJob(jobId);
             if (job != null && job.getStatus() == TransferStatus.IN_PROGRESS) {
                 foundInProgress = true;
@@ -176,7 +176,7 @@ class BasicTransferIntegrationTest {
         // Should have observed either PENDING or IN_PROGRESS status
         assertTrue(foundPending || foundInProgress, "Should have observed PENDING or IN_PROGRESS status");
 
-        TransferResult result = future.get();
+        TransferResult result = future.toCompletionStage().toCompletableFuture().get();
         assertTrue(result.isSuccessful());
         assertEquals(1048576, result.getBytesTransferred());
     }
@@ -192,8 +192,8 @@ class BasicTransferIntegrationTest {
                 .protocol("http")
                 .build();
 
-        CompletableFuture<TransferResult> future = transferEngine.submitTransfer(request);
-        TransferResult result = future.get(30, TimeUnit.SECONDS);
+        Future<TransferResult> future = transferEngine.submitTransfer(request);
+        TransferResult result = future.toCompletionStage().toCompletableFuture().get(30, TimeUnit.SECONDS);
 
         // Should fail due to 404
         assertFalse(result.isSuccessful());
@@ -205,7 +205,8 @@ class BasicTransferIntegrationTest {
     @Test
     void testConcurrentTransfers() throws Exception {
         int numTransfers = 3;
-        CompletableFuture<TransferResult>[] futures = new CompletableFuture[numTransfers];
+        @SuppressWarnings("unchecked")
+        Future<TransferResult>[] futures = new Future[numTransfers];
 
         for (int i = 0; i < numTransfers; i++) {
             URI sourceUri = URI.create(baseUrl + "/bytes/512"); // 512 bytes each
@@ -222,7 +223,7 @@ class BasicTransferIntegrationTest {
 
         // Wait for all transfers to complete
         for (int i = 0; i < numTransfers; i++) {
-            TransferResult result = futures[i].get(30, TimeUnit.SECONDS);
+            TransferResult result = futures[i].toCompletionStage().toCompletableFuture().get(30, TimeUnit.SECONDS);
             assertTrue(result.isSuccessful(), "Transfer " + i + " should succeed");
             assertEquals(512, result.getBytesTransferred());
 
@@ -246,10 +247,10 @@ class BasicTransferIntegrationTest {
                 .protocol("http")
                 .build();
 
-        CompletableFuture<TransferResult> future = transferEngine.submitTransfer(request);
+        Future<TransferResult> future = transferEngine.submitTransfer(request);
 
         // Wait for transfer to complete
-        TransferResult result = future.get(30, TimeUnit.SECONDS);
+        TransferResult result = future.toCompletionStage().toCompletableFuture().get(30, TimeUnit.SECONDS);
         assertTrue(result.isSuccessful());
 
         // Shutdown should succeed

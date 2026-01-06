@@ -18,6 +18,7 @@ package dev.mars.quorus.controller.raft;
 
 import dev.mars.quorus.controller.raft.grpc.VoteRequest;
 import dev.mars.quorus.controller.raft.grpc.VoteResponse;
+import io.vertx.core.Future;
 import dev.mars.quorus.controller.state.QuorusStateMachine;
 import dev.mars.quorus.controller.state.SystemMetadataCommand;
 import org.awaitility.Awaitility;
@@ -28,7 +29,6 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -98,11 +98,11 @@ class RaftNodeTest {
     void testNodeStartAndStop() {
         assertFalse(transport1.isRunning());
         
-        node1.start().join();
+        node1.start().toCompletionStage().toCompletableFuture().join();
         assertTrue(transport1.isRunning());
         assertEquals(RaftNode.State.FOLLOWER, node1.getState());
         
-        node1.stop().join();
+        node1.stop().toCompletionStage().toCompletableFuture().join();
         assertFalse(transport1.isRunning());
     }
 
@@ -157,17 +157,17 @@ class RaftNodeTest {
 
     @Test
     void testCommandSubmissionToNonLeader() {
-        node1.start().join();
+        node1.start().toCompletionStage().toCompletableFuture().join();
         
         // Node starts as follower, command submission should fail
         SystemMetadataCommand command = SystemMetadataCommand.set("test-key", "test-value");
         
-        CompletableFuture<Object> future = node1.submitCommand(command);
+        Future<Object> future = node1.submitCommand(command);
         
         // Verify the exception
         assertThrows(Exception.class, () -> {
             try {
-                future.get(1, TimeUnit.SECONDS);
+                future.toCompletionStage().toCompletableFuture().get(1, TimeUnit.SECONDS);
             } catch (Exception e) {
                 assertTrue(e.getCause() instanceof IllegalStateException);
                 assertTrue(e.getCause().getMessage().contains("Not the leader"));
@@ -219,10 +219,10 @@ class RaftNodeTest {
                 .setLastLogIndex(0)
                 .setLastLogTerm(0)
                 .build();
-        CompletableFuture<VoteResponse> future = transport1.sendVoteRequest("node2", voteRequest);
+        Future<VoteResponse> future = transport1.sendVoteRequest("node2", voteRequest);
         
         assertDoesNotThrow(() -> {
-            VoteResponse response = future.get(1, TimeUnit.SECONDS);
+            VoteResponse response = future.toCompletionStage().toCompletableFuture().get(1, TimeUnit.SECONDS);
             assertNotNull(response);
             assertEquals(1, response.getTerm());
         });

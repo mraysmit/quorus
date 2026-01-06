@@ -26,12 +26,10 @@ import dev.mars.quorus.protocol.ProtocolFactory;
 import dev.mars.quorus.protocol.TransferProtocol;
 import dev.mars.quorus.transfer.SimpleTransferEngine;
 import dev.mars.quorus.transfer.TransferEngine;
+import io.vertx.core.Vertx;
+import io.vertx.core.Future;
 
 import java.net.URI;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.concurrent.CompletableFuture;
 
 /**
  * Enterprise Protocol Example - Demonstrates advanced protocol support and performance optimization.
@@ -63,6 +61,7 @@ public class EnterpriseProtocolExample {
     private NetworkTopologyService networkService;
     private ConnectionPoolService connectionPoolService;
     private ProtocolFactory protocolFactory;
+    private Vertx vertx;
     
     public static void main(String[] args) {
         System.out.println("=== Quorus Enterprise Protocol Example ===");
@@ -114,11 +113,13 @@ public class EnterpriseProtocolExample {
     private void initializeServices() throws Exception {
         System.out.println("Initializing enterprise services...");
         
+        vertx = Vertx.vertx();
+
         // Initialize services with enterprise-optimized settings
-        transferEngine = new SimpleTransferEngine(20, 4, 1024 * 1024); // 20 concurrent, 4 threads, 1MB chunks
-        networkService = new NetworkTopologyService();
+        transferEngine = new SimpleTransferEngine(vertx, 20, 4, 1024 * 1024); // 20 concurrent, 4 threads, 1MB chunks
+        networkService = new NetworkTopologyService(vertx);
         connectionPoolService = new ConnectionPoolService();
-        protocolFactory = new ProtocolFactory();
+        protocolFactory = new ProtocolFactory(vertx);
         
         TestResultLogger.logExpectedSuccess("Enterprise services initialized");
     }
@@ -215,8 +216,8 @@ public class EnterpriseProtocolExample {
                     .build();
 
             // Execute transfer (simulation)
-            CompletableFuture<TransferResult> future = transferEngine.submitTransfer(request);
-            TransferResult result = future.get();
+            Future<TransferResult> future = transferEngine.submitTransfer(request);
+            TransferResult result = future.toCompletionStage().toCompletableFuture().get();
             
             if (result.isSuccessful()) {
                 TestResultLogger.logExpectedSuccess("SFTP transfer completed successfully");
@@ -273,7 +274,7 @@ public class EnterpriseProtocolExample {
         
         for (String hostname : testHosts) {
             try {
-                var nodeInfo = networkService.discoverNode(hostname).get();
+                var nodeInfo = networkService.discoverNode(hostname).toCompletionStage().toCompletableFuture().get();
                 
                 TestResultLogger.logExpectedSuccess("Network discovery for " + hostname);
                 System.out.println("   Reachable: " + nodeInfo.isReachable());
@@ -299,34 +300,10 @@ public class EnterpriseProtocolExample {
     
     private void demonstrateConnectionPooling() throws Exception {
         System.out.println("Demonstrating connection pooling optimization...");
+        System.out.println("Note: Connection pooling is now handled natively by Vert.x for database connections.");
+        System.out.println("Generic connection pooling for other protocols is deprecated in favor of protocol-specific clients.");
         
-        // Test connection pooling for different protocols
-        URI[] testUris = {
-            URI.create("http://example.com/file1.txt"),
-            URI.create("https://secure.example.com/file2.txt"),
-            URI.create("ftp://ftp.example.com/file3.txt")
-        };
-        
-        for (URI uri : testUris) {
-            try {
-                var pool = connectionPoolService.getConnectionPool(uri);
-                TestResultLogger.logExpectedSuccess("Connection pool created for " + uri.getScheme().toUpperCase());
-                System.out.println("   Pool for: " + uri.getHost());
-                System.out.println("   Max connections: 10");
-                System.out.println("   Connection timeout: 30 seconds");
-                
-            } catch (Exception e) {
-                TestResultLogger.logExpectedSuccess("Connection pooling configured for " + uri.getScheme());
-            }
-        }
-        
-        // Get pooling statistics
-        var poolStats = connectionPoolService.getStatistics();
-        System.out.println("\nConnection Pool Statistics:");
-        System.out.println("   Total pools: " + poolStats.getTotalPools());
-        System.out.println("   Total connections: " + poolStats.getTotalConnections());
-        System.out.println("   Active connections: " + poolStats.getActiveConnections());
-        System.out.println("   Idle connections: " + poolStats.getIdleConnections());
+        TestResultLogger.logExpectedSuccess("Connection pooling optimization (Vert.x Native)");
     }
     
     private void demonstratePerformanceMonitoring() throws Exception {
@@ -341,7 +318,8 @@ public class EnterpriseProtocolExample {
         networkService.updateMetrics(hostname, bytesTransferred, transferTime, true);
         
         // Get transfer recommendations
-        var recommendations = networkService.getTransferRecommendations(hostname, bytesTransferred);
+        var recommendations = networkService.getTransferRecommendations(hostname, bytesTransferred)
+                .toCompletionStage().toCompletableFuture().get();
         
         TestResultLogger.logExpectedSuccess("Performance monitoring active");
         System.out.println("   Optimal buffer size: " + recommendations.getOptimalBufferSize() / 1024 + " KB");
@@ -364,6 +342,10 @@ public class EnterpriseProtocolExample {
         try {
             if (connectionPoolService != null) {
                 connectionPoolService.shutdown();
+            }
+            
+            if (vertx != null) {
+                vertx.close();
             }
             
             // Clean up temporary files

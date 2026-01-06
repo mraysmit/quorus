@@ -23,8 +23,10 @@ import dev.mars.quorus.core.TransferResult;
 import dev.mars.quorus.core.exceptions.TransferException;
 import dev.mars.quorus.monitoring.TransferEngineHealthCheck;
 import dev.mars.quorus.monitoring.TransferMetrics;
+import io.vertx.core.Future;
 
 import java.util.Map;
+<<<<<<< HEAD
 import java.util.concurrent.CompletableFuture;
 /**
  * Description for TransferEngine
@@ -33,10 +35,12 @@ import java.util.concurrent.CompletableFuture;
  * @version 1.0
  * @since 2025-08-17
  */
+=======
+>>>>>>> 99ead9a4bf7a397233245aa6831aa3ff67de12ca
 
 public interface TransferEngine {
 
-    CompletableFuture<TransferResult> submitTransfer(TransferRequest request) throws TransferException;
+    Future<TransferResult> submitTransfer(TransferRequest request) throws TransferException;
 
     TransferJob getTransferJob(String jobId);
 

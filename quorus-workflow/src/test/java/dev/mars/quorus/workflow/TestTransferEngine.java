@@ -23,8 +23,9 @@ import dev.mars.quorus.core.TransferStatus;
 import dev.mars.quorus.core.exceptions.TransferException;
 import dev.mars.quorus.transfer.TransferEngine;
 
+import io.vertx.core.Future;
+import io.vertx.core.Promise;
 import java.time.Instant;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -79,7 +80,7 @@ class TestTransferEngine implements TransferEngine {
     }
     
     @Override
-    public CompletableFuture<TransferResult> submitTransfer(TransferRequest request) throws TransferException {
+    public Future<TransferResult> submitTransfer(TransferRequest request) throws TransferException {
         if (shutdown) {
             throw new TransferException(request.getRequestId(), "Transfer engine is shutdown");
         }
@@ -89,24 +90,35 @@ class TestTransferEngine implements TransferEngine {
         TransferJob job = new TransferJob(request);
         jobs.put(job.getJobId(), job);
         
-        return CompletableFuture.supplyAsync(() -> {
+        Promise<TransferResult> promise = Promise.promise();
+        
+        // Execute asynchronously
+        new Thread(() -> {
             try {
                 // Simulate transfer based on configured behavior
+                TransferResult result;
                 switch (behavior) {
                     case SUCCESS:
-                        return createSuccessResult(request.getRequestId());
+                        result = createSuccessResult(request.getRequestId());
+                        break;
                     case FAILURE:
-                        return createFailureResult(request.getRequestId());
+                        result = createFailureResult(request.getRequestId());
+                        break;
                     case EXCEPTION:
-                        throw exceptionToThrow != null ? exceptionToThrow : new RuntimeException("Transfer failed");
+                        promise.fail(exceptionToThrow != null ? exceptionToThrow : new RuntimeException("Transfer failed"));
+                        return;
                     default:
-                        return createSuccessResult(request.getRequestId());
+                        result = createSuccessResult(request.getRequestId());
+                        break;
                 }
+                promise.complete(result);
             } finally {
                 activeTransferCount.decrementAndGet();
                 jobs.remove(job.getJobId());
             }
-        });
+        }).start();
+        
+        return promise.future();
     }
     
     @Override

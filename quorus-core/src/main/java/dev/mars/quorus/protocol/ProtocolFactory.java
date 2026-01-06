@@ -37,30 +37,18 @@ public class ProtocolFactory {
     private final Vertx vertx;
 
     /**
-     * Constructor without Vertx for backward compatibility.
-     * @deprecated Use {@link #ProtocolFactory(Vertx)} instead
-     */
-    @Deprecated
-    public ProtocolFactory() {
-        this(null);
-        logger.warning("Using deprecated constructor - HTTP protocol will use blocking I/O");
-    }
-
-    /**
      * Constructor with Vert.x dependency injection (recommended).
      * @param vertx Vert.x instance for reactive HTTP protocol
      */
     public ProtocolFactory(Vertx vertx) {
-        this.vertx = vertx;
+        this.vertx = java.util.Objects.requireNonNull(vertx, "Vertx instance cannot be null");
         this.protocols = new HashMap<>();
         registerDefaultProtocols();
     }
 
     private void registerDefaultProtocols() {
         // Register HTTP protocol for both http and https schemes
-        HttpTransferProtocol httpProtocol = vertx != null
-            ? new HttpTransferProtocol(vertx)
-            : new HttpTransferProtocol();
+        HttpTransferProtocol httpProtocol = new HttpTransferProtocol(vertx);
         registerProtocol(httpProtocol);
         registerProtocolAlias("https", httpProtocol);
 

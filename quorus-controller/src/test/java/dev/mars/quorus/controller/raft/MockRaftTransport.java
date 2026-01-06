@@ -35,10 +35,13 @@ import dev.mars.quorus.controller.raft.grpc.AppendEntriesResponse;
 import dev.mars.quorus.controller.raft.grpc.VoteRequest;
 import dev.mars.quorus.controller.raft.grpc.VoteResponse;
 import io.vertx.core.Future;
+<<<<<<< HEAD
+=======
+import io.vertx.core.Promise;
+>>>>>>> 99ead9a4bf7a397233245aa6831aa3ff67de12ca
 
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
@@ -55,7 +58,7 @@ public class MockRaftTransport implements RaftTransport {
     private static final Logger logger = Logger.getLogger(MockRaftTransport.class.getName());
 
     private final String nodeId;
-    private final Executor executor = Executors.newCachedThreadPool();
+    private final ExecutorService executor = Executors.newCachedThreadPool();
     private volatile Consumer<Object> messageHandler;
     private volatile boolean running = false;
     private Map<String, MockRaftTransport> transports;
@@ -101,6 +104,7 @@ public class MockRaftTransport implements RaftTransport {
 
     @Override
     public Future<VoteResponse> sendVoteRequest(String targetNodeId, VoteRequest request) {
+<<<<<<< HEAD
         return Future.fromCompletionStage(CompletableFuture.supplyAsync(() -> {
             MockRaftTransport targetTransport = transports.get(targetNodeId);
             if (targetTransport == null || !targetTransport.running) {
@@ -108,13 +112,19 @@ public class MockRaftTransport implements RaftTransport {
             }
 
             // Simulate network delay
+=======
+        Promise<VoteResponse> promise = Promise.promise();
+        
+        executor.submit(() -> {
+>>>>>>> 99ead9a4bf7a397233245aa6831aa3ff67de12ca
             try {
-                Thread.sleep(10 + (long) (Math.random() * 20)); // 10-30ms delay
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new RuntimeException(e);
-            }
+                MockRaftTransport targetTransport = transports.get(targetNodeId);
+                if (targetTransport == null || !targetTransport.running) {
+                    promise.fail(new RuntimeException("Target node not available: " + targetNodeId));
+                    return;
+                }
 
+<<<<<<< HEAD
             // Process vote request
             VoteResponse response = targetTransport.handleVoteRequest(request);
             logger.fine("Vote request from " + nodeId + " to " + targetNodeId + 
@@ -122,11 +132,35 @@ public class MockRaftTransport implements RaftTransport {
             
             return response;
         }, executor));
+=======
+                // Simulate network delay
+                try {
+                    Thread.sleep(10 + (long) (Math.random() * 20)); // 10-30ms delay
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    promise.fail(new RuntimeException(e));
+                    return;
+                }
+
+                // Process vote request
+                VoteResponse response = targetTransport.handleVoteRequest(request);
+                logger.fine("Vote request from " + nodeId + " to " + targetNodeId + 
+                           ": " + response.getVoteGranted());
+                
+                promise.complete(response);
+            } catch (Exception e) {
+                promise.fail(e);
+            }
+        });
+        
+        return promise.future();
+>>>>>>> 99ead9a4bf7a397233245aa6831aa3ff67de12ca
     }
 
     @Override
     public Future<AppendEntriesResponse> sendAppendEntries(String targetNodeId, 
                                                                      AppendEntriesRequest request) {
+<<<<<<< HEAD
         return Future.fromCompletionStage(CompletableFuture.supplyAsync(() -> {
             MockRaftTransport targetTransport = transports.get(targetNodeId);
             if (targetTransport == null || !targetTransport.running) {
@@ -134,13 +168,19 @@ public class MockRaftTransport implements RaftTransport {
             }
 
             // Simulate network delay
+=======
+        Promise<AppendEntriesResponse> promise = Promise.promise();
+        
+        executor.submit(() -> {
+>>>>>>> 99ead9a4bf7a397233245aa6831aa3ff67de12ca
             try {
-                Thread.sleep(5 + (long) (Math.random() * 10)); // 5-15ms delay
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new RuntimeException(e);
-            }
+                MockRaftTransport targetTransport = transports.get(targetNodeId);
+                if (targetTransport == null || !targetTransport.running) {
+                    promise.fail(new RuntimeException("Target node not available: " + targetNodeId));
+                    return;
+                }
 
+<<<<<<< HEAD
             // Process append entries request
             AppendEntriesResponse response = targetTransport.handleAppendEntries(request);
             logger.fine("Append entries from " + nodeId + " to " + targetNodeId + 
@@ -148,6 +188,29 @@ public class MockRaftTransport implements RaftTransport {
             
             return response;
         }, executor));
+=======
+                // Simulate network delay
+                try {
+                    Thread.sleep(5 + (long) (Math.random() * 10)); // 5-15ms delay
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    promise.fail(new RuntimeException(e));
+                    return;
+                }
+
+                // Process append entries request
+                AppendEntriesResponse response = targetTransport.handleAppendEntries(request);
+                logger.fine("Append entries from " + nodeId + " to " + targetNodeId + 
+                           ": " + response.getSuccess());
+                
+                promise.complete(response);
+            } catch (Exception e) {
+                promise.fail(e);
+            }
+        });
+        
+        return promise.future();
+>>>>>>> 99ead9a4bf7a397233245aa6831aa3ff67de12ca
     }
 
     private VoteResponse handleVoteRequest(VoteRequest request) {

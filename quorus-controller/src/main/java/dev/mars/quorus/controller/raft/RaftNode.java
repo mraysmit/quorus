@@ -30,6 +30,7 @@ import org.slf4j.LoggerFactory;
 import java.io.*;
 import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -107,7 +108,11 @@ public class RaftNode {
         vertx.runOnContext(v -> {
             try {
                 if (running) {
+<<<<<<< HEAD
                     promise.complete(null);
+=======
+                    promise.complete();
+>>>>>>> 99ead9a4bf7a397233245aa6831aa3ff67de12ca
                     return;
                 }
 
@@ -123,7 +128,11 @@ public class RaftNode {
                 resetElectionTimer();
                 
                 running = true;
+<<<<<<< HEAD
                 promise.complete(null);
+=======
+                promise.complete();
+>>>>>>> 99ead9a4bf7a397233245aa6831aa3ff67de12ca
             } catch (Exception e) {
                 logger.error("Failed to start Raft node", e);
                 promise.fail(e);
@@ -137,7 +146,11 @@ public class RaftNode {
         vertx.runOnContext(v -> {
             try {
                 if (!running) {
+<<<<<<< HEAD
                     promise.complete(null);
+=======
+                    promise.complete();
+>>>>>>> 99ead9a4bf7a397233245aa6831aa3ff67de12ca
                     return;
                 }
                 running = false;
@@ -146,7 +159,11 @@ public class RaftNode {
                 cancelTimers();
                 transport.stop();
                 logger.info("Raft node stopped: {}", nodeId);
+<<<<<<< HEAD
                 promise.complete(null);
+=======
+                promise.complete();
+>>>>>>> 99ead9a4bf7a397233245aa6831aa3ff67de12ca
             } catch (Exception e) {
                 logger.error("Failed to stop Raft node", e);
                 promise.fail(e);
@@ -169,8 +186,14 @@ public class RaftNode {
             LogEntry entry = new LogEntry(currentTerm, log.size(), command);
             log.add(entry);
             
+<<<<<<< HEAD
             // Register future
             pendingCommands.put(entry.getIndex(), promise);
+=======
+            // Register promise (convert to CompletableFuture for internal storage)
+            CompletableFuture<Object> cf = promise.future().toCompletionStage().toCompletableFuture();
+            pendingCommands.put(entry.getIndex(), cf);
+>>>>>>> 99ead9a4bf7a397233245aa6831aa3ff67de12ca
 
             logger.info("Command submitted at index {} term {}", entry.getIndex(), entry.getTerm());
 
@@ -521,7 +544,7 @@ public class RaftNode {
         Collections.sort(indices);
         long N = indices.get(indices.size() / 2); // Majority index
         
-        if (N > commitIndex && log.get((int) N).getTerm() == currentTerm) {
+        if (N > commitIndex && N < log.size() && log.get((int) N).getTerm() == currentTerm) {
             commitIndex = N;
             applyLog();
         }

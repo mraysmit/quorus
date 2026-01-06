@@ -19,10 +19,10 @@ package dev.mars.quorus.workflow;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import io.vertx.core.Future;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -71,8 +71,8 @@ class SimpleWorkflowEngineTest {
     void testNormalExecution() throws Exception {
         testTransferEngine.simulateSuccess();
 
-        CompletableFuture<WorkflowExecution> future = workflowEngine.execute(testWorkflow, testContext);
-        WorkflowExecution execution = future.get();
+        Future<WorkflowExecution> future = workflowEngine.execute(testWorkflow, testContext);
+        WorkflowExecution execution = future.toCompletionStage().toCompletableFuture().get();
 
         assertNotNull(execution);
         assertEquals("test-execution-123", execution.getExecutionId());
@@ -89,8 +89,8 @@ class SimpleWorkflowEngineTest {
     
     @Test
     void testDryRun() throws Exception {
-        CompletableFuture<WorkflowExecution> future = workflowEngine.dryRun(testWorkflow, testContext);
-        WorkflowExecution execution = future.get();
+        Future<WorkflowExecution> future = workflowEngine.dryRun(testWorkflow, testContext);
+        WorkflowExecution execution = future.toCompletionStage().toCompletableFuture().get();
 
         assertNotNull(execution);
         assertEquals(WorkflowStatus.COMPLETED, execution.getStatus());
@@ -103,8 +103,8 @@ class SimpleWorkflowEngineTest {
     
     @Test
     void testVirtualRun() throws Exception {
-        CompletableFuture<WorkflowExecution> future = workflowEngine.virtualRun(testWorkflow, testContext);
-        WorkflowExecution execution = future.get();
+        Future<WorkflowExecution> future = workflowEngine.virtualRun(testWorkflow, testContext);
+        WorkflowExecution execution = future.toCompletionStage().toCompletableFuture().get();
 
         assertNotNull(execution);
         assertEquals(WorkflowStatus.COMPLETED, execution.getStatus());
@@ -123,8 +123,8 @@ class SimpleWorkflowEngineTest {
     void testFailedTransfer() throws Exception {
         testTransferEngine.simulateFailure();
 
-        CompletableFuture<WorkflowExecution> future = workflowEngine.execute(testWorkflow, testContext);
-        WorkflowExecution execution = future.get();
+        Future<WorkflowExecution> future = workflowEngine.execute(testWorkflow, testContext);
+        WorkflowExecution execution = future.toCompletionStage().toCompletableFuture().get();
 
         assertNotNull(execution);
         assertEquals(WorkflowStatus.FAILED, execution.getStatus());
@@ -139,8 +139,8 @@ class SimpleWorkflowEngineTest {
     void testTransferException() throws Exception {
         testTransferEngine.simulateException(new RuntimeException("Transfer failed"));
 
-        CompletableFuture<WorkflowExecution> future = workflowEngine.execute(testWorkflow, testContext);
-        WorkflowExecution execution = future.get();
+        Future<WorkflowExecution> future = workflowEngine.execute(testWorkflow, testContext);
+        WorkflowExecution execution = future.toCompletionStage().toCompletableFuture().get();
 
         assertNotNull(execution);
         assertEquals(WorkflowStatus.FAILED, execution.getStatus());
@@ -151,13 +151,13 @@ class SimpleWorkflowEngineTest {
     void testGetStatus() throws Exception {
         testTransferEngine.simulateSuccess();
 
-        CompletableFuture<WorkflowExecution> future = workflowEngine.execute(testWorkflow, testContext);
+        Future<WorkflowExecution> future = workflowEngine.execute(testWorkflow, testContext);
 
         // Status should be null for unknown execution
         assertNull(workflowEngine.getStatus("unknown-execution"));
 
         // Wait for completion
-        WorkflowExecution execution = future.get();
+        WorkflowExecution execution = future.toCompletionStage().toCompletableFuture().get();
 
         // Status should be null after completion (execution removed from active list)
         assertNull(workflowEngine.getStatus("test-execution-123"));
@@ -181,10 +181,10 @@ class SimpleWorkflowEngineTest {
         workflowEngine.shutdown();
         
         // After shutdown, new executions should fail
-        CompletableFuture<WorkflowExecution> future = workflowEngine.execute(testWorkflow, testContext);
+        Future<WorkflowExecution> future = workflowEngine.execute(testWorkflow, testContext);
         
         assertThrows(Exception.class, () -> {
-            future.get();
+            future.toCompletionStage().toCompletableFuture().get();
         });
     }
     
@@ -195,8 +195,8 @@ class SimpleWorkflowEngineTest {
         // Create workflow with variables
         WorkflowDefinition workflowWithVars = createWorkflowWithVariables();
 
-        CompletableFuture<WorkflowExecution> future = workflowEngine.execute(workflowWithVars, testContext);
-        WorkflowExecution execution = future.get();
+        Future<WorkflowExecution> future = workflowEngine.execute(workflowWithVars, testContext);
+        WorkflowExecution execution = future.toCompletionStage().toCompletableFuture().get();
 
         assertTrue(execution.isSuccessful());
     }
@@ -206,8 +206,8 @@ class SimpleWorkflowEngineTest {
         // Create invalid workflow (missing required fields)
         WorkflowDefinition invalidWorkflow = createInvalidWorkflow();
         
-        CompletableFuture<WorkflowExecution> future = workflowEngine.execute(invalidWorkflow, testContext);
-        WorkflowExecution execution = future.get();
+        Future<WorkflowExecution> future = workflowEngine.execute(invalidWorkflow, testContext);
+        WorkflowExecution execution = future.toCompletionStage().toCompletableFuture().get();
         
         assertEquals(WorkflowStatus.FAILED, execution.getStatus());
         assertTrue(execution.getErrorMessage().isPresent());

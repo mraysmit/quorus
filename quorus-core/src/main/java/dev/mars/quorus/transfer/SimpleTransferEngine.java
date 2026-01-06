@@ -27,6 +27,7 @@ import dev.mars.quorus.monitoring.TransferEngineHealthCheck;
 import dev.mars.quorus.monitoring.TransferMetrics;
 import dev.mars.quorus.protocol.ProtocolFactory;
 import dev.mars.quorus.protocol.TransferProtocol;
+import io.vertx.core.Future;
 import io.vertx.core.Promise;
 import io.vertx.core.Vertx;
 import io.vertx.core.WorkerExecutor;
@@ -36,7 +37,8 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -57,7 +59,7 @@ public class SimpleTransferEngine implements TransferEngine {
     private final WorkerExecutor workerExecutor;
     private final ConcurrentHashMap<String, TransferJob> activeJobs;
     private final ConcurrentHashMap<String, TransferContext> activeContexts;
-    private final ConcurrentHashMap<String, CompletableFuture<TransferResult>> activeFutures;
+    private final ConcurrentHashMap<String, Future<TransferResult>> activeFutures;
     private final ProtocolFactory protocolFactory;
     private final AtomicBoolean shutdown;
 
@@ -131,7 +133,7 @@ public class SimpleTransferEngine implements TransferEngine {
     }
     
     @Override
-    public CompletableFuture<TransferResult> submitTransfer(TransferRequest request) throws TransferException {
+    public Future<TransferResult> submitTransfer(TransferRequest request) throws TransferException {
         if (shutdown.get()) {
             throw new TransferException(request.getRequestId(), "Transfer engine is shutdown");
         }
@@ -148,11 +150,8 @@ public class SimpleTransferEngine implements TransferEngine {
         activeJobs.put(job.getJobId(), job);
         activeContexts.put(job.getJobId(), context);
         
-        // Create promise to bridge Vert.x Future to CompletableFuture
-        Promise<TransferResult> promise = Promise.promise();
-
         // Execute transfer on Vert.x worker pool
-        workerExecutor.<TransferResult>executeBlocking(() -> {
+        Future<TransferResult> future = workerExecutor.<TransferResult>executeBlocking(() -> {
             try {
                 return executeTransfer(context);
             } catch (Exception e) {
@@ -165,18 +164,7 @@ public class SimpleTransferEngine implements TransferEngine {
                 activeContexts.remove(job.getJobId());
                 activeFutures.remove(job.getJobId());
             }
-        }).onComplete(ar -> {
-            if (ar.succeeded()) {
-                promise.complete(ar.result());
-            } else {
-                promise.fail(ar.cause());
-            }
         });
-
-        // Convert Vert.x Future to CompletableFuture
-        CompletableFuture<TransferResult> future = promise.future()
-                .toCompletionStage()
-                .toCompletableFuture();
 
         activeFutures.put(job.getJobId(), future);
 
@@ -192,7 +180,7 @@ public class SimpleTransferEngine implements TransferEngine {
     @Override
     public boolean cancelTransfer(String jobId) {
         TransferContext context = activeContexts.get(jobId);
-        CompletableFuture<TransferResult> future = activeFutures.get(jobId);
+        Future<TransferResult> future = activeFutures.get(jobId);
         
         if (context != null) {
             context.cancel();
@@ -202,9 +190,7 @@ public class SimpleTransferEngine implements TransferEngine {
             }
         }
         
-        if (future != null) {
-            future.cancel(true);
-        }
+        // Note: Vert.x Future doesn't have cancel() method, cancellation handled via context
         
         return context != null;
     }
