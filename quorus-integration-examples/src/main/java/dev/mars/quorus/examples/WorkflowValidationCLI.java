@@ -16,6 +16,7 @@
 
 package dev.mars.quorus.examples;
 
+import dev.mars.quorus.examples.util.ExampleLogger;
 import dev.mars.quorus.workflow.*;
 
 import java.io.IOException;
@@ -40,6 +41,7 @@ import java.util.List;
  */
 public class WorkflowValidationCLI {
 
+    private static final ExampleLogger log = ExampleLogger.getLogger(WorkflowValidationCLI.class);
     private static final String VERSION = "2.0.0";
     private static final String USAGE = """
             Quorus Workflow Validation CLI v%s

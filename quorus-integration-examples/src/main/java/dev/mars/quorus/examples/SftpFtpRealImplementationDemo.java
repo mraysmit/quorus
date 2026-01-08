@@ -19,6 +19,7 @@ package dev.mars.quorus.examples;
 import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferResult;
 import dev.mars.quorus.core.exceptions.TransferException;
+import dev.mars.quorus.examples.util.ExampleLogger;
 import dev.mars.quorus.protocol.FtpTransferProtocol;
 import dev.mars.quorus.protocol.SftpTransferProtocol;
 import dev.mars.quorus.transfer.TransferContext;
@@ -36,27 +37,28 @@ import java.nio.file.Paths;
  * @version 1.0
  */
 public class SftpFtpRealImplementationDemo {
+    private static final ExampleLogger log = ExampleLogger.getLogger(SftpFtpRealImplementationDemo.class);
     
     public static void main(String[] args) {
-        System.out.println("=== SFTP/FTP Real Implementation Demo ===");
-        System.out.println("Demonstrating that we now have real SFTP and FTP implementations");
-        System.out.println("instead of simulations.\n");
+        log.exampleStart("SFTP/FTP Real Implementation Demo",
+                "Demonstrating that we now have real SFTP and FTP implementations\n" +
+                "instead of simulations.");
         
         demonstrateSftpValidation();
         demonstrateFtpValidation();
         demonstrateSftpConnection();
         demonstrateFtpConnection();
         
-        System.out.println("\n=== Demo Complete ===");
-        System.out.println("✅ SFTP implementation: Real JSch-based client");
-        System.out.println("✅ FTP implementation: Real socket-based client");
-        System.out.println("✅ Both protocols properly validate URIs");
-        System.out.println("✅ Both protocols attempt real network connections");
-        System.out.println("✅ Connection failures are expected for non-existent servers");
+        log.exampleComplete("Demo");
+        log.success("SFTP implementation: Real JSch-based client");
+        log.success("FTP implementation: Real socket-based client");
+        log.success("Both protocols properly validate URIs");
+        log.success("Both protocols attempt real network connections");
+        log.success("Connection failures are expected for non-existent servers");
     }
     
     private static void demonstrateSftpValidation() {
-        System.out.println("1. SFTP URI Validation Tests:");
+        log.testSection("1. SFTP URI Validation Tests", false);
         
         SftpTransferProtocol sftpProtocol = new SftpTransferProtocol();
         
@@ -70,10 +72,10 @@ public class SftpFtpRealImplementationDemo {
                     .build();
             
             boolean canHandle = sftpProtocol.canHandle(validRequest);
-            System.out.println("   ✅ Valid SFTP URI: " + canHandle);
+            log.expectedSuccess("Valid SFTP URI: " + canHandle);
             
         } catch (Exception e) {
-            System.out.println("   ❌ Valid SFTP URI test failed: " + e.getMessage());
+            log.failure("Valid SFTP URI test failed: " + e.getMessage());
         }
         
         // Test missing host validation
@@ -89,23 +91,23 @@ public class SftpFtpRealImplementationDemo {
             TransferContext context = new TransferContext(job);
             
             sftpProtocol.transfer(invalidRequest, context);
-            System.out.println("   ❌ Missing host validation failed - should have thrown exception");
+            log.failure("Missing host validation failed - should have thrown exception");
             
         } catch (TransferException e) {
             if (e.getMessage().contains("host")) {
-                System.out.println("   ✅ Missing host validation: Correctly rejected");
+                log.expectedSuccess("Missing host validation: Correctly rejected");
             } else {
-                System.out.println("   ⚠️  Missing host validation: " + e.getMessage());
+                log.warning("Missing host validation: " + e.getMessage());
             }
         } catch (Exception e) {
-            System.out.println("   ❌ Missing host validation error: " + e.getMessage());
+            log.failure("Missing host validation error: " + e.getMessage());
         }
         
-        System.out.println();
+        log.info("");
     }
     
     private static void demonstrateFtpValidation() {
-        System.out.println("2. FTP URI Validation Tests:");
+        log.testSection("2. FTP URI Validation Tests", false);
         
         FtpTransferProtocol ftpProtocol = new FtpTransferProtocol();
         
@@ -119,10 +121,10 @@ public class SftpFtpRealImplementationDemo {
                     .build();
             
             boolean canHandle = ftpProtocol.canHandle(validRequest);
-            System.out.println("   ✅ Valid FTP URI: " + canHandle);
+            log.expectedSuccess("Valid FTP URI: " + canHandle);
             
         } catch (Exception e) {
-            System.out.println("   ❌ Valid FTP URI test failed: " + e.getMessage());
+            log.failure("Valid FTP URI test failed: " + e.getMessage());
         }
         
         // Test missing path validation
@@ -138,23 +140,23 @@ public class SftpFtpRealImplementationDemo {
             TransferContext context = new TransferContext(job);
             
             ftpProtocol.transfer(invalidRequest, context);
-            System.out.println("   ❌ Missing path validation failed - should have thrown exception");
+            log.failure("Missing path validation failed - should have thrown exception");
             
         } catch (TransferException e) {
             if (e.getMessage().contains("path")) {
-                System.out.println("   ✅ Missing path validation: Correctly rejected");
+                log.expectedSuccess("Missing path validation: Correctly rejected");
             } else {
-                System.out.println("   ⚠️  Missing path validation: " + e.getMessage());
+                log.warning("Missing path validation: " + e.getMessage());
             }
         } catch (Exception e) {
-            System.out.println("   ❌ Missing path validation error: " + e.getMessage());
+            log.failure("Missing path validation error: " + e.getMessage());
         }
         
-        System.out.println();
+        log.info("");
     }
     
     private static void demonstrateSftpConnection() {
-        System.out.println("3. SFTP Real Connection Attempt:");
+        log.testSection("3. SFTP Real Connection Attempt", false);
         
         SftpTransferProtocol sftpProtocol = new SftpTransferProtocol();
         
@@ -169,26 +171,26 @@ public class SftpFtpRealImplementationDemo {
             TransferJob job = new TransferJob(request);
             TransferContext context = new TransferContext(job);
             
-            System.out.println("   Attempting SFTP connection to nonexistent.example.com...");
+            log.detail("Attempting SFTP connection to nonexistent.example.com...");
             sftpProtocol.transfer(request, context);
-            System.out.println("   ❌ Connection should have failed");
+            log.failure("Connection should have failed");
             
         } catch (TransferException e) {
             if (e.getCause() != null && e.getCause().getClass().getName().contains("JSchException")) {
-                System.out.println("   ✅ Real SFTP connection attempted (JSch library used)");
-                System.out.println("   ✅ Connection failed as expected: " + e.getCause().getClass().getSimpleName());
+                log.expectedSuccess("Real SFTP connection attempted (JSch library used)");
+                log.expectedSuccess("Connection failed as expected: " + e.getCause().getClass().getSimpleName());
             } else {
-                System.out.println("   ⚠️  SFTP connection error: " + e.getMessage());
+                log.warning("SFTP connection error: " + e.getMessage());
             }
         } catch (Exception e) {
-            System.out.println("   ❌ SFTP connection test error: " + e.getMessage());
+            log.failure("SFTP connection test error: " + e.getMessage());
         }
         
-        System.out.println();
+        log.info("");
     }
     
     private static void demonstrateFtpConnection() {
-        System.out.println("4. FTP Real Connection Attempt:");
+        log.testSection("4. FTP Real Connection Attempt", false);
         
         FtpTransferProtocol ftpProtocol = new FtpTransferProtocol();
         
@@ -203,23 +205,23 @@ public class SftpFtpRealImplementationDemo {
             TransferJob job = new TransferJob(request);
             TransferContext context = new TransferContext(job);
             
-            System.out.println("   Attempting FTP connection to nonexistent.example.com...");
+            log.detail("Attempting FTP connection to nonexistent.example.com...");
             ftpProtocol.transfer(request, context);
-            System.out.println("   ❌ Connection should have failed");
+            log.failure("Connection should have failed");
             
         } catch (TransferException e) {
             if (e.getCause() != null && 
                 (e.getCause().getClass().getName().contains("UnknownHostException") ||
                  e.getCause().getClass().getName().contains("IOException"))) {
-                System.out.println("   ✅ Real FTP connection attempted (Socket-based client)");
-                System.out.println("   ✅ Connection failed as expected: " + e.getCause().getClass().getSimpleName());
+                log.expectedSuccess("Real FTP connection attempted (Socket-based client)");
+                log.expectedSuccess("Connection failed as expected: " + e.getCause().getClass().getSimpleName());
             } else {
-                System.out.println("   ⚠️  FTP connection error: " + e.getMessage());
+                log.warning("FTP connection error: " + e.getMessage());
             }
         } catch (Exception e) {
-            System.out.println("   ❌ FTP connection test error: " + e.getMessage());
+            log.failure("FTP connection test error: " + e.getMessage());
         }
         
-        System.out.println();
+        log.info("");
     }
 }

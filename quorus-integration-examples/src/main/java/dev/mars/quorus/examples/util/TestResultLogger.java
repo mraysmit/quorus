@@ -16,92 +16,75 @@
 
 package dev.mars.quorus.examples.util;
 
-import java.util.logging.Logger;
-
 /**
  * Utility class for logging test results in examples.
  * Helps distinguish between expected test failures and actual errors.
  * 
+ * <p>This class now delegates to {@link ExampleLogger} for consistent formatting.
+ * It is maintained for backward compatibility with existing example code.
+ * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @since 2025-08-18
- * @version 1.0
+ * @version 2.0
+ * @see ExampleLogger
  */
 public class TestResultLogger {
     
-    private static final Logger logger = Logger.getLogger(TestResultLogger.class.getName());
+    private static final ExampleLogger log = ExampleLogger.getLogger(TestResultLogger.class);
     
     public static void logExpectedSuccess(String message) {
-        System.out.println("   ✓ EXPECTED: " + message);
-        logger.info("Expected test success: " + message);
+        log.expectedSuccess(message);
     }
     
     public static void logExpectedFailure(String message) {
-        System.out.println("   ✓ EXPECTED: " + message);
-        logger.info("Expected test failure: " + message);
+        log.expectedFailure(message);
     }
     
     public static void logUnexpectedResult(String message) {
-        System.out.println("   ✗ UNEXPECTED: " + message);
-        logger.warning("Unexpected test result: " + message);
+        log.failure("UNEXPECTED: " + message);
     }
     
     public static void logExpectedFailure(String message, Exception e) {
-        System.out.println("   ✓ EXPECTED: " + message + ": " + e.getMessage());
-        logger.info("Expected test failure: " + message + " - " + e.getClass().getSimpleName() + ": " + e.getMessage());
+        log.expectedFailure(message + ": " + e.getMessage());
     }
     
     public static void logUnexpectedException(String message, Exception e) {
-        System.out.println("   ✗ UNEXPECTED: " + message + ": " + e.getClass().getSimpleName() + ": " + e.getMessage());
-        logger.severe("Unexpected exception in test: " + message + " - " + e.getClass().getSimpleName() + ": " + e.getMessage());
-        // Note: Stack trace should be printed by the caller if needed for debugging
+        log.failure("UNEXPECTED: " + message + ": " + e.getClass().getSimpleName() + ": " + e.getMessage());
     }
     
     public static void logTestSection(String sectionName, boolean isIntentionalFailureTest) {
-        if (isIntentionalFailureTest) {
-            System.out.println("\n" + sectionName + " (INTENTIONAL FAILURE TEST)...");
-            logger.info("Starting intentional failure test: " + sectionName);
-        } else {
-            System.out.println("\n" + sectionName + "...");
-            logger.info("Starting test: " + sectionName);
-        }
+        log.testSection(sectionName, isIntentionalFailureTest);
     }
     
     public static void logExampleCompletion(String exampleName) {
-        System.out.println("\n=== " + exampleName + " completed successfully! ===");
-        logger.info(exampleName + " completed successfully");
+        log.exampleComplete(exampleName);
     }
     
     /**
      * Log an unexpected error in example execution.
      */
     public static void logUnexpectedError(String exampleName, Exception e) {
-        System.err.println("UNEXPECTED ERROR occurred during " + exampleName + " execution:");
-        System.err.println("Error: " + e.getMessage());
-        System.err.println("This indicates a real problem with the example execution.");
-        logger.severe("Unexpected error in " + exampleName + ": " + e.getMessage());
+        log.unexpectedError(exampleName, e);
     }
 
     /**
      * Log a test header for starting a test suite.
      */
     public static void logTestHeader(String header) {
-        System.out.println("\n=== " + header + " ===\n");
-        logger.info("Starting test suite: " + header);
+        log.header(header);
     }
 
     /**
      * Log a test footer for completing a test suite.
      */
     public static void logTestFooter(String footer) {
-        System.out.println("\n" + footer);
-        logger.info("Test suite completed: " + footer);
+        log.info(footer);
     }
 
     /**
      * Log a simple success message.
      */
     public static void logSuccess(String message) {
-        System.out.println("   ✓ SUCCESS: " + message);
-        logger.info("Success: " + message);
+        log.success(message);
     }
 }

@@ -16,7 +16,7 @@
 
 package dev.mars.quorus.examples;
 
-import dev.mars.quorus.examples.util.TestResultLogger;
+import dev.mars.quorus.examples.util.ExampleLogger;
 import dev.mars.quorus.workflow.*;
 
 /**
@@ -29,32 +29,34 @@ import dev.mars.quorus.workflow.*;
  */
 public class SchemaValidationExample {
 
+    private static final ExampleLogger log = ExampleLogger.getLogger(SchemaValidationExample.class);
+
     public static void main(String[] args) throws Exception {
         SchemaValidationExample example = new SchemaValidationExample();
         example.runExample();
     }
 
     public void runExample() throws Exception {
-        TestResultLogger.logTestHeader("Quorus Workflow Schema Validation Example");
+        log.header("Quorus Workflow Schema Validation Example");
         
         WorkflowDefinitionParser parser = new YamlWorkflowDefinitionParser();
         
-        TestResultLogger.logTestSection("1. Testing valid schema-compliant workflow", false);
+        log.testSection("1. Testing valid schema-compliant workflow", false);
         testValidSchemaCompliantWorkflow(parser);
         
-        TestResultLogger.logTestSection("2. Testing workflow with missing required metadata", true);
+        log.testSection("2. Testing workflow with missing required metadata", true);
         testMissingRequiredMetadata(parser);
         
-        TestResultLogger.logTestSection("3. Testing workflow with invalid field formats", true);
+        log.testSection("3. Testing workflow with invalid field formats", true);
         testInvalidFieldFormats(parser);
         
-        TestResultLogger.logTestSection("4. Testing workflow with deprecated 'kind' field", false);
+        log.testSection("4. Testing workflow with deprecated 'kind' field", false);
         testDeprecatedKindField(parser);
         
-        TestResultLogger.logTestSection("5. Testing comprehensive metadata validation", false);
+        log.testSection("5. Testing comprehensive metadata validation", false);
         testComprehensiveMetadataValidation(parser);
         
-        TestResultLogger.logTestFooter("Schema validation examples completed successfully!");
+        log.info("Schema validation examples completed successfully!");
     }
     
     private void testValidSchemaCompliantWorkflow(WorkflowDefinitionParser parser) {
@@ -97,12 +99,12 @@ public class SchemaValidationExample {
             // Test schema validation
             ValidationResult schemaResult = parser.validateSchema(validWorkflow);
             if (schemaResult.isValid()) {
-                TestResultLogger.logSuccess("✓ Schema validation passed");
-                System.out.println("   No validation errors found");
+                log.success("Schema validation passed");
+                log.detail("No validation errors found");
             } else {
-                TestResultLogger.logUnexpectedResult("Schema validation failed unexpectedly:");
+                log.failure("UNEXPECTED: Schema validation failed unexpectedly:");
                 schemaResult.getErrors().forEach(error ->
-                    System.out.println("     - " + error));
+                    log.subDetail(error.toString()));
             }
             
             // Test full parsing and validation
@@ -110,19 +112,19 @@ public class SchemaValidationExample {
             ValidationResult parseResult = parser.validate(workflow);
             
             if (parseResult.isValid()) {
-                TestResultLogger.logSuccess("✓ Full workflow validation passed");
-                System.out.println("   Workflow: " + workflow.getMetadata().getName());
-                System.out.println("   Type: " + workflow.getMetadata().getType());
-                System.out.println("   Tags: " + workflow.getMetadata().getTags());
-                System.out.println("   Created: " + workflow.getMetadata().getCreated());
+                log.success("Full workflow validation passed");
+                log.keyValue("Workflow", workflow.getMetadata().getName());
+                log.keyValue("Type", workflow.getMetadata().getType());
+                log.keyValue("Tags", workflow.getMetadata().getTags());
+                log.keyValue("Created", workflow.getMetadata().getCreated());
             } else {
-                TestResultLogger.logUnexpectedResult("Full validation failed:");
+                log.failure("UNEXPECTED: Full validation failed:");
                 parseResult.getErrors().forEach(error ->
-                    System.out.println("     - " + error));
+                    log.subDetail(error.toString()));
             }
             
         } catch (Exception e) {
-            TestResultLogger.logUnexpectedException("Unexpected error during validation", e);
+            log.failure("UNEXPECTED: Unexpected error during validation: " + e.getMessage());
         }
     }
     
@@ -143,9 +145,9 @@ public class SchemaValidationExample {
             ValidationResult result = parser.validateSchema(incompleteWorkflow);
             
             if (!result.isValid()) {
-                TestResultLogger.logExpectedFailure("✓ Correctly detected missing required fields:");
+                log.expectedFailure("Correctly detected missing required fields:");
                 result.getErrors().forEach(error ->
-                    System.out.println("     - " + error.getFieldPath() + ": " + error.getMessage()));
+                    log.subDetail(error.getFieldPath() + ": " + error.getMessage()));
                     
                 // Check for specific missing fields
                 String[] requiredFields = {"description", "type", "author", "created", "tags"};
@@ -153,17 +155,17 @@ public class SchemaValidationExample {
                     boolean found = result.getErrors().stream()
                         .anyMatch(e -> e.getFieldPath().contains(field));
                     if (found) {
-                        System.out.println("   ✓ Detected missing: " + field);
+                        log.success("Detected missing: " + field);
                     } else {
-                        System.out.println("   ✗ Failed to detect missing: " + field);
+                        log.failure("Failed to detect missing: " + field);
                     }
                 }
             } else {
-                TestResultLogger.logUnexpectedResult("Failed to detect missing required fields - this indicates a bug!");
+                log.failure("UNEXPECTED: Failed to detect missing required fields - this indicates a bug!");
             }
             
         } catch (Exception e) {
-            TestResultLogger.logExpectedFailure("Correctly caught validation error", e);
+            log.expectedFailure("Correctly caught validation error: " + e.getMessage());
         }
     }
     
@@ -188,17 +190,17 @@ public class SchemaValidationExample {
             ValidationResult result = parser.validateSchema(invalidWorkflow);
             
             if (!result.isValid()) {
-                TestResultLogger.logExpectedFailure("✓ Correctly detected invalid field formats:");
+                log.expectedFailure("Correctly detected invalid field formats:");
                 result.getErrors().forEach(error ->
-                    System.out.println("     - " + error.getFieldPath() + ": " + error.getMessage()));
+                    log.subDetail(error.getFieldPath() + ": " + error.getMessage()));
                     
-                System.out.println("   Total validation errors: " + result.getErrorCount());
+                log.keyValue("Total validation errors", result.getErrorCount());
             } else {
-                TestResultLogger.logUnexpectedResult("Failed to detect invalid field formats - this indicates a bug!");
+                log.failure("UNEXPECTED: Failed to detect invalid field formats - this indicates a bug!");
             }
             
         } catch (Exception e) {
-            TestResultLogger.logExpectedFailure("Correctly caught validation error", e);
+            log.expectedFailure("Correctly caught validation error: " + e.getMessage());
         }
     }
     
@@ -225,24 +227,24 @@ public class SchemaValidationExample {
             ValidationResult result = parser.validateSchema(workflowWithKind);
             
             if (result.isValid() && result.hasWarnings()) {
-                TestResultLogger.logSuccess("✓ Correctly detected deprecated 'kind' field:");
+                log.success("Correctly detected deprecated 'kind' field:");
                 result.getWarnings().forEach(warning ->
-                    System.out.println("     - " + warning.getFieldPath() + ": " + warning.getMessage()));
+                    log.subDetail(warning.getFieldPath() + ": " + warning.getMessage()));
             } else if (!result.hasWarnings()) {
-                TestResultLogger.logUnexpectedResult("Failed to generate warning for deprecated 'kind' field");
+                log.failure("UNEXPECTED: Failed to generate warning for deprecated 'kind' field");
             } else {
-                TestResultLogger.logUnexpectedResult("Validation failed when it should have passed with warnings");
+                log.failure("UNEXPECTED: Validation failed when it should have passed with warnings");
                 result.getErrors().forEach(error ->
-                    System.out.println("     - " + error));
+                    log.subDetail(error.toString()));
             }
             
         } catch (Exception e) {
-            TestResultLogger.logUnexpectedException("Unexpected error during deprecated field test", e);
+            log.failure("UNEXPECTED: Unexpected error during deprecated field test: " + e.getMessage());
         }
     }
     
     private void testComprehensiveMetadataValidation(WorkflowDefinitionParser parser) {
-        System.out.println("   Testing various metadata validation scenarios...");
+        log.detail("Testing various metadata validation scenarios...");
         
         // Test valid email vs name author formats
         testAuthorFormats(parser);
@@ -253,39 +255,39 @@ public class SchemaValidationExample {
         // Test tag validation
         testTagValidation(parser);
         
-        System.out.println("   ✓ Comprehensive metadata validation tests completed");
+        log.success("Comprehensive metadata validation tests completed");
     }
     
     private void testAuthorFormats(WorkflowDefinitionParser parser) {
         // Valid email format
         String emailWorkflow = createTestWorkflow("test@company.com");
         ValidationResult emailResult = parser.validateSchema(emailWorkflow);
-        System.out.println("   Email author format: " + (emailResult.isValid() ? "✓ Valid" : "✗ Invalid"));
+        log.keyValue("Email author format", (emailResult.isValid() ? "✓ Valid" : "✗ Invalid"));
         
         // Valid name format
         String nameWorkflow = createTestWorkflow("John Doe");
         ValidationResult nameResult = parser.validateSchema(nameWorkflow);
-        System.out.println("   Name author format: " + (nameResult.isValid() ? "✓ Valid" : "✗ Invalid"));
+        log.keyValue("Name author format", (nameResult.isValid() ? "✓ Valid" : "✗ Invalid"));
     }
     
     private void testDateValidation(WorkflowDefinitionParser parser) {
         String validDateWorkflow = createTestWorkflowWithDate("2025-08-21");
         ValidationResult validResult = parser.validateSchema(validDateWorkflow);
-        System.out.println("   Valid date format: " + (validResult.isValid() ? "✓ Valid" : "✗ Invalid"));
+        log.keyValue("Valid date format", (validResult.isValid() ? "✓ Valid" : "✗ Invalid"));
         
         String invalidDateWorkflow = createTestWorkflowWithDate("21-08-2025");
         ValidationResult invalidResult = parser.validateSchema(invalidDateWorkflow);
-        System.out.println("   Invalid date format: " + (!invalidResult.isValid() ? "✓ Correctly rejected" : "✗ Incorrectly accepted"));
+        log.keyValue("Invalid date format", (!invalidResult.isValid() ? "✓ Correctly rejected" : "✗ Incorrectly accepted"));
     }
     
     private void testTagValidation(WorkflowDefinitionParser parser) {
         String validTagsWorkflow = createTestWorkflowWithTags("[\"test\", \"validation\", \"example\"]");
         ValidationResult validResult = parser.validateSchema(validTagsWorkflow);
-        System.out.println("   Valid tags format: " + (validResult.isValid() ? "✓ Valid" : "✗ Invalid"));
+        log.keyValue("Valid tags format", (validResult.isValid() ? "✓ Valid" : "✗ Invalid"));
         
         String invalidTagsWorkflow = createTestWorkflowWithTags("[\"INVALID\", \"invalid_underscore\"]");
         ValidationResult invalidResult = parser.validateSchema(invalidTagsWorkflow);
-        System.out.println("   Invalid tags format: " + (!invalidResult.isValid() ? "✓ Correctly rejected" : "✗ Incorrectly accepted"));
+        log.keyValue("Invalid tags format", (!invalidResult.isValid() ? "✓ Correctly rejected" : "✗ Incorrectly accepted"));
     }
     
     private String createTestWorkflow(String author) {

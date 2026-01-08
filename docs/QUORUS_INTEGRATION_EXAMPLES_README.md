@@ -73,6 +73,73 @@ Demonstrates comprehensive workflow validation:
 - Variable resolution validation
 - **Intentional failure tests** to demonstrate validation capabilities
 
+---
+
+## Agent Examples
+
+These examples demonstrate Quorus's distributed agent management capabilities for coordinating file transfers across multiple nodes in a cluster.
+
+### 6. AgentDiscoveryExample
+**File:** `AgentDiscoveryExample.java`
+**Main Class:** `dev.mars.quorus.examples.AgentDiscoveryExample`
+
+Demonstrates agent discovery and monitoring in a distributed Quorus cluster:
+- Agent registration with capabilities and metadata
+- Region-based and status-based filtering
+- Capability-based agent discovery
+- Real-time health monitoring and statistics
+- Best agent selection algorithms
+
+**Features Showcased:**
+- ✅ Agent registration with full metadata (hostname, address, port, region, datacenter)
+- ✅ Discovery by region (us-east, us-west, eu-west, ap-south)
+- ✅ Discovery by status (HEALTHY, ACTIVE, DEGRADED, MAINTENANCE)
+- ✅ Capability-based agent filtering
+- ✅ Fleet-wide statistics and health metrics
+- ✅ Best agent selection for optimal performance
+
+### 7. AgentCapabilitiesExample
+**File:** `AgentCapabilitiesExample.java`
+**Main Class:** `dev.mars.quorus.examples.AgentCapabilitiesExample`
+
+Demonstrates agent capability configuration and matching for intelligent transfer routing:
+- Protocol support matching (HTTP, HTTPS, SFTP, S3, AZURE_BLOB, GCS)
+- Size and bandwidth constraint handling
+- Encryption and compression capability matching
+- Custom capability extension
+- Capability validation and conflict detection
+
+**Features Showcased:**
+- ✅ Protocol-based agent selection
+- ✅ Transfer size and bandwidth constraints
+- ✅ Encryption capabilities (AES_256, RSA, CHACHA20)
+- ✅ Compression support (GZIP, LZ4, ZSTD, BROTLI, SNAPPY)
+- ✅ Custom capability keys for specialized requirements
+- ✅ Capability validation with detailed error reporting
+
+### 8. DynamicAgentPoolExample
+**File:** `DynamicAgentPoolExample.java`
+**Main Class:** `dev.mars.quorus.examples.DynamicAgentPoolExample`
+
+Demonstrates intelligent agent pool management with advanced selection strategies:
+- Multiple agent selection strategies
+- Dynamic pool scaling (scale-up/scale-down)
+- Failover and recovery scenarios
+- Load balancing with visual metrics
+- Health-based agent rotation
+
+**Features Showcased:**
+- ✅ ROUND_ROBIN selection strategy
+- ✅ LEAST_LOADED selection for optimal distribution
+- ✅ CAPABILITY_BASED selection for specialized transfers
+- ✅ LOCALITY_AWARE selection for network optimization
+- ✅ WEIGHTED_SCORE selection combining multiple factors
+- ✅ Dynamic scaling based on load
+- ✅ Automatic failover and recovery
+- ✅ Visual load distribution bars
+
+---
+
 ## Running the Examples
 
 ### Prerequisites
@@ -103,6 +170,11 @@ mvn exec:java -pl quorus-integration-examples -Dexec.mainClass="dev.mars.quorus.
 mvn exec:java -pl quorus-integration-examples -Dexec.mainClass="dev.mars.quorus.examples.BasicWorkflowExample"
 mvn exec:java -pl quorus-integration-examples -Dexec.mainClass="dev.mars.quorus.examples.ComplexWorkflowExample"
 mvn exec:java -pl quorus-integration-examples -Dexec.mainClass="dev.mars.quorus.examples.WorkflowValidationExample"
+
+# Agent Examples:
+mvn exec:java -pl quorus-integration-examples -Dexec.mainClass="dev.mars.quorus.examples.AgentDiscoveryExample"
+mvn exec:java -pl quorus-integration-examples -Dexec.mainClass="dev.mars.quorus.examples.AgentCapabilitiesExample"
+mvn exec:java -pl quorus-integration-examples -Dexec.mainClass="dev.mars.quorus.examples.DynamicAgentPoolExample"
 ```
 
 #### Run with Maven compile first:
@@ -158,6 +230,78 @@ INFO: Shutting down transfer engine...
 INFO: === Example completed ===
 ```
 
+### Agent Discovery Example Output
+
+When you run the AgentDiscoveryExample, you'll see output similar to:
+
+```
+╔══════════════════════════════════════════════════════════════════════════════╗
+║           QUORUS AGENT DISCOVERY EXAMPLE                                     ║
+║           Demonstrating distributed agent discovery and monitoring           ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ EXAMPLE 1: Agent Registration                                                │
+└──────────────────────────────────────────────────────────────────────────────┘
+→ Registering agents across multiple regions...
+  ✓ Registered: agent-us-east-001 in us-east-1a (HEALTHY)
+  ✓ Registered: agent-us-east-002 in us-east-1b (ACTIVE)
+  ✓ Registered: agent-us-west-001 in us-west-2a (HEALTHY)
+  ✓ Registered: agent-eu-west-001 in eu-west-1a (IDLE)
+  ✓ Registered: agent-ap-south-001 in ap-south-1a (DEGRADED)
+→ Successfully registered 5 agents
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ EXAMPLE 4: Fleet Statistics                                                  │
+└──────────────────────────────────────────────────────────────────────────────┘
+→ Calculating fleet-wide statistics...
+  ═══════════════════════════════════════════════════════════════
+  QUORUS AGENT FLEET STATISTICS
+  ═══════════════════════════════════════════════════════════════
+  Total Agents:     5
+  By Status:
+    HEALTHY:        2 (40.0%)
+    ACTIVE:         1 (20.0%)
+    IDLE:           1 (20.0%)
+    DEGRADED:       1 (20.0%)
+  By Region:
+    us-east:        2
+    us-west:        1
+    eu-west:        1
+    ap-south:       1
+  ═══════════════════════════════════════════════════════════════
+```
+
+### Dynamic Agent Pool Example Output
+
+When you run the DynamicAgentPoolExample, you'll see output similar to:
+
+```
+╔══════════════════════════════════════════════════════════════════════════════╗
+║           QUORUS DYNAMIC AGENT POOL EXAMPLE                                  ║
+║           Demonstrating intelligent agent pool management                    ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ EXAMPLE 3: Load Balancing Simulation                                         │
+└──────────────────────────────────────────────────────────────────────────────┘
+→ Simulating load distribution across agents...
+
+  Current Load Distribution:
+  ┌────────────────────────────────────────────────────────────────────────┐
+  │ agent-pool-001: [████████░░░░░░░░░░░░] 40% (4/10 transfers)            │
+  │ agent-pool-002: [██████░░░░░░░░░░░░░░] 30% (3/10 transfers)            │
+  │ agent-pool-003: [████░░░░░░░░░░░░░░░░] 20% (2/10 transfers)            │
+  │ agent-pool-004: [██░░░░░░░░░░░░░░░░░░] 10% (1/10 transfers)            │
+  └────────────────────────────────────────────────────────────────────────┘
+
+  Selection Statistics:
+    Total Selections: 20
+    Most Selected: agent-pool-001 (8 times)
+    Least Selected: agent-pool-004 (2 times)
+    Distribution Variance: 6.5%
+```
+
 ## Generated Files
 
 ### BasicTransferExample
@@ -199,6 +343,21 @@ corporate-data/
 - **TransferResult** - Comprehensive result with metrics and status
 - **QuorusConfiguration** - System configuration management
 - **Progress Tracking** - Real-time transfer monitoring
+
+### Agent Management Components
+The agent examples demonstrate these key components from `quorus-core`:
+- **AgentInfo** - Agent metadata including hostname, address, port, region, datacenter, capabilities, and status
+- **AgentCapabilities** - Protocol support, bandwidth limits, encryption/compression types, custom capabilities
+- **AgentStatus** - Agent lifecycle states: REGISTERING, HEALTHY, ACTIVE, IDLE, DEGRADED, OVERLOADED, MAINTENANCE, DRAINING, UNREACHABLE
+
+### Agent Selection Strategies
+The DynamicAgentPoolExample demonstrates these selection strategies:
+- **ROUND_ROBIN** - Simple rotation through available agents
+- **LEAST_LOADED** - Selects agent with lowest current load
+- **CAPABILITY_BASED** - Matches agent capabilities to transfer requirements
+- **LOCALITY_AWARE** - Prefers agents in same region/datacenter
+- **WEIGHTED_SCORE** - Combines multiple factors (load, locality, capabilities)
+- **PREFERRED_AGENT** - Sticky selection with fallback
 
 ## Next Steps
 
