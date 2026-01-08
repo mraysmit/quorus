@@ -24,11 +24,14 @@ import org.slf4j.LoggerFactory;
 import dev.mars.quorus.controller.raft.RaftNode;
 import dev.mars.quorus.controller.raft.RaftTransport;
 import dev.mars.quorus.controller.raft.GrpcRaftTransport;
+import dev.mars.quorus.controller.raft.GrpcRaftServer;
 import dev.mars.quorus.controller.raft.RaftStateMachine;
 import dev.mars.quorus.controller.http.HttpApiServer;
 
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * Main Verticle for the Quorus Controller.
@@ -44,6 +47,7 @@ public class QuorusControllerVerticle extends AbstractVerticle {
     private RaftTransport transport;
     private RaftNode raftNode;
     private HttpApiServer apiServer;
+    private GrpcRaftServer grpcServer;
 
     @Override
     public void start(Promise<Void> startPromise) throws Exception {
@@ -53,13 +57,29 @@ public class QuorusControllerVerticle extends AbstractVerticle {
             // 1. Configuration (Mock or Env)
             String nodeId = System.getenv().getOrDefault("NODE_ID", "controller1");
             int port = Integer.parseInt(System.getenv().getOrDefault("HTTP_PORT", "8080"));
+            int raftPort = Integer.parseInt(System.getenv().getOrDefault("RAFT_PORT", "9080"));
+            String clusterNodesEnv = System.getenv().getOrDefault("CLUSTER_NODES", nodeId + "=localhost:9080");
 
-            // 2. Setup Raft Transport (gRPC)
-            // Ideally we parse cluster config from env, for now simplified
-            this.transport = new GrpcRaftTransport(vertx, nodeId, new HashMap<>());
+            // 2. Parse cluster configuration
+            Map<String, String> peerAddresses = new HashMap<>();
+            Set<String> clusterNodeIds = new HashSet<>();
+            for (String entry : clusterNodesEnv.split(",")) {
+                String[] parts = entry.trim().split("=");
+                if (parts.length == 2) {
+                    String peerNodeId = parts[0].trim();
+                    String peerAddress = parts[1].trim();
+                    clusterNodeIds.add(peerNodeId);
+                    if (!peerNodeId.equals(nodeId)) {
+                        peerAddresses.put(peerNodeId, peerAddress);
+                    }
+                }
+            }
+            logger.info("Cluster configuration: nodeId={}, peers={}", nodeId, peerAddresses);
 
-            // 3. Create Raft Node
-            // Note: StateMachine implementation would be needed here.
+            // 3. Setup Raft Transport (gRPC)
+            this.transport = new GrpcRaftTransport(vertx, nodeId, peerAddresses);
+
+            // 4. Create Raft Node
             RaftStateMachine stateMachine = new RaftStateMachine() {
                 public Object apply(Object command) {
                     return "OK";
@@ -83,28 +103,29 @@ public class QuorusControllerVerticle extends AbstractVerticle {
                 }
             };
 
-            this.raftNode = new RaftNode(vertx, nodeId, Collections.singleton(nodeId), transport, stateMachine);
+            this.raftNode = new RaftNode(vertx, nodeId, clusterNodeIds, transport, stateMachine);
 
             transport.setRaftNode(raftNode);
 
-            // 4. Start Raft
-            raftNode.start().onSuccess(v -> {
-                // 5. Start HTTP API
-                this.apiServer = new HttpApiServer(vertx, port, raftNode);
+            // 5. Create and start gRPC server for inter-node communication
+            this.grpcServer = new GrpcRaftServer(vertx, raftPort, raftNode);
 
-                apiServer.start()
-                        .onSuccess(server -> {
-                            logger.info("QuorusControllerVerticle started successfully");
-                            startPromise.complete();
-                        })
-                        .onFailure(startPromise::fail);
-<<<<<<< HEAD
+            grpcServer.start().onSuccess(v1 -> {
+                logger.info("gRPC server started on port {}", raftPort);
+
+                // 6. Start Raft
+                raftNode.start().onSuccess(v2 -> {
+                    // 7. Start HTTP API
+                    this.apiServer = new HttpApiServer(vertx, port, raftNode);
+
+                    apiServer.start()
+                            .onSuccess(server -> {
+                                logger.info("QuorusControllerVerticle started successfully");
+                                startPromise.complete();
+                            })
+                            .onFailure(startPromise::fail);
+                }).onFailure(startPromise::fail);
             }).onFailure(startPromise::fail);
-=======
-            }).onFailure(e -> {
-                startPromise.fail(e);
-            });
->>>>>>> 99ead9a4bf7a397233245aa6831aa3ff67de12ca
 
         } catch (Exception e) {
             startPromise.fail(e);
@@ -121,6 +142,9 @@ public class QuorusControllerVerticle extends AbstractVerticle {
             }
             if (raftNode != null) {
                 raftNode.stop();
+            }
+            if (grpcServer != null) {
+                grpcServer.stop();
             }
             // Transport stop is usually synchronous or handled by raftNode logic
 

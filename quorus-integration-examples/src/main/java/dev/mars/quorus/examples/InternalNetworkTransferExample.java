@@ -247,7 +247,8 @@ public class InternalNetworkTransferExample {
         
         for (int i = 0; i < futures.length; i++) {
             try {
-                TransferResult result = futures[i].get(TRANSFER_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                TransferResult result = futures[i].toCompletionStage().toCompletableFuture()
+                        .get(TRANSFER_TIMEOUT_SECONDS, TimeUnit.SECONDS);
                 String status = result.isSuccessful() ? "SUCCESS ✓" : "FAILED ✗";
                 logger.info("  " + DEPARTMENTS[i].toUpperCase() + " department: " + status +
                            " (" + result.getBytesTransferred() + " bytes)");

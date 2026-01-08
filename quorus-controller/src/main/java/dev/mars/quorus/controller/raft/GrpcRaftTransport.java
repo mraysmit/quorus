@@ -112,20 +112,12 @@ public class GrpcRaftTransport implements RaftTransport {
         Futures.addCallback(listenableFuture, new FutureCallback<T>() {
             @Override
             public void onSuccess(T result) {
-<<<<<<< HEAD
-                promise.complete(result);
-=======
                 vertx.runOnContext(v -> promise.complete(result));
->>>>>>> 99ead9a4bf7a397233245aa6831aa3ff67de12ca
             }
 
             @Override
             public void onFailure(Throwable t) {
-<<<<<<< HEAD
-                promise.fail(t);
-=======
                 vertx.runOnContext(v -> promise.fail(t));
->>>>>>> 99ead9a4bf7a397233245aa6831aa3ff67de12ca
             }
         }, executor);
         return promise.future();

@@ -21,18 +21,15 @@ import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferResult;
 import dev.mars.quorus.core.exceptions.TransferException;
 import dev.mars.quorus.transfer.TransferContext;
-<<<<<<< HEAD
+import io.vertx.core.Future;
+
 /**
- * Description for TransferProtocol
+ * Protocol interface for file transfers.
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @version 1.0
+ * @version 2.0
  * @since 2025-08-17
  */
-=======
-import io.vertx.core.Future;
->>>>>>> 99ead9a4bf7a397233245aa6831aa3ff67de12ca
-
 public interface TransferProtocol {
     
     String getProtocolName();

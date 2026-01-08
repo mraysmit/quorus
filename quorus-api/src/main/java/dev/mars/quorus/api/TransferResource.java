@@ -125,7 +125,8 @@ public class TransferResource {
             }
 
             // Fallback to local transfer engine
-            CompletableFuture<TransferResult> future = transferEngine.submitTransfer(request);
+            CompletableFuture<TransferResult> future = transferEngine.submitTransfer(request)
+                    .toCompletionStage().toCompletableFuture();
 
             // Get the job ID from the request
             String jobId = request.getRequestId();

@@ -21,10 +21,7 @@ import dev.mars.quorus.controller.raft.grpc.AppendEntriesResponse;
 import dev.mars.quorus.controller.raft.grpc.VoteRequest;
 import dev.mars.quorus.controller.raft.grpc.VoteResponse;
 import io.vertx.core.Future;
-<<<<<<< HEAD
-=======
 import io.vertx.core.Promise;
->>>>>>> 99ead9a4bf7a397233245aa6831aa3ff67de12ca
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -103,24 +100,8 @@ public class InMemoryTransport implements RaftTransport {
 
     @Override
     public Future<VoteResponse> sendVoteRequest(String targetNodeId, VoteRequest request) {
-<<<<<<< HEAD
-        return Future.fromCompletionStage(CompletableFuture.supplyAsync(() -> {
-            // Simulate Packet Drop
-            if (dropRate > 0 && random.nextDouble() < dropRate) {
-                logger.debug("Dropped VoteRequest from {} to {}", nodeId, targetNodeId);
-                throw new RuntimeException("Network packet dropped (Chaos)");
-            }
-
-            InMemoryTransport targetTransport = transports.get(targetNodeId);
-            if (targetTransport == null || !targetTransport.running) {
-                throw new RuntimeException("Target node not available: " + targetNodeId);
-            }
-
-            // Simulate network delay
-=======
         Promise<VoteResponse> promise = Promise.promise();
         executor.execute(() -> {
->>>>>>> 99ead9a4bf7a397233245aa6831aa3ff67de12ca
             try {
                 // Simulate Packet Drop
                 if (dropRate > 0 && random.nextDouble() < dropRate) {
@@ -129,14 +110,6 @@ public class InMemoryTransport implements RaftTransport {
                     return;
                 }
 
-<<<<<<< HEAD
-            // Process vote request
-            VoteResponse response = targetTransport.handleVoteRequest(request);
-            logger.debug("Vote request from {} to {}: {}", nodeId, targetNodeId, response.getVoteGranted());
-            
-            return response;
-        }, executor));
-=======
                 InMemoryTransport targetTransport = transports.get(targetNodeId);
                 if (targetTransport == null || !targetTransport.running) {
                     promise.fail(new RuntimeException("Target node not available: " + targetNodeId));
@@ -163,30 +136,13 @@ public class InMemoryTransport implements RaftTransport {
             }
         });
         return promise.future();
->>>>>>> 99ead9a4bf7a397233245aa6831aa3ff67de12ca
     }
 
     @Override
     public Future<AppendEntriesResponse> sendAppendEntries(String targetNodeId, 
                                                                      AppendEntriesRequest request) {
-<<<<<<< HEAD
-        return Future.fromCompletionStage(CompletableFuture.supplyAsync(() -> {
-            // Simulate Packet Drop
-            if (dropRate > 0 && random.nextDouble() < dropRate) {
-                logger.debug("Dropped AppendEntries from {} to {}", nodeId, targetNodeId);
-                throw new RuntimeException("Network packet dropped (Chaos)");
-            }
-
-            InMemoryTransport targetTransport = transports.get(targetNodeId);
-            if (targetTransport == null || !targetTransport.running) {
-                throw new RuntimeException("Target node not available: " + targetNodeId);
-            }
-
-            // Simulate network delay
-=======
         Promise<AppendEntriesResponse> promise = Promise.promise();
         executor.execute(() -> {
->>>>>>> 99ead9a4bf7a397233245aa6831aa3ff67de12ca
             try {
                 // Simulate Packet Drop
                 if (dropRate > 0 && random.nextDouble() < dropRate) {
@@ -195,14 +151,6 @@ public class InMemoryTransport implements RaftTransport {
                     return;
                 }
 
-<<<<<<< HEAD
-            // Process append entries request
-            AppendEntriesResponse response = targetTransport.handleAppendEntries(request);
-            logger.debug("Append entries from {} to {}: {}", nodeId, targetNodeId, response.getSuccess());
-            
-            return response;
-        }, executor));
-=======
                 InMemoryTransport targetTransport = transports.get(targetNodeId);
                 if (targetTransport == null || !targetTransport.running) {
                     promise.fail(new RuntimeException("Target node not available: " + targetNodeId));
@@ -229,7 +177,6 @@ public class InMemoryTransport implements RaftTransport {
             }
         });
         return promise.future();
->>>>>>> 99ead9a4bf7a397233245aa6831aa3ff67de12ca
     }
 
 

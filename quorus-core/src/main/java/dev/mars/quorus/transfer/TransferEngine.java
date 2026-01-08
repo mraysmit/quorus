@@ -26,18 +26,14 @@ import dev.mars.quorus.monitoring.TransferMetrics;
 import io.vertx.core.Future;
 
 import java.util.Map;
-<<<<<<< HEAD
-import java.util.concurrent.CompletableFuture;
+
 /**
- * Description for TransferEngine
+ * Engine interface for managing file transfers.
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @version 1.0
+ * @version 2.0
  * @since 2025-08-17
  */
-=======
->>>>>>> 99ead9a4bf7a397233245aa6831aa3ff67de12ca
-
 public interface TransferEngine {
 
     Future<TransferResult> submitTransfer(TransferRequest request) throws TransferException;

@@ -116,11 +116,7 @@ public class TransferHandler implements HttpHandler {
 
         // Submit to Raft
         TransferJobCommand command = TransferJobCommand.create(job);
-<<<<<<< HEAD
-        CompletableFuture<Object> future = raftNode.submitCommand(command).toCompletionStage().toCompletableFuture();
-=======
         Future<Object> future = raftNode.submitCommand(command);
->>>>>>> 99ead9a4bf7a397233245aa6831aa3ff67de12ca
 
         // Wait for consensus
         Object result = future.toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
@@ -213,11 +209,7 @@ public class TransferHandler implements HttpHandler {
 
         // Submit delete command to Raft
         TransferJobCommand command = TransferJobCommand.delete(jobId);
-<<<<<<< HEAD
-        CompletableFuture<Object> future = raftNode.submitCommand(command).toCompletionStage().toCompletableFuture();
-=======
         Future<Object> future = raftNode.submitCommand(command);
->>>>>>> 99ead9a4bf7a397233245aa6831aa3ff67de12ca
 
         // Wait for consensus
         Object result = future.toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);

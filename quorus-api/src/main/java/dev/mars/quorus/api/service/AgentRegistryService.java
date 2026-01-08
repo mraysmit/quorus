@@ -78,7 +78,8 @@ public class AgentRegistryService {
                 
                 if (raftNode.isLeader()) {
                     // Submit command to distributed state machine
-                    CompletableFuture<Object> future = raftNode.submitCommand(command);
+                    CompletableFuture<Object> future = raftNode.submitCommand(command)
+                            .toCompletionStage().toCompletableFuture();
                     
                     try {
                         // Wait for command to be committed
@@ -128,7 +129,8 @@ public class AgentRegistryService {
                 AgentCommand command = AgentCommand.deregister(agentId);
                 
                 if (raftNode.isLeader()) {
-                    CompletableFuture<Object> future = raftNode.submitCommand(command);
+                    CompletableFuture<Object> future = raftNode.submitCommand(command)
+                            .toCompletionStage().toCompletableFuture();
                     
                     try {
                         future.get(5, TimeUnit.SECONDS);
@@ -177,7 +179,8 @@ public class AgentRegistryService {
                 AgentCommand command = AgentCommand.updateCapabilities(agentId, capabilities);
                 
                 if (raftNode.isLeader()) {
-                    CompletableFuture<Object> future = raftNode.submitCommand(command);
+                    CompletableFuture<Object> future = raftNode.submitCommand(command)
+                            .toCompletionStage().toCompletableFuture();
                     
                     try {
                         future.get(5, TimeUnit.SECONDS);

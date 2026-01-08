@@ -23,18 +23,10 @@ import org.junit.jupiter.api.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
-<<<<<<< HEAD
- * Test suite for ConnectionPoolService with focus on:
- * - Configuration presets
- * - Wait queue backpressure handling
- * - Pool statistics and monitoring
- * - Performance characteristics
+ * Test suite for ConnectionPoolService (Vert.x 5 Reactive Implementation).
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @version 1.0
  * @since 2025-12-17
-=======
- * Test suite for ConnectionPoolService (Vert.x 5 Reactive Implementation).
->>>>>>> 99ead9a4bf7a397233245aa6831aa3ff67de12ca
  */
 class ConnectionPoolServiceTest {
 
