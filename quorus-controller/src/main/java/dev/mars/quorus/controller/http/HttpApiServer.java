@@ -64,15 +64,34 @@ public class HttpApiServer {
 
         // Health check
         router.get("/health")
-                .respond(ctx -> Future.succeededFuture(new JsonObject().put("status", "UP")));
+                .respond(ctx -> {
+                    JsonObject health = new JsonObject()
+                            .put("status", "UP")
+                            .put("nodeId", raftNode.getNodeId())
+                            .put("raftState", raftNode.getState().toString())
+                            .put("isLeader", raftNode.isLeader());
+                    return Future.succeededFuture(health);
+                });
+
+        // Raft status endpoint
+        router.get("/raft/status").respond(ctx -> {
+            JsonObject status = new JsonObject()
+                    .put("nodeId", raftNode.getNodeId())
+                    .put("state", raftNode.getState().toString())
+                    .put("currentTerm", raftNode.getCurrentTerm())
+                    .put("isLeader", raftNode.isLeader())
+                    .put("isRunning", raftNode.isRunning());
+            
+            String leaderId = raftNode.getLeaderId();
+            if (leaderId != null) {
+                status.put("leaderId", leaderId);
+            }
+            
+            return Future.succeededFuture(status);
+        });
 
         // Generic command endpoint
         router.post("/api/v1/command").respond(ctx -> {
-<<<<<<< HEAD
-            io.vertx.core.json.JsonObject body = ctx.body().asJsonObject();
-            return raftNode.submitCommand(body.getMap())
-                    .map(res -> new io.vertx.core.json.JsonObject().put("result", "OK").put("data", res));
-=======
             JsonObject body = ctx.body().asJsonObject();
             return raftNode.submitCommand(body.getMap())
                     .map(res -> new JsonObject().put("result", "OK").put("data", res));
@@ -213,7 +232,6 @@ public class HttpApiServer {
                 logger.error("Failed to update status", e);
                 return Future.failedFuture(e);
             }
->>>>>>> 99ead9a4bf7a397233245aa6831aa3ff67de12ca
         });
 
         httpServer = vertx.createHttpServer()

@@ -91,7 +91,7 @@ public class TestClusterConfiguration {
         private Duration heartbeatInterval = Duration.ofMillis(500);
         private Duration startupTimeout = Duration.ofMinutes(5);
         private Duration testTimeout = Duration.ofMinutes(10);
-        private String composeFile = "docker-compose.yml";
+        private String composeFile = "src/test/resources/docker-compose-test.yml";
         private Map<String, String> environmentVariables = new HashMap<>();
         private NetworkConfiguration networkConfig = new NetworkConfiguration(
                 Duration.ofMillis(10), 0, false, Duration.ofSeconds(30));
@@ -154,7 +154,7 @@ public class TestClusterConfiguration {
                 .heartbeatInterval(Duration.ofMillis(200))
                 .startupTimeout(Duration.ofMinutes(2))
                 .testTimeout(Duration.ofMinutes(3))
-                .composeFile("docker-compose.yml")
+                .composeFile("src/test/resources/docker-compose-test.yml")
                 .addEnvironmentVariable("JAVA_OPTS", "-Xmx128m -Xms64m")
                 .networkConfig(new NetworkConfiguration(
                         Duration.ofMillis(5), 0, false, Duration.ofSeconds(10)))
@@ -172,7 +172,7 @@ public class TestClusterConfiguration {
                 .heartbeatInterval(Duration.ofMillis(500))
                 .startupTimeout(Duration.ofMinutes(5))
                 .testTimeout(Duration.ofMinutes(10))
-                .composeFile("docker-compose.yml")
+                .composeFile("src/test/resources/docker-compose-test.yml")
                 .addEnvironmentVariable("JAVA_OPTS", "-Xmx256m -Xms128m")
                 .networkConfig(new NetworkConfiguration(
                         Duration.ofMillis(10), 0, false, Duration.ofSeconds(30)))
@@ -190,7 +190,7 @@ public class TestClusterConfiguration {
                 .heartbeatInterval(Duration.ofSeconds(1))
                 .startupTimeout(Duration.ofMinutes(8))
                 .testTimeout(Duration.ofMinutes(15))
-                .composeFile("docker-compose-5node.yml")
+                .composeFile("src/test/resources/docker-compose-5node-test.yml")
                 .addEnvironmentVariable("JAVA_OPTS", "-Xmx256m -Xms128m")
                 .networkConfig(new NetworkConfiguration(
                         Duration.ofMillis(20), 0, false, Duration.ofSeconds(45)))
@@ -208,7 +208,7 @@ public class TestClusterConfiguration {
                 .heartbeatInterval(Duration.ofMillis(800))
                 .startupTimeout(Duration.ofMinutes(6))
                 .testTimeout(Duration.ofMinutes(20))
-                .composeFile("docker-compose-5node.yml")
+                .composeFile("src/test/resources/docker-compose-5node-test.yml")
                 .addEnvironmentVariable("JAVA_OPTS", "-Xmx256m -Xms128m")
                 .networkConfig(new NetworkConfiguration(
                         Duration.ofMillis(50), 2, true, Duration.ofMinutes(2)))
@@ -226,7 +226,7 @@ public class TestClusterConfiguration {
                 .heartbeatInterval(Duration.ofSeconds(2))
                 .startupTimeout(Duration.ofMinutes(10))
                 .testTimeout(Duration.ofMinutes(30))
-                .composeFile("docker-compose-5node.yml")
+                .composeFile("src/test/resources/docker-compose-5node-test.yml")
                 .addEnvironmentVariable("JAVA_OPTS", "-Xmx512m -Xms256m")
                 .networkConfig(new NetworkConfiguration(
                         Duration.ofMillis(200), 5, true, Duration.ofMinutes(1)))
@@ -244,7 +244,7 @@ public class TestClusterConfiguration {
                 .heartbeatInterval(Duration.ofMillis(400))
                 .startupTimeout(Duration.ofMinutes(3))
                 .testTimeout(Duration.ofMinutes(5))
-                .composeFile("docker-compose.yml")
+                .composeFile("src/test/resources/docker-compose-test.yml")
                 .addEnvironmentVariable("JAVA_OPTS", "-Xmx96m -Xms48m")
                 .addEnvironmentVariable("STARTUP_DELAY", "5")
                 .networkConfig(new NetworkConfiguration(
@@ -263,7 +263,7 @@ public class TestClusterConfiguration {
                 .heartbeatInterval(Duration.ofMillis(600))
                 .startupTimeout(Duration.ofMinutes(4))
                 .testTimeout(Duration.ofMinutes(8))
-                .composeFile("docker-compose.yml")
+                .composeFile("src/test/resources/docker-compose-test.yml")
                 .addEnvironmentVariable("JAVA_OPTS", "-Xmx256m -Xms128m")
                 .addEnvironmentVariable("LOG_LEVEL", "DEBUG")
                 .networkConfig(new NetworkConfiguration(

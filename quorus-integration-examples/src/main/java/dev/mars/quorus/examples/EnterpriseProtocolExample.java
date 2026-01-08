@@ -30,6 +30,9 @@ import io.vertx.core.Vertx;
 import io.vertx.core.Future;
 
 import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 /**
  * Enterprise Protocol Example - Demonstrates advanced protocol support and performance optimization.

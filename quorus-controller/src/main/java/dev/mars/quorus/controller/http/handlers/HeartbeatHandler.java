@@ -114,11 +114,7 @@ public class HeartbeatHandler implements HttpHandler {
                 command = AgentCommand.heartbeat(agentId);
             }
             
-<<<<<<< HEAD
-            CompletableFuture<Object> future = raftNode.submitCommand(command).toCompletionStage().toCompletableFuture();
-=======
             Future<Object> future = raftNode.submitCommand(command);
->>>>>>> 99ead9a4bf7a397233245aa6831aa3ff67de12ca
 
             // Wait for consensus (with timeout)
             Object result = future.toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);

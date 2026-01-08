@@ -96,7 +96,7 @@ public class ConfigurableRaftClusterTest {
             String serviceName = "controller" + i;
             environment = environment
                     .withExposedService(serviceName, 8080, Wait.forHttp("/health").forStatusCode(200))
-                    .waitingFor(serviceName, Wait.forLogMessage(".*Raft node started.*", 1));
+                    .waitingFor(serviceName, Wait.forLogMessage(".*Starting Raft node.*", 1));
         }
 
         // Apply network configuration if specified

@@ -16,6 +16,10 @@
 
 package dev.mars.quorus.controller.raft;
 
+import dev.mars.quorus.controller.raft.grpc.AppendEntriesRequest;
+import dev.mars.quorus.controller.raft.grpc.AppendEntriesResponse;
+import dev.mars.quorus.controller.raft.grpc.VoteRequest;
+import dev.mars.quorus.controller.raft.grpc.VoteResponse;
 import dev.mars.quorus.controller.state.QuorusStateMachine;
 import dev.mars.quorus.controller.state.SystemMetadataCommand;
 import dev.mars.quorus.controller.state.TransferJobCommand;
@@ -245,30 +249,50 @@ class RaftConsensusTest {
 
     @Test
     void testAppendEntriesMessages() {
-        LogEntry entry1 = new LogEntry(1, 1, SystemMetadataCommand.set("key", "value"));
-        LogEntry entry2 = new LogEntry(1, 2, null); // heartbeat
-        
-        AppendEntriesRequest request = new AppendEntriesRequest(
-                1, "leader", 0, 0, Set.of(entry1, entry2).stream().toList(), 1);
+        // Test request with entries using protobuf builder pattern
+        AppendEntriesRequest request = AppendEntriesRequest.newBuilder()
+                .setTerm(1)
+                .setLeaderId("leader")
+                .setPrevLogIndex(0)
+                .setPrevLogTerm(0)
+                .addEntries(dev.mars.quorus.controller.raft.grpc.LogEntry.newBuilder()
+                        .setTerm(1)
+                        .setIndex(1)
+                        .setData(com.google.protobuf.ByteString.copyFromUtf8("key=value"))
+                        .build())
+                .addEntries(dev.mars.quorus.controller.raft.grpc.LogEntry.newBuilder()
+                        .setTerm(1)
+                        .setIndex(2)
+                        .build())
+                .setLeaderCommit(1)
+                .build();
         
         assertEquals(1, request.getTerm());
         assertEquals("leader", request.getLeaderId());
         assertEquals(0, request.getPrevLogIndex());
         assertEquals(0, request.getPrevLogTerm());
-        assertEquals(2, request.getEntries().size());
+        assertEquals(2, request.getEntriesCount());
         assertEquals(1, request.getLeaderCommit());
-        assertFalse(request.isHeartbeat());
+        assertFalse(request.getEntriesCount() == 0); // Has entries, not a heartbeat
         
-        // Test heartbeat
-        AppendEntriesRequest heartbeat = new AppendEntriesRequest(
-                1, "leader", 0, 0, null, 1);
-        assertTrue(heartbeat.isHeartbeat());
+        // Test heartbeat (no entries)
+        AppendEntriesRequest heartbeat = AppendEntriesRequest.newBuilder()
+                .setTerm(1)
+                .setLeaderId("leader")
+                .setPrevLogIndex(0)
+                .setPrevLogTerm(0)
+                .setLeaderCommit(1)
+                .build();
+        assertTrue(heartbeat.getEntriesCount() == 0); // Heartbeat has no entries
         
-        // Test response
-        AppendEntriesResponse response = new AppendEntriesResponse(1, true, "follower", 2);
+        // Test response using protobuf builder
+        AppendEntriesResponse response = AppendEntriesResponse.newBuilder()
+                .setTerm(1)
+                .setSuccess(true)
+                .setMatchIndex(2)
+                .build();
         assertEquals(1, response.getTerm());
-        assertTrue(response.isSuccess());
-        assertEquals("follower", response.getNodeId());
+        assertTrue(response.getSuccess());
         assertEquals(2, response.getMatchIndex());
         
         // Test toString methods

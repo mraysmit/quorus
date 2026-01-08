@@ -79,11 +79,7 @@ public class AgentRegistrationHandler implements HttpHandler {
 
             // Create and submit registration command to Raft
             AgentCommand command = AgentCommand.register(agentInfo);
-<<<<<<< HEAD
-            CompletableFuture<Object> future = raftNode.submitCommand(command).toCompletionStage().toCompletableFuture();
-=======
             Future<Object> future = raftNode.submitCommand(command);
->>>>>>> 99ead9a4bf7a397233245aa6831aa3ff67de12ca
 
             // Wait for consensus (with timeout)
             Object result = future.toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);

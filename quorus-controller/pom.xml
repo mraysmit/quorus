@@ -104,6 +104,7 @@
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-simple</artifactId>
             <version>2.0.9</version>
+            <scope>runtime</scope>
         </dependency>
         
         <dependency>
@@ -132,14 +133,14 @@
         <!-- TestContainers for Docker Integration Testing -->
         <dependency>
             <groupId>org.testcontainers</groupId>
-            <artifactId>junit-jupiter</artifactId>
-            <version>1.19.3</version>
+            <artifactId>testcontainers</artifactId>
+            <version>${testcontainers.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.testcontainers</groupId>
-            <artifactId>testcontainers</artifactId>
-            <version>1.19.3</version>
+            <artifactId>testcontainers-junit-jupiter</artifactId>
+            <version>${testcontainers.version}</version>
             <scope>test</scope>
         </dependency>
         <!-- Temporarily commented out due to dependency resolution issues
@@ -169,12 +170,19 @@
                     <protocArtifact>com.google.protobuf:protoc:3.25.3:exe:${os.detected.classifier}</protocArtifact>
                     <pluginId>grpc-java</pluginId>
                     <pluginArtifact>io.grpc:protoc-gen-grpc-java:1.62.2:exe:${os.detected.classifier}</pluginArtifact>
+                    <!-- Only process our proto files, skip dependency proto extraction -->
+                    <attachProtoSources>false</attachProtoSources>
                 </configuration>
                 <executions>
                     <execution>
                         <id>compile</id>
                         <goals>
                             <goal>compile</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>compile-grpc</id>
+                        <goals>
                             <goal>compile-custom</goal>
                         </goals>
                     </execution>
@@ -184,7 +192,8 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
-                    <skipTests>false</skipTests>
+                    <!-- Use property to allow -DskipTests to work from command line -->
+                    <skipTests>${skipTests}</skipTests>
                     <!-- Avoid JPMS module-path for tests to prevent missing JDK modules in graph -->
                     <useModulePath>false</useModulePath>
                     <!-- Ensure required JDK modules are available at test runtime -->

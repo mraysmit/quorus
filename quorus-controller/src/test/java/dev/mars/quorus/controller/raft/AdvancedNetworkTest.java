@@ -65,17 +65,17 @@ public class AdvancedNetworkTest {
         logger.info("Starting advanced network test: " + testInfo.getDisplayName());
         
         // Use the advanced network testing configuration
-        environment = new ComposeContainer(new File("docker-compose-network-test.yml"))
+        environment = new ComposeContainer(new File("src/test/resources/docker-compose-network-test.yml"))
                 .withExposedService("controller1", 8080, Wait.forHttp("/health").forStatusCode(200))
                 .withExposedService("controller2", 8080, Wait.forHttp("/health").forStatusCode(200))
                 .withExposedService("controller3", 8080, Wait.forHttp("/health").forStatusCode(200))
                 .withExposedService("controller4", 8080, Wait.forHttp("/health").forStatusCode(200))
                 .withExposedService("controller5", 8080, Wait.forHttp("/health").forStatusCode(200))
-                .waitingFor("controller1", Wait.forLogMessage(".*Raft node started.*", 1))
-                .waitingFor("controller2", Wait.forLogMessage(".*Raft node started.*", 1))
-                .waitingFor("controller3", Wait.forLogMessage(".*Raft node started.*", 1))
-                .waitingFor("controller4", Wait.forLogMessage(".*Raft node started.*", 1))
-                .waitingFor("controller5", Wait.forLogMessage(".*Raft node started.*", 1))
+                .waitingFor("controller1", Wait.forLogMessage(".*Starting Raft node.*", 1))
+                .waitingFor("controller2", Wait.forLogMessage(".*Starting Raft node.*", 1))
+                .waitingFor("controller3", Wait.forLogMessage(".*Starting Raft node.*", 1))
+                .waitingFor("controller4", Wait.forLogMessage(".*Starting Raft node.*", 1))
+                .waitingFor("controller5", Wait.forLogMessage(".*Starting Raft node.*", 1))
                 .withStartupTimeout(Duration.ofMinutes(8));
 
         environment.start();

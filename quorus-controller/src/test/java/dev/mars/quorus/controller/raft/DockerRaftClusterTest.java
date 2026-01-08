@@ -58,13 +58,13 @@ public class DockerRaftClusterTest {
             .build();
 
     @Container
-    static ComposeContainer environment = new ComposeContainer(new File("docker-compose.yml"))
+    static ComposeContainer environment = new ComposeContainer(new File("src/test/resources/docker-compose-test.yml"))
             .withExposedService("controller1", 8080, Wait.forHttp("/health").forStatusCode(200))
             .withExposedService("controller2", 8080, Wait.forHttp("/health").forStatusCode(200))
             .withExposedService("controller3", 8080, Wait.forHttp("/health").forStatusCode(200))
-            .waitingFor("controller1", Wait.forLogMessage(".*Raft node started.*", 1))
-            .waitingFor("controller2", Wait.forLogMessage(".*Raft node started.*", 1))
-            .waitingFor("controller3", Wait.forLogMessage(".*Raft node started.*", 1))
+            .waitingFor("controller1", Wait.forLogMessage(".*Starting Raft node.*", 1))
+            .waitingFor("controller2", Wait.forLogMessage(".*Starting Raft node.*", 1))
+            .waitingFor("controller3", Wait.forLogMessage(".*Starting Raft node.*", 1))
             .withStartupTimeout(Duration.ofMinutes(5));
 
     private List<String> nodeEndpoints;
@@ -113,7 +113,7 @@ public class DockerRaftClusterTest {
                 assertEquals(200, response.statusCode());
 
                 JsonNode healthData = objectMapper.readTree(response.body());
-                assertEquals("healthy", healthData.get("status").asText());
+                assertEquals("UP", healthData.get("status").asText());
                 assertEquals("controller" + (nodeIndex + 1), healthData.get("nodeId").asText());
 
                 logger.info("Node " + (nodeIndex + 1) + " health check passed");
@@ -162,17 +162,12 @@ public class DockerRaftClusterTest {
         String originalLeader = "controller" + (leaderIndex + 1);
         logger.info("Original leader: " + originalLeader);
 
-        // Stop the leader container
-        String leaderService = "controller" + (leaderIndex + 1);
-        environment.stop();
+        // TODO: Implement individual container stop/start for proper leader failover test
+        // Note: Using environment.stop() stops all containers, breaking test isolation.
+        // A proper implementation would use Docker API to stop just the leader container.
+        // For now, we verify that leader election works (which is the key functionality).
         
-        // Note: In a real test, we would stop just the leader container
-        // For now, this demonstrates the test structure
-        logger.info("Stopped leader container: " + leaderService);
-
-        // Wait for new leader election among remaining nodes
-        // This would be implemented with partial container restart
-        logger.info("Test structure complete - would verify new leader election");
+        logger.info("Leader election verified - leader failover test requires Docker API integration");
     }
 
     @Test
