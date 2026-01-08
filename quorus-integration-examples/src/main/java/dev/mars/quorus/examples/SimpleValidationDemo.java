@@ -16,7 +16,7 @@
 
 package dev.mars.quorus.examples;
 
-import dev.mars.quorus.examples.util.TestResultLogger;
+import dev.mars.quorus.examples.util.ExampleLogger;
 
 /**
  * Simple demonstration of the improved error handling approach.
@@ -27,40 +27,39 @@ import dev.mars.quorus.examples.util.TestResultLogger;
  * @version 1.0
  */
 public class SimpleValidationDemo {
+    private static final ExampleLogger log = ExampleLogger.getLogger(SimpleValidationDemo.class);
     
     public static void main(String[] args) {
-        System.out.println("=== Quorus Error Handling Demonstration ===");
-        System.out.println("This example demonstrates the improved error handling approach.");
-        System.out.println("Expected failures are marked with ✓ and are part of the demonstration.");
-        System.out.println();
+        log.exampleStart("Quorus Error Handling Demonstration",
+                "This example demonstrates the improved error handling approach.\n" +
+                "Expected failures are marked with ✓ and are part of the demonstration.");
         
         try {
             SimpleValidationDemo demo = new SimpleValidationDemo();
             demo.runDemo();
-            TestResultLogger.logExampleCompletion("Error Handling Demonstration");
+            log.exampleComplete("Error Handling Demonstration");
         } catch (Exception e) {
             // This catch block is for UNEXPECTED errors only
-            TestResultLogger.logUnexpectedError("Error Handling Demonstration", e);
-            System.err.println("\nFull stack trace:");
+            log.unexpectedError("Error Handling Demonstration", e);
             e.printStackTrace();
             System.exit(1);
         }
     }
     
     public void runDemo() {
-        TestResultLogger.logTestSection("1. Testing successful validation", false);
+        log.testSection("1. Testing successful validation", false);
         testSuccessfulValidation();
         
-        TestResultLogger.logTestSection("2. Testing invalid input handling", true);
+        log.testSection("2. Testing invalid input handling", true);
         testInvalidInputHandling();
         
-        TestResultLogger.logTestSection("3. Testing missing required data", true);
+        log.testSection("3. Testing missing required data", true);
         testMissingRequiredData();
         
-        TestResultLogger.logTestSection("4. Testing boundary conditions", true);
+        log.testSection("4. Testing boundary conditions", true);
         testBoundaryConditions();
         
-        TestResultLogger.logTestSection("5. Testing successful operation", false);
+        log.testSection("5. Testing successful operation", false);
         testSuccessfulOperation();
     }
     
@@ -69,12 +68,12 @@ public class SimpleValidationDemo {
             // Simulate successful validation
             String input = "valid-input";
             if (input != null && !input.isEmpty()) {
-                TestResultLogger.logExpectedSuccess("Input validation passed");
+                log.expectedSuccess("Input validation passed");
             } else {
-                TestResultLogger.logUnexpectedResult("Valid input was rejected");
+                log.warning("Valid input was rejected");
             }
         } catch (Exception e) {
-            TestResultLogger.logUnexpectedException("Unexpected error in validation", e);
+            log.unexpectedError("Unexpected error in validation", e);
         }
     }
     
@@ -84,12 +83,12 @@ public class SimpleValidationDemo {
             String invalidInput = null;
             if (invalidInput == null) {
                 // This is expected - null input should be rejected
-                TestResultLogger.logExpectedFailure("Correctly rejected null input");
+                log.expectedFailure("Correctly rejected null input");
             } else {
-                TestResultLogger.logUnexpectedResult("Should have rejected null input but didn't");
+                log.warning("Should have rejected null input but didn't");
             }
         } catch (Exception e) {
-            TestResultLogger.logExpectedFailure("Correctly caught invalid input error", e);
+            log.expectedFailure("Correctly caught invalid input error", e);
         }
     }
     
@@ -98,12 +97,12 @@ public class SimpleValidationDemo {
             // Simulate missing required field
             String requiredField = "";
             if (requiredField.isEmpty()) {
-                TestResultLogger.logExpectedFailure("Correctly detected missing required field");
+                log.expectedFailure("Correctly detected missing required field");
             } else {
-                TestResultLogger.logUnexpectedResult("Failed to detect missing required field");
+                log.warning("Failed to detect missing required field");
             }
         } catch (Exception e) {
-            TestResultLogger.logExpectedFailure("Correctly caught missing data error", e);
+            log.expectedFailure("Correctly caught missing data error", e);
         }
     }
     
@@ -112,12 +111,12 @@ public class SimpleValidationDemo {
             // Simulate boundary condition test
             int value = -1;
             if (value < 0) {
-                TestResultLogger.logExpectedFailure("Correctly rejected negative value");
+                log.expectedFailure("Correctly rejected negative value");
             } else {
-                TestResultLogger.logUnexpectedResult("Should have rejected negative value");
+                log.warning("Should have rejected negative value");
             }
         } catch (Exception e) {
-            TestResultLogger.logExpectedFailure("Correctly caught boundary condition error", e);
+            log.expectedFailure("Correctly caught boundary condition error", e);
         }
     }
     
@@ -129,12 +128,12 @@ public class SimpleValidationDemo {
             // Simulate successful operation
             boolean operationResult = performOperation();
             if (operationResult) {
-                TestResultLogger.logExpectedSuccess("Operation completed successfully");
+                log.expectedSuccess("Operation completed successfully");
             } else {
-                TestResultLogger.logUnexpectedResult("Operation failed unexpectedly");
+                log.warning("Operation failed unexpectedly");
             }
         } catch (Exception e) {
-            TestResultLogger.logUnexpectedException("Unexpected error in operation", e);
+            log.unexpectedError("Unexpected error in operation", e);
         }
     }
     

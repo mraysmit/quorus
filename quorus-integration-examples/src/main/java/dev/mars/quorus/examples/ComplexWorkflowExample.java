@@ -16,7 +16,7 @@
 
 package dev.mars.quorus.examples;
 
-import dev.mars.quorus.examples.util.TestResultLogger;
+import dev.mars.quorus.examples.util.ExampleLogger;
 import dev.mars.quorus.transfer.TransferEngine;
 import dev.mars.quorus.transfer.SimpleTransferEngine;
 import dev.mars.quorus.workflow.*;
@@ -44,19 +44,20 @@ import java.util.Map;
  */
 public class ComplexWorkflowExample {
     
+    private static final ExampleLogger log = ExampleLogger.getLogger(ComplexWorkflowExample.class);
+    
     public static void main(String[] args) {
-        System.out.println("=== Quorus Complex Workflow Example ===");
-        System.out.println("Demonstrating advanced workflow features with multi-stage processing pipeline.");
-        System.out.println();
+        log.exampleStart("Complex Workflow Example");
+        log.info("Demonstrating advanced workflow features with multi-stage processing pipeline.");
+        log.blank();
 
         try {
             ComplexWorkflowExample example = new ComplexWorkflowExample();
             example.runExample();
-            TestResultLogger.logExampleCompletion("Complex Workflow Example");
+            log.exampleComplete("Complex Workflow Example");
         } catch (Exception e) {
             // This catch block is for UNEXPECTED errors only
-            TestResultLogger.logUnexpectedError("Complex Workflow Example", e);
-            System.err.println("\nFull stack trace:");
+            log.unexpectedError("Complex Workflow Example", e);
             e.printStackTrace();
             System.exit(1);
         }
@@ -64,7 +65,7 @@ public class ComplexWorkflowExample {
     
     public void runExample() throws Exception {
         // 1. Setup with Vert.x
-        System.out.println("1. Creating Vert.x instance and engines...");
+        log.step(1, "Creating Vert.x instance and engines...");
         Vertx vertx = Vertx.vertx();
         
         try {
@@ -72,28 +73,28 @@ public class ComplexWorkflowExample {
             SimpleWorkflowEngine workflowEngine = new SimpleWorkflowEngine(vertx, transferEngine);
             
             // 2. Create complex workflow
-            System.out.println("2. Creating complex workflow definition...");
+            log.step(2, "Creating complex workflow definition...");
             String yamlWorkflow = createComplexWorkflow();
         
             // 3. Parse and validate
-            System.out.println("3. Parsing and validating workflow...");
+            log.step(3, "Parsing and validating workflow...");
             WorkflowDefinitionParser parser = new YamlWorkflowDefinitionParser();
             WorkflowDefinition workflow = parser.parseFromString(yamlWorkflow);
             
             ValidationResult validation = parser.validate(workflow);
             if (!validation.isValid()) {
-                System.err.println("Workflow validation failed:");
+                log.error("Workflow validation failed:");
                 validation.getErrors().forEach(error -> 
-                    System.err.println("  - " + error.getMessage()));
+                    log.listItem(error.getMessage()));
                 return;
             }
         
             // 4. Analyze dependency graph
-            System.out.println("4. Analyzing dependency graph...");
+            log.step(4, "Analyzing dependency graph...");
             analyzeDependencyGraph(parser, workflow);
             
             // 5. Execute with different modes
-            System.out.println("5. Executing workflow in different modes...");
+            log.step(5, "Executing workflow in different modes...");
             
             // Create execution context
             ExecutionContext baseContext = ExecutionContext.builder()
@@ -107,7 +108,7 @@ public class ComplexWorkflowExample {
                     .build();
         
             // 5a. Dry run
-            System.out.println("5a. Performing dry run...");
+            log.detail("5a. Performing dry run...");
             ExecutionContext dryRunContext = ExecutionContext.builder()
                     .executionId("complex-dry-run-" + System.currentTimeMillis())
                     .mode(ExecutionContext.ExecutionMode.DRY_RUN)
@@ -118,11 +119,11 @@ public class ComplexWorkflowExample {
             Future<WorkflowExecution> dryRunFuture = workflowEngine.dryRun(workflow, dryRunContext);
             WorkflowExecution dryRunResult = dryRunFuture.toCompletionStage().toCompletableFuture().get();
             
-            System.out.println("   Dry run completed: " + dryRunResult.getStatus());
-            System.out.println("   Groups validated: " + dryRunResult.getGroupExecutions().size());
+            log.keyValue("Dry run completed", dryRunResult.getStatus());
+            log.keyValue("Groups validated", dryRunResult.getGroupExecutions().size());
         
             // 5b. Virtual run
-            System.out.println("5b. Performing virtual run...");
+            log.detail("5b. Performing virtual run...");
             ExecutionContext virtualRunContext = ExecutionContext.builder()
                     .executionId("complex-virtual-run-" + System.currentTimeMillis())
                     .mode(ExecutionContext.ExecutionMode.VIRTUAL_RUN)
@@ -133,14 +134,14 @@ public class ComplexWorkflowExample {
             Future<WorkflowExecution> virtualRunFuture = workflowEngine.virtualRun(workflow, virtualRunContext);
             WorkflowExecution virtualRunResult = virtualRunFuture.toCompletionStage().toCompletableFuture().get();
             
-            System.out.println("   Virtual run completed: " + virtualRunResult.getStatus());
+            log.keyValue("Virtual run completed", virtualRunResult.getStatus());
             displayDetailedResults(virtualRunResult);
             
             // 6. Cleanup
-            System.out.println("6. Cleaning up...");
+            log.step(6, "Cleaning up...");
             workflowEngine.shutdown();
             
-            System.out.println("\n=== Complex workflow example completed! ===");
+            log.exampleComplete("Complex Workflow Example");
         } finally {
             vertx.close();
         }
@@ -303,24 +304,24 @@ public class ComplexWorkflowExample {
         
         DependencyGraph graph = parser.buildDependencyGraph(List.of(workflow));
         
-        System.out.println("   Total groups: " + graph.getGroups().size());
+        log.keyValue("Total groups", graph.getGroups().size());
         
         // Show topological order
         List<TransferGroup> sortedGroups = graph.topologicalSort();
-        System.out.println("   Execution order:");
+        log.detail("Execution order:");
         for (int i = 0; i < sortedGroups.size(); i++) {
             TransferGroup group = sortedGroups.get(i);
-            System.out.println("     " + (i + 1) + ". " + group.getName() + 
-                             " (depends on: " + group.getDependsOn() + ")");
+            log.subDetail((i + 1) + ". " + group.getName() + 
+                         " (depends on: " + group.getDependsOn() + ")");
         }
         
         // Show parallel execution batches
         List<List<TransferGroup>> batches = graph.getParallelExecutionBatches();
-        System.out.println("   Parallel execution batches: " + batches.size());
+        log.keyValue("Parallel execution batches", batches.size());
         for (int i = 0; i < batches.size(); i++) {
             List<TransferGroup> batch = batches.get(i);
-            System.out.println("     Batch " + (i + 1) + ": " + 
-                             batch.stream().map(TransferGroup::getName).toList());
+            log.subDetail("Batch " + (i + 1) + ": " + 
+                         batch.stream().map(TransferGroup::getName).toList());
         }
     }
     
@@ -337,31 +338,31 @@ public class ComplexWorkflowExample {
     }
     
     private void displayDetailedResults(WorkflowExecution execution) {
-        System.out.println("\n=== Detailed Execution Results ===");
-        System.out.println("Execution ID: " + execution.getExecutionId());
-        System.out.println("Status: " + execution.getStatus());
-        System.out.println("Mode: " + execution.getContext().getMode());
+        log.section("Detailed Execution Results");
+        log.keyValue("Execution ID", execution.getExecutionId());
+        log.keyValue("Status", execution.getStatus());
+        log.keyValue("Mode", execution.getContext().getMode());
         
         if (execution.getDuration().isPresent()) {
-            System.out.println("Total Duration: " + execution.getDuration().get().toMillis() + "ms");
+            log.keyValue("Total Duration", execution.getDuration().get().toMillis() + "ms");
         }
         
-        System.out.println("Groups Executed: " + execution.getGroupExecutions().size());
-        System.out.println("Total Transfers: " + execution.getTotalTransferCount());
-        System.out.println("Successful Transfers: " + execution.getSuccessfulTransferCount());
+        log.keyValue("Groups Executed", execution.getGroupExecutions().size());
+        log.keyValue("Total Transfers", execution.getTotalTransferCount());
+        log.keyValue("Successful Transfers", execution.getSuccessfulTransferCount());
         
         // Show execution timeline
-        System.out.println("\n--- Execution Timeline ---");
+        log.section("Execution Timeline");
         execution.getGroupExecutions().forEach(group -> {
-            System.out.println("Group: " + group.getGroupName());
-            System.out.println("  Status: " + group.getStatus());
-            System.out.println("  Start: " + group.getStartTime());
+            log.info("Group: " + group.getGroupName());
+            log.keyValue("Status", group.getStatus());
+            log.keyValue("Start", group.getStartTime());
             if (group.getEndTime().isPresent()) {
-                System.out.println("  End: " + group.getEndTime().get());
-                System.out.println("  Duration: " + group.getDuration().get().toMillis() + "ms");
+                log.keyValue("End", group.getEndTime().get());
+                log.keyValue("Duration", group.getDuration().get().toMillis() + "ms");
             }
-            System.out.println("  Transfers: " + group.getTransferResults().size());
-            System.out.println();
+            log.keyValue("Transfers", group.getTransferResults().size());
+            log.blank();
         });
     }
 }

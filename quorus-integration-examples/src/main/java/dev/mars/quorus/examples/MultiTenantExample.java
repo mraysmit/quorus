@@ -16,7 +16,7 @@
 
 package dev.mars.quorus.examples;
 
-import dev.mars.quorus.examples.util.TestResultLogger;
+import dev.mars.quorus.examples.util.ExampleLogger;
 import dev.mars.quorus.tenant.model.Tenant;
 import dev.mars.quorus.tenant.model.TenantConfiguration;
 import dev.mars.quorus.tenant.model.ResourceUsage;
@@ -53,23 +53,22 @@ import java.util.List;
  * @version 1.0
  */
 public class MultiTenantExample {
+    private static final ExampleLogger log = ExampleLogger.getLogger(MultiTenantExample.class);
     
     private TenantService tenantService;
     private ResourceManagementService resourceService;
     
     public static void main(String[] args) {
-        System.out.println("=== Quorus Multi-Tenant Example ===");
-        System.out.println("Demonstrating enterprise multi-tenancy with hierarchical structure,");
-        System.out.println("resource management, and tenant isolation capabilities.");
-        System.out.println();
+        log.exampleStart("Quorus Multi-Tenant Example",
+                "Demonstrating enterprise multi-tenancy with hierarchical structure,\n" +
+                "resource management, and tenant isolation capabilities.");
         
         try {
             MultiTenantExample example = new MultiTenantExample();
             example.runExample();
-            TestResultLogger.logExampleCompletion("Multi-Tenant Example");
+            log.exampleComplete("Multi-Tenant Example");
         } catch (Exception e) {
-            TestResultLogger.logUnexpectedError("Multi-Tenant Example", e);
-            System.err.println("\nFull stack trace:");
+            log.unexpectedError("Multi-Tenant Example", e);
             e.printStackTrace();
             System.exit(1);
         }
@@ -80,27 +79,27 @@ public class MultiTenantExample {
         tenantService = new SimpleTenantService();
         resourceService = new SimpleResourceManagementService(tenantService);
         
-        TestResultLogger.logTestSection("1. Creating hierarchical tenant structure", false);
+        log.testSection("1. Creating hierarchical tenant structure", false);
         createTenantHierarchy();
         
-        TestResultLogger.logTestSection("2. Configuring tenant-specific resource limits", false);
+        log.testSection("2. Configuring tenant-specific resource limits", false);
         configureTenantLimits();
         
-        TestResultLogger.logTestSection("3. Demonstrating resource usage tracking", false);
+        log.testSection("3. Demonstrating resource usage tracking", false);
         demonstrateResourceTracking();
         
-        TestResultLogger.logTestSection("4. Testing quota enforcement", true);
+        log.testSection("4. Testing quota enforcement", true);
         testQuotaEnforcement();
         
-        TestResultLogger.logTestSection("5. Showing configuration inheritance", false);
+        log.testSection("5. Showing configuration inheritance", false);
         demonstrateConfigurationInheritance();
         
-        TestResultLogger.logTestSection("6. Monitoring tenant resource utilization", false);
+        log.testSection("6. Monitoring tenant resource utilization", false);
         monitorResourceUtilization();
     }
     
     private void createTenantHierarchy() throws Exception {
-        System.out.println("Creating corporate tenant hierarchy...");
+        log.step("Creating corporate tenant hierarchy...");
         
         // Create root organization tenant
         Tenant rootTenant = Tenant.builder()
@@ -111,7 +110,7 @@ public class MultiTenantExample {
                 .build();
         
         tenantService.createTenant(rootTenant);
-        TestResultLogger.logExpectedSuccess("Created root tenant: " + rootTenant.getName());
+        log.expectedSuccess("Created root tenant: " + rootTenant.getName());
         
         // Create department-level tenants
         String[] departments = {"engineering", "sales", "marketing"};
@@ -127,7 +126,7 @@ public class MultiTenantExample {
                     .build();
             
             tenantService.createTenant(deptTenant);
-            TestResultLogger.logExpectedSuccess("Created department tenant: " + deptTenant.getName());
+            log.expectedSuccess("Created department tenant: " + deptTenant.getName());
         }
         
         // Create team-level tenants within Engineering
@@ -144,16 +143,16 @@ public class MultiTenantExample {
                     .build();
             
             tenantService.createTenant(teamTenant);
-            TestResultLogger.logExpectedSuccess("Created team tenant: " + teamTenant.getName());
+            log.expectedSuccess("Created team tenant: " + teamTenant.getName());
         }
         
         // Display hierarchy
-        System.out.println("\nTenant Hierarchy Created:");
+        log.section("Tenant Hierarchy Created");
         displayTenantHierarchy("acme-corp", 0);
     }
     
     private void configureTenantLimits() throws Exception {
-        System.out.println("Configuring tenant-specific resource limits...");
+        log.step("Configuring tenant-specific resource limits...");
         
         // Update Engineering department with higher limits
         TenantConfiguration engConfig = TenantConfiguration.builder()
@@ -173,7 +172,7 @@ public class MultiTenantExample {
                 .build();
         
         tenantService.updateTenantConfiguration("acme-engineering", engConfig);
-        TestResultLogger.logExpectedSuccess("Updated Engineering department limits (high-performance)");
+        log.expectedSuccess("Updated Engineering department limits (high-performance)");
         
         // Update Sales department with moderate limits
         TenantConfiguration salesConfig = TenantConfiguration.builder()
@@ -187,15 +186,15 @@ public class MultiTenantExample {
                 .build();
         
         tenantService.updateTenantConfiguration("acme-sales", salesConfig);
-        TestResultLogger.logExpectedSuccess("Updated Sales department limits (moderate)");
+        log.expectedSuccess("Updated Sales department limits (moderate)");
         
-        System.out.println("   Engineering: High-performance limits for development workloads");
-        System.out.println("   Sales: Moderate limits for business document transfers");
-        System.out.println("   Marketing: Default limits inherited from root tenant");
+        log.bullet("Engineering: High-performance limits for development workloads");
+        log.bullet("Sales: Moderate limits for business document transfers");
+        log.bullet("Marketing: Default limits inherited from root tenant");
     }
     
     private void demonstrateResourceTracking() throws Exception {
-        System.out.println("Demonstrating resource usage tracking...");
+        log.step("Demonstrating resource usage tracking...");
         
         // Simulate resource usage for different tenants
         String[] tenants = {"acme-engineering", "acme-sales", "acme-eng-backend"};
@@ -216,25 +215,25 @@ public class MultiTenantExample {
                     .build();
             
             resourceService.recordUsage(usage);
-            TestResultLogger.logExpectedSuccess("Recorded usage for " + tenants[i]);
+            log.expectedSuccess("Recorded usage for " + tenants[i]);
         }
         
         // Display usage statistics
-        System.out.println("\nCurrent Resource Usage:");
+        log.section("Current Resource Usage");
         for (String tenantId : tenants) {
             ResourceUsage usage = resourceService.getCurrentUsage(tenantId).orElse(null);
             if (usage != null) {
-                System.out.printf("   %s: %d transfers, %.1f MB/s, %.1f GB storage%n",
-                        tenantId,
-                        usage.getCurrentConcurrentTransfers(),
-                        usage.getCurrentBandwidthBytesPerSecond() / (1024.0 * 1024.0),
-                        usage.getCurrentStorageBytes() / (1024.0 * 1024.0 * 1024.0));
+                log.indentedKeyValue(tenantId, 
+                        String.format("%d transfers, %.1f MB/s, %.1f GB storage",
+                                usage.getCurrentConcurrentTransfers(),
+                                usage.getCurrentBandwidthBytesPerSecond() / (1024.0 * 1024.0),
+                                usage.getCurrentStorageBytes() / (1024.0 * 1024.0 * 1024.0)));
             }
         }
     }
     
     private void testQuotaEnforcement() throws Exception {
-        System.out.println("Testing quota enforcement (INTENTIONAL FAILURE SCENARIOS)...");
+        log.step("Testing quota enforcement (INTENTIONAL FAILURE SCENARIOS)...");
         
         // Test 1: Try to exceed concurrent transfer limit
         try {
@@ -242,13 +241,13 @@ public class MultiTenantExample {
                     resourceService.validateTransferRequest("acme-sales", 1024 * 1024, 10 * 1024 * 1024);
             
             if (!result.isAllowed()) {
-                TestResultLogger.logExpectedFailure("Correctly blocked transfer - concurrent limit reached");
-                System.out.println("     Reason: " + result.getReason());
+                log.expectedFailure("Correctly blocked transfer - concurrent limit reached");
+                log.subDetail("Reason: " + result.getReason());
             } else {
-                TestResultLogger.logUnexpectedResult("Should have blocked transfer due to concurrent limit");
+                log.warning("Should have blocked transfer due to concurrent limit");
             }
         } catch (Exception e) {
-            TestResultLogger.logExpectedFailure("Correctly caught quota enforcement error", e);
+            log.expectedFailure("Correctly caught quota enforcement error", e);
         }
         
         // Test 2: Try to exceed bandwidth limit
@@ -257,13 +256,13 @@ public class MultiTenantExample {
                     resourceService.validateTransferRequest("acme-sales", 1024 * 1024, 200L * 1024 * 1024);
             
             if (!result.isAllowed()) {
-                TestResultLogger.logExpectedFailure("Correctly blocked transfer - bandwidth limit exceeded");
-                System.out.println("     Violations: " + result.getViolations());
+                log.expectedFailure("Correctly blocked transfer - bandwidth limit exceeded");
+                log.subDetail("Violations: " + result.getViolations());
             } else {
-                TestResultLogger.logUnexpectedResult("Should have blocked transfer due to bandwidth limit");
+                log.warning("Should have blocked transfer due to bandwidth limit");
             }
         } catch (Exception e) {
-            TestResultLogger.logExpectedFailure("Correctly caught bandwidth limit error", e);
+            log.expectedFailure("Correctly caught bandwidth limit error", e);
         }
         
         // Test 3: Valid transfer should be allowed
@@ -272,74 +271,73 @@ public class MultiTenantExample {
                     resourceService.validateTransferRequest("acme-engineering", 100 * 1024 * 1024, 50 * 1024 * 1024);
             
             if (result.isAllowed()) {
-                TestResultLogger.logExpectedSuccess("Valid transfer correctly allowed for Engineering");
+                log.expectedSuccess("Valid transfer correctly allowed for Engineering");
             } else {
-                TestResultLogger.logUnexpectedResult("Valid transfer was incorrectly blocked: " + result.getReason());
+                log.warning("Valid transfer was incorrectly blocked: " + result.getReason());
             }
         } catch (Exception e) {
-            TestResultLogger.logUnexpectedException("Unexpected error validating transfer", e);
+            log.unexpectedError("Unexpected error validating transfer", e);
         }
     }
     
     private void demonstrateConfigurationInheritance() throws Exception {
-        System.out.println("Demonstrating configuration inheritance...");
+        log.step("Demonstrating configuration inheritance...");
         
         // Show effective configuration for team tenant (inherits from department and root)
         TenantConfiguration effectiveConfig = tenantService.getEffectiveConfiguration("acme-eng-backend");
         
         if (effectiveConfig != null) {
-            TestResultLogger.logExpectedSuccess("Retrieved effective configuration for Backend Team");
-            System.out.println("   Effective limits for Backend Team (inherited from Engineering):");
-            System.out.println("     Max concurrent transfers: " + 
+            log.expectedSuccess("Retrieved effective configuration for Backend Team");
+            log.detail("Effective limits for Backend Team (inherited from Engineering):");
+            log.subDetail("Max concurrent transfers: " + 
                     effectiveConfig.getResourceLimits().getMaxConcurrentTransfers());
-            System.out.println("     Max bandwidth: " + 
+            log.subDetail("Max bandwidth: " + 
                     effectiveConfig.getResourceLimits().getMaxBandwidthBytesPerSecond() / (1024 * 1024) + " MB/s");
-            System.out.println("     Allowed protocols: " + 
+            log.subDetail("Allowed protocols: " + 
                     effectiveConfig.getTransferPolicies().getAllowedProtocols());
         } else {
-            TestResultLogger.logUnexpectedResult("Failed to retrieve effective configuration");
+            log.warning("Failed to retrieve effective configuration");
         }
         
         // Show configuration inheritance path
         List<Tenant> path = tenantService.getTenantPath("acme-eng-backend");
-        System.out.println("\n   Configuration inheritance path:");
+        log.section("Configuration inheritance path");
         for (Tenant tenant : path) {
-            System.out.println("     " + tenant.getTenantId() + " (" + tenant.getName() + ")");
+            log.bullet(tenant.getTenantId() + " (" + tenant.getName() + ")");
         }
     }
     
     private void monitorResourceUtilization() throws Exception {
-        System.out.println("Monitoring tenant resource utilization...");
+        log.step("Monitoring tenant resource utilization...");
         
         // Get utilization for all active tenants
         List<Tenant> activeTenants = tenantService.getActiveTenants();
         
-        System.out.println("\nResource Utilization Summary:");
+        log.section("Resource Utilization Summary");
         for (Tenant tenant : activeTenants) {
             ResourceManagementService.ResourceUtilization utilization = 
                     resourceService.getResourceUtilization(tenant.getTenantId());
             
-            System.out.printf("   %s: %.1f%% max utilization%n",
-                    tenant.getName(),
-                    utilization.getMaxUtilization());
+            log.indentedKeyValue(tenant.getName(), 
+                    String.format("%.1f%% max utilization", utilization.getMaxUtilization()));
             
             if (utilization.isApproachingLimits(80.0)) {
-                System.out.println("     ⚠️  WARNING: Approaching resource limits");
+                log.warning("WARNING: " + tenant.getName() + " approaching resource limits");
             }
         }
         
         // Get aggregated statistics
         ResourceManagementService.AggregatedUsageStats stats = resourceService.getAggregatedUsageStats();
-        System.out.println("\nSystem-wide Statistics:");
-        System.out.println("   Total tenants: " + stats.getTotalTenants());
-        System.out.println("   Active tenants: " + stats.getActiveTenants());
-        System.out.println("   Total concurrent transfers: " + stats.getTotalConcurrentTransfers());
-        System.out.println("   Total bandwidth usage: " + 
+        log.section("System-wide Statistics");
+        log.indentedKeyValue("Total tenants", String.valueOf(stats.getTotalTenants()));
+        log.indentedKeyValue("Active tenants", String.valueOf(stats.getActiveTenants()));
+        log.indentedKeyValue("Total concurrent transfers", String.valueOf(stats.getTotalConcurrentTransfers()));
+        log.indentedKeyValue("Total bandwidth usage", 
                 stats.getTotalBandwidthBytesPerSecond() / (1024 * 1024) + " MB/s");
-        System.out.println("   Average success rate: " + 
+        log.indentedKeyValue("Average success rate", 
                 String.format("%.2f%%", stats.getAverageSuccessRate() * 100));
         
-        TestResultLogger.logExpectedSuccess("Resource monitoring completed successfully");
+        log.expectedSuccess("Resource monitoring completed successfully");
     }
     
     private void displayTenantHierarchy(String tenantId, int depth) {
@@ -347,7 +345,7 @@ public class MultiTenantExample {
         if (tenant == null) return;
         
         String indent = "  ".repeat(depth);
-        System.out.println(indent + "├─ " + tenant.getName() + " (" + tenant.getTenantId() + ")");
+        log.info(indent + "├─ " + tenant.getName() + " (" + tenant.getTenantId() + ")");
         
         List<Tenant> children = tenantService.getChildTenants(tenantId);
         for (Tenant child : children) {

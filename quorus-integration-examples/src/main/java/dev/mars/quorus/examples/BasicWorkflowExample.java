@@ -16,7 +16,7 @@
 
 package dev.mars.quorus.examples;
 
-import dev.mars.quorus.examples.util.TestResultLogger;
+import dev.mars.quorus.examples.util.ExampleLogger;
 import dev.mars.quorus.transfer.TransferEngine;
 import dev.mars.quorus.transfer.SimpleTransferEngine;
 import dev.mars.quorus.workflow.*;
@@ -42,18 +42,19 @@ import java.util.Map;
  */
 public class BasicWorkflowExample {
     
+    private static final ExampleLogger log = ExampleLogger.getLogger(BasicWorkflowExample.class);
+    
     public static void main(String[] args) {
-        System.out.println("=== Quorus Basic Workflow Example ===");
+        log.exampleStart("Basic Workflow Example");
         
         try {
             // Create the workflow example
             BasicWorkflowExample example = new BasicWorkflowExample();
             example.runExample();
-            TestResultLogger.logExampleCompletion("Basic Workflow Example");
+            log.exampleComplete("Basic Workflow Example");
         } catch (Exception e) {
             // This catch block is for UNEXPECTED errors only
-            TestResultLogger.logUnexpectedError("Basic Workflow Example", e);
-            System.err.println("\nFull stack trace:");
+            log.unexpectedError("Basic Workflow Example", e);
             e.printStackTrace();
             System.exit(1);
         }
@@ -61,44 +62,44 @@ public class BasicWorkflowExample {
     
     public void runExample() throws Exception {
         // 1. Create Vert.x instance (shared across engines)
-        System.out.println("1. Creating Vert.x instance...");
+        log.step(1, "Creating Vert.x instance...");
         Vertx vertx = Vertx.vertx();
         
         try {
             // 2. Create transfer engine with Vert.x
-            System.out.println("2. Creating transfer engine...");
+            log.step(2, "Creating transfer engine...");
             TransferEngine transferEngine = new SimpleTransferEngine(vertx, 10, 3, 1024 * 1024);
             
             // 3. Create workflow engine with Vert.x
-            System.out.println("3. Creating workflow engine...");
+            log.step(3, "Creating workflow engine...");
             SimpleWorkflowEngine workflowEngine = new SimpleWorkflowEngine(vertx, transferEngine);
             
             // 4. Create YAML workflow definition
-            System.out.println("4. Creating workflow definition...");
+            log.step(4, "Creating workflow definition...");
             String yamlWorkflow = createSampleWorkflow();
         
             // 5. Parse the workflow
-            System.out.println("5. Parsing workflow...");
+            log.step(5, "Parsing workflow...");
             WorkflowDefinitionParser parser = new YamlWorkflowDefinitionParser();
             WorkflowDefinition workflow = parser.parseFromString(yamlWorkflow);
             
-            System.out.println("   Workflow: " + workflow.getMetadata().getName());
-            System.out.println("   Description: " + workflow.getMetadata().getDescription());
-            System.out.println("   Transfer Groups: " + workflow.getSpec().getTransferGroups().size());
+            log.keyValue("Workflow", workflow.getMetadata().getName());
+            log.keyValue("Description", workflow.getMetadata().getDescription());
+            log.keyValue("Transfer Groups", workflow.getSpec().getTransferGroups().size());
         
             // 6. Validate the workflow
-            System.out.println("6. Validating workflow...");
+            log.step(6, "Validating workflow...");
             ValidationResult validation = parser.validate(workflow);
             if (!validation.isValid()) {
-                System.err.println("Workflow validation failed:");
+                log.error("Workflow validation failed:");
                 validation.getErrors().forEach(error -> 
-                    System.err.println("  - " + error.getMessage()));
+                    log.listItem(error.getMessage()));
                 return;
             }
-            System.out.println("   Workflow is valid!");
+            log.success("Workflow is valid!");
         
             // 7. Create execution context with variables
-            System.out.println("7. Creating execution context...");
+            log.step(7, "Creating execution context...");
             ExecutionContext context = ExecutionContext.builder()
                     .executionId("basic-example-" + System.currentTimeMillis())
                     .mode(ExecutionContext.ExecutionMode.VIRTUAL_RUN) // Use virtual run for demo
@@ -111,25 +112,25 @@ public class BasicWorkflowExample {
                     .metadata(Map.of("example", "basic-workflow"))
                     .build();
             
-            System.out.println("   Execution ID: " + context.getExecutionId());
-            System.out.println("   Mode: " + context.getMode());
-            System.out.println("   Variables: " + context.getVariables());
+            log.keyValue("Execution ID", context.getExecutionId());
+            log.keyValue("Mode", context.getMode());
+            log.keyValue("Variables", context.getVariables());
         
             // 8. Execute the workflow
-            System.out.println("8. Executing workflow...");
+            log.step(8, "Executing workflow...");
             Future<WorkflowExecution> future = workflowEngine.execute(workflow, context);
             
             // 9. Wait for completion and display results
-            System.out.println("9. Waiting for completion...");
+            log.step(9, "Waiting for completion...");
             WorkflowExecution execution = future.toCompletionStage().toCompletableFuture().get();
             
             displayResults(execution);
             
             // 10. Cleanup
-            System.out.println("10. Cleaning up...");
+            log.step(10, "Cleaning up...");
             workflowEngine.shutdown();
             
-            System.out.println("\n=== Example completed successfully! ===");
+            log.exampleComplete("Basic Workflow Example");
         } finally {
             vertx.close();
         }
@@ -198,45 +199,45 @@ public class BasicWorkflowExample {
     }
     
     private void displayResults(WorkflowExecution execution) {
-        System.out.println("\n=== Workflow Execution Results ===");
-        System.out.println("Execution ID: " + execution.getExecutionId());
-        System.out.println("Status: " + execution.getStatus());
-        System.out.println("Successful: " + execution.isSuccessful());
+        log.section("Workflow Execution Results");
+        log.keyValue("Execution ID", execution.getExecutionId());
+        log.keyValue("Status", execution.getStatus());
+        log.keyValue("Successful", execution.isSuccessful());
         
         if (execution.getDuration().isPresent()) {
-            System.out.println("Duration: " + execution.getDuration().get().toMillis() + "ms");
+            log.keyValue("Duration", execution.getDuration().get().toMillis() + "ms");
         }
         
-        System.out.println("Total Transfers: " + execution.getTotalTransferCount());
-        System.out.println("Successful Transfers: " + execution.getSuccessfulTransferCount());
-        System.out.println("Total Bytes: " + execution.getTotalBytesTransferred());
+        log.keyValue("Total Transfers", execution.getTotalTransferCount());
+        log.keyValue("Successful Transfers", execution.getSuccessfulTransferCount());
+        log.keyValue("Total Bytes", execution.getTotalBytesTransferred());
         
         if (execution.getErrorMessage().isPresent()) {
-            System.err.println("Error: " + execution.getErrorMessage().get());
+            log.error("Error: " + execution.getErrorMessage().get());
         }
         
-        System.out.println("\n--- Transfer Group Results ---");
+        log.section("Transfer Group Results");
         for (WorkflowExecution.GroupExecution group : execution.getGroupExecutions()) {
-            System.out.println("Group: " + group.getGroupName());
-            System.out.println("  Status: " + group.getStatus());
-            System.out.println("  Successful: " + group.isSuccessful());
-            System.out.println("  Transfers: " + group.getTransferResults().size());
+            log.info("Group: " + group.getGroupName());
+            log.keyValue("Status", group.getStatus());
+            log.keyValue("Successful", group.isSuccessful());
+            log.keyValue("Transfers", group.getTransferResults().size());
             
             if (group.getDuration().isPresent()) {
-                System.out.println("  Duration: " + group.getDuration().get().toMillis() + "ms");
+                log.keyValue("Duration", group.getDuration().get().toMillis() + "ms");
             }
             
             if (group.getErrorMessage().isPresent()) {
-                System.out.println("  Error: " + group.getErrorMessage().get());
+                log.keyValue("Error", group.getErrorMessage().get());
             }
             
             // Display individual transfer results
             group.getTransferResults().forEach((name, result) -> {
-                System.out.println("    Transfer: " + name);
-                System.out.println("      Status: " + result.getFinalStatus());
-                System.out.println("      Bytes: " + result.getBytesTransferred());
+                log.detail("Transfer: " + name);
+                log.indentedKeyValue("Status", result.getFinalStatus());
+                log.indentedKeyValue("Bytes", result.getBytesTransferred());
                 if (result.getErrorMessage().isPresent()) {
-                    System.out.println("      Error: " + result.getErrorMessage().get());
+                    log.indentedKeyValue("Error", result.getErrorMessage().get());
                 }
             });
         }

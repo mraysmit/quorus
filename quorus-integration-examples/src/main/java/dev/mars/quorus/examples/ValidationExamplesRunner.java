@@ -17,7 +17,7 @@
 package dev.mars.quorus.examples;
 
 import dev.mars.quorus.workflow.*;
-import dev.mars.quorus.examples.util.TestResultLogger;
+import dev.mars.quorus.examples.util.ExampleLogger;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -32,13 +32,15 @@ import java.nio.file.Paths;
  */
 public class ValidationExamplesRunner {
 
+    private static final ExampleLogger log = ExampleLogger.getLogger(ValidationExamplesRunner.class);
+
     public static void main(String[] args) throws Exception {
         ValidationExamplesRunner runner = new ValidationExamplesRunner();
         runner.runAllExamples();
     }
 
     public void runAllExamples() throws Exception {
-        TestResultLogger.logTestHeader("Quorus YAML Schema Validation Examples");
+        log.header("Quorus YAML Schema Validation Examples");
         
         // Example 1: Validate existing workflow files
         validateExistingWorkflows();
@@ -55,17 +57,17 @@ public class ValidationExamplesRunner {
         // Example 5: Real-world workflow examples
         demonstrateRealWorldExamples();
         
-        TestResultLogger.logTestFooter("All validation examples completed successfully!");
+        log.info("All validation examples completed successfully!");
     }
 
     private void validateExistingWorkflows() throws Exception {
-        TestResultLogger.logTestSection("1. Validating Existing Workflow Files", false);
+        log.testSection("1. Validating Existing Workflow Files", false);
         
         WorkflowDefinitionParser parser = new YamlWorkflowDefinitionParser();
         
         // Validate the schema-compliant example
         Path schemaCompliantPath = Paths.get("src/main/resources/workflows/schema-compliant-example.yaml");
-        System.out.println("   Validating: " + schemaCompliantPath.getFileName());
+        log.detail("Validating: " + schemaCompliantPath.getFileName());
         
         try {
             // Parse and validate
@@ -73,20 +75,20 @@ public class ValidationExamplesRunner {
             ValidationResult result = parser.validate(workflow);
             
             if (result.isValid()) {
-                TestResultLogger.logSuccess("✓ Schema-compliant example is valid");
-                System.out.println("     Name: " + workflow.getMetadata().getName());
-                System.out.println("     Type: " + workflow.getMetadata().getType());
-                System.out.println("     Tags: " + workflow.getMetadata().getTags());
-                System.out.println("     Created: " + workflow.getMetadata().getCreated());
-                System.out.println("     Transfer Groups: " + workflow.getSpec().getTransferGroups().size());
+                log.success("Schema-compliant example is valid");
+                log.indentedKeyValue("Name", workflow.getMetadata().getName());
+                log.indentedKeyValue("Type", workflow.getMetadata().getType());
+                log.indentedKeyValue("Tags", workflow.getMetadata().getTags());
+                log.indentedKeyValue("Created", workflow.getMetadata().getCreated());
+                log.indentedKeyValue("Transfer Groups", workflow.getSpec().getTransferGroups().size());
             } else {
-                TestResultLogger.logUnexpectedResult("Validation failed:");
+                log.failure("UNEXPECTED: Validation failed:");
                 result.getErrors().forEach(error ->
-                    System.out.println("       - " + error));
+                    log.subDetail(error.toString()));
             }
             
         } catch (Exception e) {
-            TestResultLogger.logUnexpectedException("Error validating workflow", e);
+            log.failure("UNEXPECTED: Error validating workflow: " + e.getMessage());
         }
         
         // Validate other example workflows
@@ -97,34 +99,34 @@ public class ValidationExamplesRunner {
         
         for (String filename : workflowFiles) {
             Path workflowPath = Paths.get("src/main/resources/workflows/" + filename);
-            System.out.println("   Validating: " + filename);
+            log.detail("Validating: " + filename);
             
             try {
                 WorkflowDefinition workflow = parser.parse(workflowPath);
                 ValidationResult result = parser.validate(workflow);
                 
                 if (result.isValid()) {
-                    System.out.println("     ✓ Valid - " + workflow.getMetadata().getName());
+                    log.subDetail("✓ Valid - " + workflow.getMetadata().getName());
                 } else {
-                    System.out.println("     ✗ Invalid:");
+                    log.subDetail("✗ Invalid:");
                     result.getErrors().forEach(error ->
-                        System.out.println("       - " + error));
+                        log.deepDetail(error.toString()));
                 }
                 
                 if (result.hasWarnings()) {
-                    System.out.println("     Warnings:");
+                    log.subDetail("Warnings:");
                     result.getWarnings().forEach(warning ->
-                        System.out.println("       - " + warning));
+                        log.deepDetail(warning.toString()));
                 }
                 
             } catch (Exception e) {
-                System.out.println("     ✗ Error: " + e.getMessage());
+                log.subDetail("✗ Error: " + e.getMessage());
             }
         }
     }
 
     private void demonstrateValidationErrors() throws Exception {
-        TestResultLogger.logTestSection("2. Demonstrating Validation Error Handling", true);
+        log.testSection("2. Demonstrating Validation Error Handling", true);
         
         WorkflowDefinitionParser parser = new YamlWorkflowDefinitionParser();
         
@@ -141,15 +143,15 @@ public class ValidationExamplesRunner {
                   transferGroups: []
                 """;
 
-        System.out.println("   Testing workflow with missing required fields...");
+        log.detail("Testing workflow with missing required fields...");
         ValidationResult result = parser.validateSchema(incompleteWorkflow);
         
         if (!result.isValid()) {
-            TestResultLogger.logExpectedFailure("✓ Correctly detected missing fields:");
+            log.expectedFailure("Correctly detected missing fields:");
             result.getErrors().forEach(error ->
-                System.out.println("     - " + error.getFieldPath() + ": " + error.getMessage()));
+                log.subDetail(error.getFieldPath() + ": " + error.getMessage()));
         } else {
-            TestResultLogger.logUnexpectedResult("Failed to detect missing fields!");
+            log.failure("UNEXPECTED: Failed to detect missing fields!");
         }
 
         // Example with invalid field formats
@@ -169,58 +171,58 @@ public class ValidationExamplesRunner {
                   transferGroups: []
                 """;
 
-        System.out.println("   Testing workflow with invalid field formats...");
+        log.detail("Testing workflow with invalid field formats...");
         result = parser.validateSchema(invalidFormatsWorkflow);
         
         if (!result.isValid()) {
-            TestResultLogger.logExpectedFailure("✓ Correctly detected format errors:");
+            log.expectedFailure("Correctly detected format errors:");
             result.getErrors().forEach(error ->
-                System.out.println("     - " + error.getFieldPath() + ": " + error.getMessage()));
+                log.subDetail(error.getFieldPath() + ": " + error.getMessage()));
         } else {
-            TestResultLogger.logUnexpectedResult("Failed to detect format errors!");
+            log.failure("UNEXPECTED: Failed to detect format errors!");
         }
     }
 
     private void demonstrateBestPractices() throws Exception {
-        TestResultLogger.logTestSection("3. Schema Compliance Best Practices", false);
+        log.testSection("3. Schema Compliance Best Practices", false);
         
-        System.out.println("   Best practices for YAML workflow definitions:");
-        System.out.println();
+        log.detail("Best practices for YAML workflow definitions:");
+        log.blank();
         
-        System.out.println("   ✓ Required Metadata Fields:");
-        System.out.println("     - name: Descriptive workflow name (2-100 chars)");
-        System.out.println("     - version: Semantic versioning (e.g., '1.0.0')");
-        System.out.println("     - description: Clear description (10-500 chars)");
-        System.out.println("     - type: Workflow type (lowercase-with-hyphens)");
-        System.out.println("     - author: Email address or name");
-        System.out.println("     - created: ISO date format (YYYY-MM-DD)");
-        System.out.println("     - tags: Array of lowercase tags");
-        System.out.println();
+        log.detail("✓ Required Metadata Fields:");
+        log.subDetail("name: Descriptive workflow name (2-100 chars)");
+        log.subDetail("version: Semantic versioning (e.g., '1.0.0')");
+        log.subDetail("description: Clear description (10-500 chars)");
+        log.subDetail("type: Workflow type (lowercase-with-hyphens)");
+        log.subDetail("author: Email address or name");
+        log.subDetail("created: ISO date format (YYYY-MM-DD)");
+        log.subDetail("tags: Array of lowercase tags");
+        log.blank();
         
-        System.out.println("   ✓ Recommended Workflow Types:");
-        System.out.println("     - transfer-workflow: File transfer operations");
-        System.out.println("     - data-pipeline-workflow: ETL and data processing");
-        System.out.println("     - download-workflow: Download operations");
-        System.out.println("     - validation-test-workflow: Testing and validation");
-        System.out.println("     - external-data-config: External data configurations");
-        System.out.println("     - etl-workflow: Extract, Transform, Load operations");
-        System.out.println("     - backup-workflow: Backup and archival operations");
-        System.out.println("     - sync-workflow: Synchronization operations");
-        System.out.println();
+        log.detail("✓ Recommended Workflow Types:");
+        log.subDetail("transfer-workflow: File transfer operations");
+        log.subDetail("data-pipeline-workflow: ETL and data processing");
+        log.subDetail("download-workflow: Download operations");
+        log.subDetail("validation-test-workflow: Testing and validation");
+        log.subDetail("external-data-config: External data configurations");
+        log.subDetail("etl-workflow: Extract, Transform, Load operations");
+        log.subDetail("backup-workflow: Backup and archival operations");
+        log.subDetail("sync-workflow: Synchronization operations");
+        log.blank();
         
-        System.out.println("   ✓ Tag Guidelines:");
-        System.out.println("     - Use lowercase letters and numbers");
-        System.out.println("     - Separate words with hyphens (not underscores)");
-        System.out.println("     - Keep tags short and descriptive");
-        System.out.println("     - Include environment, team, and category tags");
-        System.out.println("     - Maximum 20 tags per workflow");
-        System.out.println();
+        log.detail("✓ Tag Guidelines:");
+        log.subDetail("Use lowercase letters and numbers");
+        log.subDetail("Separate words with hyphens (not underscores)");
+        log.subDetail("Keep tags short and descriptive");
+        log.subDetail("Include environment, team, and category tags");
+        log.subDetail("Maximum 20 tags per workflow");
+        log.blank();
         
-        System.out.println("   ✓ Version Guidelines:");
-        System.out.println("     - Follow semantic versioning (MAJOR.MINOR.PATCH)");
-        System.out.println("     - Use pre-release identifiers for testing (1.0.0-beta)");
-        System.out.println("     - Include build metadata when needed (1.0.0+build.1)");
-        System.out.println();
+        log.detail("✓ Version Guidelines:");
+        log.subDetail("Follow semantic versioning (MAJOR.MINOR.PATCH)");
+        log.subDetail("Use pre-release identifiers for testing (1.0.0-beta)");
+        log.subDetail("Include build metadata when needed (1.0.0+build.1)");
+        log.blank();
         
         // Show a perfect example
         String perfectExample = """
@@ -264,19 +266,19 @@ public class ValidationExamplesRunner {
         ValidationResult result = parser.validateSchema(perfectExample);
         
         if (result.isValid()) {
-            TestResultLogger.logSuccess("✓ Perfect example validates successfully");
-            System.out.println("     No errors or warnings");
+            log.success("Perfect example validates successfully");
+            log.subDetail("No errors or warnings");
         } else {
-            TestResultLogger.logUnexpectedResult("Perfect example failed validation:");
+            log.failure("UNEXPECTED: Perfect example failed validation:");
             result.getErrors().forEach(error ->
-                System.out.println("     - " + error));
+                log.subDetail(error.toString()));
         }
     }
 
     private void demonstrateLegacyMigration() throws Exception {
-        TestResultLogger.logTestSection("4. Legacy Format Migration", false);
+        log.testSection("4. Legacy Format Migration", false);
         
-        System.out.println("   Migrating from legacy format to new schema...");
+        log.detail("Migrating from legacy format to new schema...");
         
         // Show legacy format with deprecation warnings
         String legacyWorkflow = """
@@ -307,32 +309,32 @@ public class ValidationExamplesRunner {
         ValidationResult result = parser.validateSchema(legacyWorkflow);
         
         if (result.isValid()) {
-            System.out.println("   ✓ Legacy format still validates");
+            log.success("Legacy format still validates");
             
             if (result.hasWarnings()) {
-                System.out.println("   Deprecation warnings:");
+                log.detail("Deprecation warnings:");
                 result.getWarnings().forEach(warning ->
-                    System.out.println("     - " + warning.getFieldPath() + ": " + warning.getMessage()));
+                    log.subDetail(warning.getFieldPath() + ": " + warning.getMessage()));
             }
             
             // Parse and show migration
             WorkflowDefinition workflow = parser.parseFromString(legacyWorkflow);
-            System.out.println("   Migration guidance:");
-            System.out.println("     - Remove 'kind' field (value: " + workflow.getKind() + ")");
-            System.out.println("     - Use 'metadata.type' instead: " + workflow.getMetadata().getType());
-            System.out.println("     - Ensure all required metadata fields are present");
+            log.detail("Migration guidance:");
+            log.subDetail("Remove 'kind' field (value: " + workflow.getKind() + ")");
+            log.subDetail("Use 'metadata.type' instead: " + workflow.getMetadata().getType());
+            log.subDetail("Ensure all required metadata fields are present");
             
         } else {
-            TestResultLogger.logUnexpectedResult("Legacy format validation failed:");
+            log.failure("UNEXPECTED: Legacy format validation failed:");
             result.getErrors().forEach(error ->
-                System.out.println("     - " + error));
+                log.subDetail(error.toString()));
         }
     }
 
     private void demonstrateRealWorldExamples() throws Exception {
-        TestResultLogger.logTestSection("5. Real-World Workflow Examples", false);
+        log.testSection("5. Real-World Workflow Examples", false);
         
-        System.out.println("   Validating real-world workflow scenarios...");
+        log.detail("Validating real-world workflow scenarios...");
         
         // E-commerce order processing workflow
         validateRealWorldExample("E-commerce Order Processing", """
@@ -451,27 +453,27 @@ public class ValidationExamplesRunner {
             ValidationResult result = parser.validateSchema(yaml);
             
             if (result.isValid()) {
-                System.out.println("   ✓ " + name + " - Valid");
+                log.success(name + " - Valid");
                 
                 WorkflowDefinition workflow = parser.parseFromString(yaml);
-                System.out.println("     Type: " + workflow.getMetadata().getType());
-                System.out.println("     Tags: " + workflow.getMetadata().getTags().size() + " tags");
-                System.out.println("     Labels: " + workflow.getMetadata().getLabels().size() + " labels");
+                log.indentedKeyValue("Type", workflow.getMetadata().getType());
+                log.indentedKeyValue("Tags", workflow.getMetadata().getTags().size() + " tags");
+                log.indentedKeyValue("Labels", workflow.getMetadata().getLabels().size() + " labels");
                 
             } else {
-                System.out.println("   ✗ " + name + " - Invalid:");
+                log.failure(name + " - Invalid:");
                 result.getErrors().forEach(error ->
-                    System.out.println("       - " + error));
+                    log.subDetail(error.toString()));
             }
             
             if (result.hasWarnings()) {
-                System.out.println("     Warnings: " + result.getWarningCount());
+                log.indentedKeyValue("Warnings", result.getWarningCount());
             }
             
         } catch (Exception e) {
-            System.out.println("   ✗ " + name + " - Error: " + e.getMessage());
+            log.failure(name + " - Error: " + e.getMessage());
         }
         
-        System.out.println();
+        log.blank();
     }
 }
