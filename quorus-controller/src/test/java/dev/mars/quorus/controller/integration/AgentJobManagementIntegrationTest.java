@@ -20,7 +20,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import dev.mars.quorus.controller.http.HttpApiServer;
-import dev.mars.quorus.controller.raft.InMemoryTransport;
+import dev.mars.quorus.controller.raft.TestInMemoryTransport;
 import dev.mars.quorus.controller.raft.RaftNode;
 import dev.mars.quorus.controller.raft.RaftTransport;
 import dev.mars.quorus.controller.state.QuorusStateMachine;
@@ -83,7 +83,7 @@ class AgentJobManagementIntegrationTest {
         stateMachine = new QuorusStateMachine();
 
         // Create an in-memory transport for testing (supports single-node clusters)
-        RaftTransport transport = new InMemoryTransport("test-node-1");
+        RaftTransport transport = new TestInMemoryTransport("test-node-1");
 
         // Initialize Raft node (single node cluster for testing with short election timeout)
         Set<String> clusterNodes = Set.of("test-node-1");
@@ -121,8 +121,8 @@ class AgentJobManagementIntegrationTest {
         if (vertx != null) {
             vertx.close();
         }
-        // Clear the InMemoryTransport registry
-        InMemoryTransport.clearAllTransports();
+        // Clear the TestInMemoryTransport registry
+        TestInMemoryTransport.clearAllTransports();
         logger.info("Test environment cleaned up");
     }
 

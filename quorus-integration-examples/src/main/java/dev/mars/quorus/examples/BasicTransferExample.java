@@ -24,12 +24,14 @@ import dev.mars.quorus.examples.util.TestResultLogger;
 import dev.mars.quorus.transfer.SimpleTransferEngine;
 import dev.mars.quorus.transfer.TransferEngine;
 
+import io.vertx.core.Future;
+import io.vertx.core.Vertx;
+
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
-import io.vertx.core.Future;
 import java.util.logging.Logger;
 
 /**
@@ -65,8 +67,12 @@ public class BasicTransferExample {
         QuorusConfiguration config = new QuorusConfiguration();
         logger.info("Configuration loaded: " + config);
 
-        // Initialize transfer engine with configuration parameters
+        // Create Vert.x instance for reactive operations
+        Vertx vertx = Vertx.vertx();
+        
+        // Initialize transfer engine with Vert.x and configuration parameters
         TransferEngine transferEngine = new SimpleTransferEngine(
+                vertx,
                 config.getMaxConcurrentTransfers(),  // Max concurrent transfers: 10
                 config.getMaxRetryAttempts(),        // Max retry attempts: 3
                 config.getRetryDelayMs()             // Initial retry delay: 1000ms
@@ -94,6 +100,7 @@ public class BasicTransferExample {
             logger.info("");
             logger.info("Shutting down transfer engine...");
             transferEngine.shutdown(10);
+            vertx.close();
             logger.info("=== Example completed successfully ===");
         }
     }

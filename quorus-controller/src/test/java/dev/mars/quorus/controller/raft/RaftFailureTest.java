@@ -46,21 +46,21 @@ class RaftFailureTest {
     private RaftNode node1;
     private RaftNode node2;
     private RaftNode node3;
-    private InMemoryTransport transport1;
-    private InMemoryTransport transport2;
-    private InMemoryTransport transport3;
+    private TestInMemoryTransport transport1;
+    private TestInMemoryTransport transport2;
+    private TestInMemoryTransport transport3;
     private io.vertx.core.Vertx vertx;
 
     @BeforeEach
     void setUp() {
         vertx = io.vertx.core.Vertx.vertx();
-        InMemoryTransport.clearAllTransports();
+        TestInMemoryTransport.clearAllTransports();
 
         Set<String> clusterNodes = Set.of("node1", "node2", "node3");
 
-        transport1 = new InMemoryTransport("node1");
-        transport2 = new InMemoryTransport("node2");
-        transport3 = new InMemoryTransport("node3");
+        transport1 = new TestInMemoryTransport("node1");
+        transport2 = new TestInMemoryTransport("node2");
+        transport3 = new TestInMemoryTransport("node3");
 
         node1 = new RaftNode(vertx, "node1", clusterNodes, transport1, new QuorusStateMachine(), 600, 120);
         node2 = new RaftNode(vertx, "node2", clusterNodes, transport2, new QuorusStateMachine(), 600, 120);
@@ -73,7 +73,7 @@ class RaftFailureTest {
         if (node2 != null) node2.stop();
         if (node3 != null) node3.stop();
         if (vertx != null) vertx.close();
-        InMemoryTransport.clearAllTransports();
+        TestInMemoryTransport.clearAllTransports();
     }
 
     @Test
@@ -293,11 +293,11 @@ class RaftFailureTest {
         Set<String> clusterNodes = Set.of("fast1", "fast2", "fast3");
         
         RaftNode fast1 = new RaftNode(vertx, "fast1", clusterNodes, 
-                new InMemoryTransport("fast1"), new QuorusStateMachine(), 100, 50);
+                new TestInMemoryTransport("fast1"), new QuorusStateMachine(), 100, 50);
         RaftNode fast2 = new RaftNode(vertx, "fast2", clusterNodes, 
-                new InMemoryTransport("fast2"), new QuorusStateMachine(), 100, 50);
+                new TestInMemoryTransport("fast2"), new QuorusStateMachine(), 100, 50);
         RaftNode fast3 = new RaftNode(vertx, "fast3", clusterNodes, 
-                new InMemoryTransport("fast3"), new QuorusStateMachine(), 100, 50);
+                new TestInMemoryTransport("fast3"), new QuorusStateMachine(), 100, 50);
         
         try {
             // Start all nodes simultaneously
@@ -383,7 +383,7 @@ class RaftFailureTest {
         // Test single node becoming leader
         Set<String> singleNode = Set.of("single");
         RaftNode single = new RaftNode(vertx, "single", singleNode, 
-                new InMemoryTransport("single"), new QuorusStateMachine(), 300, 100);
+                new TestInMemoryTransport("single"), new QuorusStateMachine(), 300, 100);
         
         single.start();
         

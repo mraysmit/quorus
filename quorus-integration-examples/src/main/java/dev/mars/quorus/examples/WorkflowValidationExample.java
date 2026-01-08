@@ -21,8 +21,10 @@ import dev.mars.quorus.transfer.TransferEngine;
 import dev.mars.quorus.transfer.SimpleTransferEngine;
 import dev.mars.quorus.workflow.*;
 
-import java.util.Map;
 import io.vertx.core.Future;
+import io.vertx.core.Vertx;
+
+import java.util.Map;
 
 /**
  * Workflow validation example demonstrating:
@@ -65,34 +67,40 @@ public class WorkflowValidationExample {
     }
     
     public void runExample() throws Exception {
-        // Setup
-        TransferEngine transferEngine = new SimpleTransferEngine();
-        SimpleWorkflowEngine workflowEngine = new SimpleWorkflowEngine(transferEngine);
-        WorkflowDefinitionParser parser = new YamlWorkflowDefinitionParser();
+        // Setup with Vert.x
+        Vertx vertx = Vertx.vertx();
         
-        TestResultLogger.logTestSection("1. Testing valid workflow validation", false);
-        testValidWorkflow(parser, workflowEngine);
+        try {
+            TransferEngine transferEngine = new SimpleTransferEngine(vertx, 10, 3, 1024 * 1024);
+            SimpleWorkflowEngine workflowEngine = new SimpleWorkflowEngine(vertx, transferEngine);
+            WorkflowDefinitionParser parser = new YamlWorkflowDefinitionParser();
+            
+            TestResultLogger.logTestSection("1. Testing valid workflow validation", false);
+            testValidWorkflow(parser, workflowEngine);
 
-        TestResultLogger.logTestSection("2. Testing invalid YAML syntax", true);
-        testInvalidYamlSyntax(parser);
+            TestResultLogger.logTestSection("2. Testing invalid YAML syntax", true);
+            testInvalidYamlSyntax(parser);
 
-        TestResultLogger.logTestSection("3. Testing missing required fields", true);
-        testMissingRequiredFields(parser);
+            TestResultLogger.logTestSection("3. Testing missing required fields", true);
+            testMissingRequiredFields(parser);
 
-        TestResultLogger.logTestSection("4. Testing circular dependencies", true);
-        testCircularDependencies(parser);
+            TestResultLogger.logTestSection("4. Testing circular dependencies", true);
+            testCircularDependencies(parser);
 
-        TestResultLogger.logTestSection("5. Testing missing dependencies", true);
-        testMissingDependencies(parser);
+            TestResultLogger.logTestSection("5. Testing missing dependencies", true);
+            testMissingDependencies(parser);
 
-        TestResultLogger.logTestSection("6. Testing variable resolution issues", true);
-        testVariableResolutionIssues(parser, workflowEngine);
+            TestResultLogger.logTestSection("6. Testing variable resolution issues", true);
+            testVariableResolutionIssues(parser, workflowEngine);
 
-        TestResultLogger.logTestSection("7. Testing dry run validation", false);
-        testDryRunValidation(parser, workflowEngine);
+            TestResultLogger.logTestSection("7. Testing dry run validation", false);
+            testDryRunValidation(parser, workflowEngine);
 
-        // Cleanup
-        workflowEngine.shutdown();
+            // Cleanup
+            workflowEngine.shutdown();
+        } finally {
+            vertx.close();
+        }
     }
     
     private void testValidWorkflow(WorkflowDefinitionParser parser, SimpleWorkflowEngine workflowEngine) 

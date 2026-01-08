@@ -75,7 +75,7 @@ class GrpcRaftServerTest {
         
         // Create a minimal RaftNode for testing
         Set<String> clusterNodes = Set.of("node1");
-        InMemoryTransport transport = new InMemoryTransport("node1");
+        TestInMemoryTransport transport = new TestInMemoryTransport("node1");
         QuorusStateMachine stateMachine = new QuorusStateMachine();
         raftNode = new RaftNode(vertx, "node1", clusterNodes, transport, stateMachine, 5000, 1000);
         raftNode.start();
@@ -916,8 +916,8 @@ class GrpcRaftServerTest {
         Set<String> cluster1 = Set.of("nodeA");
         Set<String> cluster2 = Set.of("nodeB");
         
-        InMemoryTransport transport1 = new InMemoryTransport("nodeA");
-        InMemoryTransport transport2 = new InMemoryTransport("nodeB");
+        TestInMemoryTransport transport1 = new TestInMemoryTransport("nodeA");
+        TestInMemoryTransport transport2 = new TestInMemoryTransport("nodeB");
         
         QuorusStateMachine sm1 = new QuorusStateMachine();
         QuorusStateMachine sm2 = new QuorusStateMachine();

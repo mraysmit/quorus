@@ -21,11 +21,13 @@ import dev.mars.quorus.transfer.TransferEngine;
 import dev.mars.quorus.transfer.SimpleTransferEngine;
 import dev.mars.quorus.workflow.*;
 
+import io.vertx.core.Future;
+import io.vertx.core.Vertx;
+
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Map;
-import io.vertx.core.Future;
 
 /**
  * Basic example demonstrating YAML workflow execution with the Quorus transfer engine.
@@ -58,71 +60,79 @@ public class BasicWorkflowExample {
     }
     
     public void runExample() throws Exception {
-        // 1. Create transfer engine
-        System.out.println("1. Creating transfer engine...");
-        TransferEngine transferEngine = new SimpleTransferEngine();
+        // 1. Create Vert.x instance (shared across engines)
+        System.out.println("1. Creating Vert.x instance...");
+        Vertx vertx = Vertx.vertx();
         
-        // 2. Create workflow engine
-        System.out.println("2. Creating workflow engine...");
-        SimpleWorkflowEngine workflowEngine = new SimpleWorkflowEngine(transferEngine);
+        try {
+            // 2. Create transfer engine with Vert.x
+            System.out.println("2. Creating transfer engine...");
+            TransferEngine transferEngine = new SimpleTransferEngine(vertx, 10, 3, 1024 * 1024);
+            
+            // 3. Create workflow engine with Vert.x
+            System.out.println("3. Creating workflow engine...");
+            SimpleWorkflowEngine workflowEngine = new SimpleWorkflowEngine(vertx, transferEngine);
+            
+            // 4. Create YAML workflow definition
+            System.out.println("4. Creating workflow definition...");
+            String yamlWorkflow = createSampleWorkflow();
         
-        // 3. Create YAML workflow definition
-        System.out.println("3. Creating workflow definition...");
-        String yamlWorkflow = createSampleWorkflow();
+            // 5. Parse the workflow
+            System.out.println("5. Parsing workflow...");
+            WorkflowDefinitionParser parser = new YamlWorkflowDefinitionParser();
+            WorkflowDefinition workflow = parser.parseFromString(yamlWorkflow);
+            
+            System.out.println("   Workflow: " + workflow.getMetadata().getName());
+            System.out.println("   Description: " + workflow.getMetadata().getDescription());
+            System.out.println("   Transfer Groups: " + workflow.getSpec().getTransferGroups().size());
         
-        // 4. Parse the workflow
-        System.out.println("4. Parsing workflow...");
-        WorkflowDefinitionParser parser = new YamlWorkflowDefinitionParser();
-        WorkflowDefinition workflow = parser.parseFromString(yamlWorkflow);
+            // 6. Validate the workflow
+            System.out.println("6. Validating workflow...");
+            ValidationResult validation = parser.validate(workflow);
+            if (!validation.isValid()) {
+                System.err.println("Workflow validation failed:");
+                validation.getErrors().forEach(error -> 
+                    System.err.println("  - " + error.getMessage()));
+                return;
+            }
+            System.out.println("   Workflow is valid!");
         
-        System.out.println("   Workflow: " + workflow.getMetadata().getName());
-        System.out.println("   Description: " + workflow.getMetadata().getDescription());
-        System.out.println("   Transfer Groups: " + workflow.getSpec().getTransferGroups().size());
+            // 7. Create execution context with variables
+            System.out.println("7. Creating execution context...");
+            ExecutionContext context = ExecutionContext.builder()
+                    .executionId("basic-example-" + System.currentTimeMillis())
+                    .mode(ExecutionContext.ExecutionMode.VIRTUAL_RUN) // Use virtual run for demo
+                    .variables(Map.of(
+                            "baseUrl", "https://httpbin.org",
+                            "outputDir", createTempDirectory().toString(),
+                            "environment", "demo"
+                    ))
+                    .userId("demo-user")
+                    .metadata(Map.of("example", "basic-workflow"))
+                    .build();
+            
+            System.out.println("   Execution ID: " + context.getExecutionId());
+            System.out.println("   Mode: " + context.getMode());
+            System.out.println("   Variables: " + context.getVariables());
         
-        // 5. Validate the workflow
-        System.out.println("5. Validating workflow...");
-        ValidationResult validation = parser.validate(workflow);
-        if (!validation.isValid()) {
-            System.err.println("Workflow validation failed:");
-            validation.getErrors().forEach(error -> 
-                System.err.println("  - " + error.getMessage()));
-            return;
+            // 8. Execute the workflow
+            System.out.println("8. Executing workflow...");
+            Future<WorkflowExecution> future = workflowEngine.execute(workflow, context);
+            
+            // 9. Wait for completion and display results
+            System.out.println("9. Waiting for completion...");
+            WorkflowExecution execution = future.toCompletionStage().toCompletableFuture().get();
+            
+            displayResults(execution);
+            
+            // 10. Cleanup
+            System.out.println("10. Cleaning up...");
+            workflowEngine.shutdown();
+            
+            System.out.println("\n=== Example completed successfully! ===");
+        } finally {
+            vertx.close();
         }
-        System.out.println("   Workflow is valid!");
-        
-        // 6. Create execution context with variables
-        System.out.println("6. Creating execution context...");
-        ExecutionContext context = ExecutionContext.builder()
-                .executionId("basic-example-" + System.currentTimeMillis())
-                .mode(ExecutionContext.ExecutionMode.VIRTUAL_RUN) // Use virtual run for demo
-                .variables(Map.of(
-                        "baseUrl", "https://httpbin.org",
-                        "outputDir", createTempDirectory().toString(),
-                        "environment", "demo"
-                ))
-                .userId("demo-user")
-                .metadata(Map.of("example", "basic-workflow"))
-                .build();
-        
-        System.out.println("   Execution ID: " + context.getExecutionId());
-        System.out.println("   Mode: " + context.getMode());
-        System.out.println("   Variables: " + context.getVariables());
-        
-        // 7. Execute the workflow
-        System.out.println("7. Executing workflow...");
-        Future<WorkflowExecution> future = workflowEngine.execute(workflow, context);
-        
-        // 8. Wait for completion and display results
-        System.out.println("8. Waiting for completion...");
-        WorkflowExecution execution = future.toCompletionStage().toCompletableFuture().get();
-        
-        displayResults(execution);
-        
-        // 9. Cleanup
-        System.out.println("9. Cleaning up...");
-        workflowEngine.shutdown();
-        
-        System.out.println("\n=== Example completed successfully! ===");
     }
     
     private String createSampleWorkflow() {

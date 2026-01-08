@@ -69,7 +69,7 @@ class GrpcRaftTransportTest {
         
         // Set up a target server to receive requests
         Set<String> clusterNodes = Set.of("target");
-        InMemoryTransport transport = new InMemoryTransport("target");
+        TestInMemoryTransport transport = new TestInMemoryTransport("target");
         QuorusStateMachine stateMachine = new QuorusStateMachine();
         targetNode = new RaftNode(vertx, "target", clusterNodes, transport, stateMachine, 5000, 1000);
         targetNode.start();
@@ -352,7 +352,7 @@ class GrpcRaftTransportTest {
         // Set up second target
         int targetPort2 = findAvailablePort();
         Set<String> cluster2 = Set.of("target2");
-        InMemoryTransport transport2 = new InMemoryTransport("target2");
+        TestInMemoryTransport transport2 = new TestInMemoryTransport("target2");
         QuorusStateMachine sm2 = new QuorusStateMachine();
         RaftNode node2 = new RaftNode(vertx, "target2", cluster2, transport2, sm2, 5000, 1000);
         node2.start();

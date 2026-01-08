@@ -45,9 +45,9 @@ class RaftNodeTest {
     private RaftNode node1;
     private RaftNode node2;
     private RaftNode node3;
-    private InMemoryTransport transport1;
-    private InMemoryTransport transport2;
-    private InMemoryTransport transport3;
+    private TestInMemoryTransport transport1;
+    private TestInMemoryTransport transport2;
+    private TestInMemoryTransport transport3;
     private QuorusStateMachine stateMachine1;
     private QuorusStateMachine stateMachine2;
     private QuorusStateMachine stateMachine3;
@@ -56,15 +56,15 @@ class RaftNodeTest {
     void setUp() {
         vertx = io.vertx.core.Vertx.vertx();
         // Clear any existing transports
-        InMemoryTransport.clearAllTransports();
+        TestInMemoryTransport.clearAllTransports();
 
         // Create cluster nodes
         Set<String> clusterNodes = Set.of("node1", "node2", "node3");
 
         // Create transports
-        transport1 = new InMemoryTransport("node1");
-        transport2 = new InMemoryTransport("node2");
-        transport3 = new InMemoryTransport("node3");
+        transport1 = new TestInMemoryTransport("node1");
+        transport2 = new TestInMemoryTransport("node2");
+        transport3 = new TestInMemoryTransport("node3");
 
         // Create state machines
         stateMachine1 = new QuorusStateMachine();
@@ -83,7 +83,7 @@ class RaftNodeTest {
         if (node2 != null) node2.stop();
         if (node3 != null) node3.stop();
         if (vertx != null) vertx.close();
-        InMemoryTransport.clearAllTransports();
+        TestInMemoryTransport.clearAllTransports();
     }
 
     @Test
@@ -275,7 +275,7 @@ class RaftNodeTest {
         // After election timeout, should become candidate (in a single node cluster)
         Set<String> singleNodeCluster = Set.of("node1");
         RaftNode singleNode = new RaftNode(vertx, "node1", singleNodeCluster, 
-                                          new InMemoryTransport("node1"), 
+                                          new TestInMemoryTransport("node1"), 
                                           new QuorusStateMachine(), 500, 100);
         singleNode.start();
         
