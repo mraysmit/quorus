@@ -38,7 +38,7 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Chaos testing for the Raft cluster using InMemoryTransport's fault injection capabilities.
+ * Chaos testing for the Raft cluster using TestInMemoryTransport's fault injection capabilities.
  * Tests resilience against packet loss and high latency.
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @version 1.0
@@ -49,7 +49,7 @@ public class RaftChaosTest {
     private static final Logger logger = LoggerFactory.getLogger(RaftChaosTest.class);
     
     private List<RaftNode> cluster;
-    private Map<String, InMemoryTransport> transports;
+    private Map<String, TestInMemoryTransport> transports;
     private io.vertx.core.Vertx vertx;
     private static final int CLUSTER_SIZE = 5;
     private static final String[] NODE_IDS = {"node1", "node2", "node3", "node4", "node5"};
@@ -58,8 +58,8 @@ public class RaftChaosTest {
     void setUp() {
         logger.info("=== SETTING UP RAFT CHAOS TEST ===");
         
-        // Clear any static state in InMemoryTransport
-        InMemoryTransport.clearAllTransports();
+        // Clear any static state in TestInMemoryTransport
+        TestInMemoryTransport.clearAllTransports();
         
         vertx = io.vertx.core.Vertx.vertx();
         cluster = new ArrayList<>();
@@ -67,7 +67,7 @@ public class RaftChaosTest {
         
         // Create transport layer for inter-node communication
         for (String nodeId : NODE_IDS) {
-            transports.put(nodeId, new InMemoryTransport(nodeId));
+            transports.put(nodeId, new TestInMemoryTransport(nodeId));
         }
         
         // Create cluster nodes with QuorusStateMachine
@@ -115,7 +115,7 @@ public class RaftChaosTest {
             vertx.close();
         }
         
-        InMemoryTransport.clearAllTransports();
+        TestInMemoryTransport.clearAllTransports();
     }
 
     @Test
@@ -124,7 +124,7 @@ public class RaftChaosTest {
         logger.info("=== TEST: Replication with 25% Packet Loss ===");
         
         // Configure 25% packet loss on ALL nodes
-        for (InMemoryTransport transport : transports.values()) {
+        for (TestInMemoryTransport transport : transports.values()) {
             transport.setChaosConfig(5, 15, 0.25);
         }
         
@@ -185,7 +185,7 @@ public class RaftChaosTest {
         
         // Configure high latency (100-200ms) on ALL nodes
         // Heartbeat is 200ms, so this is borderline and might cause occasional re-elections
-        for (InMemoryTransport transport : transports.values()) {
+        for (TestInMemoryTransport transport : transports.values()) {
             transport.setChaosConfig(100, 200, 0.0);
         }
         

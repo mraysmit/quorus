@@ -64,7 +64,7 @@ class IntegrationTestSuite {
         vertx = Vertx.vertx();
         transferEngine = new SimpleTransferEngine(vertx, 10, 4, 1024 * 1024);
         tenantService = new SimpleTenantService();
-        workflowEngine = new SimpleWorkflowEngine(transferEngine);
+        workflowEngine = new SimpleWorkflowEngine(vertx, transferEngine);
         protocolFactory = new ProtocolFactory(vertx);
         workflowParser = new YamlWorkflowDefinitionParser();
     }

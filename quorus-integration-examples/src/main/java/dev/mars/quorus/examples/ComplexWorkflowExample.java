@@ -21,12 +21,14 @@ import dev.mars.quorus.transfer.TransferEngine;
 import dev.mars.quorus.transfer.SimpleTransferEngine;
 import dev.mars.quorus.workflow.*;
 
+import io.vertx.core.Future;
+import io.vertx.core.Vertx;
+
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
-import io.vertx.core.Future;
 
 /**
  * Complex workflow example demonstrating advanced features:
@@ -61,81 +63,87 @@ public class ComplexWorkflowExample {
     }
     
     public void runExample() throws Exception {
-        // 1. Setup
-        System.out.println("1. Setting up transfer and workflow engines...");
-        TransferEngine transferEngine = new SimpleTransferEngine();
-        SimpleWorkflowEngine workflowEngine = new SimpleWorkflowEngine(transferEngine);
+        // 1. Setup with Vert.x
+        System.out.println("1. Creating Vert.x instance and engines...");
+        Vertx vertx = Vertx.vertx();
         
-        // 2. Create complex workflow
-        System.out.println("2. Creating complex workflow definition...");
-        String yamlWorkflow = createComplexWorkflow();
+        try {
+            TransferEngine transferEngine = new SimpleTransferEngine(vertx, 10, 3, 1024 * 1024);
+            SimpleWorkflowEngine workflowEngine = new SimpleWorkflowEngine(vertx, transferEngine);
+            
+            // 2. Create complex workflow
+            System.out.println("2. Creating complex workflow definition...");
+            String yamlWorkflow = createComplexWorkflow();
         
-        // 3. Parse and validate
-        System.out.println("3. Parsing and validating workflow...");
-        WorkflowDefinitionParser parser = new YamlWorkflowDefinitionParser();
-        WorkflowDefinition workflow = parser.parseFromString(yamlWorkflow);
+            // 3. Parse and validate
+            System.out.println("3. Parsing and validating workflow...");
+            WorkflowDefinitionParser parser = new YamlWorkflowDefinitionParser();
+            WorkflowDefinition workflow = parser.parseFromString(yamlWorkflow);
+            
+            ValidationResult validation = parser.validate(workflow);
+            if (!validation.isValid()) {
+                System.err.println("Workflow validation failed:");
+                validation.getErrors().forEach(error -> 
+                    System.err.println("  - " + error.getMessage()));
+                return;
+            }
         
-        ValidationResult validation = parser.validate(workflow);
-        if (!validation.isValid()) {
-            System.err.println("Workflow validation failed:");
-            validation.getErrors().forEach(error -> 
-                System.err.println("  - " + error.getMessage()));
-            return;
+            // 4. Analyze dependency graph
+            System.out.println("4. Analyzing dependency graph...");
+            analyzeDependencyGraph(parser, workflow);
+            
+            // 5. Execute with different modes
+            System.out.println("5. Executing workflow in different modes...");
+            
+            // Create execution context
+            ExecutionContext baseContext = ExecutionContext.builder()
+                    .variables(Map.of(
+                            "environment", "production",
+                            "baseUrl", "https://httpbin.org",
+                            "outputDir", createTempDirectory().toString(),
+                            "batchId", "batch-" + System.currentTimeMillis()
+                    ))
+                    .userId("complex-demo-user")
+                    .build();
+        
+            // 5a. Dry run
+            System.out.println("5a. Performing dry run...");
+            ExecutionContext dryRunContext = ExecutionContext.builder()
+                    .executionId("complex-dry-run-" + System.currentTimeMillis())
+                    .mode(ExecutionContext.ExecutionMode.DRY_RUN)
+                    .variables(baseContext.getVariables())
+                    .userId(baseContext.getUserId())
+                    .build();
+            
+            Future<WorkflowExecution> dryRunFuture = workflowEngine.dryRun(workflow, dryRunContext);
+            WorkflowExecution dryRunResult = dryRunFuture.toCompletionStage().toCompletableFuture().get();
+            
+            System.out.println("   Dry run completed: " + dryRunResult.getStatus());
+            System.out.println("   Groups validated: " + dryRunResult.getGroupExecutions().size());
+        
+            // 5b. Virtual run
+            System.out.println("5b. Performing virtual run...");
+            ExecutionContext virtualRunContext = ExecutionContext.builder()
+                    .executionId("complex-virtual-run-" + System.currentTimeMillis())
+                    .mode(ExecutionContext.ExecutionMode.VIRTUAL_RUN)
+                    .variables(baseContext.getVariables())
+                    .userId(baseContext.getUserId())
+                    .build();
+            
+            Future<WorkflowExecution> virtualRunFuture = workflowEngine.virtualRun(workflow, virtualRunContext);
+            WorkflowExecution virtualRunResult = virtualRunFuture.toCompletionStage().toCompletableFuture().get();
+            
+            System.out.println("   Virtual run completed: " + virtualRunResult.getStatus());
+            displayDetailedResults(virtualRunResult);
+            
+            // 6. Cleanup
+            System.out.println("6. Cleaning up...");
+            workflowEngine.shutdown();
+            
+            System.out.println("\n=== Complex workflow example completed! ===");
+        } finally {
+            vertx.close();
         }
-        
-        // 4. Analyze dependency graph
-        System.out.println("4. Analyzing dependency graph...");
-        analyzeDependencyGraph(parser, workflow);
-        
-        // 5. Execute with different modes
-        System.out.println("5. Executing workflow in different modes...");
-        
-        // Create execution context
-        ExecutionContext baseContext = ExecutionContext.builder()
-                .variables(Map.of(
-                        "environment", "production",
-                        "baseUrl", "https://httpbin.org",
-                        "outputDir", createTempDirectory().toString(),
-                        "batchId", "batch-" + System.currentTimeMillis()
-                ))
-                .userId("complex-demo-user")
-                .build();
-        
-        // 5a. Dry run
-        System.out.println("5a. Performing dry run...");
-        ExecutionContext dryRunContext = ExecutionContext.builder()
-                .executionId("complex-dry-run-" + System.currentTimeMillis())
-                .mode(ExecutionContext.ExecutionMode.DRY_RUN)
-                .variables(baseContext.getVariables())
-                .userId(baseContext.getUserId())
-                .build();
-        
-        Future<WorkflowExecution> dryRunFuture = workflowEngine.dryRun(workflow, dryRunContext);
-        WorkflowExecution dryRunResult = dryRunFuture.toCompletionStage().toCompletableFuture().get();
-        
-        System.out.println("   Dry run completed: " + dryRunResult.getStatus());
-        System.out.println("   Groups validated: " + dryRunResult.getGroupExecutions().size());
-        
-        // 5b. Virtual run
-        System.out.println("5b. Performing virtual run...");
-        ExecutionContext virtualRunContext = ExecutionContext.builder()
-                .executionId("complex-virtual-run-" + System.currentTimeMillis())
-                .mode(ExecutionContext.ExecutionMode.VIRTUAL_RUN)
-                .variables(baseContext.getVariables())
-                .userId(baseContext.getUserId())
-                .build();
-        
-        Future<WorkflowExecution> virtualRunFuture = workflowEngine.virtualRun(workflow, virtualRunContext);
-        WorkflowExecution virtualRunResult = virtualRunFuture.toCompletionStage().toCompletableFuture().get();
-        
-        System.out.println("   Virtual run completed: " + virtualRunResult.getStatus());
-        displayDetailedResults(virtualRunResult);
-        
-        // 6. Cleanup
-        System.out.println("6. Cleaning up...");
-        workflowEngine.shutdown();
-        
-        System.out.println("\n=== Complex workflow example completed! ===");
     }
     
     private String createComplexWorkflow() {

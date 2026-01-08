@@ -121,7 +121,7 @@ public class EnterpriseProtocolExample {
         // Initialize services with enterprise-optimized settings
         transferEngine = new SimpleTransferEngine(vertx, 20, 4, 1024 * 1024); // 20 concurrent, 4 threads, 1MB chunks
         networkService = new NetworkTopologyService(vertx);
-        connectionPoolService = new ConnectionPoolService();
+        connectionPoolService = new ConnectionPoolService(vertx);
         protocolFactory = new ProtocolFactory(vertx);
         
         TestResultLogger.logExpectedSuccess("Enterprise services initialized");

@@ -26,6 +26,9 @@ import dev.mars.quorus.transfer.TransferEngine;
 
 import dev.mars.quorus.core.exceptions.TransferException;
 
+import io.vertx.core.Future;
+import io.vertx.core.Vertx;
+
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
@@ -34,7 +37,6 @@ import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
-import io.vertx.core.Future;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -91,9 +93,13 @@ public class InternalNetworkTransferExample {
         // Initialize configuration optimized for corporate networks
         QuorusConfiguration config = createCorporateNetworkConfiguration();
         logger.info("Corporate network configuration loaded: " + config);
+
+        // Create Vert.x instance for reactive operations
+        Vertx vertx = Vertx.vertx();
         
-        // Initialize transfer engine with corporate network settings
+        // Initialize transfer engine with Vert.x and corporate network settings
         TransferEngine transferEngine = new SimpleTransferEngine(
+                vertx,
                 config.getMaxConcurrentTransfers(),  // Higher concurrency for corporate networks
                 config.getMaxRetryAttempts(),        // More retries for reliability
                 config.getRetryDelayMs()             // Faster retry for internal networks
@@ -159,6 +165,7 @@ public class InternalNetworkTransferExample {
             shutdownMonitoringThreads();
 
             transferEngine.shutdown(10);
+            vertx.close();
             logger.info("=== Corporate network transfer example completed ===");
         }
     }

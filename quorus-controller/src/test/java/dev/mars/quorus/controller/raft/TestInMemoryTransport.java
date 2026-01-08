@@ -32,19 +32,21 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 /**
- * Description for InMemoryTransport
+ * Test utility for in-memory Raft transport.
+ * Allows Raft nodes to communicate without real network connections.
+ * Supports chaos testing with configurable latency and packet drop.
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @version 1.0
  * @since 2026-01-05
  */
 
-public class InMemoryTransport implements RaftTransport {
+public class TestInMemoryTransport implements RaftTransport {
 
-    private static final Logger logger = LoggerFactory.getLogger(InMemoryTransport.class);
+    private static final Logger logger = LoggerFactory.getLogger(TestInMemoryTransport.class);
 
     // Global registry of all transport instances
-    private static final Map<String, InMemoryTransport> transports = new ConcurrentHashMap<>();
+    private static final Map<String, TestInMemoryTransport> transports = new ConcurrentHashMap<>();
 
     private final String nodeId;
     private final Executor executor = Executors.newCachedThreadPool();
@@ -58,7 +60,7 @@ public class InMemoryTransport implements RaftTransport {
     private volatile int maxLatencyMs = 15;
     private volatile double dropRate = 0.0; // 0.0 to 1.0
 
-    public InMemoryTransport(String nodeId) {
+    public TestInMemoryTransport(String nodeId) {
         this.nodeId = nodeId;
     }
 
@@ -110,7 +112,7 @@ public class InMemoryTransport implements RaftTransport {
                     return;
                 }
 
-                InMemoryTransport targetTransport = transports.get(targetNodeId);
+                TestInMemoryTransport targetTransport = transports.get(targetNodeId);
                 if (targetTransport == null || !targetTransport.running) {
                     promise.fail(new RuntimeException("Target node not available: " + targetNodeId));
                     return;
@@ -151,7 +153,7 @@ public class InMemoryTransport implements RaftTransport {
                     return;
                 }
 
-                InMemoryTransport targetTransport = transports.get(targetNodeId);
+                TestInMemoryTransport targetTransport = transports.get(targetNodeId);
                 if (targetTransport == null || !targetTransport.running) {
                     promise.fail(new RuntimeException("Target node not available: " + targetNodeId));
                     return;
@@ -212,7 +214,7 @@ public class InMemoryTransport implements RaftTransport {
                 .build();
     }
 
-    public static Map<String, InMemoryTransport> getAllTransports() {
+    public static Map<String, TestInMemoryTransport> getAllTransports() {
         return new ConcurrentHashMap<>(transports);
     }
 
