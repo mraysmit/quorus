@@ -1,8 +1,10 @@
 # Quorus User Guide
 
-**Version:** 1.0
-**Date:** 2025-04-14
-**Author:** Mark Andrew Ray-Smith Cityline Ltd
+**Version:** 1.1  
+**Date:** 2025-04-14  
+**Author:** Mark Andrew Ray-Smith Cityline Ltd  
+**Updated:** 2026-01-11  
+
 
 
 ## Table of Contents
@@ -27,7 +29,17 @@
 
 ## Introduction
 
-Quorus is an enterprise-grade file transfer system designed for internal corporate networks. It provides secure, reliable, and scalable file transfer capabilities with advanced workflow orchestration and multi-tenant support.
+Quorus is an enterprise-grade **route-based distributed file transfer system** designed for internal corporate networks. It uses predefined transfer routes as the primary configuration method, where the central controller manages route definitions between agents. Routes can be triggered automatically based on events, schedules, intervals, batch accumulation, or manual invocation. The system provides secure, reliable, and scalable file transfer capabilities with advanced workflow orchestration and multi-tenant support.
+
+### Route-Based Architecture
+
+At its core, Quorus operates on a **route configuration model**:
+
+- **Routes** define source agent, destination agent, and transfer conditions
+- **Controller** manages the central route repository and validates agent availability
+- **Agents** monitor locations and execute transfers according to routes
+- **Triggers** automatically initiate transfers when conditions are met (file events, schedules, thresholds)
+- **Workflows** orchestrate complex multi-step operations across multiple routes
 
 ## Key Features
 
@@ -1105,18 +1117,42 @@ Deep integration with existing enterprise infrastructure and processes:
 
 ```mermaid
 graph TB
-    UI[Web UI / CLI] --> API[Quorus API]
-    API --> Controller[Controller Cluster]
-    Controller --> Agent1[Transfer Agent 1]
-    Controller --> Agent2[Transfer Agent 2]
-    Controller --> AgentN[Transfer Agent n]
+    subgraph "Clients"
+        UI[Web UI / CLI]
+    end
     
-    Controller -.->|Raft Consensus| Controller2[Controller 2]
-    Controller -.->|Raft Consensus| Controller3[Controller 3]
+    UI --> API[Quorus API]
     
-    Agent1 --> Storage1[Corporate Storage]
-    Agent2 --> Storage2[Department Shares]
-    AgentN --> StorageN[Data Warehouse]
+    subgraph "Controller Cluster"
+        Controller[Controller 1<br/>Leader]
+        Controller2[Controller 2]
+        Controller3[Controller 3]
+        Controller -.->|Raft| Controller2
+        Controller -.->|Raft| Controller3
+        Controller2 -.->|Raft| Controller3
+    end
+    
+    API --> Controller
+    
+    subgraph "Agent Fleet"
+        Agent1[Transfer Agent 1]
+        Agent2[Transfer Agent 2]
+        AgentN[Transfer Agent n]
+    end
+    
+    Controller --> Agent1
+    Controller --> Agent2
+    Controller --> AgentN
+    
+    subgraph "Storage"
+        Storage1[Corporate Storage]
+        Storage2[Department Shares]
+        StorageN[Data Warehouse]
+    end
+    
+    Agent1 --> Storage1
+    Agent2 --> Storage2
+    AgentN --> StorageN
 ```
 
 ## Getting Started
@@ -1175,10 +1211,212 @@ spec:
 
 #### Next Steps
 
-1. **Explore YAML Workflows** - Learn how to create more complex workflows
-2. **Try Different Protocols** - Experiment with FTP, SFTP, and SMB transfers
-3. **Set Up Monitoring** - Configure progress tracking and notifications
-4. **Review Security** - Understand authentication and encryption options
+1. **Configure Routes** - Set up predefined transfer routes between agents
+2. **Explore YAML Workflows** - Learn how to create more complex workflows
+3. **Try Different Protocols** - Experiment with FTP, SFTP, and SMB transfers
+4. **Set Up Monitoring** - Configure progress tracking and notifications
+5. **Review Security** - Understand authentication and encryption options
+
+### Route Configuration Guide
+
+#### What are Routes?
+
+Routes are predefined transfer paths between two agents in your Quorus deployment. Think of them as automated highways for your files - once configured, they automatically move files from Agent A to Agent B based on the conditions you specify.
+
+**Key Concepts:**
+- **Source Agent**: Monitors a specific location for files (folder, FTP server, etc.)
+- **Destination Agent**: Receives and stores files in a target location
+- **Trigger**: The condition that initiates the transfer (new file, schedule, batch count, etc.)
+- **Controller Validation**: At startup, the controller verifies both agents are active before activating the route
+
+#### Your First Route Configuration
+
+**Option 1: Using YAML Configuration**
+
+Create a route configuration file (`routes/crm-to-warehouse.yaml`):
+
+```yaml
+apiVersion: v1
+kind: RouteConfiguration
+metadata:
+  name: crm-to-warehouse
+  description: "Automatically transfer CRM exports to data warehouse"
+  tags: ["crm", "data-warehouse", "automated"]
+
+spec:
+  # Source: Where files originate
+  source:
+    agent: agent-crm-001
+    location: /corporate-data/crm/export/
+    description: "CRM system export folder"
+
+  # Destination: Where files go
+  destination:
+    agent: agent-warehouse-001
+    location: /corporate-data/warehouse/import/
+    description: "Data warehouse import folder"
+
+  # Trigger: When to transfer
+  trigger:
+    type: EVENT_BASED
+    events:
+      - FILE_CREATED      # Transfer when new file appears
+      - FILE_MODIFIED     # Transfer when file is updated
+    filters:
+      pattern: "customer-export-*.json"  # Only match specific files
+      minSize: 1KB                        # Ignore tiny files
+
+  # Options: How to transfer
+  options:
+    validation:
+      checksumAlgorithm: SHA-256
+      verifyIntegrity: true
+    retry:
+      maxAttempts: 3
+      backoff: EXPONENTIAL
+    monitoring:
+      alertOnFailure: true
+      logLevel: INFO
+```
+
+**Option 2: Using the Web Interface**
+
+1. **Navigate** to "Route Management" in the Quorus web interface
+2. **Click** "Create New Route"
+3. **Configure Source**:
+   - Select source agent from dropdown
+   - Enter source location path
+4. **Configure Destination**:
+   - Select destination agent from dropdown
+   - Enter destination location path
+5. **Select Trigger Type**:
+   - Event-Based (file appearance)
+   - Time-Based (scheduled)
+   - Interval-Based (periodic)
+   - Batch-Based (file count threshold)
+   - Manual (on-demand)
+6. **Set Options** for validation, retry, and monitoring
+7. **Save and Activate** the route
+
+#### Route Trigger Types
+
+**1. Event-Based Triggers** (Most Common)
+```yaml
+trigger:
+  type: EVENT_BASED
+  events: [FILE_CREATED, FILE_MODIFIED]
+  filters:
+    pattern: "*.csv"
+```
+*Use when*: Files appear unpredictably and need immediate transfer
+
+**2. Time-Based Triggers** (Scheduled)
+```yaml
+trigger:
+  type: TIME_BASED
+  schedule:
+    cron: "0 2 * * *"  # Every day at 2 AM
+    timezone: "America/New_York"
+```
+*Use when*: Transfers should happen at specific times (nightly backups, daily reports)
+
+**3. Interval-Based Triggers** (Periodic)
+```yaml
+trigger:
+  type: INTERVAL_BASED
+  interval:
+    period: 15
+    unit: MINUTES
+```
+*Use when*: Regular periodic transfers regardless of file changes
+
+**4. Batch-Based Triggers** (Accumulation)
+```yaml
+trigger:
+  type: BATCH_BASED
+  batch:
+    fileCount: 100      # Transfer when 100 files accumulate
+    maxWaitTime: 1H     # Or after 1 hour, whichever comes first
+```
+*Use when*: Efficient to transfer files in batches rather than individually
+
+**5. Size-Based Triggers** (Threshold)
+```yaml
+trigger:
+  type: SIZE_BASED
+  threshold:
+    size: 1GB
+    maxWaitTime: 2H
+```
+*Use when*: Want to transfer when cumulative size reaches a threshold
+
+**6. Composite Triggers** (Multiple Conditions)
+```yaml
+trigger:
+  type: COMPOSITE
+  logic: OR  # OR | AND
+  conditions:
+    - type: BATCH_BASED
+      batch: {fileCount: 50}
+    - type: SIZE_BASED
+      threshold: {size: 500MB}
+```
+*Use when*: Complex triggering logic needed
+
+#### Route Lifecycle and Validation
+
+**Controller Startup Process:**
+
+1. **Load Routes**: Controller reads route configurations from repository
+2. **Validate Source Agent**: Controller pings source agent to verify it's active and can access the monitored location
+3. **Validate Destination Agent**: Controller pings destination agent to verify it's active and can write to target location
+4. **Activate Route**: If both agents are healthy, route status changes to ACTIVE
+5. **Monitor**: Controller continuously monitors agent health and route status
+
+**Route Status States:**
+- `CONFIGURED`: Route loaded but not yet validated
+- `VALIDATING`: Controller checking agent availability
+- `ACTIVE`: Both agents validated, route monitoring for triggers
+- `TRIGGERED`: Trigger condition met, preparing transfer
+- `TRANSFERRING`: Active file transfer in progress
+- `DEGRADED`: One agent experiencing issues, reduced functionality
+- `SUSPENDED`: Manually paused by administrator
+- `FAILED`: Validation failed or repeated transfer failures
+
+#### Managing Routes
+
+**View Active Routes:**
+```bash
+# CLI
+quorus route list --status ACTIVE
+
+# API
+GET /api/v1/routes?status=ACTIVE
+```
+
+**Suspend a Route:**
+```bash
+# CLI
+quorus route suspend crm-to-warehouse
+
+# API
+POST /api/v1/routes/crm-to-warehouse/suspend
+```
+
+**View Route Statistics:**
+```bash
+# CLI
+quorus route stats crm-to-warehouse
+
+# Output:
+# Route: crm-to-warehouse
+# Status: ACTIVE
+# Files Transferred: 1,247
+# Total Bytes: 45.2 GB
+# Average Throughput: 12.3 MB/s
+# Last Transfer: 2025-01-09 14:32:15
+# Success Rate: 99.8%
+```
 
 *Note: Detailed system architecture and technical implementation details, including all Java code examples, have been moved to [Part II: Technical Reference](#part-ii-technical-reference-developers) for better document organization. The following sections provide user-friendly overviews of system capabilities.*
 
@@ -7107,6 +7345,83 @@ GET /health/live
 }
 ```
 
+##### Transfer Engine Health Check (v1.1)
+
+> **New in v1.1**: Enhanced protocol-level health monitoring with detailed transfer metrics.
+
+```bash
+# Transfer engine health check
+GET /api/v1/health/transfer-engine
+Authorization: Bearer {token}
+Accept: application/json
+
+# Protocol-specific health
+GET /api/v1/health/protocols
+GET /api/v1/health/protocols/{protocolName}
+```
+
+**Transfer Engine Health Response:**
+```json
+{
+  "status": "UP",
+  "timestamp": "2026-01-11T10:30:00Z",
+  "message": "Transfer engine operational",
+  "protocols": [
+    {
+      "protocol": "http",
+      "status": "UP",
+      "timestamp": "2026-01-11T10:30:00Z",
+      "message": "HTTP protocol healthy",
+      "details": {
+        "totalTransfers": 1250,
+        "successRate": "98.50%",
+        "averageDurationMs": 5230
+      }
+    },
+    {
+      "protocol": "sftp",
+      "status": "UP",
+      "timestamp": "2026-01-11T10:30:00Z",
+      "details": {
+        "totalTransfers": 890,
+        "successRate": "99.10%",
+        "averageDurationMs": 8450
+      }
+    },
+    {
+      "protocol": "ftp",
+      "status": "DEGRADED",
+      "timestamp": "2026-01-11T10:30:00Z",
+      "message": "High failure rate detected",
+      "details": {
+        "totalTransfers": 234,
+        "successRate": "85.00%",
+        "failedTransfers": 35,
+        "errorCounts": {
+          "CONNECTION_TIMEOUT": 20,
+          "AUTH_FAILURE": 15
+        }
+      }
+    }
+  ],
+  "summary": {
+    "totalProtocols": 4,
+    "healthyProtocols": 3,
+    "unhealthyProtocols": 1
+  },
+  "system": {
+    "activeTransfers": 45,
+    "totalBytesTransferred": "125.5 GB",
+    "uptime": "PT72H30M"
+  }
+}
+```
+
+**Protocol Health Status Values:**
+- `UP` - Protocol is healthy and operational
+- `DOWN` - Protocol is not operational (0 successful transfers)
+- `DEGRADED` - Protocol is operational but experiencing issues (success rate < 90%)
+
 ##### Metrics (Prometheus-compatible)
 
 ```bash
@@ -7123,6 +7438,7 @@ Accept: application/json
 GET /api/v1/metrics/transfers
 GET /api/v1/metrics/workflows
 GET /api/v1/metrics/system
+GET /api/v1/metrics/protocols  # NEW in v1.1
 ```
 
 **Prometheus Metrics Sample:**

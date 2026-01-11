@@ -1,8 +1,20 @@
 # Quorus Workflow Examples
 
+
+**Version:** 1.0
+**Date:** 2025-04-14
+**Author:** Mark Andrew Ray-Smith Cityline Ltd
+**Updated:** 2025-12-11
+
 This directory contains comprehensive examples demonstrating the YAML workflow capabilities of Quorus. These examples show how to create, validate, and execute complex file transfer workflows using declarative YAML definitions.
 
 ## Overview
+
+The Quorus workflow system provides YAML-based orchestration for complex file transfer operations. While **routes** handle simple, predefined agent-to-agent transfers with automatic triggering, **workflows** orchestrate multi-step operations that may span multiple routes, involve data transformations, or require complex dependency management.
+
+**When to Use Routes vs. Workflows:**
+- **Routes**: Simple agent-to-agent file replication with automatic triggers (e.g., "whenever a file appears in folder A, copy it to folder B")
+- **Workflows**: Complex multi-step operations with dependencies, transformations, and conditional logic (e.g., "download from 3 sources, merge data, split by region, distribute to 5 different destinations")
 
 The Quorus workflow system provides:
 - **YAML-based workflow definitions** with variable substitution
@@ -10,6 +22,7 @@ The Quorus workflow system provides:
 - **Multiple execution modes** (normal, dry run, virtual run)
 - **Error handling and retry logic**
 - **Progress tracking and monitoring**
+- **Integration with route configurations** for complex orchestration
 
 ## Examples
 
@@ -61,6 +74,38 @@ mvn compile exec:java -pl quorus-integration-examples -Dexec.mainClass="dev.mars
 ```
 
 ## Sample YAML Workflows
+
+### Relationship Between Workflows and Routes
+
+Workflows can leverage existing route configurations for orchestration:
+
+```yaml
+apiVersion: v1
+kind: TransferWorkflow
+metadata:
+  name: multi-route-orchestration
+  description: Coordinate multiple routes in a workflow
+
+spec:
+  # Trigger existing routes
+  routes:
+    - name: crm-to-warehouse      # Reference existing route
+      action: trigger             # Manually trigger the route
+      waitForCompletion: true     # Wait for route to complete
+      
+    - name: warehouse-to-analytics
+      action: trigger
+      dependsOn: [crm-to-warehouse]  # Only after first route completes
+      
+  # Or define inline transfers not using routes
+  transferGroups:
+    - name: post-processing
+      dependsOn: [warehouse-to-analytics]
+      transfers:
+        - name: generate-report
+          source: "{{analyticsOutput}}/results.csv"
+          destination: "{{reportServer}}/daily-report.csv"
+```
 
 ### Simple Download Workflow (`workflows/simple-download.yaml`)
 
