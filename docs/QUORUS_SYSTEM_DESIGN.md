@@ -1,16 +1,17 @@
 # Quorus Comprehensive System Design
 
-**Version:** 2.0
-**Date:** 26 August 2025
-**Author:** Mark Andrew Ray-Smith Cityline Ltd
+**Version:** 2.1  
+**Date:** 26 August 2025  
+**Author:** Mark Andrew Ray-Smith Cityline Ltd  
+**Updated:** 2026-01-11  
 
 ## Overview
 
-Quorus is an enterprise-grade file transfer system designed for high reliability, scalability, and multi-tenant operation within corporate network environments. The system is optimized for internal corporate network transfers, providing both programmatic APIs and declarative YAML-based workflow definitions for complex file transfer orchestration with comprehensive multi-tenancy support.
+Quorus is an enterprise-grade **route-based distributed file transfer system** designed for high reliability, scalability, and multi-tenant operation within corporate network environments. The system uses predefined transfer routes as the primary configuration method, where the central controller manages route definitions between agents (e.g., "Agent A → Agent B"). The system is optimized for internal corporate network transfers, providing both route-based configurations and declarative YAML-based workflow definitions for complex file transfer orchestration with comprehensive multi-tenancy support.
 
 ## Executive Synopsis
 
-- **Mission & Scope**: Provide secure, controller-first orchestration for high-throughput, internal corporate transfers spanning data-center sync, departmental distribution, ETL staging, and compliance-driven backups. Reliability is anchored by Raft consensus, while extensibility comes from REST APIs plus declarative YAML workflows.
+- **Mission & Scope**: Provide secure, controller-first orchestration for high-throughput, internal corporate transfers spanning data-center sync, departmental distribution, ETL staging, and compliance-driven backups. Transfers are orchestrated through predefined routes that define source and destination agents, with multiple trigger mechanisms (event-based, time-based, interval-based, batch-based). Reliability is anchored by Raft consensus, while extensibility comes from REST APIs plus declarative YAML workflows and route configurations.
 - **Platform Pillars**: (1) Workflow engine with dependency graphs, dry/virtual runs, and templating. (2) Multi-tenant governance with hierarchical quotas and policy inheritance. (3) Real-time observability through Prometheus/Grafana/Splunk hooks, predictive ETAs, and Loki-based log aggregation. (4) Zero-trust security posture using TLS 1.3, AES-256, OAuth2/JWT, MFA, PKI, and audit-ready telemetry that maps to SOX, GDPR, HIPAA, PCI, and ISO 27001 controls.
 - **Controller-First Architecture**: Every controller node embeds the HTTP API, Raft engine, scheduler, and state machine—removing the API-first bottleneck, offering sub-second failover, and enabling horizontal scale by simply adding nodes to the quorum.
 - **Module Snapshot**:
@@ -56,34 +57,55 @@ Quorus follows a **controller-first architecture** where each controller is a se
 ### High-Level Distributed Architecture
 
 ```mermaid
-graph TD
-    CLI[CLI Client]
-    API[REST API Client]
-    WEB[Web Dashboard]
-    YAML[YAML Workflows]
+graph TB
+    subgraph "Clients"
+        CLI[CLI Client]
+        API[REST API Client]
+        WEB[Web Dashboard]
+        YAML[YAML Workflows]
+    end
 
     LB[Load Balancer<br/>Nginx/HAProxy]
 
-    subgraph "Controller Cluster"
-        C1[Controller 1<br/>HTTP API + Raft]
-        C2[Controller 2<br/>HTTP API + Raft]
-        C3[Controller 3<br/>HTTP API + Raft]
+    subgraph "Control Plane"
+        subgraph "Controller Cluster"
+            C1[Controller 1<br/>HTTP API + Raft]
+            C2[Controller 2<br/>HTTP API + Raft]
+            C3[Controller 3<br/>HTTP API + Raft]
+        end
+
+        subgraph "Embedded Services"
+            WS[Workflow Engine]
+            TS[Transfer Orchestration]
+            RS[Route Service]
+            AS[Agent Management]
+            MS[Monitoring & Metrics]
+            TMS[Tenant Management]
+        end
+
+        subgraph "Replicated State"
+            AR[(Agent Registry)]
+            RR[(Route Registry)]
+            HS[(Heartbeat Store)]
+            JS[(Job State)]
+            TS_DB[(Tenant Store)]
+        end
     end
 
-    subgraph "Embedded Services"
-        WS[Workflow Engine]
-        TS[Transfer Orchestration]
-        AS[Agent Management]
-        MS[Monitoring & Metrics]
-        TMS[Tenant Management]
+    subgraph "Agent Fleet"
+        subgraph "US-East Region"
+            A1[Agent 1]
+            A2[Agent 2]
+        end
+        subgraph "US-West Region"
+            A3[Agent 3]
+            A4[Agent 4]
+        end
+        subgraph "EU Region"
+            A5[Agent 5]
+            A6[Agent N...]
+        end
     end
-
-    AR[(Agent Registry)]
-    HS[(Heartbeat Store)]
-    JS[(Job State)]
-    TS_DB[(Tenant Store)]
-
-    AGENTS[Agent Fleet<br/>100+ Agents<br/>Multi-Protocol<br/>Geographic Distribution]
 
     CLI --> LB
     API --> LB
@@ -100,40 +122,42 @@ graph TD
 
     C1 --> WS
     C1 --> TS
+    C1 --> RS
     C1 --> AS
-    C1 --> MS
-    C1 --> TMS
 
-    C2 --> WS
-    C2 --> TS
-    C2 --> AS
-    C2 --> MS
-    C2 --> TMS
-
-    C3 --> WS
-    C3 --> TS
-    C3 --> AS
-    C3 --> MS
-    C3 --> TMS
-
-    WS --> AR
+    WS --> JS
     TS --> JS
+    RS --> RR
     AS --> AR
     MS --> HS
     TMS --> TS_DB
 
-    AS -.->|Job Assignment| AGENTS
-    AGENTS -.->|Heartbeat| AS
+    AS -->|Route Assignment| A1
+    AS -->|Route Assignment| A2
+    AS -->|Route Assignment| A3
+    AS -->|Route Assignment| A4
+    AS -->|Route Assignment| A5
+    AS -->|Route Assignment| A6
 
-    style C1 fill:#e3f2fd
-    style C2 fill:#e8f5e8
-    style C3 fill:#e8f5e8
+    A1 -.->|Heartbeat| AS
+    A3 -.->|Heartbeat| AS
+    A5 -.->|Heartbeat| AS
+
+    style C1 fill:#ff6b6b,color:#fff
+    style C2 fill:#ff9999
+    style C3 fill:#ff9999
     style WS fill:#fff3e0
     style TS fill:#fff3e0
+    style RS fill:#fff3e0
     style AS fill:#fff3e0
     style MS fill:#fff3e0
     style TMS fill:#fff3e0
-    style AGENTS fill:#f3e5f5
+    style A1 fill:#6bcb77
+    style A2 fill:#6bcb77
+    style A3 fill:#4d96ff
+    style A4 fill:#4d96ff
+    style A5 fill:#c9b1ff
+    style A6 fill:#c9b1ff
 ```
 
 ### Module Structure
@@ -141,35 +165,40 @@ graph TD
 The system is organized into multiple Maven modules with **controller-first architecture**:
 
 ```mermaid
-graph TD
-    QP[quorus - Parent Project]
-
-    QP --> QCT[quorus-controller<br/>**Main Application**<br/>Raft + HTTP API]
-    QP --> QC[quorus-core<br/>Core Transfer Engine]
-    QP --> QT[quorus-tenant<br/>Multi-Tenant Management]
-    QP --> QW[quorus-workflow<br/>YAML Workflow Engine]
-    QP --> QA[quorus-api<br/>Legacy API Module]
-    QP --> QIE[quorus-integration-examples<br/>Usage Examples]
-    QP --> QWE[quorus-workflow-examples<br/>Workflow Examples]
-
-    QCT --> QC
-    QCT --> QT
+graph TB
+    subgraph "Applications"
+        QCT[quorus-controller<br/>Main Application<br/>Raft + HTTP API]
+        QA[quorus-api<br/>Legacy API Module]
+    end
+    
+    subgraph "Services"
+        QW[quorus-workflow<br/>YAML Workflow Engine]
+        QT[quorus-tenant<br/>Multi-Tenant Management]
+    end
+    
+    subgraph "Foundation"
+        QC[quorus-core<br/>Core Transfer Engine]
+    end
+    
+    subgraph "Examples"
+        QIE[quorus-integration-examples]
+        QWE[quorus-workflow-examples]
+    end
+    
     QCT --> QW
-    QA --> QC
-    QA --> QT
+    QCT --> QT
     QA --> QW
+    QA --> QT
     QW --> QC
     QT --> QC
     QIE --> QC
     QWE --> QW
-    QWE --> QT
 
-    style QP fill:#e1f5fe
-    style QCT fill:#ff6b6b
-    style QC fill:#f3e5f5
-    style QT fill:#e8f5e8
-    style QW fill:#fff3e0
+    style QCT fill:#ff6b6b,color:#fff
     style QA fill:#ffeb3b
+    style QW fill:#fff3e0
+    style QT fill:#e8f5e8
+    style QC fill:#f3e5f5
     style QIE fill:#fce4ec
     style QWE fill:#f1f8e9
 ```
@@ -246,9 +275,306 @@ Controller (Main) → HTTP API (Embedded Interface)
 4. **Operational Simplicity**: Single artifact per node
 5. **Interface Flexibility**: Easy to add new interfaces (gRPC, WebSocket, etc.)
 
+### Route-Based Architecture
+
+Quorus implements a **route-based transfer orchestration** model where predefined routes are stored in the central controller's configuration repository.
+
+#### Core Route Principles
+
+1. **Route Definitions**: Routes define source agent, destination agent, and trigger conditions
+2. **Controller Repository**: Central configuration repository stores all route definitions
+3. **Startup Validation**: Controller validates all agents in routes are active before route activation
+4. **Multiple Trigger Types**: Routes support diverse trigger mechanisms:
+   - **Event-based**: File appearance/modification in monitored locations
+   - **Time-based**: Scheduled transfers with cron expressions
+   - **Interval-based**: Periodic transfers (every N minutes/hours)
+   - **Batch-based**: Transfer when N files accumulate
+   - **Size-based**: Transfer when cumulative file size reaches threshold
+   - **Manual**: On-demand triggers via API or command
+   - **External**: Triggered by external systems or events
+   - **Composite**: Multiple conditions with AND/OR logic
+5. **Automatic Orchestration**: Files transferred automatically when trigger conditions met
+6. **Health Monitoring**: Continuous monitoring of route status and agent health
+7. **Failover Support**: Automatic failover to backup agents when primary agents fail
+
+#### Route Configuration Example
+
+```yaml
+apiVersion: v1
+kind: RouteConfiguration
+metadata:
+  name: crm-to-warehouse
+  description: CRM data export to data warehouse
+  
+spec:
+  source:
+    agent: agent-crm-001
+    location: /corporate-data/crm/export/
+    
+  destination:
+    agent: agent-warehouse-001
+    location: /corporate-data/warehouse/import/
+    
+  trigger:
+    type: EVENT_BASED
+    events:
+      - FILE_CREATED
+      - FILE_MODIFIED
+    filters:
+      pattern: "*.json"
+      minSize: 1KB
+      
+  options:
+    validation:
+      checksumAlgorithm: SHA-256
+      verifyIntegrity: true
+    retry:
+      maxAttempts: 3
+      backoff: EXPONENTIAL
+    monitoring:
+      alertOnFailure: true
+      logLevel: INFO
+```
+
+#### Route Lifecycle
+
+```mermaid
+stateDiagram-v2
+    [*] --> Configured: Route Loaded from Repository
+    
+    state "Startup Validation" as validation_group {
+        Configured --> Validating: Controller Startup
+        Validating --> ValidatingSource: Check Source Agent
+        ValidatingSource --> ValidatingDest: Source Agent OK
+        ValidatingSource --> Failed: Source Agent Unreachable
+        ValidatingDest --> Active: Destination Agent OK
+        ValidatingDest --> Failed: Destination Agent Unreachable
+    }
+    
+    state "Normal Operation" as operation_group {
+        Active --> Evaluating: Trigger Check
+        Evaluating --> Active: Conditions Not Met
+        Evaluating --> Triggered: Conditions Met
+        Triggered --> Transferring: Initiate Transfer
+        Transferring --> Active: Transfer Complete
+        Transferring --> Retrying: Transfer Error
+        Retrying --> Transferring: Retry Attempt
+        Retrying --> Failed: Max Retries Exceeded
+    }
+    
+    state "Degraded Operation" as degraded_group {
+        Active --> Degraded: Agent Health Issue
+        Degraded --> FailoverCheck: Check Backup Agent
+        FailoverCheck --> FailoverActive: Backup Available
+        FailoverCheck --> Failed: No Backup Available
+        FailoverActive --> Active: Backup Agent Activated
+        Degraded --> Active: Primary Agent Recovered
+    }
+    
+    state "Administrative" as admin_group {
+        Active --> Suspended: Manual Suspension
+        Suspended --> Active: Manual Resume
+        Failed --> Configured: Configuration Update
+        Failed --> Suspended: Manual Intervention
+    }
+    
+    Failed --> [*]: Route Disabled
+```
+
+#### Route Trigger Evaluation Flow
+
+```mermaid
+flowchart TD
+    subgraph "Trigger Evaluation Engine"
+        START([Route Active]) --> CHECK{Trigger Type?}
+        
+        CHECK -->|EVENT| EVENT_EVAL["Event Monitor"]
+        CHECK -->|TIME| TIME_EVAL["Cron Scheduler"]
+        CHECK -->|INTERVAL| INT_EVAL["Interval Timer"]
+        CHECK -->|BATCH| BATCH_EVAL["File Counter"]
+        CHECK -->|SIZE| SIZE_EVAL["Size Accumulator"]
+        CHECK -->|COMPOSITE| COMP_EVAL["Composite Logic"]
+        
+        EVENT_EVAL --> EVENT_CHECK{"File Event<br/>Detected?"}
+        EVENT_CHECK -->|Yes| FILTER_CHECK{"Matches<br/>Filters?"}
+        EVENT_CHECK -->|No| EVENT_EVAL
+        FILTER_CHECK -->|Yes| TRIGGER
+        FILTER_CHECK -->|No| EVENT_EVAL
+        
+        TIME_EVAL --> TIME_CHECK{"Cron<br/>Match?"}
+        TIME_CHECK -->|Yes| TRIGGER
+        TIME_CHECK -->|No| TIME_EVAL
+        
+        INT_EVAL --> INT_CHECK{"Interval<br/>Elapsed?"}
+        INT_CHECK -->|Yes| TRIGGER
+        INT_CHECK -->|No| INT_EVAL
+        
+        BATCH_EVAL --> BATCH_CHECK{"File Count<br/>>= Threshold?"}
+        BATCH_CHECK -->|Yes| TRIGGER
+        BATCH_CHECK -->|No| TIMEOUT_CHECK{"Max Wait<br/>Exceeded?"}
+        TIMEOUT_CHECK -->|Yes| TRIGGER
+        TIMEOUT_CHECK -->|No| BATCH_EVAL
+        
+        SIZE_EVAL --> SIZE_CHECK{"Total Size<br/>>= Threshold?"}
+        SIZE_CHECK -->|Yes| TRIGGER
+        SIZE_CHECK -->|No| SIZE_TIMEOUT{"Max Wait<br/>Exceeded?"}
+        SIZE_TIMEOUT -->|Yes| TRIGGER
+        SIZE_TIMEOUT -->|No| SIZE_EVAL
+        
+        COMP_EVAL --> COMP_CHECK{"Composite<br/>Logic Met?"}
+        COMP_CHECK -->|Yes| TRIGGER
+        COMP_CHECK -->|No| COMP_EVAL
+        
+        TRIGGER([Trigger Route Transfer])
+    end
+    
+    style TRIGGER fill:#90EE90
+    style START fill:#87CEEB
+```
+
+#### Controller-Agent-Route Architecture
+
+```mermaid
+graph TB
+    subgraph "Control Plane"
+        subgraph "Controller Cluster"
+            C1["Controller 1<br/>(Leader)"]
+            C2["Controller 2<br/>(Follower)"]
+            C3["Controller 3<br/>(Follower)"]
+        end
+        
+        subgraph "Route Repository"
+            R1["Route: CRM→Warehouse<br/>⚡ EVENT"]
+            R2["Route: App→Backup<br/>🕐 TIME (2AM)"]
+            R3["Route: Logs→Archive<br/>🔄 INTERVAL (15m)"]
+            R4["Route: Reports→Dist<br/>📦 BATCH (100)"]
+        end
+        
+        C1 -.->|Raft| C2
+        C1 -.->|Raft| C3
+        C2 -.->|Raft| C3
+        
+        C1 --> R1
+        C1 --> R2
+        C1 --> R3
+        C1 --> R4
+    end
+    
+    subgraph "Agent Fleet"
+        subgraph "Region: US-East"
+            A1["📁 agent-crm-001<br/>/crm/export/"]
+            A2["📁 agent-warehouse-001<br/>/warehouse/import/"]
+            A3["📁 agent-app-001<br/>/app/data/"]
+        end
+        
+        subgraph "Region: US-West"
+            A4["📁 agent-backup-001<br/>/backup/nightly/"]
+            A5["📁 agent-logs-001<br/>/logs/collected/"]
+        end
+        
+        subgraph "Region: EU-West"
+            A6["📁 agent-archive-001<br/>/archive/logs/"]
+            A7["📁 agent-reports-001<br/>/reports/generated/"]
+            A8["📁 agent-dist-001<br/>/distribution/"]
+        end
+    end
+    
+    R1 -->|"Source"| A1
+    R1 -->|"Dest"| A2
+    
+    R2 -->|"Source"| A3
+    R2 -->|"Dest"| A4
+    
+    R3 -->|"Source"| A5
+    R3 -->|"Dest"| A6
+    
+    R4 -->|"Source"| A7
+    R4 -->|"Dest"| A8
+    
+    style C1 fill:#ff6b6b,color:#fff
+    style C2 fill:#ff9999
+    style C3 fill:#ff9999
+    style R1 fill:#ffd93d
+    style R2 fill:#ffd93d
+    style R3 fill:#ffd93d
+    style R4 fill:#ffd93d
+    style A1 fill:#6bcb77
+    style A2 fill:#6bcb77
+    style A3 fill:#6bcb77
+    style A4 fill:#4d96ff
+    style A5 fill:#4d96ff
+    style A6 fill:#c9b1ff
+    style A7 fill:#c9b1ff
+    style A8 fill:#c9b1ff
+```
+
+#### Route-Based Transfer Sequence
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant REPO as Route Repository
+    participant CTL as Controller
+    participant SA as Source Agent<br/>(agent-crm-001)
+    participant DA as Dest Agent<br/>(agent-warehouse-001)
+    participant FS_S as Source Location<br/>(/crm/export/)
+    participant FS_D as Dest Location<br/>(/warehouse/import/)
+    
+    rect rgb(230, 240, 255)
+        Note over REPO,FS_D: Phase 1: Controller Startup & Route Validation
+        REPO->>CTL: Load Route Configuration
+        CTL->>CTL: Parse Route Definition
+        CTL->>SA: POST /health (Validation Ping)
+        SA-->>CTL: 200 OK {status: HEALTHY}
+        CTL->>SA: POST /validate-location
+        SA->>FS_S: Check Access Permissions
+        FS_S-->>SA: Access OK
+        SA-->>CTL: 200 OK {location: accessible}
+        CTL->>DA: POST /health (Validation Ping)
+        DA-->>CTL: 200 OK {status: HEALTHY}
+        CTL->>DA: POST /validate-location
+        DA->>FS_D: Check Write Permissions
+        FS_D-->>DA: Write OK
+        DA-->>CTL: 200 OK {location: writable}
+        CTL->>CTL: Route Status → ACTIVE
+        CTL->>SA: POST /configure-monitor {location, patterns, events}
+        SA-->>CTL: 200 OK {monitoring: started}
+    end
+    
+    rect rgb(255, 245, 230)
+        Note over REPO,FS_D: Phase 2: Trigger Detection
+        FS_S->>SA: File System Event: FILE_CREATED
+        SA->>SA: Evaluate: customer-export-2026.json
+        SA->>SA: Check Filters: *.json ✓, size > 1KB ✓
+        SA->>CTL: POST /trigger {routeId, event, file}
+        CTL->>CTL: Evaluate Route Conditions
+        CTL->>CTL: Route Status → TRIGGERED
+    end
+    
+    rect rgb(230, 255, 230)
+        Note over REPO,FS_D: Phase 3: Transfer Execution
+        CTL->>SA: POST /initiate-transfer {jobId, destination}
+        SA->>FS_S: Open File Stream
+        SA->>DA: Stream: File Data (chunked)
+        DA->>FS_D: Write File Chunks
+        DA->>DA: Calculate Checksum
+        DA-->>SA: ACK {checksum: abc123...}
+        SA->>SA: Verify Checksum Match
+        SA-->>CTL: POST /transfer-complete {jobId, success, metrics}
+    end
+    
+    rect rgb(245, 230, 255)
+        Note over REPO,FS_D: Phase 4: Completion & Monitoring
+        CTL->>CTL: Update Route Statistics
+        CTL->>CTL: Route Status → ACTIVE
+        CTL->>CTL: Log: Transfer Metrics
+        Note right of CTL: Files: 1, Bytes: 2.4MB<br/>Duration: 1.2s<br/>Throughput: 2MB/s
+    end
+```
+
 ### Raft Consensus Implementation
 
-The Quorus controller implements a distributed consensus system based on the Raft algorithm to ensure high availability, consistency, and fault tolerance across the controller cluster.
+The Quorus controller implements a distributed consensus system based on the Raft algorithm to ensure high availability, consistency, and fault tolerance across the controller cluster. Route configurations are replicated across the controller quorum to ensure consistency.
 
 ```mermaid
 graph TB
@@ -285,6 +611,7 @@ graph TB
             RS3[Tenant Config]
             RS4[Workflow State]
             RS5[Heartbeat Tracking]
+            RS6[Route Registry]
         end
 
         C1_RAFT --> RS1
@@ -292,6 +619,7 @@ graph TB
         C1_RAFT --> RS3
         C1_RAFT --> RS4
         C1_RAFT --> RS5
+        C1_RAFT --> RS6
     end
 
     LB --> C1_HTTP
@@ -342,6 +670,64 @@ graph TB
 - **Agent Service**: Agent registration, heartbeat processing, and lifecycle management
 - **Monitoring Service**: System health monitoring, metrics collection, and alerting
 - **Tenant Service**: Multi-tenant configuration management and isolation
+
+### Raft Transport Layer (v2.1)
+
+> **New in v2.1**: The Raft transport layer has been refactored to support multiple transport implementations with Vert.x 5 reactive patterns.
+
+The `RaftTransport` interface defines the communication layer for Raft consensus messages between controller nodes:
+
+```java
+public interface RaftTransport {
+    void start(Consumer<Object> messageHandler);
+    void stop();
+    Future<VoteResponse> sendVoteRequest(String targetId, VoteRequest request);
+    Future<AppendEntriesResponse> sendAppendEntries(String targetId, AppendEntriesRequest request);
+}
+```
+
+#### gRPC Transport Implementation
+
+The `GrpcRaftTransport` provides high-performance, type-safe communication using Protocol Buffers:
+
+**Key Features:**
+- **Protocol Buffers**: Strongly-typed message definitions via `raft.proto`
+- **Bidirectional Streaming**: Efficient for high-frequency Raft messages
+- **Connection Pooling**: Reuses gRPC channels for cluster nodes
+- **Vert.x Integration**: Converts gRPC ListenableFutures to Vert.x Futures
+
+**Proto Definition:**
+```protobuf
+service RaftService {
+  rpc RequestVote (VoteRequest) returns (VoteResponse);
+  rpc AppendEntries (AppendEntriesRequest) returns (AppendEntriesResponse);
+}
+```
+
+**Usage:**
+```java
+GrpcRaftTransport transport = new GrpcRaftTransport(vertx, nodeId, clusterNodes);
+GrpcRaftServer server = new GrpcRaftServer(vertx, port, raftNode);
+server.start();
+```
+
+#### HTTP Transport Implementation
+
+The `HttpRaftTransport` provides REST-based communication for environments where gRPC is not available:
+
+**Key Features:**
+- **REST API**: Standard HTTP POST for vote requests and append entries
+- **JSON Serialization**: Human-readable message format for debugging
+- **Firewall Friendly**: Works through standard HTTP proxies
+- **Vert.x WebClient**: Non-blocking HTTP client with reactive patterns
+
+#### Transport Selection
+
+| Transport | Use Case | Pros | Cons |
+|-----------|----------|------|------|
+| **gRPC** | Production clusters | High performance, type-safe | Requires HTTP/2 |
+| **HTTP** | Development, restricted networks | Firewall-friendly, debuggable | Higher latency |
+| **In-Memory** | Testing | Fast, deterministic | Single-process only |
 
 ### Leader Election Process
 
@@ -1031,6 +1417,64 @@ upstream quorus_controllers {
 }
 ```
 
+#### Transfer Engine Health Monitoring (v2.1)
+
+> **New in v2.1**: Enhanced health check capabilities with protocol-level monitoring and transfer metrics.
+
+**TransferEngineHealthCheck:**
+Aggregates health status from all transfer protocols and provides system-level diagnostics:
+
+```java
+TransferEngineHealthCheck healthCheck = transferEngine.getHealthCheck();
+// Returns: UP, DOWN, or DEGRADED status with per-protocol details
+```
+
+**Response Format:**
+```json
+{
+  "status": "UP",
+  "timestamp": "2026-01-11T10:30:00Z",
+  "message": "Transfer engine operational",
+  "protocols": [
+    {
+      "protocol": "http",
+      "status": "UP",
+      "message": "HTTP protocol healthy"
+    },
+    {
+      "protocol": "sftp",
+      "status": "DEGRADED",
+      "message": "High failure rate: 15%"
+    }
+  ],
+  "summary": {
+    "totalProtocols": 4,
+    "healthyProtocols": 3,
+    "unhealthyProtocols": 1
+  }
+}
+```
+
+**ProtocolHealthCheck:**
+Per-protocol health status with diagnostic details:
+- `UP` - Protocol is healthy and operational
+- `DOWN` - Protocol is not operational
+- `DEGRADED` - Protocol is operational but experiencing issues
+
+**TransferMetrics:**
+Thread-safe metrics collection for each protocol:
+- Transfer counts (total, successful, failed, active)
+- Byte throughput and transfer rates
+- Duration statistics (min, max, average)
+- Error breakdown by type
+- Success rate calculation
+
+```java
+TransferMetrics metrics = transferEngine.getProtocolMetrics("sftp");
+Map<String, Object> metricsMap = metrics.toMap();
+// Includes: totalTransfers, successRate, bytesPerSecond, averageDurationMs, etc.
+```
+
 #### Monitoring Integration
 
 **Prometheus Metrics:**
@@ -1038,12 +1482,16 @@ upstream quorus_controllers {
 - `quorus_raft_leader_elections_total`
 - `quorus_heartbeat_processing_duration`
 - `quorus_agent_registration_total`
+- `quorus_transfer_total` (v2.1)
+- `quorus_transfer_bytes_total` (v2.1)
+- `quorus_protocol_health_status` (v2.1)
 
 **Grafana Dashboards:**
 - Controller cluster overview
 - Agent fleet status
 - Transfer job metrics
 - System performance
+- Protocol health dashboard (v2.1)
 
 **Log Aggregation:**
 - Structured logging with correlation IDs
@@ -1196,6 +1644,8 @@ sequenceDiagram
 
 ## Agent Fleet Management
 
+Agents are the endpoints in route configurations, responsible for monitoring locations and executing transfers as defined in the controller's route repository. The controller manages a fleet of distributed agents and assigns them to routes based on capabilities, location, and health status.
+
 ### Agent Lifecycle Management
 
 ```mermaid
@@ -1242,17 +1692,19 @@ stateDiagram-v2
 ### Dynamic Scaling and Load Balancing
 
 **Intelligent Work Distribution:**
-- **Capacity-Based**: Jobs assigned based on available agent capacity
-- **Location-Aware**: Prefer agents closer to source/destination
+- **Route Assignment**: Agents assigned to routes based on capabilities and location
+- **Capacity-Based**: Jobs assigned based on available agent capacity within routes
+- **Location-Aware**: Prefer agents closer to source/destination when defining routes
 - **Protocol-Specific**: Route jobs to agents with required protocol support
-- **Load Balancing**: Even distribution across available agents
-- **Affinity Rules**: Support for agent affinity and anti-affinity
+- **Load Balancing**: Even distribution across available agents serving same route endpoint
+- **Affinity Rules**: Support for agent affinity and anti-affinity in route configurations
 
 **Scaling Strategies:**
-- **Horizontal Scaling**: Add more agents to increase capacity
+- **Horizontal Scaling**: Add more agents to increase route endpoint capacity
 - **Vertical Scaling**: Upgrade agent resources (CPU, memory, bandwidth)
-- **Geographic Scaling**: Deploy agents across multiple data centers
-- **Protocol Scaling**: Specialized agents for specific protocols
+- **Geographic Scaling**: Deploy agents across multiple data centers for regional routes
+- **Protocol Scaling**: Specialized agents for specific protocol requirements in routes
+- **Route Failover**: Backup agents configured for critical routes
 
 **Resource Optimization:**
 - **CPU Utilization**: Monitor and optimize CPU usage across agents
@@ -2082,6 +2534,47 @@ graph TD
 
 ## Transfer Process Flow
 
+### Route-Based Transfer Flow
+
+```mermaid
+sequenceDiagram
+    participant RC as Route Configuration
+    participant CTL as Controller
+    participant SA as Source Agent
+    participant DA as Destination Agent
+    participant FS_S as Source File System
+    participant FS_D as Dest File System
+    participant MS as Monitoring Service
+
+    Note over RC,MS: Controller Startup - Route Validation
+    RC->>CTL: Load Route Definitions
+    CTL->>SA: Validate Agent (Ping/Health Check)
+    SA-->>CTL: Agent ACTIVE
+    CTL->>DA: Validate Agent (Ping/Health Check)
+    DA-->>CTL: Agent ACTIVE
+    CTL->>CTL: Activate Route
+    CTL->>SA: Configure Location Monitoring
+    SA->>FS_S: Start Watching Location
+    
+    Note over RC,MS: Trigger Condition Met
+    FS_S->>SA: File Created Event
+    SA->>CTL: Trigger Event: New File Detected
+    CTL->>CTL: Evaluate Route Conditions
+    CTL->>SA: Initiate Transfer
+    SA->>FS_S: Read Source File
+    FS_S-->>SA: File Data
+    SA->>DA: Stream File Data
+    DA->>FS_D: Write Destination File
+    FS_D-->>DA: Write Complete
+    DA->>DA: Calculate Checksum
+    DA-->>SA: Transfer ACK
+    SA->>CTL: Transfer Complete
+    CTL->>MS: Report Transfer Metrics
+    CTL->>CTL: Update Route Statistics
+```
+
+### Workflow-Based Transfer Flow
+
 ```mermaid
 sequenceDiagram
     participant U as User/System
@@ -2119,6 +2612,51 @@ sequenceDiagram
 ```
 
 ## Data Models
+
+### Route Configuration Models
+
+#### Route Definition
+```java
+public class RouteConfiguration {
+    private String routeId;
+    private String name;
+    private String description;
+    private AgentEndpoint source;
+    private AgentEndpoint destination;
+    private RouteTrigger trigger;
+    private RouteOptions options;
+    private RouteStatus status;
+    private String tenantId;
+    // ... other fields
+}
+
+public class AgentEndpoint {
+    private String agentId;
+    private String location;  // Path or URL to monitor/target
+    private Map<String, String> parameters;
+}
+
+public class RouteTrigger {
+    private TriggerType type;  // EVENT, TIME, INTERVAL, BATCH, SIZE, MANUAL, EXTERNAL, COMPOSITE
+    private Map<String, Object> configuration;
+    // Event-based: file patterns, events (CREATE, MODIFY, DELETE)
+    // Time-based: cron expression
+    // Interval-based: period duration
+    // Batch-based: file count threshold
+    // Size-based: size threshold
+}
+
+public enum RouteStatus {
+    CONFIGURED,
+    VALIDATING,
+    ACTIVE,
+    TRIGGERED,
+    TRANSFERRING,
+    DEGRADED,
+    SUSPENDED,
+    FAILED
+}
+```
 
 ### Core Domain Models
 

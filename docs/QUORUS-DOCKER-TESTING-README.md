@@ -1,6 +1,14 @@
 # Docker-Based Testing Infrastructure
 
+
+**Version:** 2.1
+**Date:** 2025-01-11
+**Author:** Mark Andrew Ray-Smith Cityline Ltd
+**Updated:** 2026-01-11
+
 This document describes the comprehensive Docker-based testing infrastructure for the Quorus distributed file transfer system, including Raft cluster testing, full network simulation with agents, and realistic file transfer scenarios.
+
+> **Note:** This document was updated to reflect changes from the Vert.x 5 migration and the addition of new agent services including JobPollingService and JobStatusReportingService.
 
 ## Overview
 
@@ -9,9 +17,11 @@ The Docker testing infrastructure provides comprehensive testing capabilities fo
 ### Core Testing Capabilities
 
 - **Raft Cluster Testing** - Real containerized nodes with HTTP communication
+- **Route Configuration Testing** - Validate route-based transfer orchestration
 - **Full Network Simulation** - Complete file transfer network with agents and servers
 - **Multi-Protocol Support** - Real SFTP, FTP, HTTP, and SMB implementations
 - **Agent Network Testing** - Multi-region agents with different capabilities
+- **Trigger Mechanism Testing** - Event-based, time-based, interval-based, batch-based triggers
 - **Container lifecycle management** (start/stop/restart scenarios)
 - **Network partition simulation** using Docker network manipulation
 - **Configurable test scenarios** for different cluster sizes and conditions
@@ -22,9 +32,10 @@ The Docker testing infrastructure provides comprehensive testing capabilities fo
 ### Test Environments
 
 1. **Raft Cluster Testing** - Controller cluster validation
-2. **Full Network Testing** - Complete file transfer network simulation
-3. **Protocol Testing** - Real file transfer server implementations
-4. **Agent Testing** - Multi-region agent deployment and coordination
+2. **Route Configuration Testing** - Route validation, trigger testing, agent coordination
+3. **Full Network Testing** - Complete file transfer network simulation
+4. **Protocol Testing** - Real file transfer server implementations
+5. **Agent Testing** - Multi-region agent deployment and coordination
 
 ## Architecture
 
@@ -99,6 +110,199 @@ scripts/network-test-helper.sh             # Network testing utilities
 
 ## 🚀 Full Network Test Environment
 
+## 🔀 Route Configuration Testing
+
+The route testing environment validates the core route-based transfer orchestration capabilities:
+
+### Route Test Scenarios
+
+#### 1. Controller Startup Route Validation
+Tests that routes are properly validated at controller startup:
+
+```powershell
+# Start controller cluster with predefined routes
+.\docker\scripts\test-route-validation.ps1
+
+# Expected behavior:
+# 1. Controller loads routes from configuration repository
+# 2. Controller validates each source agent is reachable
+# 3. Controller validates each destination agent is reachable
+# 4. Routes transition to ACTIVE status only if both agents validated
+# 5. Failed validations result in FAILED status with clear error messages
+```
+
+**Test Configuration** (`docker/test-data/routes/test-validation.yaml`):
+```yaml
+apiVersion: v1
+kind: RouteConfiguration
+metadata:
+  name: test-startup-validation
+  
+spec:
+  source:
+    agent: agent-test-001  # Must be running
+    location: /data/source/
+    
+  destination:
+    agent: agent-test-002  # Must be running
+    location: /data/dest/
+    
+  trigger:
+    type: MANUAL
+```
+
+#### 2. Event-Based Trigger Testing
+Validates file system event detection and automatic transfers:
+
+```powershell
+# Start environment with event-based route
+.\docker\scripts\test-event-triggers.ps1
+
+# Test creates files and monitors automatic transfers
+```
+
+**Test Scenario:**
+1. Agent monitors `/data/watched/` directory
+2. Test script creates file `test-file-001.txt`
+3. Agent detects `FILE_CREATED` event
+4. Agent notifies controller
+5. Controller evaluates route trigger conditions
+6. Controller initiates transfer to destination agent
+7. Destination agent writes file to `/data/dest/`
+8. Transfer completion logged and route statistics updated
+
+#### 3. Time-Based Trigger Testing
+Validates scheduled transfers with cron expressions:
+
+```yaml
+apiVersion: v1
+kind: RouteConfiguration
+metadata:
+  name: test-scheduled-transfer
+  
+spec:
+  source:
+    agent: agent-test-001
+    location: /data/scheduled/
+    
+  destination:
+    agent: agent-test-002
+    location: /data/dest/scheduled/
+    
+  trigger:
+    type: TIME_BASED
+    schedule:
+      cron: "*/5 * * * *"  # Every 5 minutes
+      timezone: "UTC"
+```
+
+**Test validates:**
+- Cron expression parsing and scheduling
+- Accurate trigger timing
+- Timezone handling
+- Multiple scheduled routes don't interfere
+
+#### 4. Batch-Based Trigger Testing
+Validates accumulation-based transfers:
+
+```yaml
+apiVersion: v1
+kind: RouteConfiguration
+metadata:
+  name: test-batch-transfer
+  
+spec:
+  source:
+    agent: agent-test-001
+    location: /data/batch/
+    
+  destination:
+    agent: agent-test-002
+    location: /data/dest/batch/
+    
+  trigger:
+    type: BATCH_BASED
+    batch:
+      fileCount: 10
+      maxWaitTime: 5M
+```
+
+**Test Scenario:**
+1. Create 9 files - no transfer triggered
+2. Create 10th file - batch transfer triggered immediately
+3. Reset and create 5 files
+4. Wait 5 minutes - timeout triggers transfer of 5 files
+
+#### 5. Agent Failover Testing
+Validates route behavior when agents become unavailable:
+
+```powershell
+# Start route with primary and backup agents
+.\docker\scripts\test-route-failover.ps1
+
+# Test scenario:
+# 1. Route active with agent-primary
+# 2. Stop agent-primary container
+# 3. Route status changes to DEGRADED
+# 4. Controller attempts failover to agent-backup
+# 5. Route status returns to ACTIVE with backup agent
+# 6. Transfers continue without data loss
+```
+
+#### 6. Multi-Route Coordination Testing
+Validates multiple routes operating simultaneously:
+
+```powershell
+# Start environment with 10 concurrent routes
+.\docker\scripts\test-multi-route.ps1
+
+# Validates:
+# - 10 routes with different trigger types
+# - No interference between routes
+# - Resource allocation and scheduling
+# - Proper isolation of route state
+```
+
+### Route Testing Tools
+
+**Route Status Viewer:**
+```powershell
+# View all routes and their status
+.\docker\scripts\view-routes.ps1
+
+# Output:
+# ROUTE                    STATUS         SOURCE           DESTINATION      TRIGGERS
+# crm-to-warehouse        ACTIVE         agent-crm-001    agent-wh-001     15
+# backup-nightly          ACTIVE         agent-app-001    agent-bk-001     1
+# log-aggregation         DEGRADED       agent-web-*      agent-log-001    142
+```
+
+**Route Trigger Simulator:**
+```powershell
+# Manually trigger a route for testing
+.\docker\scripts\trigger-route.ps1 -routeName "crm-to-warehouse"
+
+# Simulate batch accumulation
+.\docker\scripts\simulate-batch.ps1 -routeName "batch-route" -fileCount 50
+```
+
+**Route Performance Testing:**
+```powershell
+# Test route throughput
+.\docker\scripts\test-route-performance.ps1 `
+    -routeName "test-route" `
+    -fileCount 1000 `
+    -fileSizeRange "1MB-10MB"
+
+# Measures:
+# - Files per second throughput
+# - Average transfer latency
+# - Trigger detection time
+# - Route overhead
+```
+
+## 🚀 Full Network Test Environment
+
 ### Complete File Transfer Network
 
 The `docker-compose-full-network.yml` configuration provides a comprehensive test environment that simulates a realistic Quorus file transfer network:
@@ -154,6 +358,22 @@ docker-compose -f docker/compose/docker-compose-full-network.yml down
 | HTTP Server | http://localhost:8090 | - | File download testing |
 | FTP Server | ftp://localhost:21 | testuser/testpass | FTP transfer testing |
 | SFTP Server | sftp://localhost:2222 | testuser/testpass | SFTP transfer testing |
+
+### API Endpoints (v2.0)
+
+> **Updated**: New endpoints added for job polling and status reporting
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/v1/agents/register` | POST | Register a new agent |
+| `/api/v1/agents/heartbeat` | POST | Process agent heartbeat |
+| `/api/v1/agents` | GET | List all registered agents |
+| `/api/v1/agents/{agentId}/jobs` | GET | Get pending jobs for an agent |
+| `/api/v1/jobs/{jobId}/status` | POST | Update job status |
+| `/api/v1/transfers` | POST | Submit a transfer request |
+| `/api/v1/cluster` | GET | Get cluster status |
+| `/api/v1/metrics` | GET | Get system metrics |
+| `/health` | GET | Health check endpoint |
 
 ### Agent Configuration
 
@@ -1065,6 +1285,57 @@ This comprehensive log aggregation system provides enterprise-grade observabilit
 
 The Docker test environment provides a complete integration between the Quorus control plane and distributed agents, simulating a realistic production deployment with multi-region agents, real protocol implementations, and comprehensive monitoring.
 
+### Recent Architecture Updates (v2.0)
+
+> **Important**: The Quorus agent architecture has been significantly updated with the Vert.x 5 migration and new service implementations.
+
+#### Vert.x 5 Migration
+
+The agent services have been migrated to use Vert.x 5 for improved reactive programming patterns:
+
+- **TransferExecutionService**: Now uses Vert.x for asynchronous operations and non-blocking I/O
+- **HeartbeatService**: Uses Vert.x timers instead of ScheduledExecutorService for better event loop integration
+- **QuorusAgent**: Updated to use Vert.x instance for all async operations
+
+**Key Changes:**
+```java
+// Old approach (blocking)
+ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
+scheduler.scheduleAtFixedRate(() -> sendHeartbeat(), 0, interval, TimeUnit.MILLISECONDS);
+
+// New approach (Vert.x reactive)
+Vertx vertx = Vertx.vertx();
+vertx.setPeriodic(interval, id -> sendHeartbeat());
+```
+
+#### New Agent Services
+
+The agent now includes these additional services:
+
+| Service | Purpose | Introduced |
+|---------|---------|------------|
+| **JobPollingService** | Polls controller for pending job assignments | v2.0 |
+| **JobStatusReportingService** | Reports job status updates to controller | v2.0 |
+| **AgentRegistrationService** | Handles agent registration with controller | v1.0 |
+| **HeartbeatService** | Sends periodic heartbeats to controller | v1.0 |
+| **TransferExecutionService** | Executes file transfers using protocol handlers | v1.0 |
+| **HealthService** | Provides health check endpoints | v1.0 |
+
+#### Controller HTTP Handlers
+
+New HTTP handlers have been added to the controller for agent management:
+
+| Handler | Endpoint | Purpose |
+|---------|----------|---------|
+| **AgentRegistrationHandler** | POST /agents/register | Agent registration |
+| **HeartbeatHandler** | POST /agents/heartbeat | Agent heartbeat processing |
+| **AgentJobsHandler** | GET /agents/{agentId}/jobs | Job polling for agents |
+| **AgentListHandler** | GET /agents | List all registered agents |
+| **JobStatusHandler** | POST /jobs/{jobId}/status | Job status updates |
+| **TransferHandler** | POST /transfers | Submit transfer requests |
+| **ClusterHandler** | GET /cluster | Cluster status information |
+| **MetricsHandler** | GET /metrics | System metrics |
+
 ### Agent Integration Components
 
 #### 1. Agent Registration & Discovery
@@ -1176,17 +1447,87 @@ TransferRequest sftpJob = {
 // Assignment: Agent with highest priority score
 ```
 
-**Job Polling Mechanism:**
+**Job Polling Mechanism (JobPollingService):**
+
+> **New in v2.0**: The `JobPollingService` is a dedicated service that polls the controller for pending job assignments.
+
 ```java
-// Every 10 seconds, agents poll for new jobs
+// JobPollingService implementation
+public class JobPollingService {
+    // Poll the controller for pending job assignments
+    public List<PendingJob> pollForJobs() {
+        String url = config.getControllerUrl() + "/agents/" + config.getAgentId() + "/jobs";
+        // Returns list of pending jobs matching agent capabilities
+    }
+}
+
+// PendingJob structure
+public static class PendingJob {
+    private final String assignmentId;
+    private final String jobId;
+    private final String agentId;
+    private final String sourceUri;
+    private final String destinationPath;
+    private final long totalBytes;
+    private final String description;
+
+    // Convert to TransferRequest for execution
+    public TransferRequest toTransferRequest() {
+        return TransferRequest.builder()
+                .requestId(jobId)
+                .sourceUri(URI.create(sourceUri))
+                .destinationPath(Paths.get(destinationPath))
+                .expectedSize(totalBytes)
+                .build();
+    }
+}
+```
+
+**API Endpoint:**
+```bash
 GET /api/v1/agents/{agentId}/jobs
 → Returns jobs matching agent capabilities
 → Agent evaluates job compatibility
 → Agent accepts suitable jobs
 → Executes transfers using real protocol implementations
 
-// Polling request includes current capacity
+# Example request with current capacity
 GET /api/v1/agents/agent-nyc-001/jobs?capacity=3&protocols=HTTP,FTP,SFTP
+```
+
+**Job Status Reporting (JobStatusReportingService):**
+
+> **New in v2.0**: The `JobStatusReportingService` reports job status updates back to the controller.
+
+```java
+// JobStatusReportingService implementation
+public class JobStatusReportingService {
+    // Report job status updates to the controller
+    public void reportAccepted(String jobId);
+    public void reportInProgress(String jobId, long bytesTransferred);
+    public void reportCompleted(String jobId, long bytesTransferred);
+    public void reportFailed(String jobId, String errorMessage);
+}
+
+// Status update payload
+{
+    "agentId": "agent-nyc-001",
+    "status": "IN_PROGRESS",  // ACCEPTED, IN_PROGRESS, COMPLETED, FAILED
+    "bytesTransferred": 1048576,
+    "errorMessage": null
+}
+```
+
+**API Endpoint:**
+```bash
+POST /api/v1/jobs/{jobId}/status
+Content-Type: application/json
+
+{
+    "agentId": "agent-nyc-001",
+    "status": "COMPLETED",
+    "bytesTransferred": 10485760
+}
 ```
 
 #### 4. Transfer Execution Integration
@@ -1316,18 +1657,24 @@ agent-tokyo:   172.21.0.12
 **Agent-Specific Logging:**
 ```bash
 # Agent startup and registration
-2025-09-04 14:30:15 INFO [AgentRegistrationService] Agent agent-nyc-001 registered successfully
-2025-09-04 14:30:15 INFO [HealthService] Health service started on port 8080
-2025-09-04 14:30:15 INFO [TransferExecutionService] Transfer execution service started with 5 max concurrent transfers
+2025-01-11 14:30:15 INFO [AgentRegistrationService] Agent agent-nyc-001 registered successfully
+2025-01-11 14:30:15 INFO [HealthService] Health service started on port 8080
+2025-01-11 14:30:15 INFO [TransferExecutionService] Transfer execution service started with 5 max concurrent transfers
+2025-01-11 14:30:15 INFO [JobPollingService] Job polling service initialized
+2025-01-11 14:30:15 INFO [JobStatusReportingService] Job status reporting service initialized
 
-# Heartbeat monitoring
-2025-09-04 14:30:45 INFO [HeartbeatService] Heartbeat sent successfully for agent agent-nyc-001
-2025-09-04 14:30:45 DEBUG [HeartbeatService] Agent metrics: memory=134MB, cpu=4 cores, jobs=2/5
+# Heartbeat monitoring (using Vert.x timers)
+2025-01-11 14:30:45 INFO [HeartbeatService] Heartbeat sent successfully for agent agent-nyc-001
+2025-01-11 14:30:45 DEBUG [HeartbeatService] Agent metrics: memory=134MB, cpu=4 cores, jobs=2/5
 
-# Job execution
-2025-09-04 14:31:00 INFO [QuorusAgent] Polling for new transfer jobs...
-2025-09-04 14:31:05 INFO [TransferExecutionService] Executing transfer: sftp://sftp-server/file.txt -> /tmp/downloads/file.txt
-2025-09-04 14:31:07 INFO [SftpTransferProtocol] SFTP transfer completed successfully: 1024 bytes in 2.1s
+# Job polling and execution
+2025-01-11 14:31:00 INFO [JobPollingService] Polling for new transfer jobs...
+2025-01-11 14:31:00 DEBUG [JobPollingService] Polled for jobs: found 2 pending jobs
+2025-01-11 14:31:01 INFO [JobStatusReportingService] Job status reported: job-12345 -> ACCEPTED
+2025-01-11 14:31:05 INFO [TransferExecutionService] Executing transfer: sftp://sftp-server/file.txt -> /tmp/downloads/file.txt
+2025-01-11 14:31:06 INFO [JobStatusReportingService] Job status reported: job-12345 -> IN_PROGRESS
+2025-01-11 14:31:07 INFO [SftpTransferProtocol] SFTP transfer completed successfully: 1024 bytes in 2.1s
+2025-01-11 14:31:07 INFO [JobStatusReportingService] Job status reported: job-12345 -> COMPLETED
 ```
 
 **Health Endpoints:**
