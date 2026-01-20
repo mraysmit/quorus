@@ -1,4 +1,6 @@
+# syntax=docker/dockerfile:1.4
 # Multi-stage build for Quorus Controller
+# Requires Docker BuildKit for cache mount support (DOCKER_BUILDKIT=1)
 FROM maven:3.9.5-eclipse-temurin-21 AS builder
 
 # Set working directory
@@ -15,8 +17,8 @@ COPY quorus-controller/pom.xml quorus-controller/
 # Create empty integration-examples directory to satisfy parent pom
 RUN mkdir -p quorus-integration-examples && echo '<?xml version="1.0" encoding="UTF-8"?><project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"><modelVersion>4.0.0</modelVersion><parent><groupId>dev.mars</groupId><artifactId>quorus</artifactId><version>1.0-SNAPSHOT</version></parent><artifactId>quorus-integration-examples</artifactId><packaging>pom</packaging></project>' > quorus-integration-examples/pom.xml
 
-# Download dependencies
-RUN mvn dependency:go-offline -pl quorus-controller -am
+# Download dependencies (cached via Docker BuildKit cache mount)
+RUN --mount=type=cache,target=/root/.m2 mvn dependency:go-offline -pl quorus-controller -am
 
 # Copy source code
 COPY quorus-core/src quorus-core/src
@@ -25,8 +27,8 @@ COPY quorus-tenant/src quorus-tenant/src
 COPY quorus-api/src quorus-api/src
 COPY quorus-controller/src quorus-controller/src
 
-# Build the application
-RUN mvn clean package -pl quorus-controller -am -DskipTests
+# Build the application (cached via Docker BuildKit cache mount)
+RUN --mount=type=cache,target=/root/.m2 mvn clean package -pl quorus-controller -am -DskipTests
 
 # Runtime stage
 FROM eclipse-temurin:21-jre-alpine

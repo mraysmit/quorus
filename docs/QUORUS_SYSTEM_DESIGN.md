@@ -1,9 +1,22 @@
 # Quorus Comprehensive System Design
 
-**Version:** 2.1  
+**Version:** 2.2  
 **Date:** 26 August 2025  
 **Author:** Mark Andrew Ray-Smith Cityline Ltd  
-**Updated:** 2026-01-11  
+**Updated:** 2026-01-20  
+
+## Technology Stack
+
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| **Java** | 21 (LTS) | Runtime platform with virtual threads support |
+| **Vert.x** | 5.0.2 | Reactive toolkit for HTTP server, event bus, and async operations |
+| **gRPC** | 1.68.1 | High-performance RPC for Raft consensus transport |
+| **Protocol Buffers** | 3.25.5 | Binary serialization for Raft messages |
+| **Jackson** | 2.18.2 | JSON serialization for REST API |
+| **JUnit** | 5.10.1 | Testing framework |
+| **TestContainers** | 2.0.2 | Docker-based integration testing |
+| **Maven** | 3.9+ | Build and dependency management |
 
 ## Overview
 
@@ -16,13 +29,13 @@ Quorus is an enterprise-grade **route-based distributed file transfer system** d
 - **Controller-First Architecture**: Every controller node embeds the HTTP API, Raft engine, scheduler, and state machine—removing the API-first bottleneck, offering sub-second failover, and enabling horizontal scale by simply adding nodes to the quorum.
 - **Module Snapshot**:
 
-  | Module | Purpose | Notes |
-  |--------|---------|-------|
-  | `quorus-core` | Transfer primitives, protocol adapters, progress/integrity services | Powers both controller and agent execution paths |
-  | `quorus-workflow` | YAML parsing, validation, dependency resolution, execution planning | Supports sequential/parallel strategies and dry/virtual modes |
-  | `quorus-tenant` | Tenant registry, quotas, RBAC integration, encryption policy plumbing | Enforces logical/physical isolation per enterprise policy |
-  | `quorus-controller` | Main runtime with Raft consensus, job scheduler, agent fleet manager, resource allocator, and HTTP API | Acts as both control plane and API surface |
-  | `quorus-api` | Compatibility REST layer with service discovery, RBAC, OpenAPI | Bridges legacy API-first clients while controller-first rollout completes |
+  | Module | Purpose | Key Classes |
+  |--------|---------|-------------|
+  | `quorus-core` | Transfer primitives, protocol adapters (`HttpTransferProtocol`, `SftpTransferProtocol`, `FtpTransferProtocol`, `SmbTransferProtocol`), `SimpleTransferEngine` with Vert.x `WorkerExecutor` | `TransferEngine`, `ProtocolFactory`, `TransferJob`, `TransferRequest` |
+  | `quorus-workflow` | YAML parsing via `YamlWorkflowDefinitionParser`, validation with `WorkflowSchemaValidator`, dependency resolution via `DependencyGraph` | `WorkflowEngine`, `SimpleWorkflowEngine`, `WorkflowDefinition`, `TransferGroup` |
+  | `quorus-tenant` | Tenant registry, quotas via `ResourceManagementService`, hierarchical tenant model | `TenantService`, `SimpleTenantService`, `Tenant`, `TenantConfiguration` |
+  | `quorus-controller` | Vert.x 5 verticle runtime with gRPC Raft transport, `RaftNode` consensus, embedded `HttpApiServer` | `QuorusControllerVerticle`, `GrpcRaftTransport`, `GrpcRaftServer`, `QuorusStateMachine` |
+  | `quorus-api` | Legacy Quarkus REST layer with CDI producers, service discovery, agent fleet management | `QuorusApiApplication`, `TransferResource`, `AgentRegistrationResource`, `VertxProducer` |
   | `quorus-integration-examples` | Runnable demos for transfers, workflows, validation scenarios | Generates representative corporate datasets for testing |
   | `docker/agents`, `docker/compose/*` | Production-like agent fleet, transfer servers, and observability stack | Validates multi-region agents, real protocols (FTP/SFTP/HTTP/SMB), and failover |
 
@@ -671,9 +684,9 @@ graph TB
 - **Monitoring Service**: System health monitoring, metrics collection, and alerting
 - **Tenant Service**: Multi-tenant configuration management and isolation
 
-### Raft Transport Layer (v2.1)
+### Raft Transport Layer (v2.2)
 
-> **New in v2.1**: The Raft transport layer has been refactored to support multiple transport implementations with Vert.x 5 reactive patterns.
+> **Updated in v2.2**: The Raft transport layer uses gRPC as the production transport with Vert.x 5 reactive patterns.
 
 The `RaftTransport` interface defines the communication layer for Raft consensus messages between controller nodes:
 
@@ -683,51 +696,69 @@ public interface RaftTransport {
     void stop();
     Future<VoteResponse> sendVoteRequest(String targetId, VoteRequest request);
     Future<AppendEntriesResponse> sendAppendEntries(String targetId, AppendEntriesRequest request);
+    default void setRaftNode(RaftNode node) {}
 }
 ```
 
-#### gRPC Transport Implementation
+#### Transport Implementation Status
+
+| Transport | Status | Class | Description |
+|-----------|--------|-------|-------------|
+| **gRPC** | ✅ Implemented | `GrpcRaftTransport` | Production-ready, high-performance |
+| **In-Memory** | ✅ Implemented | `TestInMemoryTransport` | For unit testing (in test folder) |
+
+#### gRPC Transport Implementation (Production)
 
 The `GrpcRaftTransport` provides high-performance, type-safe communication using Protocol Buffers:
 
 **Key Features:**
 - **Protocol Buffers**: Strongly-typed message definitions via `raft.proto`
-- **Bidirectional Streaming**: Efficient for high-frequency Raft messages
-- **Connection Pooling**: Reuses gRPC channels for cluster nodes
-- **Vert.x Integration**: Converts gRPC ListenableFutures to Vert.x Futures
+- **gRPC Netty Client**: High-performance HTTP/2 transport
+- **Connection Pooling**: Reuses gRPC channels for cluster nodes via `ConcurrentHashMap`
+- **Vert.x Integration**: Converts gRPC `ListenableFuture` to Vert.x `Future` using Guava callbacks
 
-**Proto Definition:**
+**Server Component:** `GrpcRaftServer` handles incoming Raft RPC requests and delegates to `RaftNode`.
+
+**Proto Definition (`quorus-controller/src/main/proto/raft.proto`):**
 ```protobuf
 service RaftService {
   rpc RequestVote (VoteRequest) returns (VoteResponse);
   rpc AppendEntries (AppendEntriesRequest) returns (AppendEntriesResponse);
 }
+
+message LogEntry {
+  int64 term = 1;
+  int64 index = 2;
+  bytes data = 3;  // Command payload serialized
+}
 ```
 
 **Usage:**
 ```java
-GrpcRaftTransport transport = new GrpcRaftTransport(vertx, nodeId, clusterNodes);
-GrpcRaftServer server = new GrpcRaftServer(vertx, port, raftNode);
+// In QuorusControllerVerticle
+GrpcRaftTransport transport = new GrpcRaftTransport(vertx, nodeId, peerAddresses);
+GrpcRaftServer server = new GrpcRaftServer(vertx, raftPort, raftNode);
 server.start();
 ```
 
-#### HTTP Transport Implementation
+#### In-Memory Transport Implementation (Test Utility)
 
-The `HttpRaftTransport` provides REST-based communication for environments where gRPC is not available:
+The `TestInMemoryTransport` (in test folder) provides fast, deterministic transport for unit testing:
 
-**Key Features:**
-- **REST API**: Standard HTTP POST for vote requests and append entries
-- **JSON Serialization**: Human-readable message format for debugging
-- **Firewall Friendly**: Works through standard HTTP proxies
-- **Vert.x WebClient**: Non-blocking HTTP client with reactive patterns
+**Features:**
+- **Static Registry**: Global `ConcurrentHashMap` for node discovery
+- **Configurable Latency**: `setChaosConfig(minLatencyMs, maxLatencyMs, dropRate)`
+- **Packet Drop Simulation**: Configurable drop rate for chaos testing
+- **Direct Method Calls**: No network overhead, all nodes in same JVM
 
-#### Transport Selection
+**Location:** `quorus-controller/src/test/java/dev/mars/quorus/controller/raft/TestInMemoryTransport.java`
+
+#### Transport Selection Guide
 
 | Transport | Use Case | Pros | Cons |
 |-----------|----------|------|------|
-| **gRPC** | Production clusters | High performance, type-safe | Requires HTTP/2 |
-| **HTTP** | Development, restricted networks | Firewall-friendly, debuggable | Higher latency |
-| **In-Memory** | Testing | Fast, deterministic | Single-process only |
+| **gRPC** | Production & Development | High performance, type-safe, efficient | Requires HTTP/2 support |
+| **In-Memory** | Unit testing | Fast, configurable chaos, no network | Test folder only |
 
 ### Leader Election Process
 

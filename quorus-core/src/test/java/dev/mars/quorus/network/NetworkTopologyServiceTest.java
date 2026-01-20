@@ -110,10 +110,10 @@ class NetworkTopologyServiceTest {
     void testNodeCaching(VertxTestContext testContext) {
         // First discovery
         service.discoverNode("localhost")
-            .compose(node1 -> {
+            .<NetworkNode[]>compose(node1 -> {
                 // Second discovery should use cache
                 return service.discoverNode("localhost")
-                    .map(node2 -> new NetworkNode[]{node1, node2});
+                    .<NetworkNode[]>map(node2 -> new NetworkNode[]{node1, node2});
             })
             .onComplete(testContext.succeeding(nodes -> {
                 testContext.verify(() -> {
@@ -152,10 +152,10 @@ class NetworkTopologyServiceTest {
     void testPathCaching(VertxTestContext testContext) {
         // First path calculation
         service.findOptimalPath("localhost", "127.0.0.1")
-            .compose(path1 -> {
+            .<NetworkTopologyService.NetworkPath[]>compose(path1 -> {
                 // Second path calculation should use cache
                 return service.findOptimalPath("localhost", "127.0.0.1")
-                    .map(path2 -> new NetworkTopologyService.NetworkPath[]{path1, path2});
+                    .<NetworkTopologyService.NetworkPath[]>map(path2 -> new NetworkTopologyService.NetworkPath[]{path1, path2});
             })
             .onComplete(testContext.succeeding(paths -> {
                 testContext.verify(() -> {
@@ -232,7 +232,7 @@ class NetworkTopologyServiceTest {
         
         // First discover the node
         service.discoverNode(hostname)
-            .compose(v -> {
+            .<NetworkTopologyService.NetworkRecommendations>compose(v -> {
                 // Update metrics
                 service.updateMetrics(hostname, bytesTransferred, actualTime, true);
                 
@@ -254,7 +254,7 @@ class NetworkTopologyServiceTest {
     void testGetNetworkStatistics(VertxTestContext testContext) {
         // Discover a few nodes to populate statistics
         service.discoverNode("localhost")
-            .compose(v -> service.discoverNode("127.0.0.1"))
+            .<NetworkNode>compose(v -> service.discoverNode("127.0.0.1"))
             .onComplete(testContext.succeeding(v -> {
                 testContext.verify(() -> {
                     NetworkTopologyService.NetworkStatistics stats = service.getNetworkStatistics();
@@ -276,7 +276,7 @@ class NetworkTopologyServiceTest {
     void testNetworkTypeDetection(VertxTestContext testContext) {
         // Test localhost detection
         service.discoverNode("localhost")
-            .compose(localhostNode -> {
+            .<NetworkNode>compose(localhostNode -> {
                 testContext.verify(() -> assertEquals(NetworkTopologyService.NetworkType.LOCAL_NETWORK, localhostNode.getNetworkType()));
                 return service.discoverNode("127.0.0.1");
             })

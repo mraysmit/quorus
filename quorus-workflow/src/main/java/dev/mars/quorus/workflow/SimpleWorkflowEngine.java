@@ -381,6 +381,7 @@ public class SimpleWorkflowEngine implements WorkflowEngine {
             List<TransferGroup.TransferDefinition> transfers = group.getTransfers();
 
             // Create a list of Vert.x Futures for parallel execution
+            @SuppressWarnings("unchecked")
             List<Future<Map.Entry<String, TransferResult>>> transferFutures = transfers.stream()
                     .map(transfer -> {
                         try {
@@ -389,14 +390,14 @@ public class SimpleWorkflowEngine implements WorkflowEngine {
 
                             // Map to entry with transfer name
                             return transferFuture
-                                    .recover(error -> {
+                                    .<TransferResult>recover(error -> {
                                         logger.log(Level.WARNING, "Transfer execution failed: " + transfer.getName() + " - " + error.getMessage());
                                         if (logger.isLoggable(Level.FINE)) {
                                             logger.log(Level.FINE, "Transfer execution exception details for: " + transfer.getName(), error);
                                         }
                                         return Future.succeededFuture(createMockTransferResult(transfer, false));
                                     })
-                                    .map(result -> Map.entry(transfer.getName(), result));
+                                    .<Map.Entry<String, TransferResult>>map(result -> Map.entry(transfer.getName(), result));
                         } catch (Exception e) {
                             // Handle TransferException from toTransferRequest()
                             logger.log(Level.WARNING, "Failed to create transfer request: " + transfer.getName() + " - " + e.getMessage());

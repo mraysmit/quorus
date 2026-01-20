@@ -25,6 +25,7 @@ import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferResult;
 import dev.mars.quorus.core.TransferStatus;
 import dev.mars.quorus.transfer.TransferEngine;
+import io.vertx.core.Future;
 import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.json.jackson.DatabindCodec;
@@ -100,7 +101,7 @@ class TransferResourceTest {
         // Mock transfer engine response
         TransferResult mockResult = mock(TransferResult.class);
         when(mockResult.getRequestId()).thenReturn("test-job-123");
-        CompletableFuture<TransferResult> future = CompletableFuture.completedFuture(mockResult);
+        Future<TransferResult> future = Future.succeededFuture(mockResult);
         try {
             when(mockTransferEngine.submitTransfer(any(TransferRequest.class))).thenReturn(future);
         } catch (Exception e) {
