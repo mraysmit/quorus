@@ -347,4 +347,69 @@ class FtpTransferProtocolTest {
             protocol.transfer(request, context);
         });
     }
+    
+    @Test
+    void testFtpUriAuthenticationEdgeCase() {
+        // Test FTP URI with username and password
+        TransferRequest request = TransferRequest.builder()
+                .requestId("test-auth-edge")
+                .sourceUri(URI.create("ftp://user:pass@server.com:21/path/file.txt"))
+                .destinationPath(tempDir.resolve("file.txt"))
+                .build();
+        
+        assertTrue(protocol.canHandle(request));
+        
+        // Will fail due to no real server, but tests URI parsing with auth
+        assertThrows(TransferException.class, () -> {
+            protocol.transfer(request, context);
+        });
+    }
+    
+    @Test
+    void testFtpUriCustomPortEdgeCase() {
+        // Test FTP URI with custom port
+        TransferRequest request = TransferRequest.builder()
+                .requestId("test-port-edge")
+                .sourceUri(URI.create("ftp://server.com:2121/path/file.txt"))
+                .destinationPath(tempDir.resolve("file.txt"))
+                .build();
+        
+        assertTrue(protocol.canHandle(request));
+        
+        // Will fail due to no real server, but tests URI parsing with custom port
+        assertThrows(TransferException.class, () -> {
+            protocol.transfer(request, context);
+        });
+    }
+    
+    @Test
+    void testMissingHostInUri() {
+        // INTENTIONAL FAILURE TEST: URI without host should throw exception during transfer
+        TransferRequest request = TransferRequest.builder()
+                .requestId("test-missing-host")
+                .sourceUri(URI.create("ftp:///path/file.txt"))  // No host specified
+                .destinationPath(tempDir.resolve("file.txt"))
+                .build();
+        
+        // canHandle might still return true (checks scheme), but transfer should fail
+        assertThrows(TransferException.class, () -> {
+            protocol.transfer(request, context);
+        });
+    }
+    
+    @Test
+    void testMissingPathInUri() {
+        // INTENTIONAL FAILURE TEST: URI without path should throw exception during transfer
+        TransferRequest request = TransferRequest.builder()
+                .requestId("test-missing-path")
+                .sourceUri(URI.create("ftp://server.com"))  // No path specified
+                .destinationPath(tempDir.resolve("file.txt"))
+                .build();
+        
+        assertTrue(protocol.canHandle(request));
+        
+        assertThrows(TransferException.class, () -> {
+            protocol.transfer(request, context);
+        });
+    }
 }

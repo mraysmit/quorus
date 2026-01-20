@@ -1,0 +1,125 @@
+version: '3.8'
+
+# Protocol servers for integration testing (standalone)
+# These can be started independently for manual testing and debugging
+# Usage: docker-compose -f docker-compose-protocol-servers.yml up
+
+networks:
+  protocol-test:
+    name: quorus-protocol-test
+    driver: bridge
+
+services:
+  # FTP Server - Pure-FTPd with passive mode configuration
+  ftp:
+    image: stilliard/pure-ftpd:latest
+    container_name: quorus-ftp-test
+    networks:
+      protocol-test:
+        aliases:
+          - ftp-server
+    ports:
+      # Control port
+      - "21:21"
+      # Passive mode data ports (10 ports for concurrent connections)
+      - "30000-30009:30000-30009"
+    environment:
+      # Critical: Use 'localhost' for host access, 'ftp' for container-to-container
+      PUBLICHOST: "localhost"
+      FTP_USER_NAME: testuser
+      FTP_USER_PASS: testpass
+      FTP_USER_HOME: /home/ftpusers/testuser
+      # Passive port range configuration
+      ADDED_FLAGS: "-p 30000:30009"
+    volumes:
+      - ftp-data:/home/ftpusers/testuser
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "21"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # SFTP Server - OpenSSH-based SFTP
+  sftp:
+    image: atmoz/sftp:alpine
+    container_name: quorus-sftp-test
+    networks:
+      protocol-test:
+        aliases:
+          - sftp-server
+    ports:
+      - "2222:22"
+    # Format: username:password:userid:groupid:directory
+    command: testuser:testpass:1001:100:upload
+    volumes:
+      - sftp-data:/home/testuser/upload
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 22 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # SMB/CIFS Server - Samba file sharing
+  smb:
+    image: dperson/samba:latest
+    container_name: quorus-smb-test
+    networks:
+      protocol-test:
+        aliases:
+          - smb-server
+    ports:
+      # SMB/CIFS port (using 4445 to avoid conflict with Windows SMB on 445)
+      - "4445:445"
+      # NetBIOS ports (optional, for Windows discovery)
+      - "1137-1139:137-139"
+    environment:
+      # User format: username;password
+      USER: "testuser;testpass"
+      # Share format: name;path;browseable;readonly;guest;users;admins;writelist
+      SHARE: "testshare;/share;yes;no;no;testuser;testuser;testuser"
+      PERMISSIONS: "yes"
+      # Workgroup name
+      WORKGROUP: "WORKGROUP"
+    tmpfs:
+      - /tmp
+    volumes:
+      - smb-data:/share
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "smbclient -L localhost -U testuser%testpass -m SMB3 || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  ftp-data:
+    name: quorus-ftp-test-data
+  sftp-data:
+    name: quorus-sftp-test-data
+  smb-data:
+    name: quorus-smb-test-data
+
+# Documentation:
+# 
+# FTP Connection (from host):
+#   ftp://testuser:testpass@localhost:21/path/to/file.txt
+# 
+# SFTP Connection (from host):
+#   sftp://testuser:testpass@localhost:2222/upload/path/to/file.txt
+# 
+# SMB Connection (from host):
+#   Windows: Not available via \\localhost (port 4445, not standard 445)
+#   URI:     smb://testuser:testpass@localhost:4445/testshare/path/to/file.txt
+#   Note:    Using port 4445 to avoid conflict with Windows SMB service
+# 
+# Container-to-container (use service names):
+#   ftp://testuser:testpass@ftp:21/...
+#   sftp://testuser:testpass@sftp:22/...
+#   smb://testuser:testpass@smb:445/...  (internal port is still 445)
+# 
+# Manual Testing:
+#   docker-compose -f docker-compose-protocol-servers.yml up -d
+#   docker-compose -f docker-compose-protocol-servers.yml logs -f
+#   docker-compose -f docker-compose-protocol-servers.yml down -v

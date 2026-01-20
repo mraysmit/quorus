@@ -296,4 +296,118 @@ class SmbTransferProtocolTest {
             protocol.transfer(request, context);
         });
     }
+    
+    @Test
+    void testSmbUriAuthenticationEdgeCase() {
+        // Test SMB URI with username and password
+        TransferRequest request = TransferRequest.builder()
+                .requestId("test-auth-edge")
+                .sourceUri(URI.create("smb://domain;user:pass@server/share/file.txt"))
+                .destinationPath(tempDir.resolve("file.txt"))
+                .build();
+        
+        assertTrue(protocol.canHandle(request));
+    }
+    
+    @Test
+    void testSmbUriWithDomain() {
+        // Test SMB URI with domain in username
+        TransferRequest request = TransferRequest.builder()
+                .requestId("test-domain")
+                .sourceUri(URI.create("smb://DOMAIN;user@server/share/file.txt"))
+                .destinationPath(tempDir.resolve("file.txt"))
+                .build();
+        
+        assertTrue(protocol.canHandle(request));
+    }
+    
+    @Test
+    void testSmbUriWithCustomPort() {
+        // Test SMB URI with custom port
+        TransferRequest request = TransferRequest.builder()
+                .requestId("test-port")
+                .sourceUri(URI.create("smb://server:4445/share/file.txt"))
+                .destinationPath(tempDir.resolve("file.txt"))
+                .build();
+        
+        assertTrue(protocol.canHandle(request));
+    }
+    
+    @Test
+    void testMissingSmbHostInUri() {
+        // INTENTIONAL FAILURE TEST: URI without host should throw exception during transfer
+        TransferRequest request = TransferRequest.builder()
+                .requestId("test-missing-host")
+                .sourceUri(URI.create("smb:///share/file.txt"))  // No host specified
+                .destinationPath(tempDir.resolve("file.txt"))
+                .build();
+        
+        // Transfer should fail with missing host
+        assertThrows(TransferException.class, () -> {
+            protocol.transfer(request, context);
+        });
+    }
+    
+    @Test
+    void testMissingSmbPathInUri() {
+        // INTENTIONAL FAILURE TEST: URI without path should throw exception during transfer
+        TransferRequest request = TransferRequest.builder()
+                .requestId("test-missing-path")
+                .sourceUri(URI.create("smb://server"))  // No path specified
+                .destinationPath(tempDir.resolve("file.txt"))
+                .build();
+        
+        assertTrue(protocol.canHandle(request));
+        
+        assertThrows(TransferException.class, () -> {
+            protocol.transfer(request, context);
+        });
+    }
+    
+    @Test
+    void testSmbPathWithSpaces() {
+        // Test SMB URI with spaces in path
+        TransferRequest request = TransferRequest.builder()
+                .requestId("test-spaces")
+                .sourceUri(URI.create("smb://server/share/folder%20name/file%20name.txt"))
+                .destinationPath(tempDir.resolve("file.txt"))
+                .build();
+        
+        assertTrue(protocol.canHandle(request));
+        
+        // Will fail due to no real server, but tests URI parsing
+        assertThrows(TransferException.class, () -> {
+            protocol.transfer(request, context);
+        });
+    }
+    
+    @Test
+    void testCifsSchemeSupport() {
+        // Test that CIFS scheme is also supported
+        TransferRequest request = TransferRequest.builder()
+                .requestId("test-cifs-scheme")
+                .sourceUri(URI.create("cifs://server/share/file.txt"))
+                .destinationPath(tempDir.resolve("file.txt"))
+                .build();
+        
+        // CIFS is an alias for SMB
+        assertTrue(protocol.canHandle(request));
+    }
+    
+    @Test
+    void testNestedSharePath() {
+        // Test SMB URI with nested directory structure
+        TransferRequest request = TransferRequest.builder()
+                .requestId("test-nested")
+                .sourceUri(URI.create("smb://server/share/dir1/dir2/dir3/file.txt"))
+                .destinationPath(tempDir.resolve("file.txt"))
+                .build();
+        
+        assertTrue(protocol.canHandle(request));
+        
+        // Will fail due to no real server, but tests deep path handling
+        assertThrows(TransferException.class, () -> {
+            protocol.transfer(request, context);
+        });
+    }
 }

@@ -414,4 +414,88 @@ class SftpTransferProtocolTest {
             fail("Failed to read created file: " + e.getMessage());
         }
     }
+    
+    @Test
+    void testSftpUriAuthenticationEdgeCase() {
+        // Test SFTP URI with username and password
+        TransferRequest request = TransferRequest.builder()
+                .requestId("test-auth-edge")
+                .sourceUri(URI.create("sftp://user:pass@server.com:22/path/file.txt"))
+                .destinationPath(tempDir.resolve("file.txt"))
+                .build();
+        
+        assertTrue(protocol.canHandle(request));
+    }
+    
+    @Test
+    void testSftpUriCustomPortEdgeCase() {
+        // Test SFTP URI with custom port
+        TransferRequest request = TransferRequest.builder()
+                .requestId("test-port-edge")
+                .sourceUri(URI.create("sftp://server.com:2222/path/file.txt"))
+                .destinationPath(tempDir.resolve("file.txt"))
+                .build();
+        
+        assertTrue(protocol.canHandle(request));
+    }
+    
+    @Test
+    void testSftpUriUsernameOnlyEdgeCase() {
+        // Test SFTP URI with username but no password
+        TransferRequest request = TransferRequest.builder()
+                .requestId("test-username-edge")
+                .sourceUri(URI.create("sftp://user@server.com/path/file.txt"))
+                .destinationPath(tempDir.resolve("file.txt"))
+                .build();
+        
+        assertTrue(protocol.canHandle(request));
+    }
+    
+    @Test
+    void testMissingSftpHostInUri() {
+        // INTENTIONAL FAILURE TEST: URI without host should throw exception during transfer
+        TransferRequest request = TransferRequest.builder()
+                .requestId("test-missing-host")
+                .sourceUri(URI.create("sftp:///path/file.txt"))  // No host specified
+                .destinationPath(tempDir.resolve("file.txt"))
+                .build();
+        
+        // Transfer should fail with missing host
+        assertThrows(TransferException.class, () -> {
+            protocol.transfer(request, context);
+        });
+    }
+    
+    @Test
+    void testMissingSftpPathInUri() {
+        // INTENTIONAL FAILURE TEST: URI without path should throw exception during transfer
+        TransferRequest request = TransferRequest.builder()
+                .requestId("test-missing-path")
+                .sourceUri(URI.create("sftp://server.com"))  // No path specified
+                .destinationPath(tempDir.resolve("file.txt"))
+                .build();
+        
+        assertTrue(protocol.canHandle(request));
+        
+        assertThrows(TransferException.class, () -> {
+            protocol.transfer(request, context);
+        });
+    }
+    
+    @Test
+    void testIsTestHostnameDetection() {
+        // Test that simulation mode is triggered for test hostnames
+        TransferRequest request = TransferRequest.builder()
+                .requestId("test-hostname-detection")
+                .sourceUri(URI.create("sftp://test.example.com/path/file.txt"))
+                .destinationPath(tempDir.resolve("file.txt"))
+                .build();
+        
+        // Should use simulation mode for test hostnames
+        TransferResult result = assertDoesNotThrow(() -> protocol.transfer(request, context));
+        assertNotNull(result);
+        assertEquals(TransferStatus.COMPLETED, result.getFinalStatus());
+    }
+    
 }
+
