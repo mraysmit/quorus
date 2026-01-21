@@ -148,7 +148,7 @@ services:
   agent-nyc:
     build:
       context: ../..
-      dockerfile: docker/agents/Dockerfile
+      dockerfile: quorus-agent/Dockerfile
     container_name: quorus-agent-nyc
     hostname: agent-nyc
     environment:
@@ -176,7 +176,7 @@ services:
   agent-london:
     build:
       context: ../..
-      dockerfile: docker/agents/Dockerfile
+      dockerfile: quorus-agent/Dockerfile
     container_name: quorus-agent-london
     hostname: agent-london
     environment:
@@ -204,7 +204,7 @@ services:
   agent-tokyo:
     build:
       context: ../..
-      dockerfile: docker/agents/Dockerfile
+      dockerfile: quorus-agent/Dockerfile
     container_name: quorus-agent-tokyo
     hostname: agent-tokyo
     environment:

@@ -21,12 +21,12 @@ import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferResult;
 import dev.mars.quorus.transfer.SimpleTransferEngine;
 import dev.mars.quorus.transfer.TransferEngine;
+import io.vertx.core.Future;
 import io.vertx.core.Vertx;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -87,9 +87,9 @@ public class TransferExecutionService {
                    config.getMaxConcurrentTransfers());
     }
     
-    public CompletableFuture<TransferResult> executeTransfer(TransferRequest request) {
+    public Future<TransferResult> executeTransfer(TransferRequest request) {
         if (!running) {
-            return CompletableFuture.failedFuture(
+            return Future.failedFuture(
                 new IllegalStateException("Transfer execution service is not running"));
         }
 
@@ -98,26 +98,29 @@ public class TransferExecutionService {
 
         try {
             return transferEngine.submitTransfer(request)
-                .whenComplete((result, throwable) -> {
-                    if (throwable != null) {
-                        logger.error("Transfer failed: " + request.getRequestId(), throwable);
-                    } else if (result.isSuccessful()) {
-                        String durationStr = result.getDuration()
-                                .map(d -> d.toMillis() + "ms")
-                                .orElse("unknown");
-                        logger.info("Transfer completed successfully: {} ({} bytes in {})",
-                                   request.getRequestId(),
-                                   result.getBytesTransferred(),
-                                   durationStr);
+                .onComplete(ar -> {
+                    if (ar.failed()) {
+                        logger.error("Transfer failed: " + request.getRequestId(), ar.cause());
                     } else {
-                        logger.warn("Transfer failed: {} - {}",
-                                   request.getRequestId(),
-                                   result.getErrorMessage().orElse("Unknown error"));
+                        TransferResult result = ar.result();
+                        if (result.isSuccessful()) {
+                            String durationStr = result.getDuration()
+                                    .map(d -> d.toMillis() + "ms")
+                                    .orElse("unknown");
+                            logger.info("Transfer completed successfully: {} ({} bytes in {})",
+                                       request.getRequestId(),
+                                       result.getBytesTransferred(),
+                                       durationStr);
+                        } else {
+                            logger.warn("Transfer failed: {} - {}",
+                                       request.getRequestId(),
+                                       result.getErrorMessage().orElse("Unknown error"));
+                        }
                     }
                 });
         } catch (Exception e) {
             logger.error("Failed to submit transfer: " + request.getRequestId(), e);
-            return CompletableFuture.failedFuture(e);
+            return Future.failedFuture(e);
         }
     }
     
