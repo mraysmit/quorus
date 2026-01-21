@@ -8,23 +8,18 @@ WORKDIR /app
 COPY pom.xml .
 COPY quorus-core/pom.xml quorus-core/
 COPY quorus-workflow/pom.xml quorus-workflow/
+COPY quorus-agent/pom.xml quorus-agent/
 
 # Download dependencies
-RUN mvn dependency:go-offline -pl quorus-core,quorus-workflow
+RUN mvn dependency:go-offline -pl quorus-core,quorus-workflow,quorus-agent -am
 
 # Copy source code
 COPY quorus-core/src quorus-core/src
 COPY quorus-workflow/src quorus-workflow/src
+COPY quorus-agent/src quorus-agent/src
 
-# Build the core modules
-RUN mvn clean package -pl quorus-core,quorus-workflow -DskipTests
-
-# Copy agent source
-COPY docker/agents/src docker/agents/src
-COPY docker/agents/pom.xml docker/agents/
-
-# Build the agent
-RUN mvn clean package -f docker/agents/pom.xml -DskipTests
+# Build the agent and dependencies
+RUN mvn clean package -pl quorus-agent -am -DskipTests
 
 # ============================================================================
 # Runtime stage
@@ -45,11 +40,11 @@ RUN addgroup -g 1001 quorus && \
 WORKDIR /app
 
 # Copy the built JAR and dependencies
-COPY --from=builder /app/docker/agents/target/quorus-agent-*.jar app.jar
-COPY --from=builder /app/docker/agents/target/lib/ lib/
+COPY --from=builder /app/quorus-agent/target/quorus-agent-*.jar app.jar
+COPY --from=builder /app/quorus-agent/target/lib/ lib/
 
-# Copy configuration files
-COPY docker/agents/config/ config/
+# Copy configuration files from resources
+COPY quorus-agent/src/main/resources/logback.xml config/logback.xml
 
 # Create directories for logs and data
 RUN mkdir -p /app/logs /app/data /app/transfers && \
@@ -77,7 +72,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:${AGENT_PORT}/health || exit 1
 
 # Entry point
-COPY docker/agents/docker-entrypoint.sh /docker-entrypoint.sh
+COPY quorus-agent/docker-entrypoint.sh /docker-entrypoint.sh
 USER root
 RUN chmod +x /docker-entrypoint.sh
 USER quorus

@@ -303,11 +303,8 @@ public class QuorusAgent {
 
             // Execute the transfer
             transferService.executeTransfer(request)
-                    .thenAccept(result -> handleTransferComplete(jobId, result))
-                    .exceptionally(throwable -> {
-                        handleTransferError(jobId, throwable);
-                        return null;
-                    });
+                    .onSuccess(result -> handleTransferComplete(jobId, result))
+                    .onFailure(throwable -> handleTransferError(jobId, throwable));
 
         } catch (Exception e) {
             logger.error("Error processing job: {}", jobId, e);

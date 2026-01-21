@@ -18,6 +18,7 @@
         <module>quorus-tenant</module>
         <module>quorus-api</module>
         <module>quorus-controller</module>
+        <module>quorus-agent</module>
         <module>quorus-integration-examples</module>
     </modules>
 
