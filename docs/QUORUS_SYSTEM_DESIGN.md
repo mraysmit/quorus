@@ -705,7 +705,7 @@ public interface RaftTransport {
 | Transport | Status | Class | Description |
 |-----------|--------|-------|-------------|
 | **gRPC** | ✅ Implemented | `GrpcRaftTransport` | Production-ready, high-performance |
-| **In-Memory** | ✅ Implemented | `TestInMemoryTransport` | For unit testing (in test folder) |
+| **In-Memory** | ✅ Implemented | `InMemoryTransportSimulator` | For unit testing (in test folder) |
 
 #### gRPC Transport Implementation (Production)
 
@@ -743,7 +743,7 @@ server.start();
 
 #### In-Memory Transport Implementation (Test Utility)
 
-The `TestInMemoryTransport` (in test folder) provides fast, deterministic transport for unit testing:
+The `InMemoryTransportSimulator` (in test folder) provides fast, deterministic transport for unit testing:
 
 **Features:**
 - **Static Registry**: Global `ConcurrentHashMap` for node discovery
@@ -751,7 +751,7 @@ The `TestInMemoryTransport` (in test folder) provides fast, deterministic transp
 - **Packet Drop Simulation**: Configurable drop rate for chaos testing
 - **Direct Method Calls**: No network overhead, all nodes in same JVM
 
-**Location:** `quorus-controller/src/test/java/dev/mars/quorus/controller/raft/TestInMemoryTransport.java`
+**Location:** `quorus-controller/src/test/java/dev/mars/quorus/controller/raft/InMemoryTransportSimulator.java`
 
 #### Transport Selection Guide
 

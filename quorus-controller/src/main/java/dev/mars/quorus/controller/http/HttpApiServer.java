@@ -105,10 +105,12 @@ public class HttpApiServer {
                 AgentCommand command = AgentCommand.register(agentInfo);
                 
                 return raftNode.submitCommand(command)
-                        .map(res -> new JsonObject()
-                                .put("success", true)
-                                .put("agentId", agentInfo.getAgentId()))
-                        .map(json -> ctx.response().setStatusCode(201).end(json.encode()));
+                        .map(res -> {
+                            ctx.response().setStatusCode(201);
+                            return new JsonObject()
+                                    .put("success", true)
+                                    .put("agentId", agentInfo.getAgentId());
+                        });
             } catch (Exception e) {
                 logger.error("Failed to register agent", e);
                 return Future.failedFuture(e);
@@ -123,10 +125,12 @@ public class HttpApiServer {
                 TransferJobCommand command = TransferJobCommand.create(job);
                 
                 return raftNode.submitCommand(command)
-                        .map(res -> new JsonObject()
-                                .put("success", true)
-                                .put("jobId", job.getJobId()))
-                        .map(json -> ctx.response().setStatusCode(201).end(json.encode()));
+                        .map(res -> {
+                            ctx.response().setStatusCode(201);
+                            return new JsonObject()
+                                    .put("success", true)
+                                    .put("jobId", job.getJobId());
+                        });
             } catch (Exception e) {
                 logger.error("Failed to create transfer job", e);
                 return Future.failedFuture(e);
@@ -141,10 +145,12 @@ public class HttpApiServer {
                 JobAssignmentCommand command = JobAssignmentCommand.assign(assignment);
                 
                 return raftNode.submitCommand(command)
-                        .map(res -> new JsonObject()
-                                .put("success", true)
-                                .put("assignmentId", command.getAssignmentId()))
-                        .map(json -> ctx.response().setStatusCode(201).end(json.encode()));
+                        .map(res -> {
+                            ctx.response().setStatusCode(201);
+                            return new JsonObject()
+                                    .put("success", true)
+                                    .put("assignmentId", command.getAssignmentId());
+                        });
             } catch (Exception e) {
                 logger.error("Failed to assign job", e);
                 return Future.failedFuture(e);
@@ -158,7 +164,8 @@ public class HttpApiServer {
             
             TransferJobSnapshot job = stateMachine.getTransferJobs().get(jobId);
             if (job == null) {
-                return Future.succeededFuture(ctx.response().setStatusCode(404).end());
+                ctx.response().setStatusCode(404);
+                return Future.succeededFuture(new JsonObject().put("error", "Job not found"));
             }
             
             // Get the latest assignment status for this job
@@ -180,11 +187,11 @@ public class HttpApiServer {
                 response.put("status", job.getStatus().name());
             }
             
-            return Future.succeededFuture(response.encode());
+            return Future.succeededFuture(response);
         });
 
         // Get Agent Jobs (pending only)
-        router.get("/api/v1/agents/:agentId/jobs").respond(ctx -> {
+        router.get("/api/v1/agents/:agentId/jobs").handler(ctx -> {
             String agentId = ctx.pathParam("agentId");
             QuorusStateMachine stateMachine = (QuorusStateMachine) raftNode.getStateMachine();
             
@@ -195,7 +202,9 @@ public class HttpApiServer {
                             && a.getStatus() != JobAssignmentStatus.FAILED)
                     .collect(Collectors.toList());
             
-            return Future.succeededFuture(new JsonArray(assignments).encode());
+            JsonArray jsonArray = new JsonArray();
+            assignments.forEach(jsonArray::add);
+            ctx.response().setStatusCode(200).end(jsonArray.encode());
         });
 
         // Update Job Status (Assignment Status)
@@ -221,12 +230,10 @@ public class HttpApiServer {
                     TransferJobCommand jobCommand = TransferJobCommand.updateProgress(jobId, bytesTransferred);
                     return assignmentFuture
                             .compose(res -> raftNode.submitCommand(jobCommand))
-                            .map(res -> new JsonObject().put("success", true))
-                            .map(json -> ctx.response().setStatusCode(200).end(json.encode()));
+                            .map(res -> new JsonObject().put("success", true));
                 } else {
                     return assignmentFuture
-                            .map(res -> new JsonObject().put("success", true))
-                            .map(json -> ctx.response().setStatusCode(200).end(json.encode()));
+                            .map(res -> new JsonObject().put("success", true));
                 }
             } catch (Exception e) {
                 logger.error("Failed to update status", e);
