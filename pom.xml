@@ -28,7 +28,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <junit.version>5.10.1</junit.version>
         <vertx.version>5.0.2</vertx.version>
-        <testcontainers.version>2.0.2</testcontainers.version>
+        <testcontainers.version>2.0.3</testcontainers.version>
         <jacoco.version>0.8.12</jacoco.version>
     </properties>
 

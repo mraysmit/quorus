@@ -51,9 +51,9 @@ class RaftConsensusTest {
     private RaftNode leader;
     private RaftNode follower1;
     private RaftNode follower2;
-    private TestInMemoryTransport transport1;
-    private TestInMemoryTransport transport2;
-    private TestInMemoryTransport transport3;
+    private InMemoryTransportSimulator transport1;
+    private InMemoryTransportSimulator transport2;
+    private InMemoryTransportSimulator transport3;
     private QuorusStateMachine stateMachine1;
     private QuorusStateMachine stateMachine2;
     private QuorusStateMachine stateMachine3;
@@ -62,13 +62,13 @@ class RaftConsensusTest {
     @BeforeEach
     void setUp() {
         vertx = io.vertx.core.Vertx.vertx();
-        TestInMemoryTransport.clearAllTransports();
+        InMemoryTransportSimulator.clearAllTransports();
 
         Set<String> clusterNodes = Set.of("leader", "follower1", "follower2");
 
-        transport1 = new TestInMemoryTransport("leader");
-        transport2 = new TestInMemoryTransport("follower1");
-        transport3 = new TestInMemoryTransport("follower2");
+        transport1 = new InMemoryTransportSimulator("leader");
+        transport2 = new InMemoryTransportSimulator("follower1");
+        transport3 = new InMemoryTransportSimulator("follower2");
 
         stateMachine1 = new QuorusStateMachine();
         stateMachine2 = new QuorusStateMachine();
@@ -85,7 +85,7 @@ class RaftConsensusTest {
         if (follower1 != null) follower1.stop();
         if (follower2 != null) follower2.stop();
         if (vertx != null) vertx.close();
-        TestInMemoryTransport.clearAllTransports();
+        InMemoryTransportSimulator.clearAllTransports();
     }
 
     @Test
@@ -164,7 +164,7 @@ class RaftConsensusTest {
         // Start single node for simplicity
         Set<String> singleNode = Set.of("single");
         RaftNode single = new RaftNode(vertx, "single", singleNode, 
-                new TestInMemoryTransport("single"), new QuorusStateMachine(), 500, 100);
+                new InMemoryTransportSimulator("single"), new QuorusStateMachine(), 500, 100);
         
         single.start().toCompletionStage().toCompletableFuture().join();
         
@@ -203,7 +203,7 @@ class RaftConsensusTest {
         // After some time, should attempt election (single node cluster behavior)
         Set<String> singleNode = Set.of("test");
         RaftNode testNode = new RaftNode(vertx, "test", singleNode, 
-                new TestInMemoryTransport("test"), new QuorusStateMachine(), 300, 100);
+                new InMemoryTransportSimulator("test"), new QuorusStateMachine(), 300, 100);
         
         testNode.start();
         

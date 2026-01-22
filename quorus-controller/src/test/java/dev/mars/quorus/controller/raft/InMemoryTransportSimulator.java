@@ -44,12 +44,12 @@ import java.util.function.Consumer;
  * @since 2026-01-05
  */
 
-public class TestInMemoryTransport implements RaftTransport {
+public class InMemoryTransportSimulator implements RaftTransport {
 
-    private static final Logger logger = LoggerFactory.getLogger(TestInMemoryTransport.class);
+    private static final Logger logger = LoggerFactory.getLogger(InMemoryTransportSimulator.class);
 
     // Global registry of all transport instances
-    private static final Map<String, TestInMemoryTransport> transports = new ConcurrentHashMap<>();
+    private static final Map<String, InMemoryTransportSimulator> transports = new ConcurrentHashMap<>();
     
     // Network partition state (set of isolated node groups)
     private static final Set<Set<String>> networkPartitions = ConcurrentHashMap.newKeySet();
@@ -95,7 +95,7 @@ public class TestInMemoryTransport implements RaftTransport {
         FLAKY           // Node intermittently fails
     }
 
-    public TestInMemoryTransport(String nodeId) {
+    public InMemoryTransportSimulator(String nodeId) {
         this.nodeId = nodeId;
         startReorderProcessor();
     }
@@ -306,7 +306,7 @@ public class TestInMemoryTransport implements RaftTransport {
                     return;
                 }
 
-                TestInMemoryTransport targetTransport = transports.get(targetNodeId);
+                InMemoryTransportSimulator targetTransport = transports.get(targetNodeId);
                 if (targetTransport == null || !targetTransport.running) {
                     promise.fail(new RuntimeException("Target node not available: " + targetNodeId));
                     return;
@@ -384,7 +384,7 @@ public class TestInMemoryTransport implements RaftTransport {
                     return;
                 }
 
-                TestInMemoryTransport targetTransport = transports.get(targetNodeId);
+                InMemoryTransportSimulator targetTransport = transports.get(targetNodeId);
                 if (targetTransport == null || !targetTransport.running) {
                     promise.fail(new RuntimeException("Target node not available: " + targetNodeId));
                     return;
@@ -506,7 +506,7 @@ public class TestInMemoryTransport implements RaftTransport {
                 .build();
     }
 
-    public static Map<String, TestInMemoryTransport> getAllTransports() {
+    public static Map<String, InMemoryTransportSimulator> getAllTransports() {
         return new ConcurrentHashMap<>(transports);
     }
 

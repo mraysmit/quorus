@@ -33,7 +33,7 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Comprehensive tests for enhanced TestInMemoryTransport features:
+ * Comprehensive tests for enhanced InMemoryTransportSimulator features:
  * - Network partitions
  * - Message reordering
  * - Bandwidth throttling
@@ -55,12 +55,12 @@ class EnhancedInMemoryTransportTest {
     @BeforeEach
     void setUp(Vertx vertx) {
         this.vertx = vertx;
-        TestInMemoryTransport.clearAllTransports();
+        InMemoryTransportSimulator.clearAllTransports();
     }
 
     @AfterEach
     void tearDown() {
-        TestInMemoryTransport.clearAllTransports();
+        InMemoryTransportSimulator.clearAllTransports();
     }
 
     @Test
@@ -71,9 +71,9 @@ class EnhancedInMemoryTransportTest {
         
         Set<String> clusterNodes = Set.of("node1", "node2", "node3");
 
-        TestInMemoryTransport transport1 = new TestInMemoryTransport("node1");
-        TestInMemoryTransport transport2 = new TestInMemoryTransport("node2");
-        TestInMemoryTransport transport3 = new TestInMemoryTransport("node3");
+        InMemoryTransportSimulator transport1 = new InMemoryTransportSimulator("node1");
+        InMemoryTransportSimulator transport2 = new InMemoryTransportSimulator("node2");
+        InMemoryTransportSimulator transport3 = new InMemoryTransportSimulator("node3");
 
         QuorusStateMachine stateMachine1 = new QuorusStateMachine();
         QuorusStateMachine stateMachine2 = new QuorusStateMachine();
@@ -98,7 +98,7 @@ class EnhancedInMemoryTransportTest {
                     assertEquals(1, initialLeaderCount, "Should have exactly one leader initially");
 
                     // Create partition: {node1} | {node2, node3}
-                    TestInMemoryTransport.createPartition(Set.of("node1"), Set.of("node2", "node3"));
+                    InMemoryTransportSimulator.createPartition(Set.of("node1"), Set.of("node2", "node3"));
                     logger.info("Created network partition: {node1} | {node2, node3}");
 
                     // Wait for partition effects
@@ -115,7 +115,7 @@ class EnhancedInMemoryTransportTest {
                         logger.info("node3 state: {} (leader: {})", node3.getState(), node3.isLeader());
 
                         // Heal the partition
-                        TestInMemoryTransport.healPartitions();
+                        InMemoryTransportSimulator.healPartitions();
                         logger.info("Healed network partition");
 
                         // Wait for cluster to converge
@@ -146,8 +146,8 @@ class EnhancedInMemoryTransportTest {
         
         Set<String> clusterNodes = Set.of("leader", "follower");
 
-        TestInMemoryTransport transport1 = new TestInMemoryTransport("leader");
-        TestInMemoryTransport transport2 = new TestInMemoryTransport("follower");
+        InMemoryTransportSimulator transport1 = new InMemoryTransportSimulator("leader");
+        InMemoryTransportSimulator transport2 = new InMemoryTransportSimulator("follower");
 
         // Enable message reordering
         transport1.setReorderingConfig(true, 0.3, 50); // 30% reorder probability, max 50ms delay
@@ -187,8 +187,8 @@ class EnhancedInMemoryTransportTest {
         
         Set<String> clusterNodes = Set.of("node1", "node2");
 
-        TestInMemoryTransport transport1 = new TestInMemoryTransport("node1");
-        TestInMemoryTransport transport2 = new TestInMemoryTransport("node2");
+        InMemoryTransportSimulator transport1 = new InMemoryTransportSimulator("node1");
+        InMemoryTransportSimulator transport2 = new InMemoryTransportSimulator("node2");
 
         // Enable bandwidth throttling (very low limit)
         transport1.setThrottlingConfig(true, 1000); // 1KB/sec
@@ -233,9 +233,9 @@ class EnhancedInMemoryTransportTest {
         
         Set<String> clusterNodes = Set.of("node1", "node2", "node3");
 
-        TestInMemoryTransport transport1 = new TestInMemoryTransport("node1");
-        TestInMemoryTransport transport2 = new TestInMemoryTransport("node2");
-        TestInMemoryTransport transport3 = new TestInMemoryTransport("node3");
+        InMemoryTransportSimulator transport1 = new InMemoryTransportSimulator("node1");
+        InMemoryTransportSimulator transport2 = new InMemoryTransportSimulator("node2");
+        InMemoryTransportSimulator transport3 = new InMemoryTransportSimulator("node3");
 
         QuorusStateMachine stateMachine1 = new QuorusStateMachine();
         QuorusStateMachine stateMachine2 = new QuorusStateMachine();
@@ -258,7 +258,7 @@ class EnhancedInMemoryTransportTest {
                     assertEquals(1, initialLeaderCount, "Should have one leader initially");
 
                     // Crash node1
-                    transport1.setFailureMode(TestInMemoryTransport.FailureMode.CRASH, 0.0);
+                    transport1.setFailureMode(InMemoryTransportSimulator.FailureMode.CRASH, 0.0);
                     logger.info("Crashed node1");
 
                     // Wait for cluster to adapt
@@ -301,12 +301,12 @@ class EnhancedInMemoryTransportTest {
         
         Set<String> clusterNodes = Set.of("node1", "node2", "node3");
 
-        TestInMemoryTransport transport1 = new TestInMemoryTransport("node1");
-        TestInMemoryTransport transport2 = new TestInMemoryTransport("node2");
-        TestInMemoryTransport transport3 = new TestInMemoryTransport("node3");
+        InMemoryTransportSimulator transport1 = new InMemoryTransportSimulator("node1");
+        InMemoryTransportSimulator transport2 = new InMemoryTransportSimulator("node2");
+        InMemoryTransportSimulator transport3 = new InMemoryTransportSimulator("node3");
 
         // Make node1 Byzantine (corrupt 50% of responses)
-        transport1.setFailureMode(TestInMemoryTransport.FailureMode.BYZANTINE, 0.5);
+        transport1.setFailureMode(InMemoryTransportSimulator.FailureMode.BYZANTINE, 0.5);
 
         QuorusStateMachine stateMachine1 = new QuorusStateMachine();
         QuorusStateMachine stateMachine2 = new QuorusStateMachine();
@@ -348,11 +348,11 @@ class EnhancedInMemoryTransportTest {
         
         Set<String> clusterNodes = Set.of("node1", "node2");
 
-        TestInMemoryTransport transport1 = new TestInMemoryTransport("node1");
-        TestInMemoryTransport transport2 = new TestInMemoryTransport("node2");
+        InMemoryTransportSimulator transport1 = new InMemoryTransportSimulator("node1");
+        InMemoryTransportSimulator transport2 = new InMemoryTransportSimulator("node2");
 
         // Make node1 slow (10x latency)
-        transport1.setFailureMode(TestInMemoryTransport.FailureMode.SLOW, 0.0);
+        transport1.setFailureMode(InMemoryTransportSimulator.FailureMode.SLOW, 0.0);
 
         QuorusStateMachine stateMachine1 = new QuorusStateMachine();
         QuorusStateMachine stateMachine2 = new QuorusStateMachine();
@@ -393,12 +393,12 @@ class EnhancedInMemoryTransportTest {
         
         Set<String> clusterNodes = Set.of("node1", "node2", "node3");
 
-        TestInMemoryTransport transport1 = new TestInMemoryTransport("node1");
-        TestInMemoryTransport transport2 = new TestInMemoryTransport("node2");
-        TestInMemoryTransport transport3 = new TestInMemoryTransport("node3");
+        InMemoryTransportSimulator transport1 = new InMemoryTransportSimulator("node1");
+        InMemoryTransportSimulator transport2 = new InMemoryTransportSimulator("node2");
+        InMemoryTransportSimulator transport3 = new InMemoryTransportSimulator("node3");
 
         // Make node2 flaky (intermittent 50% high latency)
-        transport2.setFailureMode(TestInMemoryTransport.FailureMode.FLAKY, 0.0);
+        transport2.setFailureMode(InMemoryTransportSimulator.FailureMode.FLAKY, 0.0);
 
         QuorusStateMachine stateMachine1 = new QuorusStateMachine();
         QuorusStateMachine stateMachine2 = new QuorusStateMachine();
@@ -438,9 +438,9 @@ class EnhancedInMemoryTransportTest {
         
         Set<String> clusterNodes = Set.of("node1", "node2", "node3");
 
-        TestInMemoryTransport transport1 = new TestInMemoryTransport("node1");
-        TestInMemoryTransport transport2 = new TestInMemoryTransport("node2");
-        TestInMemoryTransport transport3 = new TestInMemoryTransport("node3");
+        InMemoryTransportSimulator transport1 = new InMemoryTransportSimulator("node1");
+        InMemoryTransportSimulator transport2 = new InMemoryTransportSimulator("node2");
+        InMemoryTransportSimulator transport3 = new InMemoryTransportSimulator("node3");
 
         // Apply multiple chaos factors
         transport1.setChaosConfig(10, 30, 0.1); // 10% packet drop

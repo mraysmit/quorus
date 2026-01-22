@@ -16,8 +16,14 @@
 
 package dev.mars.quorus.controller.service;
 
-import dev.mars.quorus.agent.*;
-import dev.mars.quorus.core.*;
+import dev.mars.quorus.agent.AgentCapabilities;
+import dev.mars.quorus.agent.AgentInfo;
+import dev.mars.quorus.agent.AgentStatus;
+import dev.mars.quorus.core.AgentLoad;
+import dev.mars.quorus.core.JobRequirements;
+import dev.mars.quorus.core.QueuedJob;
+import dev.mars.quorus.core.TransferJob;
+import dev.mars.quorus.core.TransferRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
