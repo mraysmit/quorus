@@ -1,0 +1,33 @@
+version: '3.8'
+
+# Protocol servers for SFTP abort testing
+# Minimal config for transfer cancellation tests
+
+networks:
+  sftp-abort-test:
+    name: quorus-sftp-abort-test
+    driver: bridge
+
+services:
+  # SFTP Server for abort testing
+  sftp:
+    image: atmoz/sftp:alpine
+    networks:
+      sftp-abort-test:
+        aliases:
+          - sftp-server
+    ports:
+      - "0:22"  # Dynamic port allocation by TestContainers
+    # Format: username:password:userid:groupid:directory
+    command: testuser:testpass:1001:100:upload
+    volumes:
+      - sftp-data:/home/testuser/upload
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 22 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  sftp-data:
+    name: quorus-sftp-abort-test-data

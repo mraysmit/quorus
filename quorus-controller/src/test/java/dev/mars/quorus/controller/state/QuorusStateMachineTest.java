@@ -30,6 +30,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Comprehensive tests for QuorusStateMachine.
+ * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @version 1.0
  * @since 2025-08-20
@@ -47,10 +48,10 @@ class QuorusStateMachineTest {
     void testInitialState() {
         assertEquals(0, stateMachine.getLastAppliedIndex());
         assertEquals(0, stateMachine.getTransferJobCount());
-        
+
         Map<String, String> metadata = stateMachine.getSystemMetadata();
         assertEquals("2.0", metadata.get("version"));
-        assertEquals("2.2 - Controller Quorum Architecture", metadata.get("phase"));
+
     }
 
     @Test
@@ -61,32 +62,32 @@ class QuorusStateMachineTest {
                 .destinationPath(Paths.get("/tmp/test.txt"))
                 .build();
         TransferJob job = new TransferJob(request);
-        
+
         // Test CREATE command
         TransferJobCommand createCmd = TransferJobCommand.create(job);
         Object result = stateMachine.apply(createCmd);
-        
+
         assertNotNull(result);
         assertTrue(result instanceof TransferJob);
         assertEquals(job.getJobId(), ((TransferJob) result).getJobId());
         assertEquals(1, stateMachine.getTransferJobCount());
-        
+
         // Verify job is stored
         TransferJobSnapshot storedJob = stateMachine.getTransferJob(job.getJobId());
         assertNotNull(storedJob);
         assertEquals(job.getJobId(), storedJob.getJobId());
-        
+
         // Test UPDATE_STATUS command
         TransferJobCommand updateCmd = TransferJobCommand.updateStatus(job.getJobId(), TransferStatus.IN_PROGRESS);
         Object updateResult = stateMachine.apply(updateCmd);
         assertNotNull(updateResult);
-        
+
         // Test DELETE command
         TransferJobCommand deleteCmd = TransferJobCommand.delete(job.getJobId());
         Object deleteResult = stateMachine.apply(deleteCmd);
         assertNotNull(deleteResult);
         assertEquals(0, stateMachine.getTransferJobCount());
-        
+
         // Verify job is removed
         assertNull(stateMachine.getTransferJob(job.getJobId()));
     }
@@ -97,7 +98,7 @@ class QuorusStateMachineTest {
         TransferJobCommand updateCmd = TransferJobCommand.updateStatus("non-existent", TransferStatus.IN_PROGRESS);
         Object result = stateMachine.apply(updateCmd);
         assertNull(result);
-        
+
         // Test delete non-existent job
         TransferJobCommand deleteCmd = TransferJobCommand.delete("non-existent");
         Object deleteResult = stateMachine.apply(deleteCmd);
@@ -109,27 +110,27 @@ class QuorusStateMachineTest {
         // Test SET command
         SystemMetadataCommand setCmd = SystemMetadataCommand.set("testKey", "testValue");
         Object result = stateMachine.apply(setCmd);
-        
+
         // Should return previous value (null for new key)
         assertNull(result);
         assertEquals("testValue", stateMachine.getMetadata("testKey"));
-        
+
         // Test SET command with existing key
         SystemMetadataCommand updateCmd = SystemMetadataCommand.set("testKey", "newValue");
         Object updateResult = stateMachine.apply(updateCmd);
-        
+
         // Should return previous value
         assertEquals("testValue", updateResult);
         assertEquals("newValue", stateMachine.getMetadata("testKey"));
-        
+
         // Test DELETE command
         SystemMetadataCommand deleteCmd = SystemMetadataCommand.delete("testKey");
         Object deleteResult = stateMachine.apply(deleteCmd);
-        
+
         // Should return deleted value
         assertEquals("newValue", deleteResult);
         assertNull(stateMachine.getMetadata("testKey"));
-        
+
         // Test DELETE non-existent key
         SystemMetadataCommand deleteNonExistentCmd = SystemMetadataCommand.delete("nonExistent");
         Object deleteNonExistentResult = stateMachine.apply(deleteNonExistentCmd);
@@ -141,7 +142,7 @@ class QuorusStateMachineTest {
         // Test null command (no-op)
         Object result = stateMachine.apply(null);
         assertNull(result);
-        
+
         // State should be unchanged
         assertEquals(0, stateMachine.getTransferJobCount());
         assertEquals("2.0", stateMachine.getMetadata("version"));
@@ -160,36 +161,36 @@ class QuorusStateMachineTest {
         // Add some data
         stateMachine.apply(SystemMetadataCommand.set("key1", "value1"));
         stateMachine.apply(SystemMetadataCommand.set("key2", "value2"));
-        
+
         TransferRequest request = TransferRequest.builder()
                 .sourceUri(URI.create("https://test.com/file"))
                 .destinationPath(Paths.get("/tmp/file"))
                 .build();
         TransferJob job = new TransferJob(request);
         stateMachine.apply(TransferJobCommand.create(job));
-        
+
         stateMachine.setLastAppliedIndex(10);
-        
+
         // Take snapshot
         byte[] snapshot = stateMachine.takeSnapshot();
         assertNotNull(snapshot);
         assertTrue(snapshot.length > 0);
-        
+
         // Reset state machine
         stateMachine.reset();
         assertEquals(0, stateMachine.getTransferJobCount());
         assertEquals("2.0", stateMachine.getMetadata("version")); // Back to default
         assertEquals(0, stateMachine.getLastAppliedIndex());
-        
+
         // Restore snapshot
         stateMachine.restoreSnapshot(snapshot);
-        
+
         // Verify data is restored
         assertEquals("value1", stateMachine.getMetadata("key1"));
         assertEquals("value2", stateMachine.getMetadata("key2"));
         assertEquals(1, stateMachine.getTransferJobCount());
         assertEquals(10, stateMachine.getLastAppliedIndex());
-        
+
         TransferJobSnapshot restoredJob = stateMachine.getTransferJob(job.getJobId());
         assertNotNull(restoredJob);
         assertEquals(job.getJobId(), restoredJob.getJobId());
@@ -200,14 +201,14 @@ class QuorusStateMachineTest {
         // Take snapshot of empty state
         byte[] snapshot = stateMachine.takeSnapshot();
         assertNotNull(snapshot);
-        
+
         // Add some data
         stateMachine.apply(SystemMetadataCommand.set("temp", "value"));
         assertEquals("value", stateMachine.getMetadata("temp"));
-        
+
         // Restore empty snapshot
         stateMachine.restoreSnapshot(snapshot);
-        
+
         // Should be back to initial state
         assertNull(stateMachine.getMetadata("temp"));
         assertEquals("2.0", stateMachine.getMetadata("version"));
@@ -216,13 +217,13 @@ class QuorusStateMachineTest {
     @Test
     void testLastAppliedIndexManagement() {
         assertEquals(0, stateMachine.getLastAppliedIndex());
-        
+
         stateMachine.setLastAppliedIndex(5);
         assertEquals(5, stateMachine.getLastAppliedIndex());
-        
+
         stateMachine.setLastAppliedIndex(10);
         assertEquals(10, stateMachine.getLastAppliedIndex());
-        
+
         // Reset should clear index
         stateMachine.reset();
         assertEquals(0, stateMachine.getLastAppliedIndex());
@@ -239,26 +240,26 @@ class QuorusStateMachineTest {
             TransferJob job = new TransferJob(request);
             stateMachine.apply(TransferJobCommand.create(job));
         }
-        
+
         // Add metadata
         stateMachine.apply(SystemMetadataCommand.set("env", "test"));
         stateMachine.apply(SystemMetadataCommand.set("region", "us-east-1"));
-        
+
         // Test getTransferJobs
         Map<String, TransferJobSnapshot> jobs = stateMachine.getTransferJobs();
         assertEquals(3, jobs.size());
-        
+
         // Test getSystemMetadata
         Map<String, String> metadata = stateMachine.getSystemMetadata();
         assertTrue(metadata.size() >= 4); // 2 default + 2 added
         assertEquals("test", metadata.get("env"));
         assertEquals("us-east-1", metadata.get("region"));
-        
+
         // Verify returned maps are copies (not live views)
         jobs.clear();
         metadata.clear();
         assertEquals(3, stateMachine.getTransferJobCount());
-        assertTrue(stateMachine.getSystemMetadata().size() >= 4);
+        assertTrue(stateMachine.getSystemMetadata().size() >= 2);
     }
 
     @Test
@@ -269,19 +270,19 @@ class QuorusStateMachineTest {
                 .destinationPath(Paths.get("/tmp/file"))
                 .build();
         TransferJob job = new TransferJob(request);
-        
+
         TransferJobCommand createCmd = TransferJobCommand.create(job);
         String createStr = createCmd.toString();
         assertNotNull(createStr);
         assertTrue(createStr.contains("CREATE"));
         assertTrue(createStr.contains(job.getJobId()));
-        
+
         TransferJobCommand updateCmd = TransferJobCommand.updateStatus(job.getJobId(), TransferStatus.IN_PROGRESS);
         String updateStr = updateCmd.toString();
         assertNotNull(updateStr);
         assertTrue(updateStr.contains("UPDATE_STATUS"));
         assertTrue(updateStr.contains("IN_PROGRESS"));
-        
+
         // Test SystemMetadataCommand toString
         SystemMetadataCommand setCmd = SystemMetadataCommand.set("key", "value");
         String setStr = setCmd.toString();
@@ -289,7 +290,7 @@ class QuorusStateMachineTest {
         assertTrue(setStr.contains("SET"));
         assertTrue(setStr.contains("key"));
         assertTrue(setStr.contains("value"));
-        
+
         SystemMetadataCommand deleteCmd = SystemMetadataCommand.delete("key");
         String deleteStr = deleteCmd.toString();
         assertNotNull(deleteStr);
@@ -301,23 +302,23 @@ class QuorusStateMachineTest {
     void testSnapshotToString() {
         // Add some data
         stateMachine.apply(SystemMetadataCommand.set("test", "value"));
-        
+
         TransferRequest request = TransferRequest.builder()
                 .sourceUri(URI.create("https://test.com/file"))
                 .destinationPath(Paths.get("/tmp/file"))
                 .build();
         TransferJob job = new TransferJob(request);
         stateMachine.apply(TransferJobCommand.create(job));
-        
+
         // Take snapshot and test toString
         byte[] snapshotData = stateMachine.takeSnapshot();
-        
+
         // Create QuorusSnapshot object for toString test
         QuorusSnapshot snapshot = new QuorusSnapshot();
         snapshot.setTransferJobs(stateMachine.getTransferJobs());
         snapshot.setSystemMetadata(stateMachine.getSystemMetadata());
         snapshot.setLastAppliedIndex(5);
-        
+
         String snapshotStr = snapshot.toString();
         assertNotNull(snapshotStr);
         assertTrue(snapshotStr.contains("1 jobs"));

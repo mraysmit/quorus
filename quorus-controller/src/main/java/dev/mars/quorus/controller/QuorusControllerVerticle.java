@@ -25,7 +25,7 @@ import dev.mars.quorus.controller.raft.RaftNode;
 import dev.mars.quorus.controller.raft.RaftTransport;
 import dev.mars.quorus.controller.raft.GrpcRaftTransport;
 import dev.mars.quorus.controller.raft.GrpcRaftServer;
-import dev.mars.quorus.controller.raft.RaftStateMachine;
+import dev.mars.quorus.controller.state.QuorusStateMachine;
 import dev.mars.quorus.controller.http.HttpApiServer;
 
 import java.util.HashMap;
@@ -36,6 +36,7 @@ import java.util.Set;
 /**
  * Main Verticle for the Quorus Controller.
  * Initializes the reactive stack, including Raft consensus and API.
+ * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @version 1.0
  * @since 2025-12-16
@@ -80,28 +81,10 @@ public class QuorusControllerVerticle extends AbstractVerticle {
             this.transport = new GrpcRaftTransport(vertx, nodeId, peerAddresses);
 
             // 4. Create Raft Node
-            RaftStateMachine stateMachine = new RaftStateMachine() {
-                public Object apply(Object command) {
-                    return "OK";
-                }
+            Map<String, String> initialMetadata = new HashMap<>();
+            initialMetadata.put("version", System.getenv().getOrDefault("QUORUS_VERSION", "2.0-ext"));
 
-                public byte[] takeSnapshot() {
-                    return new byte[0];
-                }
-
-                public void restoreSnapshot(byte[] data) {
-                }
-
-                public long getLastAppliedIndex() {
-                    return 0;
-                }
-
-                public void setLastAppliedIndex(long index) {
-                }
-
-                public void reset() {
-                }
-            };
+            QuorusStateMachine stateMachine = new QuorusStateMachine(initialMetadata);
 
             this.raftNode = new RaftNode(vertx, nodeId, clusterNodeIds, transport, stateMachine);
 

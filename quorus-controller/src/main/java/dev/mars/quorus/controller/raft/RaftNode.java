@@ -27,6 +27,8 @@ import io.vertx.core.Vertx;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import io.opentelemetry.api.GlobalOpenTelemetry;
+import io.opentelemetry.api.metrics.Meter;
 import java.io.*;
 import java.time.Instant;
 import java.util.*;
@@ -38,6 +40,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * Reactive Raft Node implementation.
  * Runs on the Vert.x Event Loop (Single Threaded), removing the need for
  * synchronization.
+ * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @version 1.0
  * @since 2025-08-20
@@ -101,6 +104,34 @@ public class RaftNode {
 
         // Initialize log with a dummy entry
         log.add(new LogEntry(0, 0, null));
+
+        // Initialize OpenTelemetry Metrics
+        Meter meter = GlobalOpenTelemetry.getMeter("quorus-controller");
+
+        meter.gaugeBuilder("quorus.cluster.state")
+                .setDescription("Current Raft state (0=FOLLOWER, 1=CANDIDATE, 2=LEADER)")
+                .ofLongs()
+                .buildWithCallback(measurement -> measurement.record(state.ordinal()));
+
+        meter.gaugeBuilder("quorus.cluster.term")
+                .setDescription("Current Raft term")
+                .ofLongs()
+                .buildWithCallback(measurement -> measurement.record(currentTerm));
+
+        meter.gaugeBuilder("quorus.cluster.commit_index")
+                .setDescription("Current Commit Index")
+                .ofLongs()
+                .buildWithCallback(measurement -> measurement.record(commitIndex));
+
+        meter.gaugeBuilder("quorus.cluster.last_applied")
+                .setDescription("Last Applied Log Index")
+                .ofLongs()
+                .buildWithCallback(measurement -> measurement.record(lastApplied));
+
+        meter.gaugeBuilder("quorus.cluster.is_leader")
+                .setDescription("Whether this node is the leader (1=Yes, 0=No)")
+                .ofLongs()
+                .buildWithCallback(measurement -> measurement.record(state == State.LEADER ? 1 : 0));
     }
 
     public Future<Void> start() {
@@ -122,7 +153,7 @@ public class RaftNode {
 
                 // Start election timer
                 resetElectionTimer();
-                
+
                 running = true;
                 promise.complete();
             } catch (Exception e) {
@@ -169,7 +200,7 @@ public class RaftNode {
             // Create log entry
             LogEntry entry = new LogEntry(currentTerm, log.size(), command);
             log.add(entry);
-            
+
             // Register promise for completion when committed
             pendingCommands.put(entry.getIndex(), promise);
 
@@ -181,7 +212,7 @@ public class RaftNode {
                     sendAppendEntries(peer, false);
                 }
             }
-            
+
             // Try to commit immediately (crucial for single-node clusters)
             updateCommitIndex();
         });
@@ -408,12 +439,12 @@ public class RaftNode {
                 if (request.getTerm() > currentTerm) {
                     stepDown(request.getTerm());
                 }
-                
+
                 resetElectionTimer();
 
                 // Consistency check
                 if (log.size() <= request.getPrevLogIndex() ||
-                    log.get((int) request.getPrevLogIndex()).getTerm() != request.getPrevLogTerm()) {
+                        log.get((int) request.getPrevLogIndex()).getTerm() != request.getPrevLogTerm()) {
                     promise.complete(AppendEntriesResponse.newBuilder()
                             .setTerm(currentTerm)
                             .setSuccess(false)
@@ -428,7 +459,7 @@ public class RaftNode {
                     // Deserialize command
                     Object command = deserialize(entryProto.getData());
                     LogEntry newEntry = new LogEntry(entryProto.getTerm(), currentIndex, command);
-                    
+
                     if (log.size() > currentIndex) {
                         if (log.get((int) currentIndex).getTerm() != entryProto.getTerm()) {
                             // Conflict, delete existing and following
@@ -493,7 +524,8 @@ public class RaftNode {
     }
 
     private void handleAppendEntriesResponse(String peerId, AppendEntriesResponse response) {
-        if (state != State.LEADER) return;
+        if (state != State.LEADER)
+            return;
 
         if (response.getTerm() > currentTerm) {
             stepDown(response.getTerm());
@@ -514,14 +546,15 @@ public class RaftNode {
     }
 
     private void updateCommitIndex() {
-        // If there exists an N such that N > commitIndex, a majority of matchIndex[i] >= N, 
+        // If there exists an N such that N > commitIndex, a majority of matchIndex[i]
+        // >= N,
         // and log[N].term == currentTerm: set commitIndex = N
-        
+
         List<Long> indices = new ArrayList<>(matchIndex.values());
         indices.add(log.size() - 1L); // Leader's match index
         Collections.sort(indices);
         long N = indices.get(indices.size() / 2); // Majority index
-        
+
         if (N > commitIndex && N < log.size() && log.get((int) N).getTerm() == currentTerm) {
             commitIndex = N;
             applyLog();
@@ -534,7 +567,7 @@ public class RaftNode {
             LogEntry entry = log.get((int) lastApplied);
             Object result = null;
             Exception exception = null;
-            
+
             if (entry.getCommand() != null) {
                 try {
                     result = stateMachine.apply(entry.getCommand());
@@ -543,7 +576,7 @@ public class RaftNode {
                     exception = e;
                 }
             }
-            
+
             // Complete future if this node is leader
             Promise<Object> promise = pendingCommands.remove(lastApplied);
             if (promise != null) {
@@ -558,7 +591,7 @@ public class RaftNode {
 
     private ByteString serialize(Object obj) {
         try (ByteArrayOutputStream bos = new ByteArrayOutputStream();
-             ObjectOutputStream out = new ObjectOutputStream(bos)) {
+                ObjectOutputStream out = new ObjectOutputStream(bos)) {
             out.writeObject(obj);
             return ByteString.copyFrom(bos.toByteArray());
         } catch (IOException e) {
@@ -568,7 +601,7 @@ public class RaftNode {
 
     private Object deserialize(ByteString data) {
         try (ByteArrayInputStream bis = new ByteArrayInputStream(data.toByteArray());
-             ObjectInputStream in = new ObjectInputStream(bis)) {
+                ObjectInputStream in = new ObjectInputStream(bis)) {
             return in.readObject();
         } catch (IOException | ClassNotFoundException e) {
             throw new RuntimeException("Failed to deserialize command", e);

@@ -26,6 +26,8 @@ import dev.mars.quorus.core.TransferJob;
 import dev.mars.quorus.core.TransferStatus;
 import dev.mars.quorus.core.JobAssignment;
 import dev.mars.quorus.core.QueuedJob;
+import io.opentelemetry.api.GlobalOpenTelemetry;
+import io.opentelemetry.api.metrics.Meter;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -34,6 +36,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
 /**
  * Description for QuorusStateMachine
  *
@@ -61,10 +64,37 @@ public class QuorusStateMachine implements RaftStateMachine {
         objectMapper.registerModule(new JavaTimeModule());
     }
 
+    public QuorusStateMachine(Map<String, String> initialMetadata) {
+        if (initialMetadata != null) {
+            systemMetadata.putAll(initialMetadata);
+        }
+
+        // Initialize OpenTelemetry Metrics
+        Meter meter = GlobalOpenTelemetry.getMeter("quorus-controller");
+
+        meter.gaugeBuilder("quorus.agents.total")
+                .setDescription("Total number of registered agents")
+                .ofLongs()
+                .buildWithCallback(measurement -> measurement.record(agents.size()));
+
+        meter.gaugeBuilder("quorus.jobs.total")
+                .setDescription("Total number of transfer jobs")
+                .ofLongs()
+                .buildWithCallback(measurement -> measurement.record(transferJobs.size()));
+
+        meter.gaugeBuilder("quorus.jobs.queued")
+                .setDescription("Number of jobs in the queue")
+                .ofLongs()
+                .buildWithCallback(measurement -> measurement.record(jobQueue.size()));
+
+        meter.gaugeBuilder("quorus.jobs.assignments")
+                .setDescription("Total number of job assignments")
+                .ofLongs()
+                .buildWithCallback(measurement -> measurement.record(jobAssignments.size()));
+    }
+
     public QuorusStateMachine() {
-        // Initialize with system metadata
-        systemMetadata.put("version", "2.0");
-        systemMetadata.put("phase", "2.2 - Controller Quorum Architecture");
+        this(null);
     }
 
     @Override
@@ -96,7 +126,7 @@ public class QuorusStateMachine implements RaftStateMachine {
 
     private Object applyTransferJobCommand(TransferJobCommand command) {
         String jobId = command.getJobId();
-        
+
         switch (command.getType()) {
             case CREATE:
                 TransferJob job = command.getTransferJob();
@@ -104,7 +134,7 @@ public class QuorusStateMachine implements RaftStateMachine {
                 transferJobs.put(jobId, snapshot);
                 logger.info("Created transfer job: " + jobId);
                 return job;
-                
+
             case UPDATE_STATUS:
                 TransferJobSnapshot existingJob = transferJobs.get(jobId);
                 if (existingJob != null) {
@@ -119,8 +149,7 @@ public class QuorusStateMachine implements RaftStateMachine {
                             existingJob.getStartTime(),
                             java.time.Instant.now(),
                             existingJob.getErrorMessage(),
-                            existingJob.getDescription()
-                    );
+                            existingJob.getDescription());
                     transferJobs.put(jobId, updatedJob);
                     logger.info("Updated transfer job status: " + jobId + " -> " + command.getStatus());
                     return updatedJob;
@@ -128,7 +157,7 @@ public class QuorusStateMachine implements RaftStateMachine {
                     logger.warning("Transfer job not found for update: " + jobId);
                     return null;
                 }
-                
+
             case UPDATE_PROGRESS:
                 TransferJobSnapshot progressJob = transferJobs.get(jobId);
                 if (progressJob != null) {
@@ -143,16 +172,16 @@ public class QuorusStateMachine implements RaftStateMachine {
                             progressJob.getStartTime(),
                             java.time.Instant.now(),
                             progressJob.getErrorMessage(),
-                            progressJob.getDescription()
-                    );
+                            progressJob.getDescription());
                     transferJobs.put(jobId, updatedJob);
-                    logger.info("Updated transfer job progress: " + jobId + " -> " + command.getBytesTransferred() + " bytes");
+                    logger.info("Updated transfer job progress: " + jobId + " -> " + command.getBytesTransferred()
+                            + " bytes");
                     return updatedJob;
                 } else {
                     logger.warning("Transfer job not found for progress update: " + jobId);
                     return null;
                 }
-                
+
             case DELETE:
                 TransferJobSnapshot removedJob = transferJobs.remove(jobId);
                 if (removedJob != null) {
@@ -162,7 +191,7 @@ public class QuorusStateMachine implements RaftStateMachine {
                     logger.warning("Transfer job not found for deletion: " + jobId);
                     return null;
                 }
-                
+
             default:
                 logger.warning("Unknown transfer job command type: " + command.getType());
                 return null;
@@ -267,13 +296,14 @@ public class QuorusStateMachine implements RaftStateMachine {
                 JobAssignment assignment = command.getJobAssignment();
                 jobAssignments.put(assignmentId, assignment);
                 logger.info("Created job assignment: " + assignmentId + " (job: " +
-                           assignment.getJobId() + " -> agent: " + assignment.getAgentId() + ")");
+                        assignment.getJobId() + " -> agent: " + assignment.getAgentId() + ")");
                 return assignment;
 
             case ACCEPT:
                 JobAssignment existing = jobAssignments.get(assignmentId);
                 if (existing != null) {
-                    JobAssignment updated = existing.withStatusAndTimestamp(command.getNewStatus(), command.getTimestamp());
+                    JobAssignment updated = existing.withStatusAndTimestamp(command.getNewStatus(),
+                            command.getTimestamp());
                     jobAssignments.put(assignmentId, updated);
                     logger.info("Job assignment accepted: " + assignmentId);
                     return updated;
@@ -285,10 +315,11 @@ public class QuorusStateMachine implements RaftStateMachine {
             case REJECT:
                 JobAssignment rejectedAssignment = jobAssignments.get(assignmentId);
                 if (rejectedAssignment != null) {
-                    JobAssignment updated = rejectedAssignment.withStatusAndTimestamp(command.getNewStatus(), command.getTimestamp());
+                    JobAssignment updated = rejectedAssignment.withStatusAndTimestamp(command.getNewStatus(),
+                            command.getTimestamp());
                     jobAssignments.put(assignmentId, updated);
                     logger.info("Job assignment rejected: " + assignmentId +
-                               (command.getReason() != null ? " (reason: " + command.getReason() + ")" : ""));
+                            (command.getReason() != null ? " (reason: " + command.getReason() + ")" : ""));
                     return updated;
                 } else {
                     logger.warning("Job assignment not found for reject: " + assignmentId);
@@ -298,7 +329,8 @@ public class QuorusStateMachine implements RaftStateMachine {
             case UPDATE_STATUS:
                 JobAssignment statusAssignment = jobAssignments.get(assignmentId);
                 if (statusAssignment != null) {
-                    JobAssignment updated = statusAssignment.withStatusAndTimestamp(command.getNewStatus(), command.getTimestamp());
+                    JobAssignment updated = statusAssignment.withStatusAndTimestamp(command.getNewStatus(),
+                            command.getTimestamp());
                     jobAssignments.put(assignmentId, updated);
                     logger.info("Updated job assignment status: " + assignmentId + " -> " + command.getNewStatus());
                     return updated;
@@ -310,7 +342,8 @@ public class QuorusStateMachine implements RaftStateMachine {
             case TIMEOUT:
                 JobAssignment timeoutAssignment = jobAssignments.get(assignmentId);
                 if (timeoutAssignment != null) {
-                    JobAssignment updated = timeoutAssignment.withStatusAndTimestamp(command.getNewStatus(), command.getTimestamp());
+                    JobAssignment updated = timeoutAssignment.withStatusAndTimestamp(command.getNewStatus(),
+                            command.getTimestamp());
                     jobAssignments.put(assignmentId, updated);
                     logger.info("Job assignment timed out: " + assignmentId);
                     return updated;
@@ -322,10 +355,11 @@ public class QuorusStateMachine implements RaftStateMachine {
             case CANCEL:
                 JobAssignment cancelAssignment = jobAssignments.get(assignmentId);
                 if (cancelAssignment != null) {
-                    JobAssignment updated = cancelAssignment.withStatusAndTimestamp(command.getNewStatus(), command.getTimestamp());
+                    JobAssignment updated = cancelAssignment.withStatusAndTimestamp(command.getNewStatus(),
+                            command.getTimestamp());
                     jobAssignments.put(assignmentId, updated);
                     logger.info("Job assignment cancelled: " + assignmentId +
-                               (command.getReason() != null ? " (reason: " + command.getReason() + ")" : ""));
+                            (command.getReason() != null ? " (reason: " + command.getReason() + ")" : ""));
                     return updated;
                 } else {
                     logger.warning("Job assignment not found for cancel: " + assignmentId);
@@ -374,7 +408,7 @@ public class QuorusStateMachine implements RaftStateMachine {
                     QueuedJob updatedJob = existingJob.withPriority(command.getNewPriority());
                     jobQueue.put(jobId, updatedJob);
                     logger.info("Updated job priority: " + jobId + " -> " + command.getNewPriority() +
-                               (command.getReason() != null ? " (reason: " + command.getReason() + ")" : ""));
+                            (command.getReason() != null ? " (reason: " + command.getReason() + ")" : ""));
                     return updatedJob;
                 } else {
                     logger.warning("Job not found in queue for prioritize: " + jobId);
@@ -385,7 +419,7 @@ public class QuorusStateMachine implements RaftStateMachine {
                 QueuedJob removedJob = jobQueue.remove(jobId);
                 if (removedJob != null) {
                     logger.info("Removed job from queue: " + jobId +
-                               (command.getReason() != null ? " (reason: " + command.getReason() + ")" : ""));
+                            (command.getReason() != null ? " (reason: " + command.getReason() + ")" : ""));
                     return removedJob;
                 } else {
                     logger.warning("Job not found in queue for removal: " + jobId);
@@ -396,9 +430,10 @@ public class QuorusStateMachine implements RaftStateMachine {
                 QueuedJob expediteJob = jobQueue.get(jobId);
                 if (expediteJob != null) {
                     // For expedite, we could implement special logic to move to front
-                    // For now, we'll just log it - actual queue ordering would be handled by the queue service
+                    // For now, we'll just log it - actual queue ordering would be handled by the
+                    // queue service
                     logger.info("Expedited job: " + jobId +
-                               (command.getReason() != null ? " (reason: " + command.getReason() + ")" : ""));
+                            (command.getReason() != null ? " (reason: " + command.getReason() + ")" : ""));
                     return expediteJob;
                 } else {
                     logger.warning("Job not found in queue for expedite: " + jobId);
@@ -427,7 +462,8 @@ public class QuorusStateMachine implements RaftStateMachine {
             snapshot.setLastAppliedIndex(lastAppliedIndex.get());
 
             byte[] data = objectMapper.writeValueAsBytes(snapshot);
-            logger.info("Created snapshot with " + transferJobs.size() + " transfer jobs and " + agents.size() + " agents");
+            logger.info(
+                    "Created snapshot with " + transferJobs.size() + " transfer jobs and " + agents.size() + " agents");
             return data;
         } catch (IOException e) {
             logger.log(Level.SEVERE, "Failed to create snapshot", e);
@@ -453,7 +489,8 @@ public class QuorusStateMachine implements RaftStateMachine {
 
             lastAppliedIndex.set(restoredSnapshot.getLastAppliedIndex());
 
-            logger.info("Restored snapshot with " + transferJobs.size() + " transfer jobs and " + agents.size() + " agents");
+            logger.info("Restored snapshot with " + transferJobs.size() + " transfer jobs and " + agents.size()
+                    + " agents");
         } catch (IOException e) {
             logger.log(Level.SEVERE, "Failed to restore snapshot", e);
             throw new RuntimeException("Failed to restore snapshot", e);
@@ -470,8 +507,6 @@ public class QuorusStateMachine implements RaftStateMachine {
         transferJobs.clear();
         agents.clear();
         systemMetadata.clear();
-        systemMetadata.put("version", "2.0");
-        systemMetadata.put("phase", "2.3 - Agent Fleet Management");
         lastAppliedIndex.set(0);
         logger.info("State machine reset");
     }

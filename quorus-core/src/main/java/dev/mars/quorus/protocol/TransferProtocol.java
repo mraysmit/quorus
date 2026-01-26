@@ -65,4 +65,23 @@ public interface TransferProtocol {
      * Get the maximum file size supported by this protocol (-1 for unlimited)
      */
     long getMaxFileSize();
+    
+    /**
+     * Abort an in-progress transfer immediately by closing underlying resources.
+     * This method should forcibly terminate any active connections, sockets, or streams.
+     * <p>
+     * For blocking protocols (FTP, SFTP, SMB), this will close the socket, causing
+     * the blocking read/write to throw an exception.
+     * <p>
+     * For reactive protocols (HTTP), this is typically a no-op as cancellation is
+     * handled through the Future cancellation mechanism.
+     * <p>
+     * Default implementation does nothing (no resources to abort).
+     * Protocol implementations with active resources should override this method.
+     *
+     * @since 2.1
+     */
+    default void abort() {
+        // Default: no-op (no resources to abort)
+    }
 }

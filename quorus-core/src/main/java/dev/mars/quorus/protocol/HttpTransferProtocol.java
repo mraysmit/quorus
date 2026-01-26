@@ -195,6 +195,12 @@ public class HttpTransferProtocol implements TransferProtocol {
         return MAX_FILE_SIZE;
     }
     
+    @Override
+    public void abort() {
+        // HTTP transfers are reactive and cancellation is handled via Future cancellation
+        // No explicit resources to close
+    }
+    
     private void validateRequest(TransferRequest request) throws TransferException {
         if (request.getSourceUri() == null) {
             throw new TransferException(request.getRequestId(), "Source URI cannot be null");

@@ -37,6 +37,10 @@
         <!-- Vert.x 5 Stack -->
         <dependency>
             <groupId>io.vertx</groupId>
+            <artifactId>vertx-opentelemetry</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.vertx</groupId>
             <artifactId>vertx-core</artifactId>
         </dependency>
         <dependency>
@@ -51,6 +55,24 @@
             <groupId>io.vertx</groupId>
             <artifactId>vertx-grpc-client</artifactId>
         </dependency>
+        
+        <!-- OpenTelemetry Dependencies -->
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-sdk</artifactId>
+            <version>1.34.1</version>
+        </dependency>
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-exporter-otlp</artifactId>
+            <version>1.34.1</version>
+        </dependency>
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-exporter-prometheus</artifactId>
+            <version>1.34.1-alpha</version>
+        </dependency>
+        
         <!-- Protobuf -->
         
         <!-- Jackson (Managed by Vert.x Usually, but keeping strict versions if needed) -->

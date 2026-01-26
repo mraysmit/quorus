@@ -47,6 +47,9 @@ public class FtpTransferProtocol implements TransferProtocol {
     private static final Duration DEFAULT_TIMEOUT = Duration.ofMinutes(30);
     private static final Duration CONNECTION_TIMEOUT = Duration.ofSeconds(30);
     
+    // Track active FTP client for abort capability
+    private volatile FtpClient activeClient;
+    
     @Override
     public String getProtocolName() {
         return "ftp";
@@ -98,6 +101,16 @@ public class FtpTransferProtocol implements TransferProtocol {
         return -1; // No specific limit for FTP
     }
     
+    @Override
+    public void abort() {
+        FtpClient client = activeClient;
+        if (client != null) {
+            logger.info("Aborting FTP transfer - forcibly closing connection");
+            client.forceDisconnect();
+            activeClient = null;
+        }
+    }
+    
     private TransferResult performFtpTransfer(TransferRequest request, ProgressTracker progressTracker) 
             throws TransferException {
         
@@ -112,6 +125,7 @@ public class FtpTransferProtocol implements TransferProtocol {
             
             // Establish FTP connection
             FtpClient ftpClient = new FtpClient(connectionInfo);
+            activeClient = ftpClient; // Track for abort capability
             
             try {
                 ftpClient.connect();
@@ -150,6 +164,7 @@ public class FtpTransferProtocol implements TransferProtocol {
                         .build();
                 
             } finally {
+                activeClient = null; // Clear reference
                 ftpClient.disconnect();
             }
             
@@ -376,6 +391,21 @@ public class FtpTransferProtocol implements TransferProtocol {
                 } catch (IOException e) {
                     logger.warning("Error closing FTP control socket: " + e.getMessage());
                 }
+            }
+        }
+        
+        /**
+         * Force disconnect without graceful QUIT command.
+         * Used for aborting transfers - immediately closes the socket.
+         */
+        void forceDisconnect() {
+            try {
+                if (controlSocket != null && !controlSocket.isClosed()) {
+                    logger.info("Force closing FTP control socket");
+                    controlSocket.close();
+                }
+            } catch (IOException e) {
+                logger.warning("Error during force disconnect: " + e.getMessage());
             }
         }
         
