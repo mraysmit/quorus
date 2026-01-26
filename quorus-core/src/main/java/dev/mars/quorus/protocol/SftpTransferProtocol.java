@@ -52,6 +52,9 @@ public class SftpTransferProtocol implements TransferProtocol {
     // Test simulation mode - enabled when system property is set
     private static final boolean SIMULATION_MODE = Boolean.getBoolean("quorus.sftp.simulation");
     
+    // Track active SFTP client for abort capability
+    private volatile SftpClient activeClient;
+    
     @Override
     public String getProtocolName() {
         return "sftp";
@@ -103,6 +106,16 @@ public class SftpTransferProtocol implements TransferProtocol {
         return -1; // No specific limit for SFTP
     }
     
+    @Override
+    public void abort() {
+        SftpClient client = activeClient;
+        if (client != null) {
+            logger.info("Aborting SFTP transfer - forcibly closing session");
+            client.forceDisconnect();
+            activeClient = null;
+        }
+    }
+    
     private TransferResult performSftpTransfer(TransferRequest request, ProgressTracker progressTracker)
             throws TransferException {
 
@@ -122,6 +135,7 @@ public class SftpTransferProtocol implements TransferProtocol {
 
             // Create SFTP client and perform transfer
             SftpClient sftpClient = new SftpClient(connectionInfo);
+            activeClient = sftpClient; // Track for abort capability
 
             try {
                 sftpClient.connect();
@@ -160,6 +174,7 @@ public class SftpTransferProtocol implements TransferProtocol {
                         .build();
 
             } finally {
+                activeClient = null; // Clear reference
                 sftpClient.disconnect();
             }
 
@@ -281,6 +296,30 @@ public class SftpTransferProtocol implements TransferProtocol {
                 }
             } catch (Exception e) {
                 logger.warning("Error disconnecting SFTP session: " + e.getMessage());
+            }
+        }
+        
+        /**
+         * Force disconnect without graceful shutdown.
+         * Used for aborting transfers - immediately closes the session.
+         */
+        void forceDisconnect() {
+            try {
+                if (sftpChannel != null && sftpChannel.isConnected()) {
+                    logger.info("Force closing SFTP channel");
+                    sftpChannel.disconnect();
+                }
+            } catch (Exception e) {
+                logger.warning("Error during SFTP channel force disconnect: " + e.getMessage());
+            }
+            
+            try {
+                if (session != null && session.isConnected()) {
+                    logger.info("Force closing SFTP session");
+                    session.disconnect();
+                }
+            } catch (Exception e) {
+                logger.warning("Error during SFTP session force disconnect: " + e.getMessage());
             }
         }
     }

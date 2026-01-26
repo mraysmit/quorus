@@ -183,14 +183,29 @@ public class SimpleTransferEngine implements TransferEngine {
         Future<TransferResult> future = activeFutures.get(jobId);
         
         if (context != null) {
+            // Set cancellation flag
             context.cancel();
             TransferJob job = context.getJob();
             if (job != null) {
                 job.cancel();
+                
+                // Get the protocol and call abort() for hard cancellation
+                TransferRequest request = job.getRequest();
+                if (request != null) {
+                    try {
+                        TransferProtocol protocol = protocolFactory.getProtocol(request.getProtocol());
+                        if (protocol != null) {
+                            logger.info("Aborting transfer " + jobId + " via protocol.abort()");
+                            protocol.abort();
+                        }
+                    } catch (Exception e) {
+                        logger.log(Level.WARNING, "Error aborting protocol for job " + jobId, e);
+                    }
+                }
             }
         }
         
-        // Note: Vert.x Future doesn't have cancel() method, cancellation handled via context
+        // Note: Vert.x Future doesn't have cancel() method, cancellation handled via context and abort()
         
         return context != null;
     }

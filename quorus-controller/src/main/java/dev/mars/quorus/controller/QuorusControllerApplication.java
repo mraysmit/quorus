@@ -16,18 +16,20 @@
 
 package dev.mars.quorus.controller;
 
+import dev.mars.quorus.controller.observability.TelemetryConfig;
 import io.vertx.core.Vertx;
+import io.vertx.core.VertxOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Main application class for Quorus Controller.
- * 
- * bootstraps the Vert.x reactive runtime and deploys the main Verticle.
- * 
+ *
+ * Bootstraps the Vert.x reactive runtime with OpenTelemetry tracing and deploys the main Verticle.
+ *
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @since 2025-08-26
- * @version 1.0
+ * @version 2.0 (OpenTelemetry)
  */
 public class QuorusControllerApplication {
 
@@ -43,10 +45,14 @@ public class QuorusControllerApplication {
                     "io.vertx.core.logging.SLF4JLogDelegateFactory");
         }
 
-        logger.info("Initializing Quorus Controller (Vert.x 5)...");
+        logger.info("Initializing Quorus Controller with OpenTelemetry (Vert.x 5)...");
 
-        // 1. Create the Vert.x instance
-        Vertx vertx = Vertx.vertx();
+        // 1. Create Vert.x instance with OpenTelemetry tracing enabled
+        VertxOptions options = new VertxOptions();
+        options = TelemetryConfig.configure(options);
+        Vertx vertx = Vertx.vertx(options);
+        
+        logger.info("OpenTelemetry tracing enabled - OTLP exporter on default port, Prometheus metrics on port 9464");
 
         // 2. Deploy the main verticle
         vertx.deployVerticle(new QuorusControllerVerticle())

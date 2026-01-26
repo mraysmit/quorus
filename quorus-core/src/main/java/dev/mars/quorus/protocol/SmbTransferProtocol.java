@@ -95,6 +95,13 @@ public class SmbTransferProtocol implements TransferProtocol {
         return -1; // No specific limit for SMB
     }
     
+    @Override
+    public void abort() {
+        // SMB transfers use Java NIO Files API which doesn't expose
+        // interruptible resources. Cancellation handled via thread interruption.
+        // Future enhancement: track active FileChannel for force close
+    }
+    
     private TransferResult performSmbTransfer(TransferRequest request, ProgressTracker progressTracker) 
             throws TransferException {
         

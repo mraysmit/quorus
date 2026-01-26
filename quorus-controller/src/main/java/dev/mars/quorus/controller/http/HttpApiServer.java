@@ -19,6 +19,7 @@ package dev.mars.quorus.controller.http;
 import dev.mars.quorus.agent.AgentInfo;
 import dev.mars.quorus.controller.raft.RaftNode;
 import dev.mars.quorus.controller.state.*;
+import dev.mars.quorus.controller.http.handlers.MetricsHandler;
 import dev.mars.quorus.core.JobAssignment;
 import dev.mars.quorus.core.JobAssignmentStatus;
 import dev.mars.quorus.core.TransferJob;
@@ -37,6 +38,7 @@ import java.util.stream.Collectors;
 
 /**
  * Reactive HTTP API Server using Vert.x Web.
+ * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @version 1.0
  * @since 2025-08-26
@@ -62,6 +64,9 @@ public class HttpApiServer {
         // Enable body parsing
         router.route().handler(BodyHandler.create());
 
+        // Metrics endpoint (OpenTelemetry via Proxy)
+        router.get("/metrics").handler(new MetricsHandler(vertx));
+
         // Health check
         router.get("/health")
                 .respond(ctx -> {
@@ -81,12 +86,12 @@ public class HttpApiServer {
                     .put("currentTerm", raftNode.getCurrentTerm())
                     .put("isLeader", raftNode.isLeader())
                     .put("isRunning", raftNode.isRunning());
-            
+
             String leaderId = raftNode.getLeaderId();
             if (leaderId != null) {
                 status.put("leaderId", leaderId);
             }
-            
+
             return Future.succeededFuture(status);
         });
 
@@ -103,7 +108,7 @@ public class HttpApiServer {
                 JsonObject body = ctx.body().asJsonObject();
                 AgentInfo agentInfo = body.mapTo(AgentInfo.class);
                 AgentCommand command = AgentCommand.register(agentInfo);
-                
+
                 return raftNode.submitCommand(command)
                         .map(res -> {
                             ctx.response().setStatusCode(201);
@@ -123,7 +128,7 @@ public class HttpApiServer {
                 JsonObject body = ctx.body().asJsonObject();
                 TransferJob job = body.mapTo(TransferJob.class);
                 TransferJobCommand command = TransferJobCommand.create(job);
-                
+
                 return raftNode.submitCommand(command)
                         .map(res -> {
                             ctx.response().setStatusCode(201);
@@ -143,7 +148,7 @@ public class HttpApiServer {
                 JsonObject body = ctx.body().asJsonObject();
                 JobAssignment assignment = body.mapTo(JobAssignment.class);
                 JobAssignmentCommand command = JobAssignmentCommand.assign(assignment);
-                
+
                 return raftNode.submitCommand(command)
                         .map(res -> {
                             ctx.response().setStatusCode(201);
@@ -161,32 +166,32 @@ public class HttpApiServer {
         router.get("/api/v1/transfers/:jobId").respond(ctx -> {
             String jobId = ctx.pathParam("jobId");
             QuorusStateMachine stateMachine = (QuorusStateMachine) raftNode.getStateMachine();
-            
+
             TransferJobSnapshot job = stateMachine.getTransferJobs().get(jobId);
             if (job == null) {
                 ctx.response().setStatusCode(404);
                 return Future.succeededFuture(new JsonObject().put("error", "Job not found"));
             }
-            
+
             // Get the latest assignment status for this job
             JobAssignment latestAssignment = stateMachine.getJobAssignments().values().stream()
                     .filter(a -> a.getJobId().equals(jobId))
                     .findFirst()
                     .orElse(null);
-            
+
             JsonObject response = new JsonObject()
                     .put("jobId", job.getJobId())
                     .put("sourceUri", job.getSourceUri())
                     .put("destinationPath", job.getDestinationPath())
                     .put("totalBytes", job.getTotalBytes())
                     .put("bytesTransferred", job.getBytesTransferred());
-            
+
             if (latestAssignment != null) {
                 response.put("status", latestAssignment.getStatus().name());
             } else {
                 response.put("status", job.getStatus().name());
             }
-            
+
             return Future.succeededFuture(response);
         });
 
@@ -194,14 +199,14 @@ public class HttpApiServer {
         router.get("/api/v1/agents/:agentId/jobs").handler(ctx -> {
             String agentId = ctx.pathParam("agentId");
             QuorusStateMachine stateMachine = (QuorusStateMachine) raftNode.getStateMachine();
-            
+
             // Only return assignments that are NOT completed or failed
             List<JobAssignment> assignments = stateMachine.getJobAssignments().values().stream()
                     .filter(a -> a.getAgentId().equals(agentId))
-                    .filter(a -> a.getStatus() != JobAssignmentStatus.COMPLETED 
+                    .filter(a -> a.getStatus() != JobAssignmentStatus.COMPLETED
                             && a.getStatus() != JobAssignmentStatus.FAILED)
                     .collect(Collectors.toList());
-            
+
             JsonArray jsonArray = new JsonArray();
             assignments.forEach(jsonArray::add);
             ctx.response().setStatusCode(200).end(jsonArray.encode());
@@ -216,16 +221,16 @@ public class HttpApiServer {
                 String statusStr = body.getString("status");
                 Long bytesTransferred = body.getLong("bytesTransferred", 0L);
                 JobAssignmentStatus status = JobAssignmentStatus.valueOf(statusStr);
-                
+
                 // Reconstruct assignment ID based on convention: jobId:agentId
                 String assignmentId = jobId + ":" + agentId;
-                
+
                 // Update job assignment status
                 JobAssignmentCommand assignmentCommand = JobAssignmentCommand.updateStatus(assignmentId, status);
-                
+
                 // Also update the transfer job progress if bytes transferred was provided
                 Future<Object> assignmentFuture = raftNode.submitCommand(assignmentCommand);
-                
+
                 if (bytesTransferred > 0) {
                     TransferJobCommand jobCommand = TransferJobCommand.updateProgress(jobId, bytesTransferred);
                     return assignmentFuture
