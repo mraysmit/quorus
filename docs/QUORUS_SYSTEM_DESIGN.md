@@ -1680,34 +1680,54 @@ Agents are the endpoints in route configurations, responsible for monitoring loc
 ### Agent Lifecycle Management
 
 ```mermaid
-stateDiagram-v2
-    [*] --> Initializing
-    Initializing --> Registering: Start Agent
-    Registering --> Active: Registration Success
-    Registering --> Failed: Registration Failed
+flowchart TB
+    subgraph STARTUP ["🚀 Startup Phase"]
+        START(("Start")) --> INIT["Initializing<br/>Loading config"]
+        INIT --> REG["Registering<br/>With controller"]
+    end
 
-    Active --> Working: Receive Job
-    Active --> Idle: No Jobs
-    Active --> Unhealthy: Health Check Failed
-    Active --> Draining: Graceful Shutdown
+    subgraph ACTIVE_OPS ["⚡ Active Operations"]
+        REG -->|"✓ Success"| ACTIVE["Active<br/>Ready for work"]
+        ACTIVE -->|"Job received"| WORKING["Working<br/>Executing jobs"]
+        ACTIVE -->|"No jobs"| IDLE["Idle<br/>Awaiting work"]
+        WORKING -->|"Job complete"| ACTIVE
+        IDLE -->|"Job received"| WORKING
+    end
 
-    Working --> Active: Job Complete
-    Working --> Failed: Job Failed
-    Working --> Unhealthy: Agent Failure
-    Working --> Draining: Shutdown Request
+    subgraph DEGRADED ["⚠️ Degraded States"]
+        ACTIVE -->|"Health check failed"| UNHEALTHY["Unhealthy<br/>Not receiving jobs"]
+        WORKING -->|"Agent failure"| UNHEALTHY
+        IDLE -->|"Health check failed"| UNHEALTHY
+        UNHEALTHY -->|"Recovery"| ACTIVE
+    end
 
-    Idle --> Working: Receive Job
-    Idle --> Unhealthy: Health Check Failed
-    Idle --> Draining: Shutdown Request
+    subgraph SHUTDOWN ["🛑 Shutdown Phase"]
+        ACTIVE -->|"Graceful shutdown"| DRAINING["Draining<br/>Completing jobs"]
+        WORKING -->|"Shutdown request"| DRAINING
+        IDLE -->|"Shutdown request"| DRAINING
+        DRAINING -->|"Jobs complete<br/>or timeout"| DEREG["Deregistered<br/>Removed from registry"]
+        UNHEALTHY -->|"Timeout"| DEREG
+    end
 
-    Draining --> Deregistered: All Jobs Complete
-    Draining --> Deregistered: Timeout
+    subgraph FAILURE ["❌ Failure Path"]
+        REG -->|"✗ Failed"| FAILED["Failed<br/>Registration error"]
+        WORKING -->|"Job failed"| FAILED
+        FAILED -->|"Cleanup"| DEREG
+    end
 
-    Unhealthy --> Active: Recovery
-    Unhealthy --> Deregistered: Timeout
+    DEREG --> STOP(("End"))
 
-    Failed --> Deregistered: Cleanup
-    Deregistered --> [*]
+    style START fill:#4CAF50,stroke:#2E7D32,color:#fff
+    style STOP fill:#f44336,stroke:#c62828,color:#fff
+    style ACTIVE fill:#2196F3,stroke:#1565C0,color:#fff
+    style WORKING fill:#FF9800,stroke:#EF6C00,color:#fff
+    style IDLE fill:#9E9E9E,stroke:#616161,color:#fff
+    style UNHEALTHY fill:#FFEB3B,stroke:#F9A825,color:#000
+    style DRAINING fill:#9C27B0,stroke:#6A1B9A,color:#fff
+    style FAILED fill:#f44336,stroke:#c62828,color:#fff
+    style DEREG fill:#607D8B,stroke:#37474F,color:#fff
+    style INIT fill:#81C784,stroke:#4CAF50,color:#000
+    style REG fill:#81C784,stroke:#4CAF50,color:#000
 ```
 
 **Agent States:**
