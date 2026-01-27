@@ -19,9 +19,11 @@ package dev.mars.quorus.protocol;
 
 import io.vertx.core.Vertx;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.HashMap;
 import java.util.Map;
-import java.util.logging.Logger;
 /**
  * Description for ProtocolFactory
  *
@@ -31,7 +33,7 @@ import java.util.logging.Logger;
  */
 
 public class ProtocolFactory {
-    private static final Logger logger = Logger.getLogger(ProtocolFactory.class.getName());
+    private static final Logger logger = LoggerFactory.getLogger(ProtocolFactory.class);
 
     private final Map<String, TransferProtocol> protocols;
     private final Vertx vertx;
@@ -43,53 +45,77 @@ public class ProtocolFactory {
     public ProtocolFactory(Vertx vertx) {
         this.vertx = java.util.Objects.requireNonNull(vertx, "Vertx instance cannot be null");
         this.protocols = new HashMap<>();
+        logger.debug("Initializing ProtocolFactory with Vert.x instance");
         registerDefaultProtocols();
     }
 
     private void registerDefaultProtocols() {
+        logger.debug("Registering default transfer protocols");
+        
         // Register HTTP protocol for both http and https schemes
+        logger.trace("Creating HttpTransferProtocol instance");
         HttpTransferProtocol httpProtocol = new HttpTransferProtocol(vertx);
         registerProtocol(httpProtocol);
         registerProtocolAlias("https", httpProtocol);
 
         // Register SMB protocol for both smb and cifs schemes
+        logger.trace("Creating SmbTransferProtocol instance");
         SmbTransferProtocol smbProtocol = new SmbTransferProtocol();
         registerProtocol(smbProtocol);
         registerProtocolAlias("cifs", smbProtocol);
 
         // Register FTP and SFTP protocols
+        logger.trace("Creating FtpTransferProtocol instance");
         registerProtocol(new FtpTransferProtocol());
+        logger.trace("Creating SftpTransferProtocol instance");
         registerProtocol(new SftpTransferProtocol());
 
-        logger.info("Registered default transfer protocols: HTTP/HTTPS, SMB/CIFS, FTP, SFTP");
+        logger.info("Registered default transfer protocols: count={}, schemes={}", 
+                   protocols.size(), String.join(", ", protocols.keySet()));
     }
     
     public void registerProtocol(TransferProtocol protocol) {
-        protocols.put(protocol.getProtocolName().toLowerCase(), protocol);
-        logger.info("Registered protocol: " + protocol.getProtocolName());
+        String protocolName = protocol.getProtocolName().toLowerCase();
+        protocols.put(protocolName, protocol);
+        logger.info("Registered protocol: {}", protocolName);
+        logger.debug("Protocol details: name={}, class={}, supportsResume={}, supportsPause={}",
+                    protocolName, protocol.getClass().getSimpleName(), 
+                    protocol.supportsResume(), protocol.supportsPause());
     }
 
     /**
      * Register a protocol under an alias scheme name
      */
     public void registerProtocolAlias(String alias, TransferProtocol protocol) {
-        protocols.put(alias.toLowerCase(), protocol);
-        logger.info("Registered protocol alias: " + alias + " -> " + protocol.getProtocolName());
+        String aliasLower = alias.toLowerCase();
+        protocols.put(aliasLower, protocol);
+        logger.info("Registered protocol alias: {} -> {}", aliasLower, protocol.getProtocolName());
     }
     
     public TransferProtocol getProtocol(String protocolName) {
         if (protocolName == null) {
+            logger.debug("getProtocol called with null protocol name");
             return null;
         }
-        return protocols.get(protocolName.toLowerCase());
+        TransferProtocol protocol = protocols.get(protocolName.toLowerCase());
+        if (protocol != null) {
+            logger.debug("Protocol found: name={}, implementation={}", protocolName, protocol.getClass().getSimpleName());
+        } else {
+            logger.debug("Protocol not found: name={}", protocolName);
+        }
+        return protocol;
     }
     
     public boolean isProtocolSupported(String protocolName) {
-        return protocolName != null && protocols.containsKey(protocolName.toLowerCase());
+        boolean supported = protocolName != null && protocols.containsKey(protocolName.toLowerCase());
+        logger.trace("isProtocolSupported: protocol={}, supported={}", protocolName, supported);
+        return supported;
     }
     
     public String[] getSupportedProtocols() {
-        return protocols.keySet().toArray(new String[0]);
+        String[] supportedProtocols = protocols.keySet().toArray(new String[0]);
+        logger.trace("getSupportedProtocols: count={}", supportedProtocols.length);
+        return supportedProtocols;
     }
     
     /**
@@ -97,8 +123,14 @@ public class ProtocolFactory {
      */
     public void unregisterProtocol(String protocolName) {
         if (protocolName != null) {
-            protocols.remove(protocolName.toLowerCase());
-            logger.info("Unregistered protocol: " + protocolName);
+            TransferProtocol removed = protocols.remove(protocolName.toLowerCase());
+            if (removed != null) {
+                logger.info("Unregistered protocol: {}", protocolName);
+            } else {
+                logger.debug("Protocol not found for unregistration: {}", protocolName);
+            }
+        } else {
+            logger.trace("unregisterProtocol called with null protocol name");
         }
     }
 }

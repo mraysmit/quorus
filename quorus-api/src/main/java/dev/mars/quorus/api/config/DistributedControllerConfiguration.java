@@ -26,8 +26,10 @@ import dev.mars.quorus.controller.state.QuorusStateMachine;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Produces;
 import jakarta.inject.Singleton;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.Set;
-import java.util.logging.Logger;
 
 /**
  * Configuration class for distributed controller components.
@@ -40,7 +42,7 @@ import java.util.logging.Logger;
 @ApplicationScoped
 public class DistributedControllerConfiguration {
 
-    private static final Logger logger = Logger.getLogger(DistributedControllerConfiguration.class.getName());
+    private static final Logger logger = LoggerFactory.getLogger(DistributedControllerConfiguration.class);
 
     /**
      * Produces the Raft cluster configuration.
@@ -51,15 +53,20 @@ public class DistributedControllerConfiguration {
     @Produces
     @Singleton
     public RaftClusterConfig clusterConfig() {
-        logger.info("Creating Raft cluster configuration");
+        logger.debug("Creating Raft cluster configuration");
+        logger.trace("Building cluster config with election timeout and heartbeat interval");
 
         // For development, create a simple single-node cluster
         // In production, this would be configured from external configuration
-        return new RaftClusterConfig.Builder()
+        RaftClusterConfig config = new RaftClusterConfig.Builder()
                 .addNode("api-node", "localhost", 8080)
                 .setElectionTimeoutMs(1000)  // Shorter timeout for single node
                 .setHeartbeatIntervalMs(200)
                 .build();
+        
+        logger.info("Raft cluster configuration created: electionTimeout={}ms, heartbeatInterval={}ms", 
+                config.getElectionTimeoutMs(), config.getHeartbeatIntervalMs());
+        return config;
     }
 
     /**
@@ -72,18 +79,22 @@ public class DistributedControllerConfiguration {
     @Produces
     @Singleton
     public RaftNode raftNode(io.vertx.core.Vertx vertx, RaftClusterConfig clusterConfig) {
-        logger.info("Creating Raft node");
+        logger.debug("Creating Raft node with cluster configuration");
         
         // Use the configured node ID for single-node cluster
         String nodeId = "api-node";
+        logger.debug("Using node ID: {}", nodeId);
         
         // Get cluster node IDs
         Set<String> clusterNodes = clusterConfig.getNodeIds();
+        logger.debug("Cluster nodes: {}", clusterNodes);
         
         // Get local node configuration
         RaftClusterConfig.NodeConfig nodeConfig = clusterConfig.getNodeConfig(nodeId);
+        logger.trace("Node config retrieved for nodeId={}", nodeId);
         
         // Create transport (gRPC for real communication)
+        logger.debug("Creating gRPC transport for node: {}", nodeId);
         RaftTransport transport = new GrpcRaftTransport(
             vertx,
             nodeId, 
@@ -91,9 +102,11 @@ public class DistributedControllerConfiguration {
         );
 
         // Create state machine for transfer jobs
+        logger.debug("Creating QuorusStateMachine for state management");
         RaftStateMachine stateMachine = new QuorusStateMachine();
         
         // Create and configure the Raft node
+        logger.debug("Constructing RaftNode: nodeId={}, clusterSize={}", nodeId, clusterNodes.size());
         RaftNode node = new RaftNode(
             vertx,
             nodeId,
@@ -105,9 +118,10 @@ public class DistributedControllerConfiguration {
         );
         
         // Start the node
+        logger.debug("Starting Raft node: {}", nodeId);
         node.start();
         
-        logger.info("Raft node created and started: " + nodeId);
+        logger.info("Raft node created and started: nodeId={}, clusterNodes={}", nodeId, clusterNodes);
         return node;
     }
 }

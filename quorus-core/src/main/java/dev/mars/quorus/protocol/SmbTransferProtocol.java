@@ -16,6 +16,7 @@
 
 package dev.mars.quorus.protocol;
 
+import dev.mars.quorus.core.TransferDirection;
 import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferResult;
 import dev.mars.quorus.core.TransferStatus;
@@ -23,13 +24,15 @@ import dev.mars.quorus.core.exceptions.TransferException;
 import dev.mars.quorus.transfer.TransferContext;
 import dev.mars.quorus.transfer.ProgressTracker;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.*;
 import java.net.URI;
 import java.nio.file.*;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.CompletableFuture;
-import java.util.logging.Logger;
 /**
  * Description for SmbTransferProtocol
  *
@@ -40,7 +43,7 @@ import java.util.logging.Logger;
 
 public class SmbTransferProtocol implements TransferProtocol {
     
-    private static final Logger logger = Logger.getLogger(SmbTransferProtocol.class.getName());
+    private static final Logger logger = LoggerFactory.getLogger(SmbTransferProtocol.class);
     private static final int DEFAULT_BUFFER_SIZE = 64 * 1024; // 64KB buffer for SMB
     private static final Duration DEFAULT_TIMEOUT = Duration.ofMinutes(30);
     
@@ -51,30 +54,62 @@ public class SmbTransferProtocol implements TransferProtocol {
     
     @Override
     public boolean canHandle(TransferRequest request) {
+        logger.debug("canHandle: checking request={}", request != null ? request.getRequestId() : "null");
+        
         if (request == null || request.getSourceUri() == null) {
+            logger.debug("canHandle: returning false - request or sourceUri is null");
             return false;
         }
 
-        String scheme = request.getSourceUri().getScheme();
-        return "smb".equalsIgnoreCase(scheme) || "cifs".equalsIgnoreCase(scheme);
+        TransferDirection direction = request.getDirection();
+        logger.debug("canHandle: direction={}", direction);
+        
+        if (direction == TransferDirection.DOWNLOAD) {
+            // Download: smb/cifs source -> local destination
+            String sourceScheme = request.getSourceUri().getScheme();
+            logger.debug("canHandle: DOWNLOAD - sourceScheme={}", sourceScheme);
+            boolean result = "smb".equalsIgnoreCase(sourceScheme) || "cifs".equalsIgnoreCase(sourceScheme);
+            logger.debug("canHandle: returning {} for SMB download", result);
+            return result;
+        } else if (direction == TransferDirection.UPLOAD) {
+            // Upload: local source -> smb/cifs destination
+            URI destinationUri = request.getDestinationUri();
+            if (destinationUri == null) {
+                logger.debug("canHandle: returning false - UPLOAD with null destinationUri");
+                return false;
+            }
+            String destScheme = destinationUri.getScheme();
+            logger.debug("canHandle: UPLOAD - destScheme={}", destScheme);
+            boolean result = "smb".equalsIgnoreCase(destScheme) || "cifs".equalsIgnoreCase(destScheme);
+            logger.debug("canHandle: returning {} for SMB upload", result);
+            return result;
+        }
+        
+        logger.debug("canHandle: returning false - unsupported direction");
+        return false;
     }
 
     @Override
     public TransferResult transfer(TransferRequest request, TransferContext context) throws TransferException {
-        logger.info("Starting SMB transfer for job: " + context.getJobId());
+        logger.info("Starting SMB transfer for job: {}", context.getJobId());
+        logger.debug("transfer: request={}, sourceUri={}, destinationPath={}", 
+            request.getRequestId(), request.getSourceUri(), request.getDestinationPath());
 
         ProgressTracker progressTracker = new ProgressTracker(context.getJobId());
         progressTracker.start();
+        logger.debug("transfer: progress tracker initialized");
 
         try {
-            return performSmbTransfer(request, progressTracker);
+            TransferResult result = performSmbTransfer(request, progressTracker);
+            logger.debug("transfer: completed successfully, bytesTransferred={}", result.getBytesTransferred());
+            return result;
         } catch (Exception e) {
             // Check if this is an intentional test failure
             if (isIntentionalTestFailure(request.getRequestId())) {
-                logger.info("INTENTIONAL TEST FAILURE: SMB transfer failed for test case '" +
-                           request.getRequestId() + "': " + e.getMessage());
+                logger.info("INTENTIONAL TEST FAILURE: SMB transfer failed for test case '{}': {}",
+                           request.getRequestId(), e.getMessage());
             } else {
-                logger.severe("SMB transfer failed: " + e.getMessage());
+                logger.error("SMB transfer failed: {}", e.getMessage(), e);
             }
             throw new TransferException(context.getJobId(), "SMB transfer failed", e);
         }
@@ -97,9 +132,11 @@ public class SmbTransferProtocol implements TransferProtocol {
     
     @Override
     public void abort() {
+        logger.debug("abort: SMB transfer abort requested");
         // SMB transfers use Java NIO Files API which doesn't expose
         // interruptible resources. Cancellation handled via thread interruption.
         // Future enhancement: track active FileChannel for force close
+        logger.debug("abort: SMB abort relies on thread interruption");
     }
     
     private TransferResult performSmbTransfer(TransferRequest request, ProgressTracker progressTracker) 
@@ -107,26 +144,35 @@ public class SmbTransferProtocol implements TransferProtocol {
         
         Instant startTime = Instant.now();
         String requestId = request.getRequestId();
+        logger.debug("performSmbTransfer: starting for requestId={}", requestId);
         
         try {
-            logger.info("Starting SMB transfer: " + request.getSourceUri() + " -> " + request.getDestinationPath());
+            logger.info("Starting SMB transfer: {} -> {}", request.getSourceUri(), request.getDestinationPath());
             
             // Parse SMB URI and extract connection details
             SmbConnectionInfo connectionInfo = parseSmbUri(request.getSourceUri());
+            logger.debug("performSmbTransfer: parsed connection info - host={}, path={}, hasAuth={}", 
+                connectionInfo.host, connectionInfo.path, connectionInfo.hasAuthentication());
             
             // Convert SMB URI to UNC path for Windows
+            logger.debug("performSmbTransfer: converting to UNC path");
             Path uncPath = convertToUncPath(connectionInfo);
+            logger.debug("performSmbTransfer: UNC path={}", uncPath);
             
             // Ensure destination directory exists
             Files.createDirectories(request.getDestinationPath().getParent());
+            logger.debug("performSmbTransfer: destination directory ensured");
             
             // Perform the file transfer
+            logger.debug("performSmbTransfer: starting file transfer");
             long bytesTransferred = transferFile(uncPath, request.getDestinationPath(), progressTracker);
+            logger.debug("performSmbTransfer: file transfer complete, bytesTransferred={}", bytesTransferred);
             
             // Calculate checksum if required
             String checksum = null;
             if (request.getExpectedChecksum() != null) {
                 logger.info("Calculating checksum for transferred file");
+                logger.debug("performSmbTransfer: checksum calculation requested");
                 // For demo purposes, we'll skip actual checksum calculation
                 checksum = "demo-checksum-" + bytesTransferred;
             }
@@ -134,8 +180,9 @@ public class SmbTransferProtocol implements TransferProtocol {
             Instant endTime = Instant.now();
             Duration transferTime = Duration.between(startTime, endTime);
             
-            logger.info("SMB transfer completed successfully: " + bytesTransferred + " bytes in " + 
-                       transferTime.toMillis() + "ms");
+            logger.info("SMB transfer completed successfully: {} bytes in {}ms", bytesTransferred, transferTime.toMillis());
+            logger.debug("performSmbTransfer: transfer rate={} KB/s", 
+                transferTime.toMillis() > 0 ? (bytesTransferred / 1024.0) / (transferTime.toMillis() / 1000.0) : 0);
             
             return TransferResult.builder()
                     .requestId(requestId)
@@ -149,10 +196,10 @@ public class SmbTransferProtocol implements TransferProtocol {
         } catch (Exception e) {
             // Check if this is an intentional test failure
             if (isIntentionalTestFailure(requestId)) {
-                logger.info("INTENTIONAL TEST FAILURE: SMB transfer failed for test case '" +
-                           requestId + "': " + e.getMessage());
+                logger.info("INTENTIONAL TEST FAILURE: SMB transfer failed for test case '{}': {}",
+                           requestId, e.getMessage());
             } else {
-                logger.severe("SMB transfer failed for request " + requestId + ": " + e.getMessage());
+                logger.error("SMB transfer failed for request {}: {}", requestId, e.getMessage(), e);
             }
             throw new TransferException(requestId, "SMB transfer failed", e);
         }
@@ -161,9 +208,12 @@ public class SmbTransferProtocol implements TransferProtocol {
     private long transferFile(Path sourcePath, Path destinationPath, ProgressTracker progressTracker) 
             throws IOException {
         
+        logger.debug("transferFile: starting - source={}, destination={}", sourcePath, destinationPath);
+        
         long totalBytes = Files.size(sourcePath);
         long bytesTransferred = 0;
         
+        logger.debug("transferFile: totalBytes={}", totalBytes);
         progressTracker.setTotalBytes(totalBytes);
         progressTracker.updateProgress(bytesTransferred);
         
@@ -173,41 +223,57 @@ public class SmbTransferProtocol implements TransferProtocol {
              BufferedInputStream bufferedInput = new BufferedInputStream(inputStream, DEFAULT_BUFFER_SIZE);
              BufferedOutputStream bufferedOutput = new BufferedOutputStream(outputStream, DEFAULT_BUFFER_SIZE)) {
             
+            logger.debug("transferFile: streams opened, starting byte transfer");
             byte[] buffer = new byte[DEFAULT_BUFFER_SIZE];
             int bytesRead;
+            int chunkCount = 0;
             
             while ((bytesRead = bufferedInput.read(buffer)) != -1) {
                 bufferedOutput.write(buffer, 0, bytesRead);
                 bytesTransferred += bytesRead;
+                chunkCount++;
                 
                 // Update progress
                 progressTracker.updateProgress(bytesTransferred);
                 
+                // Trace logging for frequent operations (every 100 chunks)
+                if (chunkCount % 100 == 0) {
+                    logger.trace("transferFile: progress - chunks={}, bytesTransferred={}, progress={}%", 
+                        chunkCount, bytesTransferred, (bytesTransferred * 100) / totalBytes);
+                }
+                
                 // Check for cancellation
                 if (Thread.currentThread().isInterrupted()) {
+                    logger.debug("transferFile: transfer cancelled via thread interruption");
                     throw new IOException("Transfer was cancelled");
                 }
             }
             
             bufferedOutput.flush();
+            logger.debug("transferFile: completed - totalChunks={}, bytesTransferred={}", chunkCount, bytesTransferred);
         }
         
         return bytesTransferred;
     }
     
     private SmbConnectionInfo parseSmbUri(URI sourceUri) throws TransferException {
+        logger.debug("parseSmbUri: parsing URI={}", sourceUri);
+        
         String scheme = sourceUri.getScheme();
         if (!"smb".equalsIgnoreCase(scheme) && !"cifs".equalsIgnoreCase(scheme)) {
+            logger.debug("parseSmbUri: invalid scheme={}", scheme);
             throw new TransferException("unknown", "Invalid SMB URI scheme: " + scheme);
         }
         
         String host = sourceUri.getHost();
         if (host == null || host.isEmpty()) {
+            logger.debug("parseSmbUri: missing host in URI");
             throw new TransferException("unknown", "SMB URI must specify a host");
         }
         
         String path = sourceUri.getPath();
         if (path == null || path.isEmpty()) {
+            logger.debug("parseSmbUri: missing path in URI");
             throw new TransferException("unknown", "SMB URI must specify a path");
         }
         
@@ -218,6 +284,7 @@ public class SmbTransferProtocol implements TransferProtocol {
         String password = null;
         
         if (userInfo != null) {
+            logger.debug("parseSmbUri: parsing user info");
             // Format: domain;username:password or username:password
             String[] parts = userInfo.split(":");
             if (parts.length == 2) {
@@ -232,9 +299,13 @@ public class SmbTransferProtocol implements TransferProtocol {
                     username = userPart;
                 }
             }
+            logger.debug("parseSmbUri: extracted domain={}, username={}, hasPassword={}", 
+                domain, username, password != null);
         }
         
-        return new SmbConnectionInfo(host, path, domain, username, password);
+        SmbConnectionInfo info = new SmbConnectionInfo(host, path, domain, username, password);
+        logger.debug("parseSmbUri: created connectionInfo={}", info);
+        return info;
     }
 
     /**
@@ -262,18 +333,23 @@ public class SmbTransferProtocol implements TransferProtocol {
     }
 
     private Path convertToUncPath(SmbConnectionInfo connectionInfo) throws TransferException {
+        logger.debug("convertToUncPath: converting SMB path for host={}, path={}", 
+            connectionInfo.host, connectionInfo.path);
         try {
             // Convert SMB path to Windows UNC path
             // smb://server/share/path/file -> \\server\share\path\file
             String uncPath = "\\\\" + connectionInfo.host + connectionInfo.path.replace('/', '\\');
             
-            logger.fine("Converting SMB URI to UNC path: " + uncPath);
+            logger.debug("Converting SMB URI to UNC path: {}", uncPath);
             
             // For Windows environments, we can use the UNC path directly
             // In production, you might want to use JCIFS library for better SMB support
-            return Paths.get(uncPath);
+            Path result = Paths.get(uncPath);
+            logger.debug("convertToUncPath: conversion successful, path={}", result);
+            return result;
             
         } catch (Exception e) {
+            logger.debug("convertToUncPath: conversion failed - {}", e.getMessage());
             throw new TransferException("unknown", "Failed to convert SMB URI to UNC path", e);
         }
     }

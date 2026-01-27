@@ -31,8 +31,9 @@ import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * HTTP handler for agent registration.
@@ -47,7 +48,7 @@ import java.util.logging.Logger;
  */
 public class AgentRegistrationHandler implements HttpHandler {
 
-    private static final Logger logger = Logger.getLogger(AgentRegistrationHandler.class.getName());
+    private static final Logger logger = LoggerFactory.getLogger(AgentRegistrationHandler.class);
     private final RaftNode raftNode;
     private final ObjectMapper objectMapper;
 
@@ -55,11 +56,17 @@ public class AgentRegistrationHandler implements HttpHandler {
         this.raftNode = raftNode;
         this.objectMapper = new ObjectMapper();
         this.objectMapper.registerModule(new JavaTimeModule());
+        logger.debug("AgentRegistrationHandler initialized with raftNode={}", raftNode.getNodeId());
     }
 
     @Override
     public void handle(HttpExchange exchange) throws IOException {
-        if (!"POST".equals(exchange.getRequestMethod())) {
+        String method = exchange.getRequestMethod();
+        String path = exchange.getRequestURI().getPath();
+        logger.debug("handle() entry: method={}, path={}", method, path);
+        
+        if (!"POST".equals(method)) {
+            logger.debug("Method not allowed: {}", method);
             sendJsonResponse(exchange, 405, Map.of("error", "Method not allowed"));
             return;
         }
@@ -67,26 +74,37 @@ public class AgentRegistrationHandler implements HttpHandler {
         try {
             // Read and parse request body
             String requestBody = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+            logger.debug("Request body received: length={}", requestBody.length());
+            
             AgentInfo agentInfo = objectMapper.readValue(requestBody, AgentInfo.class);
+            logger.debug("Parsed AgentInfo: agentId={}, hostname={}, address={}", 
+                    agentInfo.getAgentId(), agentInfo.getHostname(), agentInfo.getAddress());
 
             // Validate required fields
             if (agentInfo.getAgentId() == null || agentInfo.getAgentId().isEmpty()) {
+                logger.debug("Validation failed: missing agentId");
                 sendJsonResponse(exchange, 400, Map.of("error", "Missing required field: agentId"));
                 return;
             }
 
-            logger.info("Registering agent: " + agentInfo.getAgentId());
+            logger.info("Registering agent: agentId={}, hostname={}, address={}", 
+                    agentInfo.getAgentId(), agentInfo.getHostname(), agentInfo.getAddress());
 
             // Create and submit registration command to Raft
+            logger.debug("Submitting agent registration command to Raft: agentId={}", agentInfo.getAgentId());
             AgentCommand command = AgentCommand.register(agentInfo);
             Future<Object> future = raftNode.submitCommand(command);
 
             // Wait for consensus (with timeout)
+            logger.debug("Waiting for Raft consensus: agentId={}", agentInfo.getAgentId());
             Object result = future.toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
+            logger.debug("Raft consensus completed: agentId={}, resultType={}", 
+                    agentInfo.getAgentId(), result != null ? result.getClass().getSimpleName() : "null");
 
             if (result instanceof AgentInfo) {
                 AgentInfo registeredAgent = (AgentInfo) result;
-                logger.info("Agent registered successfully: " + registeredAgent.getAgentId());
+                logger.info("Agent registered successfully: agentId={}, status={}", 
+                        registeredAgent.getAgentId(), registeredAgent.getStatus());
                 
                 Map<String, Object> response = Map.of(
                         "agentId", registeredAgent.getAgentId(),
@@ -95,19 +113,20 @@ public class AgentRegistrationHandler implements HttpHandler {
                 );
                 sendJsonResponse(exchange, 201, response);
             } else {
-                logger.warning("Unexpected result from agent registration: " + result);
+                logger.warn("Unexpected result from agent registration: agentId={}, resultType={}", 
+                        agentInfo.getAgentId(), result != null ? result.getClass().getSimpleName() : "null");
                 sendJsonResponse(exchange, 500, Map.of("error", "Failed to register agent"));
             }
 
         } catch (IllegalStateException e) {
             // Not the leader - redirect to leader
-            logger.warning("Not the leader, cannot register agent: " + e.getMessage());
+            logger.warn("Not the leader, cannot register agent: {}", e.getMessage());
             sendJsonResponse(exchange, 503, Map.of(
                     "error", "Not the leader",
                     "message", e.getMessage()
             ));
         } catch (Exception e) {
-            logger.log(Level.SEVERE, "Error registering agent", e);
+            logger.error("Error registering agent", e);
             sendJsonResponse(exchange, 500, Map.of(
                     "error", "Internal server error",
                     "message", e.getMessage()

@@ -18,12 +18,14 @@ package dev.mars.quorus.network;
 
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.net.InetAddress;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.logging.Logger;
 /**
  * Description for NetworkTopologyService
  *
@@ -34,7 +36,7 @@ import java.util.logging.Logger;
 
 public class NetworkTopologyService {
     
-    private static final Logger logger = Logger.getLogger(NetworkTopologyService.class.getName());
+    private static final Logger logger = LoggerFactory.getLogger(NetworkTopologyService.class);
     
     private final Vertx vertx;
     private final Map<String, NetworkNode> networkNodes = new ConcurrentHashMap<>();
@@ -43,30 +45,34 @@ public class NetworkTopologyService {
 
     public NetworkTopologyService(Vertx vertx) {
         this.vertx = vertx;
+        logger.debug("NetworkTopologyService initialized");
     }
     
     public Future<NetworkNode> discoverNode(String hostname) {
-        logger.info("Discovering network topology for host: " + hostname);
+        logger.info("Discovering network topology for host: {}", hostname);
         
         // Check if we already have cached information
         NetworkNode cachedNode = networkNodes.get(hostname);
         if (cachedNode != null && !cachedNode.isStale()) {
-            logger.fine("Using cached network information for: " + hostname);
+            logger.debug("Using cached network information for: {} (latency={}ms)", 
+                        hostname, cachedNode.getLatency().toMillis());
             return Future.succeededFuture(cachedNode);
         }
         
         // Perform network discovery (blocking)
+        logger.debug("Cache miss or stale for '{}', performing network discovery", hostname);
         return vertx.executeBlocking(() -> performNetworkDiscovery(hostname))
             .onSuccess(node -> {
                 networkNodes.put(hostname, node);
-                logger.info("Network discovery completed for " + hostname + 
-                           " - Latency: " + node.getLatency().toMillis() + "ms, " +
-                           "Bandwidth: " + node.getEstimatedBandwidth() / (1024 * 1024) + " MB/s");
+                logger.info("Network discovery completed for {} - Latency: {}ms, Bandwidth: {} MB/s, Type: {}",
+                           hostname, node.getLatency().toMillis(), 
+                           node.getEstimatedBandwidth() / (1024 * 1024), node.getNetworkType());
             })
             .onFailure(err -> {
-                logger.warning("Network discovery failed for " + hostname + ": " + err.getMessage());
+                logger.warn("Network discovery failed for {}: {}", hostname, err.getMessage());
             })
             .recover(err -> {
+                logger.debug("Returning default node with conservative estimates for {}", hostname);
                 // Return a default node with conservative estimates
                 return Future.succeededFuture(NetworkNode.builder()
                         .hostname(hostname)
@@ -81,13 +87,17 @@ public class NetworkTopologyService {
     
     public Future<NetworkPath> findOptimalPath(String source, String destination) {
         String pathKey = source + "->" + destination;
+        logger.debug("Finding optimal path: {} -> {}", source, destination);
         
         // Check cached path
         NetworkPath cachedPath = networkPaths.get(pathKey);
         if (cachedPath != null && !cachedPath.isStale()) {
+            logger.debug("Using cached path for {} -> {} (quality={})", 
+                        source, destination, cachedPath.getQualityScore());
             return Future.succeededFuture(cachedPath);
         }
         
+        logger.debug("Cache miss for path '{}', discovering both endpoints", pathKey);
         // Discover both nodes
         return Future.all(discoverNode(source), discoverNode(destination))
             .map(composite -> {
@@ -98,32 +108,42 @@ public class NetworkTopologyService {
                 NetworkPath path = calculateOptimalPath(sourceNode, destNode);
                 networkPaths.put(pathKey, path);
                 
-                logger.info("Optimal path calculated: " + source + " -> " + destination + 
-                           " (Quality: " + path.getQualityScore() + ")");
+                logger.info("Optimal path calculated: {} -> {} (Quality: {}, Strategy: {})", 
+                           source, destination, path.getQualityScore(), path.getTransferStrategy());
                 return path;
             });
     }
     
     public Future<NetworkRecommendations> getTransferRecommendations(String hostname, long transferSize) {
+        logger.debug("Getting transfer recommendations: hostname={}, transferSize={} bytes", hostname, transferSize);
         NetworkNode node = networkNodes.get(hostname);
         Future<NetworkNode> nodeFuture;
         
         if (node == null) {
+            logger.debug("No cached node for '{}', performing discovery", hostname);
             nodeFuture = discoverNode(hostname);
         } else {
             nodeFuture = Future.succeededFuture(node);
         }
         
-        return nodeFuture.map(n -> NetworkRecommendations.builder()
+        return nodeFuture.map(n -> {
+            NetworkRecommendations recommendations = NetworkRecommendations.builder()
                 .optimalBufferSize(calculateOptimalBufferSize(n, transferSize))
                 .recommendedConcurrency(calculateOptimalConcurrency(n, transferSize))
                 .estimatedTransferTime(estimateTransferTime(n, transferSize))
                 .networkQuality(assessNetworkQuality(n))
                 .useCompression(shouldUseCompression(n, transferSize))
-                .build());
+                .build();
+            logger.debug("Transfer recommendations for '{}': bufferSize={}, concurrency={}, quality={}",
+                        hostname, recommendations.getOptimalBufferSize(), 
+                        recommendations.getRecommendedConcurrency(), recommendations.getNetworkQuality());
+            return recommendations;
+        });
     }
     
     public void updateMetrics(String hostname, long bytesTransferred, Duration actualTime, boolean successful) {
+        logger.debug("Updating metrics: hostname={}, bytesTransferred={}, actualTime={}ms, successful={}",
+                    hostname, bytesTransferred, actualTime.toMillis(), successful);
         networkMetrics.recordTransfer(hostname, bytesTransferred, actualTime, successful);
         
         // Update node information based on actual performance
@@ -132,11 +152,14 @@ public class NetworkTopologyService {
             long actualBandwidth = bytesTransferred * 1000 / actualTime.toMillis();
             NetworkNode updatedNode = node.withUpdatedBandwidth(actualBandwidth);
             networkNodes.put(hostname, updatedNode);
+            logger.trace("Updated bandwidth for '{}': estimated={} bytes/s, actual={} bytes/s",
+                        hostname, node.getEstimatedBandwidth(), actualBandwidth);
         }
     }
     
     public NetworkStatistics getNetworkStatistics() {
-        return NetworkStatistics.builder()
+        logger.debug("Collecting network statistics");
+        NetworkStatistics stats = NetworkStatistics.builder()
                 .totalNodes(networkNodes.size())
                 .reachableNodes(networkNodes.values().stream().mapToInt(n -> n.isReachable() ? 1 : 0).sum())
                 .averageLatency(calculateAverageLatency())
@@ -144,23 +167,37 @@ public class NetworkTopologyService {
                 .networkPaths(networkPaths.size())
                 .transferMetrics(networkMetrics.getAggregatedMetrics())
                 .build();
+        logger.debug("Network statistics: totalNodes={}, reachableNodes={}, networkPaths={}",
+                    stats.getTotalNodes(), stats.getReachableNodes(), stats.getNetworkPaths());
+        return stats;
     }
     
     private NetworkNode performNetworkDiscovery(String hostname) throws Exception {
+        logger.debug("Performing network discovery for hostname: {}", hostname);
         Instant startTime = Instant.now();
         
         // Test reachability
+        logger.trace("Resolving hostname: {}", hostname);
         InetAddress address = InetAddress.getByName(hostname);
+        logger.trace("Resolved {} to IP: {}", hostname, address.getHostAddress());
+        
         boolean reachable = address.isReachable(5000); // 5 second timeout
+        logger.trace("Reachability check for {}: {}", hostname, reachable);
         
         // Measure latency
         Duration latency = measureLatency(address);
+        logger.trace("Latency measurement for {}: {}ms", hostname, latency.toMillis());
         
         // Estimate bandwidth
         long estimatedBandwidth = estimateBandwidth(hostname, address);
+        logger.trace("Estimated bandwidth for {}: {} bytes/s", hostname, estimatedBandwidth);
         
         // Determine network type
         NetworkType networkType = determineNetworkType(address);
+        logger.trace("Network type for {}: {}", hostname, networkType);
+        
+        Duration discoveryTime = Duration.between(startTime, Instant.now());
+        logger.debug("Network discovery completed for {} in {}ms", hostname, discoveryTime.toMillis());
         
         return NetworkNode.builder()
                 .hostname(hostname)

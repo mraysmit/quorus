@@ -44,9 +44,8 @@ class TransferContextTest {
     void setUp() {
         TransferRequest request = TransferRequest.builder()
             .requestId("test-job-123")
-            .sourceUri(java.net.URI.create("file:///source/file.txt"))
-            .destinationPath("/dest/file.txt")
-            .protocol("http")
+            .sourceUri(java.net.URI.create("http://example.com/source/file.txt"))
+            .destinationPath(java.nio.file.Path.of("/dest/file.txt"))
             .build();
         
         testJob = new TransferJob(request);

@@ -17,13 +17,15 @@ package dev.mars.quorus.config;
  */
 
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Properties;
-import java.util.logging.Logger;
 
 /**
  * Configuration management for Quorus system.
@@ -34,7 +36,7 @@ import java.util.logging.Logger;
  * @version 1.0
  */
 public class QuorusConfiguration {
-    private static final Logger logger = Logger.getLogger(QuorusConfiguration.class.getName());
+    private static final Logger logger = LoggerFactory.getLogger(QuorusConfiguration.class);
     
     // Default configuration values
     private static final int DEFAULT_MAX_CONCURRENT_TRANSFERS = 10;
@@ -50,17 +52,23 @@ public class QuorusConfiguration {
     private final Properties properties;
     
     public QuorusConfiguration() {
+        logger.debug("Initializing QuorusConfiguration with default settings");
         this.properties = new Properties();
         loadDefaultConfiguration();
         loadConfigurationFromFile();
         loadConfigurationFromSystemProperties();
+        logger.debug("QuorusConfiguration initialized: maxConcurrentTransfers={}, maxRetryAttempts={}", 
+                     getMaxConcurrentTransfers(), getMaxRetryAttempts());
     }
     
     public QuorusConfiguration(Properties properties) {
+        logger.debug("Initializing QuorusConfiguration with custom properties: count={}", 
+                     properties != null ? properties.size() : 0);
         this.properties = new Properties();
         loadDefaultConfiguration();
         if (properties != null) {
             this.properties.putAll(properties);
+            logger.debug("Applied {} custom properties", properties.size());
         }
     }
     
@@ -142,12 +150,15 @@ public class QuorusConfiguration {
         String value = properties.getProperty(key);
         if (value != null) {
             try {
-                return Integer.parseInt(value.trim());
+                int result = Integer.parseInt(value.trim());
+                logger.trace("Retrieved int property: key={}, value={}", key, result);
+                return result;
             } catch (NumberFormatException e) {
-                logger.warning("Invalid integer value for property " + key + ": " + value + 
-                             ". Using default: " + defaultValue);
+                logger.warn("Invalid integer value for property {}: {}. Using default: {}", 
+                           key, value, defaultValue);
             }
         }
+        logger.trace("Using default int property: key={}, defaultValue={}", key, defaultValue);
         return defaultValue;
     }
     
@@ -155,12 +166,15 @@ public class QuorusConfiguration {
         String value = properties.getProperty(key);
         if (value != null) {
             try {
-                return Long.parseLong(value.trim());
+                long result = Long.parseLong(value.trim());
+                logger.trace("Retrieved long property: key={}, value={}", key, result);
+                return result;
             } catch (NumberFormatException e) {
-                logger.warning("Invalid long value for property " + key + ": " + value + 
-                             ". Using default: " + defaultValue);
+                logger.warn("Invalid long value for property {}: {}. Using default: {}", 
+                           key, value, defaultValue);
             }
         }
+        logger.trace("Using default long property: key={}, defaultValue={}", key, defaultValue);
         return defaultValue;
     }
     
@@ -173,6 +187,7 @@ public class QuorusConfiguration {
     }
     
     private void loadDefaultConfiguration() {
+        logger.debug("Loading default configuration values");
         // Set default values
         properties.setProperty("quorus.transfer.max.concurrent", String.valueOf(DEFAULT_MAX_CONCURRENT_TRANSFERS));
         properties.setProperty("quorus.transfer.max.retries", String.valueOf(DEFAULT_MAX_RETRY_ATTEMPTS));
@@ -199,35 +214,44 @@ public class QuorusConfiguration {
         for (String configFile : configFiles) {
             Path configPath = Paths.get(configFile);
             if (Files.exists(configPath) && Files.isReadable(configPath)) {
+                logger.debug("Found configuration file: {}", configPath);
                 try (InputStream input = Files.newInputStream(configPath)) {
                     properties.load(input);
-                    logger.info("Loaded configuration from: " + configPath);
+                    logger.info("Loaded configuration from: {}", configPath);
                     return;
                 } catch (IOException e) {
-                    logger.warning("Failed to load configuration from " + configPath + ": " + e.getMessage());
+                    logger.warn("Failed to load configuration from {}: {}", configPath, e.getMessage());
                 }
+            } else {
+                logger.trace("Configuration file not found or not readable: {}", configPath);
             }
         }
         
         // Try to load from classpath
+        logger.debug("Attempting to load configuration from classpath");
         try (InputStream input = getClass().getClassLoader().getResourceAsStream("quorus.properties")) {
             if (input != null) {
                 properties.load(input);
                 logger.info("Loaded configuration from classpath");
+            } else {
+                logger.debug("No configuration file found on classpath");
             }
         } catch (IOException e) {
-            logger.warning("Failed to load configuration from classpath: " + e.getMessage());
+            logger.warn("Failed to load configuration from classpath: {}", e.getMessage());
         }
     }
     
     private void loadConfigurationFromSystemProperties() {
+        logger.debug("Loading configuration overrides from system properties");
         // Override with system properties that start with "quorus."
-        System.getProperties().entrySet().stream()
+        long count = System.getProperties().entrySet().stream()
                 .filter(entry -> entry.getKey().toString().startsWith("quorus."))
-                .forEach(entry -> {
+                .peek(entry -> {
                     properties.setProperty(entry.getKey().toString(), entry.getValue().toString());
-                    logger.fine("Override from system property: " + entry.getKey() + "=" + entry.getValue());
-                });
+                    logger.debug("Override from system property: {}={}", entry.getKey(), entry.getValue());
+                })
+                .count();
+        logger.debug("Applied {} system property overrides", count);
     }
     
     @Override

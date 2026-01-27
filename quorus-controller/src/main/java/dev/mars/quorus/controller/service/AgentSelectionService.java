@@ -28,8 +28,9 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Service responsible for intelligent agent selection for job assignments.
@@ -41,7 +42,7 @@ import java.util.stream.Collectors;
  */
 public class AgentSelectionService {
     
-    private static final Logger logger = Logger.getLogger(AgentSelectionService.class.getName());
+    private static final Logger logger = LoggerFactory.getLogger(AgentSelectionService.class);
     
     // Round-robin state tracking
     private final Map<String, AtomicInteger> roundRobinCounters = new ConcurrentHashMap<>();
@@ -58,22 +59,28 @@ public class AgentSelectionService {
      * @return the selected agent ID, or null if no suitable agent found
      */
     public String selectAgent(QueuedJob job, Map<String, AgentInfo> availableAgents, Map<String, AgentLoad> agentLoads) {
+        logger.debug("Selecting agent: jobId={}, availableAgents={}, strategy={}", 
+            job.getJobId(), availableAgents.size(), 
+            job.getRequirements() != null ? job.getRequirements().getSelectionStrategy() : "default");
+        
         if (availableAgents.isEmpty()) {
-            logger.warning("No available agents for job assignment: " + job.getJobId());
+            logger.warn("No available agents for job: jobId={}", job.getJobId());
             return null;
         }
         
         JobRequirements requirements = job.getRequirements();
         if (requirements == null) {
-            logger.warning("Job has no requirements, using default selection: " + job.getJobId());
+            logger.debug("Job has no requirements, using default selection: jobId={}", job.getJobId());
             return selectByLeastLoaded(availableAgents, agentLoads);
         }
         
         // Filter agents based on basic eligibility
         List<AgentInfo> eligibleAgents = filterEligibleAgents(job, availableAgents.values(), agentLoads);
+        logger.debug("Eligible agents after filtering: jobId={}, eligibleCount={}, totalCount={}", 
+            job.getJobId(), eligibleAgents.size(), availableAgents.size());
         
         if (eligibleAgents.isEmpty()) {
-            logger.warning("No eligible agents found for job: " + job.getJobId());
+            logger.warn("No eligible agents found: jobId={}, availableAgents={}", job.getJobId(), availableAgents.size());
             return null;
         }
         
@@ -81,8 +88,10 @@ public class AgentSelectionService {
         String selectedAgentId = applySelectionStrategy(job, eligibleAgents, agentLoads, requirements.getSelectionStrategy());
         
         if (selectedAgentId != null) {
-            logger.info("Selected agent " + selectedAgentId + " for job " + job.getJobId() + 
-                       " using strategy " + requirements.getSelectionStrategy());
+            logger.info("Agent selected: jobId={}, agentId={}, strategy={}", 
+                job.getJobId(), selectedAgentId, requirements.getSelectionStrategy());
+        } else {
+            logger.warn("No agent selected: jobId={}, eligibleAgents={}", job.getJobId(), eligibleAgents.size());
         }
         
         return selectedAgentId;
@@ -92,12 +101,22 @@ public class AgentSelectionService {
      * Filter agents based on basic eligibility criteria.
      */
     private List<AgentInfo> filterEligibleAgents(QueuedJob job, Collection<AgentInfo> agents, Map<String, AgentLoad> agentLoads) {
+        logger.trace("Filtering eligible agents: jobId={}, totalAgents={}", job.getJobId(), agents.size());
         JobRequirements requirements = job.getRequirements();
         TransferRequest request = job.getTransferJob().getRequest();
         
-        return agents.stream()
-                .filter(agent -> isAgentEligible(agent, requirements, request, agentLoads.get(agent.getAgentId())))
+        List<AgentInfo> eligible = agents.stream()
+                .filter(agent -> {
+                    boolean isEligible = isAgentEligible(agent, requirements, request, agentLoads.get(agent.getAgentId()));
+                    if (!isEligible) {
+                        logger.trace("Agent ineligible: agentId={}, status={}", agent.getAgentId(), agent.getStatus());
+                    }
+                    return isEligible;
+                })
                 .collect(Collectors.toList());
+        
+        logger.trace("Filtered eligible agents: jobId={}, eligible={}", job.getJobId(), eligible.size());
+        return eligible;
     }
     
     /**
@@ -165,6 +184,7 @@ public class AgentSelectionService {
     private String applySelectionStrategy(QueuedJob job, List<AgentInfo> eligibleAgents, 
                                         Map<String, AgentLoad> agentLoads, 
                                         JobRequirements.SelectionStrategy strategy) {
+        logger.debug("Applying selection strategy: strategy={}, eligibleAgents={}", strategy, eligibleAgents.size());
         switch (strategy) {
             case ROUND_ROBIN:
                 return selectByRoundRobin(eligibleAgents, job.getRequirements().getTenantId());
@@ -185,7 +205,7 @@ public class AgentSelectionService {
                 return selectByPreference(job, eligibleAgents);
                 
             default:
-                logger.warning("Unknown selection strategy: " + strategy + ", falling back to LEAST_LOADED");
+                logger.warn("Unknown selection strategy: {}, falling back to LEAST_LOADED", strategy);
                 return selectByLeastLoaded(eligibleAgents, agentLoads);
         }
     }

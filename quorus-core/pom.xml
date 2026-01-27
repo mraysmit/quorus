@@ -67,6 +67,13 @@
             <version>0.2.20</version>
         </dependency>
 
+        <!-- SLF4J API for logging -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>2.0.9</version>
+        </dependency>
+
         <!-- Testing dependencies -->
         <dependency>
             <groupId>io.vertx</groupId>

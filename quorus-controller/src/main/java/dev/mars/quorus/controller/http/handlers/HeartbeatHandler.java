@@ -35,8 +35,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * HTTP handler for agent heartbeats.
@@ -52,7 +53,7 @@ import java.util.logging.Logger;
  */
 public class HeartbeatHandler implements HttpHandler {
 
-    private static final Logger logger = Logger.getLogger(HeartbeatHandler.class.getName());
+    private static final Logger logger = LoggerFactory.getLogger(HeartbeatHandler.class);
     private final RaftNode raftNode;
     private final ObjectMapper objectMapper;
 
@@ -60,11 +61,17 @@ public class HeartbeatHandler implements HttpHandler {
         this.raftNode = raftNode;
         this.objectMapper = new ObjectMapper();
         this.objectMapper.registerModule(new JavaTimeModule());
+        logger.debug("HeartbeatHandler initialized with raftNode={}", raftNode.getNodeId());
     }
 
     @Override
     public void handle(HttpExchange exchange) throws IOException {
-        if (!"POST".equals(exchange.getRequestMethod())) {
+        String method = exchange.getRequestMethod();
+        String path = exchange.getRequestURI().getPath();
+        logger.debug("handle() entry: method={}, path={}", method, path);
+        
+        if (!"POST".equals(method)) {
+            logger.debug("Method not allowed: {}", method);
             sendJsonResponse(exchange, 405, Map.of("error", "Method not allowed"));
             return;
         }
@@ -72,19 +79,25 @@ public class HeartbeatHandler implements HttpHandler {
         try {
             // Read and parse request body
             String requestBody = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+            logger.debug("Request body received: length={}", requestBody.length());
+            
             Map<String, Object> heartbeatData = objectMapper.readValue(requestBody, Map.class);
 
             // Validate required fields
             String agentId = (String) heartbeatData.get("agentId");
             if (agentId == null || agentId.isEmpty()) {
+                logger.debug("Validation failed: missing agentId");
                 sendJsonResponse(exchange, 400, Map.of("error", "Missing required field: agentId"));
                 return;
             }
+            logger.debug("Processing heartbeat for agentId={}", agentId);
 
             // Check if agent exists
+            logger.debug("Querying state machine for agent: agentId={}", agentId);
             QuorusStateMachine stateMachine = (QuorusStateMachine) raftNode.getStateMachine();
             AgentInfo existingAgent = stateMachine.getAgent(agentId);
             if (existingAgent == null) {
+                logger.debug("Agent not found: agentId={}", agentId);
                 sendJsonResponse(exchange, 404, Map.of(
                         "error", "Agent not found",
                         "agentId", agentId,
@@ -93,7 +106,8 @@ public class HeartbeatHandler implements HttpHandler {
                 return;
             }
 
-            logger.fine("Heartbeat received from agent: " + agentId);
+            logger.debug("Heartbeat received from agent: agentId={}, currentStatus={}", 
+                    agentId, existingAgent.getStatus());
 
             // Extract optional status from heartbeat
             AgentStatus status = null;
@@ -101,8 +115,9 @@ public class HeartbeatHandler implements HttpHandler {
                 String statusStr = (String) heartbeatData.get("status");
                 try {
                     status = AgentStatus.valueOf(statusStr.toUpperCase());
+                    logger.debug("Status provided in heartbeat: agentId={}, status={}", agentId, status);
                 } catch (IllegalArgumentException e) {
-                    logger.warning("Invalid status in heartbeat: " + statusStr);
+                    logger.warn("Invalid status in heartbeat: agentId={}, status={}", agentId, statusStr);
                 }
             }
 
@@ -110,18 +125,24 @@ public class HeartbeatHandler implements HttpHandler {
             AgentCommand command;
             if (status != null) {
                 command = AgentCommand.heartbeat(agentId, status, Instant.now());
+                logger.debug("Submitting heartbeat command with status to Raft: agentId={}, status={}", agentId, status);
             } else {
                 command = AgentCommand.heartbeat(agentId);
+                logger.debug("Submitting heartbeat command to Raft: agentId={}", agentId);
             }
             
             Future<Object> future = raftNode.submitCommand(command);
 
             // Wait for consensus (with timeout)
+            logger.debug("Waiting for Raft consensus on heartbeat: agentId={}", agentId);
             Object result = future.toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
+            logger.debug("Raft consensus completed: agentId={}, resultType={}", 
+                    agentId, result != null ? result.getClass().getSimpleName() : "null");
 
             if (result instanceof AgentInfo) {
                 AgentInfo updatedAgent = (AgentInfo) result;
-                logger.fine("Heartbeat processed for agent: " + updatedAgent.getAgentId());
+                logger.debug("Heartbeat processed successfully: agentId={}, status={}, lastHeartbeat={}", 
+                        updatedAgent.getAgentId(), updatedAgent.getStatus(), updatedAgent.getLastHeartbeat());
                 
                 Map<String, Object> response = new HashMap<>();
                 response.put("success", true);
@@ -133,23 +154,25 @@ public class HeartbeatHandler implements HttpHandler {
                 // Include sequence number if provided
                 if (heartbeatData.containsKey("sequenceNumber")) {
                     response.put("acknowledgedSequenceNumber", heartbeatData.get("sequenceNumber"));
+                    logger.debug("Acknowledging sequence number: {}", heartbeatData.get("sequenceNumber"));
                 }
                 
                 sendJsonResponse(exchange, 200, response);
             } else {
-                logger.warning("Unexpected result from heartbeat: " + result);
+                logger.warn("Unexpected result from heartbeat: agentId={}, resultType={}", 
+                        agentId, result != null ? result.getClass().getSimpleName() : "null");
                 sendJsonResponse(exchange, 500, Map.of("error", "Failed to process heartbeat"));
             }
 
         } catch (IllegalStateException e) {
             // Not the leader - redirect to leader
-            logger.warning("Not the leader, cannot process heartbeat: " + e.getMessage());
+            logger.warn("Not the leader, cannot process heartbeat: {}", e.getMessage());
             sendJsonResponse(exchange, 503, Map.of(
                     "error", "Not the leader",
                     "message", e.getMessage()
             ));
         } catch (Exception e) {
-            logger.log(Level.SEVERE, "Error processing heartbeat", e);
+            logger.error("Error processing heartbeat", e);
             sendJsonResponse(exchange, 500, Map.of(
                     "error", "Internal server error",
                     "message", e.getMessage()

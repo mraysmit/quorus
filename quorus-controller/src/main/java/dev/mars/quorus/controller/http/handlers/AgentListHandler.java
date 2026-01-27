@@ -31,8 +31,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * HTTP handler for listing registered agents.
@@ -47,7 +48,7 @@ import java.util.logging.Logger;
  */
 public class AgentListHandler implements HttpHandler {
 
-    private static final Logger logger = Logger.getLogger(AgentListHandler.class.getName());
+    private static final Logger logger = LoggerFactory.getLogger(AgentListHandler.class);
     private final RaftNode raftNode;
     private final ObjectMapper objectMapper;
 
@@ -55,21 +56,29 @@ public class AgentListHandler implements HttpHandler {
         this.raftNode = raftNode;
         this.objectMapper = new ObjectMapper();
         this.objectMapper.registerModule(new JavaTimeModule());
+        logger.debug("AgentListHandler initialized with raftNode={}", raftNode.getNodeId());
     }
 
     @Override
     public void handle(HttpExchange exchange) throws IOException {
-        if (!"GET".equals(exchange.getRequestMethod())) {
+        String method = exchange.getRequestMethod();
+        String path = exchange.getRequestURI().getPath();
+        logger.debug("handle() entry: method={}, path={}", method, path);
+        
+        if (!"GET".equals(method)) {
+            logger.debug("Method not allowed: {}", method);
             sendJsonResponse(exchange, 405, Map.of("error", "Method not allowed"));
             return;
         }
 
         try {
             // Get the state machine from RaftNode
+            logger.debug("Querying state machine for agents list");
             QuorusStateMachine stateMachine = (QuorusStateMachine) raftNode.getStateMachine();
             
             // Get all agents
             Map<String, AgentInfo> agents = stateMachine.getAgents();
+            logger.debug("Retrieved {} agents from state machine", agents.size());
             
             // Convert to list for JSON response
             List<Map<String, Object>> agentList = new ArrayList<>();
@@ -88,17 +97,19 @@ public class AgentListHandler implements HttpHandler {
                 agentData.put("healthy", agent.isHealthy());
                 agentData.put("available", agent.isAvailable());
                 agentList.add(agentData);
+                logger.debug("Agent included: agentId={}, status={}, healthy={}, available={}", 
+                        agent.getAgentId(), agent.getStatus(), agent.isHealthy(), agent.isAvailable());
             }
             
             Map<String, Object> response = new HashMap<>();
             response.put("agents", agentList);
             response.put("count", agentList.size());
             
-            logger.info("Returning " + agentList.size() + " agents");
+            logger.info("Returning {} agents", agentList.size());
             sendJsonResponse(exchange, 200, response);
 
         } catch (Exception e) {
-            logger.log(Level.SEVERE, "Error listing agents", e);
+            logger.error("Error listing agents", e);
             sendJsonResponse(exchange, 500, Map.of(
                     "error", "Internal server error",
                     "message", e.getMessage()

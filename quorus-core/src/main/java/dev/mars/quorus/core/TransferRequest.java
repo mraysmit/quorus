@@ -25,28 +25,40 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
-/**
- * Description for TransferRequest
- *
- * @author Mark Andrew Ray-Smith Cityline Ltd
- * @version 1.0
- * @since 2025-08-17
- */
 
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+/**
+ * Represents a file transfer request with bidirectional support.
+ * 
+ * <p>Supports bidirectional transfers (uploads and downloads).
+ * The transfer direction is automatically determined from the URI schemes:</p>
+ * <ul>
+ *   <li><b>DOWNLOAD:</b> Remote source → Local file:// destination</li>
+ *   <li><b>UPLOAD:</b> Local file:// source → Remote destination</li>
+ *   <li><b>REMOTE_TO_REMOTE:</b> Remote → Remote (not yet supported)</li>
+ * </ul>
+ * 
+ * <p><b>Note:</b> Pre-production - no backward compatibility constraints.</p>
+ * 
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 2.0
+ * @since 2026-01-27
+ */
 @JsonDeserialize(builder = TransferRequest.Builder.class)
 public final class TransferRequest implements Serializable {
 
-    private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 2L; // Incremented for bidirectional support
 
     private final String requestId;
 
     private final URI sourceUri;
 
     private final String destinationPath;
+
+    private final URI destinationUri;
 
     private final String protocol;
 
@@ -64,7 +76,21 @@ public final class TransferRequest implements Serializable {
 
         // Validate and set required fields
         this.sourceUri = Objects.requireNonNull(builder.sourceUri, "Source URI cannot be null");
-        this.destinationPath = Objects.requireNonNull(builder.destinationPath, "Destination path cannot be null").toString();
+        
+        // Support both old destinationPath and new destinationUri for backward compatibility
+        if (builder.destinationUri != null) {
+            this.destinationUri = builder.destinationUri;
+            this.destinationPath = null; // Not used anymore
+        } else if (builder.destinationPath != null) {
+            // Convert Path to file:// URI for backward compatibility
+            this.destinationUri = builder.destinationPath.toUri();
+            this.destinationPath = builder.destinationPath.toString(); // Keep for serialization compatibility
+        } else {
+            throw new NullPointerException("Destination URI or Path cannot be null");
+        }
+        
+        // Validate URI combinations
+        validateUriCombination(this.sourceUri, this.destinationUri);
 
         // Set optional fields with defaults
         this.protocol = builder.protocol != null ? builder.protocol : "http";
@@ -73,12 +99,60 @@ public final class TransferRequest implements Serializable {
         this.expectedSize = builder.expectedSize;
         this.expectedChecksum = builder.expectedChecksum;
     }
+    
+    /**
+     * Validates that URI combination is supported.
+     * 
+     * @throws IllegalArgumentException if both URIs are file:// (use Files.copy instead)
+     * @throws UnsupportedOperationException if both URIs are remote (not yet supported)
+     */
+    private static void validateUriCombination(URI source, URI destination) {
+        boolean sourceIsFile = "file".equalsIgnoreCase(source.getScheme());
+        boolean destIsFile = "file".equalsIgnoreCase(destination.getScheme());
+        
+        if (sourceIsFile && destIsFile) {
+            throw new IllegalArgumentException(
+                "Both source and destination are local files. Use Files.copy() for local file-to-file operations.");
+        }
+        
+        if (!sourceIsFile && !destIsFile) {
+            throw new UnsupportedOperationException(
+                "Remote-to-remote transfers not yet supported. At least one endpoint must be file:// (local filesystem).");
+        }
+    }
 
     public String getRequestId() { return requestId; }
 
     public URI getSourceUri() { return sourceUri; }
 
-    public Path getDestinationPath() { return Path.of(destinationPath); }
+    /**
+     * Returns the destination URI for this transfer.
+     * 
+     * <p>This is the new API introduced in version 2.0 for bidirectional support.</p>
+     * 
+     * @return the destination URI
+     * @since 2.0
+     */
+    public URI getDestinationUri() { return destinationUri; }
+
+    /**
+     * Returns the destination path for this transfer.
+     * 
+     * <p>This method only works when the destination is a local file:// URI.
+     * For upload operations (where destination is remote), this method throws
+     * {@link UnsupportedOperationException}.</p>
+     * 
+     * @return the destination path
+     * @throws UnsupportedOperationException if destination is not a file:// URI
+     */
+    public Path getDestinationPath() {
+        if (!"file".equalsIgnoreCase(destinationUri.getScheme())) {
+            throw new UnsupportedOperationException(
+                "getDestinationPath() only valid for file:// destinations. Use getDestinationUri() instead. " +
+                "Current destination: " + destinationUri);
+        }
+        return Paths.get(destinationUri);
+    }
 
     public String getProtocol() { return protocol; }
 
@@ -89,6 +163,64 @@ public final class TransferRequest implements Serializable {
     public long getExpectedSize() { return expectedSize; }
 
     public String getExpectedChecksum() { return expectedChecksum; }
+    
+    /**
+     * Returns the transfer direction (DOWNLOAD, UPLOAD, or REMOTE_TO_REMOTE).
+     * 
+     * <p>Direction is determined by URI schemes:</p>
+     * <ul>
+     *   <li>DOWNLOAD: source is remote, destination is file://</li>
+     *   <li>UPLOAD: source is file://, destination is remote</li>
+     *   <li>REMOTE_TO_REMOTE: both are remote (not yet supported)</li>
+     * </ul>
+     * 
+     * @return the transfer direction
+     * @since 2.0
+     */
+    public TransferDirection getDirection() {
+        boolean sourceIsFile = "file".equalsIgnoreCase(sourceUri.getScheme());
+        boolean destIsFile = "file".equalsIgnoreCase(destinationUri.getScheme());
+        
+        if (!sourceIsFile && destIsFile) {
+            return TransferDirection.DOWNLOAD;
+        } else if (sourceIsFile && !destIsFile) {
+            return TransferDirection.UPLOAD;
+        } else {
+            return TransferDirection.REMOTE_TO_REMOTE;
+        }
+    }
+    
+    /**
+     * Returns true if this is a download operation (remote → local).
+     * 
+     * @return true if downloading, false otherwise
+     * @since 2.0
+     */
+    public boolean isDownload() {
+        return getDirection() == TransferDirection.DOWNLOAD;
+    }
+    
+    /**
+     * Returns true if this is an upload operation (local → remote).
+     * 
+     * @return true if uploading, false otherwise
+     * @since 2.0
+     */
+    public boolean isUpload() {
+        return getDirection() == TransferDirection.UPLOAD;
+    }
+    
+    /**
+     * Returns true if this is a remote-to-remote operation.
+     * 
+     * <p><b>Note:</b> Remote-to-remote transfers are not yet supported.</p>
+     * 
+     * @return true if remote-to-remote, false otherwise
+     * @since 2.0
+     */
+    public boolean isRemoteToRemote() {
+        return getDirection() == TransferDirection.REMOTE_TO_REMOTE;
+    }
     
     public static Builder builder() {
         return new Builder();
@@ -102,8 +234,15 @@ public final class TransferRequest implements Serializable {
         /** Source URI where the file will be transferred from (required) */
         private URI sourceUri;
 
-        /** Destination path where the file will be stored (required) */
+        /** 
+         * Destination path where the file will be stored (backward compatibility only)
+         * @deprecated Use destinationUri instead
+         */
+        @Deprecated(since = "2.0", forRemoval = true)
         private Path destinationPath;
+
+        /** Destination URI where the file will be transferred to (required) */
+        private URI destinationUri;
 
         /** Transfer protocol to use (defaults to "http") */
         private String protocol;
@@ -130,11 +269,46 @@ public final class TransferRequest implements Serializable {
             return this;
         }
 
+        /**
+         * Sets the destination URI for the transfer (new API).
+         * 
+         * <p>Use this method for both downloads and uploads:</p>
+         * <pre>
+         * // Download
+         * .destinationUri(URI.create("file:///tmp/file.dat"))
+         * 
+         * // Upload
+         * .destinationUri(URI.create("sftp://server/file.dat"))
+         * </pre>
+         * 
+         * @param destinationUri the destination URI
+         * @return this builder
+         * @since 2.0
+         */
+        public Builder destinationUri(URI destinationUri) {
+            this.destinationUri = destinationUri;
+            return this;
+        }
+
+        /**
+         * Sets the destination path for the transfer.
+         * 
+         * <p>Path is automatically converted to file:// URI internally.</p>
+         * 
+         * @param destinationPath the destination path
+         * @return this builder
+         */
         public Builder destinationPath(Path destinationPath) {
             this.destinationPath = destinationPath;
             return this;
         }
 
+        /**
+         * Sets the destination path from string (JSON deserialization).
+         * 
+         * @param destinationPath the destination path as string
+         * @return this builder
+         */
         @JsonProperty("destinationPath")
         public Builder destinationPath(String destinationPath) {
             this.destinationPath = Paths.get(destinationPath);
@@ -208,7 +382,8 @@ public final class TransferRequest implements Serializable {
         return "TransferRequest{" +
                 "requestId='" + requestId + '\'' +
                 ", sourceUri=" + sourceUri +
-                ", destinationPath=" + destinationPath +
+                ", destinationUri=" + destinationUri +
+                ", direction=" + getDirection() +
                 ", protocol='" + protocol + '\'' +
                 ", expectedSize=" + expectedSize +
                 ", metadataKeys=" + (metadata != null ? metadata.keySet() : "[]") +

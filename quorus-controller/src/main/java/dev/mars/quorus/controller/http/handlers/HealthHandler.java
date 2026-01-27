@@ -23,7 +23,9 @@ import com.sun.net.httpserver.HttpHandler;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
-import java.util.logging.Logger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Health check handler for Quorus Controller.
@@ -39,43 +41,59 @@ import java.util.logging.Logger;
  */
 public class HealthHandler implements HttpHandler {
 
-    private static final Logger logger = Logger.getLogger(HealthHandler.class.getName());
+    private static final Logger logger = LoggerFactory.getLogger(HealthHandler.class);
     
     private final RaftNode raftNode;
 
     public HealthHandler(RaftNode raftNode) {
         this.raftNode = raftNode;
+        logger.debug("HealthHandler initialized with raftNode={}", raftNode != null ? raftNode.getNodeId() : "null");
     }
 
     @Override
     public void handle(HttpExchange exchange) throws IOException {
-        if (!"GET".equals(exchange.getRequestMethod())) {
+        String method = exchange.getRequestMethod();
+        String path = exchange.getRequestURI().getPath();
+        logger.debug("handle() entry: method={}, path={}", method, path);
+        
+        if (!"GET".equals(method)) {
+            logger.debug("Method not allowed: {}", method);
             sendResponse(exchange, 405, "{\"error\":\"Method not allowed\"}");
             return;
         }
 
         try {
             // Check overall health
+            logger.debug("Performing health check");
             boolean isHealthy = checkHealth();
             
             String response = buildHealthResponse(isHealthy);
             int statusCode = isHealthy ? 200 : 503;
             
+            logger.debug("Health check completed: isHealthy={}, statusCode={}", isHealthy, statusCode);
             sendJsonResponse(exchange, statusCode, response);
             
         } catch (Exception e) {
-            logger.warning("Error checking health: " + e.getMessage());
+            logger.warn("Error checking health: {}", e.getMessage());
             sendResponse(exchange, 500, "{\"error\":\"Internal server error\"}");
         }
     }
 
     private boolean checkHealth() {
+        logger.debug("checkHealth() entry");
         try {
             // Check if Raft node is running
-            if (raftNode == null || !raftNode.isRunning()) {
+            if (raftNode == null) {
+                logger.debug("Health check failed: raftNode is null");
+                return false;
+            }
+            
+            if (!raftNode.isRunning()) {
+                logger.debug("Health check failed: raftNode is not running");
                 return false;
             }
 
+            logger.debug("Health check passed: raftNode is running, state={}", raftNode.getState());
             // Additional health checks can be added here
             // - Database connectivity
             // - Disk space
@@ -85,12 +103,13 @@ public class HealthHandler implements HttpHandler {
             return true;
             
         } catch (Exception e) {
-            logger.warning("Health check failed: " + e.getMessage());
+            logger.warn("Health check failed with exception: {}", e.getMessage());
             return false;
         }
     }
 
     private String buildHealthResponse(boolean isHealthy) {
+        logger.debug("buildHealthResponse() entry: isHealthy={}", isHealthy);
         StringBuilder json = new StringBuilder();
         json.append("{");
         json.append("\"status\":\"").append(isHealthy ? "UP" : "DOWN").append("\",");
@@ -104,6 +123,7 @@ public class HealthHandler implements HttpHandler {
         if (raftHealthy) {
             json.append(",\"nodeId\":\"").append(raftNode.getNodeId()).append("\"");
             json.append(",\"state\":\"").append(raftNode.getState()).append("\"");
+            logger.debug("Raft health check: nodeId={}, state={}", raftNode.getNodeId(), raftNode.getState());
         }
         json.append("}");
         
