@@ -33,8 +33,9 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * HTTP handler for job status updates from agents.
@@ -49,7 +50,7 @@ import java.util.logging.Logger;
  */
 public class JobStatusHandler implements HttpHandler {
 
-    private static final Logger logger = Logger.getLogger(JobStatusHandler.class.getName());
+    private static final Logger logger = LoggerFactory.getLogger(JobStatusHandler.class);
     private final RaftNode raftNode;
     private final ObjectMapper objectMapper;
 
@@ -57,29 +58,38 @@ public class JobStatusHandler implements HttpHandler {
         this.raftNode = raftNode;
         this.objectMapper = new ObjectMapper();
         this.objectMapper.registerModule(new JavaTimeModule());
+        logger.debug("JobStatusHandler initialized with raftNode={}", raftNode.getNodeId());
     }
 
     @Override
     public void handle(HttpExchange exchange) throws IOException {
-        if (!"POST".equals(exchange.getRequestMethod())) {
+        String method = exchange.getRequestMethod();
+        String path = exchange.getRequestURI().getPath();
+        logger.debug("handle() entry: method={}, path={}", method, path);
+        
+        if (!"POST".equals(method)) {
+            logger.debug("Method not allowed: {}", method);
             sendJsonResponse(exchange, 405, Map.of("error", "Method not allowed"));
             return;
         }
 
         try {
             // Extract jobId from path: /api/v1/jobs/{jobId}/status
-            String path = exchange.getRequestURI().getPath();
             String[] parts = path.split("/");
             if (parts.length < 5) {
+                logger.debug("Invalid path format: parts.length={}", parts.length);
                 sendJsonResponse(exchange, 400, Map.of("error", "Missing jobId in path"));
                 return;
             }
 
             String jobId = parts[4];
+            logger.debug("Extracted jobId={}", jobId);
 
             // Parse request body
             InputStream is = exchange.getRequestBody();
             String requestBody = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+            logger.debug("Request body received: length={}", requestBody.length());
+            
             Map<String, Object> request = objectMapper.readValue(requestBody, Map.class);
 
             // Extract required fields
@@ -88,8 +98,12 @@ public class JobStatusHandler implements HttpHandler {
             Long bytesTransferred = request.get("bytesTransferred") != null ? 
                     ((Number) request.get("bytesTransferred")).longValue() : null;
             String errorMessage = (String) request.get("errorMessage");
+            
+            logger.debug("Parsed request: agentId={}, status={}, bytesTransferred={}", 
+                    agentId, statusStr, bytesTransferred);
 
             if (agentId == null || statusStr == null) {
+                logger.debug("Validation failed: missing required fields");
                 sendJsonResponse(exchange, 400, Map.of("error", "Missing required fields: agentId, status"));
                 return;
             }
@@ -100,30 +114,42 @@ public class JobStatusHandler implements HttpHandler {
             try {
                 assignmentStatus = JobAssignmentStatus.valueOf(statusStr);
                 transferStatus = mapToTransferStatus(assignmentStatus);
+                logger.debug("Parsed status: assignmentStatus={}, transferStatus={}", 
+                        assignmentStatus, transferStatus);
             } catch (IllegalArgumentException e) {
+                logger.debug("Invalid status value: {}", statusStr);
                 sendJsonResponse(exchange, 400, Map.of("error", "Invalid status: " + statusStr));
                 return;
             }
 
             // Update job assignment status
             String assignmentId = jobId + "-" + agentId;
+            logger.debug("Submitting job assignment update to Raft: assignmentId={}, status={}", 
+                    assignmentId, assignmentStatus);
             JobAssignmentCommand assignmentCommand = JobAssignmentCommand.updateStatus(
                     assignmentId, assignmentStatus);
 
             Object assignmentResult = raftNode.submitCommand(assignmentCommand);
+            logger.debug("Job assignment update result: type={}", 
+                    assignmentResult != null ? assignmentResult.getClass().getSimpleName() : "null");
+            
             if (assignmentResult == null) {
+                logger.debug("Job assignment not found: assignmentId={}", assignmentId);
                 sendJsonResponse(exchange, 404, Map.of("error", "Job assignment not found"));
                 return;
             }
 
             // Update transfer job status if provided
             if (transferStatus != null) {
+                logger.debug("Submitting transfer job status update to Raft: jobId={}, status={}", 
+                        jobId, transferStatus);
                 TransferJobCommand transferCommand = TransferJobCommand.updateStatus(
                         jobId, transferStatus);
                 raftNode.submitCommand(transferCommand);
             }
 
             // Wait for consensus
+            logger.debug("Waiting for consensus completion");
             TimeUnit.MILLISECONDS.sleep(100);
 
             Map<String, Object> response = Map.of(
@@ -134,10 +160,12 @@ public class JobStatusHandler implements HttpHandler {
                     "timestamp", Instant.now().toString()
             );
 
+            logger.debug("Job status update completed successfully: jobId={}, agentId={}, status={}", 
+                    jobId, agentId, statusStr);
             sendJsonResponse(exchange, 200, response);
 
         } catch (Exception e) {
-            logger.log(Level.SEVERE, "Error updating job status", e);
+            logger.error("Error updating job status", e);
             sendJsonResponse(exchange, 500, Map.of(
                     "error", "Internal server error",
                     "message", e.getMessage()
@@ -146,21 +174,30 @@ public class JobStatusHandler implements HttpHandler {
     }
 
     private TransferStatus mapToTransferStatus(JobAssignmentStatus assignmentStatus) {
+        logger.debug("mapToTransferStatus() entry: assignmentStatus={}", assignmentStatus);
+        TransferStatus result;
         switch (assignmentStatus) {
             case ASSIGNED:
             case ACCEPTED:
-                return TransferStatus.PENDING;
+                result = TransferStatus.PENDING;
+                break;
             case IN_PROGRESS:
-                return TransferStatus.IN_PROGRESS;
+                result = TransferStatus.IN_PROGRESS;
+                break;
             case COMPLETED:
-                return TransferStatus.COMPLETED;
+                result = TransferStatus.COMPLETED;
+                break;
             case FAILED:
-                return TransferStatus.FAILED;
+                result = TransferStatus.FAILED;
+                break;
             case CANCELLED:
-                return TransferStatus.CANCELLED;
+                result = TransferStatus.CANCELLED;
+                break;
             default:
-                return null;
+                result = null;
         }
+        logger.debug("mapToTransferStatus() result: {} -> {}", assignmentStatus, result);
+        return result;
     }
 
     private void sendJsonResponse(HttpExchange exchange, int statusCode, Object data) throws IOException {

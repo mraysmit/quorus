@@ -31,7 +31,8 @@ import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Service responsible for orchestrating job assignments in the distributed file transfer system.
@@ -46,7 +47,7 @@ import java.util.logging.Logger;
  */
 public class JobAssignmentService {
 
-    private static final Logger logger = Logger.getLogger(JobAssignmentService.class.getName());
+    private static final Logger logger = LoggerFactory.getLogger(JobAssignmentService.class);
 
     private final Vertx vertx;
     private final RaftNode raftNode;
@@ -75,8 +76,8 @@ public class JobAssignmentService {
         this.raftNode = Objects.requireNonNull(raftNode, "RaftNode cannot be null");
         this.agentSelectionService = Objects.requireNonNull(agentSelectionService, "AgentSelectionService cannot be null");
 
-        logger.info("Creating JobAssignmentService with Vert.x instance: " +
-                   System.identityHashCode(vertx) + " (using Vert.x timers, no ScheduledExecutorService)");
+        logger.info("Creating JobAssignmentService: vertxId={} (using Vert.x timers)", 
+            System.identityHashCode(vertx));
 
         // Start background assignment processor
         startAssignmentProcessor();
@@ -96,10 +97,14 @@ public class JobAssignmentService {
     public Future<QueuedJob> submitJob(TransferRequest transferRequest, 
                                                  JobRequirements requirements, 
                                                  JobPriority priority) {
+        logger.debug("Submitting job: requestId={}, priority={}, requirements={}", 
+            transferRequest.getRequestId(), priority, requirements);
         return vertx.executeBlocking(() -> {
             try {
                 // Create transfer job first
                 TransferJob transferJob = new TransferJob(transferRequest);
+                logger.debug("Created transfer job: jobId={}, source={}, dest={}", 
+                    transferJob.getJobId(), transferRequest.getSourceUri(), transferRequest.getDestinationPath());
 
                 // Create queued job
                 QueuedJob queuedJob = new QueuedJob.Builder()
@@ -109,6 +114,7 @@ public class JobAssignmentService {
                         .build();
                 
                 // Submit to Raft for distributed consensus
+                logger.debug("Submitting enqueue command to Raft: jobId={}", queuedJob.getJobId());
                 JobQueueCommand command = JobQueueCommand.enqueue(queuedJob);
                 Object result = raftNode.submitCommand(command);
                 
@@ -116,16 +122,18 @@ public class JobAssignmentService {
                     QueuedJob enqueuedJob = (QueuedJob) result;
                     jobQueue.put(enqueuedJob.getJobId(), enqueuedJob);
                     
-                    logger.info("Job queued successfully: " + enqueuedJob.getJobId() + 
-                               " with priority " + priority);
+                    logger.info("Job queued: jobId={}, priority={}, queueSize={}", 
+                        enqueuedJob.getJobId(), priority, jobQueue.size());
                     
                     return enqueuedJob;
                 } else {
+                    logger.error("Failed to enqueue job: requestId={}, resultType={}", 
+                        transferRequest.getRequestId(), result != null ? result.getClass().getName() : "null");
                     throw new RuntimeException("Failed to enqueue job: " + transferRequest.getRequestId());
                 }
                 
             } catch (Exception e) {
-                logger.severe("Error submitting job: " + e.getMessage());
+                logger.error("Error submitting job: requestId={}", transferRequest.getRequestId(), e);
                 throw new RuntimeException("Failed to submit job", e);
             }
         });
@@ -139,25 +147,33 @@ public class JobAssignmentService {
      * @return future containing the job assignment
      */
     public Future<JobAssignment> assignJob(String jobId, String agentId) {
+        logger.debug("Assigning job: jobId={}, requestedAgentId={}", jobId, agentId);
         return vertx.executeBlocking(() -> {
             try {
                 QueuedJob queuedJob = jobQueue.get(jobId);
                 if (queuedJob == null) {
+                    logger.warn("Job not found in queue: jobId={}", jobId);
                     throw new IllegalArgumentException("Job not found in queue: " + jobId);
                 }
                 
                 // Select agent if not specified
                 String selectedAgentId = agentId;
                 if (selectedAgentId == null) {
+                    logger.debug("Auto-selecting agent for job: jobId={}, availableAgents={}", 
+                        jobId, availableAgents.size());
                     selectedAgentId = agentSelectionService.selectAgent(queuedJob, availableAgents, agentLoads);
                     if (selectedAgentId == null) {
+                        logger.warn("No suitable agent found: jobId={}, availableAgents={}", jobId, availableAgents.size());
                         throw new RuntimeException("No suitable agent found for job: " + jobId);
                     }
+                    logger.debug("Auto-selected agent: jobId={}, selectedAgentId={}", jobId, selectedAgentId);
                 }
                 
                 // Validate agent availability
                 AgentInfo agent = availableAgents.get(selectedAgentId);
                 if (agent == null || !agent.getStatus().isAvailableForWork()) {
+                    logger.warn("Agent not available: agentId={}, exists={}, status={}", 
+                        selectedAgentId, agent != null, agent != null ? agent.getStatus() : "N/A");
                     throw new IllegalArgumentException("Agent not available: " + selectedAgentId);
                 }
                 
@@ -170,6 +186,7 @@ public class JobAssignmentService {
                         .build();
                 
                 // Submit assignment command to Raft
+                logger.debug("Submitting assignment to Raft: jobId={}, agentId={}", jobId, selectedAgentId);
                 JobAssignmentCommand assignCommand = JobAssignmentCommand.assign(assignment);
                 Object result = raftNode.submitCommand(assignCommand);
                 
@@ -182,15 +199,17 @@ public class JobAssignmentService {
                     raftNode.submitCommand(dequeueCommand);
                     jobQueue.remove(jobId);
                     
-                    logger.info("Job assigned successfully: " + jobId + " -> " + selectedAgentId);
+                    logger.info("Job assigned: jobId={}, agentId={}, activeAssignments={}, queueSize={}", 
+                        jobId, selectedAgentId, activeAssignments.size(), jobQueue.size());
                     
                     return createdAssignment;
                 } else {
+                    logger.error("Failed to create assignment: jobId={}", jobId);
                     throw new RuntimeException("Failed to create assignment for job: " + jobId);
                 }
                 
             } catch (Exception e) {
-                logger.severe("Error assigning job " + jobId + ": " + e.getMessage());
+                logger.error("Error assigning job: jobId={}, agentId={}", jobId, agentId, e);
                 throw new RuntimeException("Failed to assign job", e);
             }
         });
@@ -204,12 +223,16 @@ public class JobAssignmentService {
      * @return future containing the updated assignment
      */
     public Future<JobAssignment> updateAssignmentStatus(String jobId, JobAssignmentStatus newStatus) {
+        logger.debug("Updating assignment status: jobId={}, newStatus={}", jobId, newStatus);
         return vertx.executeBlocking(() -> {
             try {
                 JobAssignment existing = activeAssignments.get(jobId);
                 if (existing == null) {
+                    logger.warn("Assignment not found for status update: jobId={}", jobId);
                     throw new IllegalArgumentException("Assignment not found: " + jobId);
                 }
+                
+                JobAssignmentStatus oldStatus = existing.getStatus();
                 
                 // Create update command
                 JobAssignmentCommand updateCommand = JobAssignmentCommand.updateStatus(
@@ -221,20 +244,24 @@ public class JobAssignmentService {
                     JobAssignment updatedAssignment = (JobAssignment) result;
                     activeAssignments.put(jobId, updatedAssignment);
                     
-                    logger.info("Assignment status updated: " + jobId + " -> " + newStatus);
+                    logger.info("Assignment status updated: jobId={}, oldStatus={}, newStatus={}", 
+                        jobId, oldStatus, newStatus);
                     
                     // Clean up completed/failed assignments
                     if (newStatus.isTerminal()) {
                         activeAssignments.remove(jobId);
+                        logger.debug("Removed terminal assignment: jobId={}, activeAssignments={}", 
+                            jobId, activeAssignments.size());
                     }
                     
                     return updatedAssignment;
                 } else {
+                    logger.error("Failed to update assignment status: jobId={}", jobId);
                     throw new RuntimeException("Failed to update assignment status: " + jobId);
                 }
                 
             } catch (Exception e) {
-                logger.severe("Error updating assignment status for " + jobId + ": " + e.getMessage());
+                logger.error("Error updating assignment status: jobId={}, newStatus={}", jobId, newStatus, e);
                 throw new RuntimeException("Failed to update assignment status", e);
             }
         });
@@ -247,10 +274,12 @@ public class JobAssignmentService {
      * @return future indicating completion
      */
     public Future<Void> cancelAssignment(String jobId) {
+        logger.debug("Cancelling assignment: jobId={}", jobId);
         return vertx.executeBlocking(() -> {
             try {
                 JobAssignment existing = activeAssignments.get(jobId);
                 if (existing != null) {
+                    logger.debug("Cancelling active assignment: jobId={}, agentId={}", jobId, existing.getAgentId());
                     JobAssignmentCommand cancelCommand = JobAssignmentCommand.cancel(
                             existing.getJobId() + ":" + existing.getAgentId(), "User requested cancellation");
                     raftNode.submitCommand(cancelCommand);
@@ -259,16 +288,18 @@ public class JobAssignmentService {
                 
                 // Also remove from queue if still there
                 if (jobQueue.containsKey(jobId)) {
+                    logger.debug("Removing job from queue: jobId={}", jobId);
                     JobQueueCommand removeCommand = JobQueueCommand.remove(jobId, "Job cancelled by user");
                     raftNode.submitCommand(removeCommand);
                     jobQueue.remove(jobId);
                 }
                 
-                logger.info("Job cancelled: " + jobId);
+                logger.info("Job cancelled: jobId={}, activeAssignments={}, queueSize={}", 
+                    jobId, activeAssignments.size(), jobQueue.size());
                 return null;
                 
             } catch (Exception e) {
-                logger.severe("Error cancelling job " + jobId + ": " + e.getMessage());
+                logger.error("Error cancelling job: jobId={}", jobId, e);
                 throw new RuntimeException("Failed to cancel job", e);
             }
         });
@@ -323,13 +354,13 @@ public class JobAssignmentService {
                         try {
                             processQueuedJobs();
                         } catch (Exception e) {
-                            logger.warning("Error in assignment processor: " + e.getMessage());
+                            logger.warn("Error in assignment processor", e);
                         }
                     }
                 });
             }
         });
-        logger.info("Assignment processor started (Vert.x timer, 10s interval)");
+        logger.info("Assignment processor started: initialDelay=5s, interval=10s");
     }
 
     /**
@@ -345,33 +376,36 @@ public class JobAssignmentService {
                         try {
                             checkAssignmentTimeouts();
                         } catch (Exception e) {
-                            logger.warning("Error in timeout monitor: " + e.getMessage());
+                            logger.warn("Error in timeout monitor", e);
                         }
                     }
                 });
             }
         });
-        logger.info("Timeout monitor started (Vert.x timer, 30s interval)");
+        logger.info("Timeout monitor started: initialDelay=30s, interval=30s");
     }
     
     /**
      * Process queued jobs for automatic assignment.
      */
     private void processQueuedJobs() {
+        logger.trace("Processing queued jobs: queueSize={}", jobQueue.size());
         for (QueuedJob queuedJob : jobQueue.values()) {
             try {
                 // Skip if job has specific assignment requirements that need manual intervention
                 if (queuedJob.getRequirements() != null && 
                     queuedJob.getRequirements().getSelectionStrategy() == JobRequirements.SelectionStrategy.PREFERRED_AGENT &&
                     !queuedJob.getRequirements().getPreferredAgents().isEmpty()) {
+                    logger.trace("Skipping job with preferred agent requirements: jobId={}", queuedJob.getJobId());
                     continue; // Let manual assignment handle preferred agents
                 }
                 
                 // Try automatic assignment
+                logger.debug("Auto-assigning job: jobId={}, priority={}", queuedJob.getJobId(), queuedJob.getPriority());
                 assignJob(queuedJob.getJobId(), null);
                 
             } catch (Exception e) {
-                logger.warning("Failed to auto-assign job " + queuedJob.getJobId() + ": " + e.getMessage());
+                logger.warn("Failed to auto-assign job: jobId={}", queuedJob.getJobId(), e);
             }
         }
     }
@@ -381,6 +415,7 @@ public class JobAssignmentService {
      */
     private void checkAssignmentTimeouts() {
         Instant now = Instant.now();
+        logger.trace("Checking assignment timeouts: activeAssignments={}", activeAssignments.size());
         
         for (JobAssignment assignment : activeAssignments.values()) {
             if (assignment.getStatus() == JobAssignmentStatus.ASSIGNED) {
@@ -388,18 +423,18 @@ public class JobAssignmentService {
                 if (assignment.getAssignedAt() != null &&
                     assignment.getAssignedAt().plusSeconds(300).isBefore(now)) {
                     
-                    logger.warning("Assignment timeout detected for job: " + assignment.getJobId());
+                    logger.warn("Assignment timeout detected: jobId={}, agentId={}, assignedAt={}", 
+                        assignment.getJobId(), assignment.getAgentId(), assignment.getAssignedAt());
                     
                     try {
                         // Mark as timeout and try reassignment
                         updateAssignmentStatus(assignment.getJobId(), JobAssignmentStatus.TIMEOUT);
                         
-                        // For now, just log the timeout - re-queuing would need access to original TransferRequest
-                        logger.warning("Assignment timed out for job: " + assignment.getJobId() +
-                                     ". Manual intervention may be required.");
+                        logger.warn("Assignment timed out: jobId={}, manual intervention may be required", 
+                            assignment.getJobId());
                         
                     } catch (Exception e) {
-                        logger.severe("Error handling timeout for job " + assignment.getJobId() + ": " + e.getMessage());
+                        logger.error("Error handling timeout: jobId={}", assignment.getJobId(), e);
                     }
                 }
             }
@@ -412,23 +447,24 @@ public class JobAssignmentService {
      */
     public void shutdown() {
         if (closed.getAndSet(true)) {
-            logger.info("JobAssignmentService already shutdown (idempotent)");
+            logger.debug("JobAssignmentService already shutdown (idempotent)");
             return; // Already shutdown (idempotent)
         }
 
-        logger.info("Shutting down JobAssignmentService...");
+        logger.info("Shutting down JobAssignmentService: queueSize={}, activeAssignments={}", 
+            jobQueue.size(), activeAssignments.size());
 
         // Cancel Vert.x timers
         if (assignmentProcessorTimerId != 0) {
             vertx.cancelTimer(assignmentProcessorTimerId);
             assignmentProcessorTimerId = 0;
-            logger.info("Assignment processor timer cancelled");
+            logger.debug("Assignment processor timer cancelled");
         }
 
         if (timeoutMonitorTimerId != 0) {
             vertx.cancelTimer(timeoutMonitorTimerId);
             timeoutMonitorTimerId = 0;
-            logger.info("Timeout monitor timer cancelled");
+            logger.debug("Timeout monitor timer cancelled");
         }
 
         // Clear caches

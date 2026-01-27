@@ -30,9 +30,10 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * HTTP handler for agent job polling.
@@ -47,7 +48,7 @@ import java.util.stream.Collectors;
  */
 public class AgentJobsHandler implements HttpHandler {
 
-    private static final Logger logger = Logger.getLogger(AgentJobsHandler.class.getName());
+    private static final Logger logger = LoggerFactory.getLogger(AgentJobsHandler.class);
     private final RaftNode raftNode;
     private final ObjectMapper objectMapper;
 
@@ -55,36 +56,57 @@ public class AgentJobsHandler implements HttpHandler {
         this.raftNode = raftNode;
         this.objectMapper = new ObjectMapper();
         this.objectMapper.registerModule(new JavaTimeModule());
+        logger.debug("AgentJobsHandler initialized with raftNode={}", raftNode.getNodeId());
     }
 
     @Override
     public void handle(HttpExchange exchange) throws IOException {
-        if (!"GET".equals(exchange.getRequestMethod())) {
+        String method = exchange.getRequestMethod();
+        String path = exchange.getRequestURI().getPath();
+        logger.debug("handle() entry: method={}, path={}", method, path);
+        
+        if (!"GET".equals(method)) {
+            logger.debug("Method not allowed: {}", method);
             sendJsonResponse(exchange, 405, Map.of("error", "Method not allowed"));
             return;
         }
 
         try {
             // Extract agentId from path: /api/v1/agents/{agentId}/jobs
-            String path = exchange.getRequestURI().getPath();
             String[] parts = path.split("/");
             if (parts.length < 5) {
+                logger.debug("Invalid path format: parts.length={}", parts.length);
                 sendJsonResponse(exchange, 400, Map.of("error", "Missing agentId in path"));
                 return;
             }
 
             String agentId = parts[4];
+            logger.debug("Extracted agentId={}", agentId);
 
             // Get state machine
+            logger.debug("Querying state machine for job assignments: agentId={}", agentId);
             QuorusStateMachine stateMachine = (QuorusStateMachine) raftNode.getStateMachine();
 
             // Get all job assignments for this agent
             Map<String, JobAssignment> allAssignments = stateMachine.getJobAssignments();
+            logger.debug("Total job assignments in state machine: {}", allAssignments.size());
             
             // Filter for this agent and only ASSIGNED status (not yet accepted)
             List<Map<String, Object>> pendingJobs = allAssignments.values().stream()
-                    .filter(assignment -> assignment.getAgentId().equals(agentId))
-                    .filter(assignment -> assignment.getStatus() == JobAssignmentStatus.ASSIGNED)
+                    .filter(assignment -> {
+                        boolean matches = assignment.getAgentId().equals(agentId);
+                        if (matches) {
+                            logger.debug("Found assignment for agent: assignmentId={}-{}, status={}", 
+                                    assignment.getJobId(), assignment.getAgentId(), assignment.getStatus());
+                        }
+                        return matches;
+                    })
+                    .filter(assignment -> {
+                        boolean isAssigned = assignment.getStatus() == JobAssignmentStatus.ASSIGNED;
+                        logger.debug("Assignment status check: jobId={}, status={}, isAssigned={}", 
+                                assignment.getJobId(), assignment.getStatus(), isAssigned);
+                        return isAssigned;
+                    })
                     .map(assignment -> {
                         Map<String, Object> jobInfo = new HashMap<>();
                         jobInfo.put("assignmentId", assignment.getJobId() + "-" + assignment.getAgentId());
@@ -94,6 +116,7 @@ public class AgentJobsHandler implements HttpHandler {
                         jobInfo.put("assignedAt", assignment.getAssignedAt().toString());
                         
                         // Get transfer job details
+                        logger.debug("Fetching transfer job details: jobId={}", assignment.getJobId());
                         TransferJobSnapshot transferJob = stateMachine.getTransferJob(assignment.getJobId());
                         if (transferJob != null) {
                             jobInfo.put("sourceUri", transferJob.getSourceUri());
@@ -102,6 +125,10 @@ public class AgentJobsHandler implements HttpHandler {
                             if (transferJob.getDescription() != null) {
                                 jobInfo.put("description", transferJob.getDescription());
                             }
+                            logger.debug("Transfer job details added: jobId={}, sourceUri={}, destinationPath={}", 
+                                    assignment.getJobId(), transferJob.getSourceUri(), transferJob.getDestinationPath());
+                        } else {
+                            logger.warn("Transfer job not found for assignment: jobId={}", assignment.getJobId());
                         }
                         
                         return jobInfo;
@@ -113,10 +140,11 @@ public class AgentJobsHandler implements HttpHandler {
             response.put("pendingJobs", pendingJobs);
             response.put("count", pendingJobs.size());
 
+            logger.debug("Returning {} pending jobs for agent: agentId={}", pendingJobs.size(), agentId);
             sendJsonResponse(exchange, 200, response);
 
         } catch (Exception e) {
-            logger.log(Level.SEVERE, "Error retrieving agent jobs", e);
+            logger.error("Error retrieving agent jobs", e);
             sendJsonResponse(exchange, 500, Map.of(
                     "error", "Internal server error",
                     "message", e.getMessage()

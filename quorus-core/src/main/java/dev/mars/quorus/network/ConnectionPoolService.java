@@ -23,9 +23,11 @@ import io.vertx.pgclient.PgConnectOptions;
 import io.vertx.sqlclient.Pool;
 import io.vertx.sqlclient.PoolOptions;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.logging.Logger;
 /**
  * Description for ConnectionPoolService
  *
@@ -41,13 +43,14 @@ import java.util.logging.Logger;
  * @since 1.1
  */
 public class ConnectionPoolService {
-    private static final Logger logger = Logger.getLogger(ConnectionPoolService.class.getName());
+    private static final Logger logger = LoggerFactory.getLogger(ConnectionPoolService.class);
 
     private final Vertx vertx;
     private final ConcurrentHashMap<String, Pool> pools = new ConcurrentHashMap<>();
 
     public ConnectionPoolService(Vertx vertx) {
         this.vertx = Objects.requireNonNull(vertx, "Vertx cannot be null");
+        logger.debug("ConnectionPoolService initialized with external Vert.x instance");
     }
 
     /**
@@ -57,12 +60,16 @@ public class ConnectionPoolService {
     @Deprecated
     public ConnectionPoolService() {
         this(Vertx.vertx());
-        logger.warning("ConnectionPoolService created with internal Vert.x instance (deprecated)");
+        logger.warn("ConnectionPoolService created with internal Vert.x instance (deprecated)");
     }
 
     public Pool getOrCreatePool(String serviceId, PgConnectionConfig config, PgPoolConfig poolConfig) {
+        logger.debug("Requesting pool for service: serviceId={}, host={}, port={}, database={}",
+                    serviceId, config.getHost(), config.getPort(), config.getDatabase());
         return pools.computeIfAbsent(serviceId, id -> {
             try {
+                logger.debug("Creating new reactive pool for service: serviceId={}, maxSize={}, maxWaitQueueSize={}",
+                            id, poolConfig.getMaxSize(), poolConfig.getMaxWaitQueueSize());
                 PgConnectOptions connectOptions = new PgConnectOptions()
                     .setHost(config.getHost())
                     .setPort(config.getPort())
@@ -87,9 +94,11 @@ public class ConnectionPoolService {
                     .using(vertx)
                     .build();
 
-                logger.info("Created reactive pool for service '" + id + "'");
+                logger.info("Created reactive pool for service '{}': maxSize={}, idleTimeout={}", 
+                           id, poolConfig.getMaxSize(), poolConfig.getIdleTimeout());
                 return pool;
             } catch (Exception e) {
+                logger.error("Failed to create pool for service '{}': {}", id, e.getMessage());
                 pools.remove(id);
                 throw new RuntimeException("Failed to create pool for service: " + id, e);
             }
@@ -97,35 +106,50 @@ public class ConnectionPoolService {
     }
 
     public Future<Void> removePoolAsync(String serviceId) {
+        logger.debug("Removing pool for service: serviceId={}", serviceId);
         Pool pool = pools.remove(serviceId);
-        if (pool == null) return Future.succeededFuture();
+        if (pool == null) {
+            logger.debug("No pool found for service '{}', nothing to remove", serviceId);
+            return Future.succeededFuture();
+        }
 
         return pool.close()
-            .onSuccess(v -> logger.info("Closed pool for service '" + serviceId + "'"))
+            .onSuccess(v -> logger.info("Closed pool for service '{}'", serviceId))
+            .onFailure(err -> logger.warn("Error closing pool for service '{}': {}", serviceId, err.getMessage()))
             .mapEmpty();
     }
 
     public Future<Void> closeAllAsync() {
+        logger.debug("Closing all connection pools: count={}", pools.size());
         var futures = pools.keySet().stream()
             .map(this::removePoolAsync)
             .toList();
 
         pools.clear();
+        logger.debug("All pools cleared, waiting for {} close operations", futures.size());
         return Future.all(futures).mapEmpty();
     }
     
     public void shutdown() {
-        closeAllAsync().onFailure(err -> logger.warning("Error shutting down pools: " + err.getMessage()));
+        logger.debug("Initiating shutdown of ConnectionPoolService");
+        closeAllAsync().onFailure(err -> logger.warn("Error shutting down pools: {}", err.getMessage()));
     }
 
     public Future<Boolean> checkHealth(String serviceId) {
+        logger.debug("Checking health for service: serviceId={}", serviceId);
         Pool pool = pools.get(serviceId);
-        if (pool == null) return Future.succeededFuture(false);
+        if (pool == null) {
+            logger.debug("Health check: no pool found for service '{}'", serviceId);
+            return Future.succeededFuture(false);
+        }
 
         return pool.withConnection(conn ->
-            conn.query("SELECT 1").execute().map(rs -> true)
+            conn.query("SELECT 1").execute().map(rs -> {
+                logger.trace("Health check passed for service '{}'", serviceId);
+                return true;
+            })
         ).recover(err -> {
-            logger.warning("Health check failed for '" + serviceId + "': " + err.getMessage());
+            logger.warn("Health check failed for '{}': {}", serviceId, err.getMessage());
             return Future.succeededFuture(false);
         });
     }

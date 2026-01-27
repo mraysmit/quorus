@@ -24,16 +24,12 @@ import dev.mars.quorus.transfer.TransferContext;
 import io.vertx.core.Vertx;
 import io.vertx.junit5.VertxExtension;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
-import org.testcontainers.containers.ComposeContainer;
-import org.testcontainers.containers.wait.strategy.Wait;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
-import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
@@ -48,29 +44,30 @@ import java.util.logging.Logger;
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.*;
 
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
+
 /**
- * Integration tests for SFTP abort() functionality using TestContainers.
+ * Integration tests for SFTP abort() functionality using shared Testcontainers.
  * Tests verify that calling abort() during an active SFTP transfer successfully
  * interrupts the transfer by closing the underlying JSch session.
  * 
  * <p>Uses real SFTP server (atmoz/sftp:alpine) in Docker container to prove
  * abort() works in actual network transfer scenarios.
+ * 
+ * <p>Uses SharedTestContainers to reuse the SFTP container across test classes,
+ * significantly improving test execution time.
+ * 
+ * <p>These tests require Docker to be available and will be skipped if Docker
+ * is not running.
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @since 2026-01-26
  * @version 1.0
  */
-@Testcontainers
 @ExtendWith(VertxExtension.class)
 class SftpAbortIntegrationTest {
     
     private static final Logger logger = Logger.getLogger(SftpAbortIntegrationTest.class.getName());
-
-    @Container
-    static ComposeContainer environment = new ComposeContainer(
-            new File("src/test/resources/docker-compose-sftp-abort-test.yml"))
-            .withExposedService("sftp", 22, Wait.forListeningPort())
-            .withStartupTimeout(Duration.ofMinutes(2));
 
     private SftpTransferProtocol protocol;
     private Vertx vertx;
@@ -80,6 +77,14 @@ class SftpAbortIntegrationTest {
 
     @TempDir
     Path tempDir;
+
+    @BeforeAll
+    static void checkDockerAvailable() {
+        assumeTrue(SharedTestContainers.isDockerAvailable(), 
+                "Docker is not available - skipping integration tests");
+        // Start the shared container (will be reused across tests)
+        SharedTestContainers.getSftpContainer();
+    }
 
     @BeforeEach
     void setUp(Vertx vertx) throws IOException {
@@ -92,9 +97,9 @@ class SftpAbortIntegrationTest {
         
         this.engine = new SimpleTransferEngine(vertx, 5, 3, 100);
         
-        // Get SFTP container connection details
-        sftpHost = environment.getServiceHost("sftp", 22);
-        sftpPort = environment.getServicePort("sftp", 22);
+        // Get SFTP container connection details from shared container
+        sftpHost = SharedTestContainers.getSftpHost();
+        sftpPort = SharedTestContainers.getSftpPort();
         
         logger.info("SFTP server available at " + sftpHost + ":" + sftpPort);
         

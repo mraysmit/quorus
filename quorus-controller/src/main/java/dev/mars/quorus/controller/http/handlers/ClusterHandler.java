@@ -27,8 +27,9 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * HTTP handler for cluster status and management.
@@ -43,7 +44,7 @@ import java.util.logging.Logger;
  */
 public class ClusterHandler implements HttpHandler {
 
-    private static final Logger logger = Logger.getLogger(ClusterHandler.class.getName());
+    private static final Logger logger = LoggerFactory.getLogger(ClusterHandler.class);
     private final RaftNode raftNode;
     private final ObjectMapper objectMapper;
 
@@ -51,17 +52,24 @@ public class ClusterHandler implements HttpHandler {
         this.raftNode = raftNode;
         this.objectMapper = new ObjectMapper();
         this.objectMapper.registerModule(new JavaTimeModule());
+        logger.debug("ClusterHandler initialized with raftNode={}", raftNode.getNodeId());
     }
 
     @Override
     public void handle(HttpExchange exchange) throws IOException {
-        if (!"GET".equals(exchange.getRequestMethod())) {
+        String method = exchange.getRequestMethod();
+        String path = exchange.getRequestURI().getPath();
+        logger.debug("handle() entry: method={}, path={}", method, path);
+        
+        if (!"GET".equals(method)) {
+            logger.debug("Method not allowed: {}", method);
             sendJsonResponse(exchange, 405, Map.of("error", "Method not allowed"));
             return;
         }
 
         try {
             // Get cluster information from RaftNode
+            logger.debug("Querying Raft node for cluster information");
             Map<String, Object> clusterInfo = new HashMap<>();
             
             clusterInfo.put("nodeId", raftNode.getNodeId());
@@ -75,11 +83,13 @@ public class ClusterHandler implements HttpHandler {
                 clusterInfo.put("leaderId", leaderId);
             }
             
-            logger.info("Returning cluster status: " + raftNode.getState() + " (term " + raftNode.getCurrentTerm() + ")");
+            logger.info("Returning cluster status: nodeId={}, state={}, term={}, isLeader={}, leaderId={}", 
+                    raftNode.getNodeId(), raftNode.getState(), raftNode.getCurrentTerm(), 
+                    raftNode.isLeader(), leaderId);
             sendJsonResponse(exchange, 200, clusterInfo);
 
         } catch (Exception e) {
-            logger.log(Level.SEVERE, "Error getting cluster status", e);
+            logger.error("Error getting cluster status", e);
             sendJsonResponse(exchange, 500, Map.of(
                     "error", "Internal server error",
                     "message", e.getMessage()

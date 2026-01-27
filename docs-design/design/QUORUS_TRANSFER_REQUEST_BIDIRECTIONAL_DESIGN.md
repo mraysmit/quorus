@@ -4,6 +4,23 @@
 **Status:** DRAFT - For Review  
 **Context:** Discovered during abort() testing implementation  
 
+## Coding Standards
+
+- **No emojis in code**: Use ASCII text only in source files
+- **No implementation phase references in code**: Tests and comments should not reference implementation phases
+- **Pre-production**: No backward compatibility or deprecation required - breaking changes are acceptable
+
+## Testing Standards
+
+- **No reflection**: Tests must not use Java reflection API (`Field`, `Method`, `setAccessible`)
+- **No mocking**: Tests must not use mocking frameworks (Mockito, PowerMock, EasyMock)
+- **Use Testcontainers**: Integration tests must use Testcontainers for external services (SFTP, FTP, etc.)
+- **Real objects with simulation**: Unit tests should use real objects with built-in simulation modes
+- **Test isolation**: Each test must be independent and not rely on execution order
+- **All tests must pass**: Before proceeding to the next phase, ALL existing tests must pass (0 failures, 0 errors). Tests may be skipped only when external dependencies (e.g., Docker) are unavailable, using proper conditional annotations like `@Testcontainers(disabledWithoutDocker = true)`. Never proceed with failing tests.
+- **Fix broken tests immediately**: When implementing changes that cause existing tests to fail, fix those tests as part of the same change. Do not defer test fixes to later phases.
+- **Update tests for API changes**: When an API changes (e.g., bidirectional support), all affected tests must be updated to use the new API correctly.
+
 ## Problem Statement
 
 While implementing SFTP abort integration tests, we discovered a fundamental asymmetry in `TransferRequest`:
@@ -260,6 +277,23 @@ Are these legitimate Quorus use cases, or should uploads be out-of-scope?
 
 ## Implementation Plan for Option 2 (Bidirectional URIs)
 
+### Test-Driven Development Approach
+
+**Core Principle:** Write tests to support and validate changes at every step in each phase.
+
+- **Before implementation**: Write failing tests that define expected behavior
+- **During implementation**: Tests guide development and catch regressions
+- **After implementation**: Tests validate correctness and serve as documentation
+- **Continuous validation**: Run full test suite after each commit
+- **Coverage requirement**: Minimum 90% code coverage for new bidirectional features
+
+**Testing Strategy:**
+1. **Unit tests** for each new method/class (direction detection, validation, etc.)
+2. **Integration tests** for each protocol's bidirectional support
+3. **Regression tests** to ensure backward compatibility
+4. **End-to-end tests** for complete upload/download workflows
+5. **Performance tests** to validate upload speeds match download speeds
+
 ### Phase 1: Core API Changes
 
 #### 1.1 TransferRequest Class Refactoring
@@ -323,6 +357,14 @@ public Path getDestinationPath() {
 - New code uses `destinationUri`
 - Builder accepts both during transition period
 - Document deprecation timeline (Q1 2026 → Q2 2026 removal)
+
+**Phase 1 Tests:**
+- ✅ Unit test `TransferDirection` enum values and logic
+- ✅ Unit test `isDownload()`, `isUpload()`, `isRemoteToRemote()` methods
+- ✅ Unit test `getDirection()` with all URI scheme combinations
+- ✅ Unit test builder backward compatibility (both `destinationPath` and `destinationUri`)
+- ✅ Unit test validation logic (at least one `file://` endpoint)
+- ✅ Regression test: All existing `TransferRequest` tests pass unchanged
 
 #### 1.2 New TransferDirection Enum
 **File:** `quorus-core/src/main/java/dev/mars/quorus/core/TransferDirection.java` (NEW)
@@ -415,11 +457,16 @@ public TransferResult transfer(TransferRequest request, TransferContext context)
 - Upload abort: Same mechanism (force close ChannelSftp)
 - Need to test abort during `sftpChannel.put()` operations
 
-**Testing Requirements:**
-- Upload integration tests with TestContainers
-- Abort during upload (interrupting `put()` operation)
-- Progress tracking during upload
-- Large file upload tests (>10MB)
+**Phase 2.1 Tests (SFTP):**
+- ✅ Unit test `performSftpUpload()` with mocked SftpClient
+- ✅ Unit test `uploadFile()` method in SftpClient
+- ✅ Integration test: Upload 1KB file to TestContainers SFTP server
+- ✅ Integration test: Upload 10MB file with progress tracking
+- ✅ Integration test: Upload 100MB file (performance validation)
+- ✅ Integration test: Abort during upload (interrupt `put()` operation)
+- ✅ Integration test: Upload with invalid credentials (error handling)
+- ✅ Integration test: Upload to non-existent directory (auto-create validation)
+- ✅ Regression test: All existing SFTP download tests still pass
 
 ---
 
@@ -482,10 +529,15 @@ long uploadFile(String remotePath, Path localPath, ProgressTracker tracker)
     if (!response.startsWith("226")) {
         throw new IOException("Upload failed: " + response);
     }
-    
-    return fileSize;
-}
-```
+  Phase 2.2 Tests (FTP):**
+- ✅ Unit test STOR command implementation
+- ✅ Unit test passive mode data connection for upload
+- ✅ Integration test: Upload to TestContainers FTP server (`stilliard/pure-ftpd`)
+- ✅ Integration test: Upload with PASV mode
+- ✅ Integration test: Upload with active mode
+- ✅ Integration test: Abort during upload
+- ✅ Integration test: Large file upload (100MB+)
+- ✅ Regression test: All existing FTP download tests still pass
 
 **Testing Requirements:**
 - TestContainers with FTP server (e.g., `stilliard/pure-ftpd`)
@@ -548,11 +600,15 @@ private io.vertx.core.Future<TransferResult> performHttpUpload(
 }
 ```
 
-**Metadata Convention:**
-- `httpMethod`: "POST" or "PUT" (defaults to POST)
-- `contentType`: MIME type (defaults to "application/octet-stream")
-- HTTP headers can be passed via metadata
-
+**Phase 2.3 Tests (HTTP):**
+- ✅ Unit test `performHttpUpload()` method
+- ✅ Integration test: POST upload to Vert.x test server
+- ✅ Integration test: PUT upload to Vert.x test server
+- ✅ Integration test: Upload with custom HTTP headers (via metadata)
+- ✅ Integration test: Upload with authentication (Bearer token)
+- ✅ Integration test: HTTP 4xx/5xx error handling
+- ✅ Integration test: Timeout during upload
+- ✅ Regression test: All existing HTTP download tests still pass
 **Testing Requirements:**
 - Mock HTTP server in tests (Vert.x test server or WireMock)
 - POST upload tests
@@ -610,10 +666,13 @@ private long uploadFile(Path localSource, Path uncDestination, ProgressTracker t
     
     return fileSize;
 }
-```
-
-**Note:** SMB upload relies on Windows UNC path access. Linux requires CIFS mount or jCIFS library.
-
+``Phase 2.4 Tests (SMB):**
+- ✅ Unit test `uploadFile()` method
+- ✅ Integration test: Upload to Docker Samba server (Linux)
+- ✅ Integration test: Upload to Windows network share (Windows CI)
+- ✅ Integration test: Permission denied scenarios
+- ✅ Integration test: Directory auto-creation on upload
+- ✅ Regression test: All existing SMB download tests still pas
 **Testing Requirements:**
 - Windows environment or Docker with Samba server
 - Permission testing
@@ -663,7 +722,15 @@ private void validateTransferRequest(TransferRequest request) throws TransferExc
 // Track direction in metrics
 String direction = request.getDirection().name();
 protocolMetrics.computeIfAbsent(
-    protocol + "-" + direction,
+   
+
+**Phase 3 Tests (Engine/Factory):**
+- ✅ Unit test `validateTransferRequest()` with all URI combinations
+- ✅ Unit test protocol selection for uploads vs downloads
+- ✅ Unit test metrics tracking includes direction
+- ✅ Integration test: End-to-end upload workflow via engine
+- ✅ Integration test: Mixed download/upload batch operations
+- ✅ Regression test: All existing SimpleTransferEngine tests pass protocol + "-" + direction,
     k -> new TransferMetrics(protocol, direction)
 );
 ```
@@ -868,35 +935,23 @@ private void createTestFileOnSftpServer() throws Exception {
 
 ### Phase 6: Breaking Change Management
 
-#### 6.1 Deprecation Strategy
+> **NOTE:** Quorus is pre-production software. No backward compatibility or deprecation is required.
+> Breaking changes are acceptable to achieve the cleanest API design.
+> All `@Deprecated` annotations have been removed from the codebase.
 
-**Timeline:**
-- **v2.0 (Q1 2026)**: Introduce `destinationUri`, deprecate `destinationPath`
-- **v2.1 (Q2 2026)**: Warning logs when using deprecated API
-- **v3.0 (Q3 2026)**: Remove `destinationPath` entirely
+#### 6.1 ~~Deprecation Strategy~~ (Not Applicable)
 
-**Deprecation Annotations:**
-```java
-/**
- * @deprecated Use {@link #getDestinationUri()} instead.
- *             Will be removed in version 3.0.
- */
-@Deprecated(since = "2.0", forRemoval = true)
-public Path getDestinationPath() { ... }
-```
+Since Quorus is pre-production:
+- No `@Deprecated` annotations needed
+- No phased migration timelines required
+- Breaking changes implemented directly for clean API
+- Old API patterns removed immediately when obsolete
 
 ---
 
-#### 6.2 Migration Script
+#### 6.2 ~~Migration Script~~ (Not Applicable)
 
-**Provide automated migration tool:**
-```bash
-# Script: migrate-to-bidirectional-api.sh
-# Converts old API usage to new API
-
-# Find all TransferRequest.builder() usages
-# Replace .destinationPath(path) with .destinationUri(path.toUri())
-```
+Not required for pre-production software.
 
 ---
 
@@ -921,19 +976,19 @@ private void validateRemotePath(String remotePath) throws TransferException {
 ```
 
 ---
-
-#### 7.2 Upload Performance
-- **Buffer Sizes:** Match download buffer sizes (32-64KB)
-- **Progress Tracking:** Same mechanism as download
-- **Retry Logic:** Apply same retry policy for uploads
-- **Checksums:** Calculate and verify checksums after upload
-
----
-
-### Implementation Effort Estimate
-
-| Phase | Tasks | Estimated Time | Priority |
-|-------|-------|---------------|----------|
+ Test Coverage |
+|-------|-------|---------------|----------|---------------|
+| 1. Core API | TransferRequest refactor, Direction enum | 2 days | **CRITICAL** | 6 unit tests, all regression tests |
+| 2.1 SFTP Upload | Upload method, routing, tests | 3 days | **HIGH** | 2 unit + 7 integration tests |
+| 2.2 FTP Upload | Upload method, routing, tests | 3 days | **HIGH** | 3 unit + 5 integration tests |
+| 2.3 HTTP Upload | POST/PUT support, tests | 2 days | **HIGH** | 1 unit + 6 integration tests |
+| 2.4 SMB Upload | Upload method, tests | 2 days | MEDIUM | 1 unit + 4 integration tests |
+| 3. Engine/Factory | Direction routing, validation | 1 day | **HIGH** | 3 unit + 2 integration tests |
+| 4. Test Updates | Migration, new upload tests | 3 days | **HIGH** | Cross-protocol suite |
+| 5. Documentation | Guide, examples, JavaDoc | 2 days | **HIGH** | Example validation |
+| 6. Migration Tools | Deprecation, scripts | 1 day | MEDIUM | Migration test cases |
+| 7. Security/Perf | Validation, optimization | 2 days | **HIGH** | Security + perf tests |
+| **TOTAL** | | **21 days** | | **50+ new tests**---|----------|
 | 1. Core API | TransferRequest refactor, Direction enum | 2 days | **CRITICAL** |
 | 2.1 SFTP Upload | Upload method, routing, tests | 3 days | **HIGH** |
 | 2.2 FTP Upload | Upload method, routing, tests | 3 days | **HIGH** |
@@ -961,7 +1016,11 @@ private void validateRemotePath(String remotePath) throws TransferException {
 
 ### Success Criteria
 
-✅ All existing tests pass without modification (backward compatibility)
+✅ All existing tests pass without modifica
+✅ **Test coverage ≥90% for all new bidirectional code**
+✅ **All phases include passing tests before proceeding to next phase**
+✅ **Continuous integration passes at every commit**
+✅ **Zero test flakiness in upload/download tests**tion (backward compatibility)
 ✅ New upload integration tests pass for SFTP, FTP, HTTP
 ✅ `SftpAbortIntegrationTest` uses TransferRequest to create test files (no JSch workaround)
 ✅ Zero security vulnerabilities in upload paths

@@ -1,0 +1,40 @@
+version: '3.8'
+
+# FTP server for upload/download integration testing
+# Uses fauria/vsftpd - a lightweight vsftpd container
+
+networks:
+  ftp-test:
+    name: quorus-ftp-test
+    driver: bridge
+
+services:
+  # FTP Server for testing
+  ftp:
+    image: fauria/vsftpd
+    networks:
+      ftp-test:
+        aliases:
+          - ftp-server
+    ports:
+      - "0:21"      # Control port - dynamic allocation
+      - "0:21100"   # Passive mode data port range start
+    environment:
+      - FTP_USER=testuser
+      - FTP_PASS=testpass
+      - PASV_ENABLE=YES
+      - PASV_MIN_PORT=21100
+      - PASV_MAX_PORT=21100
+      - PASV_ADDRESS=127.0.0.1
+      - LOCAL_UMASK=022
+    volumes:
+      - ftp-data:/home/vsftpd/testuser
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 21 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  ftp-data:
+    name: quorus-ftp-test-data

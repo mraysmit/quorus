@@ -20,10 +20,12 @@ package dev.mars.quorus.storage;
 import dev.mars.quorus.core.TransferJob;
 import dev.mars.quorus.core.TransferStatus;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.logging.Logger;
 /**
  * Description for TransferStateRepository
  *
@@ -33,15 +35,17 @@ import java.util.logging.Logger;
  */
 
 public class TransferStateRepository {
-    private static final Logger logger = Logger.getLogger(TransferStateRepository.class.getName());
+    private static final Logger logger = LoggerFactory.getLogger(TransferStateRepository.class);
     
     private final Map<String, TransferState> transferStates;
     
     public TransferStateRepository() {
         this.transferStates = new ConcurrentHashMap<>();
+        logger.debug("TransferStateRepository initialized with empty state map");
     }
     
     public void saveTransferState(TransferJob job) {
+        logger.debug("saveTransferState: saving state for jobId={}", job.getJobId());
         TransferState state = new TransferState(
                 job.getJobId(),
                 job.getStatus(),
@@ -54,51 +58,74 @@ public class TransferStateRepository {
         );
         
         transferStates.put(job.getJobId(), state);
-        logger.fine("Saved transfer state for job: " + job.getJobId());
+        logger.debug("Saved transfer state for job: {}, status={}, progress={}%", 
+            job.getJobId(), job.getStatus(), 
+            job.getTotalBytes() > 0 ? (job.getBytesTransferred() * 100) / job.getTotalBytes() : 0);
     }
     
     public TransferState loadTransferState(String jobId) {
-        return transferStates.get(jobId);
+        logger.debug("loadTransferState: loading state for jobId={}", jobId);
+        TransferState state = transferStates.get(jobId);
+        if (state != null) {
+            logger.debug("loadTransferState: found state for jobId={}, status={}", jobId, state.getStatus());
+        } else {
+            logger.debug("loadTransferState: no state found for jobId={}", jobId);
+        }
+        return state;
     }
     
     public void removeTransferState(String jobId) {
+        logger.debug("removeTransferState: removing state for jobId={}", jobId);
         TransferState removed = transferStates.remove(jobId);
         if (removed != null) {
-            logger.fine("Removed transfer state for job: " + jobId);
+            logger.debug("Removed transfer state for job: {}, finalStatus={}", jobId, removed.getStatus());
+        } else {
+            logger.debug("removeTransferState: no state to remove for jobId={}", jobId);
         }
     }
     
     public boolean hasTransferState(String jobId) {
-        return transferStates.containsKey(jobId);
+        boolean exists = transferStates.containsKey(jobId);
+        logger.trace("hasTransferState: jobId={}, exists={}", jobId, exists);
+        return exists;
     }
     
     public Map<String, TransferState> getAllTransferStates() {
+        logger.debug("getAllTransferStates: returning {} states", transferStates.size());
         return Map.copyOf(transferStates);
     }
     
     public int getTransferStateCount() {
-        return transferStates.size();
+        int count = transferStates.size();
+        logger.trace("getTransferStateCount: count={}", count);
+        return count;
     }
     
     public void clearAll() {
         int count = transferStates.size();
+        logger.debug("clearAll: clearing {} transfer states", count);
         transferStates.clear();
-        logger.info("Cleared " + count + " transfer states");
+        logger.info("Cleared {} transfer states", count);
     }
     
     public void cleanupOldTransfers(long maxAgeMs) {
+        logger.debug("cleanupOldTransfers: cleaning up transfers older than {}ms", maxAgeMs);
         Instant cutoff = Instant.now().minusMillis(maxAgeMs);
+        logger.debug("cleanupOldTransfers: cutoff time={}", cutoff);
         
+        int initialCount = transferStates.size();
         transferStates.entrySet().removeIf(entry -> {
             TransferState state = entry.getValue();
             if (state.getStatus().isTerminal() && 
                 state.getLastUpdateTime() != null && 
                 state.getLastUpdateTime().isBefore(cutoff)) {
-                logger.fine("Cleaned up old transfer state: " + entry.getKey());
+                logger.debug("Cleaned up old transfer state: {}, lastUpdate={}", entry.getKey(), state.getLastUpdateTime());
                 return true;
             }
             return false;
         });
+        int removedCount = initialCount - transferStates.size();
+        logger.debug("cleanupOldTransfers: removed {} of {} states", removedCount, initialCount);
     }
     
     /**

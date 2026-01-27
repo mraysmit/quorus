@@ -251,7 +251,7 @@ class QuorusStateMachineTest {
 
         // Test getSystemMetadata
         Map<String, String> metadata = stateMachine.getSystemMetadata();
-        assertTrue(metadata.size() >= 4); // 2 default + 2 added
+        assertTrue(metadata.size() >= 3); // 1 default (version) + 2 added (env, region)
         assertEquals("test", metadata.get("env"));
         assertEquals("us-east-1", metadata.get("region"));
 

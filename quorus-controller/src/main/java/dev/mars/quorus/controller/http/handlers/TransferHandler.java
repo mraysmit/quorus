@@ -39,8 +39,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * HTTP handler for transfer job operations.
@@ -58,7 +59,7 @@ import java.util.logging.Logger;
  */
 public class TransferHandler implements HttpHandler {
 
-    private static final Logger logger = Logger.getLogger(TransferHandler.class.getName());
+    private static final Logger logger = LoggerFactory.getLogger(TransferHandler.class);
     private final RaftNode raftNode;
     private final ObjectMapper objectMapper;
 
@@ -66,40 +67,53 @@ public class TransferHandler implements HttpHandler {
         this.raftNode = raftNode;
         this.objectMapper = new ObjectMapper();
         this.objectMapper.registerModule(new JavaTimeModule());
+        logger.debug("TransferHandler initialized with raftNode={}", raftNode.getNodeId());
     }
 
     @Override
     public void handle(HttpExchange exchange) throws IOException {
         String method = exchange.getRequestMethod();
         String path = exchange.getRequestURI().getPath();
+        logger.debug("handle() entry: method={}, path={}", method, path);
 
         try {
             switch (method) {
                 case "POST":
+                    logger.debug("Routing to handleCreateTransfer");
                     handleCreateTransfer(exchange);
                     break;
                 case "GET":
+                    logger.debug("Routing to handleGetTransfer");
                     handleGetTransfer(exchange, path);
                     break;
                 case "DELETE":
+                    logger.debug("Routing to handleCancelTransfer");
                     handleCancelTransfer(exchange, path);
                     break;
                 default:
+                    logger.debug("Method not allowed: {}", method);
                     sendJsonResponse(exchange, 405, Map.of("error", "Method not allowed"));
             }
         } catch (Exception e) {
-            logger.log(Level.SEVERE, "Error handling transfer request", e);
+            logger.error("Error handling transfer request: method={}, path={}", method, path, e);
             sendJsonResponse(exchange, 500, Map.of("error", "Internal server error", "message", e.getMessage()));
         }
     }
 
     private void handleCreateTransfer(HttpExchange exchange) throws Exception {
+        logger.debug("handleCreateTransfer() entry");
+        
         // Read request body
         String requestBody = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+        logger.debug("Request body received: length={}", requestBody.length());
+        
         Map<String, Object> requestData = objectMapper.readValue(requestBody, Map.class);
+        logger.debug("Parsed request data: sourceUri={}, destinationPath={}", 
+                requestData.get("sourceUri"), requestData.get("destinationPath"));
 
         // Validate required fields
         if (!requestData.containsKey("sourceUri") || !requestData.containsKey("destinationPath")) {
+            logger.debug("Validation failed: missing required fields");
             sendJsonResponse(exchange, 400, Map.of("error", "Missing required fields: sourceUri, destinationPath"));
             return;
         }
@@ -110,19 +124,26 @@ public class TransferHandler implements HttpHandler {
                 .destinationPath(Paths.get((String) requestData.get("destinationPath")))
                 .protocol(requestData.containsKey("protocol") ? (String) requestData.get("protocol") : "http")
                 .build();
+        logger.debug("TransferRequest created: protocol={}", request.getProtocol());
 
         // Create TransferJob
         TransferJob job = new TransferJob(request);
+        logger.debug("TransferJob created: jobId={}", job.getJobId());
 
         // Submit to Raft
+        logger.debug("Submitting TransferJobCommand to Raft: jobId={}", job.getJobId());
         TransferJobCommand command = TransferJobCommand.create(job);
         Future<Object> future = raftNode.submitCommand(command);
 
         // Wait for consensus
+        logger.debug("Waiting for Raft consensus: jobId={}", job.getJobId());
         Object result = future.toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
+        logger.debug("Raft consensus completed: resultType={}", result != null ? result.getClass().getSimpleName() : "null");
 
         if (result instanceof TransferJob) {
             TransferJob createdJob = (TransferJob) result;
+            logger.debug("Transfer job created successfully: jobId={}, status={}", 
+                    createdJob.getJobId(), createdJob.getStatus());
             Map<String, Object> response = Map.of(
                     "jobId", createdJob.getJobId(),
                     "status", createdJob.getStatus().toString(),
@@ -132,6 +153,8 @@ public class TransferHandler implements HttpHandler {
             );
             sendJsonResponse(exchange, 201, response);
         } else {
+            logger.warn("Failed to create transfer job: unexpected result type={}", 
+                    result != null ? result.getClass().getSimpleName() : "null");
             sendJsonResponse(exchange, 500, Map.of("error", "Failed to create transfer job"));
         }
     }

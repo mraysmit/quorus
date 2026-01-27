@@ -327,9 +327,11 @@ class HttpTransferProtocolTest {
 
     @Test
     void testCanHandleReturnsFalseForFileScheme() {
+        // Test that HTTP protocol doesn't handle non-HTTP schemes
+        // Using sftp:// as source to create a valid download request
         TransferRequest request = TransferRequest.builder()
-                .requestId("test-file-scheme")
-                .sourceUri(URI.create("file:///path/to/file.txt"))
+                .requestId("test-non-http-scheme")
+                .sourceUri(URI.create("sftp://example.com/path/to/file.txt"))
                 .destinationPath(tempDir.resolve("file.txt"))
                 .build();
 

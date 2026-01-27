@@ -46,7 +46,7 @@ class TransferRequestTest {
         
         assertNotNull(request.getRequestId());
         assertEquals(sourceUri, request.getSourceUri());
-        assertEquals(destinationPath, request.getDestinationPath());
+        assertEquals(destinationPath.toAbsolutePath(), request.getDestinationPath());
         assertEquals("http", request.getProtocol()); // default
         assertTrue(request.getMetadata().isEmpty());
         assertNotNull(request.getCreatedAt());
@@ -78,7 +78,7 @@ class TransferRequestTest {
         
         assertEquals(requestId, request.getRequestId());
         assertEquals(sourceUri, request.getSourceUri());
-        assertEquals(destinationPath, request.getDestinationPath());
+        assertEquals(destinationPath.toAbsolutePath(), request.getDestinationPath());
         assertEquals(protocol, request.getProtocol());
         assertEquals(metadata, request.getMetadata());
         assertEquals(createdAt, request.getCreatedAt());

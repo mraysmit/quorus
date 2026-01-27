@@ -21,13 +21,14 @@ import dev.mars.quorus.controller.raft.RaftClusterConfig;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * Service responsible for discovering and maintaining connections to Raft controller nodes.
@@ -40,7 +41,7 @@ import java.util.logging.Logger;
 @ApplicationScoped
 public class ControllerDiscoveryService {
 
-    private static final Logger logger = Logger.getLogger(ControllerDiscoveryService.class.getName());
+    private static final Logger logger = LoggerFactory.getLogger(ControllerDiscoveryService.class);
     
     private static final int DISCOVERY_TIMEOUT_SECONDS = 3;
     private static final int HEALTH_CHECK_INTERVAL_SECONDS = 10;
@@ -59,34 +60,40 @@ public class ControllerDiscoveryService {
      * @return a CompletableFuture containing the leader RaftNode
      */
     public CompletableFuture<RaftNode> discoverLeader() {
+        logger.debug("discoverLeader() called");
         logger.info("Starting leader discovery process");
         
         return CompletableFuture.supplyAsync(() -> {
             // First, check if we have a cached leader that's still valid
             if (lastKnownLeader != null) {
+                logger.debug("Checking cached leader: {}", lastKnownLeader);
                 RaftNode cachedLeader = knownNodes.get(lastKnownLeader);
                 if (cachedLeader != null && cachedLeader.getState() == RaftNode.State.LEADER) {
-                    logger.fine("Using cached leader: " + lastKnownLeader);
+                    logger.debug("Using cached leader: nodeId={}, state={}", lastKnownLeader, cachedLeader.getState());
                     return cachedLeader;
                 }
+                logger.debug("Cached leader no longer valid, searching for new leader");
             }
             
             // Query all known nodes to find the current leader
+            logger.debug("Querying all cluster nodes for leader discovery");
             for (String nodeId : clusterConfig.getNodeIds()) {
                 try {
+                    logger.trace("Checking node for leader status: nodeId={}", nodeId);
                     RaftClusterConfig.NodeConfig nodeConfig = clusterConfig.getNodeConfig(nodeId);
                     RaftNode node = getOrCreateNode(nodeId, nodeConfig);
                     if (node != null && node.getState() == RaftNode.State.LEADER) {
                         lastKnownLeader = node.getNodeId();
                         lastDiscoveryTime = System.currentTimeMillis();
-                        logger.info("Discovered leader: " + lastKnownLeader);
+                        logger.info("Discovered leader: nodeId={}", lastKnownLeader);
                         return node;
                     }
                 } catch (Exception e) {
-                    logger.log(Level.FINE, "Failed to check node: " + nodeId, e);
+                    logger.debug("Failed to check node: nodeId={}, error={}", nodeId, e.getMessage());
                 }
             }
             
+            logger.warn("No leader found in cluster after checking all nodes");
             throw new RuntimeException("No leader found in cluster");
         }).orTimeout(DISCOVERY_TIMEOUT_SECONDS, TimeUnit.SECONDS);
     }
@@ -97,6 +104,7 @@ public class ControllerDiscoveryService {
      * @return a set of node IDs
      */
     public Set<String> getKnownNodes() {
+        logger.trace("getKnownNodes() called, returning {} nodes", knownNodes.size());
         return knownNodes.keySet();
     }
 
@@ -106,9 +114,11 @@ public class ControllerDiscoveryService {
      * @return true if we have a cached leader
      */
     public boolean hasKnownLeader() {
-        return lastKnownLeader != null && 
+        boolean hasLeader = lastKnownLeader != null && 
                knownNodes.containsKey(lastKnownLeader) &&
                (System.currentTimeMillis() - lastDiscoveryTime) < TimeUnit.SECONDS.toMillis(HEALTH_CHECK_INTERVAL_SECONDS);
+        logger.trace("hasKnownLeader() called: lastKnownLeader={}, result={}", lastKnownLeader, hasLeader);
+        return hasLeader;
     }
 
     /**
@@ -117,6 +127,7 @@ public class ControllerDiscoveryService {
      * @return the leader node ID, or null if unknown
      */
     public String getLastKnownLeader() {
+        logger.trace("getLastKnownLeader() called, returning: {}", lastKnownLeader);
         return lastKnownLeader;
     }
 
@@ -125,7 +136,8 @@ public class ControllerDiscoveryService {
      * This should be called when a leader becomes unavailable.
      */
     public void invalidateLeader() {
-        logger.info("Invalidating cached leader: " + lastKnownLeader);
+        logger.debug("invalidateLeader() called");
+        logger.info("Invalidating cached leader: {}", lastKnownLeader);
         lastKnownLeader = null;
         lastDiscoveryTime = 0;
     }
@@ -136,10 +148,13 @@ public class ControllerDiscoveryService {
      * @param nodeId the failed node ID
      */
     public void reportNodeFailure(String nodeId) {
-        logger.warning("Reporting node failure: " + nodeId);
+        logger.debug("reportNodeFailure() called: nodeId={}", nodeId);
+        logger.warn("Reporting node failure: {}", nodeId);
         knownNodes.remove(nodeId);
+        logger.debug("Node removed from known nodes: nodeId={}, remainingNodes={}", nodeId, knownNodes.size());
         
         if (nodeId.equals(lastKnownLeader)) {
+            logger.debug("Failed node was the leader, invalidating leader cache");
             invalidateLeader();
         }
     }
@@ -150,6 +165,7 @@ public class ControllerDiscoveryService {
      * @return cluster health status
      */
     public ClusterHealth getClusterHealth() {
+        logger.debug("getClusterHealth() called");
         int totalNodes = clusterConfig.getNodeIds().size();
         int availableNodes = 0;
         int leaderCount = 0;
@@ -167,12 +183,15 @@ public class ControllerDiscoveryService {
                     }
                 }
             } catch (Exception e) {
-                logger.log(Level.FINE, "Failed to check node health: " + nodeId, e);
+                logger.debug("Failed to check node health: nodeId={}, error={}", nodeId, e.getMessage());
             }
         }
         
         boolean hasQuorum = availableNodes > totalNodes / 2;
         boolean hasLeader = leaderCount == 1;
+        
+        logger.debug("getClusterHealth() result: totalNodes={}, availableNodes={}, hasQuorum={}, hasLeader={}, leaderId={}",
+                totalNodes, availableNodes, hasQuorum, hasLeader, lastKnownLeader);
         
         return new ClusterHealth(
             totalNodes,
@@ -188,17 +207,26 @@ public class ControllerDiscoveryService {
      * This method should be called during application startup.
      */
     public void initializeClusterConnections() {
+        logger.debug("initializeClusterConnections() called");
         logger.info("Initializing cluster connections");
 
+        int successCount = 0;
+        int failureCount = 0;
         for (String nodeId : clusterConfig.getNodeIds()) {
             try {
+                logger.debug("Attempting to connect to cluster node: nodeId={}", nodeId);
                 RaftClusterConfig.NodeConfig nodeConfig = clusterConfig.getNodeConfig(nodeId);
                 getOrCreateNode(nodeId, nodeConfig);
-                logger.info("Connected to cluster node: " + nodeId);
+                logger.info("Connected to cluster node: nodeId={}, address={}", nodeId, nodeConfig.getAddress());
+                successCount++;
             } catch (Exception e) {
-                logger.log(Level.WARNING, "Failed to connect to cluster node: " + nodeId, e);
+                logger.warn("Failed to connect to cluster node: nodeId={}, error={}", nodeId, e.getMessage());
+                failureCount++;
             }
         }
+        
+        logger.info("Cluster connections initialized: successful={}, failed={}, total={}", 
+                successCount, failureCount, clusterConfig.getNodeIds().size());
     }
 
     /**
@@ -209,10 +237,11 @@ public class ControllerDiscoveryService {
      * @return the RaftNode instance
      */
     private RaftNode getOrCreateNode(String nodeId, RaftClusterConfig.NodeConfig nodeConfig) {
+        logger.trace("getOrCreateNode() called: nodeId={}", nodeId);
         return knownNodes.computeIfAbsent(nodeId, id -> {
             // For now, return null to indicate remote connections not yet implemented
             // This allows the service to fall back to local operations
-            logger.fine("Remote node connections not yet implemented for: " + id + " at " + nodeConfig.getAddress());
+            logger.debug("Remote node connections not yet implemented for: nodeId={}, address={}", id, nodeConfig.getAddress());
             return null;
         });
     }

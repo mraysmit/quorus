@@ -29,8 +29,9 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * HTTP handler for API information.
@@ -49,7 +50,7 @@ import java.util.logging.Logger;
  */
 public class InfoHandler implements HttpHandler {
 
-    private static final Logger logger = Logger.getLogger(InfoHandler.class.getName());
+    private static final Logger logger = LoggerFactory.getLogger(InfoHandler.class);
     private final RaftNode raftNode;
     private final ObjectMapper objectMapper;
     
@@ -60,16 +61,23 @@ public class InfoHandler implements HttpHandler {
         this.raftNode = raftNode;
         this.objectMapper = new ObjectMapper();
         this.objectMapper.registerModule(new JavaTimeModule());
+        logger.debug("InfoHandler initialized with raftNode={}", raftNode.getNodeId());
     }
 
     @Override
     public void handle(HttpExchange exchange) throws IOException {
-        if (!"GET".equals(exchange.getRequestMethod())) {
+        String method = exchange.getRequestMethod();
+        String path = exchange.getRequestURI().getPath();
+        logger.debug("handle() entry: method={}, path={}", method, path);
+        
+        if (!"GET".equals(method)) {
+            logger.debug("Method not allowed: {}", method);
             sendJsonResponse(exchange, 405, Map.of("error", "Method not allowed"));
             return;
         }
 
         try {
+            logger.debug("Building API info response");
             Map<String, Object> info = new HashMap<>();
             
             // API information
@@ -79,16 +87,21 @@ public class InfoHandler implements HttpHandler {
             apiInfo.put("description", "Quorus Distributed File Transfer System API");
             apiInfo.put("documentation", "https://github.com/quorus/quorus/docs");
             info.put("api", apiInfo);
+            logger.debug("API info added: version={}, quorusVersion={}", API_VERSION, QUORUS_VERSION);
             
             // Controller information
+            logger.debug("Querying Raft node for controller info");
             Map<String, Object> controllerInfo = new HashMap<>();
             controllerInfo.put("nodeId", raftNode.getNodeId());
             controllerInfo.put("state", raftNode.getState().toString());
             controllerInfo.put("isLeader", raftNode.isLeader());
             controllerInfo.put("currentTerm", raftNode.getCurrentTerm());
             info.put("controller", controllerInfo);
+            logger.debug("Controller info added: nodeId={}, state={}, isLeader={}, term={}", 
+                    raftNode.getNodeId(), raftNode.getState(), raftNode.isLeader(), raftNode.getCurrentTerm());
             
             // Available endpoints
+            logger.debug("Building endpoints list");
             Map<String, List<Map<String, String>>> endpoints = new HashMap<>();
             
             // Health endpoints
@@ -129,6 +142,7 @@ public class InfoHandler implements HttpHandler {
             ));
             
             info.put("endpoints", endpoints);
+            logger.debug("Endpoints added: count={}", endpoints.size());
             
             // Capabilities
             Map<String, Object> capabilities = new HashMap<>();
@@ -139,14 +153,16 @@ public class InfoHandler implements HttpHandler {
             capabilities.put("prometheusMetrics", true);
             capabilities.put("healthChecks", true);
             info.put("capabilities", capabilities);
+            logger.debug("Capabilities added");
             
             // Timestamp
             info.put("timestamp", Instant.now().toString());
             
+            logger.debug("Returning API info response");
             sendJsonResponse(exchange, 200, info);
 
         } catch (Exception e) {
-            logger.log(Level.SEVERE, "Error generating API info", e);
+            logger.error("Error generating API info", e);
             sendJsonResponse(exchange, 500, Map.of(
                     "error", "Internal server error",
                     "message", e.getMessage()
