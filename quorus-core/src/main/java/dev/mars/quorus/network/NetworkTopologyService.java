@@ -152,7 +152,7 @@ public class NetworkTopologyService {
             long actualBandwidth = bytesTransferred * 1000 / actualTime.toMillis();
             NetworkNode updatedNode = node.withUpdatedBandwidth(actualBandwidth);
             networkNodes.put(hostname, updatedNode);
-            logger.trace("Updated bandwidth for '{}': estimated={} bytes/s, actual={} bytes/s",
+            logger.debug("Updated bandwidth for '{}': estimated={} bytes/s, actual={} bytes/s",
                         hostname, node.getEstimatedBandwidth(), actualBandwidth);
         }
     }
@@ -177,24 +177,24 @@ public class NetworkTopologyService {
         Instant startTime = Instant.now();
         
         // Test reachability
-        logger.trace("Resolving hostname: {}", hostname);
+        logger.debug("Resolving hostname: {}", hostname);
         InetAddress address = InetAddress.getByName(hostname);
-        logger.trace("Resolved {} to IP: {}", hostname, address.getHostAddress());
+        logger.debug("Resolved {} to IP: {}", hostname, address.getHostAddress());
         
         boolean reachable = address.isReachable(5000); // 5 second timeout
-        logger.trace("Reachability check for {}: {}", hostname, reachable);
+        logger.debug("Reachability check for {}: {}", hostname, reachable);
         
         // Measure latency
         Duration latency = measureLatency(address);
-        logger.trace("Latency measurement for {}: {}ms", hostname, latency.toMillis());
+        logger.debug("Latency measurement for {}: {}ms", hostname, latency.toMillis());
         
         // Estimate bandwidth
         long estimatedBandwidth = estimateBandwidth(hostname, address);
-        logger.trace("Estimated bandwidth for {}: {} bytes/s", hostname, estimatedBandwidth);
+        logger.debug("Estimated bandwidth for {}: {} bytes/s", hostname, estimatedBandwidth);
         
         // Determine network type
         NetworkType networkType = determineNetworkType(address);
-        logger.trace("Network type for {}: {}", hostname, networkType);
+        logger.debug("Network type for {}: {}", hostname, networkType);
         
         Duration discoveryTime = Duration.between(startTime, Instant.now());
         logger.debug("Network discovery completed for {} in {}ms", hostname, discoveryTime.toMillis());

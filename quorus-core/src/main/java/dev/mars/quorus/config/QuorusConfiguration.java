@@ -151,14 +151,14 @@ public class QuorusConfiguration {
         if (value != null) {
             try {
                 int result = Integer.parseInt(value.trim());
-                logger.trace("Retrieved int property: key={}, value={}", key, result);
+                logger.debug("Retrieved int property: key={}, value={}", key, result);
                 return result;
             } catch (NumberFormatException e) {
                 logger.warn("Invalid integer value for property {}: {}. Using default: {}", 
                            key, value, defaultValue);
             }
         }
-        logger.trace("Using default int property: key={}, defaultValue={}", key, defaultValue);
+        logger.debug("Using default int property: key={}, defaultValue={}", key, defaultValue);
         return defaultValue;
     }
     
@@ -167,14 +167,14 @@ public class QuorusConfiguration {
         if (value != null) {
             try {
                 long result = Long.parseLong(value.trim());
-                logger.trace("Retrieved long property: key={}, value={}", key, result);
+                logger.debug("Retrieved long property: key={}, value={}", key, result);
                 return result;
             } catch (NumberFormatException e) {
                 logger.warn("Invalid long value for property {}: {}. Using default: {}", 
                            key, value, defaultValue);
             }
         }
-        logger.trace("Using default long property: key={}, defaultValue={}", key, defaultValue);
+        logger.debug("Using default long property: key={}, defaultValue={}", key, defaultValue);
         return defaultValue;
     }
     
@@ -223,7 +223,7 @@ public class QuorusConfiguration {
                     logger.warn("Failed to load configuration from {}: {}", configPath, e.getMessage());
                 }
             } else {
-                logger.trace("Configuration file not found or not readable: {}", configPath);
+                logger.debug("Configuration file not found or not readable: {}", configPath);
             }
         }
         

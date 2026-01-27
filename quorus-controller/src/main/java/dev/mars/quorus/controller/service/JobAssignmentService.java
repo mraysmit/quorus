@@ -389,14 +389,14 @@ public class JobAssignmentService {
      * Process queued jobs for automatic assignment.
      */
     private void processQueuedJobs() {
-        logger.trace("Processing queued jobs: queueSize={}", jobQueue.size());
+        logger.debug("Processing queued jobs: queueSize={}", jobQueue.size());
         for (QueuedJob queuedJob : jobQueue.values()) {
             try {
                 // Skip if job has specific assignment requirements that need manual intervention
                 if (queuedJob.getRequirements() != null && 
                     queuedJob.getRequirements().getSelectionStrategy() == JobRequirements.SelectionStrategy.PREFERRED_AGENT &&
                     !queuedJob.getRequirements().getPreferredAgents().isEmpty()) {
-                    logger.trace("Skipping job with preferred agent requirements: jobId={}", queuedJob.getJobId());
+                    logger.debug("Skipping job with preferred agent requirements: jobId={}", queuedJob.getJobId());
                     continue; // Let manual assignment handle preferred agents
                 }
                 
@@ -415,7 +415,7 @@ public class JobAssignmentService {
      */
     private void checkAssignmentTimeouts() {
         Instant now = Instant.now();
-        logger.trace("Checking assignment timeouts: activeAssignments={}", activeAssignments.size());
+        logger.debug("Checking assignment timeouts: activeAssignments={}", activeAssignments.size());
         
         for (JobAssignment assignment : activeAssignments.values()) {
             if (assignment.getStatus() == JobAssignmentStatus.ASSIGNED) {

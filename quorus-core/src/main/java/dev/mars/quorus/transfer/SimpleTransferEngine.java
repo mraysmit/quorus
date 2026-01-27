@@ -17,6 +17,7 @@ package dev.mars.quorus.transfer;
  */
 
 
+import dev.mars.quorus.core.TransferDirection;
 import dev.mars.quorus.core.TransferJob;
 import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferResult;
@@ -127,8 +128,19 @@ public class SimpleTransferEngine implements TransferEngine {
         // Initialize monitoring (Phase 2 - Dec 2025)
         this.startTime = Instant.now();
         this.protocolMetrics = new ConcurrentHashMap<>();
-        // Initialize metrics for all supported protocols
-        logger.debug("Initializing protocol metrics for supported protocols");
+        // Initialize metrics for all supported protocols with direction tracking
+        logger.debug("Initializing protocol metrics for supported protocols (with direction tracking)");
+        // Download metrics
+        protocolMetrics.put("http-DOWNLOAD", new TransferMetrics("http-DOWNLOAD"));
+        protocolMetrics.put("ftp-DOWNLOAD", new TransferMetrics("ftp-DOWNLOAD"));
+        protocolMetrics.put("sftp-DOWNLOAD", new TransferMetrics("sftp-DOWNLOAD"));
+        protocolMetrics.put("smb-DOWNLOAD", new TransferMetrics("smb-DOWNLOAD"));
+        // Upload metrics
+        protocolMetrics.put("http-UPLOAD", new TransferMetrics("http-UPLOAD"));
+        protocolMetrics.put("ftp-UPLOAD", new TransferMetrics("ftp-UPLOAD"));
+        protocolMetrics.put("sftp-UPLOAD", new TransferMetrics("sftp-UPLOAD"));
+        protocolMetrics.put("smb-UPLOAD", new TransferMetrics("smb-UPLOAD"));
+        // Legacy protocol-only metrics (for backward compatibility)
         protocolMetrics.put("http", new TransferMetrics("http"));
         protocolMetrics.put("ftp", new TransferMetrics("ftp"));
         protocolMetrics.put("sftp", new TransferMetrics("sftp"));
@@ -141,12 +153,17 @@ public class SimpleTransferEngine implements TransferEngine {
     
     @Override
     public Future<TransferResult> submitTransfer(TransferRequest request) throws TransferException {
-        logger.debug("submitTransfer: request={}, protocol={}", request.getRequestId(), request.getProtocol());
+        TransferDirection direction = request.getDirection();
+        logger.debug("submitTransfer: request={}, protocol={}, direction={}", 
+            request.getRequestId(), request.getProtocol(), direction);
         
         if (shutdown.get()) {
             logger.debug("submitTransfer: rejected - engine is shutdown");
             throw new TransferException(request.getRequestId(), "Transfer engine is shutdown");
         }
+        
+        // Validate transfer request
+        validateTransferRequest(request);
         
         if (activeJobs.size() >= maxConcurrentTransfers) {
             logger.debug("submitTransfer: rejected - max concurrent transfers reached ({})", activeJobs.size());
@@ -272,7 +289,7 @@ public class SimpleTransferEngine implements TransferEngine {
     @Override
     public int getActiveTransferCount() {
         int count = activeJobs.size();
-        logger.trace("getActiveTransferCount: count={}", count);
+        logger.debug("getActiveTransferCount: count={}", count);
         return count;
     }
     
@@ -382,18 +399,26 @@ public class SimpleTransferEngine implements TransferEngine {
     private TransferResult executeTransfer(TransferContext context) {
         TransferJob job = context.getJob();
         TransferRequest request = job.getRequest();
+        TransferDirection direction = request.getDirection();
 
-        logger.info("Starting transfer: {}", job.getJobId());
-        logger.debug("executeTransfer: starting for jobId={}, protocol={}, sourceUri={}", 
-            job.getJobId(), request.getProtocol(), request.getSourceUri());
+        logger.info("Starting {} transfer: {}", direction, job.getJobId());
+        logger.debug("executeTransfer: starting for jobId={}, protocol={}, direction={}, sourceUri={}, destinationUri={}", 
+            job.getJobId(), request.getProtocol(), direction, request.getSourceUri(), request.getDestinationUri());
         job.start();
 
-        // Record transfer start in metrics
+        // Record transfer start in metrics (both direction-specific and legacy)
         String protocolName = request.getProtocol();
-        TransferMetrics metrics = protocolMetrics.get(protocolName);
-        if (metrics != null) {
-            metrics.recordTransferStart();
-            logger.debug("executeTransfer: recorded transfer start in metrics for protocol={}", protocolName);
+        String metricsKey = protocolName + "-" + direction.name();
+        TransferMetrics directionMetrics = protocolMetrics.get(metricsKey);
+        TransferMetrics legacyMetrics = protocolMetrics.get(protocolName);
+        
+        if (directionMetrics != null) {
+            directionMetrics.recordTransferStart();
+            logger.debug("executeTransfer: recorded transfer start in direction metrics for key={}", metricsKey);
+        }
+        if (legacyMetrics != null) {
+            legacyMetrics.recordTransferStart();
+            logger.debug("executeTransfer: recorded transfer start in legacy metrics for protocol={}", protocolName);
         }
 
         Instant transferStartTime = Instant.now();
@@ -416,15 +441,20 @@ public class SimpleTransferEngine implements TransferEngine {
                 TransferResult result = protocol.transfer(request, context);
 
                 if (result.isSuccessful()) {
-                    logger.info("Transfer completed successfully: {}", job.getJobId());
+                    logger.info("{} transfer completed successfully: {}", direction, job.getJobId());
 
-                    // Record success in metrics
-                    if (metrics != null) {
-                        Duration duration = Duration.between(transferStartTime, Instant.now());
-                        long bytesTransferred = result.getBytesTransferred();
-                        metrics.recordTransferSuccess(bytesTransferred, duration);
-                        logger.debug("executeTransfer: recorded success - bytes={}, duration={}ms", 
-                            bytesTransferred, duration.toMillis());
+                    // Record success in metrics (both direction-specific and legacy)
+                    Duration duration = Duration.between(transferStartTime, Instant.now());
+                    long bytesTransferred = result.getBytesTransferred();
+                    
+                    if (directionMetrics != null) {
+                        directionMetrics.recordTransferSuccess(bytesTransferred, duration);
+                        logger.debug("executeTransfer: recorded success in direction metrics - key={}, bytes={}, duration={}ms", 
+                            metricsKey, bytesTransferred, duration.toMillis());
+                    }
+                    if (legacyMetrics != null) {
+                        legacyMetrics.recordTransferSuccess(bytesTransferred, duration);
+                        logger.debug("executeTransfer: recorded success in legacy metrics - protocol={}", protocolName);
                     }
 
                     return result;
@@ -459,17 +489,84 @@ public class SimpleTransferEngine implements TransferEngine {
 
         // All attempts failed
         String errorMessage = lastException != null ? lastException.getMessage() : "Transfer failed after " + maxRetryAttempts + " attempts";
-        logger.debug("executeTransfer: all attempts exhausted for jobId={}", job.getJobId());
+        logger.debug("executeTransfer: all attempts exhausted for jobId={}, direction={}", job.getJobId(), direction);
         job.fail(errorMessage, lastException);
 
-        // Record failure in metrics
-        if (metrics != null) {
-            String errorType = lastException != null ? lastException.getClass().getSimpleName() : "UnknownError";
-            metrics.recordTransferFailure(errorType);
-            logger.debug("executeTransfer: recorded failure in metrics - errorType={}", errorType);
+        // Record failure in metrics (both direction-specific and legacy)
+        String errorType = lastException != null ? lastException.getClass().getSimpleName() : "UnknownError";
+        
+        if (directionMetrics != null) {
+            directionMetrics.recordTransferFailure(errorType);
+            logger.debug("executeTransfer: recorded failure in direction metrics - key={}, errorType={}", metricsKey, errorType);
+        }
+        if (legacyMetrics != null) {
+            legacyMetrics.recordTransferFailure(errorType);
+            logger.debug("executeTransfer: recorded failure in legacy metrics - protocol={}", protocolName);
         }
 
-        logger.error("Transfer failed permanently: {} - {}", job.getJobId(), errorMessage);
+        logger.error("{} transfer failed permanently: {} - {}", direction, job.getJobId(), errorMessage);
         return job.toResult();
+    }
+    
+    /**
+     * Validates that the transfer request is supported.
+     * 
+     * @param request the transfer request to validate
+     * @throws TransferException if the request is invalid
+     */
+    private void validateTransferRequest(TransferRequest request) throws TransferException {
+        java.net.URI source = request.getSourceUri();
+        java.net.URI dest = request.getDestinationUri();
+        
+        // Validate URIs are not null
+        if (source == null) {
+            throw new TransferException(request.getRequestId(), "Source URI cannot be null");
+        }
+        if (dest == null) {
+            throw new TransferException(request.getRequestId(), "Destination URI cannot be null");
+        }
+        
+        boolean sourceIsFile = "file".equalsIgnoreCase(source.getScheme());
+        boolean destIsFile = "file".equalsIgnoreCase(dest.getScheme());
+        
+        // At least one must be file://
+        if (!sourceIsFile && !destIsFile) {
+            throw new TransferException(request.getRequestId(),
+                "At least one endpoint must be file:// (local filesystem). " +
+                "Remote-to-remote transfers not yet supported.");
+        }
+        
+        // Both can't be file:// (use Files.copy instead)
+        if (sourceIsFile && destIsFile) {
+            throw new TransferException(request.getRequestId(),
+                "Both source and destination are local files. Use Files.copy() for local file-to-file operations.");
+        }
+        
+        // Validate protocol is supported
+        TransferDirection direction = request.getDirection();
+        String protocolScheme = direction == TransferDirection.UPLOAD 
+            ? dest.getScheme() 
+            : source.getScheme();
+        
+        if (!protocolFactory.isProtocolSupported(protocolScheme)) {
+            throw new TransferException(request.getRequestId(),
+                "Unsupported protocol: " + protocolScheme + ". Supported: " + 
+                String.join(", ", protocolFactory.getSupportedProtocols()));
+        }
+        
+        logger.debug("validateTransferRequest: request {} validated successfully (direction={}, protocol={})",
+            request.getRequestId(), direction, protocolScheme);
+    }
+    
+    /**
+     * Gets metrics for a specific protocol and direction combination.
+     * 
+     * @param protocolName the protocol name (e.g., "sftp")
+     * @param direction the transfer direction
+     * @return the metrics for the specified protocol and direction, or null if not found
+     */
+    public TransferMetrics getProtocolMetrics(String protocolName, TransferDirection direction) {
+        String key = protocolName + "-" + direction.name();
+        return protocolMetrics.get(key);
     }
 }

@@ -116,7 +116,7 @@ public class QuorusStateMachine implements RaftStateMachine {
     @Override
     public Object apply(Object command) {
         if (command == null) {
-            logger.trace("Received null command, returning null");
+            logger.debug("Received null command, returning null");
             return null; // No-op command
         }
 
@@ -292,7 +292,7 @@ public class QuorusStateMachine implements RaftStateMachine {
                 }
 
             case HEARTBEAT:
-                logger.trace("Processing heartbeat: agentId={}", agentId);
+                logger.debug("Processing heartbeat: agentId={}", agentId);
                 AgentInfo agentForHeartbeat = agents.get(agentId);
                 if (agentForHeartbeat != null) {
                     agentForHeartbeat.setLastHeartbeat(Instant.now());
@@ -302,7 +302,7 @@ public class QuorusStateMachine implements RaftStateMachine {
                         agentForHeartbeat.setStatus(AgentStatus.HEALTHY);
                     }
                     agents.put(agentId, agentForHeartbeat);
-                    logger.trace("Heartbeat received: agentId={}, status={}", agentId, agentForHeartbeat.getStatus());
+                    logger.debug("Heartbeat received: agentId={}, status={}", agentId, agentForHeartbeat.getStatus());
                     return agentForHeartbeat;
                 } else {
                     logger.warn("Agent not found for heartbeat: agentId={}", agentId);

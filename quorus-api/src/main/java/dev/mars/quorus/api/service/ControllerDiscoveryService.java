@@ -79,7 +79,7 @@ public class ControllerDiscoveryService {
             logger.debug("Querying all cluster nodes for leader discovery");
             for (String nodeId : clusterConfig.getNodeIds()) {
                 try {
-                    logger.trace("Checking node for leader status: nodeId={}", nodeId);
+                    logger.debug("Checking node for leader status: nodeId={}", nodeId);
                     RaftClusterConfig.NodeConfig nodeConfig = clusterConfig.getNodeConfig(nodeId);
                     RaftNode node = getOrCreateNode(nodeId, nodeConfig);
                     if (node != null && node.getState() == RaftNode.State.LEADER) {
@@ -104,7 +104,7 @@ public class ControllerDiscoveryService {
      * @return a set of node IDs
      */
     public Set<String> getKnownNodes() {
-        logger.trace("getKnownNodes() called, returning {} nodes", knownNodes.size());
+        logger.debug("getKnownNodes() called, returning {} nodes", knownNodes.size());
         return knownNodes.keySet();
     }
 
@@ -117,7 +117,7 @@ public class ControllerDiscoveryService {
         boolean hasLeader = lastKnownLeader != null && 
                knownNodes.containsKey(lastKnownLeader) &&
                (System.currentTimeMillis() - lastDiscoveryTime) < TimeUnit.SECONDS.toMillis(HEALTH_CHECK_INTERVAL_SECONDS);
-        logger.trace("hasKnownLeader() called: lastKnownLeader={}, result={}", lastKnownLeader, hasLeader);
+        logger.debug("hasKnownLeader() called: lastKnownLeader={}, result={}", lastKnownLeader, hasLeader);
         return hasLeader;
     }
 
@@ -127,7 +127,7 @@ public class ControllerDiscoveryService {
      * @return the leader node ID, or null if unknown
      */
     public String getLastKnownLeader() {
-        logger.trace("getLastKnownLeader() called, returning: {}", lastKnownLeader);
+        logger.debug("getLastKnownLeader() called, returning: {}", lastKnownLeader);
         return lastKnownLeader;
     }
 
@@ -237,7 +237,7 @@ public class ControllerDiscoveryService {
      * @return the RaftNode instance
      */
     private RaftNode getOrCreateNode(String nodeId, RaftClusterConfig.NodeConfig nodeConfig) {
-        logger.trace("getOrCreateNode() called: nodeId={}", nodeId);
+        logger.debug("getOrCreateNode() called: nodeId={}", nodeId);
         return knownNodes.computeIfAbsent(nodeId, id -> {
             // For now, return null to indicate remote connections not yet implemented
             // This allows the service to fall back to local operations

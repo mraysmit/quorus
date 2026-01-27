@@ -86,7 +86,7 @@ public class TransferStateRepository {
     
     public boolean hasTransferState(String jobId) {
         boolean exists = transferStates.containsKey(jobId);
-        logger.trace("hasTransferState: jobId={}, exists={}", jobId, exists);
+        logger.debug("hasTransferState: jobId={}, exists={}", jobId, exists);
         return exists;
     }
     
@@ -97,7 +97,7 @@ public class TransferStateRepository {
     
     public int getTransferStateCount() {
         int count = transferStates.size();
-        logger.trace("getTransferStateCount: count={}", count);
+        logger.debug("getTransferStateCount: count={}", count);
         return count;
     }
     

@@ -82,7 +82,7 @@ public class HttpTransferProtocol implements TransferProtocol {
     @Override
     public boolean canHandle(TransferRequest request) {
         if (request == null || request.getSourceUri() == null) {
-            logger.trace("canHandle: request or sourceUri is null");
+            logger.debug("canHandle: request or sourceUri is null");
             return false;
         }
 
@@ -98,7 +98,7 @@ public class HttpTransferProtocol implements TransferProtocol {
             // Upload: local source -> HTTP/HTTPS destination
             URI destinationUri = request.getDestinationUri();
             if (destinationUri == null) {
-                logger.trace("canHandle: Upload with null destination URI");
+                logger.debug("canHandle: Upload with null destination URI");
                 return false;
             }
             String scheme = destinationUri.getScheme();
@@ -107,7 +107,7 @@ public class HttpTransferProtocol implements TransferProtocol {
             return canHandle;
         }
         
-        logger.trace("canHandle: Unknown direction={}", direction);
+        logger.debug("canHandle: Unknown direction={}", direction);
         return false;
     }
     
@@ -171,7 +171,7 @@ public class HttpTransferProtocol implements TransferProtocol {
             // Create destination directory if needed
             try {
                 Files.createDirectories(destinationPath.getParent());
-                logger.trace("Created destination directory: {}", destinationPath.getParent());
+                logger.debug("Created destination directory: {}", destinationPath.getParent());
             } catch (IOException e) {
                 logger.error("Failed to create directory for job {}: {}", context.getJobId(), e.getMessage());
                 return io.vertx.core.Future.failedFuture(new TransferException(context.getJobId(), "Failed to create directory", e));
@@ -209,7 +209,7 @@ public class HttpTransferProtocol implements TransferProtocol {
                     context.getJob().updateProgress(bytesTransferred);
 
                     // Calculate checksum
-                    logger.trace("Calculating checksum for downloaded content");
+                    logger.debug("Calculating checksum for downloaded content");
                     ChecksumCalculator checksumCalculator = new ChecksumCalculator();
                     checksumCalculator.update(body.getBytes(), 0, body.length());
                     String actualChecksum = checksumCalculator.getChecksum();
@@ -231,7 +231,7 @@ public class HttpTransferProtocol implements TransferProtocol {
                     logger.debug("Writing {} bytes to temp file: {}", bytesTransferred, tempFile);
                     return vertx.fileSystem().writeFile(tempFile.toString(), body)
                         .compose(v -> {
-                            logger.trace("Moving temp file to destination: {} -> {}", tempFile, destinationPath);
+                            logger.debug("Moving temp file to destination: {} -> {}", tempFile, destinationPath);
                             return vertx.fileSystem().move(tempFile.toString(), destinationPath.toString(), new io.vertx.core.file.CopyOptions().setReplaceExisting(true));
                         })
                         .map(v -> {
@@ -294,7 +294,7 @@ public class HttpTransferProtocol implements TransferProtocol {
                     context.getJob().setTotalBytes(bytesTransferred);
 
                     // Calculate checksum before upload
-                    logger.trace("Calculating checksum for source file");
+                    logger.debug("Calculating checksum for source file");
                     ChecksumCalculator checksumCalculator = new ChecksumCalculator();
                     checksumCalculator.update(fileContent.getBytes(), 0, fileContent.length());
                     String actualChecksum = checksumCalculator.getChecksum();
@@ -384,7 +384,7 @@ public class HttpTransferProtocol implements TransferProtocol {
     }
     
     private void validateRequest(TransferRequest request) throws TransferException {
-        logger.trace("Validating HTTP transfer request: requestId={}", request.getRequestId());
+        logger.debug("Validating HTTP transfer request: requestId={}", request.getRequestId());
         
         if (request.getSourceUri() == null) {
             logger.error("Validation failed: Source URI is null");
@@ -410,6 +410,6 @@ public class HttpTransferProtocol implements TransferProtocol {
             throw new TransferException(request.getRequestId(), "HTTP protocol cannot handle this request");
         }
         
-        logger.trace("Request validation passed");
+        logger.debug("Request validation passed");
     }
 }

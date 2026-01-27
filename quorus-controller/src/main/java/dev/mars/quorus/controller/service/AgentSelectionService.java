@@ -101,7 +101,7 @@ public class AgentSelectionService {
      * Filter agents based on basic eligibility criteria.
      */
     private List<AgentInfo> filterEligibleAgents(QueuedJob job, Collection<AgentInfo> agents, Map<String, AgentLoad> agentLoads) {
-        logger.trace("Filtering eligible agents: jobId={}, totalAgents={}", job.getJobId(), agents.size());
+        logger.debug("Filtering eligible agents: jobId={}, totalAgents={}", job.getJobId(), agents.size());
         JobRequirements requirements = job.getRequirements();
         TransferRequest request = job.getTransferJob().getRequest();
         
@@ -109,13 +109,13 @@ public class AgentSelectionService {
                 .filter(agent -> {
                     boolean isEligible = isAgentEligible(agent, requirements, request, agentLoads.get(agent.getAgentId()));
                     if (!isEligible) {
-                        logger.trace("Agent ineligible: agentId={}, status={}", agent.getAgentId(), agent.getStatus());
+                        logger.debug("Agent ineligible: agentId={}, status={}", agent.getAgentId(), agent.getStatus());
                     }
                     return isEligible;
                 })
                 .collect(Collectors.toList());
         
-        logger.trace("Filtered eligible agents: jobId={}, eligible={}", job.getJobId(), eligible.size());
+        logger.debug("Filtered eligible agents: jobId={}, eligible={}", job.getJobId(), eligible.size());
         return eligible;
     }
     

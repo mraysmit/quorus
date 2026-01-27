@@ -106,7 +106,7 @@ public class HeartbeatProcessor {
             id -> {
                 if (!closed.get() && started) {
                     try {
-                        logger.trace("Running periodic failure detection check");
+                        logger.debug("Running periodic failure detection check");
                         checkForFailedAgents();
                     } catch (Exception e) {
                         logger.warn("Error in failure detection check: {}", e.getMessage(), e);
@@ -160,11 +160,11 @@ public class HeartbeatProcessor {
         return CompletableFuture.supplyAsync(() -> {
             try {
                 String agentId = request.getAgentId();
-                logger.trace("processHeartbeat() called: agentId={}, seq={}, status={}", 
+                logger.debug("processHeartbeat() called: agentId={}, seq={}, status={}", 
                         agentId, request.getSequenceNumber(), request.getStatus());
 
                 // Validate the heartbeat request
-                logger.trace("Validating heartbeat request: agentId={}", agentId);
+                logger.debug("Validating heartbeat request: agentId={}", agentId);
                 validateHeartbeatRequest(request);
 
                 // Get the agent info
@@ -194,7 +194,7 @@ public class HeartbeatProcessor {
                 Instant now = Instant.now();
                 lastHeartbeatTimes.put(agentId, now);
                 lastSequenceNumbers.put(agentId, request.getSequenceNumber());
-                logger.trace("Heartbeat tracking updated: agentId={}, seq={}, time={}", 
+                logger.debug("Heartbeat tracking updated: agentId={}, seq={}, time={}", 
                         agentId, request.getSequenceNumber(), now);
 
                 // Update agent information
@@ -216,7 +216,7 @@ public class HeartbeatProcessor {
                 // Add any instructions for the agent
                 addAgentInstructions(response, agentInfo, request);
 
-                logger.trace("Heartbeat processed successfully: agentId={}, seq={}", agentId, request.getSequenceNumber());
+                logger.debug("Heartbeat processed successfully: agentId={}, seq={}", agentId, request.getSequenceNumber());
                 return response;
 
             } catch (Exception e) {
@@ -235,7 +235,7 @@ public class HeartbeatProcessor {
         try {
             Instant now = Instant.now();
             int totalAgents = agentRegistryService.getAllAgents().size();
-            logger.trace("checkForFailedAgents() checking {} registered agents", totalAgents);
+            logger.debug("checkForFailedAgents() checking {} registered agents", totalAgents);
             
             // Get all registered agents
             agentRegistryService.getAllAgents().forEach(agentInfo -> {
@@ -245,7 +245,7 @@ public class HeartbeatProcessor {
                 if (lastHeartbeat == null) {
                     // No heartbeat received yet - use registration time
                     lastHeartbeat = agentInfo.getRegistrationTime();
-                    logger.trace("No heartbeat received yet for agent, using registration time: agentId={}", agentId);
+                    logger.debug("No heartbeat received yet for agent, using registration time: agentId={}", agentId);
                 }
                 
                 Duration timeSinceLastHeartbeat = Duration.between(lastHeartbeat, now);
@@ -267,7 +267,7 @@ public class HeartbeatProcessor {
      * Validate the heartbeat request.
      */
     private void validateHeartbeatRequest(AgentHeartbeatRequest request) {
-        logger.trace("validateHeartbeatRequest() called: agentId={}", request.getAgentId());
+        logger.debug("validateHeartbeatRequest() called: agentId={}", request.getAgentId());
         
         if (request.getAgentId() == null || request.getAgentId().trim().isEmpty()) {
             logger.debug("Validation failed: Agent ID is required");
@@ -293,14 +293,14 @@ public class HeartbeatProcessor {
             throw new IllegalArgumentException("Timestamp is too far from server time");
         }
         
-        logger.trace("validateHeartbeatRequest() passed for agentId={}", request.getAgentId());
+        logger.debug("validateHeartbeatRequest() passed for agentId={}", request.getAgentId());
     }
 
     /**
      * Update agent information from heartbeat.
      */
     private void updateAgentFromHeartbeat(AgentInfo agentInfo, AgentHeartbeatRequest request, Instant now) {
-        logger.trace("updateAgentFromHeartbeat() called: agentId={}, newStatus={}", 
+        logger.debug("updateAgentFromHeartbeat() called: agentId={}, newStatus={}", 
                 agentInfo.getAgentId(), request.getStatus());
         
         // Update basic information
@@ -316,18 +316,18 @@ public class HeartbeatProcessor {
         // Update system and network info if provided
         if (request.getSystemInfo() != null) {
             agentInfo.getCapabilities().setSystemInfo(request.getSystemInfo());
-            logger.trace("Updated system info for agent: agentId={}", agentInfo.getAgentId());
+            logger.debug("Updated system info for agent: agentId={}", agentInfo.getAgentId());
         }
         
         if (request.getNetworkInfo() != null) {
             agentInfo.getCapabilities().setNetworkInfo(request.getNetworkInfo());
-            logger.trace("Updated network info for agent: agentId={}", agentInfo.getAgentId());
+            logger.debug("Updated network info for agent: agentId={}", agentInfo.getAgentId());
         }
         
         // Update metadata
         if (request.getMetadata() != null && !request.getMetadata().isEmpty()) {
             agentInfo.getMetadata().putAll(request.getMetadata());
-            logger.trace("Updated metadata for agent: agentId={}, metadataKeys={}", 
+            logger.debug("Updated metadata for agent: agentId={}, metadataKeys={}", 
                     agentInfo.getAgentId(), request.getMetadata().keySet());
         }
     }
@@ -339,7 +339,7 @@ public class HeartbeatProcessor {
         // Update if status changed or if it's been a while since last update
         boolean shouldUpdate = !agentInfo.getStatus().equals(request.getStatus()) ||
                Duration.between(agentInfo.getLastHeartbeat(), Instant.now()).toMinutes() > 5;
-        logger.trace("shouldUpdateDistributedState() result: agentId={}, shouldUpdate={}", 
+        logger.debug("shouldUpdateDistributedState() result: agentId={}, shouldUpdate={}", 
                 agentInfo.getAgentId(), shouldUpdate);
         return shouldUpdate;
     }
@@ -361,7 +361,7 @@ public class HeartbeatProcessor {
                         agentInfo.getAgentId(), e.getMessage(), e);
             }
         } else {
-            logger.trace("Skipping distributed state update - not leader: agentId={}", agentInfo.getAgentId());
+            logger.debug("Skipping distributed state update - not leader: agentId={}", agentInfo.getAgentId());
         }
     }
 
@@ -370,7 +370,7 @@ public class HeartbeatProcessor {
      */
     private void addAgentInstructions(AgentHeartbeatResponse response, AgentInfo agentInfo, 
                                     AgentHeartbeatRequest request) {
-        logger.trace("addAgentInstructions() called: agentId={}", agentInfo.getAgentId());
+        logger.debug("addAgentInstructions() called: agentId={}", agentInfo.getAgentId());
         
         // Add maintenance instructions if needed
         if (request.getNextMaintenanceWindow() != null && 
@@ -389,7 +389,7 @@ public class HeartbeatProcessor {
         // Add cluster health information
         String clusterHealth = raftNode.isLeader() ? "healthy" : "follower";
         response.setClusterHealth(clusterHealth);
-        logger.trace("Set cluster health in response: agentId={}, clusterHealth={}", 
+        logger.debug("Set cluster health in response: agentId={}, clusterHealth={}", 
                 agentInfo.getAgentId(), clusterHealth);
     }
 

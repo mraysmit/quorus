@@ -54,7 +54,7 @@ public class DistributedControllerConfiguration {
     @Singleton
     public RaftClusterConfig clusterConfig() {
         logger.debug("Creating Raft cluster configuration");
-        logger.trace("Building cluster config with election timeout and heartbeat interval");
+        logger.debug("Building cluster config with election timeout and heartbeat interval");
 
         // For development, create a simple single-node cluster
         // In production, this would be configured from external configuration
@@ -91,7 +91,7 @@ public class DistributedControllerConfiguration {
         
         // Get local node configuration
         RaftClusterConfig.NodeConfig nodeConfig = clusterConfig.getNodeConfig(nodeId);
-        logger.trace("Node config retrieved for nodeId={}", nodeId);
+        logger.debug("Node config retrieved for nodeId={}", nodeId);
         
         // Create transport (gRPC for real communication)
         logger.debug("Creating gRPC transport for node: {}", nodeId);

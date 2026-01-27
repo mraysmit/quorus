@@ -186,11 +186,22 @@ class SimpleTransferEngineTest {
         Map<String, TransferMetrics> allMetrics = engine.getAllProtocolMetrics();
         
         assertNotNull(allMetrics);
-        assertEquals(4, allMetrics.size());
+        // 4 legacy protocol metrics + 4 download + 4 upload = 12 total
+        assertEquals(12, allMetrics.size());
+        // Legacy metrics
         assertTrue(allMetrics.containsKey("http"));
         assertTrue(allMetrics.containsKey("ftp"));
         assertTrue(allMetrics.containsKey("sftp"));
         assertTrue(allMetrics.containsKey("smb"));
+        // Direction-specific metrics
+        assertTrue(allMetrics.containsKey("http-DOWNLOAD"));
+        assertTrue(allMetrics.containsKey("http-UPLOAD"));
+        assertTrue(allMetrics.containsKey("ftp-DOWNLOAD"));
+        assertTrue(allMetrics.containsKey("ftp-UPLOAD"));
+        assertTrue(allMetrics.containsKey("sftp-DOWNLOAD"));
+        assertTrue(allMetrics.containsKey("sftp-UPLOAD"));
+        assertTrue(allMetrics.containsKey("smb-DOWNLOAD"));
+        assertTrue(allMetrics.containsKey("smb-UPLOAD"));
     }
 
     @Test
@@ -211,7 +222,8 @@ class SimpleTransferEngineTest {
         
         assertNotNull(healthCheck);
         assertNotNull(healthCheck.getProtocolHealthChecks());
-        assertEquals(4, healthCheck.getProtocolHealthChecks().size());
+        // 4 legacy + 4 download + 4 upload = 12 protocol metrics generate health checks
+        assertEquals(12, healthCheck.getProtocolHealthChecks().size());
     }
 
     @Test

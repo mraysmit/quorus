@@ -145,7 +145,7 @@ public class ConnectionPoolService {
 
         return pool.withConnection(conn ->
             conn.query("SELECT 1").execute().map(rs -> {
-                logger.trace("Health check passed for service '{}'", serviceId);
+                logger.debug("Health check passed for service '{}'", serviceId);
                 return true;
             })
         ).recover(err -> {

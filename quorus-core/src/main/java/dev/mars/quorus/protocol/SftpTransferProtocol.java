@@ -725,7 +725,7 @@ public class SftpTransferProtocol implements TransferProtocol {
 
         try {
             // Simulate connection delay
-            logger.trace("performSimulatedDownload: simulating connection delay");
+            logger.debug("performSimulatedDownload: simulating connection delay");
             Thread.sleep(100);
 
             // Create a simulated file with test content that matches test expectations
@@ -740,7 +740,7 @@ public class SftpTransferProtocol implements TransferProtocol {
             logger.debug("performSimulatedDownload: destination directory ensured");
 
             // Write simulated content to destination
-            logger.trace("performSimulatedDownload: writing simulated content to file");
+            logger.debug("performSimulatedDownload: writing simulated content to file");
             Files.write(request.getDestinationPath(), testContent.getBytes(StandardCharsets.UTF_8),
                        StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING);
 
@@ -795,7 +795,7 @@ public class SftpTransferProtocol implements TransferProtocol {
 
         try {
             // Simulate connection delay
-            logger.trace("performSimulatedUpload: simulating connection delay");
+            logger.debug("performSimulatedUpload: simulating connection delay");
             Thread.sleep(100);
 
             // Read the source file content
