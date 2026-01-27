@@ -24,6 +24,27 @@
             <artifactId>vertx-core</artifactId>
         </dependency>
 
+        <!-- Vert.x OpenTelemetry Integration -->
+        <dependency>
+            <groupId>io.vertx</groupId>
+            <artifactId>vertx-opentelemetry</artifactId>
+        </dependency>
+
+        <!-- OpenTelemetry Dependencies -->
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-sdk</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-exporter-otlp</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-exporter-prometheus</artifactId>
+            <version>1.34.1-alpha</version>
+        </dependency>
+
         <!-- Quorus Core -->
         <dependency>
             <groupId>dev.mars</groupId>

@@ -18,6 +18,7 @@ package dev.mars.quorus.tenant.service;
 
 import dev.mars.quorus.tenant.model.ResourceUsage;
 import dev.mars.quorus.tenant.model.TenantConfiguration;
+import dev.mars.quorus.tenant.observability.TenantMetrics;
 
 import java.time.LocalDate;
 import java.util.*;
@@ -45,6 +46,9 @@ public class SimpleResourceManagementService implements ResourceManagementServic
     private final Map<String, ResourceReservation> reservations = new ConcurrentHashMap<>();
     private final AtomicLong reservationCounter = new AtomicLong(0);
     private final Object lock = new Object();
+    
+    // OpenTelemetry metrics (Phase 7 - Jan 2026)
+    private final TenantMetrics metrics = TenantMetrics.getInstance();
     
     public SimpleResourceManagementService(TenantService tenantService) {
         this.tenantService = tenantService;
@@ -136,6 +140,13 @@ public class SimpleResourceManagementService implements ResourceManagementServic
             if (violations.isEmpty()) {
                 return ResourceValidationResult.allowed();
             } else {
+                // Record quota violations (Phase 7 - Jan 2026)
+                for (String violation : violations) {
+                    String violationType = violation.contains("concurrent") ? "concurrent_transfers" :
+                                          violation.contains("Bandwidth") ? "bandwidth" :
+                                          violation.contains("size") ? "transfer_size" : "daily_limit";
+                    metrics.recordQuotaViolation(tenantId, violationType);
+                }
                 return ResourceValidationResult.denied("Resource limits would be exceeded", violations);
             }
             
@@ -152,6 +163,7 @@ public class SimpleResourceManagementService implements ResourceManagementServic
         
         ResourceValidationResult validation = validateTransferRequest(tenantId, transferSizeBytes, estimatedBandwidth);
         if (!validation.isAllowed()) {
+            metrics.recordResourceReservation(tenantId, "transfer", false);
             throw new ResourceManagementException("Resource reservation denied: " + validation.getReason());
         }
         
@@ -167,6 +179,9 @@ public class SimpleResourceManagementService implements ResourceManagementServic
             updateBandwidthUsage(tenantId, 
                     getCurrentUsage(tenantId).map(ResourceUsage::getCurrentBandwidthBytesPerSecond).orElse(0L) + 
                     estimatedBandwidth);
+            
+            // Record metric (Phase 7 - Jan 2026)
+            metrics.recordResourceReservation(tenantId, "transfer", true);
             
             logger.info("Reserved resources for tenant " + tenantId + ": " + reservationToken);
             return reservationToken;
@@ -194,6 +209,9 @@ public class SimpleResourceManagementService implements ResourceManagementServic
             
             // Record transfer completion
             recordTransferCompletion(reservation.tenantId, actualBytesTransferred, true);
+            
+            // Record metric (Phase 7 - Jan 2026)
+            metrics.recordResourceRelease(reservation.tenantId, "transfer");
             
             logger.info("Released resources for reservation: " + reservationToken);
         }

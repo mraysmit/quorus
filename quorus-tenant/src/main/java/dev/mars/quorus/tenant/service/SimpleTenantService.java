@@ -18,6 +18,7 @@ package dev.mars.quorus.tenant.service;
 
 import dev.mars.quorus.tenant.model.Tenant;
 import dev.mars.quorus.tenant.model.TenantConfiguration;
+import dev.mars.quorus.tenant.observability.TenantMetrics;
 
 import java.time.Instant;
 import java.util.*;
@@ -47,6 +48,9 @@ public class SimpleTenantService implements TenantService {
     // ConcurrentHashMap provides thread-safety for individual operations
     // When deployed as a Verticle, all operations run on single event loop thread
     private final Map<String, Tenant> tenants = new ConcurrentHashMap<>();
+    
+    // OpenTelemetry metrics (Phase 7 - Jan 2026)
+    private final TenantMetrics metrics = TenantMetrics.getInstance();
     
     @Override
     public Tenant createTenant(Tenant tenant) throws TenantServiceException {
@@ -78,6 +82,9 @@ public class SimpleTenantService implements TenantService {
         if (newTenant.getParentTenantId() != null) {
             updateParentChildList(newTenant.getParentTenantId(), newTenant.getTenantId(), true);
         }
+
+        // Record metric (Phase 7 - Jan 2026)
+        metrics.recordTenantCreated(newTenant.getTenantId());
 
         logger.info("Created tenant: " + newTenant.getTenantId() + " (" + newTenant.getName() + ")");
         return newTenant;
@@ -155,6 +162,9 @@ public class SimpleTenantService implements TenantService {
         if (tenant.getParentTenantId() != null) {
             updateParentChildList(tenant.getParentTenantId(), tenantId, false);
         }
+
+        // Record metric (Phase 7 - Jan 2026)
+        metrics.recordTenantDeleted(tenantId);
 
         logger.info("Deleted tenant: " + tenantId);
     }

@@ -31,6 +31,12 @@
             <version>${project.version}</version>
         </dependency>
 
+        <!-- OpenTelemetry Dependencies (Phase 7 - Jan 2026) -->
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-api</artifactId>
+        </dependency>
+
         <!-- JSON processing for tenant configuration -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>

@@ -20,6 +20,8 @@ package dev.mars.quorus.simulator.transfer;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -34,10 +36,13 @@ import static org.assertj.core.api.Assertions.*;
 @DisplayName("InMemoryTransferEngineSimulator Tests")
 class InMemoryTransferEngineSimulatorTest {
 
+    private static final Logger log = LoggerFactory.getLogger(InMemoryTransferEngineSimulatorTest.class);
+
     private InMemoryTransferEngineSimulator engine;
 
     @BeforeEach
     void setUp() {
+        log.info("Setting up test - creating new InMemoryTransferEngineSimulator");
         engine = new InMemoryTransferEngineSimulator();
         engine.setDefaultTransferDurationMs(100); // Fast for testing
     }
@@ -45,6 +50,7 @@ class InMemoryTransferEngineSimulatorTest {
     @AfterEach
     void tearDown() {
         if (engine != null) {
+            log.info("Tearing down test - shutting down engine");
             engine.shutdown(5);
         }
     }
@@ -58,6 +64,7 @@ class InMemoryTransferEngineSimulatorTest {
         @Test
         @DisplayName("Should submit and complete transfer")
         void testSubmitAndComplete() throws Exception {
+            log.info("Test: testSubmitAndComplete - Starting");
             var request = InMemoryTransferEngineSimulator.TransferRequest.builder()
                 .jobId("test-job-1")
                 .sourceUri("sftp://host/source/file.txt")
@@ -66,15 +73,20 @@ class InMemoryTransferEngineSimulatorTest {
                 .expectedSizeBytes(1000)
                 .build();
 
+            log.debug("Submitting transfer request jobId={}", request.jobId());
             CompletableFuture<InMemoryTransferEngineSimulator.TransferResult> future = 
                 engine.submitTransfer(request);
 
             var result = future.get(30, TimeUnit.SECONDS);
+            log.info("Transfer completed: successful={}, bytes={}, duration={}ms", 
+                result.successful(), result.bytesTransferred(), 
+                result.duration() != null ? result.duration().toMillis() : "null");
 
             assertThat(result.successful()).isTrue();
             assertThat(result.jobId()).isEqualTo("test-job-1");
             assertThat(result.bytesTransferred()).isEqualTo(1000);
             assertThat(result.duration()).isNotNull();
+            log.info("Test: testSubmitAndComplete - Passed");
         }
 
         @Test
@@ -127,6 +139,7 @@ class InMemoryTransferEngineSimulatorTest {
         @Test
         @DisplayName("Should cancel transfer")
         void testCancelTransfer() {
+            log.info("Test: testCancelTransfer - Starting");
             engine.setDefaultTransferDurationMs(10000); // Long duration
 
             var request = InMemoryTransferEngineSimulator.TransferRequest.builder()
@@ -135,14 +148,18 @@ class InMemoryTransferEngineSimulatorTest {
                 .destinationPath("/dest/file.txt")
                 .build();
 
+            log.debug("Submitting transfer with long duration for cancellation test");
             engine.submitTransfer(request);
 
+            log.debug("Cancelling transfer jobId=cancel-test");
             boolean cancelled = engine.cancelTransfer("cancel-test");
             assertThat(cancelled).isTrue();
 
             var job = engine.getTransferJob("cancel-test");
+            log.info("Transfer status after cancel: {}", job.status());
             assertThat(job.status()).isEqualTo(
                 InMemoryTransferEngineSimulator.TransferStatus.CANCELLED);
+            log.info("Test: testCancelTransfer - Passed");
         }
 
         @Test

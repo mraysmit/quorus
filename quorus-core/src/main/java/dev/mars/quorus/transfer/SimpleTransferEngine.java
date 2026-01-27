@@ -28,6 +28,7 @@ import dev.mars.quorus.monitoring.TransferEngineHealthCheck;
 import dev.mars.quorus.monitoring.TransferMetrics;
 import dev.mars.quorus.protocol.ProtocolFactory;
 import dev.mars.quorus.protocol.TransferProtocol;
+import dev.mars.quorus.transfer.observability.TransferTelemetryMetrics;
 import io.vertx.core.Future;
 import io.vertx.core.Promise;
 import io.vertx.core.Vertx;
@@ -73,6 +74,9 @@ public class SimpleTransferEngine implements TransferEngine {
     // Monitoring (Phase 2 - Dec 2025)
     private final Instant startTime;
     private final Map<String, TransferMetrics> protocolMetrics;
+
+    // OpenTelemetry Metrics (Phase 8 - Jan 2026)
+    private final TransferTelemetryMetrics telemetryMetrics;
 
     /**
      * Default constructor - creates internal Vert.x instance.
@@ -146,7 +150,10 @@ public class SimpleTransferEngine implements TransferEngine {
         protocolMetrics.put("sftp", new TransferMetrics("sftp"));
         protocolMetrics.put("smb", new TransferMetrics("smb"));
 
-        logger.info("SimpleTransferEngine initialized with {} max concurrent transfers (Vert.x WorkerExecutor mode)",
+        // Initialize OpenTelemetry metrics (Phase 8 - Jan 2026)
+        this.telemetryMetrics = TransferTelemetryMetrics.getInstance();
+
+        logger.info("SimpleTransferEngine initialized with {} max concurrent transfers (Vert.x WorkerExecutor mode, OpenTelemetry enabled)",
             maxConcurrentTransfers);
         logger.debug("SimpleTransferEngine initialization complete - startTime={}", startTime);
     }
@@ -179,6 +186,9 @@ public class SimpleTransferEngine implements TransferEngine {
         activeJobs.put(job.getJobId(), job);
         activeContexts.put(job.getJobId(), context);
         logger.debug("submitTransfer: job registered, activeJobs={}", activeJobs.size());
+        
+        // Record OpenTelemetry metric (Phase 8 - Jan 2026)
+        telemetryMetrics.recordTransferStarted(request.getProtocol(), direction.name());
         
         // Execute transfer on Vert.x worker pool
         logger.debug("submitTransfer: submitting to worker executor");
@@ -457,6 +467,10 @@ public class SimpleTransferEngine implements TransferEngine {
                         logger.debug("executeTransfer: recorded success in legacy metrics - protocol={}", protocolName);
                     }
 
+                    // Record OpenTelemetry metric (Phase 8 - Jan 2026)
+                    telemetryMetrics.recordTransferCompleted(protocolName, direction.name(), 
+                            bytesTransferred, duration.toMillis() / 1000.0);
+
                     return result;
                 } else {
                     String errorMsg = result.getErrorMessage().orElse("Unknown error");
@@ -475,6 +489,10 @@ public class SimpleTransferEngine implements TransferEngine {
                 if (attempt <= maxRetryAttempts && context.shouldContinue()) {
                     long delay = retryDelayMs * attempt;
                     logger.debug("executeTransfer: scheduling retry after {}ms", delay);
+                    
+                    // Record OpenTelemetry retry metric (Phase 8 - Jan 2026)
+                    telemetryMetrics.recordRetryAttempt(protocolName, direction.name(), attempt);
+                    
                     try {
                         Thread.sleep(delay); // Exponential backoff
                     } catch (InterruptedException ie) {
@@ -503,6 +521,9 @@ public class SimpleTransferEngine implements TransferEngine {
             legacyMetrics.recordTransferFailure(errorType);
             logger.debug("executeTransfer: recorded failure in legacy metrics - protocol={}", protocolName);
         }
+
+        // Record OpenTelemetry metric (Phase 8 - Jan 2026)
+        telemetryMetrics.recordTransferFailed(protocolName, direction.name(), errorType);
 
         logger.error("{} transfer failed permanently: {} - {}", direction, job.getJobId(), errorMessage);
         return job.toResult();
