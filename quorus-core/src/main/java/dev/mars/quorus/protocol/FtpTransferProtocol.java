@@ -60,7 +60,7 @@ public class FtpTransferProtocol implements TransferProtocol {
     @Override
     public boolean canHandle(TransferRequest request) {
         if (request == null || request.getSourceUri() == null) {
-            logger.trace("canHandle: request or sourceUri is null");
+            logger.debug("canHandle: request or sourceUri is null");
             return false;
         }
 
@@ -79,15 +79,16 @@ public class FtpTransferProtocol implements TransferProtocol {
             return canHandle;
         }
 
-        logger.trace("canHandle: Not an FTP request");
+        logger.debug("canHandle: Not an FTP request");
         return false;
     }
 
     @Override
     public TransferResult transfer(TransferRequest request, TransferContext context) throws TransferException {
         logger.info("Starting FTP transfer: jobId={}, isUpload={}", context.getJobId(), request.isUpload());
-        logger.debug("Transfer details: sourceUri={}, destinationPath={}", 
-                    request.getSourceUri(), request.getDestinationPath());
+        // Use destinationUri for logging to support both uploads and downloads
+        logger.debug("Transfer details: sourceUri={}, destinationUri={}", 
+                    request.getSourceUri(), request.getDestinationUri());
 
         ProgressTracker progressTracker = new ProgressTracker(context.getJobId());
         progressTracker.start();
@@ -173,7 +174,7 @@ public class FtpTransferProtocol implements TransferProtocol {
                 
                 // Ensure destination directory exists
                 Files.createDirectories(request.getDestinationPath().getParent());
-                logger.trace("Destination directory ensured: {}", request.getDestinationPath().getParent());
+                logger.debug("Destination directory ensured: {}", request.getDestinationPath().getParent());
                 
                 // Perform the file transfer
                 logger.debug("Starting file data transfer");
@@ -502,7 +503,7 @@ public class FtpTransferProtocol implements TransferProtocol {
             logger.debug("FTP authentication successful");
             
             // Set binary mode
-            logger.trace("Setting binary transfer mode");
+            logger.debug("Setting binary transfer mode");
             sendCommand("TYPE I");
             response = readResponse();
             if (!response.startsWith("200")) {
@@ -511,7 +512,7 @@ public class FtpTransferProtocol implements TransferProtocol {
             }
             
             // Set passive mode
-            logger.trace("Entering passive mode");
+            logger.debug("Entering passive mode");
             sendCommand("PASV");
             response = readResponse();
             if (!response.startsWith("227")) {
@@ -734,13 +735,13 @@ public class FtpTransferProtocol implements TransferProtocol {
         }
         
         private void sendCommand(String command) {
-            logger.trace("FTP Command: {}", command.startsWith("PASS") ? "PASS ****" : command);
+            logger.debug("FTP Command: {}", command.startsWith("PASS") ? "PASS ****" : command);
             controlWriter.println(command);
         }
         
         private String readResponse() throws IOException {
             String response = controlReader.readLine();
-            logger.trace("FTP Response: {}", response);
+            logger.debug("FTP Response: {}", response);
             return response;
         }
         

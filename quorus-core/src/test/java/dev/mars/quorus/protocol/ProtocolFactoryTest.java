@@ -111,7 +111,7 @@ class ProtocolFactoryTest {
     
     @Test
     void testGetProtocolWithNullScheme() {
-        TransferProtocol protocol = factory.getProtocol(null);
+        TransferProtocol protocol = factory.getProtocol((String) null);
         assertNull(protocol);
     }
     

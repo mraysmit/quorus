@@ -251,9 +251,9 @@ public class AgentRegistryService {
      * @return the agent info, or null if not found
      */
     public AgentInfo getAgent(String agentId) {
-        logger.trace("getAgent() called: agentId={}", agentId);
+        logger.debug("getAgent() called: agentId={}", agentId);
         AgentInfo agent = agentCache.get(agentId);
-        logger.trace("getAgent() result: agentId={}, found={}", agentId, agent != null);
+        logger.debug("getAgent() result: agentId={}, found={}", agentId, agent != null);
         return agent;
     }
 
@@ -263,9 +263,9 @@ public class AgentRegistryService {
      * @return list of all agents
      */
     public List<AgentInfo> getAllAgents() {
-        logger.trace("getAllAgents() called");
+        logger.debug("getAllAgents() called");
         List<AgentInfo> agents = new ArrayList<>(agentCache.values());
-        logger.trace("getAllAgents() returning {} agents", agents.size());
+        logger.debug("getAllAgents() returning {} agents", agents.size());
         return agents;
     }
 
@@ -364,7 +364,7 @@ public class AgentRegistryService {
      * @throws IllegalArgumentException if validation fails
      */
     private void validateRegistrationRequest(AgentRegistrationRequest request) {
-        logger.trace("validateRegistrationRequest() called: agentId={}", request.getAgentId());
+        logger.debug("validateRegistrationRequest() called: agentId={}", request.getAgentId());
         
         if (request.getAgentId() == null || request.getAgentId().trim().isEmpty()) {
             logger.debug("Validation failed: Agent ID is required");
@@ -398,7 +398,7 @@ public class AgentRegistryService {
             throw new IllegalArgumentException("Agent ID already exists: " + request.getAgentId());
         }
         
-        logger.trace("validateRegistrationRequest() passed for agentId={}", request.getAgentId());
+        logger.debug("validateRegistrationRequest() passed for agentId={}", request.getAgentId());
     }
 
     /**
@@ -408,7 +408,7 @@ public class AgentRegistryService {
      * @return the agent info
      */
     private AgentInfo createAgentInfo(AgentRegistrationRequest request) {
-        logger.trace("createAgentInfo() called: agentId={}", request.getAgentId());
+        logger.debug("createAgentInfo() called: agentId={}", request.getAgentId());
         
         AgentInfo agentInfo = new AgentInfo(
             request.getAgentId(),

@@ -171,11 +171,11 @@ public class DistributedTransferService {
      * @return true if the controller is available
      */
     public boolean isControllerAvailable() {
-        logger.trace("isControllerAvailable() called");
+        logger.debug("isControllerAvailable() called");
         try {
             RaftNode.State state = controllerNode.getState();
             boolean available = state != null && state == RaftNode.State.LEADER;
-            logger.trace("isControllerAvailable() result: state={}, available={}", state, available);
+            logger.debug("isControllerAvailable() result: state={}, available={}", state, available);
             return available;
         } catch (Exception e) {
             logger.debug("Controller availability check failed: {}", e.getMessage());

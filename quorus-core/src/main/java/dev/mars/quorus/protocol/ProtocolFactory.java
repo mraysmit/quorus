@@ -16,7 +16,8 @@ package dev.mars.quorus.protocol;
  * limitations under the License.
  */
 
-
+import dev.mars.quorus.core.TransferDirection;
+import dev.mars.quorus.core.TransferRequest;
 import io.vertx.core.Vertx;
 
 import org.slf4j.Logger;
@@ -53,21 +54,21 @@ public class ProtocolFactory {
         logger.debug("Registering default transfer protocols");
         
         // Register HTTP protocol for both http and https schemes
-        logger.trace("Creating HttpTransferProtocol instance");
+        logger.debug("Creating HttpTransferProtocol instance");
         HttpTransferProtocol httpProtocol = new HttpTransferProtocol(vertx);
         registerProtocol(httpProtocol);
         registerProtocolAlias("https", httpProtocol);
 
         // Register SMB protocol for both smb and cifs schemes
-        logger.trace("Creating SmbTransferProtocol instance");
+        logger.debug("Creating SmbTransferProtocol instance");
         SmbTransferProtocol smbProtocol = new SmbTransferProtocol();
         registerProtocol(smbProtocol);
         registerProtocolAlias("cifs", smbProtocol);
 
         // Register FTP and SFTP protocols
-        logger.trace("Creating FtpTransferProtocol instance");
+        logger.debug("Creating FtpTransferProtocol instance");
         registerProtocol(new FtpTransferProtocol());
-        logger.trace("Creating SftpTransferProtocol instance");
+        logger.debug("Creating SftpTransferProtocol instance");
         registerProtocol(new SftpTransferProtocol());
 
         logger.info("Registered default transfer protocols: count={}, schemes={}", 
@@ -108,14 +109,67 @@ public class ProtocolFactory {
     
     public boolean isProtocolSupported(String protocolName) {
         boolean supported = protocolName != null && protocols.containsKey(protocolName.toLowerCase());
-        logger.trace("isProtocolSupported: protocol={}, supported={}", protocolName, supported);
+        logger.debug("isProtocolSupported: protocol={}, supported={}", protocolName, supported);
         return supported;
     }
     
     public String[] getSupportedProtocols() {
         String[] supportedProtocols = protocols.keySet().toArray(new String[0]);
-        logger.trace("getSupportedProtocols: count={}", supportedProtocols.length);
+        logger.debug("getSupportedProtocols: count={}", supportedProtocols.length);
         return supportedProtocols;
+    }
+    
+    /**
+     * Get the appropriate protocol handler for a transfer request.
+     * Determines the protocol based on the transfer direction:
+     * <ul>
+     *   <li>DOWNLOAD: Uses source URI scheme to determine protocol</li>
+     *   <li>UPLOAD: Uses destination URI scheme to determine protocol</li>
+     *   <li>REMOTE_TO_REMOTE: Not yet supported</li>
+     * </ul>
+     * 
+     * @param request the transfer request
+     * @return the protocol handler, or null if no matching protocol found
+     * @throws UnsupportedOperationException if remote-to-remote transfers are attempted
+     */
+    public TransferProtocol getProtocol(TransferRequest request) {
+        if (request == null) {
+            logger.debug("getProtocol(TransferRequest): called with null request");
+            return null;
+        }
+        
+        TransferDirection direction = request.getDirection();
+        String protocolScheme;
+        
+        switch (direction) {
+            case DOWNLOAD:
+                protocolScheme = request.getSourceUri().getScheme();
+                logger.debug("getProtocol(TransferRequest): DOWNLOAD - using source scheme: {}", protocolScheme);
+                break;
+            case UPLOAD:
+                protocolScheme = request.getDestinationUri().getScheme();
+                logger.debug("getProtocol(TransferRequest): UPLOAD - using destination scheme: {}", protocolScheme);
+                break;
+            case REMOTE_TO_REMOTE:
+                logger.error("getProtocol(TransferRequest): REMOTE_TO_REMOTE transfers not supported");
+                throw new UnsupportedOperationException(
+                    "Remote-to-remote transfers not yet implemented. " +
+                    "At least one endpoint must be file:// (local filesystem).");
+            default:
+                logger.error("getProtocol(TransferRequest): Unknown direction: {}", direction);
+                throw new IllegalArgumentException("Unknown transfer direction: " + direction);
+        }
+        
+        TransferProtocol protocol = getProtocol(protocolScheme);
+        if (protocol != null && protocol.canHandle(request)) {
+            logger.debug("getProtocol(TransferRequest): found protocol {} for {} transfer", 
+                protocol.getProtocolName(), direction);
+            return protocol;
+        }
+        
+        logger.warn("getProtocol(TransferRequest): no protocol found for scheme {} (direction={})", 
+            protocolScheme, direction);
+        return null;
     }
     
     /**
@@ -130,7 +184,7 @@ public class ProtocolFactory {
                 logger.debug("Protocol not found for unregistration: {}", protocolName);
             }
         } else {
-            logger.trace("unregisterProtocol called with null protocol name");
+            logger.debug("unregisterProtocol called with null protocol name");
         }
     }
 }

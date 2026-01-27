@@ -19,6 +19,9 @@ package dev.mars.quorus.protocol;
 import dev.mars.quorus.core.TransferDirection;
 import dev.mars.quorus.core.TransferJob;
 import dev.mars.quorus.core.TransferRequest;
+import dev.mars.quorus.core.TransferResult;
+import dev.mars.quorus.core.TransferStatus;
+import dev.mars.quorus.core.exceptions.TransferException;
 import dev.mars.quorus.transfer.TransferContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -346,6 +349,272 @@ class SmbTransferProtocolUploadTest {
             // Verify directions
             assertEquals(TransferDirection.DOWNLOAD, downloadRequest.getDirection());
             assertEquals(TransferDirection.UPLOAD, uploadRequest.getDirection());
+        }
+    }
+
+    @Nested
+    @DisplayName("Upload Transfer Execution with Simulated Server")
+    class UploadTransferExecutionWithSimulatedServerTests {
+
+        @Test
+        @DisplayName("transfer() successfully uploads small file to simulated server")
+        void transferUploadsSmallFileToSimulatedServer() throws Exception {
+            Path localFile = tempDir.resolve("small-upload.txt");
+            String content = "Small file content for simulated SMB upload";
+            Files.writeString(localFile, content);
+
+            TransferRequest uploadRequest = TransferRequest.builder()
+                    .requestId("simulated-small-upload-test")
+                    .sourceUri(localFile.toUri())
+                    .destinationUri(URI.create("smb://testserver/share/uploads/small.txt"))
+                    .build();
+
+            TransferContext context = new TransferContext(new TransferJob(uploadRequest));
+
+            var result = protocol.transfer(uploadRequest, context);
+
+            assertNotNull(result);
+            assertEquals("simulated-small-upload-test", result.getRequestId());
+            assertEquals(content.length(), result.getBytesTransferred());
+            assertEquals(TransferStatus.COMPLETED, result.getFinalStatus());
+        }
+
+        @Test
+        @DisplayName("transfer() successfully uploads large file to simulated server")
+        void transferUploadsLargeFileToSimulatedServer() throws Exception {
+            Path localFile = tempDir.resolve("large-upload.bin");
+            // Create a 100KB file
+            byte[] content = new byte[100 * 1024];
+            for (int i = 0; i < content.length; i++) {
+                content[i] = (byte) (i % 256);
+            }
+            Files.write(localFile, content);
+
+            TransferRequest uploadRequest = TransferRequest.builder()
+                    .requestId("simulated-large-upload-test")
+                    .sourceUri(localFile.toUri())
+                    .destinationUri(URI.create("smb://testserver/share/uploads/large.bin"))
+                    .build();
+
+            TransferContext context = new TransferContext(new TransferJob(uploadRequest));
+
+            var result = protocol.transfer(uploadRequest, context);
+
+            assertNotNull(result);
+            assertEquals(100 * 1024, result.getBytesTransferred());
+            assertEquals(TransferStatus.COMPLETED, result.getFinalStatus());
+        }
+
+        @Test
+        @DisplayName("transfer() returns correct timing information")
+        void transferReturnsCorrectTimingInfo() throws Exception {
+            Path localFile = tempDir.resolve("timing-test.txt");
+            Files.writeString(localFile, "Content for timing test");
+
+            TransferRequest uploadRequest = TransferRequest.builder()
+                    .requestId("simulated-timing-test")
+                    .sourceUri(localFile.toUri())
+                    .destinationUri(URI.create("smb://testserver/share/uploads/timing.txt"))
+                    .build();
+
+            TransferContext context = new TransferContext(new TransferJob(uploadRequest));
+
+            var result = protocol.transfer(uploadRequest, context);
+
+            assertTrue(result.getStartTime().isPresent());
+            assertTrue(result.getEndTime().isPresent());
+            assertTrue(result.getEndTime().get().isAfter(result.getStartTime().get()) || 
+                      result.getEndTime().get().equals(result.getStartTime().get()));
+        }
+
+        @Test
+        @DisplayName("transfer() fails for non-existent source file")
+        void transferFailsForNonExistentSourceFile() {
+            Path nonExistentFile = tempDir.resolve("nonexistent.txt");
+
+            TransferRequest uploadRequest = TransferRequest.builder()
+                    .requestId("simulated-missing-source-test")
+                    .sourceUri(nonExistentFile.toUri())
+                    .destinationUri(URI.create("smb://testserver/share/uploads/file.txt"))
+                    .build();
+
+            TransferContext context = new TransferContext(new TransferJob(uploadRequest));
+
+            assertThrows(TransferException.class, () -> {
+                protocol.transfer(uploadRequest, context);
+            });
+        }
+
+        @Test
+        @DisplayName("transfer() handles empty file upload")
+        void transferHandlesEmptyFileUpload() throws Exception {
+            Path emptyFile = tempDir.resolve("empty-upload.txt");
+            Files.writeString(emptyFile, "");
+
+            TransferRequest uploadRequest = TransferRequest.builder()
+                    .requestId("simulated-empty-upload-test")
+                    .sourceUri(emptyFile.toUri())
+                    .destinationUri(URI.create("smb://testserver/share/uploads/empty.txt"))
+                    .build();
+
+            TransferContext context = new TransferContext(new TransferJob(uploadRequest));
+
+            var result = protocol.transfer(uploadRequest, context);
+
+            assertNotNull(result);
+            assertEquals(0, result.getBytesTransferred());
+            assertEquals(TransferStatus.COMPLETED, result.getFinalStatus());
+        }
+
+        @Test
+        @DisplayName("transfer() handles file with special characters")
+        void transferHandlesFileWithSpecialCharacters() throws Exception {
+            Path localFile = tempDir.resolve("special-content.txt");
+            String content = "Content with special chars: äöü中文🎉\n\t\r";
+            Files.writeString(localFile, content);
+
+            TransferRequest uploadRequest = TransferRequest.builder()
+                    .requestId("simulated-special-chars-test")
+                    .sourceUri(localFile.toUri())
+                    .destinationUri(URI.create("smb://testserver/share/uploads/special.txt"))
+                    .build();
+
+            TransferContext context = new TransferContext(new TransferJob(uploadRequest));
+
+            var result = protocol.transfer(uploadRequest, context);
+
+            assertNotNull(result);
+            assertEquals(TransferStatus.COMPLETED, result.getFinalStatus());
+            assertTrue(result.getBytesTransferred() > 0);
+        }
+
+        @Test
+        @DisplayName("transfer() handles simulated server with localhost.test")
+        void transferHandlesLocalhostTestServer() throws Exception {
+            Path localFile = tempDir.resolve("localhost-test.txt");
+            Files.writeString(localFile, "Localhost test content");
+
+            TransferRequest uploadRequest = TransferRequest.builder()
+                    .requestId("simulated-localhost-test")
+                    .sourceUri(localFile.toUri())
+                    .destinationUri(URI.create("smb://localhost.test/share/uploads/file.txt"))
+                    .build();
+
+            TransferContext context = new TransferContext(new TransferJob(uploadRequest));
+
+            var result = protocol.transfer(uploadRequest, context);
+
+            assertNotNull(result);
+            assertEquals(TransferStatus.COMPLETED, result.getFinalStatus());
+        }
+
+        @Test
+        @DisplayName("transfer() handles simulated-smb-server hostname")
+        void transferHandlesSimulatedSmbServerHostname() throws Exception {
+            Path localFile = tempDir.resolve("simulated-server.txt");
+            Files.writeString(localFile, "Simulated SMB server content");
+
+            TransferRequest uploadRequest = TransferRequest.builder()
+                    .requestId("simulated-smb-server-test")
+                    .sourceUri(localFile.toUri())
+                    .destinationUri(URI.create("smb://simulated-smb-server/share/uploads/file.txt"))
+                    .build();
+
+            TransferContext context = new TransferContext(new TransferJob(uploadRequest));
+
+            var result = protocol.transfer(uploadRequest, context);
+
+            assertNotNull(result);
+            assertEquals(TransferStatus.COMPLETED, result.getFinalStatus());
+        }
+
+        @Test
+        @DisplayName("transfer() handles CIFS URI with simulated server")
+        void transferHandlesCifsUriWithSimulatedServer() throws Exception {
+            Path localFile = tempDir.resolve("cifs-upload.txt");
+            Files.writeString(localFile, "CIFS protocol upload content");
+
+            TransferRequest uploadRequest = TransferRequest.builder()
+                    .requestId("simulated-cifs-upload-test")
+                    .sourceUri(localFile.toUri())
+                    .destinationUri(URI.create("cifs://testserver/share/uploads/cifs-file.txt"))
+                    .build();
+
+            TransferContext context = new TransferContext(new TransferJob(uploadRequest));
+
+            var result = protocol.transfer(uploadRequest, context);
+
+            assertNotNull(result);
+            assertEquals(TransferStatus.COMPLETED, result.getFinalStatus());
+        }
+
+        @Test
+        @DisplayName("transfer() verifies isUpload returns true for upload requests")
+        void transferVerifiesIsUploadReturnsTrue() throws Exception {
+            Path localFile = tempDir.resolve("verify-upload-flag.txt");
+            Files.writeString(localFile, "Verifying upload flag");
+
+            TransferRequest uploadRequest = TransferRequest.builder()
+                    .requestId("verify-upload-flag-test")
+                    .sourceUri(localFile.toUri())
+                    .destinationUri(URI.create("smb://testserver/share/uploads/flag-test.txt"))
+                    .build();
+
+            // Verify the request is recognized as an upload
+            assertTrue(uploadRequest.isUpload());
+            assertFalse(uploadRequest.isDownload());
+            assertEquals(TransferDirection.UPLOAD, uploadRequest.getDirection());
+
+            TransferContext context = new TransferContext(new TransferJob(uploadRequest));
+
+            var result = protocol.transfer(uploadRequest, context);
+
+            assertNotNull(result);
+            assertEquals(TransferStatus.COMPLETED, result.getFinalStatus());
+        }
+
+        @Test
+        @DisplayName("transfer() verifies upload direction flag")
+        void transferVerifiesUploadDirectionFlag() throws Exception {
+            Path localFile = tempDir.resolve("direction-test.txt");
+            Files.writeString(localFile, "Direction verification content");
+
+            TransferRequest uploadRequest = TransferRequest.builder()
+                    .requestId("direction-flag-test")
+                    .sourceUri(localFile.toUri())
+                    .destinationUri(URI.create("smb://testserver/share/uploads/file.txt"))
+                    .build();
+
+            // Verify the request direction is correctly set as UPLOAD
+            assertEquals(TransferDirection.UPLOAD, uploadRequest.getDirection());
+            assertTrue(uploadRequest.isUpload());
+            assertFalse(uploadRequest.isDownload());
+
+            TransferContext context = new TransferContext(new TransferJob(uploadRequest));
+
+            TransferResult result = protocol.transfer(uploadRequest, context);
+
+            assertEquals(TransferStatus.COMPLETED, result.getFinalStatus());
+        }
+
+        @Test
+        @DisplayName("transfer() preserves requestId through entire transfer")
+        void transferPreservesRequestIdThroughEntireTransfer() throws Exception {
+            Path localFile = tempDir.resolve("request-id-test.txt");
+            Files.writeString(localFile, "Request ID preservation test");
+
+            String uniqueRequestId = "unique-request-id-" + System.currentTimeMillis();
+            TransferRequest uploadRequest = TransferRequest.builder()
+                    .requestId(uniqueRequestId)
+                    .sourceUri(localFile.toUri())
+                    .destinationUri(URI.create("smb://testserver/share/uploads/reqid.txt"))
+                    .build();
+
+            TransferContext context = new TransferContext(new TransferJob(uploadRequest));
+
+            var result = protocol.transfer(uploadRequest, context);
+
+            assertEquals(uniqueRequestId, result.getRequestId());
         }
     }
 }
