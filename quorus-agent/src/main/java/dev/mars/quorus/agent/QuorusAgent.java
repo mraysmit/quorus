@@ -17,6 +17,8 @@
 package dev.mars.quorus.agent;
 
 import dev.mars.quorus.agent.config.AgentConfiguration;
+import dev.mars.quorus.agent.observability.AgentMetrics;
+import dev.mars.quorus.agent.observability.AgentTelemetryConfig;
 import dev.mars.quorus.agent.service.AgentRegistrationService;
 import dev.mars.quorus.agent.service.HeartbeatService;
 import dev.mars.quorus.agent.service.TransferExecutionService;
@@ -26,6 +28,7 @@ import dev.mars.quorus.agent.service.JobStatusReportingService;
 import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferResult;
 import io.vertx.core.Vertx;
+import io.vertx.core.VertxOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,6 +62,9 @@ public class QuorusAgent {
     private final JobPollingService jobPollingService;
     private final JobStatusReportingService jobStatusReportingService;
 
+    // OpenTelemetry metrics (Phase 6 - Jan 2026)
+    private final AgentMetrics metrics;
+
     // Vert.x timer IDs for proper cleanup
     private long heartbeatTimerId = 0;
     private long jobPollingTimerId = 0;
@@ -90,7 +96,10 @@ public class QuorusAgent {
         this.jobPollingService = new JobPollingService(config);
         this.jobStatusReportingService = new JobStatusReportingService(config);
 
-        logger.info("Quorus Agent initialized: {} (reactive mode)", config.getAgentId());
+        // Initialize OpenTelemetry metrics (Phase 6 - Jan 2026)
+        this.metrics = new AgentMetrics(config.getAgentId(), System.currentTimeMillis());
+
+        logger.info("Quorus Agent initialized: {} (reactive mode with OpenTelemetry)", config.getAgentId());
     }
 
     /**
@@ -107,15 +116,19 @@ public class QuorusAgent {
     }
     
     public static void main(String[] args) {
-        logger.info("Starting Quorus Agent...");
-
-        // Create shared Vert.x instance
-        Vertx vertx = Vertx.vertx();
-        logger.info("Created Vert.x instance: {}", System.identityHashCode(vertx));
+        logger.info("Starting Quorus Agent with OpenTelemetry...");
 
         try {
             // Load configuration from environment
             AgentConfiguration config = AgentConfiguration.fromEnvironment();
+
+            // Create shared Vert.x instance with OpenTelemetry tracing
+            VertxOptions options = new VertxOptions();
+            options = AgentTelemetryConfig.configure(options, config.getAgentId());
+            Vertx vertx = Vertx.vertx(options);
+            
+            logger.info("Created Vert.x instance with OpenTelemetry: {} (Prometheus on port {})", 
+                    System.identityHashCode(vertx), AgentTelemetryConfig.getPrometheusPort());
 
             // Create and start agent with Vert.x instance
             QuorusAgent agent = new QuorusAgent(vertx, config);
@@ -159,13 +172,18 @@ public class QuorusAgent {
 
         running = true;
 
+        // Set metrics status
+        metrics.setStatusRunning();
+
         // Start health service first
         healthService.start();
         logger.info("Health service started on port {}", config.getAgentPort());
 
         // Register with controller
         boolean registered = registrationService.register();
+        metrics.recordRegistration(registered);
         if (!registered) {
+            metrics.setStatusError();
             throw new RuntimeException("Failed to register with controller");
         }
         logger.info("Agent registered successfully with controller");
@@ -177,8 +195,10 @@ public class QuorusAgent {
                 if (!closed.get() && running) {
                     try {
                         heartbeatService.sendHeartbeat();
+                        metrics.recordHeartbeat(true);
                     } catch (Exception e) {
                         logger.error("Error sending heartbeat", e);
+                        metrics.recordHeartbeat(false);
                     }
                 }
             }
@@ -225,6 +245,7 @@ public class QuorusAgent {
 
         logger.info("Shutting down Quorus Agent (reactive mode)...");
         running = false;
+        metrics.setStatusStopped();
 
         try {
             // Cancel Vert.x timers (no ScheduledExecutorService to shutdown!)
@@ -278,6 +299,7 @@ public class QuorusAgent {
             }
 
             logger.info("Found {} pending job(s)", pendingJobs.size());
+            metrics.recordJobPolled(pendingJobs.size());
 
             // Process each pending job
             for (JobPollingService.PendingJob pendingJob : pendingJobs) {
@@ -301,6 +323,9 @@ public class QuorusAgent {
             // Convert to transfer request
             TransferRequest request = pendingJob.toTransferRequest();
 
+            // Record job started
+            metrics.recordJobStarted();
+
             // Execute the transfer
             transferService.executeTransfer(request)
                     .onSuccess(result -> handleTransferComplete(jobId, result))
@@ -313,6 +338,10 @@ public class QuorusAgent {
     }
 
     private void handleTransferComplete(String jobId, TransferResult result) {
+        long durationSeconds = result.getDuration().map(d -> d.toSeconds()).orElse(0L);
+        String protocol = result.getProtocol().orElse("unknown");
+        String direction = result.getDirection().map(Enum::name).orElse("DOWNLOAD");
+        
         if (result.isSuccessful()) {
             String durationStr = result.getDuration()
                     .map(d -> d.toMillis() + "ms")
@@ -322,10 +351,12 @@ public class QuorusAgent {
                        result.getBytesTransferred(),
                        durationStr);
             jobStatusReportingService.reportCompleted(jobId, result.getBytesTransferred());
+            metrics.recordJobCompleted(true, protocol, direction, result.getBytesTransferred(), durationSeconds);
         } else {
             String errorMessage = result.getErrorMessage().orElse("Unknown error");
             logger.warn("Transfer failed: {} - {}", jobId, errorMessage);
             jobStatusReportingService.reportFailed(jobId, errorMessage);
+            metrics.recordJobCompleted(false, protocol, direction, 0, durationSeconds);
         }
     }
 

@@ -22,6 +22,7 @@ import dev.mars.quorus.agent.AgentInfo;
 import dev.mars.quorus.agent.AgentStatus;
 import dev.mars.quorus.agent.AgentCapabilities;
 import dev.mars.quorus.controller.raft.RaftStateMachine;
+import dev.mars.quorus.core.JobPriority;
 import dev.mars.quorus.core.TransferJob;
 import dev.mars.quorus.core.TransferStatus;
 import dev.mars.quorus.core.JobAssignment;

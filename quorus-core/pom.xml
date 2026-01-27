@@ -38,6 +38,12 @@
             <version>5.0.2</version>
         </dependency>
 
+        <!-- OpenTelemetry API (Phase 8 - Jan 2026) -->
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-api</artifactId>
+        </dependency>
+
         <!-- Jackson for JSON serialization -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>

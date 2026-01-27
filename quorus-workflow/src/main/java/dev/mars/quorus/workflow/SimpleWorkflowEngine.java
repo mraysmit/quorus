@@ -20,6 +20,7 @@ import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferResult;
 import dev.mars.quorus.core.TransferStatus;
 import dev.mars.quorus.transfer.TransferEngine;
+import dev.mars.quorus.workflow.observability.WorkflowMetrics;
 import io.vertx.core.Future;
 import io.vertx.core.Promise;
 import io.vertx.core.Vertx;
@@ -57,6 +58,9 @@ public class SimpleWorkflowEngine implements WorkflowEngine {
     private final WorkerExecutor workerExecutor;
     private final Map<String, WorkflowExecution> activeExecutions;
     private final AtomicBoolean shutdown = new AtomicBoolean(false);
+
+    // OpenTelemetry metrics (Phase 9 - Jan 2026)
+    private final WorkflowMetrics metrics = WorkflowMetrics.getInstance();
 
     /**
      * Create a new SimpleWorkflowEngine with Vert.x integration (recommended).
@@ -196,8 +200,14 @@ public class SimpleWorkflowEngine implements WorkflowEngine {
         
         Instant startTime = Instant.now();
         String executionId = context.getExecutionId();
+        String workflowName = definition.getMetadata() != null && definition.getMetadata().getName() != null 
+                ? definition.getMetadata().getName() : executionId;
+        String executionMode = context.getMode().name();
         
         logger.info("Starting workflow execution: " + executionId + " in mode: " + context.getMode());
+        
+        // Record workflow started (Phase 9 - Jan 2026)
+        metrics.recordWorkflowStarted(workflowName, executionMode);
         
         // Validate workflow
         ValidationResult validation = parser.validate(definition);
@@ -259,6 +269,18 @@ public class SimpleWorkflowEngine implements WorkflowEngine {
                     null,
                     null
             );
+            
+            // Record workflow completion (Phase 9 - Jan 2026)
+            double durationSeconds = Duration.between(startTime, endTime).toMillis() / 1000.0;
+            int transferCount = groupExecutions.stream()
+                    .mapToInt(g -> g.getTransferResults() != null ? g.getTransferResults().size() : 0)
+                    .sum();
+            
+            if (finalStatus == WorkflowStatus.COMPLETED) {
+                metrics.recordWorkflowCompleted(workflowName, executionMode, durationSeconds, transferCount);
+            } else {
+                metrics.recordWorkflowFailed(workflowName, executionMode, "Step execution failed");
+            }
             
             logger.info("Workflow execution completed: " + executionId + " with status: " + finalStatus);
             return execution;
@@ -484,6 +506,11 @@ public class SimpleWorkflowEngine implements WorkflowEngine {
     }
     
     private WorkflowExecution createFailedExecution(WorkflowDefinition definition, ExecutionContext context, Exception e) {
+        // Record workflow failure (Phase 9 - Jan 2026)
+        String workflowName = definition.getMetadata() != null && definition.getMetadata().getName() != null 
+                ? definition.getMetadata().getName() : context.getExecutionId();
+        metrics.recordWorkflowFailed(workflowName, context.getMode().name(), e.getMessage());
+        
         return new WorkflowExecution(
                 context.getExecutionId(),
                 definition,
