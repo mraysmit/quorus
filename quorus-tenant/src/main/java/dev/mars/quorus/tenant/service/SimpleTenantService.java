@@ -23,8 +23,10 @@ import dev.mars.quorus.tenant.observability.TenantMetrics;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Simple in-memory implementation of TenantService.
@@ -43,7 +45,7 @@ import java.util.stream.Collectors;
  */
 public class SimpleTenantService implements TenantService {
 
-    private static final Logger logger = Logger.getLogger(SimpleTenantService.class.getName());
+    private static final Logger logger = LoggerFactory.getLogger(SimpleTenantService.class);
 
     // ConcurrentHashMap provides thread-safety for individual operations
     // When deployed as a Verticle, all operations run on single event loop thread
@@ -86,7 +88,7 @@ public class SimpleTenantService implements TenantService {
         // Record metric (Phase 7 - Jan 2026)
         metrics.recordTenantCreated(newTenant.getTenantId());
 
-        logger.info("Created tenant: " + newTenant.getTenantId() + " (" + newTenant.getName() + ")");
+        logger.info("Created tenant: {} ({})", newTenant.getTenantId(), newTenant.getName());
         return newTenant;
     }
     
@@ -133,7 +135,7 @@ public class SimpleTenantService implements TenantService {
 
         tenants.put(updatedTenant.getTenantId(), updatedTenant);
 
-        logger.info("Updated tenant: " + updatedTenant.getTenantId());
+        logger.info("Updated tenant: {}", updatedTenant.getTenantId());
         return updatedTenant;
     }
     
@@ -166,7 +168,7 @@ public class SimpleTenantService implements TenantService {
         // Record metric (Phase 7 - Jan 2026)
         metrics.recordTenantDeleted(tenantId);
 
-        logger.info("Deleted tenant: " + tenantId);
+        logger.info("Deleted tenant: {}", tenantId);
     }
     
     @Override
@@ -245,7 +247,7 @@ public class SimpleTenantService implements TenantService {
         Tenant updatedTenant = tenant.withConfiguration(configuration);
         tenants.put(tenantId, updatedTenant);
 
-        logger.info("Updated configuration for tenant: " + tenantId);
+        logger.info("Updated configuration for tenant: {}", tenantId);
         return updatedTenant;
     }
     
@@ -358,7 +360,7 @@ public class SimpleTenantService implements TenantService {
         Tenant updatedTenant = tenant.withStatus(status);
         tenants.put(tenantId, updatedTenant);
 
-        logger.info("Updated tenant status: " + tenantId + " -> " + status);
+        logger.info("Updated tenant status: {} -> {}", tenantId, status);
     }
     
     private boolean wouldCreateCircularReference(String tenantId, String parentTenantId) {

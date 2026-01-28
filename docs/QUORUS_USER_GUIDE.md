@@ -8351,15 +8351,461 @@ This section will contain comprehensive Java API documentation including:
 
 ## Advanced Configuration
 
-This section will contain advanced technical configuration including:
+This section covers the configuration of all Quorus modules through properties files and environment variables.
 
-- **Cluster Configuration** - Raft settings, network topology, security
-- **Performance Tuning** - JVM settings, resource allocation, optimization
-- **Security Configuration** - TLS, authentication, authorization, compliance
-- **Monitoring Setup** - Metrics, logging, alerting, dashboards
-- **Troubleshooting** - Common issues, debugging, performance analysis
+### Configuration Overview
 
-*[Advanced technical configuration will be documented here in a future update]*
+Each Quorus module has its own properties file located in `src/main/resources/`. All settings can be overridden via:
+1. **Environment variables** - Use uppercase with underscores (e.g., `QUORUS_HTTP_PORT=8080`)
+2. **System properties** - Use `-D` flag (e.g., `-Dquorus.http.port=8080`)
+3. **Properties files** - Module-specific configuration files
+
+| Module | Properties File | Config Class |
+|--------|-----------------|--------------|
+| `quorus-core` | `quorus.properties` | `QuorusConfiguration` |
+| `quorus-controller` | `quorus-controller.properties` | `AppConfig` |
+| `quorus-agent` | `quorus-agent.properties` | `AgentConfig` |
+| `quorus-api` | `quorus-api.properties` | `ApiConfig` |
+
+---
+
+### Core Configuration (`quorus.properties`)
+
+The core library configuration controls transfer engine behavior and is used by all Quorus components.
+
+```properties
+# ==============================================================================
+# Transfer Engine Configuration
+# ==============================================================================
+
+# Maximum concurrent transfers per agent
+quorus.transfer.max.concurrent=10
+
+# Maximum retry attempts for failed transfers
+quorus.transfer.max.retries=3
+
+# Delay between retry attempts (milliseconds)
+quorus.transfer.retry.delay.ms=1000
+
+# Buffer size for file operations (bytes)
+quorus.transfer.buffer.size=8192
+
+# ==============================================================================
+# Network Configuration  
+# ==============================================================================
+
+# Connection timeout (milliseconds)
+quorus.network.connection.timeout.ms=30000
+
+# Read timeout (milliseconds)
+quorus.network.read.timeout.ms=60000
+
+# ==============================================================================
+# File Configuration
+# ==============================================================================
+
+# Maximum file size for transfers (bytes) - 10GB default
+quorus.file.max.size=10737418240
+
+# Checksum algorithm (SHA-256, MD5, SHA-1, SHA-512)
+quorus.file.checksum.algorithm=SHA-256
+
+# Temporary directory for in-progress transfers
+# Default: system temp directory
+# quorus.file.temp.dir=/var/tmp/quorus
+
+# ==============================================================================
+# Monitoring Configuration
+# ==============================================================================
+
+# Enable/disable metrics collection
+quorus.monitoring.metrics.enabled=true
+
+# Enable/disable health check endpoints
+quorus.monitoring.health.enabled=true
+
+# State cleanup interval (milliseconds) - 1 hour default
+quorus.monitoring.state.cleanup.interval.ms=3600000
+
+# Maximum age for transfer state records (milliseconds) - 24 hours default
+quorus.monitoring.state.max.age.ms=86400000
+
+# ==============================================================================
+# Protocol-Specific Configuration
+# ==============================================================================
+
+# SFTP Configuration
+quorus.protocol.sftp.port=22
+quorus.protocol.sftp.buffer.size=32768
+
+# FTP Configuration
+quorus.protocol.ftp.port=21
+quorus.protocol.ftp.buffer.size=32768
+
+# SMB Configuration
+quorus.protocol.smb.buffer.size=65536
+```
+
+---
+
+### Controller Configuration (`quorus-controller.properties`)
+
+The controller configuration manages Raft consensus, HTTP API, and cluster coordination.
+
+```properties
+# ==============================================================================
+# Application Info
+# ==============================================================================
+quorus.version=2.0-ext
+
+# ==============================================================================
+# Node Identity
+# ==============================================================================
+# Unique node identifier for Raft cluster. If empty, derives from hostname.
+# MUST be unique per node in a cluster.
+quorus.node.id=
+
+# ==============================================================================
+# HTTP Server Configuration
+# ==============================================================================
+quorus.http.port=8080
+quorus.http.host=0.0.0.0
+
+# ==============================================================================
+# Raft Cluster Configuration
+# ==============================================================================
+# Port for inter-node Raft gRPC communication
+quorus.raft.port=9080
+
+# Cluster nodes in format: nodeId=host:port,nodeId2=host2:port2
+# Leave empty for single-node mode (will auto-configure)
+quorus.cluster.nodes=
+
+# ==============================================================================
+# Telemetry Configuration
+# ==============================================================================
+# OpenTelemetry OTLP exporter endpoint (gRPC)
+quorus.telemetry.otlp.endpoint=http://localhost:4317
+
+# Prometheus metrics HTTP server port
+quorus.telemetry.prometheus.port=9464
+
+# Enable/disable telemetry
+quorus.telemetry.enabled=true
+
+# Service name for tracing
+quorus.telemetry.service.name=quorus-controller
+
+# ==============================================================================
+# Job Assignment Service Configuration
+# ==============================================================================
+# Initial delay before starting assignment processor (ms)
+quorus.jobs.assignment.initial-delay-ms=5000
+
+# Interval between assignment processing runs (ms)
+quorus.jobs.assignment.interval-ms=10000
+
+# Initial delay before starting timeout monitor (ms)
+quorus.jobs.timeout.initial-delay-ms=30000
+
+# Interval between timeout checks (ms)
+quorus.jobs.timeout.interval-ms=30000
+```
+
+---
+
+### Agent Configuration (`quorus-agent.properties`)
+
+The agent configuration controls transfer workers that execute file transfers.
+
+```properties
+# ==============================================================================
+# Agent Identity
+# ==============================================================================
+# Unique agent identifier. If empty, uses AGENT_ID env var (required)
+quorus.agent.id=
+
+# Agent version
+quorus.agent.version=1.0.0
+
+# ==============================================================================
+# Controller Connection
+# ==============================================================================
+# URL of the Quorus controller API
+quorus.agent.controller.url=http://localhost:8080/api/v1
+
+# ==============================================================================
+# Network Configuration
+# ==============================================================================
+# Port for agent HTTP server
+quorus.agent.port=8080
+
+# Region identifier (for agent selection)
+quorus.agent.region=default
+
+# Datacenter identifier (for agent selection)
+quorus.agent.datacenter=default
+
+# ==============================================================================
+# Transfer Configuration
+# ==============================================================================
+# Maximum concurrent transfers this agent can handle
+quorus.agent.transfers.max-concurrent=5
+
+# Supported protocols (comma-separated)
+quorus.agent.protocols=HTTP,HTTPS
+
+# ==============================================================================
+# Heartbeat Configuration
+# ==============================================================================
+# Interval between heartbeat messages (ms)
+quorus.agent.heartbeat.interval-ms=30000
+
+# ==============================================================================
+# Job Polling Configuration
+# ==============================================================================
+# Initial delay before starting job polling (ms)
+quorus.agent.jobs.polling.initial-delay-ms=5000
+
+# Interval between job polling attempts (ms)
+quorus.agent.jobs.polling.interval-ms=10000
+
+# ==============================================================================
+# Telemetry Configuration
+# ==============================================================================
+# Enable/disable telemetry
+quorus.agent.telemetry.enabled=true
+
+# Prometheus metrics HTTP server port
+quorus.agent.telemetry.prometheus.port=9465
+
+# OpenTelemetry OTLP exporter endpoint (gRPC)
+quorus.agent.telemetry.otlp.endpoint=http://localhost:4317
+```
+
+---
+
+### API Configuration (`quorus-api.properties`)
+
+The API configuration manages the REST API service and agent fleet coordination.
+
+```properties
+# ==============================================================================
+# HTTP Server Configuration
+# ==============================================================================
+# HTTP server port
+quorus.http.port=8080
+
+# HTTP server bind address (0.0.0.0 = all interfaces)
+quorus.http.host=0.0.0.0
+
+# ==============================================================================
+# Application Info
+# ==============================================================================
+quorus.api.name=quorus-api
+quorus.api.version=2.0
+
+# ==============================================================================
+# Agent Fleet Configuration
+# ==============================================================================
+# Heartbeat interval for registered agents (milliseconds)
+quorus.agent.heartbeat.interval-ms=30000
+
+# Agent timeout threshold (milliseconds) - agents not sending heartbeats
+# within this time are considered offline (default: 3 missed heartbeats)
+quorus.agent.timeout-ms=90000
+
+# Interval for checking agent failures (milliseconds)
+quorus.agent.failure-check.interval-ms=15000
+
+# ==============================================================================
+# Transfer Service Configuration
+# ==============================================================================
+# Maximum concurrent transfers per agent
+quorus.transfer.max-concurrent-transfers=10
+
+# Maximum retry attempts for failed transfers
+quorus.transfer.max-retry-attempts=3
+
+# Delay between retry attempts (milliseconds)
+quorus.transfer.retry-delay-ms=1000
+
+# Default timeout for transfer operations (seconds)
+quorus.transfer.timeout-seconds=30
+
+# ==============================================================================
+# Controller Discovery Configuration
+# ==============================================================================
+# Timeout for discovering controller nodes (seconds)
+quorus.controller.discovery.timeout-seconds=3
+
+# Leader discovery timeout (seconds)
+quorus.controller.leader.discovery.timeout-seconds=5
+
+# Health check interval for controller nodes (seconds)
+quorus.controller.health-check.interval-seconds=10
+
+# ==============================================================================
+# OpenTelemetry Configuration
+# ==============================================================================
+quorus.telemetry.enabled=true
+quorus.telemetry.otlp.endpoint=http://localhost:4317
+
+# ==============================================================================
+# CLI Client Configuration
+# ==============================================================================
+# Default controller URL for CLI client
+quorus.cli.default-url=http://localhost:8080
+```
+
+---
+
+### Environment Variable Override Pattern
+
+All configuration properties can be overridden using environment variables. The pattern is:
+
+1. Convert the property name to uppercase
+2. Replace dots (`.`) with underscores (`_`)
+3. Prefix with the module identifier (if applicable)
+
+**Examples:**
+
+| Property | Environment Variable |
+|----------|---------------------|
+| `quorus.http.port` | `QUORUS_HTTP_PORT` |
+| `quorus.agent.id` | `QUORUS_AGENT_ID` or `AGENT_ID` |
+| `quorus.transfer.max.concurrent` | `QUORUS_TRANSFER_MAX_CONCURRENT` |
+| `quorus.telemetry.enabled` | `QUORUS_TELEMETRY_ENABLED` |
+
+---
+
+### Docker Environment Configuration
+
+When running in Docker, configuration is typically provided via environment variables:
+
+```yaml
+# docker-compose.yml example
+services:
+  quorus-controller:
+    image: quorus-controller:latest
+    environment:
+      - QUORUS_NODE_ID=controller-1
+      - QUORUS_HTTP_PORT=8080
+      - QUORUS_RAFT_PORT=9080
+      - QUORUS_CLUSTER_NODES=controller-1=controller-1:9080,controller-2=controller-2:9080,controller-3=controller-3:9080
+      - QUORUS_TELEMETRY_OTLP_ENDPOINT=http://otel-collector:4317
+
+  quorus-agent:
+    image: quorus-agent:latest
+    environment:
+      - AGENT_ID=agent-east-1
+      - QUORUS_AGENT_CONTROLLER_URL=http://controller-1:8080/api/v1
+      - QUORUS_AGENT_REGION=us-east
+      - QUORUS_AGENT_DATACENTER=dc1
+      - QUORUS_AGENT_TRANSFERS_MAX_CONCURRENT=10
+```
+
+---
+
+### Configuration File Locations
+
+The configuration system searches for properties files in the following order:
+
+1. **Classpath** - `src/main/resources/` (packaged in JAR)
+2. **Working directory** - Current working directory
+3. **Home directory** - `~/.quorus/`
+4. **System directory** - `/etc/quorus/` (Linux/macOS)
+
+Later files override earlier ones, allowing deployment-specific customization.
+
+---
+
+### Performance Tuning
+
+Key configuration parameters for performance optimization:
+
+| Parameter | Default | Description | Recommendation |
+|-----------|---------|-------------|----------------|
+| `quorus.transfer.max.concurrent` | 10 | Max parallel transfers | Increase for high-throughput |
+| `quorus.transfer.buffer.size` | 8192 | I/O buffer size | 32KB-64KB for large files |
+| `quorus.network.connection.timeout.ms` | 30000 | Connection timeout | Reduce for fast-fail |
+| `quorus.agent.jobs.polling.interval-ms` | 10000 | Job polling frequency | Lower for faster job pickup |
+| `quorus.jobs.assignment.interval-ms` | 10000 | Job assignment frequency | Lower for real-time assignment |
+
+---
+
+### Cluster Configuration
+
+For production deployments with multiple controller nodes:
+
+```properties
+# Controller 1
+quorus.node.id=controller-1
+quorus.http.port=8081
+quorus.raft.port=9081
+quorus.cluster.nodes=controller-1=host1:9081,controller-2=host2:9082,controller-3=host3:9083
+
+# Controller 2
+quorus.node.id=controller-2
+quorus.http.port=8082
+quorus.raft.port=9082
+quorus.cluster.nodes=controller-1=host1:9081,controller-2=host2:9082,controller-3=host3:9083
+
+# Controller 3
+quorus.node.id=controller-3
+quorus.http.port=8083
+quorus.raft.port=9083
+quorus.cluster.nodes=controller-1=host1:9081,controller-2=host2:9082,controller-3=host3:9083
+```
+
+---
+
+### Monitoring Configuration
+
+Configure telemetry endpoints for observability:
+
+```properties
+# OpenTelemetry (Jaeger, Zipkin, etc.)
+quorus.telemetry.enabled=true
+quorus.telemetry.otlp.endpoint=http://otel-collector:4317
+quorus.telemetry.service.name=quorus-controller
+
+# Prometheus metrics endpoint
+quorus.telemetry.prometheus.port=9464
+```
+
+---
+
+### Security Configuration
+
+For secure deployments, additional configuration may be required:
+
+- **TLS Configuration** - Configure SSL certificates and key stores
+- **Authentication** - OAuth2, JWT, or API key configuration
+- **Authorization** - Role-based access control settings
+- **Audit Logging** - Compliance and security event logging
+
+*[Detailed security configuration will be documented in a dedicated Security Guide]*
+
+---
+
+### Troubleshooting Configuration Issues
+
+**Common Issues:**
+
+1. **Port conflicts** - Ensure unique ports across nodes
+2. **Node ID conflicts** - Each node must have a unique identifier
+3. **Cluster connectivity** - Verify firewall rules allow Raft ports
+4. **Timeout issues** - Adjust timeouts for network latency
+
+**Debug Configuration:**
+```bash
+# Enable debug logging
+export QUORUS_LOG_LEVEL=DEBUG
+
+# Verify configuration loading
+java -jar quorus-controller.jar --show-config
+```
 
 ---
 

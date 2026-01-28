@@ -32,8 +32,8 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import java.util.stream.Collectors;
 
 /**
@@ -50,7 +50,7 @@ import java.util.stream.Collectors;
  */
 public class SimpleWorkflowEngine implements WorkflowEngine {
 
-    private static final Logger logger = Logger.getLogger(SimpleWorkflowEngine.class.getName());
+    private static final Logger logger = LoggerFactory.getLogger(SimpleWorkflowEngine.class);
 
     private final Vertx vertx;
     private final TransferEngine transferEngine;
@@ -90,7 +90,7 @@ public class SimpleWorkflowEngine implements WorkflowEngine {
     @Deprecated(since = "1.0", forRemoval = true)
     public SimpleWorkflowEngine(TransferEngine transferEngine) {
         this(Vertx.vertx(), transferEngine);
-        logger.warning("Using deprecated constructor - consider passing shared Vert.x instance");
+        logger.warn("Using deprecated constructor - consider passing shared Vert.x instance");
     }
     
     @Override
@@ -117,14 +117,14 @@ public class SimpleWorkflowEngine implements WorkflowEngine {
     @Override
     public boolean pause(String executionId) {
         // For this simple implementation, we don't support pausing
-        logger.warning("Pause operation not supported in SimpleWorkflowEngine");
+        logger.warn("Pause operation not supported in SimpleWorkflowEngine");
         return false;
     }
     
     @Override
     public boolean resume(String executionId) {
         // For this simple implementation, we don't support resuming
-        logger.warning("Resume operation not supported in SimpleWorkflowEngine");
+        logger.warn("Resume operation not supported in SimpleWorkflowEngine");
         return false;
     }
     
@@ -133,7 +133,7 @@ public class SimpleWorkflowEngine implements WorkflowEngine {
         WorkflowExecution execution = activeExecutions.get(executionId);
         if (execution != null && execution.isRunning()) {
             // For this simple implementation, we mark as cancelled but don't interrupt
-            logger.info("Cancelling workflow execution: " + executionId);
+            logger.info("Cancelling workflow execution: {}", executionId);
             return true;
         }
         return false;
@@ -175,11 +175,11 @@ public class SimpleWorkflowEngine implements WorkflowEngine {
                 return executeWorkflowInternal(definition, executionContext);
             } catch (Exception e) {
                 // Log without stack trace for cleaner output, especially during testing
-                logger.log(Level.SEVERE, "Workflow execution failed: " + executionContext.getExecutionId() + " - " + e.getMessage());
+                logger.error("Workflow execution failed: {} - {}", executionContext.getExecutionId(), e.getMessage());
 
                 // Only log full stack trace in debug mode
-                if (logger.isLoggable(Level.FINE)) {
-                    logger.log(Level.FINE, "Workflow execution exception details for: " + executionContext.getExecutionId(), e);
+                if (logger.isDebugEnabled()) {
+                    logger.debug("Workflow execution exception details for: {}", executionContext.getExecutionId(), e);
                 }
 
                 return createFailedExecution(definition, executionContext, e);
@@ -204,7 +204,7 @@ public class SimpleWorkflowEngine implements WorkflowEngine {
                 ? definition.getMetadata().getName() : executionId;
         String executionMode = context.getMode().name();
         
-        logger.info("Starting workflow execution: " + executionId + " in mode: " + context.getMode());
+        logger.info("Starting workflow execution: {} in mode: {}", executionId, context.getMode());
         
         // Record workflow started (Phase 9 - Jan 2026)
         metrics.recordWorkflowStarted(workflowName, executionMode);
@@ -282,7 +282,7 @@ public class SimpleWorkflowEngine implements WorkflowEngine {
                 metrics.recordWorkflowFailed(workflowName, executionMode, "Step execution failed");
             }
             
-            logger.info("Workflow execution completed: " + executionId + " with status: " + finalStatus);
+            logger.info("Workflow execution completed: {} with status: {}", executionId, finalStatus);
             return execution;
             
         } finally {
@@ -319,7 +319,7 @@ public class SimpleWorkflowEngine implements WorkflowEngine {
             );
             
             groupExecutions.add(groupExecution);
-            logger.info("Dry run validated group: " + group.getName());
+            logger.info("Dry run validated group: {}", group.getName());
         }
         
         return groupExecutions;
@@ -368,7 +368,7 @@ public class SimpleWorkflowEngine implements WorkflowEngine {
                 }
 
             } catch (Exception e) {
-                logger.log(Level.WARNING, "Virtual run simulation interrupted: " + e.getMessage());
+                logger.warn("Virtual run simulation interrupted: {}", e.getMessage());
                 // Continue with partial results
             }
 
@@ -383,7 +383,7 @@ public class SimpleWorkflowEngine implements WorkflowEngine {
             );
 
             groupExecutions.add(groupExecution);
-            logger.info("Virtual run completed group: " + group.getName() + " (parallel simulation)");
+            logger.info("Virtual run completed group: {} (parallel simulation)", group.getName());
         }
 
         return groupExecutions;
@@ -413,16 +413,16 @@ public class SimpleWorkflowEngine implements WorkflowEngine {
                             // Map to entry with transfer name
                             return transferFuture
                                     .<TransferResult>recover(error -> {
-                                        logger.log(Level.WARNING, "Transfer execution failed: " + transfer.getName() + " - " + error.getMessage());
-                                        if (logger.isLoggable(Level.FINE)) {
-                                            logger.log(Level.FINE, "Transfer execution exception details for: " + transfer.getName(), error);
+                                        logger.warn("Transfer execution failed: {} - {}", transfer.getName(), error.getMessage());
+                                        if (logger.isDebugEnabled()) {
+                                            logger.debug("Transfer execution exception details for: {}", transfer.getName(), error);
                                         }
                                         return Future.succeededFuture(createMockTransferResult(transfer, false));
                                     })
                                     .<Map.Entry<String, TransferResult>>map(result -> Map.entry(transfer.getName(), result));
                         } catch (Exception e) {
                             // Handle TransferException from toTransferRequest()
-                            logger.log(Level.WARNING, "Failed to create transfer request: " + transfer.getName() + " - " + e.getMessage());
+                            logger.warn("Failed to create transfer request: {} - {}", transfer.getName(), e.getMessage());
                             TransferResult failedResult = createMockTransferResult(transfer, false);
                             return Future.succeededFuture(Map.entry(transfer.getName(), failedResult));
                         }
@@ -455,9 +455,9 @@ public class SimpleWorkflowEngine implements WorkflowEngine {
                 }
 
             } catch (Exception e) {
-                logger.log(Level.SEVERE, "Group execution failed: " + group.getName() + " - " + e.getMessage());
-                if (logger.isLoggable(Level.FINE)) {
-                    logger.log(Level.FINE, "Group execution exception details for: " + group.getName(), e);
+                logger.error("Group execution failed: {} - {}", group.getName(), e.getMessage());
+                if (logger.isDebugEnabled()) {
+                    logger.debug("Group execution exception details for: {}", group.getName(), e);
                 }
                 groupSuccess = false;
                 groupError = "Group execution failed: " + e.getMessage();
@@ -476,7 +476,7 @@ public class SimpleWorkflowEngine implements WorkflowEngine {
             );
 
             groupExecutions.add(groupExecution);
-            logger.info("Executed group: " + group.getName() + " with status: " + groupStatus + " (parallel execution)");
+            logger.info("Executed group: {} with status: {} (parallel execution)", group.getName(), groupStatus);
 
             // Stop execution if group failed and workflow doesn't continue on error
             if (!groupSuccess && !group.isContinueOnError()) {
