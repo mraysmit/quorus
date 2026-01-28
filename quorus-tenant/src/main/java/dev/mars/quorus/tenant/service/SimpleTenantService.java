@@ -357,8 +357,16 @@ public class SimpleTenantService implements TenantService {
             throw new TenantServiceException("Cannot update status for deleted tenant: " + tenantId);
         }
 
+        Tenant.TenantStatus previousStatus = tenant.getStatus();
         Tenant updatedTenant = tenant.withStatus(status);
         tenants.put(tenantId, updatedTenant);
+
+        // Record metrics for status changes (Phase 7 - Jan 2026)
+        if (status == Tenant.TenantStatus.SUSPENDED && previousStatus == Tenant.TenantStatus.ACTIVE) {
+            metrics.recordTenantSuspended(tenantId);
+        } else if (status == Tenant.TenantStatus.ACTIVE && previousStatus == Tenant.TenantStatus.SUSPENDED) {
+            metrics.recordTenantActivated(tenantId);
+        }
 
         logger.info("Updated tenant status: {} -> {}", tenantId, status);
     }

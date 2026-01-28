@@ -134,6 +134,14 @@ public class SimpleWorkflowEngine implements WorkflowEngine {
         if (execution != null && execution.isRunning()) {
             // For this simple implementation, we mark as cancelled but don't interrupt
             logger.info("Cancelling workflow execution: {}", executionId);
+            
+            // Record cancel metric (Phase 9 - Jan 2026)
+            String workflowName = execution.getDefinition().getMetadata() != null 
+                    ? execution.getDefinition().getMetadata().getName() : executionId;
+            String executionMode = execution.getContext() != null 
+                    ? execution.getContext().getMode().name() : "NORMAL";
+            metrics.recordWorkflowCancelled(workflowName, executionMode);
+            
             return true;
         }
         return false;
@@ -394,6 +402,10 @@ public class SimpleWorkflowEngine implements WorkflowEngine {
 
         logger.info("Performing normal workflow execution with parallel transfer execution");
         List<WorkflowExecution.GroupExecution> groupExecutions = new ArrayList<>();
+        
+        // Get workflow name for metrics (Phase 9 - Jan 2026)
+        String workflowName = definition.getMetadata() != null && definition.getMetadata().getName() != null 
+                ? definition.getMetadata().getName() : "unknown";
 
         List<TransferGroup> sortedGroups = graph.topologicalSort();
         for (TransferGroup group : sortedGroups) {
@@ -445,9 +457,13 @@ public class SimpleWorkflowEngine implements WorkflowEngine {
                 for (Future<Map.Entry<String, TransferResult>> future : transferFutures) {
                     Map.Entry<String, TransferResult> entry = future.result();
                     transferResults.put(entry.getKey(), entry.getValue());
+                    
+                    // Record step metrics (Phase 9 - Jan 2026)
+                    metrics.recordStepExecuted(workflowName, "transfer");
 
                     if (!entry.getValue().isSuccessful()) {
                         groupSuccess = false;
+                        metrics.recordStepFailed(workflowName, "transfer", entry.getValue().getErrorMessage());
                         if (!group.isContinueOnError()) {
                             groupError = "Transfer failed: " + entry.getKey();
                         }
