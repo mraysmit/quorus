@@ -35,6 +35,7 @@ Quorus is an enterprise-grade **route-based distributed file transfer system** d
   | `quorus-workflow` | YAML parsing via `YamlWorkflowDefinitionParser`, validation with `WorkflowSchemaValidator`, dependency resolution via `DependencyGraph` | `WorkflowEngine`, `SimpleWorkflowEngine`, `WorkflowDefinition`, `TransferGroup` |
   | `quorus-tenant` | Tenant registry, quotas via `ResourceManagementService`, hierarchical tenant model | `TenantService`, `SimpleTenantService`, `Tenant`, `TenantConfiguration` |
   | `quorus-controller` | Vert.x 5 verticle runtime with gRPC Raft transport, `RaftNode` consensus, embedded `HttpApiServer` | `QuorusControllerVerticle`, `GrpcRaftTransport`, `GrpcRaftServer`, `QuorusStateMachine` |
+  | `quorus-agent` | Distributed transfer worker that polls controller for jobs, executes file transfers via protocol adapters, sends heartbeats and status reports | `QuorusAgent`, `JobPollingService`, `TransferExecutionService`, `HeartbeatService`, `AgentRegistrationService` |
   | `quorus-api` | Legacy Quarkus REST layer with CDI producers, service discovery, agent fleet management | `QuorusApiApplication`, `TransferResource`, `AgentRegistrationResource`, `VertxProducer` |
   | `quorus-integration-examples` | Runnable demos for transfers, workflows, validation scenarios | Generates representative corporate datasets for testing |
   | `docker/agents`, `docker/compose/*` | Production-like agent fleet, transfer servers, and observability stack | Validates multi-region agents, real protocols (FTP/SFTP/HTTP/SMB), and failover |
@@ -181,10 +182,11 @@ The system is organized into multiple Maven modules with **controller-first arch
 graph TB
     subgraph "Applications"
         QCT[quorus-controller<br/>Main Application<br/>Raft + HTTP API]
+        QAG[quorus-agent<br/>Transfer Worker]
         QA[quorus-api<br/>Legacy API Module]
     end
     
-    subgraph "Services"
+    subgraph "Libraries"
         QW[quorus-workflow<br/>YAML Workflow Engine]
         QT[quorus-tenant<br/>Multi-Tenant Management]
     end
@@ -200,6 +202,8 @@ graph TB
     
     QCT --> QW
     QCT --> QT
+    QCT -.->|assigns jobs| QAG
+    QAG --> QC
     QA --> QW
     QA --> QT
     QW --> QC
@@ -208,6 +212,7 @@ graph TB
     QWE --> QW
 
     style QCT fill:#ff6b6b,color:#fff
+    style QAG fill:#4ecdc4,color:#fff
     style QA fill:#ffeb3b
     style QW fill:#fff3e0
     style QT fill:#e8f5e8
@@ -218,11 +223,17 @@ graph TB
 
 #### Module Responsibilities
 
+**Applications** (standalone processes with `main()`):
 - **quorus-controller**: Main executable application with embedded HTTP API and Raft consensus
-- **quorus-core**: Core transfer engine and protocols
-- **quorus-tenant**: Multi-tenant management and isolation
-- **quorus-workflow**: YAML-based workflow engine
-- **quorus-api**: Legacy API module (being phased out)
+- **quorus-agent**: Distributed transfer worker that polls controller for jobs, executes SFTP/FTP/HTTP/SMB transfers, sends heartbeats
+- **quorus-api**: Legacy REST API module (being phased out)
+
+**Libraries** (embedded in applications):
+- **quorus-core**: Core transfer engine and protocol adapters
+- **quorus-workflow**: YAML-based workflow parsing and execution engine
+- **quorus-tenant**: Multi-tenant management, quotas, and isolation
+
+**Examples**:
 - **quorus-integration-examples**: Usage examples and integration patterns
 - **quorus-workflow-examples**: Workflow definition examples
 

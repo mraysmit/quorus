@@ -655,14 +655,15 @@ public class InMemoryTransferEngineSimulator {
             totalBytesTransferred.addAndGet(transfer.totalBytes);
             
             Duration duration = Duration.between(transfer.startTime, transfer.endTime);
-            log.info("completeTransfer: Transfer completed successfully jobId={}, bytes={}, duration={}ms", 
-                transfer.jobId, transfer.totalBytes, duration.toMillis());
+            TransferDirection direction = transfer.request.getDirection();
+            log.info("completeTransfer: Transfer completed successfully jobId={}, direction={}, bytes={}, duration={}ms", 
+                transfer.jobId, direction, transfer.totalBytes, duration.toMillis());
             
-            // Update protocol metrics
+            // Update protocol metrics with direction
             String protocol = transfer.request.protocol();
             if (protocol != null) {
                 ProtocolMetrics metrics = getProtocolMetrics(protocol);
-                metrics.recordTransfer(transfer.totalBytes, duration);
+                metrics.recordTransfer(transfer.totalBytes, duration, direction);
             }
             
             transfer.completionFuture.complete(new TransferResult(
@@ -722,16 +723,80 @@ public class InMemoryTransferEngineSimulator {
     }
 
     /**
-     * Transfer request.
+     * Transfer direction enumeration.
+     * Matches the production TransferDirection enum.
+     */
+    public enum TransferDirection {
+        /** Transfer from remote source to local file:// destination */
+        DOWNLOAD,
+        /** Transfer from local file:// source to remote destination */
+        UPLOAD,
+        /** Transfer between two remote endpoints (relay/proxy) */
+        REMOTE_TO_REMOTE
+    }
+
+    /**
+     * Transfer request with bidirectional support.
+     * 
+     * <p>Supports both uploads and downloads:</p>
+     * <ul>
+     *   <li><b>DOWNLOAD:</b> Remote source → Local file:// destination</li>
+     *   <li><b>UPLOAD:</b> Local file:// source → Remote destination</li>
+     * </ul>
      */
     public record TransferRequest(
         String jobId,
         String sourceUri,
-        String destinationPath,
+        String destinationUri,
         String protocol,
         long expectedSizeBytes,
         Map<String, String> options
     ) {
+        /**
+         * Gets the destination path (only valid for downloads).
+         * For backward compatibility, extracts path from file:// URI.
+         */
+        public String destinationPath() {
+            if (destinationUri == null) return null;
+            if (destinationUri.startsWith("file://")) {
+                return destinationUri.substring(7); // Remove "file://" prefix
+            }
+            return destinationUri;
+        }
+        
+        /**
+         * Determines the transfer direction based on URI schemes.
+         * @return the transfer direction
+         */
+        public TransferDirection getDirection() {
+            boolean sourceIsFile = sourceUri != null && 
+                (sourceUri.startsWith("file://") || sourceUri.startsWith("file:///"));
+            boolean destIsFile = destinationUri != null && 
+                (destinationUri.startsWith("file://") || destinationUri.startsWith("file:///"));
+            
+            if (!sourceIsFile && destIsFile) {
+                return TransferDirection.DOWNLOAD;
+            } else if (sourceIsFile && !destIsFile) {
+                return TransferDirection.UPLOAD;
+            } else {
+                return TransferDirection.REMOTE_TO_REMOTE;
+            }
+        }
+        
+        /**
+         * Returns true if this is a download operation (remote → local).
+         */
+        public boolean isDownload() {
+            return getDirection() == TransferDirection.DOWNLOAD;
+        }
+        
+        /**
+         * Returns true if this is an upload operation (local → remote).
+         */
+        public boolean isUpload() {
+            return getDirection() == TransferDirection.UPLOAD;
+        }
+        
         public static Builder builder() {
             return new Builder();
         }
@@ -739,7 +804,8 @@ public class InMemoryTransferEngineSimulator {
         public static class Builder {
             private String jobId;
             private String sourceUri;
-            private String destinationPath;
+            private String destinationUri;
+            private String destinationPath; // For backward compatibility
             private String protocol;
             private long expectedSizeBytes = 0;
             private Map<String, String> options = Map.of();
@@ -754,6 +820,19 @@ public class InMemoryTransferEngineSimulator {
                 return this;
             }
             
+            /**
+             * Sets the destination URI (new bidirectional API).
+             * @param uri the destination URI (can be file://, sftp://, ftp://, etc.)
+             */
+            public Builder destinationUri(String uri) {
+                this.destinationUri = uri;
+                return this;
+            }
+            
+            /**
+             * Sets the destination path (backward compatibility - converts to file:// URI).
+             * @param path the local destination path
+             */
             public Builder destinationPath(String path) {
                 this.destinationPath = path;
                 return this;
@@ -775,7 +854,13 @@ public class InMemoryTransferEngineSimulator {
             }
             
             public TransferRequest build() {
-                return new TransferRequest(jobId, sourceUri, destinationPath, 
+                // Prefer destinationUri, fall back to destinationPath converted to URI
+                String destUri = destinationUri;
+                if (destUri == null && destinationPath != null) {
+                    // Convert local path to file:// URI
+                    destUri = "file://" + destinationPath;
+                }
+                return new TransferRequest(jobId, sourceUri, destUri, 
                     protocol, expectedSizeBytes, options);
             }
         }
@@ -870,28 +955,49 @@ public class InMemoryTransferEngineSimulator {
     ) {}
 
     /**
-     * Protocol-specific metrics.
+     * Protocol-specific metrics with direction tracking.
      */
     public static class ProtocolMetrics {
         private final String protocol;
         private final AtomicLong transferCount = new AtomicLong(0);
         private final AtomicLong totalBytes = new AtomicLong(0);
         private final AtomicLong totalDurationMs = new AtomicLong(0);
+        private final AtomicLong downloadCount = new AtomicLong(0);
+        private final AtomicLong uploadCount = new AtomicLong(0);
+        private final AtomicLong downloadBytes = new AtomicLong(0);
+        private final AtomicLong uploadBytes = new AtomicLong(0);
         
         public ProtocolMetrics(String protocol) {
             this.protocol = protocol;
         }
         
         void recordTransfer(long bytes, Duration duration) {
+            recordTransfer(bytes, duration, null);
+        }
+        
+        void recordTransfer(long bytes, Duration duration, TransferDirection direction) {
             transferCount.incrementAndGet();
             totalBytes.addAndGet(bytes);
             totalDurationMs.addAndGet(duration.toMillis());
+            
+            // Track direction-specific metrics
+            if (direction == TransferDirection.DOWNLOAD) {
+                downloadCount.incrementAndGet();
+                downloadBytes.addAndGet(bytes);
+            } else if (direction == TransferDirection.UPLOAD) {
+                uploadCount.incrementAndGet();
+                uploadBytes.addAndGet(bytes);
+            }
         }
         
         public String getProtocol() { return protocol; }
         public long getTransferCount() { return transferCount.get(); }
         public long getTotalBytes() { return totalBytes.get(); }
         public long getTotalDurationMs() { return totalDurationMs.get(); }
+        public long getDownloadCount() { return downloadCount.get(); }
+        public long getUploadCount() { return uploadCount.get(); }
+        public long getDownloadBytes() { return downloadBytes.get(); }
+        public long getUploadBytes() { return uploadBytes.get(); }
         
         public double getAverageBytesPerSecond() {
             if (totalDurationMs.get() == 0) return 0;

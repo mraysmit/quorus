@@ -52,10 +52,10 @@ public class HeartbeatProcessor {
 
     private static final Logger logger = LoggerFactory.getLogger(HeartbeatProcessor.class);
 
-    // Configuration constants
-    private static final long DEFAULT_HEARTBEAT_INTERVAL_MS = 30000; // 30 seconds
-    private static final long AGENT_TIMEOUT_MS = 90000; // 90 seconds (3 missed heartbeats)
-    private static final long FAILURE_CHECK_INTERVAL_MS = 15000; // Check every 15 seconds
+    // Configuration loaded from ApiConfig
+    private final dev.mars.quorus.api.config.ApiConfig config = dev.mars.quorus.api.config.ApiConfig.get();
+    private final long agentTimeoutMs = config.getAgentTimeoutMs();
+    private final long failureCheckIntervalMs = config.getAgentFailureCheckIntervalMs();
     private static final long DEGRADED_THRESHOLD_MS = 60000; // 60 seconds for degraded status
 
     @Inject
@@ -97,12 +97,12 @@ public class HeartbeatProcessor {
         }
 
         logger.info("Starting HeartbeatProcessor (Vert.x reactive mode)");
-        logger.debug("Configuration: heartbeatInterval={}ms, agentTimeout={}ms, failureCheckInterval={}ms, degradedThreshold={}ms",
-                DEFAULT_HEARTBEAT_INTERVAL_MS, AGENT_TIMEOUT_MS, FAILURE_CHECK_INTERVAL_MS, DEGRADED_THRESHOLD_MS);
+        logger.debug("Configuration: agentTimeout={}ms, failureCheckInterval={}ms, degradedThreshold={}ms",
+                agentTimeoutMs, failureCheckIntervalMs, DEGRADED_THRESHOLD_MS);
 
         // Start failure detection monitoring using Vert.x timer (no ScheduledExecutorService!)
         failureCheckTimerId = vertx.setPeriodic(
-            FAILURE_CHECK_INTERVAL_MS,
+            failureCheckIntervalMs,
             id -> {
                 if (!closed.get() && started) {
                     try {
@@ -117,7 +117,7 @@ public class HeartbeatProcessor {
 
         started = true;
         logger.info("HeartbeatProcessor started successfully: timerId={}, interval={}ms (0 extra threads)", 
-                failureCheckTimerId, FAILURE_CHECK_INTERVAL_MS);
+                failureCheckTimerId, failureCheckIntervalMs);
     }
 
     /**
@@ -210,7 +210,7 @@ public class HeartbeatProcessor {
                 AgentHeartbeatResponse response = AgentHeartbeatResponse.success(
                     agentId, 
                     request.getSequenceNumber(), 
-                    DEFAULT_HEARTBEAT_INTERVAL_MS
+                    config.getAgentHeartbeatIntervalMs()
                 );
 
                 // Add any instructions for the agent
@@ -251,7 +251,7 @@ public class HeartbeatProcessor {
                 Duration timeSinceLastHeartbeat = Duration.between(lastHeartbeat, now);
                 
                 // Check for different failure conditions
-                if (timeSinceLastHeartbeat.toMillis() > AGENT_TIMEOUT_MS) {
+                if (timeSinceLastHeartbeat.toMillis() > agentTimeoutMs) {
                     handleFailedAgent(agentInfo, timeSinceLastHeartbeat);
                 } else if (timeSinceLastHeartbeat.toMillis() > DEGRADED_THRESHOLD_MS) {
                     handleDegradedAgent(agentInfo, timeSinceLastHeartbeat);
@@ -477,14 +477,14 @@ public class HeartbeatProcessor {
             .mapToLong(entry -> {
                 Duration timeSince = Duration.between(entry.getValue(), now);
                 return timeSince.toMillis() >= DEGRADED_THRESHOLD_MS && 
-                       timeSince.toMillis() < AGENT_TIMEOUT_MS ? 1 : 0;
+                       timeSince.toMillis() < agentTimeoutMs ? 1 : 0;
             })
             .sum();
         
         long failedAgents = lastHeartbeatTimes.entrySet().stream()
             .mapToLong(entry -> {
                 Duration timeSince = Duration.between(entry.getValue(), now);
-                return timeSince.toMillis() >= AGENT_TIMEOUT_MS ? 1 : 0;
+                return timeSince.toMillis() >= agentTimeoutMs ? 1 : 0;
             })
             .sum();
         

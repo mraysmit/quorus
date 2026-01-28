@@ -552,23 +552,44 @@ public class InMemoryTransferProtocolSimulator {
         // Check for immediate failures
         checkPreTransferFailures(request);
         
-        // Get source file
-        String sourcePath = extractPath(request.sourceUri());
-        byte[] sourceContent;
-        try {
-            sourceContent = fileSystem.readFile(sourcePath);
-        } catch (IOException e) {
-            throw new TransferException("Source file not found: " + sourcePath, e);
+        // Determine transfer direction
+        TransferDirection direction = request.getDirection();
+        
+        byte[] content;
+        String sourcePath;
+        String destPath;
+        
+        if (direction == TransferDirection.DOWNLOAD) {
+            // DOWNLOAD: Read from remote source, write to local destination
+            sourcePath = extractPath(request.sourceUri());
+            destPath = extractPath(request.destinationUri());
+            try {
+                content = fileSystem.readFile(sourcePath);
+            } catch (IOException e) {
+                throw new TransferException("Source file not found: " + sourcePath, e);
+            }
+        } else if (direction == TransferDirection.UPLOAD) {
+            // UPLOAD: Read from local source, write to remote destination
+            sourcePath = extractPath(request.sourceUri());
+            destPath = extractPath(request.destinationUri());
+            try {
+                content = fileSystem.readFile(sourcePath);
+            } catch (IOException e) {
+                throw new TransferException("Local source file not found: " + sourcePath, e);
+            }
+        } else {
+            // REMOTE_TO_REMOTE: Not yet supported
+            throw new TransferException("Remote-to-remote transfers not yet supported");
         }
         
         // Check file size
-        if (sourceContent.length > maxFileSize) {
-            throw new TransferException("File size " + sourceContent.length + 
+        if (content.length > maxFileSize) {
+            throw new TransferException("File size " + content.length + 
                 " exceeds maximum " + maxFileSize);
         }
         
         // Create active transfer record
-        ActiveTransfer activeTransfer = new ActiveTransfer(transferId, request, sourceContent.length);
+        ActiveTransfer activeTransfer = new ActiveTransfer(transferId, request, content.length);
         activeTransfers.put(transferId, activeTransfer);
         
         try {
@@ -580,26 +601,25 @@ public class InMemoryTransferProtocolSimulator {
             }
             
             // Simulate transfer with progress
-            simulateTransferProgress(activeTransfer, sourceContent, context, resumeFrom);
+            simulateTransferProgress(activeTransfer, content, context, resumeFrom);
             
             // Check for post-transfer failures
             checkPostTransferFailures();
             
-            // Write destination file
-            String destPath = request.destinationPath().toString().replace('\\', '/');
+            // Write to destination (works for both upload and download in virtual FS)
             try {
-                fileSystem.writeFile(destPath, sourceContent);
+                fileSystem.writeFile(destPath, content);
             } catch (IOException e) {
                 throw new TransferException("Failed to write destination: " + destPath, e);
             }
             
             successfulTransfers.incrementAndGet();
-            totalBytesTransferred.addAndGet(sourceContent.length - resumeFrom);
+            totalBytesTransferred.addAndGet(content.length - resumeFrom);
             
             return new TransferResult(
                 transferId,
                 true,
-                sourceContent.length,
+                content.length,
                 Duration.between(startTime, Instant.now()),
                 resumeFrom,
                 null
@@ -770,6 +790,16 @@ public class InMemoryTransferProtocolSimulator {
         if (path == null || path.isEmpty()) {
             return "/";
         }
+
+        // Standardize Windows file URIs: file:///C:/path -> /path
+        if ("file".equalsIgnoreCase(uri.getScheme()) && path.startsWith("/")) {
+            // Look for pattern: / + Letter + : + /
+            if (path.length() >= 3 && Character.isLetter(path.charAt(1)) && path.charAt(2) == ':') {
+                String normalized = path.substring(3);
+                return normalized.isEmpty() ? "/" : normalized;
+            }
+        }
+        
         return path;
     }
 
@@ -799,16 +829,85 @@ public class InMemoryTransferProtocolSimulator {
     }
 
     /**
-     * Transfer request.
+     * Transfer direction enumeration.
+     * Matches the production TransferDirection enum.
+     */
+    public enum TransferDirection {
+        /** Transfer from remote source to local file:// destination */
+        DOWNLOAD,
+        /** Transfer from local file:// source to remote destination */
+        UPLOAD,
+        /** Transfer between two remote endpoints (relay/proxy) */
+        REMOTE_TO_REMOTE
+    }
+
+    /**
+     * Transfer request with bidirectional support.
+     * 
+     * <p>Supports both uploads and downloads:</p>
+     * <ul>
+     *   <li><b>DOWNLOAD:</b> Remote source → Local file:// destination</li>
+     *   <li><b>UPLOAD:</b> Local file:// source → Remote destination</li>
+     * </ul>
      */
     public record TransferRequest(
         URI sourceUri,
-        Path destinationPath,
+        URI destinationUri,
         long resumeFromBytes,
         Map<String, String> options
     ) {
+        /**
+         * Creates a download request (backward compatibility).
+         * @param sourceUri remote source URI
+         * @param destinationPath local destination path
+         */
         public TransferRequest(URI sourceUri, Path destinationPath) {
-            this(sourceUri, destinationPath, 0, Map.of());
+            this(sourceUri, destinationPath.toUri(), 0, Map.of());
+        }
+        
+        /**
+         * Gets the destination as a Path (only valid for downloads).
+         * @return the destination path
+         * @throws UnsupportedOperationException if destination is not file://
+         */
+        public Path destinationPath() {
+            if (!"file".equalsIgnoreCase(destinationUri.getScheme())) {
+                throw new UnsupportedOperationException(
+                    "destinationPath() only valid for file:// destinations. Use destinationUri() instead. " +
+                    "Current destination: " + destinationUri);
+            }
+            return Path.of(destinationUri);
+        }
+        
+        /**
+         * Determines the transfer direction based on URI schemes.
+         * @return the transfer direction
+         */
+        public TransferDirection getDirection() {
+            boolean sourceIsFile = "file".equalsIgnoreCase(sourceUri.getScheme());
+            boolean destIsFile = "file".equalsIgnoreCase(destinationUri.getScheme());
+            
+            if (!sourceIsFile && destIsFile) {
+                return TransferDirection.DOWNLOAD;
+            } else if (sourceIsFile && !destIsFile) {
+                return TransferDirection.UPLOAD;
+            } else {
+                return TransferDirection.REMOTE_TO_REMOTE;
+            }
+        }
+        
+        /**
+         * Returns true if this is a download operation (remote → local).
+         */
+        public boolean isDownload() {
+            return getDirection() == TransferDirection.DOWNLOAD;
+        }
+        
+        /**
+         * Returns true if this is an upload operation (local → remote).
+         */
+        public boolean isUpload() {
+            return getDirection() == TransferDirection.UPLOAD;
         }
         
         public static Builder builder() {
@@ -817,7 +916,8 @@ public class InMemoryTransferProtocolSimulator {
         
         public static class Builder {
             private URI sourceUri;
-            private Path destinationPath;
+            private URI destinationUri;
+            private Path destinationPath; // For backward compatibility
             private long resumeFromBytes = 0;
             private Map<String, String> options = Map.of();
             
@@ -826,6 +926,19 @@ public class InMemoryTransferProtocolSimulator {
                 return this;
             }
             
+            /**
+             * Sets the destination URI (new bidirectional API).
+             * @param uri the destination URI (can be file://, sftp://, ftp://, etc.)
+             */
+            public Builder destinationUri(URI uri) {
+                this.destinationUri = uri;
+                return this;
+            }
+            
+            /**
+             * Sets the destination path (backward compatibility - converts to file:// URI).
+             * @param path the local destination path
+             */
             public Builder destinationPath(Path path) {
                 this.destinationPath = path;
                 return this;
@@ -842,7 +955,13 @@ public class InMemoryTransferProtocolSimulator {
             }
             
             public TransferRequest build() {
-                return new TransferRequest(sourceUri, destinationPath, resumeFromBytes, options);
+                // Prefer destinationUri, fall back to destinationPath converted to URI
+                URI destUri = destinationUri != null ? destinationUri : 
+                    (destinationPath != null ? destinationPath.toUri() : null);
+                if (destUri == null) {
+                    throw new IllegalStateException("Either destinationUri or destinationPath must be set");
+                }
+                return new TransferRequest(sourceUri, destUri, resumeFromBytes, options);
             }
         }
     }

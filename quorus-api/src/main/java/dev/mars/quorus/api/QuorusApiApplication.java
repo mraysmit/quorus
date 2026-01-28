@@ -16,6 +16,7 @@
 
 package dev.mars.quorus.api;
 
+import dev.mars.quorus.api.config.ApiConfig;
 import dev.mars.quorus.api.config.VertxProducer;
 import dev.mars.quorus.api.service.AgentFleetStartupService;
 import io.vertx.core.Vertx;
@@ -41,8 +42,8 @@ public class QuorusApiApplication {
 
     private static final Logger logger = LoggerFactory.getLogger(QuorusApiApplication.class);
 
-    private static final int DEFAULT_PORT = 8080;
-    private static final String DEFAULT_HOST = "0.0.0.0";
+    // Configuration loaded from application.properties
+    private static final ApiConfig config = ApiConfig.get();
 
     private SeContainer container;
     private HttpServer server;
@@ -110,9 +111,9 @@ public class QuorusApiApplication {
         fleetService.start();
         logger.info("Agent fleet services started");
 
-        // Get port and host from system properties or environment variables
-        int port = getIntProperty("quorus.http.port", "QUORUS_HTTP_PORT", DEFAULT_PORT);
-        String host = getStringProperty("quorus.http.host", "QUORUS_HTTP_HOST", DEFAULT_HOST);
+        // Get port and host from configuration
+        int port = config.getHttpPort();
+        String host = config.getHttpHost();
 
         // Create and start HTTP server
         logger.info("Starting HTTP server on {}:{}...", host, port);
@@ -190,28 +191,5 @@ public class QuorusApiApplication {
         }
 
         logger.info("Quorus API application stopped");
-    }
-
-    /**
-     * Get integer property from system properties or environment variables.
-     */
-    private static int getIntProperty(String sysPropKey, String envKey, int defaultValue) {
-        String value = System.getProperty(sysPropKey, System.getenv(envKey));
-        if (value != null) {
-            try {
-                return Integer.parseInt(value);
-            } catch (NumberFormatException e) {
-                logger.warn("Invalid integer value for {}/{}: {}, using default: {}",
-                    sysPropKey, envKey, value, defaultValue);
-            }
-        }
-        return defaultValue;
-    }
-
-    /**
-     * Get string property from system properties or environment variables.
-     */
-    private static String getStringProperty(String sysPropKey, String envKey, String defaultValue) {
-        return System.getProperty(sysPropKey, System.getenv(envKey) != null ? System.getenv(envKey) : defaultValue);
     }
 }

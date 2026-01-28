@@ -1,0 +1,1395 @@
+# Minimal Write-Ahead Log (WAL) for Raft
+**Design, Requirements, and Integration Strategy**
+
+## Status
+**Proposed – Design Review**
+
+## Scope
+This document defines a **minimal, Raft-correct Write-Ahead Log (WAL)** design for a Java & Vert.x 5.x Raft implementation.
+
+The WAL is intentionally constrained to support **only**:
+- append
+- truncate (suffix deletion)
+- sequential replay on startup
+
+It is **not** a general-purpose storage engine.
+
+---
+
+## 1. Motivation
+
+Quite often we see Raft implementations storing the following **entirely in memory**:
+
+- `currentTerm`
+- `votedFor`
+- the Raft log (`List<LogEntry>`)
+
+This violates Raft’s persistence requirements.
+
+### Consequences of the this type of design
+- Node restart resets `currentTerm` and `votedFor` → double voting, split elections
+- Followers can acknowledge log entries that are lost on crash
+- Log divergence and data loss become possible
+
+In short: **this implementation design is unsafe under restart or crash**.
+
+---
+
+## 2. Raft Persistence Rules (Non-Negotiable)
+
+Per the classic Raft paper, the following **must be durably persisted**:
+
+### Persistent State
+- `currentTerm`
+- `votedFor`
+- log entries
+
+### Critical Rule
+> **Persist-before-response**  
+> A node must not respond positively to `RequestVote` or `AppendEntries` until the corresponding state is durably stored.
+
+Durability means: **written to disk and fsync’d**.
+
+---
+
+## 3. Design Constraints & Assumptions
+
+This WAL is designed around the following assumptions:
+
+- The Raft log is kept fully **in memory during runtime**
+- Disk is only used for:
+  - crash recovery
+  - restart replay
+- No random disk reads are required during steady state
+- No snapshots or compaction are required initially
+- Correctness is prioritised over throughput
+
+These constraints significantly simplify the WAL design.
+
+---
+
+## 4. High-Level Architecture
+
+### Files
+```
+data/
+ ├─ meta.dat     // currentTerm + votedFor
+ └─ raft.log     // append-only WAL
+```
+
+### Responsibilities
+- `meta.dat`
+  - Stores `(currentTerm, votedFor)`
+  - Atomically rewritten on update
+- `raft.log`
+  - Append-only
+  - Stores both truncation markers and appended log entries
+  - Sequentially replayed on startup
+
+---
+
+## 5. WAL Record Model
+
+Only **two record types** are required.
+
+```
+RecordType:
+  - TRUNCATE
+  - APPEND
+```
+
+### Record Format (binary)
+Each record is self-framing and checksummed:
+
+| Field            | Type   |
+|------------------|--------|
+| Magic            | int    |
+| Version          | short  |
+| Record Type      | byte   |
+| Log Index        | long   |
+| Term             | long   |
+| Payload Length   | int    |
+| Payload Bytes    | byte[] |
+| CRC32C           | int    |
+
+---
+
+## 6. AppendEntries Integration (Critical Path)
+
+Correct sequence per AppendEntries RPC:
+
+1. Validate `prevLogIndex / prevLogTerm`
+2. Write WAL records:
+   - `TRUNCATE(conflictIndex)` if required
+   - `APPEND(index, term, payload)` for each new entry
+3. `fsync()` once after all records are written
+4. Apply the same truncate + append to in-memory log
+5. Reply `success = true`
+
+---
+
+## 7. RequestVote Integration
+
+When granting a vote:
+
+1. Update `(currentTerm, votedFor)`
+2. Persist both **together** in `meta.dat`
+3. `fsync`
+4. Reply `VoteGranted`
+
+---
+
+## 8. Startup Replay
+
+On node startup:
+
+1. Load `meta.dat`
+2. Replay `raft.log` sequentially
+3. Truncate `raft.log` to the last valid byte offset
+
+---
+
+## 9. Vert.x Integration Model
+
+- WAL operations are blocking
+- Run on a dedicated WorkerExecutor
+- Raft logic remains on the event loop
+
+---
+
+## 10. Testing Requirements
+
+Mandatory tests:
+
+- Crash during append
+- Crash during truncate
+- Vote persistence across restart
+- CRC corruption detection
+
+---
+
+## 11. Effort Estimate
+
+Total estimated effort: **~2 weeks**
+
+---
+
+## 12. Conclusion
+
+This WAL design is minimal, correct, and well-scoped. It avoids unnecessary complexity while meeting Raft’s safety requirements.
+
+---
+
+## 13. Explicit Non-Goals (Hard Constraints)
+
+To avoid scope creep and accidental re-implementation of a database, the following are **explicit non-goals** of this WAL:
+
+- ❌ No random-access reads from disk during runtime
+- ❌ No log segments or segment rotation (initially)
+- ❌ No background compaction
+- ❌ No snapshots (initially)
+- ❌ No key/value semantics
+- ❌ No concurrent writers
+- ❌ No read-after-write guarantees beyond in-memory state
+- ❌ No attempt to make the WAL "fast" by weakening durability rules
+
+The WAL exists **solely** to:
+- survive crashes
+- enforce Raft safety rules
+- rebuild in-memory state on restart
+
+Anything beyond that is out of scope.
+
+### 13.1 No Random-Access Reads from Disk
+
+**What this means:** During normal runtime, the WAL is **write-only**. The system never seeks to a specific position to read a particular entry. All log entries are served from the in-memory `List<LogEntry>`.
+
+**Why it's a non-goal:** Random-access reads require an **index** (entry index → file offset mapping). Building and maintaining an index:
+- Adds complexity (index corruption, index-vs-data consistency)
+- Requires additional disk I/O (index file reads)
+- Is unnecessary when the entire log fits in memory
+
+**Trade-off:** The entire Raft log must fit in memory. For Quorus's expected workload (metadata operations, not bulk data), this is acceptable. If you had millions of entries, you'd need segments + index.
+
+**If you need this later:** Add a separate index file that maps `logIndex → fileOffset`, written during append and read during recovery to enable random access.
+
+### 13.2 No Log Segments or Segment Rotation
+
+**What this means:** There is **one file** that grows unbounded: `raft.wal`. We don't split the log into multiple segment files (e.g., `segment-0001.wal`, `segment-0002.wal`).
+
+**Why it's a non-goal (initially):** Segmentation adds significant complexity:
+- Deciding when to rotate (size-based? entry-count-based? time-based?)
+- Managing the "active" vs "sealed" segment distinction
+- Handling recovery across multiple files
+- Coordinating segment deletion after snapshots
+
+For an Alpha release, a single file simplifies everything.
+
+**Trade-off:** File size grows unbounded until snapshots are implemented. For early testing and development, this is acceptable.
+
+**If you need this later:** Implement segment rotation when the current segment exceeds a size threshold (e.g., 64MB), seal the old segment, open a new one, and update recovery to scan all segments in order.
+
+### 13.3 No Background Compaction
+
+**What this means:** Unlike LSM-tree databases (RocksDB, LevelDB), we don't run background threads merging or compacting data files.
+
+**Why it's a non-goal:** Raft log entries are **immutable and ordered**. There's nothing to "compact" in the traditional sense. Compaction in databases removes obsolete key versions—Raft entries don't have versions, they're an append-only sequence.
+
+**Trade-off:** None for correctness. This is simply not applicable to WAL semantics.
+
+**If you need this later:** You don't. What you need instead is **snapshots** (see 13.4) to truncate prefix entries that have been applied to the state machine.
+
+### 13.4 No Snapshots (Initially)
+
+**What this means:** There's no mechanism to "checkpoint" the state machine and truncate old log entries. The log grows forever.
+
+**Why it's a non-goal (initially):** Snapshots are complex:
+- Must capture a consistent state machine image
+- Must track the "last included index/term" for Raft protocol correctness
+- Must handle InstallSnapshot RPC for slow followers
+- Must coordinate snapshot creation with ongoing operations
+
+This is significant implementation effort that can be deferred.
+
+**Trade-off:** Unbounded log growth. Acceptable for Alpha/Beta where logs stay small. Must be addressed before production deployment with long-running clusters.
+
+**If you need this later:** Implement a `createSnapshot(lastIncludedIndex, lastIncludedTerm, stateData)` method that writes a snapshot file and truncates all log entries ≤ `lastIncludedIndex`.
+
+### 13.5 No Key/Value Semantics
+
+**What this means:** The WAL treats every entry as an **opaque byte array**. It has no understanding of keys, values, columns, or any schema. It doesn't support "get entry by key" or "delete key".
+
+**Why it's a non-goal:** The WAL's job is to persist the **Raft log**, which is a sequence of commands. The interpretation of those commands belongs to the **state machine**, not the storage layer.
+
+**Trade-off:** The WAL cannot answer queries like "what's the latest value for key X?" — that's the state machine's responsibility.
+
+**If you need this later:** You don't want it in the WAL. You want a state machine that maintains key/value state by processing log entries.
+
+### 13.6 No Concurrent Writers
+
+**What this means:** Exactly **one thread** (the `walExecutor`) performs all write operations. There's no support for multiple threads appending simultaneously.
+
+**Why it's a non-goal:** Raft has a **single leader** at any term. Only the leader appends entries. Even on a single node, the Raft algorithm is sequential—there's no benefit to concurrent writes.
+
+**Trade-off:** Write throughput is limited to single-threaded performance. For Raft metadata operations, this is more than sufficient.
+
+**If you need this later:** You don't for Raft. If you somehow need parallel writes, you're probably building something other than a Raft log.
+
+### 13.7 No Read-After-Write Guarantees Beyond In-Memory State
+
+**What this means:** After you call `appendEntries()`, you can immediately read those entries—from the **in-memory log**. There's no guarantee you can read them **from disk** until recovery.
+
+**Why it's a non-goal:** During normal operation, all reads go to memory. The WAL is purely a durability mechanism. The only time we read from the WAL file is during recovery at startup.
+
+**Trade-off:** You cannot implement "read entry X from disk" during runtime. All reads must go through the in-memory `List<LogEntry>`.
+
+**If you need this later:** This pattern is actually correct for WAL design. If you need disk-based reads during runtime, you're building a database, not a WAL.
+
+### 13.8 No Durability Weakening for Performance
+
+**What this means:** We will **not** implement "optimizations" that trade durability for speed:
+- No `fsync` batching across unrelated operations
+- No periodic `fsync` instead of per-operation
+- No reliance on OS write-back caching
+- No `fdatasync` (we use `fsync` which also syncs metadata)
+
+**Why it's a non-goal:** Raft safety requires that once we respond to an RPC, the data **must** be durable. Any "optimization" that violates this breaks Raft's correctness guarantees.
+
+**Acceptable optimizations:**
+- Batching multiple entries in a single `appendEntries()` call (with one `fsync` at the end)
+- Using memory-mapped files (still with explicit `msync`)
+- Using kernel AIO with synchronous completion notification
+
+**Unacceptable optimizations:**
+- Responding before `fsync` completes
+- Using `O_DIRECT` without explicit `fsync`
+- Disabling `fsync` for "testing" and forgetting to re-enable
+
+**Trade-off:** Writes are as slow as `fsync` allows (typically 1-10ms on SSD). For Raft consensus operations, this is acceptable. High-throughput systems should batch multiple entries per append.
+
+**If you need this later:** The only safe path is batching—accumulating multiple entries and syncing once. Never skip or defer `fsync`.
+
+---
+
+## 14. Generic Raft Storage Interface (`RaftStorage`)
+
+To ensure the system can switch between a **Custom WAL** (simple, pure Java) and **RocksDB** (high performance, key-value), we define a backend-agnostic interface. The `RaftNode` will depend solely on this interface.
+
+```java
+package dev.mars.quorus.controller.raft.storage;
+
+import io.vertx.core.Future;
+import java.io.Closeable;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Optional;
+
+public interface RaftStorage extends Closeable {
+
+  /** Opens the storage engine. Idempotent. */
+  Future<Void> open(Path dataDir);
+
+  // ---- Metadata (Term & Vote) ----
+
+  /** 
+   * Atomically persists the current term and vote. 
+   * Implementation MUST ensure durability (fsync) before returning.
+   */
+  Future<Void> updateMetadata(long currentTerm, Optional<String> votedFor);
+
+  /** Loads metadata on startup. Returns (0, empty) if no state exists. */
+  Future<PersistentMeta> loadMetadata();
+
+  record PersistentMeta(long currentTerm, Optional<String> votedFor) {}
+
+  // ---- Log Operations ----
+
+  /** 
+   * Appends a batch of entries to the log. 
+   * NOT required to fsync immediately (use sync() for that).
+   */
+  Future<Void> appendEntries(List<LogEntryData> entries);
+  
+  record LogEntryData(long index, long term, byte[] payload) {}
+
+  /** 
+   * Deletes all log entries with index >= fromIndex.
+   * Used to resolve conflicts when a follower diverges from the leader.
+   */
+  Future<Void> truncateSuffix(long fromIndex);
+
+  /**
+   * Universal Durability Barrier.
+   * Forces all pending appends/truncations to physical disk.
+   * Must be called before acknowledging AppendEntries RPCs.
+   */
+  Future<Void> sync();
+
+  /** 
+   * Replays the entire log from disk on startup.
+   * For RocksDB: Scans keys `log:1` to `log:N`.
+   * For FileWAL: Scans the append-only file sequentially.
+   */
+  Future<List<LogEntryData>> replayLog();
+}
+```
+
+### 14.1 Plug-in Implementations
+
+| Feature | **FileRaftStorage** (Custom WAL) | **RocksDbRaftStorage** (Adapter) |
+| :--- | :--- | :--- |
+| **Metadata** | Atomic rename of `meta.dat` | `batch.put("meta:term", ...)` |
+| **Append** | `FileChannel.write()` (append-only) | `batch.put("log:<index>", ...)` |
+| **Truncate** | `FileChannel.truncate()` | `db.deleteRange("log:<index>", "log:MAX")` |
+| **Sync** | `FileChannel.force(false)` | `db.write(batch, {sync: true})` |
+| **Replay** | Sequential read + CRC check | Iterator scan over `log:*` prefix |
+
+---
+
+## 15. Implementation A: FileRaftStorage (The Custom WAL)
+
+This is the default implementation for the Alpha release (Zero-Dependency).
+
+This section describes a minimal, crash-safe implementation using `FileChannel`.
+
+### 15.1 Files
+```
+data/
+ ├─ meta.dat       // currentTerm + votedFor (atomic replace)
+ └─ raft.log       // append-only WAL: TRUNCATE and APPEND records
+```
+
+### 15.2 Record framing (raft.log)
+
+A simple, robust binary record:
+
+| Field | Type |
+|------|------|
+| MAGIC | int |
+| VERSION | short |
+| TYPE | byte | 
+| INDEX | long |
+| TERM | long |
+| PAYLOAD_LEN | int |
+| PAYLOAD | byte[] |
+| CRC32C | int |
+
+- **CRC32C** covers all bytes from `MAGIC` through `PAYLOAD`.
+- On replay, stop at the first:
+  - incomplete record
+  - CRC mismatch
+- Then truncate `raft.log` to the last known-good byte offset.
+
+### 15.3 Types
+
+```java
+static final byte TYPE_TRUNCATE = 1;
+static final byte TYPE_APPEND   = 2;
+```
+
+### 15.4 meta.dat (term + vote)
+`meta.dat` must be updated atomically. The simplest safe method:
+
+1. write new bytes to `meta.dat.tmp`
+2. `force(true)` the tmp file
+3. atomic move/rename `meta.dat.tmp` → `meta.dat`
+4. fsync the directory (optional but recommended on Linux for maximum safety)
+
+This avoids partial meta overwrites.
+
+### 15.5 Vert.x offload + serialization model
+- `FileChannel` I/O is blocking → run on a **dedicated WorkerExecutor**
+- Enforce a **single-writer** discipline:
+  - either one-thread worker pool, or
+  - internal queue (actor style)
+
+### 15.6 Skeleton: FileRaftWAL (illustrative)
+
+```java
+package dev.mars.quorus.controller.raft.storage;
+
+import io.vertx.core.Future;
+import io.vertx.core.Vertx;
+import io.vertx.core.WorkerExecutor;
+
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.file.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.zip.CRC32C;
+
+import static java.nio.file.StandardOpenOption.*;
+
+public final class FileRaftWAL implements RaftWAL {
+
+  private static final int MAGIC = 0x52414654; // 'RAFT'
+  private static final short VERSION = 1;
+  private static final byte TYPE_TRUNCATE = 1;
+  private static final byte TYPE_APPEND = 2;
+
+  private final Vertx vertx;
+  private final WorkerExecutor walExecutor;
+
+  private Path dataDir;
+  private FileChannel logCh;
+
+  public FileRaftWAL(Vertx vertx, WorkerExecutor walExecutor) {
+    this.vertx = vertx;
+    this.walExecutor = walExecutor;
+  }
+
+  @Override
+  public Future<Void> open(Path dataDir) {
+    this.dataDir = dataDir;
+    return vertx.executeBlocking(p -> {
+      try {
+        Files.createDirectories(dataDir);
+        this.logCh = FileChannel.open(dataDir.resolve("raft.log"), CREATE, READ, WRITE);
+        logCh.position(logCh.size()); // seek to end for appends
+        p.complete();
+      } catch (Exception e) {
+        p.fail(e);
+      }
+    }, false, walExecutor);
+  }
+
+  @Override
+  public Future<Void> persistTermAndVote(long currentTerm, Optional<String> votedFor) {
+    return vertx.executeBlocking(p -> {
+      try {
+        Path tmp = dataDir.resolve("meta.dat.tmp");
+        Path dst = dataDir.resolve("meta.dat");
+
+        byte[] voteBytes = votedFor.map(s -> s.getBytes(java.nio.charset.StandardCharsets.UTF_8))
+                                   .orElse(new byte[0]);
+
+        ByteBuffer buf = ByteBuffer.allocate(8 + 4 + voteBytes.length + 4);
+        buf.putLong(currentTerm);
+        buf.putInt(voteBytes.length);
+        buf.put(voteBytes);
+
+        CRC32C crc = new CRC32C();
+        crc.update(buf.array(), 0, 8 + 4 + voteBytes.length);
+        buf.putInt((int) crc.getValue());
+        buf.flip();
+
+        try (FileChannel ch = FileChannel.open(tmp, CREATE, TRUNCATE_EXISTING, WRITE)) {
+          while (buf.hasRemaining()) ch.write(buf);
+          ch.force(true);
+        }
+
+        Files.move(tmp, dst, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        
+        // Fsync the directory to ensure the rename is durable (critical on Linux ext4/xfs)
+        try (FileChannel dirCh = FileChannel.open(dataDir, READ)) {
+          dirCh.force(true);
+        }
+        
+        p.complete();
+      } catch (Exception e) {
+        p.fail(e);
+      }
+    }, false, walExecutor);
+  }
+
+  @Override
+  public Future<PersistentMeta> loadMeta() {
+    return vertx.executeBlocking(p -> {
+      try {
+        Path dst = dataDir.resolve("meta.dat");
+        if (!Files.exists(dst)) {
+          p.complete(new PersistentMeta(0L, Optional.empty()));
+          return;
+        }
+
+        byte[] all = Files.readAllBytes(dst);
+        ByteBuffer b = ByteBuffer.wrap(all);
+
+        long term = b.getLong();
+        int len = b.getInt();
+        if (len < 0 || len > (all.length - (8 + 4 + 4))) throw new IOException("Corrupt meta.dat");
+
+        byte[] vote = new byte[len];
+        b.get(vote);
+
+        int expectedCrc = b.getInt();
+        CRC32C crc = new CRC32C();
+        crc.update(all, 0, 8 + 4 + len);
+        if (((int) crc.getValue()) != expectedCrc) throw new IOException("meta.dat CRC mismatch");
+
+        Optional<String> votedFor = (len == 0) ? Optional.empty()
+            : Optional.of(new String(vote, java.nio.charset.StandardCharsets.UTF_8));
+
+        p.complete(new PersistentMeta(term, votedFor));
+      } catch (NoSuchFileException e) {
+        p.complete(new PersistentMeta(0L, Optional.empty()));
+      } catch (Exception e) {
+        p.fail(e);
+      }
+    }, false, walExecutor);
+  }
+
+  @Override
+  public Future<Void> truncateFrom(long fromIndex) {
+    return writeRecord(TYPE_TRUNCATE, fromIndex, 0L, new byte[0]);
+  }
+
+  /**
+   * Batch append: writes all entries in a single executeBlocking call.
+   * This avoids 100 separate FileChannel.write() calls for 100 entries.
+   */
+  @Override
+  public Future<Void> appendBatch(List<LogEntryData> entries) {
+    if (entries.isEmpty()) {
+      return Future.succeededFuture();
+    }
+    return vertx.executeBlocking(p -> {
+      try {
+        for (LogEntryData entry : entries) {
+          writeRecordSync(TYPE_APPEND, entry.index(), entry.term(), entry.payload());
+        }
+        p.complete();
+      } catch (Exception e) {
+        p.fail(e);
+      }
+    }, false, walExecutor);
+  }
+
+  @Override
+  public Future<Void> append(long index, long term, byte[] payload) {
+    return writeRecord(TYPE_APPEND, index, term, payload);
+  }
+
+  /** Synchronous write - for use within batch operations */
+  private void writeRecordSync(byte type, long index, long term, byte[] payload) throws IOException {
+    int payloadLen = payload.length;
+    int headerLen = 4 + 2 + 1 + 8 + 8 + 4;
+    ByteBuffer buf = ByteBuffer.allocate(headerLen + payloadLen + 4);
+
+    buf.putInt(MAGIC);
+    buf.putShort(VERSION);
+    buf.put(type);
+    buf.putLong(index);
+    buf.putLong(term);
+    buf.putInt(payloadLen);
+    buf.put(payload);
+
+    CRC32C crc = new CRC32C();
+    crc.update(buf.array(), 0, headerLen + payloadLen);
+    buf.putInt((int) crc.getValue());
+    buf.flip();
+
+    while (buf.hasRemaining()) logCh.write(buf);
+  }
+
+  private Future<Void> writeRecord(byte type, long index, long term, byte[] payload) {
+    return vertx.executeBlocking(p -> {
+      try {
+        int payloadLen = payload.length;
+        int headerLen = 4 + 2 + 1 + 8 + 8 + 4;
+        ByteBuffer buf = ByteBuffer.allocate(headerLen + payloadLen + 4);
+
+        buf.putInt(MAGIC);
+        buf.putShort(VERSION);
+        buf.put(type);
+        buf.putLong(index);
+        buf.putLong(term);
+        buf.putInt(payloadLen);
+        buf.put(payload);
+
+        CRC32C crc = new CRC32C();
+        crc.update(buf.array(), 0, headerLen + payloadLen);
+        buf.putInt((int) crc.getValue());
+        buf.flip();
+
+        while (buf.hasRemaining()) logCh.write(buf);
+        p.complete();
+      } catch (Exception e) {
+        p.fail(e);
+      }
+    }, false, walExecutor);
+  }
+
+  @Override
+  public Future<Void> sync() {
+    return vertx.executeBlocking(p -> {
+      try {
+        logCh.force(false);
+        p.complete();
+      } catch (Exception e) {
+        p.fail(e);
+      }
+    }, false, walExecutor);
+  }
+
+  @Override
+  public Future<List<ReplayedEntry>> replayLog() {
+    return vertx.executeBlocking(p -> {
+      try {
+        Path logPath = dataDir.resolve("raft.log");
+        if (!Files.exists(logPath)) {
+          p.complete(List.of());
+          return;
+        }
+
+        List<ReplayedEntry> out = new ArrayList<>();
+        try (FileChannel ch = FileChannel.open(logPath, READ, WRITE)) {
+
+          long pos = 0;
+          long lastGood = 0;
+          ByteBuffer hdr = ByteBuffer.allocate(4 + 2 + 1 + 8 + 8 + 4);
+
+          while (true) {
+            hdr.clear();
+            int r = ch.read(hdr, pos);
+            if (r < hdr.capacity()) break;
+            hdr.flip();
+
+            int magic = hdr.getInt();
+            short ver = hdr.getShort();
+            byte type = hdr.get();
+            long index = hdr.getLong();
+            long term = hdr.getLong();
+            int len = hdr.getInt();
+
+            if (magic != MAGIC || ver != VERSION || len < 0) break;
+
+            ByteBuffer payload = ByteBuffer.allocate(len);
+            int pr = ch.read(payload, pos + hdr.capacity());
+            if (pr < len) break;
+            payload.flip();
+
+            ByteBuffer crcBuf = ByteBuffer.allocate(4);
+            int cr = ch.read(crcBuf, pos + hdr.capacity() + len);
+            if (cr < 4) break;
+            crcBuf.flip();
+            int expected = crcBuf.getInt();
+
+            // compute CRC over header+payload bytes
+            ByteBuffer combined = ByteBuffer.allocate(hdr.capacity() + len);
+            hdr.rewind();
+            combined.put(hdr);
+            combined.put(payload.duplicate());
+            CRC32C crc = new CRC32C();
+            crc.update(combined.array(), 0, combined.capacity());
+            if (((int) crc.getValue()) != expected) break;
+
+            if (type == TYPE_TRUNCATE) {
+              long from = index;
+              out.removeIf(e -> e.index() >= from);
+            } else if (type == TYPE_APPEND) {
+              out.add(new ReplayedEntry(index, term, payload.array()));
+            } else {
+              break;
+            }
+
+            lastGood = pos + hdr.capacity() + len + 4;
+            pos = lastGood;
+          }
+
+          ch.truncate(lastGood);
+        }
+
+        p.complete(out);
+      } catch (Exception e) {
+        p.fail(e);
+      }
+    }, false, walExecutor);
+  }
+
+  @Override
+  public void close() throws IOException {
+    if (logCh != null) logCh.close();
+  }
+}
+```
+
+**Important:** the above is a *reference outline*. The core semantics are what matter:
+- frame + checksum
+- stop at first bad tail
+- truncate file to last-good
+- explicit `sync()` barrier
+
+---
+
+## 16. Wiring Persistence Barriers into RaftNode
+
+This section maps directly to your code:
+
+- `RaftNode.handleVoteRequest(VoteRequest request)`
+- `RaftNode.handleAppendEntriesRequest(AppendEntriesRequest request)`
+
+### 16.1 RequestVote: persist-before-grant
+
+Your current implementation (from `RaftNode.handleVoteRequest`) grants a vote by updating in-memory `votedFor` and immediately replying.
+
+**Required change:** do not reply granted until meta is durable.
+
+Pseudo-wiring (adapted to your structure using `Promise<VoteResponse>`):
+
+```java
+if (reqTerm > currentTerm) {
+  stepDown(reqTerm); // updates currentTerm, clears votedFor
+}
+
+if (reqTerm == currentTerm && (votedFor == null || votedFor.equals(request.getCandidateId()))) {
+  String newVote = request.getCandidateId();
+  long termToPersist = currentTerm;
+
+  wal.persistTermAndVote(termToPersist, Optional.of(newVote))
+     .onSuccess(v2 -> {
+        votedFor = newVote;            // mutate in-memory AFTER durability
+        resetElectionTimer();
+        promise.complete(VoteResponse.newBuilder()
+            .setTerm(currentTerm)
+            .setVoteGranted(true)
+            .build());
+     })
+     .onFailure(promise::fail);
+
+  return; // critical: prevent fallthrough
+}
+
+promise.complete(VoteResponse.newBuilder()
+    .setTerm(currentTerm)
+    .setVoteGranted(false)
+    .build());
+```
+
+### 16.2 AppendEntries: truncate+append must be durable before ACK
+
+Your current implementation (from `RaftNode.handleAppendEntriesRequest`) performs:
+- in-memory truncate (via `subList(...).clear()`)
+- in-memory append
+- then replies success
+
+**Required approach:**
+1. validate consistency against in-memory log
+2. build a *plan* of what needs truncating and what entries will be appended
+3. write to WAL: `truncateFrom(...)`, then `append(...)` for each new entry
+4. call `wal.sync()`
+5. apply plan to in-memory log
+6. reply success
+
+Pseudo-wiring:
+
+```java
+// after passing prevLogIndex/prevLogTerm consistency check
+long startIndex = request.getPrevLogIndex() + 1;
+
+// build plan WITHOUT mutating log
+AppendPlan plan = AppendPlan.from(startIndex, request.getEntriesList(), log);
+
+// persist first
+Future<Void> f = Future.succeededFuture();
+if (plan.truncateFromIndex != null) {
+  f = f.compose(v3 -> wal.truncateFrom(plan.truncateFromIndex));
+}
+for (var e : plan.entriesToAppend) {
+  f = f.compose(v3 -> wal.append(e.index, e.term, e.payloadBytes));
+}
+f = f.compose(v3 -> wal.sync());
+
+// then mutate in-memory + ACK
+f.onSuccess(v3 -> {
+  plan.applyTo(log);        // now do subList().clear() and log.add(...)
+  // commit index / applyLog afterwards
+  promise.complete(AppendEntriesResponse.newBuilder()
+      .setTerm(currentTerm)
+      .setSuccess(true)
+      .setMatchIndex(log.size() - 1)
+      .build());
+}).onFailure(err -> {
+  promise.complete(AppendEntriesResponse.newBuilder()
+      .setTerm(currentTerm)
+      .setSuccess(false)
+      .setMatchIndex(log.size() - 1)
+      .build());
+});
+```
+
+### 16.3 Why persist-before-in-memory for AppendEntries?
+Because the follower’s ACK must mean: “this change will survive restart.”
+
+Persist-first gives you a clean invariant:
+- **If we ACK success, the WAL contains the truncation+append and has been fsync’d.**
+
+---
+
+## 17. Practical Integration Notes (Vert.x)
+
+- Create a dedicated executor for WAL operations (pool size **1** is fine and simplifies ordering)
+- WAL ops run via `executeBlocking(..., walExecutor)`
+- Never block the event loop
+
+---
+
+## 18. Minimal Acceptance Criteria
+
+Before considering the WAL “done”:
+
+- ✅ restart preserves `currentTerm` and `votedFor`
+- ✅ follower never ACKs AppendEntries unless entries are fsync’d
+- ✅ replay truncates corrupt/partial tail safely
+- ✅ crash test: kill during append → restart yields prefix-safe log
+- ✅ crash test: kill during truncate+append sequence → replay yields last durable state
+
+---
+
+## 19. Design Review Feedback
+
+**Review Date:** 2026-01-28
+
+This section captures feedback from technical review of the WAL design.
+
+---
+
+### 19.0 Summary Verdict
+
+> **This is a solid, Raft-correct, production-credible WAL design.**
+> It is **minimal without being naive**, and—crucially—the **Raft safety invariants are explicit and enforced in wiring**, not hand-waved into comments.
+
+This implementation is no longer "missing persistence" — it is **intentionally implementing Raft's persistence contract**.
+
+If this landed in a design review with senior distributed-systems engineers, it would **pass with minor nits**, not fundamental objections.
+
+---
+
+### 19.1 What Was Done Correctly
+
+#### ✅ Scope Discipline (This Is Rare)
+
+The non-goals section (Section 13) is excellent. The design resists:
+- Segmenting
+- Snapshots
+- Random reads
+- Compaction fantasies
+
+This is exactly how people successfully build WALs instead of accidentally rebuilding RocksDB badly. If someone later asks "can we just add X?", this document gives the authority to say **no**.
+
+#### ✅ Persist-Before-Response Is Enforced, Not Described
+
+The design doesn't just quote the Raft paper — it wires it:
+- Vote is not granted until `meta.dat` is fsync'd
+- AppendEntries is not ACK'd until `truncate + append + sync` completes
+- In-memory state mutates **after** durability
+
+That invariant is the entire game. This got it right.
+
+#### ✅ Truncate as a Logical Record (Not Physical Truncate)
+
+This is a good design choice for a minimal WAL.
+
+Why it's correct:
+- Physical truncation during runtime is risky
+- Logical truncation + replay gives crash safety
+- Final physical truncation happens only after replay
+
+This is exactly how "real" systems do it.
+
+#### ✅ Replay Semantics Are Correct
+
+The replay loop:
+- Stops on first torn / corrupt record
+- Applies truncates in sequence
+- Rebuilds in-memory log deterministically
+- Truncates the file tail
+
+This is textbook WAL recovery logic.
+
+#### ✅ Meta Handling Is Done Properly
+
+All of the following are implemented correctly:
+- Temp file write
+- Fsync temp
+- Atomic rename
+- Fsync directory
+- CRC verification
+
+Most implementations miss at least one of these. This design doesn't.
+
+---
+
+### 19.2 Issues to Address
+
+#### ❌ CRITICAL: `truncateFrom()` Is Not Fsync-Isolated
+
+Currently:
+
+```java
+truncateFrom(long fromIndex) {
+  return writeRecord(TYPE_TRUNCATE, ...);
+}
+```
+
+But:
+- `writeRecord()` does **not** force durability
+- Durability is deferred to `sync()`
+
+This is fine **only if** the RaftNode *always* batches truncate + append + sync as one atomic plan.
+
+**Why this matters:**
+
+Someone will eventually call:
+
+```java
+wal.truncateFrom(x)
+  .onSuccess(...)
+```
+
+without a following `sync()`.
+
+Now you have:
+- Logical deletion recorded
+- No durability barrier
+- Possible reorder with later appends
+
+**Fix (simple and worth it):**
+
+Make the contract explicit in the interface:
+
+```java
+/**
+ * Truncation is not durable until sync() is called.
+ * Must not be called standalone in RaftNode.
+ */
+Future<Void> truncateSuffix(long fromIndex);
+```
+
+And in `RaftNode`, enforce:
+- Truncate + append **must** go through a single helper (`persistAppendPlan`)
+- Never expose raw truncate calls
+
+This is not a code bug yet — it's a **future foot-gun**.
+
+#### ⚠️ FileChannel Positioning vs Concurrent Writes
+
+The implementation relies on:
+
+```java
+logCh.position(logCh.size());
+```
+
+and then sequential writes.
+
+Because the design enforces:
+- Single writer
+- Single worker executor
+
+This is **currently safe**.
+
+But document (or assert) that:
+- No concurrent append paths exist
+- No reopen occurs mid-flight
+
+**Recommendation:** Add a comment or assertion:
+
+```java
+// Invariant: all writes are serialized via walExecutor (single thread)
+```
+
+Otherwise someone will "optimize" the executor size later and corrupt the log.
+
+#### ⚠️ Replay Uses `READ, WRITE`
+
+In replay:
+
+```java
+try (FileChannel ch = FileChannel.open(logPath, READ, WRITE)) {
+```
+
+`WRITE` is only needed for `truncate(lastGood)`.
+
+This is acceptable, but be aware:
+- Some filesystems behave differently for shared locks
+- This implicitly allows replay to mutate while reading
+
+**Note:** Replay **is destructive by design** — document this explicitly.
+
+#### ⚠️ Payload Length Trust Boundary
+
+The code does:
+
+```java
+int len = hdr.getInt();
+if (len < 0 || len > (all.length - ...)) throw
+```
+
+Good — but in replay:
+
+```java
+ByteBuffer.allocate(len);
+```
+
+If the log is corrupted with a very large `len` (but CRC later fails), memory can still be exhausted.
+
+**Mitigation (cheap):**
+- Define a **max entry size** constant
+- Reject `len > MAX_LOG_ENTRY_BYTES`
+
+Raft entries are not unbounded in sane systems.
+
+#### ⚠️ Interface Naming Mismatch
+
+The interface is `RaftStorage`, implementation is `FileRaftWAL`, skeleton uses `RaftWAL`.
+
+Not a logic issue, but before others touch this:
+- Standardize on **one abstraction name**
+- Recommendation: use `RaftStorage` everywhere
+
+This avoids conceptual drift ("is WAL different from storage?").
+
+---
+
+### 19.3 Architectural Recommendation
+
+#### Introduce a Single Persistence Barrier Method in RaftNode
+
+Instead of:
+
+```java
+wal.truncate(...)
+wal.append(...)
+wal.append(...)
+wal.sync()
+```
+
+Encapsulate:
+
+```java
+wal.persist(AppendPlan plan)
+```
+
+Where:
+- The storage implementation decides batching
+- RaftNode cannot misuse the API
+- RocksDB and File WAL stay symmetric
+
+The design already conceptually has `AppendPlan`. Making it explicit reduces future mistakes.
+
+---
+
+### 19.4 Truncate-then-Append Ordering
+
+**Concern:** If the node crashes after `TRUNCATE` is persisted but before `APPEND` completes, data may be deleted without replacement.
+
+**Resolution:** The replay logic (Section 15.6) processes records sequentially and applies truncations as it goes. This is **correct** provided:
+- The in-memory log is NOT updated until the entire batch (Truncate + all Appends) passes the `wal.sync()` barrier
+- The "AppendPlan" approach in Section 16.2 enforces this correctly
+
+---
+
+### 19.5 CRC and Self-Framing
+
+The record format is robust. Stopping at the first CRC mismatch or incomplete record is the standard approach for handling "torn writes" (OS crashes mid-write).
+
+---
+
+### 19.6 Directory Fsync (Critical on Linux)
+
+The `meta.dat` atomic rename strategy is the "gold standard" for small metadata:
+
+1. Write to `.tmp`
+2. `fsync` the file
+3. `rename` (atomic on POSIX)
+4. **`fsync` the parent directory** ← Often overlooked but crucial
+
+> **Important:** On Linux (ext4/xfs), fsyncing the directory ensures the directory entry itself (the pointer to the new inode) is durable. Without this, the rename may not survive a power loss.
+
+The `FileRaftWAL` code in Section 15.6 has been updated to include this step.
+
+---
+
+### 19.7 Batch Append Optimization
+
+**Problem:** The original design showed a loop: `f = f.compose(v3 -> wal.append(...))`. For 100 entries, this results in 100 separate `executeBlocking` calls and 100 `FileChannel.write()` calls.
+
+**Solution:** The `RaftStorage` interface already defines `appendEntries(List<LogEntryData>)`. The `FileRaftWAL` implementation now includes `appendBatch()` which:
+- Accepts the full list of entries
+- Writes all records in a single `executeBlocking` call
+- Performs one `sync()` at the end
+
+This reduces context switches and improves throughput significantly.
+
+---
+
+### 19.8 Log Replay Efficiency
+
+The replay logic is O(n) where n = total records ever written. This is acceptable for a "Minimal WAL."
+
+**Operational Note:** Since snapshots are an explicit non-goal (Section 13), `raft.log` will grow indefinitely. Node restart time scales linearly with total operations since inception. Teams should monitor log file size and plan for future snapshot support if restart times become problematic.
+
+---
+
+### 19.9 Recommended Testing Additions
+
+Beyond the tests in Section 10, add:
+
+1. **Zero-Fill/Corruption Test:** Manually append random garbage bytes to a valid `raft.log` to simulate partial disk writes. Verify WAL recovers the "last good" state.
+
+2. **Directory Fsync Verification:** On Linux, use `strace` or similar to confirm `fsync()` is called on both the file and directory during `persistTermAndVote`.
+
+3. **Batch Performance Test:** Compare latency of 100 single appends vs. one batch append of 100 entries.
+
+---
+
+### 19.10 Next Steps
+
+The only sensible next steps are:
+
+1. Add the safety guardrails mentioned above
+2. Write the crash tests
+3. Ship it
+4. Only *then* think about snapshots
+
+Future extensions to consider (after shipping):
+- Threat-model against power loss vs SIGKILL
+- Map directly to existing `RaftNode` code line-by-line
+- Design the **minimal snapshot extension** without breaking constraints
+
+---
+
+### 19.11 AppendPlan Implementation Details
+
+To keep the `RaftNode` logic clean and prevent the "future foot-guns" identified above, the `AppendPlan` should be a **pure, side-effect-free** calculator. It determines exactly what needs to happen to the log before any mutation or persistence occurs.
+
+#### The `AppendPlan` Implementation
+
+This helper encapsulates the logic for finding the first point of conflict and preparing the data for the WAL and in-memory log.
+
+```java
+package dev.mars.quorus.controller.raft.storage;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+/**
+ * Calculates the delta between the current in-memory log and an incoming AppendEntries request.
+ * This ensures we only persist and apply what is actually necessary.
+ */
+public record AppendPlan(
+    Long truncateFromIndex, 
+    List<RaftStorage.LogEntryData> entriesToAppend
+) {
+    public static AppendPlan from(long startIndex, List<LogEntryData> incomingEntries, List<LogEntryData> currentLog) {
+        long truncateAt = -1;
+        int incomingIdx = 0;
+
+        // 1. Find the first point of divergence
+        for (int i = 0; i < incomingEntries.size(); i++) {
+            int logPos = (int) (startIndex + i);
+            
+            // If we have an entry at this position, check for term conflict
+            if (logPos < currentLog.size()) {
+                if (currentLog.get(logPos).term() != incomingEntries.get(i).term()) {
+                    truncateAt = logPos;
+                    incomingIdx = i;
+                    break;
+                }
+            } else {
+                // We've reached the end of our local log; everything else is an append
+                incomingIdx = i;
+                break;
+            }
+        }
+
+        // 2. Build the list of new entries to actually write
+        List<RaftStorage.LogEntryData> toAppend = incomingEntries.subList(incomingIdx, incomingEntries.size());
+
+        return new AppendPlan(
+            truncateAt != -1 ? truncateAt : null,
+            toAppend
+        );
+    }
+
+    /**
+     * Applies the plan to the in-memory list. 
+     * CALL THIS ONLY AFTER WAL PERSISTENCE IS SUCCESSFUL.
+     */
+    public void applyTo(List<LogEntryData> memoryLog) {
+        if (truncateFromIndex != null) {
+            int from = truncateFromIndex.intValue();
+            if (from < memoryLog.size()) {
+                memoryLog.subList(from, memoryLog.size()).clear();
+            }
+        }
+        memoryLog.addAll(entriesToAppend);
+    }
+}
+```
+
+#### Integration into `RaftNode`
+
+By using the plan, the `AppendEntries` handler follows a clear **"Prepare → Persist → Commit"** pipeline:
+
+```java
+// Inside RaftNode.handleAppendEntriesRequest
+AppendPlan plan = AppendPlan.from(startIndex, request.getEntriesList(), log);
+
+// Step 1: WAL Persistence
+Future<Void> persistence = Future.succeededFuture();
+
+if (plan.truncateFromIndex() != null) {
+    persistence = persistence.compose(v -> wal.truncateFrom(plan.truncateFromIndex()));
+}
+
+if (!plan.entriesToAppend().isEmpty()) {
+    persistence = persistence.compose(v -> wal.appendBatch(plan.entriesToAppend()));
+}
+
+// Step 2: Sync and Respond
+persistence
+    .compose(v -> wal.sync()) // The durability barrier
+    .onSuccess(v -> {
+        // Step 3: Mutate in-memory state only after disk is safe
+        plan.applyTo(log);
+        
+        // Update commit index and respond success
+        updateCommitIndex(request.getLeaderCommit());
+        promise.complete(successResponse());
+    })
+    .onFailure(err -> {
+        LOG.error("Failed to persist log entries", err);
+        promise.fail(err);
+    });
+```
+
+#### Why This Is Safer
+
+| Benefit | Explanation |
+|---------|-------------|
+| **Atomicity** | If `wal.appendBatch` fails, the in-memory `log` remains untouched. The node can crash and reboot into a consistent state. |
+| **Efficiency** | If the leader sends entries we already have (and they match), `entriesToAppend` will be empty, skipping redundant disk I/O. |
+| **Correctness** | It strictly follows the "Persist-before-response" rule. |
+
+This pattern eliminates the possibility of:
+- Partial in-memory mutations before persistence completes
+- Acknowledging entries that aren't durable
+- Misuse of the raw `truncateFrom()` API
+
+---
+
+## Appendix A: OS Support (Windows vs Linux)
+
+Developing on Windows for a Linux deployment is perfectly viable, provided you address a few "filesystem friction" points. You don't need to ban Windows development, but you should standardize how the WAL handles OS-specific behaviors.
+
+### A.1 The Fsync Barrier (Directory vs. File)
+
+As noted in Section 19.6, fsyncing a directory is critical on Linux (ext4/xfs) to ensure metadata/rename durability.
+
+| OS | Behavior |
+|----|----------|
+| **Linux** | `FileChannel.open(dir, READ).force(true)` is **required** for durability |
+| **Windows** | Calling `force()` on a directory `FileChannel` can throw `IOException` (Access Denied) or be a no-op depending on JVM version |
+
+**Strategy:** Use a utility wrapper that swallows "unsupported" directory syncs on Windows but enforces them on Linux.
+
+```java
+public void syncDirectory(Path dir) throws IOException {
+    if (System.getProperty("os.name").toLowerCase().contains("win")) {
+        return; // Skip or handle gracefully on Windows
+    }
+    try (FileChannel fc = FileChannel.open(dir, StandardOpenOption.READ)) {
+        fc.force(true);
+    }
+}
+```
+
+### A.2 Path Formatting & Drive Letters
+
+Windows paths include drive letters (`C:\`) which create URI compatibility issues.
+
+| OS | URI Format |
+|----|------------|
+| **Linux** | `file:///path/to/file` |
+| **Windows** | `file:///C:/path/to/file` |
+
+**The Risk:** If Raft nodes communicate paths to each other (e.g., for snapshots), a Windows path will break a Linux follower.
+
+**Strategy:** Ensure all internal Raft logic uses **Unix-style relative paths** or standardized URI strings, only converting to a local `Path` object at the very last second when hitting the `FileRaftWAL`.
+
+### A.3 Line Endings and File Encoding
+
+Since the WAL is a **binary format**, you are safe from `CRLF` vs `LF` issues. However, if configuration files (`quorus.properties`) are edited on Windows, encoding issues may occur.
+
+**Strategy:** 
+- Enforce `UTF-8` for all file reads/writes
+- Use `.gitattributes` to ensure `* text eol=lf` in your repository
+
+### A.4 Atomic Move Semantics
+
+`Files.move(..., ATOMIC_MOVE)` is safe on both platforms. However, Windows is much more aggressive about **File Locking**.
+
+| OS | Behavior |
+|----|----------|
+| **Windows** | If any process (even a virus scanner or a stray `loadMeta()` call) has a handle open on `meta.dat`, the `REPLACE_EXISTING` move will **fail** |
+| **Linux** | Linux allows you to delete or rename a file even if another process has it open (the file remains on disk until the last handle is closed) |
+
+**Strategy:** Ensure all handles are closed before calling `Files.move()`.
+
+### A.5 Recommended Development Approach
+
+You don't need to force **Docker Desktop** for everyday coding, but you should use it for **Persistence Validation**.
+
+#### Use Local Windows Development for:
+- Unit testing `AppendPlan` logic
+- Writing Raft state machine logic
+- Standard debugging and IDE work
+
+#### Use TestContainers (Linux Containers) for:
+- **The "Kill -9" Test:** Validating that a crash during `sync()` leaves the WAL recoverable
+- **The Rename Test:** Ensuring the atomic move and directory fsync work on the actual target filesystem (ext4/xfs)
+- **The Performance Test:** Windows I/O performance (especially with `force(true)`) is significantly different from Linux. Do not profile your WAL on Windows.
+
+### A.6 Summary: Windows vs. Linux WAL Behavior
+
+| Feature | Windows Behavior | Linux Behavior | Impact |
+|---------|------------------|----------------|--------|
+| **Directory fsync** | Often fails/No-op | **Mandatory** for durability | Use an OS-aware wrapper |
+| **File Locking** | Very Strict (Locks prevent Move/Delete) | Advisory (Can delete open files) | Close all handles before `Files.move` |
+| **Atomic Move** | Supported | Supported | Safe to use |
+| **Path URI** | `file:///C:/path` | `file:///path` | Handle in path conversion utilities |

@@ -16,6 +16,7 @@
 
 package dev.mars.quorus.controller;
 
+import dev.mars.quorus.controller.config.AppConfig;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Promise;
 import io.vertx.core.Vertx;
@@ -55,11 +56,12 @@ public class QuorusControllerVerticle extends AbstractVerticle {
         logger.info("Starting QuorusControllerVerticle...");
 
         try {
-            // 1. Configuration (Mock or Env)
-            String nodeId = System.getenv().getOrDefault("NODE_ID", "controller1");
-            int port = Integer.parseInt(System.getenv().getOrDefault("HTTP_PORT", "8080"));
-            int raftPort = Integer.parseInt(System.getenv().getOrDefault("RAFT_PORT", "9080"));
-            String clusterNodesEnv = System.getenv().getOrDefault("CLUSTER_NODES", nodeId + "=localhost:9080");
+            // 1. Load configuration
+            AppConfig config = AppConfig.get();
+            String nodeId = config.getNodeId();
+            int port = config.getHttpPort();
+            int raftPort = config.getRaftPort();
+            String clusterNodesEnv = config.getClusterNodes();
 
             // 2. Parse cluster configuration
             Map<String, String> peerAddresses = new HashMap<>();
@@ -82,7 +84,7 @@ public class QuorusControllerVerticle extends AbstractVerticle {
 
             // 4. Create Raft Node
             Map<String, String> initialMetadata = new HashMap<>();
-            initialMetadata.put("version", System.getenv().getOrDefault("QUORUS_VERSION", "2.0-ext"));
+            initialMetadata.put("version", config.getVersion());
 
             QuorusStateMachine stateMachine = new QuorusStateMachine(initialMetadata);
 

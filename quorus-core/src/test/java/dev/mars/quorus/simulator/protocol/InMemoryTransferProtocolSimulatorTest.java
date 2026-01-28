@@ -20,6 +20,8 @@ package dev.mars.quorus.simulator.protocol;
 import dev.mars.quorus.simulator.fs.InMemoryFileSystemSimulator;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
@@ -31,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.*;
 
@@ -689,6 +692,48 @@ class InMemoryTransferProtocolSimulatorTest {
             for (int i = 0; i < 5; i++) {
                 assertThat(fileSystem.exists("/dest/file" + i + ".txt")).isTrue();
             }
+        }
+    }
+
+    // ==================== Path Extraction ====================
+
+    @Nested
+    @DisplayName("Path Extraction")
+    class PathExtractionTests {
+
+        @ParameterizedTest(name = "{0} -> {1}")
+        @MethodSource("provideUrisForExtraction")
+        @DisplayName("Should extract path correctly from URI")
+        void testExtractPath(String uriString, String expected) throws Exception {
+            // Use reflection to test private method
+            var method = InMemoryTransferProtocolSimulator.class.getDeclaredMethod("extractPath", URI.class);
+            method.setAccessible(true);
+            
+            URI uri = URI.create(uriString);
+            String result = (String) method.invoke(simulator, uri);
+            assertThat(result).isEqualTo(expected);
+        }
+
+        private static Stream<Arguments> provideUrisForExtraction() {
+            return Stream.of(
+                // Standard Unix/Linux paths
+                Arguments.of("file:///home/user/test.txt", "/home/user/test.txt"),
+                
+                // Windows-style paths (The "C:" stripping logic)
+                Arguments.of("file:///C:/destination/test.txt", "/destination/test.txt"),
+                Arguments.of("file:///D:/work/project", "/work/project"),
+                
+                // Edge Cases: Root directories
+                Arguments.of("file:///C:/", "/"),
+                Arguments.of("file:///etc/", "/etc/"),
+                
+                // Non-file schemes (Should remain untouched)
+                Arguments.of("http://localhost:8080/api/data", "/api/data"),
+                Arguments.of("sftp://host/remote/path.txt", "/remote/path.txt"),
+                
+                // Empty/Null path scenarios
+                Arguments.of("mailto:user@example.com", "/")
+            );
         }
     }
 }
