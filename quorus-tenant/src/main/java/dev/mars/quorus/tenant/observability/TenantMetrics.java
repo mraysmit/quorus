@@ -23,7 +23,9 @@ import io.opentelemetry.api.metrics.LongCounter;
 import io.opentelemetry.api.metrics.Meter;
 
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Logger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * OpenTelemetry metrics for Quorus Tenant module.
@@ -44,7 +46,7 @@ import java.util.logging.Logger;
  */
 public class TenantMetrics {
 
-    private static final Logger logger = Logger.getLogger(TenantMetrics.class.getName());
+    private static final Logger logger = LoggerFactory.getLogger(TenantMetrics.class);
     private static final String METER_NAME = "quorus-tenant";
 
     // Singleton instance

@@ -24,7 +24,9 @@ import io.opentelemetry.api.metrics.LongCounter;
 import io.opentelemetry.api.metrics.Meter;
 
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Logger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * OpenTelemetry metrics for Quorus Workflow Engine.
@@ -47,7 +49,7 @@ import java.util.logging.Logger;
  */
 public class WorkflowMetrics {
 
-    private static final Logger logger = Logger.getLogger(WorkflowMetrics.class.getName());
+    private static final Logger logger = LoggerFactory.getLogger(WorkflowMetrics.class);
     private static final String METER_NAME = "quorus-workflow";
 
     // Singleton instance

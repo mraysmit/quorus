@@ -237,6 +237,106 @@ graph TB
 - **quorus-integration-examples**: Usage examples and integration patterns
 - **quorus-workflow-examples**: Workflow definition examples
 
+## Module Configuration Architecture
+
+Each Quorus module follows a standardized configuration pattern with externalized properties files that support environment variable overrides. This design ensures consistent configuration management across the system while allowing deployment-specific customization.
+
+### Configuration Design Principles
+
+1. **Module-Specific Properties**: Each module has its own properties file in `src/main/resources/`
+2. **Environment Variable Override**: All properties can be overridden via environment variables
+3. **Sensible Defaults**: Missing configuration files fall back to reasonable defaults
+4. **Startup Logging**: All configuration properties are logged at startup for debugging
+
+### Configuration Files by Module
+
+| Module | Properties File | Config Class | Description |
+|--------|-----------------|--------------|-------------|
+| `quorus-core` | `quorus.properties` | `QuorusConfiguration` | Core transfer engine, protocols, network settings |
+| `quorus-controller` | `quorus-controller.properties` | `AppConfig` | Raft consensus, HTTP API, cluster coordination, telemetry |
+| `quorus-agent` | `quorus-agent.properties` | `AgentConfig` | Agent identity, controller connection, job polling, heartbeat |
+| `quorus-api` | `quorus-api.properties` | `ApiConfig` | REST API, agent fleet management, transfer service |
+
+### Configuration Class Pattern
+
+Each module implements a singleton configuration class following this pattern:
+
+```java
+public final class AppConfig {
+    private static final AppConfig INSTANCE = new AppConfig();
+    
+    public static AppConfig get() {
+        return INSTANCE;
+    }
+    
+    public String getString(String key, String defaultValue) {
+        // 1. Check QUORUS_XXX environment variable
+        // 2. Check properties file
+        // 3. Return default value
+    }
+    
+    public int getInt(String key, int defaultValue) { ... }
+    public boolean getBoolean(String key, boolean defaultValue) { ... }
+}
+```
+
+### Key Configuration Categories
+
+#### Controller Configuration (`quorus-controller.properties`)
+- **Node Identity**: Unique cluster node identifier
+- **HTTP Server**: Port and host bindings for REST API
+- **Raft Cluster**: Consensus port and cluster node topology
+- **Job Assignment**: Timing intervals for job processing
+- **Telemetry**: OpenTelemetry and Prometheus endpoints
+
+#### Agent Configuration (`quorus-agent.properties`)
+- **Agent Identity**: Unique agent identifier, region, datacenter
+- **Controller Connection**: URL for controller API communication
+- **Transfer Settings**: Max concurrent transfers, supported protocols
+- **Heartbeat**: Interval for health reporting to controller
+- **Job Polling**: Timing for job queue polling
+
+#### Core Configuration (`quorus.properties`)
+- **Transfer Engine**: Concurrent transfers, retries, buffer sizes
+- **Network**: Connection and read timeouts
+- **File Handling**: Max file size, checksum algorithm, temp directory
+- **Protocol Settings**: SFTP/FTP/SMB port and buffer configurations
+
+#### API Configuration (`quorus-api.properties`)
+- **HTTP Server**: Port and host for REST API
+- **Agent Fleet**: Heartbeat intervals, timeout thresholds
+- **Transfer Service**: Concurrent transfers, retry settings
+- **Controller Discovery**: Timeouts for leader discovery
+
+### Environment Variable Override Pattern
+
+Properties are converted to environment variables using this pattern:
+- Convert to uppercase
+- Replace dots (`.`) with underscores (`_`)
+
+| Property | Environment Variable |
+|----------|---------------------|
+| `quorus.http.port` | `QUORUS_HTTP_PORT` |
+| `quorus.node.id` | `QUORUS_NODE_ID` |
+| `quorus.cluster.nodes` | `QUORUS_CLUSTER_NODES` |
+| `quorus.agent.heartbeat.interval-ms` | `QUORUS_AGENT_HEARTBEAT_INTERVAL_MS` |
+
+### Configuration Loading Order
+
+1. **Classpath** - Packaged in JAR (`src/main/resources/`)
+2. **Working directory** - Runtime override files
+3. **Home directory** - User-specific settings (`~/.quorus/`)
+4. **System directory** - System-wide settings (`/etc/quorus/`)
+
+Later sources override earlier ones, enabling flexible deployment customization without modifying packaged JARs.
+
+### Backward Compatibility
+
+The configuration system maintains backward compatibility:
+- Environment variables always override properties files
+- Missing config files fall back to sensible defaults
+- No breaking changes to existing deployments
+
 ## Deployment Configurations
 
 Quorus supports multiple deployment configurations to meet different operational requirements:

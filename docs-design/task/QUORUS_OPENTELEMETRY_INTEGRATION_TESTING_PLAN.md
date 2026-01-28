@@ -1,9 +1,8 @@
 # OpenTelemetry Integration & Testing Plan
 
-**Version:** 2.0 (Consolidated)  
+**Version:** 2.0  
 **Author:** Mark Andrew Ray-Smith Cityline Ltd  
 **Date:** 2026-01-26  
-**Status:** Phases 1-5 Complete (Controller), Testing & Future Phases Proposed
 
 ## Table of Contents
 
@@ -400,7 +399,16 @@ flowchart TB
 
 ### Current State Assessment
 
-The OpenTelemetry migration is currently complete for **quorus-controller** (Phases 1-5), but **quorus-agent** and **quorus-tenant** modules require additional work to achieve full observability across the entire Quorus system.
+> **📅 Updated: 2026-01-28** - Assessment verified against actual codebase.
+
+The OpenTelemetry migration is **more advanced than originally documented**:
+
+- ✅ **quorus-controller** (Phases 1-5): COMPLETE - All metrics, tracing, and configuration in place
+- ✅ **quorus-agent** (Phase 6): COMPLETE - 12 metrics + tracing + TelemetryConfig implemented ahead of schedule
+- ⚠️ **quorus-tenant** (Phase 7): PARTIAL - TenantMetrics (7 metrics) exists, but logging still uses JUL
+- ⚠️ **quorus-core** (Phase 8): PARTIAL - TransferTelemetryMetrics exists alongside old TransferMetrics (needs cleanup)
+- ⚠️ **quorus-workflow** (Phase 9): PARTIAL - WorkflowMetrics (9 metrics) exists, but logging still uses JUL
+- ❌ **Integration Tests**: NOT STARTED - Docker/OTel Collector infrastructure not created
 
 ### Module Comparison
 
@@ -408,11 +416,11 @@ The OpenTelemetry migration is currently complete for **quorus-controller** (Pha
 |--------|------------------|--------------|---------------|-------------|-----------------|------------|
 | **Type** | Standalone app | Standalone app | Library | Library | Library | Standalone (deprecated) |
 | **Deployment** | Cluster nodes | Edge locations | In controller | In agent/API | In API/controller | Standalone (legacy) |
-| **Logging** | SLF4J ✅ | SLF4J ✅ | JUL ❌ | JUL ❌ | JUL ❌ | SLF4J ✅ |
-| **OTel Status** | ✅ Complete | ❌ None | ❌ None | ❌ Manual metrics | ❌ None | ❌ None (deprecated) |
-| **Metrics** | 5 Raft gauges | Heartbeat JSON | Domain models | `TransferMetrics` class | None | None |
-| **Tracing** | ✅ Vert.x | ❌ None | ❌ None | ❌ None | ❌ None | ❌ None |
-| **Priority** | ✅ Done | Critical (Phase 6) | Medium (Phase 7) | **CRITICAL (Phase 8)** | High (Phase 9) | N/A (EOL) |
+| **Logging** | SLF4J ✅ | SLF4J ✅ | JUL ❌ | SLF4J ✅ | JUL ❌ | SLF4J ✅ |
+| **OTel Status** | ✅ Complete | ✅ Complete | ⚠️ Metrics Only | ⚠️ Dual (Old+New) | ⚠️ Metrics Only | ❌ None (deprecated) |
+| **Metrics** | 5 Raft gauges | 12 agent metrics | 7 tenant metrics | Both manual + OTel | 9 workflow metrics | None |
+| **Tracing** | ✅ Vert.x | ✅ Vert.x | ❌ None | ❌ None | ❌ None | ❌ None |
+| **Priority** | ✅ Done | ✅ Done | ⚠️ Logging Migration | ⚠️ Remove Old Metrics | ⚠️ Logging Migration | N/A (EOL) |
 
 ---
 
@@ -3456,53 +3464,53 @@ Track progress on all OpenTelemetry migration, testing, and critical fixes. Chec
 | Replace Java Serialization with Protobuf | ⬜ Pending | 🟡 HIGH | Q2 2026 | Version-safe state machine replication |
 | Fix tenant module synchronized bottleneck | ⬜ Pending | 🟠 MEDIUM | Q2 2026 | Use ReadWriteLock or ConcurrentHashMap |
 
-### Phase 6: quorus-agent Migration (POST-LAUNCH)
+### Phase 6: quorus-agent Migration (COMPLETED ✅)
 
 | Task | Status | Priority | Target Date | Notes |
 |------|--------|----------|-------------|-------|
-| Add OpenTelemetry dependencies to agent POM | ⬜ Pending | 🟡 HIGH | Q3 2026 | Same as controller (SDK 1.34.1) |
-| Create AgentTelemetryConfig class | ⬜ Pending | 🟡 HIGH | Q3 2026 | Static configuration |
-| Add 7 agent health metrics | ⬜ Pending | 🟡 HIGH | Q3 2026 | registration_status, heartbeat_count, etc. |
-| Add 5 transfer execution metrics | ⬜ Pending | 🟡 HIGH | Q3 2026 | active_transfers, bytes_transferred, etc. |
-| Instrument AgentRegistrationService | ⬜ Pending | 🟡 HIGH | Q3 2026 | Tracing for registration calls |
-| Instrument HeartbeatService | ⬜ Pending | 🟡 HIGH | Q3 2026 | Tracing for heartbeat calls |
-| Instrument JobPollingService | ⬜ Pending | 🟡 HIGH | Q3 2026 | Tracing for polling calls |
-| Instrument TransferExecutionService | ⬜ Pending | 🟡 HIGH | Q3 2026 | Distributed tracing for transfers |
+| Add OpenTelemetry dependencies to agent POM | ✅ Complete | 🟡 HIGH | Q1 2026 | vertx-opentelemetry, SDK, OTLP exporter, Prometheus exporter |
+| Create AgentTelemetryConfig class | ✅ Complete | 🟡 HIGH | Q1 2026 | Static configure() with OTLP + Prometheus |
+| Add 12 agent metrics (AgentMetrics.java) | ✅ Complete | 🟡 HIGH | Q1 2026 | status, heartbeats, registrations, jobs, transfers, uptime |
+| Integrate into QuorusAgent | ✅ Complete | 🟡 HIGH | Q1 2026 | TelemetryConfig.configure() in constructor |
+| Vert.x tracing integration | ✅ Complete | 🟡 HIGH | Q1 2026 | OpenTelemetryOptions configured |
+| Instrument AgentRegistrationService | ⬜ Pending | 🟢 LOW | Q3 2026 | Additional service-level tracing |
+| Instrument HeartbeatService | ⬜ Pending | 🟢 LOW | Q3 2026 | Additional service-level tracing |
+| Instrument JobPollingService | ⬜ Pending | 🟢 LOW | Q3 2026 | Additional service-level tracing |
 
-### Phase 7: quorus-tenant Migration (POST-LAUNCH)
-
-| Task | Status | Priority | Target Date | Notes |
-|------|--------|----------|-------------|-------|
-| Standardize logging to SLF4J | ⬜ Pending | 🟠 MEDIUM | Q3 2026 | Replace JUL with SLF4J |
-| Add OpenTelemetry dependencies | ⬜ Pending | 🟠 MEDIUM | Q3 2026 | Shared Meter from controller |
-| Add 7 tenant metrics | ⬜ Pending | 🟠 MEDIUM | Q3 2026 | tenant_count, operations, quota metrics |
-| Deploy as Vert.x Verticle | ⬜ Pending | 🟠 MEDIUM | Q3 2026 | Thread-safe operations |
-| Export via controller endpoint | ⬜ Pending | 🟠 MEDIUM | Q3 2026 | Port 9464 shared endpoint |
-
-### Phase 8: quorus-core Migration (POST-LAUNCH)
+### Phase 7: quorus-tenant Migration (PARTIAL ⚠️)
 
 | Task | Status | Priority | Target Date | Notes |
 |------|--------|----------|-------------|-------|
-| Standardize logging to SLF4J | ⬜ Pending | 🟡 HIGH | Q3 2026 | Replace JUL with SLF4J |
-| Add OpenTelemetry dependencies | ⬜ Pending | 🟡 HIGH | Q3 2026 | SDK 1.34.1 |
-| Create CoreTelemetryConfig class | ⬜ Pending | 🟡 HIGH | Q3 2026 | Static configuration |
-| Replace manual TransferMetrics with OTel | ⬜ Pending | 🟡 HIGH | Q3 2026 | Remove LongAdder/AtomicLong classes |
-| Add 8 transfer execution metrics | ⬜ Pending | 🟡 HIGH | Q3 2026 | active_transfers, bytes_transferred, etc. |
-| Add 4 protocol adapter metrics | ⬜ Pending | 🟡 HIGH | Q3 2026 | Per-protocol counters |
-| Instrument SimpleTransferEngine | ⬜ Pending | 🟡 HIGH | Q3 2026 | Tracing for transfer lifecycle |
-| Instrument protocol adapters | ⬜ Pending | 🟡 HIGH | Q3 2026 | HTTP, SFTP, FTP, SMB tracing |
+| Add OpenTelemetry dependencies | ✅ Complete | 🟠 MEDIUM | Q1 2026 | opentelemetry-api added to pom.xml |
+| Add 7 tenant metrics (TenantMetrics.java) | ✅ Complete | 🟠 MEDIUM | Q1 2026 | total, active, created, deleted, quota violations, reservations, releases |
+| Standardize logging to SLF4J | ⬜ **Pending** | 🟠 MEDIUM | Q1 2026 | SimpleTenantService, SimpleResourceManagementService, TenantMetrics still use JUL |
+| Integrate TenantMetrics into services | ⬜ Pending | 🟠 MEDIUM | Q2 2026 | Wire up metrics recording in service methods |
+| Export via controller endpoint | ✅ Complete | 🟠 MEDIUM | Q1 2026 | Uses GlobalOpenTelemetry from controller |
 
-### Phase 9: quorus-workflow Migration (POST-LAUNCH)
+### Phase 8: quorus-core Migration (PARTIAL ⚠️)
 
 | Task | Status | Priority | Target Date | Notes |
 |------|--------|----------|-------------|-------|
-| Standardize logging to SLF4J | ⬜ Pending | 🟠 MEDIUM | Q4 2026 | Replace JUL with SLF4J |
-| Add OpenTelemetry dependencies | ⬜ Pending | 🟠 MEDIUM | Q4 2026 | SDK 1.34.1 |
-| Create WorkflowTelemetryConfig class | ⬜ Pending | 🟠 MEDIUM | Q4 2026 | Static configuration |
-| Add 6 workflow execution metrics | ⬜ Pending | 🟠 MEDIUM | Q4 2026 | active_workflows, completed, failed, etc. |
-| Add 3 dependency graph metrics | ⬜ Pending | 🟠 MEDIUM | Q4 2026 | graph_size, cycles_detected, depth |
-| Instrument SimpleWorkflowEngine | ⬜ Pending | 🟠 MEDIUM | Q4 2026 | Tracing for workflow execution |
-| Instrument YamlWorkflowDefinitionParser | ⬜ Pending | 🟠 MEDIUM | Q4 2026 | Tracing for YAML parsing |
+| Standardize logging to SLF4J | ✅ Complete | 🟡 HIGH | Q1 2026 | Main classes (SimpleTransferEngine, protocols) use SLF4J |
+| Add OpenTelemetry dependencies | ✅ Complete | 🟡 HIGH | Q1 2026 | opentelemetry-api added to pom.xml |
+| Create TransferTelemetryMetrics class | ✅ Complete | 🟡 HIGH | Q1 2026 | 9 metrics: active, total, completed, failed, cancelled, bytes, duration, throughput, retries |
+| Remove old manual TransferMetrics | ⬜ **Pending** | 🟡 HIGH | Q1 2026 | Old TransferMetrics.java still exists and used |
+| Integrate new metrics into SimpleTransferEngine | ⬜ Pending | 🟡 HIGH | Q2 2026 | Wire up TransferTelemetryMetrics calls |
+| Add protocol adapter metrics | ⬜ Pending | 🟠 MEDIUM | Q3 2026 | Per-protocol counters |
+| Instrument SimpleTransferEngine tracing | ⬜ Pending | 🟠 MEDIUM | Q3 2026 | Tracing for transfer lifecycle |
+| Instrument protocol adapters tracing | ⬜ Pending | 🟠 MEDIUM | Q3 2026 | HTTP, SFTP, FTP, SMB tracing |
+
+### Phase 9: quorus-workflow Migration (PARTIAL ⚠️)
+
+| Task | Status | Priority | Target Date | Notes |
+|------|--------|----------|-------------|-------|
+| Add OpenTelemetry dependencies | ✅ Complete | 🟠 MEDIUM | Q1 2026 | opentelemetry-api added to pom.xml |
+| Create WorkflowMetrics class | ✅ Complete | 🟠 MEDIUM | Q1 2026 | 9 metrics: active, total, completed, failed, cancelled, steps, duration, transfers_per_workflow |
+| Standardize logging to SLF4J | ⬜ **Pending** | 🟠 MEDIUM | Q1 2026 | SimpleWorkflowEngine, WorkflowMetrics still use JUL |
+| Integrate WorkflowMetrics into engine | ⬜ Pending | 🟠 MEDIUM | Q2 2026 | Wire up metrics recording in SimpleWorkflowEngine |
+| Add dependency graph metrics | ⬜ Pending | 🟢 LOW | Q4 2026 | graph_size, cycles_detected, depth |
+| Instrument SimpleWorkflowEngine tracing | ⬜ Pending | 🟢 LOW | Q4 2026 | Tracing for workflow execution |
+| Instrument YamlWorkflowDefinitionParser | ⬜ Pending | 🟢 LOW | Q4 2026 | Tracing for YAML parsing |
 
 ### Admin UI Decision (POST-LAUNCH)
 
@@ -3521,12 +3529,12 @@ Track progress on all OpenTelemetry migration, testing, and critical fixes. Chec
 | **Controller Migration (Phases 1-5)** | 5 | 5 | 0 | 100% ✅ |
 | **Integration Testing (Test Phases 1-5)** | 5 | 0 | 5 | 0% |
 | **Critical Pre-Production Fixes** | 8 | 0 | 8 | 0% 🔴 |
-| **Agent Migration (Phase 6)** | 8 | 0 | 8 | 0% |
-| **Tenant Migration (Phase 7)** | 5 | 0 | 5 | 0% |
-| **Core Migration (Phase 8)** | 8 | 0 | 8 | 0% |
-| **Workflow Migration (Phase 9)** | 7 | 0 | 7 | 0% |
+| **Agent Migration (Phase 6)** | 8 | 5 | 3 | 63% ✅ |
+| **Tenant Migration (Phase 7)** | 5 | 3 | 2 | 60% ⚠️ |
+| **Core Migration (Phase 8)** | 8 | 3 | 5 | 38% ⚠️ |
+| **Workflow Migration (Phase 9)** | 7 | 2 | 5 | 29% ⚠️ |
 | **Admin UI Decision** | 5 | 0 | 5 | 0% |
-| **TOTAL** | **51** | **5** | **46** | **10%** |
+| **TOTAL** | **51** | **18** | **33** | **35%** |
 
 ### Priority Legend
 
@@ -3537,14 +3545,23 @@ Track progress on all OpenTelemetry migration, testing, and critical fixes. Chec
 
 ### Next Immediate Actions (Q1 2026)
 
-1. ✅ **Implement Raft persistence** - Custom WAL with RocksDB
-2. ✅ **Fix agent blocking I/O** - Replace Apache HttpClient with Vert.x WebClient
-3. ✅ **Create integration tests** - Test Phases 1-5 with TestContainers
-4. ✅ **Add log compaction** - Prevent infinite Raft log growth
-5. ✅ **Implement InstallSnapshot RPC** - For catching up lagging followers
+#### OpenTelemetry Completion Tasks (Priority Order)
+
+1. ⬜ **Migrate quorus-tenant logging to SLF4J** - 3 files need update (SimpleTenantService, SimpleResourceManagementService, TenantMetrics)
+2. ⬜ **Migrate quorus-workflow logging to SLF4J** - 2 files need update (SimpleWorkflowEngine, WorkflowMetrics)
+3. ⬜ **Remove old TransferMetrics.java from quorus-core** - Replace with TransferTelemetryMetrics integration
+4. ⬜ **Wire TenantMetrics into SimpleTenantService** - Call recordTenantCreated/Deleted/Suspended/Activated
+5. ⬜ **Wire WorkflowMetrics into SimpleWorkflowEngine** - Call recordWorkflowStarted/Completed/Failed
+6. ⬜ **Create OTel integration test infrastructure** - Test Phases 1-5 (Docker Compose, Collector, Tests)
+
+#### Critical Pre-Production Fixes (Blocking Production)
+
+1. ⬜ **Implement Raft persistence** - Custom WAL with RocksDB
+2. ⬜ **Add Raft log compaction** - Prevent infinite memory growth
+3. ⬜ **Implement InstallSnapshot RPC** - For catching up lagging followers
 
 ---
 
-**Document Status**: Ready for Implementation  
-**Last Updated**: 2026-01-26  
-**Version**: 2.0
+**Document Status**: Updated Based on Code Review  
+**Last Updated**: 2026-01-28  
+**Version**: 2.1

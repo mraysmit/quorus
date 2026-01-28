@@ -24,8 +24,10 @@ import java.time.LocalDate;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Simple in-memory implementation of ResourceManagementService.
@@ -38,7 +40,7 @@ import java.util.stream.Collectors;
  */
 public class SimpleResourceManagementService implements ResourceManagementService {
     
-    private static final Logger logger = Logger.getLogger(SimpleResourceManagementService.class.getName());
+    private static final Logger logger = LoggerFactory.getLogger(SimpleResourceManagementService.class);
     
     private final TenantService tenantService;
     private final Map<String, ResourceUsage> currentUsage = new ConcurrentHashMap<>();
@@ -64,7 +66,7 @@ public class SimpleResourceManagementService implements ResourceManagementServic
             usageHistory.computeIfAbsent(usage.getTenantId(), k -> new ConcurrentHashMap<>())
                        .put(usage.getUsageDate(), usage);
             
-            logger.fine("Recorded usage for tenant: " + usage.getTenantId());
+            logger.debug("Recorded usage for tenant: {}", usage.getTenantId());
         }
     }
     
@@ -151,7 +153,7 @@ public class SimpleResourceManagementService implements ResourceManagementServic
             }
             
         } catch (Exception e) {
-            logger.severe("Error validating transfer request: " + e.getMessage());
+            logger.error("Error validating transfer request: {}", e.getMessage());
             return ResourceValidationResult.denied("Validation error: " + e.getMessage(), 
                     List.of("Internal validation error"));
         }
@@ -183,7 +185,7 @@ public class SimpleResourceManagementService implements ResourceManagementServic
             // Record metric (Phase 7 - Jan 2026)
             metrics.recordResourceReservation(tenantId, "transfer", true);
             
-            logger.info("Reserved resources for tenant " + tenantId + ": " + reservationToken);
+            logger.info("Reserved resources for tenant {}: {}", tenantId, reservationToken);
             return reservationToken;
         }
     }
@@ -213,7 +215,7 @@ public class SimpleResourceManagementService implements ResourceManagementServic
             // Record metric (Phase 7 - Jan 2026)
             metrics.recordResourceRelease(reservation.tenantId, "transfer");
             
-            logger.info("Released resources for reservation: " + reservationToken);
+            logger.info("Released resources for reservation: {}", reservationToken);
         }
     }
     
@@ -378,7 +380,7 @@ public class SimpleResourceManagementService implements ResourceManagementServic
                     try {
                         recordUsage(reset);
                     } catch (ResourceManagementException e) {
-                        logger.severe("Error resetting daily usage for tenant " + tenantId + ": " + e.getMessage());
+                        logger.error("Error resetting daily usage for tenant {}: {}", tenantId, e.getMessage());
                     }
                 }
             }
