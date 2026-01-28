@@ -16,6 +16,7 @@
 
 package dev.mars.quorus.agent.observability;
 
+import dev.mars.quorus.agent.config.AgentConfig;
 import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
 import io.opentelemetry.sdk.metrics.SdkMeterProvider;
@@ -33,7 +34,7 @@ import io.vertx.tracing.opentelemetry.OpenTelemetryOptions;
  * 
  * Provides:
  * - OTLP trace export for distributed tracing
- * - Prometheus metrics export on port 9465
+ * - Prometheus metrics export (configurable port, default 9465)
  * - Vert.x tracing integration
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
@@ -42,7 +43,7 @@ import io.vertx.tracing.opentelemetry.OpenTelemetryOptions;
  */
 public class AgentTelemetryConfig {
 
-    private static final int PROMETHEUS_PORT = 9465;
+    private static final AgentConfig config = AgentConfig.get();
 
     /**
      * Configure Vert.x options with OpenTelemetry tracing.
@@ -60,6 +61,7 @@ public class AgentTelemetryConfig {
 
         // 2. Configure Tracing (OTLP Exporter)
         OtlpGrpcSpanExporter spanExporter = OtlpGrpcSpanExporter.builder()
+                .setEndpoint(config.getOtlpEndpoint())
                 .build();
 
         SdkTracerProvider tracerProvider = SdkTracerProvider.builder()
@@ -69,7 +71,7 @@ public class AgentTelemetryConfig {
 
         // 3. Configure Metrics (Prometheus)
         PrometheusHttpServer prometheusReader = PrometheusHttpServer.builder()
-                .setPort(PROMETHEUS_PORT)
+                .setPort(config.getPrometheusPort())
                 .build();
 
         SdkMeterProvider meterProvider = SdkMeterProvider.builder()
@@ -91,6 +93,6 @@ public class AgentTelemetryConfig {
      * Get the Prometheus metrics port.
      */
     public static int getPrometheusPort() {
-        return PROMETHEUS_PORT;
+        return config.getPrometheusPort();
     }
 }

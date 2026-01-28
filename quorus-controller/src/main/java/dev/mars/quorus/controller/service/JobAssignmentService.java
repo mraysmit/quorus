@@ -17,6 +17,7 @@
 package dev.mars.quorus.controller.service;
 
 import dev.mars.quorus.agent.AgentInfo;
+import dev.mars.quorus.controller.config.AppConfig;
 import dev.mars.quorus.core.*;
 import dev.mars.quorus.core.TransferJob;
 import dev.mars.quorus.controller.state.JobAssignmentCommand;
@@ -346,10 +347,13 @@ public class JobAssignmentService {
      * Uses Vert.x periodic timer instead of ScheduledExecutorService.
      */
     private void startAssignmentProcessor() {
-        // Initial delay: 5 seconds, then every 10 seconds
-        vertx.setTimer(5000, id -> {
+        AppConfig config = AppConfig.get();
+        long initialDelay = config.getAssignmentInitialDelayMs();
+        long interval = config.getAssignmentIntervalMs();
+        
+        vertx.setTimer(initialDelay, id -> {
             if (!closed.get()) {
-                assignmentProcessorTimerId = vertx.setPeriodic(10000, timerId -> {
+                assignmentProcessorTimerId = vertx.setPeriodic(interval, timerId -> {
                     if (!closed.get()) {
                         try {
                             processQueuedJobs();
@@ -360,7 +364,7 @@ public class JobAssignmentService {
                 });
             }
         });
-        logger.info("Assignment processor started: initialDelay=5s, interval=10s");
+        logger.info("Assignment processor started: initialDelay={}ms, interval={}ms", initialDelay, interval);
     }
 
     /**
@@ -368,10 +372,13 @@ public class JobAssignmentService {
      * Uses Vert.x periodic timer instead of ScheduledExecutorService.
      */
     private void startTimeoutMonitor() {
-        // Initial delay: 30 seconds, then every 30 seconds
-        vertx.setTimer(30000, id -> {
+        AppConfig config = AppConfig.get();
+        long initialDelay = config.getTimeoutInitialDelayMs();
+        long interval = config.getTimeoutIntervalMs();
+        
+        vertx.setTimer(initialDelay, id -> {
             if (!closed.get()) {
-                timeoutMonitorTimerId = vertx.setPeriodic(30000, timerId -> {
+                timeoutMonitorTimerId = vertx.setPeriodic(interval, timerId -> {
                     if (!closed.get()) {
                         try {
                             checkAssignmentTimeouts();
@@ -382,7 +389,7 @@ public class JobAssignmentService {
                 });
             }
         });
-        logger.info("Timeout monitor started: initialDelay=30s, interval=30s");
+        logger.info("Timeout monitor started: initialDelay={}ms, interval={}ms", initialDelay, interval);
     }
     
     /**

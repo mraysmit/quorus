@@ -16,6 +16,7 @@
 
 package dev.mars.quorus.agent;
 
+import dev.mars.quorus.agent.config.AgentConfig;
 import dev.mars.quorus.agent.config.AgentConfiguration;
 import dev.mars.quorus.agent.observability.AgentMetrics;
 import dev.mars.quorus.agent.observability.AgentTelemetryConfig;
@@ -156,7 +157,6 @@ public class QuorusAgent {
 
         } catch (Exception e) {
             logger.error("Failed to start Quorus Agent", e);
-            vertx.close();
             System.exit(1);
         }
 
@@ -211,10 +211,14 @@ public class QuorusAgent {
         logger.info("Transfer execution service started");
 
         // Start job polling using Vert.x timer (no ScheduledExecutorService!)
-        // Initial delay of 5 seconds, then poll every 10 seconds
-        vertx.setTimer(5000, initialId -> {
+        // Configurable initial delay and polling interval
+        final AgentConfig agentConfig = AgentConfig.get();
+        final long initialDelay = agentConfig.getJobPollingInitialDelayMs();
+        final long pollingInterval = agentConfig.getJobPollingIntervalMs();
+        
+        vertx.setTimer(initialDelay, initialId -> {
             if (!closed.get() && running) {
-                jobPollingTimerId = vertx.setPeriodic(10000, id -> {
+                jobPollingTimerId = vertx.setPeriodic(pollingInterval, id -> {
                     if (!closed.get() && running) {
                         try {
                             pollForJobs();
@@ -223,7 +227,7 @@ public class QuorusAgent {
                         }
                     }
                 });
-                logger.info("Job polling started (interval: 10s) [Vert.x timer ID: {}]", jobPollingTimerId);
+                logger.info("Job polling started (interval: {}ms) [Vert.x timer ID: {}]", pollingInterval, jobPollingTimerId);
             }
         });
 
@@ -339,8 +343,9 @@ public class QuorusAgent {
 
     private void handleTransferComplete(String jobId, TransferResult result) {
         long durationSeconds = result.getDuration().map(d -> d.toSeconds()).orElse(0L);
-        String protocol = result.getProtocol().orElse("unknown");
-        String direction = result.getDirection().map(Enum::name).orElse("DOWNLOAD");
+        // Protocol and direction not available on TransferResult, use defaults for metrics
+        String protocol = "unknown";
+        String direction = "DOWNLOAD";
         
         if (result.isSuccessful()) {
             String durationStr = result.getDuration()
