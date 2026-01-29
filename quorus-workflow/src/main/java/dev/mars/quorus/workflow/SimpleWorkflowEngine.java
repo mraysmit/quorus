@@ -463,7 +463,7 @@ public class SimpleWorkflowEngine implements WorkflowEngine {
 
                     if (!entry.getValue().isSuccessful()) {
                         groupSuccess = false;
-                        metrics.recordStepFailed(workflowName, "transfer", entry.getValue().getErrorMessage());
+                        metrics.recordStepFailed(workflowName, "transfer", entry.getValue().getErrorMessage().orElse("Unknown error"));
                         if (!group.isContinueOnError()) {
                             groupError = "Transfer failed: " + entry.getKey();
                         }
