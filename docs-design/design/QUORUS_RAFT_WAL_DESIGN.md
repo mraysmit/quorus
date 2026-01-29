@@ -2749,3 +2749,855 @@ RaftNode Integration:
 ├── [ ] shouldGrantVote() checks votedFor and log up-to-date
 └── [ ] Error handlers don't mutate state on failure
 ```
+
+---
+
+## Appendix F: Pluggable Storage Architecture
+
+This appendix defines the **Storage Provider Interface (SPI)** pattern that allows the Raft implementation to use either the custom `FileRaftStorage` (our minimal WAL) or a high-performance key-value store like **RocksDB** as a drop-in replacement.
+
+### F.1 Design Goals
+
+| Goal | Rationale |
+|------|-----------|
+| **Backend Agnostic** | `RaftNode` depends only on the interface, never on concrete implementations |
+| **Zero Code Changes** | Switching backends requires only configuration changes |
+| **Raft-Correct** | All implementations must honor the "Persist-before-response" contract |
+| **Testable** | Easy to inject mock implementations for unit testing |
+
+### F.2 The RaftStorage Interface (SPI)
+
+This is the **single contract** that all storage backends must implement:
+
+```java
+package dev.mars.quorus.controller.raft.storage;
+
+import io.vertx.core.Future;
+import java.io.Closeable;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Optional;
+
+/**
+ * Storage Provider Interface (SPI) for Raft persistence.
+ * 
+ * <p>All implementations MUST guarantee:</p>
+ * <ul>
+ *   <li>Durability: Data survives process crash after {@link #sync()} returns</li>
+ *   <li>Atomicity: Metadata updates are all-or-nothing</li>
+ *   <li>Ordering: Log entries maintain strict index ordering</li>
+ * </ul>
+ * 
+ * <p>Implementations:</p>
+ * <ul>
+ *   <li>{@code FileRaftStorage} - Custom WAL (zero dependencies)</li>
+ *   <li>{@code RocksDbRaftStorage} - RocksDB adapter (high performance)</li>
+ * </ul>
+ */
+public interface RaftStorage extends Closeable {
+
+    // =========================================================================
+    // Lifecycle
+    // =========================================================================
+
+    /**
+     * Opens the storage backend at the specified directory.
+     * Creates the directory if it does not exist.
+     * Idempotent: calling open() on an already-open storage is a no-op.
+     *
+     * @param dataDir the directory for storage files
+     * @return a Future that completes when the storage is ready
+     */
+    Future<Void> open(Path dataDir);
+
+    /**
+     * Closes the storage backend and releases all resources.
+     * Must be called before JVM shutdown to ensure data integrity.
+     */
+    @Override
+    void close();
+
+    // =========================================================================
+    // Metadata Operations (Term & Vote)
+    // =========================================================================
+
+    /**
+     * Atomically persists the current term and voted-for candidate.
+     * 
+     * <p><b>Raft Safety:</b> This method MUST ensure durability (fsync equivalent)
+     * before the Future completes. The caller will grant a vote or update term
+     * only after this Future succeeds.</p>
+     *
+     * @param currentTerm the current Raft term
+     * @param votedFor    the candidate voted for in this term (empty if none)
+     * @return a Future that completes after durable persistence
+     */
+    Future<Void> updateMetadata(long currentTerm, Optional<String> votedFor);
+
+    /**
+     * Loads persisted metadata on startup.
+     * Returns default values (term=0, votedFor=empty) if no state exists.
+     *
+     * @return a Future containing the persisted metadata
+     */
+    Future<PersistentMeta> loadMetadata();
+
+    /**
+     * Immutable record for persisted Raft metadata.
+     */
+    record PersistentMeta(long currentTerm, Optional<String> votedFor) {
+        public static PersistentMeta empty() {
+            return new PersistentMeta(0L, Optional.empty());
+        }
+    }
+
+    // =========================================================================
+    // Log Operations
+    // =========================================================================
+
+    /**
+     * Appends a batch of log entries.
+     * 
+     * <p><b>Note:</b> Entries are NOT guaranteed to be durable until {@link #sync()}
+     * is called. This allows batching multiple appends before a single fsync.</p>
+     *
+     * @param entries the entries to append (must have sequential indices)
+     * @return a Future that completes when entries are written (but not necessarily synced)
+     */
+    Future<Void> appendEntries(List<LogEntryData> entries);
+
+    /**
+     * Deletes all log entries with index >= fromIndex.
+     * Used to resolve log conflicts when a follower diverges from the leader.
+     * 
+     * <p><b>Note:</b> Truncation is NOT guaranteed to be durable until {@link #sync()}
+     * is called.</p>
+     *
+     * @param fromIndex the first index to delete (inclusive)
+     * @return a Future that completes when truncation is recorded
+     */
+    Future<Void> truncateSuffix(long fromIndex);
+
+    /**
+     * Forces all pending writes to durable storage.
+     * 
+     * <p><b>THE DURABILITY BARRIER:</b> This is the critical synchronization point.
+     * After this Future completes successfully, all prior appends and truncations
+     * are guaranteed to survive a crash.</p>
+     * 
+     * <p>The RaftNode MUST call this before acknowledging AppendEntries RPCs.</p>
+     *
+     * @return a Future that completes after fsync (or equivalent)
+     */
+    Future<Void> sync();
+
+    /**
+     * Replays the entire log from storage on startup.
+     * Returns entries in index order, handling any truncation markers.
+     *
+     * @return a Future containing all valid log entries
+     */
+    Future<List<LogEntryData>> replayLog();
+
+    /**
+     * Immutable record for a log entry.
+     */
+    record LogEntryData(long index, long term, byte[] payload) {}
+}
+```
+
+### F.3 Implementation A: FileRaftStorage (Custom WAL)
+
+This is the **default implementation** — zero external dependencies, pure Java.
+
+```java
+package dev.mars.quorus.controller.raft.storage.file;
+
+import dev.mars.quorus.controller.raft.storage.RaftStorage;
+import io.vertx.core.Future;
+import io.vertx.core.Vertx;
+import io.vertx.core.WorkerExecutor;
+
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.file.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.zip.CRC32C;
+
+import static java.nio.file.StandardOpenOption.*;
+
+/**
+ * File-based Raft storage using a custom Write-Ahead Log.
+ * 
+ * <p>Storage layout:</p>
+ * <pre>
+ * {dataDir}/
+ *   ├── meta.dat      // currentTerm + votedFor (atomic replace)
+ *   └── raft.log      // append-only WAL with TRUNCATE/APPEND records
+ * </pre>
+ * 
+ * <p>This implementation is designed for correctness over performance.
+ * For high-throughput scenarios, use {@code RocksDbRaftStorage}.</p>
+ */
+public final class FileRaftStorage implements RaftStorage {
+
+    private static final int MAGIC = 0x52414654;  // 'RAFT'
+    private static final short VERSION = 1;
+    private static final byte TYPE_TRUNCATE = 1;
+    private static final byte TYPE_APPEND = 2;
+
+    private final Vertx vertx;
+    private final WorkerExecutor executor;
+    
+    private Path dataDir;
+    private FileChannel logChannel;
+
+    public FileRaftStorage(Vertx vertx, WorkerExecutor executor) {
+        this.vertx = vertx;
+        this.executor = executor;
+    }
+
+    @Override
+    public Future<Void> open(Path dataDir) {
+        this.dataDir = dataDir;
+        return vertx.executeBlocking(() -> {
+            Files.createDirectories(dataDir);
+            this.logChannel = FileChannel.open(
+                dataDir.resolve("raft.log"), CREATE, READ, WRITE);
+            logChannel.position(logChannel.size());
+            return null;
+        }, false);
+    }
+
+    @Override
+    public Future<Void> updateMetadata(long currentTerm, Optional<String> votedFor) {
+        return vertx.executeBlocking(() -> {
+            Path tmp = dataDir.resolve("meta.dat.tmp");
+            Path dst = dataDir.resolve("meta.dat");
+
+            byte[] voteBytes = votedFor.map(s -> s.getBytes(java.nio.charset.StandardCharsets.UTF_8))
+                                       .orElse(new byte[0]);
+
+            ByteBuffer buf = ByteBuffer.allocate(8 + 4 + voteBytes.length + 4);
+            buf.putLong(currentTerm);
+            buf.putInt(voteBytes.length);
+            buf.put(voteBytes);
+
+            CRC32C crc = new CRC32C();
+            crc.update(buf.array(), 0, 8 + 4 + voteBytes.length);
+            buf.putInt((int) crc.getValue());
+            buf.flip();
+
+            // Write to temp file
+            try (FileChannel ch = FileChannel.open(tmp, CREATE, TRUNCATE_EXISTING, WRITE)) {
+                while (buf.hasRemaining()) ch.write(buf);
+                ch.force(true);  // fsync the file
+            }
+
+            // Atomic rename
+            Files.move(tmp, dst, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            
+            // Fsync the directory (critical on Linux)
+            syncDirectory(dataDir);
+            
+            return null;
+        }, false);
+    }
+
+    @Override
+    public Future<PersistentMeta> loadMetadata() {
+        return vertx.executeBlocking(() -> {
+            Path metaPath = dataDir.resolve("meta.dat");
+            if (!Files.exists(metaPath)) {
+                return PersistentMeta.empty();
+            }
+
+            byte[] data = Files.readAllBytes(metaPath);
+            ByteBuffer buf = ByteBuffer.wrap(data);
+
+            long term = buf.getLong();
+            int voteLen = buf.getInt();
+            
+            if (voteLen < 0 || voteLen > data.length - 16) {
+                throw new IOException("Corrupt meta.dat: invalid vote length");
+            }
+
+            byte[] voteBytes = new byte[voteLen];
+            buf.get(voteBytes);
+
+            int storedCrc = buf.getInt();
+            CRC32C crc = new CRC32C();
+            crc.update(data, 0, 8 + 4 + voteLen);
+            
+            if ((int) crc.getValue() != storedCrc) {
+                throw new IOException("Corrupt meta.dat: CRC mismatch");
+            }
+
+            Optional<String> votedFor = voteLen == 0 
+                ? Optional.empty()
+                : Optional.of(new String(voteBytes, java.nio.charset.StandardCharsets.UTF_8));
+
+            return new PersistentMeta(term, votedFor);
+        }, false);
+    }
+
+    @Override
+    public Future<Void> appendEntries(List<LogEntryData> entries) {
+        if (entries.isEmpty()) return Future.succeededFuture();
+        
+        return vertx.executeBlocking(() -> {
+            for (LogEntryData entry : entries) {
+                writeRecord(TYPE_APPEND, entry.index(), entry.term(), entry.payload());
+            }
+            return null;
+        }, false);
+    }
+
+    @Override
+    public Future<Void> truncateSuffix(long fromIndex) {
+        return vertx.executeBlocking(() -> {
+            writeRecord(TYPE_TRUNCATE, fromIndex, 0L, new byte[0]);
+            return null;
+        }, false);
+    }
+
+    @Override
+    public Future<Void> sync() {
+        return vertx.executeBlocking(() -> {
+            logChannel.force(true);
+            return null;
+        }, false);
+    }
+
+    @Override
+    public Future<List<LogEntryData>> replayLog() {
+        // See Section 15.6 for full implementation
+        return vertx.executeBlocking(() -> {
+            // ... replay logic with CRC validation and tail truncation
+            return new ArrayList<LogEntryData>();
+        }, false);
+    }
+
+    @Override
+    public void close() {
+        try {
+            if (logChannel != null) logChannel.close();
+        } catch (IOException e) {
+            // Log warning
+        }
+    }
+
+    // ---- Private Helpers ----
+
+    private void writeRecord(byte type, long index, long term, byte[] payload) throws IOException {
+        int headerLen = 4 + 2 + 1 + 8 + 8 + 4;  // magic + ver + type + index + term + payloadLen
+        ByteBuffer buf = ByteBuffer.allocate(headerLen + payload.length + 4);
+
+        buf.putInt(MAGIC);
+        buf.putShort(VERSION);
+        buf.put(type);
+        buf.putLong(index);
+        buf.putLong(term);
+        buf.putInt(payload.length);
+        buf.put(payload);
+
+        CRC32C crc = new CRC32C();
+        crc.update(buf.array(), 0, headerLen + payload.length);
+        buf.putInt((int) crc.getValue());
+        buf.flip();
+
+        while (buf.hasRemaining()) logChannel.write(buf);
+    }
+
+    private void syncDirectory(Path dir) throws IOException {
+        if (System.getProperty("os.name").toLowerCase().contains("win")) {
+            return;  // Windows doesn't support directory fsync
+        }
+        try (FileChannel dirChannel = FileChannel.open(dir, READ)) {
+            dirChannel.force(true);
+        }
+    }
+}
+```
+
+### F.4 Implementation B: RocksDbRaftStorage (High Performance)
+
+This adapter wraps RocksDB to provide the same interface with better performance characteristics.
+
+```java
+package dev.mars.quorus.controller.raft.storage.rocksdb;
+
+import dev.mars.quorus.controller.raft.storage.RaftStorage;
+import io.vertx.core.Future;
+import io.vertx.core.Vertx;
+import io.vertx.core.WorkerExecutor;
+import org.rocksdb.*;
+
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+/**
+ * RocksDB-based Raft storage for high-performance deployments.
+ * 
+ * <p>Key Schema:</p>
+ * <pre>
+ * meta:term     -> 8-byte long (currentTerm)
+ * meta:votedFor -> UTF-8 string (candidateId)
+ * log:{index}   -> {term:8bytes}{payload:*}
+ * </pre>
+ * 
+ * <p>RocksDB provides:</p>
+ * <ul>
+ *   <li>LSM-tree with efficient writes</li>
+ *   <li>Built-in compression</li>
+ *   <li>Atomic batch writes</li>
+ *   <li>Range deletes for truncation</li>
+ * </ul>
+ */
+public final class RocksDbRaftStorage implements RaftStorage {
+
+    static {
+        RocksDB.loadLibrary();
+    }
+
+    private static final byte[] KEY_TERM = "meta:term".getBytes(StandardCharsets.UTF_8);
+    private static final byte[] KEY_VOTED_FOR = "meta:votedFor".getBytes(StandardCharsets.UTF_8);
+    private static final String LOG_PREFIX = "log:";
+
+    private final Vertx vertx;
+    private final WorkerExecutor executor;
+    
+    private RocksDB db;
+    private WriteOptions syncWriteOptions;
+    private WriteOptions asyncWriteOptions;
+
+    public RocksDbRaftStorage(Vertx vertx, WorkerExecutor executor) {
+        this.vertx = vertx;
+        this.executor = executor;
+    }
+
+    @Override
+    public Future<Void> open(Path dataDir) {
+        return vertx.executeBlocking(() -> {
+            Options options = new Options()
+                .setCreateIfMissing(true)
+                .setWriteBufferSize(64 * 1024 * 1024)  // 64MB write buffer
+                .setMaxWriteBufferNumber(3)
+                .setTargetFileSizeBase(64 * 1024 * 1024);
+
+            db = RocksDB.open(options, dataDir.toString());
+            
+            // Sync writes for durability-critical operations
+            syncWriteOptions = new WriteOptions().setSync(true);
+            
+            // Async writes for batched appends (sync() called separately)
+            asyncWriteOptions = new WriteOptions().setSync(false);
+            
+            return null;
+        }, false);
+    }
+
+    @Override
+    public Future<Void> updateMetadata(long currentTerm, Optional<String> votedFor) {
+        return vertx.executeBlocking(() -> {
+            try (WriteBatch batch = new WriteBatch()) {
+                // Write term
+                ByteBuffer termBuf = ByteBuffer.allocate(8);
+                termBuf.putLong(currentTerm);
+                batch.put(KEY_TERM, termBuf.array());
+
+                // Write votedFor (delete if empty)
+                if (votedFor.isPresent()) {
+                    batch.put(KEY_VOTED_FOR, votedFor.get().getBytes(StandardCharsets.UTF_8));
+                } else {
+                    batch.delete(KEY_VOTED_FOR);
+                }
+
+                // Atomic, synchronous write
+                db.write(syncWriteOptions, batch);
+            }
+            return null;
+        }, false);
+    }
+
+    @Override
+    public Future<PersistentMeta> loadMetadata() {
+        return vertx.executeBlocking(() -> {
+            byte[] termBytes = db.get(KEY_TERM);
+            byte[] voteBytes = db.get(KEY_VOTED_FOR);
+
+            long term = 0;
+            if (termBytes != null && termBytes.length == 8) {
+                term = ByteBuffer.wrap(termBytes).getLong();
+            }
+
+            Optional<String> votedFor = Optional.empty();
+            if (voteBytes != null && voteBytes.length > 0) {
+                votedFor = Optional.of(new String(voteBytes, StandardCharsets.UTF_8));
+            }
+
+            return new PersistentMeta(term, votedFor);
+        }, false);
+    }
+
+    @Override
+    public Future<Void> appendEntries(List<LogEntryData> entries) {
+        if (entries.isEmpty()) return Future.succeededFuture();
+
+        return vertx.executeBlocking(() -> {
+            try (WriteBatch batch = new WriteBatch()) {
+                for (LogEntryData entry : entries) {
+                    byte[] key = logKey(entry.index());
+                    byte[] value = encodeEntry(entry.term(), entry.payload());
+                    batch.put(key, value);
+                }
+                // Async write - sync() will be called separately
+                db.write(asyncWriteOptions, batch);
+            }
+            return null;
+        }, false);
+    }
+
+    @Override
+    public Future<Void> truncateSuffix(long fromIndex) {
+        return vertx.executeBlocking(() -> {
+            // RocksDB range delete: [fromIndex, MAX_LONG)
+            byte[] startKey = logKey(fromIndex);
+            byte[] endKey = logKey(Long.MAX_VALUE);
+            
+            try (WriteBatch batch = new WriteBatch()) {
+                batch.deleteRange(startKey, endKey);
+                db.write(asyncWriteOptions, batch);
+            }
+            return null;
+        }, false);
+    }
+
+    @Override
+    public Future<Void> sync() {
+        return vertx.executeBlocking(() -> {
+            // Force WAL sync in RocksDB
+            db.flushWal(true);
+            return null;
+        }, false);
+    }
+
+    @Override
+    public Future<List<LogEntryData>> replayLog() {
+        return vertx.executeBlocking(() -> {
+            List<LogEntryData> entries = new ArrayList<>();
+            
+            byte[] prefix = LOG_PREFIX.getBytes(StandardCharsets.UTF_8);
+            
+            try (RocksIterator iter = db.newIterator()) {
+                iter.seek(prefix);
+                
+                while (iter.isValid()) {
+                    byte[] key = iter.key();
+                    
+                    // Check if still in log: prefix
+                    if (!startsWith(key, prefix)) break;
+                    
+                    long index = parseLogIndex(key);
+                    byte[] value = iter.value();
+                    
+                    long term = ByteBuffer.wrap(value, 0, 8).getLong();
+                    byte[] payload = new byte[value.length - 8];
+                    System.arraycopy(value, 8, payload, 0, payload.length);
+                    
+                    entries.add(new LogEntryData(index, term, payload));
+                    iter.next();
+                }
+            }
+            
+            return entries;
+        }, false);
+    }
+
+    @Override
+    public void close() {
+        if (syncWriteOptions != null) syncWriteOptions.close();
+        if (asyncWriteOptions != null) asyncWriteOptions.close();
+        if (db != null) db.close();
+    }
+
+    // ---- Private Helpers ----
+
+    private byte[] logKey(long index) {
+        // Format: "log:{index}" with zero-padded index for lexicographic ordering
+        return String.format("log:%020d", index).getBytes(StandardCharsets.UTF_8);
+    }
+
+    private long parseLogIndex(byte[] key) {
+        String keyStr = new String(key, StandardCharsets.UTF_8);
+        return Long.parseLong(keyStr.substring(LOG_PREFIX.length()));
+    }
+
+    private byte[] encodeEntry(long term, byte[] payload) {
+        ByteBuffer buf = ByteBuffer.allocate(8 + payload.length);
+        buf.putLong(term);
+        buf.put(payload);
+        return buf.array();
+    }
+
+    private boolean startsWith(byte[] array, byte[] prefix) {
+        if (array.length < prefix.length) return false;
+        for (int i = 0; i < prefix.length; i++) {
+            if (array[i] != prefix[i]) return false;
+        }
+        return true;
+    }
+}
+```
+
+### F.5 Storage Factory & Configuration
+
+Use a factory to instantiate the correct implementation based on configuration:
+
+```java
+package dev.mars.quorus.controller.raft.storage;
+
+import dev.mars.quorus.controller.config.AppConfig;
+import dev.mars.quorus.controller.raft.storage.file.FileRaftStorage;
+import dev.mars.quorus.controller.raft.storage.rocksdb.RocksDbRaftStorage;
+import io.vertx.core.Vertx;
+import io.vertx.core.WorkerExecutor;
+
+/**
+ * Factory for creating RaftStorage instances based on configuration.
+ */
+public final class RaftStorageFactory {
+
+    public enum StorageType {
+        FILE,       // Custom WAL (default)
+        ROCKSDB     // High-performance KV store
+    }
+
+    private RaftStorageFactory() {}
+
+    /**
+     * Creates a RaftStorage instance based on configuration.
+     * 
+     * @param vertx    the Vert.x instance
+     * @param executor the worker executor for blocking I/O
+     * @return the configured RaftStorage implementation
+     */
+    public static RaftStorage create(Vertx vertx, WorkerExecutor executor) {
+        AppConfig config = AppConfig.get();
+        String storageType = config.getString("quorus.raft.storage.type", "file");
+
+        return switch (storageType.toLowerCase()) {
+            case "rocksdb" -> {
+                validateRocksDbAvailable();
+                yield new RocksDbRaftStorage(vertx, executor);
+            }
+            case "file" -> new FileRaftStorage(vertx, executor);
+            default -> throw new IllegalArgumentException(
+                "Unknown storage type: " + storageType + ". Valid options: file, rocksdb");
+        };
+    }
+
+    private static void validateRocksDbAvailable() {
+        try {
+            Class.forName("org.rocksdb.RocksDB");
+        } catch (ClassNotFoundException e) {
+            throw new IllegalStateException(
+                "RocksDB storage requested but org.rocksdb:rocksdbjni is not on classpath. " +
+                "Add the dependency or use storage.type=file");
+        }
+    }
+}
+```
+
+### F.6 Configuration Properties
+
+Add to `quorus-controller.properties`:
+
+```properties
+# =============================================================================
+# Raft Storage Configuration
+# =============================================================================
+
+# Storage backend type: "file" (default) or "rocksdb"
+# - file:    Custom WAL, zero dependencies, simpler, lower throughput
+# - rocksdb: High-performance LSM-tree, requires rocksdbjni dependency
+quorus.raft.storage.type=file
+
+# Base directory for storage files
+quorus.raft.storage.path=/var/lib/quorus/data
+
+# Enable fsync after writes (required for durability, disable only for testing)
+quorus.raft.storage.fsync=true
+
+# RocksDB-specific settings (ignored if type=file)
+quorus.raft.storage.rocksdb.write-buffer-size=67108864
+quorus.raft.storage.rocksdb.max-write-buffers=3
+```
+
+### F.7 Dependency Management
+
+For RocksDB support, add to `pom.xml` with an optional scope:
+
+```xml
+<!-- Optional: High-performance storage backend -->
+<dependency>
+    <groupId>org.rocksdb</groupId>
+    <artifactId>rocksdbjni</artifactId>
+    <version>9.0.0</version>
+    <optional>true</optional>
+</dependency>
+```
+
+This allows:
+- Default builds to work without RocksDB
+- Production deployments to opt-in by including the JAR
+
+### F.8 Comparison Matrix
+
+| Feature | FileRaftStorage | RocksDbRaftStorage |
+|---------|-----------------|-------------------|
+| **Dependencies** | None (pure Java) | `rocksdbjni` (~40MB) |
+| **Write Performance** | ~1,000 ops/sec | ~100,000 ops/sec |
+| **Read Performance** | O(n) replay | O(1) point lookups |
+| **Compression** | None | LZ4/Snappy/Zstd |
+| **Memory Usage** | Minimal | Configurable (write buffers) |
+| **Complexity** | Simple | More operational overhead |
+| **Best For** | Dev, small clusters | Production, high throughput |
+
+### F.9 Testing with Mock Storage
+
+For unit tests, create a mock implementation:
+
+```java
+package dev.mars.quorus.controller.raft.storage;
+
+import io.vertx.core.Future;
+import java.nio.file.Path;
+import java.util.*;
+
+/**
+ * In-memory storage for unit testing.
+ * NOT for production use - does not provide durability.
+ */
+public final class InMemoryRaftStorage implements RaftStorage {
+
+    private long currentTerm = 0;
+    private Optional<String> votedFor = Optional.empty();
+    private final List<LogEntryData> log = new ArrayList<>();
+    
+    private boolean failOnSync = false;  // For testing error paths
+
+    @Override
+    public Future<Void> open(Path dataDir) {
+        return Future.succeededFuture();
+    }
+
+    @Override
+    public Future<Void> updateMetadata(long currentTerm, Optional<String> votedFor) {
+        this.currentTerm = currentTerm;
+        this.votedFor = votedFor;
+        return Future.succeededFuture();
+    }
+
+    @Override
+    public Future<PersistentMeta> loadMetadata() {
+        return Future.succeededFuture(new PersistentMeta(currentTerm, votedFor));
+    }
+
+    @Override
+    public Future<Void> appendEntries(List<LogEntryData> entries) {
+        log.addAll(entries);
+        return Future.succeededFuture();
+    }
+
+    @Override
+    public Future<Void> truncateSuffix(long fromIndex) {
+        log.removeIf(e -> e.index() >= fromIndex);
+        return Future.succeededFuture();
+    }
+
+    @Override
+    public Future<Void> sync() {
+        if (failOnSync) {
+            return Future.failedFuture(new IOException("Simulated sync failure"));
+        }
+        return Future.succeededFuture();
+    }
+
+    @Override
+    public Future<List<LogEntryData>> replayLog() {
+        return Future.succeededFuture(new ArrayList<>(log));
+    }
+
+    @Override
+    public void close() {
+        log.clear();
+    }
+
+    // ---- Test Helpers ----
+    
+    public void setFailOnSync(boolean fail) {
+        this.failOnSync = fail;
+    }
+    
+    public List<LogEntryData> getLog() {
+        return Collections.unmodifiableList(log);
+    }
+}
+```
+
+### F.10 RaftNode Integration
+
+The `RaftNode` is completely decoupled from storage implementation:
+
+```java
+public class RaftNode {
+    
+    private final RaftStorage storage;  // Interface, not implementation
+
+    public RaftNode(RaftStorage storage, StateMachine stateMachine) {
+        this.storage = storage;
+        // ...
+    }
+
+    // All storage operations go through the interface
+    // RaftNode never knows if it's using File or RocksDB
+}
+
+// Usage in QuorusControllerVerticle:
+WorkerExecutor walExecutor = vertx.createSharedWorkerExecutor("wal", 1);
+RaftStorage storage = RaftStorageFactory.create(vertx, walExecutor);
+RaftNode raftNode = new RaftNode(storage, stateMachine);
+```
+
+### F.11 Migration Path
+
+To switch from FileRaftStorage to RocksDB in production:
+
+1. **Stop the cluster gracefully** (let leader step down)
+2. **Backup `data/` directories** on all nodes
+3. **Add rocksdbjni dependency** to deployment
+4. **Update configuration**: `quorus.raft.storage.type=rocksdb`
+5. **Clear data directories** (RocksDB uses different format)
+6. **Restart cluster** — it will bootstrap as a new cluster
+
+> **Note:** There is no automatic migration between storage formats. The Raft cluster will re-elect a leader and rebuild state from scratch.
+
+### F.12 Summary
+
+| Aspect | Design Choice |
+|--------|---------------|
+| **Interface** | Single `RaftStorage` SPI for all backends |
+| **Default** | `FileRaftStorage` — zero dependencies |
+| **Optional** | `RocksDbRaftStorage` — opt-in high performance |
+| **Testing** | `InMemoryRaftStorage` — fast unit tests |
+| **Configuration** | `quorus.raft.storage.type` property |
+| **Factory** | `RaftStorageFactory.create()` for instantiation |
+| **Coupling** | `RaftNode` depends only on interface |
