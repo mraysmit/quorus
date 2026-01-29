@@ -16,13 +16,13 @@ Implement the `RaftStorage` SPI (Service Provider Interface) enabling drop-in re
 
 | # | Deliverable | Package | Status |
 |---|-------------|---------|--------|
-| 1 | `RaftStorage` interface | `raft.storage` | [ ] |
-| 2 | `FileRaftStorage` implementation | `raft.storage.file` | [ ] |
-| 3 | `RocksDbRaftStorage` implementation | `raft.storage.rocksdb` | [ ] |
-| 4 | `InMemoryRaftStorage` (testing) | `raft.storage` | [ ] |
-| 5 | `RaftStorageFactory` | `raft.storage` | [ ] |
+| 1 | `RaftStorage` interface | `raft.storage` | [x] |
+| 2 | `FileRaftStorage` implementation | `raft.storage.file` | [x] |
+| 3 | `RocksDbRaftStorage` implementation | `raft.storage.rocksdb` | [x] |
+| 4 | `InMemoryRaftStorage` (testing) | `raft.storage` | [x] |
+| 5 | `RaftStorageFactory` | `raft.storage` | [x] |
 | 6 | Configuration properties | `quorus-controller.properties` | [ ] |
-| 7 | Unit tests | `raft.storage` (test) | [ ] |
+| 7 | Unit tests | `raft.storage` (test) | [x] |
 
 ---
 
