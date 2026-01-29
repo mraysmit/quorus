@@ -100,6 +100,33 @@ public final class AppConfig {
         return nodes;
     }
 
+    // ==================== Raft Storage Configuration ====================
+
+    /**
+     * Gets the Raft storage backend type.
+     * Supported values: "file" (default), "rocksdb", "memory" (testing only).
+     */
+    public String getRaftStorageType() {
+        return getString("quorus.raft.storage.type", "file");
+    }
+
+    /**
+     * Gets the path for Raft persistent storage.
+     * Defaults to ./data/raft/{nodeId} for local development.
+     */
+    public String getRaftStoragePath() {
+        String defaultPath = "./data/raft/" + getNodeId();
+        return getString("quorus.raft.storage.path", defaultPath);
+    }
+
+    /**
+     * Whether to fsync after each WAL write.
+     * Defaults to true for durability; set to false only for testing.
+     */
+    public boolean getRaftStorageFsync() {
+        return getBoolean("quorus.raft.storage.fsync", true);
+    }
+
     // ==================== Telemetry Configuration ====================
 
     public boolean isTelemetryEnabled() {

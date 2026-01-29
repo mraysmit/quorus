@@ -20,6 +20,9 @@ import dev.mars.quorus.controller.raft.grpc.AppendEntriesRequest;
 import dev.mars.quorus.controller.raft.grpc.AppendEntriesResponse;
 import dev.mars.quorus.controller.raft.grpc.VoteRequest;
 import dev.mars.quorus.controller.raft.grpc.VoteResponse;
+import dev.mars.quorus.controller.raft.storage.RaftStorage;
+import dev.mars.quorus.controller.raft.storage.RaftStorage.LogEntryData;
+import dev.mars.quorus.controller.raft.storage.RaftStorage.PersistentMeta;
 import com.google.protobuf.ByteString;
 import io.vertx.core.Future;
 import io.vertx.core.Promise;
@@ -37,9 +40,17 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Reactive Raft Node implementation.
+ * Reactive Raft Node implementation with durable WAL storage.
  * Runs on the Vert.x Event Loop (Single Threaded), removing the need for
  * synchronization.
+ * 
+ * <p>Implements the "Persist-before-response" rule for all state-changing
+ * Raft operations:
+ * <ul>
+ *   <li>Vote is never granted until metadata is durable</li>
+ *   <li>AppendEntries is never ACK'd until log entries are durable</li>
+ *   <li>In-memory state is only mutated AFTER durability is confirmed</li>
+ * </ul>
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @version 1.0
@@ -62,6 +73,7 @@ public class RaftNode {
     private final Set<String> clusterNodes;
     private final RaftTransport transport;
     private final RaftStateMachine stateMachine;
+    private final RaftStorage storage;  // WAL storage for durability
 
     // ========== PERSISTENT STATE ==========
     private volatile long currentTerm = 0;
@@ -87,18 +99,46 @@ public class RaftNode {
     private final long electionTimeoutMs;
     private final long heartbeatIntervalMs;
 
+    /**
+     * Creates a RaftNode with default timing parameters and in-memory storage.
+     * <p>Use this constructor for testing or single-node development only.
+     * For production, use the constructor that accepts RaftStorage.
+     */
     public RaftNode(Vertx vertx, String nodeId, Set<String> clusterNodes, RaftTransport transport,
             RaftStateMachine stateMachine) {
-        this(vertx, nodeId, clusterNodes, transport, stateMachine, 5000, 1000);
+        this(vertx, nodeId, clusterNodes, transport, stateMachine, null, 5000, 1000);
     }
 
+    /**
+     * Creates a RaftNode with custom timing parameters and optional storage.
+     * <p>If storage is null, runs in volatile mode (no persistence).
+     */
     public RaftNode(Vertx vertx, String nodeId, Set<String> clusterNodes, RaftTransport transport,
             RaftStateMachine stateMachine, long electionTimeoutMs, long heartbeatIntervalMs) {
+        this(vertx, nodeId, clusterNodes, transport, stateMachine, null, electionTimeoutMs, heartbeatIntervalMs);
+    }
+
+    /**
+     * Creates a RaftNode with durable WAL storage.
+     * <p>This is the recommended constructor for production use.
+     *
+     * @param vertx             The Vert.x instance
+     * @param nodeId            Unique node identifier
+     * @param clusterNodes      Set of all node IDs in the cluster
+     * @param transport         Transport for inter-node communication
+     * @param stateMachine      State machine for applying committed entries
+     * @param storage           WAL storage for durability (null for volatile mode)
+     * @param electionTimeoutMs Base election timeout in milliseconds
+     * @param heartbeatIntervalMs Heartbeat interval in milliseconds
+     */
+    public RaftNode(Vertx vertx, String nodeId, Set<String> clusterNodes, RaftTransport transport,
+            RaftStateMachine stateMachine, RaftStorage storage, long electionTimeoutMs, long heartbeatIntervalMs) {
         this.vertx = vertx;
         this.nodeId = nodeId;
         this.clusterNodes = new HashSet<>(clusterNodes);
-        this.transport = transport; // This should be GrpcRaftTransport
+        this.transport = transport;
         this.stateMachine = stateMachine;
+        this.storage = storage;
         this.electionTimeoutMs = electionTimeoutMs;
         this.heartbeatIntervalMs = heartbeatIntervalMs;
 
@@ -148,20 +188,90 @@ public class RaftNode {
                 // Set reference to this node in transport
                 transport.setRaftNode(this);
 
-                // Start transport listener
-                transport.start(this::handleMessage);
+                // Recover state from WAL if storage is configured
+                recoverFromStorage()
+                    .onSuccess(v2 -> {
+                        // Start transport listener
+                        transport.start(this::handleMessage);
 
-                // Start election timer
-                resetElectionTimer();
+                        // Start election timer
+                        resetElectionTimer();
 
-                running = true;
-                promise.complete();
+                        running = true;
+                        logger.info("Raft node {} started successfully (term={}, logSize={})", 
+                                    nodeId, currentTerm, log.size());
+                        promise.complete();
+                    })
+                    .onFailure(err -> {
+                        logger.error("Failed to recover Raft state from storage", err);
+                        promise.fail(err);
+                    });
+
             } catch (Exception e) {
                 logger.error("Failed to start Raft node", e);
                 promise.fail(e);
             }
         });
         return promise.future();
+    }
+
+    /**
+     * Recovers persistent state from WAL storage.
+     * <p>Order: Metadata → Log Replay → State Machine Rebuild
+     */
+    private Future<Void> recoverFromStorage() {
+        if (storage == null) {
+            logger.info("No storage configured, running in volatile mode");
+            return Future.succeededFuture();
+        }
+
+        logger.info("Recovering Raft state from storage...");
+
+        return storage.loadMetadata()
+            .compose(meta -> {
+                this.currentTerm = meta.currentTerm();
+                this.votedFor = meta.votedFor().orElse(null);
+                logger.info("Recovered metadata: term={}, votedFor={}", currentTerm, votedFor);
+                return storage.replayLog();
+            })
+            .compose(entries -> {
+                // Rebuild in-memory log from WAL
+                log.clear();
+                // Add sentinel entry at index 0
+                log.add(new LogEntry(0, 0, null));
+                
+                for (LogEntryData entry : entries) {
+                    Object command = deserialize(ByteString.copyFrom(entry.payload()));
+                    log.add(new LogEntry(entry.term(), entry.index(), command));
+                }
+                
+                logger.info("Recovered {} log entries from storage", entries.size());
+
+                // Replay committed entries to state machine
+                return rebuildStateMachine();
+            })
+            .onSuccess(v -> logger.info("Recovery complete: term={}, logSize={}, lastApplied={}",
+                                        currentTerm, log.size(), lastApplied))
+            .onFailure(err -> logger.error("Recovery failed", err));
+    }
+
+    /**
+     * Rebuilds state machine by replaying all committed entries.
+     * <p>Note: State machine operations should be idempotent.
+     */
+    private Future<Void> rebuildStateMachine() {
+        logger.info("Rebuilding state machine from {} entries...", log.size() - 1);
+        
+        // Reset state machine to blank state
+        stateMachine.reset();
+        lastApplied = 0;
+        
+        // Re-apply all entries (assume all recovered entries were committed)
+        // In a more sophisticated implementation, we'd also persist commitIndex
+        commitIndex = log.size() > 1 ? log.size() - 1 : 0;
+        
+        applyLog();
+        return Future.succeededFuture();
     }
 
     public Future<Void> stop() {
@@ -177,8 +287,22 @@ public class RaftNode {
 
                 cancelTimers();
                 transport.stop();
-                logger.info("Raft node stopped: {}", nodeId);
-                promise.complete();
+                
+                // Close storage
+                if (storage != null) {
+                    storage.close()
+                        .onSuccess(v2 -> {
+                            logger.info("Raft node stopped: {}", nodeId);
+                            promise.complete();
+                        })
+                        .onFailure(err -> {
+                            logger.warn("Error closing storage during shutdown", err);
+                            promise.complete(); // Still complete, just log the warning
+                        });
+                } else {
+                    logger.info("Raft node stopped: {}", nodeId);
+                    promise.complete();
+                }
             } catch (Exception e) {
                 logger.error("Failed to stop Raft node", e);
                 promise.fail(e);
@@ -198,26 +322,52 @@ public class RaftNode {
             }
 
             // Create log entry
-            LogEntry entry = new LogEntry(currentTerm, log.size(), command);
-            log.add(entry);
+            long entryIndex = log.size();
+            LogEntry entry = new LogEntry(currentTerm, entryIndex, command);
 
-            // Register promise for completion when committed
-            pendingCommands.put(entry.getIndex(), promise);
+            // Persist to WAL before adding to in-memory log
+            persistLogEntry(entry)
+                .onSuccess(v2 -> {
+                    // Add to in-memory log AFTER durability confirmed
+                    log.add(entry);
 
-            logger.info("Command submitted at index {} term {}", entry.getIndex(), entry.getTerm());
+                    // Register promise for completion when committed
+                    pendingCommands.put(entry.getIndex(), promise);
 
-            // Trigger replication
-            for (String peer : clusterNodes) {
-                if (!peer.equals(nodeId)) {
-                    sendAppendEntries(peer, false);
-                }
-            }
+                    logger.info("Command submitted at index {} term {}", entry.getIndex(), entry.getTerm());
 
-            // Try to commit immediately (crucial for single-node clusters)
-            updateCommitIndex();
+                    // Trigger replication
+                    for (String peer : clusterNodes) {
+                        if (!peer.equals(nodeId)) {
+                            sendAppendEntries(peer, false);
+                        }
+                    }
+
+                    // Try to commit immediately (crucial for single-node clusters)
+                    updateCommitIndex();
+                })
+                .onFailure(err -> {
+                    logger.error("Failed to persist command to WAL", err);
+                    promise.fail(err);
+                });
         });
 
         return promise.future();
+    }
+
+    /**
+     * Persists a log entry to the WAL with sync barrier.
+     */
+    private Future<Void> persistLogEntry(LogEntry entry) {
+        if (storage == null) {
+            return Future.succeededFuture();  // Volatile mode
+        }
+
+        ByteString serialized = serialize(entry.getCommand());
+        LogEntryData entryData = new LogEntryData(entry.getIndex(), entry.getTerm(), serialized.toByteArray());
+        
+        return storage.appendEntries(List.of(entryData))
+            .compose(v -> storage.sync());  // Durability barrier
     }
 
     // ... Getters ...
@@ -395,27 +545,67 @@ public class RaftNode {
         }
     }
 
+    /**
+     * Handles RequestVote RPC from a Candidate.
+     * <p>Implements Persist-before-Grant:
+     * <ul>
+     *   <li>Vote is only granted AFTER metadata is durable</li>
+     *   <li>Prevents double-voting after crash/restart</li>
+     * </ul>
+     */
     public Future<VoteResponse> handleVoteRequest(VoteRequest request) {
         Promise<VoteResponse> promise = Promise.promise();
         vertx.runOnContext(v -> {
             try {
                 long reqTerm = request.getTerm();
-                boolean grant = false;
 
+                // Step 1: Reject if stale term
+                if (reqTerm < currentTerm) {
+                    logger.debug("Rejecting vote: stale term {} < {}", reqTerm, currentTerm);
+                    promise.complete(VoteResponse.newBuilder()
+                            .setTerm(currentTerm)
+                            .setVoteGranted(false)
+                            .build());
+                    return;
+                }
+
+                // Step 2: Step down if higher term
                 if (reqTerm > currentTerm) {
                     stepDown(reqTerm);
                 }
 
-                if (reqTerm == currentTerm && (votedFor == null || votedFor.equals(request.getCandidateId()))) {
-                    votedFor = request.getCandidateId();
-                    grant = true;
-                    resetElectionTimer(); // Reset election timer if we vote
-                }
+                // Step 3: Check if we can grant vote
+                boolean canGrant = (votedFor == null || votedFor.equals(request.getCandidateId()));
 
-                promise.complete(VoteResponse.newBuilder()
-                        .setTerm(currentTerm)
-                        .setVoteGranted(grant)
-                        .build());
+                if (canGrant) {
+                    // Step 4: Persist metadata BEFORE granting vote (Persist-before-Grant)
+                    persistVote(reqTerm, request.getCandidateId())
+                        .onSuccess(v2 -> {
+                            // Step 5: Update in-memory state AFTER durability confirmed
+                            votedFor = request.getCandidateId();
+                            resetElectionTimer();
+                            
+                            logger.info("Vote granted to {} for term {}", request.getCandidateId(), reqTerm);
+                            promise.complete(VoteResponse.newBuilder()
+                                    .setTerm(currentTerm)
+                                    .setVoteGranted(true)
+                                    .build());
+                        })
+                        .onFailure(err -> {
+                            logger.error("Failed to persist vote metadata", err);
+                            // Vote not granted if we can't persist
+                            promise.complete(VoteResponse.newBuilder()
+                                    .setTerm(currentTerm)
+                                    .setVoteGranted(false)
+                                    .build());
+                        });
+                } else {
+                    logger.debug("Vote rejected: already voted for {} in term {}", votedFor, currentTerm);
+                    promise.complete(VoteResponse.newBuilder()
+                            .setTerm(currentTerm)
+                            .setVoteGranted(false)
+                            .build());
+                }
             } catch (Exception e) {
                 logger.error("Error handling vote request", e);
                 promise.fail(e);
@@ -424,11 +614,34 @@ public class RaftNode {
         return promise.future();
     }
 
+    /**
+     * Persists vote metadata to WAL.
+     */
+    private Future<Void> persistVote(long term, String candidateId) {
+        if (storage == null) {
+            return Future.succeededFuture();  // Volatile mode
+        }
+        return storage.updateMetadata(term, Optional.of(candidateId));
+    }
+
+    /**
+     * Handles AppendEntries RPC from the Leader.
+     * <p>Follows the Prepare → Persist → Apply sequence:
+     * <ol>
+     *   <li>Consistency check (prevLogIndex/prevLogTerm)</li>
+     *   <li>Prepare entries to persist (handle conflicts)</li>
+     *   <li>Persist to WAL with sync barrier</li>
+     *   <li>Apply to in-memory log</li>
+     *   <li>Update commitIndex and trigger applier</li>
+     * </ol>
+     */
     public Future<AppendEntriesResponse> handleAppendEntriesRequest(AppendEntriesRequest request) {
         Promise<AppendEntriesResponse> promise = Promise.promise();
         vertx.runOnContext(v -> {
             try {
+                // Step 1: Term check
                 if (request.getTerm() < currentTerm) {
+                    logger.debug("Rejecting AppendEntries: stale term {} < {}", request.getTerm(), currentTerm);
                     promise.complete(AppendEntriesResponse.newBuilder()
                             .setTerm(currentTerm)
                             .setSuccess(false)
@@ -436,15 +649,18 @@ public class RaftNode {
                     return;
                 }
 
+                // Step 2: Step down if higher term
                 if (request.getTerm() > currentTerm) {
                     stepDown(request.getTerm());
                 }
 
                 resetElectionTimer();
 
-                // Consistency check
+                // Step 3: Consistency check
                 if (log.size() <= request.getPrevLogIndex() ||
                         log.get((int) request.getPrevLogIndex()).getTerm() != request.getPrevLogTerm()) {
+                    logger.debug("Rejecting AppendEntries: log inconsistent at prevLogIndex={}",
+                                request.getPrevLogIndex());
                     promise.complete(AppendEntriesResponse.newBuilder()
                             .setTerm(currentTerm)
                             .setSuccess(false)
@@ -453,43 +669,104 @@ public class RaftNode {
                     return;
                 }
 
-                // Append new entries
-                long currentIndex = request.getPrevLogIndex() + 1;
+                // Step 4: Prepare entries for persistence (handle conflicts)
+                long startIndex = request.getPrevLogIndex() + 1;
+                List<LogEntry> entriesToPersist = new ArrayList<>();
+                Long truncateFromIndex = null;
+
+                long currentIndex = startIndex;
                 for (dev.mars.quorus.controller.raft.grpc.LogEntry entryProto : request.getEntriesList()) {
-                    // Deserialize command
                     Object command = deserialize(entryProto.getData());
                     LogEntry newEntry = new LogEntry(entryProto.getTerm(), currentIndex, command);
 
                     if (log.size() > currentIndex) {
                         if (log.get((int) currentIndex).getTerm() != entryProto.getTerm()) {
-                            // Conflict, delete existing and following
-                            log.subList((int) currentIndex, log.size()).clear();
-                            log.add(newEntry);
+                            // Conflict detected - need to truncate
+                            if (truncateFromIndex == null) {
+                                truncateFromIndex = currentIndex;
+                            }
+                            entriesToPersist.add(newEntry);
                         }
-                        // Else matches, skip
+                        // Else matches, skip (idempotent)
                     } else {
-                        log.add(newEntry);
+                        entriesToPersist.add(newEntry);
                     }
                     currentIndex++;
                 }
 
-                // Update commit index
-                if (request.getLeaderCommit() > commitIndex) {
-                    commitIndex = Math.min(request.getLeaderCommit(), log.size() - 1);
-                    applyLog();
-                }
+                // Step 5: Persist to WAL (Durability Barrier)
+                final Long finalTruncateFrom = truncateFromIndex;
+                persistAppendEntries(truncateFromIndex, entriesToPersist)
+                    .onSuccess(v2 -> {
+                        // Step 6: Apply to in-memory log AFTER durability confirmed
+                        if (finalTruncateFrom != null) {
+                            log.subList(finalTruncateFrom.intValue(), log.size()).clear();
+                        }
+                        for (LogEntry entry : entriesToPersist) {
+                            if (log.size() <= entry.getIndex()) {
+                                log.add(entry);
+                            }
+                        }
 
-                promise.complete(AppendEntriesResponse.newBuilder()
-                        .setTerm(currentTerm)
-                        .setSuccess(true)
-                        .setMatchIndex(log.size() - 1)
-                        .build());
+                        // Step 7: Update commit index and apply
+                        if (request.getLeaderCommit() > commitIndex) {
+                            commitIndex = Math.min(request.getLeaderCommit(), log.size() - 1);
+                            applyLog();
+                        }
+
+                        logger.debug("AppendEntries success: logSize={}, commitIndex={}", log.size(), commitIndex);
+                        promise.complete(AppendEntriesResponse.newBuilder()
+                                .setTerm(currentTerm)
+                                .setSuccess(true)
+                                .setMatchIndex(log.size() - 1)
+                                .build());
+                    })
+                    .onFailure(err -> {
+                        logger.error("AppendEntries failed during WAL persist", err);
+                        promise.complete(AppendEntriesResponse.newBuilder()
+                                .setTerm(currentTerm)
+                                .setSuccess(false)
+                                .build());
+                    });
+
             } catch (Exception e) {
                 logger.error("Error handling append entries request", e);
                 promise.fail(e);
             }
         });
         return promise.future();
+    }
+
+    /**
+     * Persists append entries to WAL with optional truncation.
+     */
+    private Future<Void> persistAppendEntries(Long truncateFromIndex, List<LogEntry> entries) {
+        if (storage == null) {
+            return Future.succeededFuture();  // Volatile mode
+        }
+        
+        if (entries.isEmpty() && truncateFromIndex == null) {
+            return Future.succeededFuture();  // Nothing to persist (heartbeat)
+        }
+
+        Future<Void> f = Future.succeededFuture();
+
+        // Truncate if needed
+        if (truncateFromIndex != null) {
+            f = f.compose(v -> storage.truncateSuffix(truncateFromIndex));
+        }
+
+        // Append entries
+        if (!entries.isEmpty()) {
+            List<LogEntryData> entryDataList = entries.stream()
+                .map(e -> new LogEntryData(e.getIndex(), e.getTerm(), 
+                                           serialize(e.getCommand()).toByteArray()))
+                .toList();
+            f = f.compose(v -> storage.appendEntries(entryDataList));
+        }
+
+        // Sync for durability
+        return f.compose(v -> storage.sync());
     }
 
     private void sendAppendEntries(String target, boolean heartbeat) {

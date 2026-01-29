@@ -26,9 +26,12 @@ import dev.mars.quorus.controller.raft.RaftNode;
 import dev.mars.quorus.controller.raft.RaftTransport;
 import dev.mars.quorus.controller.raft.GrpcRaftTransport;
 import dev.mars.quorus.controller.raft.GrpcRaftServer;
+import dev.mars.quorus.controller.raft.storage.RaftStorage;
+import dev.mars.quorus.controller.raft.storage.RaftStorageFactory;
 import dev.mars.quorus.controller.state.QuorusStateMachine;
 import dev.mars.quorus.controller.http.HttpApiServer;
 
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -48,6 +51,7 @@ public class QuorusControllerVerticle extends AbstractVerticle {
 
     private RaftTransport transport;
     private RaftNode raftNode;
+    private RaftStorage raftStorage;
     private HttpApiServer apiServer;
     private GrpcRaftServer grpcServer;
 
@@ -82,25 +86,58 @@ public class QuorusControllerVerticle extends AbstractVerticle {
             // 3. Setup Raft Transport (gRPC)
             this.transport = new GrpcRaftTransport(vertx, nodeId, peerAddresses);
 
-            // 4. Create Raft Node
+            // 4. Create Raft Storage (WAL)
+            String storageType = config.getRaftStorageType();
+            Path storagePath = Path.of(config.getRaftStoragePath());
+            boolean fsyncEnabled = config.getRaftStorageFsync();
+            
+            logger.info("Initializing Raft storage: type={}, path={}, fsync={}", 
+                       storageType, storagePath, fsyncEnabled);
+
+            // Create storage via factory
+            RaftStorageFactory.create(vertx, storageType, storagePath, fsyncEnabled)
+                .onSuccess(storage -> {
+                    this.raftStorage = storage;
+                    continueStartup(startPromise, config, nodeId, port, raftPort, clusterNodeIds);
+                })
+                .onFailure(err -> {
+                    logger.error("Failed to initialize Raft storage", err);
+                    startPromise.fail(err);
+                });
+
+        } catch (Exception e) {
+            startPromise.fail(e);
+        }
+    }
+
+    /**
+     * Continues the startup sequence after storage is initialized.
+     */
+    private void continueStartup(Promise<Void> startPromise, AppConfig config, 
+                                 String nodeId, int port, int raftPort, 
+                                 Set<String> clusterNodeIds) {
+        try {
+            // 5. Create Raft Node with storage
             Map<String, String> initialMetadata = new HashMap<>();
             initialMetadata.put("version", config.getVersion());
 
             QuorusStateMachine stateMachine = new QuorusStateMachine(initialMetadata);
 
-            this.raftNode = new RaftNode(vertx, nodeId, clusterNodeIds, transport, stateMachine);
+            // Use the constructor with storage for durability
+            this.raftNode = new RaftNode(vertx, nodeId, clusterNodeIds, transport, 
+                                         stateMachine, raftStorage, 5000, 1000);
 
             transport.setRaftNode(raftNode);
 
-            // 5. Create and start gRPC server for inter-node communication
+            // 6. Create and start gRPC server for inter-node communication
             this.grpcServer = new GrpcRaftServer(vertx, raftPort, raftNode);
 
             grpcServer.start().onSuccess(v1 -> {
                 logger.info("gRPC server started on port {}", raftPort);
 
-                // 6. Start Raft
+                // 7. Start Raft (includes recovery from WAL)
                 raftNode.start().onSuccess(v2 -> {
-                    // 7. Start HTTP API
+                    // 8. Start HTTP API
                     this.apiServer = new HttpApiServer(vertx, port, raftNode);
 
                     apiServer.start()
@@ -123,7 +160,7 @@ public class QuorusControllerVerticle extends AbstractVerticle {
 
         try {
             if (apiServer != null) {
-                apiServer.stop(); // Returns Future, we should ideally wait for it
+                apiServer.stop();
             }
             if (raftNode != null) {
                 raftNode.stop();
@@ -131,13 +168,13 @@ public class QuorusControllerVerticle extends AbstractVerticle {
             if (grpcServer != null) {
                 grpcServer.stop();
             }
-            // Transport stop is usually synchronous or handled by raftNode logic
+            // Storage is closed by raftNode.stop()
 
             logger.info("QuorusControllerVerticle stopped successfully");
             stopPromise.complete();
         } catch (Exception e) {
             logger.warn("Error during shutdown", e);
-            stopPromise.complete(); // Don't fail the stop promise for cleanup errors
+            stopPromise.complete();
         }
     }
 }
