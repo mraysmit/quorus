@@ -29,8 +29,9 @@ RUN mkdir -p quorus-integration-examples && echo '<?xml version="1.0" encoding="
 RUN mkdir -p quorus-agent && echo '<?xml version="1.0" encoding="UTF-8"?><project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"><modelVersion>4.0.0</modelVersion><parent><groupId>dev.mars</groupId><artifactId>quorus</artifactId><version>1.0-SNAPSHOT</version></parent><artifactId>quorus-agent</artifactId><packaging>pom</packaging></project>' > quorus-agent/pom.xml
 
 # Copy local Maven artifacts from named build context (raftlog-core not on Maven Central)
-# BuildKit pulls these from host's ~/.m2/repository via --build-context m2cache=...
-COPY --from=m2cache /dev/mars /root/.m2/repository/dev/mars
+# BuildKit pulls these from host's ~/.m2/repository/dev/mars via --build-context m2cache=...
+# Context is pointed directly at dev/mars to avoid transferring the entire Maven cache
+COPY --from=m2cache / /root/.m2/repository/dev/mars
 
 # Download dependencies (cached via Docker BuildKit cache mount)
 RUN --mount=type=cache,target=/root/.m2/repository/org \

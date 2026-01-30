@@ -16,6 +16,7 @@
 
 package dev.mars.quorus.controller.raft.storage;
 
+import dev.mars.quorus.controller.raft.storage.file.FileRaftStorage;
 import dev.mars.raftlog.storage.RaftStorageConfig;
 import io.vertx.core.Vertx;
 import io.vertx.junit5.VertxExtension;
@@ -173,15 +174,16 @@ class RaftLogStorageAdapterTest {
 
     @Test
     @Order(6)
-    @DisplayName("Factory should default to raftlog with fsync when no type specified")
-    void testFactoryDefaultsToRaftLogWithFsync(Vertx vertx, VertxTestContext ctx) {
+    @DisplayName("Factory should default to FileRaftStorage with fsync when no type specified")
+    void testFactoryDefaultsToFileRaftStorageWithFsync(Vertx vertx, VertxTestContext ctx) {
         Path factoryDir = tempDir.resolve("default");
         
         // Pass empty type and fsync=true to test production default behavior
+        // Default is FILE (not RAFTLOG) because raftlog-core requires local build
         RaftStorageFactory.create(vertx, "", factoryDir, true)
                 .onComplete(ctx.succeeding(createdStorage -> {
                     ctx.verify(() -> {
-                        assertInstanceOf(RaftLogStorageAdapter.class, createdStorage);
+                        assertInstanceOf(FileRaftStorage.class, createdStorage);
                     });
                     createdStorage.close()
                             .onComplete(ctx.succeedingThenComplete());
