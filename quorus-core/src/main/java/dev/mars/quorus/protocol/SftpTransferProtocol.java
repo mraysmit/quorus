@@ -113,7 +113,7 @@ public class SftpTransferProtocol implements TransferProtocol {
                 logger.info("INTENTIONAL TEST FAILURE: SFTP transfer failed for test case '{}': {}",
                            request.getRequestId(), e.getMessage());
             } else {
-                logger.error("SFTP transfer failed: {}", e.getMessage(), e);
+                logger.error("SFTP transfer failed: {} ({})", e.getMessage(), e.getClass().getSimpleName());
             }
             throw new TransferException(context.getJobId(), "SFTP transfer failed", e);
         }
@@ -171,7 +171,7 @@ public class SftpTransferProtocol implements TransferProtocol {
                 logger.info("INTENTIONAL TEST FAILURE: SFTP transfer failed for test case '{}': {}",
                            requestId, e.getMessage());
             } else {
-                logger.error("SFTP transfer failed for request {}: {}", requestId, e.getMessage(), e);
+                logger.error("SFTP transfer failed for request {}: {} ({})", requestId, e.getMessage(), e.getClass().getSimpleName());
             }
             throw new TransferException(requestId, "SFTP transfer failed", e);
         }
