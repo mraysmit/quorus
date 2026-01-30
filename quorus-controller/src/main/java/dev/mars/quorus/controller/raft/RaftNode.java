@@ -399,6 +399,60 @@ public class RaftNode {
         return state == State.LEADER;
     }
 
+    /**
+     * Returns the current size of the Raft log (number of entries).
+     * Useful for monitoring replication progress across the cluster.
+     */
+    public int getLogSize() {
+        return log.size();
+    }
+
+    /**
+     * Returns the index of the last log entry applied to the state machine.
+     * This trails commitIndex and indicates local state machine progress.
+     */
+    public long getLastApplied() {
+        return lastApplied;
+    }
+
+    /**
+     * Returns the index of the highest log entry known to be committed.
+     * Entries up to this index are safe to apply to the state machine.
+     */
+    public long getCommitIndex() {
+        return commitIndex;
+    }
+
+    /**
+     * Returns the candidate ID this node voted for in the current term.
+     * Returns null if no vote has been cast in this term.
+     * Useful for debugging election issues and split vote scenarios.
+     */
+    public String getVotedFor() {
+        return votedFor;
+    }
+
+    /**
+     * Returns the index of the last entry in the log.
+     * This is used during elections for log comparison (§5.4.1).
+     * Returns 0 if the log only contains the sentinel entry.
+     */
+    public long getLastLogIndex() {
+        return log.size() - 1;  // -1 because index 0 is sentinel
+    }
+
+    /**
+     * Returns the term of the last entry in the log.
+     * This is used during elections for log comparison (§5.4.1).
+     * Returns 0 if the log only contains the sentinel entry.
+     */
+    public long getLastLogTerm() {
+        if (log.isEmpty()) {
+            return 0;
+        }
+        return log.get(log.size() - 1).getTerm();
+    }
+
     private void cancelTimers() {
         if (electionTimerId != -1)
             vertx.cancelTimer(electionTimerId);
