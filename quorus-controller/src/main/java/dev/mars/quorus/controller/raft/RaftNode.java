@@ -172,6 +172,11 @@ public class RaftNode {
                 .setDescription("Whether this node is the leader (1=Yes, 0=No)")
                 .ofLongs()
                 .buildWithCallback(measurement -> measurement.record(state == State.LEADER ? 1 : 0));
+
+        meter.gaugeBuilder("quorus.cluster.log_size")
+                .setDescription("Number of entries in the Raft log")
+                .ofLongs()
+                .buildWithCallback(measurement -> measurement.record(log.size()));
     }
 
     public Future<Void> start() {

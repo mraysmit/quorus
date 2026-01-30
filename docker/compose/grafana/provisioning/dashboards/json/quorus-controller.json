@@ -1,0 +1,733 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "description": "Quorus Controller Cluster Overview - Raft consensus with interactive network topology",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 4 },
+      "id": 1,
+      "panels": [],
+      "title": "Cluster Topology",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "infinity" },
+      "description": "Interactive Raft cluster topology. Leader (green) connects to followers (blue). Click nodes to see details.",
+      "fieldConfig": { 
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": { "h": 14, "w": 8, "x": 0, "y": 5 },
+      "id": 100,
+      "options": {},
+      "pluginVersion": "10.3.1",
+      "targets": [
+        {
+          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "infinity" },
+          "columns": [
+            { "selector": "id", "text": "id", "type": "string" },
+            { "selector": "title", "text": "title", "type": "string" },
+            { "selector": "subTitle", "text": "subTitle", "type": "string" },
+            { "selector": "mainStat", "text": "mainStat", "type": "string" },
+            { "selector": "secondaryStat", "text": "secondaryStat", "type": "string" },
+            { "selector": "arc__role", "text": "arc__role", "type": "number" },
+            { "selector": "arc__role_color", "text": "arc__role_color", "type": "string" }
+          ],
+          "data": "id,title,subTitle,mainStat,secondaryStat,arc__role,arc__role_color\nnode-1,node-1,172.20.0.10:9471,LEADER,Term: 5,1,green\nnode-2,node-2,172.20.0.11:9472,FOLLOWER,Term: 5,1,blue\nnode-3,node-3,172.20.0.12:9473,FOLLOWER,Term: 5,1,blue",
+          "filters": [],
+          "format": "node-graph-nodes",
+          "refId": "nodes",
+          "root_selector": "",
+          "source": "inline",
+          "type": "csv"
+        },
+        {
+          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "infinity" },
+          "columns": [
+            { "selector": "id", "text": "id", "type": "string" },
+            { "selector": "source", "text": "source", "type": "string" },
+            { "selector": "target", "text": "target", "type": "string" },
+            { "selector": "mainStat", "text": "mainStat", "type": "string" }
+          ],
+          "data": "id,source,target,mainStat\n1,node-1,node-2,replicate\n2,node-1,node-3,replicate",
+          "filters": [],
+          "format": "node-graph-edges",
+          "refId": "edges",
+          "root_selector": "",
+          "source": "inline",
+          "type": "csv"
+        }
+      ],
+      "title": "Raft Cluster Network",
+      "type": "nodeGraph"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Detailed status of each cluster node with network addresses",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "custom": {
+            "align": "center",
+            "cellOptions": { "type": "color-text" },
+            "inspect": false
+          },
+          "mappings": [
+            { "options": { "0": { "color": "#3274D9", "index": 0, "text": "FOLLOWER" } }, "type": "value" },
+            { "options": { "1": { "color": "#FF9830", "index": 1, "text": "CANDIDATE" } }, "type": "value" },
+            { "options": { "2": { "color": "#73BF69", "index": 2, "text": "★ LEADER" } }, "type": "value" }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#3274D9", "value": null },
+              { "color": "#FF9830", "value": 1 },
+              { "color": "#73BF69", "value": 2 }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Node" },
+            "properties": [
+              { "id": "custom.width", "value": 80 },
+              { "id": "custom.cellOptions", "value": { "type": "auto" } },
+              { "id": "custom.align", "value": "left" }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Address" },
+            "properties": [
+              { "id": "custom.width", "value": 180 },
+              { "id": "custom.cellOptions", "value": { "type": "auto" } },
+              { "id": "custom.align", "value": "left" }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "State" },
+            "properties": [{ "id": "custom.width", "value": 110 }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Term" },
+            "properties": [
+              { "id": "custom.width", "value": 60 },
+              { "id": "custom.cellOptions", "value": { "type": "auto" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Commit" },
+            "properties": [
+              { "id": "custom.width", "value": 70 },
+              { "id": "custom.cellOptions", "value": { "type": "auto" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Log" },
+            "properties": [
+              { "id": "custom.width", "value": 60 },
+              { "id": "custom.cellOptions", "value": { "type": "auto" } }
+            ]
+          }
+        ]
+      },
+      "gridPos": { "h": 14, "w": 16, "x": 8, "y": 5 },
+      "id": 2,
+      "options": {
+        "cellHeight": "md",
+        "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
+        "showHeader": true,
+        "sortBy": [{ "desc": true, "displayName": "State" }]
+      },
+      "pluginVersion": "10.3.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "quorus_cluster_state",
+          "format": "table",
+          "instant": true,
+          "refId": "State"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "quorus_cluster_term",
+          "format": "table",
+          "instant": true,
+          "refId": "Term"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "quorus_cluster_commit_index",
+          "format": "table",
+          "instant": true,
+          "refId": "Commit"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "quorus_cluster_log_size",
+          "format": "table",
+          "instant": true,
+          "refId": "LogSize"
+        }
+      ],
+      "title": "Node Details",
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "deployment": true,
+              "job": true,
+              "otel_scope_name": true,
+              "service": true
+            },
+            "indexByName": {
+              "node": 0,
+              "instance": 1,
+              "quorus_cluster_state": 2,
+              "quorus_cluster_term": 3,
+              "quorus_cluster_commit_index": 4,
+              "quorus_cluster_log_size": 5
+            },
+            "renameByName": {
+              "node": "Node",
+              "instance": "Address",
+              "quorus_cluster_state": "State",
+              "quorus_cluster_term": "Term",
+              "quorus_cluster_commit_index": "Commit",
+              "quorus_cluster_log_size": "Log"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 4,
+      "panels": [],
+      "title": "Cluster Health",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Active nodes reporting metrics. Red <2, Yellow 2, Green 3+",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 2 },
+              { "color": "green", "value": 3 }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 3, "w": 4, "x": 0, "y": 1 },
+      "id": 5,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "pluginVersion": "10.3.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "count(quorus_cluster_state)",
+          "legendFormat": "__auto",
+          "refId": "A"
+        }
+      ],
+      "title": "Nodes",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Must be exactly 1. Red if 0 or >1 (split brain)",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "#73BF69", "value": 1 },
+              { "color": "red", "value": 2 }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 3, "w": 4, "x": 4, "y": 1 },
+      "id": 6,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "pluginVersion": "10.3.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "count(quorus_cluster_state == 2) or vector(0)",
+          "legendFormat": "__auto",
+          "refId": "A"
+        }
+      ],
+      "title": "Leaders",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Nodes replicating from leader",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#3274D9", "value": null }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 3, "w": 4, "x": 8, "y": 1 },
+      "id": 7,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "pluginVersion": "10.3.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "count(quorus_cluster_state == 0) or vector(0)",
+          "legendFormat": "__auto",
+          "refId": "A"
+        }
+      ],
+      "title": "Followers",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Election epoch. Increments on leader election. Rapid increase = instability",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "#B877D9", "value": null }]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 3, "w": 4, "x": 12, "y": 1 },
+      "id": 8,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "pluginVersion": "10.3.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "max(quorus_cluster_term)",
+          "legendFormat": "__auto",
+          "refId": "A"
+        }
+      ],
+      "title": "Term",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Highest log index replicated to majority. Entries below this are durable",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "#FF9830", "value": null }]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 3, "w": 4, "x": 16, "y": 1 },
+      "id": 9,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "pluginVersion": "10.3.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "max(quorus_cluster_commit_index)",
+          "legendFormat": "__auto",
+          "refId": "A"
+        }
+      ],
+      "title": "Commit Idx",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Total entries in Raft log. Gap vs Commit = pending replication",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "#56A64B", "value": null }]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 3, "w": 4, "x": 20, "y": 1 },
+      "id": 10,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "pluginVersion": "10.3.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "max(quorus_cluster_log_size)",
+          "legendFormat": "__auto",
+          "refId": "A"
+        }
+      ],
+      "title": "Log Size",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 19 },
+      "id": 20,
+      "panels": [],
+      "title": "Raft Metrics Over Time",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { 
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 30,
+            "gradientMode": "opacity",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 3,
+            "pointSize": 8,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "always",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [
+            { "options": { "0": { "text": "FOLLOWER" } }, "type": "value" },
+            { "options": { "1": { "text": "CANDIDATE" } }, "type": "value" },
+            { "options": { "2": { "text": "LEADER" } }, "type": "value" }
+          ],
+          "max": 2,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#3274D9", "value": null },
+              { "color": "#FF9830", "value": 1 },
+              { "color": "#73BF69", "value": 2 }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "node-1" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "#73BF69", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "node-2" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "#3274D9", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "node-3" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "#FF9830", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+      "id": 21,
+      "options": {
+        "legend": { "calcs": ["lastNotNull"], "displayMode": "table", "placement": "right", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "pluginVersion": "10.3.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "quorus_cluster_state",
+          "legendFormat": "{{node}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Node State (0=Follower, 1=Candidate, 2=Leader)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { 
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "gradientMode": "opacity",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 6,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "node-1" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "#73BF69", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "node-2" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "#3274D9", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "node-3" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "#FF9830", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+      "id": 22,
+      "options": {
+        "legend": { "calcs": ["lastNotNull"], "displayMode": "table", "placement": "right", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "pluginVersion": "10.3.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "quorus_cluster_term",
+          "legendFormat": "{{node}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Raft Term Over Time",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { 
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "gradientMode": "opacity",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 6,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "node-1" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "#73BF69", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "node-2" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "#3274D9", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "node-3" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "#FF9830", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
+      "id": 23,
+      "options": {
+        "legend": { "calcs": ["lastNotNull"], "displayMode": "table", "placement": "right", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "pluginVersion": "10.3.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "quorus_cluster_commit_index",
+          "legendFormat": "{{node}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Commit Index Over Time",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { 
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "gradientMode": "opacity",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 6,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "node-1" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "#73BF69", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "node-2" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "#3274D9", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "node-3" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "#FF9830", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
+      "id": 24,
+      "options": {
+        "legend": { "calcs": ["lastNotNull"], "displayMode": "table", "placement": "right", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "pluginVersion": "10.3.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "quorus_cluster_log_size",
+          "legendFormat": "{{node}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Log Size Over Time",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "5s",
+  "schemaVersion": 39,
+  "tags": ["quorus", "raft", "controller", "cluster"],
+  "templating": { "list": [] },
+  "time": { "from": "now-15m", "to": "now" },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Quorus Controller Cluster",
+  "uid": "quorus-controller",
+  "version": 5,
+  "weekStart": ""
+}

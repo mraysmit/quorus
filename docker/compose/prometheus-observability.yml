@@ -1,0 +1,96 @@
+# Prometheus Configuration for Quorus Observability Stack
+# Scrapes metrics from OTel Collector and directly from Quorus services
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'quorus-local'
+    environment: 'test'
+
+# Remote write receiver for OTel Collector
+# Enabled via --web.enable-remote-write-receiver flag
+
+scrape_configs:
+  # Self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # OTel Collector internal metrics
+  - job_name: 'otel-collector'
+    static_configs:
+      - targets: ['otel-collector:8888']
+        labels:
+          service: 'otel-collector'
+
+  # Tempo internal metrics
+  - job_name: 'tempo'
+    static_configs:
+      - targets: ['tempo:3200']
+        labels:
+          service: 'tempo'
+
+  # Loki internal metrics
+  - job_name: 'loki'
+    static_configs:
+      - targets: ['loki:3100']
+        labels:
+          service: 'loki'
+
+  # Quorus Controller - Single node (standalone mode on port 9464)
+  - job_name: 'quorus-controller-standalone'
+    scrape_interval: 10s
+    static_configs:
+      - targets: ['host.docker.internal:9464']
+        labels:
+          service: 'quorus-controller'
+          deployment: 'standalone'
+          node: 'standalone'
+
+  # Quorus Controller - 3-node local cluster
+  - job_name: 'quorus-controller-cluster'
+    scrape_interval: 10s
+    static_configs:
+      - targets: ['host.docker.internal:9471']
+        labels:
+          service: 'quorus-controller'
+          deployment: 'cluster'
+          node: 'node-1'
+      - targets: ['host.docker.internal:9472']
+        labels:
+          service: 'quorus-controller'
+          deployment: 'cluster'
+          node: 'node-2'
+      - targets: ['host.docker.internal:9473']
+        labels:
+          service: 'quorus-controller'
+          deployment: 'cluster'
+          node: 'node-3'
+
+  # Quorus Agent (when running on Docker host)
+  - job_name: 'quorus-agent-host'
+    scrape_interval: 10s
+    static_configs:
+      - targets: ['host.docker.internal:9465']
+        labels:
+          service: 'quorus-agent'
+          deployment: 'host'
+
+  # Quorus Controller cluster (when running in Docker)
+  - job_name: 'quorus-controller-docker'
+    scrape_interval: 10s
+    dns_sd_configs:
+      - names:
+          - 'controller'
+        type: 'A'
+        port: 9464
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+      - source_labels: []
+        target_label: service
+        replacement: 'quorus-controller'
+      - source_labels: []
+        target_label: deployment
+        replacement: 'docker'

@@ -1,0 +1,72 @@
+# Grafana Datasources Provisioning for Quorus Observability Stack
+# Auto-configures Prometheus, Tempo, and Loki datasources
+
+apiVersion: 1
+
+datasources:
+  # Prometheus - Metrics
+  - name: Prometheus
+    type: prometheus
+    uid: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      httpMethod: POST
+      manageAlerts: true
+      prometheusType: Prometheus
+      prometheusVersion: 2.49.1
+
+  # Tempo - Traces
+  - name: Tempo
+    type: tempo
+    uid: tempo
+    access: proxy
+    url: http://tempo:3200
+    editable: false
+    jsonData:
+      httpMethod: GET
+      tracesToLogsV2:
+        datasourceUid: loki
+        spanStartTimeShift: '-1h'
+        spanEndTimeShift: '1h'
+        filterByTraceID: true
+        filterBySpanID: true
+      tracesToMetrics:
+        datasourceUid: prometheus
+        spanStartTimeShift: '-1h'
+        spanEndTimeShift: '1h'
+      serviceMap:
+        datasourceUid: prometheus
+      nodeGraph:
+        enabled: true
+      search:
+        hide: false
+      lokiSearch:
+        datasourceUid: loki
+
+  # Loki - Logs
+  - name: Loki
+    type: loki
+    uid: loki
+    access: proxy
+    url: http://loki:3100
+    editable: false
+    jsonData:
+      derivedFields:
+        - datasourceUid: tempo
+          matcherRegex: '"traceId":"([a-f0-9]+)"'
+          name: TraceID
+          url: '$${__value.raw}'
+
+  # Infinity - For flexible data visualization (Node Graph, etc.)
+  - name: Infinity
+    type: yesoreyeram-infinity-datasource
+    uid: infinity
+    access: proxy
+    editable: true
+    jsonData:
+      allowedHosts:
+        - prometheus:9090
+        - localhost:9090
