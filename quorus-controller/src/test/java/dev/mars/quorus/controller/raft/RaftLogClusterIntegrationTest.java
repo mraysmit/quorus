@@ -118,27 +118,40 @@ class RaftLogClusterIntegrationTest {
     @DisplayName("WAL files are created when cluster starts")
     void testWalFilesCreated(VertxTestContext ctx) throws Exception {
         LOG.info("=== TEST: WAL Files Created ===");
+        long testStartTime = System.currentTimeMillis();
         
         startClusterWithStorage();
         
         // Wait for cluster startup
+        LOG.debug("Waiting 2s for cluster to stabilize...");
         Thread.sleep(2000);
         
+        // Log cluster state before verification
+        logClusterState("after startup");
+        
         // Verify WAL files exist for each node
+        LOG.debug("Verifying WAL files for {} nodes...", NODE_IDS.length);
         for (String nodeId : NODE_IDS) {
             Path dataDir = dataDirs.get(nodeId);
             Path walFile = dataDir.resolve("raft.log");
             Path lockFile = dataDir.resolve("raft.lock");
+            Path metaFile = dataDir.resolve("raft.meta");
+            
+            LOG.debug("Checking {} - dataDir={}", nodeId, dataDir);
             
             assertTrue(Files.exists(walFile), 
                 "WAL file should exist for " + nodeId + " at " + walFile);
             assertTrue(Files.exists(lockFile), 
                 "Lock file should exist for " + nodeId + " at " + lockFile);
             
-            LOG.info("✓ {} has WAL at {} ({} bytes)", 
-                nodeId, walFile, Files.size(walFile));
+            long walSize = Files.size(walFile);
+            boolean metaExists = Files.exists(metaFile);
+            
+            LOG.info("✓ {} has WAL at {} ({} bytes, meta={})", 
+                nodeId, walFile, walSize, metaExists ? Files.size(metaFile) + "b" : "N/A");
         }
         
+        LOG.info("Test completed in {} ms", System.currentTimeMillis() - testStartTime);
         ctx.completeNow();
     }
 
@@ -151,22 +164,33 @@ class RaftLogClusterIntegrationTest {
     @DisplayName("Vote metadata persists to WAL during election")
     void testVoteMetadataPersistence(VertxTestContext ctx) throws Exception {
         LOG.info("=== TEST: Vote Metadata Persistence ===");
+        long testStartTime = System.currentTimeMillis();
         
         startClusterWithStorage();
         
         // Wait for leader election
+        LOG.debug("Waiting for leader election (timeout=10s)...");
+        long electionStart = System.currentTimeMillis();
         RaftNode leader = waitForLeader(10_000);
         assertNotNull(leader, "Leader should be elected");
-        LOG.info("Leader elected: {} (term={})", leader.getNodeId(), leader.getCurrentTerm());
+        LOG.info("Leader elected: {} (term={}) in {} ms", 
+            leader.getNodeId(), leader.getCurrentTerm(), System.currentTimeMillis() - electionStart);
+        
+        // Log pre-stop cluster state
+        logClusterState("before stopping nodes");
         
         // Get the current term
         long electionTerm = leader.getCurrentTerm();
         assertTrue(electionTerm > 0, "Term should be > 0 after election");
+        LOG.debug("Election term: {}, will verify this persists", electionTerm);
         
         // Stop all nodes
-        LOG.info("Stopping all nodes...");
+        LOG.info("Stopping all {} nodes...", cluster.size());
         for (RaftNode node : cluster) {
+            LOG.debug("Stopping node {} (state={}, term={})", 
+                node.getNodeId(), node.getState(), node.getCurrentTerm());
             node.stop().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
+            LOG.debug("Node {} stopped successfully", node.getNodeId());
         }
         cluster.clear();
         
@@ -215,16 +239,23 @@ class RaftLogClusterIntegrationTest {
     @DisplayName("Log entries persist and replay after restart")
     void testLogEntryPersistenceAndReplay(VertxTestContext ctx) throws Exception {
         LOG.info("=== TEST: Log Entry Persistence and Replay ===");
+        long testStartTime = System.currentTimeMillis();
         
         startClusterWithStorage();
         
         // Wait for leader
+        LOG.debug("Waiting for leader election...");
         RaftNode leader = waitForLeader(10_000);
         assertNotNull(leader, "Leader should be elected");
-        LOG.info("Leader: {}", leader.getNodeId());
+        LOG.info("Leader: {} (term={}, logSize={})", 
+            leader.getNodeId(), leader.getCurrentTerm(), leader.getLogSize());
+        
+        // Log initial WAL sizes
+        logWalSizes("before command submission");
         
         // Submit commands to the leader
         List<String> jobIds = new ArrayList<>();
+        LOG.debug("Submitting 3 commands to leader...");
         for (int i = 1; i <= 3; i++) {
             String jobId = "wal-test-job-" + i;
             jobIds.add(jobId);
@@ -232,14 +263,23 @@ class RaftLogClusterIntegrationTest {
             TransferJob job = createTestJob(jobId);
             TransferJobCommand cmd = TransferJobCommand.create(job);
             
+            long cmdStart = System.currentTimeMillis();
             Object result = leader.submitCommand(cmd)
                 .toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
             
-            LOG.info("Submitted job {} to leader, result: {}", jobId, result);
+            LOG.info("Submitted job {} to leader in {} ms, result: {}", 
+                jobId, System.currentTimeMillis() - cmdStart, result);
         }
         
+        // Log WAL sizes after submission
+        logWalSizes("after command submission");
+        
         // Wait for replication
+        LOG.debug("Waiting 2s for replication to all followers...");
         Thread.sleep(2000);
+        
+        // Verify replication to followers
+        logReplicationStatus(jobIds);
         
         // Verify jobs exist in state machine before restart
         QuorusStateMachine leaderSM = (QuorusStateMachine) leader.getStateMachine();
@@ -292,23 +332,31 @@ class RaftLogClusterIntegrationTest {
     @DisplayName("Single node restart recovers from WAL")
     void testSingleNodeRecovery(VertxTestContext ctx) throws Exception {
         LOG.info("=== TEST: Single Node Recovery ===");
+        long testStartTime = System.currentTimeMillis();
         
         startClusterWithStorage();
         
         // Wait for leader
+        LOG.debug("Waiting for leader election...");
         RaftNode leader = waitForLeader(10_000);
         assertNotNull(leader);
-        LOG.info("Leader: {}", leader.getNodeId());
+        LOG.info("Leader: {} (term={}, logSize={})", 
+            leader.getNodeId(), leader.getCurrentTerm(), leader.getLogSize());
         
         // Submit a job
         String jobId = "recovery-test-job";
         TransferJob job = createTestJob(jobId);
+        long cmdStart = System.currentTimeMillis();
         leader.submitCommand(TransferJobCommand.create(job))
             .toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
-        LOG.info("Submitted job: {}", jobId);
+        LOG.info("Submitted job: {} in {} ms", jobId, System.currentTimeMillis() - cmdStart);
         
         // Wait for replication
+        LOG.debug("Waiting 2s for replication...");
         Thread.sleep(2000);
+        
+        // Log cluster state before follower restart
+        logClusterState("before follower restart");
         
         // Pick a follower to restart
         RaftNode follower = cluster.stream()
@@ -318,25 +366,40 @@ class RaftLogClusterIntegrationTest {
         
         String followerId = follower.getNodeId();
         Path followerDataDir = dataDirs.get(followerId);
-        LOG.info("Will restart follower: {}", followerId);
+        LOG.info("Will restart follower: {} (current state={}, term={}, logSize={})", 
+            followerId, follower.getState(), follower.getCurrentTerm(), follower.getLogSize());
         
-        // Check WAL size before restart
+        // Check WAL size and content before restart
         long walSizeBefore = Files.size(followerDataDir.resolve("raft.log"));
         LOG.info("WAL size before restart: {} bytes", walSizeBefore);
+        LOG.debug("Follower data directory: {}", followerDataDir);
         
         // Stop the follower
+        long stopStart = System.currentTimeMillis();
         follower.stop().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
         cluster.remove(follower);
-        LOG.info("Stopped follower: {}", followerId);
+        LOG.info("Stopped follower: {} in {} ms", followerId, System.currentTimeMillis() - stopStart);
+        
+        // Verify cluster still has quorum
+        LOG.debug("Cluster size after follower stop: {} (quorum requires {})", 
+            cluster.size(), (CLUSTER_SIZE / 2) + 1);
         
         // Restart the follower
         LOG.info("Restarting follower from WAL...");
+        long restartStart = System.currentTimeMillis();
         RaftNode restartedFollower = createNodeWithStorage(followerId, followerDataDir, false);
         restartedFollower.start().toCompletionStage().toCompletableFuture().get(10, TimeUnit.SECONDS);
         cluster.add(restartedFollower);
+        LOG.info("Follower {} restarted in {} ms (term={}, logSize={})", 
+            followerId, System.currentTimeMillis() - restartStart,
+            restartedFollower.getCurrentTerm(), restartedFollower.getLogSize());
         
         // Wait for catch-up
+        LOG.debug("Waiting 3s for follower catch-up...");
         Thread.sleep(3000);
+        
+        // Log cluster state after restart
+        logClusterState("after follower restart");
         
         // Verify recovered follower has the job
         QuorusStateMachine recoveredSM = (QuorusStateMachine) restartedFollower.getStateMachine();
@@ -353,32 +416,45 @@ class RaftLogClusterIntegrationTest {
     // =========================================================================
 
     private void startClusterWithStorage() throws Exception {
+        long startTime = System.currentTimeMillis();
         LOG.info("Starting {}-node cluster with WAL storage...", CLUSTER_SIZE);
         
         // Create transports
+        LOG.debug("Creating mock transports for {} nodes", NODE_IDS.length);
         for (String nodeId : NODE_IDS) {
             transports.put(nodeId, new MockRaftTransport(nodeId));
         }
         for (MockRaftTransport transport : transports.values()) {
             transport.setTransports(transports);
         }
+        LOG.debug("Transports created and connected");
         
         // Create nodes with storage
+        LOG.debug("Creating {} RaftNodes with WAL storage", NODE_IDS.length);
         for (String nodeId : NODE_IDS) {
             Path dataDir = tempDir.resolve(nodeId);
             dataDirs.put(nodeId, dataDir);
+            LOG.debug("Creating node {} with dataDir={}", nodeId, dataDir);
             
             RaftNode node = createNodeWithStorage(nodeId, dataDir, true);
             cluster.add(node);
         }
         
         // Start all nodes
+        LOG.debug("Starting all {} nodes in parallel", cluster.size());
         CountDownLatch startLatch = new CountDownLatch(cluster.size());
         for (RaftNode node : cluster) {
-            node.start().onComplete(ar -> startLatch.countDown());
+            node.start().onComplete(ar -> {
+                if (ar.succeeded()) {
+                    LOG.debug("Node {} started successfully", node.getNodeId());
+                } else {
+                    LOG.error("Node {} failed to start: {}", node.getNodeId(), ar.cause().getMessage());
+                }
+                startLatch.countDown();
+            });
         }
         assertTrue(startLatch.await(30, TimeUnit.SECONDS), "Cluster should start");
-        LOG.info("Cluster started successfully");
+        LOG.info("Cluster started successfully in {} ms", System.currentTimeMillis() - startTime);
     }
 
     private void restartClusterWithExistingStorage() throws Exception {
@@ -460,5 +536,75 @@ class RaftLogClusterIntegrationTest {
             .metadata("testId", jobId)
             .build();
         return new TransferJob(request);
+    }
+    
+    // =========================================================================
+    // Debug Logging Helpers
+    // =========================================================================
+    
+    /**
+     * Logs the current state of all nodes in the cluster.
+     */
+    private void logClusterState(String context) {
+        LOG.debug("--- Cluster State ({}) ---", context);
+        for (RaftNode node : cluster) {
+            QuorusStateMachine sm = (QuorusStateMachine) node.getStateMachine();
+            LOG.debug("  {} | state={} | term={} | votedFor={} | log=[size={}, lastIdx={}, lastTerm={}] | commit={} | applied={} | jobs={}",
+                node.getNodeId(),
+                node.getState(),
+                node.getCurrentTerm(),
+                node.getVotedFor() != null ? node.getVotedFor() : "(none)",
+                node.getLogSize(),
+                node.getLastLogIndex(),
+                node.getLastLogTerm(),
+                node.getCommitIndex(),
+                node.getLastApplied(),
+                sm.getTransferJobCount());
+        }
+        LOG.debug("--- End Cluster State ---");
+    }
+    
+    /**
+     * Logs WAL file sizes for all nodes.
+     */
+    private void logWalSizes(String context) {
+        LOG.debug("--- WAL Sizes ({}) ---", context);
+        for (String nodeId : NODE_IDS) {
+            try {
+                Path walFile = dataDirs.get(nodeId).resolve("raft.log");
+                if (Files.exists(walFile)) {
+                    LOG.debug("  {} | WAL={} bytes", nodeId, Files.size(walFile));
+                } else {
+                    LOG.debug("  {} | WAL file not found", nodeId);
+                }
+            } catch (Exception e) {
+                LOG.debug("  {} | Error reading WAL: {}", nodeId, e.getMessage());
+            }
+        }
+    }
+    
+    /**
+     * Logs replication status for given job IDs across all nodes.
+     */
+    private void logReplicationStatus(List<String> jobIds) {
+        LOG.debug("--- Replication Status ---");
+        for (RaftNode node : cluster) {
+            QuorusStateMachine sm = (QuorusStateMachine) node.getStateMachine();
+            StringBuilder sb = new StringBuilder();
+            sb.append(node.getNodeId()).append(" (").append(node.getState()).append("): ");
+            
+            int found = 0;
+            for (String jobId : jobIds) {
+                if (sm.hasTransferJob(jobId)) {
+                    found++;
+                    sb.append("✓");
+                } else {
+                    sb.append("✗");
+                }
+            }
+            sb.append(" (").append(found).append("/").append(jobIds.size()).append(" jobs)");
+            LOG.debug("  {}", sb.toString());
+        }
+        LOG.debug("--- End Replication Status ---");
     }
 }
