@@ -19,55 +19,172 @@
       "type": "row"
     },
     {
-      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "infinity" },
-      "description": "Interactive Raft cluster topology. Leader (green) connects to followers (blue). Click nodes to see details.",
-      "fieldConfig": { 
-        "defaults": {},
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Visual network topology of the Raft cluster showing node states and connections.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#3274D9", "value": null },
+              { "color": "#FF9830", "value": 1 },
+              { "color": "#73BF69", "value": 2 }
+            ]
+          },
+          "mappings": [
+            { "options": { "0": { "text": "FOLLOWER", "index": 0 } }, "type": "value" },
+            { "options": { "1": { "text": "CANDIDATE", "index": 1 } }, "type": "value" },
+            { "options": { "2": { "text": "★ LEADER", "index": 2 } }, "type": "value" }
+          ]
+        },
         "overrides": []
       },
       "gridPos": { "h": 14, "w": 8, "x": 0, "y": 5 },
       "id": 100,
-      "options": {},
+      "options": {
+        "inlineEditing": false,
+        "showAdvancedTypes": false,
+        "panZoom": false,
+        "infinitePan": false,
+        "root": {
+          "background": { "color": { "fixed": "transparent" } },
+          "border": { "color": { "fixed": "transparent" } },
+          "constraint": { "horizontal": "left", "vertical": "top" },
+          "elements": [
+            {
+              "background": { "color": { "field": "node-1", "fixed": "#3274D9" } },
+              "border": { "color": { "fixed": "#FFFFFF" }, "width": 3 },
+              "config": {
+                "align": "center",
+                "color": { "fixed": "#FFFFFF" },
+                "size": 16,
+                "text": { "fixed": "node-1" },
+                "valign": "middle"
+              },
+              "constraint": { "horizontal": "center", "vertical": "top" },
+              "name": "node-1",
+              "placement": { "height": 70, "left": 115, "top": 30, "width": 70 },
+              "type": "ellipse"
+            },
+            {
+              "background": { "color": { "field": "node-2", "fixed": "#3274D9" } },
+              "border": { "color": { "fixed": "#FFFFFF" }, "width": 3 },
+              "config": {
+                "align": "center",
+                "color": { "fixed": "#FFFFFF" },
+                "size": 16,
+                "text": { "fixed": "node-2" },
+                "valign": "middle"
+              },
+              "constraint": { "horizontal": "left", "vertical": "top" },
+              "name": "node-2",
+              "placement": { "height": 70, "left": 40, "top": 180, "width": 70 },
+              "type": "ellipse"
+            },
+            {
+              "background": { "color": { "field": "node-3", "fixed": "#3274D9" } },
+              "border": { "color": { "fixed": "#FFFFFF" }, "width": 3 },
+              "config": {
+                "align": "center",
+                "color": { "fixed": "#FFFFFF" },
+                "size": 16,
+                "text": { "fixed": "node-3" },
+                "valign": "middle"
+              },
+              "constraint": { "horizontal": "left", "vertical": "top" },
+              "name": "node-3",
+              "placement": { "height": 70, "left": 190, "top": 180, "width": 70 },
+              "type": "ellipse"
+            },
+            {
+              "background": { "color": { "fixed": "transparent" } },
+              "config": {
+                "align": "center",
+                "color": { "field": "node-1", "fixed": "#AAAAAA" },
+                "size": 12,
+                "text": { "field": "node-1", "mode": "field" },
+                "valign": "middle"
+              },
+              "constraint": { "horizontal": "center", "vertical": "top" },
+              "name": "label-1",
+              "placement": { "height": 20, "left": 115, "top": 105, "width": 70 },
+              "type": "text"
+            },
+            {
+              "background": { "color": { "fixed": "transparent" } },
+              "config": {
+                "align": "center",
+                "color": { "field": "node-2", "fixed": "#AAAAAA" },
+                "size": 12,
+                "text": { "field": "node-2", "mode": "field" },
+                "valign": "middle"
+              },
+              "constraint": { "horizontal": "left", "vertical": "top" },
+              "name": "label-2",
+              "placement": { "height": 20, "left": 40, "top": 255, "width": 70 },
+              "type": "text"
+            },
+            {
+              "background": { "color": { "fixed": "transparent" } },
+              "config": {
+                "align": "center",
+                "color": { "field": "node-3", "fixed": "#AAAAAA" },
+                "size": 12,
+                "text": { "field": "node-3", "mode": "field" },
+                "valign": "middle"
+              },
+              "constraint": { "horizontal": "left", "vertical": "top" },
+              "name": "label-3",
+              "placement": { "height": 20, "left": 190, "top": 255, "width": 70 },
+              "type": "text"
+            },
+            {
+              "background": { "color": { "fixed": "transparent" } },
+              "config": {
+                "align": "center",
+                "color": { "fixed": "#666666" },
+                "size": 14,
+                "text": { "fixed": "Raft Consensus" },
+                "valign": "middle"
+              },
+              "constraint": { "horizontal": "center", "vertical": "top" },
+              "name": "title",
+              "placement": { "height": 25, "left": 100, "top": 135, "width": 100 },
+              "type": "text"
+            }
+          ],
+          "name": "canvas",
+          "placement": { "height": 300, "left": 0, "top": 0, "width": 300 },
+          "type": "frame"
+        }
+      },
       "pluginVersion": "10.3.1",
       "targets": [
         {
-          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "infinity" },
-          "columns": [
-            { "selector": "id", "text": "id", "type": "string" },
-            { "selector": "title", "text": "title", "type": "string" },
-            { "selector": "subTitle", "text": "subTitle", "type": "string" },
-            { "selector": "mainStat", "text": "mainStat", "type": "string" },
-            { "selector": "secondaryStat", "text": "secondaryStat", "type": "string" },
-            { "selector": "arc__role", "text": "arc__role", "type": "number" },
-            { "selector": "arc__role_color", "text": "arc__role_color", "type": "string" }
-          ],
-          "data": "id,title,subTitle,mainStat,secondaryStat,arc__role,arc__role_color\nnode-1,node-1,172.20.0.10:9471,LEADER,Term: 5,1,green\nnode-2,node-2,172.20.0.11:9472,FOLLOWER,Term: 5,1,blue\nnode-3,node-3,172.20.0.12:9473,FOLLOWER,Term: 5,1,blue",
-          "filters": [],
-          "format": "node-graph-nodes",
-          "refId": "nodes",
-          "root_selector": "",
-          "source": "inline",
-          "type": "csv"
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "quorus_cluster_state{node=\"node-1\"}",
+          "legendFormat": "node-1",
+          "refId": "A",
+          "instant": true
         },
         {
-          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "infinity" },
-          "columns": [
-            { "selector": "id", "text": "id", "type": "string" },
-            { "selector": "source", "text": "source", "type": "string" },
-            { "selector": "target", "text": "target", "type": "string" },
-            { "selector": "mainStat", "text": "mainStat", "type": "string" }
-          ],
-          "data": "id,source,target,mainStat\n1,node-1,node-2,replicate\n2,node-1,node-3,replicate",
-          "filters": [],
-          "format": "node-graph-edges",
-          "refId": "edges",
-          "root_selector": "",
-          "source": "inline",
-          "type": "csv"
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "quorus_cluster_state{node=\"node-2\"}",
+          "legendFormat": "node-2",
+          "refId": "B",
+          "instant": true
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "quorus_cluster_state{node=\"node-3\"}",
+          "legendFormat": "node-3",
+          "refId": "C",
+          "instant": true
         }
       ],
       "title": "Raft Cluster Network",
-      "type": "nodeGraph"
+      "type": "canvas"
     },
     {
       "datasource": { "type": "prometheus", "uid": "prometheus" },
@@ -99,7 +216,7 @@
             "matcher": { "id": "byName", "options": "Node" },
             "properties": [
               { "id": "custom.width", "value": 80 },
-              { "id": "custom.cellOptions", "value": { "type": "auto" } },
+              { "id": "custom.cellOptions", "value": { "type": "color-text", "tooltipFromField": "Address", "tooltipPlacement": "top" } },
               { "id": "custom.align", "value": "left" }
             ]
           },
@@ -113,7 +230,9 @@
           },
           {
             "matcher": { "id": "byName", "options": "State" },
-            "properties": [{ "id": "custom.width", "value": 110 }]
+            "properties": [
+              { "id": "custom.width", "value": 110 }
+            ]
           },
           {
             "matcher": { "id": "byName", "options": "Term" },
@@ -180,34 +299,45 @@
       "title": "Node Details",
       "transformations": [
         {
-          "id": "merge",
-          "options": {}
+          "id": "seriesToColumns",
+          "options": { "byField": "instance" }
         },
         {
           "id": "organize",
           "options": {
-            "excludeByName": {
-              "Time": true,
-              "__name__": true,
-              "deployment": true,
-              "job": true,
-              "otel_scope_name": true,
-              "service": true
+            "excludeByName": { 
+              "Time 1": true, "Time 2": true, "Time 3": true, "Time 4": true,
+              "__name__ 1": true, "__name__ 2": true, "__name__ 3": true, "__name__ 4": true,
+              "otel_scope_name": true, "otel_scope_name 1": true, "otel_scope_name 2": true, "otel_scope_name 3": true, "otel_scope_name 4": true,
+              "deployment 1": true, "deployment 2": true, "deployment 3": true, "deployment 4": true,
+              "service 1": true, "service 2": true, "service 3": true, "service 4": true,
+              "job 1": true, "job 2": true, "job 3": true, "job 4": true,
+              "node 2": true, "node 3": true, "node 4": true
             },
             "indexByName": {
+              "node 1": 0,
               "node": 0,
               "instance": 1,
+              "Value #State": 2,
               "quorus_cluster_state": 2,
+              "Value #Term": 3,
               "quorus_cluster_term": 3,
+              "Value #Commit": 4,
               "quorus_cluster_commit_index": 4,
+              "Value #LogSize": 5,
               "quorus_cluster_log_size": 5
             },
             "renameByName": {
+              "node 1": "Node",
               "node": "Node",
               "instance": "Address",
+              "Value #State": "State",
               "quorus_cluster_state": "State",
+              "Value #Term": "Term",
               "quorus_cluster_term": "Term",
+              "Value #Commit": "Commit",
               "quorus_cluster_commit_index": "Commit",
+              "Value #LogSize": "Log",
               "quorus_cluster_log_size": "Log"
             }
           }

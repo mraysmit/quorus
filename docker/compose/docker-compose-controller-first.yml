@@ -3,6 +3,11 @@ version: '3.8'
 # Quorus Controller-First Architecture
 # Each controller is a self-contained node with embedded HTTP API
 # This provides natural scaling and fault tolerance
+#
+# Maven Repository for BuildKit:
+#   Set M2_REPO in .env file or environment before running docker-compose.
+#   Windows:   $env:M2_REPO = "$env:USERPROFILE/.m2/repository"
+#   Linux/Mac: export M2_REPO="$HOME/.m2/repository"
 
 services:
   # Controller Node 1
@@ -10,14 +15,16 @@ services:
     build:
       context: ../..
       dockerfile: quorus-controller/Dockerfile
+      additional_contexts:
+        m2cache: ${M2_REPO}
     container_name: quorus-controller1
     hostname: controller1
     environment:
-      - NODE_ID=controller1
-      - RAFT_HOST=0.0.0.0
-      - RAFT_PORT=8080
-      - HTTP_PORT=8080
-      - CLUSTER_NODES=controller1=controller1:8080,controller2=controller2:8080,controller3=controller3:8080
+      - QUORUS_NODE_ID=controller1
+      - QUORUS_RAFT_HOST=0.0.0.0
+      - QUORUS_RAFT_PORT=9080
+      - QUORUS_HTTP_PORT=8080
+      - QUORUS_CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080
       - ELECTION_TIMEOUT_MS=3000
       - HEARTBEAT_INTERVAL_MS=500
       - JAVA_OPTS=-Xmx512m -Xms256m
@@ -50,14 +57,16 @@ services:
     build:
       context: ../..
       dockerfile: quorus-controller/Dockerfile
+      additional_contexts:
+        m2cache: ${M2_REPO}
     container_name: quorus-controller2
     hostname: controller2
     environment:
-      - NODE_ID=controller2
-      - RAFT_HOST=0.0.0.0
-      - RAFT_PORT=8080
-      - HTTP_PORT=8080
-      - CLUSTER_NODES=controller1=controller1:8080,controller2=controller2:8080,controller3=controller3:8080
+      - QUORUS_NODE_ID=controller2
+      - QUORUS_RAFT_HOST=0.0.0.0
+      - QUORUS_RAFT_PORT=9080
+      - QUORUS_HTTP_PORT=8080
+      - QUORUS_CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080
       - ELECTION_TIMEOUT_MS=3000
       - HEARTBEAT_INTERVAL_MS=500
       - JAVA_OPTS=-Xmx512m -Xms256m
@@ -92,14 +101,16 @@ services:
     build:
       context: ../..
       dockerfile: quorus-controller/Dockerfile
+      additional_contexts:
+        m2cache: ${M2_REPO}
     container_name: quorus-controller3
     hostname: controller3
     environment:
-      - NODE_ID=controller3
-      - RAFT_HOST=0.0.0.0
-      - RAFT_PORT=8080
-      - HTTP_PORT=8080
-      - CLUSTER_NODES=controller1=controller1:8080,controller2=controller2:8080,controller3=controller3:8080
+      - QUORUS_NODE_ID=controller3
+      - QUORUS_RAFT_HOST=0.0.0.0
+      - QUORUS_RAFT_PORT=9080
+      - QUORUS_HTTP_PORT=8080
+      - QUORUS_CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080
       - ELECTION_TIMEOUT_MS=3000
       - HEARTBEAT_INTERVAL_MS=500
       - JAVA_OPTS=-Xmx512m -Xms256m

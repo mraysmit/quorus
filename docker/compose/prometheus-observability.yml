@@ -77,6 +77,27 @@ scrape_configs:
           service: 'quorus-agent'
           deployment: 'host'
 
+  # Quorus Controller cluster (controller-first architecture in Docker)
+  # These use the HTTP API metrics endpoint on port 8080
+  - job_name: 'quorus-controllers-compose'
+    scrape_interval: 5s
+    static_configs:
+      - targets: ['controller1:8080']
+        labels:
+          service: 'quorus-controller'
+          deployment: 'compose-cluster'
+          node: 'controller1'
+      - targets: ['controller2:8080']
+        labels:
+          service: 'quorus-controller'
+          deployment: 'compose-cluster'
+          node: 'controller2'
+      - targets: ['controller3:8080']
+        labels:
+          service: 'quorus-controller'
+          deployment: 'compose-cluster'
+          node: 'controller3'
+
   # Quorus Controller cluster (when running in Docker)
   - job_name: 'quorus-controller-docker'
     scrape_interval: 10s
