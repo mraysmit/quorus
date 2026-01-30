@@ -22,7 +22,6 @@ import dev.mars.quorus.controller.raft.grpc.VoteRequest;
 import dev.mars.quorus.controller.raft.grpc.VoteResponse;
 import dev.mars.quorus.controller.raft.storage.RaftStorage;
 import dev.mars.quorus.controller.raft.storage.RaftStorage.LogEntryData;
-import dev.mars.quorus.controller.raft.storage.RaftStorage.PersistentMeta;
 import com.google.protobuf.ByteString;
 import io.vertx.core.Future;
 import io.vertx.core.Promise;
@@ -31,11 +30,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import io.opentelemetry.api.GlobalOpenTelemetry;
+import io.opentelemetry.api.common.AttributeKey;
+import io.opentelemetry.api.common.Attributes;
+import io.opentelemetry.api.metrics.LongCounter;
 import io.opentelemetry.api.metrics.Meter;
 import java.io.*;
-import java.time.Instant;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -94,6 +94,9 @@ public class RaftNode {
     private volatile boolean running = false;
     private long electionTimerId = -1;
     private long heartbeatTimerId = -1;
+
+    // ========== EDGE METRICS ==========
+    private LongCounter rpcCounter;
 
     // ========== CONFIGURATION PARAMETERS ==========
     private final long electionTimeoutMs;
@@ -177,6 +180,12 @@ public class RaftNode {
                 .setDescription("Number of entries in the Raft log")
                 .ofLongs()
                 .buildWithCallback(measurement -> measurement.record(log.size()));
+
+        // Edge metrics for nodeGraph visualization
+        rpcCounter = meter.counterBuilder("quorus.raft.rpc.total")
+                .setDescription("Total Raft RPC calls between nodes (for nodeGraph edges)")
+                .setUnit("1")
+                .build();
     }
 
     public Future<Void> start() {
@@ -515,6 +524,13 @@ public class RaftNode {
                 transport.sendVoteRequest(peerId, request)
                         .onSuccess(response -> vertx.runOnContext(v -> handleVoteResponse(response, term, voteCount)))
                         .onFailure(e -> logger.warn("Failed to retrieve vote from {}", peerId));
+
+                // Record edge metric for nodeGraph visualization
+                rpcCounter.add(1, Attributes.of(
+                        AttributeKey.stringKey("source"), nodeId,
+                        AttributeKey.stringKey("target"), peerId,
+                        AttributeKey.stringKey("type"), "request_vote"
+                ));
             }
         }
     }
@@ -857,6 +873,13 @@ public class RaftNode {
         transport.sendAppendEntries(target, builder.build())
                 .onSuccess(response -> vertx.runOnContext(v -> handleAppendEntriesResponse(target, response)))
                 .onFailure(e -> logger.warn("Failed to send AppendEntries to {}", target));
+
+        // Record edge metric for nodeGraph visualization
+        rpcCounter.add(1, Attributes.of(
+                AttributeKey.stringKey("source"), nodeId,
+                AttributeKey.stringKey("target"), target,
+                AttributeKey.stringKey("type"), heartbeat ? "heartbeat" : "append_entries"
+        ));
     }
 
     private void handleAppendEntriesResponse(String peerId, AppendEntriesResponse response) {

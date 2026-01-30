@@ -215,13 +215,13 @@ public final class RaftStorageFactory {
             return type.trim();
         }
 
-        // Default to raftlog
-        return "raftlog";
+        // Default to file (raftlog-core requires local build)
+        return "file";
     }
 
     private static StorageType parseStorageType(String type) {
         if (type == null || type.isBlank()) {
-            return StorageType.RAFTLOG;
+            return StorageType.FILE;
         }
 
         return switch (type.toLowerCase().trim()) {

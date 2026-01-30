@@ -61,6 +61,7 @@
             <groupId>dev.mars.raftlog</groupId>
             <artifactId>raftlog-core</artifactId>
             <version>1.0</version>
+            <optional>false</optional>
         </dependency>
 
         <!-- Optional: High-performance storage backend -->
