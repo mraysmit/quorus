@@ -8,15 +8,17 @@ services:
     build:
       context: ../../../..
       dockerfile: quorus-controller/Dockerfile
+      additional_contexts:
+        m2cache: ${M2_REPO:-~/.m2/repository}/dev/mars
     hostname: controller1
     environment:
-      - NODE_ID=controller1
-      - RAFT_HOST=0.0.0.0
-      - RAFT_PORT=9080
-      - HTTP_PORT=8080
-      - CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080
-      - ELECTION_TIMEOUT_MS=3000
-      - HEARTBEAT_INTERVAL_MS=500
+      - QUORUS_NODE_ID=controller1
+      - QUORUS_RAFT_HOST=0.0.0.0
+      - QUORUS_RAFT_PORT=9080
+      - QUORUS_HTTP_PORT=8080
+      - QUORUS_CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080
+      - QUORUS_RAFT_ELECTION_TIMEOUT_MS=3000
+      - QUORUS_RAFT_HEARTBEAT_INTERVAL_MS=500
       - JAVA_OPTS=-Xmx256m -Xms128m
     ports:
       - "8080"
@@ -33,15 +35,17 @@ services:
     build:
       context: ../../../..
       dockerfile: quorus-controller/Dockerfile
+      additional_contexts:
+        m2cache: ${M2_REPO:-~/.m2/repository}/dev/mars
     hostname: controller2
     environment:
-      - NODE_ID=controller2
-      - RAFT_HOST=0.0.0.0
-      - RAFT_PORT=9080
-      - HTTP_PORT=8080
-      - CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080
-      - ELECTION_TIMEOUT_MS=3000
-      - HEARTBEAT_INTERVAL_MS=500
+      - QUORUS_NODE_ID=controller2
+      - QUORUS_RAFT_HOST=0.0.0.0
+      - QUORUS_RAFT_PORT=9080
+      - QUORUS_HTTP_PORT=8080
+      - QUORUS_CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080
+      - QUORUS_RAFT_ELECTION_TIMEOUT_MS=3000
+      - QUORUS_RAFT_HEARTBEAT_INTERVAL_MS=500
       - JAVA_OPTS=-Xmx256m -Xms128m
     ports:
       - "8080"
@@ -58,15 +62,17 @@ services:
     build:
       context: ../../../..
       dockerfile: quorus-controller/Dockerfile
+      additional_contexts:
+        m2cache: ${M2_REPO:-~/.m2/repository}/dev/mars
     hostname: controller3
     environment:
-      - NODE_ID=controller3
-      - RAFT_HOST=0.0.0.0
-      - RAFT_PORT=9080
-      - HTTP_PORT=8080
-      - CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080
-      - ELECTION_TIMEOUT_MS=3000
-      - HEARTBEAT_INTERVAL_MS=500
+      - QUORUS_NODE_ID=controller3
+      - QUORUS_RAFT_HOST=0.0.0.0
+      - QUORUS_RAFT_PORT=9080
+      - QUORUS_HTTP_PORT=8080
+      - QUORUS_CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080
+      - QUORUS_RAFT_ELECTION_TIMEOUT_MS=3000
+      - QUORUS_RAFT_HEARTBEAT_INTERVAL_MS=500
       - JAVA_OPTS=-Xmx256m -Xms128m
     ports:
       - "8080"

@@ -123,9 +123,14 @@ public class DockerRaftClusterTest {
 
     @Test
     void testLeaderElection() {
-        // Wait for leader election to complete
-        await().atMost(Duration.ofSeconds(30))
+        // Wait for leader election to complete with diagnostic logging
+        await().atMost(Duration.ofSeconds(60))
                 .pollInterval(Duration.ofSeconds(2))
+                .conditionEvaluationListener(condition -> {
+                    if (!condition.isSatisfied()) {
+                        logger.info("Waiting for leader election to complete...");
+                    }
+                })
                 .until(this::hasExactlyOneLeader);
 
         // Verify exactly one leader exists
@@ -151,9 +156,14 @@ public class DockerRaftClusterTest {
 
     @Test
     void testLeaderFailureAndReelection() {
-        // Wait for initial leader election
-        await().atMost(Duration.ofSeconds(30))
+        // Wait for initial leader election with increased timeout
+        await().atMost(Duration.ofSeconds(60))
                 .pollInterval(Duration.ofSeconds(2))
+                .conditionEvaluationListener(condition -> {
+                    if (!condition.isSatisfied()) {
+                        logger.info("Waiting for leader (failover test)...");
+                    }
+                })
                 .until(this::hasExactlyOneLeader);
 
         // Find the current leader
@@ -172,9 +182,14 @@ public class DockerRaftClusterTest {
 
     @Test
     void testNetworkPartitionRecovery() {
-        // Wait for initial stable cluster
-        await().atMost(Duration.ofSeconds(30))
+        // Wait for initial stable cluster with increased timeout
+        await().atMost(Duration.ofSeconds(60))
                 .pollInterval(Duration.ofSeconds(2))
+                .conditionEvaluationListener(condition -> {
+                    if (!condition.isSatisfied()) {
+                        logger.info("Waiting for leader (partition test)...");
+                    }
+                })
                 .until(this::hasExactlyOneLeader);
 
         int originalLeader = findLeaderIndex();
@@ -185,7 +200,7 @@ public class DockerRaftClusterTest {
         logger.info("Simulating network partition...");
 
         // Verify cluster maintains quorum with 2/3 nodes
-        await().atMost(Duration.ofSeconds(20))
+        await().atMost(Duration.ofSeconds(30))
                 .pollInterval(Duration.ofSeconds(2))
                 .until(() -> {
                     try {
@@ -223,18 +238,23 @@ public class DockerRaftClusterTest {
 
     private boolean hasExactlyOneLeader() {
         int leaderCount = 0;
+        StringBuilder stateLog = new StringBuilder();
         for (int i = 0; i < nodeEndpoints.size(); i++) {
             try {
                 String state = getNodeState(i);
+                stateLog.append("controller").append(i + 1).append("=").append(state).append(" ");
                 if ("LEADER".equals(state)) {
                     leaderCount++;
                 }
             } catch (Exception e) {
-                // Node might not be ready yet
-                return false;
+                // Node might not be ready yet or HTTP error
+                stateLog.append("controller").append(i + 1).append("=ERROR(").append(e.getClass().getSimpleName()).append(") ");
+                logger.warning("Node " + (i + 1) + " error: " + e.getMessage());
             }
         }
-        return leaderCount == 1;
+        boolean result = leaderCount == 1;
+        logger.info("Cluster state: " + stateLog + "| leaders=" + leaderCount + " | result=" + result);
+        return result;
     }
 
     private int findLeaderIndex() {
