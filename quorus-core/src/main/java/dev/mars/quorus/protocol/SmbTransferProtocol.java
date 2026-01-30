@@ -110,7 +110,7 @@ public class SmbTransferProtocol implements TransferProtocol {
                 logger.info("INTENTIONAL TEST FAILURE: SMB transfer failed for test case '{}': {}",
                            request.getRequestId(), e.getMessage());
             } else {
-                logger.error("SMB transfer failed: jobId={}, error={}", context.getJobId(), e.getMessage());
+                logger.error("SMB transfer failed: jobId={}, error={} ({})", context.getJobId(), e.getMessage(), e.getClass().getSimpleName());
             }
             throw new TransferException(context.getJobId(), "SMB transfer failed", e);
         }
@@ -214,7 +214,7 @@ public class SmbTransferProtocol implements TransferProtocol {
                 logger.info("INTENTIONAL TEST FAILURE: SMB download failed for test case '{}': {}",
                            requestId, e.getMessage());
             } else {
-                logger.error("SMB download failed for request {}: {}", requestId, e.getMessage(), e);
+                logger.error("SMB download failed for request {}: {} ({})", requestId, e.getMessage(), e.getClass().getSimpleName());
             }
             throw new TransferException(requestId, "SMB download failed", e);
         }

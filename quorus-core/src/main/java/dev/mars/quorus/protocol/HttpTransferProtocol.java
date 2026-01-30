@@ -122,8 +122,13 @@ public class HttpTransferProtocol implements TransferProtocol {
             if (cause instanceof TransferException) {
                 throw (TransferException) cause;
             }
-            logger.error("HTTP transfer failed: jobId={}, error={}", context.getJobId(), 
-                        cause != null ? cause.getMessage() : e.getMessage());
+            String errorMsg = cause != null ? cause.getMessage() : e.getMessage();
+            if (isIntentionalTestFailure(context.getJobId())) {
+                logger.info("INTENTIONAL TEST FAILURE: HTTP transfer failed for test case '{}': {}",
+                           context.getJobId(), errorMsg);
+            } else {
+                logger.error("HTTP transfer failed: jobId={}, error={}", context.getJobId(), errorMsg);
+            }
             throw new TransferException(context.getJobId(), "Transfer failed", cause != null ? cause : e);
         }
     }
@@ -250,7 +255,12 @@ public class HttpTransferProtocol implements TransferProtocol {
                         });
                 })
                 .recover(err -> {
-                    logger.error("HTTP download failed for job {}: {}", context.getJobId(), err.getMessage());
+                    if (isIntentionalTestFailure(context.getJobId())) {
+                        logger.info("INTENTIONAL TEST FAILURE: HTTP download failed for test case '{}': {}",
+                                   context.getJobId(), err.getMessage());
+                    } else {
+                        logger.error("HTTP download failed for job {}: {}", context.getJobId(), err.getMessage());
+                    }
                     return io.vertx.core.Future.failedFuture(err);
                 });
         } catch (Exception e) {
@@ -411,5 +421,25 @@ public class HttpTransferProtocol implements TransferProtocol {
         }
         
         logger.debug("Request validation passed");
+    }
+
+    /**
+     * Determines if a request ID indicates an intentional test failure.
+     * Test request IDs follow patterns like "test-*", "upload-*-test", etc.
+     * This allows suppressing verbose error logging for expected test failures.
+     *
+     * @param requestId the request ID to check
+     * @return true if this appears to be an intentional test failure
+     */
+    private boolean isIntentionalTestFailure(String requestId) {
+        if (requestId == null) {
+            return false;
+        }
+        return requestId.startsWith("test-") ||
+               requestId.contains("-test") ||
+               requestId.contains("test-invalid") ||
+               requestId.contains("test-missing") ||
+               requestId.contains("test-exception") ||
+               requestId.contains("test-timeout");
     }
 }

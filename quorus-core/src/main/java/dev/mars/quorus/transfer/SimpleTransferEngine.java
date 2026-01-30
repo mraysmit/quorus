@@ -196,7 +196,13 @@ public class SimpleTransferEngine implements TransferEngine {
             try {
                 return executeTransfer(context);
             } catch (Exception e) {
-                logger.error("Transfer execution failed for job {}: {}", job.getJobId(), e.getMessage(), e);
+                if (isIntentionalTestFailure(job.getJobId())) {
+                    logger.info("INTENTIONAL TEST FAILURE: Transfer execution failed for test case '{}': {}",
+                               job.getJobId(), e.getMessage());
+                } else {
+                    logger.error("Transfer execution failed for job {}: {} ({})", 
+                                job.getJobId(), e.getMessage(), e.getClass().getSimpleName());
+                }
                 job.fail("Transfer execution failed: " + e.getMessage(), e);
                 return job.toResult();
             } finally {
@@ -525,7 +531,12 @@ public class SimpleTransferEngine implements TransferEngine {
         // Record OpenTelemetry metric (Phase 8 - Jan 2026)
         telemetryMetrics.recordTransferFailed(protocolName, direction.name(), errorType);
 
-        logger.error("{} transfer failed permanently: {} - {}", direction, job.getJobId(), errorMessage);
+        if (isIntentionalTestFailure(job.getJobId())) {
+            logger.info("INTENTIONAL TEST FAILURE: {} transfer failed for test case '{}': {}",
+                       direction, job.getJobId(), errorMessage);
+        } else {
+            logger.error("{} transfer failed permanently: {} - {}", direction, job.getJobId(), errorMessage);
+        }
         return job.toResult();
     }
     
@@ -589,5 +600,25 @@ public class SimpleTransferEngine implements TransferEngine {
     public TransferMetrics getProtocolMetrics(String protocolName, TransferDirection direction) {
         String key = protocolName + "-" + direction.name();
         return protocolMetrics.get(key);
+    }
+
+    /**
+     * Determines if a job ID indicates an intentional test failure.
+     * Test job IDs follow patterns like "test-*", "*-test", etc.
+     * This allows suppressing verbose error logging for expected test failures.
+     *
+     * @param jobId the job ID to check
+     * @return true if this appears to be an intentional test failure
+     */
+    private boolean isIntentionalTestFailure(String jobId) {
+        if (jobId == null) {
+            return false;
+        }
+        return jobId.startsWith("test-") ||
+               jobId.contains("-test") ||
+               jobId.contains("test-invalid") ||
+               jobId.contains("test-missing") ||
+               jobId.contains("test-exception") ||
+               jobId.contains("test-timeout");
     }
 }

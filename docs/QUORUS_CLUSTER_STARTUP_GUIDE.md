@@ -685,15 +685,30 @@ environment:
 
 **Symptom**: Maven cannot find `dev.mars.raftlog:raftlog-core:1.0`
 
-**Cause**: m2-repo directory structure is incorrect.
+**Cause**: M2_REPO environment variable not set or raftlog-core not installed in local Maven repository.
 
-**Solution**: Ensure path is `m2-repo/raftlog/raftlog-core/1.0/` (not `m2-repo/raftlog-core/1.0/`)
+**Solution**: 
 
+1. Verify M2_REPO is set:
 ```powershell
-# Correct structure
-Remove-Item -Recurse -Force "m2-repo" -ErrorAction SilentlyContinue
-New-Item -ItemType Directory -Force -Path "m2-repo"
-Copy-Item -Recurse "$env:USERPROFILE\.m2\repository\dev\mars\raftlog\*" "m2-repo\" -Force
+# Check environment variable
+if ($env:M2_REPO) { Write-Host "✓ M2_REPO = $env:M2_REPO" } else { Write-Host "✗ M2_REPO not set!" }
+
+# Set if missing (Windows)
+[System.Environment]::SetEnvironmentVariable("M2_REPO", "$env:USERPROFILE/.m2/repository", "User")
+$env:M2_REPO = "$env:USERPROFILE/.m2/repository"
+```
+
+2. Verify raftlog-core exists in local Maven repository:
+```powershell
+Test-Path "$env:M2_REPO/dev/mars/raftlog/raftlog-core/1.0/raftlog-core-1.0.jar"
+# Should return: True
+```
+
+3. If missing, build and install raftlog:
+```powershell
+cd <path-to-raftlog-project>
+mvn clean install -DskipTests
 ```
 
 ### Issue: Prometheus Cannot Scrape Controllers

@@ -275,95 +275,9 @@ class FtpTransferProtocolUploadTest {
         }
     }
 
-    @Nested
-    @DisplayName("Upload Error Handling Tests")
-    class UploadErrorHandlingTests {
-
-        @Test
-        @DisplayName("Upload should fail when source file does not exist")
-        void upload_failsWhenSourceNotExists() {
-            Path nonExistentFile = tempDir.resolve("does-not-exist.txt");
-
-            TransferRequest uploadRequest = TransferRequest.builder()
-                    .requestId("test-upload-missing-source")
-                    .sourceUri(nonExistentFile.toUri())
-                    .destinationUri(URI.create("ftp://testserver/remote/target.txt"))
-                    .build();
-
-            TransferException exception = assertThrows(TransferException.class, () -> {
-                protocol.transfer(uploadRequest, context);
-            }, "Should throw TransferException when source file doesn't exist");
-
-            assertNotNull(exception.getMessage());
-            String fullMessage = getFullExceptionMessage(exception);
-            assertTrue(fullMessage.toLowerCase().contains("source") ||
-                            fullMessage.toLowerCase().contains("file") ||
-                            fullMessage.toLowerCase().contains("not found") ||
-                            fullMessage.toLowerCase().contains("exist") ||
-                            fullMessage.toLowerCase().contains("ftp"),
-                    "Error message should indicate source file or FTP issue. Got: " + fullMessage);
-        }
-
-        @Test
-        @DisplayName("Upload should fail with empty destination host")
-        void upload_failsWithEmptyDestinationHost() throws IOException {
-            Path localFile = tempDir.resolve("test-file.txt");
-            Files.writeString(localFile, "Test content");
-
-            TransferRequest uploadRequest = TransferRequest.builder()
-                    .requestId("test-upload-no-host")
-                    .sourceUri(localFile.toUri())
-                    .destinationUri(URI.create("ftp:///remote/path/file.txt"))
-                    .build();
-
-            TransferException exception = assertThrows(TransferException.class, () -> {
-                protocol.transfer(uploadRequest, context);
-            }, "Should throw TransferException when destination has no host");
-
-            assertNotNull(exception.getMessage());
-        }
-
-        @Test
-        @DisplayName("Upload should fail with empty destination path")
-        void upload_failsWithEmptyDestinationPath() throws IOException {
-            Path localFile = tempDir.resolve("test-file.txt");
-            Files.writeString(localFile, "Test content");
-
-            TransferRequest uploadRequest = TransferRequest.builder()
-                    .requestId("test-upload-no-path")
-                    .sourceUri(localFile.toUri())
-                    .destinationUri(URI.create("ftp://testserver"))
-                    .build();
-
-            TransferException exception = assertThrows(TransferException.class, () -> {
-                protocol.transfer(uploadRequest, context);
-            }, "Should throw TransferException when destination has no path");
-
-            assertNotNull(exception.getMessage());
-        }
-
-        @Test
-        @DisplayName("Upload exception should contain transfer ID from context")
-        void upload_exceptionContainsTransferId() throws IOException {
-            Path localFile = tempDir.resolve("test-file.txt");
-            Files.writeString(localFile, "Test content");
-
-            TransferRequest uploadRequest = TransferRequest.builder()
-                    .requestId("test-upload-exception-id")
-                    .sourceUri(localFile.toUri())
-                    .destinationUri(URI.create("ftp:///no-host/file.txt"))
-                    .build();
-
-            TransferException exception = assertThrows(TransferException.class, () -> {
-                protocol.transfer(uploadRequest, context);
-            });
-
-            assertNotNull(exception.getTransferId(),
-                    "Exception should contain a transfer ID");
-            assertEquals(context.getJobId(), exception.getTransferId(),
-                    "Exception should contain the context job ID");
-        }
-    }
+    // Upload error handling tests have been moved to:
+    // dev.mars.quorus.protocol.errorhandling.FtpTransferProtocolErrorHandlingTest
+    // This keeps test output clean by isolating intentional failure tests.
 
     @Nested
     @DisplayName("Upload with Checksum Tests")

@@ -137,63 +137,7 @@ class FtpTransferProtocolTest {
         });
     }
     
-    @Test
-    void testTransferWithInvalidFtpUri() {
-        // INTENTIONAL FAILURE TEST: Testing invalid FTP URI handling
-        // This test verifies that the protocol correctly rejects malformed URIs
-
-        // URI.create("ftp://") throws IllegalArgumentException due to missing authority
-        // So we test that URI creation itself throws the exception
-        assertThrows(IllegalArgumentException.class, () -> {
-            URI.create("ftp://");
-        });
-
-        // Test with a malformed but parseable URI that the protocol should reject
-        // Expected behavior: TransferException should be thrown
-        TransferRequest request = TransferRequest.builder()
-                .requestId("test-invalid-ftp")
-                .sourceUri(URI.create("ftp://invalid-host-without-path"))
-                .destinationPath(tempDir.resolve("testfile.txt"))
-                .build();
-
-        assertThrows(TransferException.class, () -> {
-            protocol.transfer(request, context);
-        });
-    }
-    
-    @Test
-    void testTransferWithFtpUriMissingHost() {
-        // INTENTIONAL FAILURE TEST: Testing FTP URI validation for missing host
-        // This test verifies that the protocol correctly rejects URIs without a hostname
-        // Expected behavior: TransferException should be thrown with clear error message
-
-        TransferRequest request = TransferRequest.builder()
-                .requestId("test-missing-host")
-                .sourceUri(URI.create("ftp:///path/file.txt"))  // Missing hostname
-                .destinationPath(tempDir.resolve("testfile.txt"))
-                .build();
-
-        assertThrows(TransferException.class, () -> {
-            protocol.transfer(request, context);
-        });
-    }
-    
-    @Test
-    void testTransferWithFtpUriMissingPath() {
-        // INTENTIONAL FAILURE TEST: Testing FTP URI validation for missing path
-        // This test verifies that the protocol correctly rejects URIs without a file path
-        // Expected behavior: TransferException should be thrown with clear error message
-
-        TransferRequest request = TransferRequest.builder()
-                .requestId("test-missing-path")
-                .sourceUri(URI.create("ftp://server"))  // Missing file path
-                .destinationPath(tempDir.resolve("testfile.txt"))
-                .build();
-
-        assertThrows(TransferException.class, () -> {
-            protocol.transfer(request, context);
-        });
-    }
+    // Error handling tests moved to dev.mars.quorus.protocol.errorhandling.FtpTransferProtocolErrorHandlingTest
     
     @Test
     void testFtpUriWithAuthentication() {
@@ -257,33 +201,7 @@ class FtpTransferProtocolTest {
         // Should use anonymous credentials internally
     }
     
-    @Test
-    void testErrorHandlingWithInvalidScheme() {
-        TransferRequest request = TransferRequest.builder()
-                .requestId("test-invalid-scheme")
-                .sourceUri(URI.create("invalid://server/path/file.txt"))
-                .destinationPath(tempDir.resolve("testfile.txt"))
-                .build();
-        
-        assertFalse(protocol.canHandle(request));
-    }
-    
-    @Test
-    void testTransferExceptionContainsRequestId() {
-        TransferRequest request = TransferRequest.builder()
-                .requestId("test-exception-id")
-                .sourceUri(URI.create("ftp://nonexistent.server.com/path/file.txt"))
-                .destinationPath(tempDir.resolve("testfile.txt"))
-                .build();
-        
-        TransferException exception = assertThrows(TransferException.class, () -> {
-            protocol.transfer(request, context);
-        });
-        
-        // The exception should contain context about the transfer
-        assertNotNull(exception.getMessage());
-        assertTrue(exception.getMessage().contains("FTP"));
-    }
+    // Additional error handling tests moved to dev.mars.quorus.protocol.errorhandling.FtpTransferProtocolErrorHandlingTest
     
     @Test
     void testChecksumHandling() {
@@ -382,34 +300,5 @@ class FtpTransferProtocolTest {
         });
     }
     
-    @Test
-    void testMissingHostInUri() {
-        // INTENTIONAL FAILURE TEST: URI without host should throw exception during transfer
-        TransferRequest request = TransferRequest.builder()
-                .requestId("test-missing-host")
-                .sourceUri(URI.create("ftp:///path/file.txt"))  // No host specified
-                .destinationPath(tempDir.resolve("file.txt"))
-                .build();
-        
-        // canHandle might still return true (checks scheme), but transfer should fail
-        assertThrows(TransferException.class, () -> {
-            protocol.transfer(request, context);
-        });
-    }
-    
-    @Test
-    void testMissingPathInUri() {
-        // INTENTIONAL FAILURE TEST: URI without path should throw exception during transfer
-        TransferRequest request = TransferRequest.builder()
-                .requestId("test-missing-path")
-                .sourceUri(URI.create("ftp://server.com"))  // No path specified
-                .destinationPath(tempDir.resolve("file.txt"))
-                .build();
-        
-        assertTrue(protocol.canHandle(request));
-        
-        assertThrows(TransferException.class, () -> {
-            protocol.transfer(request, context);
-        });
-    }
+    // Additional edge case error tests moved to dev.mars.quorus.protocol.errorhandling.FtpTransferProtocolErrorHandlingTest
 }

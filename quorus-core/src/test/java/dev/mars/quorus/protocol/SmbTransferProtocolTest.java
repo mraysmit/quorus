@@ -139,63 +139,7 @@ class SmbTransferProtocolTest {
         });
     }
     
-    @Test
-    void testTransferWithInvalidSmbUri() {
-        // INTENTIONAL FAILURE TEST: Testing invalid SMB URI handling
-        // This test verifies that the protocol correctly rejects malformed URIs
-
-        // URI.create("smb://") throws IllegalArgumentException due to missing authority
-        // So we test that URI creation itself throws the exception
-        assertThrows(IllegalArgumentException.class, () -> {
-            URI.create("smb://");
-        });
-
-        // Test with a malformed but parseable URI that the protocol should reject
-        // Expected behavior: TransferException should be thrown
-        TransferRequest request = TransferRequest.builder()
-                .requestId("test-invalid-smb")
-                .sourceUri(URI.create("smb://invalid-host-without-path"))
-                .destinationPath(tempDir.resolve("testfile.txt"))
-                .build();
-
-        assertThrows(TransferException.class, () -> {
-            protocol.transfer(request, context);
-        });
-    }
-    
-    @Test
-    void testTransferWithSmbUriMissingHost() {
-        // INTENTIONAL FAILURE TEST: Testing SMB URI validation for missing host
-        // This test verifies that the protocol correctly rejects URIs without a hostname
-        // Expected behavior: TransferException should be thrown with clear error message
-
-        TransferRequest request = TransferRequest.builder()
-                .requestId("test-missing-host")
-                .sourceUri(URI.create("smb:///share/file.txt"))  // Missing hostname
-                .destinationPath(tempDir.resolve("testfile.txt"))
-                .build();
-
-        assertThrows(TransferException.class, () -> {
-            protocol.transfer(request, context);
-        });
-    }
-    
-    @Test
-    void testTransferWithSmbUriMissingPath() {
-        // INTENTIONAL FAILURE TEST: Testing SMB URI validation for missing path
-        // This test verifies that the protocol correctly rejects URIs without a file path
-        // Expected behavior: TransferException should be thrown with clear error message
-
-        TransferRequest request = TransferRequest.builder()
-                .requestId("test-missing-path")
-                .sourceUri(URI.create("smb://server"))  // Missing file path
-                .destinationPath(tempDir.resolve("testfile.txt"))
-                .build();
-
-        assertThrows(TransferException.class, () -> {
-            protocol.transfer(request, context);
-        });
-    }
+    // Error handling tests moved to dev.mars.quorus.protocol.errorhandling.SmbTransferProtocolErrorHandlingTest
     
     @Test
     void testSmbUriWithAuthentication() {
@@ -333,36 +277,7 @@ class SmbTransferProtocolTest {
         assertTrue(protocol.canHandle(request));
     }
     
-    @Test
-    void testMissingSmbHostInUri() {
-        // INTENTIONAL FAILURE TEST: URI without host should throw exception during transfer
-        TransferRequest request = TransferRequest.builder()
-                .requestId("test-missing-host")
-                .sourceUri(URI.create("smb:///share/file.txt"))  // No host specified
-                .destinationPath(tempDir.resolve("file.txt"))
-                .build();
-        
-        // Transfer should fail with missing host
-        assertThrows(TransferException.class, () -> {
-            protocol.transfer(request, context);
-        });
-    }
-    
-    @Test
-    void testMissingSmbPathInUri() {
-        // INTENTIONAL FAILURE TEST: URI without path should throw exception during transfer
-        TransferRequest request = TransferRequest.builder()
-                .requestId("test-missing-path")
-                .sourceUri(URI.create("smb://server"))  // No path specified
-                .destinationPath(tempDir.resolve("file.txt"))
-                .build();
-        
-        assertTrue(protocol.canHandle(request));
-        
-        assertThrows(TransferException.class, () -> {
-            protocol.transfer(request, context);
-        });
-    }
+    // Additional edge case error tests moved to dev.mars.quorus.protocol.errorhandling.SmbTransferProtocolErrorHandlingTest
     
     @Test
     void testSmbPathWithSpaces() {
