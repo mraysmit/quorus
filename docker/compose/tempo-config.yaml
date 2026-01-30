@@ -1,0 +1,67 @@
+# Tempo Configuration for Quorus Observability Stack
+# Grafana Tempo - Distributed tracing backend
+
+server:
+  http_listen_port: 3200
+  grpc_listen_port: 9095
+
+# Storage configuration - local filesystem for development/testing
+storage:
+  trace:
+    backend: local
+    local:
+      path: /tmp/tempo/traces
+    wal:
+      path: /tmp/tempo/wal
+    block:
+      bloom_filter_false_positive: 0.05
+      v2_index_downsample_bytes: 1000
+      v2_encoding: zstd
+
+# Distributor receives spans from OTel Collector
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+
+# Ingester writes received data to storage
+ingester:
+  trace_idle_period: 10s
+  max_block_bytes: 1_000_000
+  max_block_duration: 5m
+
+# Compactor optimizes storage
+compactor:
+  compaction:
+    compaction_window: 1h
+    max_block_bytes: 100_000_000
+    block_retention: 1h
+    compacted_block_retention: 10m
+
+# Query frontend for efficient trace lookups
+query_frontend:
+  search:
+    duration_slo: 5s
+    throughput_bytes_slo: 1.073741824e+09
+
+# Metrics generator creates RED metrics from traces
+metrics_generator:
+  registry:
+    external_labels:
+      source: tempo
+      cluster: docker-compose
+  storage:
+    path: /tmp/tempo/generator/wal
+    remote_write:
+      - url: http://prometheus:9090/api/v1/write
+        send_exemplars: true
+
+# Overrides for resource limits
+overrides:
+  defaults:
+    metrics_generator:
+      processors: [service-graphs, span-metrics]

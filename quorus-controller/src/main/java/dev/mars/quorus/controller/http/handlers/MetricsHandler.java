@@ -16,6 +16,7 @@
 
 package dev.mars.quorus.controller.http.handlers;
 
+import dev.mars.quorus.controller.config.AppConfig;
 import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
 import io.vertx.ext.web.RoutingContext;
@@ -25,26 +26,44 @@ import org.slf4j.LoggerFactory;
 
 /**
  * HTTP handler for system metrics.
- * Proxies the OpenTelemetry Prometheus exporter running on port 9464.
+ * Proxies the OpenTelemetry Prometheus exporter.
+ * 
+ * The Prometheus port is read from configuration (quorus.telemetry.prometheus.port),
+ * defaulting to 9464.
  *
  * Endpoint: GET /metrics
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @since 2025-12-11
- * @version 2.0 (OpenTelemetry)
+ * @version 2.1 (Configurable port)
  */
 public class MetricsHandler implements Handler<RoutingContext> {
 
     private static final Logger logger = LoggerFactory.getLogger(MetricsHandler.class);
+    private static final int DEFAULT_PROMETHEUS_PORT = 9464;
+    
     private final WebClient webClient;
+    private final int prometheusPort;
 
+    /**
+     * Creates a MetricsHandler with the default Prometheus port from configuration.
+     */
     public MetricsHandler(Vertx vertx) {
+        this(vertx, AppConfig.get().getPrometheusPort());
+    }
+
+    /**
+     * Creates a MetricsHandler with a specific Prometheus port.
+     * Useful for testing with non-default ports.
+     */
+    public MetricsHandler(Vertx vertx, int prometheusPort) {
         this.webClient = WebClient.create(vertx);
+        this.prometheusPort = prometheusPort;
     }
 
     @Override
     public void handle(RoutingContext ctx) {
-        webClient.get(9464, "localhost", "/metrics")
+        webClient.get(prometheusPort, "localhost", "/metrics")
                 .send()
                 .onSuccess(response -> {
                     if (response.statusCode() == 200) {
@@ -58,7 +77,7 @@ public class MetricsHandler implements Handler<RoutingContext> {
                     }
                 })
                 .onFailure(err -> {
-                    logger.error("Failed to fetch metrics from OTel exporter", err);
+                    logger.error("Failed to fetch metrics from OTel exporter on port {}", prometheusPort, err);
                     ctx.response().setStatusCode(500).end("Internal Server Error: Metrics unavailable");
                 });
     }

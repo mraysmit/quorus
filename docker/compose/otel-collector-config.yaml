@@ -1,0 +1,108 @@
+# OpenTelemetry Collector Configuration for Quorus Observability Stack
+# Routes traces to Tempo, metrics to Prometheus, logs to Loki
+#
+# Receives:
+#   - OTLP gRPC on 0.0.0.0:4317
+#   - OTLP HTTP on 0.0.0.0:4318
+#
+# Exports:
+#   - Traces  -> Tempo (OTLP gRPC)
+#   - Metrics -> Prometheus (remote write) - OTLP metrics only
+#   - Logs    -> Loki (HTTP)
+#
+# NOTE: Prometheus metrics scraping is done directly by Prometheus, NOT via OTel Collector
+#       to avoid double-counting. OTel Collector only handles OTLP telemetry.
+
+receivers:
+  # OTLP receiver for traces, metrics, and logs
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+        cors:
+          allowed_origins:
+            - "*"
+
+processors:
+  # Batch processor to reduce network overhead
+  batch:
+    timeout: 5s
+    send_batch_size: 512
+    send_batch_max_size: 1024
+  
+  # Memory limiter to prevent OOM
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 512
+    spike_limit_mib: 128
+  
+  # Resource processor to add common attributes
+  resource:
+    attributes:
+      - key: deployment.environment
+        value: test
+        action: upsert
+
+exporters:
+  # Export traces to Tempo via OTLP
+  otlp/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+  
+  # Export metrics to Prometheus via remote write
+  prometheusremotewrite:
+    endpoint: http://prometheus:9090/api/v1/write
+    tls:
+      insecure: true
+    resource_to_telemetry_conversion:
+      enabled: true
+  
+  # Export logs to Loki
+  loki:
+    endpoint: http://loki:3100/loki/api/v1/push
+    tls:
+      insecure: true
+  
+  # Debug exporter for troubleshooting
+  debug:
+    verbosity: basic
+    sampling_initial: 5
+    sampling_thereafter: 200
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+  
+  zpages:
+    endpoint: 0.0.0.0:55679
+
+service:
+  extensions: [health_check, zpages]
+  
+  pipelines:
+    # Traces pipeline: OTLP -> Tempo
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, resource, batch]
+      exporters: [otlp/tempo, debug]
+    
+    # Metrics pipeline: OTLP only -> Prometheus (no prometheus receiver to avoid double-counting)
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, resource, batch]
+      exporters: [prometheusremotewrite, debug]
+    
+    # Logs pipeline: OTLP -> Loki
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, resource, batch]
+      exporters: [loki, debug]
+  
+  telemetry:
+    logs:
+      level: info
+    metrics:
+      address: 0.0.0.0:8888

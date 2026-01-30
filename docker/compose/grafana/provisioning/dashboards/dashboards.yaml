@@ -1,0 +1,16 @@
+# Grafana Dashboard Provisioning for Quorus Observability Stack
+# Auto-loads dashboards from the dashboards folder
+
+apiVersion: 1
+
+providers:
+  - name: 'Quorus'
+    orgId: 1
+    folder: 'Quorus'
+    folderUid: 'quorus'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/json

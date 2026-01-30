@@ -40,7 +40,7 @@ import java.util.stream.Collectors;
  * Reactive HTTP API Server using Vert.x Web.
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @version 1.0
+ * @version 1.1
  * @since 2025-08-26
  */
 public class HttpApiServer {
@@ -50,12 +50,27 @@ public class HttpApiServer {
     private final Vertx vertx;
     private final int port;
     private final RaftNode raftNode;
+    private final int prometheusPort;
     private HttpServer httpServer;
 
+    /**
+     * Creates an HttpApiServer with default Prometheus port from configuration.
+     */
     public HttpApiServer(Vertx vertx, int port, RaftNode raftNode) {
+        this(vertx, port, raftNode, -1); // -1 means use default from config
+    }
+
+    /**
+     * Creates an HttpApiServer with a specific Prometheus port.
+     * Useful for testing with non-default ports.
+     * 
+     * @param prometheusPort the port where Prometheus metrics are exposed, or -1 to use config default
+     */
+    public HttpApiServer(Vertx vertx, int port, RaftNode raftNode, int prometheusPort) {
         this.vertx = vertx;
         this.port = port;
         this.raftNode = raftNode;
+        this.prometheusPort = prometheusPort;
     }
 
     public Future<Void> start() {
@@ -65,7 +80,11 @@ public class HttpApiServer {
         router.route().handler(BodyHandler.create());
 
         // Metrics endpoint (OpenTelemetry via Proxy)
-        router.get("/metrics").handler(new MetricsHandler(vertx));
+        if (prometheusPort > 0) {
+            router.get("/metrics").handler(new MetricsHandler(vertx, prometheusPort));
+        } else {
+            router.get("/metrics").handler(new MetricsHandler(vertx));
+        }
 
         // Health check
         router.get("/health")

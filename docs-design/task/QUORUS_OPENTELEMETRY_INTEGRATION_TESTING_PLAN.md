@@ -1141,6 +1141,156 @@ This section covers the **integration testing infrastructure** for validating th
 
 > **Note**: This is separate from the migration phases (1-5) which are complete. These are integration tests to validate the migration.
 
+---
+
+### Standard Observability Stack (Grafana + Tempo + Prometheus + Loki)
+
+> **Updated: 2026-01-29** - Full Grafana observability stack implemented
+
+The standard observability stack provides a production-ready visualization layer for all telemetry data. This stack replaces the simpler Jaeger-only configuration for comprehensive observability.
+
+#### Stack Components
+
+| Component | Version | Purpose | Port |
+|-----------|---------|---------|------|
+| **Grafana** | 10.3.1 | Unified dashboard & visualization | 3000 |
+| **Tempo** | 2.3.1 | Distributed tracing backend | 3200 |
+| **Prometheus** | 2.49.1 | Metrics storage & querying | 9090 |
+| **Loki** | 2.9.3 | Log aggregation | 3100 |
+| **OTel Collector** | 0.96.0 | Telemetry routing & processing | 4317 (gRPC), 4318 (HTTP) |
+
+#### Architecture
+
+```
++------------------+     OTLP/gRPC      +------------------+
+|  Quorus          | -----------------> |  OTel Collector  |
+|  Controller/     |     :4317          |  (aggregation)   |
+|  Agent           |                    +--------+---------+
++------------------+                             |
+                                                 | Routes to backends
+                    +----------------------------+----------------------------+
+                    |                            |                            |
+                    v                            v                            v
+           +----------------+          +----------------+           +----------------+
+           |    Tempo       |          |   Prometheus   |           |     Loki       |
+           |   (traces)     |          |   (metrics)    |           |    (logs)      |
+           |    :3200       |          |     :9090      |           |    :3100       |
+           +-------+--------+          +-------+--------+           +-------+--------+
+                   |                           |                            |
+                   +---------------------------+----------------------------+
+                                               |
+                                               v
+                                      +----------------+
+                                      |    Grafana     |
+                                      |  (dashboards)  |
+                                      |     :3000      |
+                                      +----------------+
+```
+
+#### Files Created
+
+| File | Purpose |
+|------|---------|
+| `docker/compose/docker-compose-observability.yml` | Main compose file |
+| `docker/compose/otel-collector-config.yaml` | Collector routing config |
+| `docker/compose/tempo-config.yaml` | Tempo distributed tracing config |
+| `docker/compose/prometheus-observability.yml` | Prometheus scrape config |
+| `docker/compose/loki-config.yaml` | Loki log aggregation config |
+| `docker/compose/grafana/provisioning/datasources/datasources.yaml` | Auto-configured datasources |
+| `docker/compose/grafana/provisioning/dashboards/dashboards.yaml` | Dashboard provisioning |
+| `docker/compose/grafana/provisioning/dashboards/json/quorus-controller.json` | Controller dashboard |
+| `docker/start-observability.ps1` | PowerShell startup script |
+
+#### Quick Start
+
+```powershell
+# Start the observability stack
+cd docker
+.\start-observability.ps1
+
+# Access points:
+#   Grafana:    http://localhost:3000 (admin/admin)
+#   Prometheus: http://localhost:9090
+#   Tempo:      http://localhost:3200
+
+# Stop the stack
+.\start-observability.ps1 -Down
+
+# View logs
+.\start-observability.ps1 -Logs
+```
+
+#### Configuring Quorus to Send Telemetry
+
+Set these environment variables before running Quorus components:
+
+```bash
+# For OTLP export to the collector
+export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
+export OTEL_METRICS_EXPORTER=otlp
+export OTEL_TRACES_EXPORTER=otlp
+export OTEL_SERVICE_NAME=quorus-controller
+```
+
+Or via Java system properties:
+
+```bash
+java -Dotel.exporter.otlp.endpoint=http://localhost:4317 \
+     -Dotel.metrics.exporter=otlp \
+     -Dotel.traces.exporter=otlp \
+     -Dotel.service.name=quorus-controller \
+     -jar quorus-controller.jar
+```
+
+#### Grafana Features
+
+**Pre-configured Datasources:**
+- **Prometheus** - Metrics queries with PromQL
+- **Tempo** - Trace exploration with TraceQL
+- **Loki** - Log queries with LogQL
+
+**Trace-to-Logs Correlation:**
+The Tempo datasource is configured to link traces to Loki logs via `traceId`:
+```yaml
+tracesToLogsV2:
+  datasourceUid: loki
+  filterByTraceID: true
+  filterBySpanID: true
+```
+
+**Trace-to-Metrics Correlation:**
+Service maps and span metrics are generated from traces:
+```yaml
+tracesToMetrics:
+  datasourceUid: prometheus
+serviceMap:
+  datasourceUid: prometheus
+```
+
+#### Dashboard: Quorus Controller Overview
+
+The pre-provisioned dashboard (`quorus-controller.json`) includes:
+- **Cluster State** - Current Raft state (FOLLOWER/CANDIDATE/LEADER)
+- **Raft Term** - Current consensus term
+- **Commit Index** - Log replication progress
+- **Log Size** - Raft log entries count
+- **Raft Metrics Over Time** - Time series graphs
+- **HTTP Request Latency** - API performance metrics
+
+#### Comparison: Standard Stack vs. Jaeger-Only
+
+| Aspect | Jaeger-Only | Grafana Stack |
+|--------|-------------|---------------|
+| **Traces** | Yes (Jaeger UI) | Yes (Tempo + Grafana) |
+| **Metrics** | Prometheus (separate) | Unified in Grafana |
+| **Logs** | None | Loki integration |
+| **Correlation** | Manual | Automatic trace-log-metric links |
+| **Dashboards** | Limited | Rich, customizable |
+| **Alerting** | None | Grafana Alerting |
+| **Long-term Storage** | Memory only | Persistent volumes |
+
+---
+
 ### Test Phase 1: Docker Compose Configuration for OpenTelemetry Stack
 
 **File**: `docker/compose/docker-compose-otel-test.yml`

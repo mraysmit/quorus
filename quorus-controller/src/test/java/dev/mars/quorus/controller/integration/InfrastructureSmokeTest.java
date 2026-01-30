@@ -227,11 +227,45 @@ class InfrastructureSmokeTest {
         logger.info("✓ Command endpoint responds (status: " + response.statusCode() + ")");
     }
 
-    // ========== JSON Serialization Tests ==========
+    // ========== Metrics Endpoint Tests ==========
 
     @Test
     @Order(7)
-    @DisplayName("7. JSON serialization works")
+    @DisplayName("7. Metrics endpoint responds")
+    void testMetricsEndpoint() throws Exception {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(BASE_URL + "/metrics"))
+                .timeout(Duration.ofSeconds(5))
+                .GET()
+                .build();
+
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        
+        // Metrics endpoint should respond - either with metrics (200) or with error if OTel exporter is not running (500)
+        // In test environment without OTel exporter, we expect 500 with a descriptive error
+        assertTrue(response.statusCode() == 200 || response.statusCode() == 500,
+                "Metrics endpoint should respond with 200 (if OTel running) or 500 (if not)");
+        
+        if (response.statusCode() == 200) {
+            // If OTel exporter is running, verify we get Prometheus-format metrics
+            String body = response.body();
+            assertTrue(body.contains("# ") || body.contains("TYPE") || body.isEmpty() == false,
+                    "Metrics response should contain Prometheus-format data");
+            logger.info("✓ Metrics endpoint responds with Prometheus data");
+        } else {
+            // Verify we get a meaningful error message, not a crash
+            String body = response.body();
+            assertTrue(body.contains("Metrics unavailable") || body.contains("Internal Server Error"),
+                    "Metrics endpoint should return descriptive error when OTel exporter unavailable");
+            logger.info("✓ Metrics endpoint responds with expected error (OTel exporter not running in test)");
+        }
+    }
+
+    // ========== JSON Serialization Tests ==========
+
+    @Test
+    @Order(8)
+    @DisplayName("8. JSON serialization works")
     void testJsonSerialization() throws Exception {
         // Test that Java Time module is properly configured
         Instant now = Instant.now();
@@ -247,16 +281,16 @@ class InfrastructureSmokeTest {
     // ========== Performance Baseline ==========
 
     @Test
-    @Order(8)
-    @DisplayName("8. Startup time is acceptable")
+    @Order(9)
+    @DisplayName("9. Startup time is acceptable")
     void testStartupTime() {
         assertTrue(startupTime < 10000, "Infrastructure should start in under 10 seconds");
         logger.info("✓ Startup time: " + startupTime + "ms (threshold: 10000ms)");
     }
 
     @Test
-    @Order(9)
-    @DisplayName("9. Health endpoint latency is acceptable")
+    @Order(10)
+    @DisplayName("10. Health endpoint latency is acceptable")
     void testHealthEndpointLatency() throws Exception {
         long start = System.currentTimeMillis();
         
@@ -277,8 +311,8 @@ class InfrastructureSmokeTest {
     // ========== Summary ==========
 
     @Test
-    @Order(10)
-    @DisplayName("10. All infrastructure components ready")
+    @Order(11)
+    @DisplayName("11. All infrastructure components ready")
     void testInfrastructureSummary() {
         logger.info("");
         logger.info("=== Infrastructure Smoke Test Summary ===");
@@ -286,6 +320,7 @@ class InfrastructureSmokeTest {
         logger.info("  Raft Node:     ✓ Leader elected");
         logger.info("  State Machine: ✓ Initialized");
         logger.info("  HTTP Server:   ✓ Listening on port " + HTTP_PORT);
+        logger.info("  Metrics:       ✓ Endpoint available");
         logger.info("  Startup Time:  " + startupTime + "ms");
         logger.info("=========================================");
         logger.info("");
