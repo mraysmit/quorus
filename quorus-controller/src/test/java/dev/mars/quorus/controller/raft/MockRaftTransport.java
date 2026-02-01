@@ -56,7 +56,7 @@ public class MockRaftTransport implements RaftTransport {
 
     private final String nodeId;
     private final ExecutorService executor = Executors.newCachedThreadPool();
-    private volatile Consumer<Object> messageHandler;
+    private volatile Consumer<RaftMessage> messageHandler;
     private volatile boolean running = false;
     private Map<String, MockRaftTransport> transports;
     private RaftNode raftNode;
@@ -79,7 +79,7 @@ public class MockRaftTransport implements RaftTransport {
     }
 
     @Override
-    public void start(Consumer<Object> messageHandler) {
+    public void start(Consumer<RaftMessage> messageHandler) {
         this.messageHandler = messageHandler;
         this.running = true;
         logger.info("Started mock transport for node: " + nodeId);
@@ -176,7 +176,7 @@ public class MockRaftTransport implements RaftTransport {
         }
         
         if (messageHandler != null) {
-            messageHandler.accept(request);
+            messageHandler.accept(new RaftMessage.Vote(request));
         }
         
         // Fallback if RaftNode is not set (should not happen in correct setup)
@@ -194,7 +194,7 @@ public class MockRaftTransport implements RaftTransport {
         }
 
         if (messageHandler != null) {
-            messageHandler.accept(request);
+            messageHandler.accept(new RaftMessage.AppendEntries(request));
         }
         
         // Fallback if RaftNode is not set

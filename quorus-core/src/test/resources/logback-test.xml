@@ -8,6 +8,29 @@
         </encoder>
     </appender>
     
+    <!-- File appender for test logs -->
+    <appender name="FILE" class="ch.qos.logback.core.FileAppender">
+        <file>target/test-logs/quorus-core-tests.log</file>
+        <append>false</append>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{50} - %msg%n</pattern>
+        </encoder>
+    </appender>
+    
+    <!-- Rolling file appender (alternative - rotates by size) -->
+    <appender name="ROLLING_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>target/test-logs/quorus-core-tests-rolling.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>target/test-logs/quorus-core-tests.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <maxFileSize>10MB</maxFileSize>
+            <maxHistory>5</maxHistory>
+            <totalSizeCap>50MB</totalSizeCap>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{50} - %msg%n</pattern>
+        </encoder>
+    </appender>
+    
     <!-- Quorus packages at DEBUG level -->
     <logger name="dev.mars.quorus" level="DEBUG"/>
     
@@ -17,7 +40,9 @@
     <logger name="io.netty" level="WARN"/>
     
     <root level="INFO">
+        <!-- Output to both console AND file -->
         <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
     </root>
     
 </configuration>

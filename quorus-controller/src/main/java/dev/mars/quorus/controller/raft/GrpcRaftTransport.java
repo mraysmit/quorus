@@ -68,7 +68,7 @@ public class GrpcRaftTransport implements RaftTransport {
     }
 
     @Override
-    public void start(Consumer<Object> messageHandler) {
+    public void start(Consumer<RaftMessage> messageHandler) {
         // Server side should be started in the Verticle separately (GrpcRaftServer)
         // Client side just needs to be ready
         logger.info("GrpcRaftTransport initialized for node: {}", selfId);

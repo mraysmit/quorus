@@ -196,7 +196,7 @@ class RaftFailureTest {
         // Test transport that fails to start
         RaftTransport failingTransport = new RaftTransport() {
             @Override
-            public void start(java.util.function.Consumer<Object> messageHandler) {
+            public void start(java.util.function.Consumer<RaftMessage> messageHandler) {
                 throw new RuntimeException("Transport failed to start");
             }
             
