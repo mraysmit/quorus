@@ -56,7 +56,7 @@ public class InMemoryTransportSimulator implements RaftTransport {
 
     private final String nodeId;
     private final Executor executor = Executors.newCachedThreadPool();
-    private volatile Consumer<Object> messageHandler;
+    private volatile Consumer<RaftMessage> messageHandler;
     private volatile boolean running = false;
     private RaftNode raftNode;
     
@@ -264,7 +264,7 @@ public class InMemoryTransportSimulator implements RaftTransport {
     }
 
     @Override
-    public void start(Consumer<Object> messageHandler) {
+    public void start(Consumer<RaftMessage> messageHandler) {
         this.messageHandler = messageHandler;
         this.running = true;
         transports.put(nodeId, this);
@@ -480,7 +480,7 @@ public class InMemoryTransportSimulator implements RaftTransport {
         }
         
         if (messageHandler != null) {
-            messageHandler.accept(request);
+            messageHandler.accept(new RaftMessage.Vote(request));
         }
         
         logger.warn("RaftNode not set for transport {}, returning failure", nodeId);
@@ -496,7 +496,7 @@ public class InMemoryTransportSimulator implements RaftTransport {
         }
 
         if (messageHandler != null) {
-            messageHandler.accept(request);
+            messageHandler.accept(new RaftMessage.AppendEntries(request));
         }
         
         logger.warn("RaftNode not set for transport {}, returning failure", nodeId);

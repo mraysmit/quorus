@@ -606,17 +606,24 @@ public class RaftNode {
 
     // Message Handlers running on Event Loop
 
-    private void handleMessage(Object message) {
-        // Ensure we are on the Context
+    /**
+     * Handles incoming Raft messages using pattern matching.
+     * <p>Uses Java 21+ sealed interface pattern matching for type-safe,
+     * exhaustive message handling.
+     * 
+     * @param message the incoming RaftMessage
+     */
+    private void handleMessage(RaftMessage message) {
+        // Ensure we are on the Vert.x Context
         if (Vertx.currentContext() != vertx.getOrCreateContext()) {
             vertx.runOnContext(v -> handleMessage(message));
             return;
         }
 
-        if (message instanceof VoteRequest) {
-            handleVoteRequest((VoteRequest) message);
-        } else if (message instanceof AppendEntriesRequest) {
-            handleAppendEntriesRequest((AppendEntriesRequest) message);
+        // Exhaustive pattern matching - compiler enforces all cases handled
+        switch (message) {
+            case RaftMessage.Vote vote -> handleVoteRequest(vote.request());
+            case RaftMessage.AppendEntries ae -> handleAppendEntriesRequest(ae.request());
         }
     }
 

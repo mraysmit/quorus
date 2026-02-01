@@ -1,0 +1,41 @@
+flowchart TB
+    subgraph HOST["🖥️ HOST MACHINE"]
+        direction TB
+        
+        subgraph TESTS["Test Scripts / curl / PowerShell"]
+            T1["prove-metadata-persistence.ps1<br/>test-log-integrity.ps1"]
+        end
+        
+        TESTS -->|"connects via localhost<br/>+ mapped ports"| DOCKER
+        
+        subgraph DOCKER["🐳 DOCKER NETWORK (quorus-cluster) — 172.20.0.0/16"]
+            direction TB
+            
+            subgraph CLUSTER["Raft Controller Cluster"]
+                direction LR
+                C1["<b>controller1</b><br/>LEADER<br/>HTTP: 8080<br/>Raft: 9080<br/>172.20.0.11"]
+                C2["<b>controller2</b><br/>FOLLOWER<br/>HTTP: 8080<br/>Raft: 9080<br/>172.20.0.12"]
+                C3["<b>controller3</b><br/>FOLLOWER<br/>HTTP: 8080<br/>Raft: 9080<br/>172.20.0.13"]
+            end
+            
+            C1 <-.->|"gRPC<br/>AppendEntries<br/>Vote"| C2
+            C2 <-.->|"gRPC<br/>AppendEntries<br/>Vote"| C3
+            C1 <-.->|"gRPC<br/>AppendEntries<br/>Vote"| C3
+            
+            LB["<b>NGINX Load Balancer</b><br/>172.20.0.10<br/>Forwards to healthy node"]
+            
+            CLUSTER --> LB
+        end
+        
+        subgraph PORTS["📡 Port Mappings (Host → Container)"]
+            direction LR
+            PM["8080 → 80 &nbsp;(Load Balancer)<br/>8081 → 8080 (Controller 1 HTTP)<br/>8082 → 8080 (Controller 2 HTTP)<br/>8083 → 8080 (Controller 3 HTTP)<br/>9080 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(Raft gRPC - internal)"]
+        end
+    end
+    
+    style C1 fill:#4ade80,stroke:#166534,color:#000
+    style C2 fill:#fbbf24,stroke:#92400e,color:#000
+    style C3 fill:#fbbf24,stroke:#92400e,color:#000
+    style LB fill:#60a5fa,stroke:#1e40af,color:#000
+    style CLUSTER fill:#f0fdf4,stroke:#166534
+    style DOCKER fill:#eff6ff,stroke:#1e40af

@@ -1,5 +1,6 @@
 package dev.mars.quorus.controller.integration;
 
+import dev.mars.quorus.controller.raft.RaftMessage;
 import dev.mars.quorus.controller.raft.RaftNode;
 import dev.mars.quorus.controller.raft.RaftStateMachine;
 import dev.mars.quorus.controller.raft.RaftTransport;
@@ -81,7 +82,7 @@ public class RaftNodeIntegrationTest {
 
     static class TestRaftTransport implements RaftTransport {
         @Override
-        public void start(Consumer<Object> messageHandler) {
+        public void start(Consumer<RaftMessage> messageHandler) {
         }
 
         @Override

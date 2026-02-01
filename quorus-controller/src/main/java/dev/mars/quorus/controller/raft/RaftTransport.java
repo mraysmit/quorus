@@ -26,13 +26,22 @@ import java.util.function.Consumer;
 
 /**
  * Interface for Raft transport layer.
+ * 
+ * <p>Implementations handle network communication between Raft nodes,
+ * supporting both request-response RPCs and message-based notifications.
+ * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @version 1.0
+ * @version 2.0
  * @since 2025-08-20
  */
 public interface RaftTransport {
 
-    void start(Consumer<Object> messageHandler);
+    /**
+     * Starts the transport with a type-safe message handler.
+     * 
+     * @param messageHandler consumer for incoming {@link RaftMessage} instances
+     */
+    void start(Consumer<RaftMessage> messageHandler);
 
     void stop();
 
@@ -40,7 +49,13 @@ public interface RaftTransport {
 
     Future<AppendEntriesResponse> sendAppendEntries(String targetId, AppendEntriesRequest request);
 
-    // Helper to set RaftNode reference
+    /**
+     * Sets the RaftNode reference for direct method invocation.
+     * <p>This allows transports to bypass the message handler and call
+     * RaftNode methods directly for request-response patterns.
+     * 
+     * @param node the RaftNode instance
+     */
     default void setRaftNode(RaftNode node) {
     }
 }

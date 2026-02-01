@@ -249,3 +249,35 @@ class IntegrationTest {
 - Pure algorithmic logic
 - Stateless transformations
 - In-memory deterministic data structures
+
+## Code Validation Requirements (MANDATORY)
+
+**When validating implementation status, gap analysis, or architecture reviews:**
+
+### DO NOT:
+- Conclude "not implemented" based solely on grep searches
+- Trust design documents as source of truth for implementation status
+- Pattern-match class names from docs against codebase
+- Make claims without reading actual source files
+
+### MUST DO:
+1. **Read the actual Java source files** using `read_file`, not just `grep_search`
+2. **Trace dependencies** - check `pom.xml` for relevant libraries
+3. **Follow the code path** - if checking persistence, read constructor → fields → methods that use storage
+4. **Cite specific evidence** - file path and line numbers for every claim
+5. **Check tests** - integration tests often prove functionality exists
+
+### Required Format for Implementation Claims:
+
+**WRONG:**
+> "Raft persistence is not implemented"
+
+**CORRECT:**
+> "Raft persistence status:
+> - Checked `RaftNode.java` lines 70-90: Found `private final RaftStorage storage` field
+> - Checked `pom.xml` line 62: Found `raftlog-core` dependency
+> - Checked `RaftLogStorageAdapter.java`: Wraps FileRaftStorage
+> - **Conclusion: IMPLEMENTED** via raftlog-core library"
+
+### If Uncertain:
+Say "I haven't verified this in the source code yet" rather than guessing.
