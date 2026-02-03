@@ -961,19 +961,45 @@ graph TB
 | Raft Consensus | `RaftNode` | `quorus-controller` | Leader election, log replication |
 | State Machine | `QuorusStateMachine` | `quorus-controller` | Replicated state storage |
 
-### Raft Transport Layer (v2.2)
+### Raft Transport Layer (v2.3)
 
-> **Updated in v2.2**: The Raft transport layer uses gRPC as the production transport with Vert.x 5 reactive patterns.
+> **Updated in v2.3**: The Raft transport layer uses type-safe sealed interfaces with pattern matching (Java 21+).
 
 The `RaftTransport` interface defines the communication layer for Raft consensus messages between controller nodes:
 
 ```java
 public interface RaftTransport {
-    void start(Consumer<Object> messageHandler);
+    void start(Consumer<RaftMessage> messageHandler);
     void stop();
     Future<VoteResponse> sendVoteRequest(String targetId, VoteRequest request);
     Future<AppendEntriesResponse> sendAppendEntries(String targetId, AppendEntriesRequest request);
     default void setRaftNode(RaftNode node) {}
+}
+```
+
+#### RaftMessage Sealed Interface (v2.3)
+
+The `RaftMessage` sealed interface provides compile-time type safety for Raft protocol messages:
+
+```java
+public sealed interface RaftMessage {
+    record Vote(VoteRequest request) implements RaftMessage {}
+    record AppendEntries(AppendEntriesRequest request) implements RaftMessage {}
+}
+```
+
+**Benefits of Sealed Interfaces:**
+- **Exhaustive pattern matching**: Compiler ensures all message types are handled
+- **Type safety**: No runtime `instanceof` checks needed
+- **Modern Java idiom**: Leverages Java 21 record patterns
+
+**Usage in RaftNode:**
+```java
+private void handleMessage(RaftMessage message) {
+    switch (message) {
+        case RaftMessage.Vote vote -> handleVoteRequest(vote.request());
+        case RaftMessage.AppendEntries ae -> handleAppendEntriesRequest(ae.request());
+    }
 }
 ```
 
