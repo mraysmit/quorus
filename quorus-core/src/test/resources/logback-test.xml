@@ -8,12 +8,13 @@
         </encoder>
     </appender>
     
-    <!-- File appender for test logs -->
+    <!-- File appender for test logs with MDC context -->
     <appender name="FILE" class="ch.qos.logback.core.FileAppender">
         <file>target/test-logs/quorus-core-tests.log</file>
         <append>false</append>
         <encoder>
-            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{50} - %msg%n</pattern>
+            <!-- Include simulator and test context from MDC when available -->
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{simulator}/%X{testMethod}] %logger{40} - %msg%n</pattern>
         </encoder>
     </appender>
     
@@ -27,9 +28,16 @@
             <totalSizeCap>50MB</totalSizeCap>
         </rollingPolicy>
         <encoder>
-            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{50} - %msg%n</pattern>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{simulator}/%X{testMethod}] %logger{40} - %msg%n</pattern>
         </encoder>
     </appender>
+    
+    <!-- SimulatorTestRunner at DEBUG level for test context -->
+    <!-- Set to TRACE to also see OS/environment details (hostname, Java version, etc.) -->
+    <logger name="SimulatorTestRunner" level="DEBUG"/>
+    
+    <!-- Quorus simulator packages at DEBUG level -->
+    <logger name="dev.mars.quorus.simulator" level="DEBUG"/>
     
     <!-- Quorus packages at DEBUG level -->
     <logger name="dev.mars.quorus" level="DEBUG"/>

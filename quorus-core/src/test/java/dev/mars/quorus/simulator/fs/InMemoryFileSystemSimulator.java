@@ -1,7 +1,6 @@
 /*
- * Copyright (c) 2025 Cityline Ltd.
- * All rights reserved.
- *
+ * Copyright 2025 Mark Andrew Ray-Smith Cityline Ltd
+  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -443,12 +442,17 @@ public class InMemoryFileSystemSimulator {
      * Deletes a directory (must be empty).
      *
      * @param path the directory path
-     * @throws IOException if the directory is not empty or doesn't exist
+     * @throws IOException if the directory is not empty, doesn't exist, or is the root directory
      */
     public void deleteDirectory(String path) throws IOException {
         String normalizedPath = normalizePath(path);
         checkFailure(normalizedPath);
         checkWriteAccess();
+        
+        // Prevent deleting root directory
+        if (normalizedPath.equals("/")) {
+            throw new IOException("Cannot delete root directory");
+        }
         
         if (!directories.containsKey(normalizedPath)) {
             throw new NoSuchFileException("Directory not found: " + normalizedPath);

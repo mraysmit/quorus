@@ -1,7 +1,6 @@
 /*
- * Copyright (c) 2025 Cityline Ltd.
- * All rights reserved.
- *
+ * Copyright 2025 Mark Andrew Ray-Smith Cityline Ltd
+  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -17,7 +16,9 @@
 
 package dev.mars.quorus.simulator.transfer;
 
+import dev.mars.quorus.simulator.SimulatorTestLoggingExtension;
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.slf4j.Logger;
@@ -33,6 +34,7 @@ import static org.assertj.core.api.Assertions.*;
 /**
  * Unit tests for {@link InMemoryTransferEngineSimulator}.
  */
+@ExtendWith(SimulatorTestLoggingExtension.class)
 @DisplayName("InMemoryTransferEngineSimulator Tests")
 class InMemoryTransferEngineSimulatorTest {
 
@@ -77,7 +79,7 @@ class InMemoryTransferEngineSimulatorTest {
             CompletableFuture<InMemoryTransferEngineSimulator.TransferResult> future = 
                 engine.submitTransfer(request);
 
-            var result = future.get(30, TimeUnit.SECONDS);
+            var result = future.get(5, TimeUnit.SECONDS);
             log.info("Transfer completed: successful={}, bytes={}, duration={}ms", 
                 result.successful(), result.bytesTransferred(), 
                 result.duration() != null ? result.duration().toMillis() : "null");
@@ -98,7 +100,7 @@ class InMemoryTransferEngineSimulatorTest {
                 .build();
 
             var future = engine.submitTransfer(request);
-            var result = future.get(30, TimeUnit.SECONDS);
+            var result = future.get(5, TimeUnit.SECONDS);
 
             assertThat(result.jobId()).isNotNull().startsWith("job-");
         }
@@ -172,7 +174,7 @@ class InMemoryTransferEngineSimulatorTest {
                 .build();
 
             var future = engine.submitTransfer(request);
-            future.get(30, TimeUnit.SECONDS); // Wait for completion
+            future.get(5, TimeUnit.SECONDS); // Wait for completion
 
             boolean cancelled = engine.cancelTransfer("completed-test");
             assertThat(cancelled).isFalse();
@@ -312,7 +314,7 @@ class InMemoryTransferEngineSimulatorTest {
                 .build();
 
             var future = engine.submitTransfer(request);
-            future.get(30, TimeUnit.SECONDS);
+            future.get(5, TimeUnit.SECONDS);
 
             // Should have STARTED and COMPLETED at minimum
             assertThat(events).extracting(
@@ -342,7 +344,7 @@ class InMemoryTransferEngineSimulatorTest {
                 .build();
 
             var future = engine.submitTransfer(request);
-            future.get(30, TimeUnit.SECONDS);
+            future.get(5, TimeUnit.SECONDS);
 
             assertThat(progressCount.get()).isGreaterThan(0);
         }
@@ -408,7 +410,7 @@ class InMemoryTransferEngineSimulatorTest {
 
             var future = engine.submitTransfer(request);
 
-            assertThatThrownBy(() -> future.get(30, TimeUnit.SECONDS))
+            assertThatThrownBy(() -> future.get(5, TimeUnit.SECONDS))
                 .isInstanceOf(ExecutionException.class)
                 .hasCauseInstanceOf(InMemoryTransferEngineSimulator.TransferException.class);
         }
@@ -427,7 +429,7 @@ class InMemoryTransferEngineSimulatorTest {
 
             var future = engine.submitTransfer(request);
 
-            assertThatThrownBy(() -> future.get(30, TimeUnit.SECONDS))
+            assertThatThrownBy(() -> future.get(5, TimeUnit.SECONDS))
                 .isInstanceOf(ExecutionException.class);
         }
 
@@ -445,7 +447,7 @@ class InMemoryTransferEngineSimulatorTest {
                 .destinationPath("/dest/file.txt")
                 .build();
 
-            var result = engine.submitTransfer(request).get(30, TimeUnit.SECONDS);
+            var result = engine.submitTransfer(request).get(5, TimeUnit.SECONDS);
             assertThat(result.successful()).isTrue();
         }
     }
@@ -514,7 +516,7 @@ class InMemoryTransferEngineSimulatorTest {
                     .sourceUri("sftp://host/file.txt")
                     .destinationPath("/dest/file.txt")
                     .build();
-                engine.submitTransfer(request).get(30, TimeUnit.SECONDS);
+                engine.submitTransfer(request).get(5, TimeUnit.SECONDS);
             }
 
             assertThat(engine.getTotalSubmitted()).isEqualTo(3);
@@ -529,7 +531,7 @@ class InMemoryTransferEngineSimulatorTest {
                     .sourceUri("sftp://host/file.txt")
                     .destinationPath("/dest/file.txt")
                     .build();
-                engine.submitTransfer(request).get(30, TimeUnit.SECONDS);
+                engine.submitTransfer(request).get(5, TimeUnit.SECONDS);
             }
 
             assertThat(engine.getTotalCompleted()).isEqualTo(2);
@@ -562,7 +564,7 @@ class InMemoryTransferEngineSimulatorTest {
                 .expectedSizeBytes(5000)
                 .build();
 
-            engine.submitTransfer(request).get(30, TimeUnit.SECONDS);
+            engine.submitTransfer(request).get(5, TimeUnit.SECONDS);
 
             assertThat(engine.getTotalBytesTransferred()).isEqualTo(5000);
         }
@@ -575,7 +577,7 @@ class InMemoryTransferEngineSimulatorTest {
                 .destinationPath("/dest/file.txt")
                 .build();
 
-            engine.submitTransfer(request).get(30, TimeUnit.SECONDS);
+            engine.submitTransfer(request).get(5, TimeUnit.SECONDS);
             engine.resetStatistics();
 
             assertThat(engine.getTotalSubmitted()).isZero();
@@ -600,7 +602,7 @@ class InMemoryTransferEngineSimulatorTest {
                 .expectedSizeBytes(1000)
                 .build();
 
-            engine.submitTransfer(request).get(30, TimeUnit.SECONDS);
+            engine.submitTransfer(request).get(5, TimeUnit.SECONDS);
 
             var metrics = engine.getProtocolMetrics("sftp");
             assertThat(metrics.getTransferCount()).isEqualTo(1);
@@ -622,8 +624,8 @@ class InMemoryTransferEngineSimulatorTest {
                 .protocol("ftp")
                 .build();
 
-            engine.submitTransfer(sftpRequest).get(30, TimeUnit.SECONDS);
-            engine.submitTransfer(ftpRequest).get(30, TimeUnit.SECONDS);
+            engine.submitTransfer(sftpRequest).get(5, TimeUnit.SECONDS);
+            engine.submitTransfer(ftpRequest).get(5, TimeUnit.SECONDS);
 
             var allMetrics = engine.getAllProtocolMetrics();
             assertThat(allMetrics).containsKeys("sftp", "ftp");
@@ -660,7 +662,7 @@ class InMemoryTransferEngineSimulatorTest {
                 .destinationPath("/dest/file.txt")
                 .build();
 
-            engine.submitTransfer(request).get(30, TimeUnit.SECONDS);
+            engine.submitTransfer(request).get(5, TimeUnit.SECONDS);
             engine.clear();
 
             assertThat(engine.getTransferJob("clear-test")).isNull();
@@ -683,7 +685,7 @@ class InMemoryTransferEngineSimulatorTest {
                     .sourceUri("sftp://host/file.txt")
                     .destinationPath("/dest/file.txt")
                     .build();
-                engine.submitTransfer(request).get(30, TimeUnit.SECONDS);
+                engine.submitTransfer(request).get(5, TimeUnit.SECONDS);
             }
 
             var jobs = engine.getAllTransferJobs();
@@ -711,6 +713,452 @@ class InMemoryTransferEngineSimulatorTest {
                 .contains("status-filter-test");
             
             engine.cancelTransfer("status-filter-test");
+        }
+    }
+
+    // ==================== Edge Cases Tests ====================
+
+    @Nested
+    @DisplayName("Edge Cases")
+    class EdgeCasesTests {
+
+        @Test
+        @DisplayName("Should handle null job ID - auto-generate")
+        void testNullJobId() throws Exception {
+            var request = InMemoryTransferEngineSimulator.TransferRequest.builder()
+                .jobId(null)
+                .sourceUri("sftp://host/file.txt")
+                .destinationPath("/dest/file.txt")
+                .build();
+
+            var result = engine.submitTransfer(request).get(5, TimeUnit.SECONDS);
+            
+            assertThat(result.jobId()).isNotNull().startsWith("job-");
+        }
+
+        @Test
+        @DisplayName("Should handle empty job ID - auto-generate")
+        void testEmptyJobId() throws Exception {
+            var request = InMemoryTransferEngineSimulator.TransferRequest.builder()
+                .jobId("")
+                .sourceUri("sftp://host/file.txt")
+                .destinationPath("/dest/file.txt")
+                .build();
+
+            var result = engine.submitTransfer(request).get(5, TimeUnit.SECONDS);
+            
+            // Empty ID should be treated as provided (not null)
+            assertThat(result.jobId()).isEqualTo("");
+        }
+
+        @Test
+        @DisplayName("Should handle zero byte transfer")
+        void testZeroByteTransfer() throws Exception {
+            engine.setDefaultTransferDurationMs(50); // Fast execution
+            
+            var request = InMemoryTransferEngineSimulator.TransferRequest.builder()
+                .jobId("zero-byte")
+                .sourceUri("sftp://host/empty.txt")
+                .destinationPath("/dest/empty.txt")
+                .expectedSizeBytes(0)
+                .build();
+
+            var result = engine.submitTransfer(request).get(5, TimeUnit.SECONDS);
+            
+            // Zero byte request completes successfully (simulator may use default size)
+            assertThat(result.successful()).isTrue();
+        }
+
+        @Test
+        @DisplayName("Should handle negative size - use default")
+        void testNegativeSize() throws Exception {
+            var request = InMemoryTransferEngineSimulator.TransferRequest.builder()
+                .jobId("negative-size")
+                .sourceUri("sftp://host/file.txt")
+                .destinationPath("/dest/file.txt")
+                .expectedSizeBytes(-100)
+                .build();
+
+            var result = engine.submitTransfer(request).get(5, TimeUnit.SECONDS);
+            
+            assertThat(result.successful()).isTrue();
+            // Should use default size since negative is invalid
+        }
+
+        @Test
+        @DisplayName("Should handle very large transfer size")
+        void testVeryLargeTransferSize() throws Exception {
+            var request = InMemoryTransferEngineSimulator.TransferRequest.builder()
+                .jobId("large-size")
+                .sourceUri("sftp://host/huge.bin")
+                .destinationPath("/dest/huge.bin")
+                .expectedSizeBytes(Long.MAX_VALUE)
+                .build();
+
+            var result = engine.submitTransfer(request).get(5, TimeUnit.SECONDS);
+            
+            assertThat(result.successful()).isTrue();
+            assertThat(result.bytesTransferred()).isEqualTo(Long.MAX_VALUE);
+        }
+
+        @Test
+        @DisplayName("Should handle duplicate job IDs")
+        void testDuplicateJobIds() throws Exception {
+            var request1 = InMemoryTransferEngineSimulator.TransferRequest.builder()
+                .jobId("duplicate-id")
+                .sourceUri("sftp://host/file1.txt")
+                .destinationPath("/dest/file1.txt")
+                .build();
+
+            var request2 = InMemoryTransferEngineSimulator.TransferRequest.builder()
+                .jobId("duplicate-id")
+                .sourceUri("sftp://host/file2.txt")
+                .destinationPath("/dest/file2.txt")
+                .build();
+
+            var result1 = engine.submitTransfer(request1).get(5, TimeUnit.SECONDS);
+            var result2 = engine.submitTransfer(request2).get(5, TimeUnit.SECONDS);
+            
+            // Both should be tracked - second may overwrite first
+            assertThat(result1.successful()).isTrue();
+            assertThat(result2.successful()).isTrue();
+        }
+
+        @Test
+        @DisplayName("Should handle special characters in job ID")
+        void testSpecialCharactersInJobId() throws Exception {
+            var request = InMemoryTransferEngineSimulator.TransferRequest.builder()
+                .jobId("job-特殊字符-#$%&*@!")
+                .sourceUri("sftp://host/file.txt")
+                .destinationPath("/dest/file.txt")
+                .build();
+
+            var result = engine.submitTransfer(request).get(5, TimeUnit.SECONDS);
+            
+            assertThat(result.successful()).isTrue();
+            assertThat(result.jobId()).isEqualTo("job-特殊字符-#$%&*@!");
+        }
+
+        @Test
+        @DisplayName("Should handle empty source URI")
+        void testEmptySourceUri() throws Exception {
+            var request = InMemoryTransferEngineSimulator.TransferRequest.builder()
+                .jobId("empty-source")
+                .sourceUri("")
+                .destinationPath("/dest/file.txt")
+                .build();
+
+            var result = engine.submitTransfer(request).get(5, TimeUnit.SECONDS);
+            
+            // Simulator doesn't validate URIs
+            assertThat(result.successful()).isTrue();
+        }
+
+        @Test
+        @DisplayName("Should handle empty destination path")
+        void testEmptyDestinationPath() throws Exception {
+            var request = InMemoryTransferEngineSimulator.TransferRequest.builder()
+                .jobId("empty-dest")
+                .sourceUri("sftp://host/file.txt")
+                .destinationPath("")
+                .build();
+
+            var result = engine.submitTransfer(request).get(5, TimeUnit.SECONDS);
+            
+            assertThat(result.successful()).isTrue();
+        }
+
+        @Test
+        @DisplayName("Should handle cancel of non-existent job")
+        void testCancelNonExistentJob() {
+            boolean cancelled = engine.cancelTransfer("non-existent-job-id");
+            assertThat(cancelled).isFalse();
+        }
+
+        @Test
+        @DisplayName("Should handle pause of non-existent job")
+        void testPauseNonExistentJob() {
+            boolean paused = engine.pauseTransfer("non-existent-job-id");
+            assertThat(paused).isFalse();
+        }
+
+        @Test
+        @DisplayName("Should handle resume of non-existent job")
+        void testResumeNonExistentJob() {
+            boolean resumed = engine.resumeTransfer("non-existent-job-id");
+            assertThat(resumed).isFalse();
+        }
+
+        @Test
+        @DisplayName("Should handle max concurrent boundary")
+        void testMaxConcurrentBoundary() throws Exception {
+            engine.setMaxConcurrentTransfers(2);
+            engine.setDefaultTransferDurationMs(1000); // Give time to observe
+
+            List<CompletableFuture<InMemoryTransferEngineSimulator.TransferResult>> futures = new ArrayList<>();
+            
+            // Submit more than max concurrent
+            for (int i = 0; i < 5; i++) {
+                var request = InMemoryTransferEngineSimulator.TransferRequest.builder()
+                    .jobId("boundary-" + i)
+                    .sourceUri("sftp://host/file.txt")
+                    .destinationPath("/dest/file.txt")
+                    .build();
+                futures.add(engine.submitTransfer(request));
+            }
+
+            Thread.sleep(200);
+            
+            // All 5 should be submitted (whether active or queued)
+            assertThat(engine.getTotalSubmitted()).isEqualTo(5);
+            
+            // Cancel all to clean up
+            for (int i = 0; i < 5; i++) {
+                engine.cancelTransfer("boundary-" + i);
+            }
+        }
+
+        @Test
+        @DisplayName("Should handle zero max concurrent transfers")
+        void testZeroMaxConcurrent() {
+            engine.setMaxConcurrentTransfers(0);
+            
+            var request = InMemoryTransferEngineSimulator.TransferRequest.builder()
+                .jobId("zero-max")
+                .sourceUri("sftp://host/file.txt")
+                .destinationPath("/dest/file.txt")
+                .build();
+
+            // Should accept but queue (never execute)
+            var future = engine.submitTransfer(request);
+            assertThat(future).isNotNull();
+            
+            engine.cancelTransfer("zero-max");
+        }
+
+        @Test
+        @DisplayName("Should handle very long job ID")
+        void testVeryLongJobId() throws Exception {
+            String longId = "job-" + "a".repeat(10000);
+            
+            var request = InMemoryTransferEngineSimulator.TransferRequest.builder()
+                .jobId(longId)
+                .sourceUri("sftp://host/file.txt")
+                .destinationPath("/dest/file.txt")
+                .build();
+
+            var result = engine.submitTransfer(request).get(5, TimeUnit.SECONDS);
+            
+            assertThat(result.successful()).isTrue();
+            assertThat(result.jobId()).isEqualTo(longId);
+        }
+    }
+
+    // ==================== Advanced Concurrency Tests ====================
+
+    @Nested
+    @DisplayName("Advanced Concurrency")
+    class AdvancedConcurrencyTests {
+
+        private static final Logger advLog = LoggerFactory.getLogger(AdvancedConcurrencyTests.class);
+
+        @Test
+        @DisplayName("Should handle concurrent submissions")
+        void testConcurrentSubmissions() throws Exception {
+            int numTransfers = 50;
+            advLog.info("Testing concurrent submissions: {} transfers via 10 threads", numTransfers);
+            engine.setDefaultTransferDurationMs(50);
+            
+            ExecutorService executor = Executors.newFixedThreadPool(10);
+            CountDownLatch latch = new CountDownLatch(numTransfers);
+            AtomicInteger successes = new AtomicInteger(0);
+            AtomicInteger failures = new AtomicInteger(0);
+
+            try {
+                for (int i = 0; i < numTransfers; i++) {
+                    final int index = i;
+                    executor.submit(() -> {
+                        try {
+                            var request = InMemoryTransferEngineSimulator.TransferRequest.builder()
+                                .jobId("concurrent-" + index)
+                                .sourceUri("sftp://host/file" + index + ".txt")
+                                .destinationPath("/dest/file" + index + ".txt")
+                                .build();
+                            
+                            engine.submitTransfer(request).get(10, TimeUnit.SECONDS);
+                            successes.incrementAndGet();
+                        } catch (Exception e) {
+                            failures.incrementAndGet();
+                        } finally {
+                            latch.countDown();
+                        }
+                    });
+                }
+
+                latch.await(30, TimeUnit.SECONDS);
+                
+                advLog.info("Completed: {} successes, {} failures, {} total submitted", 
+                    successes.get(), failures.get(), engine.getTotalSubmitted());
+                
+                assertThat(successes.get()).isGreaterThan(0);
+                assertThat(engine.getTotalSubmitted()).isEqualTo(numTransfers);
+            } finally {
+                executor.shutdownNow();
+            }
+        }
+
+        @Test
+        @DisplayName("Should handle concurrent cancel operations")
+        void testConcurrentCancellations() throws Exception {
+            advLog.info("Testing concurrent cancellations: 10 transfers cancelled by 5 threads");
+            engine.setDefaultTransferDurationMs(5000);
+            
+            // Submit several transfers
+            for (int i = 0; i < 10; i++) {
+                var request = InMemoryTransferEngineSimulator.TransferRequest.builder()
+                    .jobId("to-cancel-" + i)
+                    .sourceUri("sftp://host/file.txt")
+                    .destinationPath("/dest/file.txt")
+                    .build();
+                engine.submitTransfer(request);
+            }
+
+            Thread.sleep(100);
+
+            // Cancel all concurrently
+            ExecutorService executor = Executors.newFixedThreadPool(5);
+            try {
+                for (int i = 0; i < 10; i++) {
+                    final int index = i;
+                    executor.submit(() -> engine.cancelTransfer("to-cancel-" + index));
+                }
+                
+                executor.shutdown();
+                executor.awaitTermination(5, TimeUnit.SECONDS);
+                
+                advLog.info("Completed: {} transfers cancelled", engine.getTotalCancelled());
+                assertThat(engine.getTotalCancelled()).isGreaterThan(0);
+            } finally {
+                executor.shutdownNow();
+            }
+        }
+
+        @Test
+        @DisplayName("Should handle rapid submit-cancel cycles")
+        void testRapidSubmitCancelCycles() throws Exception {
+            advLog.info("Testing rapid submit-cancel cycles: 20 transfers submitted and immediately cancelled");
+            engine.setDefaultTransferDurationMs(1000);
+            
+            for (int i = 0; i < 20; i++) {
+                var request = InMemoryTransferEngineSimulator.TransferRequest.builder()
+                    .jobId("rapid-" + i)
+                    .sourceUri("sftp://host/file.txt")
+                    .destinationPath("/dest/file.txt")
+                    .build();
+                
+                engine.submitTransfer(request);
+                engine.cancelTransfer("rapid-" + i);
+            }
+            
+            advLog.info("Completed: {} submitted, {} cancelled", 
+                engine.getTotalSubmitted(), engine.getTotalCancelled());
+            assertThat(engine.getTotalSubmitted()).isEqualTo(20);
+        }
+
+        @Test
+        @DisplayName("Should handle parallel pause/resume operations")
+        void testParallelPauseResume() throws Exception {
+            advLog.info("Testing parallel pause/resume: 4 threads racing on single transfer");
+            engine.setDefaultTransferDurationMs(10000);
+            
+            var request = InMemoryTransferEngineSimulator.TransferRequest.builder()
+                .jobId("pause-resume-test")
+                .sourceUri("sftp://host/file.txt")
+                .destinationPath("/dest/file.txt")
+                .build();
+            
+            engine.submitTransfer(request);
+            Thread.sleep(100);
+
+            ExecutorService executor = Executors.newFixedThreadPool(4);
+            try {
+                advLog.info("Launching 20 concurrent pause/resume operations...");
+                for (int i = 0; i < 10; i++) {
+                    executor.submit(() -> engine.pauseTransfer("pause-resume-test"));
+                    executor.submit(() -> engine.resumeTransfer("pause-resume-test"));
+                }
+                
+                executor.shutdown();
+                executor.awaitTermination(5, TimeUnit.SECONDS);
+                advLog.info("Completed parallel pause/resume without errors");
+            } finally {
+                executor.shutdownNow();
+                engine.cancelTransfer("pause-resume-test");
+            }
+        }
+    }
+
+    // ==================== Security Edge Cases ====================
+
+    @Nested
+    @DisplayName("Security Edge Cases")
+    class SecurityEdgeCasesTests {
+
+        @Test
+        @DisplayName("Should handle path traversal in destination")
+        void testPathTraversalInDestination() throws Exception {
+            var request = InMemoryTransferEngineSimulator.TransferRequest.builder()
+                .jobId("traversal-test")
+                .sourceUri("sftp://host/file.txt")
+                .destinationPath("/dest/../../../etc/passwd")
+                .build();
+
+            var result = engine.submitTransfer(request).get(5, TimeUnit.SECONDS);
+            
+            // Simulator doesn't validate paths
+            assertThat(result.successful()).isTrue();
+        }
+
+        @Test
+        @DisplayName("Should handle malformed URI in source")
+        void testMalformedSourceUri() throws Exception {
+            var request = InMemoryTransferEngineSimulator.TransferRequest.builder()
+                .jobId("malformed-uri")
+                .sourceUri("not-a-valid-uri:::///")
+                .destinationPath("/dest/file.txt")
+                .build();
+
+            var result = engine.submitTransfer(request).get(5, TimeUnit.SECONDS);
+            
+            assertThat(result.successful()).isTrue();
+        }
+
+        @Test
+        @DisplayName("Should handle injection-like patterns in metadata")
+        void testInjectionPatterns() throws Exception {
+            var request = InMemoryTransferEngineSimulator.TransferRequest.builder()
+                .jobId("'; DROP TABLE transfers; --")
+                .sourceUri("sftp://host/file.txt")
+                .destinationPath("/dest/file.txt")
+                .build();
+
+            var result = engine.submitTransfer(request).get(5, TimeUnit.SECONDS);
+            
+            assertThat(result.successful()).isTrue();
+        }
+
+        @Test
+        @DisplayName("Should handle null characters in paths")
+        void testNullCharactersInPaths() throws Exception {
+            var request = InMemoryTransferEngineSimulator.TransferRequest.builder()
+                .jobId("null-char-test")
+                .sourceUri("sftp://host/file\u0000.txt")
+                .destinationPath("/dest/file\u0000.txt")
+                .build();
+
+            var result = engine.submitTransfer(request).get(5, TimeUnit.SECONDS);
+            
+            assertThat(result.successful()).isTrue();
         }
     }
 }

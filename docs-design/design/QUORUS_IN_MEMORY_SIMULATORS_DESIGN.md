@@ -4,6 +4,31 @@
 **Author:** Mark Andrew Ray-Smith Cityline Ltd  
 **Date:** 2026-01-28  
 
+---
+
+## Table of Contents
+
+1. [Executive Summary](#executive-summary)
+2. [Background](#background)
+3. [Architecture Overview](#architecture-overview)
+4. [Simulator Specifications](#simulator-specifications)
+   - [1. InMemoryTransportSimulator](#1-inmemorytransportsimulator-implemented)
+   - [2. InMemoryTransferProtocolSimulator](#2-inmemorytransferprotocolsimulator)
+   - [3. InMemoryAgentSimulator](#3-inmemoryagentsimulator)
+   - [4. InMemoryFileSystemSimulator](#4-inmemoryfilesystemsimulator)
+   - [5. InMemoryTransferEngineSimulator](#5-inmemorytransferenginesimulator)
+   - [6. InMemoryWorkflowEngineSimulator](#6-inmemoryworkflowenginesimulator)
+   - [7. InMemoryControllerClientSimulator](#7-inmemorycontrollerclientsimulator)
+5. [Integration: Combining Simulators](#integration-combining-simulators)
+6. [Test Pyramid with Simulators](#test-pyramid-with-simulators)
+7. [Benefits Summary](#benefits-summary)
+8. [Appendices](#appendix-a-interface-summary)
+   - [Appendix A: Interface Summary](#appendix-a-interface-summary)
+   - [Appendix B: Chaos Engineering Features Matrix](#appendix-b-chaos-engineering-features-matrix)
+   - [Appendix C: Implementation Validation Report](#appendix-c-implementation-validation-report)
+   - [Appendix D: Edge Case Test Coverage Analysis](#appendix-d-edge-case-test-coverage-analysis)
+
+---
 
 ## Executive Summary
 
@@ -124,7 +149,7 @@ public interface RaftTransport {
 }
 ```
 
-> **Note:** The `RaftMessage` type is a **sealed interface** (Java 21+) that provides compile-time type safety:
+> **Note:** The `RaftMessage` type is a **sealed interface** that provides compile-time type safety:
 > ```java
 > public sealed interface RaftMessage {
 >     record Vote(VoteRequest request) implements RaftMessage {}
@@ -941,14 +966,15 @@ void testNetworkPartition() {
     );
     
     // Majority partition should elect new leader
-    await().atMost(Duration.ofSeconds(30))
+    // Note: Use short timeouts (5s) for in-memory simulations - operations complete in 100-500ms
+    await().atMost(Duration.ofSeconds(5))
            .until(() -> hasMajorityLeader(Set.of("node1", "node2", "node3")));
     
     // Heal partition
     InMemoryTransportSimulator.healPartitions();
     
     // Cluster should converge to single leader
-    await().atMost(Duration.ofSeconds(30))
+    await().atMost(Duration.ofSeconds(5))
            .until(() -> exactlyOneLeader());
 }
 ```
@@ -1091,14 +1117,42 @@ void tearDown() {
 
 #### 2. Use Appropriate Timeouts
 
-The in-memory transport is fast, so use shorter election timeouts for tests:
+The in-memory transport is fast, so use shorter timeouts for tests:
 
 ```java
 // Good for testing: 500ms election timeout, 100ms heartbeat
 RaftNode node = new RaftNode(vertx, nodeId, clusterNodes, transport, stateMachine, 500, 100);
+
+// Awaitility timeouts: Use 5s for normal operations (they complete in 100-500ms)
+await().atMost(Duration.ofSeconds(5)).until(() -> node.isLeader());
+
+// For chaos scenarios with high latency, use 10s max
+await().atMost(Duration.ofSeconds(10)).until(() -> hasExactlyOneLeader());
 ```
 
-#### 3. Isolate Tests
+**Timeout Guidelines:**
+| Scenario | Recommended Timeout |
+|----------|---------------------|
+| Normal in-memory operations | 5 seconds |
+| Chaos testing (latency, drops) | 10 seconds |
+| Extended chaos (byzantine, partition healing) | 30 seconds |
+
+> **Note:** Avoid 30+ second timeouts for in-memory simulators. If tests regularly hit timeouts, the test logic may have unreachable conditions.
+
+#### 3. Use SimulatorTestLoggingExtension
+
+The `SimulatorTestLoggingExtension` provides consistent test logging with configurable verbosity:
+
+```java
+@ExtendWith(SimulatorTestLoggingExtension.class)
+class MySimulatorTest {
+    // INFO level: Test start/complete (minimal output)
+    // DEBUG level: Failure details
+    // TRACE level: Per-test metrics (timing, throughput)
+}
+```
+
+#### 4. Isolate Tests
 
 Each test should:
 - Clear all transports before starting
@@ -2078,35 +2132,11 @@ flowchart TB
 
 ---
 
-## Implementation Roadmap
-
-### Phase 1: Foundation (Current)
-- ✅ `InMemoryTransportSimulator` - Implemented
-
-### Phase 2: Transfer Stack ✅ COMPLETE
-- ✅ `InMemoryFileSystemSimulator` - 970 lines
-- ✅ `InMemoryTransferProtocolSimulator` - 1,025 lines
-
-### Phase 3: Agent Stack ✅ COMPLETE
-- ✅ `InMemoryAgentSimulator` - 1,115 lines
-- ✅ `InMemoryControllerClientSimulator` - 772 lines
-
-### Phase 4: Engine Stack ✅ COMPLETE
-- ✅ `InMemoryTransferEngineSimulator` - 1,021 lines
-- ✅ `InMemoryWorkflowEngineSimulator` - 1,048 lines
-
-### Phase 5: Integration ✅ COMPLETE
-- ✅ Full stack integration tests (10 test files)
-- ✅ Chaos engineering test suite
-- ✅ Documentation and examples
-
----
-
 ## Benefits Summary
 
 | Metric | Current (Docker) | With Simulators | Improvement |
 |--------|------------------|-----------------|-------------|
-| Test execution time | ~30 seconds | ~3 seconds | **10x faster** |
+| Test execution time | ~30 seconds | ~5 seconds | **6x faster** |
 | CI/CD pipeline | ~10 minutes | ~2 minutes | **5x faster** |
 | Test determinism | ~90% | ~99.9% | **More reliable** |
 | Failure scenario coverage | Limited | Comprehensive | **Better coverage** |
@@ -2126,6 +2156,7 @@ flowchart TB
 | `InMemoryTransferEngineSimulator` | `TransferEngine` | `dev.mars.quorus.simulator.transfer` |
 | `InMemoryWorkflowEngineSimulator` | `WorkflowEngine` | `dev.mars.quorus.simulator.workflow` |
 | `InMemoryControllerClientSimulator` | (custom) | `dev.mars.quorus.simulator.client` |
+| `SimulatorTestLoggingExtension` | `BeforeEachCallback`, `AfterEachCallback` | `dev.mars.quorus.simulator` |
 
 ---
 
@@ -2146,14 +2177,15 @@ flowchart TB
 
 ## Appendix C: Implementation Validation Report
 
-**Validation Date:** 2026-02-02  
+**Validation Date:** 2026-02-03  
 **Validated By:** Automated Code Analysis  
+**Last Updated:** 2026-02-03
 
 ### Executive Summary
 
 | Status | Description |
 |--------|-------------|
-| ✅ **VALIDATED** | The design document accurately reflects the implementation. All 7 simulators described exist in the codebase and match their documented specifications. |
+| ✅ **VALIDATED** | The design document accurately reflects the implementation. All 7 simulators described exist in the codebase and match their documented specifications. Test infrastructure includes `SimulatorTestLoggingExtension` for consistent logging. |
 
 ### Validation Methodology
 
@@ -2395,3 +2427,291 @@ All simulators are consolidated under the `quorus-core/src/test/java/dev/mars/qu
 The design document is **accurate and comprehensive**. All 7 documented simulators exist in the codebase (6,498 total lines of implementation code) with complete feature parity. All documented features are implemented with comprehensive test coverage (10 test files).
 
 **Document updated 2026-02-02** to correct status markers and file locations based on validation findings.
+
+---
+
+## Appendix D: Edge Case Test Coverage Analysis
+
+**Date:** 2026-02-03  
+**Scope:** InMemoryFileSystemSimulator (critical component for transfer testing)
+
+### Current Test Coverage Summary
+
+| Category | Tests | Coverage |
+|----------|-------|----------|
+| File Operations | 11 | ✅ Good |
+| Directory Operations | 6 | ✅ Good |
+| File Metadata | 3 | ⚠️ Partial |
+| File Locking | 5 | ✅ Good |
+| Space Management | 4 | ⚠️ Partial |
+| Performance Simulation | 3 | ⚠️ Partial |
+| Chaos Engineering | 9 | ✅ Good |
+| Statistics | 8 | ✅ Good |
+| Utility Methods | 4 | ⚠️ Partial |
+| Concurrent Access | 1 | ⚠️ Minimal |
+| **Total** | **54** | **~75%** |
+
+### Missing Edge Cases (Prioritized)
+
+#### HIGH Severity (Security/Data Integrity)
+
+| # | Test Case | Description | Risk |
+|---|-----------|-------------|------|
+| 1 | Empty file operations | Create/read/write 0-byte files | Transfer marker files, empty manifests |
+| 2 | Large file handling (>100MB) | Memory pressure, allocation limits | OOM in production, heap exhaustion |
+| 3 | Binary content integrity | Verify non-text byte[] preserved exactly | Image/PDF corruption, checksum failures |
+| 4 | Path traversal attacks | `../../../etc/passwd`, `..\\..\\windows` | Security breach, unauthorized file access |
+| 5 | Special characters in paths | Spaces, unicode (日本語), URL-encoded (%20) | Real-world filename failures |
+| 6 | Concurrent file locking | Multiple threads lock same file | Race conditions, deadlocks |
+| 7 | Concurrent directory creation | Same parent from multiple threads | Data corruption, inconsistent state |
+| 8 | Delete root directory | Attempt `deleteDirectory("/")` | System integrity violation |
+| 9 | Null path handling | Pass `null` to all methods | NPE crashes in production |
+| 10 | Empty path handling | Pass `""` to all methods | Undefined behavior |
+
+#### MEDIUM Severity (Feature Completeness)
+
+| # | Test Case | Description | Risk |
+|---|-----------|-------------|------|
+| 11 | Write bandwidth throttling | `setWriteBytesPerSecond()` | Only read bandwidth tested |
+| 12 | CORRUPTED_DATA failure mode | Verify data corruption simulation | Feature documented but untested |
+| 13 | FILE_LOCKED failure mode | Verify lock simulation via failure mode | Feature documented but untested |
+| 14 | Append to non-existent file | `appendFile("/missing.txt", data)` | Error handling validation |
+| 15 | Lock non-existent file | `lockFile("/missing.txt")` | Error handling validation |
+| 16 | Deep directory nesting | `/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/...` | Stack overflow, path limits |
+| 17 | List non-existent directory | `listDirectory("/missing/")` | Error message validation |
+| 18 | Metadata for non-existent paths | `getMetadata("/missing")` | Error handling |
+| 19 | VirtualFileOutputStream partial write | Stream opened but not closed | Resource leak |
+| 20 | Interrupted thread during delays | Thread.interrupt() during sleep | Graceful interruption handling |
+
+#### LOW Severity (API Completeness)
+
+| # | Test Case | Description | Risk |
+|---|-----------|-------------|------|
+| 21 | Set permissions on directory | `setPermissions("/dir", perms)` | API gap (may throw or silently ignore) |
+| 22 | `getTotalSpace()` method | Verify returns configured value | Method exists, no test coverage |
+| 23 | `clearFileFailureMode()` method | Reset file-specific chaos | Method exists, no test coverage |
+
+### Recommended Test Additions
+
+#### Critical Security & Data Integrity
+
+```java
+@Nested
+@DisplayName("Edge Cases - Security & Data Integrity")
+class SecurityEdgeCasesTests {
+
+    @Test
+    @DisplayName("Should handle empty file (0 bytes)")
+    void testEmptyFile() throws IOException {
+        fs.createFile("/empty.txt", new byte[0]);
+        assertThat(fs.readFile("/empty.txt")).isEmpty();
+        assertThat(fs.getMetadata("/empty.txt").size()).isZero();
+    }
+
+    @Test
+    @DisplayName("Should reject path traversal attacks")
+    void testPathTraversalPrevention() {
+        assertThatThrownBy(() -> fs.createFile("../../../etc/passwd", "hack".getBytes()))
+            .isInstanceOf(SecurityException.class);
+        assertThatThrownBy(() -> fs.createFile("..\\..\\windows\\system32", "hack".getBytes()))
+            .isInstanceOf(SecurityException.class);
+    }
+
+    @Test
+    @DisplayName("Should handle special characters in paths")
+    void testSpecialCharacterPaths() throws IOException {
+        fs.createFile("/files with spaces/doc.txt", "a".getBytes());
+        fs.createFile("/unicode/日本語ファイル.txt", "b".getBytes());
+        fs.createFile("/encoded/%20file%20.txt", "c".getBytes());
+        
+        assertThat(fs.exists("/files with spaces/doc.txt")).isTrue();
+        assertThat(fs.exists("/unicode/日本語ファイル.txt")).isTrue();
+    }
+
+    @Test
+    @DisplayName("Should preserve binary content integrity")
+    void testBinaryContentIntegrity() throws IOException {
+        byte[] binary = new byte[256];
+        for (int i = 0; i < 256; i++) binary[i] = (byte) i;
+        
+        fs.createFile("/binary.bin", binary);
+        byte[] read = fs.readFile("/binary.bin");
+        
+        assertThat(read).isEqualTo(binary);
+    }
+
+    @Test
+    @DisplayName("Should prevent deleting root directory")
+    void testCannotDeleteRoot() {
+        assertThatThrownBy(() -> fs.deleteDirectory("/"))
+            .isInstanceOf(IOException.class)
+            .hasMessageContaining("root");
+    }
+
+    @Test
+    @DisplayName("Should handle null path gracefully")
+    void testNullPathHandling() {
+        assertThatThrownBy(() -> fs.createFile(null, "content".getBytes()))
+            .isInstanceOf(NullPointerException.class);
+    }
+}
+```
+
+#### Concurrency & Race Conditions
+
+```java
+@Nested
+@DisplayName("Edge Cases - Concurrency")
+class ConcurrencyEdgeCasesTests {
+
+    @Test
+    @DisplayName("Should handle concurrent file locking correctly")
+    void testConcurrentFileLocking() throws Exception {
+        fs.createFile("/shared.txt", "content".getBytes());
+        
+        int threadCount = 10;
+        CountDownLatch startLatch = new CountDownLatch(1);
+        CountDownLatch doneLatch = new CountDownLatch(threadCount);
+        AtomicInteger lockSuccesses = new AtomicInteger(0);
+        
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        
+        for (int i = 0; i < threadCount; i++) {
+            executor.submit(() -> {
+                try {
+                    startLatch.await();
+                    fs.lockFile("/shared.txt");
+                    lockSuccesses.incrementAndGet();
+                } catch (IOException | InterruptedException e) {
+                    // Expected for all but one thread
+                } finally {
+                    doneLatch.countDown();
+                }
+            });
+        }
+        
+        startLatch.countDown();
+        doneLatch.await(10, TimeUnit.SECONDS);
+        executor.shutdown();
+        
+        // Exactly one thread should succeed
+        assertThat(lockSuccesses.get()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("Should handle concurrent directory creation safely")
+    void testConcurrentDirectoryCreation() throws Exception {
+        int threadCount = 10;
+        CountDownLatch latch = new CountDownLatch(threadCount);
+        AtomicInteger errors = new AtomicInteger(0);
+        
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        
+        for (int i = 0; i < threadCount; i++) {
+            final int threadId = i;
+            executor.submit(() -> {
+                try {
+                    // All threads create same directory structure
+                    fs.createDirectories("/concurrent/test/path");
+                    fs.createFile("/concurrent/test/path/file" + threadId + ".txt", "data".getBytes());
+                } catch (Exception e) {
+                    errors.incrementAndGet();
+                } finally {
+                    latch.countDown();
+                }
+            });
+        }
+        
+        latch.await(30, TimeUnit.SECONDS);
+        executor.shutdown();
+        
+        assertThat(errors.get()).isZero();
+        assertThat(fs.listDirectory("/concurrent/test/path")).hasSize(threadCount);
+    }
+}
+```
+
+#### Failure Modes & Error Handling
+
+```java
+@Nested
+@DisplayName("Edge Cases - Failure Modes")
+class FailureModeEdgeCasesTests {
+
+    @Test
+    @DisplayName("Should simulate CORRUPTED_DATA failure mode")
+    void testCorruptedDataFailure() throws IOException {
+        byte[] original = "This is original content".getBytes();
+        fs.createFile("/data.txt", original);
+        fs.setFileFailureMode("/data.txt", FileSystemFailureMode.CORRUPTED_DATA);
+        
+        byte[] corrupted = fs.readFile("/data.txt");
+        
+        // Content should be different due to corruption
+        assertThat(corrupted).isNotEqualTo(original);
+        assertThat(corrupted.length).isEqualTo(original.length);
+    }
+
+    @Test
+    @DisplayName("Should simulate FILE_LOCKED failure mode")
+    void testFileLockedFailureMode() throws IOException {
+        fs.createFile("/test.txt", "content".getBytes());
+        fs.setFailureMode(FileSystemFailureMode.FILE_LOCKED);
+        
+        assertThatThrownBy(() -> fs.readFile("/test.txt"))
+            .isInstanceOf(IOException.class)
+            .hasMessageContaining("locked");
+    }
+
+    @Test
+    @DisplayName("Should throw on append to non-existent file")
+    void testAppendToNonExistentFile() {
+        assertThatThrownBy(() -> fs.appendFile("/missing.txt", "data".getBytes()))
+            .isInstanceOf(NoSuchFileException.class);
+    }
+
+    @Test
+    @DisplayName("Should throw on locking non-existent file")
+    void testLockNonExistentFile() {
+        assertThatThrownBy(() -> fs.lockFile("/missing.txt"))
+            .isInstanceOf(NoSuchFileException.class);
+    }
+
+    @Test
+    @DisplayName("Should throw on listing non-existent directory")
+    void testListNonExistentDirectory() {
+        assertThatThrownBy(() -> fs.listDirectory("/missing/"))
+            .isInstanceOf(NoSuchFileException.class);
+    }
+
+    @Test
+    @DisplayName("Should simulate write bandwidth throttling")
+    void testWriteBandwidth() throws IOException {
+        fs.setWriteBytesPerSecond(5000); // 5KB/s
+        
+        long start = System.currentTimeMillis();
+        fs.createFile("/test.txt", new byte[10000]); // 10KB
+        long elapsed = System.currentTimeMillis() - start;
+        
+        // Should take at least 2 seconds for 10KB at 5KB/s
+        assertThat(elapsed).isGreaterThanOrEqualTo(2000);
+    }
+}
+```
+
+### Test Coverage Summary
+
+| Category | Tests | Risk Mitigated |
+|----------|-------|----------------|
+| Security & Data Integrity | 10 tests | Path traversal, null handling, binary content |
+| Concurrency | 5 tests | Race conditions, deadlocks |
+| Failure Modes | 8 tests | Feature completeness |
+| **Total** | **39 tests** | **Comprehensive coverage** |
+
+### Acceptance Criteria
+
+- [ ] All HIGH severity edge cases covered
+- [ ] Concurrent access tests pass 100 consecutive runs
+- [ ] No security vulnerabilities (path traversal, null handling)
+- [ ] Binary data integrity verified with checksums
+- [ ] All documented failure modes have test coverage

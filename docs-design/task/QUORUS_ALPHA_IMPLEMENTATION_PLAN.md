@@ -10,6 +10,8 @@
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.6 | 2026-02-03 | Added T4.4 (Agent Job Streaming), T4.5 (Tenant Hierarchy), T5.5 (Tenant State Persistence), T5.6 (Workflow State Persistence) from architecture review cross-check |
+| 1.5 | 2026-02-03 | Added T2.4 (Strict Node Identity), T3.3 (Transfer Retry Refactor), T4.3 (Scheduling Strategy) |
 | 1.4 | 2026-02-02 | Third review: Fixed schedule checkboxes, corrected line references |
 | 1.3 | 2026-02-01 | **MAJOR CORRECTIONS**: Routes are core architecture (not "future"), T5.2 snapshots partially complete, T6.7 changed from "decision" to implementation task |
 | 1.2 | 2026-02-01 | T5.1 Raft WAL marked COMPLETE (raftlog-core verified) |
@@ -191,6 +193,32 @@ These are targeted code changes that fix known issues in core functionality.
 
 ---
 
+### T2.4: Strict Node Identity
+
+**Goal:** Prevent split-brain scenarios in containerized environments.
+
+**Effort:** 2-4 hours  
+**Priority:** 🔴 CRITICAL  
+**Dependencies:** None
+
+| Task | Module | Effort | Status |
+|------|--------|--------|--------|
+| Remove InetAddress-based node.id guessing | AppConfig | 1 hour | ⬜ Pending |
+| Add Production mode detection | AppConfig | 30 min | ⬜ Pending |
+| Throw exception if node.id missing in Production | AppConfig | 30 min | ⬜ Pending |
+| Update Docker entrypoints to require NODE_ID | docker/ | 30 min | ⬜ Pending |
+| Add node identity validation tests | quorus-controller/test | 1 hour | ⬜ Pending |
+
+**Rationale:**
+> The current `AppConfig` guesses `node.id` from `InetAddress.getLocalHost()`. In containers/Kubernetes where hostnames are dynamic, this causes nodes to adopt different identities across restarts, leading to split-brain and data corruption.
+
+**Acceptance Criteria:**
+- [ ] `QUORUS_NODE_ID` environment variable is **required** in production mode
+- [ ] Clear error message if node.id is missing: "QUORUS_NODE_ID must be set in production"
+- [ ] Development mode (detected via `quorus.mode=dev`) may use hostname fallback with warning
+
+---
+
 ## Stage 3: Agent & Threading Fixes (2-3 days each)
 
 Fix critical blocking I/O and thread management issues.
@@ -249,6 +277,44 @@ webClient.postAbs(url)
 
 ---
 
+### T3.3: Refactor Transfer Engine Retries
+
+**Goal:** Make transfer retries fully non-blocking/reactive.
+
+**Effort:** 1-2 days  
+**Priority:** 🟡 HIGH  
+**Dependencies:** None
+
+| Task | Module | Effort | Status |
+|------|--------|--------|--------|
+| Replace Thread.sleep with vertx.setTimer | SimpleTransferEngine | 2 hours | ⬜ Pending |
+| Refactor retry logic to use Promise chain | SimpleTransferEngine | 4 hours | ⬜ Pending |
+| Add configurable retry delays | CoreConfig | 1 hour | ⬜ Pending |
+| Update retry tests for async behavior | quorus-core/test | 4 hours | ⬜ Pending |
+
+**Current Issue:**
+```java
+// BAD: Blocks worker thread during backoff
+Thread.sleep(backoffMs);
+```
+
+**Target Pattern:**
+```java
+// GOOD: Non-blocking timer-based retry
+Promise<TransferResult> promise = Promise.promise();
+vertx.setTimer(backoffMs, id -> {
+    executeTransfer(request)
+        .onSuccess(promise::complete)
+        .onFailure(err -> scheduleRetry(attempt + 1, promise));
+});
+return promise.future();
+```
+
+**Rationale:**
+> The current `Thread.sleep` in retry backoff blocks the WorkerExecutor thread, limiting throughput to the worker pool size. With 20 workers and 5-second backoff, only 20 concurrent retries can be in-flight. Timer-based retries allow thousands of concurrent retry waits without blocking threads.
+
+---
+
 ## Stage 4: Protocol & Services (3-5 days each)
 
 Extend capabilities with new protocols and services.
@@ -287,6 +353,102 @@ Extend capabilities with new protocols and services.
 | Remove synchronized(lock) global bottleneck | quorus-tenant | 4 hours | ⬜ Pending |
 | Add concurrent access stress tests | quorus-tenant/test | 8 hours | ⬜ Pending |
 | Add resource tracking metrics | quorus-tenant | 4 hours | ⬜ Pending |
+
+---
+
+### T4.3: Extract Scheduling Strategy
+
+**Goal:** Decouple agent scheduling logic from domain POJOs to enable pluggable strategies.
+
+**Effort:** 2-3 days  
+**Priority:** 🟡 HIGH  
+**Dependencies:** None (but **blocks T6.7 Routes**)
+
+| Task | Module | Effort | Status |
+|------|--------|--------|--------|
+| Create SchedulingStrategy interface | quorus-controller | 2 hours | ⬜ Pending |
+| Implement DefaultSchedulingStrategy | quorus-controller | 4 hours | ⬜ Pending |
+| Extract scoring logic from AgentCapabilities | quorus-controller | 2 hours | ⬜ Pending |
+| Add strategy configuration property | AppConfig | 1 hour | ⬜ Pending |
+| Create RouteAwareSchedulingStrategy (stub) | quorus-controller | 2 hours | ⬜ Pending |
+| Add scheduling strategy tests | quorus-controller/test | 4 hours | ⬜ Pending |
+
+**Current Issue:**
+```java
+// In AgentCapabilities.java - hardcoded weights
+public double calculateCompatibilityScore(TransferRequest request) {
+    return protocolScore * 0.4 + sizeScore * 0.3 + regionScore * 0.3;
+}
+```
+
+**Target Design:**
+```java
+public interface SchedulingStrategy {
+    double scoreAgent(AgentCapabilities agent, TransferRequest request);
+    List<AgentCapabilities> rankAgents(List<AgentCapabilities> agents, TransferRequest request);
+}
+
+public class DefaultSchedulingStrategy implements SchedulingStrategy {
+    private final double protocolWeight;  // configurable
+    private final double sizeWeight;
+    private final double regionWeight;
+}
+```
+
+**Rationale:**
+> Routes (T6.7) require agent selection based on route configuration, not just generic compatibility. Hardcoding the scoring in `AgentCapabilities` violates SRP and makes route-aware scheduling impossible without major refactoring. Extract now to avoid tech debt.
+
+---
+
+### T4.4: Agent Job Streaming (Alternative to Polling)
+
+**Goal:** Reduce job assignment latency from 10 seconds to near-instant.
+
+**Effort:** 3-4 days  
+**Priority:** 🟠 MEDIUM  
+**Dependencies:** T3.1 (WebClient Migration)
+
+| Task | Module | Effort | Status |
+|------|--------|--------|--------|
+| Evaluate long-polling vs gRPC streaming | docs-design/ | 4 hours | ⬜ Pending |
+| Implement long-polling endpoint `/agents/{id}/jobs/stream` | HttpApiServer | 1 day | ⬜ Pending |
+| Update JobPollingService to use long-polling | quorus-agent | 1 day | ⬜ Pending |
+| Add connection timeout/retry handling | quorus-agent | 4 hours | ⬜ Pending |
+| Create streaming job assignment tests | quorus-agent/test | 1 day | ⬜ Pending |
+
+**Current Behavior:**
+> Agent polls `GET /agents/{id}/jobs` every 10 seconds. If a job is assigned immediately after a poll, the agent won't see it for up to 10 seconds.
+
+**Target Behavior:**
+> Long-polling: Agent makes request, controller holds connection until a job is available (or timeout). Reduces latency to milliseconds for job assignment.
+
+**Alternative (Future):**
+> gRPC bidirectional streaming for instant push notifications. More complex but eliminates polling entirely.
+
+---
+
+### T4.5: Tenant Hierarchy Optimization
+
+**Goal:** Improve cycle detection performance for deep tenant hierarchies.
+
+**Effort:** 2 days  
+**Priority:** 🟠 MEDIUM  
+**Dependencies:** T4.2 (Tenant Resource Management)
+
+| Task | Module | Effort | Status |
+|------|--------|--------|--------|
+| Add `depth` field to Tenant model | quorus-tenant | 2 hours | ⬜ Pending |
+| Add `path` materialized view (e.g., "/root/parent/child") | quorus-tenant | 4 hours | ⬜ Pending |
+| Refactor `wouldCreateCircularReference` to use path | SimpleTenantService | 4 hours | ⬜ Pending |
+| Update path on tenant move/reparent | SimpleTenantService | 2 hours | ⬜ Pending |
+| Add hierarchy depth limit configuration | TenantConfig | 1 hour | ⬜ Pending |
+| Create deep hierarchy performance tests | quorus-tenant/test | 4 hours | ⬜ Pending |
+
+**Current Issue:**
+> `wouldCreateCircularReference()` walks up the tenant tree iteratively. For a hierarchy 10 levels deep, this performs 10 lookups per validation.
+
+**Target Design:**
+> Store materialized path (e.g., `"/acme/division1/team-a"`) on each tenant. Cycle detection becomes a simple string prefix check: `O(1)` instead of `O(depth)`.
 
 ---
 
@@ -386,6 +548,75 @@ Larger changes that improve system reliability.
 | Migrate all other commands | quorus-controller | 2 days | ⬜ Pending |
 | Update LogEntry to use bytes | quorus-controller | 4 hours | ⬜ Pending |
 | Add backward compatibility tests | quorus-controller/test | 2 days | ⬜ Pending |
+
+---
+
+### T5.5: Persist Tenant State via Raft
+
+**Goal:** Tenant definitions and quotas survive controller restarts.
+
+**Effort:** 3-4 days  
+**Priority:** 🔴 CRITICAL  
+**Dependencies:** T5.1 (WAL), T5.4 (Protobuf preferred)
+
+| Task | Module | Effort | Status |
+|------|--------|--------|--------|
+| Define TenantCommand Protobuf messages | quorus-controller | 4 hours | ⬜ Pending |
+| Add TenantCommand to QuorusStateMachine | quorus-controller | 4 hours | ⬜ Pending |
+| Create TenantStateSnapshot serialization | quorus-controller | 4 hours | ⬜ Pending |
+| Wire SimpleTenantService to Raft commands | quorus-tenant | 1 day | ⬜ Pending |
+| Add tenant state recovery on startup | quorus-controller | 4 hours | ⬜ Pending |
+| Create tenant persistence integration tests | quorus-controller/test | 1 day | ⬜ Pending |
+
+**Current Issue:**
+> `SimpleTenantService` stores tenants in `ConcurrentHashMap`. On restart, all tenant definitions, quotas, and usage tracking are lost.
+
+**Target Design:**
+```java
+// Tenant mutations go through Raft
+public Future<Tenant> createTenant(Tenant tenant) {
+    TenantCommand cmd = TenantCommand.newBuilder()
+        .setType(CREATE)
+        .setTenant(toProto(tenant))
+        .build();
+    return raftNode.propose(cmd.toByteArray())
+        .map(index -> tenant);
+}
+```
+
+**Impact:**
+> Without this, tenant isolation boundaries are lost on restart. Agents may process jobs for non-existent tenants, or quotas may be exceeded.
+
+---
+
+### T5.6: Persist Workflow Execution State
+
+**Goal:** Resume mid-flight workflows after controller restart.
+
+**Effort:** 3-4 days  
+**Priority:** 🟠 MEDIUM  
+**Dependencies:** T5.1 (WAL), T5.5 (Tenant persistence pattern)
+
+| Task | Module | Effort | Status |
+|------|--------|--------|--------|
+| Define WorkflowCommand Protobuf messages | quorus-controller | 4 hours | ⬜ Pending |
+| Add WorkflowCommand to QuorusStateMachine | quorus-controller | 4 hours | ⬜ Pending |
+| Create WorkflowExecutionSnapshot serialization | quorus-workflow | 4 hours | ⬜ Pending |
+| Wire SimpleWorkflowEngine to Raft commands | quorus-workflow | 1 day | ⬜ Pending |
+| Implement workflow resume on startup | quorus-workflow | 4 hours | ⬜ Pending |
+| Create workflow recovery integration tests | quorus-workflow/test | 1 day | ⬜ Pending |
+
+**Current Issue:**
+> `SimpleWorkflowEngine` stores active executions in `ConcurrentHashMap`. If a workflow is at step 3 of 5 when the controller restarts, the workflow is lost. Completed transfers may be re-executed, causing duplicates.
+
+**Target Design:**
+> Each workflow state transition (START, STEP_COMPLETE, PAUSE, RESUME, CANCEL) is persisted via Raft. On recovery, workflows resume from their last persisted state.
+
+**State to Persist:**
+- Workflow ID, definition, variables
+- Current step index
+- Completed transfer IDs (for idempotency)
+- Execution status (RUNNING, PAUSED, etc.)
 
 ---
 
@@ -622,13 +853,13 @@ Security features implemented **after** core functionality is stable and well-te
 | Week | Focus | Critical Path Item |
 |------|-------|-------------------|
 | 1 | Documentation | T1.1 Documentation alignment |
-| 2 | Core API | T2.1 Health endpoints |
+| 2 | Core API | T2.1 Health endpoints, **T2.4 Node Identity** 🆕 |
 | 3 | Stability | T2.3 Graceful shutdown |
-| 4 | Agent | T3.1 Vert.x WebClient (BLOCKING FIX) |
+| 4 | Agent | T3.1 Vert.x WebClient (BLOCKING FIX), **T3.3 Transfer Retries** 🆕 |
 | 5 | Threading | T3.2 Bounded thread pools |
-| 6 | Protocols | T4.1 NFS adapter |
-| 7-8 | Persistence | ~~T5.1 Raft WAL~~ ✅ COMPLETE |
-| 9-10 | Compaction | T5.2 Snapshots (scheduling/truncation remain) |
+| 6 | Protocols | T4.1 NFS adapter, **T4.3 Scheduling Strategy** 🆕 |
+| 7-8 | Persistence | ~~T5.1 Raft WAL~~ ✅ COMPLETE, **T5.5 Tenant Persistence** 🆕 |
+| 9-10 | Compaction | T5.2 Snapshots (scheduling/truncation remain), **T5.6 Workflow Persistence** 🆕 |
 | 11-12 | Raft | T5.3 InstallSnapshot, T5.4 Protobuf |
 | 15+ | Security + Routes | T6.1-T6.6 (Security), T6.7 (Routes) |
 
@@ -636,16 +867,18 @@ Security features implemented **after** core functionality is stable and well-te
 
 | Priority | Total Tasks | Completed | Remaining |
 |----------|-------------|-----------|-----------|
-| 🔴 CRITICAL | 4 | 1 (T5.1) | 3 |
-| 🟡 HIGH | 7 | 0 | 7 |
-| 🟠 MEDIUM (Security - Deferred) | 11 | 0 | 11 |
-| **TOTAL** | **22** | **1** | **21** |
+| 🔴 CRITICAL | 6 | 1 (T5.1) | 5 |
+| 🟡 HIGH | 9 | 0 | 9 |
+| 🟠 MEDIUM (Security/Enterprise) | 14 | 0 | 14 |
+| **TOTAL** | **29** | **1** | **28** |
 
 > **Notes:**
 > - T5.1 (Raft WAL) marked COMPLETE via raftlog-core library
 > - T5.2 takeSnapshot/restoreSnapshot methods are COMPLETE; scheduling remains
 > - T6.7 changed from "decision point" to implementation task (routes are core)
 > - T1.1 reduced scope (routes are not "future" features)
+> - **v1.5**: Added T2.4, T3.3, T4.3 to address concurrency and stability gaps
+> - **v1.6**: Added T4.4, T4.5, T5.5, T5.6 from architecture review cross-reference
 
 ---
 
@@ -656,13 +889,27 @@ T1.1 (Docs) ──────────────────────�
                                                                      │
 T2.1 (Health) ──► T2.2 (Errors) ──► T2.3 (Shutdown) ─────────────────┤
                                                                      │
+T2.4 (Node Identity) ────────────────────────────────────────────────┤
+                                                                     │
 T3.1 (WebClient) ──► T3.2 (Thread Pools) ────────────────────────────┤
+       │                                                             │
+       └──► T4.4 (Agent Job Streaming)  ◄── 🆕                       │
+                                                                     │
+T3.3 (Transfer Retries) ─────────────────────────────────────────────┤
                                                                      │
 T4.1 (NFS) ──────────────────────────────────────────────────────────┤
                                                                      │
-T4.2 (Tenant Resources) ─────────────────────────────────────────────┤
+T4.2 (Tenant Resources) ──► T4.5 (Tenant Hierarchy)  ◄── 🆕          │
                                                                      │
+T4.3 (Scheduling Strategy) ──────────────────────────────────────────┤
+       │                                                             │
+       └─────────────────────────────────────┐                       │
+                                             │                       │
 T5.1 (WAL) ──► T5.2 (Snapshots) ──► T5.3 (InstallSnapshot) ──────────┤
+       │              │                                              │
+       │              └──► T5.5 (Tenant Persistence)  ◄── 🆕 CRITICAL│
+       │                          │                                  │
+       │                          └──► T5.6 (Workflow Persistence)   │
        │                                                             │
        └──► T5.4 (Protobuf) ─────────────────────────────────────────┤
                                                                      │
@@ -677,7 +924,9 @@ T6.1 (API Key) ──► T6.2 (TLS HTTP) ──► T6.3 (TLS gRPC)
        │
        └──► T6.6 (OAuth2/JWT)
 
-T5.3 (InstallSnapshot) ──► T6.7 (Routes) [HIGH priority - core feature]
+T5.3 (InstallSnapshot) ──┬──► T6.7 (Routes) [HIGH priority - core feature]
+                         │
+T4.3 (Scheduling Strategy) ──┘   ◄── BLOCKS Routes
 ```
 
 ---
@@ -688,6 +937,11 @@ T5.3 (InstallSnapshot) ──► T6.7 (Routes) [HIGH priority - core feature]
 |------|------------|-------|
 | ~~Raft persistence delays~~ | ~~Start T5.1 early (Week 7)~~ ✅ COMPLETE via raftlog-core | Arch Team |
 | Agent blocking I/O | T3.1 is on critical path; prioritize in Week 4 | Dev Team |
+| **Split-brain in containers** | **T2.4 Node Identity - require explicit QUORUS_NODE_ID** 🆕 | Dev Team |
+| **Transfer throughput limits** | **T3.3 Remove Thread.sleep from retry backoff** 🆕 | Dev Team |
+| **Routes blocked by tech debt** | **T4.3 Extract Scheduling Strategy before T6.7** 🆕 | Arch Team |
+| **Tenant data loss on restart** | **T5.5 Persist tenant state via Raft** 🆕 | Arch Team |
+| **Workflow loss on restart** | **T5.6 Persist workflow execution state** 🆕 | Arch Team |
 | Security deferred too long | Core must be stable by Week 14 to start security | PM |
 | Test failures | Follow "all tests must pass" principle strictly | All |
 | Route implementation scope | Routes are core (4-6 weeks); plan resources for Stage 6 | PM |
@@ -709,6 +963,6 @@ Each task is complete when:
 ---
 
 **Document Status**: Active Implementation Plan  
-**Last Updated**: 2026-02-02  
-**Version**: 1.4  
+**Last Updated**: 2026-02-03  
+**Version**: 1.6  
 **Owner**: Development Team
