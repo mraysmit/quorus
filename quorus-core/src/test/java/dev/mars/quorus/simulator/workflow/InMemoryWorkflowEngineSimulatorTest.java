@@ -1,7 +1,6 @@
 /*
- * Copyright (c) 2025 Cityline Ltd.
- * All rights reserved.
- *
+ * Copyright 2025 Mark Andrew Ray-Smith Cityline Ltd
+  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -17,9 +16,13 @@
 
 package dev.mars.quorus.simulator.workflow;
 
+import dev.mars.quorus.simulator.SimulatorTestLoggingExtension;
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.*;
 import java.util.concurrent.*;
@@ -31,8 +34,11 @@ import static java.util.concurrent.TimeUnit.*;
 /**
  * Unit tests for {@link InMemoryWorkflowEngineSimulator}.
  */
+@ExtendWith(SimulatorTestLoggingExtension.class)
 @DisplayName("InMemoryWorkflowEngineSimulator Tests")
 class InMemoryWorkflowEngineSimulatorTest {
+
+    private static final Logger log = LoggerFactory.getLogger(InMemoryWorkflowEngineSimulatorTest.class);
 
     private InMemoryWorkflowEngineSimulator engine;
 
@@ -59,6 +65,7 @@ class InMemoryWorkflowEngineSimulatorTest {
         @Test
         @DisplayName("Should execute simple workflow")
         void testExecuteSimpleWorkflow() throws Exception {
+            log.info("Testing simple workflow execution with single step");
             var workflow = InMemoryWorkflowEngineSimulator.WorkflowDefinition.builder()
                 .name("simple-workflow")
                 .step(InMemoryWorkflowEngineSimulator.WorkflowStep.builder()
@@ -70,7 +77,8 @@ class InMemoryWorkflowEngineSimulatorTest {
             var future = engine.execute(workflow, 
                 InMemoryWorkflowEngineSimulator.ExecutionContext.empty());
 
-            var execution = future.get(30, TimeUnit.SECONDS);
+            var execution = future.get(5, TimeUnit.SECONDS);
+            log.info("Workflow completed with status: {}", execution.getStatus());
 
             assertThat(execution.getStatus())
                 .isEqualTo(InMemoryWorkflowEngineSimulator.WorkflowStatus.COMPLETED);
@@ -80,6 +88,7 @@ class InMemoryWorkflowEngineSimulatorTest {
         @Test
         @DisplayName("Should execute multi-step workflow")
         void testMultiStepWorkflow() throws Exception {
+            log.info("Testing multi-step workflow execution with 3 dependent steps");
             var workflow = InMemoryWorkflowEngineSimulator.WorkflowDefinition.builder()
                 .name("multi-step-workflow")
                 .step(InMemoryWorkflowEngineSimulator.WorkflowStep.builder()
@@ -100,7 +109,8 @@ class InMemoryWorkflowEngineSimulatorTest {
 
             var execution = engine.execute(workflow, 
                 InMemoryWorkflowEngineSimulator.ExecutionContext.empty())
-                .get(30, TimeUnit.SECONDS);
+                .get(5, TimeUnit.SECONDS);
+            log.info("Multi-step workflow completed: {} steps executed", execution.getStepExecutions().size());
 
             assertThat(execution.getStatus())
                 .isEqualTo(InMemoryWorkflowEngineSimulator.WorkflowStatus.COMPLETED);
@@ -110,6 +120,7 @@ class InMemoryWorkflowEngineSimulatorTest {
         @Test
         @DisplayName("Should track execution duration")
         void testExecutionDuration() throws Exception {
+            log.info("Testing execution duration tracking");
             var workflow = InMemoryWorkflowEngineSimulator.WorkflowDefinition.builder()
                 .name("timed-workflow")
                 .step(InMemoryWorkflowEngineSimulator.WorkflowStep.builder()
@@ -119,7 +130,8 @@ class InMemoryWorkflowEngineSimulatorTest {
 
             var execution = engine.execute(workflow, 
                 InMemoryWorkflowEngineSimulator.ExecutionContext.empty())
-                .get(30, TimeUnit.SECONDS);
+                .get(5, TimeUnit.SECONDS);
+            log.info("Execution duration tracked: {}ms", execution.getDuration().toMillis());
 
             assertThat(execution.getStartTime()).isNotNull();
             assertThat(execution.getEndTime()).isNotNull();
@@ -129,6 +141,7 @@ class InMemoryWorkflowEngineSimulatorTest {
         @Test
         @DisplayName("Should get execution status")
         void testGetExecutionStatus() throws Exception {
+            log.info("Testing execution status retrieval during long-running workflow");
             engine.setDefaultStepDurationMs(5000);
 
             var workflow = InMemoryWorkflowEngineSimulator.WorkflowDefinition.builder()
@@ -144,6 +157,7 @@ class InMemoryWorkflowEngineSimulatorTest {
             Thread.sleep(100);
 
             var execution = engine.getExecution(future.get().getExecutionId());
+            log.info("Retrieved execution status: {}", execution != null ? "found" : "not found");
             // Either still running or completed by now
             assertThat(execution).isNotNull();
         }
@@ -158,6 +172,7 @@ class InMemoryWorkflowEngineSimulatorTest {
         @Test
         @DisplayName("Should perform dry run (validation only)")
         void testDryRun() throws Exception {
+            log.info("Testing dry run mode - validation only, no step execution");
             var workflow = InMemoryWorkflowEngineSimulator.WorkflowDefinition.builder()
                 .name("dry-run-workflow")
                 .step(InMemoryWorkflowEngineSimulator.WorkflowStep.builder()
@@ -167,7 +182,10 @@ class InMemoryWorkflowEngineSimulatorTest {
 
             var execution = engine.dryRun(workflow, 
                 InMemoryWorkflowEngineSimulator.ExecutionContext.empty())
-                .get(30, TimeUnit.SECONDS);
+                .get(5, TimeUnit.SECONDS);
+            log.info("Dry run completed: status={}, steps executed={}", 
+                execution.getStatus(), 
+                execution.getStepExecutions() != null ? execution.getStepExecutions().size() : 0);
 
             assertThat(execution.getStatus())
                 .isEqualTo(InMemoryWorkflowEngineSimulator.WorkflowStatus.COMPLETED);
@@ -178,6 +196,7 @@ class InMemoryWorkflowEngineSimulatorTest {
         @Test
         @DisplayName("Should detect validation errors in dry run")
         void testDryRunValidationError() throws Exception {
+            log.info("Testing dry run with invalid workflow - expects validation failure");
             var workflow = InMemoryWorkflowEngineSimulator.WorkflowDefinition.builder()
                 .name("invalid-workflow")
                 .step(InMemoryWorkflowEngineSimulator.WorkflowStep.builder()
@@ -188,7 +207,8 @@ class InMemoryWorkflowEngineSimulatorTest {
 
             var execution = engine.dryRun(workflow, 
                 InMemoryWorkflowEngineSimulator.ExecutionContext.empty())
-                .get(30, TimeUnit.SECONDS);
+                .get(5, TimeUnit.SECONDS);
+            log.info("Dry run detected error: {}", execution.getError());
 
             assertThat(execution.getStatus())
                 .isEqualTo(InMemoryWorkflowEngineSimulator.WorkflowStatus.FAILED);
@@ -205,6 +225,7 @@ class InMemoryWorkflowEngineSimulatorTest {
         @Test
         @DisplayName("Should perform virtual run (fast execution)")
         void testVirtualRun() throws Exception {
+            log.info("Testing virtual run mode - fast execution ignoring estimated durations");
             var workflow = InMemoryWorkflowEngineSimulator.WorkflowDefinition.builder()
                 .name("virtual-workflow")
                 .step(InMemoryWorkflowEngineSimulator.WorkflowStep.builder()
@@ -216,8 +237,9 @@ class InMemoryWorkflowEngineSimulatorTest {
             long start = System.currentTimeMillis();
             var execution = engine.virtualRun(workflow, 
                 InMemoryWorkflowEngineSimulator.ExecutionContext.empty())
-                .get(30, TimeUnit.SECONDS);
+                .get(5, TimeUnit.SECONDS);
             long elapsed = System.currentTimeMillis() - start;
+            log.info("Virtual run completed in {}ms (step estimated 10000ms)", elapsed);
 
             assertThat(execution.getStatus())
                 .isEqualTo(InMemoryWorkflowEngineSimulator.WorkflowStatus.COMPLETED);
@@ -235,6 +257,7 @@ class InMemoryWorkflowEngineSimulatorTest {
         @Test
         @DisplayName("Should pause workflow")
         void testPauseWorkflow() throws Exception {
+            log.info("Testing workflow pause functionality");
             engine.setDefaultStepDurationMs(10000);
 
             var workflow = InMemoryWorkflowEngineSimulator.WorkflowDefinition.builder()
@@ -255,6 +278,7 @@ class InMemoryWorkflowEngineSimulatorTest {
             String executionId = future.get().getExecutionId();
             
             boolean paused = engine.pause(executionId);
+            log.info("Pause result: {} for execution {}", paused, executionId);
             
             if (paused) {
                 assertThat(engine.getStatus(executionId))
@@ -265,6 +289,7 @@ class InMemoryWorkflowEngineSimulatorTest {
         @Test
         @DisplayName("Should resume paused workflow")
         void testResumeWorkflow() throws Exception {
+            log.info("Testing workflow resume after pause");
             engine.setDefaultStepDurationMs(5000);
 
             var workflow = InMemoryWorkflowEngineSimulator.WorkflowDefinition.builder()
@@ -282,6 +307,7 @@ class InMemoryWorkflowEngineSimulatorTest {
             
             if (engine.pause(executionId)) {
                 boolean resumed = engine.resume(executionId);
+                log.info("Resume result: {} for execution {}", resumed, executionId);
                 assertThat(resumed).isTrue();
                 
                 var status = engine.getStatus(executionId);
@@ -295,6 +321,7 @@ class InMemoryWorkflowEngineSimulatorTest {
         @Test
         @DisplayName("Should cancel workflow")
         void testCancelWorkflow() throws Exception {
+            log.info("Testing workflow cancellation");
             engine.setDefaultStepDurationMs(10000);
 
             var workflow = InMemoryWorkflowEngineSimulator.WorkflowDefinition.builder()
@@ -311,6 +338,7 @@ class InMemoryWorkflowEngineSimulatorTest {
             String executionId = future.get().getExecutionId();
             
             boolean cancelled = engine.cancel(executionId);
+            log.info("Cancel result: {} for execution {}", cancelled, executionId);
             
             if (cancelled) {
                 assertThat(engine.getStatus(executionId))
@@ -321,6 +349,7 @@ class InMemoryWorkflowEngineSimulatorTest {
         @Test
         @DisplayName("Should not cancel completed workflow")
         void testCannotCancelCompleted() throws Exception {
+            log.info("Testing that completed workflows cannot be cancelled");
             var workflow = InMemoryWorkflowEngineSimulator.WorkflowDefinition.builder()
                 .name("completed-workflow")
                 .step(InMemoryWorkflowEngineSimulator.WorkflowStep.builder()
@@ -330,9 +359,10 @@ class InMemoryWorkflowEngineSimulatorTest {
 
             var execution = engine.execute(workflow, 
                 InMemoryWorkflowEngineSimulator.ExecutionContext.empty())
-                .get(30, TimeUnit.SECONDS);
+                .get(5, TimeUnit.SECONDS);
 
             boolean cancelled = engine.cancel(execution.getExecutionId());
+            log.info("Attempted cancel on completed workflow: {}", cancelled);
             assertThat(cancelled).isFalse();
         }
     }
@@ -346,6 +376,7 @@ class InMemoryWorkflowEngineSimulatorTest {
         @Test
         @DisplayName("Should notify step callback")
         void testStepCallback() throws Exception {
+            log.info("Testing step callback notification during workflow execution");
             List<String> notifications = new CopyOnWriteArrayList<>();
 
             engine.setStepCallback((step, status) -> 
@@ -359,7 +390,8 @@ class InMemoryWorkflowEngineSimulatorTest {
                 .build();
 
             engine.execute(workflow, InMemoryWorkflowEngineSimulator.ExecutionContext.empty())
-                .get(30, TimeUnit.SECONDS);
+                .get(5, TimeUnit.SECONDS);
+            log.info("Step callback received {} notifications: {}", notifications.size(), notifications);
 
             assertThat(notifications).contains(
                 "step-1:RUNNING",
@@ -370,6 +402,7 @@ class InMemoryWorkflowEngineSimulatorTest {
         @Test
         @DisplayName("Should use custom output generator")
         void testStepOutputGenerator() throws Exception {
+            log.info("Testing custom step output generator");
             engine.setStepOutputGenerator(step -> 
                 Map.of("customOutput", "value-" + step.name()));
 
@@ -382,9 +415,10 @@ class InMemoryWorkflowEngineSimulatorTest {
 
             var execution = engine.execute(workflow, 
                 InMemoryWorkflowEngineSimulator.ExecutionContext.empty())
-                .get(30, TimeUnit.SECONDS);
+                .get(5, TimeUnit.SECONDS);
 
             var stepExecution = execution.getStepExecutions().get("step-1");
+            log.info("Custom output generated: {}", stepExecution.getOutputs());
             assertThat(stepExecution.getOutputs())
                 .containsEntry("customOutput", "value-step-1");
         }
@@ -399,6 +433,7 @@ class InMemoryWorkflowEngineSimulatorTest {
         @Test
         @DisplayName("Should fire workflow events")
         void testWorkflowEvents() throws Exception {
+            log.info("Testing workflow event firing during execution lifecycle");
             List<InMemoryWorkflowEngineSimulator.WorkflowEvent> events = 
                 new CopyOnWriteArrayList<>();
 
@@ -412,7 +447,9 @@ class InMemoryWorkflowEngineSimulatorTest {
                     .build())
                 .build();
 
-            engine.execute(workflow, context).get(30, TimeUnit.SECONDS);
+            engine.execute(workflow, context).get(5, TimeUnit.SECONDS);
+            log.info("Received {} workflow events: {}", events.size(), 
+                events.stream().map(e -> e.type().name()).toList());
 
             assertThat(events).extracting(
                 InMemoryWorkflowEngineSimulator.WorkflowEvent::type)
@@ -436,6 +473,7 @@ class InMemoryWorkflowEngineSimulatorTest {
         @EnumSource(InMemoryWorkflowEngineSimulator.WorkflowFailureMode.class)
         @DisplayName("Should support all failure modes")
         void testAllFailureModes(InMemoryWorkflowEngineSimulator.WorkflowFailureMode mode) {
+            log.info("Testing failure mode: {}", mode);
             engine.setFailureMode(mode);
             // Just verify setting doesn't throw
         }
@@ -443,6 +481,7 @@ class InMemoryWorkflowEngineSimulatorTest {
         @Test
         @DisplayName("Should fail validation")
         void testValidationFailure() throws Exception {
+            log.info("Testing VALIDATION_FAILURE chaos mode");
             engine.setFailureMode(
                 InMemoryWorkflowEngineSimulator.WorkflowFailureMode.VALIDATION_FAILURE);
 
@@ -455,7 +494,9 @@ class InMemoryWorkflowEngineSimulatorTest {
 
             var execution = engine.execute(workflow, 
                 InMemoryWorkflowEngineSimulator.ExecutionContext.empty())
-                .get(30, TimeUnit.SECONDS);
+                .get(5, TimeUnit.SECONDS);
+            log.info("Validation failure triggered: status={}, error={}", 
+                execution.getStatus(), execution.getError());
 
             assertThat(execution.getStatus())
                 .isEqualTo(InMemoryWorkflowEngineSimulator.WorkflowStatus.FAILED);
@@ -465,6 +506,7 @@ class InMemoryWorkflowEngineSimulatorTest {
         @Test
         @DisplayName("Should fail at specific step")
         void testFailAtStep() throws Exception {
+            log.info("Testing STEP_FAILURE chaos mode targeting step-2");
             engine.setFailureMode(
                 InMemoryWorkflowEngineSimulator.WorkflowFailureMode.STEP_FAILURE);
             engine.setFailAtStep("step-2");
@@ -482,7 +524,10 @@ class InMemoryWorkflowEngineSimulatorTest {
 
             var execution = engine.execute(workflow, 
                 InMemoryWorkflowEngineSimulator.ExecutionContext.empty())
-                .get(30, TimeUnit.SECONDS);
+                .get(5, TimeUnit.SECONDS);
+            log.info("Step failure: step-1={}, step-2={}", 
+                execution.getStepExecutions().get("step-1").getStatus(),
+                execution.getStepExecutions().get("step-2").getStatus());
 
             assertThat(execution.getStatus())
                 .isEqualTo(InMemoryWorkflowEngineSimulator.WorkflowStatus.FAILED);
@@ -495,6 +540,7 @@ class InMemoryWorkflowEngineSimulatorTest {
         @Test
         @DisplayName("Should fail step with specific mode")
         void testStepSpecificFailure() throws Exception {
+            log.info("Testing step-specific failure mode on failing-step");
             engine.setStepFailureMode("failing-step", 
                 InMemoryWorkflowEngineSimulator.WorkflowFailureMode.STEP_FAILURE);
 
@@ -507,7 +553,8 @@ class InMemoryWorkflowEngineSimulatorTest {
 
             var execution = engine.execute(workflow, 
                 InMemoryWorkflowEngineSimulator.ExecutionContext.empty())
-                .get(30, TimeUnit.SECONDS);
+                .get(5, TimeUnit.SECONDS);
+            log.info("Step-specific failure result: {}", execution.getStatus());
 
             assertThat(execution.getStatus())
                 .isEqualTo(InMemoryWorkflowEngineSimulator.WorkflowStatus.FAILED);
@@ -516,6 +563,7 @@ class InMemoryWorkflowEngineSimulatorTest {
         @Test
         @DisplayName("Should clear step failure mode")
         void testClearStepFailureMode() throws Exception {
+            log.info("Testing clearing of step failure mode");
             engine.setStepFailureMode("step-1", 
                 InMemoryWorkflowEngineSimulator.WorkflowFailureMode.STEP_FAILURE);
             engine.clearStepFailureMode("step-1");
@@ -529,7 +577,8 @@ class InMemoryWorkflowEngineSimulatorTest {
 
             var execution = engine.execute(workflow, 
                 InMemoryWorkflowEngineSimulator.ExecutionContext.empty())
-                .get(30, TimeUnit.SECONDS);
+                .get(5, TimeUnit.SECONDS);
+            log.info("After clearing failure mode: {}", execution.getStatus());
 
             assertThat(execution.getStatus())
                 .isEqualTo(InMemoryWorkflowEngineSimulator.WorkflowStatus.COMPLETED);
@@ -538,6 +587,7 @@ class InMemoryWorkflowEngineSimulatorTest {
         @Test
         @DisplayName("Should fail steps randomly")
         void testRandomStepFailure() throws Exception {
+            log.info("Testing random step failure with 100% failure rate");
             engine.setStepFailureRate(1.0); // 100% failure
 
             var workflow = InMemoryWorkflowEngineSimulator.WorkflowDefinition.builder()
@@ -549,7 +599,8 @@ class InMemoryWorkflowEngineSimulatorTest {
 
             var execution = engine.execute(workflow, 
                 InMemoryWorkflowEngineSimulator.ExecutionContext.empty())
-                .get(30, TimeUnit.SECONDS);
+                .get(5, TimeUnit.SECONDS);
+            log.info("Random failure result: {}", execution.getStatus());
 
             assertThat(execution.getStatus())
                 .isEqualTo(InMemoryWorkflowEngineSimulator.WorkflowStatus.FAILED);
@@ -558,6 +609,7 @@ class InMemoryWorkflowEngineSimulatorTest {
         @Test
         @DisplayName("Should simulate resource unavailable")
         void testResourceUnavailable() throws Exception {
+            log.info("Testing RESOURCE_UNAVAILABLE chaos mode");
             engine.setFailureMode(
                 InMemoryWorkflowEngineSimulator.WorkflowFailureMode.RESOURCE_UNAVAILABLE);
 
@@ -570,7 +622,9 @@ class InMemoryWorkflowEngineSimulatorTest {
 
             var execution = engine.execute(workflow, 
                 InMemoryWorkflowEngineSimulator.ExecutionContext.empty())
-                .get(30, TimeUnit.SECONDS);
+                .get(5, TimeUnit.SECONDS);
+            log.info("Resource unavailable result: status={}, error={}", 
+                execution.getStatus(), execution.getError());
 
             assertThat(execution.getStatus())
                 .isEqualTo(InMemoryWorkflowEngineSimulator.WorkflowStatus.FAILED);
@@ -581,6 +635,7 @@ class InMemoryWorkflowEngineSimulatorTest {
         @Test
         @DisplayName("Should reset chaos settings")
         void testResetChaos() throws Exception {
+            log.info("Testing chaos settings reset");
             engine.setFailureMode(
                 InMemoryWorkflowEngineSimulator.WorkflowFailureMode.VALIDATION_FAILURE);
             engine.setStepFailureRate(1.0);
@@ -596,7 +651,8 @@ class InMemoryWorkflowEngineSimulatorTest {
 
             var execution = engine.execute(workflow, 
                 InMemoryWorkflowEngineSimulator.ExecutionContext.empty())
-                .get(30, TimeUnit.SECONDS);
+                .get(5, TimeUnit.SECONDS);
+            log.info("After reset: {}", execution.getStatus());
 
             assertThat(execution.getStatus())
                 .isEqualTo(InMemoryWorkflowEngineSimulator.WorkflowStatus.COMPLETED);
@@ -612,9 +668,11 @@ class InMemoryWorkflowEngineSimulatorTest {
         @Test
         @DisplayName("Should reject null workflow")
         void testNullWorkflow() throws Exception {
+            log.info("Testing null workflow rejection");
             var execution = engine.execute(null, 
                 InMemoryWorkflowEngineSimulator.ExecutionContext.empty())
-                .get(30, TimeUnit.SECONDS);
+                .get(5, TimeUnit.SECONDS);
+            log.info("Null workflow result: {}", execution.getStatus());
 
             assertThat(execution.getStatus())
                 .isEqualTo(InMemoryWorkflowEngineSimulator.WorkflowStatus.FAILED);
@@ -623,13 +681,15 @@ class InMemoryWorkflowEngineSimulatorTest {
         @Test
         @DisplayName("Should reject workflow without steps")
         void testNoSteps() throws Exception {
+            log.info("Testing workflow without steps rejection");
             var workflow = InMemoryWorkflowEngineSimulator.WorkflowDefinition.builder()
                 .name("empty-workflow")
                 .build();
 
             var execution = engine.execute(workflow, 
                 InMemoryWorkflowEngineSimulator.ExecutionContext.empty())
-                .get(30, TimeUnit.SECONDS);
+                .get(5, TimeUnit.SECONDS);
+            log.info("Empty workflow result: {}", execution.getStatus());
 
             assertThat(execution.getStatus())
                 .isEqualTo(InMemoryWorkflowEngineSimulator.WorkflowStatus.FAILED);
@@ -638,6 +698,7 @@ class InMemoryWorkflowEngineSimulatorTest {
         @Test
         @DisplayName("Should reject duplicate step names")
         void testDuplicateStepNames() throws Exception {
+            log.info("Testing duplicate step name rejection");
             var workflow = InMemoryWorkflowEngineSimulator.WorkflowDefinition.builder()
                 .name("duplicate-workflow")
                 .step(InMemoryWorkflowEngineSimulator.WorkflowStep.builder()
@@ -650,7 +711,9 @@ class InMemoryWorkflowEngineSimulatorTest {
 
             var execution = engine.execute(workflow, 
                 InMemoryWorkflowEngineSimulator.ExecutionContext.empty())
-                .get(30, TimeUnit.SECONDS);
+                .get(5, TimeUnit.SECONDS);
+            log.info("Duplicate step result: status={}, error={}", 
+                execution.getStatus(), execution.getError());
 
             assertThat(execution.getStatus())
                 .isEqualTo(InMemoryWorkflowEngineSimulator.WorkflowStatus.FAILED);
@@ -660,6 +723,7 @@ class InMemoryWorkflowEngineSimulatorTest {
         @Test
         @DisplayName("Should reject invalid dependency")
         void testInvalidDependency() throws Exception {
+            log.info("Testing invalid dependency rejection");
             var workflow = InMemoryWorkflowEngineSimulator.WorkflowDefinition.builder()
                 .name("invalid-dep-workflow")
                 .step(InMemoryWorkflowEngineSimulator.WorkflowStep.builder()
@@ -670,7 +734,9 @@ class InMemoryWorkflowEngineSimulatorTest {
 
             var execution = engine.execute(workflow, 
                 InMemoryWorkflowEngineSimulator.ExecutionContext.empty())
-                .get(30, TimeUnit.SECONDS);
+                .get(5, TimeUnit.SECONDS);
+            log.info("Invalid dependency result: status={}, error={}", 
+                execution.getStatus(), execution.getError());
 
             assertThat(execution.getStatus())
                 .isEqualTo(InMemoryWorkflowEngineSimulator.WorkflowStatus.FAILED);
@@ -687,6 +753,7 @@ class InMemoryWorkflowEngineSimulatorTest {
         @Test
         @DisplayName("Should track total executions")
         void testTotalExecutions() throws Exception {
+            log.info("Testing total executions tracking");
             var workflow = InMemoryWorkflowEngineSimulator.WorkflowDefinition.builder()
                 .name("stat-workflow")
                 .step(InMemoryWorkflowEngineSimulator.WorkflowStep.builder()
@@ -695,9 +762,10 @@ class InMemoryWorkflowEngineSimulatorTest {
                 .build();
 
             engine.execute(workflow, InMemoryWorkflowEngineSimulator.ExecutionContext.empty())
-                .get(30, TimeUnit.SECONDS);
+                .get(5, TimeUnit.SECONDS);
             engine.execute(workflow, InMemoryWorkflowEngineSimulator.ExecutionContext.empty())
-                .get(30, TimeUnit.SECONDS);
+                .get(5, TimeUnit.SECONDS);
+            log.info("Total executions after 2 runs: {}", engine.getTotalExecutions());
 
             assertThat(engine.getTotalExecutions()).isEqualTo(2);
         }
@@ -705,6 +773,7 @@ class InMemoryWorkflowEngineSimulatorTest {
         @Test
         @DisplayName("Should track completed executions")
         void testCompletedExecutions() throws Exception {
+            log.info("Testing completed executions tracking");
             var workflow = InMemoryWorkflowEngineSimulator.WorkflowDefinition.builder()
                 .name("completed-stat-workflow")
                 .step(InMemoryWorkflowEngineSimulator.WorkflowStep.builder()
@@ -713,7 +782,8 @@ class InMemoryWorkflowEngineSimulatorTest {
                 .build();
 
             engine.execute(workflow, InMemoryWorkflowEngineSimulator.ExecutionContext.empty())
-                .get(30, TimeUnit.SECONDS);
+                .get(5, TimeUnit.SECONDS);
+            log.info("Completed executions: {}", engine.getCompletedExecutions());
 
             assertThat(engine.getCompletedExecutions()).isEqualTo(1);
         }
@@ -721,6 +791,7 @@ class InMemoryWorkflowEngineSimulatorTest {
         @Test
         @DisplayName("Should track failed executions")
         void testFailedExecutions() throws Exception {
+            log.info("Testing failed executions tracking");
             engine.setFailureMode(
                 InMemoryWorkflowEngineSimulator.WorkflowFailureMode.VALIDATION_FAILURE);
 
@@ -732,7 +803,8 @@ class InMemoryWorkflowEngineSimulatorTest {
                 .build();
 
             engine.execute(workflow, InMemoryWorkflowEngineSimulator.ExecutionContext.empty())
-                .get(30, TimeUnit.SECONDS);
+                .get(5, TimeUnit.SECONDS);
+            log.info("Failed executions: {}", engine.getFailedExecutions());
 
             assertThat(engine.getFailedExecutions()).isEqualTo(1);
         }
@@ -740,6 +812,7 @@ class InMemoryWorkflowEngineSimulatorTest {
         @Test
         @DisplayName("Should reset statistics")
         void testResetStatistics() throws Exception {
+            log.info("Testing statistics reset");
             var workflow = InMemoryWorkflowEngineSimulator.WorkflowDefinition.builder()
                 .name("reset-stat-workflow")
                 .step(InMemoryWorkflowEngineSimulator.WorkflowStep.builder()
@@ -748,9 +821,11 @@ class InMemoryWorkflowEngineSimulatorTest {
                 .build();
 
             engine.execute(workflow, InMemoryWorkflowEngineSimulator.ExecutionContext.empty())
-                .get(30, TimeUnit.SECONDS);
+                .get(5, TimeUnit.SECONDS);
 
             engine.resetStatistics();
+            log.info("After reset - total: {}, completed: {}", 
+                engine.getTotalExecutions(), engine.getCompletedExecutions());
 
             assertThat(engine.getTotalExecutions()).isZero();
             assertThat(engine.getCompletedExecutions()).isZero();
@@ -766,6 +841,7 @@ class InMemoryWorkflowEngineSimulatorTest {
         @Test
         @DisplayName("Should build workflow definition")
         void testWorkflowBuilder() {
+            log.info("Testing WorkflowDefinition builder");
             var workflow = InMemoryWorkflowEngineSimulator.WorkflowDefinition.builder()
                 .name("test-workflow")
                 .description("A test workflow")
@@ -775,6 +851,8 @@ class InMemoryWorkflowEngineSimulatorTest {
                     .name("step-1")
                     .build())
                 .build();
+            log.info("Built workflow: name={}, steps={}, vars={}", 
+                workflow.name(), workflow.steps().size(), workflow.variables());
 
             assertThat(workflow.name()).isEqualTo("test-workflow");
             assertThat(workflow.description()).isEqualTo("A test workflow");
@@ -785,6 +863,7 @@ class InMemoryWorkflowEngineSimulatorTest {
         @Test
         @DisplayName("Should build workflow step")
         void testStepBuilder() {
+            log.info("Testing WorkflowStep builder with full configuration");
             var step = InMemoryWorkflowEngineSimulator.WorkflowStep.builder()
                 .name("transfer-step")
                 .type("transfer")
@@ -795,6 +874,8 @@ class InMemoryWorkflowEngineSimulatorTest {
                 .required(true)
                 .estimatedDurationMs(5000)
                 .build();
+            log.info("Built step: name={}, type={}, deps={}", 
+                step.name(), step.type(), step.dependsOn());
 
             assertThat(step.name()).isEqualTo("transfer-step");
             assertThat(step.type()).isEqualTo("transfer");
@@ -806,7 +887,10 @@ class InMemoryWorkflowEngineSimulatorTest {
         @Test
         @DisplayName("Should create default workflow options")
         void testDefaultOptions() {
+            log.info("Testing default WorkflowOptions creation");
             var options = InMemoryWorkflowEngineSimulator.WorkflowOptions.defaults();
+            log.info("Default options: stopOnError={}, timeout={}ms, maxRetries={}, parallel={}", 
+                options.stopOnError(), options.timeoutMs(), options.maxRetries(), options.parallel());
 
             assertThat(options.stopOnError()).isTrue();
             assertThat(options.timeoutMs()).isEqualTo(3600000);
@@ -824,6 +908,7 @@ class InMemoryWorkflowEngineSimulatorTest {
         @Test
         @DisplayName("Should get active executions")
         void testGetActiveExecutions() throws Exception {
+            log.info("Testing active executions retrieval during long-running workflow");
             engine.setDefaultStepDurationMs(5000);
 
             var workflow = InMemoryWorkflowEngineSimulator.WorkflowDefinition.builder()
@@ -837,6 +922,7 @@ class InMemoryWorkflowEngineSimulatorTest {
             Thread.sleep(100);
 
             var active = engine.getActiveExecutions();
+            log.info("Active executions found: {}", active != null ? active.size() : 0);
             // May or may not have active executions depending on timing
             assertThat(active).isNotNull();
         }
@@ -844,6 +930,7 @@ class InMemoryWorkflowEngineSimulatorTest {
         @Test
         @DisplayName("Should clear all executions")
         void testClear() throws Exception {
+            log.info("Testing clear all executions");
             var workflow = InMemoryWorkflowEngineSimulator.WorkflowDefinition.builder()
                 .name("clear-workflow")
                 .step(InMemoryWorkflowEngineSimulator.WorkflowStep.builder()
@@ -853,9 +940,12 @@ class InMemoryWorkflowEngineSimulatorTest {
 
             var execution = engine.execute(workflow, 
                 InMemoryWorkflowEngineSimulator.ExecutionContext.empty())
-                .get(30, TimeUnit.SECONDS);
+                .get(5, TimeUnit.SECONDS);
 
             engine.clear();
+            log.info("After clear - execution found: {}, total: {}", 
+                engine.getExecution(execution.getExecutionId()) != null, 
+                engine.getTotalExecutions());
 
             assertThat(engine.getExecution(execution.getExecutionId())).isNull();
             assertThat(engine.getTotalExecutions()).isZero();
