@@ -425,7 +425,7 @@ public class SimpleWorkflowEngine implements WorkflowEngine {
                             // Map to entry with transfer name
                             return transferFuture
                                     .<TransferResult>recover(error -> {
-                                        logger.warn("Transfer execution failed: {} - {}", transfer.getName(), error.getMessage());
+                                        logger.error("Transfer execution failed: {} - {}", transfer.getName(), error.getMessage());
                                         if (logger.isDebugEnabled()) {
                                             logger.debug("Transfer execution exception details for: {}", transfer.getName(), error);
                                         }
@@ -434,7 +434,10 @@ public class SimpleWorkflowEngine implements WorkflowEngine {
                                     .<Map.Entry<String, TransferResult>>map(result -> Map.entry(transfer.getName(), result));
                         } catch (Exception e) {
                             // Handle TransferException from toTransferRequest()
-                            logger.warn("Failed to create transfer request: {} - {}", transfer.getName(), e.getMessage());
+                            logger.error("Failed to create transfer request: {} - {}", transfer.getName(), e.getMessage());
+                            if (logger.isDebugEnabled()) {
+                                logger.debug("Transfer request creation exception details for: {}", transfer.getName(), e);
+                            }
                             TransferResult failedResult = createMockTransferResult(transfer, false);
                             return Future.succeededFuture(Map.entry(transfer.getName(), failedResult));
                         }

@@ -108,12 +108,9 @@ public class SftpTransferProtocol implements TransferProtocol {
             logger.debug("transfer: completed successfully, bytesTransferred={}", result.getBytesTransferred());
             return result;
         } catch (Exception e) {
-            // Check if this is an intentional test failure
-            if (isIntentionalTestFailure(request.getRequestId())) {
-                logger.info("INTENTIONAL TEST FAILURE: SFTP transfer failed for test case '{}': {}",
-                           request.getRequestId(), e.getMessage());
-            } else {
-                logger.error("SFTP transfer failed: {} ({})", e.getMessage(), e.getClass().getSimpleName());
+            logger.error("SFTP transfer failed: {} ({})", e.getMessage(), e.getClass().getSimpleName());
+            if (logger.isDebugEnabled()) {
+                logger.debug("SFTP transfer exception details for request: {}", request.getRequestId(), e);
             }
             throw new TransferException(context.getJobId(), "SFTP transfer failed", e);
         }
@@ -166,12 +163,9 @@ public class SftpTransferProtocol implements TransferProtocol {
             }
 
         } catch (Exception e) {
-            // Check if this is an intentional test failure
-            if (isIntentionalTestFailure(requestId)) {
-                logger.info("INTENTIONAL TEST FAILURE: SFTP transfer failed for test case '{}': {}",
-                           requestId, e.getMessage());
-            } else {
-                logger.error("SFTP transfer failed for request {}: {} ({})", requestId, e.getMessage(), e.getClass().getSimpleName());
+            logger.error("SFTP transfer failed for request {}: {} ({})", requestId, e.getMessage(), e.getClass().getSimpleName());
+            if (logger.isDebugEnabled()) {
+                logger.debug("SFTP transfer exception details for request: {}", requestId, e);
             }
             throw new TransferException(requestId, "SFTP transfer failed", e);
         }
@@ -633,30 +627,6 @@ public class SftpTransferProtocol implements TransferProtocol {
         }
         
         return new SftpConnectionInfo(host, port, path, username, password);
-    }
-
-    /**
-     * Determines if a request ID indicates an intentional test failure.
-     * This helps distinguish between real errors and expected test failures.
-     */
-    private boolean isIntentionalTestFailure(String requestId) {
-        if (requestId == null) {
-            return false;
-        }
-
-        // Check for common test failure patterns
-        return requestId.startsWith("test-") && (
-            requestId.contains("missing-host") ||
-            requestId.contains("missing-path") ||
-            requestId.contains("invalid-") ||
-            requestId.contains("malformed") ||
-            requestId.contains("error") ||
-            requestId.contains("fail") ||
-            requestId.contains("timeout") ||
-            requestId.contains("exception") ||
-            requestId.contains("nonexistent") ||
-            requestId.contains("unreachable")
-        );
     }
 
     /**

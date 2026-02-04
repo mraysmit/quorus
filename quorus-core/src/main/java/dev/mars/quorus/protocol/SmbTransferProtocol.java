@@ -105,12 +105,9 @@ public class SmbTransferProtocol implements TransferProtocol {
             logger.debug("transfer: completed successfully, bytesTransferred={}", result.getBytesTransferred());
             return result;
         } catch (Exception e) {
-            // Check if this is an intentional test failure
-            if (isIntentionalTestFailure(request.getRequestId())) {
-                logger.info("INTENTIONAL TEST FAILURE: SMB transfer failed for test case '{}': {}",
-                           request.getRequestId(), e.getMessage());
-            } else {
-                logger.error("SMB transfer failed: jobId={}, error={} ({})", context.getJobId(), e.getMessage(), e.getClass().getSimpleName());
+            logger.error("SMB transfer failed: jobId={}, error={} ({})", context.getJobId(), e.getMessage(), e.getClass().getSimpleName());
+            if (logger.isDebugEnabled()) {
+                logger.debug("SMB transfer exception details for job: {}", context.getJobId(), e);
             }
             throw new TransferException(context.getJobId(), "SMB transfer failed", e);
         }
@@ -209,12 +206,9 @@ public class SmbTransferProtocol implements TransferProtocol {
                     .build();
             
         } catch (Exception e) {
-            // Check if this is an intentional test failure
-            if (isIntentionalTestFailure(requestId)) {
-                logger.info("INTENTIONAL TEST FAILURE: SMB download failed for test case '{}': {}",
-                           requestId, e.getMessage());
-            } else {
-                logger.error("SMB download failed for request {}: {} ({})", requestId, e.getMessage(), e.getClass().getSimpleName());
+            logger.error("SMB download failed for request {}: {} ({})", requestId, e.getMessage(), e.getClass().getSimpleName());
+            if (logger.isDebugEnabled()) {
+                logger.debug("SMB download exception details for request: {}", requestId, e);
             }
             throw new TransferException(requestId, "SMB download failed", e);
         }
@@ -295,12 +289,9 @@ public class SmbTransferProtocol implements TransferProtocol {
                     .build();
             
         } catch (Exception e) {
-            // Check if this is an intentional test failure
-            if (isIntentionalTestFailure(requestId)) {
-                logger.info("INTENTIONAL TEST FAILURE: SMB upload failed for test case '{}': {}",
-                           requestId, e.getMessage());
-            } else {
-                logger.error("SMB upload failed for request {}: {}", requestId, e.getMessage());
+            logger.error("SMB upload failed for request {}: {}", requestId, e.getMessage());
+            if (logger.isDebugEnabled()) {
+                logger.debug("SMB upload exception details for request: {}", requestId, e);
             }
             throw new TransferException(requestId, "SMB upload failed", e);
         }
@@ -478,30 +469,6 @@ public class SmbTransferProtocol implements TransferProtocol {
         SmbConnectionInfo info = new SmbConnectionInfo(host, path, domain, username, password);
         logger.debug("parseSmbUri: created connectionInfo={}", info);
         return info;
-    }
-
-    /**
-     * Determines if a request ID indicates an intentional test failure.
-     * This helps distinguish between real errors and expected test failures.
-     */
-    private boolean isIntentionalTestFailure(String requestId) {
-        if (requestId == null) {
-            return false;
-        }
-
-        // Check for common test failure patterns
-        return requestId.startsWith("test-") && (
-            requestId.contains("missing-host") ||
-            requestId.contains("missing-path") ||
-            requestId.contains("invalid-") ||
-            requestId.contains("malformed") ||
-            requestId.contains("error") ||
-            requestId.contains("fail") ||
-            requestId.contains("timeout") ||
-            requestId.contains("exception") ||
-            requestId.contains("nonexistent") ||
-            requestId.contains("unreachable")
-        );
     }
 
     private Path convertToUncPath(SmbConnectionInfo connectionInfo) throws TransferException {

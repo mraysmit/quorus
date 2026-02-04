@@ -54,6 +54,7 @@ public class HttpApiServer {
     private final RaftNode raftNode;
     private final int prometheusPort;
     private HttpServer httpServer;
+    private volatile boolean draining = false;
 
     /**
      * Creates an HttpApiServer with default Prometheus port from configuration.
@@ -80,6 +81,32 @@ public class HttpApiServer {
 
         // Enable body parsing
         router.route().handler(BodyHandler.create());
+        
+        // Drain mode handler - reject new requests during shutdown (except health probes)
+        router.route().handler(ctx -> {
+            if (draining) {
+                String path = ctx.request().path();
+                // Allow health probes during drain
+                if (path.startsWith("/health")) {
+                    ctx.next();
+                    return;
+                }
+                // Reject other requests with 503 Service Unavailable
+                logger.debug("Rejecting request during drain: {} {}", ctx.request().method(), path);
+                ctx.response()
+                        .setStatusCode(503)
+                        .putHeader("Retry-After", "30")
+                        .putHeader("Content-Type", "application/json")
+                        .end(new JsonObject()
+                                .put("error", new JsonObject()
+                                        .put("code", "SERVICE_SHUTTING_DOWN")
+                                        .put("message", "Server is shutting down")
+                                        .put("path", path))
+                                .encode());
+                return;
+            }
+            ctx.next();
+        });
 
         // Global error handler for consistent error responses
         router.route().failureHandler(new GlobalErrorHandler());
@@ -334,6 +361,34 @@ public class HttpApiServer {
                     .onSuccess(v -> logger.info("HTTP API Server stopped"));
         }
         return Future.succeededFuture();
+    }
+    
+    /**
+     * Enters drain mode - stops accepting new API requests but allows health probes.
+     * 
+     * <p>During drain mode, all requests except /health/* will receive a 503 response
+     * with a Retry-After header.
+     *
+     * @return a Future that completes immediately when drain mode is activated
+     */
+    public Future<Void> enterDrainMode() {
+        if (draining) {
+            logger.debug("Already in drain mode");
+            return Future.succeededFuture();
+        }
+        
+        draining = true;
+        logger.info("HTTP API Server entered drain mode - rejecting new requests");
+        return Future.succeededFuture();
+    }
+    
+    /**
+     * Checks if the server is in drain mode.
+     *
+     * @return true if drain mode is active
+     */
+    public boolean isDraining() {
+        return draining;
     }
 
     // ==================== Health Check Helpers ====================
