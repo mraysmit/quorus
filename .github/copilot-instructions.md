@@ -42,11 +42,14 @@ All exceptions extend `QuorusException`:
 - `WorkflowParseException` — YAML parsing errors
 
 ### Configuration
-Each module has `src/main/resources/<module>.properties` with env var overrides:
-```properties
-quorus.http.port=8080  →  QUORUS_HTTP_PORT
-quorus.node.id=        →  QUORUS_NODE_ID
-```
+Each module has `src/main/resources/<module>.properties` with override support.
+
+**Resolution order (highest to lowest priority):**
+1. Environment variable: `QUORUS_HTTP_PORT=8080`
+2. System property: `-Dquorus.http.port=8080`
+3. Properties file: `quorus.http.port=8080`
+4. Default value
+
 Config classes use singleton pattern: `AppConfig.get()`, `AgentConfig.get()`
 
 ## Build & Test Commands

@@ -183,7 +183,87 @@ class InfrastructureSmokeTest {
 
     @Test
     @Order(5)
-    @DisplayName("5. Raft status endpoint responds")
+    @DisplayName("5. Health/live endpoint responds (liveness probe)")
+    void testHealthLiveEndpoint() throws Exception {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(BASE_URL + "/health/live"))
+                .timeout(Duration.ofSeconds(5))
+                .GET()
+                .build();
+
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        
+        assertEquals(200, response.statusCode(), "Liveness endpoint should return 200");
+        
+        JsonNode json = objectMapper.readTree(response.body());
+        assertEquals("UP", json.get("status").asText(), "Liveness status should be UP");
+        assertTrue(json.has("timestamp"), "Liveness should include timestamp");
+        
+        logger.info("✓ Health/live endpoint responds: " + json.get("status").asText());
+    }
+
+    @Test
+    @Order(6)
+    @DisplayName("6. Health/ready endpoint responds (readiness probe)")
+    void testHealthReadyEndpoint() throws Exception {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(BASE_URL + "/health/ready"))
+                .timeout(Duration.ofSeconds(5))
+                .GET()
+                .build();
+
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        
+        assertEquals(200, response.statusCode(), "Readiness endpoint should return 200 when ready");
+        
+        JsonNode json = objectMapper.readTree(response.body());
+        assertEquals("UP", json.get("status").asText(), "Readiness status should be UP");
+        assertTrue(json.has("checks"), "Readiness should include checks object");
+        assertEquals("UP", json.get("checks").get("raftRunning").asText(), "Raft should be running");
+        assertEquals("UP", json.get("checks").get("clusterHasLeader").asText(), "Cluster should have leader");
+        
+        logger.info("✓ Health/ready endpoint responds: " + json.get("status").asText());
+    }
+
+    @Test
+    @Order(7)
+    @DisplayName("7. Full health endpoint includes detailed checks")
+    void testFullHealthEndpoint() throws Exception {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(BASE_URL + "/health"))
+                .timeout(Duration.ofSeconds(5))
+                .GET()
+                .build();
+
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        
+        assertEquals(200, response.statusCode(), "Full health endpoint should return 200");
+        
+        JsonNode json = objectMapper.readTree(response.body());
+        assertEquals("UP", json.get("status").asText(), "Full health status should be UP");
+        assertTrue(json.has("version"), "Full health should include version");
+        assertTrue(json.has("timestamp"), "Full health should include timestamp");
+        assertTrue(json.has("raft"), "Full health should include raft object");
+        assertTrue(json.has("checks"), "Full health should include checks object");
+        
+        // Verify Raft details
+        JsonNode raft = json.get("raft");
+        assertEquals("LEADER", raft.get("state").asText(), "Raft state should be LEADER");
+        assertTrue(raft.has("term"), "Raft should include term");
+        assertTrue(raft.get("isLeader").asBoolean(), "isLeader should be true");
+        
+        // Verify checks
+        JsonNode checks = json.get("checks");
+        assertTrue(checks.has("raftCluster"), "Checks should include raftCluster");
+        assertTrue(checks.has("diskSpace"), "Checks should include diskSpace");
+        assertTrue(checks.has("memory"), "Checks should include memory");
+        
+        logger.info("✓ Full health endpoint responds with detailed checks");
+    }
+
+    @Test
+    @Order(8)
+    @DisplayName("8. Raft status endpoint responds")
     void testRaftStatusEndpoint() throws Exception {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(BASE_URL + "/raft/status"))
@@ -205,8 +285,8 @@ class InfrastructureSmokeTest {
     }
 
     @Test
-    @Order(6)
-    @DisplayName("6. Command endpoint responds")
+    @Order(9)
+    @DisplayName("9. Command endpoint responds")
     void testCommandEndpoint() throws Exception {
         // Test generic command endpoint with a ping-like command
         String payload = "{\"type\":\"PING\"}";
@@ -230,8 +310,8 @@ class InfrastructureSmokeTest {
     // ========== Metrics Endpoint Tests ==========
 
     @Test
-    @Order(7)
-    @DisplayName("7. Metrics endpoint responds")
+    @Order(10)
+    @DisplayName("10. Metrics endpoint responds")
     void testMetricsEndpoint() throws Exception {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(BASE_URL + "/metrics"))
@@ -264,8 +344,8 @@ class InfrastructureSmokeTest {
     // ========== JSON Serialization Tests ==========
 
     @Test
-    @Order(8)
-    @DisplayName("8. JSON serialization works")
+    @Order(11)
+    @DisplayName("11. JSON serialization works")
     void testJsonSerialization() throws Exception {
         // Test that Java Time module is properly configured
         Instant now = Instant.now();
@@ -281,16 +361,16 @@ class InfrastructureSmokeTest {
     // ========== Performance Baseline ==========
 
     @Test
-    @Order(9)
-    @DisplayName("9. Startup time is acceptable")
+    @Order(12)
+    @DisplayName("12. Startup time is acceptable")
     void testStartupTime() {
         assertTrue(startupTime < 10000, "Infrastructure should start in under 10 seconds");
         logger.info("✓ Startup time: " + startupTime + "ms (threshold: 10000ms)");
     }
 
     @Test
-    @Order(10)
-    @DisplayName("10. Health endpoint latency is acceptable")
+    @Order(13)
+    @DisplayName("13. Health endpoint latency is acceptable")
     void testHealthEndpointLatency() throws Exception {
         long start = System.currentTimeMillis();
         
@@ -311,8 +391,8 @@ class InfrastructureSmokeTest {
     // ========== Summary ==========
 
     @Test
-    @Order(11)
-    @DisplayName("11. All infrastructure components ready")
+    @Order(14)
+    @DisplayName("14. All infrastructure components ready")
     void testInfrastructureSummary() {
         logger.info("");
         logger.info("=== Infrastructure Smoke Test Summary ===");

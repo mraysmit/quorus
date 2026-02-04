@@ -8351,7 +8351,22 @@ This section will contain comprehensive Java API documentation including:
 
 ## Advanced Configuration
 
-This section covers the configuration of all Quorus modules through properties files and environment variables.
+This section covers the configuration of all Quorus modules through properties files, system properties, and environment variables.
+
+### Configuration Precedence
+
+All Quorus configuration properties are resolved in the following order (highest to lowest priority):
+
+| Priority | Source | Example |
+|----------|--------|---------|
+| 1️⃣ | **Environment Variable** | `QUORUS_HTTP_PORT=8080` |
+| 2️⃣ | **System Property** | `-Dquorus.http.port=8080` |
+| 3️⃣ | **Properties File** | `quorus.http.port=8080` in `quorus-controller.properties` |
+| 4️⃣ | **Default Value** | Hardcoded in application |
+
+**Environment variable naming:** Convert property key to uppercase and replace `.` and `-` with `_`:
+- `quorus.http.port` → `QUORUS_HTTP_PORT`
+- `quorus.node.id` → `QUORUS_NODE_ID`
 
 ### Configuration Overview
 
