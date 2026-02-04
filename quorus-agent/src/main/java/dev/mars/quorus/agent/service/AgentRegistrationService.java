@@ -18,61 +18,59 @@ package dev.mars.quorus.agent.service;
 
 import dev.mars.quorus.agent.config.AgentConfiguration;
 import dev.mars.quorus.agent.AgentCapabilities;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import org.apache.hc.client5.http.classic.methods.HttpPost;
-import org.apache.hc.client5.http.classic.methods.HttpDelete;
-import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
-import org.apache.hc.client5.http.impl.classic.HttpClients;
-import org.apache.hc.core5.http.ContentType;
-import org.apache.hc.core5.http.io.entity.StringEntity;
+import io.vertx.core.Future;
+import io.vertx.core.Vertx;
+import io.vertx.core.json.JsonArray;
+import io.vertx.core.json.JsonObject;
+import io.vertx.ext.web.client.WebClient;
+import io.vertx.ext.web.client.WebClientOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.HashMap;
-import java.util.Map;
-
 /**
  * Service for registering and deregistering the agent with the Quorus controller.
+ * Uses Vert.x WebClient for non-blocking HTTP communication.
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @since 2025-09-04
- * @version 1.0
+ * @version 2.0 (Migrated to Vert.x WebClient - T3.1)
  */
 public class AgentRegistrationService {
     
     private static final Logger logger = LoggerFactory.getLogger(AgentRegistrationService.class);
     
     private final AgentConfiguration config;
-    private final ObjectMapper objectMapper;
-    private final CloseableHttpClient httpClient;
+    private final WebClient webClient;
     
     private volatile boolean registered = false;
     
-    public AgentRegistrationService(AgentConfiguration config) {
+    public AgentRegistrationService(Vertx vertx, AgentConfiguration config) {
         this.config = config;
-        this.objectMapper = new ObjectMapper();
-        this.objectMapper.registerModule(new JavaTimeModule());
-        this.httpClient = HttpClients.createDefault();
+        this.webClient = WebClient.create(vertx, new WebClientOptions()
+            .setConnectTimeout(config.getHttpConnectionTimeout())
+            .setIdleTimeout(config.getHttpIdleTimeout())
+            .setUserAgent("Quorus-Agent/1.0"));
+        logger.debug("AgentRegistrationService initialized with Vert.x WebClient (connectTimeout={}ms, idleTimeout={}ms)",
+            config.getHttpConnectionTimeout(), config.getHttpIdleTimeout());
     }
     
-    public boolean register() {
-        try {
-            logger.info("Registering agent {} with controller at {}", 
-                       config.getAgentId(), config.getControllerUrl());
-            
-            // Create registration request
-            Map<String, Object> request = createRegistrationRequest();
-            String requestJson = objectMapper.writeValueAsString(request);
-            
-            // Send registration request
-            String url = config.getControllerUrl() + "/agents/register";
-            HttpPost post = new HttpPost(url);
-            post.setEntity(new StringEntity(requestJson, ContentType.APPLICATION_JSON));
-            post.setHeader("Content-Type", "application/json");
-            
-            return httpClient.execute(post, response -> {
-                int statusCode = response.getCode();
+    /**
+     * Registers the agent with the controller.
+     * 
+     * @return Future that completes with true if registration succeeded, false otherwise
+     */
+    public Future<Boolean> register() {
+        logger.info("Registering agent {} with controller at {}", 
+                   config.getAgentId(), config.getControllerUrl());
+        
+        JsonObject request = createRegistrationRequest();
+        String url = config.getControllerUrl() + "/agents/register";
+        
+        return webClient.postAbs(url)
+            .putHeader("Content-Type", "application/json")
+            .sendJsonObject(request)
+            .map(response -> {
+                int statusCode = response.statusCode();
                 if (statusCode == 201 || statusCode == 200) {
                     registered = true;
                     logger.info("Agent {} registered successfully", config.getAgentId());
@@ -82,27 +80,30 @@ public class AgentRegistrationService {
                                config.getAgentId(), statusCode);
                     return false;
                 }
+            })
+            .recover(err -> {
+                logger.error("Error registering agent {}: {}", config.getAgentId(), err.getMessage());
+                return Future.succeededFuture(false);
             });
-            
-        } catch (Exception e) {
-            logger.error("Error registering agent " + config.getAgentId(), e);
-            return false;
-        }
     }
     
-    public boolean deregister() {
+    /**
+     * Deregisters the agent from the controller.
+     * 
+     * @return Future that completes with true if deregistration succeeded, false otherwise
+     */
+    public Future<Boolean> deregister() {
         if (!registered) {
-            return true;
+            return Future.succeededFuture(true);
         }
         
-        try {
-            logger.info("Deregistering agent {} from controller", config.getAgentId());
-            
-            String url = config.getControllerUrl() + "/agents/" + config.getAgentId();
-            HttpDelete delete = new HttpDelete(url);
-            
-            return httpClient.execute(delete, response -> {
-                int statusCode = response.getCode();
+        logger.info("Deregistering agent {} from controller", config.getAgentId());
+        String url = config.getControllerUrl() + "/agents/" + config.getAgentId();
+        
+        return webClient.deleteAbs(url)
+            .send()
+            .map(response -> {
+                int statusCode = response.statusCode();
                 if (statusCode == 200 || statusCode == 204 || statusCode == 404) {
                     registered = false;
                     logger.info("Agent {} deregistered successfully", config.getAgentId());
@@ -112,39 +113,51 @@ public class AgentRegistrationService {
                                config.getAgentId(), statusCode);
                     return false;
                 }
+            })
+            .recover(err -> {
+                logger.error("Error deregistering agent {}: {}", config.getAgentId(), err.getMessage());
+                return Future.succeededFuture(false);
             });
-            
-        } catch (Exception e) {
-            logger.error("Error deregistering agent " + config.getAgentId(), e);
-            return false;
-        }
     }
     
-    private Map<String, Object> createRegistrationRequest() {
-        Map<String, Object> request = new HashMap<>();
-        request.put("agentId", config.getAgentId());
-        request.put("hostname", config.getHostname());
-        request.put("address", config.getAddress());
-        request.put("port", config.getAgentPort());
-        request.put("version", config.getVersion());
-        request.put("region", config.getRegion());
-        request.put("datacenter", config.getDatacenter());
-        request.put("capabilities", config.createCapabilities());
+    private JsonObject createRegistrationRequest() {
+        AgentCapabilities capabilities = config.createCapabilities();
+        
+        JsonObject request = new JsonObject()
+            .put("agentId", config.getAgentId())
+            .put("hostname", config.getHostname())
+            .put("address", config.getAddress())
+            .put("port", config.getAgentPort())
+            .put("version", config.getVersion())
+            .put("region", config.getRegion())
+            .put("datacenter", config.getDatacenter())
+            .put("capabilities", capabilitiesToJson(capabilities));
         
         return request;
+    }
+    
+    private JsonObject capabilitiesToJson(AgentCapabilities capabilities) {
+        JsonArray protocols = new JsonArray();
+        capabilities.getSupportedProtocols().forEach(protocols::add);
+        
+        return new JsonObject()
+            .put("supportedProtocols", protocols)
+            .put("maxConcurrentTransfers", capabilities.getMaxConcurrentTransfers())
+            .put("maxTransferSize", capabilities.getMaxTransferSize());
     }
     
     public boolean isRegistered() {
         return registered;
     }
     
-    public void shutdown() {
-        try {
-            if (httpClient != null) {
-                httpClient.close();
-            }
-        } catch (Exception e) {
-            logger.warn("Error closing HTTP client", e);
-        }
+    /**
+     * Shuts down the WebClient.
+     * 
+     * @return Future that completes when shutdown is done
+     */
+    public Future<Void> shutdown() {
+        logger.debug("Shutting down AgentRegistrationService WebClient");
+        webClient.close();
+        return Future.succeededFuture();
     }
 }

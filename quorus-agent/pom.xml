@@ -59,11 +59,10 @@
             <version>${project.version}</version>
         </dependency>
 
-        <!-- HTTP Client -->
+        <!-- Vert.x WebClient for non-blocking HTTP (replaces Apache HttpClient 5) -->
         <dependency>
-            <groupId>org.apache.httpcomponents.client5</groupId>
-            <artifactId>httpclient5</artifactId>
-            <version>5.3</version>
+            <groupId>io.vertx</groupId>
+            <artifactId>vertx-web-client</artifactId>
         </dependency>
 
         <!-- JSON Processing -->

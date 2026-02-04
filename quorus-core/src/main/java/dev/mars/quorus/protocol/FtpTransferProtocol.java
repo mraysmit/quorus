@@ -96,12 +96,9 @@ public class FtpTransferProtocol implements TransferProtocol {
         try {
             return performFtpTransfer(request, progressTracker);
         } catch (Exception e) {
-            // Check if this is an intentional test failure
-            if (isIntentionalTestFailure(request.getRequestId())) {
-                logger.info("INTENTIONAL TEST FAILURE: FTP transfer failed for test case '{}': {}",
-                           request.getRequestId(), e.getMessage());
-            } else {
-                logger.error("FTP transfer failed: jobId={}, error={}", context.getJobId(), e.getMessage());
+            logger.error("FTP transfer failed: jobId={}, error={}", context.getJobId(), e.getMessage());
+            if (logger.isDebugEnabled()) {
+                logger.debug("FTP transfer exception details for job: {}", context.getJobId(), e);
             }
             throw new TransferException(context.getJobId(), "FTP transfer failed", e);
         }
@@ -213,12 +210,9 @@ public class FtpTransferProtocol implements TransferProtocol {
             }
             
         } catch (Exception e) {
-            // Check if this is an intentional test failure
-            if (isIntentionalTestFailure(requestId)) {
-                logger.info("INTENTIONAL TEST FAILURE: FTP download failed for test case '{}': {}",
-                           requestId, e.getMessage());
-            } else {
-                logger.error("FTP download failed for request {}: {}", requestId, e.getMessage());
+            logger.error("FTP download failed for request {}: {}", requestId, e.getMessage());
+            if (logger.isDebugEnabled()) {
+                logger.debug("FTP download exception details for request: {}", requestId, e);
             }
             throw new TransferException(requestId, "FTP download failed", e);
         }
@@ -310,12 +304,9 @@ public class FtpTransferProtocol implements TransferProtocol {
             }
             
         } catch (Exception e) {
-            // Check if this is an intentional test failure
-            if (isIntentionalTestFailure(requestId)) {
-                logger.info("INTENTIONAL TEST FAILURE: FTP upload failed for test case '{}': {}",
-                           requestId, e.getMessage());
-            } else {
-                logger.error("FTP upload failed for request {}: {}", requestId, e.getMessage());
+            logger.error("FTP upload failed for request {}: {}", requestId, e.getMessage());
+            if (logger.isDebugEnabled()) {
+                logger.debug("FTP upload exception details for request: {}", requestId, e);
             }
             throw new TransferException(requestId, "FTP upload failed", e);
         }
@@ -432,30 +423,6 @@ public class FtpTransferProtocol implements TransferProtocol {
         }
         
         return new FtpConnectionInfo(host, port, path, username, password);
-    }
-
-    /**
-     * Determines if a request ID indicates an intentional test failure.
-     * This helps distinguish between real errors and expected test failures.
-     */
-    private boolean isIntentionalTestFailure(String requestId) {
-        if (requestId == null) {
-            return false;
-        }
-
-        // Check for common test failure patterns
-        return requestId.startsWith("test-") && (
-            requestId.contains("missing-host") ||
-            requestId.contains("missing-path") ||
-            requestId.contains("invalid-") ||
-            requestId.contains("malformed") ||
-            requestId.contains("error") ||
-            requestId.contains("fail") ||
-            requestId.contains("timeout") ||
-            requestId.contains("exception") ||
-            requestId.contains("nonexistent") ||
-            requestId.contains("unreachable")
-        );
     }
 
     private static class FtpClient {

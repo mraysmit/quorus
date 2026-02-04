@@ -31,7 +31,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Service for executing file transfer operations.
- * Converted to Vert.x reactive patterns (Phase 1.5 - Dec 2025).
+ * Converted to Vert.x reactive patterns 
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @since 2025-09-04

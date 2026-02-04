@@ -1,6 +1,6 @@
 # Quorus Alpha Implementation Plan
 
-**Version:** 1.8  
+**Version:** 1.9  
 **Date:** February 4, 2026  
 **Author:** Mark Andrew Ray-Smith Cityline Ltd
 
@@ -10,6 +10,7 @@
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.9 | 2026-02-04 | T2.3 (Graceful Shutdown) ✅ COMPLETE - ShutdownCoordinator, drain mode, awaitActiveTransfers |
 | 1.8 | 2026-02-04 | Added T5.8 (Test Infrastructure Abstraction) - pluggable test environments for in-memory/Docker |
 | 1.7 | 2026-02-04 | Added T5.7 (Dynamic Cluster Membership) for zero-downtime node scaling |
 | 1.6 | 2026-02-03 | Added T4.4 (Agent Job Streaming), T4.5 (Tenant Hierarchy), T5.5 (Tenant State Persistence), T5.6 (Workflow State Persistence) from architecture review cross-check |
@@ -206,7 +207,7 @@ These are targeted code changes that fix known issues in core functionality.
 
 ---
 
-### T2.3: Graceful Shutdown
+### T2.3: Graceful Shutdown ✅ COMPLETE
 
 **Goal:** Clean shutdown without losing in-flight work.
 
@@ -216,10 +217,20 @@ These are targeted code changes that fix known issues in core functionality.
 
 | Task | Module | Effort | Status |
 |------|--------|--------|--------|
-| Add shutdown hook to QuorusControllerApplication | quorus-controller | 1 hour | ⬜ Pending |
-| Implement agent drain mode | quorus-agent | 2 hours | ⬜ Pending |
-| Wait for active transfers before shutdown | SimpleTransferEngine | 2 hours | ⬜ Pending |
-| Add graceful shutdown tests | All modules | 2 hours | ⬜ Pending |
+| Create ShutdownCoordinator with 4-phase shutdown | quorus-controller | 2 hours | ✅ Complete |
+| Add HTTP drain mode (503 during shutdown) | HttpApiServer | 1 hour | ✅ Complete |
+| Integrate coordinator in QuorusControllerVerticle | quorus-controller | 1 hour | ✅ Complete |
+| Add awaitActiveTransfers() to SimpleTransferEngine | quorus-core | 1 hour | ✅ Complete |
+| Add graceful shutdown tests (10 tests) | quorus-controller/test | 2 hours | ✅ Complete |
+
+**Implementation Notes:**
+- `ShutdownCoordinator` orchestrates 4 phases: DRAIN → AWAIT_COMPLETION → STOP_SERVICES → CLOSE_RESOURCES
+- Hooks registered via fluent API: `onDrain()`, `onAwaitCompletion()`, `onServiceStop()`, `onResourceClose()`
+- Failure-tolerant: logs errors but continues shutdown sequence
+- Idempotent: multiple `shutdown()` calls are safe
+- Configurable timeouts: `quorus.shutdown.drain.timeout.ms` (5s), `quorus.shutdown.timeout.ms` (30s)
+- HTTP drain mode returns 503 with `Retry-After` header (health probes still allowed)
+- `SimpleTransferEngine.awaitActiveTransfers(timeoutMs)` waits for in-flight transfers
 
 ---
 
@@ -1087,11 +1098,9 @@ Security features implemented **after** core functionality is stable and well-te
 ### Week 1-2: Foundation & Quick Wins
 - [x] Gap analysis complete
 - [ ] **Stage 1**: All documentation and configuration tasks (T1.1, T1.2, T1.3)
-- [x] **Stage 2**: T2.1 (Health Endpoints) ✅, T2.4 (Node Identity) ✅, T2.2 (Error Responses) ✅
-- [ ] **Stage 2**: T2.3 (Graceful Shutdown)
+- [x] **Stage 2**: T2.1 (Health Endpoints) ✅, T2.4 (Node Identity) ✅, T2.2 (Error Responses) ✅, T2.3 (Graceful Shutdown) ✅
 
 ### Week 3-4: Stability & Agent Fixes
-- [ ] **Stage 2**: T2.3 (Graceful Shutdown)
 - [ ] **Stage 3**: T3.1 (Vert.x WebClient Migration) - CRITICAL BLOCKING FIX
 - [ ] **Stage 3**: T3.2 (Bounded Thread Pools)
 
@@ -1126,8 +1135,8 @@ Security features implemented **after** core functionality is stable and well-te
 | Week | Focus | Critical Path Item |
 |------|-------|-------------------|
 | 1 | Documentation | T1.1 Documentation alignment |
-| 2 | Core API | T2.1 Health endpoints, **T2.4 Node Identity** 🆕 |
-| 3 | Stability | T2.3 Graceful shutdown |
+| 2 | Core API | T2.1 Health ✅, T2.2 Errors ✅, T2.3 Shutdown ✅, T2.4 Node Identity ✅ |
+| 3 | Stability | T3.1 Vert.x WebClient (BLOCKING FIX) |
 | 4 | Agent | T3.1 Vert.x WebClient (BLOCKING FIX), **T3.3 Transfer Retries** 🆕 |
 | 5 | Threading | T3.2 Bounded thread pools |
 | 6 | Protocols | T4.1 NFS adapter, **T4.3 Scheduling Strategy** 🆕 |

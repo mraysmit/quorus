@@ -33,7 +33,6 @@ import io.vertx.core.VertxOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -89,15 +88,15 @@ public class QuorusAgent {
         logger.info("Creating QuorusAgent with Vert.x instance: {} (using Vert.x timers, no ScheduledExecutorService)",
                     System.identityHashCode(vertx));
 
-        // Initialize services
-        this.registrationService = new AgentRegistrationService(config);
-        this.heartbeatService = new HeartbeatService(config, registrationService);
+        // Initialize services with Vert.x for non-blocking HTTP 
+        this.registrationService = new AgentRegistrationService(vertx, config);
+        this.heartbeatService = new HeartbeatService(vertx, config, registrationService);
         this.transferService = new TransferExecutionService(vertx, config);  // Pass Vertx
         this.healthService = new HealthService(config);
-        this.jobPollingService = new JobPollingService(config);
-        this.jobStatusReportingService = new JobStatusReportingService(config);
+        this.jobPollingService = new JobPollingService(vertx, config);
+        this.jobStatusReportingService = new JobStatusReportingService(vertx, config);
 
-        // Initialize OpenTelemetry metrics (Phase 6 - Jan 2026)
+        // Initialize OpenTelemetry metrics 
         this.metrics = new AgentMetrics(config.getAgentId(), System.currentTimeMillis());
 
         logger.info("Quorus Agent initialized: {} (reactive mode with OpenTelemetry)", config.getAgentId());
@@ -179,27 +178,44 @@ public class QuorusAgent {
         healthService.start();
         logger.info("Health service started on port {}", config.getAgentPort());
 
-        // Register with controller
-        boolean registered = registrationService.register();
-        metrics.recordRegistration(registered);
-        if (!registered) {
-            metrics.setStatusError();
-            throw new RuntimeException("Failed to register with controller");
+        // Register with controller (reactive WebClient)
+        registrationService.register()
+            .onSuccess(registered -> {
+                metrics.recordRegistration(registered);
+                if (!registered) {
+                    metrics.setStatusError();
+                    logger.error("Failed to register with controller");
+                    shutdown();
+                    return;
+                }
+                logger.info("Agent registered successfully with controller");
+                startBackgroundServices();
+            })
+            .onFailure(err -> {
+                metrics.setStatusError();
+                logger.error("Failed to register with controller: {}", err.getMessage());
+                shutdown();
+            });
+    }
+    
+    private void startBackgroundServices() {
+        // Guard against race condition: shutdown may have been called before registration callback fires
+        if (closed.get() || !running) {
+            logger.warn("Agent was shutdown before background services could start, aborting startup");
+            return;
         }
-        logger.info("Agent registered successfully with controller");
 
         // Start heartbeat service using Vert.x timer (no ScheduledExecutorService!)
         heartbeatTimerId = vertx.setPeriodic(
             config.getHeartbeatInterval(),
             id -> {
                 if (!closed.get() && running) {
-                    try {
-                        heartbeatService.sendHeartbeat();
-                        metrics.recordHeartbeat(true);
-                    } catch (Exception e) {
-                        logger.error("Error sending heartbeat", e);
-                        metrics.recordHeartbeat(false);
-                    }
+                    heartbeatService.sendHeartbeat()
+                        .onSuccess(success -> metrics.recordHeartbeat(success))
+                        .onFailure(err -> {
+                            logger.error("Error sending heartbeat", err);
+                            metrics.recordHeartbeat(false);
+                        });
                 }
             }
         );
@@ -220,11 +236,7 @@ public class QuorusAgent {
             if (!closed.get() && running) {
                 jobPollingTimerId = vertx.setPeriodic(pollingInterval, id -> {
                     if (!closed.get() && running) {
-                        try {
-                            pollForJobs();
-                        } catch (Exception e) {
-                            logger.error("Error polling for jobs", e);
-                        }
+                        pollForJobs();
                     }
                 });
                 logger.info("Job polling started (interval: {}ms) [Vert.x timer ID: {}]", pollingInterval, jobPollingTimerId);
@@ -265,17 +277,25 @@ public class QuorusAgent {
                 jobPollingTimerId = 0;
             }
 
-            // Stop services
+            // Stop services (Future-based shutdown)
             transferService.shutdown();
             heartbeatService.shutdown();
             healthService.shutdown();
             jobPollingService.shutdown();
             jobStatusReportingService.shutdown();
 
-            // Deregister from controller
-            registrationService.deregister();
-
-            logger.info("Quorus Agent shutdown complete (0 threads to cleanup)");
+            // Deregister from controller (reactive WebClient)
+            registrationService.deregister()
+                .onComplete(ar -> {
+                    if (ar.succeeded() && ar.result()) {
+                        logger.info("Agent deregistered from controller");
+                    } else if (ar.failed()) {
+                        logger.warn("Failed to deregister from controller: {}", ar.cause().getMessage());
+                    }
+                    logger.info("Quorus Agent shutdown complete (0 threads to cleanup)");
+                    shutdownLatch.countDown();
+                });
+            return; // Early return - shutdownLatch will be counted down in callback
 
         } catch (Exception e) {
             logger.error("Error during shutdown", e);
@@ -293,52 +313,44 @@ public class QuorusAgent {
             return;
         }
 
-        try {
-            // Poll controller for new jobs
-            List<JobPollingService.PendingJob> pendingJobs = jobPollingService.pollForJobs();
+        // Poll controller for new jobs (reactive migration)
+        jobPollingService.pollForJobs()
+            .onSuccess(pendingJobs -> {
+                if (pendingJobs.isEmpty()) {
+                    logger.debug("No pending jobs found");
+                    return;
+                }
 
-            if (pendingJobs.isEmpty()) {
-                logger.debug("No pending jobs found");
-                return;
-            }
+                logger.info("Found {} pending job(s)", pendingJobs.size());
+                metrics.recordJobPolled(pendingJobs.size());
 
-            logger.info("Found {} pending job(s)", pendingJobs.size());
-            metrics.recordJobPolled(pendingJobs.size());
-
-            // Process each pending job
-            for (JobPollingService.PendingJob pendingJob : pendingJobs) {
-                processJob(pendingJob);
-            }
-
-        } catch (Exception e) {
-            logger.warn("Error polling for jobs", e);
-        }
+                // Process each pending job
+                for (JobPollingService.PendingJob pendingJob : pendingJobs) {
+                    processJob(pendingJob);
+                }
+            })
+            .onFailure(err -> logger.warn("Error polling for jobs: {}", err.getMessage()));
     }
 
     private void processJob(JobPollingService.PendingJob pendingJob) {
         String jobId = pendingJob.getJobId();
 
-        try {
-            logger.info("Processing job: {} ({})", jobId, pendingJob.getDescription());
+        logger.info("Processing job: {} ({})", jobId, pendingJob.getDescription());
 
-            // Report that we've accepted the job
-            jobStatusReportingService.reportAccepted(jobId);
+        // Report that we've accepted the job (reactive)
+        jobStatusReportingService.reportAccepted(jobId)
+            .onComplete(ar -> {
+                // Convert to transfer request
+                TransferRequest request = pendingJob.toTransferRequest();
 
-            // Convert to transfer request
-            TransferRequest request = pendingJob.toTransferRequest();
+                // Record job started
+                metrics.recordJobStarted();
 
-            // Record job started
-            metrics.recordJobStarted();
-
-            // Execute the transfer
-            transferService.executeTransfer(request)
+                // Execute the transfer
+                transferService.executeTransfer(request)
                     .onSuccess(result -> handleTransferComplete(jobId, result))
                     .onFailure(throwable -> handleTransferError(jobId, throwable));
-
-        } catch (Exception e) {
-            logger.error("Error processing job: {}", jobId, e);
-            jobStatusReportingService.reportFailed(jobId, e.getMessage());
-        }
+            });
     }
 
     private void handleTransferComplete(String jobId, TransferResult result) {

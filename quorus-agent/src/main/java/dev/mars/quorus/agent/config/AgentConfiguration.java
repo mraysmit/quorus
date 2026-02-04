@@ -46,6 +46,8 @@ public class AgentConfiguration {
     private final Set<String> supportedProtocols;
     private final int maxConcurrentTransfers;
     private final long heartbeatInterval;
+    private final int httpConnectionTimeout;
+    private final int httpIdleTimeout;
     private final String version;
     
     private AgentConfiguration(Builder builder) {
@@ -59,6 +61,8 @@ public class AgentConfiguration {
         this.supportedProtocols = builder.supportedProtocols;
         this.maxConcurrentTransfers = builder.maxConcurrentTransfers;
         this.heartbeatInterval = builder.heartbeatInterval;
+        this.httpConnectionTimeout = builder.httpConnectionTimeout;
+        this.httpIdleTimeout = builder.httpIdleTimeout;
         this.version = builder.version;
     }
     
@@ -75,6 +79,8 @@ public class AgentConfiguration {
         builder.agentPort(Integer.parseInt(getEnvOrDefault("AGENT_PORT", "8080")));
         builder.maxConcurrentTransfers(Integer.parseInt(getEnvOrDefault("MAX_CONCURRENT_TRANSFERS", "5")));
         builder.heartbeatInterval(Long.parseLong(getEnvOrDefault("HEARTBEAT_INTERVAL", "30000")));
+        builder.httpConnectionTimeout(Integer.parseInt(getEnvOrDefault("HTTP_CONNECTION_TIMEOUT_MS", "5000")));
+        builder.httpIdleTimeout(Integer.parseInt(getEnvOrDefault("HTTP_IDLE_TIMEOUT_MS", "10000")));
         builder.version(getEnvOrDefault("AGENT_VERSION", "1.0.0"));
         
         // Parse supported protocols
@@ -145,6 +151,8 @@ public class AgentConfiguration {
     public Set<String> getSupportedProtocols() { return supportedProtocols; }
     public int getMaxConcurrentTransfers() { return maxConcurrentTransfers; }
     public long getHeartbeatInterval() { return heartbeatInterval; }
+    public int getHttpConnectionTimeout() { return httpConnectionTimeout; }
+    public int getHttpIdleTimeout() { return httpIdleTimeout; }
     public String getVersion() { return version; }
     
     public static class Builder {
@@ -158,6 +166,8 @@ public class AgentConfiguration {
         private Set<String> supportedProtocols = new HashSet<>();
         private int maxConcurrentTransfers = 5;
         private long heartbeatInterval = 30000;
+        private int httpConnectionTimeout = 5000;
+        private int httpIdleTimeout = 10000;
         private String version = "1.0.0";
         
         public Builder agentId(String agentId) { this.agentId = agentId; return this; }
@@ -170,6 +180,8 @@ public class AgentConfiguration {
         public Builder supportedProtocols(Set<String> supportedProtocols) { this.supportedProtocols = supportedProtocols; return this; }
         public Builder maxConcurrentTransfers(int maxConcurrentTransfers) { this.maxConcurrentTransfers = maxConcurrentTransfers; return this; }
         public Builder heartbeatInterval(long heartbeatInterval) { this.heartbeatInterval = heartbeatInterval; return this; }
+        public Builder httpConnectionTimeout(int httpConnectionTimeout) { this.httpConnectionTimeout = httpConnectionTimeout; return this; }
+        public Builder httpIdleTimeout(int httpIdleTimeout) { this.httpIdleTimeout = httpIdleTimeout; return this; }
         public Builder version(String version) { this.version = version; return this; }
         
         public AgentConfiguration build() {

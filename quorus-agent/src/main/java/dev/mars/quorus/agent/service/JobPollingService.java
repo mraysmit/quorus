@@ -16,68 +16,70 @@
 
 package dev.mars.quorus.agent.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import dev.mars.quorus.agent.config.AgentConfiguration;
 import dev.mars.quorus.core.TransferRequest;
-import org.apache.hc.client5.http.classic.methods.HttpGet;
-import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
-import org.apache.hc.client5.http.impl.classic.HttpClients;
-import org.apache.hc.core5.http.io.entity.EntityUtils;
+import io.vertx.core.Future;
+import io.vertx.core.Vertx;
+import io.vertx.core.json.JsonArray;
+import io.vertx.core.json.JsonObject;
+import io.vertx.ext.web.client.WebClient;
+import io.vertx.ext.web.client.WebClientOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Service for polling the controller for new job assignments.
+ * Uses Vert.x WebClient for non-blocking HTTP communication.
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @since 2025-12-11
- * @version 1.0
+ * @version 2.0 (Migrated to Vert.x WebClient - T3.1)
  */
 public class JobPollingService {
 
     private static final Logger logger = LoggerFactory.getLogger(JobPollingService.class);
     
     private final AgentConfiguration config;
-    private final ObjectMapper objectMapper;
-    private final CloseableHttpClient httpClient;
+    private final WebClient webClient;
 
-    public JobPollingService(AgentConfiguration config) {
+    public JobPollingService(Vertx vertx, AgentConfiguration config) {
         this.config = config;
-        this.objectMapper = new ObjectMapper();
-        this.objectMapper.registerModule(new JavaTimeModule());
-        this.httpClient = HttpClients.createDefault();
+        this.webClient = WebClient.create(vertx, new WebClientOptions()
+            .setConnectTimeout(config.getHttpConnectionTimeout())
+            .setIdleTimeout(config.getHttpIdleTimeout())
+            .setUserAgent("Quorus-Agent/1.0"));
+        logger.debug("JobPollingService initialized with Vert.x WebClient (connectTimeout={}ms, idleTimeout={}ms)",
+            config.getHttpConnectionTimeout(), config.getHttpIdleTimeout());
     }
 
     /**
      * Poll the controller for pending job assignments.
      * 
-     * @return list of pending jobs
+     * @return Future containing list of pending jobs (empty list on failure)
      */
-    public List<PendingJob> pollForJobs() {
-        List<PendingJob> pendingJobs = new ArrayList<>();
+    public Future<List<PendingJob>> pollForJobs() {
+        String url = config.getControllerUrl() + "/agents/" + config.getAgentId() + "/jobs";
         
-        try {
-            String url = config.getControllerUrl() + "/agents/" + config.getAgentId() + "/jobs";
-            HttpGet get = new HttpGet(url);
-            get.setHeader("Accept", "application/json");
-            
-            httpClient.execute(get, response -> {
-                int statusCode = response.getCode();
+        return webClient.getAbs(url)
+            .putHeader("Accept", "application/json")
+            .send()
+            .map(response -> {
+                int statusCode = response.statusCode();
                 if (statusCode == 200) {
-                    String responseBody = EntityUtils.toString(response.getEntity());
-                    Map<String, Object> responseMap = objectMapper.readValue(responseBody, Map.class);
+                    List<PendingJob> pendingJobs = new ArrayList<>();
+                    JsonObject responseBody = response.bodyAsJsonObject();
                     
-                    List<Map<String, Object>> jobs = (List<Map<String, Object>>) responseMap.get("pendingJobs");
+                    JsonArray jobs = responseBody.getJsonArray("pendingJobs");
                     if (jobs != null) {
-                        for (Map<String, Object> jobData : jobs) {
+                        for (int i = 0; i < jobs.size(); i++) {
                             try {
+                                JsonObject jobData = jobs.getJsonObject(i);
                                 PendingJob job = parsePendingJob(jobData);
                                 pendingJobs.add(job);
                             } catch (Exception e) {
@@ -87,40 +89,39 @@ public class JobPollingService {
                     }
                     
                     logger.debug("Polled for jobs: found {} pending jobs", pendingJobs.size());
+                    return pendingJobs;
                 } else {
                     logger.warn("Failed to poll for jobs: HTTP {}", statusCode);
+                    return Collections.<PendingJob>emptyList();
                 }
-                return null;
+            })
+            .recover(err -> {
+                logger.error("Error polling for jobs: {}", err.getMessage());
+                return Future.succeededFuture(Collections.emptyList());
             });
-            
-        } catch (Exception e) {
-            logger.error("Error polling for jobs", e);
-        }
-        
-        return pendingJobs;
     }
 
-    private PendingJob parsePendingJob(Map<String, Object> jobData) {
-        String assignmentId = (String) jobData.get("assignmentId");
-        String jobId = (String) jobData.get("jobId");
-        String agentId = (String) jobData.get("agentId");
-        String sourceUri = (String) jobData.get("sourceUri");
-        String destinationPath = (String) jobData.get("destinationPath");
-        Long totalBytes = jobData.get("totalBytes") != null ? 
-                ((Number) jobData.get("totalBytes")).longValue() : 0L;
-        String description = (String) jobData.get("description");
+    private PendingJob parsePendingJob(JsonObject jobData) {
+        String assignmentId = jobData.getString("assignmentId");
+        String jobId = jobData.getString("jobId");
+        String agentId = jobData.getString("agentId");
+        String sourceUri = jobData.getString("sourceUri");
+        String destinationPath = jobData.getString("destinationPath");
+        Long totalBytes = jobData.getLong("totalBytes", 0L);
+        String description = jobData.getString("description");
         
         return new PendingJob(assignmentId, jobId, agentId, sourceUri, destinationPath, totalBytes, description);
     }
 
-    public void shutdown() {
-        try {
-            if (httpClient != null) {
-                httpClient.close();
-            }
-        } catch (Exception e) {
-            logger.warn("Error closing HTTP client", e);
-        }
+    /**
+     * Shuts down the WebClient.
+     * 
+     * @return Future that completes when shutdown is done
+     */
+    public Future<Void> shutdown() {
+        logger.debug("Shutting down JobPollingService WebClient");
+        webClient.close();
+        return Future.succeededFuture();
     }
 
     /**

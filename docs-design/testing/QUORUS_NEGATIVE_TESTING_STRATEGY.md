@@ -63,28 +63,13 @@ class SftpTransferProtocolErrorHandlingTest extends ProtocolErrorHandlingTestBas
 }
 ```
 
-### Quiet Logging for Expected Failures
+### Why This Works
 
-Protocol implementations detect test scenarios and log at INFO instead of ERROR:
-
-```java
-// Before: ERROR with stack trace (noisy)
-logger.error("SFTP transfer failed: {}", e.getMessage(), e);
-
-// After: INFO without stack trace for test scenarios
-logger.info("INTENTIONAL TEST FAILURE: SFTP transfer failed for test case '{}': {}",
-           requestId, e.getMessage());
-```
-
-### Example Test Output
-
-When running negative tests, you'll see clean INFO-level messages:
-
-```
-13:19:27.511 [main] INFO  d.m.q.protocol.FtpTransferProtocol - INTENTIONAL TEST FAILURE: FTP download failed for test case 'test-exception-id': nonexistent.server.com
-13:19:27.517 [main] INFO  d.m.q.protocol.FtpTransferProtocol - INTENTIONAL TEST FAILURE: FTP download failed for test case 'test-invalid-ftp': FTP URI must specify a path
-13:19:27.521 [main] INFO  d.m.q.protocol.FtpTransferProtocol - INTENTIONAL TEST FAILURE: FTP download failed for test case 'test-missing-host': FTP URI must specify a host
-```
+When negative tests are tagged and excluded from the default run:
+- Default `mvn test` runs only happy-path tests
+- Any ERROR in the default test output is a **real bug**
+- Negative tests run separately with `-Pnegative-tests`
+- Production code remains clean — no test-aware logic
 
 ---
 
@@ -171,20 +156,6 @@ Test logs output to both console and file. Configuration is in `quorus-core/src/
         </encoder>
     </appender>
     
-    <!-- Rolling file appender (rotates by size) -->
-    <appender name="ROLLING_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>target/test-logs/quorus-core-tests-rolling.log</file>
-        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
-            <fileNamePattern>target/test-logs/quorus-core-tests.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
-            <maxFileSize>10MB</maxFileSize>
-            <maxHistory>5</maxHistory>
-            <totalSizeCap>50MB</totalSizeCap>
-        </rollingPolicy>
-        <encoder>
-            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{50} - %msg%n</pattern>
-        </encoder>
-    </appender>
-    
     <!-- Quorus packages at DEBUG level -->
     <logger name="dev.mars.quorus" level="DEBUG"/>
     
@@ -194,7 +165,6 @@ Test logs output to both console and file. Configuration is in `quorus-core/src/
     <logger name="io.netty" level="WARN"/>
     
     <root level="INFO">
-        <!-- Output to both console AND file -->
         <appender-ref ref="CONSOLE"/>
         <appender-ref ref="FILE"/>
     </root>
@@ -202,70 +172,17 @@ Test logs output to both console and file. Configuration is in `quorus-core/src/
 </configuration>
 ```
 
-#### Appender Options
-
-| Appender | Description |
-|----------|-------------|
-| `CONSOLE` | Real-time console output |
-| `FILE` | Simple file appender (overwrites each run) |
-| `ROLLING_FILE` | Rotates by size/date, keeps history |
-
-#### Log Output Variants
-
-```xml
-<!-- Console only -->
-<root level="INFO">
-    <appender-ref ref="CONSOLE"/>
-</root>
-
-<!-- File only (quiet console) -->
-<root level="INFO">
-    <appender-ref ref="FILE"/>
-</root>
-
-<!-- Both (current default) -->
-<root level="INFO">
-    <appender-ref ref="CONSOLE"/>
-    <appender-ref ref="FILE"/>
-</root>
-```
-
 ---
 
-## Implementation Details
-
-### Intentional Test Failure Detection
-
-Protocol implementations use `isIntentionalTestFailure()` to detect test scenarios:
-
-```java
-private boolean isIntentionalTestFailure(String requestId) {
-    if (requestId == null) {
-        return false;
-    }
-    return requestId.startsWith("test-") ||
-           requestId.contains("-test") ||
-           requestId.contains("test-invalid") ||
-           requestId.contains("test-missing") ||
-           requestId.contains("test-exception") ||
-           requestId.contains("test-timeout");
-}
-```
-
-### Files Modified
+## Files to Modify
 
 | File | Changes |
 |------|---------|
-| `quorus-core/pom.xml` | Added Surefire excludedGroups and Maven profiles |
-| `ProtocolErrorHandlingTestBase.java` | Created base class with `@Tag("negative")` |
-| `SftpTransferProtocolErrorHandlingTest.java` | Created with `@Tag("negative")` |
-| `FtpTransferProtocolErrorHandlingTest.java` | Created with `@Tag("negative")` |
-| `SmbTransferProtocolErrorHandlingTest.java` | Created with `@Tag("negative")` |
-| `SftpTransferProtocol.java` | Added `isIntentionalTestFailure()`, updated logging |
-| `FtpTransferProtocol.java` | Added `isIntentionalTestFailure()`, updated logging |
-| `SmbTransferProtocol.java` | Added `isIntentionalTestFailure()`, updated logging |
-| `HttpTransferProtocol.java` | Added `isIntentionalTestFailure()`, updated logging |
-| `SimpleTransferEngine.java` | Added `isIntentionalTestFailure()`, updated logging |
+| `quorus-core/pom.xml` | Add Surefire excludedGroups and Maven profiles |
+| `ProtocolErrorHandlingTestBase.java` | Create base class with `@Tag("negative")` |
+| `*ErrorHandlingTest.java` | Create test classes with `@Tag("negative")` |
+
+**Important:** Production code (protocols, engines) remains unchanged. No test-detection logic in production.
 
 ---
 
@@ -296,22 +213,18 @@ jobs:
 
 ---
 
-## Background: Why Separate Negative Tests?
-
-If a test is *supposed* to fail (or trigger noisy error paths), mixing it into the same suite/log stream as happy-path regression causes confusion and ignored signals.
-
-### Key Principles
+## Key Principles
 
 1. **Separate by test category** — Put intentional failure tests in a separate package
 2. **Use JUnit 5 `@Tag`** — Gate execution with tags like `@Tag("negative")`
-3. **Fix logging config** — Expected errors shouldn't pollute logs at ERROR level
+3. **Exclude from default run** — Configure Maven Surefire to exclude `negative` tag by default
 4. **Don't assert on logs** — Assert on exceptions, error payloads, metrics, or state
-5. **Make expected failures quiet** — Log at INFO/WARN, not ERROR with stack traces
+5. **Keep production code clean** — No test-detection logic in production classes
 
 ### Why "separate package" alone isn't enough
 
 Moving tests into a separate package helps humans browse, but unless you **change how they are executed**, they'll still run together and write to the same log sink.
 
-**Solution:** Separate + tag + separate execution.
+**Solution:** Separate package + `@Tag` + Maven profile exclusion.
 
-This gives testing staff a clean signal: if the "happy" suite shows errors in logs, it's real.
+This gives testing staff a clean signal: if the default test suite shows ERROR in logs, it's a real bug.

@@ -16,94 +16,100 @@
 
 package dev.mars.quorus.agent.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import dev.mars.quorus.agent.config.AgentConfiguration;
-import org.apache.hc.client5.http.classic.methods.HttpPost;
-import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
-import org.apache.hc.client5.http.impl.classic.HttpClients;
-import org.apache.hc.core5.http.ContentType;
-import org.apache.hc.core5.http.io.entity.StringEntity;
+import io.vertx.core.Future;
+import io.vertx.core.Vertx;
+import io.vertx.core.json.JsonObject;
+import io.vertx.ext.web.client.WebClient;
+import io.vertx.ext.web.client.WebClientOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.HashMap;
-import java.util.Map;
-
 /**
  * Service for reporting job status updates to the controller.
+ * Uses Vert.x WebClient for non-blocking HTTP communication.
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @since 2025-12-11
- * @version 1.0
+ * @version 2.0 (Migrated to Vert.x WebClient - T3.1)
  */
 public class JobStatusReportingService {
 
     private static final Logger logger = LoggerFactory.getLogger(JobStatusReportingService.class);
     
     private final AgentConfiguration config;
-    private final ObjectMapper objectMapper;
-    private final CloseableHttpClient httpClient;
+    private final WebClient webClient;
 
-    public JobStatusReportingService(AgentConfiguration config) {
+    public JobStatusReportingService(Vertx vertx, AgentConfiguration config) {
         this.config = config;
-        this.objectMapper = new ObjectMapper();
-        this.objectMapper.registerModule(new JavaTimeModule());
-        this.httpClient = HttpClients.createDefault();
+        this.webClient = WebClient.create(vertx, new WebClientOptions()
+            .setConnectTimeout(config.getHttpConnectionTimeout())
+            .setIdleTimeout(config.getHttpIdleTimeout())
+            .setUserAgent("Quorus-Agent/1.0"));
+        logger.debug("JobStatusReportingService initialized with Vert.x WebClient (connectTimeout={}ms, idleTimeout={}ms)",
+            config.getHttpConnectionTimeout(), config.getHttpIdleTimeout());
     }
 
     /**
      * Report that a job has been accepted.
+     * 
+     * @return Future that completes when the report is sent
      */
-    public void reportAccepted(String jobId) {
-        reportStatus(jobId, "ACCEPTED", null, null);
+    public Future<Void> reportAccepted(String jobId) {
+        return reportStatus(jobId, "ACCEPTED", null, null);
     }
 
     /**
      * Report that a job is in progress.
+     * 
+     * @return Future that completes when the report is sent
      */
-    public void reportInProgress(String jobId, long bytesTransferred) {
-        reportStatus(jobId, "IN_PROGRESS", bytesTransferred, null);
+    public Future<Void> reportInProgress(String jobId, long bytesTransferred) {
+        return reportStatus(jobId, "IN_PROGRESS", bytesTransferred, null);
     }
 
     /**
      * Report that a job has completed successfully.
+     * 
+     * @return Future that completes when the report is sent
      */
-    public void reportCompleted(String jobId, long bytesTransferred) {
-        reportStatus(jobId, "COMPLETED", bytesTransferred, null);
+    public Future<Void> reportCompleted(String jobId, long bytesTransferred) {
+        return reportStatus(jobId, "COMPLETED", bytesTransferred, null);
     }
 
     /**
      * Report that a job has failed.
+     * 
+     * @return Future that completes when the report is sent
      */
-    public void reportFailed(String jobId, String errorMessage) {
-        reportStatus(jobId, "FAILED", null, errorMessage);
+    public Future<Void> reportFailed(String jobId, String errorMessage) {
+        return reportStatus(jobId, "FAILED", null, errorMessage);
     }
 
     /**
      * Report job status to the controller.
+     * 
+     * @return Future that completes when the report is sent
      */
-    private void reportStatus(String jobId, String status, Long bytesTransferred, String errorMessage) {
-        try {
-            Map<String, Object> request = new HashMap<>();
-            request.put("agentId", config.getAgentId());
-            request.put("status", status);
-            if (bytesTransferred != null) {
-                request.put("bytesTransferred", bytesTransferred);
-            }
-            if (errorMessage != null) {
-                request.put("errorMessage", errorMessage);
-            }
-            
-            String requestJson = objectMapper.writeValueAsString(request);
-            
-            String url = config.getControllerUrl() + "/jobs/" + jobId + "/status";
-            HttpPost post = new HttpPost(url);
-            post.setEntity(new StringEntity(requestJson, ContentType.APPLICATION_JSON));
-            post.setHeader("Content-Type", "application/json");
-            
-            httpClient.execute(post, response -> {
-                int statusCode = response.getCode();
+    private Future<Void> reportStatus(String jobId, String status, Long bytesTransferred, String errorMessage) {
+        JsonObject request = new JsonObject()
+            .put("agentId", config.getAgentId())
+            .put("status", status);
+        
+        if (bytesTransferred != null) {
+            request.put("bytesTransferred", bytesTransferred);
+        }
+        if (errorMessage != null) {
+            request.put("errorMessage", errorMessage);
+        }
+        
+        String url = config.getControllerUrl() + "/jobs/" + jobId + "/status";
+        
+        return webClient.postAbs(url)
+            .putHeader("Content-Type", "application/json")
+            .sendJsonObject(request)
+            .<Void>map(response -> {
+                int statusCode = response.statusCode();
                 if (statusCode == 200) {
                     logger.debug("Job status reported: {} -> {}", jobId, status);
                 } else {
@@ -111,21 +117,22 @@ public class JobStatusReportingService {
                               jobId, status, statusCode);
                 }
                 return null;
+            })
+            .recover(err -> {
+                logger.error("Error reporting job status: {} -> {}: {}", jobId, status, err.getMessage());
+                return Future.succeededFuture();
             });
-            
-        } catch (Exception e) {
-            logger.error("Error reporting job status: {} -> {}", jobId, status, e);
-        }
     }
 
-    public void shutdown() {
-        try {
-            if (httpClient != null) {
-                httpClient.close();
-            }
-        } catch (Exception e) {
-            logger.warn("Error closing HTTP client", e);
-        }
+    /**
+     * Shuts down the WebClient.
+     * 
+     * @return Future that completes when shutdown is done
+     */
+    public Future<Void> shutdown() {
+        logger.debug("Shutting down JobStatusReportingService WebClient");
+        webClient.close();
+        return Future.succeededFuture();
     }
 }
 

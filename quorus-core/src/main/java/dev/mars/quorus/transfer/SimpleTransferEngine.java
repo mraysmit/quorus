@@ -39,7 +39,9 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
@@ -49,7 +51,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * Simple implementation of the TransferEngine interface.
  * Handles basic file transfers with retry logic and progress tracking.
- * Converted to Vert.x WorkerExecutor (Phase 1.5 - Dec 2025).
+ * Converted to Vert.x WorkerExecutor
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @since 2025-08-17
@@ -196,12 +198,10 @@ public class SimpleTransferEngine implements TransferEngine {
             try {
                 return executeTransfer(context);
             } catch (Exception e) {
-                if (isIntentionalTestFailure(job.getJobId())) {
-                    logger.info("INTENTIONAL TEST FAILURE: Transfer execution failed for test case '{}': {}",
-                               job.getJobId(), e.getMessage());
-                } else {
-                    logger.error("Transfer execution failed for job {}: {} ({})", 
-                                job.getJobId(), e.getMessage(), e.getClass().getSimpleName());
+                logger.error("Transfer execution failed for job {}: {} ({})", 
+                            job.getJobId(), e.getMessage(), e.getClass().getSimpleName());
+                if (logger.isDebugEnabled()) {
+                    logger.debug("Transfer execution exception details for job: {}", job.getJobId(), e);
                 }
                 job.fail("Transfer execution failed: " + e.getMessage(), e);
                 return job.toResult();
@@ -331,6 +331,57 @@ public class SimpleTransferEngine implements TransferEngine {
         logger.info("Transfer engine shutdown completed (Vert.x WorkerExecutor closed)");
         logger.debug("shutdown: complete");
         return true;
+    }
+    
+    /**
+     * Waits for all active transfers to complete or timeout.
+     * 
+     * <p>This method is useful for graceful shutdown where you want to allow
+     * in-flight transfers to finish before closing resources.
+     *
+     * @param timeoutMs maximum time to wait in milliseconds
+     * @return a Future that completes when all transfers are done or timeout expires
+     */
+    public Future<Void> awaitActiveTransfers(long timeoutMs) {
+        int activeCount = activeJobs.size();
+        if (activeCount == 0) {
+            logger.debug("awaitActiveTransfers: no active transfers");
+            return Future.succeededFuture();
+        }
+        
+        logger.info("Waiting for {} active transfers to complete (timeout={}ms)", activeCount, timeoutMs);
+        
+        // Collect all active transfer futures
+        List<Future<TransferResult>> futures = new ArrayList<>(activeFutures.values());
+        if (futures.isEmpty()) {
+            return Future.succeededFuture();
+        }
+        
+        // Wait for all with timeout
+        return Future.all(futures)
+                .timeout(timeoutMs)
+                .map(v -> {
+                    logger.info("All active transfers completed");
+                    return (Void) null;
+                })
+                .recover(err -> {
+                    int remaining = activeJobs.size();
+                    if (remaining > 0) {
+                        logger.warn("Timeout waiting for transfers, {} still active", remaining);
+                    } else {
+                        logger.info("All active transfers completed");
+                    }
+                    return Future.succeededFuture();
+                });
+    }
+    
+    /**
+     * Checks if the transfer engine is in shutdown state.
+     *
+     * @return true if shutdown has been initiated
+     */
+    public boolean isShutdown() {
+        return shutdown.get();
     }
 
     @Override
@@ -531,11 +582,9 @@ public class SimpleTransferEngine implements TransferEngine {
         // Record OpenTelemetry metric (Phase 8 - Jan 2026)
         telemetryMetrics.recordTransferFailed(protocolName, direction.name(), errorType);
 
-        if (isIntentionalTestFailure(job.getJobId())) {
-            logger.info("INTENTIONAL TEST FAILURE: {} transfer failed for test case '{}': {}",
-                       direction, job.getJobId(), errorMessage);
-        } else {
-            logger.error("{} transfer failed permanently: {} - {}", direction, job.getJobId(), errorMessage);
+        logger.error("{} transfer failed permanently: {} - {}", direction, job.getJobId(), errorMessage);
+        if (logger.isDebugEnabled()) {
+            logger.debug("Permanent transfer failure details for job: {}", job.getJobId());
         }
         return job.toResult();
     }
@@ -600,25 +649,5 @@ public class SimpleTransferEngine implements TransferEngine {
     public TransferMetrics getProtocolMetrics(String protocolName, TransferDirection direction) {
         String key = protocolName + "-" + direction.name();
         return protocolMetrics.get(key);
-    }
-
-    /**
-     * Determines if a job ID indicates an intentional test failure.
-     * Test job IDs follow patterns like "test-*", "*-test", etc.
-     * This allows suppressing verbose error logging for expected test failures.
-     *
-     * @param jobId the job ID to check
-     * @return true if this appears to be an intentional test failure
-     */
-    private boolean isIntentionalTestFailure(String jobId) {
-        if (jobId == null) {
-            return false;
-        }
-        return jobId.startsWith("test-") ||
-               jobId.contains("-test") ||
-               jobId.contains("test-invalid") ||
-               jobId.contains("test-missing") ||
-               jobId.contains("test-exception") ||
-               jobId.contains("test-timeout");
     }
 }
