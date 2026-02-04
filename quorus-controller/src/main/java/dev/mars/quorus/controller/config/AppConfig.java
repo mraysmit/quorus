@@ -58,12 +58,40 @@ public final class AppConfig {
 
     // ==================== Node Configuration ====================
 
+    /**
+     * Gets the node ID for this controller instance.
+     * 
+     * <p>For multi-node clusters, an explicit node ID is REQUIRED to prevent split-brain.
+     * For single-node clusters (local development), hostname fallback is allowed with a warning.
+     * 
+     * @return the node ID
+     * @throws IllegalStateException if node ID is not set in a multi-node cluster
+     */
     public String getNodeId() {
         String nodeId = getString("quorus.node.id", "");
         if (nodeId.isEmpty()) {
+            if (isMultiNodeCluster()) {
+                throw new IllegalStateException(
+                    "quorus.node.id must be set for multi-node clusters to prevent split-brain. " +
+                    "Set via environment variable QUORUS_NODE_ID, system property -Dquorus.node.id, " +
+                    "or in quorus-controller.properties.");
+            }
+            // Single-node is safe to use hostname (local dev)
             nodeId = deriveNodeIdFromHostname();
+            logger.warn("Using hostname '{}' as node ID. Set quorus.node.id explicitly for production.", nodeId);
         }
         return nodeId;
+    }
+
+    /**
+     * Checks if this is a multi-node cluster configuration.
+     * A multi-node cluster is detected when quorus.cluster.nodes contains multiple nodes (comma-separated).
+     * 
+     * @return true if multiple nodes are configured
+     */
+    private boolean isMultiNodeCluster() {
+        String nodes = getString("quorus.cluster.nodes", "");
+        return !nodes.isEmpty() && nodes.contains(",");
     }
 
     private String deriveNodeIdFromHostname() {
@@ -172,7 +200,19 @@ public final class AppConfig {
     // ==================== Core Property Accessors ====================
 
     /**
-     * Gets a string property with environment variable override.
+     * Gets a string property with environment variable and system property override.
+     * 
+     * <p>Resolution order (highest to lowest priority):
+     * <ol>
+     *   <li>Environment variable (e.g., QUORUS_HTTP_PORT)</li>
+     *   <li>System property (e.g., -Dquorus.http.port=8080)</li>
+     *   <li>Properties file (quorus-controller.properties)</li>
+     *   <li>Default value</li>
+     * </ol>
+     * 
+     * @param key the property key (e.g., "quorus.http.port")
+     * @param defaultValue the default value if not found
+     * @return the resolved property value
      */
     public String getString(String key, String defaultValue) {
         // 1. Check environment variable (QUORUS_HTTP_PORT format)
@@ -182,7 +222,13 @@ public final class AppConfig {
             return envValue;
         }
 
-        // 2. Check properties file
+        // 2. Check system property (-Dquorus.http.port format)
+        String sysValue = System.getProperty(key);
+        if (sysValue != null && !sysValue.isEmpty()) {
+            return sysValue;
+        }
+
+        // 3. Check properties file
         return properties.getProperty(key, defaultValue);
     }
 

@@ -694,11 +694,31 @@ curl http://localhost:8080/api/v1/transfers/job-20260130-001
 
 ## Configuration
 
-The HTTP API server port is configured via:
+All Quorus configuration properties can be set via multiple sources. Resolution order (highest to lowest priority):
 
-- **Property:** `quorus.http.port`
-- **Environment Variable:** `QUORUS_HTTP_PORT`
-- **Default:** `8080`
+1. **Environment Variable** — e.g., `QUORUS_HTTP_PORT=8080`
+2. **System Property** — e.g., `-Dquorus.http.port=8080`
+3. **Properties File** — e.g., `quorus-controller.properties`
+4. **Default Value**
+
+### Example: HTTP Port
+
+| Source | Setting |
+|--------|---------|
+| Environment Variable | `QUORUS_HTTP_PORT=9090` |
+| System Property | `-Dquorus.http.port=9090` |
+| Properties File | `quorus.http.port=9090` |
+| Default | `8080` |
+
+### Common Properties
+
+| Property | Environment Variable | Default | Description |
+|----------|---------------------|---------|-------------|
+| `quorus.node.id` | `QUORUS_NODE_ID` | (hostname) | Unique node identifier |
+| `quorus.http.port` | `QUORUS_HTTP_PORT` | `8080` | HTTP API port |
+| `quorus.http.host` | `QUORUS_HTTP_HOST` | `0.0.0.0` | HTTP bind address |
+| `quorus.raft.port` | `QUORUS_RAFT_PORT` | `9080` | Raft gRPC port |
+| `quorus.cluster.nodes` | `QUORUS_CLUSTER_NODES` | (auto) | Cluster node list |
 
 ---
 

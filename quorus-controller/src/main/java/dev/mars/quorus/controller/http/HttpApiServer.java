@@ -33,6 +33,8 @@ import io.vertx.ext.web.handler.BodyHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
+import java.time.Instant;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -79,6 +81,9 @@ public class HttpApiServer {
         // Enable body parsing
         router.route().handler(BodyHandler.create());
 
+        // Global error handler for consistent error responses
+        router.route().failureHandler(new GlobalErrorHandler());
+
         // Metrics endpoint (OpenTelemetry via Proxy)
         if (prometheusPort > 0) {
             router.get("/metrics").handler(new MetricsHandler(vertx, prometheusPort));
@@ -86,14 +91,64 @@ public class HttpApiServer {
             router.get("/metrics").handler(new MetricsHandler(vertx));
         }
 
-        // Health check
+        // ==================== Health Endpoints ====================
+        
+        // Liveness probe - is the process alive and responsive?
+        router.get("/health/live")
+                .respond(ctx -> {
+                    JsonObject liveness = new JsonObject()
+                            .put("status", "UP")
+                            .put("timestamp", Instant.now().toString());
+                    return Future.succeededFuture(liveness);
+                });
+
+        // Readiness probe - is the node ready to serve traffic?
+        router.get("/health/ready")
+                .respond(ctx -> {
+                    boolean raftReady = raftNode.isRunning();
+                    boolean clusterReady = raftNode.getLeaderId() != null;
+                    boolean isReady = raftReady && clusterReady;
+                    
+                    JsonObject readiness = new JsonObject()
+                            .put("status", isReady ? "UP" : "DOWN")
+                            .put("timestamp", Instant.now().toString())
+                            .put("checks", new JsonObject()
+                                    .put("raftRunning", raftReady ? "UP" : "DOWN")
+                                    .put("clusterHasLeader", clusterReady ? "UP" : "DOWN"));
+                    
+                    if (!isReady) {
+                        ctx.response().setStatusCode(503);
+                    }
+                    return Future.succeededFuture(readiness);
+                });
+
+        // Full health check with detailed status
         router.get("/health")
                 .respond(ctx -> {
+                    // Dependency checks
+                    boolean raftOk = raftNode.isRunning();
+                    boolean diskOk = checkDiskSpace();
+                    boolean memoryOk = checkMemory();
+                    boolean allHealthy = raftOk && diskOk && memoryOk;
+                    
                     JsonObject health = new JsonObject()
-                            .put("status", "UP")
+                            .put("status", allHealthy ? "UP" : "DEGRADED")
+                            .put("version", getVersion())
+                            .put("timestamp", Instant.now().toString())
                             .put("nodeId", raftNode.getNodeId())
-                            .put("raftState", raftNode.getState().toString())
-                            .put("isLeader", raftNode.isLeader());
+                            .put("raft", new JsonObject()
+                                    .put("state", raftNode.getState().toString())
+                                    .put("term", raftNode.getCurrentTerm())
+                                    .put("isLeader", raftNode.isLeader())
+                                    .put("leaderId", raftNode.getLeaderId()))
+                            .put("checks", new JsonObject()
+                                    .put("raftCluster", raftOk ? "UP" : "DOWN")
+                                    .put("diskSpace", diskOk ? "UP" : "WARNING")
+                                    .put("memory", memoryOk ? "UP" : "WARNING"));
+                    
+                    if (!allHealthy) {
+                        ctx.response().setStatusCode(503);
+                    }
                     return Future.succeededFuture(health);
                 });
 
@@ -188,8 +243,7 @@ public class HttpApiServer {
 
             TransferJobSnapshot job = stateMachine.getTransferJobs().get(jobId);
             if (job == null) {
-                ctx.response().setStatusCode(404);
-                return Future.succeededFuture(new JsonObject().put("error", "Job not found"));
+                throw QuorusApiException.notFound(ErrorCode.TRANSFER_NOT_FOUND, jobId);
             }
 
             // Get the latest assignment status for this job
@@ -280,5 +334,51 @@ public class HttpApiServer {
                     .onSuccess(v -> logger.info("HTTP API Server stopped"));
         }
         return Future.succeededFuture();
+    }
+
+    // ==================== Health Check Helpers ====================
+
+    private static final String VERSION = "1.0.0-alpha";
+    private static final long MIN_FREE_DISK_MB = 100;
+    private static final double MIN_FREE_MEMORY_RATIO = 0.1; // 10%
+
+    private String getVersion() {
+        // Could read from manifest or build properties in production
+        return VERSION;
+    }
+
+    /**
+     * Checks if disk space is adequate for operation.
+     * Returns false if free space is below MIN_FREE_DISK_MB.
+     */
+    private boolean checkDiskSpace() {
+        try {
+            File root = new File(".");
+            long freeSpaceMb = root.getFreeSpace() / (1024 * 1024);
+            return freeSpaceMb >= MIN_FREE_DISK_MB;
+        } catch (Exception e) {
+            logger.warn("Failed to check disk space", e);
+            return true; // Assume OK if we can't check
+        }
+    }
+
+    /**
+     * Checks if memory usage is within acceptable bounds.
+     * Returns false if free memory is below MIN_FREE_MEMORY_RATIO of max.
+     */
+    private boolean checkMemory() {
+        try {
+            Runtime runtime = Runtime.getRuntime();
+            long maxMemory = runtime.maxMemory();
+            long totalMemory = runtime.totalMemory();
+            long freeMemory = runtime.freeMemory();
+            long usedMemory = totalMemory - freeMemory;
+            long availableMemory = maxMemory - usedMemory;
+            
+            return (double) availableMemory / maxMemory >= MIN_FREE_MEMORY_RATIO;
+        } catch (Exception e) {
+            logger.warn("Failed to check memory", e);
+            return true; // Assume OK if we can't check
+        }
     }
 }
