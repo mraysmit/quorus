@@ -126,7 +126,8 @@ public class AgentRegistrationHandler implements HttpHandler {
                     "message", e.getMessage()
             ));
         } catch (Exception e) {
-            logger.error("Error registering agent", e);
+            logger.error("Error registering agent: {}", e.getMessage());
+            logger.trace("Stack trace for agent registration error", e);
             sendJsonResponse(exchange, 500, Map.of(
                     "error", "Internal server error",
                     "message", e.getMessage()

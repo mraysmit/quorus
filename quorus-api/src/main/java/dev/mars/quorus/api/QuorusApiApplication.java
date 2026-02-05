@@ -60,7 +60,8 @@ public class QuorusApiApplication {
         try {
             app.start();
         } catch (Exception e) {
-            logger.error("Failed to start application", e);
+            logger.error("Failed to start application: {}", e.getMessage());
+            logger.debug("Stack trace", e);
             System.exit(1);
         }
     }
@@ -154,7 +155,8 @@ public class QuorusApiApplication {
                 server.close().toCompletionStage().toCompletableFuture().get();
                 logger.info("HTTP server stopped");
             } catch (Exception e) {
-                logger.error("Error stopping HTTP server", e);
+                logger.error("Error stopping HTTP server: {}", e.getMessage());
+                logger.debug("Stack trace", e);
             }
         }
 
@@ -165,7 +167,8 @@ public class QuorusApiApplication {
                 fleetService.stop();
                 logger.info("Agent fleet services stopped");
             } catch (Exception e) {
-                logger.error("Error stopping agent fleet services", e);
+                logger.error("Error stopping agent fleet services: {}", e.getMessage());
+                logger.debug("Stack trace", e);
             }
         }
 
@@ -176,7 +179,8 @@ public class QuorusApiApplication {
                 vertxProducer.shutdown();
                 logger.info("Vert.x instance closed");
             } catch (Exception e) {
-                logger.error("Error closing Vert.x", e);
+                logger.error("Error closing Vert.x: {}", e.getMessage());
+                logger.debug("Stack trace", e);
             }
         }
 
@@ -186,7 +190,8 @@ public class QuorusApiApplication {
                 container.close();
                 logger.info("Weld CDI container closed");
             } catch (Exception e) {
-                logger.error("Error closing CDI container", e);
+                logger.error("Error closing CDI container: {}", e.getMessage());
+                logger.debug("Stack trace", e);
             }
         }
 

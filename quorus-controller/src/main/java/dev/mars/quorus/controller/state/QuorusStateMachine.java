@@ -569,7 +569,8 @@ public class QuorusStateMachine implements RaftStateMachine {
             logger.info("Restored snapshot: jobs={}, agents={}, metadata={}, lastAppliedIndex={}", 
                 transferJobs.size(), agents.size(), systemMetadata.size(), lastAppliedIndex.get());
         } catch (IOException e) {
-            logger.error("Failed to restore snapshot: snapshotSize={}bytes", snapshot.length, e);
+            logger.error("Failed to restore snapshot: snapshotSize={}bytes, error={}", snapshot.length, e.getMessage());
+            logger.trace("Stack trace for snapshot restore failure", e);
             throw new RuntimeException("Failed to restore snapshot", e);
         }
     }

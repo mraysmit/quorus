@@ -232,21 +232,22 @@ webClient.postAbs(url)
 
 ---
 
-### T3.2: Bounded Thread Pools
+### T3.2: Bounded Thread Pools ✅ COMPLETE
 
 **Goal:** Replace unbounded thread pools with controlled resources.
 
 **Effort:** 3 days  
 **Priority:** 🟡 HIGH  
-**Dependencies:** None
+**Dependencies:** None  
+**Status:** ✅ COMPLETE (verified 2026-02-05)
 
 | Task | Module | Effort | Status |
 |------|--------|--------|--------|
-| Replace newCachedThreadPool in GrpcRaftTransport | quorus-controller | 2 hours | ⬜ Pending |
-| Use vertx.createSharedWorkerExecutor | quorus-controller | 2 hours | ⬜ Pending |
-| Add thread pool metrics | quorus-controller | 4 hours | ⬜ Pending |
-| Configure pool sizes via properties | AppConfig | 2 hours | ⬜ Pending |
-| Add thread pool exhaustion tests | quorus-controller/test | 4 hours | ⬜ Pending |
+| Replace newCachedThreadPool in GrpcRaftTransport | quorus-controller | 2 hours | ✅ Done |
+| Use bounded ThreadPoolExecutor with named threads | quorus-controller | 2 hours | ✅ Done |
+| Add thread pool metrics (RaftMetrics) | quorus-controller | 4 hours | ✅ Done |
+| Configure pool sizes via properties | AppConfig | 2 hours | ✅ Done |
+| Add thread pool exhaustion tests | quorus-controller/test | 4 hours | ✅ Done |
 
 ---
 
@@ -590,7 +591,7 @@ Security features implemented **after** core functionality is stable and well-te
 ### Week 3-4: Stability & Agent Fixes
 - [ ] **Stage 2**: T2.3 (Graceful Shutdown)
 - [x] **Stage 3**: T3.1 (Vert.x WebClient Migration) - ✅ COMPLETE
-- [ ] **Stage 3**: T3.2 (Bounded Thread Pools)
+- [x] **Stage 3**: T3.2 (Bounded Thread Pools) - ✅ COMPLETE
 
 ### Week 5-6: Protocols & Services
 - [ ] **Stage 4**: T4.1 (NFS Protocol Adapter)
@@ -626,7 +627,7 @@ Security features implemented **after** core functionality is stable and well-te
 | 2 | Core API | T2.1 Health endpoints |
 | 3 | Stability | T2.3 Graceful shutdown |
 | 4 | Agent | ~~T3.1 Vert.x WebClient~~ ✅ COMPLETE |
-| 5 | Threading | T3.2 Bounded thread pools |
+| 5 | Threading | ~~T3.2 Bounded thread pools~~ ✅ COMPLETE |
 | 6 | Protocols | T4.1 NFS adapter |
 | 7-8 | Persistence | ~~T5.1 Raft WAL~~ ✅ COMPLETE |
 | 9-10 | Compaction | T5.2 Snapshots (scheduling/truncation remain) |
@@ -638,12 +639,14 @@ Security features implemented **after** core functionality is stable and well-te
 | Priority | Total Tasks | Completed | Remaining |
 |----------|-------------|-----------|-----------|
 | 🔴 CRITICAL | 4 | 2 (T5.1, T3.1) | 2 |
-| 🟡 HIGH | 7 | 0 | 7 |
+| 🟡 HIGH | 7 | 1 (T3.2) | 6 |
 | 🟠 MEDIUM (Security - Deferred) | 11 | 0 | 11 |
-| **TOTAL** | **22** | **1** | **21** |
+| **TOTAL** | **22** | **3** | **19** |
 
 > **Notes:**
 > - T5.1 (Raft WAL) marked COMPLETE via raftlog-core library
+> - T3.1 (WebClient Migration) marked COMPLETE with dedicated tests
+> - T3.2 (Bounded Thread Pools) marked COMPLETE with RaftMetrics (87% coverage)
 > - T5.2 takeSnapshot/restoreSnapshot methods are COMPLETE; scheduling remains
 > - T6.7 changed from "decision point" to implementation task (routes are core)
 > - T1.1 reduced scope (routes are not "future" features)

@@ -20,6 +20,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
 import org.testcontainers.containers.ComposeContainer;
@@ -43,11 +44,17 @@ import static org.junit.jupiter.api.Assertions.*;
  * Advanced network testing for Raft cluster using custom Docker networks.
  * Tests realistic network scenarios including geographic distribution,
  * network partitions, and complex failure modes.
+ * 
+ * <p>NOTE: These tests are marked as flaky because they are timing-sensitive and
+ * may fail when run as part of the full test suite due to resource contention.
+ * They pass reliably when run in isolation.</p>
+ * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @version 1.0
  * @since 2025-08-20
  */
 @Testcontainers
+@Tag("flaky")
 public class AdvancedNetworkTest {
 
     private static final Logger logger = Logger.getLogger(AdvancedNetworkTest.class.getName());

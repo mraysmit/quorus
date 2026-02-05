@@ -210,7 +210,8 @@ public class JobAssignmentService {
                 }
                 
             } catch (Exception e) {
-                logger.error("Error assigning job: jobId={}, agentId={}", jobId, agentId, e);
+                logger.error("Error assigning job: jobId={}, agentId={}, error={}", jobId, agentId, e.getMessage());
+                logger.trace("Stack trace for job assignment error", e);
                 throw new RuntimeException("Failed to assign job", e);
             }
         });
@@ -262,7 +263,8 @@ public class JobAssignmentService {
                 }
                 
             } catch (Exception e) {
-                logger.error("Error updating assignment status: jobId={}, newStatus={}", jobId, newStatus, e);
+                logger.error("Error updating assignment status: jobId={}, newStatus={}, error={}", jobId, newStatus, e.getMessage());
+                logger.trace("Stack trace for assignment status update error", e);
                 throw new RuntimeException("Failed to update assignment status", e);
             }
         });
@@ -300,7 +302,8 @@ public class JobAssignmentService {
                 return null;
                 
             } catch (Exception e) {
-                logger.error("Error cancelling job: jobId={}", jobId, e);
+                logger.error("Error cancelling job: jobId={}, error={}", jobId, e.getMessage());
+                logger.trace("Stack trace for job cancellation error", e);
                 throw new RuntimeException("Failed to cancel job", e);
             }
         });
@@ -358,7 +361,8 @@ public class JobAssignmentService {
                         try {
                             processQueuedJobs();
                         } catch (Exception e) {
-                            logger.warn("Error in assignment processor", e);
+                            logger.warn("Error in assignment processor: {}", e.getMessage());
+                            logger.trace("Stack trace for assignment processor error", e);
                         }
                     }
                 });
@@ -383,7 +387,8 @@ public class JobAssignmentService {
                         try {
                             checkAssignmentTimeouts();
                         } catch (Exception e) {
-                            logger.warn("Error in timeout monitor", e);
+                            logger.warn("Error in timeout monitor: {}", e.getMessage());
+                            logger.trace("Stack trace for timeout monitor error", e);
                         }
                     }
                 });

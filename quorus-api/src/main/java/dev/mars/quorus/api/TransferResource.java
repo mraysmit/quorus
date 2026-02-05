@@ -119,7 +119,8 @@ public class TransferResource {
                     return;
 
                 } catch (Exception e) {
-                    logger.warn("Distributed transfer submission failed, falling back to local", e);
+                    logger.warn("Distributed transfer submission failed, falling back to local: {}", e.getMessage());
+                    logger.debug("Stack trace", e);
                     // Fall through to local processing
                 }
             }
@@ -144,16 +145,19 @@ public class TransferResource {
                 .end(JsonObject.mapFrom(response).encode());
 
         } catch (TransferException e) {
-            logger.warn("Failed to create transfer", e);
+            logger.warn("Failed to create transfer: {}", e.getMessage());
+            logger.debug("Stack trace", e);
             ctx.response().setStatusCode(400)
                 .end(JsonObject.mapFrom(new ErrorResponse("Error", "Invalid transfer request: " + e.getMessage())).encode());
         } catch (IllegalArgumentException e) {
             // Handle URI creation errors and other validation errors
-            logger.warn("Invalid request parameters", e);
+            logger.warn("Invalid request parameters: {}", e.getMessage());
+            logger.debug("Stack trace", e);
             ctx.response().setStatusCode(400)
                 .end(JsonObject.mapFrom(new ErrorResponse("Invalid request", "Invalid URI or path: " + e.getMessage())).encode());
         } catch (Exception e) {
-            logger.error("Internal error creating transfer", e);
+            logger.error("Internal error creating transfer: {}", e.getMessage());
+            logger.debug("Stack trace", e);
             ctx.response().setStatusCode(500)
                 .end(JsonObject.mapFrom(new ErrorResponse("Internal server error", "An unexpected error occurred")).encode());
         }
@@ -193,7 +197,8 @@ public class TransferResource {
                     .end(JsonObject.mapFrom(new ErrorResponse("Transfer job not found: " + jobId)).encode());
             }
         } catch (Exception e) {
-            logger.error("Error retrieving transfer status", e);
+            logger.error("Error retrieving transfer status: {}", e.getMessage());
+            logger.debug("Stack trace", e);
             ctx.response().setStatusCode(500)
                 .end(JsonObject.mapFrom(new ErrorResponse("Internal server error")).encode());
         }
@@ -233,7 +238,8 @@ public class TransferResource {
                     .end(JsonObject.mapFrom(new ErrorResponse("Transfer cannot be cancelled or not found")).encode());
             }
         } catch (Exception e) {
-            logger.error("Error cancelling transfer", e);
+            logger.error("Error cancelling transfer: {}", e.getMessage());
+            logger.debug("Stack trace", e);
             ctx.response().setStatusCode(500)
                 .end(JsonObject.mapFrom(new ErrorResponse("Internal server error")).encode());
         }
@@ -247,7 +253,8 @@ public class TransferResource {
             int count = transferEngine.getActiveTransferCount();
             ctx.json(new CountResponse(count));
         } catch (Exception e) {
-            logger.error("Error retrieving active transfer count", e);
+            logger.error("Error retrieving active transfer count: {}", e.getMessage());
+            logger.debug("Stack trace", e);
             ctx.response().setStatusCode(500)
                 .end(JsonObject.mapFrom(new ErrorResponse("Internal server error")).encode());
         }

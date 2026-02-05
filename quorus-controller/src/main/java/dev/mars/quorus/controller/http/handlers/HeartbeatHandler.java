@@ -172,7 +172,8 @@ public class HeartbeatHandler implements HttpHandler {
                     "message", e.getMessage()
             ));
         } catch (Exception e) {
-            logger.error("Error processing heartbeat", e);
+            logger.error("Error processing heartbeat: {}", e.getMessage());
+            logger.trace("Stack trace for heartbeat processing error", e);
             sendJsonResponse(exchange, 500, Map.of(
                     "error", "Internal server error",
                     "message", e.getMessage()

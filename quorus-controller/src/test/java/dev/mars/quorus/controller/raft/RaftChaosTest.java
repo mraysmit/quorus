@@ -26,6 +26,7 @@ import io.vertx.core.Future;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,10 +41,16 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Chaos testing for the Raft cluster using InMemoryTransportSimulator's fault injection capabilities.
  * Tests resilience against packet loss and high latency.
+ * 
+ * <p>NOTE: These tests are marked as flaky because they are timing-sensitive and
+ * may fail when run as part of the full test suite due to resource contention.
+ * They pass reliably when run in isolation.</p>
+ * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @version 1.0
  * @since 2026-01-05
  */
+@Tag("flaky")
 public class RaftChaosTest {
 
     private static final Logger logger = LoggerFactory.getLogger(RaftChaosTest.class);

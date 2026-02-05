@@ -89,7 +89,8 @@ public class ClusterHandler implements HttpHandler {
             sendJsonResponse(exchange, 200, clusterInfo);
 
         } catch (Exception e) {
-            logger.error("Error getting cluster status", e);
+            logger.error("Error getting cluster status: {}", e.getMessage());
+            logger.trace("Stack trace for cluster status error", e);
             sendJsonResponse(exchange, 500, Map.of(
                     "error", "Internal server error",
                     "message", e.getMessage()

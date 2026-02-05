@@ -217,12 +217,14 @@ public class RaftNode {
                         promise.complete();
                     })
                     .onFailure(err -> {
-                        logger.error("Failed to recover Raft state from storage", err);
+                        logger.error("Failed to recover Raft state from storage: {}", err.getMessage());
+                        logger.trace("Stack trace for recovery failure", err);
                         promise.fail(err);
                     });
 
             } catch (Exception e) {
-                logger.error("Failed to start Raft node", e);
+                logger.error("Failed to start Raft node: {}", e.getMessage());
+                logger.trace("Stack trace for Raft node start failure", e);
                 promise.fail(e);
             }
         });
@@ -266,7 +268,10 @@ public class RaftNode {
             })
             .onSuccess(v -> logger.info("Recovery complete: term={}, logSize={}, lastApplied={}",
                                         currentTerm, log.size(), lastApplied))
-            .onFailure(err -> logger.error("Recovery failed", err));
+            .onFailure(err -> {
+                logger.error("Recovery failed: {}", err.getMessage());
+                logger.trace("Stack trace for recovery failure", err);
+            });
     }
 
     /**
@@ -310,7 +315,8 @@ public class RaftNode {
                             promise.complete();
                         })
                         .onFailure(err -> {
-                            logger.warn("Error closing storage during shutdown", err);
+                            logger.warn("Error closing storage during shutdown: {}", err.getMessage());
+                            logger.trace("Stack trace for storage close error", err);
                             promise.complete(); // Still complete, just log the warning
                         });
                 } else {
@@ -318,7 +324,8 @@ public class RaftNode {
                     promise.complete();
                 }
             } catch (Exception e) {
-                logger.error("Failed to stop Raft node", e);
+                logger.error("Failed to stop Raft node: {}", e.getMessage());
+                logger.trace("Stack trace for Raft node stop failure", e);
                 promise.fail(e);
             }
         });
@@ -361,7 +368,8 @@ public class RaftNode {
                     updateCommitIndex();
                 })
                 .onFailure(err -> {
-                    logger.error("Failed to persist command to WAL", err);
+                    logger.error("Failed to persist command to WAL: {}", err.getMessage());
+                    logger.trace("Stack trace for WAL persist failure", err);
                     promise.fail(err);
                 });
         });
@@ -674,7 +682,8 @@ public class RaftNode {
                                     .build());
                         })
                         .onFailure(err -> {
-                            logger.error("Failed to persist vote metadata", err);
+                            logger.error("Failed to persist vote metadata: {}", err.getMessage());
+                            logger.trace("Stack trace for vote metadata persist failure", err);
                             // Vote not granted if we can't persist
                             promise.complete(VoteResponse.newBuilder()
                                     .setTerm(currentTerm)
@@ -689,7 +698,8 @@ public class RaftNode {
                             .build());
                 }
             } catch (Exception e) {
-                logger.error("Error handling vote request", e);
+                logger.error("Error handling vote request: {}", e.getMessage());
+                logger.trace("Stack trace for vote request handling error", e);
                 promise.fail(e);
             }
         });
@@ -804,7 +814,8 @@ public class RaftNode {
                                 .build());
                     })
                     .onFailure(err -> {
-                        logger.error("AppendEntries failed during WAL persist", err);
+                        logger.error("AppendEntries failed during WAL persist: {}", err.getMessage());
+                        logger.trace("Stack trace for AppendEntries WAL persist failure", err);
                         promise.complete(AppendEntriesResponse.newBuilder()
                                 .setTerm(currentTerm)
                                 .setSuccess(false)
@@ -812,7 +823,8 @@ public class RaftNode {
                     });
 
             } catch (Exception e) {
-                logger.error("Error handling append entries request", e);
+                logger.error("Error handling append entries request: {}", e.getMessage());
+                logger.trace("Stack trace for append entries handling error", e);
                 promise.fail(e);
             }
         });
@@ -938,7 +950,8 @@ public class RaftNode {
                 try {
                     result = stateMachine.apply(entry.getCommand());
                 } catch (Exception e) {
-                    logger.error("Failed to apply command at index {}", lastApplied, e);
+                    logger.error("Failed to apply command at index {}: {}", lastApplied, e.getMessage());
+                    logger.trace("Stack trace for command apply failure at index {}", lastApplied, e);
                     exception = e;
                 }
             }

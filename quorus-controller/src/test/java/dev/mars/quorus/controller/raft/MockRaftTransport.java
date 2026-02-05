@@ -54,7 +54,8 @@ public class MockRaftTransport implements RaftTransport {
     private static final Logger logger = Logger.getLogger(MockRaftTransport.class.getName());
 
     private final String nodeId;
-    private final ExecutorService executor = Executors.newCachedThreadPool();
+    // Use bounded thread pool (T3.2 consistency with production code)
+    private final ExecutorService executor = Executors.newFixedThreadPool(10);
     private volatile Consumer<RaftMessage> messageHandler;
     private volatile boolean running = false;
     private Map<String, MockRaftTransport> transports;

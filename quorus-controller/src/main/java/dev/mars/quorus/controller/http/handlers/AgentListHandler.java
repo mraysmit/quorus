@@ -109,7 +109,8 @@ public class AgentListHandler implements HttpHandler {
             sendJsonResponse(exchange, 200, response);
 
         } catch (Exception e) {
-            logger.error("Error listing agents", e);
+            logger.error("Error listing agents: {}", e.getMessage());
+            logger.trace("Stack trace for agent listing error", e);
             sendJsonResponse(exchange, 500, Map.of(
                     "error", "Internal server error",
                     "message", e.getMessage()

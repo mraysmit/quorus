@@ -94,7 +94,8 @@ public class HealthResource {
 
             ctx.json(info);
         } catch (Exception e) {
-            logger.error("Error generating service info", e);
+            logger.error("Error generating service info: {}", e.getMessage());
+            logger.debug("Stack trace", e);
             ctx.response()
                 .setStatusCode(500)
                 .end(new JsonObject()
@@ -164,7 +165,8 @@ public class HealthResource {
 
             ctx.json(status);
         } catch (Exception e) {
-            logger.error("Error generating service status", e);
+            logger.error("Error generating service status: {}", e.getMessage());
+            logger.debug("Stack trace", e);
             ctx.response()
                 .setStatusCode(500)
                 .end(new JsonObject()

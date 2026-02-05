@@ -144,7 +144,8 @@ public class AgentJobsHandler implements HttpHandler {
             sendJsonResponse(exchange, 200, response);
 
         } catch (Exception e) {
-            logger.error("Error retrieving agent jobs", e);
+            logger.error("Error retrieving agent jobs: {}", e.getMessage());
+            logger.trace("Stack trace for agent jobs retrieval error", e);
             sendJsonResponse(exchange, 500, Map.of(
                     "error", "Internal server error",
                     "message", e.getMessage()
