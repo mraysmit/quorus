@@ -218,7 +218,8 @@ public class HttpApiServer {
                                     .put("agentId", agentInfo.getAgentId());
                         });
             } catch (Exception e) {
-                logger.error("Failed to register agent", e);
+                logger.error("Failed to register agent: {}", e.getMessage());
+                logger.trace("Stack trace for agent registration failure", e);
                 return Future.failedFuture(e);
             }
         });
@@ -238,7 +239,8 @@ public class HttpApiServer {
                                     .put("jobId", job.getJobId());
                         });
             } catch (Exception e) {
-                logger.error("Failed to create transfer job", e);
+                logger.error("Failed to create transfer job: {}", e.getMessage());
+                logger.trace("Stack trace for transfer job creation failure", e);
                 return Future.failedFuture(e);
             }
         });
@@ -258,7 +260,8 @@ public class HttpApiServer {
                                     .put("assignmentId", command.getAssignmentId());
                         });
             } catch (Exception e) {
-                logger.error("Failed to assign job", e);
+                logger.error("Failed to assign job: {}", e.getMessage());
+                logger.trace("Stack trace for job assignment failure", e);
                 return Future.failedFuture(e);
             }
         });
@@ -341,7 +344,8 @@ public class HttpApiServer {
                             .map(res -> new JsonObject().put("success", true));
                 }
             } catch (Exception e) {
-                logger.error("Failed to update status", e);
+                logger.error("Failed to update status: {}", e.getMessage());
+                logger.trace("Stack trace for status update failure", e);
                 return Future.failedFuture(e);
             }
         });
@@ -351,7 +355,10 @@ public class HttpApiServer {
 
         return httpServer.listen(port)
                 .onSuccess(server -> logger.info("HTTP API Server listening on port {}", port))
-                .onFailure(err -> logger.error("Failed to start HTTP API Server", err))
+                .onFailure(err -> {
+                    logger.error("Failed to start HTTP API Server: {}", err.getMessage());
+                    logger.trace("Stack trace for HTTP API Server start failure", err);
+                })
                 .mapEmpty();
     }
 
@@ -412,7 +419,8 @@ public class HttpApiServer {
             long freeSpaceMb = root.getFreeSpace() / (1024 * 1024);
             return freeSpaceMb >= MIN_FREE_DISK_MB;
         } catch (Exception e) {
-            logger.warn("Failed to check disk space", e);
+            logger.warn("Failed to check disk space: {}", e.getMessage());
+            logger.trace("Stack trace for disk space check failure", e);
             return true; // Assume OK if we can't check
         }
     }
@@ -432,7 +440,8 @@ public class HttpApiServer {
             
             return (double) availableMemory / maxMemory >= MIN_FREE_MEMORY_RATIO;
         } catch (Exception e) {
-            logger.warn("Failed to check memory", e);
+            logger.warn("Failed to check memory: {}", e.getMessage());
+            logger.trace("Stack trace for memory check failure", e);
             return true; // Assume OK if we can't check
         }
     }

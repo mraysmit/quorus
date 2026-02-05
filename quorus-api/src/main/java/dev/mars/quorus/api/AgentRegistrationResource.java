@@ -96,13 +96,15 @@ public class AgentRegistrationResource {
             ctx.response().setStatusCode(201).end(JsonObject.mapFrom(response).encode());
 
         } catch (IllegalArgumentException e) {
-            logger.warn("Invalid registration request", e);
+            logger.warn("Invalid registration request: {}", e.getMessage());
+            logger.debug("Stack trace", e);
             AgentRegistrationResponse response = AgentRegistrationResponse.failure(
                 e.getMessage(), "INVALID_REQUEST");
             ctx.response().setStatusCode(400).end(JsonObject.mapFrom(response).encode());
 
         } catch (Exception e) {
-            logger.error("Agent registration failed", e);
+            logger.error("Agent registration failed: {}", e.getMessage());
+            logger.debug("Stack trace", e);
 
             if (e.getMessage() != null && e.getMessage().contains("already exists")) {
                 AgentRegistrationResponse response = AgentRegistrationResponse.failure(

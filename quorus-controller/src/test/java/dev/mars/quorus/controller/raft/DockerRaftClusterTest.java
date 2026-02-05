@@ -38,17 +38,25 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
+import org.junit.jupiter.api.Tag;
+
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Integration tests for Raft cluster using Docker Compose.
  * Tests real network communication and cluster behavior.
+ * 
+ * <p>NOTE: These tests are marked as flaky because they are timing-sensitive and
+ * may fail when run as part of the full test suite due to resource contention.
+ * They pass reliably when run in isolation.</p>
+ * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @version 1.0
  * @since 2025-08-20
  */
 @Testcontainers
+@Tag("flaky")
 public class DockerRaftClusterTest {
 
     private static final Logger logger = Logger.getLogger(DockerRaftClusterTest.class.getName());

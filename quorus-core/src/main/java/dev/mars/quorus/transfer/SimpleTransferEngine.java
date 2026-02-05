@@ -254,7 +254,8 @@ public class SimpleTransferEngine implements TransferEngine {
                             logger.debug("cancelTransfer: protocol abort called successfully");
                         }
                     } catch (Exception e) {
-                        logger.warn("Error aborting protocol for job {}: {}", jobId, e.getMessage(), e);
+                        logger.warn("Error aborting protocol for job {}: {}", jobId, e.getMessage());
+                        logger.trace("Stack trace for abort error on job {}", jobId, e);
                     }
                 }
             }
@@ -359,7 +360,7 @@ public class SimpleTransferEngine implements TransferEngine {
         
         // Wait for all with timeout
         return Future.all(futures)
-                .timeout(timeoutMs)
+                .timeout(timeoutMs, TimeUnit.MILLISECONDS)
                 .map(v -> {
                     logger.info("All active transfers completed");
                     return (Void) null;
@@ -541,7 +542,8 @@ public class SimpleTransferEngine implements TransferEngine {
                 context.incrementRetryCount();
 
                 logger.warn("Transfer attempt {} failed for job {}: {}",
-                        attempt, job.getJobId(), e.getMessage(), e);
+                        attempt, job.getJobId(), e.getMessage());
+                logger.trace("Stack trace for failed attempt {} on job {}", attempt, job.getJobId(), e);
 
                 if (attempt <= maxRetryAttempts && context.shouldContinue()) {
                     long delay = retryDelayMs * attempt;
@@ -583,8 +585,8 @@ public class SimpleTransferEngine implements TransferEngine {
         telemetryMetrics.recordTransferFailed(protocolName, direction.name(), errorType);
 
         logger.error("{} transfer failed permanently: {} - {}", direction, job.getJobId(), errorMessage);
-        if (logger.isDebugEnabled()) {
-            logger.debug("Permanent transfer failure details for job: {}", job.getJobId());
+        if (logger.isTraceEnabled() && lastException != null) {
+            logger.trace("Full stack trace for failed transfer {}", job.getJobId(), lastException);
         }
         return job.toResult();
     }

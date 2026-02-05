@@ -162,7 +162,8 @@ public class InfoHandler implements HttpHandler {
             sendJsonResponse(exchange, 200, info);
 
         } catch (Exception e) {
-            logger.error("Error generating API info", e);
+            logger.error("Error generating API info: {}", e.getMessage());
+            logger.trace("Stack trace for API info generation error", e);
             sendJsonResponse(exchange, 500, Map.of(
                     "error", "Internal server error",
                     "message", e.getMessage()

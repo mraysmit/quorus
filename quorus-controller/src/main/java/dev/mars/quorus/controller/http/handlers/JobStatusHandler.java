@@ -165,7 +165,8 @@ public class JobStatusHandler implements HttpHandler {
             sendJsonResponse(exchange, 200, response);
 
         } catch (Exception e) {
-            logger.error("Error updating job status", e);
+            logger.error("Error updating job status: {}", e.getMessage());
+            logger.trace("Stack trace for job status update error", e);
             sendJsonResponse(exchange, 500, Map.of(
                     "error", "Internal server error",
                     "message", e.getMessage()

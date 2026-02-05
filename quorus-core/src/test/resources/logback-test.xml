@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
     
+    <!-- Timestamp for unique log filenames -->
+    <timestamp key="testRunTime" datePattern="yyyyMMdd-HHmmss"/>
+    
     <!-- Console appender with DEBUG level for tests -->
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
@@ -8,9 +11,9 @@
         </encoder>
     </appender>
     
-    <!-- File appender for test logs with MDC context -->
+    <!-- File appender for test logs with MDC context and timestamp -->
     <appender name="FILE" class="ch.qos.logback.core.FileAppender">
-        <file>target/test-logs/quorus-core-tests.log</file>
+        <file>target/test-logs/quorus-core-test-${testRunTime}.log</file>
         <append>false</append>
         <encoder>
             <!-- Include simulator and test context from MDC when available -->

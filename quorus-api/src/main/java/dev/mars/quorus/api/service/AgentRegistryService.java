@@ -167,7 +167,8 @@ public class AgentRegistryService {
                         logger.info("Agent deregistered successfully: agentId={}", agentId);
                         
                     } catch (Exception e) {
-                        logger.error("Failed to commit agent deregistration: agentId={}", agentId, e);
+                        logger.error("Failed to commit agent deregistration: agentId={}: {}", agentId, e.getMessage());
+                        logger.debug("Stack trace", e);
                         throw new RuntimeException("Failed to deregister agent: " + e.getMessage(), e);
                     }
                 } else {
@@ -176,7 +177,8 @@ public class AgentRegistryService {
                 }
                 
             } catch (Exception e) {
-                logger.error("Agent deregistration failed: agentId={}", agentId, e);
+                logger.error("Agent deregistration failed: agentId={}: {}", agentId, e.getMessage());
+                logger.debug("Stack trace", e);
                 throw new RuntimeException("Agent deregistration failed: " + e.getMessage(), e);
             }
         });
@@ -229,7 +231,8 @@ public class AgentRegistryService {
                         return agentInfo;
                         
                     } catch (Exception e) {
-                        logger.error("Failed to commit agent capabilities update: agentId={}", agentId, e);
+                        logger.error("Failed to commit agent capabilities update: agentId={}: {}", agentId, e.getMessage());
+                        logger.debug("Stack trace", e);
                         throw new RuntimeException("Failed to update agent capabilities: " + e.getMessage(), e);
                     }
                 } else {
@@ -238,7 +241,8 @@ public class AgentRegistryService {
                 }
                 
             } catch (Exception e) {
-                logger.error("Agent capabilities update failed: agentId={}", agentId, e);
+                logger.error("Agent capabilities update failed: agentId={}: {}", agentId, e.getMessage());
+                logger.debug("Stack trace", e);
                 throw new RuntimeException("Agent capabilities update failed: " + e.getMessage(), e);
             }
         });

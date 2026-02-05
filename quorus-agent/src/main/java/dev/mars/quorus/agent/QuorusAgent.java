@@ -155,7 +155,8 @@ public class QuorusAgent {
             agent.awaitShutdown();
 
         } catch (Exception e) {
-            logger.error("Failed to start Quorus Agent", e);
+            logger.error("Failed to start Quorus Agent: {}", e.getMessage());
+            logger.debug("Stack trace", e);
             System.exit(1);
         }
 
@@ -298,7 +299,8 @@ public class QuorusAgent {
             return; // Early return - shutdownLatch will be counted down in callback
 
         } catch (Exception e) {
-            logger.error("Error during shutdown", e);
+            logger.error("Error during shutdown: {}", e.getMessage());
+            logger.debug("Stack trace", e);
         } finally {
             shutdownLatch.countDown();
         }

@@ -95,7 +95,8 @@ public class TransferHandler implements HttpHandler {
                     sendJsonResponse(exchange, 405, Map.of("error", "Method not allowed"));
             }
         } catch (Exception e) {
-            logger.error("Error handling transfer request: method={}, path={}", method, path, e);
+            logger.error("Error handling transfer request: method={}, path={}, error={}", method, path, e.getMessage());
+            logger.trace("Stack trace for transfer request handling error", e);
             sendJsonResponse(exchange, 500, Map.of("error", "Internal server error", "message", e.getMessage()));
         }
     }

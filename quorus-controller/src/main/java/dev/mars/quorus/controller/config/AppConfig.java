@@ -173,6 +173,18 @@ public final class AppConfig {
         return getString("quorus.telemetry.service.name", "quorus-controller");
     }
 
+    // ==================== Thread Pool Configuration ====================
+
+    /**
+     * Gets the maximum pool size for Raft I/O operations (gRPC callbacks).
+     * This replaces the unbounded newCachedThreadPool for better resource control.
+     * 
+     * @return pool size (default: 10)
+     */
+    public int getRaftIoPoolSize() {
+        return getInt("quorus.raft.io.pool-size", 10);
+    }
+
     // ==================== Job Assignment Configuration ====================
 
     public long getAssignmentInitialDelayMs() {
@@ -277,7 +289,8 @@ public final class AppConfig {
                 logger.warn("Configuration file {} not found, using defaults", CONFIG_FILE);
             }
         } catch (IOException e) {
-            logger.error("Error loading configuration file", e);
+            logger.error("Error loading configuration file: {}", e.getMessage());
+            logger.trace("Stack trace for configuration load error", e);
         }
     }
 
@@ -290,6 +303,8 @@ public final class AppConfig {
         logger.info("  Cluster Nodes:        {}", getClusterNodes());
         logger.info("  Service Name:         {}", getServiceName());
         logger.info("  Version:              {}", getVersion());
+        logger.info("  --- Thread Pools ---");
+        logger.info("  Raft I/O Pool Size:   {}", getRaftIoPoolSize());
         logger.info("  --- Job Assignment ---");
         logger.info("  Initial Delay:        {}ms", getAssignmentInitialDelayMs());
         logger.info("  Assignment Interval:  {}ms", getAssignmentIntervalMs());

@@ -248,7 +248,8 @@ public class QuorusControllerVerticle extends AbstractVerticle {
                 logger.info("QuorusControllerVerticle stopped successfully (immediate)");
                 stopPromise.complete();
             } catch (Exception e) {
-                logger.warn("Error during shutdown", e);
+                logger.warn("Error during shutdown: {}", e.getMessage());
+                logger.trace("Stack trace for shutdown error", e);
                 stopPromise.complete();
             }
         }

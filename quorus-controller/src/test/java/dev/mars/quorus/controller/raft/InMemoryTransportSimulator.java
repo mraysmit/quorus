@@ -55,7 +55,8 @@ public class InMemoryTransportSimulator implements RaftTransport {
     private static final Set<Set<String>> networkPartitions = ConcurrentHashMap.newKeySet();
 
     private final String nodeId;
-    private final Executor executor = Executors.newCachedThreadPool();
+    // Use bounded thread pool (T3.2 consistency with production code)
+    private final Executor executor = Executors.newFixedThreadPool(10);
     private volatile Consumer<RaftMessage> messageHandler;
     private volatile boolean running = false;
     private RaftNode raftNode;

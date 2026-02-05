@@ -210,7 +210,8 @@ public final class ApiConfig {
                 logger.warn("Configuration file {} not found, using defaults and environment variables", CONFIG_FILE);
             }
         } catch (IOException e) {
-            logger.error("Error loading configuration file", e);
+            logger.error("Error loading configuration file: {}", e.getMessage());
+            logger.debug("Stack trace", e);
         }
     }
 
