@@ -1,7 +1,7 @@
 # Quorus Alpha Implementation Plan
 
-**Version:** 1.9  
-**Date:** February 4, 2026  
+**Version:** 1.4  
+**Date:** February 2, 2026  
 **Author:** Mark Andrew Ray-Smith Cityline Ltd
 
 ---
@@ -10,11 +10,6 @@
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 1.9 | 2026-02-04 | T2.3 (Graceful Shutdown) ✅ COMPLETE - ShutdownCoordinator, drain mode, awaitActiveTransfers |
-| 1.8 | 2026-02-04 | Added T5.8 (Test Infrastructure Abstraction) - pluggable test environments for in-memory/Docker |
-| 1.7 | 2026-02-04 | Added T5.7 (Dynamic Cluster Membership) for zero-downtime node scaling |
-| 1.6 | 2026-02-03 | Added T4.4 (Agent Job Streaming), T4.5 (Tenant Hierarchy), T5.5 (Tenant State Persistence), T5.6 (Workflow State Persistence) from architecture review cross-check |
-| 1.5 | 2026-02-03 | Added T2.4 (Strict Node Identity), T3.3 (Transfer Retry Refactor), T4.3 (Scheduling Strategy) |
 | 1.4 | 2026-02-02 | Third review: Fixed schedule checkboxes, corrected line references |
 | 1.3 | 2026-02-01 | **MAJOR CORRECTIONS**: Routes are core architecture (not "future"), T5.2 snapshots partially complete, T6.7 changed from "decision" to implementation task |
 | 1.2 | 2026-02-01 | T5.1 Raft WAL marked COMPLETE (raftlog-core verified) |
@@ -51,19 +46,6 @@ From [QUORUS_ALPHA_ARCH_REVIEW_JAN_2026.md](../archive/QUORUS_ALPHA_ARCH_REVIEW_
 | **Stage 4** | 3-5 days each | Week 4-8 | Protocol & Services |
 | **Stage 5** | 1-2 weeks each | Week 8-14 | Architecture (Raft Persistence) |
 | **Stage 6** | 2-4 weeks each | Week 14+ | Security & Enterprise Features |
-
-### Total Effort Estimate
-
-| Stage | Tasks | Estimated Effort | Cumulative |
-|-------|-------|------------------|------------|
-| Stage 1 | 3 | ~6 hours | 1 day |
-| Stage 2 | 4 | ~4 days | 1 week |
-| Stage 3 | 3 | ~7 days | 2.5 weeks |
-| Stage 4 | 5 | ~15 days | 5.5 weeks |
-| Stage 5 | 7 | ~7 weeks | 12.5 weeks |
-| Stage 6 | 8 | ~12 weeks | **~24.5 weeks** |
-
-> **Resource Note:** Estimates assume 1 developer. Parallelization possible for independent tasks (e.g., T4.1 NFS + T4.2 Tenant Resources).
 
 ---
 
@@ -123,7 +105,7 @@ These items require minimal code changes and deliver immediate value.
 
 These are targeted code changes that fix known issues in core functionality.
 
-### T2.1: Health Endpoint Enhancements ✅ COMPLETE
+### T2.1: Health Endpoint Enhancements
 
 **Goal:** Richer health information for operational visibility.
 
@@ -133,17 +115,11 @@ These are targeted code changes that fix known issues in core functionality.
 
 | Task | Module | Effort | Status |
 |------|--------|--------|--------|
-| Add `/health/ready` endpoint | HttpApiServer | 1 hour | ✅ Complete |
-| Add `/health/live` endpoint | HttpApiServer | 1 hour | ✅ Complete |
-| Include dependency health in response | HttpApiServer | 2 hours | ✅ Complete |
-| Add version info to health response | HttpApiServer | 30 min | ✅ Complete |
-| Create health check tests | quorus-controller/test | 2 hours | ✅ Complete |
-
-**Implementation Notes:**
-- `/health/live` - Always returns UP (liveness probe)
-- `/health/ready` - Checks Raft running + cluster has leader (readiness probe)
-- `/health` - Full health with raft, disk space, and memory checks
-- Tests in `InfrastructureSmokeTest.java` (testHealthLiveEndpoint, testHealthReadyEndpoint, testFullHealthEndpoint)
+| Add `/health/ready` endpoint | HttpApiServer | 1 hour | ⬜ Pending |
+| Add `/health/live` endpoint | HttpApiServer | 1 hour | ⬜ Pending |
+| Include dependency health in response | HttpApiServer | 2 hours | ⬜ Pending |
+| Add version info to health response | HttpApiServer | 30 min | ⬜ Pending |
+| Create health check tests | quorus-controller/test | 2 hours | ⬜ Pending |
 
 **Target Response Format:**
 ```json
@@ -167,7 +143,7 @@ These are targeted code changes that fix known issues in core functionality.
 
 ---
 
-### T2.2: Error Response Standardization ✅ COMPLETE
+### T2.2: Error Response Standardization
 
 **Goal:** Consistent error responses across all endpoints.
 
@@ -177,20 +153,11 @@ These are targeted code changes that fix known issues in core functionality.
 
 | Task | Module | Effort | Status |
 |------|--------|--------|--------|
-| Create `ErrorResponse` record | quorus-controller | 30 min | ✅ Complete |
-| Create `GlobalErrorHandler` | HttpApiServer | 2 hours | ✅ Complete |
-| Apply error handler to all routes | HttpApiServer | 1 hour | ✅ Complete |
-| Add error code constants (`ErrorCode` enum) | quorus-controller | 1 hour | ✅ Complete |
-| Add `QuorusApiException` for typed errors | quorus-controller | 30 min | ✅ Complete |
-| Create error response tests | quorus-controller/test | 1 hour | ✅ Complete |
+| Create `ErrorResponse` record | quorus-controller | 30 min | ⬜ Pending |
+| Create `GlobalErrorHandler` | HttpApiServer | 2 hours | ⬜ Pending |
+| Apply error handler to all routes | HttpApiServer | 1 hour | ⬜ Pending |
+| Add error code constants | quorus-core | 1 hour | ⬜ Pending |
 | Document error codes | docs/QUORUS_API_REFERENCE.md | 1 hour | ⬜ Pending |
-
-**Implementation Notes:**
-- `ErrorCode` enum with 25+ error codes covering transfers, agents, cluster, workflows, tenants
-- `ErrorResponse` record with `of()` (template args) and `withMessage()` (explicit message)
-- `GlobalErrorHandler` maps exceptions to standardized responses
-- `QuorusApiException` with factory methods: `notFound()`, `badRequest()`, `notLeader()`, etc.
-- Tests in `ErrorResponseTest.java` (14 tests)
 
 **Target Error Format:**
 ```json
@@ -207,7 +174,7 @@ These are targeted code changes that fix known issues in core functionality.
 
 ---
 
-### T2.3: Graceful Shutdown ✅ COMPLETE
+### T2.3: Graceful Shutdown
 
 **Goal:** Clean shutdown without losing in-flight work.
 
@@ -217,53 +184,10 @@ These are targeted code changes that fix known issues in core functionality.
 
 | Task | Module | Effort | Status |
 |------|--------|--------|--------|
-| Create ShutdownCoordinator with 4-phase shutdown | quorus-controller | 2 hours | ✅ Complete |
-| Add HTTP drain mode (503 during shutdown) | HttpApiServer | 1 hour | ✅ Complete |
-| Integrate coordinator in QuorusControllerVerticle | quorus-controller | 1 hour | ✅ Complete |
-| Add awaitActiveTransfers() to SimpleTransferEngine | quorus-core | 1 hour | ✅ Complete |
-| Add graceful shutdown tests (10 tests) | quorus-controller/test | 2 hours | ✅ Complete |
-
-**Implementation Notes:**
-- `ShutdownCoordinator` orchestrates 4 phases: DRAIN → AWAIT_COMPLETION → STOP_SERVICES → CLOSE_RESOURCES
-- Hooks registered via fluent API: `onDrain()`, `onAwaitCompletion()`, `onServiceStop()`, `onResourceClose()`
-- Failure-tolerant: logs errors but continues shutdown sequence
-- Idempotent: multiple `shutdown()` calls are safe
-- Configurable timeouts: `quorus.shutdown.drain.timeout.ms` (5s), `quorus.shutdown.timeout.ms` (30s)
-- HTTP drain mode returns 503 with `Retry-After` header (health probes still allowed)
-- `SimpleTransferEngine.awaitActiveTransfers(timeoutMs)` waits for in-flight transfers
-
----
-
-### T2.4: Strict Node Identity ✅ COMPLETE
-
-**Goal:** Prevent split-brain scenarios in containerized environments.
-
-**Effort:** 2-4 hours  
-**Priority:** 🔴 CRITICAL  
-**Dependencies:** None
-
-| Task | Module | Effort | Status |
-|------|--------|--------|--------|
-| Remove InetAddress-based node.id guessing | AppConfig | 1 hour | ✅ Complete |
-| Add multi-node cluster detection | AppConfig | 30 min | ✅ Complete |
-| Throw exception if node.id missing in multi-node cluster | AppConfig | 30 min | ✅ Complete |
-| Update Docker entrypoints to require NODE_ID | docker/ | 30 min | ⬜ Pending |
-| Add node identity validation tests | quorus-controller/test | 1 hour | ✅ Complete |
-
-**Implementation Notes:**
-- Multi-node cluster detected via comma in `quorus.cluster.nodes` property
-- `getNodeId()` throws `IllegalStateException` if multi-node cluster and no explicit node ID
-- Single-node clusters allow hostname fallback for development convenience
-- Configuration precedence: env var > system property (-D) > properties file > default
-- Tests in `AppConfigNodeIdentityTest.java` (5 tests covering precedence, multi-node detection)
-
-**Rationale:**
-> The current `AppConfig` guesses `node.id` from `InetAddress.getLocalHost()`. In containers/Kubernetes where hostnames are dynamic, this causes nodes to adopt different identities across restarts, leading to split-brain and data corruption.
-
-**Acceptance Criteria:**
-- [x] `QUORUS_NODE_ID` environment variable is **required** in multi-node clusters
-- [x] Clear error message if node.id is missing: "QUORUS_NODE_ID (or quorus.node.id) must be set explicitly when running in a multi-node cluster"
-- [x] Single-node mode may use hostname fallback with warning
+| Add shutdown hook to QuorusControllerApplication | quorus-controller | 1 hour | ⬜ Pending |
+| Implement agent drain mode | quorus-agent | 2 hours | ⬜ Pending |
+| Wait for active transfers before shutdown | SimpleTransferEngine | 2 hours | ⬜ Pending |
+| Add graceful shutdown tests | All modules | 2 hours | ⬜ Pending |
 
 ---
 
@@ -271,22 +195,23 @@ These are targeted code changes that fix known issues in core functionality.
 
 Fix critical blocking I/O and thread management issues.
 
-### T3.1: Vert.x WebClient Migration (Agent)
+### T3.1: Vert.x WebClient Migration (Agent) ✅ COMPLETE
 
 **Goal:** Fix blocking I/O in agent event loop.
 
 **Effort:** 3-4 days  
 **Priority:** 🔴 CRITICAL  
-**Dependencies:** None
+**Dependencies:** None  
+**Status:** ✅ COMPLETE (verified 2025-01-30)
 
 | Task | Module | Effort | Status |
 |------|--------|--------|--------|
-| Replace HeartbeatService HttpClient | quorus-agent | 4 hours | ⬜ Pending |
-| Replace JobPollingService HttpClient | quorus-agent | 4 hours | ⬜ Pending |
-| Replace JobStatusReportingService HttpClient | quorus-agent | 4 hours | ⬜ Pending |
-| Replace AgentRegistrationService HttpClient | quorus-agent | 4 hours | ⬜ Pending |
-| Remove Apache HttpClient dependency | pom.xml | 30 min | ⬜ Pending |
-| Update all agent service tests | quorus-agent/test | 8 hours | ⬜ Pending |
+| Replace HeartbeatService HttpClient | quorus-agent | 4 hours | ✅ Done |
+| Replace JobPollingService HttpClient | quorus-agent | 4 hours | ✅ Done |
+| Replace JobStatusReportingService HttpClient | quorus-agent | 4 hours | ✅ Done |
+| Replace AgentRegistrationService HttpClient | quorus-agent | 4 hours | ✅ Done |
+| Remove Apache HttpClient dependency | pom.xml | 30 min | ✅ Done |
+| Update all agent service tests | quorus-agent/test | 8 hours | ✅ Done |
 
 **Migration Pattern:**
 ```java
@@ -322,44 +247,6 @@ webClient.postAbs(url)
 | Add thread pool metrics | quorus-controller | 4 hours | ⬜ Pending |
 | Configure pool sizes via properties | AppConfig | 2 hours | ⬜ Pending |
 | Add thread pool exhaustion tests | quorus-controller/test | 4 hours | ⬜ Pending |
-
----
-
-### T3.3: Refactor Transfer Engine Retries
-
-**Goal:** Make transfer retries fully non-blocking/reactive.
-
-**Effort:** 1-2 days  
-**Priority:** 🟡 HIGH  
-**Dependencies:** None
-
-| Task | Module | Effort | Status |
-|------|--------|--------|--------|
-| Replace Thread.sleep with vertx.setTimer | SimpleTransferEngine | 2 hours | ⬜ Pending |
-| Refactor retry logic to use Promise chain | SimpleTransferEngine | 4 hours | ⬜ Pending |
-| Add configurable retry delays | CoreConfig | 1 hour | ⬜ Pending |
-| Update retry tests for async behavior | quorus-core/test | 4 hours | ⬜ Pending |
-
-**Current Issue:**
-```java
-// BAD: Blocks worker thread during backoff
-Thread.sleep(backoffMs);
-```
-
-**Target Pattern:**
-```java
-// GOOD: Non-blocking timer-based retry
-Promise<TransferResult> promise = Promise.promise();
-vertx.setTimer(backoffMs, id -> {
-    executeTransfer(request)
-        .onSuccess(promise::complete)
-        .onFailure(err -> scheduleRetry(attempt + 1, promise));
-});
-return promise.future();
-```
-
-**Rationale:**
-> The current `Thread.sleep` in retry backoff blocks the WorkerExecutor thread, limiting throughput to the worker pool size. With 20 workers and 5-second backoff, only 20 concurrent retries can be in-flight. Timer-based retries allow thousands of concurrent retry waits without blocking threads.
 
 ---
 
@@ -401,102 +288,6 @@ Extend capabilities with new protocols and services.
 | Remove synchronized(lock) global bottleneck | quorus-tenant | 4 hours | ⬜ Pending |
 | Add concurrent access stress tests | quorus-tenant/test | 8 hours | ⬜ Pending |
 | Add resource tracking metrics | quorus-tenant | 4 hours | ⬜ Pending |
-
----
-
-### T4.3: Extract Scheduling Strategy
-
-**Goal:** Decouple agent scheduling logic from domain POJOs to enable pluggable strategies.
-
-**Effort:** 2-3 days  
-**Priority:** 🟡 HIGH  
-**Dependencies:** None (but **blocks T6.7 Routes**)
-
-| Task | Module | Effort | Status |
-|------|--------|--------|--------|
-| Create SchedulingStrategy interface | quorus-controller | 2 hours | ⬜ Pending |
-| Implement DefaultSchedulingStrategy | quorus-controller | 4 hours | ⬜ Pending |
-| Extract scoring logic from AgentCapabilities | quorus-controller | 2 hours | ⬜ Pending |
-| Add strategy configuration property | AppConfig | 1 hour | ⬜ Pending |
-| Create RouteAwareSchedulingStrategy (stub) | quorus-controller | 2 hours | ⬜ Pending |
-| Add scheduling strategy tests | quorus-controller/test | 4 hours | ⬜ Pending |
-
-**Current Issue:**
-```java
-// In AgentCapabilities.java - hardcoded weights
-public double calculateCompatibilityScore(TransferRequest request) {
-    return protocolScore * 0.4 + sizeScore * 0.3 + regionScore * 0.3;
-}
-```
-
-**Target Design:**
-```java
-public interface SchedulingStrategy {
-    double scoreAgent(AgentCapabilities agent, TransferRequest request);
-    List<AgentCapabilities> rankAgents(List<AgentCapabilities> agents, TransferRequest request);
-}
-
-public class DefaultSchedulingStrategy implements SchedulingStrategy {
-    private final double protocolWeight;  // configurable
-    private final double sizeWeight;
-    private final double regionWeight;
-}
-```
-
-**Rationale:**
-> Routes (T6.7) require agent selection based on route configuration, not just generic compatibility. Hardcoding the scoring in `AgentCapabilities` violates SRP and makes route-aware scheduling impossible without major refactoring. Extract now to avoid tech debt.
-
----
-
-### T4.4: Agent Job Streaming (Alternative to Polling)
-
-**Goal:** Reduce job assignment latency from 10 seconds to near-instant.
-
-**Effort:** 3-4 days  
-**Priority:** 🟠 MEDIUM  
-**Dependencies:** T3.1 (WebClient Migration)
-
-| Task | Module | Effort | Status |
-|------|--------|--------|--------|
-| Evaluate long-polling vs gRPC streaming | docs-design/ | 4 hours | ⬜ Pending |
-| Implement long-polling endpoint `/agents/{id}/jobs/stream` | HttpApiServer | 1 day | ⬜ Pending |
-| Update JobPollingService to use long-polling | quorus-agent | 1 day | ⬜ Pending |
-| Add connection timeout/retry handling | quorus-agent | 4 hours | ⬜ Pending |
-| Create streaming job assignment tests | quorus-agent/test | 1 day | ⬜ Pending |
-
-**Current Behavior:**
-> Agent polls `GET /agents/{id}/jobs` every 10 seconds. If a job is assigned immediately after a poll, the agent won't see it for up to 10 seconds.
-
-**Target Behavior:**
-> Long-polling: Agent makes request, controller holds connection until a job is available (or timeout). Reduces latency to milliseconds for job assignment.
-
-**Alternative (Future):**
-> gRPC bidirectional streaming for instant push notifications. More complex but eliminates polling entirely.
-
----
-
-### T4.5: Tenant Hierarchy Optimization
-
-**Goal:** Improve cycle detection performance for deep tenant hierarchies.
-
-**Effort:** 2 days  
-**Priority:** 🟠 MEDIUM  
-**Dependencies:** T4.2 (Tenant Resource Management)
-
-| Task | Module | Effort | Status |
-|------|--------|--------|--------|
-| Add `depth` field to Tenant model | quorus-tenant | 2 hours | ⬜ Pending |
-| Add `path` materialized view (e.g., "/root/parent/child") | quorus-tenant | 4 hours | ⬜ Pending |
-| Refactor `wouldCreateCircularReference` to use path | SimpleTenantService | 4 hours | ⬜ Pending |
-| Update path on tenant move/reparent | SimpleTenantService | 2 hours | ⬜ Pending |
-| Add hierarchy depth limit configuration | TenantConfig | 1 hour | ⬜ Pending |
-| Create deep hierarchy performance tests | quorus-tenant/test | 4 hours | ⬜ Pending |
-
-**Current Issue:**
-> `wouldCreateCircularReference()` walks up the tenant tree iteratively. For a hierarchy 10 levels deep, this performs 10 lookups per validation.
-
-**Target Design:**
-> Store materialized path (e.g., `"/acme/division1/team-a"`) on each tenant. Cycle detection becomes a simple string prefix check: `O(1)` instead of `O(depth)`.
 
 ---
 
@@ -596,308 +387,6 @@ Larger changes that improve system reliability.
 | Migrate all other commands | quorus-controller | 2 days | ⬜ Pending |
 | Update LogEntry to use bytes | quorus-controller | 4 hours | ⬜ Pending |
 | Add backward compatibility tests | quorus-controller/test | 2 days | ⬜ Pending |
-
----
-
-### T5.5: Persist Tenant State via Raft
-
-**Goal:** Tenant definitions and quotas survive controller restarts.
-
-**Effort:** 3-4 days  
-**Priority:** 🔴 CRITICAL  
-**Dependencies:** T5.1 (WAL), T5.4 (Protobuf preferred)
-
-| Task | Module | Effort | Status |
-|------|--------|--------|--------|
-| Define TenantCommand Protobuf messages | quorus-controller | 4 hours | ⬜ Pending |
-| Add TenantCommand to QuorusStateMachine | quorus-controller | 4 hours | ⬜ Pending |
-| Create TenantStateSnapshot serialization | quorus-controller | 4 hours | ⬜ Pending |
-| Wire SimpleTenantService to Raft commands | quorus-tenant | 1 day | ⬜ Pending |
-| Add tenant state recovery on startup | quorus-controller | 4 hours | ⬜ Pending |
-| Create tenant persistence integration tests | quorus-controller/test | 1 day | ⬜ Pending |
-
-**Current Issue:**
-> `SimpleTenantService` stores tenants in `ConcurrentHashMap`. On restart, all tenant definitions, quotas, and usage tracking are lost.
-
-**Target Design:**
-```java
-// Tenant mutations go through Raft
-public Future<Tenant> createTenant(Tenant tenant) {
-    TenantCommand cmd = TenantCommand.newBuilder()
-        .setType(CREATE)
-        .setTenant(toProto(tenant))
-        .build();
-    return raftNode.propose(cmd.toByteArray())
-        .map(index -> tenant);
-}
-```
-
-**Impact:**
-> Without this, tenant isolation boundaries are lost on restart. Agents may process jobs for non-existent tenants, or quotas may be exceeded.
-
----
-
-### T5.6: Persist Workflow Execution State
-
-**Goal:** Resume mid-flight workflows after controller restart.
-
-**Effort:** 3-4 days  
-**Priority:** 🟠 MEDIUM  
-**Dependencies:** T5.1 (WAL), T5.5 (Tenant persistence pattern)
-
-| Task | Module | Effort | Status |
-|------|--------|--------|--------|
-| Define WorkflowCommand Protobuf messages | quorus-controller | 4 hours | ⬜ Pending |
-| Add WorkflowCommand to QuorusStateMachine | quorus-controller | 4 hours | ⬜ Pending |
-| Create WorkflowExecutionSnapshot serialization | quorus-workflow | 4 hours | ⬜ Pending |
-| Wire SimpleWorkflowEngine to Raft commands | quorus-workflow | 1 day | ⬜ Pending |
-| Implement workflow resume on startup | quorus-workflow | 4 hours | ⬜ Pending |
-| Create workflow recovery integration tests | quorus-workflow/test | 1 day | ⬜ Pending |
-
-**Current Issue:**
-> `SimpleWorkflowEngine` stores active executions in `ConcurrentHashMap`. If a workflow is at step 3 of 5 when the controller restarts, the workflow is lost. Completed transfers may be re-executed, causing duplicates.
-
-**Target Design:**
-> Each workflow state transition (START, STEP_COMPLETE, PAUSE, RESUME, CANCEL) is persisted via Raft. On recovery, workflows resume from their last persisted state.
-
-**State to Persist:**
-- Workflow ID, definition, variables
-- Current step index
-- Completed transfer IDs (for idempotency)
-- Execution status (RUNNING, PAUSED, etc.)
-
----
-
-### T5.7: Dynamic Cluster Membership
-
-**Goal:** Add or remove cluster nodes without restarting the entire cluster.
-
-**Effort:** 1.5-2 weeks  
-**Priority:** 🟡 HIGH  
-**Dependencies:** T5.1 (WAL), T5.2 (Snapshots), T5.3 (InstallSnapshot)
-
-| Task | Module | Effort | Status |
-|------|--------|--------|--------|
-| Design membership change protocol | docs-design/ | 4 hours | ⬜ Pending |
-| Add ConfigurationChange to raft.proto | quorus-controller | 2 hours | ⬜ Pending |
-| Implement joint consensus in RaftNode | quorus-controller | 3 days | ⬜ Pending |
-| Store cluster config in state machine | quorus-controller | 1 day | ⬜ Pending |
-| Add `POST /api/v1/cluster/nodes` endpoint | HttpApiServer | 4 hours | ⬜ Pending |
-| Add `DELETE /api/v1/cluster/nodes/{nodeId}` endpoint | HttpApiServer | 4 hours | ⬜ Pending |
-| Add `GET /api/v1/cluster/nodes` endpoint | HttpApiServer | 2 hours | ⬜ Pending |
-| Implement new node catch-up (uses InstallSnapshot) | quorus-controller | 1 day | ⬜ Pending |
-| Add membership change integration tests | quorus-controller/test | 2 days | ⬜ Pending |
-| Document cluster operations | docs/ | 4 hours | ⬜ Pending |
-
-**Current Limitation:**
-> Cluster membership is static, configured via `quorus.cluster.nodes` property. Adding a 4th node requires updating configuration on ALL nodes and restarting the entire cluster, causing downtime.
-
-**Target Design (Joint Consensus):**
-```
-1. Operator calls: POST /api/v1/cluster/nodes {"nodeId": "node4", "address": "host4:9080"}
-2. Leader creates log entry: C_old → C_old,new (joint configuration)
-3. Entry must be replicated to majority of BOTH old AND new configs
-4. Once committed, leader creates C_new entry (new configuration only)
-5. Node4 receives snapshot via InstallSnapshot RPC and becomes full member
-6. Old nodes not in C_new gracefully shut down Raft participation
-```
-
-**API Endpoints:**
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/v1/cluster/nodes` | List current cluster membership |
-| `POST` | `/api/v1/cluster/nodes` | Add a node to the cluster |
-| `DELETE` | `/api/v1/cluster/nodes/{nodeId}` | Remove a node from the cluster |
-
-**Request/Response Examples:**
-
-```json
-// POST /api/v1/cluster/nodes
-{
-  "nodeId": "node4",
-  "address": "host4:9080"
-}
-
-// Response
-{
-  "success": true,
-  "message": "Node node4 added to cluster",
-  "clusterSize": 4,
-  "configurationChangeId": "cfg-12345"
-}
-```
-
-**Safety Guarantees:**
-- Only leader can initiate membership changes
-- Only one membership change at a time (no concurrent changes)
-- New node must catch up via InstallSnapshot before becoming voter
-- Removal requires node to not be the leader (leader must step down first)
-
-**Operational Benefits:**
-- Zero-downtime cluster scaling
-- Safe node replacement for maintenance
-- Automatic failover during node removal
-
----
-
-### T5.8: Test Infrastructure Abstraction Layer
-
-**Goal:** Make simulator tests runnable against both in-memory and Docker environments without code duplication.
-
-**Effort:** 4-5 days  
-**Priority:** 🟡 HIGH  
-**Dependencies:** Existing simulator tests in quorus-core
-
-| Task | Module | Effort | Status |
-|------|--------|--------|--------|
-| Define `TestClusterEnvironment` interface | quorus-core/test | 2 hours | ⬜ Pending |
-| Define `TestEnvironmentConfig` for timeouts/retries | quorus-core/test | 2 hours | ⬜ Pending |
-| Create `InMemoryClusterEnvironment` (wraps existing simulators) | quorus-core/test | 4 hours | ⬜ Pending |
-| Create `DockerClusterEnvironment` (Testcontainers) | quorus-integration-examples | 6 hours | ⬜ Pending |
-| Refactor `InMemoryAgentSimulatorTest` to use abstraction | quorus-core/test | 4 hours | ⬜ Pending |
-| Refactor `InMemoryTransferEngineSimulatorTest` to use abstraction | quorus-core/test | 4 hours | ⬜ Pending |
-| Refactor `InMemoryWorkflowEngineSimulatorTest` to use abstraction | quorus-core/test | 4 hours | ⬜ Pending |
-| Add `@EnabledIfDocker` conditional for CI | quorus-core/test | 1 hour | ⬜ Pending |
-| Document test infrastructure pattern | docs/ | 2 hours | ⬜ Pending |
-
-**Architecture:**
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                    TestClusterEnvironment                           │
-│  ┌──────────────────────────────────────────────────────────────┐  │
-│  │  + start() / stop()                                          │  │
-│  │  + getControllerUrl()                                        │  │
-│  │  + registerAgent(AgentRegistration) → agentId                │  │
-│  │  + submitTransfer(TransferRequest) → TransferResult          │  │
-│  │  + injectNetworkPartition(nodeId)                            │  │
-│  │  + getConfig() → TestEnvironmentConfig                       │  │
-│  └──────────────────────────────────────────────────────────────┘  │
-│                              ▲                                      │
-│              ┌───────────────┴───────────────┐                      │
-│              │                               │                      │
-│  ┌───────────────────────┐    ┌───────────────────────┐            │
-│  │ InMemoryClusterEnv    │    │ DockerClusterEnv      │            │
-│  │ ───────────────────── │    │ ───────────────────── │            │
-│  │ Wraps existing        │    │ Testcontainers        │            │
-│  │ simulators            │    │ 3-node Raft cluster   │            │
-│  │ Fast (ms)             │    │ Real I/O (seconds)    │            │
-│  └───────────────────────┘    └───────────────────────┘            │
-└─────────────────────────────────────────────────────────────────────┘
-```
-
-**Test Environment Configuration:**
-```java
-public record TestEnvironmentConfig(
-    // Timeouts - vary significantly between in-memory and Docker
-    Duration operationTimeout,      // In-memory: 1s, Docker: 30s
-    Duration clusterStartTimeout,   // In-memory: 100ms, Docker: 60s
-    Duration leaderElectionTimeout, // In-memory: 500ms, Docker: 30s
-    Duration transferTimeout,       // In-memory: 1s, Docker: 120s
-    
-    // Retry configuration
-    int maxRetries,                 // In-memory: 1, Docker: 3
-    Duration retryDelay,            // In-memory: 10ms, Docker: 1s
-    
-    // Polling intervals (for async operations)
-    Duration pollInterval,          // In-memory: 10ms, Docker: 500ms
-    Duration pollTimeout,           // In-memory: 1s, Docker: 60s
-    
-    // Chaos testing parameters
-    Duration chaosRecoveryTimeout,  // In-memory: 500ms, Docker: 30s
-    boolean chaosSupported          // In-memory: limited, Docker: full
-) {
-    public static TestEnvironmentConfig inMemory() {
-        return new TestEnvironmentConfig(
-            Duration.ofSeconds(1),    // operationTimeout
-            Duration.ofMillis(100),   // clusterStartTimeout
-            Duration.ofMillis(500),   // leaderElectionTimeout
-            Duration.ofSeconds(1),    // transferTimeout
-            1,                        // maxRetries
-            Duration.ofMillis(10),    // retryDelay
-            Duration.ofMillis(10),    // pollInterval
-            Duration.ofSeconds(1),    // pollTimeout
-            Duration.ofMillis(500),   // chaosRecoveryTimeout
-            false                     // chaosSupported (limited)
-        );
-    }
-    
-    public static TestEnvironmentConfig docker() {
-        return new TestEnvironmentConfig(
-            Duration.ofSeconds(30),   // operationTimeout
-            Duration.ofSeconds(60),   // clusterStartTimeout
-            Duration.ofSeconds(30),   // leaderElectionTimeout
-            Duration.ofSeconds(120),  // transferTimeout
-            3,                        // maxRetries
-            Duration.ofSeconds(1),    // retryDelay
-            Duration.ofMillis(500),   // pollInterval
-            Duration.ofSeconds(60),   // pollTimeout
-            Duration.ofSeconds(30),   // chaosRecoveryTimeout
-            true                      // chaosSupported (full)
-        );
-    }
-}
-```
-
-**Test Pattern:**
-```java
-@ParameterizedTest
-@MethodSource("environments")
-@DisplayName("Agent should register and receive jobs")
-void testAgentLifecycle(TestClusterEnvironment env) {
-    var config = env.getConfig();
-    env.start();
-    try {
-        // Use config-driven timeouts
-        await().atMost(config.operationTimeout())
-               .pollInterval(config.pollInterval())
-               .untilAsserted(() -> {
-                   String agentId = env.registerAgent(registration);
-                   assertThat(agentId).isNotNull();
-               });
-        
-        env.submitTransfer(request);
-        
-        // Polling with environment-specific intervals
-        await().atMost(config.pollTimeout())
-               .pollInterval(config.pollInterval())
-               .until(() -> !env.pollJobs(agentId).isEmpty());
-    } finally {
-        env.stop();
-    }
-}
-
-static Stream<TestClusterEnvironment> environments() {
-    var envs = new ArrayList<TestClusterEnvironment>();
-    envs.add(new InMemoryClusterEnvironment());  // Always runs
-    
-    if (DockerClusterEnvironment.isDockerAvailable()) {
-        envs.add(new DockerClusterEnvironment());  // Only if Docker running
-    }
-    return envs.stream();
-}
-```
-
-**Execution Modes:**
-| Mode | Command | Speed | Docker Required |
-|------|---------|-------|------------------|
-| Fast (default) | `mvn test` | ~30s | No |
-| Full E2E | `mvn test -Pintegration` | ~5min | Yes |
-| Docker only | `mvn test -Dtest.env=docker` | ~5min | Yes |
-
-**Benefits:**
-- **Zero test logic duplication** - same assertions validate both environments
-- **Environment-aware timeouts** - tests don't fail due to unrealistic expectations
-- **Gradual adoption** - refactor tests incrementally, not all at once
-- **Easy extensibility** - add Kubernetes, cloud environments later
-- **CI flexibility** - fast in-memory for PRs, full Docker on merge to main
-
-**Acceptance Criteria:**
-- [ ] Existing simulator tests pass unchanged with in-memory environment
-- [ ] Same tests pass against Docker cluster (when available)
-- [ ] Timeouts/retries are configurable per environment
-- [ ] CI runs in-memory by default, Docker on merge to main
-- [ ] < 100 lines of adapter code per environment
 
 ---
 
@@ -1027,13 +516,11 @@ Security features implemented **after** core functionality is stable and well-te
 
 ### T6.7: Route Architecture Implementation
 
-> ⚠️ **Staging Note:** Routes are **core business logic**, not security. Placed in Stage 6 for scheduling convenience (after Raft stability), but should be prioritized over T6.1-T6.6 security tasks if resources allow.
-
 **Goal:** Implement the route-based transfer system as specified in QUORUS_SYSTEM_DESIGN.md.
 
 **Effort:** 4-6 weeks  
 **Priority:** 🟡 HIGH (Core feature, not optional)  
-**Dependencies:** T5.1-T5.3 (Raft stability), T4.3 (Scheduling Strategy)
+**Dependencies:** T5.1-T5.3 (Raft stability)
 
 > **Note (2026-02-01):** Routes are **core** to Quorus architecture, not a decision point.
 > The system is explicitly designed as a "route-based distributed file transfer system."
@@ -1098,10 +585,11 @@ Security features implemented **after** core functionality is stable and well-te
 ### Week 1-2: Foundation & Quick Wins
 - [x] Gap analysis complete
 - [ ] **Stage 1**: All documentation and configuration tasks (T1.1, T1.2, T1.3)
-- [x] **Stage 2**: T2.1 (Health Endpoints) ✅, T2.4 (Node Identity) ✅, T2.2 (Error Responses) ✅, T2.3 (Graceful Shutdown) ✅
+- [ ] **Stage 2**: T2.1 (Health Endpoints), T2.2 (Error Responses)
 
 ### Week 3-4: Stability & Agent Fixes
-- [ ] **Stage 3**: T3.1 (Vert.x WebClient Migration) - CRITICAL BLOCKING FIX
+- [ ] **Stage 2**: T2.3 (Graceful Shutdown)
+- [x] **Stage 3**: T3.1 (Vert.x WebClient Migration) - ✅ COMPLETE
 - [ ] **Stage 3**: T3.2 (Bounded Thread Pools)
 
 ### Week 5-6: Protocols & Services
@@ -1135,34 +623,30 @@ Security features implemented **after** core functionality is stable and well-te
 | Week | Focus | Critical Path Item |
 |------|-------|-------------------|
 | 1 | Documentation | T1.1 Documentation alignment |
-| 2 | Core API | T2.1 Health ✅, T2.2 Errors ✅, T2.3 Shutdown ✅, T2.4 Node Identity ✅ |
-| 3 | Stability | T3.1 Vert.x WebClient (BLOCKING FIX) |
-| 4 | Agent | T3.1 Vert.x WebClient (BLOCKING FIX), **T3.3 Transfer Retries** 🆕 |
+| 2 | Core API | T2.1 Health endpoints |
+| 3 | Stability | T2.3 Graceful shutdown |
+| 4 | Agent | ~~T3.1 Vert.x WebClient~~ ✅ COMPLETE |
 | 5 | Threading | T3.2 Bounded thread pools |
-| 6 | Protocols | T4.1 NFS adapter, **T4.3 Scheduling Strategy** 🆕 |
-| 7-8 | Persistence | ~~T5.1 Raft WAL~~ ✅ COMPLETE, **T5.5 Tenant Persistence** 🆕 |
-| 9-10 | Compaction | T5.2 Snapshots (scheduling/truncation remain), **T5.6 Workflow Persistence** 🆕 |
+| 6 | Protocols | T4.1 NFS adapter |
+| 7-8 | Persistence | ~~T5.1 Raft WAL~~ ✅ COMPLETE |
+| 9-10 | Compaction | T5.2 Snapshots (scheduling/truncation remain) |
 | 11-12 | Raft | T5.3 InstallSnapshot, T5.4 Protobuf |
-| 13-14 | Cluster Ops | **T5.7 Dynamic Cluster Membership** 🆕, **T5.8 Test Infrastructure Abstraction** 🆕 |
 | 15+ | Security + Routes | T6.1-T6.6 (Security), T6.7 (Routes) |
 
 ### Summary by Priority
 
 | Priority | Total Tasks | Completed | Remaining |
 |----------|-------------|-----------|-----------|
-| 🔴 CRITICAL | 6 | 1 (T5.1) | 5 |
-| 🟡 HIGH | 10 | 0 | 10 |
-| 🟠 MEDIUM (Security/Enterprise) | 14 | 0 | 14 |
-| **TOTAL** | **30** | **1** | **29** |
+| 🔴 CRITICAL | 4 | 2 (T5.1, T3.1) | 2 |
+| 🟡 HIGH | 7 | 0 | 7 |
+| 🟠 MEDIUM (Security - Deferred) | 11 | 0 | 11 |
+| **TOTAL** | **22** | **1** | **21** |
 
 > **Notes:**
 > - T5.1 (Raft WAL) marked COMPLETE via raftlog-core library
 > - T5.2 takeSnapshot/restoreSnapshot methods are COMPLETE; scheduling remains
 > - T6.7 changed from "decision point" to implementation task (routes are core)
 > - T1.1 reduced scope (routes are not "future" features)
-> - **v1.5**: Added T2.4, T3.3, T4.3 to address concurrency and stability gaps
-> - **v1.6**: Added T4.4, T4.5, T5.5, T5.6 from architecture review cross-reference
-> - **v1.7**: Added T5.7 (Dynamic Cluster Membership) for zero-downtime scaling
 
 ---
 
@@ -1173,37 +657,16 @@ T1.1 (Docs) ──────────────────────�
                                                                      │
 T2.1 (Health) ──► T2.2 (Errors) ──► T2.3 (Shutdown) ─────────────────┤
                                                                      │
-T2.4 (Node Identity) ────────────────────────────────────────────────┤
-                                                                     │
 T3.1 (WebClient) ──► T3.2 (Thread Pools) ────────────────────────────┤
-       │                                                             │
-       └──► T4.4 (Agent Job Streaming)  ◄── 🆕                       │
-                                                                     │
-T3.3 (Transfer Retries) ─────────────────────────────────────────────┤
                                                                      │
 T4.1 (NFS) ──────────────────────────────────────────────────────────┤
                                                                      │
-T4.2 (Tenant Resources) ──► T4.5 (Tenant Hierarchy)  ◄── 🆕          │
+T4.2 (Tenant Resources) ─────────────────────────────────────────────┤
                                                                      │
-T4.3 (Scheduling Strategy) ──────────────────────────────────────────┤
-       │                                                             │
-       └─────────────────────────────────────┐                       │
-                                             │                       │
 T5.1 (WAL) ──► T5.2 (Snapshots) ──► T5.3 (InstallSnapshot) ──────────┤
-       │              │                      │                       │
-       │              │                      └──► T5.7 (Dynamic Membership) 🆕
-       │              │                                              │
-       │              └──► T5.5 (Tenant Persistence)  ◄── 🆕 CRITICAL│
-       │                          │                                  │
-       │                          └──► T5.6 (Workflow Persistence)   │
        │                                                             │
        └──► T5.4 (Protobuf) ─────────────────────────────────────────┤
                                                                      │
-Existing Simulator Tests ──► T5.8 (Test Infrastructure Abstraction) 🆕
-       │                            │                                │
-       │  InMemoryClusterEnv ◄──────┤                                │
-       │  DockerClusterEnv ◄────────┘                                │
-       │                                                             │
                           ┌──────────────────────────────────────────┘
                           │  SECURITY & ROUTES (After Core Complete)
                           ▼
@@ -1215,23 +678,8 @@ T6.1 (API Key) ──► T6.2 (TLS HTTP) ──► T6.3 (TLS gRPC)
        │
        └──► T6.6 (OAuth2/JWT)
 
-T5.3 (InstallSnapshot) ──┬──► T6.7 (Routes) [HIGH priority - core feature]
-                         │
-T4.3 (Scheduling Strategy) ──┘   ◄── BLOCKS Routes
+T5.3 (InstallSnapshot) ──► T6.7 (Routes) [HIGH priority - core feature]
 ```
-
----
-
-## Rollback Strategy for High-Risk Tasks
-
-| Task | Risk Level | Rollback Plan |
-|------|------------|---------------|
-| T5.4 (Protobuf Migration) | 🔴 HIGH | Keep Java serialization as fallback codec; feature flag `quorus.serialization=java\|protobuf` |
-| T5.5 (Tenant Persistence) | 🔴 HIGH | Retain in-memory `SimpleTenantService` as fallback; migrate incrementally |
-| T5.6 (Workflow Persistence) | 🟡 MEDIUM | Workflow engine can operate stateless (existing behavior) if Raft integration fails |
-| T5.7 (Dynamic Membership) | 🟡 MEDIUM | Static membership via config still works; rolling restart as fallback |
-| T5.8 (Test Infrastructure) | 🟢 LOW | Tests continue working with existing pattern; abstraction is additive |
-| T6.7 (Routes) | 🟡 MEDIUM | Routes are additive; existing workflow/transfer APIs remain functional |
 
 ---
 
@@ -1241,13 +689,6 @@ T4.3 (Scheduling Strategy) ──┘   ◄── BLOCKS Routes
 |------|------------|-------|
 | ~~Raft persistence delays~~ | ~~Start T5.1 early (Week 7)~~ ✅ COMPLETE via raftlog-core | Arch Team |
 | Agent blocking I/O | T3.1 is on critical path; prioritize in Week 4 | Dev Team |
-| **Split-brain in containers** | **T2.4 Node Identity - require explicit node ID for multi-node clusters** | Dev Team |
-| **Transfer throughput limits** | **T3.3 Remove Thread.sleep from retry backoff** 🆕 | Dev Team |
-| **Routes blocked by tech debt** | **T4.3 Extract Scheduling Strategy before T6.7** 🆕 | Arch Team |
-| **Tenant data loss on restart** | **T5.5 Persist tenant state via Raft** 🆕 | Arch Team |
-| **Workflow loss on restart** | **T5.6 Persist workflow execution state** 🆕 | Arch Team |
-| **Cluster scaling requires downtime** | **T5.7 Dynamic Membership for zero-downtime node changes** 🆕 | Arch Team |
-| **Tests don't validate real infrastructure** | **T5.8 Test Infrastructure Abstraction - same tests run against Docker** 🆕 | QA Team |
 | Security deferred too long | Core must be stable by Week 14 to start security | PM |
 | Test failures | Follow "all tests must pass" principle strictly | All |
 | Route implementation scope | Routes are core (4-6 weeks); plan resources for Stage 6 | PM |
@@ -1269,6 +710,6 @@ Each task is complete when:
 ---
 
 **Document Status**: Active Implementation Plan  
-**Last Updated**: 2026-02-04  
-**Version**: 1.7  
+**Last Updated**: 2026-02-02  
+**Version**: 1.4  
 **Owner**: Development Team
