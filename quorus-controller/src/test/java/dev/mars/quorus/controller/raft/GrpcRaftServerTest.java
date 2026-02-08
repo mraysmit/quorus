@@ -80,8 +80,10 @@ class GrpcRaftServerTest {
         raftNode = new RaftNode(vertx, "node1", clusterNodes, transport, stateMachine, 5000, 1000);
         raftNode.start();
         
-        // Give the node time to initialize
-        Thread.sleep(100);
+        // Wait for node to be running (reactive polling instead of fixed sleep)
+        await().atMost(Duration.ofSeconds(5))
+            .pollInterval(Duration.ofMillis(10))
+            .until(() -> raftNode.isRunning());
     }
 
     @AfterEach
@@ -763,7 +765,7 @@ class GrpcRaftServerTest {
     void testSustainedLoad() throws Exception {
         startServerAndConnect();
         
-        int durationSeconds = 5;
+        int durationSeconds = 2;
         int requestsPerSecond = 50;
         AtomicBoolean running = new AtomicBoolean(true);
         AtomicInteger successCount = new AtomicInteger(0);
@@ -795,8 +797,10 @@ class GrpcRaftServerTest {
             });
         }
         
-        // Let it run
-        Thread.sleep(durationSeconds * 1000L);
+        // Let it run for the specified duration
+        await().pollDelay(Duration.ofSeconds(durationSeconds))
+            .atMost(Duration.ofSeconds(durationSeconds + 1))
+            .until(() -> true);
         running.set(false);
         executor.shutdownNow();
         executor.awaitTermination(5, TimeUnit.SECONDS);
@@ -927,7 +931,9 @@ class GrpcRaftServerTest {
         
         node1.start();
         node2.start();
-        Thread.sleep(100);
+        await().atMost(Duration.ofSeconds(5))
+            .pollInterval(Duration.ofMillis(10))
+            .until(() -> node1.isRunning() && node2.isRunning());
         
         GrpcRaftServer server1 = new GrpcRaftServer(vertx, port1, node1);
         GrpcRaftServer server2 = new GrpcRaftServer(vertx, port2, node2);

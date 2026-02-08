@@ -31,6 +31,7 @@ import org.junit.jupiter.api.parallel.ExecutionMode;
 
 import java.io.IOException;
 import java.net.ServerSocket;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -73,7 +74,9 @@ class GrpcRaftTransportTest {
         QuorusStateMachine stateMachine = new QuorusStateMachine();
         targetNode = new RaftNode(vertx, "target", clusterNodes, transport, stateMachine, 5000, 1000);
         targetNode.start();
-        Thread.sleep(100);
+        await().atMost(Duration.ofSeconds(5))
+            .pollInterval(Duration.ofMillis(10))
+            .until(() -> targetNode.isRunning());
         
         targetServer = new GrpcRaftServer(vertx, targetPort, targetNode);
         targetServer.start().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
@@ -356,7 +359,9 @@ class GrpcRaftTransportTest {
         QuorusStateMachine sm2 = new QuorusStateMachine();
         RaftNode node2 = new RaftNode(vertx, "target2", cluster2, transport2, sm2, 5000, 1000);
         node2.start();
-        Thread.sleep(100);
+        await().atMost(Duration.ofSeconds(5))
+            .pollInterval(Duration.ofMillis(10))
+            .until(() -> node2.isRunning());
         
         GrpcRaftServer server2 = new GrpcRaftServer(vertx, targetPort2, node2);
         server2.start().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);

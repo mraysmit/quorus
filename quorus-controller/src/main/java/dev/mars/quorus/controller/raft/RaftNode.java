@@ -95,6 +95,9 @@ public class RaftNode {
     private long electionTimerId = -1;
     private long heartbeatTimerId = -1;
 
+    // ========== STATE CHANGE LISTENERS ==========
+    private final List<io.vertx.core.Handler<State>> stateChangeListeners = new ArrayList<>();
+
     // ========== EDGE METRICS ==========
     private LongCounter rpcCounter;
 
@@ -475,6 +478,91 @@ public class RaftNode {
         return log.get(log.size() - 1).getTerm();
     }
 
+    // ========== STATE CHANGE OBSERVATION ==========
+
+    /**
+     * Registers a listener that is notified whenever this node's Raft state changes.
+     * <p>Listeners are invoked on the Vert.x event loop context, making them safe
+     * for use with Vert.x Futures and Promises. This enables reactive test patterns
+     * instead of Thread.sleep polling loops.
+     *
+     * @param listener handler that receives the new {@link State}
+     */
+    public void addStateChangeListener(io.vertx.core.Handler<State> listener) {
+        stateChangeListeners.add(listener);
+    }
+
+    /**
+     * Removes a previously registered state change listener.
+     *
+     * @param listener the listener to remove
+     */
+    public void removeStateChangeListener(io.vertx.core.Handler<State> listener) {
+        stateChangeListeners.remove(listener);
+    }
+
+    /**
+     * Returns a Future that completes when this node transitions to the target state,
+     * or fails if the timeout expires. This is the primary reactive alternative to
+     * polling loops with Thread.sleep.
+     *
+     * <p>Usage in tests:
+     * <pre>{@code
+     * node.awaitState(State.LEADER, 10000)
+     *     .onComplete(ctx.succeedingThenComplete());
+     * }</pre>
+     *
+     * @param targetState the state to wait for
+     * @param timeoutMs maximum time to wait in milliseconds
+     * @return a Future that completes with the target state or fails on timeout
+     */
+    public Future<State> awaitState(State targetState, long timeoutMs) {
+        // Already in target state
+        if (state == targetState) {
+            return Future.succeededFuture(targetState);
+        }
+
+        Promise<State> promise = Promise.promise();
+
+        // Register listener
+        io.vertx.core.Handler<State> listener = newState -> {
+            if (newState == targetState && !promise.future().isComplete()) {
+                promise.complete(targetState);
+            }
+        };
+        addStateChangeListener(listener);
+
+        // Set timeout
+        long timerId = vertx.setTimer(timeoutMs, id -> {
+            if (!promise.future().isComplete()) {
+                removeStateChangeListener(listener);
+                promise.fail("Timed out waiting for state " + targetState + " after " + timeoutMs + "ms (current: " + state + ")");
+            }
+        });
+
+        // Clean up on completion
+        promise.future().onComplete(ar -> {
+            removeStateChangeListener(listener);
+            vertx.cancelTimer(timerId);
+        });
+
+        return promise.future();
+    }
+
+    /**
+     * Notifies all registered state change listeners of a state transition.
+     * Invoked internally after every state change (becomeLeader, startElection, stepDown).
+     */
+    private void notifyStateChangeListeners(State newState) {
+        for (io.vertx.core.Handler<State> listener : stateChangeListeners) {
+            try {
+                listener.handle(newState);
+            } catch (Exception e) {
+                logger.warn("State change listener threw exception", e);
+            }
+        }
+    }
+
     private void cancelTimers() {
         if (electionTimerId != -1)
             vertx.cancelTimer(electionTimerId);
@@ -501,6 +589,7 @@ public class RaftNode {
         state = State.CANDIDATE;
         currentTerm++;
         votedFor = nodeId;
+        notifyStateChangeListeners(State.CANDIDATE);
 
         resetElectionTimer();
 
@@ -566,6 +655,7 @@ public class RaftNode {
 
         state = State.LEADER;
         logger.info("Node {} became LEADER for term {}", nodeId, currentTerm);
+        notifyStateChangeListeners(State.LEADER);
 
         if (electionTimerId != -1)
             vertx.cancelTimer(electionTimerId);
@@ -605,6 +695,7 @@ public class RaftNode {
             currentTerm = newTerm;
             votedFor = null;
             state = State.FOLLOWER;
+            notifyStateChangeListeners(State.FOLLOWER);
 
             cancelTimers();
             resetElectionTimer();

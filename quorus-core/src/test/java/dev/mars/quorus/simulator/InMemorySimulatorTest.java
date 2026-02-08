@@ -325,7 +325,7 @@ class InMemorySimulatorTest {
 
         @AfterEach
         void tearDown() {
-            engine.shutdown(5);
+            engine.shutdownNow();
         }
 
         @Test

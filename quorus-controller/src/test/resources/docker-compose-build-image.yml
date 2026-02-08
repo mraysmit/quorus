@@ -1,0 +1,15 @@
+version: '3.8'
+
+# Build-only compose file — creates the quorus-controller:test image.
+# Used by SharedDockerCluster to build the image once before all tests.
+# The image: tag ensures the built image is tagged with a stable name
+# that the prebuilt compose files can reference.
+
+services:
+  controller:
+    build:
+      context: ../../../..
+      dockerfile: quorus-controller/Dockerfile
+      additional_contexts:
+        m2cache: ${M2_REPO:-~/.m2/repository}/dev/mars
+    image: quorus-controller:test

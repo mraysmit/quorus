@@ -26,6 +26,8 @@ import dev.mars.quorus.controller.raft.RaftTransport;
 import dev.mars.quorus.controller.state.QuorusStateMachine;
 import org.junit.jupiter.api.*;
 
+import static org.awaitility.Awaitility.await;
+
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -90,22 +92,16 @@ class AgentJobManagementIntegrationTest {
         raftNode = new RaftNode(vertx, "test-node-1", clusterNodes, transport, stateMachine, 500, 100);
         raftNode.start();
 
-        // Wait for node to become leader (election timeout is 500-1000ms)
-        for (int i = 0; i < 30; i++) {
-            if (raftNode.isLeader()) {
-                break;
-            }
-            Thread.sleep(100);
-        }
+        // Wait for node to become leader reactively
+        await().atMost(java.time.Duration.ofSeconds(10))
+            .pollInterval(java.time.Duration.ofMillis(50))
+            .until(() -> raftNode.isLeader());
 
         assertTrue(raftNode.isLeader(), "Node should become leader");
 
-        // Start HTTP API server
+        // Start HTTP API server and wait for it to be ready
         httpServer = new HttpApiServer(vertx, HTTP_PORT, raftNode);
-        httpServer.start();
-
-        // Wait for server to be ready
-        Thread.sleep(1000);
+        httpServer.start().toCompletionStage().toCompletableFuture().get(5, java.util.concurrent.TimeUnit.SECONDS);
 
         logger.info("Test environment ready");
     }

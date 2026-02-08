@@ -36,11 +36,13 @@ import org.slf4j.LoggerFactory;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.*;
 
 import org.junit.jupiter.api.Tag;
@@ -130,8 +132,10 @@ class RaftLogClusterIntegrationTest {
         startClusterWithStorage();
         
         // Wait for cluster startup
-        LOG.debug("Waiting 2s for cluster to stabilize...");
-        Thread.sleep(2000);
+        LOG.debug("Waiting for cluster to stabilize...");
+        await().atMost(Duration.ofSeconds(10))
+            .pollInterval(Duration.ofMillis(200))
+            .until(() -> cluster.stream().anyMatch(n -> n.getState() == RaftNode.State.LEADER));
         
         // Log cluster state before verification
         logClusterState("after startup");
@@ -282,8 +286,15 @@ class RaftLogClusterIntegrationTest {
         logWalSizes("after command submission");
         
         // Wait for replication
-        LOG.debug("Waiting 2s for replication to all followers...");
-        Thread.sleep(2000);
+        LOG.debug("Waiting for replication to all followers...");
+        await().atMost(Duration.ofSeconds(10))
+            .pollInterval(Duration.ofMillis(200))
+            .until(() -> {
+                String lastId = jobIds.get(jobIds.size() - 1);
+                return cluster.stream()
+                    .filter(n -> ((QuorusStateMachine) n.getStateMachine()).hasTransferJob(lastId))
+                    .count() >= (CLUSTER_SIZE / 2) + 1;
+            });
         
         // Verify replication to followers
         logReplicationStatus(jobIds);
@@ -359,8 +370,14 @@ class RaftLogClusterIntegrationTest {
         LOG.info("Submitted job: {} in {} ms", jobId, System.currentTimeMillis() - cmdStart);
         
         // Wait for replication
-        LOG.debug("Waiting 2s for replication...");
-        Thread.sleep(2000);
+        LOG.debug("Waiting for replication...");
+        await().atMost(Duration.ofSeconds(10))
+            .pollInterval(Duration.ofMillis(200))
+            .until(() -> {
+                return cluster.stream()
+                    .filter(n -> ((QuorusStateMachine) n.getStateMachine()).hasTransferJob(jobId))
+                    .count() >= (CLUSTER_SIZE / 2) + 1;
+            });
         
         // Log cluster state before follower restart
         logClusterState("before follower restart");
@@ -401,9 +418,14 @@ class RaftLogClusterIntegrationTest {
             followerId, System.currentTimeMillis() - restartStart,
             restartedFollower.getCurrentTerm(), restartedFollower.getLogSize());
         
-        // Wait for catch-up
-        LOG.debug("Waiting 3s for follower catch-up...");
-        Thread.sleep(3000);
+        // Wait for catch-up (reactive: poll until recovered follower has the job)
+        LOG.debug("Waiting for follower catch-up...");
+        await().atMost(Duration.ofSeconds(15))
+            .pollInterval(Duration.ofMillis(200))
+            .until(() -> {
+                QuorusStateMachine sm = (QuorusStateMachine) restartedFollower.getStateMachine();
+                return sm.hasTransferJob(jobId);
+            });
         
         // Log cluster state after restart
         logClusterState("after follower restart");
@@ -521,23 +543,20 @@ class RaftLogClusterIntegrationTest {
         );
     }
 
-    private RaftNode waitForLeader(long timeoutMs) throws InterruptedException {
-        long deadline = System.currentTimeMillis() + timeoutMs;
-        while (System.currentTimeMillis() < deadline) {
-            for (RaftNode node : cluster) {
-                if (node.getState() == RaftNode.State.LEADER) {
-                    return node;
-                }
-            }
-            Thread.sleep(200);
-        }
-        return null;
+    private RaftNode waitForLeader(long timeoutMs) {
+        await().atMost(Duration.ofMillis(timeoutMs))
+            .pollInterval(Duration.ofMillis(200))
+            .until(() -> cluster.stream().anyMatch(n -> n.getState() == RaftNode.State.LEADER));
+        return cluster.stream()
+            .filter(n -> n.getState() == RaftNode.State.LEADER)
+            .findFirst()
+            .orElse(null);
     }
 
     private TransferJob createTestJob(String jobId) {
         TransferRequest request = TransferRequest.builder()
             .requestId(jobId)  // Use our custom ID so we can look it up later
-            .sourceUri(URI.create("file:///test/" + jobId + "/source.txt"))
+            .sourceUri(URI.create("sftp://testhost/test/" + jobId + "/source.txt"))
             .destinationPath(Path.of("/test/" + jobId + "/dest.txt"))
             .expectedSize(1024L)
             .metadata("testId", jobId)

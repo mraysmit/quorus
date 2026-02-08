@@ -26,10 +26,7 @@ import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.testcontainers.containers.ComposeContainer;
-import org.testcontainers.containers.wait.strategy.Wait;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
-import java.io.File;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -55,7 +52,6 @@ import static org.junit.jupiter.api.Assertions.*;
  * @version 1.0
  * @since 2025-08-20
  */
-@Testcontainers
 @Tag("flaky")
 public class ConfigurableRaftClusterTest {
 
@@ -94,35 +90,18 @@ public class ConfigurableRaftClusterTest {
         this.config = config;
         logger.info("Starting test: " + testInfo.getDisplayName() + " with config: " + config);
 
-        // Create compose container with the specified configuration
-        environment = new ComposeContainer(new File(config.getComposeFile()))
-                .withStartupTimeout(config.getStartupTimeout());
-
-        // Configure wait strategies for each node
-        for (int i = 1; i <= config.getNodeCount(); i++) {
-            String serviceName = "controller" + i;
-            environment = environment
-                    .withExposedService(serviceName, 8080, Wait.forHttp("/health").forStatusCode(200))
-                    .waitingFor(serviceName, Wait.forLogMessage(".*Starting Raft node.*", 1));
-        }
+        // Use shared singleton container based on node count
+        environment = config.getNodeCount() <= 3
+                ? SharedDockerCluster.getThreeNodeCluster()
+                : SharedDockerCluster.getFiveNodeCluster();
 
         // Apply network configuration if specified
         if (config.getNetworkConfig().isPartitionTestingEnabled()) {
             logger.info("Partition testing enabled for this configuration");
         }
 
-        // Start the environment
-        environment.start();
-
-        // Get the exposed ports for each controller
-        nodeEndpoints = new ArrayList<>();
-        for (int i = 1; i <= config.getNodeCount(); i++) {
-            String serviceName = "controller" + i;
-            Integer port = environment.getServicePort(serviceName, 8080);
-            String endpoint = "http://localhost:" + port;
-            nodeEndpoints.add(endpoint);
-            logger.info("Controller " + i + " endpoint: " + endpoint);
-        }
+        // Get the exposed ports from the shared container
+        nodeEndpoints = SharedDockerCluster.getNodeEndpoints(environment, config.getNodeCount());
 
         // Wait for all nodes to be healthy
         await().atMost(config.getStartupTimeout())
@@ -134,9 +113,7 @@ public class ConfigurableRaftClusterTest {
 
     @AfterEach
     void tearDown(TestInfo testInfo) {
-        if (environment != null) {
-            environment.stop();
-        }
+        // Container is shared — do NOT stop it
         logger.info("Completed test: " + testInfo.getDisplayName());
     }
 

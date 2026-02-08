@@ -53,7 +53,7 @@ class InMemoryTransferEngineSimulatorTest {
     void tearDown() {
         if (engine != null) {
             log.info("Tearing down test - shutting down engine");
-            engine.shutdown(5);
+            engine.shutdownNow();
         }
     }
 

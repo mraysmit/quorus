@@ -1,0 +1,124 @@
+version: '3.8'
+
+# 5-node Raft cluster using pre-built image (no Docker build step).
+# Requires quorus-controller:test image — built by SharedDockerCluster.
+
+services:
+  controller1:
+    image: quorus-controller:test
+    hostname: controller1
+    environment:
+      - QUORUS_NODE_ID=controller1
+      - QUORUS_RAFT_HOST=0.0.0.0
+      - QUORUS_RAFT_PORT=9080
+      - QUORUS_HTTP_PORT=8080
+      - QUORUS_CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080,controller4=controller4:9080,controller5=controller5:9080
+      - QUORUS_RAFT_ELECTION_TIMEOUT_MS=3000
+      - QUORUS_RAFT_HEARTBEAT_INTERVAL_MS=500
+      - JAVA_OPTS=-Xmx256m -Xms128m
+    ports:
+      - "8080"
+    networks:
+      - raft-cluster
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  controller2:
+    image: quorus-controller:test
+    hostname: controller2
+    environment:
+      - QUORUS_NODE_ID=controller2
+      - QUORUS_RAFT_HOST=0.0.0.0
+      - QUORUS_RAFT_PORT=9080
+      - QUORUS_HTTP_PORT=8080
+      - QUORUS_CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080,controller4=controller4:9080,controller5=controller5:9080
+      - QUORUS_RAFT_ELECTION_TIMEOUT_MS=3000
+      - QUORUS_RAFT_HEARTBEAT_INTERVAL_MS=500
+      - JAVA_OPTS=-Xmx256m -Xms128m
+    ports:
+      - "8080"
+    networks:
+      - raft-cluster
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  controller3:
+    image: quorus-controller:test
+    hostname: controller3
+    environment:
+      - QUORUS_NODE_ID=controller3
+      - QUORUS_RAFT_HOST=0.0.0.0
+      - QUORUS_RAFT_PORT=9080
+      - QUORUS_HTTP_PORT=8080
+      - QUORUS_CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080,controller4=controller4:9080,controller5=controller5:9080
+      - QUORUS_RAFT_ELECTION_TIMEOUT_MS=3000
+      - QUORUS_RAFT_HEARTBEAT_INTERVAL_MS=500
+      - JAVA_OPTS=-Xmx256m -Xms128m
+    ports:
+      - "8080"
+    networks:
+      - raft-cluster
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  controller4:
+    image: quorus-controller:test
+    hostname: controller4
+    environment:
+      - QUORUS_NODE_ID=controller4
+      - QUORUS_RAFT_HOST=0.0.0.0
+      - QUORUS_RAFT_PORT=9080
+      - QUORUS_HTTP_PORT=8080
+      - QUORUS_CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080,controller4=controller4:9080,controller5=controller5:9080
+      - QUORUS_RAFT_ELECTION_TIMEOUT_MS=3000
+      - QUORUS_RAFT_HEARTBEAT_INTERVAL_MS=500
+      - JAVA_OPTS=-Xmx256m -Xms128m
+    ports:
+      - "8080"
+    networks:
+      - raft-cluster
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  controller5:
+    image: quorus-controller:test
+    hostname: controller5
+    environment:
+      - QUORUS_NODE_ID=controller5
+      - QUORUS_RAFT_HOST=0.0.0.0
+      - QUORUS_RAFT_PORT=9080
+      - QUORUS_HTTP_PORT=8080
+      - QUORUS_CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080,controller4=controller4:9080,controller5=controller5:9080
+      - QUORUS_RAFT_ELECTION_TIMEOUT_MS=3000
+      - QUORUS_RAFT_HEARTBEAT_INTERVAL_MS=500
+      - JAVA_OPTS=-Xmx256m -Xms128m
+    ports:
+      - "8080"
+    networks:
+      - raft-cluster
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+networks:
+  raft-cluster:
+    driver: bridge

@@ -33,9 +33,11 @@ import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -127,7 +129,7 @@ public class RaftChaosTest {
 
     @Test
     @DisplayName("Cluster should reach consensus despite 25% packet loss")
-    void testReplicationWithPacketLoss() throws InterruptedException {
+    void testReplicationWithPacketLoss() {
         logger.info("=== TEST: Replication with 25% Packet Loss ===");
         
         // Configure 25% packet loss on ALL nodes
@@ -144,7 +146,7 @@ public class RaftChaosTest {
         String jobId = UUID.randomUUID().toString();
         TransferRequest request = TransferRequest.builder()
             .requestId(jobId)
-            .sourceUri(Paths.get("/tmp/source.txt").toUri())
+            .sourceUri(URI.create("sftp://testhost/tmp/source.txt"))
             .destinationPath(Paths.get("/tmp/dest.txt"))
             .build();
             
@@ -162,24 +164,19 @@ public class RaftChaosTest {
             fail("Failed to commit job under packet loss conditions: " + e.getMessage());
         }
         
-        // Verify replication to majority (allow time for commit index propagation)
-        int nodesWithData = 0;
-        long deadline = System.currentTimeMillis() + 10000; // Wait up to 10s for propagation in lossy network
+        // Verify replication to majority (reactive: poll until condition met)
+        await().atMost(Duration.ofSeconds(10))
+            .pollInterval(Duration.ofMillis(200))
+            .until(() -> {
+                long count = cluster.stream()
+                    .filter(node -> ((QuorusStateMachine) node.getStateMachine()).getTransferJob(jobId) != null)
+                    .count();
+                return count >= 3;
+            });
         
-        while (System.currentTimeMillis() < deadline) {
-            nodesWithData = 0;
-            for (RaftNode node : cluster) {
-                QuorusStateMachine sm = (QuorusStateMachine) node.getStateMachine();
-                if (sm.getTransferJob(jobId) != null) {
-                    nodesWithData++;
-                }
-            }
-            
-            if (nodesWithData >= 3) {
-                break;
-            }
-            Thread.sleep(200);
-        }
+        long nodesWithData = cluster.stream()
+            .filter(node -> ((QuorusStateMachine) node.getStateMachine()).getTransferJob(jobId) != null)
+            .count();
         
         logger.info("{} nodes have the data", nodesWithData);
         assertTrue(nodesWithData >= 3, "Data should be replicated to at least a majority (3) of nodes");
@@ -187,7 +184,7 @@ public class RaftChaosTest {
 
     @Test
     @DisplayName("Cluster should remain stable with high latency (100-200ms)")
-    void testReplicationWithHighLatency() throws InterruptedException {
+    void testReplicationWithHighLatency() {
         logger.info("=== TEST: Replication with High Latency ===");
         
         // Configure high latency (100-200ms) on ALL nodes
@@ -209,7 +206,7 @@ public class RaftChaosTest {
             String jobId = UUID.randomUUID().toString();
             TransferRequest request = TransferRequest.builder()
                 .requestId(jobId)
-                .sourceUri(Paths.get("/tmp/source" + i + ".txt").toUri())
+                .sourceUri(URI.create("sftp://testhost/tmp/source" + i + ".txt"))
                 .destinationPath(Paths.get("/tmp/dest" + i + ".txt"))
                 .build();
                 
@@ -232,16 +229,13 @@ public class RaftChaosTest {
         }
     }
 
-    private RaftNode waitForLeader(long timeoutMs) throws InterruptedException {
-        long deadline = System.currentTimeMillis() + timeoutMs;
-        while (System.currentTimeMillis() < deadline) {
-            for (RaftNode node : cluster) {
-                if (node.getState() == RaftNode.State.LEADER) {
-                    return node;
-                }
-            }
-            Thread.sleep(100);
-        }
-        return null;
+    private RaftNode waitForLeader(long timeoutMs) {
+        await().atMost(Duration.ofMillis(timeoutMs))
+            .pollInterval(Duration.ofMillis(100))
+            .until(() -> cluster.stream().anyMatch(n -> n.getState() == RaftNode.State.LEADER));
+        return cluster.stream()
+            .filter(n -> n.getState() == RaftNode.State.LEADER)
+            .findFirst()
+            .orElse(null);
     }
 }
