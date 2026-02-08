@@ -1,0 +1,39 @@
+# =============================================================================
+# Docker build context exclusions for Quorus
+# Reduces context transfer from ~100MB to ~10MB per build.
+# =============================================================================
+
+# Build outputs (55MB+ waste — rebuilt inside Docker anyway)
+**/target/
+
+# Version control
+.git/
+
+# IDE / editor state
+.idea/
+.history/
+.vscode/
+**/*.iml
+
+# Runtime data (not needed for image builds)
+data/
+logs/
+downloads/
+corporate-data/
+temp/
+
+# Documentation
+docs/
+docs-design/
+
+# Docker compose configs (not needed inside image builds)
+docker/
+
+# Scripts
+scripts/
+
+# Root-level files not needed for builds
+*.json
+LICENSE
+NOTICE
+OPEN_SOURCE_USAGE.md

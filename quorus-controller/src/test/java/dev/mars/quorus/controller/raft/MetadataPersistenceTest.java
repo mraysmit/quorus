@@ -29,10 +29,12 @@ import org.junit.jupiter.api.Tag;
 
 import java.net.URI;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -135,8 +137,10 @@ public class MetadataPersistenceTest {
         assertNotNull(response, "Command should be processed successfully");
         logger.info("Command processed successfully: " + response);
         
-        // Wait for replication to complete
-        Thread.sleep(1000);
+        // Wait for replication to complete (reactive: poll until all nodes have the job)
+        await().atMost(Duration.ofSeconds(10))
+            .pollInterval(Duration.ofMillis(200))
+            .until(() -> allNodesHaveJob(testJob.getJobId()));
         
         // Verify metadata exists on all nodes
         logger.info("Verifying metadata replication across all nodes...");
@@ -172,8 +176,11 @@ public class MetadataPersistenceTest {
             logger.info("Submitted job " + job.getJobId() + " to original leader");
         }
         
-        // Wait for replication
-        Thread.sleep(1000);
+        // Wait for replication (reactive: poll until all nodes have all jobs)
+        String lastJobId = testJobs.get(testJobs.size() - 1).getJobId();
+        await().atMost(Duration.ofSeconds(10))
+            .pollInterval(Duration.ofMillis(200))
+            .until(() -> allNodesHaveJob(lastJobId));
         
         // Verify all jobs are replicated before leader change
         logger.info("Verifying initial replication...");
@@ -189,8 +196,13 @@ public class MetadataPersistenceTest {
         logger.info("Forcing leader change by stopping " + originalLeader.getNodeId());
         originalLeader.stop();
         
-        // Wait for new leader election
-        Thread.sleep(3000);
+        // Wait for new leader election (reactive: poll until a new leader emerges)
+        await().atMost(Duration.ofSeconds(15))
+            .pollInterval(Duration.ofMillis(200))
+            .until(() -> {
+                RaftNode leader = findCurrentLeader();
+                return leader != null && !leader.getNodeId().equals(originalLeader.getNodeId());
+            });
         RaftNode newLeader = findCurrentLeader();
         assertNotNull(newLeader, "New leader should be elected");
         assertNotEquals(originalLeader.getNodeId(), newLeader.getNodeId(), 
@@ -219,8 +231,11 @@ public class MetadataPersistenceTest {
         newResult.toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
         logger.info("Successfully submitted new job to new leader: " + newJob.getJobId());
         
-        // Wait for replication
-        Thread.sleep(1000);
+        // Wait for replication (reactive: poll until remaining nodes have the new job)
+        await().atMost(Duration.ofSeconds(10))
+            .pollInterval(Duration.ofMillis(200))
+            .until(() -> remainingNodes.stream().allMatch(node -> 
+                ((QuorusStateMachine) node.getStateMachine()).hasTransferJob(newJob.getJobId())));
         
         // Verify new job is replicated to all remaining nodes
         for (RaftNode node : remainingNodes) {
@@ -266,15 +281,29 @@ public class MetadataPersistenceTest {
             logger.info("Submitted job " + job.getJobId() + " while follower was down");
         }
         
-        // Wait for replication to remaining nodes
-        Thread.sleep(1000);
+        // Wait for replication to remaining nodes (reactive: poll until committed)
+        String lastJobId = jobsWhileDown.get(jobsWhileDown.size() - 1).getJobId();
+        await().atMost(Duration.ofSeconds(10))
+            .pollInterval(Duration.ofMillis(200))
+            .until(() -> {
+                // Check at least majority of running nodes have the job
+                return cluster.stream()
+                    .filter(n -> !n.getNodeId().equals(followerToFail.getNodeId()))
+                    .filter(n -> ((QuorusStateMachine) n.getStateMachine()).hasTransferJob(lastJobId))
+                    .count() >= 3;
+            });
         
         // Restart the failed follower
         logger.info("Restarting failed follower: " + followerToFail.getNodeId());
         followerToFail.start();
         
-        // Wait for recovery and catch-up
-        Thread.sleep(3000);
+        // Wait for recovery and catch-up (reactive: poll until recovered node has the data)
+        await().atMost(Duration.ofSeconds(15))
+            .pollInterval(Duration.ofMillis(200))
+            .until(() -> {
+                QuorusStateMachine sm = (QuorusStateMachine) followerToFail.getStateMachine();
+                return jobsWhileDown.stream().allMatch(job -> sm.hasTransferJob(job.getJobId()));
+            });
         
         // Verify recovered node has all metadata
         logger.info("Verifying recovered node has all metadata...");
@@ -291,15 +320,11 @@ public class MetadataPersistenceTest {
 
     // Helper methods
     
-    private RaftNode waitForLeaderElection() throws InterruptedException {
-        for (int i = 0; i < 30; i++) { // Wait up to 30 seconds
-            RaftNode leader = findCurrentLeader();
-            if (leader != null) {
-                return leader;
-            }
-            Thread.sleep(1000);
-        }
-        return null;
+    private RaftNode waitForLeaderElection() {
+        await().atMost(Duration.ofSeconds(30))
+            .pollInterval(Duration.ofMillis(200))
+            .until(() -> findCurrentLeader() != null);
+        return findCurrentLeader();
     }
     
     private RaftNode findCurrentLeader() {
@@ -309,10 +334,15 @@ public class MetadataPersistenceTest {
             .orElse(null);
     }
     
+    private boolean allNodesHaveJob(String jobId) {
+        return cluster.stream().allMatch(node -> 
+            ((QuorusStateMachine) node.getStateMachine()).hasTransferJob(jobId));
+    }
+    
     private TransferJob createTestTransferJob(String jobId, String description) {
         try {
             TransferRequest request = TransferRequest.builder()
-                .sourceUri(URI.create("file:///test/source/" + jobId + ".txt"))
+                .sourceUri(URI.create("sftp://testhost/test/source/" + jobId + ".txt"))
                 .destinationPath(Paths.get("/test/dest/" + jobId + ".txt"))
                 .expectedSize(1024L)
                 .metadata("description", description)

@@ -28,6 +28,8 @@ import io.opentelemetry.api.GlobalOpenTelemetry;
 import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
 import io.opentelemetry.sdk.metrics.SdkMeterProvider;
+
+import static org.awaitility.Awaitility.await;
 import io.opentelemetry.sdk.resources.Resource;
 import io.opentelemetry.sdk.trace.SdkTracerProvider;
 import io.opentelemetry.sdk.trace.export.BatchSpanProcessor;
@@ -174,14 +176,11 @@ class InfrastructureWithTelemetryTest {
         raftNode.start();
         logger.info("  -> Raft node started, waiting for leader election...");
 
-        // Wait for leader election
-        for (int i = 0; i < 30; i++) {
-            if (raftNode.isLeader()) {
-                logger.info("  -> Leader elected after " + (i * 100) + "ms");
-                break;
-            }
-            Thread.sleep(100);
-        }
+        // Wait for leader election reactively
+        await().atMost(java.time.Duration.ofSeconds(10))
+            .pollInterval(java.time.Duration.ofMillis(50))
+            .until(() -> raftNode.isLeader());
+        logger.info("  -> Leader elected");
         logger.info("  -> Raft state: " + (raftNode.isLeader() ? "LEADER" : "FOLLOWER"));
         logger.info("  -> Current term: " + raftNode.getCurrentTerm());
         logger.info("  [OK] Raft node ready");
@@ -192,8 +191,7 @@ class InfrastructureWithTelemetryTest {
 
         // Start HTTP server with the correct Prometheus port for metrics proxy
         httpServer = new HttpApiServer(vertx, HTTP_PORT, raftNode, PROMETHEUS_PORT);
-        httpServer.start();
-        Thread.sleep(500);
+        httpServer.start().toCompletionStage().toCompletableFuture().get(5, java.util.concurrent.TimeUnit.SECONDS);
         logger.info("  [OK] HTTP Server deployed and listening");
 
         startupTime = System.currentTimeMillis() - start;

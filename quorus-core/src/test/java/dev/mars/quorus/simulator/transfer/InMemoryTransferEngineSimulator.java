@@ -545,6 +545,17 @@ public class InMemoryTransferEngineSimulator {
     }
 
     /**
+     * Immediately shuts down the transfer engine without waiting for tasks to complete.
+     * Preferred for test teardown where pending tasks are not needed.
+     */
+    public void shutdownNow() {
+        failureMode = TransferEngineFailureMode.SHUTTING_DOWN;
+        pendingQueue.forEach(t -> cancelTransfer(t.jobId));
+        pendingQueue.clear();
+        scheduler.shutdownNow();
+    }
+
+    /**
      * Clears all transfers and resets state.
      */
     public void clear() {

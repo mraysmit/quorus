@@ -18,18 +18,17 @@ package dev.mars.quorus.controller.raft;
 
 import dev.mars.quorus.controller.state.QuorusStateMachine;
 import io.vertx.core.Vertx;
-import io.vertx.junit5.VertxExtension;
-import io.vertx.junit5.VertxTestContext;
-import org.awaitility.Awaitility;
 import org.junit.jupiter.api.*;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -40,33 +39,51 @@ import static org.junit.jupiter.api.Assertions.*;
  * - Byzantine and crash failure modes
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @version 1.0
+ * @version 2.0
  * @since 2026-01-20
  */
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@ExtendWith(VertxExtension.class)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class EnhancedInMemoryTransportTest {
 
     private static final Logger logger = LoggerFactory.getLogger(EnhancedInMemoryTransportTest.class);
 
     private Vertx vertx;
+    private final List<RaftNode> activeNodes = new ArrayList<>();
 
     @BeforeEach
-    void setUp(Vertx vertx) {
-        this.vertx = vertx;
+    void setUp() {
+        vertx = Vertx.vertx();
         InMemoryTransportSimulator.clearAllTransports();
+        activeNodes.clear();
     }
 
     @AfterEach
-    void tearDown() {
+    void tearDown() throws Exception {
         InMemoryTransportSimulator.clearAllTransports();
+        for (RaftNode node : activeNodes) {
+            try { node.stop(); } catch (Exception ignored) {}
+        }
+        activeNodes.clear();
+        if (vertx != null) {
+            vertx.close().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
+        }
+    }
+
+    private long leaderCount(RaftNode... nodes) {
+        return Set.of(nodes).stream().filter(RaftNode::isLeader).count();
+    }
+
+    private void startAndTrack(RaftNode... nodes) {
+        for (RaftNode node : nodes) {
+            node.start();
+            activeNodes.add(node);
+        }
     }
 
     @Test
     @Order(1)
     @DisplayName("Test network partition prevents communication")
-    void testNetworkPartition(VertxTestContext testContext) {
+    void testNetworkPartition() {
         logger.info("=== Testing Network Partition ===");
         
         Set<String> clusterNodes = Set.of("node1", "node2", "node3");
@@ -75,73 +92,51 @@ class EnhancedInMemoryTransportTest {
         InMemoryTransportSimulator transport2 = new InMemoryTransportSimulator("node2");
         InMemoryTransportSimulator transport3 = new InMemoryTransportSimulator("node3");
 
-        QuorusStateMachine stateMachine1 = new QuorusStateMachine();
-        QuorusStateMachine stateMachine2 = new QuorusStateMachine();
-        QuorusStateMachine stateMachine3 = new QuorusStateMachine();
+        QuorusStateMachine sm1 = new QuorusStateMachine();
+        QuorusStateMachine sm2 = new QuorusStateMachine();
+        QuorusStateMachine sm3 = new QuorusStateMachine();
 
-        RaftNode node1 = new RaftNode(vertx, "node1", clusterNodes, transport1, stateMachine1, 1000, 200);
-        RaftNode node2 = new RaftNode(vertx, "node2", clusterNodes, transport2, stateMachine2, 1000, 200);
-        RaftNode node3 = new RaftNode(vertx, "node3", clusterNodes, transport3, stateMachine3, 1000, 200);
+        RaftNode node1 = new RaftNode(vertx, "node1", clusterNodes, transport1, sm1, 1000, 200);
+        RaftNode node2 = new RaftNode(vertx, "node2", clusterNodes, transport2, sm2, 1000, 200);
+        RaftNode node3 = new RaftNode(vertx, "node3", clusterNodes, transport3, sm3, 1000, 200);
 
-        // Start all nodes
-        node1.start()
-            .compose(v -> node2.start())
-            .compose(v -> node3.start())
-            .onComplete(testContext.succeeding(v -> {
-                // Wait for initial leader election
-                vertx.setTimer(2000, id1 -> {
-                    long initialLeaderCount = Set.of(node1, node2, node3).stream()
-                        .filter(RaftNode::isLeader)
-                        .count();
-                    
-                    logger.info("Initial leader count: {}", initialLeaderCount);
-                    assertEquals(1, initialLeaderCount, "Should have exactly one leader initially");
+        startAndTrack(node1, node2, node3);
 
-                    // Create partition: {node1} | {node2, node3}
-                    InMemoryTransportSimulator.createPartition(Set.of("node1"), Set.of("node2", "node3"));
-                    logger.info("Created network partition: {node1} | {node2, node3}");
+        // Wait for leader election
+        await().atMost(Duration.ofSeconds(10))
+            .pollInterval(Duration.ofMillis(100))
+            .until(() -> leaderCount(node1, node2, node3) == 1);
+        logger.info("Initial leader elected");
 
-                    // Wait for partition effects
-                    vertx.setTimer(2000, id2 -> {
-                        // Now we should have 2 leaders (one in each partition)
-                        // OR node1 becomes follower/candidate due to isolation
-                        long leaderCount = Set.of(node1, node2, node3).stream()
-                            .filter(RaftNode::isLeader)
-                            .count();
-                        
-                        logger.info("Leader count after partition: {}", leaderCount);
-                        logger.info("node1 state: {} (leader: {})", node1.getState(), node1.isLeader());
-                        logger.info("node2 state: {} (leader: {})", node2.getState(), node2.isLeader());
-                        logger.info("node3 state: {} (leader: {})", node3.getState(), node3.isLeader());
+        // Create partition: {node1} | {node2, node3}
+        InMemoryTransportSimulator.createPartition(Set.of("node1"), Set.of("node2", "node3"));
+        logger.info("Created network partition: {{node1}} | {{node2, node3}}");
 
-                        // Heal the partition
-                        InMemoryTransportSimulator.healPartitions();
-                        logger.info("Healed network partition");
+        // Wait for partition to take effect (majority side should have a leader)
+        await().atMost(Duration.ofSeconds(10))
+            .pollInterval(Duration.ofMillis(100))
+            .until(() -> node2.isLeader() || node3.isLeader());
 
-                        // Wait for cluster to converge
-                        vertx.setTimer(2000, id3 -> {
-                            long finalLeaderCount = Set.of(node1, node2, node3).stream()
-                                .filter(RaftNode::isLeader)
-                                .count();
-                            
-                            logger.info("Final leader count after healing: {}", finalLeaderCount);
-                            assertEquals(1, finalLeaderCount, "Should have exactly one leader after healing");
+        logger.info("node1 state: {} (leader: {})", node1.getState(), node1.isLeader());
+        logger.info("node2 state: {} (leader: {})", node2.getState(), node2.isLeader());
+        logger.info("node3 state: {} (leader: {})", node3.getState(), node3.isLeader());
 
-                            // Cleanup
-                            node1.stop()
-                                .compose(v2 -> node2.stop())
-                                .compose(v2 -> node3.stop())
-                                .onComplete(testContext.succeeding(v2 -> testContext.completeNow()));
-                        });
-                    });
-                });
-            }));
+        // Heal the partition
+        InMemoryTransportSimulator.healPartitions();
+        logger.info("Healed network partition");
+
+        // Wait for cluster to converge to exactly one leader
+        await().atMost(Duration.ofSeconds(10))
+            .pollInterval(Duration.ofMillis(100))
+            .until(() -> leaderCount(node1, node2, node3) == 1);
+
+        assertEquals(1, leaderCount(node1, node2, node3), "Should have exactly one leader after healing");
     }
 
     @Test
     @Order(2)
     @DisplayName("Test message reordering affects Raft behavior")
-    void testMessageReordering(VertxTestContext testContext) {
+    void testMessageReordering() {
         logger.info("=== Testing Message Reordering ===");
         
         Set<String> clusterNodes = Set.of("leader", "follower");
@@ -150,39 +145,30 @@ class EnhancedInMemoryTransportTest {
         InMemoryTransportSimulator transport2 = new InMemoryTransportSimulator("follower");
 
         // Enable message reordering
-        transport1.setReorderingConfig(true, 0.3, 50); // 30% reorder probability, max 50ms delay
+        transport1.setReorderingConfig(true, 0.3, 50);
         transport2.setReorderingConfig(true, 0.3, 50);
 
-        QuorusStateMachine stateMachine1 = new QuorusStateMachine();
-        QuorusStateMachine stateMachine2 = new QuorusStateMachine();
+        QuorusStateMachine sm1 = new QuorusStateMachine();
+        QuorusStateMachine sm2 = new QuorusStateMachine();
 
-        RaftNode node1 = new RaftNode(vertx, "leader", clusterNodes, transport1, stateMachine1, 1000, 200);
-        RaftNode node2 = new RaftNode(vertx, "follower", clusterNodes, transport2, stateMachine2, 1000, 200);
+        RaftNode node1 = new RaftNode(vertx, "leader", clusterNodes, transport1, sm1, 1000, 200);
+        RaftNode node2 = new RaftNode(vertx, "follower", clusterNodes, transport2, sm2, 1000, 200);
 
-        node1.start()
-            .compose(v -> node2.start())
-            .onComplete(testContext.succeeding(v -> {
-                // Wait for leader election (may take longer due to reordering)
-                vertx.setTimer(3000, id -> {
-                    long leaderCount = Set.of(node1, node2).stream()
-                        .filter(RaftNode::isLeader)
-                        .count();
-                    
-                    logger.info("Leader count with reordering: {}", leaderCount);
-                    assertEquals(1, leaderCount, "Should still have exactly one leader despite reordering");
+        startAndTrack(node1, node2);
 
-                    // Cleanup
-                    node1.stop()
-                        .compose(v2 -> node2.stop())
-                        .onComplete(testContext.succeeding(v2 -> testContext.completeNow()));
-                });
-            }));
+        // Wait for leader election despite reordering
+        await().atMost(Duration.ofSeconds(10))
+            .pollInterval(Duration.ofMillis(100))
+            .until(() -> leaderCount(node1, node2) == 1);
+
+        logger.info("Leader count with reordering: {}", leaderCount(node1, node2));
+        assertEquals(1, leaderCount(node1, node2), "Should still have exactly one leader despite reordering");
     }
 
     @Test
     @Order(3)
     @DisplayName("Test bandwidth throttling slows down communication")
-    void testBandwidthThrottling(VertxTestContext testContext) {
+    void testBandwidthThrottling() {
         logger.info("=== Testing Bandwidth Throttling ===");
         
         Set<String> clusterNodes = Set.of("node1", "node2");
@@ -194,41 +180,30 @@ class EnhancedInMemoryTransportTest {
         transport1.setThrottlingConfig(true, 1000); // 1KB/sec
         transport2.setThrottlingConfig(true, 1000);
 
-        QuorusStateMachine stateMachine1 = new QuorusStateMachine();
-        QuorusStateMachine stateMachine2 = new QuorusStateMachine();
+        QuorusStateMachine sm1 = new QuorusStateMachine();
+        QuorusStateMachine sm2 = new QuorusStateMachine();
 
-        RaftNode node1 = new RaftNode(vertx, "node1", clusterNodes, transport1, stateMachine1, 1000, 200);
-        RaftNode node2 = new RaftNode(vertx, "node2", clusterNodes, transport2, stateMachine2, 1000, 200);
+        RaftNode node1 = new RaftNode(vertx, "node1", clusterNodes, transport1, sm1, 1000, 200);
+        RaftNode node2 = new RaftNode(vertx, "node2", clusterNodes, transport2, sm2, 1000, 200);
 
         long startTime = System.currentTimeMillis();
 
-        node1.start()
-            .compose(v -> node2.start())
-            .onComplete(testContext.succeeding(v -> {
-                // With throttling, cluster should still work but slower
-                vertx.setTimer(4000, id -> {
-                    long elapsedTime = System.currentTimeMillis() - startTime;
-                    logger.info("Time to start with throttling: {}ms", elapsedTime);
+        startAndTrack(node1, node2);
 
-                    long leaderCount = Set.of(node1, node2).stream()
-                        .filter(RaftNode::isLeader)
-                        .count();
-                    
-                    assertEquals(1, leaderCount, "Should have one leader despite throttling");
-                    assertTrue(elapsedTime >= 4000, "Should take at least 4 seconds due to throttling");
+        // With throttling, cluster should still elect a leader (may be slower)
+        await().atMost(Duration.ofSeconds(15))
+            .pollInterval(Duration.ofMillis(200))
+            .until(() -> leaderCount(node1, node2) == 1);
 
-                    // Cleanup
-                    node1.stop()
-                        .compose(v2 -> node2.stop())
-                        .onComplete(testContext.succeeding(v2 -> testContext.completeNow()));
-                });
-            }));
+        long elapsed = System.currentTimeMillis() - startTime;
+        logger.info("Time to elect leader with throttling: {}ms", elapsed);
+        assertEquals(1, leaderCount(node1, node2), "Should have one leader despite throttling");
     }
 
     @Test
     @Order(4)
     @DisplayName("Test crash failure mode stops node communication")
-    void testCrashFailureMode(VertxTestContext testContext) {
+    void testCrashFailureMode() {
         logger.info("=== Testing Crash Failure Mode ===");
         
         Set<String> clusterNodes = Set.of("node1", "node2", "node3");
@@ -237,66 +212,50 @@ class EnhancedInMemoryTransportTest {
         InMemoryTransportSimulator transport2 = new InMemoryTransportSimulator("node2");
         InMemoryTransportSimulator transport3 = new InMemoryTransportSimulator("node3");
 
-        QuorusStateMachine stateMachine1 = new QuorusStateMachine();
-        QuorusStateMachine stateMachine2 = new QuorusStateMachine();
-        QuorusStateMachine stateMachine3 = new QuorusStateMachine();
+        QuorusStateMachine sm1 = new QuorusStateMachine();
+        QuorusStateMachine sm2 = new QuorusStateMachine();
+        QuorusStateMachine sm3 = new QuorusStateMachine();
 
-        RaftNode node1 = new RaftNode(vertx, "node1", clusterNodes, transport1, stateMachine1, 800, 150);
-        RaftNode node2 = new RaftNode(vertx, "node2", clusterNodes, transport2, stateMachine2, 800, 150);
-        RaftNode node3 = new RaftNode(vertx, "node3", clusterNodes, transport3, stateMachine3, 800, 150);
+        RaftNode node1 = new RaftNode(vertx, "node1", clusterNodes, transport1, sm1, 800, 150);
+        RaftNode node2 = new RaftNode(vertx, "node2", clusterNodes, transport2, sm2, 800, 150);
+        RaftNode node3 = new RaftNode(vertx, "node3", clusterNodes, transport3, sm3, 800, 150);
 
-        node1.start()
-            .compose(v -> node2.start())
-            .compose(v -> node3.start())
-            .onComplete(testContext.succeeding(v -> {
-                // Wait for initial leader election
-                vertx.setTimer(2000, id1 -> {
-                    long initialLeaderCount = Set.of(node1, node2, node3).stream()
-                        .filter(RaftNode::isLeader)
-                        .count();
-                    
-                    assertEquals(1, initialLeaderCount, "Should have one leader initially");
+        startAndTrack(node1, node2, node3);
 
-                    // Crash node1
-                    transport1.setFailureMode(InMemoryTransportSimulator.FailureMode.CRASH, 0.0);
-                    logger.info("Crashed node1");
+        // Wait for initial leader election
+        await().atMost(Duration.ofSeconds(10))
+            .pollInterval(Duration.ofMillis(100))
+            .until(() -> leaderCount(node1, node2, node3) == 1);
 
-                    // Wait for cluster to adapt
-                    vertx.setTimer(2000, id2 -> {
-                        // node2 or node3 should become leader
-                        boolean node2Leader = node2.isLeader();
-                        boolean node3Leader = node3.isLeader();
-                        
-                        logger.info("After crash - node2 leader: {}, node3 leader: {}", node2Leader, node3Leader);
-                        assertTrue(node2Leader || node3Leader, "One of the remaining nodes should be leader");
+        assertEquals(1, leaderCount(node1, node2, node3), "Should have one leader initially");
 
-                        // Recover node1
-                        transport1.recoverFromCrash();
-                        logger.info("Recovered node1 from crash");
+        // Crash node1
+        transport1.setFailureMode(InMemoryTransportSimulator.FailureMode.CRASH, 0.0);
+        logger.info("Crashed node1");
 
-                        // Wait for node1 to rejoin
-                        vertx.setTimer(2000, id3 -> {
-                            long finalLeaderCount = Set.of(node1, node2, node3).stream()
-                                .filter(RaftNode::isLeader)
-                                .count();
-                            
-                            assertEquals(1, finalLeaderCount, "Should have one leader after recovery");
+        // Wait for cluster to adapt — node2 or node3 should be leader
+        await().atMost(Duration.ofSeconds(10))
+            .pollInterval(Duration.ofMillis(100))
+            .until(() -> node2.isLeader() || node3.isLeader());
 
-                            // Cleanup
-                            node1.stop()
-                                .compose(v2 -> node2.stop())
-                                .compose(v2 -> node3.stop())
-                                .onComplete(testContext.succeeding(v2 -> testContext.completeNow()));
-                        });
-                    });
-                });
-            }));
+        logger.info("After crash - node2 leader: {}, node3 leader: {}", node2.isLeader(), node3.isLeader());
+
+        // Recover node1
+        transport1.recoverFromCrash();
+        logger.info("Recovered node1 from crash");
+
+        // Wait for cluster to converge to exactly one leader
+        await().atMost(Duration.ofSeconds(10))
+            .pollInterval(Duration.ofMillis(100))
+            .until(() -> leaderCount(node1, node2, node3) == 1);
+
+        assertEquals(1, leaderCount(node1, node2, node3), "Should have one leader after recovery");
     }
 
     @Test
     @Order(5)
     @DisplayName("Test Byzantine failure mode with corrupted responses")
-    void testByzantineFailureMode(VertxTestContext testContext) {
+    void testByzantineFailureMode() {
         logger.info("=== Testing Byzantine Failure Mode ===");
         
         Set<String> clusterNodes = Set.of("node1", "node2", "node3");
@@ -308,42 +267,30 @@ class EnhancedInMemoryTransportTest {
         // Make node1 Byzantine (corrupt 50% of responses)
         transport1.setFailureMode(InMemoryTransportSimulator.FailureMode.BYZANTINE, 0.5);
 
-        QuorusStateMachine stateMachine1 = new QuorusStateMachine();
-        QuorusStateMachine stateMachine2 = new QuorusStateMachine();
-        QuorusStateMachine stateMachine3 = new QuorusStateMachine();
+        QuorusStateMachine sm1 = new QuorusStateMachine();
+        QuorusStateMachine sm2 = new QuorusStateMachine();
+        QuorusStateMachine sm3 = new QuorusStateMachine();
 
-        RaftNode node1 = new RaftNode(vertx, "node1", clusterNodes, transport1, stateMachine1, 1000, 200);
-        RaftNode node2 = new RaftNode(vertx, "node2", clusterNodes, transport2, stateMachine2, 1000, 200);
-        RaftNode node3 = new RaftNode(vertx, "node3", clusterNodes, transport3, stateMachine3, 1000, 200);
+        RaftNode node1 = new RaftNode(vertx, "node1", clusterNodes, transport1, sm1, 1000, 200);
+        RaftNode node2 = new RaftNode(vertx, "node2", clusterNodes, transport2, sm2, 1000, 200);
+        RaftNode node3 = new RaftNode(vertx, "node3", clusterNodes, transport3, sm3, 1000, 200);
 
-        node1.start()
-            .compose(v -> node2.start())
-            .compose(v -> node3.start())
-            .onComplete(testContext.succeeding(v -> {
-                // Raft should tolerate Byzantine node if it's not the majority
-                vertx.setTimer(3000, id -> {
-                    long leaderCount = Set.of(node1, node2, node3).stream()
-                        .filter(RaftNode::isLeader)
-                        .count();
-                    
-                    logger.info("Leader count with Byzantine node: {}", leaderCount);
-                    
-                    // May have 0 or 1 leaders depending on Byzantine interference
-                    assertTrue(leaderCount <= 1, "Should have at most one leader with Byzantine node");
+        startAndTrack(node1, node2, node3);
 
-                    // Cleanup
-                    node1.stop()
-                        .compose(v2 -> node2.stop())
-                        .compose(v2 -> node3.stop())
-                        .onComplete(testContext.succeeding(v2 -> testContext.completeNow()));
-                });
-            }));
+        // Raft should tolerate Byzantine node — wait for election to settle
+        await().atMost(Duration.ofSeconds(10))
+            .pollInterval(Duration.ofMillis(100))
+            .until(() -> leaderCount(node1, node2, node3) <= 1);
+
+        long lc = leaderCount(node1, node2, node3);
+        logger.info("Leader count with Byzantine node: {}", lc);
+        assertTrue(lc <= 1, "Should have at most one leader with Byzantine node");
     }
 
     @Test
     @Order(6)
     @DisplayName("Test SLOW failure mode increases latency")
-    void testSlowFailureMode(VertxTestContext testContext) {
+    void testSlowFailureMode() {
         logger.info("=== Testing SLOW Failure Mode ===");
         
         Set<String> clusterNodes = Set.of("node1", "node2");
@@ -354,41 +301,30 @@ class EnhancedInMemoryTransportTest {
         // Make node1 slow (10x latency)
         transport1.setFailureMode(InMemoryTransportSimulator.FailureMode.SLOW, 0.0);
 
-        QuorusStateMachine stateMachine1 = new QuorusStateMachine();
-        QuorusStateMachine stateMachine2 = new QuorusStateMachine();
+        QuorusStateMachine sm1 = new QuorusStateMachine();
+        QuorusStateMachine sm2 = new QuorusStateMachine();
 
-        RaftNode node1 = new RaftNode(vertx, "node1", clusterNodes, transport1, stateMachine1, 1000, 200);
-        RaftNode node2 = new RaftNode(vertx, "node2", clusterNodes, transport2, stateMachine2, 1000, 200);
+        RaftNode node1 = new RaftNode(vertx, "node1", clusterNodes, transport1, sm1, 1000, 200);
+        RaftNode node2 = new RaftNode(vertx, "node2", clusterNodes, transport2, sm2, 1000, 200);
 
         long startTime = System.currentTimeMillis();
 
-        node1.start()
-            .compose(v -> node2.start())
-            .onComplete(testContext.succeeding(v -> {
-                // SLOW mode should significantly increase election time
-                vertx.setTimer(4000, id -> {
-                    long elapsedTime = System.currentTimeMillis() - startTime;
-                    logger.info("Time with SLOW mode: {}ms", elapsedTime);
+        startAndTrack(node1, node2);
 
-                    long leaderCount = Set.of(node1, node2).stream()
-                        .filter(RaftNode::isLeader)
-                        .count();
-                    
-                    assertEquals(1, leaderCount, "Should eventually have one leader despite slow node");
-                    assertTrue(elapsedTime >= 3000, "Should take longer due to SLOW mode");
+        // SLOW mode should still eventually elect a leader
+        await().atMost(Duration.ofSeconds(15))
+            .pollInterval(Duration.ofMillis(200))
+            .until(() -> leaderCount(node1, node2) == 1);
 
-                    // Cleanup
-                    node1.stop()
-                        .compose(v2 -> node2.stop())
-                        .onComplete(testContext.succeeding(v2 -> testContext.completeNow()));
-                });
-            }));
+        long elapsed = System.currentTimeMillis() - startTime;
+        logger.info("Time with SLOW mode: {}ms", elapsed);
+        assertEquals(1, leaderCount(node1, node2), "Should eventually have one leader despite slow node");
     }
 
     @Test
     @Order(7)
     @DisplayName("Test FLAKY failure mode with intermittent issues")
-    void testFlakyFailureMode(VertxTestContext testContext) {
+    void testFlakyFailureMode() {
         logger.info("=== Testing FLAKY Failure Mode ===");
         
         Set<String> clusterNodes = Set.of("node1", "node2", "node3");
@@ -400,40 +336,29 @@ class EnhancedInMemoryTransportTest {
         // Make node2 flaky (intermittent 50% high latency)
         transport2.setFailureMode(InMemoryTransportSimulator.FailureMode.FLAKY, 0.0);
 
-        QuorusStateMachine stateMachine1 = new QuorusStateMachine();
-        QuorusStateMachine stateMachine2 = new QuorusStateMachine();
-        QuorusStateMachine stateMachine3 = new QuorusStateMachine();
+        QuorusStateMachine sm1 = new QuorusStateMachine();
+        QuorusStateMachine sm2 = new QuorusStateMachine();
+        QuorusStateMachine sm3 = new QuorusStateMachine();
 
-        RaftNode node1 = new RaftNode(vertx, "node1", clusterNodes, transport1, stateMachine1, 800, 150);
-        RaftNode node2 = new RaftNode(vertx, "node2", clusterNodes, transport2, stateMachine2, 800, 150);
-        RaftNode node3 = new RaftNode(vertx, "node3", clusterNodes, transport3, stateMachine3, 800, 150);
+        RaftNode node1 = new RaftNode(vertx, "node1", clusterNodes, transport1, sm1, 800, 150);
+        RaftNode node2 = new RaftNode(vertx, "node2", clusterNodes, transport2, sm2, 800, 150);
+        RaftNode node3 = new RaftNode(vertx, "node3", clusterNodes, transport3, sm3, 800, 150);
 
-        node1.start()
-            .compose(v -> node2.start())
-            .compose(v -> node3.start())
-            .onComplete(testContext.succeeding(v -> {
-                // FLAKY mode should still allow cluster to function
-                vertx.setTimer(3000, id -> {
-                    long leaderCount = Set.of(node1, node2, node3).stream()
-                        .filter(RaftNode::isLeader)
-                        .count();
-                    
-                    logger.info("Leader count with FLAKY node: {}", leaderCount);
-                    assertEquals(1, leaderCount, "Should have one leader despite flaky node");
+        startAndTrack(node1, node2, node3);
 
-                    // Cleanup
-                    node1.stop()
-                        .compose(v2 -> node2.stop())
-                        .compose(v2 -> node3.stop())
-                        .onComplete(testContext.succeeding(v2 -> testContext.completeNow()));
-                });
-            }));
+        // FLAKY mode should still allow cluster to function
+        await().atMost(Duration.ofSeconds(10))
+            .pollInterval(Duration.ofMillis(100))
+            .until(() -> leaderCount(node1, node2, node3) == 1);
+
+        logger.info("Leader count with FLAKY node: {}", leaderCount(node1, node2, node3));
+        assertEquals(1, leaderCount(node1, node2, node3), "Should have one leader despite flaky node");
     }
 
     @Test
     @Order(8)
     @DisplayName("Test combined chaos: partition + reordering + packet drop")
-    void testCombinedChaos(VertxTestContext testContext) {
+    void testCombinedChaos() {
         logger.info("=== Testing Combined Chaos Scenarios ===");
         
         Set<String> clusterNodes = Set.of("node1", "node2", "node3");
@@ -443,44 +368,31 @@ class EnhancedInMemoryTransportTest {
         InMemoryTransportSimulator transport3 = new InMemoryTransportSimulator("node3");
 
         // Apply multiple chaos factors
-        transport1.setChaosConfig(10, 30, 0.1); // 10% packet drop
+        transport1.setChaosConfig(10, 30, 0.1);
         transport2.setChaosConfig(10, 30, 0.1);
         transport3.setChaosConfig(10, 30, 0.1);
         
-        transport1.setReorderingConfig(true, 0.2, 40); // 20% reorder probability
+        transport1.setReorderingConfig(true, 0.2, 40);
         transport2.setReorderingConfig(true, 0.2, 40);
         transport3.setReorderingConfig(true, 0.2, 40);
 
-        QuorusStateMachine stateMachine1 = new QuorusStateMachine();
-        QuorusStateMachine stateMachine2 = new QuorusStateMachine();
-        QuorusStateMachine stateMachine3 = new QuorusStateMachine();
+        QuorusStateMachine sm1 = new QuorusStateMachine();
+        QuorusStateMachine sm2 = new QuorusStateMachine();
+        QuorusStateMachine sm3 = new QuorusStateMachine();
 
-        RaftNode node1 = new RaftNode(vertx, "node1", clusterNodes, transport1, stateMachine1, 1000, 200);
-        RaftNode node2 = new RaftNode(vertx, "node2", clusterNodes, transport2, stateMachine2, 1000, 200);
-        RaftNode node3 = new RaftNode(vertx, "node3", clusterNodes, transport3, stateMachine3, 1000, 200);
+        RaftNode node1 = new RaftNode(vertx, "node1", clusterNodes, transport1, sm1, 1000, 200);
+        RaftNode node2 = new RaftNode(vertx, "node2", clusterNodes, transport2, sm2, 1000, 200);
+        RaftNode node3 = new RaftNode(vertx, "node3", clusterNodes, transport3, sm3, 1000, 200);
 
-        node1.start()
-            .compose(v -> node2.start())
-            .compose(v -> node3.start())
-            .onComplete(testContext.succeeding(v -> {
-                // Even with combined chaos, Raft should eventually elect a leader
-                vertx.setTimer(5000, id -> {
-                    long leaderCount = Set.of(node1, node2, node3).stream()
-                        .filter(RaftNode::isLeader)
-                        .count();
-                    
-                    logger.info("Leader count with combined chaos: {}", leaderCount);
-                    
-                    // May need more time or may not always succeed with heavy chaos
-                    // But should have at most 1 leader
-                    assertTrue(leaderCount <= 1, "Should have at most one leader");
+        startAndTrack(node1, node2, node3);
 
-                    // Cleanup
-                    node1.stop()
-                        .compose(v2 -> node2.stop())
-                        .compose(v2 -> node3.stop())
-                        .onComplete(testContext.succeeding(v2 -> testContext.completeNow()));
-                });
-            }));
+        // Even with combined chaos, Raft should eventually have at most 1 leader
+        await().atMost(Duration.ofSeconds(15))
+            .pollInterval(Duration.ofMillis(200))
+            .until(() -> leaderCount(node1, node2, node3) <= 1);
+
+        long lc = leaderCount(node1, node2, node3);
+        logger.info("Leader count with combined chaos: {}", lc);
+        assertTrue(lc <= 1, "Should have at most one leader");
     }
 }

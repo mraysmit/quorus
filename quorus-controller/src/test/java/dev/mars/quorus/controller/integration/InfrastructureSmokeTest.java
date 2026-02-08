@@ -27,6 +27,8 @@ import dev.mars.quorus.controller.state.QuorusStateMachine;
 import io.vertx.core.Vertx;
 import org.junit.jupiter.api.*;
 
+import static org.awaitility.Awaitility.await;
+
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -98,16 +100,14 @@ class InfrastructureSmokeTest {
         raftNode = new RaftNode(vertx, "smoke-test-node", clusterNodes, transport, stateMachine, 500, 100);
         raftNode.start();
 
-        // Wait for leader election
-        for (int i = 0; i < 30; i++) {
-            if (raftNode.isLeader()) break;
-            Thread.sleep(100);
-        }
+        // Wait for leader election reactively
+        await().atMost(java.time.Duration.ofSeconds(10))
+            .pollInterval(java.time.Duration.ofMillis(50))
+            .until(() -> raftNode.isLeader());
 
-        // Start HTTP server
+        // Start HTTP server and wait for it to be ready
         httpServer = new HttpApiServer(vertx, HTTP_PORT, raftNode);
-        httpServer.start();
-        Thread.sleep(500);
+        httpServer.start().toCompletionStage().toCompletableFuture().get(5, java.util.concurrent.TimeUnit.SECONDS);
 
         startupTime = System.currentTimeMillis() - start;
         logger.info("Infrastructure started in " + startupTime + "ms");

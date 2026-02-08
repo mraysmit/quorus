@@ -23,11 +23,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
 import org.testcontainers.containers.ComposeContainer;
-import org.testcontainers.containers.wait.strategy.Wait;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
-import java.io.File;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -35,7 +31,6 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
 import org.junit.jupiter.api.Tag;
@@ -55,7 +50,6 @@ import static org.junit.jupiter.api.Assertions.*;
  * @version 1.0
  * @since 2025-08-20
  */
-@Testcontainers
 @Tag("flaky")
 public class DockerRaftClusterTest {
 
@@ -64,32 +58,14 @@ public class DockerRaftClusterTest {
     private static final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
             .build();
-
-    @Container
-    static ComposeContainer environment = new ComposeContainer(new File("src/test/resources/docker-compose-test.yml"))
-            .withExposedService("controller1", 8080, Wait.forHttp("/health").forStatusCode(200))
-            .withExposedService("controller2", 8080, Wait.forHttp("/health").forStatusCode(200))
-            .withExposedService("controller3", 8080, Wait.forHttp("/health").forStatusCode(200))
-            .waitingFor("controller1", Wait.forLogMessage(".*Starting Raft node.*", 1))
-            .waitingFor("controller2", Wait.forLogMessage(".*Starting Raft node.*", 1))
-            .waitingFor("controller3", Wait.forLogMessage(".*Starting Raft node.*", 1))
-            .withStartupTimeout(Duration.ofMinutes(5));
+    private static final ComposeContainer environment = SharedDockerCluster.getThreeNodeCluster();
 
     private List<String> nodeEndpoints;
 
     @BeforeEach
     void setUp(TestInfo testInfo) {
         logger.info("Starting test: " + testInfo.getDisplayName());
-        
-        // Get the exposed ports for each controller
-        nodeEndpoints = new ArrayList<>();
-        for (int i = 1; i <= 3; i++) {
-            String serviceName = "controller" + i;
-            Integer port = environment.getServicePort(serviceName, 8080);
-            String endpoint = "http://localhost:" + port;
-            nodeEndpoints.add(endpoint);
-            logger.info("Controller " + i + " endpoint: " + endpoint);
-        }
+        nodeEndpoints = SharedDockerCluster.getNodeEndpoints(environment, 3);
 
         // Wait for all nodes to be healthy
         await().atMost(Duration.ofMinutes(2))
