@@ -69,50 +69,48 @@ Quorus uses a structured, hierarchical logging format designed for readability a
 | **ERROR** | Test failures (brief summary only: error type + truncated message) |
 | **WARN** | Simulated failures, chaos engineering events, test aborts |
 | **INFO** | Test lifecycle events, major operations (transfer complete) |
-| **DEBUG** | Per-test metrics, timing, resource deltas, completion status, failure details |
-| **TRACE** | OS/environment context, **full stack traces**, nested exception chains |
+| **DEBUG** | Per-test metrics, timing, resource deltas, completion status, failure details, **full stack traces**, nested exception chains |
 
 ### Stack Trace Policy
 
-**Stack traces are logged at TRACE level only** to keep ERROR output clean:
+**Stack traces are logged at DEBUG level only** to keep ERROR output clean:
 - **ERROR level**: Brief failure summary (error type + first 100 chars of message)
-- **DEBUG level**: Error type, full message, root cause summary
-- **TRACE level**: Complete stack trace with all nested causes
+- **DEBUG level**: Error type, full message, root cause summary, complete stack trace with all nested causes
 
 This separation ensures:
 1. CI/CD logs remain scannable at default log levels
-2. DevOps can enable TRACE for deep diagnostics when needed
+2. DevOps can enable DEBUG for deep diagnostics when needed
 3. No stack trace pollution in normal test output
 
 ---
 
-## TRACE Level: Environment Context
+## DEBUG Level: Environment Context
 
-Environment/OS information is logged at TRACE level to reduce verbosity. Enable by setting `SimulatorTestRunner` logger to TRACE in logback-test.xml.
+Environment/OS information is logged at DEBUG level to reduce verbosity. Enable by setting `SimulatorTestRunner` logger to DEBUG in logback-test.xml.
 
-### Environment Context (logged at suite start, TRACE level)
+### Environment Context (logged at suite start, DEBUG level)
 ```
-[TRACE] ══════════════════════════ ENVIRONMENT ══════════════════════════
-[TRACE] HOSTNAME: LAPTOP-T26VQQ26 (172.20.10.13)
-[TRACE] JAVA VERSION: 25 (Oracle Corporation)
-[TRACE] JAVA HOME: C:\Users\markr\.jdks\openjdk-25
-[TRACE] JVM: OpenJDK 64-Bit Server VM 25+36-3489
-[TRACE] OS: Windows 11 10.0 (amd64)
-[TRACE] USER: markr @ C:\Users\markr\dev\java\corejava\quorus
-[TRACE] PROCESSORS: 12
-[TRACE] MAX MEMORY: 8152MB
-[TRACE] INITIAL HEAP: 516MB
-[TRACE] TIMEZONE: Asia/Shanghai
-[TRACE] TEMP DIR: C:\Users\markr\AppData\Local\Temp\
-[TRACE] FILE ENCODING: UTF-8
-[TRACE] LINE SEPARATOR: \r\n
-[TRACE] JVM ARGS: -Xmx8g -XX:+UseG1GC
-[TRACE] PID: 27120
-[TRACE] UPTIME: 0s
-[TRACE] BUILD TOOL: Maven (/path/to/maven) | Gradle 8.x | IDE or direct execution
-[TRACE] SUREFIRE VERSION: 3.2.2
-[TRACE] PARALLEL CONFIG: forks=1, threads=4
-[TRACE] ══════════════════════════════════════════════════════════════════
+[DEBUG] ══════════════════════════ ENVIRONMENT ══════════════════════════
+[DEBUG] HOSTNAME: LAPTOP-T26VQQ26 (172.20.10.13)
+[DEBUG] JAVA VERSION: 25 (Oracle Corporation)
+[DEBUG] JAVA HOME: C:\Users\markr\.jdks\openjdk-25
+[DEBUG] JVM: OpenJDK 64-Bit Server VM 25+36-3489
+[DEBUG] OS: Windows 11 10.0 (amd64)
+[DEBUG] USER: markr @ C:\Users\markr\dev\java\corejava\quorus
+[DEBUG] PROCESSORS: 12
+[DEBUG] MAX MEMORY: 8152MB
+[DEBUG] INITIAL HEAP: 516MB
+[DEBUG] TIMEZONE: Asia/Shanghai
+[DEBUG] TEMP DIR: C:\Users\markr\AppData\Local\Temp\
+[DEBUG] FILE ENCODING: UTF-8
+[DEBUG] LINE SEPARATOR: \r\n
+[DEBUG] JVM ARGS: -Xmx8g -XX:+UseG1GC
+[DEBUG] PID: 27120
+[DEBUG] UPTIME: 0s
+[DEBUG] BUILD TOOL: Maven (/path/to/maven) | Gradle 8.x | IDE or direct execution
+[DEBUG] SUREFIRE VERSION: 3.2.2
+[DEBUG] PARALLEL CONFIG: forks=1, threads=4
+[DEBUG] ══════════════════════════════════════════════════════════════════
 ```
 
 ---
@@ -170,18 +168,18 @@ The DEBUG logging provides per-test metrics for troubleshooting.
 [DEBUG] ══════════════════════════════════════════════════════════
 ```
 
-**TRACE level** (full stack traces with -Dtest.loglevel=TRACE):
+**DEBUG level** (full stack traces with -Dtest.loglevel=DEBUG):
 ```
-[TRACE] ════════════════════ FULL STACK TRACE ════════════════════
-[TRACE]   at org.junit.jupiter.api.AssertionUtils.fail(...)
-[TRACE]   at dev.mars.quorus.simulator.TransferTest.test(...)
-[TRACE]   at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(...)
-[TRACE]   at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(...)
-[TRACE]   at java.base/java.lang.reflect.Method.invoke(...)
-[TRACE] Caused by: java.io.IOException: Connection refused
-[TRACE]   at java.net.PlainSocketImpl.connect(...)
-[TRACE]   at java.net.Socket.connect(...)
-[TRACE] ══════════════════════════════════════════════════════════
+[DEBUG] ════════════════════ FULL STACK TRACE ════════════════════
+[DEBUG]   at org.junit.jupiter.api.AssertionUtils.fail(...)
+[DEBUG]   at dev.mars.quorus.simulator.TransferTest.test(...)
+[DEBUG]   at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(...)
+[DEBUG]   at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(...)
+[DEBUG]   at java.base/java.lang.reflect.Method.invoke(...)
+[DEBUG] Caused by: java.io.IOException: Connection refused
+[DEBUG]   at java.net.PlainSocketImpl.connect(...)
+[DEBUG]   at java.net.Socket.connect(...)
+[DEBUG] ══════════════════════════════════════════════════════════
 ```
 
 ### DevOps Diagnostic Fields Reference
@@ -237,20 +235,20 @@ The `SimulatorTestLoggingExtension` is designed to **never interfere with test e
 - **All callback methods** (`beforeAll`, `afterAll`, `beforeEach`, `afterEach`, `testSuccessful`, `testFailed`, `testAborted`, `testDisabled`) are wrapped in try-catch blocks
 - **Logging failures are caught and suppressed** — a brief message is printed to stderr
 - **MDC cleanup always runs** — even if logging fails, MDC entries are cleared in `finally` blocks
-- **Internal exceptions logged at TRACE** — extension errors are logged via `log.trace(msg, exception)` for debugging
+- **Internal exceptions logged at DEBUG** — extension errors are logged via `log.debug(msg, exception)` for debugging
 
 ### Recovery Behavior
 ```java
 // If logging fails, the extension prints a minimal warning and continues:
 // stderr: [SimulatorTestLoggingExtension] Failed in beforeEach: <error message>
-// TRACE log: Full exception with stack trace for later diagnosis
+// DEBUG log: Full exception with stack trace for later diagnosis
 ```
 
 ### Why This Matters
 1. **Test isolation**: Logging infrastructure failures cannot cause test failures
 2. **CI/CD stability**: Build pipelines won't break due to logging issues
 3. **Observability**: When logging works, full diagnostic data is captured
-4. **Debuggability**: When logging fails, TRACE logs capture what went wrong
+4. **Debuggability**: When logging fails, DEBUG logs capture what went wrong
 
 ---
 
