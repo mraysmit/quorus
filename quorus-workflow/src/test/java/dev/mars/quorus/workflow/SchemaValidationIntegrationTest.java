@@ -52,7 +52,7 @@ class SchemaValidationIntegrationTest {
         void testCompleteWorkflowParsing() throws WorkflowParseException {
             String completeWorkflow = """
                     metadata:
-                      name: "Integration Test Workflow"
+                      name: "integration-test-workflow"
                       version: "2.1.0"
                       description: "Complete workflow for integration testing with all features"
                       type: "data-pipeline-workflow"
@@ -149,7 +149,7 @@ class SchemaValidationIntegrationTest {
 
             // Validate parsed metadata
             WorkflowDefinition.WorkflowMetadata metadata = workflow.getMetadata();
-            assertEquals("Integration Test Workflow", metadata.getName());
+            assertEquals("integration-test-workflow", metadata.getName());
             assertEquals("2.1.0", metadata.getVersion());
             assertEquals("data-pipeline-workflow", metadata.getType());
             assertEquals("integration@quorus.dev", metadata.getAuthor());
@@ -231,13 +231,12 @@ class SchemaValidationIntegrationTest {
     class BackwardCompatibilityTests {
 
         @Test
-        @DisplayName("Should handle legacy workflows with kind field")
+        @DisplayName("Should handle standard workflow format")
         void testLegacyWorkflowCompatibility() throws WorkflowParseException {
             String legacyWorkflow = """
                     apiVersion: v1
-                    kind: TransferWorkflow
                     metadata:
-                      name: "Legacy Workflow"
+                      name: "legacy-workflow"
                       version: "1.0.0"
                       description: "Legacy workflow using old format for backward compatibility"
                       type: "transfer-workflow"
@@ -260,23 +259,19 @@ class SchemaValidationIntegrationTest {
             // Should parse successfully
             WorkflowDefinition workflow = parser.parseFromString(legacyWorkflow);
             assertNotNull(workflow);
-            assertEquals("TransferWorkflow", workflow.getKind());
 
-            // Should generate deprecation warning
+            // Should validate without errors
             ValidationResult result = parser.validateSchema(legacyWorkflow);
             assertTrue(result.isValid());
-            assertTrue(result.hasWarnings());
-            assertTrue(result.getWarnings().stream().anyMatch(w -> 
-                w.getFieldPath().equals("kind") && w.getMessage().contains("deprecated")));
         }
 
         @Test
         @DisplayName("Should migrate from old metadata format")
         void testMetadataMigration() throws WorkflowParseException {
-            // Test workflow with minimal metadata (using deprecated constructor)
+            // Test workflow with minimal metadata
             String minimalWorkflow = """
                     metadata:
-                      name: "Minimal Legacy Workflow"
+                      name: "minimal-legacy-workflow"
                       version: "1.0.0"
                       description: "Workflow with minimal metadata for migration testing"
                       type: "transfer-workflow"
@@ -315,7 +310,7 @@ class SchemaValidationIntegrationTest {
             StringBuilder largeWorkflow = new StringBuilder();
             largeWorkflow.append("""
                     metadata:
-                      name: "Large Performance Test Workflow"
+                      name: "large-performance-test-workflow"
                       version: "1.0.0"
                       description: "Large workflow for performance testing with many transfer groups and transfers"
                       type: "data-pipeline-workflow"
@@ -386,7 +381,7 @@ class SchemaValidationIntegrationTest {
 
             String workflowWithManyTags = String.format("""
                     metadata:
-                      name: "Many Tags Test Workflow"
+                      name: "many-tags-test-workflow"
                       version: "1.0.0"
                       description: "Workflow with maximum allowed tags for performance testing"
                       type: "validation-test-workflow"
@@ -418,7 +413,7 @@ class SchemaValidationIntegrationTest {
         void testETLPipelineWorkflow() throws WorkflowParseException {
             String etlWorkflow = """
                     metadata:
-                      name: "Customer Data ETL Pipeline"
+                      name: "customer-data-etl-pipeline"
                       version: "3.2.1"
                       description: "Production ETL pipeline for customer data processing with error handling and monitoring"
                       type: "etl-workflow"
@@ -496,7 +491,7 @@ class SchemaValidationIntegrationTest {
         void testBackupSyncWorkflow() throws WorkflowParseException {
             String backupWorkflow = """
                     metadata:
-                      name: "Database Backup and Sync"
+                      name: "database-backup-and-sync"
                       version: "1.5.2"
                       description: "Automated database backup with cross-region synchronization and verification"
                       type: "backup-workflow"

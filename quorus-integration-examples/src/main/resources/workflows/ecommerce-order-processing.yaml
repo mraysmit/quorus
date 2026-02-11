@@ -1,5 +1,5 @@
 metadata:
-  name: "E-commerce Order Processing Pipeline"
+  name: "ecommerce-order-processing-pipeline"
   version: "3.1.2"
   description: "Complete order processing pipeline from payment verification to fulfillment with inventory management and customer notifications"
   type: "data-pipeline-workflow"

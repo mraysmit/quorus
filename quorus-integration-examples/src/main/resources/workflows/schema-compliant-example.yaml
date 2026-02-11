@@ -1,5 +1,5 @@
 metadata:
-  name: "Database Data Sources Example"
+  name: "database-data-sources-example"
   version: "1.0.0"
   description: "Example configuration showing different database data source setups with comprehensive validation"
   type: "external-data-config"

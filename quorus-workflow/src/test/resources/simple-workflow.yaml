@@ -1,5 +1,5 @@
 metadata:
-  name: "Simple File Transfer Workflow"
+  name: "simple-file-transfer-workflow"
   version: "1.0.0"
   description: "A simple workflow demonstrating basic file transfer capabilities with dependency management"
   type: "transfer-workflow"

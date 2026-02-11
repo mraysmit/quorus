@@ -41,7 +41,7 @@ class YamlWorkflowDefinitionParserTest {
     void testParseSimpleWorkflow() throws WorkflowParseException {
         String yaml = """
                 metadata:
-                  name: "Simple Test Workflow"
+                  name: "simple-test-workflow"
                   version: "1.0.0"
                   description: "A simple test workflow"
                   type: "test-workflow"
@@ -69,9 +69,8 @@ class YamlWorkflowDefinitionParserTest {
         WorkflowDefinition definition = parser.parseFromString(yaml);
         
         assertNotNull(definition);
-        assertEquals("v1", definition.getApiVersion()); // Still supported for backward compatibility
-        assertEquals("TransferWorkflow", definition.getKind()); // Still supported for backward compatibility
-        assertEquals("Simple Test Workflow", definition.getMetadata().getName());
+        assertEquals("v1", definition.getApiVersion());
+        assertEquals("simple-test-workflow", definition.getMetadata().getName());
         assertEquals("1.0.0", definition.getMetadata().getVersion());
         assertEquals("A simple test workflow", definition.getMetadata().getDescription());
         assertEquals("test-workflow", definition.getMetadata().getType());
@@ -94,7 +93,7 @@ class YamlWorkflowDefinitionParserTest {
     void testParseWorkflowWithDependencies() throws WorkflowParseException {
         String yaml = """
                 metadata:
-                  name: "Dependency Test Workflow"
+                  name: "dependency-test-workflow"
                   version: "1.0.0"
                   description: "Test workflow with dependencies"
                   type: "dependency-test-workflow"
@@ -134,7 +133,7 @@ class YamlWorkflowDefinitionParserTest {
     void testParseWorkflowWithVariables() throws WorkflowParseException {
         String yaml = """
                 metadata:
-                  name: "Variable Test Workflow"
+                  name: "variable-test-workflow"
                   version: "1.0.0"
                   description: "Test workflow with variables"
                   type: "variable-test-workflow"
@@ -173,7 +172,7 @@ class YamlWorkflowDefinitionParserTest {
     void testValidateWorkflow() throws WorkflowParseException {
         String yaml = """
                 metadata:
-                  name: "Validation Test Workflow"
+                  name: "validation-test-workflow"
                   version: "1.0.0"
                   description: "Test workflow for validation with comprehensive metadata"
                   type: "validation-test-workflow"
@@ -205,7 +204,6 @@ class YamlWorkflowDefinitionParserTest {
     void testValidateInvalidWorkflow() {
         String yaml = """
                 apiVersion: v1
-                kind: TransferWorkflow
                 metadata:
                   name: ""
                 spec:
@@ -223,7 +221,7 @@ class YamlWorkflowDefinitionParserTest {
     void testParseInvalidYaml() {
         String invalidYaml = """
                 metadata:
-                  name: "Invalid Test"
+                  name: "invalid-test"
                   invalid: [unclosed
                 """;
         
@@ -236,7 +234,7 @@ class YamlWorkflowDefinitionParserTest {
     void testBuildDependencyGraph() throws WorkflowParseException {
         String yaml = """
                 metadata:
-                  name: "Dependency Graph Test Workflow"
+                  name: "dependency-graph-test-workflow"
                   version: "1.0.0"
                   description: "Test workflow for dependency graph building with complete metadata"
                   type: "dependency-graph-test-workflow"
@@ -290,7 +288,7 @@ class YamlWorkflowDefinitionParserTest {
     void testSchemaValidation() {
         String validYaml = """
                 metadata:
-                  name: "Schema Validation Test"
+                  name: "schema-validation-test"
                   version: "1.0.0"
                   description: "Test workflow for schema validation with complete metadata"
                   type: "schema-test-workflow"

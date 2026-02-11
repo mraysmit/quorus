@@ -145,7 +145,7 @@ class IntegrationTestSuite {
     void testWorkflowWithMultipleProtocols() throws Exception {
         String workflowYaml = """
                 metadata:
-                  name: "Multi-Protocol Test Workflow"
+                  name: "multi-protocol-test-workflow"
                   version: "1.0.0"
                   description: "Test workflow with multiple protocols"
                   type: "multi-protocol-test-workflow"
@@ -176,7 +176,7 @@ class IntegrationTestSuite {
         WorkflowDefinition workflow = workflowParser.parseFromString(workflowYaml);
         
         assertNotNull(workflow);
-        assertEquals("Multi-Protocol Test Workflow", workflow.getMetadata().getName());
+        assertEquals("multi-protocol-test-workflow", workflow.getMetadata().getName());
         assertEquals(1, workflow.getSpec().getTransferGroups().size());
         assertEquals(2, workflow.getSpec().getTransferGroups().get(0).getTransfers().size());
         

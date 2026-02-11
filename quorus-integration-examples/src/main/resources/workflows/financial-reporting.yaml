@@ -1,5 +1,5 @@
 metadata:
-  name: "Monthly Financial Reporting Pipeline"
+  name: "monthly-financial-reporting-pipeline"
   version: "2.0.1"
   description: "Automated monthly financial report generation with regulatory compliance checks and multi-format output"
   type: "etl-workflow"

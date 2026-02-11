@@ -44,10 +44,9 @@ class WorkflowDefinitionTest {
         WorkflowDefinition.WorkflowSpec spec = new WorkflowDefinition.WorkflowSpec(
                 Map.of("var1", "value1"), execution, List.of());
         
-        WorkflowDefinition definition = new WorkflowDefinition("v1", "TransferWorkflow", metadata, spec);
+        WorkflowDefinition definition = new WorkflowDefinition("v1", metadata, spec);
         
         assertEquals("v1", definition.getApiVersion());
-        assertEquals("TransferWorkflow", definition.getKind());
         assertEquals(metadata, definition.getMetadata());
         assertEquals(spec, definition.getSpec());
     }
@@ -62,19 +61,15 @@ class WorkflowDefinitionTest {
                 Map.of(), execution, List.of());
         
         assertThrows(NullPointerException.class, () -> {
-            new WorkflowDefinition(null, "TransferWorkflow", metadata, spec);
+            new WorkflowDefinition(null, metadata, spec);
         });
         
         assertThrows(NullPointerException.class, () -> {
-            new WorkflowDefinition("v1", null, metadata, spec);
+            new WorkflowDefinition("v1", null, spec);
         });
         
         assertThrows(NullPointerException.class, () -> {
-            new WorkflowDefinition("v1", "TransferWorkflow", null, spec);
-        });
-        
-        assertThrows(NullPointerException.class, () -> {
-            new WorkflowDefinition("v1", "TransferWorkflow", metadata, null);
+            new WorkflowDefinition("v1", metadata, null);
         });
     }
     
@@ -259,11 +254,10 @@ class WorkflowDefinitionTest {
         WorkflowDefinition.WorkflowSpec spec = new WorkflowDefinition.WorkflowSpec(
                 variables, execution, List.of(group1, group2));
         
-        WorkflowDefinition definition = new WorkflowDefinition("v1", "TransferWorkflow", metadata, spec);
+        WorkflowDefinition definition = new WorkflowDefinition("v1", metadata, spec);
         
         // Verify all components
         assertEquals("v1", definition.getApiVersion());
-        assertEquals("TransferWorkflow", definition.getKind());
         assertEquals("data-sync-workflow", definition.getMetadata().getName());
         assertEquals("data", definition.getMetadata().getLabels().get("team"));
         assertTrue(definition.getSpec().getExecution().isVirtualRun());
@@ -283,12 +277,11 @@ class WorkflowDefinitionTest {
         WorkflowDefinition.WorkflowSpec spec = new WorkflowDefinition.WorkflowSpec(
                 Map.of(), execution, List.of());
         
-        WorkflowDefinition definition = new WorkflowDefinition("v1", "TransferWorkflow", metadata, spec);
+        WorkflowDefinition definition = new WorkflowDefinition("v1", metadata, spec);
         
         String toString = definition.toString();
         assertNotNull(toString);
         assertTrue(toString.contains("v1"));
-        assertTrue(toString.contains("TransferWorkflow"));
         assertTrue(toString.contains("test-workflow"));
     }
     
@@ -300,7 +293,7 @@ class WorkflowDefinitionTest {
                 false, false, 1, Duration.ofMinutes(30), "sequential");
         WorkflowDefinition.WorkflowSpec spec1 = new WorkflowDefinition.WorkflowSpec(
                 Map.of(), execution1, List.of());
-        WorkflowDefinition definition1 = new WorkflowDefinition("v1", "TransferWorkflow", metadata1, spec1);
+        WorkflowDefinition definition1 = new WorkflowDefinition("v1", metadata1, spec1);
         
         WorkflowDefinition.WorkflowMetadata metadata2 = new WorkflowDefinition.WorkflowMetadata(
                 "same-name", "desc", Map.of());
@@ -308,13 +301,13 @@ class WorkflowDefinitionTest {
                 false, false, 1, Duration.ofMinutes(30), "sequential");
         WorkflowDefinition.WorkflowSpec spec2 = new WorkflowDefinition.WorkflowSpec(
                 Map.of(), execution2, List.of());
-        WorkflowDefinition definition2 = new WorkflowDefinition("v1", "TransferWorkflow", metadata2, spec2);
+        WorkflowDefinition definition2 = new WorkflowDefinition("v1", metadata2, spec2);
         
         WorkflowDefinition.WorkflowMetadata metadata3 = new WorkflowDefinition.WorkflowMetadata(
                 "different-name", "desc", Map.of());
         WorkflowDefinition.WorkflowSpec spec3 = new WorkflowDefinition.WorkflowSpec(
                 Map.of(), execution1, List.of());
-        WorkflowDefinition definition3 = new WorkflowDefinition("v1", "TransferWorkflow", metadata3, spec3);
+        WorkflowDefinition definition3 = new WorkflowDefinition("v1", metadata3, spec3);
         
         assertEquals(definition1, definition2);
         assertNotEquals(definition1, definition3);

@@ -1,5 +1,5 @@
 metadata:
-  name: "Simple Download Workflow"
+  name: "simple-download-workflow"
   version: "1.0.0"
   description: "Simple workflow for downloading files from HTTP sources with basic error handling"
   type: "download-workflow"

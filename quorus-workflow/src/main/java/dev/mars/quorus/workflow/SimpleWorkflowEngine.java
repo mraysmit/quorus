@@ -82,15 +82,13 @@ public class SimpleWorkflowEngine implements WorkflowEngine {
     }
 
     /**
-     * Create a new SimpleWorkflowEngine (deprecated - use constructor with Vertx).
+     * Create a new SimpleWorkflowEngine with an internally-managed Vert.x instance.
+     * Prefer {@link #SimpleWorkflowEngine(Vertx, TransferEngine)} when a shared Vert.x instance is available.
      *
      * @param transferEngine the transfer engine for executing transfers
-     * @deprecated Use {@link #SimpleWorkflowEngine(Vertx, TransferEngine)} instead
      */
-    @Deprecated(since = "1.0", forRemoval = true)
     public SimpleWorkflowEngine(TransferEngine transferEngine) {
         this(Vertx.vertx(), transferEngine);
-        logger.warn("Using deprecated constructor - consider passing shared Vert.x instance");
     }
     
     @Override

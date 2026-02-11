@@ -31,23 +31,17 @@ import java.util.Objects;
 public class WorkflowDefinition {
     
     private final String apiVersion;
-    private final String kind;
     private final WorkflowMetadata metadata;
     private final WorkflowSpec spec;
     
-    public WorkflowDefinition(String apiVersion, String kind, WorkflowMetadata metadata, WorkflowSpec spec) {
+    public WorkflowDefinition(String apiVersion, WorkflowMetadata metadata, WorkflowSpec spec) {
         this.apiVersion = Objects.requireNonNull(apiVersion, "API version cannot be null");
-        this.kind = Objects.requireNonNull(kind, "Kind cannot be null");
         this.metadata = Objects.requireNonNull(metadata, "Metadata cannot be null");
         this.spec = Objects.requireNonNull(spec, "Spec cannot be null");
     }
     
     public String getApiVersion() {
         return apiVersion;
-    }
-    
-    public String getKind() {
-        return kind;
     }
     
     public WorkflowMetadata getMetadata() {
@@ -64,21 +58,19 @@ public class WorkflowDefinition {
         if (o == null || getClass() != o.getClass()) return false;
         WorkflowDefinition that = (WorkflowDefinition) o;
         return Objects.equals(apiVersion, that.apiVersion) &&
-               Objects.equals(kind, that.kind) &&
                Objects.equals(metadata, that.metadata) &&
                Objects.equals(spec, that.spec);
     }
     
     @Override
     public int hashCode() {
-        return Objects.hash(apiVersion, kind, metadata, spec);
+        return Objects.hash(apiVersion, metadata, spec);
     }
     
     @Override
     public String toString() {
         return "WorkflowDefinition{" +
                "apiVersion='" + apiVersion + '\'' +
-               ", kind='" + kind + '\'' +
                ", metadata=" + metadata +
                ", spec=" + spec +
                '}';
@@ -106,14 +98,10 @@ public class WorkflowDefinition {
             this.labels = labels != null ? Map.copyOf(labels) : Map.of();
         }
 
-        // Backward compatibility constructor - deprecated
-        @Deprecated
         public WorkflowMetadata(String name, String version, String description, String type, String author, Map<String, String> labels) {
             this(name, version, description, type, author, null, List.of(), labels);
         }
 
-        // Backward compatibility constructor - deprecated
-        @Deprecated
         public WorkflowMetadata(String name, String description, Map<String, String> labels) {
             this(name, "1.0.0", description, "workflow", null, null, List.of(), labels);
         }

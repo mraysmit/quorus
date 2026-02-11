@@ -43,7 +43,7 @@ class WorkflowSchemaValidatorTest {
     @Test
     void testValidCompleteMetadata() {
         Map<String, Object> metadata = Map.of(
-            "name", "Test Workflow",
+            "name", "test-workflow",
             "version", "1.0.0",
             "description", "A comprehensive test workflow for validation",
             "type", "validation-test-workflow",
@@ -61,7 +61,7 @@ class WorkflowSchemaValidatorTest {
     @Test
     void testMissingRequiredFields() {
         Map<String, Object> metadata = Map.of(
-            "name", "Incomplete Workflow",
+            "name", "incomplete-workflow",
             "version", "1.0.0"
             // Missing: description, type, author, created, tags
         );
@@ -106,7 +106,7 @@ class WorkflowSchemaValidatorTest {
     void testValidEmailAndNameAuthors() {
         // Test valid email
         Map<String, Object> metadataWithEmail = Map.of(
-            "name", "Email Test Workflow",
+            "name", "email-test-workflow",
             "version", "1.0.0",
             "description", "Testing email validation for author field",
             "type", "validation-test-workflow",
@@ -120,7 +120,7 @@ class WorkflowSchemaValidatorTest {
 
         // Test valid name
         Map<String, Object> metadataWithName = Map.of(
-            "name", "Name Test Workflow",
+            "name", "name-test-workflow",
             "version", "1.0.0",
             "description", "Testing name validation for author field",
             "type", "validation-test-workflow",
@@ -137,7 +137,7 @@ class WorkflowSchemaValidatorTest {
     void testDateValidation() {
         // Test valid date
         Map<String, Object> validDate = Map.of(
-            "name", "Date Test Workflow",
+            "name", "date-test-workflow",
             "version", "1.0.0",
             "description", "Testing date validation for created field",
             "type", "validation-test-workflow",
@@ -151,7 +151,7 @@ class WorkflowSchemaValidatorTest {
 
         // Test invalid date format
         Map<String, Object> invalidDate = Map.of(
-            "name", "Invalid Date Test",
+            "name", "invalid-date-test",
             "version", "1.0.0",
             "description", "Testing invalid date format",
             "type", "validation-test-workflow",
@@ -168,7 +168,7 @@ class WorkflowSchemaValidatorTest {
     void testTagsValidation() {
         // Test valid tags
         Map<String, Object> validTags = Map.of(
-            "name", "Tags Test Workflow",
+            "name", "tags-test-workflow",
             "version", "1.0.0",
             "description", "Testing tags validation with proper format",
             "type", "validation-test-workflow",
@@ -182,7 +182,7 @@ class WorkflowSchemaValidatorTest {
 
         // Test invalid tags
         Map<String, Object> invalidTags = Map.of(
-            "name", "Invalid Tags Test",
+            "name", "invalid-tags-test",
             "version", "1.0.0",
             "description", "Testing invalid tags format",
             "type", "validation-test-workflow",
@@ -199,7 +199,7 @@ class WorkflowSchemaValidatorTest {
     @Test
     void testDuplicateTags() {
         Map<String, Object> duplicateTags = Map.of(
-            "name", "Duplicate Tags Test",
+            "name", "duplicate-tags-test",
             "version", "1.0.0",
             "description", "Testing duplicate tags detection",
             "type", "validation-test-workflow",
@@ -217,7 +217,7 @@ class WorkflowSchemaValidatorTest {
     @Test
     void testEmptyTags() {
         Map<String, Object> emptyTags = Map.of(
-            "name", "Empty Tags Test",
+            "name", "empty-tags-test",
             "version", "1.0.0",
             "description", "Testing empty tags array",
             "type", "validation-test-workflow",
@@ -235,7 +235,7 @@ class WorkflowSchemaValidatorTest {
     @Test
     void testWorkflowTypeWarning() {
         Map<String, Object> customType = Map.of(
-            "name", "Custom Type Test",
+            "name", "custom-type-test",
             "version", "1.0.0",
             "description", "Testing custom workflow type warning",
             "type", "custom-workflow-type", // Not in recommended list
@@ -255,7 +255,7 @@ class WorkflowSchemaValidatorTest {
     void testCompleteWorkflowValidation() {
         Map<String, Object> completeWorkflow = Map.of(
             "metadata", Map.of(
-                "name", "Complete Workflow Test",
+                "name", "complete-workflow-test",
                 "version", "1.0.0",
                 "description", "Testing complete workflow validation",
                 "type", "validation-test-workflow",

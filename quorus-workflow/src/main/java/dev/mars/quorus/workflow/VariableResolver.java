@@ -154,7 +154,6 @@ public class VariableResolver {
         
         return new WorkflowDefinition(
                 workflow.getApiVersion(),
-                workflow.getKind(),
                 workflow.getMetadata(),
                 newSpec
         );

@@ -62,7 +62,7 @@ public class SchemaValidationExample {
     private void testValidSchemaCompliantWorkflow(WorkflowDefinitionParser parser) {
         String validWorkflow = """
                 metadata:
-                  name: "Schema Validation Test Workflow"
+                  name: "schema-validation-test-workflow"
                   version: "1.0.0"
                   description: "A comprehensive test workflow demonstrating proper schema compliance"
                   type: "validation-test-workflow"
@@ -131,7 +131,7 @@ public class SchemaValidationExample {
     private void testMissingRequiredMetadata(WorkflowDefinitionParser parser) {
         String incompleteWorkflow = """
                 metadata:
-                  name: "Incomplete Workflow"
+                  name: "incomplete-workflow"
                   version: "1.0.0"
                   # Missing: description, type, author, created, tags
 
@@ -209,7 +209,7 @@ public class SchemaValidationExample {
                 apiVersion: v1
                 kind: TransferWorkflow  # Deprecated field
                 metadata:
-                  name: "Deprecated Kind Test"
+                  name: "deprecated-kind-test"
                   version: "1.0.0"
                   description: "Testing deprecated kind field warning"
                   type: "validation-test-workflow"
@@ -293,7 +293,7 @@ public class SchemaValidationExample {
     private String createTestWorkflow(String author) {
         return String.format("""
                 metadata:
-                  name: "Author Test Workflow"
+                  name: "author-test-workflow"
                   version: "1.0.0"
                   description: "Testing author field validation"
                   type: "validation-test-workflow"
@@ -310,7 +310,7 @@ public class SchemaValidationExample {
     private String createTestWorkflowWithDate(String date) {
         return String.format("""
                 metadata:
-                  name: "Date Test Workflow"
+                  name: "date-test-workflow"
                   version: "1.0.0"
                   description: "Testing date field validation"
                   type: "validation-test-workflow"
@@ -327,7 +327,7 @@ public class SchemaValidationExample {
     private String createTestWorkflowWithTags(String tags) {
         return String.format("""
                 metadata:
-                  name: "Tags Test Workflow"
+                  name: "tags-test-workflow"
                   version: "1.0.0"
                   description: "Testing tags field validation"
                   type: "validation-test-workflow"

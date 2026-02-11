@@ -261,7 +261,7 @@ class SimpleWorkflowEngineTest {
                 List.of(group)
         );
 
-        return new WorkflowDefinition("v1", "TransferWorkflow", metadata, spec);
+        return new WorkflowDefinition("v1", metadata, spec);
     }
     
     /**
@@ -310,7 +310,7 @@ class SimpleWorkflowEngineTest {
                 List.of(group)
         );
 
-        return new WorkflowDefinition("v1", "TransferWorkflow", metadata, spec);
+        return new WorkflowDefinition("v1", metadata, spec);
     }
     
     /**
@@ -344,6 +344,6 @@ class SimpleWorkflowEngineTest {
                 List.of() // Empty transfer groups - also invalid
         );
 
-        return new WorkflowDefinition("v1", "TransferWorkflow", metadata, spec);
+        return new WorkflowDefinition("v1", metadata, spec);
     }
 }

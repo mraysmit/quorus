@@ -1,5 +1,5 @@
 metadata:
-  name: "Data Processing Pipeline"
+  name: "data-processing-pipeline"
   version: "2.1.0"
   description: "Multi-stage data processing pipeline with dependencies and parallel execution capabilities"
   type: "data-pipeline-workflow"

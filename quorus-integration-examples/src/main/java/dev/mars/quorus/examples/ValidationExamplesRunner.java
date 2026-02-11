@@ -133,7 +133,7 @@ public class ValidationExamplesRunner {
         // Example with missing required fields
         String incompleteWorkflow = """
                 metadata:
-                  name: "Incomplete Example"
+                  name: "incomplete-example"
                   version: "1.0.0"
                   # Missing: description, type, author, created, tags
 
@@ -227,7 +227,7 @@ public class ValidationExamplesRunner {
         // Show a perfect example
         String perfectExample = """
                 metadata:
-                  name: "Production ETL Pipeline"
+                  name: "production-etl-pipeline"
                   version: "2.1.0"
                   description: "Production-ready ETL pipeline for customer data processing with comprehensive error handling and monitoring"
                   type: "etl-workflow"
@@ -276,56 +276,49 @@ public class ValidationExamplesRunner {
     }
 
     private void demonstrateLegacyMigration() throws Exception {
-        log.testSection("4. Legacy Format Migration", false);
+        log.testSection("4. Workflow Format Validation", false);
         
-        log.detail("Migrating from legacy format to new schema...");
+        log.detail("Demonstrating standard workflow format validation...");
         
-        // Show legacy format with deprecation warnings
-        String legacyWorkflow = """
+        // Show standard workflow format
+        String standardWorkflow = """
                 apiVersion: v1
-                kind: TransferWorkflow  # Deprecated - use metadata.type instead
                 metadata:
-                  name: "Legacy Workflow"
+                  name: "standard-workflow"
                   version: "1.0.0"
-                  description: "Legacy workflow format for backward compatibility demonstration"
+                  description: "Standard workflow format demonstration"
                   type: "transfer-workflow"
-                  author: "legacy@company.com"
+                  author: "dev@company.com"
                   created: "2025-08-21"
-                  tags: ["legacy", "migration", "backward-compatibility"]
+                  tags: ["standard", "validation"]
 
                 spec:
                   execution:
                     parallelism: 1
                   transferGroups:
-                    - name: legacy-transfer
+                    - name: standard-transfer
                       transfers:
-                        - name: legacy-file-copy
-                          source: "http://legacy.example.com/data.txt"
-                          destination: "/tmp/legacy-data.txt"
+                        - name: file-copy
+                          source: "http://example.com/data.txt"
+                          destination: "/tmp/data.txt"
                           protocol: http
                 """;
 
         WorkflowDefinitionParser parser = new YamlWorkflowDefinitionParser();
-        ValidationResult result = parser.validateSchema(legacyWorkflow);
+        ValidationResult result = parser.validateSchema(standardWorkflow);
         
         if (result.isValid()) {
-            log.success("Legacy format still validates");
+            log.success("Standard format validates successfully");
             
-            if (result.hasWarnings()) {
-                log.detail("Deprecation warnings:");
-                result.getWarnings().forEach(warning ->
-                    log.subDetail(warning.getFieldPath() + ": " + warning.getMessage()));
-            }
-            
-            // Parse and show migration
-            WorkflowDefinition workflow = parser.parseFromString(legacyWorkflow);
-            log.detail("Migration guidance:");
-            log.subDetail("Remove 'kind' field (value: " + workflow.getKind() + ")");
-            log.subDetail("Use 'metadata.type' instead: " + workflow.getMetadata().getType());
-            log.subDetail("Ensure all required metadata fields are present");
+            // Parse and show details
+            WorkflowDefinition workflow = parser.parseFromString(standardWorkflow);
+            log.detail("Workflow details:");
+            log.subDetail("Type: " + workflow.getMetadata().getType());
+            log.subDetail("Name: " + workflow.getMetadata().getName());
+            log.subDetail("All required metadata fields are present");
             
         } else {
-            log.failure("UNEXPECTED: Legacy format validation failed:");
+            log.failure("UNEXPECTED: Standard format validation failed:");
             result.getErrors().forEach(error ->
                 log.subDetail(error.toString()));
         }
@@ -339,7 +332,7 @@ public class ValidationExamplesRunner {
         // E-commerce order processing workflow
         validateRealWorldExample("E-commerce Order Processing", """
                 metadata:
-                  name: "E-commerce Order Processing Pipeline"
+                  name: "ecommerce-order-processing-pipeline"
                   version: "3.1.2"
                   description: "Complete order processing pipeline from payment to fulfillment with inventory management"
                   type: "data-pipeline-workflow"
@@ -375,7 +368,7 @@ public class ValidationExamplesRunner {
         // Financial reporting workflow
         validateRealWorldExample("Financial Reporting", """
                 metadata:
-                  name: "Monthly Financial Reporting"
+                  name: "monthly-financial-reporting"
                   version: "2.0.1"
                   description: "Automated monthly financial report generation with regulatory compliance checks"
                   type: "etl-workflow"
@@ -412,7 +405,7 @@ public class ValidationExamplesRunner {
         // IoT sensor data processing
         validateRealWorldExample("IoT Sensor Data Processing", """
                 metadata:
-                  name: "IoT Sensor Data Processing Pipeline"
+                  name: "iot-sensor-data-processing-pipeline"
                   version: "1.5.0"
                   description: "Real-time processing of IoT sensor data with anomaly detection and alerting"
                   type: "data-pipeline-workflow"
