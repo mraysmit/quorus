@@ -35,7 +35,7 @@ import java.util.regex.Pattern;
 public class WorkflowSchemaValidator {
     
     // Regex patterns for validation
-    private static final Pattern NAME_PATTERN = Pattern.compile("^[a-zA-Z0-9][a-zA-Z0-9\\s\\-_]*[a-zA-Z0-9]$");
+    private static final Pattern NAME_PATTERN = Pattern.compile("^[a-zA-Z0-9][a-zA-Z0-9\\-_]*[a-zA-Z0-9]$");
     private static final Pattern VERSION_PATTERN = Pattern.compile("^[0-9]+\\.[0-9]+\\.[0-9]+(-[a-zA-Z0-9\\-\\.]+)?(\\+[a-zA-Z0-9\\-\\.]+)?$");
     private static final Pattern TYPE_PATTERN = Pattern.compile("^[a-z][a-z0-9\\-]*[a-z0-9]$");
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
@@ -77,11 +77,6 @@ public class WorkflowSchemaValidator {
             @SuppressWarnings("unchecked")
             Map<String, Object> spec = (Map<String, Object>) data.get("spec");
             validateSpecSchema(spec, result);
-        }
-        
-        // Check for deprecated 'kind' field
-        if (data.containsKey("kind")) {
-            result.addWarning("kind", "Field 'kind' is deprecated. Use 'metadata.type' instead.");
         }
         
         return result;
@@ -162,7 +157,7 @@ public class WorkflowSchemaValidator {
             } else if (name.length() > 100) {
                 result.addError("metadata.name", "Name must be 100 characters or less");
             } else if (!NAME_PATTERN.matcher(name).matches()) {
-                result.addError("metadata.name", "Name must start and end with alphanumeric characters, can contain spaces, hyphens, and underscores");
+                result.addError("metadata.name", "Name must start and end with alphanumeric characters, can contain hyphens and underscores but not spaces");
             }
         }
         

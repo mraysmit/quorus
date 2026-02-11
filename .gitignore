@@ -39,6 +39,8 @@ build/
 
 # Project-specific generated files
 downloads/
+logs/
+test-logs/
 
 # IntelliJ (additional)
 .idea/

@@ -1,9 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
     
-    <!-- Timestamp for unique log filenames -->
-    <timestamp key="testRunTime" datePattern="yyyyMMdd-HHmmss"/>
-    
     <!-- Console appender with DEBUG level for tests -->
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
@@ -11,10 +8,13 @@
         </encoder>
     </appender>
     
-    <!-- File appender with timestamped filename -->
+    <!-- Consolidated file appender: all modules write to one file at project root.
+         testRunTimestamp is passed as a system property from Maven surefire (parent pom.xml)
+         so all modules share the same timestamp. prudent=true enables cross-JVM file locking. -->
     <appender name="FILE" class="ch.qos.logback.core.FileAppender">
-        <file>target/test-logs/quorus-api-test-${testRunTime}.log</file>
-        <append>false</append>
+        <file>../test-logs/quorus-test-${testRunTimestamp}.log</file>
+        <append>true</append>
+        <prudent>true</prudent>
         <encoder>
             <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{40} - %msg%n</pattern>
         </encoder>

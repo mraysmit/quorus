@@ -30,6 +30,8 @@
         <vertx.version>5.0.2</vertx.version>
         <testcontainers.version>2.0.3</testcontainers.version>
         <jacoco.version>0.8.12</jacoco.version>
+        <!-- Shared timestamp for consolidated test log file across all modules -->
+        <maven.build.timestamp.format>yyyy-MM-dd_HH-mm-ss</maven.build.timestamp.format>
     </properties>
 
     <dependencyManagement>
@@ -69,6 +71,12 @@
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-surefire-plugin</artifactId>
                     <version>3.2.2</version>
+                    <configuration>
+                        <systemPropertyVariables>
+                            <!-- Shared across all modules so logback writes to one consolidated file -->
+                            <testRunTimestamp>${maven.build.timestamp}</testRunTimestamp>
+                        </systemPropertyVariables>
+                    </configuration>
                 </plugin>
                 <plugin>
                     <groupId>org.codehaus.mojo</groupId>

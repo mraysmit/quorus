@@ -212,7 +212,7 @@ class VariableResolverTest {
                 java.util.List.of(group)
         );
         
-        WorkflowDefinition workflow = new WorkflowDefinition("v1", "TransferWorkflow", metadata, spec);
+        WorkflowDefinition workflow = new WorkflowDefinition("v1", metadata, spec);
         
         WorkflowDefinition resolved = resolver.resolve(workflow);
         

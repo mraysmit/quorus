@@ -158,9 +158,7 @@ public class YamlWorkflowDefinitionParser implements WorkflowDefinitionParser {
     }
     
     private WorkflowDefinition parseWorkflowDefinition(Map<String, Object> data) throws WorkflowParseException {
-        // For backward compatibility, support both old and new formats
         String apiVersion = getStringValue(data, "apiVersion", "v1");
-        String kind = getStringValue(data, "kind", "TransferWorkflow");
 
         Map<String, Object> metadataMap = getMapValue(data, "metadata");
         WorkflowDefinition.WorkflowMetadata metadata = parseMetadata(metadataMap);
@@ -175,7 +173,7 @@ public class YamlWorkflowDefinitionParser implements WorkflowDefinitionParser {
         }
         WorkflowDefinition.WorkflowSpec spec = parseSpec(specMap);
 
-        return new WorkflowDefinition(apiVersion, kind, metadata, spec);
+        return new WorkflowDefinition(apiVersion, metadata, spec);
     }
     
     private WorkflowDefinition.WorkflowMetadata parseMetadata(Map<String, Object> data) throws WorkflowParseException {

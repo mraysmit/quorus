@@ -73,9 +73,15 @@ class ComprehensiveSchemaValidationTest {
 
             // Test valid name
             Map<String, Object> validName = createMutableMetadata();
-            validName.put("name", "Valid Workflow Name-123");
+            validName.put("name", "valid-workflow-name-123");
             result = validator.validateMetadataSchema(validName);
             assertTrue(result.isValid());
+
+            // Test name with spaces (should be rejected)
+            Map<String, Object> spacedName = createMutableMetadata();
+            spacedName.put("name", "Invalid Name With Spaces");
+            result = validator.validateMetadataSchema(spacedName);
+            assertFalse(result.isValid(), "Name with spaces should fail validation");
         }
 
         @Test
@@ -338,7 +344,7 @@ class ComprehensiveSchemaValidationTest {
         void testCompleteWorkflowValidation() {
             String completeWorkflow = """
                     metadata:
-                      name: "Complete Test Workflow"
+                      name: "complete-test-workflow"
                       version: "1.2.3"
                       description: "A comprehensive test workflow with all required fields and proper structure"
                       type: "validation-test-workflow"
@@ -393,39 +399,11 @@ class ComprehensiveSchemaValidationTest {
         }
 
         @Test
-        @DisplayName("Should handle workflows with deprecated kind field")
-        void testDeprecatedKindFieldHandling() {
-            String workflowWithKind = """
-                    apiVersion: v1
-                    kind: TransferWorkflow
-                    metadata:
-                      name: "Legacy Workflow"
-                      version: "1.0.0"
-                      description: "Workflow using deprecated kind field for backward compatibility"
-                      type: "transfer-workflow"
-                      author: "legacy@quorus.dev"
-                      created: "2025-08-21"
-                      tags: ["legacy", "deprecated", "kind"]
-
-                    spec:
-                      execution:
-                        parallelism: 1
-                      transferGroups: []
-                    """;
-
-            ValidationResult result = parser.validateSchema(workflowWithKind);
-            assertTrue(result.isValid());
-            assertTrue(result.hasWarnings());
-            assertTrue(result.getWarnings().stream().anyMatch(w -> 
-                w.getFieldPath().equals("kind") && w.getMessage().contains("deprecated")));
-        }
-
-        @Test
         @DisplayName("Should validate workflow with minimal required fields")
         void testMinimalWorkflowValidation() {
             String minimalWorkflow = """
                     metadata:
-                      name: "Minimal Workflow"
+                      name: "minimal-workflow"
                       version: "1.0.0"
                       description: "Minimal workflow with only required fields"
                       type: "transfer-workflow"
@@ -482,7 +460,7 @@ class ComprehensiveSchemaValidationTest {
         void testMalformedYamlHandling() {
             String malformedYaml = """
                     metadata:
-                      name: "Malformed Workflow"
+                      name: "malformed-workflow"
                       invalid: [unclosed bracket
                       description: "This YAML has syntax errors"
                     """;
@@ -534,7 +512,7 @@ class ComprehensiveSchemaValidationTest {
 
     private Map<String, Object> createBaseMetadata() {
         return Map.of(
-            "name", "Test Workflow",
+            "name", "test-workflow",
             "version", "1.0.0",
             "description", "A test workflow for validation purposes",
             "type", "validation-test-workflow",
@@ -546,7 +524,7 @@ class ComprehensiveSchemaValidationTest {
 
     private Map<String, Object> createMutableMetadata() {
         Map<String, Object> metadata = new java.util.HashMap<>();
-        metadata.put("name", "Test Workflow");
+        metadata.put("name", "test-workflow");
         metadata.put("version", "1.0.0");
         metadata.put("description", "A test workflow for validation purposes");
         metadata.put("type", "validation-test-workflow");

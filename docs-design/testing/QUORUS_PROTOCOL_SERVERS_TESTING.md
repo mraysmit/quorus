@@ -239,7 +239,7 @@ mvn test -Dtest=ProtocolServersLifecycleIT
 | Protocol | Library | Maven Artifact |
 |----------|---------|----------------|
 | FTP | Apache Commons Net | `commons-net:commons-net` |
-| SFTP | JSch | `com.jcraft:jsch` |
+| SFTP | JSch (mwiede fork) | `com.github.mwiede:jsch` |
 | SMB | jCIFS-ng | `eu.agno3.jcifs:jcifs-ng` |
 
 ---
