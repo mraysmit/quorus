@@ -19,9 +19,11 @@ package dev.mars.quorus.protocol;
 import org.testcontainers.containers.ComposeContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.File;
 import java.time.Duration;
-import java.util.logging.Logger;
 
 /**
  * Shared test containers that are reused across multiple integration test classes.
@@ -56,7 +58,7 @@ import java.util.logging.Logger;
  */
 public final class SharedTestContainers {
 
-    private static final Logger logger = Logger.getLogger(SharedTestContainers.class.getName());
+    private static final Logger logger = LoggerFactory.getLogger(SharedTestContainers.class);
 
     // SFTP container (atmoz/sftp:alpine)
     private static volatile ComposeContainer sftpContainer;
@@ -88,13 +90,14 @@ public final class SharedTestContainers {
             synchronized (SFTP_LOCK) {
                 if (sftpContainer == null) {
                     logger.info("Starting shared SFTP container...");
+
                     sftpContainer = new ComposeContainer(
                             new File("src/test/resources/docker-compose-sftp-abort-test.yml"))
                             .withExposedService("sftp", 22, Wait.forListeningPort())
                             .withStartupTimeout(Duration.ofMinutes(2));
                     sftpContainer.start();
                     registerShutdownHook();
-                    logger.info("Shared SFTP container started at " + getSftpHost() + ":" + getSftpPort());
+                    logger.info("Shared SFTP container started at {}:{}", getSftpHost(), getSftpPort());
                 }
             }
         }
@@ -132,13 +135,14 @@ public final class SharedTestContainers {
             synchronized (FTP_LOCK) {
                 if (ftpContainer == null) {
                     logger.info("Starting shared FTP container...");
+
                     ftpContainer = new ComposeContainer(
                             new File("src/test/resources/docker-compose-ftp-test.yml"))
                             .withExposedService("ftp", 21, Wait.forListeningPort())
                             .withStartupTimeout(Duration.ofMinutes(2));
                     ftpContainer.start();
                     registerShutdownHook();
-                    logger.info("Shared FTP container started at " + getFtpHost() + ":" + getFtpPort());
+                    logger.info("Shared FTP container started at {}:{}", getFtpHost(), getFtpPort());
                 }
             }
         }
@@ -189,14 +193,16 @@ public final class SharedTestContainers {
             synchronized (FTPS_LOCK) {
                 if (ftpsContainer == null) {
                     logger.info("Starting shared FTPS container...");
+
                     ftpsContainer = new ComposeContainer(
                             new File("src/test/resources/docker-compose-ftps-test.yml"))
+                            .withBuild(true)
                             .withStartupTimeout(Duration.ofMinutes(3));
                     ftpsContainer.start();
                     registerShutdownHook();
                     // Wait for the FTP service to fully initialise (DH params, TLS cert, etc.)
                     waitForFtpReady("localhost", FTPS_CONTROL_PORT, Duration.ofMinutes(2));
-                    logger.info("Shared FTPS container started at " + getFtpsHost() + ":" + getFtpsPort());
+                    logger.info("Shared FTPS container started at {}:{}", getFtpsHost(), getFtpsPort());
                 }
             }
         }
@@ -235,7 +241,7 @@ public final class SharedTestContainers {
      */
     private static void waitForFtpReady(String host, int port, Duration timeout) {
         long deadline = System.currentTimeMillis() + timeout.toMillis();
-        logger.info("Waiting for FTP service at " + host + ":" + port + " (timeout: " + timeout + ")...");
+        logger.info("Waiting for FTP service at {}:{} (timeout: {})...", host, port, timeout);
         int attempt = 0;
         while (System.currentTimeMillis() < deadline) {
             attempt++;
@@ -244,15 +250,19 @@ public final class SharedTestContainers {
                 socket.setSoTimeout(5000);
                 java.io.BufferedReader reader = new java.io.BufferedReader(
                         new java.io.InputStreamReader(socket.getInputStream()));
+                java.io.OutputStreamWriter writer = new java.io.OutputStreamWriter(
+                        socket.getOutputStream());
                 String welcome = reader.readLine();
                 if (welcome != null && welcome.startsWith("220")) {
-                    logger.info("FTP service ready at " + host + ":" + port 
-                            + " after " + attempt + " attempts: " + welcome);
+                    // Send QUIT to cleanly close the FTP session
+                    writer.write("QUIT\r\n");
+                    writer.flush();
+                    logger.info("FTP service ready at {}:{} after {} attempts: {}", host, port, attempt, welcome);
                     return;
                 }
-                logger.fine("FTP not ready yet (attempt " + attempt + "): " + welcome);
+                logger.debug("FTP not ready yet (attempt {}): {}", attempt, welcome);
             } catch (java.io.IOException e) {
-                logger.fine("FTP not ready yet (attempt " + attempt + "): " + e.getMessage());
+                logger.debug("FTP not ready yet (attempt {}): {}", attempt, e.getMessage());
             }
             try {
                 Thread.sleep(2000);
@@ -274,7 +284,7 @@ public final class SharedTestContainers {
             org.testcontainers.DockerClientFactory.instance().client();
             return true;
         } catch (Exception e) {
-            logger.warning("Docker is not available: " + e.getMessage());
+            logger.warn("Docker is not available: {}", e.getMessage());
             return false;
         }
     }
@@ -305,7 +315,7 @@ public final class SharedTestContainers {
                 logger.info("Stopping shared SFTP container...");
                 sftpContainer.stop();
             } catch (Exception e) {
-                logger.warning("Error stopping SFTP container: " + e.getMessage());
+                logger.warn("Error stopping SFTP container: {}", e.getMessage());
             }
         }
         if (ftpContainer != null) {
@@ -313,7 +323,7 @@ public final class SharedTestContainers {
                 logger.info("Stopping shared FTP container...");
                 ftpContainer.stop();
             } catch (Exception e) {
-                logger.warning("Error stopping FTP container: " + e.getMessage());
+                logger.warn("Error stopping FTP container: {}", e.getMessage());
             }
         }
         if (ftpsContainer != null) {
@@ -321,7 +331,7 @@ public final class SharedTestContainers {
                 logger.info("Stopping shared FTPS container...");
                 ftpsContainer.stop();
             } catch (Exception e) {
-                logger.warning("Error stopping FTPS container: " + e.getMessage());
+                logger.warn("Error stopping FTPS container: {}", e.getMessage());
             }
         }
     }

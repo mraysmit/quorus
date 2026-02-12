@@ -25,7 +25,8 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.security.SecureRandom;
 import java.util.concurrent.Executors;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Local HTTP test server to replace external dependencies like httpbin.org.
@@ -44,7 +45,7 @@ import java.util.logging.Logger;
  */
 public class LocalHttpTestServer {
 
-    private static final Logger logger = Logger.getLogger(LocalHttpTestServer.class.getName());
+    private static final Logger logger = LoggerFactory.getLogger(LocalHttpTestServer.class);
     private static final SecureRandom random = new SecureRandom();
 
     private final HttpServer server;
@@ -78,7 +79,7 @@ public class LocalHttpTestServer {
         server.setExecutor(Executors.newFixedThreadPool(4));
 
         server.start();
-        logger.info("Local HTTP test server started on port " + this.port);
+        logger.info("Local HTTP test server started on port {}", this.port);
     }
 
     /**

@@ -39,7 +39,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.*;
@@ -67,7 +68,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 @ExtendWith(VertxExtension.class)
 class SftpAbortIntegrationTest {
     
-    private static final Logger logger = Logger.getLogger(SftpAbortIntegrationTest.class.getName());
+    private static final Logger logger = LoggerFactory.getLogger(SftpAbortIntegrationTest.class);
 
     private SftpTransferProtocol protocol;
     private Vertx vertx;
@@ -101,7 +102,7 @@ class SftpAbortIntegrationTest {
         sftpHost = SharedTestContainers.getSftpHost();
         sftpPort = SharedTestContainers.getSftpPort();
         
-        logger.info("SFTP server available at " + sftpHost + ":" + sftpPort);
+        logger.info("SFTP server available at {}:{}", sftpHost, sftpPort);
         
         // Create a large test file on the SFTP server to enable abort testing
         // We'll do this by uploading first, then downloading with abort
@@ -182,9 +183,9 @@ class SftpAbortIntegrationTest {
                 transferStarted.set(true);
                 TransferResult result = protocol.transfer(request, context);
                 transferCompleted.set(true);
-                logger.info("Transfer completed with status: " + result.getFinalStatus());
+                logger.info("Transfer completed with status: {}", result.getFinalStatus());
             } catch (Exception e) {
-                logger.info("Transfer interrupted (expected): " + e.getMessage());
+                logger.info("Transfer interrupted (expected): {}", e.getMessage());
             }
         });
         
@@ -243,7 +244,7 @@ class SftpAbortIntegrationTest {
                 transferStarted.countDown();
                 protocol.transfer(request, context);
             } catch (Exception e) {
-                logger.info("Transfer interrupted by abort from another thread: " + e.getMessage());
+                logger.info("Transfer interrupted by abort from another thread: {}", e.getMessage());
             }
         });
 

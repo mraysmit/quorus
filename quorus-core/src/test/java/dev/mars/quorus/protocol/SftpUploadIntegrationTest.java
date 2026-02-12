@@ -35,7 +35,8 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
@@ -60,7 +61,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 @DisplayName("SFTP Upload Integration Tests")
 class SftpUploadIntegrationTest {
 
-    private static final Logger logger = Logger.getLogger(SftpUploadIntegrationTest.class.getName());
+    private static final Logger logger = LoggerFactory.getLogger(SftpUploadIntegrationTest.class);
 
     private SftpTransferProtocol protocol;
     private TransferContext context;
@@ -86,7 +87,7 @@ class SftpUploadIntegrationTest {
         sftpHost = SharedTestContainers.getSftpHost();
         sftpPort = SharedTestContainers.getSftpPort();
 
-        logger.info("SFTP server available at " + sftpHost + ":" + sftpPort);
+        logger.info("SFTP server available at {}:{}", sftpHost, sftpPort);
 
         // Create context for tests
         TransferRequest dummyRequest = TransferRequest.builder()

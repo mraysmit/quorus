@@ -593,15 +593,6 @@ public class FtpTransferProtocol implements TransferProtocol {
                 throw new IOException("Failed to set binary mode: " + response);
             }
             
-            // Set passive mode
-            logger.debug("Entering passive mode");
-            sendCommand("PASV");
-            response = readResponse();
-            if (!response.startsWith("227")) {
-                logger.error("Failed to enter passive mode: {}", response);
-                throw new IOException("Failed to enter passive mode: " + response);
-            }
-            
             logger.info("{} connection established successfully to {}:{}", modeLabel, 
                        connectionInfo.host, connectionInfo.port);
         }
@@ -693,16 +684,21 @@ public class FtpTransferProtocol implements TransferProtocol {
             // Parse passive mode response to get data connection details
             DataConnectionInfo dataInfo = parsePassiveResponse(response);
             
-            // Establish data connection (plain or TLS-wrapped)
-            Socket dataSocket = createDataSocket(dataInfo);
+            // Connect data socket (plain TCP — TLS negotiation happens after RETR)
+            Socket dataSocket = createPlainDataSocket(dataInfo);
             
             try {
-                // Send RETR command
+                // Send RETR command — server starts listening for data/TLS AFTER this
                 sendCommand("RETR " + remotePath);
                 response = readResponse();
                 if (!response.startsWith("150") && !response.startsWith("125")) {
                     throw new IOException("Failed to start file transfer: " + response);
                 }
+                
+                // Wrap data socket in TLS now that the transfer command has been accepted.
+                // vsftpd only initiates the TLS handshake on the data channel AFTER
+                // receiving STOR/RETR — wrapping before that causes a deadlock.
+                dataSocket = wrapDataSocketInTls(dataSocket, dataInfo);
                 
                 // Transfer file data
                 long bytesTransferred = 0;
@@ -759,16 +755,21 @@ public class FtpTransferProtocol implements TransferProtocol {
             // Parse passive mode response to get data connection details
             DataConnectionInfo dataInfo = parsePassiveResponse(response);
             
-            // Establish data connection (plain or TLS-wrapped)
-            Socket dataSocket = createDataSocket(dataInfo);
+            // Connect data socket (plain TCP — TLS negotiation happens after STOR)
+            Socket dataSocket = createPlainDataSocket(dataInfo);
             
             try {
-                // Send STOR command
+                // Send STOR command — server starts listening for data/TLS AFTER this
                 sendCommand("STOR " + remotePath);
                 response = readResponse();
                 if (!response.startsWith("150") && !response.startsWith("125")) {
                     throw new IOException("Failed to start file upload: " + response);
                 }
+                
+                // Wrap data socket in TLS now that the transfer command has been accepted.
+                // vsftpd only initiates the TLS handshake on the data channel AFTER
+                // receiving STOR/RETR — wrapping before that causes a deadlock.
+                dataSocket = wrapDataSocketInTls(dataSocket, dataInfo);
                 
                 // Transfer file data
                 long bytesTransferred = 0;
@@ -892,24 +893,40 @@ public class FtpTransferProtocol implements TransferProtocol {
         }
         
         /**
-         * Creates a data socket, wrapping it in TLS if FTPS is enabled (PROT P).
+         * Creates a plain TCP data socket (no TLS yet).
+         * For FTPS, TLS negotiation must happen AFTER the STOR/RETR command is sent,
+         * because vsftpd only initiates the data channel TLS handshake after receiving
+         * a transfer command. Call {@link #wrapDataSocketInTls} after the transfer
+         * command has been accepted.
          */
-        private Socket createDataSocket(DataConnectionInfo dataInfo) throws IOException {
+        private Socket createPlainDataSocket(DataConnectionInfo dataInfo) throws IOException {
             Socket plainSocket = new Socket();
             plainSocket.connect(new InetSocketAddress(dataInfo.host, dataInfo.port), 
                     (int) CONNECTION_TIMEOUT.toMillis());
-            
+            plainSocket.setSoTimeout((int) CONNECTION_TIMEOUT.toMillis());
+            return plainSocket;
+        }
+        
+        /**
+         * Wraps an existing data socket in TLS if FTPS is enabled (PROT P).
+         * Must be called AFTER the STOR/RETR command has been accepted by the server.
+         * 
+         * @param dataSocket the plain TCP data socket
+         * @param dataInfo   the data connection info (host/port for SNI)
+         * @return the TLS-wrapped socket, or the original socket if TLS is not required
+         */
+        private Socket wrapDataSocketInTls(Socket dataSocket, DataConnectionInfo dataInfo) throws IOException {
             if (connectionInfo.ftpsMode != FtpsMode.NONE && sslSocketFactory != null) {
-                // Wrap data connection in TLS for FTPS data channel protection
                 logger.debug("FTPS: wrapping data connection in TLS to {}:{}", dataInfo.host, dataInfo.port);
                 SSLSocket sslDataSocket = (SSLSocket) sslSocketFactory.createSocket(
-                        plainSocket, dataInfo.host, dataInfo.port, true);
+                        dataSocket, dataInfo.host, dataInfo.port, true);
                 sslDataSocket.setUseClientMode(true);
                 sslDataSocket.startHandshake();
+                logger.debug("FTPS: data channel TLS handshake completed (protocol={})",
+                        sslDataSocket.getSession().getProtocol());
                 return sslDataSocket;
             }
-            
-            return plainSocket;
+            return dataSocket;
         }
         
         private DataConnectionInfo parsePassiveResponse(String response) throws IOException {

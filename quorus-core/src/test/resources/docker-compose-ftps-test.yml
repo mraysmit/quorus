@@ -1,11 +1,16 @@
 # FTPS (FTP over SSL/TLS) server for integration testing
-# Uses stilliard/pure-ftpd with TLS enabled for Explicit FTPS (AUTH TLS on port 21)
-# The container auto-generates a self-signed certificate using TLS_CN/TLS_ORG/TLS_C
-# DH parameter generation takes ~30-60s on first start; start_period accounts for this.
+# Extends delfer/alpine-ftp-server (vsftpd on Alpine) with auto-generated self-signed cert.
+# Supports Explicit FTPS via AUTH TLS on port 21 (TLS optional, not forced).
+#
+# Why not stilliard/pure-ftpd?
+#   The stilliard/pure-ftpd:latest image has a glibc malloc() corruption bug on modern
+#   Docker/kernel versions, causing the daemon to crash on every incoming connection.
+#   The image hasn't been updated in 4+ years.
 #
 # Manual usage:
-#   docker compose -f docker-compose-ftps-test.yml up -d
-#   # Wait for healthy status, then connect via: ftps://testuser:testpass@localhost:<mapped-port>
+#   docker compose -f docker-compose-ftps-test.yml up -d --build
+#   # Wait for healthy status, then: ftp testuser:testpass@localhost:2121
+#   # For FTPS: connect to localhost:2121, send AUTH TLS to upgrade
 #
 # Automated usage: Managed by SharedTestContainers / Testcontainers ComposeContainer
 
@@ -15,40 +20,31 @@ networks:
     driver: bridge
 
 services:
-  # FTPS Server - Pure-FTPd with TLS enabled
   ftps:
-    image: stilliard/pure-ftpd:latest
+    build:
+      context: ./ftps-docker
+      dockerfile: Dockerfile
     networks:
       ftps-test:
         aliases:
           - ftps-server
     ports:
-      - "2121:21"        # Control port - fixed mapping (avoids socat proxy for TLS session compat)
+      - "2121:21"        # Control port - fixed mapping (avoids socat proxy for TLS compat)
       - "30000:30000"    # Passive mode data port - fixed mapping (FTP PASV requires this)
     environment:
-      # FTP credentials
-      FTP_USER_NAME: testuser
-      FTP_USER_PASS: testpass
-      FTP_USER_HOME: /home/ftpusers/testuser
-      # Enable TLS mode 1: TLS optional (clients can use AUTH TLS to upgrade)
-      # Mode 1 allows both plain FTP and FTPS connections for flexibility
-      ADDED_FLAGS: "--tls=1 -p 30000:30000"
-      # Passive mode: use container-local address (Testcontainers maps dynamically)
-      PUBLICHOST: "127.0.0.1"
-      # Auto-generate self-signed TLS certificate
+      # FTP credentials (delfer/alpine-ftp-server format: name|password)
+      USERS: "testuser|testpass"
+      # Passive mode: advertise localhost (tests run on Docker host)
+      ADDRESS: "127.0.0.1"
+      MIN_PORT: "30000"
+      MAX_PORT: "30000"
+      # Certificate subject (used by ftps-entrypoint.sh)
       TLS_CN: "localhost"
       TLS_ORG: "Quorus Test"
       TLS_C: "GB"
-    volumes:
-      - ftps-data:/home/ftpusers/testuser
     healthcheck:
-      # stilliard/pure-ftpd doesn't have nc/netcat; use bash /dev/tcp instead
-      test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/21' || exit 1"]
-      interval: 10s
-      timeout: 5s
+      test: ["CMD-SHELL", "nc -z localhost 21 || exit 1"]
+      interval: 5s
+      timeout: 3s
       retries: 10
-      start_period: 60s
-
-volumes:
-  ftps-data:
-    name: quorus-ftps-test-data
+      start_period: 5s    # No DH param generation — cert gen is sub-second

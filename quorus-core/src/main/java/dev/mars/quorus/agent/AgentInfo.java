@@ -18,7 +18,6 @@ package dev.mars.quorus.agent;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-import java.net.InetAddress;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;

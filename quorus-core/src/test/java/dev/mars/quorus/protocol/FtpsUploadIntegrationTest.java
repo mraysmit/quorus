@@ -44,7 +44,9 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.cert.X509Certificate;
-import java.util.logging.Logger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
@@ -53,9 +55,9 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * Integration tests for FTPS (FTP over SSL/TLS) using a real FTPS server
  * running in a Docker container via Testcontainers.
  * <p>
- * Uses {@code stilliard/pure-ftpd} with TLS enabled (explicit FTPS via AUTH TLS).
- * The container auto-generates a self-signed certificate, so tests configure
- * a trust-all SSLSocketFactory.
+ * Uses {@code delfer/alpine-ftp-server} (vsftpd on Alpine) extended with a custom
+ * Dockerfile that auto-generates a self-signed TLS certificate. The container
+ * supports explicit FTPS via AUTH TLS. Tests configure a trust-all SSLSocketFactory.
  * <p>
  * Tests are ordered to validate connectivity first, then progress to transfers.
  * <p>
@@ -70,7 +72,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class FtpsUploadIntegrationTest {
 
-    private static final Logger logger = Logger.getLogger(FtpsUploadIntegrationTest.class.getName());
+    private static final Logger logger = LoggerFactory.getLogger(FtpsUploadIntegrationTest.class);
     private static final String TEST_USERNAME = "testuser";
     private static final String TEST_PASSWORD = "testpass";
 
@@ -104,10 +106,12 @@ class FtpsUploadIntegrationTest {
 
     @BeforeAll
     static void checkDockerAvailable() {
+        log("checkDockerAvailable", "Checking Docker availability for FTPS integration tests");
         assumeTrue(SharedTestContainers.isDockerAvailable(),
                 "Docker is not available - skipping FTPS integration tests");
         // Start the shared FTPS container (will be reused across tests)
         SharedTestContainers.getFtpsContainer();
+        log("checkDockerAvailable", "FTPS container started successfully");
     }
 
     @BeforeEach
@@ -120,7 +124,7 @@ class FtpsUploadIntegrationTest {
         ftpsHost = SharedTestContainers.getFtpsHost();
         ftpsPort = SharedTestContainers.getFtpsPort();
 
-        logger.info("FTPS server available at " + ftpsHost + ":" + ftpsPort);
+        logger.info("FTPS server available at {}:{}", ftpsHost, ftpsPort);
 
         // Create context for tests
         TransferRequest dummyRequest = TransferRequest.builder()
@@ -142,10 +146,13 @@ class FtpsUploadIntegrationTest {
         @Order(1)
         @DisplayName("Verify FTPS server is reachable and accepts AUTH TLS")
         void verifyFtpsServerConnectivity() throws Exception {
-            logger.info("=== FTPS Server Connectivity Test ===");
-            logger.info("Target: " + ftpsHost + ":" + ftpsPort);
+            log("verifyFtpsServerConnectivity", "=== FTPS Server Connectivity Test ===");
+            log("verifyFtpsServerConnectivity", "Target: " + ftpsHost + ":" + ftpsPort);
 
-            // Use Apache Commons Net FTPSClient for raw connectivity validation
+            // Use Apache Commons Net FTPSClient for raw connectivity validation.
+            // In explicit mode (isImplicit=false), FTPSClient.connect() automatically
+            // executes AUTH TLS during _connectAction_(), so we must NOT call
+            // execAUTH("TLS") manually — doing so would get reply 530 (already upgraded).
             FTPSClient ftpsClient = new FTPSClient("TLS", false); // explicit FTPS
             ftpsClient.setTrustManager(new org.apache.commons.net.util.TrustManagerUtils()
                     .getAcceptAllTrustManager());
@@ -153,26 +160,17 @@ class FtpsUploadIntegrationTest {
             ftpsClient.setDefaultTimeout(10_000);
 
             try {
-                // Connect to the FTP port
+                // Connect — this reads the 220 banner and performs AUTH TLS + SSL handshake
                 long startConnect = System.currentTimeMillis();
                 ftpsClient.connect(ftpsHost, ftpsPort);
                 int reply = ftpsClient.getReplyCode();
                 long connectTime = System.currentTimeMillis() - startConnect;
 
-                logger.info("  > Connection established in " + connectTime + "ms");
-                logger.info("  > Server reply code: " + reply + " (" + ftpsClient.getReplyString().trim() + ")");
+                log("verifyFtpsServerConnectivity", "Connection established (incl. AUTH TLS) in " + connectTime + "ms");
+                log("verifyFtpsServerConnectivity", "Server reply code: " + reply + " (" + ftpsClient.getReplyString().trim() + ")");
 
                 assertTrue(FTPReply.isPositiveCompletion(reply),
                         "FTPS server should return positive completion code, got: " + reply);
-
-                // Execute AUTH TLS to upgrade to TLS
-                long startAuth = System.currentTimeMillis();
-                int authReply = ftpsClient.execAUTH("TLS");
-                long authTime = System.currentTimeMillis() - startAuth;
-                assertTrue(FTPReply.isPositiveCompletion(authReply), 
-                        "AUTH TLS should succeed, got reply: " + authReply);
-
-                logger.info("  > AUTH TLS completed in " + authTime + "ms");
 
                 // Set PBSZ and PROT P per RFC 4217
                 ftpsClient.execPBSZ(0);
@@ -181,17 +179,14 @@ class FtpsUploadIntegrationTest {
                 // Login
                 boolean loggedIn = ftpsClient.login(TEST_USERNAME, TEST_PASSWORD);
                 assertTrue(loggedIn, "FTPS authentication should succeed");
-                logger.info("  > Authenticated as: " + TEST_USERNAME);
+                log("verifyFtpsServerConnectivity", "Authenticated as: " + TEST_USERNAME);
 
                 // Verify FTPS control channel is fully functional
-                // Data channel (PASV + LIST) is validated in the upload/download tests
-                // using our FtpTransferProtocol which handles passive mode without
-                // requiring TLS session reuse from the commons-net FTPSClient.
                 int sysReply = ftpsClient.syst();
                 assertTrue(FTPReply.isPositiveCompletion(sysReply),
                         "SYST command should succeed over encrypted control channel");
-                logger.info("  > SYST command succeeded: " + ftpsClient.getReplyString().trim());
-                logger.info("[PASS] FTPS Server Connectivity Validated");
+                log("verifyFtpsServerConnectivity", "SYST command succeeded: " + ftpsClient.getReplyString().trim());
+                log("verifyFtpsServerConnectivity", "[PASS] FTPS Server Connectivity Validated");
 
             } finally {
                 if (ftpsClient.isConnected()) {
@@ -201,7 +196,7 @@ class FtpsUploadIntegrationTest {
                         // Best-effort logout
                     }
                     ftpsClient.disconnect();
-                    logger.info("  > Connection closed gracefully");
+                    log("verifyFtpsServerConnectivity", "Connection closed gracefully");
                 }
             }
         }
@@ -218,6 +213,7 @@ class FtpsUploadIntegrationTest {
         @Order(1)
         @DisplayName("Upload small text file via FTPS")
         void uploadSmallFile() throws IOException, TransferException {
+            log("uploadSmallFile", "Uploading small text file via FTPS");
             // Create local file to upload
             Path localFile = tempDir.resolve("small-ftps-upload.txt");
             String content = "Hello from FTPS integration test!";
@@ -241,13 +237,14 @@ class FtpsUploadIntegrationTest {
             assertNotNull(result);
             assertEquals(TransferStatus.COMPLETED, result.getFinalStatus());
             assertEquals(content.length(), result.getBytesTransferred());
-            logger.info("FTPS upload completed: " + content.length() + " bytes");
+            log("uploadSmallFile", "[PASS] FTPS upload completed: " + content.length() + " bytes");
         }
 
         @Test
         @Order(2)
         @DisplayName("Upload 1KB file via FTPS")
         void upload1KBFile() throws IOException, TransferException {
+            log("upload1KBFile", "Uploading 1KB file via FTPS");
             // Create 1KB file
             Path localFile = tempDir.resolve("1kb-ftps-upload.txt");
             StringBuilder content = new StringBuilder();
@@ -273,13 +270,14 @@ class FtpsUploadIntegrationTest {
             assertEquals(expectedSize, result.getBytesTransferred());
             assertTrue(result.getStartTime().isPresent());
             assertTrue(result.getEndTime().isPresent());
-            logger.info("FTPS 1KB upload completed: " + expectedSize + " bytes");
+            log("upload1KBFile", "[PASS] FTPS 1KB upload completed: " + expectedSize + " bytes");
         }
 
         @Test
         @Order(3)
         @DisplayName("Upload binary file via FTPS")
         void uploadBinaryFile() throws IOException, TransferException {
+            log("uploadBinaryFile", "Uploading 512-byte binary file via FTPS");
             // Create binary file
             Path localFile = tempDir.resolve("binary-ftps-upload.bin");
             byte[] binaryContent = new byte[512];
@@ -302,13 +300,14 @@ class FtpsUploadIntegrationTest {
             assertNotNull(result);
             assertEquals(TransferStatus.COMPLETED, result.getFinalStatus());
             assertEquals(binaryContent.length, result.getBytesTransferred());
-            logger.info("FTPS binary upload completed: " + binaryContent.length + " bytes");
+            log("uploadBinaryFile", "[PASS] FTPS binary upload completed: " + binaryContent.length + " bytes");
         }
 
         @Test
         @Order(4)
         @DisplayName("Upload and download roundtrip via FTPS verifying data integrity")
         void uploadDownloadRoundtrip() throws IOException, TransferException {
+            log("uploadDownloadRoundtrip", "Starting FTPS upload/download roundtrip test");
             // Create local file with unique content
             Path localFile = tempDir.resolve("ftps-roundtrip-source.txt");
             String originalContent = "FTPS Roundtrip test content - encrypted transfer - " + System.currentTimeMillis();
@@ -323,7 +322,7 @@ class FtpsUploadIntegrationTest {
 
             TransferResult uploadResult = protocol.transfer(uploadRequest, context);
             assertEquals(TransferStatus.COMPLETED, uploadResult.getFinalStatus());
-            logger.info("FTPS roundtrip upload completed: " + uploadResult.getBytesTransferred() + " bytes");
+            log("uploadDownloadRoundtrip", "Upload phase completed: " + uploadResult.getBytesTransferred() + " bytes");
 
             // Download back via FTPS
             Path downloadedFile = tempDir.resolve("ftps-roundtrip-downloaded.txt");
@@ -335,19 +334,20 @@ class FtpsUploadIntegrationTest {
 
             TransferResult downloadResult = protocol.transfer(downloadRequest, context);
             assertEquals(TransferStatus.COMPLETED, downloadResult.getFinalStatus());
-            logger.info("FTPS roundtrip download completed: " + downloadResult.getBytesTransferred() + " bytes");
+            log("uploadDownloadRoundtrip", "Download phase completed: " + downloadResult.getBytesTransferred() + " bytes");
 
             // Verify content matches — this proves end-to-end FTPS data integrity
             String downloadedContent = Files.readString(downloadedFile);
             assertEquals(originalContent, downloadedContent,
                     "Content after FTPS upload→download roundtrip must match original");
-            logger.info("[PASS] FTPS roundtrip data integrity verified");
+            log("uploadDownloadRoundtrip", "[PASS] FTPS roundtrip data integrity verified");
         }
 
         @Test
         @Order(5)
         @DisplayName("Verify timing information in FTPS transfer results")
         void uploadWithTimingInfo() throws IOException, TransferException {
+            log("uploadWithTimingInfo", "Testing FTPS transfer timing metadata");
             // Create file
             Path localFile = tempDir.resolve("ftps-timing-test.txt");
             String content = "Content for FTPS timing test";
@@ -371,7 +371,7 @@ class FtpsUploadIntegrationTest {
             assertTrue(result.getEndTime().get().isAfter(result.getStartTime().get()) ||
                             result.getEndTime().get().equals(result.getStartTime().get()),
                     "End time should be at or after start time");
-            logger.info("FTPS timing: start=" + result.getStartTime().get() 
+            log("uploadWithTimingInfo", "[PASS] FTPS timing: start=" + result.getStartTime().get() 
                     + ", end=" + result.getEndTime().get());
         }
     }
@@ -403,12 +403,14 @@ class FtpsUploadIntegrationTest {
             TransferResult result = protocol.transfer(uploadRequest, context);
             assertEquals(TransferStatus.COMPLETED, result.getFinalStatus(),
                     "Failed to seed file on FTPS server: " + remotePath);
+            log("seedFileOnServer", "Seeded " + content.length + " bytes to " + remotePath);
         }
 
         @Test
         @Order(1)
         @DisplayName("Download file from FTPS server")
         void downloadFile() throws Exception {
+            log("downloadFile", "Testing FTPS text file download");
             // Seed a file on the server
             String content = "FTPS download test content - " + System.currentTimeMillis();
             seedFileOnServer("/ftps-download-test.txt", content.getBytes());
@@ -430,13 +432,14 @@ class FtpsUploadIntegrationTest {
             // Verify content
             String downloaded = Files.readString(downloadDest);
             assertEquals(content, downloaded);
-            logger.info("FTPS download verified: " + result.getBytesTransferred() + " bytes");
+            log("downloadFile", "[PASS] FTPS download verified: " + result.getBytesTransferred() + " bytes");
         }
 
         @Test
         @Order(2)
         @DisplayName("Download binary file from FTPS server")
         void downloadBinaryFile() throws Exception {
+            log("downloadBinaryFile", "Testing FTPS 1KB binary file download");
             // Seed a binary file
             byte[] binaryContent = new byte[1024];
             for (int i = 0; i < binaryContent.length; i++) {
@@ -462,7 +465,7 @@ class FtpsUploadIntegrationTest {
             byte[] downloaded = Files.readAllBytes(downloadDest);
             assertArrayEquals(binaryContent, downloaded,
                     "Binary content must match after FTPS download");
-            logger.info("FTPS binary download verified: " + result.getBytesTransferred() + " bytes");
+            log("downloadBinaryFile", "[PASS] FTPS binary download verified: " + result.getBytesTransferred() + " bytes");
         }
     }
 
@@ -475,6 +478,7 @@ class FtpsUploadIntegrationTest {
         @Test
         @DisplayName("Attempt to upload non-existent local file via FTPS")
         void uploadNonExistentFile() {
+            log("uploadNonExistentFile", "Testing upload of non-existent file throws TransferException");
             Path nonExistent = tempDir.resolve("does-not-exist.txt");
 
             TransferRequest uploadRequest = TransferRequest.builder()
@@ -485,7 +489,7 @@ class FtpsUploadIntegrationTest {
 
             assertThrows(TransferException.class, () ->
                     protocol.transfer(uploadRequest, context));
-            logger.info("FTPS correctly rejected upload of non-existent file");
+            log("uploadNonExistentFile", "[PASS] FTPS correctly rejected upload of non-existent file");
         }
     }
 
@@ -495,5 +499,10 @@ class FtpsUploadIntegrationTest {
      */
     private URI buildFtpsUri(String path) {
         return URI.create("ftps://" + TEST_USERNAME + ":" + TEST_PASSWORD + "@" + ftpsHost + ":" + ftpsPort + path);
+    }
+
+    // ========================================================================
+    private static void log(String testName, String message) {
+        logger.info("[FtpsUploadIntegrationTest.{}] {}", testName, message);
     }
 }
