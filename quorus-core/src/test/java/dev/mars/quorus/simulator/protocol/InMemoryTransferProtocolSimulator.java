@@ -176,6 +176,22 @@ public class InMemoryTransferProtocolSimulator {
     }
 
     /**
+     * Creates an FTPS (FTP over SSL/TLS) protocol simulator.
+     * <p>Behaves identically to FTP but accepts {@code ftps://} URIs
+     * and simulates TLS connection overhead with slightly higher
+     * default latency than plain FTP.
+     *
+     * @param fileSystem the virtual file system
+     * @return a new FTPS simulator
+     */
+    public static InMemoryTransferProtocolSimulator ftps(InMemoryFileSystemSimulator fileSystem) {
+        InMemoryTransferProtocolSimulator sim = new InMemoryTransferProtocolSimulator("ftps", fileSystem);
+        sim.supportsResume = true;
+        sim.supportsPause = true;
+        return sim;
+    }
+
+    /**
      * Creates an SMB protocol simulator.
      *
      * @param fileSystem the virtual file system
@@ -214,7 +230,9 @@ public class InMemoryTransferProtocolSimulator {
             return false;
         }
         return scheme.equalsIgnoreCase(protocolName) || 
-               (protocolName.equals("http") && scheme.equalsIgnoreCase("https"));
+               (protocolName.equals("http") && scheme.equalsIgnoreCase("https")) ||
+               (protocolName.equals("ftps") && scheme.equalsIgnoreCase("ftp")) ||
+               (protocolName.equals("ftp") && scheme.equalsIgnoreCase("ftps"));
     }
 
     /**
@@ -525,6 +543,11 @@ public class InMemoryTransferProtocolSimulator {
             case "ftp" -> {
                 minLatencyMs = 50;
                 maxLatencyMs = 200;
+            }
+            case "ftps" -> {
+                // FTPS has slightly higher latency than plain FTP due to TLS handshake
+                minLatencyMs = 80;
+                maxLatencyMs = 300;
             }
             case "sftp" -> {
                 minLatencyMs = 30;

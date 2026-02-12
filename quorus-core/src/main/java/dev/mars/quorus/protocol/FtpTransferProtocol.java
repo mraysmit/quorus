@@ -26,18 +26,38 @@ import dev.mars.quorus.transfer.ProgressTracker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.SSLSocketFactory;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.TrustManagerFactory;
+import javax.net.ssl.X509TrustManager;
 import java.io.*;
 import java.net.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.security.KeyStore;
+import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.time.Instant;
 /**
- * Description for FtpTransferProtocol
+ * FTP and FTPS (FTP over SSL/TLS) transfer protocol implementation.
+ * <p>
+ * Supports three connection modes:
+ * <ul>
+ *   <li><b>Plain FTP</b> ({@code ftp://}) — No encryption, port 21</li>
+ *   <li><b>Explicit FTPS</b> ({@code ftps://}, port 21) — Connects plain, then upgrades
+ *       to TLS via {@code AUTH TLS} command. This is the default FTPS mode.</li>
+ *   <li><b>Implicit FTPS</b> ({@code ftps://}, port 990) — Connects directly over TLS
+ *       with no plaintext phase. Used when port 990 is specified explicitly.</li>
+ * </ul>
+ * <p>
+ * After TLS negotiation, the data channel is also protected via {@code PROT P}
+ * (Private), ensuring both control and data channels are encrypted.
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @version 1.0
+ * @version 2.0
  * @since 2025-08-18
  */
 
@@ -45,12 +65,41 @@ public class FtpTransferProtocol implements TransferProtocol {
     
     private static final Logger logger = LoggerFactory.getLogger(FtpTransferProtocol.class);
     private static final int DEFAULT_FTP_PORT = 21;
+    private static final int DEFAULT_FTPS_IMPLICIT_PORT = 990;
     private static final int DEFAULT_BUFFER_SIZE = 32 * 1024; // 32KB buffer for FTP
     private static final Duration DEFAULT_TIMEOUT = Duration.ofMinutes(30);
     private static final Duration CONNECTION_TIMEOUT = Duration.ofSeconds(30);
     
+    /**
+     * FTPS connection mode.
+     */
+    public enum FtpsMode {
+        /** Plain FTP — no TLS. */
+        NONE,
+        /** Explicit FTPS — connect plain on port 21, upgrade via AUTH TLS. */
+        EXPLICIT,
+        /** Implicit FTPS — connect directly over TLS on port 990. */
+        IMPLICIT
+    }
+    
     // Track active FTP client for abort capability
     private volatile FtpClient activeClient;
+    
+    // Custom SSL socket factory (for testing with self-signed certificates)
+    private volatile SSLSocketFactory customSslSocketFactory;
+    
+    /**
+     * Sets a custom SSLSocketFactory for FTPS connections.
+     * <p>
+     * This is primarily intended for integration testing against FTPS servers
+     * with self-signed certificates. In production, the default trust store
+     * (JVM cacerts) is used.
+     *
+     * @param sslSocketFactory the custom SSLSocketFactory to use, or null to use defaults
+     */
+    public void setSslSocketFactory(SSLSocketFactory sslSocketFactory) {
+        this.customSslSocketFactory = sslSocketFactory;
+    }
     
     @Override
     public String getProtocolName() {
@@ -64,23 +113,30 @@ public class FtpTransferProtocol implements TransferProtocol {
             return false;
         }
 
-        // Check for FTP download (FTP source)
+        // Check for FTP/FTPS download (FTP or FTPS source)
         String sourceScheme = request.getSourceUri().getScheme();
-        if ("ftp".equalsIgnoreCase(sourceScheme)) {
-            logger.debug("canHandle: FTP download detected, sourceScheme={}", sourceScheme);
+        if (isFtpScheme(sourceScheme)) {
+            logger.debug("canHandle: FTP/FTPS download detected, sourceScheme={}", sourceScheme);
             return true;
         }
 
-        // Check for FTP upload (FTP destination)
+        // Check for FTP/FTPS upload (FTP or FTPS destination)
         if (request.getDestinationUri() != null) {
             String destScheme = request.getDestinationUri().getScheme();
-            boolean canHandle = "ftp".equalsIgnoreCase(destScheme);
-            logger.debug("canHandle: FTP upload check, destScheme={}, canHandle={}", destScheme, canHandle);
+            boolean canHandle = isFtpScheme(destScheme);
+            logger.debug("canHandle: FTP/FTPS upload check, destScheme={}, canHandle={}", destScheme, canHandle);
             return canHandle;
         }
 
-        logger.debug("canHandle: Not an FTP request");
+        logger.debug("canHandle: Not an FTP/FTPS request");
         return false;
+    }
+    
+    /**
+     * Returns true if the scheme is ftp or ftps.
+     */
+    private boolean isFtpScheme(String scheme) {
+        return "ftp".equalsIgnoreCase(scheme) || "ftps".equalsIgnoreCase(scheme);
     }
 
     @Override
@@ -158,7 +214,7 @@ public class FtpTransferProtocol implements TransferProtocol {
             
             // Establish FTP connection
             logger.debug("Establishing FTP connection to {}:{}", connectionInfo.host, connectionInfo.port);
-            FtpClient ftpClient = new FtpClient(connectionInfo);
+            FtpClient ftpClient = new FtpClient(connectionInfo, customSslSocketFactory);
             activeClient = ftpClient; // Track for abort capability
             
             try {
@@ -253,7 +309,7 @@ public class FtpTransferProtocol implements TransferProtocol {
             
             // Establish FTP connection
             logger.debug("Establishing FTP connection to {}:{}", connectionInfo.host, connectionInfo.port);
-            FtpClient ftpClient = new FtpClient(connectionInfo);
+            FtpClient ftpClient = new FtpClient(connectionInfo, customSslSocketFactory);
             activeClient = ftpClient; // Track for abort capability
             
             try {
@@ -390,9 +446,11 @@ public class FtpTransferProtocol implements TransferProtocol {
     
     private FtpConnectionInfo parseFtpUri(URI sourceUri) throws TransferException {
         String scheme = sourceUri.getScheme();
-        if (!"ftp".equalsIgnoreCase(scheme)) {
-            throw new TransferException("unknown", "Invalid FTP URI scheme: " + scheme);
+        if (!isFtpScheme(scheme)) {
+            throw new TransferException("unknown", "Invalid FTP/FTPS URI scheme: " + scheme);
         }
+        
+        boolean isFtps = "ftps".equalsIgnoreCase(scheme);
         
         String host = sourceUri.getHost();
         if (host == null || host.isEmpty()) {
@@ -400,8 +458,20 @@ public class FtpTransferProtocol implements TransferProtocol {
         }
         
         int port = sourceUri.getPort();
+        
+        // Determine FTPS mode based on scheme and port
+        FtpsMode ftpsMode = FtpsMode.NONE;
+        if (isFtps) {
+            if (port == DEFAULT_FTPS_IMPLICIT_PORT) {
+                ftpsMode = FtpsMode.IMPLICIT;
+            } else {
+                // Default FTPS mode is explicit (AUTH TLS on port 21)
+                ftpsMode = FtpsMode.EXPLICIT;
+            }
+        }
+        
         if (port == -1) {
-            port = DEFAULT_FTP_PORT;
+            port = (ftpsMode == FtpsMode.IMPLICIT) ? DEFAULT_FTPS_IMPLICIT_PORT : DEFAULT_FTP_PORT;
         }
         
         String path = sourceUri.getPath();
@@ -422,25 +492,60 @@ public class FtpTransferProtocol implements TransferProtocol {
             }
         }
         
-        return new FtpConnectionInfo(host, port, path, username, password);
+        logger.debug("Parsed URI: scheme={}, host={}, port={}, ftpsMode={}", scheme, host, port, ftpsMode);
+        return new FtpConnectionInfo(host, port, path, username, password, ftpsMode);
     }
 
     private static class FtpClient {
         private final FtpConnectionInfo connectionInfo;
+        private final SSLSocketFactory customSslSocketFactory;
         private Socket controlSocket;
         private BufferedReader controlReader;
         private PrintWriter controlWriter;
+        private SSLSocketFactory sslSocketFactory;
         
         FtpClient(FtpConnectionInfo connectionInfo) {
+            this(connectionInfo, null);
+        }
+        
+        FtpClient(FtpConnectionInfo connectionInfo, SSLSocketFactory customSslSocketFactory) {
             this.connectionInfo = connectionInfo;
+            this.customSslSocketFactory = customSslSocketFactory;
         }
         
         void connect() throws IOException {
-            logger.info("Connecting to FTP server: {}:{}", connectionInfo.host, connectionInfo.port);
+            boolean useTls = connectionInfo.ftpsMode != FtpsMode.NONE;
+            String modeLabel = useTls ? "FTPS (" + connectionInfo.ftpsMode + ")" : "FTP";
+            logger.info("Connecting to {} server: {}:{}", modeLabel, connectionInfo.host, connectionInfo.port);
             
-            controlSocket = new Socket();
-            controlSocket.connect(new InetSocketAddress(connectionInfo.host, connectionInfo.port), 
-                    (int) CONNECTION_TIMEOUT.toMillis());
+            // Initialise SSL context if TLS is required
+            if (useTls) {
+                try {
+                    if (customSslSocketFactory != null) {
+                        sslSocketFactory = customSslSocketFactory;
+                        logger.debug("Using custom SSLSocketFactory for FTPS connection");
+                    } else {
+                        sslSocketFactory = createSslSocketFactory();
+                    }
+                } catch (Exception e) {
+                    throw new IOException("Failed to initialise TLS for FTPS connection", e);
+                }
+            }
+            
+            // For implicit FTPS: connect directly over TLS
+            if (connectionInfo.ftpsMode == FtpsMode.IMPLICIT) {
+                logger.debug("Implicit FTPS: establishing TLS connection to {}:{}", 
+                            connectionInfo.host, connectionInfo.port);
+                controlSocket = sslSocketFactory.createSocket(
+                        connectionInfo.host, connectionInfo.port);
+                ((SSLSocket) controlSocket).startHandshake();
+                logger.debug("Implicit FTPS: TLS handshake completed");
+            } else {
+                // Plain FTP or Explicit FTPS: connect with a plain socket first
+                controlSocket = new Socket();
+                controlSocket.connect(new InetSocketAddress(connectionInfo.host, connectionInfo.port), 
+                        (int) CONNECTION_TIMEOUT.toMillis());
+            }
             logger.debug("TCP connection established to {}:{}", connectionInfo.host, connectionInfo.port);
             
             controlReader = new BufferedReader(new InputStreamReader(controlSocket.getInputStream()));
@@ -453,6 +558,11 @@ public class FtpTransferProtocol implements TransferProtocol {
                 throw new IOException("FTP connection failed: " + response);
             }
             logger.debug("Received FTP welcome message");
+            
+            // For explicit FTPS: upgrade to TLS now
+            if (connectionInfo.ftpsMode == FtpsMode.EXPLICIT) {
+                upgradeToTls();
+            }
             
             // Login
             logger.debug("Authenticating as user: {}", connectionInfo.username);
@@ -468,6 +578,11 @@ public class FtpTransferProtocol implements TransferProtocol {
                 throw new IOException("FTP login failed: " + response);
             }
             logger.debug("FTP authentication successful");
+            
+            // For FTPS: set data channel protection after login
+            if (useTls) {
+                setDataChannelProtection();
+            }
             
             // Set binary mode
             logger.debug("Setting binary transfer mode");
@@ -487,7 +602,71 @@ public class FtpTransferProtocol implements TransferProtocol {
                 throw new IOException("Failed to enter passive mode: " + response);
             }
             
-            logger.info("FTP connection established successfully to {}:{}", connectionInfo.host, connectionInfo.port);
+            logger.info("{} connection established successfully to {}:{}", modeLabel, 
+                       connectionInfo.host, connectionInfo.port);
+        }
+        
+        /**
+         * Upgrades the control connection to TLS using AUTH TLS (explicit FTPS).
+         */
+        private void upgradeToTls() throws IOException {
+            logger.debug("Explicit FTPS: sending AUTH TLS to upgrade control connection");
+            sendCommand("AUTH TLS");
+            String response = readResponse();
+            if (!response.startsWith("234")) {
+                throw new IOException("Server rejected AUTH TLS: " + response);
+            }
+            
+            // Wrap the existing plain socket in an SSLSocket
+            SSLSocket sslSocket = (SSLSocket) sslSocketFactory.createSocket(
+                    controlSocket, connectionInfo.host, connectionInfo.port, true);
+            sslSocket.setUseClientMode(true);
+            sslSocket.startHandshake();
+            
+            // Replace control streams with encrypted ones
+            controlSocket = sslSocket;
+            controlReader = new BufferedReader(new InputStreamReader(sslSocket.getInputStream()));
+            controlWriter = new PrintWriter(sslSocket.getOutputStream(), true);
+            
+            logger.debug("Explicit FTPS: control connection upgraded to TLS (protocol={})", 
+                        sslSocket.getSession().getProtocol());
+        }
+        
+        /**
+         * Sets the data channel protection level to Private (encrypted).
+         * Sends PBSZ 0 and PROT P as required by RFC 4217.
+         */
+        private void setDataChannelProtection() throws IOException {
+            // PBSZ (Protection Buffer Size) — must be 0 for TLS
+            logger.debug("FTPS: setting protection buffer size (PBSZ 0)");
+            sendCommand("PBSZ 0");
+            String response = readResponse();
+            if (!response.startsWith("200")) {
+                logger.warn("PBSZ 0 returned unexpected response: {}", response);
+            }
+            
+            // PROT P — set data channel to Private (encrypted)
+            logger.debug("FTPS: setting data channel protection to Private (PROT P)");
+            sendCommand("PROT P");
+            response = readResponse();
+            if (!response.startsWith("200")) {
+                throw new IOException("Server rejected PROT P (data channel encryption): " + response);
+            }
+            logger.debug("FTPS: data channel protection set to Private");
+        }
+        
+        /**
+         * Creates an SSLSocketFactory for FTPS connections.
+         * Uses the default trust store from the JVM.
+         */
+        private static SSLSocketFactory createSslSocketFactory() throws Exception {
+            TrustManagerFactory tmf = TrustManagerFactory.getInstance(
+                    TrustManagerFactory.getDefaultAlgorithm());
+            tmf.init((KeyStore) null); // Uses default cacerts trust store
+            
+            SSLContext sslContext = SSLContext.getInstance("TLSv1.3");
+            sslContext.init(null, tmf.getTrustManagers(), null);
+            return sslContext.getSocketFactory();
         }
         
         long getFileSize(String remotePath) throws IOException {
@@ -514,10 +693,8 @@ public class FtpTransferProtocol implements TransferProtocol {
             // Parse passive mode response to get data connection details
             DataConnectionInfo dataInfo = parsePassiveResponse(response);
             
-            // Establish data connection
-            Socket dataSocket = new Socket();
-            dataSocket.connect(new InetSocketAddress(dataInfo.host, dataInfo.port), 
-                    (int) CONNECTION_TIMEOUT.toMillis());
+            // Establish data connection (plain or TLS-wrapped)
+            Socket dataSocket = createDataSocket(dataInfo);
             
             try {
                 // Send RETR command
@@ -582,10 +759,8 @@ public class FtpTransferProtocol implements TransferProtocol {
             // Parse passive mode response to get data connection details
             DataConnectionInfo dataInfo = parsePassiveResponse(response);
             
-            // Establish data connection
-            Socket dataSocket = new Socket();
-            dataSocket.connect(new InetSocketAddress(dataInfo.host, dataInfo.port), 
-                    (int) CONNECTION_TIMEOUT.toMillis());
+            // Establish data connection (plain or TLS-wrapped)
+            Socket dataSocket = createDataSocket(dataInfo);
             
             try {
                 // Send STOR command
@@ -708,8 +883,33 @@ public class FtpTransferProtocol implements TransferProtocol {
         
         private String readResponse() throws IOException {
             String response = controlReader.readLine();
+            if (response == null) {
+                logger.error("FTP server closed connection unexpectedly (EOF)");
+                throw new IOException("FTP server closed connection unexpectedly");
+            }
             logger.debug("FTP Response: {}", response);
             return response;
+        }
+        
+        /**
+         * Creates a data socket, wrapping it in TLS if FTPS is enabled (PROT P).
+         */
+        private Socket createDataSocket(DataConnectionInfo dataInfo) throws IOException {
+            Socket plainSocket = new Socket();
+            plainSocket.connect(new InetSocketAddress(dataInfo.host, dataInfo.port), 
+                    (int) CONNECTION_TIMEOUT.toMillis());
+            
+            if (connectionInfo.ftpsMode != FtpsMode.NONE && sslSocketFactory != null) {
+                // Wrap data connection in TLS for FTPS data channel protection
+                logger.debug("FTPS: wrapping data connection in TLS to {}:{}", dataInfo.host, dataInfo.port);
+                SSLSocket sslDataSocket = (SSLSocket) sslSocketFactory.createSocket(
+                        plainSocket, dataInfo.host, dataInfo.port, true);
+                sslDataSocket.setUseClientMode(true);
+                sslDataSocket.startHandshake();
+                return sslDataSocket;
+            }
+            
+            return plainSocket;
         }
         
         private DataConnectionInfo parsePassiveResponse(String response) throws IOException {
@@ -738,13 +938,22 @@ public class FtpTransferProtocol implements TransferProtocol {
         final String path;
         final String username;
         final String password;
+        final FtpsMode ftpsMode;
         
-        FtpConnectionInfo(String host, int port, String path, String username, String password) {
+        FtpConnectionInfo(String host, int port, String path, String username, String password, FtpsMode ftpsMode) {
             this.host = host;
             this.port = port;
             this.path = path;
             this.username = username;
             this.password = password;
+            this.ftpsMode = ftpsMode;
+        }
+        
+        /**
+         * Convenience constructor for plain FTP (no TLS).
+         */
+        FtpConnectionInfo(String host, int port, String path, String username, String password) {
+            this(host, port, path, username, password, FtpsMode.NONE);
         }
         
         @Override
@@ -754,6 +963,7 @@ public class FtpTransferProtocol implements TransferProtocol {
                     ", port=" + port +
                     ", path='" + path + '\'' +
                     ", username='" + username + '\'' +
+                    ", ftpsMode=" + ftpsMode +
                     '}';
         }
     }

@@ -464,12 +464,12 @@ spec:
         recipients: ["team@company.com", "manager@company.com"]
         subject: "URGENT: Daily sync FAILED - {{date}}"
         priority: "high"
-      - type: slack
+      - type: symphony
         channel: "#data-ops"
         message: "Daily sync failed for {{date}}"
 ```
 
-Quorus supports three notification types: `email`, `slack`, and `webhook`. See [Notifications Reference](#notifications-reference) in Part II for full details.
+Quorus supports three notification types: `email`, `symphony`, and `webhook`. See [Notifications Reference](#notifications-reference) in Part II for full details.
 
 ---
 
@@ -992,7 +992,7 @@ integrity:
     maxAttempts: 3
     backoffStrategy: "exponential"
     quarantineLocation: "/quarantine/"
-    channels: ["email", "slack"]
+    channels: ["email", "symphony"]
 ```
 
 Alternative source failover on integrity failures:
@@ -1087,7 +1087,7 @@ spec:
       - name: "slow-transfer-alert"
         condition: "transfer-rate < 1MB/s AND elapsed-time > 60s"
         action: "notify"            # notify | escalate | investigate
-        channels: ["email", "slack"]
+        channels: ["email", "symphony"]
 ```
 
 ### Notifications Reference
@@ -1102,7 +1102,7 @@ notifications:
       includeMetrics: true
       attachments:
         - "{{stagingArea}}/validation-report.json"
-    - type: slack
+    - type: symphony
       channel: "#data-ops"
       message: "Pipeline completed for {{processingDate}}"
       includeMetrics: true
@@ -1115,7 +1115,7 @@ notifications:
       includeErrorDetails: true
       includeLogs: true
       priority: "high"
-    - type: slack
+    - type: symphony
       channel: "#data-ops"
       message: "CRITICAL: Pipeline FAILED for {{processingDate}}"
       mentions: ["@oncall", "@team-lead"]
@@ -1141,7 +1141,7 @@ notifications:
 | Notification Type | Required Fields |
 |-------------------|----------------|
 | `email` | `recipients[]`, `subject` |
-| `slack` | `channel`, `message` |
+| `symphony` | `channel`, `message` |
 | `webhook` | `url`, `method` |
 
 ### Cleanup
@@ -2153,17 +2153,17 @@ These keywords appear in this guide's reference material for forward planning, b
 
 #### Notifications (19)
 
-Configures how Quorus alerts operators and stakeholders about workflow events. Notifications can be triggered on failure, success, or at regular intervals during long-running transfers. Each trigger type (`onFailure`, `onSuccess`, `onProgress`) supports multiple delivery channels including email, Slack, and webhooks, with templated messages that support `{{variable}}` substitution. This group also covers attachment handling, recipient management, and throttling controls to prevent notification flooding.
+Configures how Quorus alerts operators and stakeholders about workflow events. Notifications can be triggered on failure, success, or at regular intervals during long-running transfers. Each trigger type (`onFailure`, `onSuccess`, `onProgress`) supports multiple delivery channels including email, symphony, and webhooks, with templated messages that support `{{variable}}` substitution. This group also covers attachment handling, recipient management, and throttling controls to prevent notification flooding.
 
 | Keyword | Context | Type | Description |
 |---------|---------|------|-------------|
 | `attachments` | onFailure, onSuccess | object[] | Files or reports to attach to the notification (e.g., transfer logs, error summaries). |
-| `channels` | onFailure, onSuccess, onProgress | string[] | Delivery channels for the notification — e.g., `"email"`, `"slack"`, `"webhook"`. |
+| `channels` | onFailure, onSuccess, onProgress | string[] | Delivery channels for the notification — e.g., `"email"`, `"symphony"`, `"webhook"`. |
 | `includeErrorDetails` | onFailure | boolean | When `true`, append full error stack traces and context to the notification body. |
 | `includeLogs` | onFailure, onSuccess | boolean | When `true`, attach relevant workflow execution logs to the notification. |
 | `includeMetrics` | onSuccess, onProgress | boolean | When `true`, include transfer metrics (bytes, duration, throughput) in the notification. |
 | `intervalMinutes` | onProgress | integer | Minimum interval between repeated progress notifications to avoid flooding. |
-| `mentions` | onFailure, onSuccess | string[] | Users or groups to @-mention in chat-based notifications (e.g., Slack handles). |
+| `mentions` | onFailure, onSuccess | string[] | Users or groups to @-mention in chat-based notifications (e.g., symphony handles). |
 | `message` | onFailure, onSuccess, onProgress | string | Body text of the notification. Supports `{{variable}}` substitution. |
 | `minimumDurationMinutes` | onProgress | integer | Only send the notification if the workflow has been running longer than this threshold. |
 | `notifications` | Spec | object | Container for all notification configuration within a workflow. |

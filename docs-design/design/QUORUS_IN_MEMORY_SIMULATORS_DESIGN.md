@@ -1203,7 +1203,7 @@ quorus-controller/
 
 ### Purpose
 
-Simulates file transfer protocols (FTP, SFTP, HTTP, SMB) without real network connections or protocol servers.
+Simulates file transfer protocols (FTP, FTPS, SFTP, HTTP, SMB) without real network connections or protocol servers.
 
 ### Interface
 
@@ -1323,6 +1323,12 @@ InMemoryTransferProtocolSimulator sftpProtocol =
         .withKeyAuthentication(true)
         .withCompression(true)
         .build();
+
+// FTPS-specific simulation (FTP over SSL/TLS)
+InMemoryTransferProtocolSimulator ftpsProtocol = 
+    InMemoryTransferProtocolSimulator.ftps(fileSystem);
+// FTPS defaults: resume=true, pause=true, latency 80-300ms (TLS overhead)
+// Cross-compatible: FTPS simulator also handles ftp:// URIs and vice versa
 
 // HTTP-specific simulation
 InMemoryTransferProtocolSimulator httpProtocol = 
@@ -2242,7 +2248,7 @@ To validate this document, the following were examined:
 
 | Feature | Documented | Implemented (Line #) |
 |---------|-----------|---------------------|
-| Protocol names (ftp, sftp, http, smb) | ✅ | ✅ Lines 140-185: Factory methods |
+| Protocol names (ftp, ftps, sftp, http, smb) | ✅ | ✅ Lines 140-185: Factory methods |
 | `ProtocolFailureMode` enum | ✅ | ✅ Lines 87-110: All modes present |
 | Latency simulation | ✅ | ✅ Lines 72-73 |
 | Bandwidth simulation | ✅ | ✅ Line 74 |
@@ -2251,7 +2257,17 @@ To validate this document, the following were examined:
 | Failure injection | ✅ | ✅ Lines 78-80 |
 | Statistics tracking | ✅ | ✅ Lines 83-86 |
 
-**Test File:** `InMemoryTransferProtocolSimulatorTest.java`
+**Test Files:** `InMemoryTransferProtocolSimulatorTest.java`, `InMemoryFtpsProtocolSimulatorTest.java`
+
+**FTPS-Specific Validation:**
+
+| Feature | Documented | Implemented |
+|---------|-----------|-------------|
+| `ftps()` factory method | ✅ | ✅ Creates simulator with protocol name "ftps" |
+| Cross-scheme `canHandle()` | ✅ | ✅ FTPS handles ftp:// and FTP handles ftps:// |
+| TLS latency defaults (80-300ms) | ✅ | ✅ Higher than FTP (50-200ms) to simulate handshake overhead |
+| Resume/Pause support | ✅ | ✅ Both enabled by default |
+| Chaos engineering (auth, timeout, interrupted) | ✅ | ✅ All ProtocolFailureMode values supported |
 
 #### 3. InMemoryAgentSimulator
 

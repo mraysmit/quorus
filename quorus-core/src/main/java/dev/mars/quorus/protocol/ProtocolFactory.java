@@ -65,9 +65,13 @@ public class ProtocolFactory {
         registerProtocol(smbProtocol);
         registerProtocolAlias("cifs", smbProtocol);
 
-        // Register FTP and SFTP protocols
+        // Register FTP protocol for both ftp and ftps schemes
         logger.debug("Creating FtpTransferProtocol instance");
-        registerProtocol(new FtpTransferProtocol());
+        FtpTransferProtocol ftpProtocol = new FtpTransferProtocol();
+        registerProtocol(ftpProtocol);
+        registerProtocolAlias("ftps", ftpProtocol);
+
+        // Register SFTP protocol
         logger.debug("Creating SftpTransferProtocol instance");
         registerProtocol(new SftpTransferProtocol());
 
