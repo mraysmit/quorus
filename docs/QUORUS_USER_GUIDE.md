@@ -1066,7 +1066,7 @@ Comprehensive monitoring and observability for all transfer operations:
 monitoring:
   dashboards: [Grafana, Custom Web UI]
   metrics: [Prometheus, InfluxDB]
-  alerting: [PagerDuty, Slack, Email]
+  alerting: [xmatters, symphony, Email]
   siem: [Splunk, Elastic, QRadar]
 ```
 
@@ -2551,12 +2551,12 @@ spec:
       - name: "slow-transfer-alert"
         condition: "transfer-rate < 1MB/s AND elapsed-time > 60s"
         action: "notify"
-        channels: ["email", "slack"]
+        channels: ["email", "symphony"]
 
       - name: "high-error-rate-alert"
         condition: "error-rate > 10%"
         action: "escalate"
-        channels: ["pagerduty"]
+        channels: ["xmatters"]
 
       - name: "eta-exceeded-alert"
         condition: "elapsed-time > eta * 1.5"
@@ -2991,7 +2991,7 @@ spec:
       maxRetries: 3
       retryDelay: "exponential"
       quarantineLocation: "/quarantine/"
-      notificationChannels: ["email", "slack"]
+      notificationChannels: ["email", "symphony"]
 
   transferGroups:
     - name: resilient-integrity-transfers
@@ -4032,11 +4032,11 @@ spec:
         attachments:
           - "{{stagingArea}}/validation-report-{{processingDate}}.json"
 
-      - type: slack
-        # Line 137: Also notify via Slack for immediate visibility
+      - type: symphony
+        # Line 137: Also notify via symphony for immediate visibility
         channel: "#finance-data-ops"
         message: "✅ Daily financial pipeline completed successfully for {{processingDate}}"
-        # Line 140: Include key metrics in Slack message
+        # Line 140: Include key metrics in symphony message
         includeMetrics: true
 
     # Failure notifications - sent when workflow fails
@@ -4052,7 +4052,7 @@ spec:
         # Line 152: Mark as high priority for email filtering
         priority: "high"
 
-      - type: slack
+      - type: symphony
         channel: "#finance-data-ops"
         message: "🚨 CRITICAL: Financial pipeline FAILED for {{processingDate}} - immediate attention required!"
         # Line 157: Mention specific people for urgent issues
@@ -4151,7 +4151,7 @@ We've progressed through increasingly complex YAML configurations:
 - Complete enterprise metadata with `tenant`, `namespace`, `annotations`
 - Comprehensive error handling with `continueOnError`, `onError`
 - Authentication with `credentials`
-- Multi-channel `notifications` (email, Slack, webhook)
+- Multi-channel `notifications` (email, symphony, webhook)
 - Resource management and `cleanup` policies
 - Service Level Agreements (`sla`)
 
@@ -4257,7 +4257,7 @@ notifications:
       subject: "URGENT: Workflow failed"
       priority: "high"
 
-    - type: slack
+    - type: symphony
       channel: "#alerts"
       message: "Workflow failed - immediate attention required"
 ```
@@ -4408,7 +4408,7 @@ spec:
     # Notification and alerting
     primaryNotificationEmail: "finance-ops@acme-corp.com"
     escalationEmail: "finance-director@acme-corp.com"
-    slackChannel: "#finance-data-ops"
+    symphonyChannel: "#finance-data-ops"
 
     # Compliance and audit
     auditRequired: true
@@ -4739,8 +4739,8 @@ spec:
         template: "workflow-success"
         includeMetrics: true
 
-      - type: slack
-        channel: "{{slackChannel}}"
+      - type: symphony
+        channel: "{{symphonyChannel}}"
         message: "✅ Finance data pipeline completed successfully for {{processingDate}}"
 
     # Failure notifications
@@ -4752,8 +4752,8 @@ spec:
         includeErrorDetails: true
         includeLogs: true
 
-      - type: slack
-        channel: "{{slackChannel}}"
+      - type: symphony
+        channel: "{{symphonyChannel}}"
         message: "🚨 Finance data pipeline FAILED for {{processingDate}} - immediate attention required"
 
       - type: webhook
@@ -5102,7 +5102,7 @@ public class CriticalPathAnalysis {
     private final List<String> criticalPath;
     private final int totalDuration;
     private final List<String> bottlenecks;
-    private final Map<String, Integer> slackTimes;
+    private final Map<String, Integer> symphonyTimes;
 
     // Methods for critical path optimization
 }

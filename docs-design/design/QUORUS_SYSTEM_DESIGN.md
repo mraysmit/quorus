@@ -2493,7 +2493,7 @@ spec:
   # Post-execution actions
   onSuccess:
     - action: notify
-      target: "slack://data-ops-channel"
+      target: "symphony://data-ops-channel"
       message: "Daily backup completed successfully"
     - action: cleanup
       target: "/backup"
@@ -2718,8 +2718,8 @@ spec:
     # Alerting configuration
     alerting:
       channels:
-        - type: "slack"
-          webhook: "https://hooks.slack.com/acme-corp"
+        - type: "symphony"
+          webhook: "https://hooks.symphony.com/acme-corp"
         - type: "email"
           recipients: ["ops@acme-corp.com"]
         - type: "webhook"
@@ -3182,12 +3182,12 @@ monitoring:
     - name: transfer-failure
       condition: "errorRate > 5%"
       severity: critical
-      channels: ["slack", "email", "pagerduty"]
+      channels: ["symphony", "email", "xmatters"]
 
     - name: slow-transfer
       condition: "transferRate < 1MB/s"
       severity: warning
-      channels: ["slack"]
+      channels: ["symphony"]
 ```
 
 ## Security Architecture

@@ -1,0 +1,54 @@
+# FTPS (FTP over SSL/TLS) server for integration testing
+# Uses stilliard/pure-ftpd with TLS enabled for Explicit FTPS (AUTH TLS on port 21)
+# The container auto-generates a self-signed certificate using TLS_CN/TLS_ORG/TLS_C
+# DH parameter generation takes ~30-60s on first start; start_period accounts for this.
+#
+# Manual usage:
+#   docker compose -f docker-compose-ftps-test.yml up -d
+#   # Wait for healthy status, then connect via: ftps://testuser:testpass@localhost:<mapped-port>
+#
+# Automated usage: Managed by SharedTestContainers / Testcontainers ComposeContainer
+
+networks:
+  ftps-test:
+    name: quorus-ftps-test
+    driver: bridge
+
+services:
+  # FTPS Server - Pure-FTPd with TLS enabled
+  ftps:
+    image: stilliard/pure-ftpd:latest
+    networks:
+      ftps-test:
+        aliases:
+          - ftps-server
+    ports:
+      - "2121:21"        # Control port - fixed mapping (avoids socat proxy for TLS session compat)
+      - "30000:30000"    # Passive mode data port - fixed mapping (FTP PASV requires this)
+    environment:
+      # FTP credentials
+      FTP_USER_NAME: testuser
+      FTP_USER_PASS: testpass
+      FTP_USER_HOME: /home/ftpusers/testuser
+      # Enable TLS mode 1: TLS optional (clients can use AUTH TLS to upgrade)
+      # Mode 1 allows both plain FTP and FTPS connections for flexibility
+      ADDED_FLAGS: "--tls=1 -p 30000:30000"
+      # Passive mode: use container-local address (Testcontainers maps dynamically)
+      PUBLICHOST: "127.0.0.1"
+      # Auto-generate self-signed TLS certificate
+      TLS_CN: "localhost"
+      TLS_ORG: "Quorus Test"
+      TLS_C: "GB"
+    volumes:
+      - ftps-data:/home/ftpusers/testuser
+    healthcheck:
+      # stilliard/pure-ftpd doesn't have nc/netcat; use bash /dev/tcp instead
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/21' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+volumes:
+  ftps-data:
+    name: quorus-ftps-test-data
