@@ -38,7 +38,8 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
@@ -63,7 +64,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 @DisplayName("FTP Upload Integration Tests")
 class FtpUploadIntegrationTest {
 
-    private static final Logger logger = Logger.getLogger(FtpUploadIntegrationTest.class.getName());
+    private static final Logger logger = LoggerFactory.getLogger(FtpUploadIntegrationTest.class);
 
     private FtpTransferProtocol protocol;
     private TransferContext context;
@@ -89,7 +90,7 @@ class FtpUploadIntegrationTest {
         ftpHost = SharedTestContainers.getFtpHost();
         ftpPort = SharedTestContainers.getFtpPort();
 
-        logger.info("FTP server available at " + ftpHost + ":" + ftpPort);
+        logger.info("FTP server available at {}:{}", ftpHost, ftpPort);
 
         // Create context for tests
         TransferRequest dummyRequest = TransferRequest.builder()

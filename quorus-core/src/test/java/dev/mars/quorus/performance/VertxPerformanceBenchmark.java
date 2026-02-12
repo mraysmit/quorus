@@ -28,7 +28,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -48,7 +49,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 public class VertxPerformanceBenchmark {
 
-    private static final Logger logger = Logger.getLogger(VertxPerformanceBenchmark.class.getName());
+    private static final Logger logger = LoggerFactory.getLogger(VertxPerformanceBenchmark.class);
     
     private static Vertx vertx;
     private static ThreadMXBean threadMXBean;
@@ -71,7 +72,7 @@ public class VertxPerformanceBenchmark {
     void testThreadCountEfficiency() throws Exception {
         // Record initial thread count
         int initialThreadCount = threadMXBean.getThreadCount();
-        logger.info("Initial thread count: " + initialThreadCount);
+        logger.info("Initial thread count: {}", initialThreadCount);
 
         // Create 100 concurrent operations
         int operations = 100;
@@ -94,10 +95,10 @@ public class VertxPerformanceBenchmark {
         int currentThreadCount = threadMXBean.getThreadCount();
 
         logger.info("=== Thread Count Metrics ===");
-        logger.info("Initial threads: " + initialThreadCount);
-        logger.info("Peak threads: " + peakThreadCount);
-        logger.info("Current threads: " + currentThreadCount);
-        logger.info("Duration: " + duration + "ms");
+        logger.info("Initial threads: {}", initialThreadCount);
+        logger.info("Peak threads: {}", peakThreadCount);
+        logger.info("Current threads: {}", currentThreadCount);
+        logger.info("Duration: {}ms", duration);
         
         // Vert.x should use event loop threads efficiently
         // Expecting minimal thread creation (< 50 threads for 100 operations)
@@ -116,7 +117,7 @@ public class VertxPerformanceBenchmark {
         runOperations(warmupIterations);
 
         // Measure
-        logger.info("Measuring throughput with " + measureIterations + " operations...");
+        logger.info("Measuring throughput with {} operations...", measureIterations);
         long startTime = System.nanoTime();
         runOperations(measureIterations);
         long duration = System.nanoTime() - startTime;
@@ -125,10 +126,10 @@ public class VertxPerformanceBenchmark {
         double avgLatencyMs = duration / (measureIterations * 1_000_000.0);
 
         logger.info("=== Throughput Metrics ===");
-        logger.info("Operations: " + measureIterations);
-        logger.info("Duration: " + (duration / 1_000_000) + "ms");
-        logger.info("Throughput: " + String.format("%.2f", throughput) + " ops/sec");
-        logger.info("Average latency: " + String.format("%.2f", avgLatencyMs) + "ms");
+        logger.info("Operations: {}", measureIterations);
+        logger.info("Duration: {}ms", duration / 1_000_000);
+        logger.info("Throughput: {} ops/sec", String.format("%.2f", throughput));
+        logger.info("Average latency: {}ms", String.format("%.2f", avgLatencyMs));
 
         // Expect high throughput with Vert.x reactive model
         assertTrue(throughput > 1000, "Throughput should exceed 1000 ops/sec: " + throughput);
@@ -164,10 +165,10 @@ public class VertxPerformanceBenchmark {
         long max = latencies.get(iterations - 1);
 
         logger.info("=== Latency Percentiles (microseconds) ===");
-        logger.info("P50: " + (p50 / 1000));
-        logger.info("P95: " + (p95 / 1000));
-        logger.info("P99: " + (p99 / 1000));
-        logger.info("Max: " + (max / 1000));
+        logger.info("P50: {}", p50 / 1000);
+        logger.info("P95: {}", p95 / 1000);
+        logger.info("P99: {}", p99 / 1000);
+        logger.info("Max: {}", max / 1000);
 
         // Vert.x should provide low latency
         assertTrue(p95 / 1000 < 100, "P95 latency should be under 100μs: " + (p95 / 1000));
