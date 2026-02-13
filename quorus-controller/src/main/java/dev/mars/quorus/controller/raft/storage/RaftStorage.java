@@ -181,6 +181,74 @@ public interface RaftStorage {
      */
     Future<List<LogEntryData>> replayLog();
 
+    // =========================================================================
+    // Snapshot Operations
+    // =========================================================================
+
+    /**
+     * Persists a state machine snapshot to durable storage.
+     *
+     * <p>The snapshot captures the complete state machine at the given log index.
+     * After a snapshot is saved and {@link #truncatePrefix(long)} removes the
+     * corresponding log entries, this snapshot becomes the recovery baseline.</p>
+     *
+     * <p>Implementations must write atomically (e.g., write-then-rename) so that
+     * a crash during save cannot corrupt an existing valid snapshot.</p>
+     *
+     * @param data              the serialized snapshot bytes (opaque to storage)
+     * @param lastIncludedIndex the log index of the last entry included in the snapshot
+     * @param lastIncludedTerm  the term of the last entry included in the snapshot
+     * @return a Future that completes after durable persistence
+     */
+    Future<Void> saveSnapshot(byte[] data, long lastIncludedIndex, long lastIncludedTerm);
+
+    /**
+     * Loads the most recent snapshot from durable storage.
+     *
+     * <p>Returns an empty Optional if no snapshot exists (fresh node or never
+     * compacted). Called during recovery before log replay.</p>
+     *
+     * @return a Future containing the snapshot metadata and data, or empty if none
+     */
+    Future<Optional<SnapshotData>> loadSnapshot();
+
+    /**
+     * Deletes all log entries with index &lt;= toIndex.
+     *
+     * <p>Used after a snapshot is saved to reclaim storage space. The entries
+     * removed are no longer needed because the snapshot captures their cumulative
+     * effect on the state machine.</p>
+     *
+     * <p><b>Safety:</b> Only call this after successfully saving a snapshot that
+     * includes all entries up to {@code toIndex}.</p>
+     *
+     * @param toIndex the last index to delete (inclusive). All entries with
+     *                index &lt;= toIndex are removed.
+     * @return a Future that completes when prefix truncation is recorded
+     */
+    Future<Void> truncatePrefix(long toIndex);
+
+    /**
+     * Immutable record for a persisted snapshot.
+     *
+     * @param data              the serialized snapshot bytes
+     * @param lastIncludedIndex the log index of the last entry in the snapshot
+     * @param lastIncludedTerm  the term of the last entry in the snapshot
+     */
+    record SnapshotData(byte[] data, long lastIncludedIndex, long lastIncludedTerm) {
+        public SnapshotData {
+            if (data == null || data.length == 0) {
+                throw new IllegalArgumentException("Snapshot data must not be null or empty");
+            }
+            if (lastIncludedIndex < 0) {
+                throw new IllegalArgumentException("lastIncludedIndex must be non-negative: " + lastIncludedIndex);
+            }
+            if (lastIncludedTerm < 0) {
+                throw new IllegalArgumentException("lastIncludedTerm must be non-negative: " + lastIncludedTerm);
+            }
+        }
+    }
+
     /**
      * Immutable record for a log entry.
      *

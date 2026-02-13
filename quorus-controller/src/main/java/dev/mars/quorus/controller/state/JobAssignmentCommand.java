@@ -68,12 +68,20 @@ public class JobAssignmentCommand implements Serializable {
      */
     private JobAssignmentCommand(CommandType type, String assignmentId, JobAssignment jobAssignment,
                                 JobAssignmentStatus newStatus, String reason) {
+        this(type, assignmentId, jobAssignment, newStatus, reason, null);
+    }
+
+    /**
+     * Package-private constructor for protobuf deserialization with explicit timestamp.
+     */
+    JobAssignmentCommand(CommandType type, String assignmentId, JobAssignment jobAssignment,
+                         JobAssignmentStatus newStatus, String reason, Instant timestamp) {
         this.type = Objects.requireNonNull(type, "Command type cannot be null");
         this.assignmentId = assignmentId;
         this.jobAssignment = jobAssignment;
         this.newStatus = newStatus;
         this.reason = reason;
-        this.timestamp = Instant.now();
+        this.timestamp = (timestamp != null) ? timestamp : Instant.now();
         
         // Validate command parameters
         validateCommand();

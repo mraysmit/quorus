@@ -14,28 +14,29 @@
  * limitations under the License.
  */
 
-/*
- * Copyright 2025 Mark Andrew Ray-Smith Cityline Ltd
- */
-
 package dev.mars.quorus.controller.http.handlers;
 
 import dev.mars.quorus.controller.raft.RaftNode;
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpHandler;
+import io.vertx.core.Handler;
+import io.vertx.core.json.JsonObject;
+import io.vertx.ext.web.RoutingContext;
 
-import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 
 /**
  * Readiness check handler - indicates if the controller is ready to serve traffic.
+ *
+ * <p>Endpoint: {@code GET /health/ready}
+ *
+ * <p>Readiness requires both Raft running and a cluster leader elected.
+ * Returns 503 when not ready so load balancers stop routing traffic here.
+ *
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @version 1.0
+ * @version 2.0 (Vert.x reactive)
  * @since 2025-08-26
  */
-public class ReadinessHandler implements HttpHandler {
-    
+public class ReadinessHandler implements Handler<RoutingContext> {
+
     private final RaftNode raftNode;
 
     public ReadinessHandler(RaftNode raftNode) {
@@ -43,25 +44,21 @@ public class ReadinessHandler implements HttpHandler {
     }
 
     @Override
-    public void handle(HttpExchange exchange) throws IOException {
-        if (!"GET".equals(exchange.getRequestMethod())) {
-            sendResponse(exchange, 405, "{\"error\":\"Method not allowed\"}");
-            return;
-        }
+    public void handle(RoutingContext ctx) {
+        boolean raftReady = raftNode.isRunning();
+        boolean clusterReady = raftNode.getLeaderId() != null;
+        boolean isReady = raftReady && clusterReady;
 
-        boolean isReady = raftNode != null && raftNode.isRunning();
-        String response = "{\"status\":\"" + (isReady ? "UP" : "DOWN") + "\"}";
-        int statusCode = isReady ? 200 : 503;
-        
-        exchange.getResponseHeaders().set("Content-Type", "application/json");
-        sendResponse(exchange, statusCode, response);
-    }
+        JsonObject readiness = new JsonObject()
+                .put("status", isReady ? "UP" : "DOWN")
+                .put("timestamp", Instant.now().toString())
+                .put("checks", new JsonObject()
+                        .put("raftRunning", raftReady ? "UP" : "DOWN")
+                        .put("clusterHasLeader", clusterReady ? "UP" : "DOWN"));
 
-    private void sendResponse(HttpExchange exchange, int statusCode, String response) throws IOException {
-        byte[] responseBytes = response.getBytes(StandardCharsets.UTF_8);
-        exchange.sendResponseHeaders(statusCode, responseBytes.length);
-        try (OutputStream os = exchange.getResponseBody()) {
-            os.write(responseBytes);
+        if (!isReady) {
+            ctx.response().setStatusCode(503);
         }
+        ctx.json(readiness);
     }
 }

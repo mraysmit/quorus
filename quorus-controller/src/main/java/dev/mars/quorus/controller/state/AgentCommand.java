@@ -59,12 +59,20 @@ public class AgentCommand implements Serializable {
      */
     private AgentCommand(CommandType type, String agentId, AgentInfo agentInfo, 
                         AgentStatus newStatus, AgentCapabilities newCapabilities) {
+        this(type, agentId, agentInfo, newStatus, newCapabilities, null);
+    }
+
+    /**
+     * Package-private constructor for protobuf deserialization with explicit timestamp.
+     */
+    AgentCommand(CommandType type, String agentId, AgentInfo agentInfo,
+                 AgentStatus newStatus, AgentCapabilities newCapabilities, Instant timestamp) {
         this.type = type;
         this.agentId = agentId;
         this.agentInfo = agentInfo;
         this.newStatus = newStatus;
         this.newCapabilities = newCapabilities;
-        this.timestamp = Instant.now();
+        this.timestamp = (timestamp != null) ? timestamp : Instant.now();
     }
 
     /**

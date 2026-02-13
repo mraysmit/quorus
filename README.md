@@ -47,6 +47,45 @@
 - **Thread-safe concurrent operations**
 - **Comprehensive error handling** with custom exception hierarchy
 
+## ⚙️ Configuration
+
+Quorus uses a layered configuration system. Values are resolved in this order (highest priority first):
+
+1. **Environment variable** (e.g., `QUORUS_HTTP_PORT=8080`)
+2. **System property** (e.g., `-Dquorus.http.port=8080`)
+3. **Properties file** (`quorus-controller.properties` / `quorus-agent.properties`)
+4. **Default value**
+
+### Controller Configuration
+
+| Environment Variable | Property | Default | Description |
+|---------------------|----------|---------|-------------|
+| `QUORUS_NODE_ID` | `quorus.node.id` | hostname | Unique node ID (required for multi-node) |
+| `QUORUS_HTTP_PORT` | `quorus.http.port` | `8080` | HTTP API port |
+| `QUORUS_HTTP_HOST` | `quorus.http.host` | `0.0.0.0` | HTTP bind address |
+| `QUORUS_RAFT_PORT` | `quorus.raft.port` | `9080` | gRPC Raft port |
+| `QUORUS_CLUSTER_NODES` | `quorus.cluster.nodes` | single-node | Cluster topology (`id=host:port,...`) |
+| `QUORUS_RAFT_STORAGE_TYPE` | `quorus.raft.storage.type` | `file` | Storage backend: `raftlog`, `file`, `memory` |
+| `QUORUS_RAFT_STORAGE_PATH` | `quorus.raft.storage.path` | `./data/raft/{nodeId}` | WAL data directory |
+| `QUORUS_TELEMETRY_ENABLED` | `quorus.telemetry.enabled` | `true` | Enable OpenTelemetry |
+| `QUORUS_TELEMETRY_PROMETHEUS_PORT` | `quorus.telemetry.prometheus.port` | `9464` | Prometheus scrape port |
+
+### Agent Configuration
+
+| Environment Variable | Property | Default | Description |
+|---------------------|----------|---------|-------------|
+| `QUORUS_AGENT_ID` | `quorus.agent.id` | hostname-derived | Unique agent ID |
+| `QUORUS_AGENT_CONTROLLER_URL` | `quorus.agent.controller.url` | `http://localhost:8080/api/v1` | Controller URL |
+| `QUORUS_AGENT_PORT` | `quorus.agent.port` | `8080` | Health/status port |
+| `QUORUS_AGENT_REGION` | `quorus.agent.region` | `default` | Deployment region |
+| `QUORUS_AGENT_DATACENTER` | `quorus.agent.datacenter` | `default` | Datacenter name |
+| `QUORUS_AGENT_TRANSFERS_MAX_CONCURRENT` | `quorus.agent.transfers.max-concurrent` | `5` | Max parallel transfers |
+| `QUORUS_AGENT_HEARTBEAT_INTERVAL_MS` | `quorus.agent.heartbeat.interval-ms` | `30000` | Heartbeat interval (ms) |
+| `QUORUS_AGENT_JOBS_POLLING_INTERVAL_MS` | `quorus.agent.jobs.polling.interval-ms` | `10000` | Job poll interval (ms) |
+| `QUORUS_AGENT_TELEMETRY_PROMETHEUS_PORT` | `quorus.agent.telemetry.prometheus.port` | `9465` | Agent Prometheus port |
+
+---
+
 ## 🚀 Quick Start
 
 ### Prerequisites

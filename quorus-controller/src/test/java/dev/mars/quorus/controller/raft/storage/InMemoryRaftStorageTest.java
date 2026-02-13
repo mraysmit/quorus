@@ -215,4 +215,62 @@ class InMemoryRaftStorageTest {
                     ctx.completeNow();
                 }));
     }
+
+    @Test
+    @DisplayName("saveSnapshot and loadSnapshot round-trip")
+    void saveAndLoadSnapshot(VertxTestContext ctx) {
+        byte[] data = "snapshot-data-payload".getBytes();
+        storage.saveSnapshot(data, 42, 3)
+                .compose(v -> storage.loadSnapshot())
+                .onComplete(ctx.succeeding(opt -> {
+                    assertTrue(opt.isPresent(), "Snapshot should be present after save");
+                    var snapshot = opt.get();
+                    assertEquals(42, snapshot.lastIncludedIndex());
+                    assertEquals(3, snapshot.lastIncludedTerm());
+                    assertArrayEquals(data, snapshot.data());
+                    ctx.completeNow();
+                }));
+    }
+
+    @Test
+    @DisplayName("loadSnapshot returns empty when no snapshot saved")
+    void loadSnapshotEmpty(VertxTestContext ctx) {
+        storage.loadSnapshot()
+                .onComplete(ctx.succeeding(opt -> {
+                    assertTrue(opt.isEmpty(), "No snapshot should be present initially");
+                    ctx.completeNow();
+                }));
+    }
+
+    @Test
+    @DisplayName("truncatePrefix removes entries up to given index")
+    void truncatePrefix(VertxTestContext ctx) {
+        storage.appendEntries(List.of(
+                new LogEntryData(1, 1, "a".getBytes()),
+                new LogEntryData(2, 1, "b".getBytes()),
+                new LogEntryData(3, 2, "c".getBytes()),
+                new LogEntryData(4, 2, "d".getBytes())
+        )).compose(v -> storage.truncatePrefix(2))
+          .onComplete(ctx.succeeding(v -> {
+              // Entries 1 and 2 should be removed, 3 and 4 remain
+              List<LogEntryData> remaining = storage.getLog();
+              assertEquals(2, remaining.size());
+              assertEquals(3, remaining.get(0).index());
+              assertEquals(4, remaining.get(1).index());
+              ctx.completeNow();
+          }));
+    }
+
+    @Test
+    @DisplayName("reset clears snapshot state")
+    void resetClearsSnapshot(VertxTestContext ctx) {
+        storage.saveSnapshot("data".getBytes(), 10, 2)
+                .onComplete(ctx.succeeding(v -> {
+                    storage.reset();
+                    storage.loadSnapshot().onComplete(ctx.succeeding(opt -> {
+                        assertTrue(opt.isEmpty(), "Snapshot should be cleared after reset");
+                        ctx.completeNow();
+                    }));
+                }));
+    }
 }

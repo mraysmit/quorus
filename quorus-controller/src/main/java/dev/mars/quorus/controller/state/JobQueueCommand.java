@@ -66,12 +66,20 @@ public class JobQueueCommand implements Serializable {
      */
     private JobQueueCommand(CommandType type, String jobId, QueuedJob queuedJob,
                            JobPriority newPriority, String reason) {
+        this(type, jobId, queuedJob, newPriority, reason, null);
+    }
+
+    /**
+     * Package-private constructor for protobuf deserialization with explicit timestamp.
+     */
+    JobQueueCommand(CommandType type, String jobId, QueuedJob queuedJob,
+                    JobPriority newPriority, String reason, Instant timestamp) {
         this.type = Objects.requireNonNull(type, "Command type cannot be null");
         this.jobId = jobId;
         this.queuedJob = queuedJob;
         this.newPriority = newPriority;
         this.reason = reason;
-        this.timestamp = Instant.now();
+        this.timestamp = (timestamp != null) ? timestamp : Instant.now();
         
         // Validate command parameters
         validateCommand();

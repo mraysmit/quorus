@@ -18,10 +18,14 @@ package dev.mars.quorus.controller.raft;
 
 import dev.mars.quorus.controller.raft.grpc.AppendEntriesRequest;
 import dev.mars.quorus.controller.raft.grpc.AppendEntriesResponse;
+import dev.mars.quorus.controller.raft.grpc.InstallSnapshotRequest;
+import dev.mars.quorus.controller.raft.grpc.InstallSnapshotResponse;
 import dev.mars.quorus.controller.raft.grpc.VoteRequest;
 import dev.mars.quorus.controller.raft.grpc.VoteResponse;
 import dev.mars.quorus.controller.raft.storage.RaftStorage;
 import dev.mars.quorus.controller.raft.storage.RaftStorage.LogEntryData;
+import dev.mars.quorus.controller.raft.storage.RaftStorage.SnapshotData;
+import dev.mars.quorus.controller.state.ProtobufCommandCodec;
 import com.google.protobuf.ByteString;
 import io.vertx.core.Future;
 import io.vertx.core.Promise;
@@ -33,8 +37,8 @@ import io.opentelemetry.api.GlobalOpenTelemetry;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.metrics.LongCounter;
+import io.opentelemetry.api.metrics.LongHistogram;
 import io.opentelemetry.api.metrics.Meter;
-import java.io.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -85,6 +89,16 @@ public class RaftNode {
     private volatile long commitIndex = 0;
     private volatile long lastApplied = 0;
 
+    // ========== SNAPSHOT STATE ==========
+    /** The log index of the last entry included in the most recent snapshot.
+     *  All in-memory log entries have indices > snapshotLastIndex.
+     *  Array offset: log.get(logIndex - snapshotLastIndex). */
+    private long snapshotLastIndex = 0;
+    /** The term of the last entry included in the most recent snapshot. */
+    private long snapshotLastTerm = 0;
+    /** Timer ID for periodic snapshot eligibility checks. */
+    private long snapshotTimerId = -1;
+
     // ========== LEADER STATE ==========
     private final Map<String, Long> nextIndex = new HashMap<>();
     private final Map<String, Long> matchIndex = new HashMap<>();
@@ -104,6 +118,24 @@ public class RaftNode {
     // ========== CONFIGURATION PARAMETERS ==========
     private final long electionTimeoutMs;
     private final long heartbeatIntervalMs;
+    private final boolean snapshotEnabled;
+    private final long snapshotThreshold;
+    private final long snapshotCheckIntervalMs;
+
+    // ========== INSTALL SNAPSHOT STATE ==========
+    /** Maximum chunk size for InstallSnapshot RPC (default 1 MB). */
+    static final int SNAPSHOT_CHUNK_SIZE = 1024 * 1024;
+    /** Tracks in-progress snapshot installs from a leader (follower side). */
+    private final Map<String, SnapshotChunkAssembler> pendingInstalls = new HashMap<>();
+    /** Tracks in-progress snapshot sends to followers (leader side). */
+    private final Set<String> installSnapshotInProgress = new HashSet<>();
+
+    // ========== SNAPSHOT METRICS ==========
+    private LongCounter snapshotCounter;
+    private LongHistogram snapshotDuration;
+    private LongCounter logCompactedEntries;
+    private LongCounter installSnapshotSent;
+    private LongCounter installSnapshotReceived;
 
     /**
      * Creates a RaftNode with default timing parameters and in-memory storage.
@@ -112,7 +144,8 @@ public class RaftNode {
      */
     public RaftNode(Vertx vertx, String nodeId, Set<String> clusterNodes, RaftTransport transport,
             RaftStateMachine stateMachine) {
-        this(vertx, nodeId, clusterNodes, transport, stateMachine, null, 5000, 1000);
+        this(vertx, nodeId, clusterNodes, transport, stateMachine, null, 5000, 1000,
+                false, 10000, 60000);
     }
 
     /**
@@ -121,7 +154,8 @@ public class RaftNode {
      */
     public RaftNode(Vertx vertx, String nodeId, Set<String> clusterNodes, RaftTransport transport,
             RaftStateMachine stateMachine, long electionTimeoutMs, long heartbeatIntervalMs) {
-        this(vertx, nodeId, clusterNodes, transport, stateMachine, null, electionTimeoutMs, heartbeatIntervalMs);
+        this(vertx, nodeId, clusterNodes, transport, stateMachine, null, electionTimeoutMs, heartbeatIntervalMs,
+                false, 10000, 60000);
     }
 
     /**
@@ -139,6 +173,28 @@ public class RaftNode {
      */
     public RaftNode(Vertx vertx, String nodeId, Set<String> clusterNodes, RaftTransport transport,
             RaftStateMachine stateMachine, RaftStorage storage, long electionTimeoutMs, long heartbeatIntervalMs) {
+        this(vertx, nodeId, clusterNodes, transport, stateMachine, storage, electionTimeoutMs, heartbeatIntervalMs,
+                true, 10000, 60000);
+    }
+
+    /**
+     * Creates a RaftNode with full configuration including snapshot scheduling.
+     *
+     * @param vertx                   The Vert.x instance
+     * @param nodeId                  Unique node identifier
+     * @param clusterNodes            Set of all node IDs in the cluster
+     * @param transport               Transport for inter-node communication
+     * @param stateMachine            State machine for applying committed entries
+     * @param storage                 WAL storage for durability (null for volatile mode)
+     * @param electionTimeoutMs       Base election timeout in milliseconds
+     * @param heartbeatIntervalMs     Heartbeat interval in milliseconds
+     * @param snapshotEnabled         Whether to enable automatic snapshot scheduling
+     * @param snapshotThreshold       Number of entries between snapshots
+     * @param snapshotCheckIntervalMs Interval between snapshot eligibility checks
+     */
+    public RaftNode(Vertx vertx, String nodeId, Set<String> clusterNodes, RaftTransport transport,
+            RaftStateMachine stateMachine, RaftStorage storage, long electionTimeoutMs, long heartbeatIntervalMs,
+            boolean snapshotEnabled, long snapshotThreshold, long snapshotCheckIntervalMs) {
         this.vertx = vertx;
         this.nodeId = nodeId;
         this.clusterNodes = new HashSet<>(clusterNodes);
@@ -147,6 +203,9 @@ public class RaftNode {
         this.storage = storage;
         this.electionTimeoutMs = electionTimeoutMs;
         this.heartbeatIntervalMs = heartbeatIntervalMs;
+        this.snapshotEnabled = snapshotEnabled && storage != null;
+        this.snapshotThreshold = snapshotThreshold;
+        this.snapshotCheckIntervalMs = snapshotCheckIntervalMs;
 
         // Initialize log with a dummy entry
         log.add(new LogEntry(0, 0, null));
@@ -183,6 +242,38 @@ public class RaftNode {
                 .setDescription("Number of entries in the Raft log")
                 .ofLongs()
                 .buildWithCallback(measurement -> measurement.record(log.size()));
+
+        // Snapshot metrics
+        snapshotCounter = meter.counterBuilder("quorus.raft.snapshot.total")
+                .setDescription("Total number of snapshots taken")
+                .setUnit("1")
+                .build();
+
+        snapshotDuration = meter.histogramBuilder("quorus.raft.snapshot.duration")
+                .setDescription("Time taken to create and persist a snapshot")
+                .setUnit("ms")
+                .ofLongs()
+                .build();
+
+        logCompactedEntries = meter.counterBuilder("quorus.raft.log.compacted.entries")
+                .setDescription("Total number of log entries removed by compaction")
+                .setUnit("1")
+                .build();
+
+        meter.gaugeBuilder("quorus.raft.snapshot.last_index")
+                .setDescription("Log index of the last snapshot")
+                .ofLongs()
+                .buildWithCallback(measurement -> measurement.record(snapshotLastIndex));
+
+        installSnapshotSent = meter.counterBuilder("quorus.raft.install_snapshot.sent.total")
+                .setDescription("Total InstallSnapshot RPCs sent by leader")
+                .setUnit("1")
+                .build();
+
+        installSnapshotReceived = meter.counterBuilder("quorus.raft.install_snapshot.received.total")
+                .setDescription("Total InstallSnapshot RPCs received by follower")
+                .setUnit("1")
+                .build();
 
         // Edge metrics for nodeGraph visualization
         rpcCounter = meter.counterBuilder("quorus.raft.rpc.total")
@@ -236,7 +327,7 @@ public class RaftNode {
 
     /**
      * Recovers persistent state from WAL storage.
-     * <p>Order: Metadata → Log Replay → State Machine Rebuild
+     * <p>Order: Metadata → Snapshot (if any) → Log Replay → State Machine Rebuild
      */
     private Future<Void> recoverFromStorage() {
         if (storage == null) {
@@ -251,26 +342,75 @@ public class RaftNode {
                 this.currentTerm = meta.currentTerm();
                 this.votedFor = meta.votedFor().orElse(null);
                 logger.info("Recovered metadata: term={}, votedFor={}", currentTerm, votedFor);
+
+                // Try to load snapshot
+                return storage.loadSnapshot();
+            })
+            .compose(snapshotOpt -> {
+                if (snapshotOpt.isPresent()) {
+                    SnapshotData snapshot = snapshotOpt.get();
+                    logger.info("Restoring from snapshot: lastIncludedIndex={}, lastIncludedTerm={}",
+                            snapshot.lastIncludedIndex(), snapshot.lastIncludedTerm());
+
+                    // Restore state machine from snapshot
+                    stateMachine.restoreSnapshot(snapshot.data());
+
+                    // Set snapshot boundaries
+                    snapshotLastIndex = snapshot.lastIncludedIndex();
+                    snapshotLastTerm = snapshot.lastIncludedTerm();
+                    lastApplied = snapshot.lastIncludedIndex();
+                    commitIndex = snapshot.lastIncludedIndex();
+
+                    // Initialize log with sentinel at snapshot boundary
+                    log.clear();
+                    log.add(new LogEntry(snapshotLastTerm, snapshotLastIndex, null));
+                } else {
+                    logger.info("No snapshot found, will rebuild from full log replay");
+                }
+
                 return storage.replayLog();
             })
             .compose(entries -> {
-                // Rebuild in-memory log from WAL
-                log.clear();
-                // Add sentinel entry at index 0
-                log.add(new LogEntry(0, 0, null));
-                
-                for (LogEntryData entry : entries) {
-                    Object command = deserialize(ByteString.copyFrom(entry.payload()));
-                    log.add(new LogEntry(entry.term(), entry.index(), command));
-                }
-                
-                logger.info("Recovered {} log entries from storage", entries.size());
+                if (snapshotLastIndex > 0) {
+                    // Snapshot recovery: only replay entries AFTER the snapshot
+                    int replayedCount = 0;
+                    for (LogEntryData entry : entries) {
+                        if (entry.index() > snapshotLastIndex) {
+                            Object command = deserialize(ByteString.copyFrom(entry.payload()));
+                            log.add(new LogEntry(entry.term(), entry.index(), command));
+                            replayedCount++;
+                        }
+                    }
+                    logger.info("Replayed {} post-snapshot entries (skipped {} compacted entries)",
+                            replayedCount, entries.size() - replayedCount);
 
-                // Replay committed entries to state machine
-                return rebuildStateMachine();
+                    // Apply post-snapshot entries to state machine
+                    commitIndex = lastLogIndex() > snapshotLastIndex ? lastLogIndex() : snapshotLastIndex;
+                    while (lastApplied < commitIndex) {
+                        lastApplied++;
+                        if (hasLogEntry(lastApplied)) {
+                            LogEntry entry = log.get(toArrayIndex(lastApplied));
+                            if (entry.getCommand() != null) {
+                                stateMachine.apply(entry.getCommand());
+                            }
+                        }
+                    }
+                } else {
+                    // Full rebuild: no snapshot, replay everything
+                    log.clear();
+                    log.add(new LogEntry(0, 0, null));
+                    for (LogEntryData entry : entries) {
+                        Object command = deserialize(ByteString.copyFrom(entry.payload()));
+                        log.add(new LogEntry(entry.term(), entry.index(), command));
+                    }
+                    logger.info("Recovered {} log entries from storage", entries.size());
+                    return rebuildStateMachine();
+                }
+
+                return Future.<Void>succeededFuture();
             })
-            .onSuccess(v -> logger.info("Recovery complete: term={}, logSize={}, lastApplied={}",
-                                        currentTerm, log.size(), lastApplied))
+            .onSuccess(v -> logger.info("Recovery complete: term={}, logSize={}, lastApplied={}, snapshotLastIndex={}",
+                                        currentTerm, log.size(), lastApplied, snapshotLastIndex))
             .onFailure(err -> {
                 logger.error("Recovery failed: {}", err.getMessage());
                 logger.trace("Stack trace for recovery failure", err);
@@ -286,11 +426,11 @@ public class RaftNode {
         
         // Reset state machine to blank state
         stateMachine.reset();
-        lastApplied = 0;
+        lastApplied = snapshotLastIndex;
         
         // Re-apply all entries (assume all recovered entries were committed)
         // In a more sophisticated implementation, we'd also persist commitIndex
-        commitIndex = log.size() > 1 ? log.size() - 1 : 0;
+        commitIndex = lastLogIndex() > snapshotLastIndex ? lastLogIndex() : snapshotLastIndex;
         
         applyLog();
         return Future.succeededFuture();
@@ -346,7 +486,7 @@ public class RaftNode {
             }
 
             // Create log entry
-            long entryIndex = log.size();
+            long entryIndex = lastLogIndex() + 1;
             LogEntry entry = new LogEntry(currentTerm, entryIndex, command);
 
             // Persist to WAL before adding to in-memory log
@@ -458,12 +598,39 @@ public class RaftNode {
     }
 
     /**
+     * Returns the log index of the last entry included in the most recent snapshot.
+     * Returns 0 if no snapshot has been taken.
+     */
+    public long getSnapshotLastIndex() {
+        return snapshotLastIndex;
+    }
+
+    /**
+     * Returns the term of the last entry included in the most recent snapshot.
+     * Returns 0 if no snapshot has been taken.
+     */
+    public long getSnapshotLastTerm() {
+        return snapshotLastTerm;
+    }
+
+    /**
+     * Returns the leader's nextIndex for a given peer.
+     * Used in tests to verify index tracking after InstallSnapshot.
+     *
+     * @param peerId the peer node ID
+     * @return the nextIndex for the peer, or -1 if not tracked
+     */
+    public long getNextIndex(String peerId) {
+        return nextIndex.getOrDefault(peerId, -1L);
+    }
+
+    /**
      * Returns the index of the last entry in the log.
      * This is used during elections for log comparison (§5.4.1).
      * Returns 0 if the log only contains the sentinel entry.
      */
     public long getLastLogIndex() {
-        return log.size() - 1;  // -1 because index 0 is sentinel
+        return lastLogIndex();
     }
 
     /**
@@ -473,7 +640,7 @@ public class RaftNode {
      */
     public long getLastLogTerm() {
         if (log.isEmpty()) {
-            return 0;
+            return snapshotLastTerm;
         }
         return log.get(log.size() - 1).getTerm();
     }
@@ -563,11 +730,39 @@ public class RaftNode {
         }
     }
 
+    // ========== LOG OFFSET HELPERS ==========
+
+    /**
+     * Converts a Raft log index to the in-memory array index.
+     * The in-memory log starts at snapshotLastIndex (the sentinel/snapshot boundary).
+     * Entry at snapshotLastIndex is at array position 0 (the sentinel).
+     */
+    private int toArrayIndex(long logIndex) {
+        return (int) (logIndex - snapshotLastIndex);
+    }
+
+    /**
+     * Returns the Raft log index of the last entry in the in-memory log.
+     */
+    private long lastLogIndex() {
+        return snapshotLastIndex + log.size() - 1;
+    }
+
+    /**
+     * Returns true if the given Raft log index is present in the in-memory log.
+     */
+    private boolean hasLogEntry(long logIndex) {
+        int arrayIdx = toArrayIndex(logIndex);
+        return arrayIdx >= 0 && arrayIdx < log.size();
+    }
+
     private void cancelTimers() {
         if (electionTimerId != -1)
             vertx.cancelTimer(electionTimerId);
         if (heartbeatTimerId != -1)
             vertx.cancelTimer(heartbeatTimerId);
+        if (snapshotTimerId != -1)
+            vertx.cancelTimer(snapshotTimerId);
     }
 
     private void resetElectionTimer() {
@@ -598,8 +793,10 @@ public class RaftNode {
 
     private void requestVotes() {
         long term = currentTerm;
-        long lastLogIndex = log.size() - 1;
-        long lastLogTerm = log.get((int) lastLogIndex).getTerm();
+        long lastLogIdx = lastLogIndex();
+        long lastLogTrm = lastLogIdx > 0 && hasLogEntry(lastLogIdx)
+                ? log.get(toArrayIndex(lastLogIdx)).getTerm()
+                : snapshotLastTerm;
 
         AtomicLong voteCount = new AtomicLong(1); // Self vote
 
@@ -613,8 +810,8 @@ public class RaftNode {
                 VoteRequest request = VoteRequest.newBuilder()
                         .setTerm(term)
                         .setCandidateId(nodeId)
-                        .setLastLogIndex(lastLogIndex)
-                        .setLastLogTerm(lastLogTerm)
+                        .setLastLogIndex(lastLogIdx)
+                        .setLastLogTerm(lastLogTrm)
                         .build();
 
                 // Using transport (Wait for Future integration)
@@ -663,10 +860,11 @@ public class RaftNode {
         initializeLeaderState();
         startHeartbeats();
         sendHeartbeats(); // Immediate
+        startSnapshotScheduler();
     }
 
     private void initializeLeaderState() {
-        long nextIndexValue = log.size();
+        long nextIndexValue = lastLogIndex() + 1;
         for (String peer : clusterNodes) {
             if (!peer.equals(nodeId)) {
                 nextIndex.put(peer, nextIndexValue);
@@ -840,14 +1038,14 @@ public class RaftNode {
                 resetElectionTimer();
 
                 // Step 3: Consistency check
-                if (log.size() <= request.getPrevLogIndex() ||
-                        log.get((int) request.getPrevLogIndex()).getTerm() != request.getPrevLogTerm()) {
+                if (!hasLogEntry(request.getPrevLogIndex()) ||
+                        log.get(toArrayIndex(request.getPrevLogIndex())).getTerm() != request.getPrevLogTerm()) {
                     logger.debug("Rejecting AppendEntries: log inconsistent at prevLogIndex={}",
                                 request.getPrevLogIndex());
                     promise.complete(AppendEntriesResponse.newBuilder()
                             .setTerm(currentTerm)
                             .setSuccess(false)
-                            .setMatchIndex(log.size() - 1) // Hint for leader
+                            .setMatchIndex(lastLogIndex()) // Hint for leader
                             .build());
                     return;
                 }
@@ -862,8 +1060,8 @@ public class RaftNode {
                     Object command = deserialize(entryProto.getData());
                     LogEntry newEntry = new LogEntry(entryProto.getTerm(), currentIndex, command);
 
-                    if (log.size() > currentIndex) {
-                        if (log.get((int) currentIndex).getTerm() != entryProto.getTerm()) {
+                    if (hasLogEntry(currentIndex)) {
+                        if (log.get(toArrayIndex(currentIndex)).getTerm() != entryProto.getTerm()) {
                             // Conflict detected - need to truncate
                             if (truncateFromIndex == null) {
                                 truncateFromIndex = currentIndex;
@@ -883,17 +1081,18 @@ public class RaftNode {
                     .onSuccess(v2 -> {
                         // Step 6: Apply to in-memory log AFTER durability confirmed
                         if (finalTruncateFrom != null) {
-                            log.subList(finalTruncateFrom.intValue(), log.size()).clear();
+                            int truncateArrayIdx = toArrayIndex(finalTruncateFrom);
+                            log.subList(truncateArrayIdx, log.size()).clear();
                         }
                         for (LogEntry entry : entriesToPersist) {
-                            if (log.size() <= entry.getIndex()) {
+                            if (!hasLogEntry(entry.getIndex())) {
                                 log.add(entry);
                             }
                         }
 
                         // Step 7: Update commit index and apply
                         if (request.getLeaderCommit() > commitIndex) {
-                            commitIndex = Math.min(request.getLeaderCommit(), log.size() - 1);
+                            commitIndex = Math.min(request.getLeaderCommit(), lastLogIndex());
                             applyLog();
                         }
 
@@ -901,7 +1100,7 @@ public class RaftNode {
                         promise.complete(AppendEntriesResponse.newBuilder()
                                 .setTerm(currentTerm)
                                 .setSuccess(true)
-                                .setMatchIndex(log.size() - 1)
+                                .setMatchIndex(lastLogIndex())
                                 .build());
                     })
                     .onFailure(err -> {
@@ -956,10 +1155,19 @@ public class RaftNode {
 
     private void sendAppendEntries(String target, boolean heartbeat) {
         long nextIdx = nextIndex.getOrDefault(target, 1L);
+
+        // If the follower needs entries we've already compacted, send a snapshot
+        if (snapshotLastIndex > 0 && nextIdx <= snapshotLastIndex) {
+            sendInstallSnapshot(target);
+            return;
+        }
+
         long prevLogIndex = nextIdx - 1;
         long prevLogTerm = 0;
-        if (prevLogIndex >= 0 && prevLogIndex < log.size()) {
-            prevLogTerm = log.get((int) prevLogIndex).getTerm();
+        if (prevLogIndex >= 0 && hasLogEntry(prevLogIndex)) {
+            prevLogTerm = log.get(toArrayIndex(prevLogIndex)).getTerm();
+        } else if (prevLogIndex == snapshotLastIndex) {
+            prevLogTerm = snapshotLastTerm;
         }
 
         AppendEntriesRequest.Builder builder = AppendEntriesRequest.newBuilder()
@@ -970,13 +1178,16 @@ public class RaftNode {
                 .setLeaderCommit(commitIndex);
 
         if (!heartbeat) {
-            for (int i = (int) nextIdx; i < log.size(); i++) {
-                LogEntry entry = log.get(i);
-                builder.addEntries(dev.mars.quorus.controller.raft.grpc.LogEntry.newBuilder()
-                        .setTerm(entry.getTerm())
-                        .setIndex(entry.getIndex())
-                        .setData(serialize(entry.getCommand()))
-                        .build());
+            long lastIdx = lastLogIndex();
+            for (long i = nextIdx; i <= lastIdx; i++) {
+                if (hasLogEntry(i)) {
+                    LogEntry entry = log.get(toArrayIndex(i));
+                    builder.addEntries(dev.mars.quorus.controller.raft.grpc.LogEntry.newBuilder()
+                            .setTerm(entry.getTerm())
+                            .setIndex(entry.getIndex())
+                            .setData(serialize(entry.getCommand()))
+                            .build());
+                }
             }
         }
 
@@ -1020,11 +1231,11 @@ public class RaftNode {
         // and log[N].term == currentTerm: set commitIndex = N
 
         List<Long> indices = new ArrayList<>(matchIndex.values());
-        indices.add(log.size() - 1L); // Leader's match index
+        indices.add(lastLogIndex()); // Leader's match index
         Collections.sort(indices);
         long N = indices.get(indices.size() / 2); // Majority index
 
-        if (N > commitIndex && N < log.size() && log.get((int) N).getTerm() == currentTerm) {
+        if (N > commitIndex && hasLogEntry(N) && log.get(toArrayIndex(N)).getTerm() == currentTerm) {
             commitIndex = N;
             applyLog();
         }
@@ -1033,7 +1244,11 @@ public class RaftNode {
     private void applyLog() {
         while (lastApplied < commitIndex) {
             lastApplied++;
-            LogEntry entry = log.get((int) lastApplied);
+            if (!hasLogEntry(lastApplied)) {
+                // Entry already compacted by snapshot - skip
+                continue;
+            }
+            LogEntry entry = log.get(toArrayIndex(lastApplied));
             Object result = null;
             Exception exception = null;
 
@@ -1059,22 +1274,451 @@ public class RaftNode {
         }
     }
 
-    private ByteString serialize(Object obj) {
-        try (ByteArrayOutputStream bos = new ByteArrayOutputStream();
-                ObjectOutputStream out = new ObjectOutputStream(bos)) {
-            out.writeObject(obj);
-            return ByteString.copyFrom(bos.toByteArray());
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to serialize command", e);
+    // ========== SNAPSHOT SCHEDULING ==========
+
+    /**
+     * Starts periodic snapshot eligibility checks (leader only).
+     * The check fires at the configured interval and triggers a snapshot
+     * when (lastApplied - snapshotLastIndex) exceeds the threshold.
+     */
+    private void startSnapshotScheduler() {
+        if (!snapshotEnabled) {
+            return;
         }
+        if (snapshotTimerId != -1) {
+            vertx.cancelTimer(snapshotTimerId);
+        }
+        snapshotTimerId = vertx.setPeriodic(snapshotCheckIntervalMs, id -> checkAndTakeSnapshot());
+        logger.info("Snapshot scheduler started: threshold={}, checkInterval={}ms",
+                snapshotThreshold, snapshotCheckIntervalMs);
+    }
+
+    /**
+     * Checks whether a snapshot is needed and takes one if the threshold is reached.
+     * Only the leader takes snapshots to avoid redundant work.
+     */
+    private void checkAndTakeSnapshot() {
+        if (state != State.LEADER || !snapshotEnabled) {
+            return;
+        }
+
+        long entriesSinceSnapshot = lastApplied - snapshotLastIndex;
+        if (entriesSinceSnapshot < snapshotThreshold) {
+            logger.debug("Snapshot check: {} entries since last snapshot (threshold: {})",
+                    entriesSinceSnapshot, snapshotThreshold);
+            return;
+        }
+
+        logger.info("Snapshot threshold reached: {} entries since last snapshot, triggering snapshot",
+                entriesSinceSnapshot);
+        takeSnapshot();
+    }
+
+    /**
+     * Takes a snapshot of the current state machine state, persists it, and
+     * truncates the log prefix up to the snapshot index.
+     *
+     * <p>Flow: takeSnapshot() → saveSnapshot() → truncatePrefix() → trim in-memory log</p>
+     *
+     * @return a Future that completes when the snapshot is saved and log is compacted
+     */
+    public Future<Void> takeSnapshot() {
+        if (storage == null) {
+            return Future.failedFuture(new IllegalStateException("Cannot take snapshot in volatile mode"));
+        }
+
+        long snapshotIndex = lastApplied;
+        if (snapshotIndex <= snapshotLastIndex) {
+            logger.debug("No new entries to snapshot (lastApplied={}, snapshotLastIndex={})",
+                    lastApplied, snapshotLastIndex);
+            return Future.succeededFuture();
+        }
+
+        // Capture the term of the entry at lastApplied
+        long snapshotTerm;
+        if (hasLogEntry(snapshotIndex)) {
+            snapshotTerm = log.get(toArrayIndex(snapshotIndex)).getTerm();
+        } else {
+            snapshotTerm = currentTerm;
+        }
+
+        long startTime = System.currentTimeMillis();
+
+        // Step 1: Take state machine snapshot (synchronous - on event loop)
+        byte[] snapshotData;
+        try {
+            snapshotData = stateMachine.takeSnapshot();
+        } catch (Exception e) {
+            logger.error("Failed to take state machine snapshot: {}", e.getMessage(), e);
+            return Future.failedFuture(e);
+        }
+
+        logger.info("Snapshot taken at index={}, term={}, size={}bytes, compacting {} entries",
+                snapshotIndex, snapshotTerm, snapshotData.length,
+                snapshotIndex - snapshotLastIndex);
+
+        // Step 2: Persist snapshot to storage (async)
+        return storage.saveSnapshot(snapshotData, snapshotIndex, snapshotTerm)
+                .compose(v -> {
+                    // Step 3: Truncate log prefix in storage
+                    return storage.truncatePrefix(snapshotIndex);
+                })
+                .compose(v -> {
+                    // Step 4: Trim in-memory log
+                    long entriesToRemove = snapshotIndex - snapshotLastIndex;
+                    if (entriesToRemove > 0 && toArrayIndex(snapshotIndex) < log.size()) {
+                        // Remove entries from front of list, keep entries after snapshotIndex
+                        int removeCount = toArrayIndex(snapshotIndex);
+                        if (removeCount > 0) {
+                            log.subList(0, removeCount).clear();
+                        }
+                    }
+
+                    // Step 5: Update snapshot state
+                    long previousSnapshotIndex = snapshotLastIndex;
+                    snapshotLastIndex = snapshotIndex;
+                    snapshotLastTerm = snapshotTerm;
+
+                    // Update sentinel entry at new position 0
+                    if (!log.isEmpty()) {
+                        log.set(0, new LogEntry(snapshotTerm, snapshotIndex, null));
+                    }
+
+                    long duration = System.currentTimeMillis() - startTime;
+
+                    // Record metrics
+                    snapshotCounter.add(1);
+                    snapshotDuration.record(duration);
+                    logCompactedEntries.add(snapshotIndex - previousSnapshotIndex);
+
+                    logger.info("Snapshot complete: snapshotIndex={}, logSize={}, duration={}ms",
+                            snapshotIndex, log.size(), duration);
+                    return Future.<Void>succeededFuture();
+                })
+                .onFailure(err -> logger.error("Snapshot failed: {}", err.getMessage(), err));
+    }
+
+    /**
+     * Returns whether snapshot scheduling is enabled for this node.
+     */
+    public boolean isSnapshotEnabled() {
+        return snapshotEnabled;
+    }
+
+    // ========== INSTALL SNAPSHOT (Leader Side) ==========
+
+    /**
+     * Sends a snapshot to a lagging follower using chunked transfer.
+     * Called from {@link #sendAppendEntries(String, boolean)} when the follower's
+     * nextIndex is behind the compacted snapshot boundary.
+     *
+     * <p>Flow: load snapshot from storage → split into chunks → send sequentially →
+     * on final ACK, update nextIndex/matchIndex for the follower.</p>
+     *
+     * @param target the follower node ID
+     */
+    private void sendInstallSnapshot(String target) {
+        // Prevent concurrent snapshot installs to the same follower
+        if (installSnapshotInProgress.contains(target)) {
+            logger.debug("InstallSnapshot already in progress for {}, skipping", target);
+            return;
+        }
+        if (storage == null) {
+            logger.warn("Cannot send InstallSnapshot: no storage configured");
+            return;
+        }
+
+        installSnapshotInProgress.add(target);
+        logger.info("Sending InstallSnapshot to lagging follower {} (nextIndex={}, snapshotLastIndex={})",
+                target, nextIndex.getOrDefault(target, 1L), snapshotLastIndex);
+
+        storage.loadSnapshot()
+                .onSuccess(snapshotOpt -> {
+                    if (snapshotOpt.isEmpty()) {
+                        logger.warn("No snapshot available to send to {}", target);
+                        installSnapshotInProgress.remove(target);
+                        return;
+                    }
+                    SnapshotData snapshot = snapshotOpt.get();
+                    byte[] data = snapshot.data();
+                    int totalChunks = Math.max(1, (int) Math.ceil((double) data.length / SNAPSHOT_CHUNK_SIZE));
+
+                    logger.info("Sending snapshot to {}: {} bytes in {} chunk(s), lastIncludedIndex={}, lastIncludedTerm={}",
+                            target, data.length, totalChunks, snapshot.lastIncludedIndex(), snapshot.lastIncludedTerm());
+
+                    sendSnapshotChunk(target, snapshot, data, 0, totalChunks);
+                })
+                .onFailure(err -> {
+                    logger.error("Failed to load snapshot for InstallSnapshot to {}: {}", target, err.getMessage());
+                    installSnapshotInProgress.remove(target);
+                });
+    }
+
+    /**
+     * Sends a single snapshot chunk sequentially. On success, sends the next chunk
+     * or completes the install if this was the last chunk.
+     */
+    private void sendSnapshotChunk(String target, SnapshotData snapshot, byte[] data,
+                                    int chunkIndex, int totalChunks) {
+        if (state != State.LEADER) {
+            logger.debug("No longer leader, aborting InstallSnapshot to {}", target);
+            installSnapshotInProgress.remove(target);
+            return;
+        }
+
+        int offset = chunkIndex * SNAPSHOT_CHUNK_SIZE;
+        int length = Math.min(SNAPSHOT_CHUNK_SIZE, data.length - offset);
+        boolean isLast = (chunkIndex == totalChunks - 1);
+
+        InstallSnapshotRequest request = InstallSnapshotRequest.newBuilder()
+                .setTerm(currentTerm)
+                .setLeaderId(nodeId)
+                .setLastIncludedIndex(snapshot.lastIncludedIndex())
+                .setLastIncludedTerm(snapshot.lastIncludedTerm())
+                .setChunkIndex(chunkIndex)
+                .setTotalChunks(totalChunks)
+                .setData(com.google.protobuf.ByteString.copyFrom(data, offset, length))
+                .setDone(isLast)
+                .build();
+
+        installSnapshotSent.add(1);
+
+        transport.sendInstallSnapshot(target, request)
+                .onSuccess(response -> vertx.runOnContext(v -> {
+                    if (response.getTerm() > currentTerm) {
+                        stepDown(response.getTerm());
+                        installSnapshotInProgress.remove(target);
+                        return;
+                    }
+
+                    if (!response.getSuccess()) {
+                        logger.warn("InstallSnapshot chunk {}/{} rejected by {}, retrying from chunk {}",
+                                chunkIndex + 1, totalChunks, target, response.getNextChunkIndex());
+                        // Retry from the chunk the follower expects
+                        sendSnapshotChunk(target, snapshot, data, response.getNextChunkIndex(), totalChunks);
+                        return;
+                    }
+
+                    if (isLast) {
+                        // Snapshot fully installed — update follower tracking
+                        long snapIdx = snapshot.lastIncludedIndex();
+                        nextIndex.put(target, snapIdx + 1);
+                        matchIndex.put(target, snapIdx);
+                        installSnapshotInProgress.remove(target);
+                        logger.info("InstallSnapshot to {} complete: nextIndex={}, matchIndex={}",
+                                target, snapIdx + 1, snapIdx);
+                        updateCommitIndex();
+                    } else {
+                        // Send next chunk
+                        sendSnapshotChunk(target, snapshot, data, chunkIndex + 1, totalChunks);
+                    }
+                }))
+                .onFailure(err -> {
+                    logger.warn("Failed to send InstallSnapshot chunk {}/{} to {}: {}",
+                            chunkIndex + 1, totalChunks, target, err.getMessage());
+                    installSnapshotInProgress.remove(target);
+                });
+
+        rpcCounter.add(1, Attributes.of(
+                AttributeKey.stringKey("source"), nodeId,
+                AttributeKey.stringKey("target"), target,
+                AttributeKey.stringKey("type"), "install_snapshot"
+        ));
+    }
+
+    // ========== INSTALL SNAPSHOT (Follower Side) ==========
+
+    /**
+     * Handles an incoming InstallSnapshot RPC from the leader.
+     * Reassembles chunks, saves the snapshot to storage, restores the state machine,
+     * and resets the in-memory log to the snapshot boundary.
+     *
+     * @param request the InstallSnapshot request (single chunk)
+     * @return Future containing the response
+     */
+    public Future<InstallSnapshotResponse> handleInstallSnapshot(InstallSnapshotRequest request) {
+        Promise<InstallSnapshotResponse> promise = Promise.promise();
+        vertx.runOnContext(v -> {
+            try {
+                installSnapshotReceived.add(1);
+
+                // Step 1: Term check
+                if (request.getTerm() < currentTerm) {
+                    logger.debug("Rejecting InstallSnapshot: stale term {} < {}",
+                            request.getTerm(), currentTerm);
+                    promise.complete(InstallSnapshotResponse.newBuilder()
+                            .setTerm(currentTerm)
+                            .setSuccess(false)
+                            .setNextChunkIndex(0)
+                            .build());
+                    return;
+                }
+
+                // Step 2: Step down if higher or equal term (we're receiving from a leader)
+                if (request.getTerm() > currentTerm) {
+                    stepDown(request.getTerm());
+                }
+                resetElectionTimer();
+
+                String leaderId = request.getLeaderId();
+                int chunkIndex = request.getChunkIndex();
+                int totalChunks = request.getTotalChunks();
+
+                logger.debug("InstallSnapshot from {}: chunk {}/{}, lastIncludedIndex={}",
+                        leaderId, chunkIndex + 1, totalChunks, request.getLastIncludedIndex());
+
+                // Step 3: Get or create chunk assembler
+                SnapshotChunkAssembler assembler = pendingInstalls.computeIfAbsent(leaderId,
+                        k -> new SnapshotChunkAssembler(totalChunks));
+
+                // Reset if a new snapshot transfer starts
+                if (assembler.getTotalChunks() != totalChunks
+                        || assembler.getLastIncludedIndex() != request.getLastIncludedIndex()) {
+                    assembler = new SnapshotChunkAssembler(totalChunks);
+                    pendingInstalls.put(leaderId, assembler);
+                }
+                assembler.setLastIncludedIndex(request.getLastIncludedIndex());
+
+                // Step 4: Validate chunk sequence
+                if (chunkIndex != assembler.getNextExpectedChunk()) {
+                    logger.warn("Out-of-order chunk: expected {}, got {}",
+                            assembler.getNextExpectedChunk(), chunkIndex);
+                    promise.complete(InstallSnapshotResponse.newBuilder()
+                            .setTerm(currentTerm)
+                            .setSuccess(false)
+                            .setNextChunkIndex(assembler.getNextExpectedChunk())
+                            .build());
+                    return;
+                }
+
+                // Step 5: Accept chunk
+                assembler.addChunk(chunkIndex, request.getData().toByteArray());
+
+                if (!request.getDone()) {
+                    // More chunks expected
+                    promise.complete(InstallSnapshotResponse.newBuilder()
+                            .setTerm(currentTerm)
+                            .setSuccess(true)
+                            .setNextChunkIndex(chunkIndex + 1)
+                            .build());
+                    return;
+                }
+
+                // Step 6: All chunks received — assemble and apply
+                byte[] snapshotData = assembler.assemble();
+                long lastIncludedIndex = request.getLastIncludedIndex();
+                long lastIncludedTerm = request.getLastIncludedTerm();
+                pendingInstalls.remove(leaderId);
+
+                logger.info("InstallSnapshot complete: assembling {} bytes at index={}, term={}",
+                        snapshotData.length, lastIncludedIndex, lastIncludedTerm);
+
+                // Step 7: Persist snapshot and restore state
+                Future<Void> saveFuture = (storage != null)
+                        ? storage.saveSnapshot(snapshotData, lastIncludedIndex, lastIncludedTerm)
+                        : Future.succeededFuture();
+
+                saveFuture
+                    .compose(v2 -> {
+                        // Truncate old log entries from storage
+                        if (storage != null) {
+                            return storage.truncatePrefix(lastIncludedIndex);
+                        }
+                        return Future.succeededFuture();
+                    })
+                    .onSuccess(v2 -> {
+                        // Step 8: Restore state machine
+                        stateMachine.restoreSnapshot(snapshotData);
+
+                        // Step 9: Reset in-memory log to snapshot boundary
+                        log.clear();
+                        log.add(new LogEntry(lastIncludedTerm, lastIncludedIndex, null));
+
+                        // Step 10: Update snapshot and index tracking
+                        snapshotLastIndex = lastIncludedIndex;
+                        snapshotLastTerm = lastIncludedTerm;
+                        lastApplied = lastIncludedIndex;
+                        commitIndex = Math.max(commitIndex, lastIncludedIndex);
+
+                        logger.info("Snapshot installed: snapshotLastIndex={}, snapshotLastTerm={}, commitIndex={}",
+                                snapshotLastIndex, snapshotLastTerm, commitIndex);
+
+                        promise.complete(InstallSnapshotResponse.newBuilder()
+                                .setTerm(currentTerm)
+                                .setSuccess(true)
+                                .setNextChunkIndex(totalChunks)
+                                .build());
+                    })
+                    .onFailure(err -> {
+                        logger.error("Failed to persist installed snapshot: {}", err.getMessage(), err);
+                        pendingInstalls.remove(leaderId);
+                        promise.complete(InstallSnapshotResponse.newBuilder()
+                                .setTerm(currentTerm)
+                                .setSuccess(false)
+                                .setNextChunkIndex(0)
+                                .build());
+                    });
+
+            } catch (Exception e) {
+                logger.error("Error handling InstallSnapshot: {}", e.getMessage(), e);
+                promise.fail(e);
+            }
+        });
+        return promise.future();
+    }
+
+    // ========== SNAPSHOT CHUNK ASSEMBLER ==========
+
+    /**
+     * Reassembles snapshot chunks received via InstallSnapshot RPCs.
+     * Tracks which chunks have been received and produces the complete
+     * snapshot byte array when all chunks are present.
+     */
+    static class SnapshotChunkAssembler {
+        private final int totalChunks;
+        private final byte[][] chunks;
+        private int nextExpectedChunk = 0;
+        private long lastIncludedIndex = 0;
+
+        SnapshotChunkAssembler(int totalChunks) {
+            this.totalChunks = totalChunks;
+            this.chunks = new byte[totalChunks][];
+        }
+
+        void addChunk(int index, byte[] data) {
+            chunks[index] = data;
+            nextExpectedChunk = index + 1;
+        }
+
+        byte[] assemble() {
+            int totalSize = 0;
+            for (byte[] chunk : chunks) {
+                if (chunk != null) totalSize += chunk.length;
+            }
+            byte[] result = new byte[totalSize];
+            int offset = 0;
+            for (byte[] chunk : chunks) {
+                if (chunk != null) {
+                    System.arraycopy(chunk, 0, result, offset, chunk.length);
+                    offset += chunk.length;
+                }
+            }
+            return result;
+        }
+
+        int getTotalChunks() { return totalChunks; }
+        int getNextExpectedChunk() { return nextExpectedChunk; }
+        long getLastIncludedIndex() { return lastIncludedIndex; }
+        void setLastIncludedIndex(long idx) { this.lastIncludedIndex = idx; }
+    }
+
+    // ========== SERIALIZATION ==========
+
+    private ByteString serialize(Object obj) {
+        return ProtobufCommandCodec.serialize(obj);
     }
 
     private Object deserialize(ByteString data) {
-        try (ByteArrayInputStream bis = new ByteArrayInputStream(data.toByteArray());
-                ObjectInputStream in = new ObjectInputStream(bis)) {
-            return in.readObject();
-        } catch (IOException | ClassNotFoundException e) {
-            throw new RuntimeException("Failed to deserialize command", e);
-        }
+        return ProtobufCommandCodec.deserialize(data);
     }
 }

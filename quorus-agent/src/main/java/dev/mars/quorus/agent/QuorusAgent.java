@@ -115,12 +115,24 @@ public class QuorusAgent {
         logger.warn("Using deprecated constructor - consider passing shared Vert.x instance");
     }
     
+    private static final String BANNER = """
+            
+              ██████  ██    ██  ██████  ██████  ██    ██ ███████
+             ██    ██ ██    ██ ██    ██ ██   ██ ██    ██ ██
+             ██    ██ ██    ██ ██    ██ ██████  ██    ██ ███████
+             ██ ▄▄ ██ ██    ██ ██    ██ ██   ██ ██    ██      ██
+              ██████   ██████   ██████  ██   ██  ██████  ███████
+                 ▀▀                          Agent
+            """;
+
     public static void main(String[] args) {
+        System.out.println(BANNER);
         logger.info("Starting Quorus Agent with OpenTelemetry...");
 
         try {
-            // Load configuration from environment
+            // Load and validate configuration (fail fast on misconfiguration)
             AgentConfiguration config = AgentConfiguration.fromEnvironment();
+            AgentConfig.get().validate();
 
             // Create shared Vert.x instance with OpenTelemetry tracing
             VertxOptions options = new VertxOptions();

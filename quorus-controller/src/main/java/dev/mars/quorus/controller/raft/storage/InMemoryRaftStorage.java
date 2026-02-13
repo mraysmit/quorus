@@ -146,6 +146,46 @@ public final class InMemoryRaftStorage implements RaftStorage {
     }
 
     // =========================================================================
+    // Snapshot Operations
+    // =========================================================================
+
+    private byte[] snapshotData;
+    private long snapshotLastIncludedIndex = -1;
+    private long snapshotLastIncludedTerm = -1;
+
+    @Override
+    public Future<Void> saveSnapshot(byte[] data, long lastIncludedIndex, long lastIncludedTerm) {
+        if (!opened || closed) {
+            return Future.failedFuture(new IllegalStateException("Storage not open"));
+        }
+        this.snapshotData = data.clone();
+        this.snapshotLastIncludedIndex = lastIncludedIndex;
+        this.snapshotLastIncludedTerm = lastIncludedTerm;
+        return Future.succeededFuture();
+    }
+
+    @Override
+    public Future<Optional<SnapshotData>> loadSnapshot() {
+        if (closed) {
+            return Future.failedFuture(new IllegalStateException("Storage has been closed"));
+        }
+        if (snapshotData == null) {
+            return Future.succeededFuture(Optional.empty());
+        }
+        return Future.succeededFuture(Optional.of(
+                new SnapshotData(snapshotData.clone(), snapshotLastIncludedIndex, snapshotLastIncludedTerm)));
+    }
+
+    @Override
+    public Future<Void> truncatePrefix(long toIndex) {
+        if (!opened || closed) {
+            return Future.failedFuture(new IllegalStateException("Storage not open"));
+        }
+        log.removeIf(e -> e.index() <= toIndex);
+        return Future.succeededFuture();
+    }
+
+    // =========================================================================
     // Test Helpers
     // =========================================================================
 
@@ -213,6 +253,9 @@ public final class InMemoryRaftStorage implements RaftStorage {
         currentTerm = 0;
         votedFor = Optional.empty();
         log.clear();
+        snapshotData = null;
+        snapshotLastIncludedIndex = -1;
+        snapshotLastIncludedTerm = -1;
         failOnSync = false;
         failOnAppend = false;
         failOnMetadataUpdate = false;

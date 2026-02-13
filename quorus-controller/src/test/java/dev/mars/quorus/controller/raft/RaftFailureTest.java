@@ -18,6 +18,8 @@ package dev.mars.quorus.controller.raft;
 
 import dev.mars.quorus.controller.raft.grpc.AppendEntriesRequest;
 import dev.mars.quorus.controller.raft.grpc.AppendEntriesResponse;
+import dev.mars.quorus.controller.raft.grpc.InstallSnapshotRequest;
+import dev.mars.quorus.controller.raft.grpc.InstallSnapshotResponse;
 import io.vertx.core.Future;
 import dev.mars.quorus.controller.raft.grpc.VoteRequest;
 import dev.mars.quorus.controller.raft.grpc.VoteResponse;
@@ -210,6 +212,11 @@ class RaftFailureTest {
             
             @Override
             public Future<AppendEntriesResponse> sendAppendEntries(String nodeId, AppendEntriesRequest request) {
+                return Future.failedFuture(new RuntimeException("Network error"));
+            }
+
+            @Override
+            public Future<InstallSnapshotResponse> sendInstallSnapshot(String nodeId, InstallSnapshotRequest request) {
                 return Future.failedFuture(new RuntimeException("Network error"));
             }
             

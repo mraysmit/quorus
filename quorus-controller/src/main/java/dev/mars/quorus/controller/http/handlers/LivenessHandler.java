@@ -14,53 +14,32 @@
  * limitations under the License.
  */
 
-/*
- * Copyright 2025 Mark Andrew Ray-Smith Cityline Ltd
- */
-
 package dev.mars.quorus.controller.http.handlers;
 
-import dev.mars.quorus.controller.raft.RaftNode;
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpHandler;
+import io.vertx.core.Handler;
+import io.vertx.core.json.JsonObject;
+import io.vertx.ext.web.RoutingContext;
 
-import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 
 /**
  * Liveness check handler - indicates if the controller process is alive.
+ *
+ * <p>Endpoint: {@code GET /health/live}
+ *
+ * <p>Liveness probes verify the process is running and responsive.
+ * Always returns UP unless the JVM is unresponsive.
+ *
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @version 1.0
+ * @version 2.0 (Vert.x reactive)
  * @since 2025-08-26
  */
-public class LivenessHandler implements HttpHandler {
-    
-    private final RaftNode raftNode;
-
-    public LivenessHandler(RaftNode raftNode) {
-        this.raftNode = raftNode;
-    }
+public class LivenessHandler implements Handler<RoutingContext> {
 
     @Override
-    public void handle(HttpExchange exchange) throws IOException {
-        if (!"GET".equals(exchange.getRequestMethod())) {
-            sendResponse(exchange, 405, "{\"error\":\"Method not allowed\"}");
-            return;
-        }
-
-        // Liveness just checks if the process is running
-        String response = "{\"status\":\"UP\"}";
-        
-        exchange.getResponseHeaders().set("Content-Type", "application/json");
-        sendResponse(exchange, 200, response);
-    }
-
-    private void sendResponse(HttpExchange exchange, int statusCode, String response) throws IOException {
-        byte[] responseBytes = response.getBytes(StandardCharsets.UTF_8);
-        exchange.sendResponseHeaders(statusCode, responseBytes.length);
-        try (OutputStream os = exchange.getResponseBody()) {
-            os.write(responseBytes);
-        }
+    public void handle(RoutingContext ctx) {
+        ctx.json(new JsonObject()
+                .put("status", "UP")
+                .put("timestamp", Instant.now().toString()));
     }
 }

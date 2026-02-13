@@ -55,31 +55,32 @@ public class GlobalErrorHandler implements Handler<RoutingContext> {
         Throwable failure = ctx.failure();
         String path = ctx.request().path();
         int statusCode = ctx.statusCode();
+        String requestId = CorrelationIdHandler.getRequestId(ctx);
 
         ErrorResponse errorResponse;
 
         if (failure == null) {
             // No exception, just a status code (e.g., 404 from router)
-            errorResponse = mapStatusCodeToError(statusCode, path);
+            errorResponse = mapStatusCodeToError(statusCode, path, requestId);
         } else if (failure instanceof QuorusApiException apiEx) {
             // Our custom API exception with error code
-            errorResponse = ErrorResponse.withMessage(apiEx.getErrorCode(), path, apiEx.getMessage());
+            errorResponse = ErrorResponse.withMessage(apiEx.getErrorCode(), path, apiEx.getMessage(), requestId);
             logError(apiEx.getErrorCode(), failure, path);
         } else if (failure instanceof IllegalArgumentException) {
             // Validation/argument errors
-            errorResponse = ErrorResponse.fromException(ErrorCode.VALIDATION_ERROR, failure, path);
+            errorResponse = ErrorResponse.fromException(ErrorCode.VALIDATION_ERROR, failure, path, requestId);
             logError(ErrorCode.VALIDATION_ERROR, failure, path);
         } else if (failure instanceof DecodeException) {
             // JSON parsing errors
-            errorResponse = ErrorResponse.withMessage(ErrorCode.BAD_REQUEST, path, "Invalid JSON: " + failure.getMessage());
+            errorResponse = ErrorResponse.withMessage(ErrorCode.BAD_REQUEST, path, "Invalid JSON: " + failure.getMessage(), requestId);
             logError(ErrorCode.BAD_REQUEST, failure, path);
         } else if (failure instanceof NullPointerException) {
             // NPE - don't expose details to client
-            errorResponse = ErrorResponse.withMessage(ErrorCode.INTERNAL_ERROR, path, "Unexpected error occurred");
+            errorResponse = ErrorResponse.withMessage(ErrorCode.INTERNAL_ERROR, path, "Unexpected error occurred", requestId);
             logger.error("NullPointerException at path {}", path, failure);
         } else {
             // Generic server error - don't expose internal details
-            errorResponse = ErrorResponse.withMessage(ErrorCode.INTERNAL_ERROR, path, "An unexpected error occurred");
+            errorResponse = ErrorResponse.withMessage(ErrorCode.INTERNAL_ERROR, path, "An unexpected error occurred", requestId);
             logger.error("Unhandled exception at path {}: {}", path, failure.getMessage(), failure);
         }
 
@@ -89,19 +90,19 @@ public class GlobalErrorHandler implements Handler<RoutingContext> {
     /**
      * Maps HTTP status codes (from router) to appropriate ErrorResponse.
      */
-    private ErrorResponse mapStatusCodeToError(int statusCode, String path) {
+    private ErrorResponse mapStatusCodeToError(int statusCode, String path, String requestId) {
         return switch (statusCode) {
-            case 400 -> ErrorResponse.withMessage(ErrorCode.BAD_REQUEST, path, "Bad request");
-            case 401 -> ErrorResponse.of(ErrorCode.UNAUTHORIZED, path);
-            case 403 -> ErrorResponse.withMessage(ErrorCode.FORBIDDEN, path, "Access denied");
-            case 404 -> ErrorResponse.of(ErrorCode.NOT_FOUND, path, path);
-            case 405 -> ErrorResponse.of(ErrorCode.METHOD_NOT_ALLOWED, path, "unknown");
-            case 409 -> ErrorResponse.withMessage(ErrorCode.CONFLICT, path, "Resource conflict");
-            case 429 -> ErrorResponse.of(ErrorCode.TENANT_QUOTA_EXCEEDED, path, "unknown", "rate limit");
-            case 500 -> ErrorResponse.withMessage(ErrorCode.INTERNAL_ERROR, path, "Internal server error");
-            case 503 -> ErrorResponse.withMessage(ErrorCode.SERVICE_UNAVAILABLE, path, "Service unavailable");
-            case 504 -> ErrorResponse.withMessage(ErrorCode.TIMEOUT, path, "Request timeout");
-            default -> ErrorResponse.withMessage(ErrorCode.INTERNAL_ERROR, path, "Error " + statusCode);
+            case 400 -> ErrorResponse.withMessage(ErrorCode.BAD_REQUEST, path, "Bad request", requestId);
+            case 401 -> ErrorResponse.withMessage(ErrorCode.UNAUTHORIZED, path, String.format(ErrorCode.UNAUTHORIZED.messageTemplate()), requestId);
+            case 403 -> ErrorResponse.withMessage(ErrorCode.FORBIDDEN, path, "Access denied", requestId);
+            case 404 -> ErrorResponse.withMessage(ErrorCode.NOT_FOUND, path, String.format(ErrorCode.NOT_FOUND.messageTemplate(), path), requestId);
+            case 405 -> ErrorResponse.withMessage(ErrorCode.METHOD_NOT_ALLOWED, path, String.format(ErrorCode.METHOD_NOT_ALLOWED.messageTemplate(), "unknown"), requestId);
+            case 409 -> ErrorResponse.withMessage(ErrorCode.CONFLICT, path, "Resource conflict", requestId);
+            case 429 -> ErrorResponse.withMessage(ErrorCode.TENANT_QUOTA_EXCEEDED, path, String.format(ErrorCode.TENANT_QUOTA_EXCEEDED.messageTemplate(), "unknown", "rate limit"), requestId);
+            case 500 -> ErrorResponse.withMessage(ErrorCode.INTERNAL_ERROR, path, "Internal server error", requestId);
+            case 503 -> ErrorResponse.withMessage(ErrorCode.SERVICE_UNAVAILABLE, path, "Service unavailable", requestId);
+            case 504 -> ErrorResponse.withMessage(ErrorCode.TIMEOUT, path, "Request timeout", requestId);
+            default -> ErrorResponse.withMessage(ErrorCode.INTERNAL_ERROR, path, "Error " + statusCode, requestId);
         };
     }
 
@@ -117,10 +118,9 @@ public class GlobalErrorHandler implements Handler<RoutingContext> {
 
     /**
      * Logs the error with appropriate level based on status code.
+     * The correlation ID is automatically included via SLF4J MDC (set by {@link CorrelationIdHandler}).
      */
     private void logError(ErrorCode code, Throwable failure, String path) {
-        String requestId = ""; // Would be extracted from response in real implementation
-        
         if (code.httpStatus() >= 500) {
             logger.error("Server error [{}] at {}: {}", code.code(), path, failure.getMessage(), failure);
         } else if (code.httpStatus() >= 400) {

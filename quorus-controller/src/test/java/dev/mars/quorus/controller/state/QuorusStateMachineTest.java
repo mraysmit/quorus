@@ -19,6 +19,9 @@ package dev.mars.quorus.controller.state;
 import dev.mars.quorus.core.TransferJob;
 import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferStatus;
+import dev.mars.quorus.core.JobAssignment;
+import dev.mars.quorus.core.JobPriority;
+import dev.mars.quorus.core.QueuedJob;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -323,5 +326,52 @@ class QuorusStateMachineTest {
         assertNotNull(snapshotStr);
         assertTrue(snapshotStr.contains("1 jobs"));
         assertTrue(snapshotStr.contains("lastAppliedIndex=5"));
+    }
+
+    @Test
+    void testSnapshotIncludesJobAssignmentsAndQueue() {
+        // Add metadata and transfer job through the state machine
+        stateMachine.apply(SystemMetadataCommand.set("region", "us-east"));
+
+        TransferRequest request = TransferRequest.builder()
+                .sourceUri(URI.create("https://source.com/data.csv"))
+                .destinationPath(Paths.get("/dest/data.csv"))
+                .build();
+        TransferJob transferJob = new TransferJob(request);
+        stateMachine.apply(TransferJobCommand.create(transferJob));
+
+        // Add a job assignment via command
+        JobAssignment assignment = new JobAssignment.Builder()
+                .jobId(transferJob.getJobId())
+                .agentId("agent-001")
+                .build();
+        stateMachine.apply(JobAssignmentCommand.assign(assignment));
+
+        stateMachine.setLastAppliedIndex(20);
+
+        // Take snapshot
+        byte[] snapshotData = stateMachine.takeSnapshot();
+        assertNotNull(snapshotData);
+        assertTrue(snapshotData.length > 0);
+
+        // Restore to a fresh state machine
+        QuorusStateMachine restored = new QuorusStateMachine();
+        restored.restoreSnapshot(snapshotData);
+
+        // Verify metadata survived
+        assertEquals("us-east", restored.getMetadata("region"));
+
+        // Verify transfer job survived
+        assertNotNull(restored.getTransferJob(transferJob.getJobId()));
+
+        // Verify job assignment survived the round-trip
+        String assignmentId = transferJob.getJobId() + ":" + "agent-001";
+        JobAssignment restoredAssignment = restored.getJobAssignment(assignmentId);
+        assertNotNull(restoredAssignment, "Job assignment should survive snapshot round-trip");
+        assertEquals("agent-001", restoredAssignment.getAgentId());
+        assertEquals(transferJob.getJobId(), restoredAssignment.getJobId());
+
+        // Verify lastAppliedIndex survived
+        assertEquals(20, restored.getLastAppliedIndex());
     }
 }

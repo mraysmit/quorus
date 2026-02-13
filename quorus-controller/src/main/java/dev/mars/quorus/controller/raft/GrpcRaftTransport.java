@@ -21,6 +21,8 @@ import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import dev.mars.quorus.controller.raft.grpc.AppendEntriesRequest;
 import dev.mars.quorus.controller.raft.grpc.AppendEntriesResponse;
+import dev.mars.quorus.controller.raft.grpc.InstallSnapshotRequest;
+import dev.mars.quorus.controller.raft.grpc.InstallSnapshotResponse;
 import dev.mars.quorus.controller.raft.grpc.RaftServiceGrpc;
 import dev.mars.quorus.controller.raft.grpc.VoteRequest;
 import dev.mars.quorus.controller.raft.grpc.VoteResponse;
@@ -163,6 +165,11 @@ public class GrpcRaftTransport implements RaftTransport {
     @Override
     public Future<AppendEntriesResponse> sendAppendEntries(String targetId, AppendEntriesRequest request) {
         return toVertxFuture(getStub(targetId).appendEntries(request));
+    }
+
+    @Override
+    public Future<InstallSnapshotResponse> sendInstallSnapshot(String targetId, InstallSnapshotRequest request) {
+        return toVertxFuture(getStub(targetId).installSnapshot(request));
     }
 
     private RaftServiceGrpc.RaftServiceFutureStub getStub(String targetId) {

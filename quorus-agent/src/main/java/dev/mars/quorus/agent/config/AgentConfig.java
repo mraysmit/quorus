@@ -143,7 +143,15 @@ public final class AgentConfig {
     // ==================== Core Property Accessors ====================
 
     /**
-     * Gets a string property with environment variable override.
+     * Gets a string property with layered resolution.
+     * 
+     * <p>Resolution order (highest to lowest priority):
+     * <ol>
+     *   <li>Environment variable (e.g., QUORUS_AGENT_CONTROLLER_URL)</li>
+     *   <li>System property (e.g., -Dquorus.agent.controller.url=...)</li>
+     *   <li>Properties file (quorus-agent.properties)</li>
+     *   <li>Default value</li>
+     * </ol>
      */
     public String getString(String key, String defaultValue) {
         // 1. Check environment variable (QUORUS_AGENT_XXX format)
@@ -153,8 +161,52 @@ public final class AgentConfig {
             return envValue;
         }
 
-        // 2. Check properties file
+        // 2. Check system property (e.g., -Dquorus.agent.port=8090)
+        String sysProp = System.getProperty(key);
+        if (sysProp != null && !sysProp.isEmpty()) {
+            return sysProp;
+        }
+
+        // 3. Check properties file
         return properties.getProperty(key, defaultValue);
+    }
+
+    /**
+     * Validates that required configuration is present and values are sensible.
+     * Called during startup to fail fast on misconfiguration.
+     *
+     * @throws IllegalStateException if required configuration is invalid
+     */
+    public void validate() {
+        // Validate controller URL is reachable format
+        String controllerUrl = getControllerUrl();
+        if (!controllerUrl.startsWith("http://") && !controllerUrl.startsWith("https://")) {
+            throw new IllegalStateException(
+                    "Controller URL must start with http:// or https://, got: " + controllerUrl);
+        }
+
+        // Validate port ranges
+        int port = getAgentPort();
+        if (port < 1 || port > 65535) {
+            throw new IllegalStateException(
+                    "Agent port must be between 1 and 65535, got: " + port);
+        }
+
+        // Validate positive intervals
+        if (getHeartbeatIntervalMs() <= 0) {
+            throw new IllegalStateException(
+                    "Heartbeat interval must be positive, got: " + getHeartbeatIntervalMs());
+        }
+        if (getJobPollingIntervalMs() <= 0) {
+            throw new IllegalStateException(
+                    "Job polling interval must be positive, got: " + getJobPollingIntervalMs());
+        }
+        if (getMaxConcurrentTransfers() <= 0) {
+            throw new IllegalStateException(
+                    "Max concurrent transfers must be positive, got: " + getMaxConcurrentTransfers());
+        }
+
+        logger.info("Agent configuration validated successfully");
     }
 
     public int getInt(String key, int defaultValue) {

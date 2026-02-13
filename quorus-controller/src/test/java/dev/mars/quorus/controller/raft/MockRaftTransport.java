@@ -31,6 +31,8 @@ package dev.mars.quorus.controller.raft;
 
 import dev.mars.quorus.controller.raft.grpc.AppendEntriesRequest;
 import dev.mars.quorus.controller.raft.grpc.AppendEntriesResponse;
+import dev.mars.quorus.controller.raft.grpc.InstallSnapshotRequest;
+import dev.mars.quorus.controller.raft.grpc.InstallSnapshotResponse;
 import dev.mars.quorus.controller.raft.grpc.VoteRequest;
 import dev.mars.quorus.controller.raft.grpc.VoteResponse;
 import io.vertx.core.Future;
@@ -207,5 +209,41 @@ public class MockRaftTransport implements RaftTransport {
                 .setMatchIndex(matchIndex)
                 .build();
     }
-}
 
+    @Override
+    public Future<InstallSnapshotResponse> sendInstallSnapshot(String targetNodeId,
+                                                                InstallSnapshotRequest request) {
+        Promise<InstallSnapshotResponse> promise = Promise.promise();
+
+        executor.submit(() -> {
+            try {
+                MockRaftTransport targetTransport = transports.get(targetNodeId);
+                if (targetTransport == null || !targetTransport.running) {
+                    promise.fail(new RuntimeException("Target node not available: " + targetNodeId));
+                    return;
+                }
+
+                Thread.sleep(5 + (long) (Math.random() * 10));
+
+                InstallSnapshotResponse response = targetTransport.handleInstallSnapshot(request);
+                promise.complete(response);
+            } catch (Exception e) {
+                promise.fail(e);
+            }
+        });
+
+        return promise.future();
+    }
+
+    private InstallSnapshotResponse handleInstallSnapshot(InstallSnapshotRequest request) {
+        if (raftNode != null) {
+            return raftNode.handleInstallSnapshot(request).toCompletionStage().toCompletableFuture().join();
+        }
+
+        return InstallSnapshotResponse.newBuilder()
+                .setTerm(request.getTerm())
+                .setSuccess(false)
+                .setNextChunkIndex(0)
+                .build();
+    }
+}

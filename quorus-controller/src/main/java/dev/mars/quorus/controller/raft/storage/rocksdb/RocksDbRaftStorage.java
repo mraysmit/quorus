@@ -335,6 +335,67 @@ public final class RocksDbRaftStorage implements RaftStorage {
     }
 
     // =========================================================================
+    // Snapshot Operations
+    // =========================================================================
+
+    private static final String SNAPSHOT_KEY = "snapshot:data";
+    private static final String SNAPSHOT_INDEX_KEY = "snapshot:lastIncludedIndex";
+    private static final String SNAPSHOT_TERM_KEY = "snapshot:lastIncludedTerm";
+
+    @Override
+    public Future<Void> saveSnapshot(byte[] data, long lastIncludedIndex, long lastIncludedTerm) {
+        return vertx.executeBlocking(() -> {
+            try (WriteBatch batch = new WriteBatch();
+                 WriteOptions opts = new WriteOptions().setSync(true)) {
+                batch.put(SNAPSHOT_KEY.getBytes(StandardCharsets.UTF_8), data);
+                batch.put(SNAPSHOT_INDEX_KEY.getBytes(StandardCharsets.UTF_8),
+                        ByteBuffer.allocate(8).putLong(lastIncludedIndex).array());
+                batch.put(SNAPSHOT_TERM_KEY.getBytes(StandardCharsets.UTF_8),
+                        ByteBuffer.allocate(8).putLong(lastIncludedTerm).array());
+                db.write(opts, batch);
+            }
+            LOG.info("Snapshot saved to RocksDB: lastIncludedIndex={}, lastIncludedTerm={}, size={}bytes",
+                    lastIncludedIndex, lastIncludedTerm, data.length);
+            return null;
+        }, false);
+    }
+
+    @Override
+    public Future<Optional<SnapshotData>> loadSnapshot() {
+        return vertx.executeBlocking(() -> {
+            byte[] data = db.get(SNAPSHOT_KEY.getBytes(StandardCharsets.UTF_8));
+            if (data == null) {
+                return Optional.<SnapshotData>empty();
+            }
+            byte[] indexBytes = db.get(SNAPSHOT_INDEX_KEY.getBytes(StandardCharsets.UTF_8));
+            byte[] termBytes = db.get(SNAPSHOT_TERM_KEY.getBytes(StandardCharsets.UTF_8));
+            if (indexBytes == null || termBytes == null) {
+                return Optional.<SnapshotData>empty();
+            }
+            long lastIncludedIndex = ByteBuffer.wrap(indexBytes).getLong();
+            long lastIncludedTerm = ByteBuffer.wrap(termBytes).getLong();
+            LOG.info("Snapshot loaded from RocksDB: lastIncludedIndex={}, lastIncludedTerm={}, size={}bytes",
+                    lastIncludedIndex, lastIncludedTerm, data.length);
+            return Optional.of(new SnapshotData(data, lastIncludedIndex, lastIncludedTerm));
+        }, false);
+    }
+
+    @Override
+    public Future<Void> truncatePrefix(long toIndex) {
+        return vertx.executeBlocking(() -> {
+            byte[] startKey = logKey(0);
+            byte[] endKey = logKey(toIndex + 1);
+            try {
+                db.deleteRange(startKey, endKey);
+            } catch (RocksDBException e) {
+                throw new RuntimeException("Failed to truncate prefix", e);
+            }
+            LOG.info("RocksDB prefix truncation complete: removed entries with index <= {}", toIndex);
+            return null;
+        }, false);
+    }
+
+    // =========================================================================
     // Private Helpers
     // =========================================================================
 

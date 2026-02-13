@@ -126,9 +126,12 @@ public class QuorusControllerVerticle extends AbstractVerticle {
 
             QuorusStateMachine stateMachine = new QuorusStateMachine(initialMetadata);
 
-            // Use the constructor with storage for durability
+            // Use the constructor with storage and snapshot configuration
             this.raftNode = new RaftNode(vertx, nodeId, clusterNodeIds, transport, 
-                                         stateMachine, raftStorage, 5000, 1000);
+                                         stateMachine, raftStorage, 5000, 1000,
+                                         config.isSnapshotEnabled(),
+                                         config.getSnapshotThreshold(),
+                                         config.getSnapshotCheckIntervalMs());
 
             transport.setRaftNode(raftNode);
 

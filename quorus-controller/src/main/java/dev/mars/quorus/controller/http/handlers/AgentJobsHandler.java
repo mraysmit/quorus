@@ -16,153 +16,83 @@
 
 package dev.mars.quorus.controller.http.handlers;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpHandler;
 import dev.mars.quorus.controller.raft.RaftNode;
 import dev.mars.quorus.controller.state.QuorusStateMachine;
+import dev.mars.quorus.controller.state.TransferJobSnapshot;
 import dev.mars.quorus.core.JobAssignment;
 import dev.mars.quorus.core.JobAssignmentStatus;
-import dev.mars.quorus.controller.state.TransferJobSnapshot;
-
-import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
-import java.util.*;
-import java.util.stream.Collectors;
-
+import io.vertx.core.Handler;
+import io.vertx.core.json.JsonArray;
+import io.vertx.core.json.JsonObject;
+import io.vertx.ext.web.RoutingContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Map;
+
 /**
  * HTTP handler for agent job polling.
- * 
- * Endpoint: GET /api/v1/agents/{agentId}/jobs
- * 
- * Returns pending job assignments for a specific agent.
- * 
+ *
+ * <p>Endpoint: {@code GET /api/v1/agents/:agentId/jobs}
+ *
+ * <p>Returns pending job assignments for a specific agent, enriched with
+ * transfer job details (source URI, destination, total bytes).
+ *
  * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 2.0 (Vert.x reactive)
  * @since 2025-12-11
- * @version 1.0
  */
-public class AgentJobsHandler implements HttpHandler {
+public class AgentJobsHandler implements Handler<RoutingContext> {
 
     private static final Logger logger = LoggerFactory.getLogger(AgentJobsHandler.class);
     private final RaftNode raftNode;
-    private final ObjectMapper objectMapper;
 
     public AgentJobsHandler(RaftNode raftNode) {
         this.raftNode = raftNode;
-        this.objectMapper = new ObjectMapper();
-        this.objectMapper.registerModule(new JavaTimeModule());
-        logger.debug("AgentJobsHandler initialized with raftNode={}", raftNode.getNodeId());
     }
 
     @Override
-    public void handle(HttpExchange exchange) throws IOException {
-        String method = exchange.getRequestMethod();
-        String path = exchange.getRequestURI().getPath();
-        logger.debug("handle() entry: method={}, path={}", method, path);
-        
-        if (!"GET".equals(method)) {
-            logger.debug("Method not allowed: {}", method);
-            sendJsonResponse(exchange, 405, Map.of("error", "Method not allowed"));
-            return;
-        }
+    public void handle(RoutingContext ctx) {
+        String agentId = ctx.pathParam("agentId");
+        QuorusStateMachine stateMachine = (QuorusStateMachine) raftNode.getStateMachine();
 
-        try {
-            // Extract agentId from path: /api/v1/agents/{agentId}/jobs
-            String[] parts = path.split("/");
-            if (parts.length < 5) {
-                logger.debug("Invalid path format: parts.length={}", parts.length);
-                sendJsonResponse(exchange, 400, Map.of("error", "Missing agentId in path"));
-                return;
+        Map<String, JobAssignment> allAssignments = stateMachine.getJobAssignments();
+        JsonArray pendingJobs = new JsonArray();
+
+        for (JobAssignment assignment : allAssignments.values()) {
+            if (!assignment.getAgentId().equals(agentId)) {
+                continue;
+            }
+            if (assignment.getStatus() == JobAssignmentStatus.COMPLETED
+                    || assignment.getStatus() == JobAssignmentStatus.FAILED) {
+                continue;
             }
 
-            String agentId = parts[4];
-            logger.debug("Extracted agentId={}", agentId);
+            JsonObject jobInfo = new JsonObject()
+                    .put("assignmentId", assignment.getJobId() + "-" + assignment.getAgentId())
+                    .put("jobId", assignment.getJobId())
+                    .put("agentId", assignment.getAgentId())
+                    .put("status", assignment.getStatus().toString())
+                    .put("assignedAt", assignment.getAssignedAt().toString());
 
-            // Get state machine
-            logger.debug("Querying state machine for job assignments: agentId={}", agentId);
-            QuorusStateMachine stateMachine = (QuorusStateMachine) raftNode.getStateMachine();
+            // Enrich with transfer job details
+            TransferJobSnapshot transferJob = stateMachine.getTransferJob(assignment.getJobId());
+            if (transferJob != null) {
+                jobInfo.put("sourceUri", transferJob.getSourceUri())
+                        .put("destinationPath", transferJob.getDestinationPath())
+                        .put("totalBytes", transferJob.getTotalBytes());
+                if (transferJob.getDescription() != null) {
+                    jobInfo.put("description", transferJob.getDescription());
+                }
+            }
 
-            // Get all job assignments for this agent
-            Map<String, JobAssignment> allAssignments = stateMachine.getJobAssignments();
-            logger.debug("Total job assignments in state machine: {}", allAssignments.size());
-            
-            // Filter for this agent and only ASSIGNED status (not yet accepted)
-            List<Map<String, Object>> pendingJobs = allAssignments.values().stream()
-                    .filter(assignment -> {
-                        boolean matches = assignment.getAgentId().equals(agentId);
-                        if (matches) {
-                            logger.debug("Found assignment for agent: assignmentId={}-{}, status={}", 
-                                    assignment.getJobId(), assignment.getAgentId(), assignment.getStatus());
-                        }
-                        return matches;
-                    })
-                    .filter(assignment -> {
-                        boolean isAssigned = assignment.getStatus() == JobAssignmentStatus.ASSIGNED;
-                        logger.debug("Assignment status check: jobId={}, status={}, isAssigned={}", 
-                                assignment.getJobId(), assignment.getStatus(), isAssigned);
-                        return isAssigned;
-                    })
-                    .map(assignment -> {
-                        Map<String, Object> jobInfo = new HashMap<>();
-                        jobInfo.put("assignmentId", assignment.getJobId() + "-" + assignment.getAgentId());
-                        jobInfo.put("jobId", assignment.getJobId());
-                        jobInfo.put("agentId", assignment.getAgentId());
-                        jobInfo.put("status", assignment.getStatus().toString());
-                        jobInfo.put("assignedAt", assignment.getAssignedAt().toString());
-                        
-                        // Get transfer job details
-                        logger.debug("Fetching transfer job details: jobId={}", assignment.getJobId());
-                        TransferJobSnapshot transferJob = stateMachine.getTransferJob(assignment.getJobId());
-                        if (transferJob != null) {
-                            jobInfo.put("sourceUri", transferJob.getSourceUri());
-                            jobInfo.put("destinationPath", transferJob.getDestinationPath());
-                            jobInfo.put("totalBytes", transferJob.getTotalBytes());
-                            if (transferJob.getDescription() != null) {
-                                jobInfo.put("description", transferJob.getDescription());
-                            }
-                            logger.debug("Transfer job details added: jobId={}, sourceUri={}, destinationPath={}", 
-                                    assignment.getJobId(), transferJob.getSourceUri(), transferJob.getDestinationPath());
-                        } else {
-                            logger.warn("Transfer job not found for assignment: jobId={}", assignment.getJobId());
-                        }
-                        
-                        return jobInfo;
-                    })
-                    .collect(Collectors.toList());
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("agentId", agentId);
-            response.put("pendingJobs", pendingJobs);
-            response.put("count", pendingJobs.size());
-
-            logger.debug("Returning {} pending jobs for agent: agentId={}", pendingJobs.size(), agentId);
-            sendJsonResponse(exchange, 200, response);
-
-        } catch (Exception e) {
-            logger.error("Error retrieving agent jobs: {}", e.getMessage());
-            logger.trace("Stack trace for agent jobs retrieval error", e);
-            sendJsonResponse(exchange, 500, Map.of(
-                    "error", "Internal server error",
-                    "message", e.getMessage()
-            ));
+            pendingJobs.add(jobInfo);
         }
-    }
 
-    private void sendJsonResponse(HttpExchange exchange, int statusCode, Object data) throws IOException {
-        String json = objectMapper.writeValueAsString(data);
-        byte[] responseBytes = json.getBytes(StandardCharsets.UTF_8);
-        
-        exchange.getResponseHeaders().set("Content-Type", "application/json");
-        exchange.sendResponseHeaders(statusCode, responseBytes.length);
-        
-        try (OutputStream os = exchange.getResponseBody()) {
-            os.write(responseBytes);
-        }
+        logger.debug("Returning {} pending jobs for agent: agentId={}", pendingJobs.size(), agentId);
+        ctx.response()
+                .putHeader("Content-Type", "application/json")
+                .end(pendingJobs.encode());
     }
 }
 

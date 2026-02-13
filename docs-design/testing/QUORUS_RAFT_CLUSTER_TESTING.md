@@ -55,7 +55,7 @@ echo "M2_REPO = $M2_REPO"
 Compiles the Java controller code and packages it into a Docker image. This creates a self-contained container with the Raft consensus engine, HTTP API, and all dependencies.
 
 ```powershell
-cd c:\Users\markr\dev\java\corejava\quorus
+cd c:\Users\mraysmit\dev\idea-projects\quorus
 docker build --no-cache -t quorus-controller:latest -f quorus-controller/Dockerfile .
 ```
 
@@ -90,10 +90,10 @@ quorus-controller1   Up 15 seconds (healthy)
 
 ### 5. Verify Leader Election
 
-Queries `quorus-controller1`'s `/health` endpoint (via port 8081) to confirm Raft consensus is working. The response shows which Quorus Controller is the leader, the current Raft term, and system health checks.
+Queries `quorus-controller1`'s `/health` endpoint (via port 8081) to confirm Raft consensus is working. The response shows which Quorus Controller is the leader, the current Raft term, and log replication status (`commitIndex`/`lastApplied`).
 
 ```powershell
-curl -s http://localhost:8081/health | ConvertFrom-Json | Select-Object -ExpandProperty raft
+curl -s http://localhost:8081/health | ConvertFrom-Json | Select-Object -ExpandProperty checks | Select-Object -ExpandProperty raft
 ```
 
 ### 6. Stop Cluster (when done)
@@ -112,7 +112,7 @@ docker-compose -f docker-compose-controller-first.yml down -v
 | `quorus-controller1` | 8081 | 8080 | 9080 | 172.20.0.11 |
 | `quorus-controller2` | 8082 | 8080 | 9080 | 172.20.0.12 |
 | `quorus-controller3` | 8083 | 8080 | 9080 | 172.20.0.13 |
-| `quorus-loadbalancer` (nginx) | 8080 | 80 | - | 172.20.0.10 |
+| `nginx` (load balancer) | 8080 | 80 | - | 172.20.0.10 |
 
 ---
 
@@ -281,19 +281,14 @@ curl -s http://localhost:8081/health | ConvertFrom-Json
 ```json
 {
   "status": "UP",
-  "version": "1.0.0-alpha",
-  "timestamp": "2026-02-01T10:00:00.000Z",
-  "nodeId": "controller1",
-  "raft": {
-    "state": "LEADER",
-    "term": 1,
-    "isLeader": true,
-    "leaderId": "controller1"
-  },
   "checks": {
-    "raftCluster": "UP",
-    "diskSpace": "UP",
-    "memory": "UP"
+    "raft": {
+      "state": "LEADER",
+      "nodeId": "controller1",
+      "term": 1,
+      "commitIndex": 42,
+      "lastApplied": 42
+    }
   }
 }
 ```
@@ -302,31 +297,25 @@ curl -s http://localhost:8081/health | ConvertFrom-Json
 
 | Field | Example | Description |
 |-------|---------|-------------|
-| `status` | "UP" | Overall health of this Quorus Controller. "UP" means the `HttpApiServer` is responding and the Raft consensus engine is operational. "DEGRADED" if any health check fails. |
-| `version` | "1.0.0-alpha" | Controller software version. |
-| `timestamp` | "2026-02-01T10:00:00.000Z" | ISO-8601 timestamp of when the health check was performed. |
+| `status` | "UP" | Overall health of this Quorus Controller. "UP" means the `HttpApiServer` is responding and the Raft consensus engine is operational. |
+| `state` | "LEADER" | This controller's Raft role: `LEADER` (accepts writes), `FOLLOWER` (replicates from leader), or `CANDIDATE` (election in progress). |
 | `nodeId` | "controller1" | This controller's identifier, matching the `QUORUS_NODE_ID` environment variable set in `docker-compose-controller-first.yml`. |
-| `raft.state` | "LEADER" | This controller's Raft role: `LEADER` (accepts writes), `FOLLOWER` (replicates from leader), or `CANDIDATE` (election in progress). |
-| `raft.term` | 1 | Raft election term. Increments when a new election occurs (e.g., after leader failure). All controllers in a healthy cluster report the same term. |
-| `raft.isLeader` | true | Boolean indicating whether this controller is the current leader. |
-| `raft.leaderId` | "controller1" | The `nodeId` of the current cluster leader (may be null during elections). |
-| `checks.raftCluster` | "UP" | Whether the Raft consensus engine is running. |
-| `checks.diskSpace` | "UP" | Whether adequate disk space is available ("WARNING" if below 100 MB). |
-| `checks.memory` | "UP" | Whether memory usage is within bounds ("WARNING" if free memory < 10%). |
+| `term` | 1 | Raft election term. Increments when a new election occurs (e.g., after leader failure). All controllers in a healthy cluster report the same term. |
+| `commitIndex` | 42 | Highest Raft log index replicated to a majority of controllers (2 of 3). Committed entries (workflows, agent state) are durable. |
+| `lastApplied` | 42 | Highest Raft log index applied to the `QuorusStateMachine`. Should equal `commitIndex` when this controller is caught up. |
 
 **Interpreting the values:**
 
-- **`raft.isLeader` = true**: This Quorus Controller is currently the leader and will accept write operations.
-- **`raft.leaderId` = null**: A leader election is in progress; no controller is currently accepting writes.
+- **`commitIndex` = `lastApplied`**: This Quorus Controller is fully caught up; all committed entries have been applied to its `QuorusStateMachine`.
+- **`commitIndex` > `lastApplied`**: This Quorus Controller is still applying committed entries (transient state during catch-up).
 - **Different `term` values across Quorus Controllers**: A new leader election is in progress or just completed.
 - **Multiple Quorus Controllers report `LEADER`**: Split-brain condition (temporary); the Quorus Controller with the higher term will win.
-- **`status` = "DEGRADED"**: One or more health checks (disk, memory, raft) are failing; the controller is operational but needs attention.
 
 > **What are committed entries?**  
 > When a workflow is submitted via `curl` or the Quorus API, the LEADER Quorus Controller appends it to its Raft log and replicates it to the FOLLOWER Quorus Controllers. An entry becomes **committed** once the LEADER confirms it has been written to a majority (2 of 3 Quorus Controllers). Only committed entries are guaranteed to survive failures—they will never be lost or overwritten. The `commitIndex` tracks the highest such entry. Once committed, the entry is then **applied** to the `QuorusStateMachine` (the actual workflow/agent data store), which is tracked by `lastApplied`.
 >
 > **Example:** Submitting a Quorus workflow YAML to the 3-node Quorus Controller cluster:
-> 1. `curl -X POST http://localhost:8080/api/v1/command -d @daily-export.json` → the `quorus-loadbalancer` container (port 8080) routes to the current Quorus Controller leader
+> 1. `curl -X POST http://localhost:8080/api/v1/workflows -d @daily-export.yaml` → the `nginx` container (port 8080) routes to the current Quorus Controller leader
 > 2. The leader's `HttpApiServer` (running inside `quorus-controller1`, `quorus-controller2`, or `quorus-controller3`) receives the request
 > 3. The leader's `RaftNode` appends `{workflowId: "wf-123", name: "daily-export", transfers: [...]}` to its Raft log at index 43
 > 4. The leader's `GrpcRaftTransport` sends the entry to the other two Quorus Controllers via `AppendEntries` gRPC (port 9080)
@@ -335,22 +324,10 @@ curl -s http://localhost:8081/health | ConvertFrom-Json
 > 7. The leader's `QuorusStateMachine` applies the entry (`lastApplied` = 43) and responds with `201 Created`
 > 8. Follower `QuorusStateMachine` instances apply the entry when they learn of the new `commitIndex`
 
-### Raft Status Endpoint
+### Cluster Status Endpoint
 
 ```powershell
-curl -s http://localhost:8081/raft/status | ConvertFrom-Json
-```
-
-**Response:**
-```json
-{
-  "nodeId": "controller1",
-  "state": "LEADER",
-  "currentTerm": 1,
-  "isLeader": true,
-  "isRunning": true,
-  "leaderId": "controller1"
-}
+curl -s http://localhost:8081/api/v1/cluster/status | ConvertFrom-Json
 ```
 
 ### Metrics Endpoint
@@ -367,18 +344,18 @@ quorus_cluster_is_leader     # 1 if this controller is leader, 0 otherwise
 quorus_cluster_commit_index  # Highest log index committed (replicated to 2+ controllers)
 quorus_cluster_last_applied  # Highest log index applied to QuorusStateMachine
 quorus_cluster_log_size      # Total Raft log entries (workflows, agent state, etc.)
-quorus_raft_rpc_total         # gRPC calls between controllers (AppendEntries, RequestVote)
+quorus_raft_rpc_ratio_total  # gRPC calls between controllers (AppendEntries, RequestVote)
 ```
 
 ### Quorus Controller API Endpoints
 
-These endpoints are served by the `HttpApiServer` class running inside the `quorus-controller1`, `quorus-controller2`, and `quorus-controller3` containers. Access via the `quorus-loadbalancer` (nginx, port 8080) or directly to a specific Quorus Controller (ports 8081-8083).
+These endpoints are served by the `HttpApiServer` class running inside the `quorus-controller1`, `quorus-controller2`, and `quorus-controller3` containers. Access via the `nginx` load balancer (port 8080) or directly to a specific Quorus Controller (ports 8081-8083).
 
 **How `HttpApiServer` works inside each container:**
 
 Each Quorus Controller container runs a single Java process (`QuorusControllerVerticle`) that starts two servers:
 
-1. **`HttpApiServer`** (port 8080 inside container) — A Vert.x HTTP server that handles REST API requests. It provides the `/health`, `/metrics`, `/raft/status`, and `/api/v1/*` endpoints. When a write request arrives (e.g., `POST /api/v1/command`), the `HttpApiServer` forwards it to the local `RaftNode`. If this Quorus Controller is the LEADER, it processes the request; if it's a FOLLOWER, it can redirect or reject the write.
+1. **`HttpApiServer`** (port 8080 inside container) — A Vert.x HTTP server that handles REST API requests. It provides the `/health`, `/metrics`, and `/api/v1/*` endpoints. When a request arrives (e.g., `POST /api/v1/workflows`), the `HttpApiServer` forwards it to the local `RaftNode`. If this Quorus Controller is the LEADER, it processes the request; if it's a FOLLOWER, it can redirect or reject the write.
 
 2. **`GrpcRaftServer`** (port 9080 inside container) — A gRPC server that handles Raft protocol messages (`AppendEntries`, `RequestVote`) from the other two Quorus Controllers. This is how the 3-node cluster maintains consensus.
 
@@ -386,7 +363,7 @@ Each Quorus Controller container runs a single Java process (`QuorusControllerVe
 
 | Access Method | URL | Use Case |
 |---------------|-----|----------|
-| Via `quorus-loadbalancer` (nginx) | `http://localhost:8080/...` | Production usage; nginx routes to a healthy Quorus Controller |
+| Via `nginx` load balancer | `http://localhost:8080/...` | Production usage; `nginx` routes to a healthy Quorus Controller |
 | Direct to `quorus-controller1` | `http://localhost:8081/...` | Testing/debugging a specific node |
 | Direct to `quorus-controller2` | `http://localhost:8082/...` | Testing/debugging a specific node |
 | Direct to `quorus-controller3` | `http://localhost:8083/...` | Testing/debugging a specific node |
@@ -396,17 +373,10 @@ Each Quorus Controller container runs a single Java process (`QuorusControllerVe
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/health` | GET | Controller health including Raft state (as shown above) |
-| `/health/live` | GET | Liveness probe — is the process alive and responsive? |
-| `/health/ready` | GET | Readiness probe — is the node ready to serve traffic? |
 | `/metrics` | GET | Prometheus metrics (prefixed with `quorus_`) |
-| `/raft/status` | GET | Raft status: node ID, state, term, leader ID, running state |
-| `/api/v1/command` | POST | Submit a generic command to the Raft log |
-| `/api/v1/agents/register` | POST | Register a Quorus Agent with capabilities |
-| `/api/v1/agents/:agentId/jobs` | GET | Get pending job assignments for a specific agent |
-| `/api/v1/transfers` | POST | Create a transfer job |
-| `/api/v1/transfers/:jobId` | GET | Get transfer job status by ID |
-| `/api/v1/jobs/assign` | POST | Assign a job to an agent |
-| `/api/v1/jobs/:jobId/status` | POST | Update job status (assignment status, bytes transferred) |
+| `/api/v1/cluster/status` | GET | Raft cluster status: leader ID, term, all node states |
+| `/api/v1/agents` | GET | Quorus Agents currently registered with this cluster |
+| `/api/v1/workflows` | POST | Submit a Quorus workflow YAML for execution |
 
 ---
 
@@ -534,7 +504,7 @@ quorus_cluster_is_leader{job="quorus-controllers-compose"} == 1
 quorus_cluster_term{job="quorus-controllers-compose"}
 
 # gRPC traffic between Quorus Controllers (AppendEntries, RequestVote)
-rate(quorus_raft_rpc_total[1m])
+rate(quorus_raft_rpc_ratio_total[1m])
 ```
 
 ---

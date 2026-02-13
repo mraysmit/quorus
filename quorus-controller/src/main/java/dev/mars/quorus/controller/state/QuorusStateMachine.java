@@ -535,11 +535,13 @@ public class QuorusStateMachine implements RaftStateMachine {
             snapshot.setTransferJobs(new ConcurrentHashMap<>(transferJobs));
             snapshot.setAgents(new ConcurrentHashMap<>(agents));
             snapshot.setSystemMetadata(new ConcurrentHashMap<>(systemMetadata));
+            snapshot.setJobAssignments(new ConcurrentHashMap<>(jobAssignments));
+            snapshot.setJobQueue(new ConcurrentHashMap<>(jobQueue));
             snapshot.setLastAppliedIndex(lastAppliedIndex.get());
 
             byte[] data = objectMapper.writeValueAsBytes(snapshot);
-            logger.info("Created snapshot: size={}bytes, jobs={}, agents={}, lastAppliedIndex={}", 
-                data.length, transferJobs.size(), agents.size(), lastAppliedIndex.get());
+            logger.info("Created snapshot: size={}bytes, jobs={}, agents={}, assignments={}, queue={}, lastAppliedIndex={}", 
+                data.length, transferJobs.size(), agents.size(), jobAssignments.size(), jobQueue.size(), lastAppliedIndex.get());
             return data;
         } catch (IOException e) {
             logger.error("Failed to create snapshot: jobs={}, agents={}", transferJobs.size(), agents.size(), e);
@@ -564,10 +566,21 @@ public class QuorusStateMachine implements RaftStateMachine {
             systemMetadata.clear();
             systemMetadata.putAll(restoredSnapshot.getSystemMetadata());
 
+            jobAssignments.clear();
+            if (restoredSnapshot.getJobAssignments() != null) {
+                jobAssignments.putAll(restoredSnapshot.getJobAssignments());
+            }
+
+            jobQueue.clear();
+            if (restoredSnapshot.getJobQueue() != null) {
+                jobQueue.putAll(restoredSnapshot.getJobQueue());
+            }
+
             lastAppliedIndex.set(restoredSnapshot.getLastAppliedIndex());
 
-            logger.info("Restored snapshot: jobs={}, agents={}, metadata={}, lastAppliedIndex={}", 
-                transferJobs.size(), agents.size(), systemMetadata.size(), lastAppliedIndex.get());
+            logger.info("Restored snapshot: jobs={}, agents={}, metadata={}, assignments={}, queue={}, lastAppliedIndex={}", 
+                transferJobs.size(), agents.size(), systemMetadata.size(), 
+                jobAssignments.size(), jobQueue.size(), lastAppliedIndex.get());
         } catch (IOException e) {
             logger.error("Failed to restore snapshot: snapshotSize={}bytes, error={}", snapshot.length, e.getMessage());
             logger.trace("Stack trace for snapshot restore failure", e);
