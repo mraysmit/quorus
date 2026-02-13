@@ -18,6 +18,8 @@ package dev.mars.quorus.controller.raft;
 
 import dev.mars.quorus.controller.raft.grpc.AppendEntriesRequest;
 import dev.mars.quorus.controller.raft.grpc.AppendEntriesResponse;
+import dev.mars.quorus.controller.raft.grpc.InstallSnapshotRequest;
+import dev.mars.quorus.controller.raft.grpc.InstallSnapshotResponse;
 import dev.mars.quorus.controller.raft.grpc.VoteRequest;
 import dev.mars.quorus.controller.raft.grpc.VoteResponse;
 import io.vertx.core.Future;
@@ -505,6 +507,68 @@ public class InMemoryTransportSimulator implements RaftTransport {
                 .setTerm(request.getTerm())
                 .setSuccess(false)
                 .build();
+    }
+
+    private InstallSnapshotResponse handleInstallSnapshot(InstallSnapshotRequest request) {
+        if (raftNode != null) {
+            return raftNode.handleInstallSnapshot(request).toCompletionStage().toCompletableFuture().join();
+        }
+
+        logger.warn("RaftNode not set for transport {}, returning failure for InstallSnapshot", nodeId);
+        return InstallSnapshotResponse.newBuilder()
+                .setTerm(request.getTerm())
+                .setSuccess(false)
+                .setNextChunkIndex(0)
+                .build();
+    }
+
+    @Override
+    public Future<InstallSnapshotResponse> sendInstallSnapshot(String targetNodeId,
+                                                                InstallSnapshotRequest request) {
+        Promise<InstallSnapshotResponse> promise = Promise.promise();
+        executor.execute(() -> {
+            try {
+                // Check if crashed
+                if (crashed) {
+                    promise.fail(new RuntimeException("Node crashed"));
+                    return;
+                }
+
+                // Check for network partition
+                if (!canCommunicate(nodeId, targetNodeId)) {
+                    logger.debug("Network partition prevents communication from {} to {}", nodeId, targetNodeId);
+                    promise.fail(new RuntimeException("Network partition"));
+                    return;
+                }
+
+                // Simulate Packet Drop
+                if (dropRate > 0 && random.nextDouble() < dropRate) {
+                    logger.debug("Dropped InstallSnapshot from {} to {}", nodeId, targetNodeId);
+                    promise.fail(new RuntimeException("Network packet dropped (Chaos)"));
+                    return;
+                }
+
+                InMemoryTransportSimulator targetTransport = transports.get(targetNodeId);
+                if (targetTransport == null || !targetTransport.running) {
+                    promise.fail(new RuntimeException("Target node not available: " + targetNodeId));
+                    return;
+                }
+
+                // Simulate network delay
+                long delay = calculateDelay();
+                Thread.sleep(delay);
+
+                // Process install snapshot request
+                InstallSnapshotResponse response = targetTransport.handleInstallSnapshot(request);
+
+                logger.debug("InstallSnapshot from {} to {}: success={}", nodeId, targetNodeId, response.getSuccess());
+
+                promise.complete(response);
+            } catch (Exception e) {
+                promise.fail(e);
+            }
+        });
+        return promise.future();
     }
 
     public static Map<String, InMemoryTransportSimulator> getAllTransports() {

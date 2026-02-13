@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -227,6 +228,7 @@ public final class TransferRequest implements Serializable {
     }
 
     @JsonPOJOBuilder(withPrefix = "")
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Builder {
         /** Unique identifier for the transfer request (auto-generated if not set) */
         private String requestId;
@@ -305,13 +307,25 @@ public final class TransferRequest implements Serializable {
 
         /**
          * Sets the destination path from string (JSON deserialization).
+         * Handles both plain filesystem paths and URI strings (e.g. file:///path).
          * 
-         * @param destinationPath the destination path as string
+         * @param destinationPath the destination path as string or URI
          * @return this builder
          */
         @JsonProperty("destinationPath")
         public Builder destinationPath(String destinationPath) {
-            this.destinationPath = Paths.get(destinationPath);
+            if (destinationPath == null) {
+                return this;
+            }
+            if (destinationPath.startsWith("file:")) {
+                try {
+                    this.destinationPath = java.nio.file.Paths.get(java.net.URI.create(destinationPath));
+                } catch (Exception e) {
+                    this.destinationPath = java.nio.file.Paths.get(destinationPath);
+                }
+            } else {
+                this.destinationPath = java.nio.file.Paths.get(destinationPath);
+            }
             return this;
         }
 

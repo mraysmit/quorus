@@ -1,0 +1,311 @@
+/*
+ * Copyright 2025 Mark Andrew Ray-Smith Cityline Ltd
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "dev.mars.quorus.controller.raft.grpc";
+option java_outer_classname = "CommandsProto";
+
+package quorus.raft;
+
+// ============================================================
+// Protobuf definitions for Raft state machine commands.
+// Replaces Java serialization with version-safe, efficient
+// Protobuf encoding for all command payloads in the Raft log.
+// ============================================================
+
+// ===== DOMAIN ENUMS =====
+
+enum TransferStatusProto {
+  TRANSFER_STATUS_UNSPECIFIED = 0;
+  TRANSFER_STATUS_PENDING = 1;
+  TRANSFER_STATUS_IN_PROGRESS = 2;
+  TRANSFER_STATUS_COMPLETED = 3;
+  TRANSFER_STATUS_FAILED = 4;
+  TRANSFER_STATUS_CANCELLED = 5;
+  TRANSFER_STATUS_PAUSED = 6;
+}
+
+enum AgentStatusProto {
+  AGENT_STATUS_UNSPECIFIED = 0;
+  AGENT_STATUS_REGISTERING = 1;
+  AGENT_STATUS_HEALTHY = 2;
+  AGENT_STATUS_ACTIVE = 3;
+  AGENT_STATUS_IDLE = 4;
+  AGENT_STATUS_DEGRADED = 5;
+  AGENT_STATUS_OVERLOADED = 6;
+  AGENT_STATUS_MAINTENANCE = 7;
+  AGENT_STATUS_DRAINING = 8;
+  AGENT_STATUS_UNREACHABLE = 9;
+  AGENT_STATUS_FAILED = 10;
+  AGENT_STATUS_DEREGISTERED = 11;
+}
+
+enum JobPriorityProto {
+  JOB_PRIORITY_UNSPECIFIED = 0;
+  JOB_PRIORITY_LOW = 1;
+  JOB_PRIORITY_NORMAL = 2;
+  JOB_PRIORITY_HIGH = 3;
+  JOB_PRIORITY_CRITICAL = 4;
+}
+
+enum JobAssignmentStatusProto {
+  JOB_ASSIGNMENT_STATUS_UNSPECIFIED = 0;
+  JOB_ASSIGNMENT_STATUS_ASSIGNED = 1;
+  JOB_ASSIGNMENT_STATUS_ACCEPTED = 2;
+  JOB_ASSIGNMENT_STATUS_IN_PROGRESS = 3;
+  JOB_ASSIGNMENT_STATUS_COMPLETED = 4;
+  JOB_ASSIGNMENT_STATUS_FAILED = 5;
+  JOB_ASSIGNMENT_STATUS_REJECTED = 6;
+  JOB_ASSIGNMENT_STATUS_TIMEOUT = 7;
+  JOB_ASSIGNMENT_STATUS_CANCELLED = 8;
+}
+
+enum SelectionStrategyProto {
+  SELECTION_STRATEGY_UNSPECIFIED = 0;
+  SELECTION_STRATEGY_ROUND_ROBIN = 1;
+  SELECTION_STRATEGY_LEAST_LOADED = 2;
+  SELECTION_STRATEGY_CAPABILITY_BASED = 3;
+  SELECTION_STRATEGY_LOCALITY_AWARE = 4;
+  SELECTION_STRATEGY_WEIGHTED_SCORE = 5;
+  SELECTION_STRATEGY_PREFERRED_AGENT = 6;
+}
+
+// ===== COMMAND TYPE ENUMS =====
+
+enum TransferJobCommandType {
+  TRANSFER_JOB_CMD_UNSPECIFIED = 0;
+  TRANSFER_JOB_CMD_CREATE = 1;
+  TRANSFER_JOB_CMD_UPDATE_STATUS = 2;
+  TRANSFER_JOB_CMD_UPDATE_PROGRESS = 3;
+  TRANSFER_JOB_CMD_DELETE = 4;
+}
+
+enum AgentCommandType {
+  AGENT_CMD_UNSPECIFIED = 0;
+  AGENT_CMD_REGISTER = 1;
+  AGENT_CMD_DEREGISTER = 2;
+  AGENT_CMD_UPDATE_STATUS = 3;
+  AGENT_CMD_UPDATE_CAPABILITIES = 4;
+  AGENT_CMD_HEARTBEAT = 5;
+}
+
+enum SystemMetadataCommandType {
+  SYSTEM_METADATA_CMD_UNSPECIFIED = 0;
+  SYSTEM_METADATA_CMD_SET = 1;
+  SYSTEM_METADATA_CMD_DELETE = 2;
+}
+
+enum JobAssignmentCommandType {
+  JOB_ASSIGNMENT_CMD_UNSPECIFIED = 0;
+  JOB_ASSIGNMENT_CMD_ASSIGN = 1;
+  JOB_ASSIGNMENT_CMD_ACCEPT = 2;
+  JOB_ASSIGNMENT_CMD_REJECT = 3;
+  JOB_ASSIGNMENT_CMD_UPDATE_STATUS = 4;
+  JOB_ASSIGNMENT_CMD_TIMEOUT = 5;
+  JOB_ASSIGNMENT_CMD_CANCEL = 6;
+  JOB_ASSIGNMENT_CMD_REMOVE = 7;
+}
+
+enum JobQueueCommandType {
+  JOB_QUEUE_CMD_UNSPECIFIED = 0;
+  JOB_QUEUE_CMD_ENQUEUE = 1;
+  JOB_QUEUE_CMD_DEQUEUE = 2;
+  JOB_QUEUE_CMD_PRIORITIZE = 3;
+  JOB_QUEUE_CMD_REMOVE = 4;
+  JOB_QUEUE_CMD_EXPEDITE = 5;
+  JOB_QUEUE_CMD_UPDATE_REQUIREMENTS = 6;
+}
+
+// ===== DOMAIN MODEL MESSAGES =====
+
+message TransferRequestProto {
+  string request_id = 1;
+  string source_uri = 2;
+  string destination_path = 3;
+  string destination_uri = 4;
+  string protocol = 5;
+  map<string, string> metadata = 6;
+  int64 created_at_epoch_ms = 7;
+  int64 expected_size = 8;
+  string expected_checksum = 9;
+}
+
+message TransferJobProto {
+  TransferRequestProto request = 1;
+  TransferStatusProto status = 2;
+  int64 bytes_transferred = 3;
+  int64 total_bytes = 4;
+  int64 start_time_epoch_ms = 5;
+  int64 last_update_time_epoch_ms = 6;
+  string error_message = 7;
+  string actual_checksum = 8;
+}
+
+message AgentSystemInfoProto {
+  string operating_system = 1;
+  string architecture = 2;
+  string java_version = 3;
+  int64 total_memory = 4;
+  int64 available_memory = 5;
+  int64 total_disk_space = 6;
+  int64 available_disk_space = 7;
+  int32 cpu_cores = 8;
+  double cpu_usage = 9;
+  double load_average = 10;
+}
+
+message AgentNetworkInfoProto {
+  string public_ip_address = 1;
+  string private_ip_address = 2;
+  repeated string network_interfaces = 3;
+  int64 bandwidth_capacity = 4;
+  int64 current_bandwidth_usage = 5;
+  double latency_ms = 6;
+  double packet_loss_percentage = 7;
+  string connection_type = 8;
+  bool is_nat_traversal = 9;
+  repeated int32 firewall_ports = 10;
+}
+
+message AgentCapabilitiesProto {
+  repeated string supported_protocols = 1;
+  int32 max_concurrent_transfers = 2;
+  int64 max_transfer_size = 3;
+  int64 max_bandwidth = 4;
+  repeated string available_regions = 5;
+  repeated string supported_compression_types = 6;
+  repeated string supported_encryption_types = 7;
+  map<string, string> custom_capabilities = 8;
+  AgentSystemInfoProto system_info = 9;
+  AgentNetworkInfoProto network_info = 10;
+}
+
+message AgentInfoProto {
+  string agent_id = 1;
+  string hostname = 2;
+  string address = 3;
+  int32 port = 4;
+  AgentCapabilitiesProto capabilities = 5;
+  AgentStatusProto status = 6;
+  int64 registration_time_epoch_ms = 7;
+  int64 last_heartbeat_epoch_ms = 8;
+  string version = 9;
+  string region = 10;
+  string datacenter = 11;
+  map<string, string> metadata = 12;
+}
+
+message JobRequirementsProto {
+  string target_region = 1;
+  repeated string required_protocols = 2;
+  repeated string preferred_regions = 3;
+  repeated string excluded_agents = 4;
+  repeated string preferred_agents = 5;
+  int64 min_bandwidth = 6;
+  int64 max_transfer_size = 7;
+  bool requires_encryption = 8;
+  bool requires_compression = 9;
+  SelectionStrategyProto selection_strategy = 10;
+  map<string, string> custom_attributes = 11;
+  int32 max_concurrent_jobs = 12;
+  string tenant_id = 13;
+  string namespace = 14;
+}
+
+message QueuedJobProto {
+  TransferJobProto transfer_job = 1;
+  JobPriorityProto priority = 2;
+  int64 queue_time_epoch_ms = 3;
+  JobRequirementsProto requirements = 4;
+  string submitted_by = 5;
+  string workflow_id = 6;
+  string group_name = 7;
+  int32 retry_count = 8;
+  int64 earliest_start_time_epoch_ms = 9;
+}
+
+message JobAssignmentProto {
+  string job_id = 1;
+  string agent_id = 2;
+  int64 assigned_at_epoch_ms = 3;
+  int64 accepted_at_epoch_ms = 4;
+  int64 started_at_epoch_ms = 5;
+  int64 completed_at_epoch_ms = 6;
+  JobAssignmentStatusProto status = 7;
+  string failure_reason = 8;
+  int32 retry_count = 9;
+  int64 estimated_duration_ms = 10;
+  string assignment_strategy = 11;
+}
+
+// ===== STATE MACHINE COMMAND MESSAGES =====
+
+message TransferJobCommandProto {
+  TransferJobCommandType type = 1;
+  string job_id = 2;
+  TransferJobProto transfer_job = 3;
+  TransferStatusProto status = 4;
+  int64 bytes_transferred = 5;
+}
+
+message AgentCommandProto {
+  AgentCommandType type = 1;
+  string agent_id = 2;
+  AgentInfoProto agent_info = 3;
+  AgentStatusProto new_status = 4;
+  AgentCapabilitiesProto new_capabilities = 5;
+  int64 timestamp_epoch_ms = 6;
+}
+
+message SystemMetadataCommandProto {
+  SystemMetadataCommandType type = 1;
+  string key = 2;
+  string value = 3;
+}
+
+message JobAssignmentCommandProto {
+  JobAssignmentCommandType type = 1;
+  string assignment_id = 2;
+  JobAssignmentProto job_assignment = 3;
+  JobAssignmentStatusProto new_status = 4;
+  string reason = 5;
+  int64 timestamp_epoch_ms = 6;
+}
+
+message JobQueueCommandProto {
+  JobQueueCommandType type = 1;
+  string job_id = 2;
+  QueuedJobProto queued_job = 3;
+  JobPriorityProto new_priority = 4;
+  string reason = 5;
+  int64 timestamp_epoch_ms = 6;
+}
+
+// ===== RAFT COMMAND WRAPPER =====
+
+// Top-level wrapper for all state machine commands.
+// Each Raft log entry's data field contains a serialized RaftCommand.
+message RaftCommand {
+  oneof command {
+    TransferJobCommandProto transfer_job_command = 1;
+    AgentCommandProto agent_command = 2;
+    SystemMetadataCommandProto system_metadata_command = 3;
+    JobAssignmentCommandProto job_assignment_command = 4;
+    JobQueueCommandProto job_queue_command = 5;
+  }
+}

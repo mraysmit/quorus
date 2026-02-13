@@ -14,28 +14,24 @@
  * limitations under the License.
  */
 
-/*
- * Copyright 2025 Mark Andrew Ray-Smith Cityline Ltd
- */
-
 package dev.mars.quorus.controller.http.handlers;
 
 import dev.mars.quorus.controller.raft.RaftNode;
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpHandler;
-
-import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
+import io.vertx.core.Handler;
+import io.vertx.core.json.JsonObject;
+import io.vertx.ext.web.RoutingContext;
 
 /**
- * Status handler - provides detailed controller status information.
+ * Status handler - provides simple controller status information.
+ *
+ * <p>Endpoint: {@code GET /status}
+ *
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @version 1.0
+ * @version 2.0 (Vert.x reactive)
  * @since 2025-08-26
  */
-public class StatusHandler implements HttpHandler {
-    
+public class StatusHandler implements Handler<RoutingContext> {
+
     private final RaftNode raftNode;
 
     public StatusHandler(RaftNode raftNode) {
@@ -43,24 +39,9 @@ public class StatusHandler implements HttpHandler {
     }
 
     @Override
-    public void handle(HttpExchange exchange) throws IOException {
-        if (!"GET".equals(exchange.getRequestMethod())) {
-            sendResponse(exchange, 405, "{\"error\":\"Method not allowed\"}");
-            return;
-        }
-
-        String response = "{\"status\":\"Controller running\",\"nodeId\":\"" + 
-                         (raftNode != null ? raftNode.getNodeId() : "unknown") + "\"}";
-        
-        exchange.getResponseHeaders().set("Content-Type", "application/json");
-        sendResponse(exchange, 200, response);
-    }
-
-    private void sendResponse(HttpExchange exchange, int statusCode, String response) throws IOException {
-        byte[] responseBytes = response.getBytes(StandardCharsets.UTF_8);
-        exchange.sendResponseHeaders(statusCode, responseBytes.length);
-        try (OutputStream os = exchange.getResponseBody()) {
-            os.write(responseBytes);
-        }
+    public void handle(RoutingContext ctx) {
+        ctx.json(new JsonObject()
+                .put("status", "Controller running")
+                .put("nodeId", raftNode != null ? raftNode.getNodeId() : "unknown"));
     }
 }

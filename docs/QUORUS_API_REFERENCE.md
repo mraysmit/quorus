@@ -63,16 +63,60 @@ Currently, the API does not enforce authentication. For production deployments, 
 
 Returns the health status of the controller node and its Raft state.
 
-**Endpoint:** `GET /health`
+#### Liveness Probe
 
-**Response:** `200 OK`
+**Endpoint:** `GET /health/live`
+
+Returns `200 OK` if the process is alive and responsive. Not dependent on Raft state.
 
 ```json
 {
   "status": "UP",
-  "nodeId": "node1",
-  "raftState": "LEADER",
-  "isLeader": true
+  "timestamp": "2026-02-13T10:00:00Z"
+}
+```
+
+#### Readiness Probe
+
+**Endpoint:** `GET /health/ready`
+
+Returns `200 OK` if the node is ready to serve traffic (Raft running and leader elected), otherwise `503`.
+
+```json
+{
+  "status": "UP",
+  "timestamp": "2026-02-13T10:00:00Z",
+  "checks": {
+    "raftRunning": "UP",
+    "clusterHasLeader": "UP"
+  }
+}
+```
+
+#### Full Health Check
+
+**Endpoint:** `GET /health`
+
+**Response:** `200 OK` (or `503` if degraded)
+
+```json
+{
+  "status": "UP",
+  "version": "1.0.0-alpha",
+  "timestamp": "2026-02-13T10:00:00Z",
+  "nodeId": "controller1",
+  "raft": {
+    "state": "LEADER",
+    "term": 42,
+    "commitIndex": 1000,
+    "isLeader": true,
+    "leaderId": "controller1"
+  },
+  "checks": {
+    "raftCluster": "UP",
+    "diskSpace": "UP",
+    "memory": "UP"
+  }
 }
 ```
 
@@ -80,14 +124,29 @@ Returns the health status of the controller node and its Raft state.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `status` | string | Always `"UP"` if the node is responsive |
-| `nodeId` | string | The unique identifier of this controller node |
-| `raftState` | string | Current Raft state: `FOLLOWER`, `CANDIDATE`, or `LEADER` |
-| `isLeader` | boolean | `true` if this node is the current cluster leader |
+| `status` | string | `"UP"` or `"DEGRADED"` based on all checks |
+| `version` | string | Application version |
+| `timestamp` | string | ISO 8601 UTC timestamp |
+| `nodeId` | string | Unique identifier of this controller node |
+| `raft.state` | string | Current Raft state: `FOLLOWER`, `CANDIDATE`, or `LEADER` |
+| `raft.term` | number | Current Raft election term |
+| `raft.commitIndex` | number | Last committed log entry index |
+| `raft.isLeader` | boolean | `true` if this node is the current cluster leader |
+| `raft.leaderId` | string | ID of the current cluster leader (null if no leader) |
+| `checks.raftCluster` | string | `"UP"` or `"DOWN"` — is the Raft node running |
+| `checks.diskSpace` | string | `"UP"` or `"WARNING"` — free disk > 100MB |
+| `checks.memory` | string | `"UP"` or `"WARNING"` — free memory > 10% of max |
 
 **Example:**
 
 ```bash
+# Liveness (always UP)
+curl http://localhost:8080/health/live
+
+# Readiness (Raft-dependent)
+curl http://localhost:8080/health/ready
+
+# Full health with dependency checks
 curl http://localhost:8080/health
 ```
 
@@ -608,24 +667,137 @@ The status of an agent in the fleet:
 
 ### Error Response Format
 
-All errors return a JSON object with an `error` field:
+All errors return a standardized JSON response with a nested `error` object:
 
 ```json
 {
-  "error": "Description of the error"
+  "error": {
+    "code": "TRANSFER_NOT_FOUND",
+    "message": "Transfer job 'xyz' not found",
+    "timestamp": "2026-02-13T10:00:00Z",
+    "path": "/api/v1/transfers/xyz",
+    "requestId": "req-a1b2c3d4"
+  }
 }
 ```
 
-### HTTP Status Codes
+| Field | Type | Description |
+|-------|------|-------------|
+| `code` | string | Machine-readable error code (see table below) |
+| `message` | string | Human-readable error description |
+| `timestamp` | string | ISO 8601 UTC timestamp of the error |
+| `path` | string | Request path that caused the error |
+| `requestId` | string | Correlation ID for log tracing (from `X-Request-ID` header) |
+
+**Implementation:** [`ErrorResponse.java`](../quorus-controller/src/main/java/dev/mars/quorus/controller/http/ErrorResponse.java), [`GlobalErrorHandler.java`](../quorus-controller/src/main/java/dev/mars/quorus/controller/http/GlobalErrorHandler.java)
+
+### Correlation ID
+
+Every request is assigned a correlation ID via the `X-Request-ID` header:
+- If the client sends `X-Request-ID`, that value is echoed back and used in logs
+- If no header is provided, the server generates one (format: `req-XXXXXXXX`)
+- The ID appears in all log entries for the request and in error responses
+
+### Error Codes
+
+#### General Errors (400-499)
+
+| Code | HTTP Status | Description |
+|------|-------------|-------------|
+| `BAD_REQUEST` | 400 | Request body is missing or malformed |
+| `VALIDATION_ERROR` | 400 | Request validation failed |
+| `MISSING_REQUIRED_FIELD` | 400 | A required field is missing |
+| `UNAUTHORIZED` | 401 | Authentication required but not provided |
+| `FORBIDDEN` | 403 | Authenticated but not authorized |
+| `NOT_FOUND` | 404 | Generic resource not found |
+| `METHOD_NOT_ALLOWED` | 405 | HTTP method not supported for endpoint |
+| `CONFLICT` | 409 | Resource state conflict |
+
+#### Transfer Errors
+
+| Code | HTTP Status | Description |
+|------|-------------|-------------|
+| `TRANSFER_NOT_FOUND` | 404 | Transfer job does not exist |
+| `TRANSFER_INVALID` | 400 | Transfer request is invalid |
+| `TRANSFER_DUPLICATE` | 409 | Transfer job already exists |
+| `TRANSFER_STATE_CONFLICT` | 409 | Transfer is in a state that doesn't allow this operation |
+
+#### Agent Errors
+
+| Code | HTTP Status | Description |
+|------|-------------|-------------|
+| `AGENT_NOT_FOUND` | 404 | Agent does not exist |
+| `AGENT_INVALID` | 400 | Agent registration is invalid |
+| `AGENT_DUPLICATE` | 409 | Agent is already registered |
+| `AGENT_UNAVAILABLE` | 503 | Agent is offline or unresponsive |
+
+#### Job Assignment Errors
+
+| Code | HTTP Status | Description |
+|------|-------------|-------------|
+| `ASSIGNMENT_NOT_FOUND` | 404 | Job assignment does not exist |
+| `ASSIGNMENT_INVALID` | 400 | Job assignment is invalid |
+| `NO_AVAILABLE_AGENTS` | 503 | No agents available to process the job |
+
+#### Cluster/Raft Errors
+
+| Code | HTTP Status | Description |
+|------|-------------|-------------|
+| `NOT_LEADER` | 503 | Node is not the cluster leader (write operations) |
+| `NO_LEADER` | 503 | Cluster has no elected leader |
+| `CLUSTER_NOT_READY` | 503 | Cluster is not ready to accept requests |
+| `RAFT_COMMIT_FAILED` | 500 | Failed to commit operation to Raft log |
+
+#### Workflow Errors
+
+| Code | HTTP Status | Description |
+|------|-------------|-------------|
+| `WORKFLOW_NOT_FOUND` | 404 | Workflow does not exist |
+| `WORKFLOW_INVALID` | 400 | Workflow definition is invalid |
+| `WORKFLOW_EXECUTION_NOT_FOUND` | 404 | Workflow execution does not exist |
+
+#### Tenant Errors
+
+| Code | HTTP Status | Description |
+|------|-------------|-------------|
+| `TENANT_NOT_FOUND` | 404 | Tenant does not exist |
+| `TENANT_QUOTA_EXCEEDED` | 429 | Tenant quota exceeded |
+
+#### Server Errors (500+)
+
+| Code | HTTP Status | Description |
+|------|-------------|-------------|
+| `INTERNAL_ERROR` | 500 | Unexpected internal error |
+| `SERVICE_UNAVAILABLE` | 503 | Service temporarily unavailable |
+| `TIMEOUT` | 504 | Request timed out |
+
+### Exception Mapping
+
+The `GlobalErrorHandler` maps exceptions to error codes automatically:
+
+| Exception | Error Code |
+|-----------|------------|
+| `QuorusApiException` | Uses exception's `ErrorCode` |
+| `IllegalArgumentException` | `VALIDATION_ERROR` (400) |
+| `DecodeException` (JSON) | `BAD_REQUEST` (400) |
+| `NullPointerException` | `INTERNAL_ERROR` (500) — details not exposed |
+| All other exceptions | `INTERNAL_ERROR` (500) — details not exposed |
+
+### HTTP Status Codes Summary
 
 | Code | Meaning | When Used |
 |------|---------|-----------|
 | `200` | OK | Successful GET or status update |
 | `201` | Created | Successful POST creating a resource |
 | `400` | Bad Request | Invalid JSON or missing required fields |
+| `401` | Unauthorized | Authentication required |
+| `403` | Forbidden | Permission denied |
 | `404` | Not Found | Resource (job, agent) does not exist |
+| `409` | Conflict | Resource state conflict |
+| `429` | Too Many Requests | Rate limit / quota exceeded |
 | `500` | Internal Server Error | Unexpected server error |
 | `503` | Service Unavailable | Node not ready or Raft consensus issue |
+| `504` | Gateway Timeout | Request timed out |
 
 ---
 

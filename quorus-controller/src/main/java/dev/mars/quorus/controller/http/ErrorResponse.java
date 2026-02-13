@@ -65,6 +65,20 @@ public record ErrorResponse(
     }
 
     /**
+     * Creates an ErrorResponse with an explicit message and a pre-existing request ID.
+     * Use when the correlation ID has been assigned by the {@link CorrelationIdHandler}.
+     */
+    public static ErrorResponse withMessage(ErrorCode code, String path, String message, String requestId) {
+        return new ErrorResponse(
+            code.code(),
+            message,
+            Instant.now(),
+            path,
+            requestId != null ? requestId : generateRequestId()
+        );
+    }
+
+    /**
      * Creates an ErrorResponse with a formatted message from ErrorCode's template.
      * The messageArgs are substituted into the ErrorCode's messageTemplate.
      */
@@ -91,6 +105,22 @@ public record ErrorResponse(
             Instant.now(),
             path,
             generateRequestId()
+        );
+    }
+
+    /**
+     * Creates an ErrorResponse from an exception with a pre-existing request ID.
+     */
+    public static ErrorResponse fromException(ErrorCode code, Throwable cause, String path, String requestId) {
+        String message = cause.getMessage() != null 
+            ? cause.getMessage() 
+            : code.messageTemplate();
+        return new ErrorResponse(
+            code.code(),
+            message,
+            Instant.now(),
+            path,
+            requestId != null ? requestId : generateRequestId()
         );
     }
 

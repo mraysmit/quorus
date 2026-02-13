@@ -16,6 +16,10 @@
 
 package dev.mars.quorus.core;
 
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 import java.io.Serializable;
 import java.time.Instant;
 import java.util.Objects;
@@ -29,6 +33,8 @@ import java.util.Objects;
  * @since 2025-10-28
  * @version 1.0
  */
+@JsonDeserialize(builder = QueuedJob.Builder.class)
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class QueuedJob implements Serializable, Comparable<QueuedJob> {
     
     private static final long serialVersionUID = 1L;
@@ -186,6 +192,8 @@ public class QueuedJob implements Serializable, Comparable<QueuedJob> {
     /**
      * Builder for creating QueuedJob instances.
      */
+    @JsonPOJOBuilder(withPrefix = "")
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Builder {
         private TransferJob transferJob;
         private JobPriority priority;

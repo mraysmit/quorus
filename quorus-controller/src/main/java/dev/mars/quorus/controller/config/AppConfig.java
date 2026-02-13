@@ -155,6 +155,34 @@ public final class AppConfig {
         return getBoolean("quorus.raft.storage.fsync", true);
     }
 
+    // ==================== Snapshot Configuration ====================
+
+    /**
+     * Whether snapshot-based log compaction is enabled.
+     * When enabled, the leader periodically takes snapshots and truncates the log.
+     */
+    public boolean isSnapshotEnabled() {
+        return getBoolean("quorus.raft.snapshot.enabled", true);
+    }
+
+    /**
+     * Number of committed log entries between automatic snapshots.
+     * A snapshot is triggered when (lastApplied - lastSnapshotIndex) exceeds this threshold.
+     * Lower values reduce recovery time but increase I/O. Default: 10000.
+     */
+    public long getSnapshotThreshold() {
+        return getLong("quorus.raft.snapshot.threshold", 10000);
+    }
+
+    /**
+     * Interval in milliseconds between snapshot eligibility checks.
+     * The leader checks whether the threshold has been reached at this interval.
+     * Default: 60000 (1 minute).
+     */
+    public long getSnapshotCheckIntervalMs() {
+        return getLong("quorus.raft.snapshot.check-interval-ms", 60000);
+    }
+
     // ==================== Telemetry Configuration ====================
 
     public boolean isTelemetryEnabled() {
@@ -280,6 +308,68 @@ public final class AppConfig {
 
     // ==================== Private Helpers ====================
 
+    /**
+     * Validates that required configuration is present and values are sensible.
+     * Called during startup to fail fast on misconfiguration.
+     *
+     * @throws IllegalStateException if required configuration is invalid
+     */
+    public void validate() {
+        // Validate port ranges
+        int httpPort = getHttpPort();
+        if (httpPort < 1 || httpPort > 65535) {
+            throw new IllegalStateException(
+                    "HTTP port must be between 1 and 65535, got: " + httpPort);
+        }
+
+        int raftPort = getRaftPort();
+        if (raftPort < 1 || raftPort > 65535) {
+            throw new IllegalStateException(
+                    "Raft port must be between 1 and 65535, got: " + raftPort);
+        }
+
+        if (httpPort == raftPort) {
+            throw new IllegalStateException(
+                    "HTTP port and Raft port must be different, both are: " + httpPort);
+        }
+
+        // Validate thread pool size
+        int poolSize = getRaftIoPoolSize();
+        if (poolSize < 1 || poolSize > 100) {
+            throw new IllegalStateException(
+                    "Raft I/O pool size must be between 1 and 100, got: " + poolSize);
+        }
+
+        // Validate positive intervals
+        if (getAssignmentIntervalMs() <= 0) {
+            throw new IllegalStateException(
+                    "Assignment interval must be positive, got: " + getAssignmentIntervalMs());
+        }
+        if (getTimeoutIntervalMs() <= 0) {
+            throw new IllegalStateException(
+                    "Timeout interval must be positive, got: " + getTimeoutIntervalMs());
+        }
+
+        // Validate snapshot threshold
+        if (getSnapshotThreshold() < 1) {
+            throw new IllegalStateException(
+                    "Snapshot threshold must be positive, got: " + getSnapshotThreshold());
+        }
+        if (getSnapshotCheckIntervalMs() < 1000) {
+            throw new IllegalStateException(
+                    "Snapshot check interval must be at least 1000ms, got: " + getSnapshotCheckIntervalMs());
+        }
+
+        // Validate storage type
+        String storageType = getRaftStorageType();
+        if (!storageType.equals("raftlog") && !storageType.equals("file") && !storageType.equals("memory")) {
+            throw new IllegalStateException(
+                    "Raft storage type must be 'raftlog', 'file', or 'memory', got: " + storageType);
+        }
+
+        logger.info("Controller configuration validated successfully");
+    }
+
     private void loadProperties() {
         try (InputStream input = getClass().getClassLoader().getResourceAsStream(CONFIG_FILE)) {
             if (input != null) {
@@ -310,6 +400,10 @@ public final class AppConfig {
         logger.info("  Assignment Interval:  {}ms", getAssignmentIntervalMs());
         logger.info("  Timeout Initial:      {}ms", getTimeoutInitialDelayMs());
         logger.info("  Timeout Interval:     {}ms", getTimeoutIntervalMs());
+        logger.info("  --- Snapshot ---");
+        logger.info("  Enabled:              {}", isSnapshotEnabled());
+        logger.info("  Threshold:            {} entries", getSnapshotThreshold());
+        logger.info("  Check Interval:       {}ms", getSnapshotCheckIntervalMs());
         logger.info("  --- Telemetry ---");
         logger.info("  Enabled:              {}", isTelemetryEnabled());
         logger.info("  OTLP Endpoint:        {}", getOtlpEndpoint());

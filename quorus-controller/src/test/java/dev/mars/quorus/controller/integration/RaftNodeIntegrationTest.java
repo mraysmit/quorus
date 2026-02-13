@@ -6,6 +6,8 @@ import dev.mars.quorus.controller.raft.RaftStateMachine;
 import dev.mars.quorus.controller.raft.RaftTransport;
 import dev.mars.quorus.controller.raft.grpc.AppendEntriesRequest;
 import dev.mars.quorus.controller.raft.grpc.AppendEntriesResponse;
+import dev.mars.quorus.controller.raft.grpc.InstallSnapshotRequest;
+import dev.mars.quorus.controller.raft.grpc.InstallSnapshotResponse;
 import dev.mars.quorus.controller.raft.grpc.VoteRequest;
 import dev.mars.quorus.controller.raft.grpc.VoteResponse;
 import io.vertx.core.Future;
@@ -97,6 +99,12 @@ public class RaftNodeIntegrationTest {
         @Override
         public Future<AppendEntriesResponse> sendAppendEntries(String targetId, AppendEntriesRequest request) {
             return Future.succeededFuture(AppendEntriesResponse.newBuilder().setTerm(1).setSuccess(true).build());
+        }
+
+        @Override
+        public Future<InstallSnapshotResponse> sendInstallSnapshot(String targetId, InstallSnapshotRequest request) {
+            return Future.succeededFuture(InstallSnapshotResponse.newBuilder()
+                    .setTerm(1).setSuccess(true).setNextChunkIndex(request.getChunkIndex() + 1).build());
         }
     }
 

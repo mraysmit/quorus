@@ -18,6 +18,8 @@ package dev.mars.quorus.controller.raft;
 
 import dev.mars.quorus.controller.raft.grpc.AppendEntriesRequest;
 import dev.mars.quorus.controller.raft.grpc.AppendEntriesResponse;
+import dev.mars.quorus.controller.raft.grpc.InstallSnapshotRequest;
+import dev.mars.quorus.controller.raft.grpc.InstallSnapshotResponse;
 import dev.mars.quorus.controller.raft.grpc.RaftServiceGrpc;
 import dev.mars.quorus.controller.raft.grpc.VoteRequest;
 import dev.mars.quorus.controller.raft.grpc.VoteResponse;
@@ -156,6 +158,26 @@ public class GrpcRaftServer {
                     .onFailure(e -> {
                         logger.error("Error handling AppendEntries: {}", e.getMessage());
                         logger.trace("Stack trace for AppendEntries handling error", e);
+                        responseObserver.onError(e);
+                    });
+        }
+
+        @Override
+        public void installSnapshot(InstallSnapshotRequest request, StreamObserver<InstallSnapshotResponse> responseObserver) {
+            logger.debug("Received InstallSnapshot from {} for term {}, lastIncludedIndex={}, chunk {}/{}",
+                    request.getLeaderId(), request.getTerm(),
+                    request.getLastIncludedIndex(), request.getChunkIndex() + 1, request.getTotalChunks());
+
+            raftNode.handleInstallSnapshot(request)
+                    .onSuccess(response -> {
+                        logger.debug("Responding to InstallSnapshot: success={}, term={}",
+                                response.getSuccess(), response.getTerm());
+                        responseObserver.onNext(response);
+                        responseObserver.onCompleted();
+                    })
+                    .onFailure(e -> {
+                        logger.error("Error handling InstallSnapshot: {}", e.getMessage());
+                        logger.trace("Stack trace for InstallSnapshot handling error", e);
                         responseObserver.onError(e);
                     });
         }

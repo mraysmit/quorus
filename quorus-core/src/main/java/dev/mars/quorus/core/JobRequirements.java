@@ -16,6 +16,10 @@
 
 package dev.mars.quorus.core;
 
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 import java.io.Serializable;
 import java.util.Map;
 import java.util.Objects;
@@ -30,6 +34,8 @@ import java.util.Set;
  * @since 2025-10-28
  * @version 1.0
  */
+@JsonDeserialize(builder = JobRequirements.Builder.class)
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class JobRequirements implements Serializable {
     
     private static final long serialVersionUID = 1L;
@@ -260,6 +266,8 @@ public class JobRequirements implements Serializable {
     /**
      * Builder for creating JobRequirements instances.
      */
+    @JsonPOJOBuilder(withPrefix = "")
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Builder {
         private String targetRegion;
         private Set<String> requiredProtocols;

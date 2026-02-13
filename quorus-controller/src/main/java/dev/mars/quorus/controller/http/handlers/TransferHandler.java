@@ -16,253 +16,145 @@
 
 package dev.mars.quorus.controller.http.handlers;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpHandler;
+import dev.mars.quorus.controller.http.ErrorCode;
+import dev.mars.quorus.controller.http.QuorusApiException;
 import dev.mars.quorus.controller.raft.RaftNode;
 import dev.mars.quorus.controller.state.QuorusStateMachine;
 import dev.mars.quorus.controller.state.TransferJobCommand;
 import dev.mars.quorus.controller.state.TransferJobSnapshot;
+import dev.mars.quorus.core.JobAssignment;
 import dev.mars.quorus.core.TransferJob;
-import dev.mars.quorus.core.TransferRequest;
-import dev.mars.quorus.core.TransferStatus;
-import io.vertx.core.Future;
-
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.URI;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Paths;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
-
+import io.vertx.core.Handler;
+import io.vertx.core.json.JsonObject;
+import io.vertx.ext.web.RoutingContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * HTTP handler for transfer job operations.
- * 
- * Endpoints:
- * - POST /api/v1/transfers - Create a new transfer job
- * - GET /api/v1/transfers/{jobId} - Get transfer job status
- * - DELETE /api/v1/transfers/{jobId} - Cancel a transfer job
- * 
- * All operations are submitted to Raft for distributed consensus.
- * 
+ *
+ * <p>Endpoints:
+ * <ul>
+ *   <li>{@code POST /api/v1/transfers} — Create a new transfer job</li>
+ *   <li>{@code GET /api/v1/transfers/:jobId} — Get transfer job status</li>
+ *   <li>{@code DELETE /api/v1/transfers/:jobId} — Cancel a transfer job</li>
+ * </ul>
+ *
+ * <p>All write operations are submitted to Raft for distributed consensus.
+ *
  * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 2.0 (Vert.x reactive)
  * @since 2025-12-11
- * @version 1.0
  */
-public class TransferHandler implements HttpHandler {
+public class TransferHandler {
 
     private static final Logger logger = LoggerFactory.getLogger(TransferHandler.class);
     private final RaftNode raftNode;
-    private final ObjectMapper objectMapper;
 
     public TransferHandler(RaftNode raftNode) {
         this.raftNode = raftNode;
-        this.objectMapper = new ObjectMapper();
-        this.objectMapper.registerModule(new JavaTimeModule());
-        logger.debug("TransferHandler initialized with raftNode={}", raftNode.getNodeId());
     }
 
-    @Override
-    public void handle(HttpExchange exchange) throws IOException {
-        String method = exchange.getRequestMethod();
-        String path = exchange.getRequestURI().getPath();
-        logger.debug("handle() entry: method={}, path={}", method, path);
+    /**
+     * Handles {@code POST /api/v1/transfers} — creates a new transfer job.
+     */
+    public Handler<RoutingContext> handleCreate() {
+        return ctx -> {
+            try {
+                JsonObject body = ctx.body().asJsonObject();
+                TransferJob job = body.mapTo(TransferJob.class);
+                TransferJobCommand command = TransferJobCommand.create(job);
 
-        try {
-            switch (method) {
-                case "POST":
-                    logger.debug("Routing to handleCreateTransfer");
-                    handleCreateTransfer(exchange);
-                    break;
-                case "GET":
-                    logger.debug("Routing to handleGetTransfer");
-                    handleGetTransfer(exchange, path);
-                    break;
-                case "DELETE":
-                    logger.debug("Routing to handleCancelTransfer");
-                    handleCancelTransfer(exchange, path);
-                    break;
-                default:
-                    logger.debug("Method not allowed: {}", method);
-                    sendJsonResponse(exchange, 405, Map.of("error", "Method not allowed"));
+                raftNode.submitCommand(command)
+                        .onSuccess(result -> {
+                            ctx.response().setStatusCode(201);
+                            ctx.json(new JsonObject()
+                                    .put("success", true)
+                                    .put("jobId", job.getJobId()));
+                        })
+                        .onFailure(ctx::fail);
+            } catch (Exception e) {
+                logger.error("Failed to create transfer job: {}", e.getMessage());
+                logger.trace("Stack trace for transfer job creation failure", e);
+                ctx.fail(e);
             }
-        } catch (Exception e) {
-            logger.error("Error handling transfer request: method={}, path={}, error={}", method, path, e.getMessage());
-            logger.trace("Stack trace for transfer request handling error", e);
-            sendJsonResponse(exchange, 500, Map.of("error", "Internal server error", "message", e.getMessage()));
-        }
+        };
     }
 
-    private void handleCreateTransfer(HttpExchange exchange) throws Exception {
-        logger.debug("handleCreateTransfer() entry");
-        
-        // Read request body
-        String requestBody = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
-        logger.debug("Request body received: length={}", requestBody.length());
-        
-        Map<String, Object> requestData = objectMapper.readValue(requestBody, Map.class);
-        logger.debug("Parsed request data: sourceUri={}, destinationPath={}", 
-                requestData.get("sourceUri"), requestData.get("destinationPath"));
+    /**
+     * Handles {@code GET /api/v1/transfers/:jobId} — gets transfer job status.
+     */
+    public Handler<RoutingContext> handleGet() {
+        return ctx -> {
+            String jobId = ctx.pathParam("jobId");
+            QuorusStateMachine stateMachine = (QuorusStateMachine) raftNode.getStateMachine();
 
-        // Validate required fields
-        if (!requestData.containsKey("sourceUri") || !requestData.containsKey("destinationPath")) {
-            logger.debug("Validation failed: missing required fields");
-            sendJsonResponse(exchange, 400, Map.of("error", "Missing required fields: sourceUri, destinationPath"));
-            return;
-        }
+            TransferJobSnapshot job = stateMachine.getTransferJobs().get(jobId);
+            if (job == null) {
+                throw QuorusApiException.notFound(ErrorCode.TRANSFER_NOT_FOUND, jobId);
+            }
 
-        // Create TransferRequest
-        TransferRequest request = TransferRequest.builder()
-                .sourceUri(URI.create((String) requestData.get("sourceUri")))
-                .destinationPath(Paths.get((String) requestData.get("destinationPath")))
-                .protocol(requestData.containsKey("protocol") ? (String) requestData.get("protocol") : "http")
-                .build();
-        logger.debug("TransferRequest created: protocol={}", request.getProtocol());
+            // Get the latest assignment status for this job
+            JobAssignment latestAssignment = stateMachine.getJobAssignments().values().stream()
+                    .filter(a -> a.getJobId().equals(jobId))
+                    .findFirst()
+                    .orElse(null);
 
-        // Create TransferJob
-        TransferJob job = new TransferJob(request);
-        logger.debug("TransferJob created: jobId={}", job.getJobId());
+            JsonObject response = new JsonObject()
+                    .put("jobId", job.getJobId())
+                    .put("sourceUri", job.getSourceUri())
+                    .put("destinationPath", job.getDestinationPath())
+                    .put("totalBytes", job.getTotalBytes())
+                    .put("bytesTransferred", job.getBytesTransferred());
 
-        // Submit to Raft
-        logger.debug("Submitting TransferJobCommand to Raft: jobId={}", job.getJobId());
-        TransferJobCommand command = TransferJobCommand.create(job);
-        Future<Object> future = raftNode.submitCommand(command);
+            if (latestAssignment != null) {
+                response.put("status", latestAssignment.getStatus().name());
+            } else {
+                response.put("status", job.getStatus().name());
+            }
 
-        // Wait for consensus
-        logger.debug("Waiting for Raft consensus: jobId={}", job.getJobId());
-        Object result = future.toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
-        logger.debug("Raft consensus completed: resultType={}", result != null ? result.getClass().getSimpleName() : "null");
+            if (job.getStartTime() != null) {
+                response.put("startTime", job.getStartTime().toString());
+            }
+            if (job.getLastUpdateTime() != null) {
+                response.put("lastUpdateTime", job.getLastUpdateTime().toString());
+            }
+            if (job.getErrorMessage() != null) {
+                response.put("errorMessage", job.getErrorMessage());
+            }
+            if (job.getDescription() != null) {
+                response.put("description", job.getDescription());
+            }
+            if (job.getTotalBytes() > 0) {
+                double progress = (double) job.getBytesTransferred() / job.getTotalBytes() * 100.0;
+                response.put("progressPercentage", Math.round(progress * 100.0) / 100.0);
+            }
 
-        if (result instanceof TransferJob) {
-            TransferJob createdJob = (TransferJob) result;
-            logger.debug("Transfer job created successfully: jobId={}, status={}", 
-                    createdJob.getJobId(), createdJob.getStatus());
-            Map<String, Object> response = Map.of(
-                    "jobId", createdJob.getJobId(),
-                    "status", createdJob.getStatus().toString(),
-                    "sourceUri", createdJob.getRequest().getSourceUri().toString(),
-                    "destinationPath", createdJob.getRequest().getDestinationPath().toString(),
-                    "message", "Transfer job created successfully"
-            );
-            sendJsonResponse(exchange, 201, response);
-        } else {
-            logger.warn("Failed to create transfer job: unexpected result type={}", 
-                    result != null ? result.getClass().getSimpleName() : "null");
-            sendJsonResponse(exchange, 500, Map.of("error", "Failed to create transfer job"));
-        }
+            ctx.json(response);
+        };
     }
 
-    private void handleGetTransfer(HttpExchange exchange, String path) throws Exception {
-        // Extract jobId from path: /api/v1/transfers/{jobId}
-        String[] parts = path.split("/");
-        if (parts.length < 5) {
-            sendJsonResponse(exchange, 400, Map.of("error", "Missing jobId in path"));
-            return;
-        }
+    /**
+     * Handles {@code DELETE /api/v1/transfers/:jobId} — cancels a transfer job.
+     */
+    public Handler<RoutingContext> handleDelete() {
+        return ctx -> {
+            String jobId = ctx.pathParam("jobId");
+            QuorusStateMachine stateMachine = (QuorusStateMachine) raftNode.getStateMachine();
 
-        String jobId = parts[4];
+            if (!stateMachine.hasTransferJob(jobId)) {
+                throw QuorusApiException.notFound(ErrorCode.TRANSFER_NOT_FOUND, jobId);
+            }
 
-        // Query state machine for job status
-        QuorusStateMachine stateMachine = (QuorusStateMachine) raftNode.getStateMachine();
-        TransferJobSnapshot jobSnapshot = stateMachine.getTransferJob(jobId);
-
-        if (jobSnapshot == null) {
-            sendJsonResponse(exchange, 404, Map.of("error", "Transfer job not found", "jobId", jobId));
-            return;
-        }
-
-        // Build response with all job details
-        Map<String, Object> response = new HashMap<>();
-        response.put("jobId", jobSnapshot.getJobId());
-        response.put("sourceUri", jobSnapshot.getSourceUri());
-        response.put("destinationPath", jobSnapshot.getDestinationPath());
-        response.put("status", jobSnapshot.getStatus().toString());
-        response.put("bytesTransferred", jobSnapshot.getBytesTransferred());
-        response.put("totalBytes", jobSnapshot.getTotalBytes());
-
-        if (jobSnapshot.getTotalBytes() > 0) {
-            double progress = (double) jobSnapshot.getBytesTransferred() / jobSnapshot.getTotalBytes() * 100.0;
-            response.put("progressPercentage", Math.round(progress * 100.0) / 100.0);
-        } else {
-            response.put("progressPercentage", 0.0);
-        }
-
-        if (jobSnapshot.getStartTime() != null) {
-            response.put("startTime", jobSnapshot.getStartTime().toString());
-        }
-
-        if (jobSnapshot.getLastUpdateTime() != null) {
-            response.put("lastUpdateTime", jobSnapshot.getLastUpdateTime().toString());
-        }
-
-        if (jobSnapshot.getErrorMessage() != null) {
-            response.put("errorMessage", jobSnapshot.getErrorMessage());
-        }
-
-        if (jobSnapshot.getDescription() != null) {
-            response.put("description", jobSnapshot.getDescription());
-        }
-
-        sendJsonResponse(exchange, 200, response);
-    }
-
-    private void handleCancelTransfer(HttpExchange exchange, String path) throws Exception {
-        // Extract jobId from path
-        String[] parts = path.split("/");
-        if (parts.length < 5) {
-            sendJsonResponse(exchange, 400, Map.of("error", "Missing jobId in path"));
-            return;
-        }
-
-        String jobId = parts[4];
-
-        // Check if job exists before attempting to delete
-        QuorusStateMachine stateMachine = (QuorusStateMachine) raftNode.getStateMachine();
-        if (!stateMachine.hasTransferJob(jobId)) {
-            sendJsonResponse(exchange, 404, Map.of("error", "Transfer job not found", "jobId", jobId));
-            return;
-        }
-
-        // Submit delete command to Raft
-        TransferJobCommand command = TransferJobCommand.delete(jobId);
-        Future<Object> future = raftNode.submitCommand(command);
-
-        // Wait for consensus
-        Object result = future.toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
-
-        if (result instanceof TransferJobSnapshot) {
-            TransferJobSnapshot deletedJob = (TransferJobSnapshot) result;
-            Map<String, Object> response = Map.of(
-                    "jobId", deletedJob.getJobId(),
-                    "status", deletedJob.getStatus().toString(),
-                    "message", "Transfer job cancelled and deleted successfully"
-            );
-            sendJsonResponse(exchange, 200, response);
-        } else if (result == null) {
-            sendJsonResponse(exchange, 404, Map.of("error", "Transfer job not found", "jobId", jobId));
-        } else {
-            sendJsonResponse(exchange, 500, Map.of("error", "Failed to cancel transfer job"));
-        }
-    }
-
-    private void sendJsonResponse(HttpExchange exchange, int statusCode, Object data) throws IOException {
-        String json = objectMapper.writeValueAsString(data);
-        byte[] responseBytes = json.getBytes(StandardCharsets.UTF_8);
-        
-        exchange.getResponseHeaders().set("Content-Type", "application/json");
-        exchange.sendResponseHeaders(statusCode, responseBytes.length);
-        
-        try (OutputStream os = exchange.getResponseBody()) {
-            os.write(responseBytes);
-        }
+            TransferJobCommand command = TransferJobCommand.delete(jobId);
+            raftNode.submitCommand(command)
+                    .onSuccess(result -> {
+                        ctx.json(new JsonObject()
+                                .put("jobId", jobId)
+                                .put("message", "Transfer job cancelled and deleted successfully"));
+                    })
+                    .onFailure(ctx::fail);
+        };
     }
 }
 

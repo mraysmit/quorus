@@ -17,133 +17,101 @@
 package dev.mars.quorus.controller.http.handlers;
 
 import dev.mars.quorus.controller.raft.RaftNode;
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpHandler;
-
-import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
-
+import io.vertx.core.Handler;
+import io.vertx.core.json.JsonObject;
+import io.vertx.ext.web.RoutingContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
+import java.time.Instant;
+
 /**
- * Health check handler for Quorus Controller.
- * 
- * Provides health status information including:
- * - Overall controller health
- * - Raft node status
- * - Cluster connectivity
- * 
+ * Full health check handler for Quorus Controller.
+ *
+ * <p>Endpoint: {@code GET /health}
+ *
+ * <p>Provides comprehensive health status including:
+ * <ul>
+ *   <li>Raft node state, term, commitIndex, leader info</li>
+ *   <li>Disk space check</li>
+ *   <li>Memory usage check</li>
+ * </ul>
+ *
+ * <p>Returns 503 when any check is degraded.
+ *
  * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 2.0 (Vert.x reactive)
  * @since 2025-08-26
- * @version 1.0
  */
-public class HealthHandler implements HttpHandler {
+public class HealthHandler implements Handler<RoutingContext> {
 
     private static final Logger logger = LoggerFactory.getLogger(HealthHandler.class);
-    
-    private final RaftNode raftNode;
+    private static final long MIN_FREE_DISK_MB = 100;
+    private static final double MIN_FREE_MEMORY_RATIO = 0.1;
 
-    public HealthHandler(RaftNode raftNode) {
+    private final RaftNode raftNode;
+    private final String version;
+
+    public HealthHandler(RaftNode raftNode, String version) {
         this.raftNode = raftNode;
-        logger.debug("HealthHandler initialized with raftNode={}", raftNode != null ? raftNode.getNodeId() : "null");
+        this.version = version;
     }
 
     @Override
-    public void handle(HttpExchange exchange) throws IOException {
-        String method = exchange.getRequestMethod();
-        String path = exchange.getRequestURI().getPath();
-        logger.debug("handle() entry: method={}, path={}", method, path);
-        
-        if (!"GET".equals(method)) {
-            logger.debug("Method not allowed: {}", method);
-            sendResponse(exchange, 405, "{\"error\":\"Method not allowed\"}");
-            return;
-        }
+    public void handle(RoutingContext ctx) {
+        boolean raftOk = raftNode.isRunning();
+        boolean diskOk = checkDiskSpace();
+        boolean memoryOk = checkMemory();
+        boolean allHealthy = raftOk && diskOk && memoryOk;
 
+        JsonObject health = new JsonObject()
+                .put("status", allHealthy ? "UP" : "DEGRADED")
+                .put("version", version)
+                .put("timestamp", Instant.now().toString())
+                .put("nodeId", raftNode.getNodeId())
+                .put("raft", new JsonObject()
+                        .put("state", raftNode.getState().toString())
+                        .put("term", raftNode.getCurrentTerm())
+                        .put("commitIndex", raftNode.getCommitIndex())
+                        .put("isLeader", raftNode.isLeader())
+                        .put("leaderId", raftNode.getLeaderId()))
+                .put("checks", new JsonObject()
+                        .put("raftCluster", raftOk ? "UP" : "DOWN")
+                        .put("diskSpace", diskOk ? "UP" : "WARNING")
+                        .put("memory", memoryOk ? "UP" : "WARNING"));
+
+        if (!allHealthy) {
+            ctx.response().setStatusCode(503);
+        }
+        ctx.json(health);
+    }
+
+    private boolean checkDiskSpace() {
         try {
-            // Check overall health
-            logger.debug("Performing health check");
-            boolean isHealthy = checkHealth();
-            
-            String response = buildHealthResponse(isHealthy);
-            int statusCode = isHealthy ? 200 : 503;
-            
-            logger.debug("Health check completed: isHealthy={}, statusCode={}", isHealthy, statusCode);
-            sendJsonResponse(exchange, statusCode, response);
-            
+            File root = new File(".");
+            long freeSpaceMb = root.getFreeSpace() / (1024 * 1024);
+            return freeSpaceMb >= MIN_FREE_DISK_MB;
         } catch (Exception e) {
-            logger.warn("Error checking health: {}", e.getMessage());
-            sendResponse(exchange, 500, "{\"error\":\"Internal server error\"}");
+            logger.warn("Failed to check disk space: {}", e.getMessage());
+            logger.trace("Stack trace for disk space check failure", e);
+            return true; // Assume OK if we can't check
         }
     }
 
-    private boolean checkHealth() {
-        logger.debug("checkHealth() entry");
+    private boolean checkMemory() {
         try {
-            // Check if Raft node is running
-            if (raftNode == null) {
-                logger.debug("Health check failed: raftNode is null");
-                return false;
-            }
-            
-            if (!raftNode.isRunning()) {
-                logger.debug("Health check failed: raftNode is not running");
-                return false;
-            }
-
-            logger.debug("Health check passed: raftNode is running, state={}", raftNode.getState());
-            // Additional health checks can be added here
-            // - Database connectivity
-            // - Disk space
-            // - Memory usage
-            // - Network connectivity to cluster peers
-
-            return true;
-            
+            Runtime runtime = Runtime.getRuntime();
+            long maxMemory = runtime.maxMemory();
+            long totalMemory = runtime.totalMemory();
+            long freeMemory = runtime.freeMemory();
+            long usedMemory = totalMemory - freeMemory;
+            long availableMemory = maxMemory - usedMemory;
+            return (double) availableMemory / maxMemory >= MIN_FREE_MEMORY_RATIO;
         } catch (Exception e) {
-            logger.warn("Health check failed with exception: {}", e.getMessage());
-            return false;
-        }
-    }
-
-    private String buildHealthResponse(boolean isHealthy) {
-        logger.debug("buildHealthResponse() entry: isHealthy={}", isHealthy);
-        StringBuilder json = new StringBuilder();
-        json.append("{");
-        json.append("\"status\":\"").append(isHealthy ? "UP" : "DOWN").append("\",");
-        json.append("\"timestamp\":\"").append(java.time.Instant.now().toString()).append("\",");
-        json.append("\"checks\":{");
-        
-        // Raft node check
-        boolean raftHealthy = raftNode != null && raftNode.isRunning();
-        json.append("\"raft\":{");
-        json.append("\"status\":\"").append(raftHealthy ? "UP" : "DOWN").append("\"");
-        if (raftHealthy) {
-            json.append(",\"nodeId\":\"").append(raftNode.getNodeId()).append("\"");
-            json.append(",\"state\":\"").append(raftNode.getState()).append("\"");
-            logger.debug("Raft health check: nodeId={}, state={}", raftNode.getNodeId(), raftNode.getState());
-        }
-        json.append("}");
-        
-        json.append("}");
-        json.append("}");
-        
-        return json.toString();
-    }
-
-    private void sendJsonResponse(HttpExchange exchange, int statusCode, String response) throws IOException {
-        exchange.getResponseHeaders().set("Content-Type", "application/json");
-        sendResponse(exchange, statusCode, response);
-    }
-
-    private void sendResponse(HttpExchange exchange, int statusCode, String response) throws IOException {
-        byte[] responseBytes = response.getBytes(StandardCharsets.UTF_8);
-        exchange.sendResponseHeaders(statusCode, responseBytes.length);
-        
-        try (OutputStream os = exchange.getResponseBody()) {
-            os.write(responseBytes);
+            logger.warn("Failed to check memory: {}", e.getMessage());
+            logger.trace("Stack trace for memory check failure", e);
+            return true; // Assume OK if we can't check
         }
     }
 }

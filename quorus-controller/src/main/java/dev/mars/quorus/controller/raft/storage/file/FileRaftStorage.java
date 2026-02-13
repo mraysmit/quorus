@@ -460,6 +460,252 @@ public final class FileRaftStorage implements RaftStorage {
     }
 
     // =========================================================================
+    // Snapshot Operations
+    // =========================================================================
+
+    @Override
+    public Future<Void> saveSnapshot(byte[] data, long lastIncludedIndex, long lastIncludedTerm) {
+        return vertx.executeBlocking(() -> {
+            Path snapshotPath = dataDir.resolve("snapshot.dat");
+            Path tmpPath = dataDir.resolve("snapshot.dat.tmp");
+
+            // Format: lastIncludedIndex(8) + lastIncludedTerm(8) + dataLen(4) + data + crc(4)
+            int totalSize = 8 + 8 + 4 + data.length + 4;
+            ByteBuffer buf = ByteBuffer.allocate(totalSize);
+            buf.putLong(lastIncludedIndex);
+            buf.putLong(lastIncludedTerm);
+            buf.putInt(data.length);
+            buf.put(data);
+
+            // CRC over everything except the CRC itself
+            CRC32C crc = new CRC32C();
+            crc.update(buf.array(), 0, 8 + 8 + 4 + data.length);
+            buf.putInt((int) crc.getValue());
+            buf.flip();
+
+            // Write to temp file, then atomic rename
+            try (FileChannel ch = FileChannel.open(tmpPath,
+                    StandardOpenOption.CREATE,
+                    StandardOpenOption.TRUNCATE_EXISTING,
+                    StandardOpenOption.WRITE)) {
+                while (buf.hasRemaining()) {
+                    ch.write(buf);
+                }
+                if (fsyncEnabled) {
+                    ch.force(true);
+                }
+            }
+
+            Files.move(tmpPath, snapshotPath,
+                    StandardCopyOption.REPLACE_EXISTING,
+                    StandardCopyOption.ATOMIC_MOVE);
+
+            if (fsyncEnabled) {
+                syncDirectory(dataDir);
+            }
+
+            LOG.info("Snapshot saved: lastIncludedIndex={}, lastIncludedTerm={}, size={}bytes",
+                    lastIncludedIndex, lastIncludedTerm, data.length);
+            return null;
+        }, false);
+    }
+
+    @Override
+    public Future<Optional<SnapshotData>> loadSnapshot() {
+        return vertx.executeBlocking(() -> {
+            Path snapshotPath = dataDir.resolve("snapshot.dat");
+
+            if (!Files.exists(snapshotPath)) {
+                LOG.debug("No snapshot file found");
+                return Optional.<SnapshotData>empty();
+            }
+
+            byte[] raw;
+            try {
+                raw = Files.readAllBytes(snapshotPath);
+            } catch (NoSuchFileException e) {
+                return Optional.<SnapshotData>empty();
+            }
+
+            // Minimum: index(8) + term(8) + dataLen(4) + crc(4) = 24
+            if (raw.length < 24) {
+                throw new IOException("Corrupt snapshot.dat: file too short (" + raw.length + " bytes)");
+            }
+
+            ByteBuffer buf = ByteBuffer.wrap(raw);
+            long lastIncludedIndex = buf.getLong();
+            long lastIncludedTerm = buf.getLong();
+            int dataLen = buf.getInt();
+
+            if (dataLen < 0 || dataLen > raw.length - 24) {
+                throw new IOException("Corrupt snapshot.dat: invalid data length " + dataLen);
+            }
+
+            byte[] data = new byte[dataLen];
+            buf.get(data);
+
+            int storedCrc = buf.getInt();
+
+            // Verify CRC
+            CRC32C crc = new CRC32C();
+            crc.update(raw, 0, 8 + 8 + 4 + dataLen);
+            if ((int) crc.getValue() != storedCrc) {
+                throw new IOException("Corrupt snapshot.dat: CRC mismatch");
+            }
+
+            LOG.info("Snapshot loaded: lastIncludedIndex={}, lastIncludedTerm={}, size={}bytes",
+                    lastIncludedIndex, lastIncludedTerm, dataLen);
+            return Optional.of(new SnapshotData(data, lastIncludedIndex, lastIncludedTerm));
+        }, false);
+    }
+
+    @Override
+    public Future<Void> truncatePrefix(long toIndex) {
+        return vertx.executeBlocking(() -> {
+            // Prefix truncation in a WAL is achieved by rewriting the log file
+            // excluding entries with index <= toIndex.
+            // For efficiency, we replay the current log, filter, and rewrite.
+            LOG.info("Truncating WAL prefix: removing entries with index <= {}", toIndex);
+
+            Path logPath = dataDir.resolve("raft.log");
+            Path tmpLogPath = dataDir.resolve("raft.log.tmp");
+
+            if (!Files.exists(logPath)) {
+                return null;
+            }
+
+            // Close current channel to allow rewrite
+            if (logChannel != null) {
+                logChannel.close();
+            }
+
+            // Read all entries, filter out prefix
+            List<LogEntryData> entries = replayLogBlocking();
+            int originalSize = entries.size();
+            entries.removeIf(e -> e.index() <= toIndex);
+
+            // Rewrite the log with remaining entries
+            try (FileChannel tmpChannel = FileChannel.open(tmpLogPath,
+                    StandardOpenOption.CREATE,
+                    StandardOpenOption.TRUNCATE_EXISTING,
+                    StandardOpenOption.WRITE)) {
+                for (LogEntryData entry : entries) {
+                    writeRecordToChannel(tmpChannel, TYPE_APPEND, entry.index(), entry.term(), entry.payload());
+                }
+                if (fsyncEnabled) {
+                    tmpChannel.force(true);
+                }
+            }
+
+            // Atomic replace
+            Files.move(tmpLogPath, logPath,
+                    StandardCopyOption.REPLACE_EXISTING,
+                    StandardCopyOption.ATOMIC_MOVE);
+
+            if (fsyncEnabled) {
+                syncDirectory(dataDir);
+            }
+
+            // Reopen the log channel for continued appending
+            logChannel = FileChannel.open(logPath,
+                    StandardOpenOption.CREATE,
+                    StandardOpenOption.READ,
+                    StandardOpenOption.WRITE);
+            logChannel.position(logChannel.size());
+
+            LOG.info("WAL prefix truncation complete: removed {} entries, {} remaining",
+                    originalSize - entries.size(), entries.size());
+            return null;
+        }, false);
+    }
+
+    /**
+     * Blocking replay for use within executeBlocking contexts.
+     */
+    private List<LogEntryData> replayLogBlocking() throws IOException {
+        Path logPath = dataDir.resolve("raft.log");
+        if (!Files.exists(logPath)) {
+            return new ArrayList<>();
+        }
+
+        List<LogEntryData> result = new ArrayList<>();
+        try (FileChannel ch = FileChannel.open(logPath, StandardOpenOption.READ)) {
+            long pos = 0;
+            ByteBuffer headerBuf = ByteBuffer.allocate(HEADER_SIZE);
+
+            while (true) {
+                headerBuf.clear();
+                int bytesRead = ch.read(headerBuf, pos);
+                if (bytesRead < HEADER_SIZE) break;
+                headerBuf.flip();
+
+                int magic = headerBuf.getInt();
+                short version = headerBuf.getShort();
+                byte type = headerBuf.get();
+                long index = headerBuf.getLong();
+                long term = headerBuf.getLong();
+                int payloadLen = headerBuf.getInt();
+
+                if (magic != MAGIC || version != VERSION || payloadLen < 0 || payloadLen > MAX_PAYLOAD_SIZE) break;
+
+                ByteBuffer payloadBuf = ByteBuffer.allocate(payloadLen);
+                if (ch.read(payloadBuf, pos + HEADER_SIZE) < payloadLen) break;
+                payloadBuf.flip();
+
+                ByteBuffer crcBuf = ByteBuffer.allocate(CRC_SIZE);
+                if (ch.read(crcBuf, pos + HEADER_SIZE + payloadLen) < CRC_SIZE) break;
+                crcBuf.flip();
+                int storedCrc = crcBuf.getInt();
+
+                CRC32C crc = new CRC32C();
+                headerBuf.rewind();
+                crc.update(headerBuf);
+                crc.update(payloadBuf.duplicate());
+                if ((int) crc.getValue() != storedCrc) break;
+
+                if (type == TYPE_TRUNCATE) {
+                    long truncateFrom = index;
+                    result.removeIf(e -> e.index() >= truncateFrom);
+                } else if (type == TYPE_APPEND) {
+                    byte[] payload = new byte[payloadLen];
+                    payloadBuf.get(payload);
+                    result.add(new LogEntryData(index, term, payload));
+                }
+
+                pos += HEADER_SIZE + payloadLen + CRC_SIZE;
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Writes a record to a specific FileChannel (used during log rewrite).
+     */
+    private void writeRecordToChannel(FileChannel ch, byte type, long index, long term, byte[] payload)
+            throws IOException {
+        byte[] safePayload = payload != null ? payload : new byte[0];
+        int totalSize = HEADER_SIZE + safePayload.length + CRC_SIZE;
+        ByteBuffer buf = ByteBuffer.allocate(totalSize);
+
+        buf.putInt(MAGIC);
+        buf.putShort(VERSION);
+        buf.put(type);
+        buf.putLong(index);
+        buf.putLong(term);
+        buf.putInt(safePayload.length);
+        buf.put(safePayload);
+
+        CRC32C crc = new CRC32C();
+        crc.update(buf.array(), 0, HEADER_SIZE + safePayload.length);
+        buf.putInt((int) crc.getValue());
+        buf.flip();
+
+        while (buf.hasRemaining()) {
+            ch.write(buf);
+        }
+    }
+
+    // =========================================================================
     // Private Helpers
     // =========================================================================
 

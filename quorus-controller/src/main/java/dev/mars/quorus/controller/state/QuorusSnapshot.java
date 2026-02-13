@@ -19,6 +19,8 @@ package dev.mars.quorus.controller.state;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import dev.mars.quorus.agent.AgentInfo;
+import dev.mars.quorus.core.JobAssignment;
+import dev.mars.quorus.core.QueuedJob;
 
 import java.io.Serializable;
 import java.time.Instant;
@@ -38,6 +40,8 @@ public class QuorusSnapshot implements Serializable {
     private Map<String, TransferJobSnapshot> transferJobs;
     private Map<String, AgentInfo> agents;
     private Map<String, String> systemMetadata;
+    private Map<String, JobAssignment> jobAssignments;
+    private Map<String, QueuedJob> jobQueue;
     private long lastAppliedIndex;
     private Instant timestamp;
 
@@ -49,11 +53,15 @@ public class QuorusSnapshot implements Serializable {
     public QuorusSnapshot(@JsonProperty("transferJobs") Map<String, TransferJobSnapshot> transferJobs,
                          @JsonProperty("agents") Map<String, AgentInfo> agents,
                          @JsonProperty("systemMetadata") Map<String, String> systemMetadata,
+                         @JsonProperty("jobAssignments") Map<String, JobAssignment> jobAssignments,
+                         @JsonProperty("jobQueue") Map<String, QueuedJob> jobQueue,
                          @JsonProperty("lastAppliedIndex") long lastAppliedIndex,
                          @JsonProperty("timestamp") Instant timestamp) {
         this.transferJobs = transferJobs;
         this.agents = agents;
         this.systemMetadata = systemMetadata;
+        this.jobAssignments = jobAssignments;
+        this.jobQueue = jobQueue;
         this.lastAppliedIndex = lastAppliedIndex;
         this.timestamp = timestamp != null ? timestamp : Instant.now();
     }
@@ -82,6 +90,22 @@ public class QuorusSnapshot implements Serializable {
         this.systemMetadata = systemMetadata;
     }
 
+    public Map<String, JobAssignment> getJobAssignments() {
+        return jobAssignments;
+    }
+
+    public void setJobAssignments(Map<String, JobAssignment> jobAssignments) {
+        this.jobAssignments = jobAssignments;
+    }
+
+    public Map<String, QueuedJob> getJobQueue() {
+        return jobQueue;
+    }
+
+    public void setJobQueue(Map<String, QueuedJob> jobQueue) {
+        this.jobQueue = jobQueue;
+    }
+
     public long getLastAppliedIndex() {
         return lastAppliedIndex;
     }
@@ -107,6 +131,8 @@ public class QuorusSnapshot implements Serializable {
                 "transferJobs=" + (transferJobs != null ? transferJobs.size() : 0) + " jobs" +
                 ", agents=" + (agents != null ? agents.size() : 0) + " agents" +
                 ", systemMetadata=" + (systemMetadata != null ? systemMetadata.size() : 0) + " entries" +
+                ", jobAssignments=" + (jobAssignments != null ? jobAssignments.size() : 0) + " assignments" +
+                ", jobQueue=" + (jobQueue != null ? jobQueue.size() : 0) + " queued" +
                 ", lastAppliedIndex=" + lastAppliedIndex +
                 ", timestamp=" + timestamp +
                 '}';

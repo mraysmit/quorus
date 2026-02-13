@@ -18,6 +18,8 @@ package dev.mars.quorus.controller.raft;
 
 import dev.mars.quorus.controller.raft.grpc.AppendEntriesRequest;
 import dev.mars.quorus.controller.raft.grpc.AppendEntriesResponse;
+import dev.mars.quorus.controller.raft.grpc.InstallSnapshotRequest;
+import dev.mars.quorus.controller.raft.grpc.InstallSnapshotResponse;
 import dev.mars.quorus.controller.raft.grpc.VoteRequest;
 import dev.mars.quorus.controller.raft.grpc.VoteResponse;
 import io.vertx.core.Future;
@@ -31,7 +33,7 @@ import java.util.function.Consumer;
  * supporting both request-response RPCs and message-based notifications.
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @version 2.0
+ * @version 3.0
  * @since 2025-08-20
  */
 public interface RaftTransport {
@@ -48,6 +50,17 @@ public interface RaftTransport {
     Future<VoteResponse> sendVoteRequest(String targetId, VoteRequest request);
 
     Future<AppendEntriesResponse> sendAppendEntries(String targetId, AppendEntriesRequest request);
+
+    /**
+     * Sends an InstallSnapshot RPC to a target node.
+     * Used by leaders to bring lagging followers up to date when the
+     * required log entries have been compacted by a snapshot.
+     *
+     * @param targetId the target node's ID
+     * @param request the InstallSnapshot request (may be a single chunk)
+     * @return Future containing the response
+     */
+    Future<InstallSnapshotResponse> sendInstallSnapshot(String targetId, InstallSnapshotRequest request);
 
     /**
      * Sets the RaftNode reference for direct method invocation.

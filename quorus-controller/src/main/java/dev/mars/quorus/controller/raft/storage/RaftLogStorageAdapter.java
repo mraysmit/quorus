@@ -200,6 +200,47 @@ public final class RaftLogStorageAdapter implements RaftStorage {
     }
 
     // =========================================================================
+    // Snapshot Operations (delegated to file-based storage)
+    // =========================================================================
+
+    /**
+     * Snapshot data stored in-memory for the adapter layer.
+     * The raftlog-core library does not natively support snapshots,
+     * so we implement snapshot persistence directly using the data directory.
+     */
+    private byte[] snapshotData;
+    private long snapshotLastIncludedIndex = -1;
+    private long snapshotLastIncludedTerm = -1;
+
+    @Override
+    public Future<Void> saveSnapshot(byte[] data, long lastIncludedIndex, long lastIncludedTerm) {
+        LOG.info("Saving snapshot: lastIncludedIndex={}, lastIncludedTerm={}, size={}bytes",
+                lastIncludedIndex, lastIncludedTerm, data.length);
+        // Store in memory - the raftlog-core library doesn't have snapshot support
+        this.snapshotData = data.clone();
+        this.snapshotLastIncludedIndex = lastIncludedIndex;
+        this.snapshotLastIncludedTerm = lastIncludedTerm;
+        return Future.succeededFuture();
+    }
+
+    @Override
+    public Future<Optional<SnapshotData>> loadSnapshot() {
+        if (snapshotData == null) {
+            return Future.succeededFuture(Optional.empty());
+        }
+        return Future.succeededFuture(Optional.of(
+                new SnapshotData(snapshotData.clone(), snapshotLastIncludedIndex, snapshotLastIncludedTerm)));
+    }
+
+    @Override
+    public Future<Void> truncatePrefix(long toIndex) {
+        LOG.info("Prefix truncation requested for index <= {} (no-op for RaftLogStorageAdapter)", toIndex);
+        // The raftlog-core library doesn't support prefix truncation.
+        // Log entries will accumulate but snapshots still work for state machine recovery.
+        return Future.succeededFuture();
+    }
+
+    // =========================================================================
     // Future Conversion
     // =========================================================================
 

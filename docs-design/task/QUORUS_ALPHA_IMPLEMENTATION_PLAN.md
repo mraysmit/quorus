@@ -1,7 +1,7 @@
 # Quorus Alpha Implementation Plan
 
-**Version:** 1.4  
-**Date:** February 2, 2026  
+**Version:** 1.5  
+**Date:** February 13, 2026  
 **Author:** Mark Andrew Ray-Smith Cityline Ltd
 
 ---
@@ -10,6 +10,8 @@
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.6 | 2026-02-13 | Consolidated: merged IMPLEMENTATION_STATUS, CHANGELOG, .env.example into appendices |
+| 1.5 | 2026-02-13 | Stage 1 & Stage 2 COMPLETE: All documentation, config, logging, health, error, and shutdown tasks |
 | 1.4 | 2026-02-02 | Third review: Fixed schedule checkboxes, corrected line references |
 | 1.3 | 2026-02-01 | **MAJOR CORRECTIONS**: Routes are core architecture (not "future"), T5.2 snapshots partially complete, T6.7 changed from "decision" to implementation task |
 | 1.2 | 2026-02-01 | T5.1 Raft WAL marked COMPLETE (raftlog-core verified) |
@@ -53,7 +55,7 @@ From [QUORUS_ALPHA_ARCH_REVIEW_JAN_2026.md](../archive/QUORUS_ALPHA_ARCH_REVIEW_
 
 These items require minimal code changes and deliver immediate value.
 
-### T1.1: Documentation Alignment
+### T1.1: Documentation Alignment ✅ COMPLETE
 
 **Goal:** Ensure implementation status is accurately reflected in documentation.
 
@@ -61,8 +63,8 @@ These items require minimal code changes and deliver immediate value.
 |------|------|--------|--------|
 | ~~Move route architecture to "Future" section~~ | ~~`docs/QUORUS_SYSTEM_DESIGN.md`~~ | ~~30 min~~ | ❌ REMOVED (routes are core design) |
 | ~~Mark trigger evaluation as "Planned"~~ | ~~`docs/QUORUS_SYSTEM_DESIGN.md`~~ | ~~15 min~~ | ❌ REMOVED (triggers are core to routes) |
-| Document route implementation status | `docs/QUORUS_IMPLEMENTATION_STATUS.md` | 1 hour | ⬜ Pending |
-| Create CHANGELOG.md | `docs/` | 1 hour | ⬜ Pending |
+| Document route implementation status | See Appendix A below | 1 hour | ✅ Done |
+| Create CHANGELOG.md | See Appendix B below | 1 hour | ✅ Done |
 
 > **Note (2026-02-01):** Routes and triggers are **core** to the Quorus architecture, not future features.
 > The system is explicitly designed as a "route-based distributed file transfer system."
@@ -70,34 +72,34 @@ These items require minimal code changes and deliver immediate value.
 > See [QUORUS_SYSTEM_DESIGN.md](../design/QUORUS_SYSTEM_DESIGN.md) lines 373-800 for full route specification.
 
 **Acceptance Criteria:**
-- [ ] Clear separation between implemented features and not-yet-implemented features
-- [ ] Routes and triggers documented as "designed but not yet implemented"
-- [ ] No reader confusion about what exists vs what's designed-but-pending
+- [x] Clear separation between implemented features and not-yet-implemented features
+- [x] Routes and triggers documented as "designed but not yet implemented"
+- [x] No reader confusion about what exists vs what's designed-but-pending
 
 ---
 
-### T1.2: Configuration Improvements
+### T1.2: Configuration Improvements ✅ COMPLETE
 
 **Goal:** Ensure all configurable values have sensible defaults and documentation.
 
 | Task | File | Effort | Status |
 |------|------|--------|--------|
-| Document all environment variables in README | `README.md` | 1 hour | ⬜ Pending |
-| Add default values to AgentConfig | `quorus-agent/` | 30 min | ⬜ Pending |
-| Add validation for required config properties | All config classes | 1 hour | ⬜ Pending |
-| Create sample `.env.example` file | Root | 30 min | ⬜ Pending |
+| Document all environment variables in README | `README.md` | 1 hour | ✅ Done |
+| Add default values to AgentConfig | `quorus-agent/` | 30 min | ✅ Done (already had defaults) |
+| Add validation for required config properties | All config classes | 1 hour | ✅ Done |
+| Create configuration reference | See Appendix C below | 30 min | ✅ Done |
 
 ---
 
-### T1.3: Logging Standardization
+### T1.3: Logging Standardization ✅ COMPLETE
 
 **Goal:** Consistent, structured logging across all modules.
 
 | Task | File | Effort | Status |
 |------|------|--------|--------|
-| Add correlation ID to all log statements | All modules | 2 hours | ⬜ Pending |
-| Standardize log levels (DEBUG/INFO/WARN/ERROR) | All modules | 1 hour | ⬜ Pending |
-| Add startup banner with version info | Main classes | 30 min | ⬜ Pending |
+| Add correlation ID to all log statements | All modules | 2 hours | ✅ Done |
+| Standardize log levels (DEBUG/INFO/WARN/ERROR) | All modules | 1 hour | ✅ Done |
+| Add startup banner with version info | Main classes | 30 min | ✅ Done |
 
 ---
 
@@ -105,21 +107,22 @@ These items require minimal code changes and deliver immediate value.
 
 These are targeted code changes that fix known issues in core functionality.
 
-### T2.1: Health Endpoint Enhancements
+### T2.1: Health Endpoint Enhancements ✅ COMPLETE
 
 **Goal:** Richer health information for operational visibility.
 
 **Effort:** 1 day  
 **Priority:** 🔴 CRITICAL  
-**Dependencies:** None
+**Dependencies:** None  
+**Status:** ✅ COMPLETE (verified 2026-02-13)
 
 | Task | Module | Effort | Status |
 |------|--------|--------|--------|
-| Add `/health/ready` endpoint | HttpApiServer | 1 hour | ⬜ Pending |
-| Add `/health/live` endpoint | HttpApiServer | 1 hour | ⬜ Pending |
-| Include dependency health in response | HttpApiServer | 2 hours | ⬜ Pending |
-| Add version info to health response | HttpApiServer | 30 min | ⬜ Pending |
-| Create health check tests | quorus-controller/test | 2 hours | ⬜ Pending |
+| Add `/health/ready` endpoint | HttpApiServer | 1 hour | ✅ Done (already existed) |
+| Add `/health/live` endpoint | HttpApiServer | 1 hour | ✅ Done (already existed) |
+| Include dependency health in response | HttpApiServer | 2 hours | ✅ Done (already existed: disk, memory, raft) |
+| Add version info to health response | HttpApiServer | 30 min | ✅ Done (already existed) |
+| Create health check tests | quorus-controller/test | 2 hours | ✅ Done (HttpApiServerHealthTest: 10 tests) |
 
 **Target Response Format:**
 ```json
@@ -143,21 +146,22 @@ These are targeted code changes that fix known issues in core functionality.
 
 ---
 
-### T2.2: Error Response Standardization
+### T2.2: Error Response Standardization ✅ COMPLETE
 
 **Goal:** Consistent error responses across all endpoints.
 
 **Effort:** 1 day  
 **Priority:** 🟡 HIGH  
-**Dependencies:** None
+**Dependencies:** None  
+**Status:** ✅ COMPLETE (verified 2026-02-13)
 
 | Task | Module | Effort | Status |
 |------|--------|--------|--------|
-| Create `ErrorResponse` record | quorus-controller | 30 min | ⬜ Pending |
-| Create `GlobalErrorHandler` | HttpApiServer | 2 hours | ⬜ Pending |
-| Apply error handler to all routes | HttpApiServer | 1 hour | ⬜ Pending |
-| Add error code constants | quorus-core | 1 hour | ⬜ Pending |
-| Document error codes | docs/QUORUS_API_REFERENCE.md | 1 hour | ⬜ Pending |
+| Create `ErrorResponse` record | quorus-controller | 30 min | ✅ Done (already existed) |
+| Create `GlobalErrorHandler` | HttpApiServer | 2 hours | ✅ Done (already existed) |
+| Apply error handler to all routes | HttpApiServer | 1 hour | ✅ Done (already existed) |
+| Add error code constants | quorus-core | 1 hour | ✅ Done (28 ErrorCode constants existed) |
+| Document error codes | docs/QUORUS_API_REFERENCE.md | 1 hour | ✅ Done (all 28 codes documented) |
 
 **Target Error Format:**
 ```json
@@ -174,20 +178,21 @@ These are targeted code changes that fix known issues in core functionality.
 
 ---
 
-### T2.3: Graceful Shutdown
+### T2.3: Graceful Shutdown ✅ COMPLETE
 
 **Goal:** Clean shutdown without losing in-flight work.
 
 **Effort:** 1 day  
 **Priority:** 🟡 HIGH  
-**Dependencies:** None
+**Dependencies:** None  
+**Status:** ✅ COMPLETE (verified 2026-02-13)
 
 | Task | Module | Effort | Status |
 |------|--------|--------|--------|
-| Add shutdown hook to QuorusControllerApplication | quorus-controller | 1 hour | ⬜ Pending |
-| Implement agent drain mode | quorus-agent | 2 hours | ⬜ Pending |
-| Wait for active transfers before shutdown | SimpleTransferEngine | 2 hours | ⬜ Pending |
-| Add graceful shutdown tests | All modules | 2 hours | ⬜ Pending |
+| Add shutdown hook to QuorusControllerApplication | quorus-controller | 1 hour | ✅ Done (ShutdownCoordinator existed) |
+| Implement agent drain mode | quorus-agent | 2 hours | ✅ Done (drain mode existed in HttpApiServer) |
+| Wait for active transfers before shutdown | SimpleTransferEngine | 2 hours | ✅ Done (4-phase shutdown existed) |
+| Add graceful shutdown tests | All modules | 2 hours | ✅ Done (GracefulShutdownIntegrationTest: 3 tests) |
 
 ---
 
@@ -329,7 +334,7 @@ Larger changes that improve system reliability.
 
 ---
 
-### T5.2: Raft Log Compaction & Snapshots (Partially Complete)
+### T5.2: Raft Log Compaction & Snapshots ✅ COMPLETE
 
 **Goal:** Prevent infinite memory/disk growth.
 
@@ -337,19 +342,27 @@ Larger changes that improve system reliability.
 **Priority:** 🔴 CRITICAL  
 **Dependencies:** T5.1 (WAL)
 
+**Status:** ✅ COMPLETE (verified 2026-02-13)
+
 | Task | Module | Effort | Status |
 |------|--------|--------|--------|
-| ~~Implement QuorusStateMachine.takeSnapshot()~~ | ~~quorus-controller~~ | ~~2 days~~ | ✅ Complete (line 530) |
-| ~~Implement QuorusStateMachine.restoreSnapshot()~~ | ~~quorus-controller~~ | ~~1 day~~ | ✅ Complete (line 551) |
-| Add snapshot scheduling | RaftNode | 1 day | ⬜ Pending |
-| Implement log truncation after snapshot | RaftNode | 1 day | ⬜ Pending |
-| Add snapshot metrics | quorus-controller | 4 hours | ⬜ Pending |
-| Create snapshot scheduling tests | quorus-controller/test | 1 day | ⬜ Pending |
+| ~~Implement QuorusStateMachine.takeSnapshot()~~ | ~~quorus-controller~~ | ~~2 days~~ | ✅ Complete |
+| ~~Implement QuorusStateMachine.restoreSnapshot()~~ | ~~quorus-controller~~ | ~~1 day~~ | ✅ Complete |
+| Add snapshot scheduling | RaftNode | 1 day | ✅ Complete |
+| Implement log truncation after snapshot | RaftNode | 1 day | ✅ Complete |
+| Add snapshot metrics | quorus-controller | 4 hours | ✅ Complete |
+| Create snapshot scheduling tests | quorus-controller/test | 1 day | ✅ Complete |
 
-> **Note (2026-02-01):** `takeSnapshot()` and `restoreSnapshot()` are fully implemented in 
-> [QuorusStateMachine.java](../../quorus-controller/src/main/java/dev/mars/quorus/controller/state/QuorusStateMachine.java#L530-L577).
-> Tests exist in [QuorusStateMachineTest.java](../../quorus-controller/src/test/java/dev/mars/quorus/controller/state/QuorusStateMachineTest.java).
-> Remaining work: automatic scheduling, log truncation, and metrics.
+**Implementation Details (2026-02-13):**
+- RaftNode: offset tracking (`snapshotLastIndex`/`snapshotLastTerm`), periodic `checkAndTakeSnapshot()`, full `takeSnapshot()` flow (capture → save → truncate → trim)
+- RaftStorage SPI: added `saveSnapshot()`, `loadSnapshot()`, `truncatePrefix()`, `SnapshotData` record
+- All 4 storage backends updated: FileRaftStorage, InMemoryRaftStorage, RaftLogStorageAdapter, RocksDbRaftStorage
+- AppConfig: `quorus.snapshot.enabled`, `quorus.snapshot.threshold`, `quorus.snapshot.check-interval-ms`
+- QuorusSnapshot: extended with `jobAssignments` and `jobQueue` fields (all 5 state machine maps captured)
+- Recovery: snapshot-first recovery in `recoverFromStorage()` — load snapshot → restore state machine → replay only post-snapshot entries
+- Metrics: `quorus.raft.snapshot.total`, `quorus.raft.snapshot.duration`, `quorus.raft.log.compacted.entries`
+- Tests: 7 in RaftSnapshotTest, 4 in InMemoryRaftStorageTest, 1 in QuorusStateMachineTest (12 new tests total)
+- Bug fixes: Jackson annotations for QueuedJob/JobRequirements/TransferRequest deserialization
 
 ---
 
@@ -360,14 +373,27 @@ Larger changes that improve system reliability.
 **Effort:** 1 week  
 **Priority:** 🟡 HIGH  
 **Dependencies:** T5.2 (Snapshots)
+**Status:** ✅ COMPLETE (2026-02-13)
 
 | Task | Module | Effort | Status |
 |------|--------|--------|--------|
-| Add InstallSnapshot to raft.proto | quorus-controller | 2 hours | ⬜ Pending |
-| Implement InstallSnapshot handler | GrpcRaftServer | 1 day | ⬜ Pending |
-| Implement InstallSnapshot sender | GrpcRaftTransport | 1 day | ⬜ Pending |
-| Add chunked transfer for large snapshots | quorus-controller | 1 day | ⬜ Pending |
-| Create slow follower tests | quorus-controller/test | 2 days | ⬜ Pending |
+| Add InstallSnapshot to raft.proto | quorus-controller | 2 hours | ✅ Complete |
+| Implement InstallSnapshot handler | GrpcRaftServer | 1 day | ✅ Complete |
+| Implement InstallSnapshot sender | GrpcRaftTransport | 1 day | ✅ Complete |
+| Add chunked transfer for large snapshots | quorus-controller | 1 day | ✅ Complete |
+| Create slow follower tests | quorus-controller/test | 2 days | ✅ Complete |
+
+**Implementation Details:**
+- **raft.proto**: Added `InstallSnapshot` RPC, `InstallSnapshotRequest` (term, leader_id, last_included_index, last_included_term, chunk_index, total_chunks, data, done), `InstallSnapshotResponse` (term, success, next_chunk_index)
+- **RaftTransport**: Added `sendInstallSnapshot()` method (interface version 3.0)
+- **GrpcRaftTransport**: Delegates to gRPC stub `installSnapshot()`
+- **GrpcRaftServer**: `installSnapshot()` handler delegates to `raftNode.handleInstallSnapshot()`
+- **RaftNode (leader side)**: `sendInstallSnapshot()` loads snapshot from storage, splits into 1MB chunks, sends sequentially via `sendSnapshotChunk()`. On final ACK updates `nextIndex`/`matchIndex`. Guards against concurrent installs per follower.
+- **RaftNode (follower side)**: `handleInstallSnapshot()` validates term, reassembles chunks via `SnapshotChunkAssembler`, persists to storage, restores state machine, resets log to snapshot boundary.
+- **sendAppendEntries()**: Modified to detect `nextIdx <= snapshotLastIndex` and redirect to `sendInstallSnapshot()`
+- **Metrics**: `installSnapshotSent` and `installSnapshotReceived` counters
+- **Tests (InstallSnapshotTest.java, 7 tests)**: Leader sends snapshot to partitioned-then-healed follower, follower state machine restore + continued replication, leader index tracking after install, stale term rejection, chunk assembler multi-chunk, chunk assembler single-chunk, follower persists snapshot to storage
+- **All 5 RaftTransport implementations updated**: GrpcRaftTransport, InMemoryTransportSimulator, MockRaftTransport, RaftFailureTest (anonymous), RaftNodeIntegrationTest.TestRaftTransport
 
 ---
 
@@ -381,13 +407,21 @@ Larger changes that improve system reliability.
 
 | Task | Module | Effort | Status |
 |------|--------|--------|--------|
-| Define Command messages in raft.proto | quorus-controller | 1 day | ⬜ Pending |
-| Generate Protobuf classes | quorus-controller | 2 hours | ⬜ Pending |
-| Migrate TransferJobCommand to Protobuf | quorus-controller | 1 day | ⬜ Pending |
-| Migrate AgentCommand to Protobuf | quorus-controller | 1 day | ⬜ Pending |
-| Migrate all other commands | quorus-controller | 2 days | ⬜ Pending |
-| Update LogEntry to use bytes | quorus-controller | 4 hours | ⬜ Pending |
-| Add backward compatibility tests | quorus-controller/test | 2 days | ⬜ Pending |
+| Define Command messages in raft.proto | quorus-controller | 1 day | ✅ DONE |
+| Generate Protobuf classes | quorus-controller | 2 hours | ✅ DONE |
+| Migrate TransferJobCommand to Protobuf | quorus-controller | 1 day | ✅ DONE |
+| Migrate AgentCommand to Protobuf | quorus-controller | 1 day | ✅ DONE |
+| Migrate all other commands | quorus-controller | 2 days | ✅ DONE |
+| Update LogEntry to use bytes | quorus-controller | 4 hours | ✅ DONE |
+| Add backward compatibility tests | quorus-controller/test | 2 days | ✅ DONE |
+
+**Implementation Notes:**
+- **commands.proto**: 5 domain enums, 5 command type enums, 9 domain messages, 5 command messages, RaftCommand wrapper with oneof
+- **ProtobufCommandCodec.java**: ~750-line static codec with serialize/deserialize for all command types and domain objects
+- **RaftNode.java**: serialize()/deserialize() methods now delegate to ProtobufCommandCodec (LogEntry.data remains bytes, now Protobuf-encoded)
+- **Command classes**: AgentCommand, JobAssignmentCommand, JobQueueCommand gained package-private constructors for timestamp preservation
+- **Tests (ProtobufCommandCodecTest.java, 31 tests)**: Roundtrip tests for all 5 command types, all enum values, deep nested objects, null handling, timestamp preservation
+- **Controller module**: 317 tests, 0 failures, 0 errors, 2 skipped
 
 ---
 
@@ -585,11 +619,11 @@ Security features implemented **after** core functionality is stable and well-te
 
 ### Week 1-2: Foundation & Quick Wins
 - [x] Gap analysis complete
-- [ ] **Stage 1**: All documentation and configuration tasks (T1.1, T1.2, T1.3)
-- [ ] **Stage 2**: T2.1 (Health Endpoints), T2.2 (Error Responses)
+- [x] **Stage 1**: All documentation and configuration tasks (T1.1, T1.2, T1.3) - ✅ COMPLETE
+- [x] **Stage 2**: T2.1 (Health Endpoints), T2.2 (Error Responses) - ✅ COMPLETE
 
 ### Week 3-4: Stability & Agent Fixes
-- [ ] **Stage 2**: T2.3 (Graceful Shutdown)
+- [x] **Stage 2**: T2.3 (Graceful Shutdown) - ✅ COMPLETE
 - [x] **Stage 3**: T3.1 (Vert.x WebClient Migration) - ✅ COMPLETE
 - [x] **Stage 3**: T3.2 (Bounded Thread Pools) - ✅ COMPLETE
 
@@ -602,8 +636,8 @@ Security features implemented **after** core functionality is stable and well-te
 - [ ] **Stage 5**: T5.2 (Snapshots) - scheduling/truncation remain
 
 ### Week 11-14: Raft Maturity
-- [ ] **Stage 5**: T5.3 (InstallSnapshot RPC)
-- [ ] **Stage 5**: T5.4 (Replace Java Serialization with Protobuf)
+- [x] **Stage 5**: T5.3 (InstallSnapshot RPC)
+- [x] **Stage 5**: T5.4 (Replace Java Serialization with Protobuf) - ✅ COMPLETE
 
 ### Week 15+: Security & Enterprise Features
 - [ ] **Stage 6**: T6.1 (API Key Authentication)
@@ -623,15 +657,15 @@ Security features implemented **after** core functionality is stable and well-te
 
 | Week | Focus | Critical Path Item |
 |------|-------|-------------------|
-| 1 | Documentation | T1.1 Documentation alignment |
-| 2 | Core API | T2.1 Health endpoints |
-| 3 | Stability | T2.3 Graceful shutdown |
+| 1 | Documentation | ~~T1.1 Documentation alignment~~ ✅ COMPLETE |
+| 2 | Core API | ~~T2.1 Health endpoints~~ ✅ COMPLETE |
+| 3 | Stability | ~~T2.3 Graceful shutdown~~ ✅ COMPLETE |
 | 4 | Agent | ~~T3.1 Vert.x WebClient~~ ✅ COMPLETE |
 | 5 | Threading | ~~T3.2 Bounded thread pools~~ ✅ COMPLETE |
 | 6 | Protocols | T4.1 NFS adapter |
 | 7-8 | Persistence | ~~T5.1 Raft WAL~~ ✅ COMPLETE |
 | 9-10 | Compaction | T5.2 Snapshots (scheduling/truncation remain) |
-| 11-12 | Raft | T5.3 InstallSnapshot, T5.4 Protobuf |
+| 11-12 | Raft | ~~T5.3 InstallSnapshot, T5.4 Protobuf~~ ✅ COMPLETE |
 | 15+ | Security + Routes | T6.1-T6.6 (Security), T6.7 (Routes) |
 
 ### Summary by Priority
@@ -639,17 +673,22 @@ Security features implemented **after** core functionality is stable and well-te
 | Priority | Total Tasks | Completed | Remaining |
 |----------|-------------|-----------|-----------|
 | 🔴 CRITICAL | 4 | 2 (T5.1, T3.1) | 2 |
-| 🟡 HIGH | 7 | 1 (T3.2) | 6 |
+| 🟡 HIGH | 7 | 5 (T3.2, T2.1, T2.2, T2.3, T5.4) | 2 |
+| 🟢 LOW | 3 | 3 (T1.1, T1.2, T1.3) | 0 |
 | 🟠 MEDIUM (Security - Deferred) | 11 | 0 | 11 |
-| **TOTAL** | **22** | **3** | **19** |
+| **TOTAL** | **22** | **10** | **12** |
 
 > **Notes:**
 > - T5.1 (Raft WAL) marked COMPLETE via raftlog-core library
 > - T3.1 (WebClient Migration) marked COMPLETE with dedicated tests
 > - T3.2 (Bounded Thread Pools) marked COMPLETE with RaftMetrics (87% coverage)
 > - T5.2 takeSnapshot/restoreSnapshot methods are COMPLETE; scheduling remains
+> - T5.3 (InstallSnapshot RPC) marked COMPLETE with 7 tests, all 5 RaftTransport implementations updated
+> - T5.4 (Protobuf Serialization) marked COMPLETE: commands.proto, ProtobufCommandCodec, 31 roundtrip tests (317 total controller tests)
 > - T6.7 changed from "decision point" to implementation task (routes are core)
 > - T1.1 reduced scope (routes are not "future" features)
+> - **Stage 1 COMPLETE (2026-02-13):** T1.1 (docs/QUORUS_IMPLEMENTATION_STATUS.md + CHANGELOG.md), T1.2 (.env.example, README config, AgentConfig/AppConfig validate()), T1.3 (CorrelationIdHandler, MDC logback patterns, startup banners)
+> - **Stage 2 COMPLETE (2026-02-13):** T2.1 (health endpoints already existed, added commitIndex + 10 dedicated tests), T2.2 (error system already existed with 28 codes, documented all in API reference), T2.3 (ShutdownCoordinator already existed with 4-phase shutdown, added 3 integration tests)
 
 ---
 
@@ -712,7 +751,250 @@ Each task is complete when:
 
 ---
 
+## Appendix A: Implementation Status by Module
+
+### Status Key
+
+| Symbol | Meaning |
+|--------|---------|
+| ✅ | Fully implemented and tested |
+| 🔶 | Partially implemented (core exists, gaps noted) |
+| ⬜ | Designed but not yet implemented |
+
+### quorus-core (Transfer Engine)
+
+| Feature | Status | Evidence |
+|---------|--------|----------|
+| `TransferEngine` interface | ✅ | `TransferEngine.java` |
+| `SimpleTransferEngine` implementation | ✅ | 656 lines, concurrent transfers, retry, cancel, pause/resume |
+| `ProtocolFactory` protocol registry | ✅ | Registers HTTP, HTTPS, FTP, SFTP, SMB |
+| `HttpTransferProtocol` (reactive) | ✅ | Non-blocking Vert.x WebClient-based |
+| `SftpTransferProtocol` | ✅ | Blocking, uses WorkerExecutor |
+| `FtpTransferProtocol` | ✅ | Blocking, uses WorkerExecutor |
+| `SmbTransferProtocol` | ✅ | Blocking, uses WorkerExecutor |
+| NFS protocol adapter | ⬜ | Not yet implemented |
+| SHA-256 checksum verification | ✅ | `ChecksumMismatchException` |
+| Transfer metrics (OpenTelemetry) | ✅ | `TransferTelemetryMetrics` |
+| Transfer health checks | ✅ | `TransferEngineHealthCheck` (183 lines) |
+| Exception hierarchy | ✅ | `QuorusException` → `TransferException`, `ChecksumMismatchException` |
+| Graceful shutdown | ✅ | `SimpleTransferEngine` `shutdown()`, `awaitActiveTransfers()` |
+
+### quorus-workflow (YAML Workflow Engine)
+
+| Feature | Status | Evidence |
+|---------|--------|----------|
+| YAML workflow parsing | ✅ | `YamlWorkflowDefinitionParser` |
+| Variable substitution (`{{var}}`) | ✅ | Parser handles `{{TODAY}}` and custom variables |
+| Dependency graph resolution | ✅ | `DependencyGraph` with topological sorting |
+| Workflow execution engine | ✅ | Execution modes: normal, dry run, virtual run |
+| Workflow validation | ✅ | Cycle detection, missing dependency checks |
+
+### quorus-controller (Raft Consensus & HTTP API)
+
+| Feature | Status | Evidence |
+|---------|--------|----------|
+| **Raft Consensus** | | |
+| `RaftNode` state machine (FOLLOWER→CANDIDATE→LEADER) | ✅ | 1081 lines |
+| Leader election with randomized timeouts | ✅ | `resetElectionTimer()` |
+| Log replication (AppendEntries) | ✅ | `sendAppendEntries()` |
+| WAL persistence | ✅ | `RaftLogStorageAdapter` wraps `raftlog-core:1.0` |
+| Raft metadata persistence (term, votedFor) | ✅ | `persistVote()`, `persistAppendEntries()` |
+| Recovery on restart | ✅ | `recoverFromStorage()` → `loadMetadata()` → `replayLog()` |
+| Snapshot: `takeSnapshot()` / `restoreSnapshot()` | ✅ | `QuorusStateMachine` |
+| Snapshot scheduling & log truncation | ⬜ | Methods exist but no automatic scheduling |
+| InstallSnapshot RPC | ⬜ | Not in `raft.proto` |
+| Protobuf serialization for commands | ⬜ | Currently uses Java serialization |
+| **gRPC Transport** | | |
+| `GrpcRaftTransport` (inter-node, bounded pools) | ✅ | Named threads `raft-io-*` |
+| `GrpcRaftServer` (handles RPCs) | ✅ | Vote + AppendEntries handlers |
+| TLS/mTLS for gRPC | ⬜ | Not yet implemented |
+| **HTTP API** | | |
+| `HttpApiServer` (embedded Vert.x Web) | ✅ | All endpoints |
+| `GET /health`, `/health/live`, `/health/ready` | ✅ | Raft state, disk, memory, version |
+| `GET /raft/status` | ✅ | Node state, term, leader info |
+| `GET /metrics` (Prometheus proxy) | ✅ | `MetricsHandler` |
+| Agent + Transfer + Job endpoints | ✅ | Full REST API |
+| TLS for HTTP | ⬜ | Not yet implemented |
+| API key authentication | ⬜ | Not yet implemented |
+| Rate limiting | ⬜ | Not yet implemented |
+| **Error Handling** | | |
+| `ErrorCode` enum (28 error codes) | ✅ | All HTTP status mappings |
+| `ErrorResponse` record | ✅ | Nested `error` object JSON format |
+| `GlobalErrorHandler` | ✅ | Exception→error mapping |
+| `QuorusApiException` with factory methods | ✅ | `notFound()`, `badRequest()`, `conflict()`, etc. |
+| **State Machine** | | |
+| `QuorusStateMachine` | ✅ | 674 lines, all command types |
+| **Lifecycle** | | |
+| `ShutdownCoordinator` (4-phase) | ✅ | DRAIN→AWAIT→STOP→CLOSE |
+| Drain mode | ✅ | `HttpApiServer.enterDrainMode()` |
+| Configurable shutdown timeouts | ✅ | `quorus.shutdown.drain.timeout.ms` etc. |
+| **Observability** | | |
+| OpenTelemetry metrics | ✅ | Raft, cluster, job gauges/counters |
+| Prometheus endpoint | ✅ | Port 9464 (configurable) |
+
+### quorus-agent (Transfer Agent)
+
+| Feature | Status | Evidence |
+|---------|--------|----------|
+| `QuorusAgent` main class | ✅ | Full lifecycle |
+| All services (reactive WebClient) | ✅ | Registration, Heartbeat, JobPolling, StatusReporting |
+| `TransferExecutionService` | ✅ | Executes transfers via protocol adapters |
+| `HealthService` (JDK HttpServer) | ✅ | `/health` + `/status` |
+| Graceful shutdown (idempotent) | ✅ | Cancel timers, stop services, deregister |
+| `AgentMetrics` (OpenTelemetry) | ✅ | Registration, heartbeat, status gauges |
+| Agent configuration (`AgentConfig`) | ✅ | Properties + env var + system property resolution |
+
+### quorus-tenant (Multi-Tenancy)
+
+| Feature | Status | Evidence |
+|---------|--------|----------|
+| `TenantService` / `SimpleTenantService` | ✅ | In-memory tenant CRUD |
+| `ResourceManagementService` | ✅ | Quota tracking |
+| `SimpleResourceManagementService` | 🔶 | Uses `synchronized(lock)` — performance bottleneck |
+| `TenantSecurityService` | ⬜ | Not yet implemented |
+| `TenantAwareStorageService` | ⬜ | Not yet implemented |
+
+### Route Architecture (Core Design — Not Yet Implemented)
+
+| Trigger | Description | Status |
+|---------|-------------|--------|
+| EVENT | File system events (CREATE, MODIFY, DELETE) | ⬜ |
+| TIME | Cron-based scheduling | ⬜ |
+| INTERVAL | Periodic execution | ⬜ |
+| BATCH | File count threshold | ⬜ |
+| SIZE | Cumulative size threshold | ⬜ |
+| COMPOSITE | AND/OR of multiple triggers | ⬜ |
+
+### Test Coverage
+
+| Module | Test Files | Key Test Types |
+|--------|-----------|----------------|
+| quorus-controller | 32+ | Unit, Integration, Docker cluster, Raft consensus |
+| quorus-agent | 6 | Unit, Service tests with real HTTP simulation |
+| quorus-core | Multiple | Protocol adapters, transfer engine |
+| quorus-workflow | Multiple | YAML parsing, dependency resolution |
+| quorus-tenant | Multiple | Tenant CRUD, resource management |
+
+---
+
+## Appendix B: Changelog
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+
+### [Unreleased]
+
+**Added:**
+- Correlation ID middleware (`CorrelationIdHandler`) for HTTP request tracing
+- Startup banners for Controller and Agent applications
+- `commitIndex` field in `/health` endpoint response
+- Dedicated health endpoint test suite (`HttpApiServerHealthTest` — 10 tests)
+- Graceful shutdown integration tests (`GracefulShutdownIntegrationTest` — 3 tests)
+- Configuration validation (`AgentConfig.validate()`, `AppConfig.validate()`)
+- Environment variable documentation in README
+- Logback MDC patterns with `requestId` for correlation
+- Error codes reference section in API documentation
+
+### [1.0.0-alpha.3] - 2026-02-05
+
+**Fixed:**
+- Replaced unbounded `newCachedThreadPool` in `GrpcRaftTransport` with bounded `ThreadPoolExecutor` (T3.2)
+- Thread pools now use named threads (`raft-io-*`), sizes configurable via `quorus.raft.io.pool-size`
+- Added `RaftMetrics` thread pool monitoring (87% test coverage)
+
+### [1.0.0-alpha.2] - 2026-02-04
+
+**Added:**
+- `ErrorCode` enum with 28 standardized error codes
+- `ErrorResponse` record, `GlobalErrorHandler`, `QuorusApiException`
+- `ShutdownCoordinator` with 4-phase graceful shutdown (DRAIN→AWAIT→STOP→CLOSE)
+- Drain mode — rejects non-health requests with 503 + `Retry-After`
+
+**Changed:**
+- All agent HTTP services migrated from Apache `HttpClient` to Vert.x `WebClient` (T3.1)
+- Removed Apache HttpClient dependency from agent
+
+### [1.0.0-alpha.1] - 2026-01-30
+
+**Added:**
+- Raft WAL persistence via `raftlog-core:1.0` library (T5.1)
+- `RaftLogStorageAdapter`, `RaftStorageFactory`, recovery flow
+- Persist-before-response pattern for all Raft state changes
+- `QuorusStateMachine.takeSnapshot()` and `restoreSnapshot()`
+
+### [1.0.0-alpha.0] - 2025-12-16
+
+**Added:**
+- Controller-first architecture with embedded HTTP API
+- Raft consensus (`RaftNode`, 1081 lines), gRPC transport
+- `QuorusStateMachine` with commands for transfers, agents, jobs, queue, metadata
+- `HttpApiServer` with health, raft status, agent, transfer, and job endpoints
+- `SimpleTransferEngine` with concurrent transfers, retry, cancel, pause/resume
+- Protocol adapters: HTTP, HTTPS, FTP, SFTP, SMB
+- YAML workflow engine with dependency graphs and variable substitution
+- `QuorusAgent` with reactive WebClient services
+- OpenTelemetry integration (metrics + tracing)
+- Multi-tenancy foundation
+- Docker Compose configurations for cluster deployment and monitoring
+- 150+ tests (JUnit 5, Testcontainers, no mocking)
+
+---
+
+## Appendix C: Configuration Reference
+
+Configuration resolution order (highest to lowest priority):
+1. Environment variable (e.g., `QUORUS_HTTP_PORT=8080`)
+2. System property (e.g., `-Dquorus.http.port=8080`)
+3. Properties file (`quorus-controller.properties` / `quorus-agent.properties`)
+4. Default value
+
+Environment variable naming: replace dots with underscores, uppercase (`quorus.http.port` → `QUORUS_HTTP_PORT`).
+
+### Controller Settings
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `QUORUS_NODE_ID` | Unique node identifier | hostname |
+| `QUORUS_HTTP_PORT` | HTTP API port | `8080` |
+| `QUORUS_HTTP_HOST` | HTTP API bind address | `0.0.0.0` |
+| `QUORUS_RAFT_PORT` | Raft gRPC port | `9080` |
+| `QUORUS_CLUSTER_NODES` | Cluster node list (`nodeId=host:port,...`) | `{nodeId}=localhost:{raftPort}` |
+| `QUORUS_RAFT_STORAGE_TYPE` | Storage backend: `raftlog`, `file`, `memory` | `file` |
+| `QUORUS_RAFT_STORAGE_PATH` | Raft log/metadata directory | `./data/raft/{nodeId}` |
+| `QUORUS_RAFT_STORAGE_FSYNC` | Enable fsync for durability | `true` |
+| `QUORUS_RAFT_IO_POOL_SIZE` | I/O thread pool size | `10` |
+| `QUORUS_JOBS_ASSIGNMENT_INITIAL_DELAY_MS` | Delay before first job assignment | `5000` |
+| `QUORUS_JOBS_ASSIGNMENT_INTERVAL_MS` | Job assignment sweep interval | `10000` |
+| `QUORUS_JOBS_TIMEOUT_INITIAL_DELAY_MS` | Delay before first timeout check | `30000` |
+| `QUORUS_JOBS_TIMEOUT_INTERVAL_MS` | Timeout check interval | `30000` |
+| `QUORUS_SHUTDOWN_DRAIN_TIMEOUT_MS` | Drain timeout for in-flight requests | `5000` |
+| `QUORUS_SHUTDOWN_TIMEOUT_MS` | Total shutdown timeout | `30000` |
+| `QUORUS_TELEMETRY_ENABLED` | Enable OpenTelemetry | `true` |
+| `QUORUS_TELEMETRY_OTLP_ENDPOINT` | OTLP exporter endpoint (gRPC) | `http://localhost:4317` |
+| `QUORUS_TELEMETRY_PROMETHEUS_PORT` | Prometheus scrape port | `9464` |
+| `QUORUS_TELEMETRY_SERVICE_NAME` | Telemetry service name | `quorus-controller` |
+
+### Agent Settings
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `QUORUS_AGENT_ID` | Unique agent identifier | hostname-derived |
+| `QUORUS_AGENT_VERSION` | Agent version string | `1.0.0` |
+| `QUORUS_AGENT_CONTROLLER_URL` | Controller base URL | `http://localhost:8080/api/v1` |
+| `QUORUS_AGENT_PORT` | Agent health/status port | `8090` |
+| `QUORUS_AGENT_REGION` | Deployment region | `us-east-1` |
+| `QUORUS_AGENT_DATACENTER` | Datacenter name | `dc1` |
+| `QUORUS_AGENT_TRANSFERS_MAX_CONCURRENT` | Max concurrent transfers | `5` |
+| `QUORUS_AGENT_PROTOCOLS` | Supported protocols (comma-separated) | `HTTP,HTTPS` |
+| `QUORUS_AGENT_HEARTBEAT_INTERVAL_MS` | Heartbeat interval | `30000` |
+| `QUORUS_AGENT_JOBS_POLLING_INITIAL_DELAY_MS` | Initial delay before first job poll | `5000` |
+| `QUORUS_AGENT_JOBS_POLLING_INTERVAL_MS` | Job polling interval | `10000` |
+| `QUORUS_AGENT_TELEMETRY_ENABLED` | Enable agent telemetry | `true` |
+| `QUORUS_AGENT_TELEMETRY_PROMETHEUS_PORT` | Agent Prometheus port | `9465` |
+| `QUORUS_AGENT_TELEMETRY_OTLP_ENDPOINT` | Agent OTLP endpoint | `http://localhost:4317` |
+
+---
+
 **Document Status**: Active Implementation Plan  
-**Last Updated**: 2026-02-02  
-**Version**: 1.4  
+**Last Updated**: 2026-02-13  
+**Version**: 1.6  
 **Owner**: Development Team

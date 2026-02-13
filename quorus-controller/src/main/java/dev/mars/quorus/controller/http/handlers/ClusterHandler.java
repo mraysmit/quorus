@@ -16,98 +16,45 @@
 
 package dev.mars.quorus.controller.http.handlers;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpHandler;
 import dev.mars.quorus.controller.raft.RaftNode;
-
-import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
-import java.util.Map;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import io.vertx.core.Handler;
+import io.vertx.core.json.JsonObject;
+import io.vertx.ext.web.RoutingContext;
 
 /**
- * HTTP handler for cluster status and management.
- * 
- * Endpoint: GET /api/v1/cluster
- * 
- * Returns information about the Raft cluster including leader, term, and node status.
- * 
+ * HTTP handler for cluster status.
+ *
+ * <p>Endpoint: {@code GET /raft/status}
+ *
+ * <p>Returns Raft cluster information including leader, term, and node state.
+ *
  * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 2.0 (Vert.x reactive)
  * @since 2025-12-11
- * @version 1.0
  */
-public class ClusterHandler implements HttpHandler {
+public class ClusterHandler implements Handler<RoutingContext> {
 
-    private static final Logger logger = LoggerFactory.getLogger(ClusterHandler.class);
     private final RaftNode raftNode;
-    private final ObjectMapper objectMapper;
 
     public ClusterHandler(RaftNode raftNode) {
         this.raftNode = raftNode;
-        this.objectMapper = new ObjectMapper();
-        this.objectMapper.registerModule(new JavaTimeModule());
-        logger.debug("ClusterHandler initialized with raftNode={}", raftNode.getNodeId());
     }
 
     @Override
-    public void handle(HttpExchange exchange) throws IOException {
-        String method = exchange.getRequestMethod();
-        String path = exchange.getRequestURI().getPath();
-        logger.debug("handle() entry: method={}, path={}", method, path);
-        
-        if (!"GET".equals(method)) {
-            logger.debug("Method not allowed: {}", method);
-            sendJsonResponse(exchange, 405, Map.of("error", "Method not allowed"));
-            return;
+    public void handle(RoutingContext ctx) {
+        JsonObject status = new JsonObject()
+                .put("nodeId", raftNode.getNodeId())
+                .put("state", raftNode.getState().toString())
+                .put("currentTerm", raftNode.getCurrentTerm())
+                .put("isLeader", raftNode.isLeader())
+                .put("isRunning", raftNode.isRunning());
+
+        String leaderId = raftNode.getLeaderId();
+        if (leaderId != null) {
+            status.put("leaderId", leaderId);
         }
 
-        try {
-            // Get cluster information from RaftNode
-            logger.debug("Querying Raft node for cluster information");
-            Map<String, Object> clusterInfo = new HashMap<>();
-            
-            clusterInfo.put("nodeId", raftNode.getNodeId());
-            clusterInfo.put("state", raftNode.getState().toString());
-            clusterInfo.put("currentTerm", raftNode.getCurrentTerm());
-            clusterInfo.put("isLeader", raftNode.isLeader());
-            clusterInfo.put("isRunning", raftNode.isRunning());
-            
-            String leaderId = raftNode.getLeaderId();
-            if (leaderId != null) {
-                clusterInfo.put("leaderId", leaderId);
-            }
-            
-            logger.info("Returning cluster status: nodeId={}, state={}, term={}, isLeader={}, leaderId={}", 
-                    raftNode.getNodeId(), raftNode.getState(), raftNode.getCurrentTerm(), 
-                    raftNode.isLeader(), leaderId);
-            sendJsonResponse(exchange, 200, clusterInfo);
-
-        } catch (Exception e) {
-            logger.error("Error getting cluster status: {}", e.getMessage());
-            logger.trace("Stack trace for cluster status error", e);
-            sendJsonResponse(exchange, 500, Map.of(
-                    "error", "Internal server error",
-                    "message", e.getMessage()
-            ));
-        }
-    }
-
-    private void sendJsonResponse(HttpExchange exchange, int statusCode, Object data) throws IOException {
-        String json = objectMapper.writeValueAsString(data);
-        byte[] responseBytes = json.getBytes(StandardCharsets.UTF_8);
-        
-        exchange.getResponseHeaders().set("Content-Type", "application/json");
-        exchange.sendResponseHeaders(statusCode, responseBytes.length);
-        
-        try (OutputStream os = exchange.getResponseBody()) {
-            os.write(responseBytes);
-        }
+        ctx.json(status);
     }
 }
 

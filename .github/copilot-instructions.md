@@ -284,3 +284,19 @@ class IntegrationTest {
 
 ### If Uncertain:
 Say "I haven't verified this in the source code yet" rather than guessing.
+
+## Implementation Quality Rules (MANDATORY)
+
+These rules prevent incomplete implementations and disconnected code.
+
+### 1. No Dead Code
+Every new method, parameter, or overload **must have at least one caller at the time of commit**. If you create a new method signature, you must update all callers in the same change. Before declaring any task complete, run `list_code_usages` on every new public method — if it has zero callers outside its own class and tests, the implementation is incomplete.
+
+### 2. Flow-First Implementation
+Before writing any code, **identify the data flow end-to-end**: entry point → every touchpoint → exit point. List the flow before starting. Implement along the flow, not file-by-file. Example: a correlation ID enters via HTTP header → must appear in middleware, error responses, log output, and response headers. All touchpoints are one unit of work.
+
+### 3. Behavioral Tests Required
+Every feature must have at least one test that **exercises the full path a real request would take**. Unit tests of individual methods are not sufficient on their own. The test must prove the feature works from the perspective of the external caller (HTTP client, agent, etc.). Example: to test correlation ID propagation, send an HTTP request with `X-Request-ID`, trigger an error, and assert the JSON response `requestId` matches.
+
+### 4. No Document Proliferation
+Do not create new standalone documents (markdown files, changelog files, example files) unless explicitly requested. Consolidate into existing working documents. The single source of truth for implementation planning is `docs-design/task/QUORUS_ALPHA_IMPLEMENTATION_PLAN.md`.

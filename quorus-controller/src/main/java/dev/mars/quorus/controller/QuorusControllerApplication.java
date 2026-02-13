@@ -30,7 +30,7 @@ import org.slf4j.LoggerFactory;
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @since 2025-08-26
- * @version 2.0 (OpenTelemetry)
+ * @version 2.0 
  */
 public class QuorusControllerApplication {
 
@@ -39,11 +39,23 @@ public class QuorusControllerApplication {
     /**
      * Main entry point for the Quorus Controller application.
      */
+    private static final String BANNER = """
+            
+              ██████  ██    ██  ██████  ██████  ██    ██ ███████
+             ██    ██ ██    ██ ██    ██ ██   ██ ██    ██ ██
+             ██    ██ ██    ██ ██    ██ ██████  ██    ██ ███████
+             ██ ▄▄ ██ ██    ██ ██    ██ ██   ██ ██    ██      ██
+              ██████   ██████   ██████  ██   ██  ██████  ███████
+                 ▀▀                       Controller
+            """;
+
     public static void main(String[] args) {
+        System.out.println(BANNER);
         logger.info("Initializing Quorus Controller with OpenTelemetry (Vert.x 5)...");
 
-        // Load configuration first (this logs all config values)
+        // Load and validate configuration (fail fast on misconfiguration)
         AppConfig config = AppConfig.get();
+        config.validate();
 
         // Create Vert.x instance with OpenTelemetry tracing enabled
         VertxOptions options = new VertxOptions();
