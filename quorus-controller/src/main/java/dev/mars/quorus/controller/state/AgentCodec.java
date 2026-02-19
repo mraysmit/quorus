@@ -1,0 +1,342 @@
+/*
+ * Copyright 2025 Mark Andrew Ray-Smith Cityline Ltd
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package dev.mars.quorus.controller.state;
+
+import dev.mars.quorus.agent.AgentCapabilities;
+import dev.mars.quorus.agent.AgentInfo;
+import dev.mars.quorus.agent.AgentNetworkInfo;
+import dev.mars.quorus.agent.AgentStatus;
+import dev.mars.quorus.agent.AgentSystemInfo;
+import dev.mars.quorus.controller.raft.grpc.*;
+
+import java.time.Instant;
+import java.util.*;
+
+/**
+ * Protobuf codec for agent-related types: {@link AgentCommand},
+ * {@link AgentInfo}, {@link AgentCapabilities}, {@link AgentSystemInfo},
+ * {@link AgentNetworkInfo}, and {@link AgentStatus}.
+ *
+ * <p>Package-private utility class used by {@link ProtobufCommandCodec}.
+ *
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @since 2025
+ */
+final class AgentCodec {
+
+    private AgentCodec() {
+    }
+
+    // ── Command ─────────────────────────────────────────────────
+
+    static AgentCommandProto toProto(AgentCommand cmd) {
+        AgentCommandProto.Builder builder = AgentCommandProto.newBuilder().setType(toProto(cmd.getType()));
+        if (cmd.getAgentId() != null) {
+            builder.setAgentId(cmd.getAgentId());
+        }
+        if (cmd.getAgentInfo() != null) {
+            builder.setAgentInfo(toProto(cmd.getAgentInfo()));
+        }
+        if (cmd.getNewStatus() != null) {
+            builder.setNewStatus(toProto(cmd.getNewStatus()));
+        }
+        if (cmd.getNewCapabilities() != null) {
+            builder.setNewCapabilities(toProto(cmd.getNewCapabilities()));
+        }
+        if (cmd.getTimestamp() != null) {
+            builder.setTimestampEpochMs(cmd.getTimestamp().toEpochMilli());
+        }
+        return builder.build();
+    }
+
+    static AgentCommand fromProto(AgentCommandProto proto) {
+        Instant timestamp = proto.getTimestampEpochMs() > 0
+                ? Instant.ofEpochMilli(proto.getTimestampEpochMs()) : null;
+        AgentCommand.CommandType type = fromProto(proto.getType());
+        AgentStatus newStatus = proto.getNewStatus() != AgentStatusProto.AGENT_STATUS_UNSPECIFIED
+                ? fromProto(proto.getNewStatus()) : null;
+        return switch (type) {
+            case REGISTER -> new AgentCommand(type, proto.getAgentId(),
+                    fromProto(proto.getAgentInfo()), null, null, timestamp);
+            case DEREGISTER -> new AgentCommand(type, proto.getAgentId(),
+                    null, null, null, timestamp);
+            case UPDATE_STATUS -> new AgentCommand(type, proto.getAgentId(),
+                    null, newStatus, null, timestamp);
+            case UPDATE_CAPABILITIES -> new AgentCommand(type, proto.getAgentId(),
+                    null, null, fromProto(proto.getNewCapabilities()), timestamp);
+            case HEARTBEAT -> new AgentCommand(type, proto.getAgentId(),
+                    null, newStatus, null, timestamp);
+        };
+    }
+
+    // ── Domain models ───────────────────────────────────────────
+
+    private static AgentInfoProto toProto(AgentInfo info) {
+        AgentInfoProto.Builder builder = AgentInfoProto.newBuilder()
+                .setPort(info.getPort());
+        if (info.getAgentId() != null) {
+            builder.setAgentId(info.getAgentId());
+        }
+        if (info.getHostname() != null) {
+            builder.setHostname(info.getHostname());
+        }
+        if (info.getAddress() != null) {
+            builder.setAddress(info.getAddress());
+        }
+        if (info.getCapabilities() != null) {
+            builder.setCapabilities(toProto(info.getCapabilities()));
+        }
+        if (info.getStatus() != null) {
+            builder.setStatus(toProto(info.getStatus()));
+        }
+        if (info.getRegistrationTime() != null) {
+            builder.setRegistrationTimeEpochMs(info.getRegistrationTime().toEpochMilli());
+        }
+        if (info.getLastHeartbeat() != null) {
+            builder.setLastHeartbeatEpochMs(info.getLastHeartbeat().toEpochMilli());
+        }
+        if (info.getVersion() != null) {
+            builder.setVersion(info.getVersion());
+        }
+        if (info.getRegion() != null) {
+            builder.setRegion(info.getRegion());
+        }
+        if (info.getDatacenter() != null) {
+            builder.setDatacenter(info.getDatacenter());
+        }
+        if (info.getMetadata() != null) {
+            builder.putAllMetadata(info.getMetadata());
+        }
+        return builder.build();
+    }
+
+    private static AgentInfo fromProto(AgentInfoProto proto) {
+        AgentInfo info = new AgentInfo(
+                proto.getAgentId(),
+                proto.getHostname(),
+                proto.getAddress(),
+                proto.getPort());
+        if (proto.hasCapabilities()) {
+            info.setCapabilities(fromProto(proto.getCapabilities()));
+        }
+        if (proto.getStatus() != AgentStatusProto.AGENT_STATUS_UNSPECIFIED) {
+            info.setStatus(fromProto(proto.getStatus()));
+        }
+        if (proto.getRegistrationTimeEpochMs() > 0) {
+            info.setRegistrationTime(Instant.ofEpochMilli(proto.getRegistrationTimeEpochMs()));
+        }
+        if (proto.getLastHeartbeatEpochMs() > 0) {
+            info.setLastHeartbeat(Instant.ofEpochMilli(proto.getLastHeartbeatEpochMs()));
+        }
+        if (!proto.getVersion().isEmpty()) {
+            info.setVersion(proto.getVersion());
+        }
+        if (!proto.getRegion().isEmpty()) {
+            info.setRegion(proto.getRegion());
+        }
+        if (!proto.getDatacenter().isEmpty()) {
+            info.setDatacenter(proto.getDatacenter());
+        }
+        if (proto.getMetadataCount() > 0) {
+            info.setMetadata(new HashMap<>(proto.getMetadataMap()));
+        }
+        return info;
+    }
+
+    private static AgentCapabilitiesProto toProto(AgentCapabilities caps) {
+        AgentCapabilitiesProto.Builder builder = AgentCapabilitiesProto.newBuilder()
+                .setMaxConcurrentTransfers(caps.getMaxConcurrentTransfers())
+                .setMaxTransferSize(caps.getMaxTransferSize())
+                .setMaxBandwidth(caps.getMaxBandwidth());
+        if (caps.getSupportedProtocols() != null) {
+            builder.addAllSupportedProtocols(caps.getSupportedProtocols());
+        }
+        if (caps.getAvailableRegions() != null) {
+            builder.addAllAvailableRegions(caps.getAvailableRegions());
+        }
+        if (caps.getSupportedCompressionTypes() != null) {
+            builder.addAllSupportedCompressionTypes(caps.getSupportedCompressionTypes());
+        }
+        if (caps.getSupportedEncryptionTypes() != null) {
+            builder.addAllSupportedEncryptionTypes(caps.getSupportedEncryptionTypes());
+        }
+        if (caps.getCustomCapabilities() != null) {
+            caps.getCustomCapabilities().forEach((k, v) ->
+                    builder.putCustomCapabilities(k, v != null ? v.toString() : ""));
+        }
+        if (caps.getSystemInfo() != null) {
+            builder.setSystemInfo(toProto(caps.getSystemInfo()));
+        }
+        if (caps.getNetworkInfo() != null) {
+            builder.setNetworkInfo(toProto(caps.getNetworkInfo()));
+        }
+        return builder.build();
+    }
+
+    private static AgentCapabilities fromProto(AgentCapabilitiesProto proto) {
+        AgentCapabilities caps = new AgentCapabilities();
+        caps.setSupportedProtocols(new HashSet<>(proto.getSupportedProtocolsList()));
+        caps.setMaxConcurrentTransfers(proto.getMaxConcurrentTransfers());
+        caps.setMaxTransferSize(proto.getMaxTransferSize());
+        caps.setMaxBandwidth(proto.getMaxBandwidth());
+        caps.setAvailableRegions(new HashSet<>(proto.getAvailableRegionsList()));
+        caps.setSupportedCompressionTypes(new HashSet<>(proto.getSupportedCompressionTypesList()));
+        caps.setSupportedEncryptionTypes(new HashSet<>(proto.getSupportedEncryptionTypesList()));
+        if (proto.getCustomCapabilitiesCount() > 0) {
+            caps.setCustomCapabilities(new HashMap<>(proto.getCustomCapabilitiesMap()));
+        }
+        if (proto.hasSystemInfo()) {
+            caps.setSystemInfo(fromProto(proto.getSystemInfo()));
+        }
+        if (proto.hasNetworkInfo()) {
+            caps.setNetworkInfo(fromProto(proto.getNetworkInfo()));
+        }
+        return caps;
+    }
+
+    private static AgentSystemInfoProto toProto(AgentSystemInfo info) {
+        AgentSystemInfoProto.Builder builder = AgentSystemInfoProto.newBuilder()
+                .setTotalMemory(info.getTotalMemory())
+                .setAvailableMemory(info.getAvailableMemory())
+                .setTotalDiskSpace(info.getTotalDiskSpace())
+                .setAvailableDiskSpace(info.getAvailableDiskSpace())
+                .setCpuCores(info.getCpuCores())
+                .setCpuUsage(info.getCpuUsage())
+                .setLoadAverage(info.getLoadAverage());
+        if (info.getOperatingSystem() != null) {
+            builder.setOperatingSystem(info.getOperatingSystem());
+        }
+        if (info.getArchitecture() != null) {
+            builder.setArchitecture(info.getArchitecture());
+        }
+        if (info.getJavaVersion() != null) {
+            builder.setJavaVersion(info.getJavaVersion());
+        }
+        return builder.build();
+    }
+
+    private static AgentSystemInfo fromProto(AgentSystemInfoProto proto) {
+        AgentSystemInfo info = new AgentSystemInfo();
+        info.setOperatingSystem(proto.getOperatingSystem());
+        info.setArchitecture(proto.getArchitecture());
+        info.setJavaVersion(proto.getJavaVersion());
+        info.setTotalMemory(proto.getTotalMemory());
+        info.setAvailableMemory(proto.getAvailableMemory());
+        info.setTotalDiskSpace(proto.getTotalDiskSpace());
+        info.setAvailableDiskSpace(proto.getAvailableDiskSpace());
+        info.setCpuCores(proto.getCpuCores());
+        info.setCpuUsage(proto.getCpuUsage());
+        info.setLoadAverage(proto.getLoadAverage());
+        return info;
+    }
+
+    private static AgentNetworkInfoProto toProto(AgentNetworkInfo info) {
+        AgentNetworkInfoProto.Builder builder = AgentNetworkInfoProto.newBuilder()
+                .setBandwidthCapacity(info.getBandwidthCapacity())
+                .setCurrentBandwidthUsage(info.getCurrentBandwidthUsage())
+                .setLatencyMs(info.getLatencyMs())
+                .setPacketLossPercentage(info.getPacketLossPercentage())
+                .setIsNatTraversal(info.isNatTraversal());
+        if (info.getPublicIpAddress() != null) {
+            builder.setPublicIpAddress(info.getPublicIpAddress());
+        }
+        if (info.getPrivateIpAddress() != null) {
+            builder.setPrivateIpAddress(info.getPrivateIpAddress());
+        }
+        if (info.getNetworkInterfaces() != null) {
+            builder.addAllNetworkInterfaces(info.getNetworkInterfaces());
+        }
+        if (info.getConnectionType() != null) {
+            builder.setConnectionType(info.getConnectionType());
+        }
+        if (info.getFirewallPorts() != null) {
+            builder.addAllFirewallPorts(info.getFirewallPorts());
+        }
+        return builder.build();
+    }
+
+    private static AgentNetworkInfo fromProto(AgentNetworkInfoProto proto) {
+        AgentNetworkInfo info = new AgentNetworkInfo();
+        info.setPublicIpAddress(proto.getPublicIpAddress());
+        info.setPrivateIpAddress(proto.getPrivateIpAddress());
+        info.setNetworkInterfaces(new ArrayList<>(proto.getNetworkInterfacesList()));
+        info.setBandwidthCapacity(proto.getBandwidthCapacity());
+        info.setCurrentBandwidthUsage(proto.getCurrentBandwidthUsage());
+        info.setLatencyMs(proto.getLatencyMs());
+        info.setPacketLossPercentage(proto.getPacketLossPercentage());
+        info.setConnectionType(proto.getConnectionType());
+        info.setNatTraversal(proto.getIsNatTraversal());
+        info.setFirewallPorts(new ArrayList<>(proto.getFirewallPortsList()));
+        return info;
+    }
+
+    // ── Enums ───────────────────────────────────────────────────
+
+    private static AgentCommandType toProto(AgentCommand.CommandType type) {
+        return switch (type) {
+            case REGISTER -> AgentCommandType.AGENT_CMD_REGISTER;
+            case DEREGISTER -> AgentCommandType.AGENT_CMD_DEREGISTER;
+            case UPDATE_STATUS -> AgentCommandType.AGENT_CMD_UPDATE_STATUS;
+            case UPDATE_CAPABILITIES -> AgentCommandType.AGENT_CMD_UPDATE_CAPABILITIES;
+            case HEARTBEAT -> AgentCommandType.AGENT_CMD_HEARTBEAT;
+        };
+    }
+
+    private static AgentCommand.CommandType fromProto(AgentCommandType type) {
+        return switch (type) {
+            case AGENT_CMD_REGISTER -> AgentCommand.CommandType.REGISTER;
+            case AGENT_CMD_DEREGISTER -> AgentCommand.CommandType.DEREGISTER;
+            case AGENT_CMD_UPDATE_STATUS -> AgentCommand.CommandType.UPDATE_STATUS;
+            case AGENT_CMD_UPDATE_CAPABILITIES -> AgentCommand.CommandType.UPDATE_CAPABILITIES;
+            case AGENT_CMD_HEARTBEAT -> AgentCommand.CommandType.HEARTBEAT;
+            default -> throw new IllegalArgumentException("Unknown AgentCommandType: " + type);
+        };
+    }
+
+    private static AgentStatusProto toProto(AgentStatus status) {
+        return switch (status) {
+            case REGISTERING -> AgentStatusProto.AGENT_STATUS_REGISTERING;
+            case HEALTHY -> AgentStatusProto.AGENT_STATUS_HEALTHY;
+            case ACTIVE -> AgentStatusProto.AGENT_STATUS_ACTIVE;
+            case IDLE -> AgentStatusProto.AGENT_STATUS_IDLE;
+            case DEGRADED -> AgentStatusProto.AGENT_STATUS_DEGRADED;
+            case OVERLOADED -> AgentStatusProto.AGENT_STATUS_OVERLOADED;
+            case MAINTENANCE -> AgentStatusProto.AGENT_STATUS_MAINTENANCE;
+            case DRAINING -> AgentStatusProto.AGENT_STATUS_DRAINING;
+            case UNREACHABLE -> AgentStatusProto.AGENT_STATUS_UNREACHABLE;
+            case FAILED -> AgentStatusProto.AGENT_STATUS_FAILED;
+            case DEREGISTERED -> AgentStatusProto.AGENT_STATUS_DEREGISTERED;
+        };
+    }
+
+    private static AgentStatus fromProto(AgentStatusProto status) {
+        return switch (status) {
+            case AGENT_STATUS_REGISTERING -> AgentStatus.REGISTERING;
+            case AGENT_STATUS_HEALTHY -> AgentStatus.HEALTHY;
+            case AGENT_STATUS_ACTIVE -> AgentStatus.ACTIVE;
+            case AGENT_STATUS_IDLE -> AgentStatus.IDLE;
+            case AGENT_STATUS_DEGRADED -> AgentStatus.DEGRADED;
+            case AGENT_STATUS_OVERLOADED -> AgentStatus.OVERLOADED;
+            case AGENT_STATUS_MAINTENANCE -> AgentStatus.MAINTENANCE;
+            case AGENT_STATUS_DRAINING -> AgentStatus.DRAINING;
+            case AGENT_STATUS_UNREACHABLE -> AgentStatus.UNREACHABLE;
+            case AGENT_STATUS_FAILED -> AgentStatus.FAILED;
+            case AGENT_STATUS_DEREGISTERED -> AgentStatus.DEREGISTERED;
+            default -> throw new IllegalArgumentException("Unknown AgentStatusProto: " + status);
+        };
+    }
+}

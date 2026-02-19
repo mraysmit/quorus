@@ -123,6 +123,20 @@ public enum ErrorCode {
     /** Raft command failed to commit */
     RAFT_COMMIT_FAILED("RAFT_COMMIT_FAILED", 500, "Failed to commit operation: %s"),
     
+    // ==================== Route Errors ====================
+    
+    /** Route not found */
+    ROUTE_NOT_FOUND("ROUTE_NOT_FOUND", 404, "Route '%s' not found"),
+    
+    /** Route configuration is invalid */
+    ROUTE_INVALID("ROUTE_INVALID", 400, "Invalid route configuration: %s"),
+    
+    /** Route already exists */
+    ROUTE_DUPLICATE("ROUTE_DUPLICATE", 409, "Route '%s' already exists"),
+    
+    /** Route is in a state that doesn't allow this operation */
+    ROUTE_STATE_CONFLICT("ROUTE_STATE_CONFLICT", 409, "Route '%s' is in state '%s', cannot %s"),
+    
     // ==================== Workflow Errors ====================
     
     /** Workflow not found */

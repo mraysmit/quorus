@@ -1,0 +1,250 @@
+/*
+ * Copyright 2025 Mark Andrew Ray-Smith Cityline Ltd
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package dev.mars.quorus.controller.state;
+
+import dev.mars.quorus.controller.raft.grpc.*;
+import dev.mars.quorus.core.*;
+
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+/**
+ * Protobuf codec for {@link RouteCommand}, {@link RouteConfiguration},
+ * {@link TriggerConfiguration}, {@link RouteStatus}, and {@link TriggerType}.
+ *
+ * <p>Package-private utility class used by {@link ProtobufCommandCodec}.
+ *
+ * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @since 2025
+ */
+final class RouteCodec {
+
+    private RouteCodec() {
+    }
+
+    // ── Command ─────────────────────────────────────────────────
+
+    static RouteCommandProto toProto(RouteCommand cmd) {
+        RouteCommandProto.Builder builder = RouteCommandProto.newBuilder()
+                .setType(toProto(cmd.getType()));
+        if (cmd.getRouteId() != null) {
+            builder.setRouteId(cmd.getRouteId());
+        }
+        if (cmd.getRouteConfiguration() != null) {
+            builder.setRouteConfiguration(toProto(cmd.getRouteConfiguration()));
+        }
+        if (cmd.getNewStatus() != null) {
+            builder.setNewStatus(toProto(cmd.getNewStatus()));
+        }
+        if (cmd.getReason() != null) {
+            builder.setReason(cmd.getReason());
+        }
+        if (cmd.getTimestamp() != null) {
+            builder.setTimestampEpochMs(cmd.getTimestamp().toEpochMilli());
+        }
+        return builder.build();
+    }
+
+    static RouteCommand fromProto(RouteCommandProto proto) {
+        Instant timestamp = proto.getTimestampEpochMs() > 0
+                ? Instant.ofEpochMilli(proto.getTimestampEpochMs()) : null;
+        RouteCommand.CommandType type = fromProto(proto.getType());
+        RouteConfiguration routeConfig = proto.hasRouteConfiguration()
+                ? fromProto(proto.getRouteConfiguration()) : null;
+        RouteStatus newStatus = proto.getNewStatus() != RouteStatusProto.ROUTE_STATUS_UNSPECIFIED
+                ? fromProto(proto.getNewStatus()) : null;
+        String reason = proto.getReason().isEmpty() ? null : proto.getReason();
+
+        return new RouteCommand(type, proto.getRouteId(),
+                routeConfig, newStatus, reason, timestamp);
+    }
+
+    // ── Domain models ───────────────────────────────────────────
+
+    private static RouteConfigurationProto toProto(RouteConfiguration config) {
+        RouteConfigurationProto.Builder builder = RouteConfigurationProto.newBuilder();
+        if (config.getRouteId() != null) builder.setRouteId(config.getRouteId());
+        if (config.getName() != null) builder.setName(config.getName());
+        if (config.getDescription() != null) builder.setDescription(config.getDescription());
+        if (config.getSourceAgentId() != null) builder.setSourceAgentId(config.getSourceAgentId());
+        if (config.getSourceLocation() != null) builder.setSourceLocation(config.getSourceLocation());
+        if (config.getDestinationAgentId() != null) builder.setDestinationAgentId(config.getDestinationAgentId());
+        if (config.getDestinationLocation() != null) builder.setDestinationLocation(config.getDestinationLocation());
+        if (config.getTrigger() != null) builder.setTrigger(toProto(config.getTrigger()));
+        if (config.getStatus() != null) builder.setStatus(toProto(config.getStatus()));
+        if (config.getOptions() != null) builder.putAllOptions(config.getOptions());
+        if (config.getCreatedAt() != null) builder.setCreatedAtEpochMs(config.getCreatedAt().toEpochMilli());
+        if (config.getUpdatedAt() != null) builder.setUpdatedAtEpochMs(config.getUpdatedAt().toEpochMilli());
+        return builder.build();
+    }
+
+    private static RouteConfiguration fromProto(RouteConfigurationProto proto) {
+        Instant createdAt = proto.getCreatedAtEpochMs() > 0
+                ? Instant.ofEpochMilli(proto.getCreatedAtEpochMs()) : null;
+        Instant updatedAt = proto.getUpdatedAtEpochMs() > 0
+                ? Instant.ofEpochMilli(proto.getUpdatedAtEpochMs()) : null;
+        RouteStatus status = proto.getStatus() != RouteStatusProto.ROUTE_STATUS_UNSPECIFIED
+                ? fromProto(proto.getStatus()) : null;
+        TriggerConfiguration trigger = proto.hasTrigger() ? fromProto(proto.getTrigger()) : null;
+        Map<String, String> options = proto.getOptionsCount() > 0
+                ? new HashMap<>(proto.getOptionsMap()) : null;
+
+        return new RouteConfiguration(
+                proto.getRouteId().isEmpty() ? null : proto.getRouteId(),
+                proto.getName().isEmpty() ? null : proto.getName(),
+                proto.getDescription().isEmpty() ? null : proto.getDescription(),
+                proto.getSourceAgentId().isEmpty() ? null : proto.getSourceAgentId(),
+                proto.getSourceLocation().isEmpty() ? null : proto.getSourceLocation(),
+                proto.getDestinationAgentId().isEmpty() ? null : proto.getDestinationAgentId(),
+                proto.getDestinationLocation().isEmpty() ? null : proto.getDestinationLocation(),
+                trigger,
+                status,
+                options,
+                createdAt,
+                updatedAt);
+    }
+
+    private static TriggerConfigurationProto toProto(TriggerConfiguration trigger) {
+        TriggerConfigurationProto.Builder builder = TriggerConfigurationProto.newBuilder()
+                .setType(toProto(trigger.getType()));
+        if (trigger.getEventPatterns() != null) builder.addAllEventPatterns(trigger.getEventPatterns());
+        if (trigger.getExcludePatterns() != null) builder.addAllExcludePatterns(trigger.getExcludePatterns());
+        builder.setDebounceMs(trigger.getDebounceMs());
+        if (trigger.getCronExpression() != null) builder.setCronExpression(trigger.getCronExpression());
+        if (trigger.getTimezone() != null) builder.setTimezone(trigger.getTimezone());
+        builder.setIntervalMinutes(trigger.getIntervalMinutes());
+        builder.setFileCountThreshold(trigger.getFileCountThreshold());
+        builder.setSizeThresholdMb(trigger.getSizeThresholdMb());
+        builder.setMaxWaitMinutes(trigger.getMaxWaitMinutes());
+        if (trigger.getCompositeOperator() != null) builder.setCompositeOperator(trigger.getCompositeOperator());
+        if (trigger.getChildTriggers() != null) {
+            for (TriggerConfiguration child : trigger.getChildTriggers()) {
+                builder.addChildTriggers(toProto(child));
+            }
+        }
+        return builder.build();
+    }
+
+    private static TriggerConfiguration fromProto(TriggerConfigurationProto proto) {
+        TriggerType type = fromProto(proto.getType());
+        List<String> eventPatterns = proto.getEventPatternsCount() > 0
+                ? new ArrayList<>(proto.getEventPatternsList()) : null;
+        List<String> excludePatterns = proto.getExcludePatternsCount() > 0
+                ? new ArrayList<>(proto.getExcludePatternsList()) : null;
+        String cronExpression = proto.getCronExpression().isEmpty() ? null : proto.getCronExpression();
+        String timezone = proto.getTimezone().isEmpty() ? null : proto.getTimezone();
+        String compositeOperator = proto.getCompositeOperator().isEmpty() ? null : proto.getCompositeOperator();
+        List<TriggerConfiguration> childTriggers = proto.getChildTriggersCount() > 0
+                ? proto.getChildTriggersList().stream()
+                        .map(RouteCodec::fromProto)
+                        .collect(Collectors.toList())
+                : null;
+
+        return new TriggerConfiguration(
+                type,
+                eventPatterns,
+                excludePatterns,
+                proto.getDebounceMs(),
+                cronExpression,
+                timezone,
+                proto.getIntervalMinutes(),
+                proto.getFileCountThreshold(),
+                proto.getSizeThresholdMb(),
+                proto.getMaxWaitMinutes(),
+                compositeOperator,
+                childTriggers);
+    }
+
+    // ── Enums ───────────────────────────────────────────────────
+
+    private static RouteCommandType toProto(RouteCommand.CommandType type) {
+        return switch (type) {
+            case CREATE -> RouteCommandType.ROUTE_CMD_CREATE;
+            case UPDATE -> RouteCommandType.ROUTE_CMD_UPDATE;
+            case DELETE -> RouteCommandType.ROUTE_CMD_DELETE;
+            case SUSPEND -> RouteCommandType.ROUTE_CMD_SUSPEND;
+            case RESUME -> RouteCommandType.ROUTE_CMD_RESUME;
+            case UPDATE_STATUS -> RouteCommandType.ROUTE_CMD_UPDATE_STATUS;
+        };
+    }
+
+    private static RouteCommand.CommandType fromProto(RouteCommandType type) {
+        return switch (type) {
+            case ROUTE_CMD_CREATE -> RouteCommand.CommandType.CREATE;
+            case ROUTE_CMD_UPDATE -> RouteCommand.CommandType.UPDATE;
+            case ROUTE_CMD_DELETE -> RouteCommand.CommandType.DELETE;
+            case ROUTE_CMD_SUSPEND -> RouteCommand.CommandType.SUSPEND;
+            case ROUTE_CMD_RESUME -> RouteCommand.CommandType.RESUME;
+            case ROUTE_CMD_UPDATE_STATUS -> RouteCommand.CommandType.UPDATE_STATUS;
+            default -> throw new IllegalArgumentException("Unknown RouteCommandType: " + type);
+        };
+    }
+
+    private static RouteStatusProto toProto(RouteStatus status) {
+        return switch (status) {
+            case CONFIGURED -> RouteStatusProto.ROUTE_STATUS_CONFIGURED;
+            case ACTIVE -> RouteStatusProto.ROUTE_STATUS_ACTIVE;
+            case TRIGGERED -> RouteStatusProto.ROUTE_STATUS_TRIGGERED;
+            case TRANSFERRING -> RouteStatusProto.ROUTE_STATUS_TRANSFERRING;
+            case SUSPENDED -> RouteStatusProto.ROUTE_STATUS_SUSPENDED;
+            case DEGRADED -> RouteStatusProto.ROUTE_STATUS_DEGRADED;
+            case FAILED -> RouteStatusProto.ROUTE_STATUS_FAILED;
+            case DELETED -> RouteStatusProto.ROUTE_STATUS_DELETED;
+        };
+    }
+
+    private static RouteStatus fromProto(RouteStatusProto status) {
+        return switch (status) {
+            case ROUTE_STATUS_CONFIGURED -> RouteStatus.CONFIGURED;
+            case ROUTE_STATUS_ACTIVE -> RouteStatus.ACTIVE;
+            case ROUTE_STATUS_TRIGGERED -> RouteStatus.TRIGGERED;
+            case ROUTE_STATUS_TRANSFERRING -> RouteStatus.TRANSFERRING;
+            case ROUTE_STATUS_SUSPENDED -> RouteStatus.SUSPENDED;
+            case ROUTE_STATUS_DEGRADED -> RouteStatus.DEGRADED;
+            case ROUTE_STATUS_FAILED -> RouteStatus.FAILED;
+            case ROUTE_STATUS_DELETED -> RouteStatus.DELETED;
+            default -> throw new IllegalArgumentException("Unknown RouteStatusProto: " + status);
+        };
+    }
+
+    private static TriggerTypeProto toProto(TriggerType type) {
+        return switch (type) {
+            case EVENT -> TriggerTypeProto.TRIGGER_TYPE_EVENT;
+            case TIME -> TriggerTypeProto.TRIGGER_TYPE_TIME;
+            case INTERVAL -> TriggerTypeProto.TRIGGER_TYPE_INTERVAL;
+            case BATCH -> TriggerTypeProto.TRIGGER_TYPE_BATCH;
+            case SIZE -> TriggerTypeProto.TRIGGER_TYPE_SIZE;
+            case COMPOSITE -> TriggerTypeProto.TRIGGER_TYPE_COMPOSITE;
+        };
+    }
+
+    private static TriggerType fromProto(TriggerTypeProto type) {
+        return switch (type) {
+            case TRIGGER_TYPE_EVENT -> TriggerType.EVENT;
+            case TRIGGER_TYPE_TIME -> TriggerType.TIME;
+            case TRIGGER_TYPE_INTERVAL -> TriggerType.INTERVAL;
+            case TRIGGER_TYPE_BATCH -> TriggerType.BATCH;
+            case TRIGGER_TYPE_SIZE -> TriggerType.SIZE;
+            case TRIGGER_TYPE_COMPOSITE -> TriggerType.COMPOSITE;
+            default -> throw new IllegalArgumentException("Unknown TriggerTypeProto: " + type);
+        };
+    }
+}

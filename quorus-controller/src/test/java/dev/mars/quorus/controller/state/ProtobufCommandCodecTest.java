@@ -167,12 +167,9 @@ class ProtobufCommandCodecTest {
         assertNull(ProtobufCommandCodec.deserialize(bytes));
     }
 
-    @Test
-    @DisplayName("Unsupported command type throws IllegalArgumentException")
-    void unsupportedCommandThrows() {
-        assertThrows(IllegalArgumentException.class,
-                () -> ProtobufCommandCodec.serialize("not a command"));
-    }
+    // NOTE: "Unsupported command type throws" test removed.
+    // With the StateMachineCommand sealed interface, the compiler prevents
+    // passing non-command types to serialize() — no runtime check needed.
 
     // ========== TransferJobCommand ==========
 
@@ -647,33 +644,28 @@ class ProtobufCommandCodecTest {
         }
 
         @Test
-        @DisplayName("Each command type is correctly dispatched via instanceof after deserialization")
+        @DisplayName("Each command type is correctly dispatched via pattern matching after deserialization")
         void instanceofDispatchWorksAfterDeserialization() {
             // Simulate what QuorusStateMachine.apply() does
-            List<Object> commands = List.of(
+            List<StateMachineCommand> commands = List.of(
                     TransferJobCommand.create(createTransferJob()),
                     AgentCommand.register(createAgentInfo()),
                     SystemMetadataCommand.set("key", "value"),
                     JobAssignmentCommand.assign(createJobAssignment()),
                     JobQueueCommand.dequeue("job-001"));
 
-            for (Object original : commands) {
+            for (StateMachineCommand original : commands) {
                 ByteString bytes = ProtobufCommandCodec.serialize(original);
-                Object restored = ProtobufCommandCodec.deserialize(bytes);
+                StateMachineCommand restored = ProtobufCommandCodec.deserialize(bytes);
 
-                // This IS what QuorusStateMachine.apply() does
-                if (original instanceof TransferJobCommand) {
-                    assertInstanceOf(TransferJobCommand.class, restored);
-                } else if (original instanceof AgentCommand) {
-                    assertInstanceOf(AgentCommand.class, restored);
-                } else if (original instanceof SystemMetadataCommand) {
-                    assertInstanceOf(SystemMetadataCommand.class, restored);
-                } else if (original instanceof JobAssignmentCommand) {
-                    assertInstanceOf(JobAssignmentCommand.class, restored);
-                } else if (original instanceof JobQueueCommand) {
-                    assertInstanceOf(JobQueueCommand.class, restored);
-                } else {
-                    fail("Unexpected command type: " + original.getClass());
+                // Exhaustive switch — compiler guarantees all cases covered
+                switch (original) {
+                    case TransferJobCommand ignored -> assertInstanceOf(TransferJobCommand.class, restored);
+                    case AgentCommand ignored -> assertInstanceOf(AgentCommand.class, restored);
+                    case SystemMetadataCommand ignored -> assertInstanceOf(SystemMetadataCommand.class, restored);
+                    case JobAssignmentCommand ignored -> assertInstanceOf(JobAssignmentCommand.class, restored);
+                    case JobQueueCommand ignored -> assertInstanceOf(JobQueueCommand.class, restored);
+                    case RouteCommand ignored -> assertInstanceOf(RouteCommand.class, restored);
                 }
             }
         }
@@ -696,6 +688,241 @@ class ProtobufCommandCodecTest {
 
                 assertEquals(strategy, restored.getQueuedJob().getRequirements().getSelectionStrategy(),
                         "Failed for strategy: " + strategy);
+            }
+        }
+    }
+
+    // ========== RouteCommand ==========
+
+    @Nested
+    @DisplayName("RouteCommand roundtrip")
+    class RouteCommandTests {
+
+        private RouteConfiguration createRouteConfiguration() {
+            return new RouteConfiguration(
+                    "route-001",
+                    "crm-to-warehouse",
+                    "CRM data export to data warehouse",
+                    "agent-crm-01",
+                    "/corporate-data/crm/export/",
+                    "agent-warehouse-01",
+                    "/corporate-data/warehouse/import/",
+                    TriggerConfiguration.interval(60),
+                    RouteStatus.CONFIGURED,
+                    Map.of("retryCount", "3", "compression", "gzip"),
+                    Instant.parse("2026-02-19T10:00:00Z"),
+                    Instant.parse("2026-02-19T10:30:00Z"));
+        }
+
+        @Test
+        @DisplayName("CREATE preserves all RouteConfiguration fields")
+        void createRoundtrip() {
+            RouteConfiguration route = createRouteConfiguration();
+            RouteCommand original = RouteCommand.create(route);
+
+            ByteString bytes = ProtobufCommandCodec.serialize(original);
+            RouteCommand restored = (RouteCommand) ProtobufCommandCodec.deserialize(bytes);
+
+            assertNotNull(restored);
+            assertEquals(RouteCommand.CommandType.CREATE, restored.getType());
+            assertEquals("route-001", restored.getRouteId());
+
+            RouteConfiguration rc = restored.getRouteConfiguration();
+            assertNotNull(rc);
+            assertEquals("route-001", rc.getRouteId());
+            assertEquals("crm-to-warehouse", rc.getName());
+            assertEquals("CRM data export to data warehouse", rc.getDescription());
+            assertEquals("agent-crm-01", rc.getSourceAgentId());
+            assertEquals("/corporate-data/crm/export/", rc.getSourceLocation());
+            assertEquals("agent-warehouse-01", rc.getDestinationAgentId());
+            assertEquals("/corporate-data/warehouse/import/", rc.getDestinationLocation());
+            assertEquals(RouteStatus.CONFIGURED, rc.getStatus());
+            assertEquals(Instant.parse("2026-02-19T10:00:00Z"), rc.getCreatedAt());
+            assertEquals(Instant.parse("2026-02-19T10:30:00Z"), rc.getUpdatedAt());
+
+            // Verify trigger
+            assertNotNull(rc.getTrigger());
+            assertEquals(TriggerType.INTERVAL, rc.getTrigger().getType());
+            assertEquals(60, rc.getTrigger().getIntervalMinutes());
+
+            // Verify options
+            assertNotNull(rc.getOptions());
+            assertEquals("3", rc.getOptions().get("retryCount"));
+            assertEquals("gzip", rc.getOptions().get("compression"));
+        }
+
+        @Test
+        @DisplayName("UPDATE preserves routeId and configuration")
+        void updateRoundtrip() {
+            RouteConfiguration updatedConfig = createRouteConfiguration();
+            RouteCommand original = RouteCommand.update("route-001", updatedConfig);
+
+            ByteString bytes = ProtobufCommandCodec.serialize(original);
+            RouteCommand restored = (RouteCommand) ProtobufCommandCodec.deserialize(bytes);
+
+            assertNotNull(restored);
+            assertEquals(RouteCommand.CommandType.UPDATE, restored.getType());
+            assertEquals("route-001", restored.getRouteId());
+            assertNotNull(restored.getRouteConfiguration());
+        }
+
+        @Test
+        @DisplayName("DELETE preserves routeId")
+        void deleteRoundtrip() {
+            RouteCommand original = RouteCommand.delete("route-to-delete");
+
+            ByteString bytes = ProtobufCommandCodec.serialize(original);
+            RouteCommand restored = (RouteCommand) ProtobufCommandCodec.deserialize(bytes);
+
+            assertNotNull(restored);
+            assertEquals(RouteCommand.CommandType.DELETE, restored.getType());
+            assertEquals("route-to-delete", restored.getRouteId());
+            assertNull(restored.getRouteConfiguration());
+        }
+
+        @Test
+        @DisplayName("SUSPEND preserves routeId, status, and reason")
+        void suspendRoundtrip() {
+            RouteCommand original = RouteCommand.suspend("route-sus", "scheduled maintenance");
+
+            ByteString bytes = ProtobufCommandCodec.serialize(original);
+            RouteCommand restored = (RouteCommand) ProtobufCommandCodec.deserialize(bytes);
+
+            assertNotNull(restored);
+            assertEquals(RouteCommand.CommandType.SUSPEND, restored.getType());
+            assertEquals("route-sus", restored.getRouteId());
+            assertEquals(RouteStatus.SUSPENDED, restored.getNewStatus());
+            assertEquals("scheduled maintenance", restored.getReason());
+        }
+
+        @Test
+        @DisplayName("RESUME preserves routeId and status")
+        void resumeRoundtrip() {
+            RouteCommand original = RouteCommand.resume("route-res");
+
+            ByteString bytes = ProtobufCommandCodec.serialize(original);
+            RouteCommand restored = (RouteCommand) ProtobufCommandCodec.deserialize(bytes);
+
+            assertNotNull(restored);
+            assertEquals(RouteCommand.CommandType.RESUME, restored.getType());
+            assertEquals("route-res", restored.getRouteId());
+            assertEquals(RouteStatus.ACTIVE, restored.getNewStatus());
+        }
+
+        @Test
+        @DisplayName("UPDATE_STATUS preserves all status transition fields")
+        void updateStatusRoundtrip() {
+            RouteCommand original = RouteCommand.updateStatus("route-st", RouteStatus.TRIGGERED, "file arrived");
+
+            ByteString bytes = ProtobufCommandCodec.serialize(original);
+            RouteCommand restored = (RouteCommand) ProtobufCommandCodec.deserialize(bytes);
+
+            assertNotNull(restored);
+            assertEquals(RouteCommand.CommandType.UPDATE_STATUS, restored.getType());
+            assertEquals("route-st", restored.getRouteId());
+            assertEquals(RouteStatus.TRIGGERED, restored.getNewStatus());
+            assertEquals("file arrived", restored.getReason());
+        }
+
+        @Test
+        @DisplayName("All RouteStatus enum values roundtrip correctly")
+        void allRouteStatusValuesRoundtrip() {
+            for (RouteStatus status : RouteStatus.values()) {
+                RouteCommand original = RouteCommand.updateStatus("route-enum", status, "testing " + status);
+
+                ByteString bytes = ProtobufCommandCodec.serialize(original);
+                RouteCommand restored = (RouteCommand) ProtobufCommandCodec.deserialize(bytes);
+
+                assertEquals(status, restored.getNewStatus(),
+                        "Failed for status: " + status);
+            }
+        }
+
+        @Test
+        @DisplayName("All TriggerType enum values roundtrip correctly in RouteConfiguration")
+        void allTriggerTypesRoundtrip() {
+            Map<TriggerType, TriggerConfiguration> triggers = Map.of(
+                    TriggerType.EVENT, TriggerConfiguration.event(List.of("*.csv"), List.of(), 0),
+                    TriggerType.TIME, TriggerConfiguration.time("0 0 * * *", "UTC"),
+                    TriggerType.INTERVAL, TriggerConfiguration.interval(30),
+                    TriggerType.BATCH, TriggerConfiguration.batch(100, 5),
+                    TriggerType.SIZE, TriggerConfiguration.size(1024 * 1024, 10)
+            );
+
+            for (var entry : triggers.entrySet()) {
+                RouteConfiguration route = new RouteConfiguration(
+                        "route-" + entry.getKey().name().toLowerCase(),
+                        "trigger-test", null,
+                        "agent-src", "/src/",
+                        "agent-dst", "/dst/",
+                        entry.getValue(),
+                        RouteStatus.CONFIGURED,
+                        null, null, null);
+
+                RouteCommand original = RouteCommand.create(route);
+                ByteString bytes = ProtobufCommandCodec.serialize(original);
+                RouteCommand restored = (RouteCommand) ProtobufCommandCodec.deserialize(bytes);
+
+                assertEquals(entry.getKey(), restored.getRouteConfiguration().getTrigger().getType(),
+                        "Failed for trigger type: " + entry.getKey());
+            }
+        }
+
+        @Test
+        @DisplayName("Timestamp is preserved across serialization (millisecond precision)")
+        void timestampPreserved() {
+            RouteCommand original = RouteCommand.create(createRouteConfiguration());
+            Instant originalTimestamp = original.getTimestamp();
+
+            ByteString bytes = ProtobufCommandCodec.serialize(original);
+            RouteCommand restored = (RouteCommand) ProtobufCommandCodec.deserialize(bytes);
+
+            // Protobuf stores epoch millis, so compare at millisecond precision
+            assertEquals(originalTimestamp.toEpochMilli(), restored.getTimestamp().toEpochMilli());
+        }
+
+        @Test
+        @DisplayName("RouteCommand with null optional fields roundtrips correctly")
+        void nullOptionalFieldsRoundtrip() {
+            RouteConfiguration route = new RouteConfiguration(
+                    "route-minimal", "minimal", null,
+                    "agent-src", "/src/",
+                    "agent-dst", "/dst/",
+                    TriggerConfiguration.interval(60),
+                    RouteStatus.CONFIGURED,
+                    null, null, null);
+
+            RouteCommand original = RouteCommand.create(route);
+            ByteString bytes = ProtobufCommandCodec.serialize(original);
+            RouteCommand restored = (RouteCommand) ProtobufCommandCodec.deserialize(bytes);
+
+            assertNotNull(restored);
+            RouteConfiguration rc = restored.getRouteConfiguration();
+            assertEquals("route-minimal", rc.getRouteId());
+            assertEquals("minimal", rc.getName());
+            // Description and options should be null/empty
+        }
+
+        @Test
+        @DisplayName("All RouteCommand.CommandType values roundtrip correctly")
+        void allCommandTypesRoundtrip() {
+            RouteConfiguration route = createRouteConfiguration();
+
+            List<RouteCommand> commands = List.of(
+                    RouteCommand.create(route),
+                    RouteCommand.update("route-001", route),
+                    RouteCommand.delete("route-001"),
+                    RouteCommand.suspend("route-001", "reason"),
+                    RouteCommand.resume("route-001"),
+                    RouteCommand.updateStatus("route-001", RouteStatus.ACTIVE, "reason"));
+
+            for (RouteCommand original : commands) {
+                ByteString bytes = ProtobufCommandCodec.serialize(original);
+                RouteCommand restored = (RouteCommand) ProtobufCommandCodec.deserialize(bytes);
+
+                assertEquals(original.getType(), restored.getType(),
+                        "Failed for command type: " + original.getType());
+                assertEquals(original.getRouteId(), restored.getRouteId());
             }
         }
     }

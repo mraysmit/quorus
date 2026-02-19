@@ -151,13 +151,9 @@ class QuorusStateMachineTest {
         assertEquals("2.0", stateMachine.getMetadata("version"));
     }
 
-    @Test
-    void testUnknownCommand() {
-        // Test unknown command type
-        Object unknownCommand = new Object();
-        Object result = stateMachine.apply(unknownCommand);
-        assertNull(result);
-    }
+    // NOTE: "testUnknownCommand" test removed.
+    // With the StateMachineCommand sealed interface, the compiler prevents
+    // passing non-command types to apply() — no runtime check needed.
 
     @Test
     void testSnapshotOperations() {

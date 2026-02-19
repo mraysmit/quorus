@@ -15,6 +15,9 @@
  */
 
 package dev.mars.quorus.controller.raft;
+
+import dev.mars.quorus.controller.state.StateMachineCommand;
+
 /**
  * Description for RaftStateMachine
  *
@@ -25,7 +28,7 @@ package dev.mars.quorus.controller.raft;
 
 public interface RaftStateMachine {
 
-    Object apply(Object command);
+    Object apply(StateMachineCommand command);
 
     byte[] takeSnapshot();
 

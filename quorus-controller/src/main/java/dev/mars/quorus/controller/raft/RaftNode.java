@@ -26,6 +26,7 @@ import dev.mars.quorus.controller.raft.storage.RaftStorage;
 import dev.mars.quorus.controller.raft.storage.RaftStorage.LogEntryData;
 import dev.mars.quorus.controller.raft.storage.RaftStorage.SnapshotData;
 import dev.mars.quorus.controller.state.ProtobufCommandCodec;
+import dev.mars.quorus.controller.state.StateMachineCommand;
 import com.google.protobuf.ByteString;
 import io.vertx.core.Future;
 import io.vertx.core.Promise;
@@ -376,7 +377,7 @@ public class RaftNode {
                     int replayedCount = 0;
                     for (LogEntryData entry : entries) {
                         if (entry.index() > snapshotLastIndex) {
-                            Object command = deserialize(ByteString.copyFrom(entry.payload()));
+                            StateMachineCommand command = deserialize(ByteString.copyFrom(entry.payload()));
                             log.add(new LogEntry(entry.term(), entry.index(), command));
                             replayedCount++;
                         }
@@ -400,7 +401,7 @@ public class RaftNode {
                     log.clear();
                     log.add(new LogEntry(0, 0, null));
                     for (LogEntryData entry : entries) {
-                        Object command = deserialize(ByteString.copyFrom(entry.payload()));
+                        StateMachineCommand command = deserialize(ByteString.copyFrom(entry.payload()));
                         log.add(new LogEntry(entry.term(), entry.index(), command));
                     }
                     logger.info("Recovered {} log entries from storage", entries.size());
@@ -475,7 +476,7 @@ public class RaftNode {
         return promise.future();
     }
 
-    public Future<Object> submitCommand(Object command) {
+    public Future<Object> submitCommand(StateMachineCommand command) {
         Promise<Object> promise = Promise.promise();
 
         vertx.runOnContext(v -> {
@@ -1057,7 +1058,7 @@ public class RaftNode {
 
                 long currentIndex = startIndex;
                 for (dev.mars.quorus.controller.raft.grpc.LogEntry entryProto : request.getEntriesList()) {
-                    Object command = deserialize(entryProto.getData());
+                    StateMachineCommand command = deserialize(entryProto.getData());
                     LogEntry newEntry = new LogEntry(entryProto.getTerm(), currentIndex, command);
 
                     if (hasLogEntry(currentIndex)) {
@@ -1714,11 +1715,11 @@ public class RaftNode {
 
     // ========== SERIALIZATION ==========
 
-    private ByteString serialize(Object obj) {
-        return ProtobufCommandCodec.serialize(obj);
+    private ByteString serialize(StateMachineCommand cmd) {
+        return ProtobufCommandCodec.serialize(cmd);
     }
 
-    private Object deserialize(ByteString data) {
+    private StateMachineCommand deserialize(ByteString data) {
         return ProtobufCommandCodec.deserialize(data);
     }
 }

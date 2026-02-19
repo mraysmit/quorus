@@ -27,6 +27,8 @@ import dev.mars.quorus.core.TransferJob;
 import dev.mars.quorus.core.TransferStatus;
 import dev.mars.quorus.core.JobAssignment;
 import dev.mars.quorus.core.QueuedJob;
+import dev.mars.quorus.core.RouteConfiguration;
+import dev.mars.quorus.core.RouteStatus;
 import io.opentelemetry.api.GlobalOpenTelemetry;
 import io.opentelemetry.api.metrics.Meter;
 import org.slf4j.Logger;
@@ -56,6 +58,7 @@ public class QuorusStateMachine implements RaftStateMachine {
     private final Map<String, String> systemMetadata = new ConcurrentHashMap<>();
     private final Map<String, JobAssignment> jobAssignments = new ConcurrentHashMap<>();
     private final Map<String, QueuedJob> jobQueue = new ConcurrentHashMap<>();
+    private final Map<String, RouteConfiguration> routes = new ConcurrentHashMap<>();
     private final AtomicLong lastAppliedIndex = new AtomicLong(0);
 
     // JSON serialization
@@ -99,6 +102,11 @@ public class QuorusStateMachine implements RaftStateMachine {
                 .setDescription("Total number of job assignments")
                 .ofLongs()
                 .buildWithCallback(measurement -> measurement.record(jobAssignments.size()));
+
+        meter.gaugeBuilder("quorus.routes.total")
+                .setDescription("Total number of configured routes")
+                .ofLongs()
+                .buildWithCallback(measurement -> measurement.record(routes.size()));
     }
 
     public QuorusStateMachine() {
@@ -115,7 +123,7 @@ public class QuorusStateMachine implements RaftStateMachine {
     }
 
     @Override
-    public Object apply(Object command) {
+    public Object apply(StateMachineCommand command) {
         if (command == null) {
             logger.debug("Received null command, returning null");
             return null; // No-op command
@@ -124,21 +132,14 @@ public class QuorusStateMachine implements RaftStateMachine {
         logger.debug("Applying command: type={}", command.getClass().getSimpleName());
 
         try {
-            Object result;
-            if (command instanceof TransferJobCommand) {
-                result = applyTransferJobCommand((TransferJobCommand) command);
-            } else if (command instanceof AgentCommand) {
-                result = applyAgentCommand((AgentCommand) command);
-            } else if (command instanceof SystemMetadataCommand) {
-                result = applySystemMetadataCommand((SystemMetadataCommand) command);
-            } else if (command instanceof JobAssignmentCommand) {
-                result = applyJobAssignmentCommand((JobAssignmentCommand) command);
-            } else if (command instanceof JobQueueCommand) {
-                result = applyJobQueueCommand((JobQueueCommand) command);
-            } else {
-                logger.warn("Unknown command type: {}", command.getClass().getName());
-                return null;
-            }
+            Object result = switch (command) {
+                case TransferJobCommand cmd -> applyTransferJobCommand(cmd);
+                case AgentCommand cmd -> applyAgentCommand(cmd);
+                case SystemMetadataCommand cmd -> applySystemMetadataCommand(cmd);
+                case JobAssignmentCommand cmd -> applyJobAssignmentCommand(cmd);
+                case JobQueueCommand cmd -> applyJobQueueCommand(cmd);
+                case RouteCommand cmd -> applyRouteCommand(cmd);
+            };
             logger.debug("Command applied successfully: type={}, result={}", 
                 command.getClass().getSimpleName(), result != null ? "non-null" : "null");
             return result;
@@ -526,6 +527,95 @@ public class QuorusStateMachine implements RaftStateMachine {
         }
     }
 
+    private Object applyRouteCommand(RouteCommand command) {
+        String routeId = command.getRouteId();
+        logger.debug("Processing route command: routeId={}, type={}", routeId, command.getType());
+
+        switch (command.getType()) {
+            case CREATE:
+                RouteConfiguration routeConfig = command.getRouteConfiguration();
+                logger.debug("Creating route: routeId={}, name={}", routeId, routeConfig.getName());
+                routes.put(routeId, routeConfig);
+                logger.info("Created route: routeId={}, name={}, triggerType={}, totalRoutes={}",
+                    routeId, routeConfig.getName(),
+                    routeConfig.getTrigger() != null ? routeConfig.getTrigger().getType() : "none",
+                    routes.size());
+                return routeConfig;
+
+            case UPDATE:
+                logger.debug("Updating route: routeId={}", routeId);
+                RouteConfiguration existingRoute = routes.get(routeId);
+                if (existingRoute != null) {
+                    RouteConfiguration updatedRoute = existingRoute.withUpdate(command.getRouteConfiguration());
+                    routes.put(routeId, updatedRoute);
+                    logger.info("Updated route: routeId={}, name={}", routeId, updatedRoute.getName());
+                    return updatedRoute;
+                } else {
+                    logger.warn("Route not found for update: routeId={}", routeId);
+                    return null;
+                }
+
+            case DELETE:
+                logger.debug("Deleting route: routeId={}", routeId);
+                RouteConfiguration removedRoute = routes.remove(routeId);
+                if (removedRoute != null) {
+                    logger.info("Deleted route: routeId={}, totalRoutes={}", routeId, routes.size());
+                    return removedRoute;
+                } else {
+                    logger.warn("Route not found for deletion: routeId={}", routeId);
+                    return null;
+                }
+
+            case SUSPEND:
+                logger.debug("Suspending route: routeId={}, reason={}", routeId, command.getReason());
+                RouteConfiguration suspendRoute = routes.get(routeId);
+                if (suspendRoute != null) {
+                    RouteStatus oldStatus = suspendRoute.getStatus();
+                    RouteConfiguration suspended = suspendRoute.withStatus(RouteStatus.SUSPENDED);
+                    routes.put(routeId, suspended);
+                    logger.info("Suspended route: routeId={}, oldStatus={}, reason={}",
+                        routeId, oldStatus, command.getReason());
+                    return suspended;
+                } else {
+                    logger.warn("Route not found for suspend: routeId={}", routeId);
+                    return null;
+                }
+
+            case RESUME:
+                logger.debug("Resuming route: routeId={}", routeId);
+                RouteConfiguration resumeRoute = routes.get(routeId);
+                if (resumeRoute != null) {
+                    RouteStatus oldStatus = resumeRoute.getStatus();
+                    RouteConfiguration resumed = resumeRoute.withStatus(RouteStatus.ACTIVE);
+                    routes.put(routeId, resumed);
+                    logger.info("Resumed route: routeId={}, oldStatus={}", routeId, oldStatus);
+                    return resumed;
+                } else {
+                    logger.warn("Route not found for resume: routeId={}", routeId);
+                    return null;
+                }
+
+            case UPDATE_STATUS:
+                logger.debug("Updating route status: routeId={}, newStatus={}", routeId, command.getNewStatus());
+                RouteConfiguration statusRoute = routes.get(routeId);
+                if (statusRoute != null) {
+                    RouteStatus oldStatus = statusRoute.getStatus();
+                    RouteConfiguration updated = statusRoute.withStatus(command.getNewStatus());
+                    routes.put(routeId, updated);
+                    logger.info("Updated route status: routeId={}, oldStatus={}, newStatus={}",
+                        routeId, oldStatus, command.getNewStatus());
+                    return updated;
+                } else {
+                    logger.warn("Route not found for status update: routeId={}", routeId);
+                    return null;
+                }
+
+            default:
+                logger.warn("Unknown route command type: type={}", command.getType());
+                return null;
+        }
+    }
+
     @Override
     public byte[] takeSnapshot() {
         logger.debug("Taking state machine snapshot: jobs={}, agents={}, metadata={}, assignments={}, queue={}", 
@@ -537,11 +627,12 @@ public class QuorusStateMachine implements RaftStateMachine {
             snapshot.setSystemMetadata(new ConcurrentHashMap<>(systemMetadata));
             snapshot.setJobAssignments(new ConcurrentHashMap<>(jobAssignments));
             snapshot.setJobQueue(new ConcurrentHashMap<>(jobQueue));
+            snapshot.setRoutes(new ConcurrentHashMap<>(routes));
             snapshot.setLastAppliedIndex(lastAppliedIndex.get());
 
             byte[] data = objectMapper.writeValueAsBytes(snapshot);
-            logger.info("Created snapshot: size={}bytes, jobs={}, agents={}, assignments={}, queue={}, lastAppliedIndex={}", 
-                data.length, transferJobs.size(), agents.size(), jobAssignments.size(), jobQueue.size(), lastAppliedIndex.get());
+            logger.info("Created snapshot: size={}bytes, jobs={}, agents={}, assignments={}, queue={}, routes={}, lastAppliedIndex={}", 
+                data.length, transferJobs.size(), agents.size(), jobAssignments.size(), jobQueue.size(), routes.size(), lastAppliedIndex.get());
             return data;
         } catch (IOException e) {
             logger.error("Failed to create snapshot: jobs={}, agents={}", transferJobs.size(), agents.size(), e);
@@ -576,11 +667,16 @@ public class QuorusStateMachine implements RaftStateMachine {
                 jobQueue.putAll(restoredSnapshot.getJobQueue());
             }
 
+            routes.clear();
+            if (restoredSnapshot.getRoutes() != null) {
+                routes.putAll(restoredSnapshot.getRoutes());
+            }
+
             lastAppliedIndex.set(restoredSnapshot.getLastAppliedIndex());
 
-            logger.info("Restored snapshot: jobs={}, agents={}, metadata={}, assignments={}, queue={}, lastAppliedIndex={}", 
+            logger.info("Restored snapshot: jobs={}, agents={}, metadata={}, assignments={}, queue={}, routes={}, lastAppliedIndex={}", 
                 transferJobs.size(), agents.size(), systemMetadata.size(), 
-                jobAssignments.size(), jobQueue.size(), lastAppliedIndex.get());
+                jobAssignments.size(), jobQueue.size(), routes.size(), lastAppliedIndex.get());
         } catch (IOException e) {
             logger.error("Failed to restore snapshot: snapshotSize={}bytes, error={}", snapshot.length, e.getMessage());
             logger.trace("Stack trace for snapshot restore failure", e);
@@ -602,6 +698,7 @@ public class QuorusStateMachine implements RaftStateMachine {
         systemMetadata.clear();
         jobAssignments.clear();
         jobQueue.clear();
+        routes.clear();
         lastAppliedIndex.set(0);
         
         // Restore default metadata after clearing
@@ -682,5 +779,33 @@ public class QuorusStateMachine implements RaftStateMachine {
      */
     public QueuedJob getQueuedJob(String jobId) {
         return jobQueue.get(jobId);
+    }
+
+    /**
+     * Get all routes.
+     */
+    public Map<String, RouteConfiguration> getRoutes() {
+        return new ConcurrentHashMap<>(routes);
+    }
+
+    /**
+     * Get a specific route.
+     */
+    public RouteConfiguration getRoute(String routeId) {
+        return routes.get(routeId);
+    }
+
+    /**
+     * Check if a route exists in the state machine.
+     */
+    public boolean hasRoute(String routeId) {
+        return routes.containsKey(routeId);
+    }
+
+    /**
+     * Get the total number of routes.
+     */
+    public int getRouteCount() {
+        return routes.size();
     }
 }

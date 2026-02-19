@@ -19,7 +19,6 @@ package dev.mars.quorus.controller.state;
 import dev.mars.quorus.core.TransferJob;
 import dev.mars.quorus.core.TransferStatus;
 
-import java.io.Serializable;
 /**
  * Description for TransferJobCommand
  *
@@ -28,7 +27,7 @@ import java.io.Serializable;
  * @since 2025-08-20
  */
 
-public class TransferJobCommand implements Serializable {
+public final class TransferJobCommand implements StateMachineCommand {
 
     private static final long serialVersionUID = 1L;
 

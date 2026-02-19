@@ -137,6 +137,16 @@ public class HttpApiServer {
         // ==================== Job Endpoints ====================
         router.post("/api/v1/jobs/:jobId/status").handler(new JobStatusHandler(raftNode));
 
+        // ==================== Route Endpoints ====================
+        RouteHandler routeHandler = new RouteHandler(raftNode);
+        router.post("/api/v1/routes").handler(routeHandler.handleCreate());
+        router.get("/api/v1/routes").handler(routeHandler.handleList());
+        router.get("/api/v1/routes/:routeId").handler(routeHandler.handleGet());
+        router.put("/api/v1/routes/:routeId").handler(routeHandler.handleUpdate());
+        router.delete("/api/v1/routes/:routeId").handler(routeHandler.handleDelete());
+        router.put("/api/v1/routes/:routeId/suspend").handler(routeHandler.handleSuspend());
+        router.put("/api/v1/routes/:routeId/resume").handler(routeHandler.handleResume());
+
         // Job assignment — kept inline (no dedicated handler)
         router.post("/api/v1/jobs/assign").respond(ctx -> {
             try {
@@ -158,12 +168,10 @@ public class HttpApiServer {
             }
         });
 
-        // Generic command endpoint — kept inline (low-level Raft API)
-        router.post("/api/v1/command").respond(ctx -> {
-            JsonObject body = ctx.body().asJsonObject();
-            return raftNode.submitCommand(body.getMap())
-                    .map(res -> new JsonObject().put("result", "OK").put("data", res));
-        });
+        // NOTE: Generic command endpoint (/api/v1/command) removed.
+        // It passed raw Map objects to submitCommand(), which was incompatible
+        // with Protobuf serialization and the StateMachineCommand sealed type.
+        // Use the typed endpoints (transfers, agents, metadata, jobs, routes) instead.
 
         httpServer = vertx.createHttpServer()
                 .requestHandler(router);

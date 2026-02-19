@@ -19,7 +19,6 @@ package dev.mars.quorus.controller.state;
 import dev.mars.quorus.core.QueuedJob;
 import dev.mars.quorus.core.JobPriority;
 
-import java.io.Serializable;
 import java.time.Instant;
 import java.util.Objects;
 
@@ -32,7 +31,7 @@ import java.util.Objects;
  * @since 2025-10-28
  * @version 1.0
  */
-public class JobQueueCommand implements Serializable {
+public final class JobQueueCommand implements StateMachineCommand {
 
     private static final long serialVersionUID = 1L;
 
