@@ -24,6 +24,7 @@ import io.vertx.core.Future;
 import dev.mars.quorus.controller.raft.grpc.VoteRequest;
 import dev.mars.quorus.controller.raft.grpc.VoteResponse;
 import dev.mars.quorus.controller.state.QuorusStateMachine;
+import dev.mars.quorus.controller.state.StateMachineCommand;
 import dev.mars.quorus.controller.state.SystemMetadataCommand;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterEach;
@@ -248,7 +249,7 @@ class RaftFailureTest {
         // Test state machine that throws exceptions
         RaftStateMachine failingStateMachine = new RaftStateMachine() {
             @Override
-            public Object apply(Object command) {
+            public Object apply(StateMachineCommand command) {
                 throw new RuntimeException("State machine error");
             }
             

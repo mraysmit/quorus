@@ -286,25 +286,21 @@ class InfrastructureSmokeTest {
 
     @Test
     @Order(9)
-    @DisplayName("9. Command endpoint responds")
+    @DisplayName("9. Assignment list endpoint responds")
     void testCommandEndpoint() throws Exception {
-        // Test generic command endpoint with a ping-like command
-        String payload = "{\"type\":\"PING\"}";
-        
+        // Test job assignment listing endpoint (replaced removed /api/v1/command)
         HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(BASE_URL + "/api/v1/command"))
+                .uri(URI.create(BASE_URL + "/api/v1/assignments"))
                 .timeout(Duration.ofSeconds(5))
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(payload))
+                .GET()
                 .build();
 
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
         
-        // Command endpoint should accept requests (may return error for unknown command, but endpoint exists)
-        assertTrue(response.statusCode() == 200 || response.statusCode() == 400 || response.statusCode() == 500,
-                "Command endpoint should respond (status: " + response.statusCode() + ")");
+        assertEquals(200, response.statusCode(),
+                "Assignments endpoint should respond with 200 (status: " + response.statusCode() + ")");
         
-        logger.info("✓ Command endpoint responds (status: " + response.statusCode() + ")");
+        logger.info("✓ Assignments endpoint responds (status: " + response.statusCode() + ")");
     }
 
     // ========== Metrics Endpoint Tests ==========

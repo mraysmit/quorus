@@ -453,20 +453,16 @@ class InfrastructureWithTelemetryTest {
 
     @Test
     @Order(6)
-    @DisplayName("6. Command endpoint responds")
+    @DisplayName("6. Assignment list endpoint responds")
     void testCommandEndpoint() throws Exception {
-        logger.info("[TEST 6] Testing /api/v1/command endpoint");
-        String url = BASE_URL + "/api/v1/command";
-        String payload = "{\"type\":\"PING\"}";
-        logger.info("  -> Request: POST " + url);
-        logger.info("  -> Content-Type: application/json");
-        logger.info("  -> Payload: " + payload);
+        logger.info("[TEST 6] Testing /api/v1/assignments endpoint");
+        String url = BASE_URL + "/api/v1/assignments";
+        logger.info("  -> Request: GET " + url);
         
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
                 .timeout(Duration.ofSeconds(5))
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(payload))
+                .GET()
                 .build();
 
         long startTime = System.currentTimeMillis();
@@ -477,10 +473,10 @@ class InfrastructureWithTelemetryTest {
         logger.info("  -> Response latency: " + latency + "ms");
         logger.info("  -> Response body: " + response.body());
         
-        assertTrue(response.statusCode() == 200 || response.statusCode() == 400 || response.statusCode() == 500,
-                "Command endpoint should respond (status: " + response.statusCode() + ")");
+        assertEquals(200, response.statusCode(),
+                "Assignments endpoint should respond with 200 (status: " + response.statusCode() + ")");
         
-        logger.info("  [OK] TEST PASSED: Command endpoint responds (status: " + response.statusCode() + ")");
+        logger.info("  [OK] TEST PASSED: Assignments endpoint responds (status: " + response.statusCode() + ")");
     }
 
     // ========== OpenTelemetry Metrics Tests ==========

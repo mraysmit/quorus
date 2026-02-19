@@ -36,7 +36,7 @@ import dev.mars.quorus.controller.raft.grpc.*;
  * </ul>
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @since 2025
+ * @since 2025-02-15
  */
 public final class ProtobufCommandCodec {
 

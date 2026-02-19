@@ -164,6 +164,9 @@ public enum ErrorCode {
     /** Service temporarily unavailable */
     SERVICE_UNAVAILABLE("SERVICE_UNAVAILABLE", 503, "Service temporarily unavailable: %s"),
     
+    /** Server is shutting down (drain mode) */
+    SERVICE_SHUTTING_DOWN("SERVICE_SHUTTING_DOWN", 503, "Server is shutting down"),
+    
     /** Request timeout */
     TIMEOUT("TIMEOUT", 504, "Request timed out: %s");
 
