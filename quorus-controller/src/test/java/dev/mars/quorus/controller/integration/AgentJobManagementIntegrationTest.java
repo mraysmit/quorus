@@ -213,7 +213,7 @@ class AgentJobManagementIntegrationTest {
             """.formatted(testAssignmentId, testJobId, testAgentId);
 
         HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(BASE_URL + "/api/v1/jobs/assign"))
+                .uri(URI.create(BASE_URL + "/api/v1/assignments"))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(requestBody))
                 .build();

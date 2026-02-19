@@ -4,6 +4,7 @@ import dev.mars.quorus.controller.raft.RaftMessage;
 import dev.mars.quorus.controller.raft.RaftNode;
 import dev.mars.quorus.controller.raft.RaftStateMachine;
 import dev.mars.quorus.controller.raft.RaftTransport;
+import dev.mars.quorus.controller.state.StateMachineCommand;
 import dev.mars.quorus.controller.raft.grpc.AppendEntriesRequest;
 import dev.mars.quorus.controller.raft.grpc.AppendEntriesResponse;
 import dev.mars.quorus.controller.raft.grpc.InstallSnapshotRequest;
@@ -110,7 +111,7 @@ public class RaftNodeIntegrationTest {
 
     static class TestRaftStateMachine implements RaftStateMachine {
         @Override
-        public Object apply(Object command) {
+        public Object apply(StateMachineCommand command) {
             return null;
         }
 
