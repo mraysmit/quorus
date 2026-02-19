@@ -20,7 +20,6 @@ import dev.mars.quorus.agent.AgentInfo;
 import dev.mars.quorus.agent.AgentStatus;
 import dev.mars.quorus.agent.AgentCapabilities;
 
-import java.io.Serializable;
 import java.time.Instant;
 
 /**
@@ -32,7 +31,7 @@ import java.time.Instant;
  * @since 2025-08-26
  * @version 1.0
  */
-public class AgentCommand implements Serializable {
+public final class AgentCommand implements StateMachineCommand {
 
     private static final long serialVersionUID = 1L;
 

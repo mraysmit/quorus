@@ -24,55 +24,104 @@ import java.time.LocalDate;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.LongAdder;
+import java.util.concurrent.locks.StampedLock;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Simple in-memory implementation of ResourceManagementService.
- * This implementation is suitable for development and testing.
- * For production use, consider implementing a persistent storage backend.
+ * In-memory implementation of ResourceManagementService using lock-free atomic
+ * counters for simple updates and per-tenant {@link StampedLock} for compound
+ * operations.
+ * 
+ * <h2>Concurrency design</h2>
+ * <ul>
+ *   <li>Each tenant has its own {@link TenantCounters} with {@link AtomicLong}
+ *       gauges and {@link LongAdder} monotonic counters — simple updates
+ *       ({@code updateConcurrentTransfers}, {@code updateBandwidthUsage},
+ *       {@code updateStorageUsage}, {@code recordTransferCompletion}) are
+ *       <b>lock-free</b>.</li>
+ *   <li>Compound operations that must be atomic across multiple counters
+ *       ({@code reserveResources}, {@code releaseResources}, {@code recordUsage},
+ *       {@code resetDailyUsage}) use a <b>per-tenant StampedLock</b> — no
+ *       global bottleneck.</li>
+ *   <li>{@code reserveResources} validates <b>inside</b> the per-tenant lock
+ *       to eliminate the TOCTOU race present in the original design.</li>
+ * </ul>
+ * 
+ * <p>For production use, consider implementing a persistent storage backend.
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @since 2025-08-18
- * @version 1.0
+ * @version 2.0
  */
 public class SimpleResourceManagementService implements ResourceManagementService {
     
     private static final Logger logger = LoggerFactory.getLogger(SimpleResourceManagementService.class);
     
     private final TenantService tenantService;
-    private final Map<String, ResourceUsage> currentUsage = new ConcurrentHashMap<>();
-    private final Map<String, Map<LocalDate, ResourceUsage>> usageHistory = new ConcurrentHashMap<>();
-    private final Map<String, ResourceReservation> reservations = new ConcurrentHashMap<>();
-    private final AtomicLong reservationCounter = new AtomicLong(0);
-    private final Object lock = new Object();
     
-    // OpenTelemetry metrics (Phase 7 - Jan 2026)
+    /** Per-tenant mutable counters — the single source of truth for current usage. */
+    private final ConcurrentHashMap<String, TenantCounters> tenantCounters = new ConcurrentHashMap<>();
+    
+    /** Immutable usage snapshots indexed by date. */
+    private final ConcurrentHashMap<String, Map<LocalDate, ResourceUsage>> usageHistory = new ConcurrentHashMap<>();
+    
+    /** Active resource reservations. */
+    private final ConcurrentHashMap<String, ResourceReservation> reservations = new ConcurrentHashMap<>();
+    
+    private final AtomicLong reservationCounter = new AtomicLong(0);
+    
+    /** Aggregate operation counter for observability. */
+    private final LongAdder totalOperationCount = new LongAdder();
+    
+    // OpenTelemetry metrics
     private final TenantMetrics metrics = TenantMetrics.getInstance();
     
     public SimpleResourceManagementService(TenantService tenantService) {
         this.tenantService = tenantService;
     }
     
+    // ── Lookup / factory ─────────────────────────────────────────────────
+    
+    private TenantCounters getOrCreateCounters(String tenantId) {
+        return tenantCounters.computeIfAbsent(tenantId, id -> {
+            TenantCounters counters = new TenantCounters(id);
+            // Register observable gauges for per-tenant resource monitoring
+            metrics.registerTenantGauges(id,
+                    () -> counters.concurrentTransfers.get(),
+                    () -> counters.bandwidthBytesPerSecond.get());
+            return counters;
+        });
+    }
+    
+    // ── Public API ───────────────────────────────────────────────────────
+    
     @Override
     public void recordUsage(ResourceUsage usage) throws ResourceManagementException {
-        synchronized (lock) {
-            // Update current usage
-            currentUsage.put(usage.getTenantId(), usage);
+        TenantCounters counters = getOrCreateCounters(usage.getTenantId());
+        long stamp = counters.lock.writeLock();
+        try {
+            counters.setFrom(usage);
             
-            // Update usage history
+            // Persist the exact snapshot into history
             usageHistory.computeIfAbsent(usage.getTenantId(), k -> new ConcurrentHashMap<>())
                        .put(usage.getUsageDate(), usage);
             
             logger.debug("Recorded usage for tenant: {}", usage.getTenantId());
+        } finally {
+            counters.lock.unlockWrite(stamp);
         }
+        totalOperationCount.increment();
+        metrics.recordResourceOperation(usage.getTenantId());
     }
     
     @Override
     public Optional<ResourceUsage> getCurrentUsage(String tenantId) {
-        return Optional.ofNullable(currentUsage.get(tenantId));
+        TenantCounters counters = tenantCounters.get(tenantId);
+        return counters != null ? Optional.of(counters.snapshot()) : Optional.empty();
     }
     
     @Override
@@ -101,7 +150,6 @@ public class SimpleResourceManagementService implements ResourceManagementServic
     @Override
     public ResourceValidationResult validateTransferRequest(String tenantId, long transferSizeBytes, long estimatedBandwidth) {
         try {
-            // Get tenant configuration
             TenantConfiguration config = tenantService.getEffectiveConfiguration(tenantId);
             if (config == null) {
                 return ResourceValidationResult.denied("No configuration found for tenant", 
@@ -142,7 +190,6 @@ public class SimpleResourceManagementService implements ResourceManagementServic
             if (violations.isEmpty()) {
                 return ResourceValidationResult.allowed();
             } else {
-                // Record quota violations (Phase 7 - Jan 2026)
                 for (String violation : violations) {
                     String violationType = violation.contains("concurrent") ? "concurrent_transfers" :
                                           violation.contains("Bandwidth") ? "bandwidth" :
@@ -159,34 +206,40 @@ public class SimpleResourceManagementService implements ResourceManagementServic
         }
     }
     
+    /**
+     * Reserve resources atomically — validation happens <b>inside</b> the per-tenant
+     * lock so that the gap between "check" and "update" cannot be exploited.
+     */
     @Override
     public String reserveResources(String tenantId, long transferSizeBytes, long estimatedBandwidth) 
             throws ResourceManagementException {
         
-        ResourceValidationResult validation = validateTransferRequest(tenantId, transferSizeBytes, estimatedBandwidth);
-        if (!validation.isAllowed()) {
-            metrics.recordResourceReservation(tenantId, "transfer", false);
-            throw new ResourceManagementException("Resource reservation denied: " + validation.getReason());
-        }
-        
-        synchronized (lock) {
+        TenantCounters counters = getOrCreateCounters(tenantId);
+        long stamp = counters.lock.writeLock();
+        try {
+            // Validate INSIDE the lock to prevent TOCTOU race
+            ResourceValidationResult validation = validateTransferRequest(tenantId, transferSizeBytes, estimatedBandwidth);
+            if (!validation.isAllowed()) {
+                metrics.recordResourceReservation(tenantId, "transfer", false);
+                throw new ResourceManagementException("Resource reservation denied: " + validation.getReason());
+            }
+            
             String reservationToken = "RES-" + reservationCounter.incrementAndGet();
             ResourceReservation reservation = new ResourceReservation(
                     reservationToken, tenantId, transferSizeBytes, estimatedBandwidth);
             
             reservations.put(reservationToken, reservation);
             
-            // Update current usage to reflect reservation
-            updateConcurrentTransfers(tenantId, 1);
-            updateBandwidthUsage(tenantId, 
-                    getCurrentUsage(tenantId).map(ResourceUsage::getCurrentBandwidthBytesPerSecond).orElse(0L) + 
-                    estimatedBandwidth);
+            // Update counters directly (StampedLock is non-reentrant)
+            counters.concurrentTransfers.incrementAndGet();
+            counters.bandwidthBytesPerSecond.addAndGet(estimatedBandwidth);
             
-            // Record metric (Phase 7 - Jan 2026)
             metrics.recordResourceReservation(tenantId, "transfer", true);
             
             logger.info("Reserved resources for tenant {}: {}", tenantId, reservationToken);
             return reservationToken;
+        } finally {
+            counters.lock.unlockWrite(stamp);
         }
     }
     
@@ -194,125 +247,85 @@ public class SimpleResourceManagementService implements ResourceManagementServic
     public void releaseResources(String reservationToken, long actualBytesTransferred, long actualBandwidthUsed) 
             throws ResourceManagementException {
         
-        synchronized (lock) {
-            ResourceReservation reservation = reservations.remove(reservationToken);
-            if (reservation == null) {
-                throw new ResourceManagementException("Reservation not found: " + reservationToken);
+        ResourceReservation reservation = reservations.remove(reservationToken);
+        if (reservation == null) {
+            throw new ResourceManagementException("Reservation not found: " + reservationToken);
+        }
+        
+        TenantCounters counters = getOrCreateCounters(reservation.tenantId);
+        long stamp = counters.lock.writeLock();
+        try {
+            // Decrement concurrent transfers (floor at 0)
+            long newConcurrent = counters.concurrentTransfers.decrementAndGet();
+            if (newConcurrent < 0) {
+                counters.concurrentTransfers.set(0);
             }
             
-            // Update current usage to reflect release
-            updateConcurrentTransfers(reservation.tenantId, -1);
-            
-            ResourceUsage currentUsage = getCurrentUsage(reservation.tenantId).orElse(
-                    ResourceUsage.builder().tenantId(reservation.tenantId).build());
-            
-            long newBandwidth = Math.max(0, currentUsage.getCurrentBandwidthBytesPerSecond() - reservation.estimatedBandwidth);
-            updateBandwidthUsage(reservation.tenantId, newBandwidth);
+            // Reduce bandwidth (floor at 0)
+            long newBandwidth = counters.bandwidthBytesPerSecond.addAndGet(-reservation.estimatedBandwidth);
+            if (newBandwidth < 0) {
+                counters.bandwidthBytesPerSecond.set(0);
+            }
             
             // Record transfer completion
-            recordTransferCompletion(reservation.tenantId, actualBytesTransferred, true);
-            
-            // Record metric (Phase 7 - Jan 2026)
-            metrics.recordResourceRelease(reservation.tenantId, "transfer");
-            
-            logger.info("Released resources for reservation: {}", reservationToken);
+            counters.dailyTransferCount.increment();
+            counters.dailyBytesTransferred.add(actualBytesTransferred);
+            counters.totalTransferCount.increment();
+            counters.totalBytesTransferred.add(actualBytesTransferred);
+        } finally {
+            counters.lock.unlockWrite(stamp);
         }
+        
+        metrics.recordResourceRelease(reservation.tenantId, "transfer");
+        totalOperationCount.increment();
+        metrics.recordResourceOperation(reservation.tenantId);
+        logger.info("Released resources for reservation: {}", reservationToken);
     }
+    
+    // ── Lock-free counter updates ────────────────────────────────────────
     
     @Override
     public void updateConcurrentTransfers(String tenantId, int delta) throws ResourceManagementException {
-        synchronized (lock) {
-            ResourceUsage current = getCurrentUsage(tenantId).orElse(
-                    ResourceUsage.builder().tenantId(tenantId).build());
-            
-            long newCount = Math.max(0, current.getCurrentConcurrentTransfers() + delta);
-            
-            ResourceUsage updated = ResourceUsage.builder()
-                    .tenantId(tenantId)
-                    .currentConcurrentTransfers(newCount)
-                    .currentBandwidthBytesPerSecond(current.getCurrentBandwidthBytesPerSecond())
-                    .currentStorageBytes(current.getCurrentStorageBytes())
-                    .dailyTransferCount(current.getDailyTransferCount())
-                    .dailyBytesTransferred(current.getDailyBytesTransferred())
-                    .dailyFailedTransfers(current.getDailyFailedTransfers())
-                    .totalTransferCount(current.getTotalTransferCount())
-                    .totalBytesTransferred(current.getTotalBytesTransferred())
-                    .totalFailedTransfers(current.getTotalFailedTransfers())
-                    .build();
-            
-            recordUsage(updated);
+        TenantCounters counters = getOrCreateCounters(tenantId);
+        long newCount = counters.concurrentTransfers.addAndGet(delta);
+        if (newCount < 0) {
+            counters.concurrentTransfers.set(0);
         }
+        totalOperationCount.increment();
+        metrics.recordResourceOperation(tenantId);
     }
     
     @Override
     public void updateBandwidthUsage(String tenantId, long bandwidthBytesPerSecond) throws ResourceManagementException {
-        synchronized (lock) {
-            ResourceUsage current = getCurrentUsage(tenantId).orElse(
-                    ResourceUsage.builder().tenantId(tenantId).build());
-            
-            ResourceUsage updated = ResourceUsage.builder()
-                    .tenantId(tenantId)
-                    .currentConcurrentTransfers(current.getCurrentConcurrentTransfers())
-                    .currentBandwidthBytesPerSecond(bandwidthBytesPerSecond)
-                    .currentStorageBytes(current.getCurrentStorageBytes())
-                    .dailyTransferCount(current.getDailyTransferCount())
-                    .dailyBytesTransferred(current.getDailyBytesTransferred())
-                    .dailyFailedTransfers(current.getDailyFailedTransfers())
-                    .totalTransferCount(current.getTotalTransferCount())
-                    .totalBytesTransferred(current.getTotalBytesTransferred())
-                    .totalFailedTransfers(current.getTotalFailedTransfers())
-                    .build();
-            
-            recordUsage(updated);
-        }
+        getOrCreateCounters(tenantId).bandwidthBytesPerSecond.set(bandwidthBytesPerSecond);
+        totalOperationCount.increment();
+        metrics.recordResourceOperation(tenantId);
     }
     
     @Override
     public void updateStorageUsage(String tenantId, long storageBytes) throws ResourceManagementException {
-        synchronized (lock) {
-            ResourceUsage current = getCurrentUsage(tenantId).orElse(
-                    ResourceUsage.builder().tenantId(tenantId).build());
-            
-            ResourceUsage updated = ResourceUsage.builder()
-                    .tenantId(tenantId)
-                    .currentConcurrentTransfers(current.getCurrentConcurrentTransfers())
-                    .currentBandwidthBytesPerSecond(current.getCurrentBandwidthBytesPerSecond())
-                    .currentStorageBytes(storageBytes)
-                    .dailyTransferCount(current.getDailyTransferCount())
-                    .dailyBytesTransferred(current.getDailyBytesTransferred())
-                    .dailyFailedTransfers(current.getDailyFailedTransfers())
-                    .totalTransferCount(current.getTotalTransferCount())
-                    .totalBytesTransferred(current.getTotalBytesTransferred())
-                    .totalFailedTransfers(current.getTotalFailedTransfers())
-                    .build();
-            
-            recordUsage(updated);
-        }
+        getOrCreateCounters(tenantId).storageBytes.set(storageBytes);
+        totalOperationCount.increment();
+        metrics.recordResourceOperation(tenantId);
     }
     
     @Override
     public void recordTransferCompletion(String tenantId, long bytesTransferred, boolean successful) 
             throws ResourceManagementException {
-        synchronized (lock) {
-            ResourceUsage current = getCurrentUsage(tenantId).orElse(
-                    ResourceUsage.builder().tenantId(tenantId).build());
-            
-            ResourceUsage updated = ResourceUsage.builder()
-                    .tenantId(tenantId)
-                    .currentConcurrentTransfers(current.getCurrentConcurrentTransfers())
-                    .currentBandwidthBytesPerSecond(current.getCurrentBandwidthBytesPerSecond())
-                    .currentStorageBytes(current.getCurrentStorageBytes())
-                    .dailyTransferCount(current.getDailyTransferCount() + 1)
-                    .dailyBytesTransferred(current.getDailyBytesTransferred() + bytesTransferred)
-                    .dailyFailedTransfers(current.getDailyFailedTransfers() + (successful ? 0 : 1))
-                    .totalTransferCount(current.getTotalTransferCount() + 1)
-                    .totalBytesTransferred(current.getTotalBytesTransferred() + bytesTransferred)
-                    .totalFailedTransfers(current.getTotalFailedTransfers() + (successful ? 0 : 1))
-                    .build();
-            
-            recordUsage(updated);
+        TenantCounters counters = getOrCreateCounters(tenantId);
+        counters.dailyTransferCount.increment();
+        counters.dailyBytesTransferred.add(bytesTransferred);
+        counters.totalTransferCount.increment();
+        counters.totalBytesTransferred.add(bytesTransferred);
+        if (!successful) {
+            counters.dailyFailedTransfers.increment();
+            counters.totalFailedTransfers.increment();
         }
+        totalOperationCount.increment();
+        metrics.recordResourceOperation(tenantId);
     }
+    
+    // ── Read-only queries ────────────────────────────────────────────────
     
     @Override
     public ResourceUtilization getResourceUtilization(String tenantId) {
@@ -337,7 +350,7 @@ public class SimpleResourceManagementService implements ResourceManagementServic
     
     @Override
     public List<String> getTenantsApproachingLimits(double thresholdPercentage) {
-        return currentUsage.keySet().stream()
+        return tenantCounters.keySet().stream()
                 .filter(tenantId -> {
                     ResourceUtilization utilization = getResourceUtilization(tenantId);
                     return utilization.isApproachingLimits(thresholdPercentage);
@@ -347,7 +360,7 @@ public class SimpleResourceManagementService implements ResourceManagementServic
     
     @Override
     public List<String> getTenantsExceedingLimits() {
-        return currentUsage.keySet().stream()
+        return tenantCounters.keySet().stream()
                 .filter(tenantId -> {
                     ResourceUtilization utilization = getResourceUtilization(tenantId);
                     return utilization.isExceedingLimits();
@@ -357,41 +370,35 @@ public class SimpleResourceManagementService implements ResourceManagementServic
     
     @Override
     public void resetDailyUsage() {
-        synchronized (lock) {
-            LocalDate today = LocalDate.now();
-            
-            for (String tenantId : currentUsage.keySet()) {
-                ResourceUsage current = currentUsage.get(tenantId);
-                if (current != null) {
-                    ResourceUsage reset = ResourceUsage.builder()
-                            .tenantId(tenantId)
-                            .usageDate(today)
-                            .currentConcurrentTransfers(current.getCurrentConcurrentTransfers())
-                            .currentBandwidthBytesPerSecond(current.getCurrentBandwidthBytesPerSecond())
-                            .currentStorageBytes(current.getCurrentStorageBytes())
-                            .dailyTransferCount(0)
-                            .dailyBytesTransferred(0)
-                            .dailyFailedTransfers(0)
-                            .totalTransferCount(current.getTotalTransferCount())
-                            .totalBytesTransferred(current.getTotalBytesTransferred())
-                            .totalFailedTransfers(current.getTotalFailedTransfers())
-                            .build();
-                    
-                    try {
-                        recordUsage(reset);
-                    } catch (ResourceManagementException e) {
-                        logger.error("Error resetting daily usage for tenant {}: {}", tenantId, e.getMessage());
-                    }
-                }
+        LocalDate today = LocalDate.now();
+        
+        for (Map.Entry<String, TenantCounters> entry : tenantCounters.entrySet()) {
+            TenantCounters counters = entry.getValue();
+            long stamp = counters.lock.writeLock();
+            try {
+                // Snapshot current state before resetting for history
+                ResourceUsage snapshot = counters.snapshot();
+                usageHistory.computeIfAbsent(entry.getKey(), k -> new ConcurrentHashMap<>())
+                           .put(snapshot.getUsageDate(), snapshot);
+                
+                counters.resetDaily();
+            } finally {
+                counters.lock.unlockWrite(stamp);
             }
-            
-            logger.info("Reset daily usage for all tenants");
         }
+        
+        totalOperationCount.increment();
+        // Record a single operation for the reset sweep
+        metrics.recordResourceOperation("system");
+        logger.info("Reset daily usage for all tenants");
     }
     
     @Override
     public AggregatedUsageStats getAggregatedUsageStats() {
-        List<ResourceUsage> allUsage = new ArrayList<>(currentUsage.values());
+        // Snapshot all tenants — lock-free reads of atomic counters
+        List<ResourceUsage> allUsage = tenantCounters.values().stream()
+                .map(TenantCounters::snapshot)
+                .collect(Collectors.toList());
         
         long totalTenants = allUsage.size();
         long activeTenants = tenantService.getActiveTenants().size();
@@ -428,7 +435,101 @@ public class SimpleResourceManagementService implements ResourceManagementServic
         );
     }
     
-    // Helper class for resource reservations
+    /**
+     * Returns the total number of operations processed by this service.
+     * Useful for observability and performance monitoring.
+     */
+    long getTotalOperationCount() {
+        return totalOperationCount.sum();
+    }
+    
+    // ── Inner classes ────────────────────────────────────────────────────
+    
+    /**
+     * Per-tenant mutable counter holder. Uses {@link AtomicLong} for gauge-style
+     * metrics (concurrent transfers, bandwidth, storage) and {@link LongAdder}
+     * for monotonically increasing counters (transfer counts, bytes transferred,
+     * failure counts).
+     * 
+     * <p>A {@link StampedLock} protects compound operations that must be atomic
+     * across multiple counters. Simple single-counter updates are lock-free.
+     */
+    static class TenantCounters {
+        final String tenantId;
+        
+        // Gauges — can go up or down
+        final AtomicLong concurrentTransfers = new AtomicLong(0);
+        final AtomicLong bandwidthBytesPerSecond = new AtomicLong(0);
+        final AtomicLong storageBytes = new AtomicLong(0);
+        
+        // Monotonic counters — daily (resettable)
+        final LongAdder dailyTransferCount = new LongAdder();
+        final LongAdder dailyBytesTransferred = new LongAdder();
+        final LongAdder dailyFailedTransfers = new LongAdder();
+        
+        // Monotonic counters — lifetime totals
+        final LongAdder totalTransferCount = new LongAdder();
+        final LongAdder totalBytesTransferred = new LongAdder();
+        final LongAdder totalFailedTransfers = new LongAdder();
+        
+        /** Per-tenant lock for compound operations. Non-reentrant. */
+        final StampedLock lock = new StampedLock();
+        
+        TenantCounters(String tenantId) {
+            this.tenantId = tenantId;
+        }
+        
+        /** Set all counters from an immutable {@link ResourceUsage} snapshot. */
+        void setFrom(ResourceUsage usage) {
+            concurrentTransfers.set(usage.getCurrentConcurrentTransfers());
+            bandwidthBytesPerSecond.set(usage.getCurrentBandwidthBytesPerSecond());
+            storageBytes.set(usage.getCurrentStorageBytes());
+            
+            // LongAdder has no set() — reset then add
+            dailyTransferCount.reset();
+            dailyTransferCount.add(usage.getDailyTransferCount());
+            
+            dailyBytesTransferred.reset();
+            dailyBytesTransferred.add(usage.getDailyBytesTransferred());
+            
+            dailyFailedTransfers.reset();
+            dailyFailedTransfers.add(usage.getDailyFailedTransfers());
+            
+            totalTransferCount.reset();
+            totalTransferCount.add(usage.getTotalTransferCount());
+            
+            totalBytesTransferred.reset();
+            totalBytesTransferred.add(usage.getTotalBytesTransferred());
+            
+            totalFailedTransfers.reset();
+            totalFailedTransfers.add(usage.getTotalFailedTransfers());
+        }
+        
+        /** Create an immutable {@link ResourceUsage} snapshot from current counter values. */
+        ResourceUsage snapshot() {
+            return ResourceUsage.builder()
+                    .tenantId(tenantId)
+                    .currentConcurrentTransfers(concurrentTransfers.get())
+                    .currentBandwidthBytesPerSecond(bandwidthBytesPerSecond.get())
+                    .currentStorageBytes(storageBytes.get())
+                    .dailyTransferCount(dailyTransferCount.sum())
+                    .dailyBytesTransferred(dailyBytesTransferred.sum())
+                    .dailyFailedTransfers(dailyFailedTransfers.sum())
+                    .totalTransferCount(totalTransferCount.sum())
+                    .totalBytesTransferred(totalBytesTransferred.sum())
+                    .totalFailedTransfers(totalFailedTransfers.sum())
+                    .build();
+        }
+        
+        /** Reset daily counters to zero. Must be called under writeLock. */
+        void resetDaily() {
+            dailyTransferCount.reset();
+            dailyBytesTransferred.reset();
+            dailyFailedTransfers.reset();
+        }
+    }
+    
+    /** Represents an active resource reservation. */
     private static class ResourceReservation {
         final String token;
         final String tenantId;

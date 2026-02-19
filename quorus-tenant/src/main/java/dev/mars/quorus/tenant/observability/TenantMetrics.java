@@ -22,7 +22,10 @@ import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.metrics.LongCounter;
 import io.opentelemetry.api.metrics.Meter;
 
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Supplier;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,7 +34,7 @@ import org.slf4j.LoggerFactory;
  * OpenTelemetry metrics for Quorus Tenant module.
  * Phase 7 of the OpenTelemetry migration.
  * 
- * Provides 7 tenant-specific metrics:
+ * Provides 10 tenant-specific metrics:
  * - quorus.tenant.total (gauge) - Total number of tenants
  * - quorus.tenant.active (gauge) - Number of active tenants
  * - quorus.tenant.created (counter) - Total tenants created
@@ -39,6 +42,9 @@ import org.slf4j.LoggerFactory;
  * - quorus.tenant.quota.violations (counter) - Quota violation attempts
  * - quorus.tenant.resource.reservations (counter) - Resource reservation attempts
  * - quorus.tenant.resource.releases (counter) - Resource releases
+ * - quorus.tenant.resource.operations (counter) - Total resource management operations
+ * - quorus.tenant.resource.concurrent_transfers (gauge) - Current concurrent transfers per tenant
+ * - quorus.tenant.resource.bandwidth (gauge) - Current bandwidth usage per tenant
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @since 2026-01-27
@@ -58,10 +64,15 @@ public class TenantMetrics {
     private final LongCounter quotaViolations;
     private final LongCounter resourceReservations;
     private final LongCounter resourceReleases;
+    private final LongCounter resourceOperations;
 
     // Gauges (backed by AtomicLong for thread-safe updates)
     private final AtomicLong totalTenants = new AtomicLong(0);
     private final AtomicLong activeTenants = new AtomicLong(0);
+
+    // Resource usage gauge suppliers - registered by ResourceManagementService
+    private final ConcurrentHashMap<String, Supplier<Long>> concurrentTransfersSuppliers = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Supplier<Long>> bandwidthSuppliers = new ConcurrentHashMap<>();
 
     // Attribute keys
     private static final AttributeKey<String> TENANT_ID_KEY = AttributeKey.stringKey("tenant.id");
@@ -97,6 +108,11 @@ public class TenantMetrics {
                 .setUnit("1")
                 .build();
 
+        resourceOperations = meter.counterBuilder("quorus.tenant.resource.operations")
+                .setDescription("Total resource management operations processed")
+                .setUnit("1")
+                .build();
+
         // Initialize gauges
         meter.gaugeBuilder("quorus.tenant.total")
                 .setDescription("Total number of tenants in the system")
@@ -107,6 +123,28 @@ public class TenantMetrics {
                 .setDescription("Number of active tenants")
                 .ofLongs()
                 .buildWithCallback(measurement -> measurement.record(activeTenants.get()));
+
+        // Per-tenant resource gauges — populated via registerTenantGauges()
+        meter.gaugeBuilder("quorus.tenant.resource.concurrent_transfers")
+                .setDescription("Current concurrent transfers per tenant")
+                .ofLongs()
+                .buildWithCallback(measurement -> {
+                    for (Map.Entry<String, Supplier<Long>> entry : concurrentTransfersSuppliers.entrySet()) {
+                        measurement.record(entry.getValue().get(),
+                                Attributes.of(TENANT_ID_KEY, entry.getKey()));
+                    }
+                });
+
+        meter.gaugeBuilder("quorus.tenant.resource.bandwidth")
+                .setDescription("Current bandwidth usage per tenant (bytes/sec)")
+                .setUnit("By/s")
+                .ofLongs()
+                .buildWithCallback(measurement -> {
+                    for (Map.Entry<String, Supplier<Long>> entry : bandwidthSuppliers.entrySet()) {
+                        measurement.record(entry.getValue().get(),
+                                Attributes.of(TENANT_ID_KEY, entry.getKey()));
+                    }
+                });
 
         logger.info("TenantMetrics initialized");
     }
@@ -172,4 +210,30 @@ public class TenantMetrics {
         totalTenants.set(total);
         activeTenants.set(active);
     }
+
+    // Resource tracking methods
+    
+    /**
+     * Record a resource management operation (any counter update, reservation, etc.).
+     */
+    public void recordResourceOperation(String tenantId) {
+        resourceOperations.add(1, Attributes.of(TENANT_ID_KEY, tenantId));
+    }
+
+    /**
+     * Register per-tenant gauge suppliers for observable resource metrics.
+     * Call this when a tenant first appears in the resource management service.
+     *
+     * @param tenantId the tenant identifier
+     * @param concurrentTransfers supplier returning current concurrent transfers count
+     * @param bandwidth supplier returning current bandwidth in bytes/sec
+     */
+    public void registerTenantGauges(String tenantId, 
+                                      Supplier<Long> concurrentTransfers,
+                                      Supplier<Long> bandwidth) {
+        concurrentTransfersSuppliers.put(tenantId, concurrentTransfers);
+        bandwidthSuppliers.put(tenantId, bandwidth);
+    }
+
+
 }

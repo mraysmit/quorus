@@ -1,7 +1,7 @@
 # Quorus Alpha Implementation Plan
 
-**Version:** 1.5  
-**Date:** February 13, 2026  
+**Version:** 1.7  
+**Date:** February 19, 2026  
 **Author:** Mark Andrew Ray-Smith Cityline Ltd
 
 ---
@@ -10,6 +10,7 @@
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.7 | 2026-02-19 | Consistency fixes: updated Appendix A to match completed tasks (T4.1, T4.2, T5.2, T5.3, T5.4), corrected summary counts (14/22 completed), fixed version header, fixed 2025→2026 date in T3.1, expanded route risk mitigation |
 | 1.6 | 2026-02-13 | Consolidated: merged IMPLEMENTATION_STATUS, CHANGELOG, .env.example into appendices |
 | 1.5 | 2026-02-13 | Stage 1 & Stage 2 COMPLETE: All documentation, config, logging, health, error, and shutdown tasks |
 | 1.4 | 2026-02-02 | Third review: Fixed schedule checkboxes, corrected line references |
@@ -207,7 +208,7 @@ Fix critical blocking I/O and thread management issues.
 **Effort:** 3-4 days  
 **Priority:** 🔴 CRITICAL  
 **Dependencies:** None  
-**Status:** ✅ COMPLETE (verified 2025-01-30)
+**Status:** ✅ COMPLETE (verified 2026-01-30)
 
 | Task | Module | Effort | Status |
 |------|--------|--------|--------|
@@ -260,40 +261,60 @@ webClient.postAbs(url)
 
 Extend capabilities with new protocols and services.
 
-### T4.1: NFS Protocol Adapter
+### T4.1: NFS Protocol Adapter ✅ COMPLETE
 
 **Goal:** Enable NFS file transfers for corporate networks.
 
 **Effort:** 4-5 days  
 **Priority:** 🟡 HIGH  
-**Dependencies:** None
+**Dependencies:** None  
+**Status:** ✅ **IMPLEMENTED** — mount-path-based NFS adapter with simulation mode
 
 | Task | Module | Effort | Status |
 |------|--------|--------|--------|
-| Create NfsTransferProtocol interface impl | quorus-core | 8 hours | ⬜ Pending |
-| Add NFS client library dependency | pom.xml | 1 hour | ⬜ Pending |
-| Register NFS in ProtocolFactory | quorus-core | 1 hour | ⬜ Pending |
-| Add NFS configuration properties | quorus.properties | 1 hour | ⬜ Pending |
-| Create NFS Testcontainer setup | quorus-core/test | 4 hours | ⬜ Pending |
-| Add NFS integration tests | quorus-core/test | 8 hours | ⬜ Pending |
-| Document NFS usage | docs/ | 2 hours | ⬜ Pending |
+| Create NfsTransferProtocol interface impl | quorus-core | 8 hours | ✅ Complete |
+| Add NFS client library dependency | pom.xml | 1 hour | ✅ N/A (uses java.nio mount paths) |
+| Register NFS in ProtocolFactory | quorus-core | 1 hour | ✅ Complete |
+| Add NFS configuration properties | quorus.properties | 1 hour | ✅ Complete (quorus.nfs.mount.root) |
+| Create NFS Testcontainer setup | quorus-core/test | 4 hours | ✅ Complete (simulation mode + @TempDir) |
+| Add NFS integration tests | quorus-core/test | 8 hours | ✅ Complete (44 tests) |
+| Document NFS usage | docs/ | 2 hours | ✅ Inline Javadoc |
+
+**Implementation Notes:**
+- `NfsTransferProtocol` (~420 lines): mount-path-based adapter mapping `nfs://host/export/path` to local mount points
+- URI parsing: `NfsConnectionInfo` extracts host, port, exportPath, filePath from NFS URIs
+- Mount resolution: configurable via `quorus.nfs.mount.root` system property (default `/mnt/nfs`)
+- Simulation mode: detected via hostname patterns (testserver, localhost.test, simulated-nfs-server)
+- Checksum: SHA-256 verification on all transfers
+- Tests: 44 total (36 in NfsTransferProtocolTest + 8 in NfsTransferProtocolUploadTest)
 
 ---
 
-### T4.2: Tenant Resource Management Improvements
+### T4.2: Tenant Resource Management Improvements ✅ COMPLETE
 
 **Goal:** Remove synchronization bottlenecks in tenant resource tracking.
 
 **Effort:** 3 days  
 **Priority:** 🟡 HIGH  
-**Dependencies:** None
+**Dependencies:** None  
+**Status:** ✅ **IMPLEMENTED** — per-tenant StampedLock + lock-free atomic counters
 
 | Task | Module | Effort | Status |
 |------|--------|--------|--------|
-| Refactor SimpleResourceManagementService to use LongAdder | quorus-tenant | 4 hours | ⬜ Pending |
-| Remove synchronized(lock) global bottleneck | quorus-tenant | 4 hours | ⬜ Pending |
-| Add concurrent access stress tests | quorus-tenant/test | 8 hours | ⬜ Pending |
-| Add resource tracking metrics | quorus-tenant | 4 hours | ⬜ Pending |
+| Refactor SimpleResourceManagementService to use LongAdder | quorus-tenant | 4 hours | ✅ Complete |
+| Remove synchronized(lock) global bottleneck | quorus-tenant | 4 hours | ✅ Complete |
+| Add concurrent access stress tests | quorus-tenant/test | 8 hours | ✅ Complete (15 tests) |
+| Add resource tracking metrics | quorus-tenant | 4 hours | ✅ Complete |
+
+**Implementation Notes:**
+- Replaced global `Object lock` with per-tenant `StampedLock` in `TenantCounters` inner class
+- Lock-free operations: `updateConcurrentTransfers`, `updateBandwidthUsage`, `updateStorageUsage`, `recordTransferCompletion` use `AtomicLong`/`LongAdder` directly
+- Compound operations: `reserveResources`, `releaseResources`, `recordUsage`, `resetDailyUsage` use per-tenant write lock
+- Fixed TOCTOU race: `reserveResources` now validates INSIDE the per-tenant lock
+- Gauges: AtomicLong for concurrent transfers, bandwidth, storage; LongAdder for daily/total counters
+- New OTel metrics: `quorus.tenant.resource.operations`, `quorus.tenant.resource.concurrent_transfers`, `quorus.tenant.resource.bandwidth` (10 total)
+- Tests: 15 concurrent stress tests in `ResourceManagementConcurrencyTest` (16 threads × 500 ops)
+- Total quorus-tenant tests: 64 (49 existing + 15 new), all passing
 
 ---
 
@@ -628,12 +649,12 @@ Security features implemented **after** core functionality is stable and well-te
 - [x] **Stage 3**: T3.2 (Bounded Thread Pools) - ✅ COMPLETE
 
 ### Week 5-6: Protocols & Services
-- [ ] **Stage 4**: T4.1 (NFS Protocol Adapter)
-- [ ] **Stage 4**: T4.2 (Tenant Resource Management)
+- [x] **Stage 4**: T4.1 (NFS Protocol Adapter) - ✅ COMPLETE (44 tests)
+- [x] **Stage 4**: T4.2 (Tenant Resource Management) - ✅ COMPLETE (15 stress tests)
 
 ### Week 7-10: Raft Persistence (CRITICAL)
 - [x] **Stage 5**: T5.1 (Raft WAL) - ✅ COMPLETE via raftlog-core
-- [ ] **Stage 5**: T5.2 (Snapshots) - scheduling/truncation remain
+- [x] **Stage 5**: T5.2 (Snapshots) - ✅ COMPLETE (scheduling, truncation, metrics, 7 tests)
 
 ### Week 11-14: Raft Maturity
 - [x] **Stage 5**: T5.3 (InstallSnapshot RPC)
@@ -662,9 +683,10 @@ Security features implemented **after** core functionality is stable and well-te
 | 3 | Stability | ~~T2.3 Graceful shutdown~~ ✅ COMPLETE |
 | 4 | Agent | ~~T3.1 Vert.x WebClient~~ ✅ COMPLETE |
 | 5 | Threading | ~~T3.2 Bounded thread pools~~ ✅ COMPLETE |
-| 6 | Protocols | T4.1 NFS adapter |
+| 6 | Protocols | ~~T4.1 NFS adapter~~ ✅ COMPLETE |
+| 6 | Resources | ~~T4.2 Tenant Resource Management~~ ✅ COMPLETE |
 | 7-8 | Persistence | ~~T5.1 Raft WAL~~ ✅ COMPLETE |
-| 9-10 | Compaction | T5.2 Snapshots (scheduling/truncation remain) |
+| 9-10 | Compaction | ~~T5.2 Snapshots~~ ✅ COMPLETE |
 | 11-12 | Raft | ~~T5.3 InstallSnapshot, T5.4 Protobuf~~ ✅ COMPLETE |
 | 15+ | Security + Routes | T6.1-T6.6 (Security), T6.7 (Routes) |
 
@@ -672,19 +694,23 @@ Security features implemented **after** core functionality is stable and well-te
 
 | Priority | Total Tasks | Completed | Remaining |
 |----------|-------------|-----------|-----------|
-| 🔴 CRITICAL | 4 | 2 (T5.1, T3.1) | 2 |
-| 🟡 HIGH | 7 | 5 (T3.2, T2.1, T2.2, T2.3, T5.4) | 2 |
+| 🔴 CRITICAL | 4 | 4 (T3.1, T5.1, T5.2, T5.3) | 0 |
+| 🟡 HIGH | 7 | 7 (T2.1, T2.2, T2.3, T3.2, T4.1, T4.2, T5.4) | 0 |
 | 🟢 LOW | 3 | 3 (T1.1, T1.2, T1.3) | 0 |
-| 🟠 MEDIUM (Security - Deferred) | 11 | 0 | 11 |
-| **TOTAL** | **22** | **10** | **12** |
+| 🟠 MEDIUM (Security - Deferred) | 6 | 0 | 6 |
+| 🟡 HIGH (Routes - Core) | 1 | 0 | 1 |
+| 🟠 MEDIUM (Enterprise) | 1 | 0 | 1 |
+| **TOTAL** | **22** | **14** | **8** |
 
 > **Notes:**
 > - T5.1 (Raft WAL) marked COMPLETE via raftlog-core library
 > - T3.1 (WebClient Migration) marked COMPLETE with dedicated tests
 > - T3.2 (Bounded Thread Pools) marked COMPLETE with RaftMetrics (87% coverage)
-> - T5.2 takeSnapshot/restoreSnapshot methods are COMPLETE; scheduling remains
+> - T5.2 takeSnapshot/restoreSnapshot methods are COMPLETE; ✅ COMPLETE (scheduling, truncation, metrics, 7 tests)
 > - T5.3 (InstallSnapshot RPC) marked COMPLETE with 7 tests, all 5 RaftTransport implementations updated
 > - T5.4 (Protobuf Serialization) marked COMPLETE: commands.proto, ProtobufCommandCodec, 31 roundtrip tests (317 total controller tests)
+> - T4.1 (NFS Protocol Adapter) marked COMPLETE: NfsTransferProtocol (~420 lines), mount-path-based, simulation mode, 44 tests
+> - T4.2 (Tenant Resource Management) marked COMPLETE: per-tenant StampedLock + LongAdder, TOCTOU fix, 3 new OTel metrics, 15 concurrent stress tests (64 total tenant tests)
 > - T6.7 changed from "decision point" to implementation task (routes are core)
 > - T1.1 reduced scope (routes are not "future" features)
 > - **Stage 1 COMPLETE (2026-02-13):** T1.1 (docs/QUORUS_IMPLEMENTATION_STATUS.md + CHANGELOG.md), T1.2 (.env.example, README config, AgentConfig/AppConfig validate()), T1.3 (CorrelationIdHandler, MDC logback patterns, startup banners)
@@ -733,7 +759,7 @@ T5.3 (InstallSnapshot) ──► T6.7 (Routes) [HIGH priority - core feature]
 | Agent blocking I/O | T3.1 is on critical path; prioritize in Week 4 | Dev Team |
 | Security deferred too long | Core must be stable by Week 14 to start security | PM |
 | Test failures | Follow "all tests must pass" principle strictly | All |
-| Route implementation scope | Routes are core (4-6 weeks); plan resources for Stage 6 | PM |
+| Route implementation scope | Routes are core (4-6 weeks); plan resources for Stage 6. Break into sub-milestones (triggers individually) to limit scope creep. Track each trigger type as independent deliverable. | PM |
 
 ---
 
@@ -772,7 +798,7 @@ Each task is complete when:
 | `SftpTransferProtocol` | ✅ | Blocking, uses WorkerExecutor |
 | `FtpTransferProtocol` | ✅ | Blocking, uses WorkerExecutor |
 | `SmbTransferProtocol` | ✅ | Blocking, uses WorkerExecutor |
-| NFS protocol adapter | ⬜ | Not yet implemented |
+| NFS protocol adapter | ✅ | `NfsTransferProtocol` (~420 lines), mount-path-based, simulation mode, 44 tests (T4.1) |
 | SHA-256 checksum verification | ✅ | `ChecksumMismatchException` |
 | Transfer metrics (OpenTelemetry) | ✅ | `TransferTelemetryMetrics` |
 | Transfer health checks | ✅ | `TransferEngineHealthCheck` (183 lines) |
@@ -801,9 +827,9 @@ Each task is complete when:
 | Raft metadata persistence (term, votedFor) | ✅ | `persistVote()`, `persistAppendEntries()` |
 | Recovery on restart | ✅ | `recoverFromStorage()` → `loadMetadata()` → `replayLog()` |
 | Snapshot: `takeSnapshot()` / `restoreSnapshot()` | ✅ | `QuorusStateMachine` |
-| Snapshot scheduling & log truncation | ⬜ | Methods exist but no automatic scheduling |
-| InstallSnapshot RPC | ⬜ | Not in `raft.proto` |
-| Protobuf serialization for commands | ⬜ | Currently uses Java serialization |
+| Snapshot scheduling & log truncation | ✅ | Periodic `checkAndTakeSnapshot()`, configurable threshold/interval, log truncation after snapshot (T5.2) |
+| InstallSnapshot RPC | ✅ | `raft.proto` InstallSnapshot RPC, chunked transfer, 7 tests, all 5 transport impls updated (T5.3) |
+| Protobuf serialization for commands | ✅ | `commands.proto`, `ProtobufCommandCodec` (~750 lines), 31 roundtrip tests (T5.4) |
 | **gRPC Transport** | | |
 | `GrpcRaftTransport` (inter-node, bounded pools) | ✅ | Named threads `raft-io-*` |
 | `GrpcRaftServer` (handles RPCs) | ✅ | Vote + AppendEntries handlers |
@@ -850,7 +876,7 @@ Each task is complete when:
 |---------|--------|----------|
 | `TenantService` / `SimpleTenantService` | ✅ | In-memory tenant CRUD |
 | `ResourceManagementService` | ✅ | Quota tracking |
-| `SimpleResourceManagementService` | 🔶 | Uses `synchronized(lock)` — performance bottleneck |
+| `SimpleResourceManagementService` | ✅ | Per-tenant StampedLock + LongAdder, TOCTOU fix, 15 concurrent stress tests (T4.2) |
 | `TenantSecurityService` | ⬜ | Not yet implemented |
 | `TenantAwareStorageService` | ⬜ | Not yet implemented |
 
@@ -995,6 +1021,6 @@ Environment variable naming: replace dots with underscores, uppercase (`quorus.h
 ---
 
 **Document Status**: Active Implementation Plan  
-**Last Updated**: 2026-02-13  
-**Version**: 1.6  
+**Last Updated**: 2026-02-19  
+**Version**: 1.7  
 **Owner**: Development Team

@@ -21,6 +21,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import dev.mars.quorus.agent.AgentInfo;
 import dev.mars.quorus.core.JobAssignment;
 import dev.mars.quorus.core.QueuedJob;
+import dev.mars.quorus.core.RouteConfiguration;
 
 import java.io.Serializable;
 import java.time.Instant;
@@ -42,6 +43,7 @@ public class QuorusSnapshot implements Serializable {
     private Map<String, String> systemMetadata;
     private Map<String, JobAssignment> jobAssignments;
     private Map<String, QueuedJob> jobQueue;
+    private Map<String, RouteConfiguration> routes;
     private long lastAppliedIndex;
     private Instant timestamp;
 
@@ -55,6 +57,7 @@ public class QuorusSnapshot implements Serializable {
                          @JsonProperty("systemMetadata") Map<String, String> systemMetadata,
                          @JsonProperty("jobAssignments") Map<String, JobAssignment> jobAssignments,
                          @JsonProperty("jobQueue") Map<String, QueuedJob> jobQueue,
+                         @JsonProperty("routes") Map<String, RouteConfiguration> routes,
                          @JsonProperty("lastAppliedIndex") long lastAppliedIndex,
                          @JsonProperty("timestamp") Instant timestamp) {
         this.transferJobs = transferJobs;
@@ -62,6 +65,7 @@ public class QuorusSnapshot implements Serializable {
         this.systemMetadata = systemMetadata;
         this.jobAssignments = jobAssignments;
         this.jobQueue = jobQueue;
+        this.routes = routes;
         this.lastAppliedIndex = lastAppliedIndex;
         this.timestamp = timestamp != null ? timestamp : Instant.now();
     }
@@ -106,6 +110,14 @@ public class QuorusSnapshot implements Serializable {
         this.jobQueue = jobQueue;
     }
 
+    public Map<String, RouteConfiguration> getRoutes() {
+        return routes;
+    }
+
+    public void setRoutes(Map<String, RouteConfiguration> routes) {
+        this.routes = routes;
+    }
+
     public long getLastAppliedIndex() {
         return lastAppliedIndex;
     }
@@ -133,6 +145,7 @@ public class QuorusSnapshot implements Serializable {
                 ", systemMetadata=" + (systemMetadata != null ? systemMetadata.size() : 0) + " entries" +
                 ", jobAssignments=" + (jobAssignments != null ? jobAssignments.size() : 0) + " assignments" +
                 ", jobQueue=" + (jobQueue != null ? jobQueue.size() : 0) + " queued" +
+                ", routes=" + (routes != null ? routes.size() : 0) + " routes" +
                 ", lastAppliedIndex=" + lastAppliedIndex +
                 ", timestamp=" + timestamp +
                 '}';

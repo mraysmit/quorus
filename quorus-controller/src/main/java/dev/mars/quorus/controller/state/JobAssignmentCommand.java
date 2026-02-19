@@ -19,7 +19,6 @@ package dev.mars.quorus.controller.state;
 import dev.mars.quorus.core.JobAssignment;
 import dev.mars.quorus.core.JobAssignmentStatus;
 
-import java.io.Serializable;
 import java.time.Instant;
 import java.util.Objects;
 
@@ -32,7 +31,7 @@ import java.util.Objects;
  * @since 2025-10-28
  * @version 1.0
  */
-public class JobAssignmentCommand implements Serializable {
+public final class JobAssignmentCommand implements StateMachineCommand {
 
     private static final long serialVersionUID = 1L;
 

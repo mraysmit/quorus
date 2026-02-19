@@ -131,6 +131,38 @@ enum JobQueueCommandType {
   JOB_QUEUE_CMD_UPDATE_REQUIREMENTS = 6;
 }
 
+enum RouteCommandType {
+  ROUTE_CMD_UNSPECIFIED = 0;
+  ROUTE_CMD_CREATE = 1;
+  ROUTE_CMD_UPDATE = 2;
+  ROUTE_CMD_DELETE = 3;
+  ROUTE_CMD_SUSPEND = 4;
+  ROUTE_CMD_RESUME = 5;
+  ROUTE_CMD_UPDATE_STATUS = 6;
+}
+
+enum RouteStatusProto {
+  ROUTE_STATUS_UNSPECIFIED = 0;
+  ROUTE_STATUS_CONFIGURED = 1;
+  ROUTE_STATUS_ACTIVE = 2;
+  ROUTE_STATUS_TRIGGERED = 3;
+  ROUTE_STATUS_TRANSFERRING = 4;
+  ROUTE_STATUS_SUSPENDED = 5;
+  ROUTE_STATUS_DEGRADED = 6;
+  ROUTE_STATUS_FAILED = 7;
+  ROUTE_STATUS_DELETED = 8;
+}
+
+enum TriggerTypeProto {
+  TRIGGER_TYPE_UNSPECIFIED = 0;
+  TRIGGER_TYPE_EVENT = 1;
+  TRIGGER_TYPE_TIME = 2;
+  TRIGGER_TYPE_INTERVAL = 3;
+  TRIGGER_TYPE_BATCH = 4;
+  TRIGGER_TYPE_SIZE = 5;
+  TRIGGER_TYPE_COMPOSITE = 6;
+}
+
 // ===== DOMAIN MODEL MESSAGES =====
 
 message TransferRequestProto {
@@ -255,6 +287,43 @@ message JobAssignmentProto {
 
 // ===== STATE MACHINE COMMAND MESSAGES =====
 
+message TriggerConfigurationProto {
+  TriggerTypeProto type = 1;
+  // EVENT fields
+  repeated string event_patterns = 2;
+  repeated string exclude_patterns = 3;
+  int64 debounce_ms = 4;
+  // TIME fields
+  string cron_expression = 5;
+  string timezone = 6;
+  // INTERVAL fields
+  int32 interval_minutes = 7;
+  // BATCH fields
+  int32 file_count_threshold = 8;
+  // SIZE fields
+  int64 size_threshold_mb = 9;
+  // BATCH + SIZE shared
+  int32 max_wait_minutes = 10;
+  // COMPOSITE fields
+  string composite_operator = 11;
+  repeated TriggerConfigurationProto child_triggers = 12;
+}
+
+message RouteConfigurationProto {
+  string route_id = 1;
+  string name = 2;
+  string description = 3;
+  string source_agent_id = 4;
+  string source_location = 5;
+  string destination_agent_id = 6;
+  string destination_location = 7;
+  TriggerConfigurationProto trigger = 8;
+  RouteStatusProto status = 9;
+  map<string, string> options = 10;
+  int64 created_at_epoch_ms = 11;
+  int64 updated_at_epoch_ms = 12;
+}
+
 message TransferJobCommandProto {
   TransferJobCommandType type = 1;
   string job_id = 2;
@@ -296,6 +365,15 @@ message JobQueueCommandProto {
   int64 timestamp_epoch_ms = 6;
 }
 
+message RouteCommandProto {
+  RouteCommandType type = 1;
+  string route_id = 2;
+  RouteConfigurationProto route_configuration = 3;
+  RouteStatusProto new_status = 4;
+  string reason = 5;
+  int64 timestamp_epoch_ms = 6;
+}
+
 // ===== RAFT COMMAND WRAPPER =====
 
 // Top-level wrapper for all state machine commands.
@@ -307,5 +385,6 @@ message RaftCommand {
     SystemMetadataCommandProto system_metadata_command = 3;
     JobAssignmentCommandProto job_assignment_command = 4;
     JobQueueCommandProto job_queue_command = 5;
+    RouteCommandProto route_command = 6;
   }
 }

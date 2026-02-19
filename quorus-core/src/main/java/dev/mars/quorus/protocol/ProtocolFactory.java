@@ -75,6 +75,10 @@ public class ProtocolFactory {
         logger.debug("Creating SftpTransferProtocol instance");
         registerProtocol(new SftpTransferProtocol());
 
+        // Register NFS protocol
+        logger.debug("Creating NfsTransferProtocol instance");
+        registerProtocol(new NfsTransferProtocol());
+
         logger.info("Registered default transfer protocols: count={}, schemes={}", 
                    protocols.size(), String.join(", ", protocols.keySet()));
     }

@@ -16,7 +16,6 @@
 
 package dev.mars.quorus.controller.state;
 
-import java.io.Serializable;
 /**
  * Description for SystemMetadataCommand
  *
@@ -25,7 +24,7 @@ import java.io.Serializable;
  * @since 2025-08-20
  */
 
-public class SystemMetadataCommand implements Serializable {
+public final class SystemMetadataCommand implements StateMachineCommand {
 
     private static final long serialVersionUID = 1L;
 
