@@ -16,7 +16,7 @@
 
 package dev.mars.quorus.controller.raft;
 
-import dev.mars.quorus.controller.state.QuorusStateMachine;
+import dev.mars.quorus.controller.state.QuorusStateStore;
 import io.vertx.core.Vertx;
 import org.junit.jupiter.api.*;
 import org.slf4j.Logger;
@@ -92,9 +92,9 @@ class EnhancedInMemoryTransportTest {
         InMemoryTransportSimulator transport2 = new InMemoryTransportSimulator("node2");
         InMemoryTransportSimulator transport3 = new InMemoryTransportSimulator("node3");
 
-        QuorusStateMachine sm1 = new QuorusStateMachine();
-        QuorusStateMachine sm2 = new QuorusStateMachine();
-        QuorusStateMachine sm3 = new QuorusStateMachine();
+        QuorusStateStore sm1 = new QuorusStateStore();
+        QuorusStateStore sm2 = new QuorusStateStore();
+        QuorusStateStore sm3 = new QuorusStateStore();
 
         RaftNode node1 = new RaftNode(vertx, "node1", clusterNodes, transport1, sm1, 1000, 200);
         RaftNode node2 = new RaftNode(vertx, "node2", clusterNodes, transport2, sm2, 1000, 200);
@@ -148,8 +148,8 @@ class EnhancedInMemoryTransportTest {
         transport1.setReorderingConfig(true, 0.3, 50);
         transport2.setReorderingConfig(true, 0.3, 50);
 
-        QuorusStateMachine sm1 = new QuorusStateMachine();
-        QuorusStateMachine sm2 = new QuorusStateMachine();
+        QuorusStateStore sm1 = new QuorusStateStore();
+        QuorusStateStore sm2 = new QuorusStateStore();
 
         RaftNode node1 = new RaftNode(vertx, "leader", clusterNodes, transport1, sm1, 1000, 200);
         RaftNode node2 = new RaftNode(vertx, "follower", clusterNodes, transport2, sm2, 1000, 200);
@@ -180,8 +180,8 @@ class EnhancedInMemoryTransportTest {
         transport1.setThrottlingConfig(true, 1000); // 1KB/sec
         transport2.setThrottlingConfig(true, 1000);
 
-        QuorusStateMachine sm1 = new QuorusStateMachine();
-        QuorusStateMachine sm2 = new QuorusStateMachine();
+        QuorusStateStore sm1 = new QuorusStateStore();
+        QuorusStateStore sm2 = new QuorusStateStore();
 
         RaftNode node1 = new RaftNode(vertx, "node1", clusterNodes, transport1, sm1, 1000, 200);
         RaftNode node2 = new RaftNode(vertx, "node2", clusterNodes, transport2, sm2, 1000, 200);
@@ -212,9 +212,9 @@ class EnhancedInMemoryTransportTest {
         InMemoryTransportSimulator transport2 = new InMemoryTransportSimulator("node2");
         InMemoryTransportSimulator transport3 = new InMemoryTransportSimulator("node3");
 
-        QuorusStateMachine sm1 = new QuorusStateMachine();
-        QuorusStateMachine sm2 = new QuorusStateMachine();
-        QuorusStateMachine sm3 = new QuorusStateMachine();
+        QuorusStateStore sm1 = new QuorusStateStore();
+        QuorusStateStore sm2 = new QuorusStateStore();
+        QuorusStateStore sm3 = new QuorusStateStore();
 
         RaftNode node1 = new RaftNode(vertx, "node1", clusterNodes, transport1, sm1, 800, 150);
         RaftNode node2 = new RaftNode(vertx, "node2", clusterNodes, transport2, sm2, 800, 150);
@@ -267,9 +267,9 @@ class EnhancedInMemoryTransportTest {
         // Make node1 Byzantine (corrupt 50% of responses)
         transport1.setFailureMode(InMemoryTransportSimulator.FailureMode.BYZANTINE, 0.5);
 
-        QuorusStateMachine sm1 = new QuorusStateMachine();
-        QuorusStateMachine sm2 = new QuorusStateMachine();
-        QuorusStateMachine sm3 = new QuorusStateMachine();
+        QuorusStateStore sm1 = new QuorusStateStore();
+        QuorusStateStore sm2 = new QuorusStateStore();
+        QuorusStateStore sm3 = new QuorusStateStore();
 
         RaftNode node1 = new RaftNode(vertx, "node1", clusterNodes, transport1, sm1, 1000, 200);
         RaftNode node2 = new RaftNode(vertx, "node2", clusterNodes, transport2, sm2, 1000, 200);
@@ -301,8 +301,8 @@ class EnhancedInMemoryTransportTest {
         // Make node1 slow (10x latency)
         transport1.setFailureMode(InMemoryTransportSimulator.FailureMode.SLOW, 0.0);
 
-        QuorusStateMachine sm1 = new QuorusStateMachine();
-        QuorusStateMachine sm2 = new QuorusStateMachine();
+        QuorusStateStore sm1 = new QuorusStateStore();
+        QuorusStateStore sm2 = new QuorusStateStore();
 
         RaftNode node1 = new RaftNode(vertx, "node1", clusterNodes, transport1, sm1, 1000, 200);
         RaftNode node2 = new RaftNode(vertx, "node2", clusterNodes, transport2, sm2, 1000, 200);
@@ -336,9 +336,9 @@ class EnhancedInMemoryTransportTest {
         // Make node2 flaky (intermittent 50% high latency)
         transport2.setFailureMode(InMemoryTransportSimulator.FailureMode.FLAKY, 0.0);
 
-        QuorusStateMachine sm1 = new QuorusStateMachine();
-        QuorusStateMachine sm2 = new QuorusStateMachine();
-        QuorusStateMachine sm3 = new QuorusStateMachine();
+        QuorusStateStore sm1 = new QuorusStateStore();
+        QuorusStateStore sm2 = new QuorusStateStore();
+        QuorusStateStore sm3 = new QuorusStateStore();
 
         RaftNode node1 = new RaftNode(vertx, "node1", clusterNodes, transport1, sm1, 800, 150);
         RaftNode node2 = new RaftNode(vertx, "node2", clusterNodes, transport2, sm2, 800, 150);
@@ -376,9 +376,9 @@ class EnhancedInMemoryTransportTest {
         transport2.setReorderingConfig(true, 0.2, 40);
         transport3.setReorderingConfig(true, 0.2, 40);
 
-        QuorusStateMachine sm1 = new QuorusStateMachine();
-        QuorusStateMachine sm2 = new QuorusStateMachine();
-        QuorusStateMachine sm3 = new QuorusStateMachine();
+        QuorusStateStore sm1 = new QuorusStateStore();
+        QuorusStateStore sm2 = new QuorusStateStore();
+        QuorusStateStore sm3 = new QuorusStateStore();
 
         RaftNode node1 = new RaftNode(vertx, "node1", clusterNodes, transport1, sm1, 1000, 200);
         RaftNode node2 = new RaftNode(vertx, "node2", clusterNodes, transport2, sm2, 1000, 200);

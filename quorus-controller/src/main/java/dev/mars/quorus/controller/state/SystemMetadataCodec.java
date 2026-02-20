@@ -18,6 +18,8 @@ package dev.mars.quorus.controller.state;
 
 import dev.mars.quorus.controller.raft.grpc.*;
 
+import java.util.Optional;
+
 /**
  * Protobuf codec for {@link SystemMetadataCommand} and its type enum.
  *
@@ -36,12 +38,8 @@ final class SystemMetadataCodec {
     static SystemMetadataCommandProto toProto(SystemMetadataCommand cmd) {
         SystemMetadataCommandProto.Builder builder = SystemMetadataCommandProto.newBuilder()
                 .setType(toProto(cmd.getType()));
-        if (cmd.getKey() != null) {
-            builder.setKey(cmd.getKey());
-        }
-        if (cmd.getValue() != null) {
-            builder.setValue(cmd.getValue());
-        }
+        Optional.ofNullable(cmd.getKey()).ifPresent(builder::setKey);
+        Optional.ofNullable(cmd.getValue()).ifPresent(builder::setValue);
         return builder.build();
     }
 

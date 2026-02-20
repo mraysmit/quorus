@@ -17,7 +17,7 @@
 package dev.mars.quorus.controller.raft;
 
 import dev.mars.quorus.controller.raft.grpc.*;
-import dev.mars.quorus.controller.state.QuorusStateMachine;
+import dev.mars.quorus.controller.state.QuorusStateStore;
 import io.vertx.core.Vertx;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.parallel.Execution;
@@ -111,7 +111,7 @@ class GrpcRaftIntegrationTest {
         Set<String> clusterNodes = clusterConfig.keySet();
         
         GrpcRaftTransport transport = new GrpcRaftTransport(vertx, nodeId, clusterConfig);
-        QuorusStateMachine stateMachine = new QuorusStateMachine();
+        QuorusStateStore stateMachine = new QuorusStateStore();
         
         // Use shorter timeouts for faster tests
         RaftNode raftNode = new RaftNode(vertx, nodeId, clusterNodes, transport, stateMachine, 1000, 200);

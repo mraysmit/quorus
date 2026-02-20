@@ -138,7 +138,7 @@ public class GrpcRaftServer {
                     })
                     .onFailure(e -> {
                         logger.error("Error handling RequestVote: {}", e.getMessage());
-                        logger.trace("Stack trace for RequestVote handling error", e);
+                        logger.debug("Stack trace for RequestVote handling error", e);
                         responseObserver.onError(e);
                     });
         }
@@ -157,7 +157,7 @@ public class GrpcRaftServer {
                     })
                     .onFailure(e -> {
                         logger.error("Error handling AppendEntries: {}", e.getMessage());
-                        logger.trace("Stack trace for AppendEntries handling error", e);
+                        logger.debug("Stack trace for AppendEntries handling error", e);
                         responseObserver.onError(e);
                     });
         }
@@ -177,7 +177,7 @@ public class GrpcRaftServer {
                     })
                     .onFailure(e -> {
                         logger.error("Error handling InstallSnapshot: {}", e.getMessage());
-                        logger.trace("Stack trace for InstallSnapshot handling error", e);
+                        logger.debug("Stack trace for InstallSnapshot handling error", e);
                         responseObserver.onError(e);
                     });
         }

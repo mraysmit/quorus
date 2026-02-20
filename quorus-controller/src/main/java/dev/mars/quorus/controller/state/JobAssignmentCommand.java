@@ -31,7 +31,7 @@ import java.util.Objects;
  * @since 2025-10-28
  * @version 1.0
  */
-public final class JobAssignmentCommand implements StateMachineCommand {
+public final class JobAssignmentCommand implements RaftCommand {
 
     private static final long serialVersionUID = 1L;
 

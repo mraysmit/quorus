@@ -17,7 +17,6 @@
 package dev.mars.quorus.controller.service;
 
 import dev.mars.quorus.agent.AgentInfo;
-import dev.mars.quorus.agent.AgentStatus;
 import dev.mars.quorus.core.AgentLoad;
 import dev.mars.quorus.core.JobRequirements;
 import dev.mars.quorus.core.QueuedJob;
@@ -185,29 +184,14 @@ public class AgentSelectionService {
                                         Map<String, AgentLoad> agentLoads, 
                                         JobRequirements.SelectionStrategy strategy) {
         logger.debug("Applying selection strategy: strategy={}, eligibleAgents={}", strategy, eligibleAgents.size());
-        switch (strategy) {
-            case ROUND_ROBIN:
-                return selectByRoundRobin(eligibleAgents, job.getRequirements().getTenantId());
-                
-            case LEAST_LOADED:
-                return selectByLeastLoaded(eligibleAgents, agentLoads);
-                
-            case CAPABILITY_BASED:
-                return selectByCapabilityMatch(job, eligibleAgents);
-                
-            case LOCALITY_AWARE:
-                return selectByLocality(job, eligibleAgents);
-                
-            case WEIGHTED_SCORE:
-                return selectByWeightedScore(job, eligibleAgents, agentLoads);
-                
-            case PREFERRED_AGENT:
-                return selectByPreference(job, eligibleAgents);
-                
-            default:
-                logger.warn("Unknown selection strategy: {}, falling back to LEAST_LOADED", strategy);
-                return selectByLeastLoaded(eligibleAgents, agentLoads);
-        }
+        return switch (strategy) {
+            case ROUND_ROBIN -> selectByRoundRobin(eligibleAgents, job.getRequirements().getTenantId());
+            case LEAST_LOADED -> selectByLeastLoaded(eligibleAgents, agentLoads);
+            case CAPABILITY_BASED -> selectByCapabilityMatch(job, eligibleAgents);
+            case LOCALITY_AWARE -> selectByLocality(job, eligibleAgents);
+            case WEIGHTED_SCORE -> selectByWeightedScore(job, eligibleAgents, agentLoads);
+            case PREFERRED_AGENT -> selectByPreference(job, eligibleAgents);
+        };
     }
     
     /**

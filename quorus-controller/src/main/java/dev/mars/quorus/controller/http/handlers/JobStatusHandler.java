@@ -86,7 +86,7 @@ public class JobStatusHandler implements Handler<RoutingContext> {
             }
         } catch (Exception e) {
             logger.error("Failed to update status: {}", e.getMessage());
-            logger.trace("Stack trace for status update failure", e);
+            logger.debug("Stack trace for status update failure", e);
             ctx.fail(e);
         }
     }

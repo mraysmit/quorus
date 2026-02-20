@@ -21,7 +21,7 @@ import dev.mars.quorus.controller.raft.grpc.AppendEntriesResponse;
 import dev.mars.quorus.controller.raft.grpc.RaftServiceGrpc;
 import dev.mars.quorus.controller.raft.grpc.VoteRequest;
 import dev.mars.quorus.controller.raft.grpc.VoteResponse;
-import dev.mars.quorus.controller.state.QuorusStateMachine;
+import dev.mars.quorus.controller.state.QuorusStateStore;
 import io.grpc.*;
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
@@ -71,7 +71,7 @@ class GrpcRaftTransportTest {
         // Set up a target server to receive requests
         Set<String> clusterNodes = Set.of("target");
         InMemoryTransportSimulator transport = new InMemoryTransportSimulator("target");
-        QuorusStateMachine stateMachine = new QuorusStateMachine();
+        QuorusStateStore stateMachine = new QuorusStateStore();
         targetNode = new RaftNode(vertx, "target", clusterNodes, transport, stateMachine, 5000, 1000);
         targetNode.start();
         await().atMost(Duration.ofSeconds(5))
@@ -356,7 +356,7 @@ class GrpcRaftTransportTest {
         int targetPort2 = findAvailablePort();
         Set<String> cluster2 = Set.of("target2");
         InMemoryTransportSimulator transport2 = new InMemoryTransportSimulator("target2");
-        QuorusStateMachine sm2 = new QuorusStateMachine();
+        QuorusStateStore sm2 = new QuorusStateStore();
         RaftNode node2 = new RaftNode(vertx, "target2", cluster2, transport2, sm2, 5000, 1000);
         node2.start();
         await().atMost(Duration.ofSeconds(5))

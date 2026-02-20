@@ -20,7 +20,7 @@ import dev.mars.quorus.agent.AgentInfo;
 import dev.mars.quorus.agent.AgentStatus;
 import dev.mars.quorus.controller.raft.RaftNode;
 import dev.mars.quorus.controller.state.AgentCommand;
-import dev.mars.quorus.controller.state.QuorusStateMachine;
+import dev.mars.quorus.controller.state.QuorusStateStore;
 import io.vertx.core.Handler;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.RoutingContext;
@@ -63,7 +63,7 @@ public class HeartbeatHandler implements Handler<RoutingContext> {
             }
 
             // Verify agent exists
-            QuorusStateMachine stateMachine = (QuorusStateMachine) raftNode.getStateMachine();
+            QuorusStateStore stateMachine = (QuorusStateStore) raftNode.getStateStore();
             AgentInfo existingAgent = stateMachine.getAgent(agentId);
             if (existingAgent == null) {
                 ctx.fail(404, new IllegalArgumentException(
@@ -110,7 +110,7 @@ public class HeartbeatHandler implements Handler<RoutingContext> {
                     .onFailure(ctx::fail);
         } catch (Exception e) {
             logger.error("Error processing heartbeat: {}", e.getMessage());
-            logger.trace("Stack trace for heartbeat processing error", e);
+            logger.debug("Stack trace for heartbeat processing error", e);
             ctx.fail(e);
         }
     }

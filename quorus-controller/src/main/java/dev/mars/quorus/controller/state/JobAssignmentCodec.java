@@ -20,6 +20,7 @@ import dev.mars.quorus.controller.raft.grpc.*;
 import dev.mars.quorus.core.*;
 
 import java.time.Instant;
+import java.util.Optional;
 
 /**
  * Protobuf codec for {@link JobAssignmentCommand}, {@link JobAssignment},
@@ -40,21 +41,11 @@ final class JobAssignmentCodec {
     static JobAssignmentCommandProto toProto(JobAssignmentCommand cmd) {
         JobAssignmentCommandProto.Builder builder = JobAssignmentCommandProto.newBuilder()
                 .setType(toProto(cmd.getType()));
-        if (cmd.getAssignmentId() != null) {
-            builder.setAssignmentId(cmd.getAssignmentId());
-        }
-        if (cmd.getJobAssignment() != null) {
-            builder.setJobAssignment(toProto(cmd.getJobAssignment()));
-        }
-        if (cmd.getNewStatus() != null) {
-            builder.setNewStatus(toProto(cmd.getNewStatus()));
-        }
-        if (cmd.getReason() != null) {
-            builder.setReason(cmd.getReason());
-        }
-        if (cmd.getTimestamp() != null) {
-            builder.setTimestampEpochMs(cmd.getTimestamp().toEpochMilli());
-        }
+        Optional.ofNullable(cmd.getAssignmentId()).ifPresent(builder::setAssignmentId);
+        Optional.ofNullable(cmd.getJobAssignment()).ifPresent(a -> builder.setJobAssignment(toProto(a)));
+        Optional.ofNullable(cmd.getNewStatus()).ifPresent(s -> builder.setNewStatus(toProto(s)));
+        Optional.ofNullable(cmd.getReason()).ifPresent(builder::setReason);
+        Optional.ofNullable(cmd.getTimestamp()).ifPresent(t -> builder.setTimestampEpochMs(t.toEpochMilli()));
         return builder.build();
     }
 
@@ -77,33 +68,15 @@ final class JobAssignmentCodec {
         JobAssignmentProto.Builder builder = JobAssignmentProto.newBuilder()
                 .setRetryCount(assignment.getRetryCount())
                 .setEstimatedDurationMs(assignment.getEstimatedDurationMs());
-        if (assignment.getJobId() != null) {
-            builder.setJobId(assignment.getJobId());
-        }
-        if (assignment.getAgentId() != null) {
-            builder.setAgentId(assignment.getAgentId());
-        }
-        if (assignment.getAssignedAt() != null) {
-            builder.setAssignedAtEpochMs(assignment.getAssignedAt().toEpochMilli());
-        }
-        if (assignment.getAcceptedAt() != null) {
-            builder.setAcceptedAtEpochMs(assignment.getAcceptedAt().toEpochMilli());
-        }
-        if (assignment.getStartedAt() != null) {
-            builder.setStartedAtEpochMs(assignment.getStartedAt().toEpochMilli());
-        }
-        if (assignment.getCompletedAt() != null) {
-            builder.setCompletedAtEpochMs(assignment.getCompletedAt().toEpochMilli());
-        }
-        if (assignment.getStatus() != null) {
-            builder.setStatus(toProto(assignment.getStatus()));
-        }
-        if (assignment.getFailureReason() != null) {
-            builder.setFailureReason(assignment.getFailureReason());
-        }
-        if (assignment.getAssignmentStrategy() != null) {
-            builder.setAssignmentStrategy(assignment.getAssignmentStrategy());
-        }
+        Optional.ofNullable(assignment.getJobId()).ifPresent(builder::setJobId);
+        Optional.ofNullable(assignment.getAgentId()).ifPresent(builder::setAgentId);
+        Optional.ofNullable(assignment.getAssignedAt()).ifPresent(t -> builder.setAssignedAtEpochMs(t.toEpochMilli()));
+        Optional.ofNullable(assignment.getAcceptedAt()).ifPresent(t -> builder.setAcceptedAtEpochMs(t.toEpochMilli()));
+        Optional.ofNullable(assignment.getStartedAt()).ifPresent(t -> builder.setStartedAtEpochMs(t.toEpochMilli()));
+        Optional.ofNullable(assignment.getCompletedAt()).ifPresent(t -> builder.setCompletedAtEpochMs(t.toEpochMilli()));
+        Optional.ofNullable(assignment.getStatus()).ifPresent(s -> builder.setStatus(toProto(s)));
+        Optional.ofNullable(assignment.getFailureReason()).ifPresent(builder::setFailureReason);
+        Optional.ofNullable(assignment.getAssignmentStrategy()).ifPresent(builder::setAssignmentStrategy);
         return builder.build();
     }
 

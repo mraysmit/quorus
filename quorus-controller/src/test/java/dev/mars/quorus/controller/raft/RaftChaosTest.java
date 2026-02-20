@@ -16,7 +16,7 @@
 
 package dev.mars.quorus.controller.raft;
 
-import dev.mars.quorus.controller.state.QuorusStateMachine;
+import dev.mars.quorus.controller.state.QuorusStateStore;
 import dev.mars.quorus.controller.state.TransferJobCommand;
 import dev.mars.quorus.core.TransferJob;
 import dev.mars.quorus.core.TransferRequest;
@@ -79,10 +79,10 @@ public class RaftChaosTest {
             transports.put(nodeId, new InMemoryTransportSimulator(nodeId));
         }
         
-        // Create cluster nodes with QuorusStateMachine
+        // Create cluster nodes with QuorusStateStore
         Set<String> clusterNodes = Set.of(NODE_IDS);
         for (String nodeId : NODE_IDS) {
-            QuorusStateMachine stateMachine = new QuorusStateMachine();
+            QuorusStateStore stateMachine = new QuorusStateStore();
             // Use standard timeouts: 1000ms election, 200ms heartbeat
             RaftNode node = new RaftNode(vertx, nodeId, clusterNodes, transports.get(nodeId), stateMachine, 1000, 200);
             cluster.add(node);
@@ -169,13 +169,13 @@ public class RaftChaosTest {
             .pollInterval(Duration.ofMillis(200))
             .until(() -> {
                 long count = cluster.stream()
-                    .filter(node -> ((QuorusStateMachine) node.getStateMachine()).getTransferJob(jobId) != null)
+                    .filter(node -> ((QuorusStateStore) node.getStateStore()).getTransferJob(jobId) != null)
                     .count();
                 return count >= 3;
             });
         
         long nodesWithData = cluster.stream()
-            .filter(node -> ((QuorusStateMachine) node.getStateMachine()).getTransferJob(jobId) != null)
+            .filter(node -> ((QuorusStateStore) node.getStateStore()).getTransferJob(jobId) != null)
             .count();
         
         logger.info("{} nodes have the data", nodesWithData);

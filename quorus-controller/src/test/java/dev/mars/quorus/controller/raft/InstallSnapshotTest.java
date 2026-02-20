@@ -19,7 +19,7 @@ package dev.mars.quorus.controller.raft;
 import dev.mars.quorus.controller.raft.grpc.InstallSnapshotRequest;
 import dev.mars.quorus.controller.raft.grpc.InstallSnapshotResponse;
 import dev.mars.quorus.controller.raft.storage.InMemoryRaftStorage;
-import dev.mars.quorus.controller.state.QuorusStateMachine;
+import dev.mars.quorus.controller.state.QuorusStateStore;
 import dev.mars.quorus.controller.state.SystemMetadataCommand;
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
@@ -86,9 +86,9 @@ class InstallSnapshotTest {
         InMemoryTransportSimulator t2 = new InMemoryTransportSimulator("node2");
         InMemoryTransportSimulator t3 = new InMemoryTransportSimulator("node3");
 
-        QuorusStateMachine sm1 = new QuorusStateMachine();
-        QuorusStateMachine sm2 = new QuorusStateMachine();
-        QuorusStateMachine sm3 = new QuorusStateMachine();
+        QuorusStateStore sm1 = new QuorusStateStore();
+        QuorusStateStore sm2 = new QuorusStateStore();
+        QuorusStateStore sm3 = new QuorusStateStore();
 
         RaftNode node1 = new RaftNode(vertx, "node1", cluster, t1, sm1,
                 leaderStorage, 1000, 200, true, 5, 300);
@@ -168,9 +168,9 @@ class InstallSnapshotTest {
         InMemoryTransportSimulator t2 = new InMemoryTransportSimulator("node2");
         InMemoryTransportSimulator t3 = new InMemoryTransportSimulator("node3");
 
-        QuorusStateMachine sm1 = new QuorusStateMachine();
-        QuorusStateMachine sm2 = new QuorusStateMachine();
-        QuorusStateMachine sm3 = new QuorusStateMachine();
+        QuorusStateStore sm1 = new QuorusStateStore();
+        QuorusStateStore sm2 = new QuorusStateStore();
+        QuorusStateStore sm3 = new QuorusStateStore();
 
         RaftNode node1 = new RaftNode(vertx, "node1", cluster, t1, sm1,
                 leaderStorage, 1000, 200, true, 5, 300);
@@ -255,9 +255,9 @@ class InstallSnapshotTest {
         InMemoryTransportSimulator t2 = new InMemoryTransportSimulator("node2");
         InMemoryTransportSimulator t3 = new InMemoryTransportSimulator("node3");
 
-        QuorusStateMachine sm1 = new QuorusStateMachine();
-        QuorusStateMachine sm2 = new QuorusStateMachine();
-        QuorusStateMachine sm3 = new QuorusStateMachine();
+        QuorusStateStore sm1 = new QuorusStateStore();
+        QuorusStateStore sm2 = new QuorusStateStore();
+        QuorusStateStore sm3 = new QuorusStateStore();
 
         RaftNode node1 = new RaftNode(vertx, "node1", cluster, t1, sm1,
                 leaderStorage, 1000, 200, true, 5, 300);
@@ -325,7 +325,7 @@ class InstallSnapshotTest {
     void testFollowerRejectsStaleTermSnapshot(VertxTestContext ctx) throws Throwable {
         InMemoryRaftStorage storage = new InMemoryRaftStorage();
         InMemoryTransportSimulator transport = new InMemoryTransportSimulator("node1");
-        QuorusStateMachine sm = new QuorusStateMachine();
+        QuorusStateStore sm = new QuorusStateStore();
         Set<String> cluster = Set.of("node1");
 
         RaftNode node = new RaftNode(vertx, "node1", cluster, transport, sm,
@@ -422,7 +422,7 @@ class InstallSnapshotTest {
     void testFollowerPersistsInstalledSnapshot(VertxTestContext ctx) throws Throwable {
         InMemoryRaftStorage storage = new InMemoryRaftStorage();
         InMemoryTransportSimulator transport = new InMemoryTransportSimulator("follower-persist");
-        QuorusStateMachine sm = new QuorusStateMachine();
+        QuorusStateStore sm = new QuorusStateStore();
         Set<String> cluster = Set.of("follower-persist");
 
         RaftNode node = new RaftNode(vertx, "follower-persist", cluster, transport, sm,
@@ -433,7 +433,7 @@ class InstallSnapshotTest {
             node.start().onComplete(ctx.succeeding(v2 -> {
 
                 // Build a realistic snapshot: serialize some state machine data
-                QuorusStateMachine tempSM = new QuorusStateMachine();
+                QuorusStateStore tempSM = new QuorusStateStore();
                 tempSM.apply(SystemMetadataCommand.set("snap-key-1", "snap-val-1"));
                 tempSM.apply(SystemMetadataCommand.set("snap-key-2", "snap-val-2"));
                 byte[] snapshotData = tempSM.takeSnapshot();

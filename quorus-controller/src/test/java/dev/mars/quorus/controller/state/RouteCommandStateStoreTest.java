@@ -29,7 +29,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Tests for RouteCommand operations in the QuorusStateMachine.
+ * Tests for RouteCommand operations in the QuorusStateStore.
  * Verifies the full lifecycle: create → update → suspend → resume → delete,
  * plus snapshot/restore preservation of route state.
  *
@@ -37,13 +37,13 @@ import static org.junit.jupiter.api.Assertions.*;
  * @version 1.0
  * @since 2026-02-19
  */
-class RouteCommandStateMachineTest {
+class RouteCommandStateStoreTest {
 
-    private QuorusStateMachine stateMachine;
+    private QuorusStateStore stateMachine;
 
     @BeforeEach
     void setUp() {
-        stateMachine = new QuorusStateMachine();
+        stateMachine = new QuorusStateStore();
     }
 
     // ========== Helper factories ==========
@@ -328,7 +328,7 @@ class RouteCommandStateMachineTest {
             assertTrue(snapshot.length > 0);
 
             // Create fresh state machine and restore
-            QuorusStateMachine restored = new QuorusStateMachine();
+            QuorusStateStore restored = new QuorusStateStore();
             restored.restoreSnapshot(snapshot);
 
             // Verify routes restored

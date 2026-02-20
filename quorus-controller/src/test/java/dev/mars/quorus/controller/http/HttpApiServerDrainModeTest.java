@@ -19,7 +19,7 @@ package dev.mars.quorus.controller.http;
 import dev.mars.quorus.controller.raft.InMemoryTransportSimulator;
 import dev.mars.quorus.controller.raft.RaftNode;
 import dev.mars.quorus.controller.raft.RaftTransport;
-import dev.mars.quorus.controller.state.QuorusStateMachine;
+import dev.mars.quorus.controller.state.QuorusStateStore;
 import io.vertx.core.Vertx;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.json.JsonObject;
@@ -62,7 +62,7 @@ class HttpApiServerDrainModeTest {
     static void setUp() throws Exception {
         vertx = Vertx.vertx();
 
-        QuorusStateMachine stateMachine = new QuorusStateMachine();
+        QuorusStateStore stateMachine = new QuorusStateStore();
         RaftTransport transport = new InMemoryTransportSimulator("drain-test-node");
         Set<String> clusterNodes = Set.of("drain-test-node");
 

@@ -16,7 +16,7 @@
 
 package dev.mars.quorus.controller.raft;
 
-import dev.mars.quorus.controller.state.QuorusStateMachine;
+import dev.mars.quorus.controller.state.QuorusStateStore;
 import dev.mars.quorus.controller.state.TransferJobCommand;
 import dev.mars.quorus.core.TransferJob;
 import dev.mars.quorus.core.TransferRequest;
@@ -79,10 +79,10 @@ public class MetadataPersistenceTest {
             transport.setTransports(transports);
         }
         
-        // Create cluster nodes with QuorusStateMachine
+        // Create cluster nodes with QuorusStateStore
         Set<String> clusterNodes = Set.of(NODE_IDS);
         for (String nodeId : NODE_IDS) {
-            QuorusStateMachine stateMachine = new QuorusStateMachine();
+            QuorusStateStore stateMachine = new QuorusStateStore();
             // Use shorter timeouts for testing: 1000ms election, 200ms heartbeat
             RaftNode node = new RaftNode(vertx, nodeId, clusterNodes, transports.get(nodeId), stateMachine, 1000, 200);
             cluster.add(node);
@@ -145,7 +145,7 @@ public class MetadataPersistenceTest {
         // Verify metadata exists on all nodes
         logger.info("Verifying metadata replication across all nodes...");
         for (RaftNode node : cluster) {
-            QuorusStateMachine stateMachine = (QuorusStateMachine) node.getStateMachine();
+            QuorusStateStore stateMachine = (QuorusStateStore) node.getStateStore();
             assertTrue(stateMachine.hasTransferJob(testJob.getJobId()), 
                 "Node " + node.getNodeId() + " should have transfer job " + testJob.getJobId());
             logger.info("✓ Node " + node.getNodeId() + " has transfer job " + testJob.getJobId());
@@ -185,7 +185,7 @@ public class MetadataPersistenceTest {
         // Verify all jobs are replicated before leader change
         logger.info("Verifying initial replication...");
         for (RaftNode node : cluster) {
-            QuorusStateMachine stateMachine = (QuorusStateMachine) node.getStateMachine();
+            QuorusStateStore stateMachine = (QuorusStateStore) node.getStateStore();
             for (TransferJob job : testJobs) {
                 assertTrue(stateMachine.hasTransferJob(job.getJobId()),
                     "Node " + node.getNodeId() + " should have job " + job.getJobId() + " before leader change");
@@ -216,7 +216,7 @@ public class MetadataPersistenceTest {
             .toList();
             
         for (RaftNode node : remainingNodes) {
-            QuorusStateMachine stateMachine = (QuorusStateMachine) node.getStateMachine();
+            QuorusStateStore stateMachine = (QuorusStateStore) node.getStateStore();
             for (TransferJob job : testJobs) {
                 assertTrue(stateMachine.hasTransferJob(job.getJobId()),
                     "Node " + node.getNodeId() + " should still have job " + job.getJobId() + " after leader change");
@@ -235,11 +235,11 @@ public class MetadataPersistenceTest {
         await().atMost(Duration.ofSeconds(10))
             .pollInterval(Duration.ofMillis(200))
             .until(() -> remainingNodes.stream().allMatch(node -> 
-                ((QuorusStateMachine) node.getStateMachine()).hasTransferJob(newJob.getJobId())));
+                ((QuorusStateStore) node.getStateStore()).hasTransferJob(newJob.getJobId())));
         
         // Verify new job is replicated to all remaining nodes
         for (RaftNode node : remainingNodes) {
-            QuorusStateMachine stateMachine = (QuorusStateMachine) node.getStateMachine();
+            QuorusStateStore stateMachine = (QuorusStateStore) node.getStateStore();
             assertTrue(stateMachine.hasTransferJob(newJob.getJobId()),
                 "Node " + node.getNodeId() + " should have new job " + newJob.getJobId());
             logger.info("✓ Node " + node.getNodeId() + " received new job " + newJob.getJobId());
@@ -289,7 +289,7 @@ public class MetadataPersistenceTest {
                 // Check at least majority of running nodes have the job
                 return cluster.stream()
                     .filter(n -> !n.getNodeId().equals(followerToFail.getNodeId()))
-                    .filter(n -> ((QuorusStateMachine) n.getStateMachine()).hasTransferJob(lastJobId))
+                    .filter(n -> ((QuorusStateStore) n.getStateStore()).hasTransferJob(lastJobId))
                     .count() >= 3;
             });
         
@@ -301,13 +301,13 @@ public class MetadataPersistenceTest {
         await().atMost(Duration.ofSeconds(15))
             .pollInterval(Duration.ofMillis(200))
             .until(() -> {
-                QuorusStateMachine sm = (QuorusStateMachine) followerToFail.getStateMachine();
+                QuorusStateStore sm = (QuorusStateStore) followerToFail.getStateStore();
                 return jobsWhileDown.stream().allMatch(job -> sm.hasTransferJob(job.getJobId()));
             });
         
         // Verify recovered node has all metadata
         logger.info("Verifying recovered node has all metadata...");
-        QuorusStateMachine recoveredStateMachine = (QuorusStateMachine) followerToFail.getStateMachine();
+        QuorusStateStore recoveredStateMachine = (QuorusStateStore) followerToFail.getStateStore();
         
         for (TransferJob job : jobsWhileDown) {
             assertTrue(recoveredStateMachine.hasTransferJob(job.getJobId()),
@@ -336,7 +336,7 @@ public class MetadataPersistenceTest {
     
     private boolean allNodesHaveJob(String jobId) {
         return cluster.stream().allMatch(node -> 
-            ((QuorusStateMachine) node.getStateMachine()).hasTransferJob(jobId));
+            ((QuorusStateStore) node.getStateStore()).hasTransferJob(jobId));
     }
     
     private TransferJob createTestTransferJob(String jobId, String description) {

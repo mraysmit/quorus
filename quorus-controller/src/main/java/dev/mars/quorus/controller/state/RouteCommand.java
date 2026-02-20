@@ -32,7 +32,7 @@ import java.time.Instant;
  * @version 1.0
  * @since 2026-02-19
  */
-public final class RouteCommand implements StateMachineCommand {
+public final class RouteCommand implements RaftCommand {
 
     private static final long serialVersionUID = 1L;
 

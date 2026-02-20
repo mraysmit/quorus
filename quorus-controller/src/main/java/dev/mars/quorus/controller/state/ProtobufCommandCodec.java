@@ -25,7 +25,7 @@ import dev.mars.quorus.controller.raft.grpc.*;
  * Replaces Java serialization (ObjectOutputStream/ObjectInputStream) with
  * version-safe Protobuf encoding for Raft log entry command payloads.
  *
- * <p>Delegates to domain-specific codecs for the six {@link StateMachineCommand} sealed subtypes:
+ * <p>Delegates to domain-specific codecs for the six {@link RaftCommand} sealed subtypes:
  * <ul>
  *   <li>{@link TransferCodec} — {@link TransferJobCommand}, TransferJob, TransferRequest, TransferStatus</li>
  *   <li>{@link AgentCodec} — {@link AgentCommand}, AgentInfo, AgentCapabilities, AgentStatus</li>
@@ -50,26 +50,26 @@ public final class ProtobufCommandCodec {
      * @param command the command object (one of the six sealed command types, or null for no-op)
      * @return Protobuf-encoded bytes as ByteString
      */
-    public static ByteString serialize(StateMachineCommand command) {
+    public static ByteString serialize(RaftCommand command) {
         if (command == null) {
-            // No-op entry: encode as empty RaftCommand (no oneof field set)
-            return RaftCommand.getDefaultInstance().toByteString();
+            // No-op entry: encode as empty RaftCommandMessage (no oneof field set)
+            return RaftCommandMessage.getDefaultInstance().toByteString();
         }
-        RaftCommand raftCommand = switch (command) {
-            case TransferJobCommand cmd -> RaftCommand.newBuilder()
+        RaftCommandMessage raftMessage = switch (command) {
+            case TransferJobCommand cmd -> RaftCommandMessage.newBuilder()
                     .setTransferJobCommand(TransferCodec.toProto(cmd)).build();
-            case AgentCommand cmd -> RaftCommand.newBuilder()
+            case AgentCommand cmd -> RaftCommandMessage.newBuilder()
                     .setAgentCommand(AgentCodec.toProto(cmd)).build();
-            case SystemMetadataCommand cmd -> RaftCommand.newBuilder()
+            case SystemMetadataCommand cmd -> RaftCommandMessage.newBuilder()
                     .setSystemMetadataCommand(SystemMetadataCodec.toProto(cmd)).build();
-            case JobAssignmentCommand cmd -> RaftCommand.newBuilder()
+            case JobAssignmentCommand cmd -> RaftCommandMessage.newBuilder()
                     .setJobAssignmentCommand(JobAssignmentCodec.toProto(cmd)).build();
-            case JobQueueCommand cmd -> RaftCommand.newBuilder()
+            case JobQueueCommand cmd -> RaftCommandMessage.newBuilder()
                     .setJobQueueCommand(JobQueueCodec.toProto(cmd)).build();
-            case RouteCommand cmd -> RaftCommand.newBuilder()
+            case RouteCommand cmd -> RaftCommandMessage.newBuilder()
                     .setRouteCommand(RouteCodec.toProto(cmd)).build();
         };
-        return raftCommand.toByteString();
+        return raftMessage.toByteString();
     }
 
     /**
@@ -79,16 +79,16 @@ public final class ProtobufCommandCodec {
      * @return the deserialized command object, or null for no-op entries
      * @throws RuntimeException if the data cannot be parsed
      */
-    public static StateMachineCommand deserialize(ByteString data) {
+    public static RaftCommand deserialize(ByteString data) {
         try {
-            RaftCommand raftCommand = RaftCommand.parseFrom(data);
-            return switch (raftCommand.getCommandCase()) {
-                case TRANSFER_JOB_COMMAND -> TransferCodec.fromProto(raftCommand.getTransferJobCommand());
-                case AGENT_COMMAND -> AgentCodec.fromProto(raftCommand.getAgentCommand());
-                case SYSTEM_METADATA_COMMAND -> SystemMetadataCodec.fromProto(raftCommand.getSystemMetadataCommand());
-                case JOB_ASSIGNMENT_COMMAND -> JobAssignmentCodec.fromProto(raftCommand.getJobAssignmentCommand());
-                case JOB_QUEUE_COMMAND -> JobQueueCodec.fromProto(raftCommand.getJobQueueCommand());
-                case ROUTE_COMMAND -> RouteCodec.fromProto(raftCommand.getRouteCommand());
+            RaftCommandMessage raftMessage = RaftCommandMessage.parseFrom(data);
+            return switch (raftMessage.getCommandCase()) {
+                case TRANSFER_JOB_COMMAND -> TransferCodec.fromProto(raftMessage.getTransferJobCommand());
+                case AGENT_COMMAND -> AgentCodec.fromProto(raftMessage.getAgentCommand());
+                case SYSTEM_METADATA_COMMAND -> SystemMetadataCodec.fromProto(raftMessage.getSystemMetadataCommand());
+                case JOB_ASSIGNMENT_COMMAND -> JobAssignmentCodec.fromProto(raftMessage.getJobAssignmentCommand());
+                case JOB_QUEUE_COMMAND -> JobQueueCodec.fromProto(raftMessage.getJobQueueCommand());
+                case ROUTE_COMMAND -> RouteCodec.fromProto(raftMessage.getRouteCommand());
                 case COMMAND_NOT_SET -> null; // No-op entry
             };
         } catch (InvalidProtocolBufferException e) {

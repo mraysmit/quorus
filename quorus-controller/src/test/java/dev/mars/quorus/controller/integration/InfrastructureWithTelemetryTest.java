@@ -23,7 +23,7 @@ import dev.mars.quorus.controller.http.HttpApiServer;
 import dev.mars.quorus.controller.raft.InMemoryTransportSimulator;
 import dev.mars.quorus.controller.raft.RaftNode;
 import dev.mars.quorus.controller.raft.RaftTransport;
-import dev.mars.quorus.controller.state.QuorusStateMachine;
+import dev.mars.quorus.controller.state.QuorusStateStore;
 import io.opentelemetry.api.GlobalOpenTelemetry;
 import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
@@ -101,7 +101,7 @@ class InfrastructureWithTelemetryTest {
 
     private static Vertx vertx;
     private static RaftNode raftNode;
-    private static QuorusStateMachine stateMachine;
+    private static QuorusStateStore stateMachine;
     private static HttpApiServer httpServer;
     private static HttpClient httpClient;
     private static ObjectMapper objectMapper;
@@ -162,7 +162,7 @@ class InfrastructureWithTelemetryTest {
         logger.info("  -> HttpClient created with 5s connect timeout");
 
         // Initialize state machine
-        stateMachine = new QuorusStateMachine();
+        stateMachine = new QuorusStateStore();
         logger.info("  -> State machine initialized");
 
         // Create transport and Raft node

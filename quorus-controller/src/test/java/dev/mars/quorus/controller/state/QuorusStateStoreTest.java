@@ -32,19 +32,19 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Comprehensive tests for QuorusStateMachine.
+ * Comprehensive tests for QuorusStateStore.
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @version 1.0
  * @since 2025-08-20
  */
-class QuorusStateMachineTest {
+class QuorusStateStoreTest {
 
-    private QuorusStateMachine stateMachine;
+    private QuorusStateStore stateMachine;
 
     @BeforeEach
     void setUp() {
-        stateMachine = new QuorusStateMachine();
+        stateMachine = new QuorusStateStore();
     }
 
     @Test
@@ -152,7 +152,7 @@ class QuorusStateMachineTest {
     }
 
     // NOTE: "testUnknownCommand" test removed.
-    // With the StateMachineCommand sealed interface, the compiler prevents
+    // With the RaftCommand sealed interface, the compiler prevents
     // passing non-command types to apply() — no runtime check needed.
 
     @Test
@@ -351,7 +351,7 @@ class QuorusStateMachineTest {
         assertTrue(snapshotData.length > 0);
 
         // Restore to a fresh state machine
-        QuorusStateMachine restored = new QuorusStateMachine();
+        QuorusStateStore restored = new QuorusStateStore();
         restored.restoreSnapshot(snapshotData);
 
         // Verify metadata survived

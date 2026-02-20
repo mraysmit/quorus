@@ -16,7 +16,7 @@
 
 package dev.mars.quorus.controller.raft;
 
-import dev.mars.quorus.controller.state.StateMachineCommand;
+import dev.mars.quorus.controller.state.RaftCommand;
 
 import java.io.Serializable;
 import java.time.Instant;
@@ -35,10 +35,10 @@ public class LogEntry implements Serializable {
 
     private final long term;
     private final long index;
-    private final StateMachineCommand command;
+    private final RaftCommand command;
     private final Instant timestamp;
 
-    public LogEntry(long term, long index, StateMachineCommand command) {
+    public LogEntry(long term, long index, RaftCommand command) {
         this.term = term;
         this.index = index;
         this.command = command;
@@ -53,7 +53,7 @@ public class LogEntry implements Serializable {
         return index;
     }
 
-    public StateMachineCommand getCommand() {
+    public RaftCommand getCommand() {
         return command;
     }
 

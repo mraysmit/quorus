@@ -18,7 +18,7 @@ package dev.mars.quorus.controller.http.handlers;
 
 import dev.mars.quorus.agent.AgentInfo;
 import dev.mars.quorus.controller.raft.RaftNode;
-import dev.mars.quorus.controller.state.QuorusStateMachine;
+import dev.mars.quorus.controller.state.QuorusStateStore;
 import io.vertx.core.Handler;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
@@ -50,7 +50,7 @@ public class AgentListHandler implements Handler<RoutingContext> {
 
     @Override
     public void handle(RoutingContext ctx) {
-        QuorusStateMachine stateMachine = (QuorusStateMachine) raftNode.getStateMachine();
+        QuorusStateStore stateMachine = (QuorusStateStore) raftNode.getStateStore();
         Map<String, AgentInfo> agents = stateMachine.getAgents();
 
         JsonArray agentArray = new JsonArray();

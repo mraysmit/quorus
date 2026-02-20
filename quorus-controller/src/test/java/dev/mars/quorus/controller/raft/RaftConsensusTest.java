@@ -20,7 +20,7 @@ import dev.mars.quorus.controller.raft.grpc.AppendEntriesRequest;
 import dev.mars.quorus.controller.raft.grpc.AppendEntriesResponse;
 import dev.mars.quorus.controller.raft.grpc.VoteRequest;
 import dev.mars.quorus.controller.raft.grpc.VoteResponse;
-import dev.mars.quorus.controller.state.QuorusStateMachine;
+import dev.mars.quorus.controller.state.QuorusStateStore;
 import dev.mars.quorus.controller.state.SystemMetadataCommand;
 import dev.mars.quorus.controller.state.TransferJobCommand;
 import dev.mars.quorus.core.TransferJob;
@@ -56,9 +56,9 @@ class RaftConsensusTest {
     private InMemoryTransportSimulator transport1;
     private InMemoryTransportSimulator transport2;
     private InMemoryTransportSimulator transport3;
-    private QuorusStateMachine stateMachine1;
-    private QuorusStateMachine stateMachine2;
-    private QuorusStateMachine stateMachine3;
+    private QuorusStateStore stateMachine1;
+    private QuorusStateStore stateMachine2;
+    private QuorusStateStore stateMachine3;
     private io.vertx.core.Vertx vertx;
 
     @BeforeEach
@@ -72,9 +72,9 @@ class RaftConsensusTest {
         transport2 = new InMemoryTransportSimulator("follower1");
         transport3 = new InMemoryTransportSimulator("follower2");
 
-        stateMachine1 = new QuorusStateMachine();
-        stateMachine2 = new QuorusStateMachine();
-        stateMachine3 = new QuorusStateMachine();
+        stateMachine1 = new QuorusStateStore();
+        stateMachine2 = new QuorusStateStore();
+        stateMachine3 = new QuorusStateStore();
 
         leader = new RaftNode(vertx, "leader", clusterNodes, transport1, stateMachine1, 800, 150);
         follower1 = new RaftNode(vertx, "follower1", clusterNodes, transport2, stateMachine2, 800, 150);
@@ -170,7 +170,7 @@ class RaftConsensusTest {
         // Start single node for simplicity
         Set<String> singleNode = Set.of("single");
         RaftNode single = new RaftNode(vertx, "single", singleNode,
-                new InMemoryTransportSimulator("single"), new QuorusStateMachine(), 500, 100);
+                new InMemoryTransportSimulator("single"), new QuorusStateStore(), 500, 100);
 
         single.start().toCompletionStage().toCompletableFuture().join();
 
@@ -209,7 +209,7 @@ class RaftConsensusTest {
         // After some time, should attempt election (single node cluster behavior)
         Set<String> singleNode = Set.of("test");
         RaftNode testNode = new RaftNode(vertx, "test", singleNode,
-                new InMemoryTransportSimulator("test"), new QuorusStateMachine(), 300, 100);
+                new InMemoryTransportSimulator("test"), new QuorusStateStore(), 300, 100);
 
         testNode.start();
 
@@ -362,7 +362,7 @@ class RaftConsensusTest {
 
     @Test
     void testQuorusSnapshotSerialization() {
-        QuorusStateMachine stateMachine = new QuorusStateMachine();
+        QuorusStateStore stateMachine = new QuorusStateStore();
 
         // Add some data
         stateMachine.apply(SystemMetadataCommand.set("version", "2.1"));
@@ -374,7 +374,7 @@ class RaftConsensusTest {
         assertTrue(snapshotData.length > 0);
 
         // Create new state machine and restore
-        QuorusStateMachine newStateMachine = new QuorusStateMachine();
+        QuorusStateStore newStateMachine = new QuorusStateStore();
         newStateMachine.restoreSnapshot(snapshotData);
 
         // Verify data was restored

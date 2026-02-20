@@ -20,7 +20,7 @@ import dev.mars.quorus.controller.http.HttpApiServer;
 import dev.mars.quorus.controller.raft.InMemoryTransportSimulator;
 import dev.mars.quorus.controller.raft.RaftNode;
 import dev.mars.quorus.controller.raft.RaftTransport;
-import dev.mars.quorus.controller.state.QuorusStateMachine;
+import dev.mars.quorus.controller.state.QuorusStateStore;
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonObject;
@@ -66,7 +66,7 @@ class GracefulShutdownIntegrationTest {
         @Test
         @DisplayName("Should complete full 4-phase shutdown without errors")
         void shouldCompleteFullShutdown(Vertx vertx, VertxTestContext ctx) throws Exception {
-            QuorusStateMachine stateMachine = new QuorusStateMachine();
+            QuorusStateStore stateMachine = new QuorusStateStore();
             RaftTransport transport = new InMemoryTransportSimulator("shutdown-test");
             Set<String> clusterNodes = Set.of("shutdown-test");
 
@@ -116,7 +116,7 @@ class GracefulShutdownIntegrationTest {
         @Test
         @DisplayName("Should reject API requests but allow health during drain")
         void shouldRejectApiButAllowHealth(Vertx vertx, VertxTestContext ctx) throws Exception {
-            QuorusStateMachine stateMachine = new QuorusStateMachine();
+            QuorusStateStore stateMachine = new QuorusStateStore();
             RaftTransport transport = new InMemoryTransportSimulator("drain-seq-test");
             Set<String> clusterNodes = Set.of("drain-seq-test");
             

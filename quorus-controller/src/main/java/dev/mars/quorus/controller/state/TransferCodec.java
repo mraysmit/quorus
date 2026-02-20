@@ -22,6 +22,7 @@ import dev.mars.quorus.core.*;
 import java.net.URI;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.Optional;
 
 /**
  * Protobuf codec for transfer-related types: {@link TransferJobCommand},
@@ -42,28 +43,18 @@ final class TransferCodec {
     static TransferJobCommandProto toProto(TransferJobCommand cmd) {
         TransferJobCommandProto.Builder builder = TransferJobCommandProto.newBuilder()
                 .setType(toProto(cmd.getType()));
-        if (cmd.getJobId() != null) {
-            builder.setJobId(cmd.getJobId());
-        }
-        if (cmd.getTransferJob() != null) {
-            builder.setTransferJob(toProto(cmd.getTransferJob()));
-        }
-        if (cmd.getStatus() != null) {
-            builder.setStatus(toProto(cmd.getStatus()));
-        }
-        if (cmd.getBytesTransferred() != null) {
-            builder.setBytesTransferred(cmd.getBytesTransferred());
-        }
+        Optional.ofNullable(cmd.getJobId()).ifPresent(builder::setJobId);
+        Optional.ofNullable(cmd.getTransferJob()).ifPresent(tj -> builder.setTransferJob(toProto(tj)));
+        Optional.ofNullable(cmd.getStatus()).ifPresent(s -> builder.setStatus(toProto(s)));
+        Optional.ofNullable(cmd.getBytesTransferred()).ifPresent(builder::setBytesTransferred);
         return builder.build();
     }
 
     static TransferJobCommand fromProto(TransferJobCommandProto proto) {
         return switch (fromProto(proto.getType())) {
             case CREATE -> TransferJobCommand.create(fromProto(proto.getTransferJob()));
-            case UPDATE_STATUS -> TransferJobCommand.updateStatus(
-                    proto.getJobId(), fromProto(proto.getStatus()));
-            case UPDATE_PROGRESS -> TransferJobCommand.updateProgress(
-                    proto.getJobId(), proto.getBytesTransferred());
+            case UPDATE_STATUS -> TransferJobCommand.updateStatus(proto.getJobId(), fromProto(proto.getStatus()));
+            case UPDATE_PROGRESS -> TransferJobCommand.updateProgress(proto.getJobId(), proto.getBytesTransferred());
             case DELETE -> TransferJobCommand.delete(proto.getJobId());
         };
     }
@@ -75,21 +66,11 @@ final class TransferCodec {
                 .setStatus(toProto(job.getStatus()))
                 .setBytesTransferred(job.getBytesTransferred())
                 .setTotalBytes(job.getTotalBytes());
-        if (job.getRequest() != null) {
-            builder.setRequest(toProto(job.getRequest()));
-        }
-        if (job.getStartTime() != null) {
-            builder.setStartTimeEpochMs(job.getStartTime().toEpochMilli());
-        }
-        if (job.getLastUpdateTime() != null) {
-            builder.setLastUpdateTimeEpochMs(job.getLastUpdateTime().toEpochMilli());
-        }
-        if (job.getErrorMessage() != null) {
-            builder.setErrorMessage(job.getErrorMessage());
-        }
-        if (job.getActualChecksum() != null) {
-            builder.setActualChecksum(job.getActualChecksum());
-        }
+        Optional.ofNullable(job.getRequest()).ifPresent(r -> builder.setRequest(toProto(r)));
+        Optional.ofNullable(job.getStartTime()).ifPresent(t -> builder.setStartTimeEpochMs(t.toEpochMilli()));
+        Optional.ofNullable(job.getLastUpdateTime()).ifPresent(t -> builder.setLastUpdateTimeEpochMs(t.toEpochMilli()));
+        Optional.ofNullable(job.getErrorMessage()).ifPresent(builder::setErrorMessage);
+        Optional.ofNullable(job.getActualChecksum()).ifPresent(builder::setActualChecksum);
         return builder.build();
     }
 
@@ -103,28 +84,16 @@ final class TransferCodec {
     private static TransferRequestProto toProto(TransferRequest req) {
         TransferRequestProto.Builder builder = TransferRequestProto.newBuilder()
                 .setExpectedSize(req.getExpectedSize());
-        if (req.getRequestId() != null) {
-            builder.setRequestId(req.getRequestId());
-        }
-        if (req.getSourceUri() != null) {
-            builder.setSourceUri(req.getSourceUri().toString());
-        }
-        if (req.getDestinationUri() != null) {
-            builder.setDestinationUri(req.getDestinationUri().toString());
-            builder.setDestinationPath(req.getDestinationUri().toString());
-        }
-        if (req.getProtocol() != null) {
-            builder.setProtocol(req.getProtocol());
-        }
-        if (req.getMetadata() != null) {
-            builder.putAllMetadata(req.getMetadata());
-        }
-        if (req.getCreatedAt() != null) {
-            builder.setCreatedAtEpochMs(req.getCreatedAt().toEpochMilli());
-        }
-        if (req.getExpectedChecksum() != null) {
-            builder.setExpectedChecksum(req.getExpectedChecksum());
-        }
+        Optional.ofNullable(req.getRequestId()).ifPresent(builder::setRequestId);
+        Optional.ofNullable(req.getSourceUri()).ifPresent(u -> builder.setSourceUri(u.toString()));
+        Optional.ofNullable(req.getDestinationUri()).ifPresent(u -> {
+            builder.setDestinationUri(u.toString());
+            builder.setDestinationPath(u.toString());
+        });
+        Optional.ofNullable(req.getProtocol()).ifPresent(builder::setProtocol);
+        Optional.ofNullable(req.getMetadata()).ifPresent(builder::putAllMetadata);
+        Optional.ofNullable(req.getCreatedAt()).ifPresent(t -> builder.setCreatedAtEpochMs(t.toEpochMilli()));
+        Optional.ofNullable(req.getExpectedChecksum()).ifPresent(builder::setExpectedChecksum);
         return builder.build();
     }
 

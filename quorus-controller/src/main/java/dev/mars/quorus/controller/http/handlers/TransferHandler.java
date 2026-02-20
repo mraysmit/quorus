@@ -19,7 +19,7 @@ package dev.mars.quorus.controller.http.handlers;
 import dev.mars.quorus.controller.http.ErrorCode;
 import dev.mars.quorus.controller.http.QuorusApiException;
 import dev.mars.quorus.controller.raft.RaftNode;
-import dev.mars.quorus.controller.state.QuorusStateMachine;
+import dev.mars.quorus.controller.state.QuorusStateStore;
 import dev.mars.quorus.controller.state.TransferJobCommand;
 import dev.mars.quorus.controller.state.TransferJobSnapshot;
 import dev.mars.quorus.core.JobAssignment;
@@ -75,7 +75,7 @@ public class TransferHandler {
                         .onFailure(ctx::fail);
             } catch (Exception e) {
                 logger.error("Failed to create transfer job: {}", e.getMessage());
-                logger.trace("Stack trace for transfer job creation failure", e);
+                logger.debug("Stack trace for transfer job creation failure", e);
                 ctx.fail(e);
             }
         };
@@ -87,7 +87,7 @@ public class TransferHandler {
     public Handler<RoutingContext> handleGet() {
         return ctx -> {
             String jobId = ctx.pathParam("jobId");
-            QuorusStateMachine stateMachine = (QuorusStateMachine) raftNode.getStateMachine();
+            QuorusStateStore stateMachine = (QuorusStateStore) raftNode.getStateStore();
 
             TransferJobSnapshot job = stateMachine.getTransferJobs().get(jobId);
             if (job == null) {
@@ -140,7 +140,7 @@ public class TransferHandler {
     public Handler<RoutingContext> handleDelete() {
         return ctx -> {
             String jobId = ctx.pathParam("jobId");
-            QuorusStateMachine stateMachine = (QuorusStateMachine) raftNode.getStateMachine();
+            QuorusStateStore stateMachine = (QuorusStateStore) raftNode.getStateStore();
 
             if (!stateMachine.hasTransferJob(jobId)) {
                 throw QuorusApiException.notFound(ErrorCode.TRANSFER_NOT_FOUND, jobId);

@@ -18,7 +18,7 @@ package dev.mars.quorus.controller.raft;
 
 import dev.mars.quorus.controller.raft.storage.RaftLogStorageAdapter;
 import dev.mars.quorus.controller.raft.storage.RaftStorage;
-import dev.mars.quorus.controller.state.QuorusStateMachine;
+import dev.mars.quorus.controller.state.QuorusStateStore;
 import dev.mars.quorus.controller.state.TransferJobCommand;
 import dev.mars.quorus.core.TransferJob;
 import dev.mars.quorus.core.TransferRequest;
@@ -292,7 +292,7 @@ class RaftLogClusterIntegrationTest {
             .until(() -> {
                 String lastId = jobIds.get(jobIds.size() - 1);
                 return cluster.stream()
-                    .filter(n -> ((QuorusStateMachine) n.getStateMachine()).hasTransferJob(lastId))
+                    .filter(n -> ((QuorusStateStore) n.getStateStore()).hasTransferJob(lastId))
                     .count() >= (CLUSTER_SIZE / 2) + 1;
             });
         
@@ -300,7 +300,7 @@ class RaftLogClusterIntegrationTest {
         logReplicationStatus(jobIds);
         
         // Verify jobs exist in state machine before restart
-        QuorusStateMachine leaderSM = (QuorusStateMachine) leader.getStateMachine();
+        QuorusStateStore leaderSM = (QuorusStateStore) leader.getStateStore();
         for (String jobId : jobIds) {
             assertTrue(leaderSM.hasTransferJob(jobId), 
                 "Leader should have job " + jobId + " before restart");
@@ -330,7 +330,7 @@ class RaftLogClusterIntegrationTest {
         // Verify ALL nodes recovered the jobs from WAL
         LOG.info("Verifying state machine rebuilt from WAL...");
         for (RaftNode node : cluster) {
-            QuorusStateMachine sm = (QuorusStateMachine) node.getStateMachine();
+            QuorusStateStore sm = (QuorusStateStore) node.getStateStore();
             for (String jobId : jobIds) {
                 assertTrue(sm.hasTransferJob(jobId), 
                     "Node " + node.getNodeId() + " should have recovered job " + jobId);
@@ -375,7 +375,7 @@ class RaftLogClusterIntegrationTest {
             .pollInterval(Duration.ofMillis(200))
             .until(() -> {
                 return cluster.stream()
-                    .filter(n -> ((QuorusStateMachine) n.getStateMachine()).hasTransferJob(jobId))
+                    .filter(n -> ((QuorusStateStore) n.getStateStore()).hasTransferJob(jobId))
                     .count() >= (CLUSTER_SIZE / 2) + 1;
             });
         
@@ -423,7 +423,7 @@ class RaftLogClusterIntegrationTest {
         await().atMost(Duration.ofSeconds(15))
             .pollInterval(Duration.ofMillis(200))
             .until(() -> {
-                QuorusStateMachine sm = (QuorusStateMachine) restartedFollower.getStateMachine();
+                QuorusStateStore sm = (QuorusStateStore) restartedFollower.getStateStore();
                 return sm.hasTransferJob(jobId);
             });
         
@@ -431,7 +431,7 @@ class RaftLogClusterIntegrationTest {
         logClusterState("after follower restart");
         
         // Verify recovered follower has the job
-        QuorusStateMachine recoveredSM = (QuorusStateMachine) restartedFollower.getStateMachine();
+        QuorusStateStore recoveredSM = (QuorusStateStore) restartedFollower.getStateStore();
         assertTrue(recoveredSM.hasTransferJob(jobId), 
             "Recovered follower should have job from WAL replay");
         
@@ -528,7 +528,7 @@ class RaftLogClusterIntegrationTest {
         storage.open(dataDir).toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
         storages.put(nodeId, storage);
         
-        QuorusStateMachine stateMachine = new QuorusStateMachine();
+        QuorusStateStore stateMachine = new QuorusStateStore();
         Set<String> clusterNodes = Set.of(NODE_IDS);
         
         return new RaftNode(
@@ -574,7 +574,7 @@ class RaftLogClusterIntegrationTest {
     private void logClusterState(String context) {
         LOG.debug("--- Cluster State ({}) ---", context);
         for (RaftNode node : cluster) {
-            QuorusStateMachine sm = (QuorusStateMachine) node.getStateMachine();
+            QuorusStateStore sm = (QuorusStateStore) node.getStateStore();
             LOG.debug("  {} | state={} | term={} | votedFor={} | log=[size={}, lastIdx={}, lastTerm={}] | commit={} | applied={} | jobs={}",
                 node.getNodeId(),
                 node.getState(),
@@ -615,7 +615,7 @@ class RaftLogClusterIntegrationTest {
     private void logReplicationStatus(List<String> jobIds) {
         LOG.debug("--- Replication Status ---");
         for (RaftNode node : cluster) {
-            QuorusStateMachine sm = (QuorusStateMachine) node.getStateMachine();
+            QuorusStateStore sm = (QuorusStateStore) node.getStateStore();
             StringBuilder sb = new StringBuilder();
             sb.append(node.getNodeId()).append(" (").append(node.getState()).append("): ");
             

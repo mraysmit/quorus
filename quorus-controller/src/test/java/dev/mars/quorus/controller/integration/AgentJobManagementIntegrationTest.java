@@ -23,7 +23,7 @@ import dev.mars.quorus.controller.http.HttpApiServer;
 import dev.mars.quorus.controller.raft.InMemoryTransportSimulator;
 import dev.mars.quorus.controller.raft.RaftNode;
 import dev.mars.quorus.controller.raft.RaftTransport;
-import dev.mars.quorus.controller.state.QuorusStateMachine;
+import dev.mars.quorus.controller.state.QuorusStateStore;
 import org.junit.jupiter.api.*;
 
 import static org.awaitility.Awaitility.await;
@@ -56,7 +56,7 @@ class AgentJobManagementIntegrationTest {
     private static final String BASE_URL = "http://localhost:" + HTTP_PORT;
 
     private static RaftNode raftNode;
-    private static QuorusStateMachine stateMachine;
+    private static QuorusStateStore stateMachine;
     private static HttpApiServer httpServer;
     private static HttpClient httpClient;
     private static ObjectMapper objectMapper;
@@ -82,7 +82,7 @@ class AgentJobManagementIntegrationTest {
                 .build();
 
         // Initialize state machine
-        stateMachine = new QuorusStateMachine();
+        stateMachine = new QuorusStateStore();
 
         // Create an in-memory transport for testing (supports single-node clusters)
         RaftTransport transport = new InMemoryTransportSimulator("test-node-1");

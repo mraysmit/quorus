@@ -16,19 +16,19 @@
 
 package dev.mars.quorus.controller.raft;
 
-import dev.mars.quorus.controller.state.StateMachineCommand;
+import dev.mars.quorus.controller.state.RaftCommand;
 
 /**
- * Description for RaftStateMachine
+ * Description for RaftLogApplicator
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @version 1.0
  * @since 2025-08-20
  */
 
-public interface RaftStateMachine {
+public interface RaftLogApplicator {
 
-    Object apply(StateMachineCommand command);
+    Object apply(RaftCommand command);
 
     byte[] takeSnapshot();
 

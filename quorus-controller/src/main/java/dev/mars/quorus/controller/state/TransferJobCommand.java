@@ -27,7 +27,7 @@ import dev.mars.quorus.core.TransferStatus;
  * @since 2025-08-20
  */
 
-public final class TransferJobCommand implements StateMachineCommand {
+public final class TransferJobCommand implements RaftCommand {
 
     private static final long serialVersionUID = 1L;
 

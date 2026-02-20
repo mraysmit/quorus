@@ -19,7 +19,7 @@ package dev.mars.quorus.controller.raft;
 import dev.mars.quorus.controller.raft.grpc.VoteRequest;
 import dev.mars.quorus.controller.raft.grpc.VoteResponse;
 import io.vertx.core.Future;
-import dev.mars.quorus.controller.state.QuorusStateMachine;
+import dev.mars.quorus.controller.state.QuorusStateStore;
 import dev.mars.quorus.controller.state.SystemMetadataCommand;
 import org.awaitility.Awaitility;
 import static org.awaitility.Awaitility.await;
@@ -48,9 +48,9 @@ class RaftNodeTest {
     private InMemoryTransportSimulator transport1;
     private InMemoryTransportSimulator transport2;
     private InMemoryTransportSimulator transport3;
-    private QuorusStateMachine stateMachine1;
-    private QuorusStateMachine stateMachine2;
-    private QuorusStateMachine stateMachine3;
+    private QuorusStateStore stateMachine1;
+    private QuorusStateStore stateMachine2;
+    private QuorusStateStore stateMachine3;
 
     @BeforeEach
     void setUp() {
@@ -67,9 +67,9 @@ class RaftNodeTest {
         transport3 = new InMemoryTransportSimulator("node3");
 
         // Create state machines
-        stateMachine1 = new QuorusStateMachine();
-        stateMachine2 = new QuorusStateMachine();
-        stateMachine3 = new QuorusStateMachine();
+        stateMachine1 = new QuorusStateStore();
+        stateMachine2 = new QuorusStateStore();
+        stateMachine3 = new QuorusStateStore();
 
         // Create Raft nodes with shorter timeouts for testing
         node1 = new RaftNode(vertx, "node1", clusterNodes, transport1, stateMachine1, 1000, 200);
@@ -276,7 +276,7 @@ class RaftNodeTest {
         Set<String> singleNodeCluster = Set.of("node1");
         RaftNode singleNode = new RaftNode(vertx, "node1", singleNodeCluster, 
                                           new InMemoryTransportSimulator("node1"), 
-                                          new QuorusStateMachine(), 500, 100);
+                                          new QuorusStateStore(), 500, 100);
         singleNode.start();
         
         Awaitility.await()

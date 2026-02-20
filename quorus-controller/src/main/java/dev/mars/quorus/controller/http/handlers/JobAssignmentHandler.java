@@ -20,7 +20,7 @@ import dev.mars.quorus.controller.http.ErrorCode;
 import dev.mars.quorus.controller.http.QuorusApiException;
 import dev.mars.quorus.controller.raft.RaftNode;
 import dev.mars.quorus.controller.state.JobAssignmentCommand;
-import dev.mars.quorus.controller.state.QuorusStateMachine;
+import dev.mars.quorus.controller.state.QuorusStateStore;
 import dev.mars.quorus.core.JobAssignment;
 import dev.mars.quorus.core.JobAssignmentStatus;
 import io.vertx.core.Handler;
@@ -90,7 +90,7 @@ public class JobAssignmentHandler {
                         .onFailure(ctx::fail);
             } catch (Exception e) {
                 logger.error("Failed to assign job: {}", e.getMessage());
-                logger.trace("Stack trace for job assignment failure", e);
+                logger.debug("Stack trace for job assignment failure", e);
                 ctx.fail(e);
             }
         };
@@ -101,7 +101,7 @@ public class JobAssignmentHandler {
      */
     public Handler<RoutingContext> handleList() {
         return ctx -> {
-            QuorusStateMachine stateMachine = (QuorusStateMachine) raftNode.getStateMachine();
+            QuorusStateStore stateMachine = (QuorusStateStore) raftNode.getStateStore();
             Map<String, JobAssignment> assignments = stateMachine.getJobAssignments();
 
             JsonArray array = new JsonArray();
@@ -121,7 +121,7 @@ public class JobAssignmentHandler {
     public Handler<RoutingContext> handleGet() {
         return ctx -> {
             String assignmentId = ctx.pathParam("assignmentId");
-            QuorusStateMachine stateMachine = (QuorusStateMachine) raftNode.getStateMachine();
+            QuorusStateStore stateMachine = (QuorusStateStore) raftNode.getStateStore();
 
             JobAssignment assignment = stateMachine.getJobAssignment(assignmentId);
             if (assignment == null) {
@@ -252,7 +252,7 @@ public class JobAssignmentHandler {
      * @throws QuorusApiException with ASSIGNMENT_NOT_FOUND if it doesn't exist
      */
     private void verifyAssignmentExists(String assignmentId) {
-        QuorusStateMachine stateMachine = (QuorusStateMachine) raftNode.getStateMachine();
+        QuorusStateStore stateMachine = (QuorusStateStore) raftNode.getStateStore();
         if (stateMachine.getJobAssignment(assignmentId) == null) {
             throw QuorusApiException.notFound(ErrorCode.ASSIGNMENT_NOT_FOUND, assignmentId);
         }
