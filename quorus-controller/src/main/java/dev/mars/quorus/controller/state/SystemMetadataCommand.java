@@ -16,62 +16,61 @@
 
 package dev.mars.quorus.controller.state;
 
+import java.util.Objects;
+
 /**
- * Description for SystemMetadataCommand
+ * Sealed interface for system metadata key-value operations.
+ *
+ * <p>Each permitted record carries exactly the fields it needs — no nullable
+ * fields, no type tags. The type IS the class.
+ *
+ * <ul>
+ *   <li>{@link Set} — upsert a metadata key-value pair</li>
+ *   <li>{@link Delete} — remove a metadata key</li>
+ * </ul>
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @version 1.0
+ * @version 2.0
  * @since 2025-08-20
  */
+public sealed interface SystemMetadataCommand extends RaftCommand
+        permits SystemMetadataCommand.Set, SystemMetadataCommand.Delete {
 
-public final class SystemMetadataCommand implements RaftCommand {
+    /** Common accessor — every variant identifies itself by key. */
+    String key();
 
-    private static final long serialVersionUID = 1L;
+    // ── Records ─────────────────────────────────────────────────
 
-    public enum Type {
-        SET,
-        DELETE
-    }
+    /**
+     * Upsert a metadata key-value pair.
+     */
+    record Set(String key, String value) implements SystemMetadataCommand {
+        private static final long serialVersionUID = 1L;
 
-    private final Type type;
-    private final String key;
-    private final String value;
-
-    private SystemMetadataCommand(Type type, String key, String value) {
-        this.type = type;
-        this.key = key;
-        this.value = value;
-    }
-
-    public static SystemMetadataCommand set(String key, String value) {
-        return new SystemMetadataCommand(Type.SET, key, value);
-    }
-
-    public static SystemMetadataCommand delete(String key) {
-        return new SystemMetadataCommand(Type.DELETE, key, null);
-    }
-
-    public Type getType() {
-        return type;
-    }
-
-    public String getKey() {
-        return key;
+        public Set {
+            Objects.requireNonNull(key, "key");
+            Objects.requireNonNull(value, "value");
+        }
     }
 
     /**
-     * Get the metadata value (for SET commands).
+     * Remove a metadata key.
      */
-    public String getValue() {
-        return value;
+    record Delete(String key) implements SystemMetadataCommand {
+        private static final long serialVersionUID = 1L;
+
+        public Delete {
+            Objects.requireNonNull(key, "key");
+        }
     }
 
-    @Override
-    public String toString() {
-        return "SystemMetadataCommand{" +
-                "type=" + type +
-                ", key='" + key + '\'' +
-                ", value='" + value + '\'' +
-                '}';
+    // ── Factory methods (preserves existing API) ────────────────
+
+    static SystemMetadataCommand set(String key, String value) {
+        return new Set(key, value);
+    }
+
+    static SystemMetadataCommand delete(String key) {
+        return new Delete(key);
     }
 }

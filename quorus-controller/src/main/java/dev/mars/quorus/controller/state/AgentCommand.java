@@ -21,256 +21,165 @@ import dev.mars.quorus.agent.AgentStatus;
 import dev.mars.quorus.agent.AgentCapabilities;
 
 import java.time.Instant;
+import java.util.Objects;
 
 /**
- * Command for agent operations in the Raft state machine.
- * This class represents commands that can be submitted to the distributed controller
- * for managing agents in the fleet.
- * 
+ * Sealed interface for agent lifecycle commands.
+ *
+ * <p>Each permitted subtype carries only the fields relevant to its operation,
+ * eliminating nullable "bag-of-fields" patterns. Pattern matching in
+ * {@code switch} expressions provides compile-time exhaustiveness.
+ *
+ * <h3>Permitted subtypes</h3>
+ * <ul>
+ *   <li>{@link Register} — register a new agent</li>
+ *   <li>{@link Deregister} — deregister an agent</li>
+ *   <li>{@link UpdateStatus} — change agent status</li>
+ *   <li>{@link UpdateCapabilities} — update agent capabilities</li>
+ *   <li>{@link Heartbeat} — record an agent heartbeat</li>
+ * </ul>
+ *
  * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 2.0
  * @since 2025-08-26
- * @version 1.0
  */
-public final class AgentCommand implements RaftCommand {
+public sealed interface AgentCommand extends RaftCommand
+        permits AgentCommand.Register,
+                AgentCommand.Deregister,
+                AgentCommand.UpdateStatus,
+                AgentCommand.UpdateCapabilities,
+                AgentCommand.Heartbeat {
 
-    private static final long serialVersionUID = 1L;
+    /** Common accessor: every subtype carries an agent ID. */
+    String agentId();
 
-    /**
-     * Types of agent commands.
-     */
-    public enum CommandType {
-        REGISTER,
-        DEREGISTER,
-        UPDATE_STATUS,
-        UPDATE_CAPABILITIES,
-        HEARTBEAT
-    }
-
-    private final CommandType type;
-    private final String agentId;
-    private final AgentInfo agentInfo;
-    private final AgentStatus newStatus;
-    private final AgentCapabilities newCapabilities;
-    private final Instant timestamp;
+    /** Common accessor: every subtype carries a timestamp. */
+    Instant timestamp();
 
     /**
-     * Private constructor for creating commands.
+     * Register a new agent.
+     *
+     * @param agentId   the agent identifier
+     * @param agentInfo the full agent information
+     * @param timestamp the command timestamp
      */
-    private AgentCommand(CommandType type, String agentId, AgentInfo agentInfo, 
-                        AgentStatus newStatus, AgentCapabilities newCapabilities) {
-        this(type, agentId, agentInfo, newStatus, newCapabilities, null);
+    record Register(String agentId, AgentInfo agentInfo, Instant timestamp) implements AgentCommand {
+        private static final long serialVersionUID = 1L;
+
+        public Register {
+            Objects.requireNonNull(agentId, "agentId");
+            Objects.requireNonNull(agentInfo, "agentInfo");
+            Objects.requireNonNull(timestamp, "timestamp");
+        }
     }
 
     /**
-     * Package-private constructor for protobuf deserialization with explicit timestamp.
+     * Deregister an agent.
+     *
+     * @param agentId   the agent identifier
+     * @param timestamp the command timestamp
      */
-    AgentCommand(CommandType type, String agentId, AgentInfo agentInfo,
-                 AgentStatus newStatus, AgentCapabilities newCapabilities, Instant timestamp) {
-        this.type = type;
-        this.agentId = agentId;
-        this.agentInfo = agentInfo;
-        this.newStatus = newStatus;
-        this.newCapabilities = newCapabilities;
-        this.timestamp = (timestamp != null) ? timestamp : Instant.now();
+    record Deregister(String agentId, Instant timestamp) implements AgentCommand {
+        private static final long serialVersionUID = 1L;
+
+        public Deregister {
+            Objects.requireNonNull(agentId, "agentId");
+            Objects.requireNonNull(timestamp, "timestamp");
+        }
     }
+
+    /**
+     * Update the status of an existing agent.
+     *
+     * @param agentId   the agent identifier
+     * @param newStatus the new status
+     * @param timestamp the command timestamp
+     */
+    record UpdateStatus(String agentId, AgentStatus newStatus, Instant timestamp) implements AgentCommand {
+        private static final long serialVersionUID = 1L;
+
+        public UpdateStatus {
+            Objects.requireNonNull(agentId, "agentId");
+            Objects.requireNonNull(newStatus, "newStatus");
+            Objects.requireNonNull(timestamp, "timestamp");
+        }
+    }
+
+    /**
+     * Update the capabilities of an existing agent.
+     *
+     * @param agentId         the agent identifier
+     * @param newCapabilities the new capabilities
+     * @param timestamp       the command timestamp
+     */
+    record UpdateCapabilities(String agentId, AgentCapabilities newCapabilities, Instant timestamp) implements AgentCommand {
+        private static final long serialVersionUID = 1L;
+
+        public UpdateCapabilities {
+            Objects.requireNonNull(agentId, "agentId");
+            Objects.requireNonNull(newCapabilities, "newCapabilities");
+            Objects.requireNonNull(timestamp, "timestamp");
+        }
+    }
+
+    /**
+     * Record an agent heartbeat.
+     *
+     * @param agentId   the agent identifier
+     * @param status    optional status update with heartbeat (may be null)
+     * @param timestamp the command timestamp
+     */
+    record Heartbeat(String agentId, AgentStatus status, Instant timestamp) implements AgentCommand {
+        private static final long serialVersionUID = 1L;
+
+        public Heartbeat {
+            Objects.requireNonNull(agentId, "agentId");
+            Objects.requireNonNull(timestamp, "timestamp");
+            // status may be null — heartbeat doesn't always carry a status update
+        }
+    }
+
+    // ── Factory methods (preserve existing API) ─────────────────
 
     /**
      * Create a command to register a new agent.
-     * 
-     * @param agentInfo the agent to register
-     * @return the command
      */
-    public static AgentCommand register(AgentInfo agentInfo) {
-        return new AgentCommand(CommandType.REGISTER, agentInfo.getAgentId(), agentInfo, null, null);
+    static AgentCommand register(AgentInfo agentInfo) {
+        return new Register(agentInfo.getAgentId(), agentInfo, Instant.now());
     }
 
     /**
      * Create a command to deregister an agent.
-     * 
-     * @param agentId the agent ID to deregister
-     * @return the command
      */
-    public static AgentCommand deregister(String agentId) {
-        return new AgentCommand(CommandType.DEREGISTER, agentId, null, AgentStatus.DEREGISTERED, null);
+    static AgentCommand deregister(String agentId) {
+        return new Deregister(agentId, Instant.now());
     }
 
     /**
      * Create a command to update an agent's status.
-     * 
-     * @param agentId the agent ID
-     * @param newStatus the new status
-     * @return the command
      */
-    public static AgentCommand updateStatus(String agentId, AgentStatus newStatus) {
-        return new AgentCommand(CommandType.UPDATE_STATUS, agentId, null, newStatus, null);
+    static AgentCommand updateStatus(String agentId, AgentStatus newStatus) {
+        return new UpdateStatus(agentId, newStatus, Instant.now());
     }
 
     /**
      * Create a command to update an agent's capabilities.
-     * 
-     * @param agentId the agent ID
-     * @param newCapabilities the new capabilities
-     * @return the command
      */
-    public static AgentCommand updateCapabilities(String agentId, AgentCapabilities newCapabilities) {
-        return new AgentCommand(CommandType.UPDATE_CAPABILITIES, agentId, null, null, newCapabilities);
+    static AgentCommand updateCapabilities(String agentId, AgentCapabilities newCapabilities) {
+        return new UpdateCapabilities(agentId, newCapabilities, Instant.now());
     }
 
     /**
      * Create a command to record an agent heartbeat.
-     *
-     * @param agentId the agent ID
-     * @return the command
      */
-    public static AgentCommand heartbeat(String agentId) {
-        return new AgentCommand(CommandType.HEARTBEAT, agentId, null, null, null);
+    static AgentCommand heartbeat(String agentId) {
+        return new Heartbeat(agentId, null, Instant.now());
     }
 
     /**
      * Create a command to record an agent heartbeat with status.
-     *
-     * @param agentId the agent ID
-     * @param status the agent status
-     * @param timestamp the heartbeat timestamp
-     * @return the command
      */
-    public static AgentCommand heartbeat(String agentId, AgentStatus status, Instant timestamp) {
-        return new AgentCommand(CommandType.HEARTBEAT, agentId, null, status, null);
-    }
-
-    /**
-     * Get the command type.
-     * 
-     * @return the command type
-     */
-    public CommandType getType() {
-        return type;
-    }
-
-    /**
-     * Get the agent ID.
-     * 
-     * @return the agent ID
-     */
-    public String getAgentId() {
-        return agentId;
-    }
-
-    /**
-     * Get the agent info (for REGISTER commands).
-     * 
-     * @return the agent info, or null if not applicable
-     */
-    public AgentInfo getAgentInfo() {
-        return agentInfo;
-    }
-
-    /**
-     * Get the new status (for UPDATE_STATUS commands).
-     * 
-     * @return the new status, or null if not applicable
-     */
-    public AgentStatus getNewStatus() {
-        return newStatus;
-    }
-
-    /**
-     * Get the new capabilities (for UPDATE_CAPABILITIES commands).
-     * 
-     * @return the new capabilities, or null if not applicable
-     */
-    public AgentCapabilities getNewCapabilities() {
-        return newCapabilities;
-    }
-
-    /**
-     * Get the command timestamp.
-     * 
-     * @return the timestamp when the command was created
-     */
-    public Instant getTimestamp() {
-        return timestamp;
-    }
-
-    /**
-     * Check if this is a REGISTER command.
-     * 
-     * @return true if this is a REGISTER command
-     */
-    public boolean isRegister() {
-        return type == CommandType.REGISTER;
-    }
-
-    /**
-     * Check if this is a DEREGISTER command.
-     * 
-     * @return true if this is a DEREGISTER command
-     */
-    public boolean isDeregister() {
-        return type == CommandType.DEREGISTER;
-    }
-
-    /**
-     * Check if this is an UPDATE_STATUS command.
-     * 
-     * @return true if this is an UPDATE_STATUS command
-     */
-    public boolean isUpdateStatus() {
-        return type == CommandType.UPDATE_STATUS;
-    }
-
-    /**
-     * Check if this is an UPDATE_CAPABILITIES command.
-     * 
-     * @return true if this is an UPDATE_CAPABILITIES command
-     */
-    public boolean isUpdateCapabilities() {
-        return type == CommandType.UPDATE_CAPABILITIES;
-    }
-
-    /**
-     * Check if this is a HEARTBEAT command.
-     * 
-     * @return true if this is a HEARTBEAT command
-     */
-    public boolean isHeartbeat() {
-        return type == CommandType.HEARTBEAT;
-    }
-
-    @Override
-    public String toString() {
-        return "AgentCommand{" +
-                "type=" + type +
-                ", agentId='" + agentId + '\'' +
-                ", newStatus=" + newStatus +
-                ", timestamp=" + timestamp +
-                '}';
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-
-        AgentCommand that = (AgentCommand) o;
-
-        if (type != that.type) return false;
-        if (!agentId.equals(that.agentId)) return false;
-        if (agentInfo != null ? !agentInfo.equals(that.agentInfo) : that.agentInfo != null) return false;
-        if (newStatus != that.newStatus) return false;
-        if (newCapabilities != null ? !newCapabilities.equals(that.newCapabilities) : that.newCapabilities != null)
-            return false;
-        return timestamp.equals(that.timestamp);
-    }
-
-    @Override
-    public int hashCode() {
-        int result = type.hashCode();
-        result = 31 * result + agentId.hashCode();
-        result = 31 * result + (agentInfo != null ? agentInfo.hashCode() : 0);
-        result = 31 * result + (newStatus != null ? newStatus.hashCode() : 0);
-        result = 31 * result + (newCapabilities != null ? newCapabilities.hashCode() : 0);
-        result = 31 * result + timestamp.hashCode();
-        return result;
+    static AgentCommand heartbeat(String agentId, AgentStatus status, Instant timestamp) {
+        return new Heartbeat(agentId, status, timestamp != null ? timestamp : Instant.now());
     }
 }

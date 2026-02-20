@@ -45,27 +45,59 @@ final class RouteCodec {
 
     static RouteCommandProto toProto(RouteCommand cmd) {
         RouteCommandProto.Builder builder = RouteCommandProto.newBuilder()
-                .setType(toProto(cmd.getType()));
-        Optional.ofNullable(cmd.getRouteId()).ifPresent(builder::setRouteId);
-        Optional.ofNullable(cmd.getRouteConfiguration()).ifPresent(c -> builder.setRouteConfiguration(toProto(c)));
-        Optional.ofNullable(cmd.getNewStatus()).ifPresent(s -> builder.setNewStatus(toProto(s)));
-        Optional.ofNullable(cmd.getReason()).ifPresent(builder::setReason);
-        Optional.ofNullable(cmd.getTimestamp()).ifPresent(t -> builder.setTimestampEpochMs(t.toEpochMilli()));
+                .setRouteId(cmd.routeId())
+                .setTimestampEpochMs(cmd.timestamp().toEpochMilli());
+
+        switch (cmd) {
+            case RouteCommand.Create c -> {
+                builder.setType(RouteCommandType.ROUTE_CMD_CREATE);
+                builder.setRouteConfiguration(toProto(c.routeConfiguration()));
+            }
+            case RouteCommand.Update u -> {
+                builder.setType(RouteCommandType.ROUTE_CMD_UPDATE);
+                builder.setRouteConfiguration(toProto(u.routeConfiguration()));
+            }
+            case RouteCommand.Delete ignored -> {
+                builder.setType(RouteCommandType.ROUTE_CMD_DELETE);
+            }
+            case RouteCommand.Suspend s -> {
+                builder.setType(RouteCommandType.ROUTE_CMD_SUSPEND);
+                if (s.reason() != null) builder.setReason(s.reason());
+            }
+            case RouteCommand.Resume ignored -> {
+                builder.setType(RouteCommandType.ROUTE_CMD_RESUME);
+            }
+            case RouteCommand.UpdateStatus us -> {
+                builder.setType(RouteCommandType.ROUTE_CMD_UPDATE_STATUS);
+                builder.setNewStatus(toProto(us.newStatus()));
+                if (us.reason() != null) builder.setReason(us.reason());
+            }
+        }
+
         return builder.build();
     }
 
     static RouteCommand fromProto(RouteCommandProto proto) {
         Instant timestamp = proto.getTimestampEpochMs() > 0
-                ? Instant.ofEpochMilli(proto.getTimestampEpochMs()) : null;
-        RouteCommand.CommandType type = fromProto(proto.getType());
-        RouteConfiguration routeConfig = proto.hasRouteConfiguration()
-                ? fromProto(proto.getRouteConfiguration()) : null;
-        RouteStatus newStatus = proto.getNewStatus() != RouteStatusProto.ROUTE_STATUS_UNSPECIFIED
-                ? fromProto(proto.getNewStatus()) : null;
+                ? Instant.ofEpochMilli(proto.getTimestampEpochMs()) : Instant.now();
+        String routeId = proto.getRouteId();
         String reason = proto.getReason().isEmpty() ? null : proto.getReason();
 
-        return new RouteCommand(type, proto.getRouteId(),
-                routeConfig, newStatus, reason, timestamp);
+        return switch (proto.getType()) {
+            case ROUTE_CMD_CREATE -> new RouteCommand.Create(routeId,
+                    fromProto(proto.getRouteConfiguration()), timestamp);
+            case ROUTE_CMD_UPDATE -> new RouteCommand.Update(routeId,
+                    fromProto(proto.getRouteConfiguration()), timestamp);
+            case ROUTE_CMD_DELETE -> new RouteCommand.Delete(routeId, timestamp);
+            case ROUTE_CMD_SUSPEND -> new RouteCommand.Suspend(routeId, reason, timestamp);
+            case ROUTE_CMD_RESUME -> new RouteCommand.Resume(routeId, timestamp);
+            case ROUTE_CMD_UPDATE_STATUS -> {
+                RouteStatus newStatus = proto.getNewStatus() != RouteStatusProto.ROUTE_STATUS_UNSPECIFIED
+                        ? fromProto(proto.getNewStatus()) : null;
+                yield new RouteCommand.UpdateStatus(routeId, newStatus, reason, timestamp);
+            }
+            default -> throw new IllegalArgumentException("Unknown RouteCommandType: " + proto.getType());
+        };
     }
 
     // ── Domain models ───────────────────────────────────────────
@@ -162,29 +194,6 @@ final class RouteCodec {
     }
 
     // ── Enums ───────────────────────────────────────────────────
-
-    private static RouteCommandType toProto(RouteCommand.CommandType type) {
-        return switch (type) {
-            case CREATE -> RouteCommandType.ROUTE_CMD_CREATE;
-            case UPDATE -> RouteCommandType.ROUTE_CMD_UPDATE;
-            case DELETE -> RouteCommandType.ROUTE_CMD_DELETE;
-            case SUSPEND -> RouteCommandType.ROUTE_CMD_SUSPEND;
-            case RESUME -> RouteCommandType.ROUTE_CMD_RESUME;
-            case UPDATE_STATUS -> RouteCommandType.ROUTE_CMD_UPDATE_STATUS;
-        };
-    }
-
-    private static RouteCommand.CommandType fromProto(RouteCommandType type) {
-        return switch (type) {
-            case ROUTE_CMD_CREATE -> RouteCommand.CommandType.CREATE;
-            case ROUTE_CMD_UPDATE -> RouteCommand.CommandType.UPDATE;
-            case ROUTE_CMD_DELETE -> RouteCommand.CommandType.DELETE;
-            case ROUTE_CMD_SUSPEND -> RouteCommand.CommandType.SUSPEND;
-            case ROUTE_CMD_RESUME -> RouteCommand.CommandType.RESUME;
-            case ROUTE_CMD_UPDATE_STATUS -> RouteCommand.CommandType.UPDATE_STATUS;
-            default -> throw new IllegalArgumentException("Unknown RouteCommandType: " + type);
-        };
-    }
 
     private static RouteStatusProto toProto(RouteStatus status) {
         return switch (status) {

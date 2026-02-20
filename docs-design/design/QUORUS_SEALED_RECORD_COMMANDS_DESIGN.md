@@ -232,7 +232,7 @@ public sealed interface TransferJobCommand extends RaftCommand {
         private static final long serialVersionUID = 1L;
     }
 
-    record UpdateStatus(String jobId, TransferStatus newStatus)
+    record UpdateStatus(String jobId, TransferStatus expectedStatus, TransferStatus newStatus)
             implements TransferJobCommand {
         private static final long serialVersionUID = 1L;
     }
@@ -253,8 +253,8 @@ public sealed interface TransferJobCommand extends RaftCommand {
         return new Create(job.getJobId(), job);
     }
 
-    static TransferJobCommand updateStatus(String jobId, TransferStatus status) {
-        return new UpdateStatus(jobId, status);
+    static TransferJobCommand updateStatus(String jobId, TransferStatus expectedStatus, TransferStatus status) {
+        return new UpdateStatus(jobId, expectedStatus, status);
     }
 
     static TransferJobCommand updateProgress(String jobId, long bytesTransferred) {
@@ -329,7 +329,7 @@ RaftCommand (sealed interface)
 | Record | Fields | Notes |
 |---|---|---|
 | `Create` | `String jobId`, `TransferJob transferJob` | Carries full transfer job for initial creation |
-| `UpdateStatus` | `String jobId`, `TransferStatus newStatus` | Status transitions (PENDING → IN_PROGRESS → COMPLETED) |
+| `UpdateStatus` | `String jobId`, `TransferStatus expectedStatus`, `TransferStatus newStatus` | Status transitions (PENDING → IN_PROGRESS → COMPLETED). Uses CAS. |
 | `UpdateProgress` | `String jobId`, `long bytesTransferred` | Primitive `long`, not `Long` — no null boxing |
 | `Delete` | `String jobId` | Minimal — just the ID to remove |
 
@@ -339,7 +339,7 @@ RaftCommand (sealed interface)
 |---|---|---|
 | `Register` | `String agentId`, `AgentInfo agentInfo` | Full agent info for registration |
 | `Deregister` | `String agentId`, `Instant timestamp` | Timestamp for audit trail |
-| `UpdateStatus` | `String agentId`, `AgentStatus newStatus`, `Instant timestamp` | Status change with timestamp |
+| `UpdateStatus` | `String agentId`, `AgentStatus expectedStatus`, `AgentStatus newStatus`, `Instant timestamp` | Status change with timestamp and CAS |
 | `UpdateCapabilities` | `String agentId`, `AgentCapabilities newCapabilities`, `Instant timestamp` | Capability update with timestamp |
 | `Heartbeat` | `String agentId`, `Instant timestamp` | Keep-alive signal |
 
@@ -361,7 +361,7 @@ Common accessor: `String key()` on the sealed interface.
 | `Assign` | `String assignmentId`, `JobAssignment jobAssignment`, `Instant timestamp` | Full assignment with generated ID |
 | `Accept` | `String assignmentId`, `Instant timestamp` | Agent accepts — status set by factory to ACCEPTED |
 | `Reject` | `String assignmentId`, `String reason`, `Instant timestamp` | Agent rejects with reason |
-| `UpdateStatus` | `String assignmentId`, `JobAssignmentStatus newStatus`, `Instant timestamp` | Generic status transition |
+| `UpdateStatus` | `String assignmentId`, `JobAssignmentStatus expectedStatus`, `JobAssignmentStatus newStatus`, `Instant timestamp` | Generic status transition with CAS |
 | `Timeout` | `String assignmentId`, `Instant timestamp` | Timeout detection — status set by factory to TIMEOUT |
 | `Cancel` | `String assignmentId`, `String reason`, `Instant timestamp` | Controller cancels with reason |
 | `Remove` | `String assignmentId`, `Instant timestamp` | Cleanup after completion/failure |
@@ -370,15 +370,25 @@ Common accessor: `String assignmentId()` on the sealed interface.
 
 **Validation:** The current `validateCommand()` method in `JobAssignmentCommand` validates field
 presence per variant. With records, this validation is structural — `Assign` requires a non-null
-`JobAssignment` because it's a record component. Use compact constructors for additional validation:
+`JobAssignment` because it's a record component. Use compact constructors for additional validation.
+
+**Strict non-null policy:** Compact constructors must never default missing values. If a field is
+required, `Objects.requireNonNull` fails fast — the bug is at the call site that omitted the value,
+not here. Factory methods (Section 7.3) supply `Instant.now()` for production callers; the codec
+supplies the deserialized timestamp. No path should ever pass `null` for `timestamp`.
 
 ```java
 record Assign(String assignmentId, JobAssignment jobAssignment, Instant timestamp)
         implements JobAssignmentCommand {
-    Assign {  // compact constructor
-        Objects.requireNonNull(jobAssignment, "Job assignment cannot be null");
-        Objects.requireNonNull(assignmentId, "Assignment ID cannot be null");
-        if (timestamp == null) timestamp = Instant.now();
+    Assign {  // compact constructor — fail fast, never default
+        Objects.requireNonNull(assignmentId, "assignmentId");
+        Objects.requireNonNull(jobAssignment, "jobAssignment");
+        Objects.requireNonNull(timestamp, "timestamp");
+    }
+
+    /** Production factory — callers use this, never the canonical constructor directly. */
+    public static Assign create(String assignmentId, JobAssignment jobAssignment) {
+        return new Assign(assignmentId, jobAssignment, Instant.now());
     }
 }
 ```
@@ -405,7 +415,7 @@ Common accessor: `String jobId()` on the sealed interface.
 | `Delete` | `String routeId`, `Instant timestamp` | Route removal |
 | `Suspend` | `String routeId`, `String reason`, `Instant timestamp` | Pause with reason |
 | `Resume` | `String routeId`, `Instant timestamp` | Reactivate |
-| `UpdateStatus` | `String routeId`, `RouteStatus newStatus`, `String reason`, `Instant timestamp` | Generic status change |
+| `UpdateStatus` | `String routeId`, `RouteStatus expectedStatus`, `RouteStatus newStatus`, `String reason`, `Instant timestamp` | Generic status change with CAS |
 
 Common accessor: `String routeId()` on the sealed interface.
 
@@ -445,83 +455,122 @@ private Object applyTransferJobCommand(TransferJobCommand command) {
 }
 ```
 
-### 5.2 Proposed Pattern (handler delegation)
+### 5.2 First-Class Results: The CommandResult ADT
+
+Returning `null` when an entity is not found is another instance of structural lying. The caller (the HTTP handler) receives a `null` objective and must guess why the command was rejected. Instead, we introduce a sum type for the result of `apply()`, eliminating `yield null` entirely:
 
 ```java
-private Object applyTransferJobCommand(TransferJobCommand command) {
+public sealed interface CommandResult<T> {
+    record Success<T>(T entity) implements CommandResult<T> {}
+    record NotFound<T>(String id, String entityType) implements CommandResult<T> {}
+    record CasMismatch<T>(T currentEntity) implements CommandResult<T> {}
+}
+```
+
+### 5.3 Proposed Pattern (applicator delegation)
+
+To avoid causing `QuorusStateStore` to balloon into 36+ methods, the implementation extracts pure, domain-specific **applicator classes** (e.g., `TransferJobApplicator`). `QuorusStateStore` delegates to these applicators, which return strongly-typed `CommandResult` records.
+
+```java
+private CommandResult<?> applyTransferJobCommand(TransferJobCommand command) {
     logger.debug("Processing transfer job command: type={}, jobId={}",
         command.getClass().getSimpleName(), command.jobId());
     return switch (command) {
-        case TransferJobCommand.Create cmd        -> handleCreateJob(cmd);
-        case TransferJobCommand.UpdateStatus cmd  -> handleUpdateJobStatus(cmd);
-        case TransferJobCommand.UpdateProgress cmd -> handleUpdateJobProgress(cmd);
-        case TransferJobCommand.Delete cmd        -> handleDeleteJob(cmd);
+        case TransferJobCommand.Create cmd         -> transferJobApplicator.handleCreateJob(cmd);
+        case TransferJobCommand.UpdateStatus cmd   -> transferJobApplicator.handleUpdateJobStatus(cmd);
+        case TransferJobCommand.UpdateProgress cmd -> transferJobApplicator.handleUpdateJobProgress(cmd);
+        case TransferJobCommand.Delete cmd         -> transferJobApplicator.handleDeleteJob(cmd);
     };
 }
 
-private TransferJob handleCreateJob(TransferJobCommand.Create cmd) {
+// Inside TransferJobApplicator.java
+public CommandResult<TransferJob> handleCreateJob(TransferJobCommand.Create cmd) {
     TransferJobSnapshot snapshot = TransferJobSnapshot.fromTransferJob(cmd.transferJob());
     transferJobs.put(cmd.jobId(), snapshot);
     logger.info("Created transfer job: jobId={}, protocol={}, totalJobs={}", 
         cmd.jobId(), cmd.transferJob().getRequest().getProtocol(), transferJobs.size());
-    return cmd.transferJob();
+    return new CommandResult.Success<>(cmd.transferJob());
 }
 
-private TransferJobSnapshot handleUpdateJobStatus(TransferJobCommand.UpdateStatus cmd) {
-    TransferJobSnapshot existing = getOrWarn(transferJobs, cmd.jobId(), "Transfer job", "status update");
-    if (existing == null) return null;
-    TransferStatus oldStatus = existing.getStatus();
-    TransferJobSnapshot updated = new TransferJobSnapshot(
-            existing.getJobId(), existing.getSourceUri(), existing.getDestinationPath(),
-            cmd.newStatus(), existing.getBytesTransferred(), existing.getTotalBytes(),
-            existing.getStartTime(), Instant.now(),
-            existing.getErrorMessage(), existing.getDescription());
-    transferJobs.put(cmd.jobId(), updated);
-    logger.info("Updated transfer job status: jobId={}, oldStatus={}, newStatus={}", 
-        cmd.jobId(), oldStatus, cmd.newStatus());
-    return updated;
+public CommandResult<TransferJobSnapshot> handleUpdateJobStatus(TransferJobCommand.UpdateStatus cmd) {
+    return Optional.ofNullable(transferJobs.get(cmd.jobId()))
+        .map(existing -> {
+            if (existing.getStatus() != cmd.expectedStatus()) {
+                logger.warn("State CAS mismatch (expected {}, got {}). Ignored transition.", 
+                    cmd.expectedStatus(), existing.getStatus());
+                return new CommandResult.CasMismatch<TransferJobSnapshot>(existing);
+            }
+
+            TransferStatus oldStatus = existing.getStatus();
+            TransferJobSnapshot updated = new TransferJobSnapshot(
+                    existing.getJobId(), existing.getSourceUri(), existing.getDestinationPath(),
+                    cmd.newStatus(), existing.getBytesTransferred(), existing.getTotalBytes(),
+                    existing.getStartTime(), Instant.now(),
+                    existing.getErrorMessage(), existing.getDescription());
+            transferJobs.put(cmd.jobId(), updated);
+            logger.info("Updated transfer job status: jobId={}, oldStatus={}, newStatus={}", 
+                cmd.jobId(), oldStatus, cmd.newStatus());
+            
+            return new CommandResult.Success<>(updated);
+        })
+        .orElseGet(() -> {
+            logger.warn("Transfer job not found for status update: {}", cmd.jobId());
+            return new CommandResult.NotFound<>(cmd.jobId(), "TransferJob");
+        });
 }
 
-private TransferJobSnapshot handleUpdateJobProgress(TransferJobCommand.UpdateProgress cmd) {
-    TransferJobSnapshot existing = getOrWarn(transferJobs, cmd.jobId(), "Transfer job", "progress update");
-    if (existing == null) return null;
-    TransferJobSnapshot updated = new TransferJobSnapshot(
-            existing.getJobId(), existing.getSourceUri(), existing.getDestinationPath(),
-            existing.getStatus(), cmd.bytesTransferred(), existing.getTotalBytes(),
-            existing.getStartTime(), Instant.now(),
-            existing.getErrorMessage(), existing.getDescription());
-    transferJobs.put(cmd.jobId(), updated);
-    return updated;
+public CommandResult<TransferJobSnapshot> handleUpdateJobProgress(TransferJobCommand.UpdateProgress cmd) {
+    return Optional.ofNullable(transferJobs.get(cmd.jobId()))
+        .map(existing -> {
+            TransferJobSnapshot updated = new TransferJobSnapshot( /* ... */ );
+            transferJobs.put(cmd.jobId(), updated);
+            return (CommandResult<TransferJobSnapshot>) new CommandResult.Success<>(updated);
+        })
+        .orElseGet(() -> {
+            logger.warn("Transfer job not found for progress update: {}", cmd.jobId());
+            return new CommandResult.NotFound<>(cmd.jobId(), "TransferJob");
+        });
 }
 
-private TransferJobSnapshot handleDeleteJob(TransferJobCommand.Delete cmd) {
-    TransferJobSnapshot removed = removeOrWarn(transferJobs, cmd.jobId(), "Transfer job", "deletion");
-    if (removed == null) return null;
-    logger.info("Deleted transfer job: jobId={}, finalStatus={}, totalJobs={}", 
-        cmd.jobId(), removed.getStatus(), transferJobs.size());
-    return removed;
+public CommandResult<TransferJobSnapshot> handleDeleteJob(TransferJobCommand.Delete cmd) {
+    return Optional.ofNullable(transferJobs.remove(cmd.jobId()))
+        .map(removed -> {
+            logger.info("Deleted transfer job: jobId={}, finalStatus={}, totalJobs={}", 
+                cmd.jobId(), removed.getStatus(), transferJobs.size());
+            return (CommandResult<TransferJobSnapshot>) new CommandResult.Success<>(removed);
+        })
+        .orElseGet(() -> {
+            logger.warn("Transfer job not found for deletion: {}", cmd.jobId());
+            return new CommandResult.NotFound<>(cmd.jobId(), "TransferJob");
+        });
 }
 ```
 
-### 5.3 Structural Comparison
+### 5.3.1 Eliminating the Null-Check Code Smell
+
+Previous designs featured defensive guard clauses like `if (existing == null) yield null;` or explicit imperative null checks in handlers. This represents a known code smell in modern Java. 
+
+By pushing null-handling into `Optional.map().orElseGet()`, we:
+1. **Declare intent explicitly:** Data flow defines what to do if present vs. absent.
+2. **Prevent unhandled edge cases:** The compiler forces developers to either unwrap safely or provide an `orElse` path.
+3. **Bridge into Domain ADTs:** We smoothly convert a nullable state-store retrieval (`Optional.ofNullable`) into a structured domain outcome (`CommandResult`). Instead of passing `null` around until it eventually NPEs, nullability is bounded and mapped directly into business semantics (`NotFound`) at the storage boundary.
+
+### 5.4 Structural Comparison
 
 | Aspect | Before | After |
 |---|---|---|
 | Dispatch method | 1 per domain, 20-80 lines | 1 dispatcher (5-8 lines) + N handlers (8-15 lines each) |
 | Switch body | Block with `yield` | Expression (single method call) |
 | Field access | `command.getTransferJob()` (nullable) | `cmd.transferJob()` (non-null, typed) |
-| Return type | `Object` (from `yield`) | Specific type per handler |
-| `getOrWarn`/`removeOrWarn` helpers | Still used, return null | Still used, return null (Raft safety) |
+| Return type | `Object` (from `yield null`) | `CommandResult<T>` (explicit Sum Type) |
+| `getOrWarn`/`removeOrWarn` helpers | Yields/returns `null` | Replaced by `CommandResult.NotFound` |
 | Adding a new variant | Add enum case + switch block | Add record + compiler forces handler |
-| Total methods in QuorusStateStore | ~12 | ~36 (6 dispatchers + 30 handlers) |
-| Total LOC | ~550 (6 switch methods) | ~520 (more methods, less per method) |
+| Total methods in QuorusStateStore | ~12 | ~6 (dispatches to Applicator classes) |
+| Total LOC | ~550 (6 switch methods) | ~150 in Store, logic moved to Applicators |
 
-### 5.4 Raft Safety Note
+### 5.5 Raft Safety Note
 
-The `getOrWarn` / `removeOrWarn` helper pattern and null returns are **retained**. In a Raft state
-machine, committed commands must be applied deterministically on every node. A DELETE followed by an
-UPDATE for the same entity (both committed) would break log replay if UPDATE threw. Returning null
-for "entity not found" is correct Raft behavior — the refactoring changes structure, not semantics.
+Returning `CommandResult.NotFound` completely replaces the explicit `getOrWarn` and `return null` checks. In a Raft state machine, committed commands must be applied deterministically on every node. A DELETE followed by an UPDATE for the same entity (both committed) would break log replay if UPDATE threw an exception. Returning a `NotFound` record safely handles these edge cases without breaking log determinism, while providing full context to the caller.
 
 ---
 
@@ -689,28 +738,40 @@ if (result instanceof TransferJobCommand.Create create) {
 
 Estimated test assertions requiring update: ~150 across 6 test files.
 
-### 7.3 Codec Package-Private Constructors
+### 7.3 Codec Deserialization and Timestamps
 
-Four of the six codecs use package-private constructors for deserialization:
+Four of the six codecs currently use package-private constructors for deserialization:
 
 ```java
 // AgentCodec.fromProto currently does:
 new AgentCommand(CommandType.REGISTER, agentId, agentInfo, null, null, timestamp);
 ```
 
-After refactoring, these become record constructors:
+After refactoring, records will use canonical constructors:
 ```java
-new AgentCommand.Register(agentId, agentInfo);
+new AgentCommand.Register(agentId, agentInfo, timestamp);
 ```
 
-However, since factory methods can handle timestamp defaulting, using factory methods is preferred.
-Codec-specific constructors (with explicit timestamp) can be added to records as secondary methods:
+**Recommendation:** Do not use package-private constructors to bypass immutability or validation. The canonical constructor accepts all required fields (including `timestamp`) and enforces non-null via the compact constructor. Factory methods supply `Instant.now()` for production callers. The codec always supplies the deserialized timestamp — no path ever passes `null`.
 
 ```java
-record Register(String agentId, AgentInfo agentInfo) implements AgentCommand {
-    // Used by codec for deserialization — agentInfo already contains timestamp
+record Register(String agentId, AgentInfo agentInfo, Instant timestamp) implements AgentCommand {
+    Register {  // compact constructor — fail fast, never default
+        Objects.requireNonNull(agentId, "agentId");
+        Objects.requireNonNull(agentInfo, "agentInfo");
+        Objects.requireNonNull(timestamp, "timestamp");
+    }
+
+    /** Production factory — callers use this, never the canonical constructor directly. */
+    public static Register create(String agentId, AgentInfo agentInfo) {
+        return new Register(agentId, agentInfo, Instant.now());
+    }
 }
 ```
+
+Two construction paths, both non-null:
+1. **Production code** → `Register.create(agentId, agentInfo)` — factory supplies `Instant.now()`
+2. **Codec deserialization** → `new Register(agentId, agentInfo, protoTimestamp)` — proto always has a timestamp
 
 ---
 
@@ -801,7 +862,7 @@ without affecting others.
 
 | Risk | Description | Mitigation |
 |---|---|---|
-| **Method count increase in QuorusStateStore** | 30 handler methods replace 30 `case` blocks. The class grows from ~12 methods to ~36 methods. | Same total logic, better organized. Consider grouping handlers into inner classes or extracting domain-specific handler classes (e.g., `TransferJobHandler`). |
+| **Method count increase in QuorusStateStore** | 30 handler methods replace 30 `case` blocks. The class grows from ~12 methods to ~36 methods. | **Extract Domain-Specific Applicators.** `QuorusStateStore` should be stripped down to only the top-level Level 1 switches, delegating actual map updates to stateless applicator classes (e.g., `TransferJobApplicator`, `AgentStatusApplicator`). |
 | **Snapshot compatibility** | `takeSnapshot()` / `restoreSnapshot()` serialize the state maps (not commands). | Commands are only serialized via the protobuf codec. State maps contain domain objects (`TransferJobSnapshot`, `AgentInfo`, etc.) which are unchanged. |
 | **Rolling cluster upgrade** | Mixed-version cluster where some nodes use old enum commands and others use new sealed records. | Wire format is protobuf — identical on the wire. Codec produces the same bytes. Nodes don't share Java objects. No compatibility issue. |
 
@@ -813,17 +874,23 @@ With sealed record subtypes, the state machine can use **record deconstruction p
 zero-getter field access:
 
 ```java
-private Object applyTransferJobCommand(TransferJobCommand command) {
+private CommandResult<?> applyTransferJobCommand(TransferJobCommand command) {
     return switch (command) {
         case Create(var jobId, var transferJob) -> {
             transferJobs.put(jobId, TransferJobSnapshot.fromTransferJob(transferJob));
-            yield transferJob;
+            yield new CommandResult.Success<>(transferJob);
         }
-        case UpdateStatus(var jobId, var newStatus) -> {
-            var existing = getOrWarn(transferJobs, jobId, "Transfer job", "status update");
-            if (existing == null) yield null;
-            // use newStatus directly — no getter call
-            yield updateSnapshot(existing, newStatus);
+        case UpdateStatus(var jobId, var expectedStatus, var newStatus) -> {
+            yield Optional.ofNullable(transferJobs.get(jobId))
+                .map(existing -> {
+                    if (existing.getStatus() != expectedStatus) {
+                        return (CommandResult<?>) new CommandResult.CasMismatch<>(existing);
+                    }
+                    var updated = updateSnapshot(existing, newStatus);
+                    transferJobs.put(jobId, updated);
+                    return (CommandResult<?>) new CommandResult.Success<>(updated);
+                })
+                .orElseGet(() -> new CommandResult.NotFound<>(jobId, "TransferJob"));
         }
         case UpdateProgress(var jobId, var bytes) -> { /* ... */ }
         case Delete(var jobId) -> { /* ... */ }
@@ -990,8 +1057,10 @@ validated commands. The transition rules belong in the **command submission laye
 or services), not in `apply()`.
 
 However, `apply()` should still have **defensive guards** for Raft safety — if a command references
-a non-existent entity (possible during log replay after compaction), it should warn and return null,
-not throw. This is what the existing `getOrWarn()`/`removeOrWarn()` helpers do.
+a non-existent entity (possible during log replay after compaction), it should warn and return
+`CommandResult.NotFound`, not throw. Similarly, CAS mismatches during concurrent submissions return
+`CommandResult.CasMismatch` — deterministic on all nodes, with full context for the caller
+(see [Section 5.2](#52-first-class-results-the-commandresult-adt)).
 
 ---
 
@@ -1199,30 +1268,35 @@ public boolean canTransitionTo(RouteStatus target) {
 }
 ```
 
-### 13.3 Pre-Commit Validation — Implementation Pattern
+### 13.3 Pre-Commit Validation (Fast-Reject Optimization)
 
 The validation layer sits in the HTTP handlers/services, between the request parsing and the
-`raftNode.submitCommand()` call. Pattern:
+`raftNode.submitCommand()` call. **This validation is advisory only.** It serves as a fast-reject to give the client a clean `409 Conflict` without burning a Raft round-trip for an obviously invalid transition. The *actual* safety mechanism is the CAS validation inside `apply()`.
+
+Pattern:
 
 ```java
 // In TransferHandler or equivalent service method:
 public Future<TransferJobSnapshot> updateTransferJobStatus(String jobId, TransferStatus newStatus) {
-    // 1. Read current state (read-only query on state machine)
-    TransferJobSnapshot current = stateMachine.getTransferJob(jobId);
-    if (current == null) {
+    // 1. Read current state (read-only query on state store)
+    Optional<TransferJobSnapshot> current = stateStore.getTransferJob(jobId);
+    if (current.isEmpty()) {
         return Future.failedFuture(new NotFoundException("Transfer job not found: " + jobId));
     }
 
+    TransferJobSnapshot job = current.get();
+
     // 2. Validate transition
-    if (!current.getStatus().canTransitionTo(newStatus)) {
+    if (!job.getStatus().canTransitionTo(newStatus)) {
         return Future.failedFuture(new InvalidTransitionException(
             "Cannot transition transfer job '%s' from %s to %s. Valid targets: %s",
-            jobId, current.getStatus(), newStatus,
-            current.getStatus().getValidTransitions()));
+            jobId, job.getStatus(), newStatus,
+            job.getStatus().getValidTransitions()));
     }
 
-    // 3. Submit to Raft (only valid commands reach the log)
-    return raftNode.submitCommand(TransferJobCommand.updateStatus(jobId, newStatus))
+    // 3. Submit to Raft with CAS (only valid commands reach the log)
+    return raftNode.submitCommand(
+            TransferJobCommand.updateStatus(jobId, job.getStatus(), newStatus))
         .map(result -> (TransferJobSnapshot) result);
 }
 ```
@@ -1330,16 +1404,17 @@ void canTransitionTo_coversAllPairs(TransferStatus from, TransferStatus to, bool
 
 ### 14.3 Phase 8: State Machine Query Methods
 
-**Goal:** Ensure `QuorusStateStore` exposes read-only query methods for all stateful entities.
+**Goal:** Ensure `QuorusStateStore` exposes read-only query methods for all stateful entities,
+returning `Optional<T>` instead of nullable references.
 
 | Task | Method | Returns |
 |---|---|---|
-| 8a | `getTransferJob(String jobId)` | `TransferJobSnapshot` or `null` |
-| 8b | `getAgent(String agentId)` | `AgentInfo` or `null` |
-| 8c | `getJobAssignment(String assignmentId)` | `JobAssignment` or `null` |
-| 8d | `getRoute(String routeId)` | `RouteConfiguration` or `null` |
+| 8a | `getTransferJob(String jobId)` | `Optional<TransferJobSnapshot>` |
+| 8b | `getAgent(String agentId)` | `Optional<AgentInfo>` |
+| 8c | `getJobAssignment(String assignmentId)` | `Optional<JobAssignment>` |
+| 8d | `getRoute(String routeId)` | `Optional<RouteConfiguration>` |
 
-Each is a one-line `Map.get()` delegation. Some may already exist — verify before adding.
+Each is a one-line `Optional.ofNullable(map.get(id))` delegation. Some may already exist — verify before adding.
 
 ### 14.4 Phase 9: Pre-Commit Validation in Handlers
 
@@ -1359,29 +1434,65 @@ Each is a one-line `Map.get()` delegation. Some may already exist — verify bef
 
 ```java
 // Before submitting to Raft:
-TransferJobSnapshot current = stateMachine.getTransferJob(jobId);
-if (current == null) {
+Optional<TransferJobSnapshot> current = stateStore.getTransferJob(jobId);
+if (current.isEmpty()) {
     ctx.response().setStatusCode(404).end(notFoundJson(jobId));
     return;
 }
-if (!current.getStatus().canTransitionTo(newStatus)) {
+TransferJobSnapshot job = current.get();
+if (!job.getStatus().canTransitionTo(newStatus)) {
     ctx.response().setStatusCode(409).end(invalidTransitionJson(
-        jobId, current.getStatus(), newStatus));
+        jobId, job.getStatus(), newStatus));
     return;
 }
 // Now safe to submit
-raftNode.submitCommand(TransferJobCommand.updateStatus(jobId, newStatus));
+raftNode.submitCommand(TransferJobCommand.updateStatus(jobId, job.getStatus(), newStatus));
 ```
 
-**Raft safety note:** This validation is **best-effort**. Between reading the current state and
-the command being committed, another command could change the state (TOCTOU race). This is
-acceptable because:
-- In a single-leader Raft cluster, the leader processes commands sequentially
-- The `apply()` method is single-threaded on each node
-- The worst case is a stale read leading to a redundant state change (idempotent operations)
+**CRITICAL: Raft Safety, TOCTOU, and Client Retry Semantics**
 
-For strict safety, a future enhancement could add a **conditional write** pattern:
-`submitCommand(command, expectedCurrentStatus)` — but this is out of scope for this phase.
+If validation *only* exists pre-commit, and `apply()` remains a blind applicator, high concurrency will still result in invalid transitions due to Time-Of-Check to Time-Of-Use (TOCTOU) races. For example: Thread A and B both read `HEALTHY`. A submits `MAINTENANCE`, B submits `DEGRADED`. Both pass pre-commit validation. When applied sequentially, the agent becomes `MAINTENANCE` then unconditionally `DEGRADED`, performing an illegal transition.
+
+To ensure strict safety, **Compare-And-Swap (CAS) state validation must be embedded in the commands**.
+
+*Note: CAS is only required for status-changing variants (e.g., `UpdateStatus`). Variants that create or delete records are naturally idempotent or use existence checks, and do not need CAS fields.*
+
+Commands that change state must carry their `expectedStatus`:
+```java
+record UpdateStatus(String jobId, TransferStatus expectedStatus, TransferStatus newStatus) 
+    implements TransferJobCommand {}
+```
+
+Inside `apply()`, the state machine maintains Raft determinism by deterministically ignoring mismatched commands on all nodes, returning a strongly typed rejection result:
+```java
+case TransferJobCommand.UpdateStatus cmd -> {
+    TransferJobSnapshot existing = transferJobs.get(cmd.jobId());
+    if (existing == null) {
+        logger.warn("Transfer job not found: {}", cmd.jobId());
+        yield new CommandResult.NotFound<>(cmd.jobId(), "TransferJob");
+    }
+    
+    if (existing.getStatus() != cmd.expectedStatus()) {
+        logger.warn("State CAS mismatch (expected {}, got {}).", 
+                    cmd.expectedStatus(), existing.getStatus());
+        yield new CommandResult.CasMismatch<>(existing); 
+    }
+    
+    // Valid. Perform snapshot update...
+    TransferJobSnapshot updated = updateSnapshot(existing, cmd.newStatus());
+    transferJobs.put(cmd.jobId(), updated);
+    yield new CommandResult.Success<>(updated); 
+}
+```
+
+**Client Retry Semantics:** 
+When `apply()` encounters an invalid state, it returns a descriptive `CommandResult`. The `raftNode.submitCommand()` future completes with this yield value.
+The client (HTTP handler) now evaluates explicitly typed failures rather than guessing why a transition didn't apply:
+1. `submitCommand` returns.
+2. The handler pattern matches on the result:
+   - `case Success(var entity)`: Completed successfully.
+   - `case CasMismatch(var entity)`: Another thread won the race. Handler can automatically read the returned `entity.getStatus()` to apply a retry, or surface `409 Conflict`.
+   - `case NotFound`: The entity was deleted before the command committed. Returns `404 Not Found`.
 
 ### 14.5 Phase 10: Integration Tests for Transition Enforcement
 
@@ -1508,6 +1619,255 @@ the pragmatic boundary for the current refactoring effort.
 
 ---
 
+## 16. Progress Tracking & Regression Prevention
+
+This refactoring touches ~81 files across 50 tasks and 17 work packages. A single broken
+commit can cascade failures through Raft consensus, protobuf serialization, and HTTP handlers.
+This section defines how to track progress, prevent regressions, and verify correctness at
+every step.
+
+### 16.1 Invariant: Green-to-Green Commits
+
+**Every commit must leave the build in a passing state.** No "work in progress" commits that
+break compilation or tests. This is non-negotiable because:
+
+1. Raft consensus requires all nodes to apply identical commands — a serialization mismatch
+   between old and new formats causes split-brain
+2. `QuorusStateStore.apply()` is called on every node — a broken switch expression crashes
+   the entire cluster
+3. Protobuf codec changes affect both snapshot persistence and gRPC transport
+
+**Gate criteria before every commit:**
+
+```bash
+# Must pass — no exceptions
+mvn clean test -pl quorus-core,quorus-controller
+
+# Must pass if workflow module was touched
+mvn clean test -pl quorus-workflow
+
+# Full verification before PR merge
+mvn clean verify
+```
+
+### 16.2 One Domain at a Time — Vertical Slices
+
+Section 9 defines 6 phases (one per command domain). Each phase is a **vertical slice** through
+the entire stack:
+
+```
+Command class ──→ Codec ──→ State machine handler ──→ Tests
+```
+
+**Rules:**
+- Never start Phase N+1 until Phase N is merged and green
+- Never split a domain across commits (e.g., converting `AgentCommand` to records but leaving
+  `AgentCodec` using the old `getType()` pattern)
+- Each phase produces a single PR with all 4 layers updated atomically
+
+This prevents the "half-migrated" state where some commands are records and their codecs still
+expect enum tags.
+
+### 16.3 Quantifiable Regression Metrics
+
+Track these metrics before and after each phase. They must monotonically improve (or stay
+constant for unrelated modules):
+
+| Metric | Baseline | How to Measure | Target |
+|---|---|---|---|
+| `null` check count | ~847 | `grep -rn "== null\|!= null\|\.isPresent\|\.isEmpty" --include="*.java" \| wc -l` | 0 in command/codec/state machine paths |
+| `Object` return types | ~77 | `grep -rn "Object>" --include="*.java" \| wc -l` | 0 in Raft path |
+| `yield null` in state machine | 18 | `grep -rn "yield null" QuorusStateStore.java \| wc -l` | 0 |
+| `instanceof` casts | ~4 | `grep -rn "instanceof" --include="*.java" \| wc -l` (in handlers) | 0 from `Object` casts |
+| `getType()` calls | ~30 | `grep -rn "getType()" --include="*.java" \| wc -l` | 0 |
+| Test count | ~369+ | `mvn test` summary line | Monotonically increasing |
+| Test failures | 0 (excl. Docker) | `mvn test` summary line | 0 |
+
+**After each phase, record the updated counts in Section 16.8 (Progress Log).**
+
+### 16.4 Serialization Compatibility Gate
+
+Raft log entries and snapshots are persisted via protobuf. A codec change that silently drops
+a field or changes a default value will corrupt the cluster state on restart.
+
+**Per-phase serialization verification:**
+
+1. **Round-trip test** — For every new record type, assert:
+   ```java
+   @Test
+   void roundTrip_preservesAllFields() {
+       var original = AgentCommand.Register.create("agent-1", "us-east", "dc-1",
+           List.of("sftp", "http"), 5);
+       var proto = AgentCodec.toProto(original);
+       var restored = AgentCodec.fromProto(proto);
+       assertEquals(original, restored); // Record equals() compares all fields
+   }
+   ```
+   Record `equals()` is field-by-field by default — this single assertion covers every field.
+
+2. **Backward compatibility test** — Before changing a codec, capture the current proto bytes
+   for a representative command. After the change, verify the new codec can still decode those
+   bytes:
+   ```java
+   @Test
+   void backwardCompatibility_decodesPreRefactorBytes() {
+       // Proto bytes captured from pre-refactor codec
+       byte[] legacyBytes = Base64.getDecoder().decode(LEGACY_AGENT_REGISTER_BASE64);
+       RaftCommandMessage proto = RaftCommandMessage.parseFrom(legacyBytes);
+       RaftCommand command = ProtobufCommandCodec.fromProto(proto);
+       assertInstanceOf(AgentCommand.Register.class, command);
+       // Verify key fields survived
+   }
+   ```
+
+3. **Snapshot compatibility** — `takeSnapshot()` and `restoreSnapshot()` must round-trip
+   correctly after each phase. Test with a populated state machine:
+   ```java
+   @Test
+   void snapshotRoundTrip_afterPhase3Migration() {
+       // Populate state machine with agents, jobs, routes
+       populateTestState(stateStore);
+       byte[] snapshot = stateStore.takeSnapshot();
+       QuorusStateStore restored = new QuorusStateStore();
+       restored.restoreSnapshot(snapshot);
+       // Assert all entities survived
+       assertEquals(stateStore.getAgents(), restored.getAgents());
+       assertEquals(stateStore.getTransferJobs(), restored.getTransferJobs());
+   }
+   ```
+
+### 16.5 Compiler as Regression Detector
+
+The sealed record refactoring is designed so the Java compiler catches incomplete migrations:
+
+| Change | Compiler Enforcement |
+|---|---|
+| Sealed interface replaces class | Any code calling removed `getType()` → compile error |
+| Record replaces constructor | Any code calling old constructor → compile error |
+| `CommandResult<T>` replaces `Object` | Any code assuming `Object` return → compile error |
+| Pattern matching switch | Missing record variant → compiler warning (exhaustiveness) |
+
+**This is the primary safety mechanism.** If Phase 3 converts `AgentCommand` to a sealed
+interface, every file that calls `agentCommand.getType()` will fail to compile. The compiler
+tells you exactly which files need updating — there is no risk of a silent behavioral change.
+
+After converting each command class, run `mvn compile -pl quorus-controller` (not `test`)
+first. Fix all compilation errors. Then run tests. This separates "did I break the API?" from
+"does the logic still work?".
+
+### 16.6 Branch Strategy
+
+```
+main (always green)
+  │
+  ├── sealed-records/phase-1-system-metadata
+  │     └── PR #1: SystemMetadataCommand → sealed records + codec + state machine + tests
+  │
+  ├── sealed-records/phase-2-transfer-job
+  │     └── PR #2: TransferJobCommand → sealed records + codec + state machine + tests
+  │
+  ├── sealed-records/phase-3-agent        (depends on PR #1 or #2 merged)
+  │     ...
+  │
+  ├── type-safety/command-result          (depends on all Phase 1–6 PRs merged)
+  │     └── PR #7: Object → CommandResult<T> across Raft path
+  │
+  ├── transitions/phase-7-enums           (independent — can start anytime)
+  │     └── PR #8: canTransitionTo() on all status enums
+  │
+  └── independent/*                       (E.7–E.15, no dependencies)
+        └── PR per work package
+```
+
+**Merge order:**
+1. Phases 1–6 sequentially (each builds on the pattern established by the previous)
+2. Phase 6b (CommandResult) after all sealed record phases
+3. Phases 7–10 can interleave with 1–6 since they modify different files
+4. Independent work packages (E.7–E.15) anytime — no ordering constraints
+
+### 16.7 Per-Phase Verification Protocol
+
+Execute this checklist for every phase before marking it complete:
+
+#### Pre-Implementation
+- [ ] Read the current source files being modified (command, codec, state machine)
+- [ ] List all callers of the command class (use IDE "Find Usages" or `grep`)
+- [ ] Count current null checks and `getType()` calls in affected files
+
+#### Implementation
+- [ ] Convert command class → sealed interface + records
+- [ ] Update codec `toProto`/`fromProto` to pattern-match
+- [ ] Update `QuorusStateStore` handler to pattern-match
+- [ ] Update all callers (handlers, services, tests)
+
+#### Post-Implementation
+- [ ] `mvn compile -pl quorus-controller` — zero errors
+- [ ] `mvn test -pl quorus-core,quorus-controller` — zero new failures
+- [ ] Serialization round-trip test passes
+- [ ] No remaining `getType()` calls for this domain
+- [ ] No remaining `instanceof` casts for this domain's `Object` returns
+- [ ] Null check count in modified files decreased or stayed constant
+- [ ] Record updated metrics in Section 16.8
+
+### 16.8 Progress Log
+
+Record actual results after completing each phase. This becomes the audit trail.
+
+| Phase | Date | Tests Before | Tests After | Null Checks Removed | `getType()` Removed | Notes |
+|---|---|---|---|---|---|---|
+| 1 — SystemMetadata | 2026-02-20 | 369 | 369 | 2 (`Optional.ofNullable`) | 3 (`getType()`, enum mapping) | `enum Type` removed, compact constructors require `public` in interface records (Java 21) |
+| 2 — TransferJob | 2026-02-20 | 369 | 369 | 4 (`Optional.ofNullable` in `toProto`) | 4 (`getType()`, `getJobId()→jobId()`, enum mapping×2) | `enum Type` removed, 4 records (Create, UpdateStatus, UpdateProgress, Delete), codec uses pattern matching |
+| 3 — Agent | 2026-02-20 | 369 | 369 | 5 (`Optional.ofNullable` in `toProto`) | 5 (`getType()`, `getAgentId()→agentId()`, enum mapping×2, `is*()` methods×5) | `enum CommandType` removed, 5 records (Register, Deregister, UpdateStatus, UpdateCapabilities, Heartbeat), equals/hashCode now auto-generated |
+| 4 — Route | 2026-02-20 | 369 | 369 | 6 (`Optional.ofNullable` in `toProto`) | 4 (`getType()`, `getRouteId()→routeId()`, enum mapping×2) | `enum CommandType` removed, 6 records (Create, Update, Delete, Suspend, Resume, UpdateStatus), Suspend/Resume no longer carry redundant newStatus field, equals/hashCode auto-generated |
+| 5 — JobQueue | 2026-02-20 | 369 | 369 | 5 (`Optional.ofNullable` in `toProto`) | 4 (`getType()`, `getJobId()→jobId()`, enum mapping×2) | `enum CommandType` removed, 6 records (Enqueue, Dequeue, Prioritize, Remove, Expedite, UpdateRequirements), `validateCommand()` method eliminated — validation now in compact constructors, equals/hashCode auto-generated |
+| 6 — JobAssignment | — | — | — | — | — | — |
+| 6b — CommandResult | — | — | — | — | — | — |
+| 7 — Transition Enums | — | — | — | — | — | — |
+| 8 — Optional Queries | — | — | — | — | — | — |
+| 9 — Pre-Commit Valid. | — | — | — | — | — | — |
+| 10 — Integration Tests | — | — | — | — | — | — |
+| E.7 — Eager Collections | — | — | — | — | — | — |
+| E.8 — RaftNode Optional | — | — | — | — | — | — |
+| E.9 — Shutdown Guards | — | — | — | — | — | — |
+| E.10 — Handler Optional | — | — | — | — | — | — |
+| E.11 — NetworkStats | — | — | — | — | — | — |
+| E.12 — TransferContext | — | — | — | — | — | — |
+| E.13 — Health Check DTOs | — | — | — | — | — | — |
+| E.14 — Singleton Holder | — | — | — | — | — | — |
+| E.15 — Builder Fail-Fast | — | — | — | — | — | — |
+
+### 16.9 Rollback Strategy
+
+If a phase introduces a regression that cannot be resolved quickly:
+
+1. **Revert the entire branch** — do not try to "fix forward" across multiple domains
+2. Record the failure mode in the Progress Log above
+3. Write a failing test that captures the regression before re-attempting
+4. Re-implement with the test as a guard
+
+The vertical-slice approach (Section 16.2) makes reverting clean — each phase touches a
+self-contained set of files with no cross-domain coupling.
+
+### 16.10 Known Pre-Existing Failures
+
+These failures exist before the refactoring and must not be confused with regressions:
+
+| Test Class | Failure Mode | Root Cause |
+|---|---|---|
+| `FtpUploadIntegrationTest` | Errors (5) | Requires Docker (Testcontainers) |
+| `FtpsUploadIntegrationTest` | Error (1) | Requires Docker (Testcontainers) |
+| `SftpAbortIntegrationTest` | Errors (4) | Requires Docker (Testcontainers) |
+| `SftpUploadIntegrationTest` | Failures (1), Errors (3) | Requires Docker (Testcontainers) |
+
+These are **Docker-dependent integration tests** that fail when Docker is not running. They are
+unrelated to the sealed record refactoring. The refactoring must not introduce any new failures
+beyond this known set.
+
+**Verification:** After each phase, the failure set must be identical to the table above. Any
+new entry in `mvn test` output with `FAILURE` that is not in this table is a regression.
+
+---
+
 ## Appendix A: Current Command Class Structures
 
 ### A.1 TransferJobCommand
@@ -1610,3 +1970,872 @@ Constructors: private (5 params), package-private (6 params with timestamp — u
 | `RouteCodec.fromProto()` | `new RouteCommand(type, routeId, routeConfig, newStatus, reason, timestamp)` | Deserialization with explicit timestamp |
 | `TransferCodec.fromProto()` | Uses factory methods | — |
 | `SystemMetadataCodec.fromProto()` | Uses factory methods | — |
+---
+
+## Appendix C: Codebase Null-Check Audit
+
+**847** null-check patterns across the production codebase (`== null`, `!= null`,
+`Optional.ofNullable`, `requireNonNull`). Null checks are a code smell — each one signals an
+interface that permits a state the domain does not. This appendix categorises every occurrence
+and maps each category to its elimination strategy.
+
+### C.1 Overall Counts
+
+| Module | `== null` | `!= null` | `Optional.ofNullable` | `requireNonNull` | Total |
+|---|---|---|---|---|---|
+| quorus-core | 68 | 130 | 5 | 23 | **226** |
+| quorus-controller | 98 | 116 | 112 | 11 | **337** |
+| quorus-agent | 7 | 8 | 0 | 4 | **19** |
+| quorus-workflow | 38 | 56 | 5 | 27 | **126** |
+| quorus-tenant | 19 | 19 | 1 | 7 | **48** |
+| quorus-api (legacy) | 22 | 36 | 0 | 0 | **61** |
+| quorus-integration-examples | 4 | 26 | 0 | 0 | **30** |
+| **Total** | **256** | **391** | **123** | **72** | **847** |
+
+Only 5 `@NotNull` annotations exist in the entire codebase. Zero `@Nullable` or `@NonNull`.
+
+### C.2 Category Taxonomy
+
+Each null check falls into one of seven categories. Categories 1-3 are eliminated by the sealed
+record refactoring. Categories 4-7 require targeted fixes outside this design's scope but are
+tracked here for completeness.
+
+#### Category 1: Structural Lying (sealed records eliminate)
+
+**Count: ~130 matches** — the single largest category.
+
+The current command classes carry all possible fields with null for inapplicable ones.
+Every `Optional.ofNullable` in the codecs and every `yield null` in `QuorusStateStore` exists
+because the interface lies about what it carries.
+
+| Pattern | Files | Count | Sealed Record Fix |
+|---|---|---|---|
+| Codec `Optional.ofNullable(...).ifPresent(...)` | AgentCodec, RouteCodec, TransferCodec, JobQueueCodec, JobAssignmentCodec | 112 | Each record carries exactly its fields — pattern match, set directly, no guards |
+| `yield null` on map-miss in `QuorusStateStore` | QuorusStateStore.java | 18 | `CommandResult.NotFound` (Section 5.2) |
+| `if (command == null) return null` | QuorusStateStore.java:156 | 1 | `requireNonNull` in `apply()` — Raft log should never produce a null command |
+
+**Example (before):**
+```java
+// AgentCodec.toProto — 5 nullable guards for one command
+Optional.ofNullable(cmd.getAgentId()).ifPresent(builder::setAgentId);
+Optional.ofNullable(cmd.getAgentInfo()).ifPresent(i -> builder.setAgentInfo(toProto(i)));
+Optional.ofNullable(cmd.getNewStatus()).ifPresent(s -> builder.setNewStatus(toProto(s)));
+Optional.ofNullable(cmd.getNewCapabilities()).ifPresent(c -> builder.setNewCapabilities(toProto(c)));
+Optional.ofNullable(cmd.getTimestamp()).ifPresent(t -> builder.setTimestampEpochMs(t.toEpochMilli()));
+```
+
+**After (sealed records):**
+```java
+case AgentCommand.Register reg -> AgentCommandProto.newBuilder()
+    .setType(REGISTER)
+    .setAgentId(reg.agentId())          // non-null — it's a record component
+    .setAgentInfo(toProto(reg.agentInfo()))  // non-null
+    .setTimestampEpochMs(reg.timestamp().toEpochMilli())  // non-null
+    .build();
+```
+
+#### Category 2: Boilerplate `equals()`/`hashCode()` (records eliminate)
+
+**Count: ~40 matches.**
+
+Every `if (o == null || getClass() != o.getClass())` and ternary-null `hashCode()` in domain
+classes and command classes is eliminated when those classes become records. Records generate
+correct `equals()`, `hashCode()`, and `toString()` from their components.
+
+| Files | Count |
+|---|---|
+| AgentCommand, JobAssignmentCommand, JobQueueCommand, RouteCommand | 4 (command classes) |
+| AgentLoad, JobAssignment, QueuedJob, RouteConfiguration, TransferJob, TransferRequest, TransferResult, NetworkNode | 8 (domain classes) |
+| ExecutionContext, TransferGroup, ValidationResult, WorkflowDefinition, WorkflowExecution | 5 (workflow) |
+| Tenant, ResourceUsage | 2 (tenant) |
+
+#### Category 3: Command `validateCommand()` Null Guards (compact constructors eliminate)
+
+**Count: ~25 matches.**
+
+`JobAssignmentCommand.validateCommand()` and `JobQueueCommand.validateCommand()` manually check
+`if (assignmentId == null)`, `if (jobAssignment == null)`, etc. With sealed records, compact
+constructors enforce these invariants structurally:
+
+```java
+record Assign(String assignmentId, JobAssignment jobAssignment, Instant timestamp)
+        implements JobAssignmentCommand {
+    Assign {
+        Objects.requireNonNull(assignmentId, "assignmentId");
+        Objects.requireNonNull(jobAssignment, "jobAssignment");
+        Objects.requireNonNull(timestamp, "timestamp");
+    }
+}
+```
+
+#### Category 4: Map Lookups → Optional Returns
+
+**Count: ~60 matches.**
+
+Handler and service code does `stateMachine.getRoute(id)` then `if (route == null)`. The null
+comes from `ConcurrentHashMap.get()` — the map API forces this. The fix is two-layered:
+
+1. **QuorusStateStore query methods** return `Optional<T>` instead of nullable `T` (Phase 8, Section 14.3)
+2. **Handlers** use `orElseThrow()` instead of `if (x == null) throw`:
+
+```java
+// Before — null check parade
+RouteConfiguration route = stateMachine.getRoute(routeId);
+if (route == null) {
+    throw QuorusApiException.notFound(ErrorCode.ROUTE_NOT_FOUND, routeId);
+}
+
+// After — Optional chain
+RouteConfiguration route = stateStore.getRoute(routeId)
+    .orElseThrow(() -> QuorusApiException.notFound(ErrorCode.ROUTE_NOT_FOUND, routeId));
+```
+
+**Files affected:**
+- RouteHandler.java (6 lookups)
+- JobAssignmentHandler.java (3 lookups)
+- TransferHandler.java (1 lookup)
+- HeartbeatHandler.java (1 lookup)
+- JobAssignmentService.java (4 lookups)
+- SimpleTenantService.java (8 lookups)
+- SimpleResourceManagementService.java (4 lookups)
+
+#### Category 5: Lazy Initialisation → Eager Initialisation
+
+**Count: ~15 matches.**
+
+`AgentCapabilities` uses lazy null-check initialisation:
+```java
+public void addSupportedProtocol(String protocol) {
+    if (this.supportedProtocols == null) {
+        this.supportedProtocols = new HashSet<>();  // why wasn't this initialised?
+    }
+    this.supportedProtocols.add(protocol);
+}
+```
+
+The field should be initialised to an empty collection at construction, never null. The null
+possibility then infects every method that reads the field (`supportsProtocol` checks
+`supportedProtocols != null`). Fix: initialise all collection fields eagerly in constructors.
+
+**Files affected:**
+- AgentCapabilities.java (3 lazy-init collections: supportedProtocols, availableRegions, customCapabilities)
+- AgentInfo.java (1 lazy-init: metadata)
+- TransferRequest.java (1 lazy-init: metadata)
+
+#### Category 6: Repeated Guard on Same Field → requireNonNull at Construction
+
+**Count: ~15 matches.**
+
+`RaftNode` checks `if (storage == null)` in 5 separate methods (lines 334, 528, 1003, 1129, 1327).
+This is the same design flaw — the field is optionally null, and every usage re-checks. The fix
+depends on the domain semantics:
+
+- If storage is truly optional (volatile mode), use `Optional<RaftStorage>` as the field type and
+  force callers to acknowledge optionality via `ifPresent()` / `map()`.
+- If storage is required, `requireNonNull` in the constructor and remove all guards.
+
+Similarly, `QuorusControllerVerticle` checks `apiServer != null`, `raftNode != null`,
+`grpcServer != null` in shutdown — these should be non-null post-startup.
+
+#### Category 7: Input Validation at Boundary (legitimate, but improvable)
+
+**Count: ~80 matches.**
+
+Protocol adapters (`FtpTransferProtocol`, `SftpTransferProtocol`, `HttpTransferProtocol`, etc.)
+validate `if (request == null || request.getSourceUri() == null)`. YAML parser checks
+`if (data == null)`. Handler validation methods check `if (route.getRouteId() == null)`.
+
+These are boundary checks on external input (HTTP bodies, YAML documents, URI components). They are
+the most legitimate category of null checking — the external world genuinely can send null. But
+even here, improvements exist:
+
+- **Builder validation**: `TransferRequest.Builder` should validate required fields in `build()`,
+  not downstream. A valid `TransferRequest` should be non-null in all required fields by
+  construction.
+- **HTTP body parsing**: Vert.x `ctx.body().asJsonObject()` returns null for missing/malformed
+  bodies. A shared middleware could reject null bodies before handlers execute.
+- **YAML parsing**: `YamlWorkflowDefinitionParser` helper methods (`getString`, `getInt`, `getList`)
+  return null/default for missing keys. These could return `Optional` or throw
+  `WorkflowParseException` for required fields.
+
+### C.3 Elimination Roadmap
+
+| Category | Count | Elimination Mechanism | Phase |
+|---|---|---|---|
+| 1. Structural Lying | ~130 | Sealed records + CommandResult ADT | Phases 1-6 (this design) |
+| 2. Boilerplate equals/hashCode | ~40 | Records generate these | Phases 1-6 (this design) |
+| 3. validateCommand() guards | ~25 | Compact constructors | Phases 1-6 (this design) |
+| 4. Map lookups → Optional | ~60 | `Optional<T>` query methods | Phase 8 (Section 14.3) |
+| 5. Lazy init → eager init | ~15 | Initialise in constructor | Separate PR (quorus-core) |
+| 6. Repeated field guards | ~15 | `Optional<T>` field or `requireNonNull` | Separate PR (per module) |
+| 7. Boundary input validation | ~80 | Builder validation, middleware, parse exceptions | Incremental |
+| **Total** | **~365** eliminated or improved | | |
+
+Note: ~482 of the 847 matches are `!= null` checks in existing code that mirror the `== null`
+checks above (same root cause, opposite polarity). The counts above deduplicate by root cause,
+not by syntactic occurrence.
+
+### C.4 Highest-Impact Files (by null-check density)
+
+| File | `== null` | `!= null` | `Optional.ofNullable` | Total | Primary Category |
+|---|---|---|---|---|---|
+| QuorusStateStore.java | 22 | 4 | 4 | **30** | 1 (structural lying) |
+| AgentCodec.java | 0 | 2 | 27 | **29** | 1 (structural lying) |
+| RouteCodec.java | 0 | 2 | 22 | **24** | 1 (structural lying) |
+| JobQueueCodec.java | 0 | 2 | 22 | **24** | 1 (structural lying) |
+| SimpleTenantService.java | 12 | 12 | 0 | **24** | 4 (map lookups) |
+| RaftNode.java | 7 | 14 | 0 | **21** | 6 (repeated guards) |
+| RouteHandler.java | 12 | 2 | 0 | **14** | 4+7 (lookups + validation) |
+| YamlWorkflowDefinitionParser.java | 17 | 10 | 0 | **27** | 7 (boundary input) |
+| FtpTransferProtocol.java | 8 | 8 | 0 | **16** | 7 (boundary input) |
+| AgentCapabilities.java | 4 | 6 | 0 | **10** | 5 (lazy init) |
+
+### C.5 Singleton Double-Checked Locking (Anti-Pattern)
+
+Four metrics classes use `if (instance == null)` in `synchronized getInstance()`:
+
+- `TransferTelemetryMetrics.getInstance()`
+- `WorkflowMetrics.getInstance()`
+- `TenantMetrics.getInstance()`
+- `RaftMetrics.getInstance()`
+
+This is a well-known anti-pattern. Replace with the **Initialization-on-demand holder** idiom
+(lazy, thread-safe, no null check):
+
+```java
+public final class TransferTelemetryMetrics {
+    private TransferTelemetryMetrics() { /* init meters */ }
+
+    private static final class Holder {
+        static final TransferTelemetryMetrics INSTANCE = new TransferTelemetryMetrics();
+    }
+
+    public static TransferTelemetryMetrics getInstance() {
+        return Holder.INSTANCE;
+    }
+}
+```
+
+Or better: inject via Vert.x / CDI and eliminate the singleton entirely.
+
+---
+
+## Appendix D: `Object` Return Type Audit — Type Erasure Code Smell
+
+Using `Object` as a return type, parameter type, or field type is lazy and unsafe. It erases all
+compile-time type information, forces callers to `instanceof`-check and cast, and makes code
+impossible to understand without reading the implementation. Every `Object` in a signature is a
+missing type that the programmer was too lazy to express.
+
+### D.1 The Core Problem: `RaftLogApplicator.apply()` → `Object`
+
+The root of the type-safety rot:
+
+```java
+// RaftLogApplicator.java — the interface that started it all
+public interface RaftLogApplicator {
+    Object apply(RaftCommand command);  // what does this return? anything. nothing. who knows.
+}
+```
+
+This single `Object` return type cascades through the entire system:
+
+```
+RaftLogApplicator.apply() → Object
+    ↓
+QuorusStateStore.apply() → Object
+    ↓
+RaftNode.submitCommand() → Future<Object>
+    ↓
+JobAssignmentService → instanceof check + cast
+HeartbeatHandler → instanceof check + cast
+TransferHandler → ignores the result entirely
+```
+
+**9 methods** return `Object` in QuorusStateStore alone (the top-level `apply()` plus 6 private
+`apply*Command()` methods). Every caller of `submitCommand()` is forced into an `instanceof`
+lottery — the type system provides zero help.
+
+### D.2 Full Inventory
+
+#### Methods returning `Object` (CRITICAL)
+
+| File | Line | Signature | Impact |
+|---|---|---|---|
+| RaftLogApplicator.java | 31 | `Object apply(RaftCommand command)` | Interface contract — poisons everything |
+| QuorusStateStore.java | 155 | `public Object apply(RaftCommand command)` | 6 switch arms, each returning different types |
+| QuorusStateStore.java | 181 | `private Object applyTransferJobCommand(...)` | Returns TransferJob, TransferJobSnapshot, or null |
+| QuorusStateStore.java | 249 | `private Object applyAgentCommand(...)` | Returns AgentInfo or null |
+| QuorusStateStore.java | 312 | `private Object applySystemMetadataCommand(...)` | Returns String or null |
+| QuorusStateStore.java | 331 | `private Object applyJobAssignmentCommand(...)` | Returns JobAssignment or null |
+| QuorusStateStore.java | 414 | `private Object applyJobQueueCommand(...)` | Returns QueuedJob or null |
+| QuorusStateStore.java | 470 | `private Object applyRouteCommand(...)` | Returns RouteConfiguration or null |
+| RaftNode.java | 479 | `Future<Object> submitCommand(RaftCommand)` | Every caller must cast |
+| NetworkTopologyService.java | 507 | `Object getTransferMetrics()` | Meaningless return type |
+| NetworkTopologyService.java | 541 | `Object getAggregatedMetrics()` | Returns a String literal (!?) |
+| TransferContext.java | 79 | `Object getAttribute(String key)` | Untyped attribute bag |
+| VariableResolver.java | 198 | `private Object resolveVariable(String)` | YAML untyped value |
+
+#### `instanceof` checks forced by `Object` returns (downstream damage)
+
+| File | Line | Code | Root Cause |
+|---|---|---|---|
+| JobAssignmentService.java | 122 | `if (result instanceof QueuedJob)` | `submitCommand()` → `Future<Object>` |
+| JobAssignmentService.java | 194 | `if (result instanceof JobAssignment)` | `submitCommand()` → `Future<Object>` |
+| JobAssignmentService.java | 245 | `if (result instanceof JobAssignment)` | `submitCommand()` → `Future<Object>` |
+| HeartbeatHandler.java | 97 | `if (result instanceof AgentInfo updatedAgent)` | `submitCommand()` → `Future<Object>` |
+
+Every one of these `instanceof` checks only exists because `submitCommand()` returns
+`Future<Object>`. If the type system carried the result type, these would be direct field accesses
+with compile-time safety.
+
+#### Fields typed as `Object` (type information destroyed at storage)
+
+| File | Line | Field | Actual Type |
+|---|---|---|---|
+| NetworkTopologyService.java | 491 | `private final Object transferMetrics` | Unknown — set by builder, never typed |
+| NetworkTopologyService.java | 517 | `private Object transferMetrics = null` | Builder mirrors the field |
+| TransferContext.java | 38 | `Map<String, Object> attributes` | Untyped attribute bag |
+
+#### Collections using `Map<String, Object>` (85 occurrences)
+
+| Context | Count | Avoidability |
+|---|---|---|
+| YAML parsing (`YamlWorkflowDefinitionParser`, `WorkflowSchemaValidator`) | ~48 | **Inherent** — SnakeYAML returns `Map<String, Object>`. Unavoidable until the YAML is parsed into typed domain objects. |
+| Workflow variables (`VariableResolver`, `ExecutionContext`) | ~14 | **Partially avoidable** — variable values could be a sealed `VariableValue` (String, Number, Boolean, List) |
+| Health checks / DTOs (`HealthResource`, `ProtocolHealthCheck`, etc.) | ~12 | **Avoidable** — should be typed `HealthStatus` / `HealthDetail` records |
+| Agent capabilities metadata (`AgentCapabilities.customCapabilities`) | ~3 | **Avoidable** — should have a typed schema or use `JsonObject` |
+| Tenant configuration (`TenantConfiguration.customProperties`) | ~4 | **Avoidable** — typed configuration record |
+| Integration examples | ~3 | **Acceptable** — example code |
+
+### D.3 The Fix: `CommandResult<T>` Already Solves This
+
+The `CommandResult<T>` ADT introduced in Section 5.2 directly replaces every `Object` return in
+the Raft command path. Here is the complete flow:
+
+#### Step 1: Type the interface
+
+```java
+public interface RaftLogApplicator {
+    CommandResult<?> apply(RaftCommand command);  // no more Object
+}
+```
+
+#### Step 2: Type each dispatch method
+
+```java
+// QuorusStateStore — each method returns its specific CommandResult
+private CommandResult<TransferJob> applyTransferJobCreate(TransferJobCommand.Create cmd) { ... }
+private CommandResult<TransferJobSnapshot> applyTransferJobUpdateStatus(TransferJobCommand.UpdateStatus cmd) { ... }
+private CommandResult<AgentInfo> applyAgentRegister(AgentCommand.Register cmd) { ... }
+// ... etc
+```
+
+The top-level `apply()` method returns `CommandResult<?>` because different command types produce
+different entity types. The wildcard is acceptable here — it's the dispatch point. Downstream,
+each applicator method is fully typed.
+
+#### Step 3: Type `submitCommand()`
+
+```java
+// RaftNode — still returns Future<CommandResult<?>> (wildcard at the dispatch boundary)
+public Future<CommandResult<?>> submitCommand(RaftCommand command) { ... }
+```
+
+#### Step 4: Callers pattern-match on `CommandResult`, not `instanceof Object`
+
+```java
+// Before — instanceof lottery on Object
+Object result = raftNode.submitCommand(command);
+if (result instanceof QueuedJob) {
+    QueuedJob enqueuedJob = (QueuedJob) result;
+    // ...
+} else {
+    throw new RuntimeException("Failed to enqueue job");
+}
+
+// After — exhaustive pattern match on CommandResult
+raftNode.submitCommand(command)
+    .onSuccess(result -> switch (result) {
+        case CommandResult.Success<?> s -> {
+            QueuedJob enqueuedJob = (QueuedJob) s.entity();  // one cast, typed context
+            jobQueue.put(enqueuedJob.getJobId(), enqueuedJob);
+        }
+        case CommandResult.NotFound<?> nf ->
+            throw QuorusApiException.notFound(ErrorCode.JOB_NOT_FOUND, nf.id());
+        case CommandResult.CasMismatch<?> cas ->
+            throw QuorusApiException.conflict(ErrorCode.CAS_MISMATCH, ...);
+    });
+```
+
+Better still — if `RaftCommand` carries its result type as a type parameter:
+
+```java
+public sealed interface RaftCommand<R> extends Serializable { ... }
+
+public sealed interface TransferJobCommand extends RaftCommand<TransferJobSnapshot> { ... }
+public sealed interface AgentCommand extends RaftCommand<AgentInfo> { ... }
+```
+
+Then `submitCommand()` can be:
+
+```java
+public <R> Future<CommandResult<R>> submitCommand(RaftCommand<R> command) { ... }
+```
+
+And callers get full type safety — no casts at all:
+
+```java
+Future<CommandResult<QueuedJob>> future = raftNode.submitCommand(enqueueCommand);
+future.onSuccess(result -> switch (result) {
+    case CommandResult.Success<QueuedJob> s -> jobQueue.put(s.entity().getJobId(), s.entity());
+    case CommandResult.NotFound<QueuedJob> nf -> { /* handle */ }
+    case CommandResult.CasMismatch<QueuedJob> cas -> { /* handle */ }
+});
+```
+
+**Note:** The type-parameterised approach (`RaftCommand<R>`) requires that each sealed command
+subtype has a uniform result type. This works for most commands (e.g., all `AgentCommand` variants
+return `AgentInfo`). For `TransferJobCommand`, where `Create` returns `TransferJob` but
+`UpdateStatus` returns `TransferJobSnapshot`, the result type would be a common supertype or the
+variants would need separate type parameters. The simpler approach (Step 1-4 above with
+`CommandResult<?>` at the dispatch boundary) is recommended for Phase 1.
+
+### D.4 Other `Object` Fixes
+
+| Problem | Fix |
+|---|---|
+| `NetworkStatistics.transferMetrics: Object` | Type as `NetworkMetrics` or `Map<String, TransferMetric>` |
+| `NetworkMetrics.getAggregatedMetrics(): Object` | Returns a `String` literal — type as `String` or create `AggregatedMetrics` record |
+| `TransferContext.getAttribute(): Object` | Keep typed overload `<T> getAttribute(key, Class<T>)`, deprecate untyped overload |
+| `VariableResolver.resolveVariable(): Object` | Inherent to YAML untyped values — acceptable until variables get a typed schema |
+| `Map<String, Object>` in health checks | Replace with `HealthDetail` record: `record HealthDetail(String component, Status status, Map<String, String> metadata)` |
+| `Map<String, Object>` in `TenantConfiguration` | Replace with `TenantProperties` record with typed fields |
+
+### D.5 Elimination Roadmap
+
+| What | Count | Fix | Phase |
+|---|---|---|---|
+| `RaftLogApplicator.apply()` → `Object` | 1 | `CommandResult<?>` | Phase 6 (this design) |
+| `QuorusStateStore.apply*()` → `Object` | 7 | `CommandResult<T>` per applicator | Phase 6 (this design) |
+| `RaftNode.submitCommand()` → `Future<Object>` | 1 | `Future<CommandResult<?>>` | Phase 6 (this design) |
+| `instanceof` casts on submit result | 4 | Pattern match on `CommandResult` | Phase 6 (this design) |
+| `NetworkStatistics.transferMetrics: Object` | 2 | Type the field | Separate PR |
+| `NetworkMetrics.getAggregatedMetrics(): Object` | 1 | Type as `String` or record | Separate PR |
+| `TransferContext.getAttribute(): Object` | 1 | Deprecate untyped overload | Separate PR |
+| `Map<String, Object>` in health checks | ~12 | Typed records | Separate PR |
+| `Map<String, Object>` in YAML parsing | ~48 | Inherent to SnakeYAML | No change needed |
+| **Total type-unsafe interfaces** | **~77** (excluding YAML) | | |
+
+The sealed record refactoring (this design) eliminates the **13 most critical** `Object` uses —
+the entire `apply()` → `submitCommand()` → `instanceof` chain. The remaining ~64 are lower
+severity and can be addressed incrementally.
+
+---
+
+## Appendix E: Remediation Task Breakdown
+
+This appendix provides detailed, actionable tasks for eliminating every code smell identified in
+Appendices C and D. Tasks are grouped into work packages, ordered by dependency, and each task
+specifies the exact files, the anti-pattern, and the target pattern.
+
+**Scope:** Tasks E.1–E.6 are covered by the existing Phases 1–10 of this design. Tasks E.7–E.14
+are **new work** outside the current phase plan — they address the residual null and `Object`
+smells that the sealed record refactoring does not reach.
+
+### E.1 [Phases 1–6] Sealed Record Refactoring — Eliminate Structural Lying
+
+**Already tracked in Section 13.** Included here for cross-reference completeness.
+
+| Task | Files | Anti-Pattern | Target Pattern | Est. |
+|---|---|---|---|---|
+| E.1.1 Convert `SystemMetadataCommand` to sealed records | SystemMetadataCommand.java, SystemMetadataCodec.java, QuorusStateStore.java | Enum tag + nullable fields | 2 records, compact constructors | 2h |
+| E.1.2 Convert `TransferJobCommand` | TransferJobCommand.java, TransferCodec.java, QuorusStateStore.java, TransferHandler.java | 4 nullable fields | 4 records, factory methods | 3h |
+| E.1.3 Convert `AgentCommand` | AgentCommand.java, AgentCodec.java, QuorusStateStore.java | 5 nullable fields, 5 `Optional.ofNullable` guards in toProto | 5 records with timestamps | 3h |
+| E.1.4 Convert `RouteCommand` | RouteCommand.java, RouteCodec.java, QuorusStateStore.java | 5 nullable fields, 22 `Optional.ofNullable` guards | 6 records | 3h |
+| E.1.5 Convert `JobQueueCommand` | JobQueueCommand.java, JobQueueCodec.java, QuorusStateStore.java | 5 nullable fields, 22 `Optional.ofNullable` guards | 6 records | 3h |
+| E.1.6 Convert `JobAssignmentCommand` | JobAssignmentCommand.java, JobAssignmentCodec.java, QuorusStateStore.java | 6 nullable fields, 15 `Optional.ofNullable` guards | 7 records with CAS | 4h |
+
+**Metrics eliminated:** ~112 `Optional.ofNullable` guards in codecs, ~25 `validateCommand()` null
+checks, ~40 boilerplate `equals()`/`hashCode()` methods.
+
+### E.2 [Phase 6] `Object` → `CommandResult<T>` in Raft Path
+
+| Task | Files | Anti-Pattern | Target Pattern | Est. |
+|---|---|---|---|---|
+| E.2.1 Change `RaftLogApplicator.apply()` return type | RaftLogApplicator.java | `Object apply(RaftCommand)` | `CommandResult<?> apply(RaftCommand)` | 30m |
+| E.2.2 Change `QuorusStateStore.apply()` and 6 private dispatch methods | QuorusStateStore.java | 7 methods returning `Object`, 18 × `yield null` | `CommandResult<T>` per applicator, `CommandResult.NotFound` replaces null | 4h |
+| E.2.3 Change `RaftNode.submitCommand()` | RaftNode.java | `Future<Object> submitCommand(RaftCommand)` | `Future<CommandResult<?>> submitCommand(RaftCommand)` | 1h |
+| E.2.4 Update `JobAssignmentService` callers | JobAssignmentService.java | 3 × `if (result instanceof QueuedJob)` / `instanceof JobAssignment` | Pattern match on `CommandResult.Success` / `NotFound` / `CasMismatch` | 2h |
+| E.2.5 Update `HeartbeatHandler` caller | HeartbeatHandler.java | `if (result instanceof AgentInfo updatedAgent)` | Pattern match on `CommandResult.Success<AgentInfo>` | 30m |
+| E.2.6 Update all other `submitCommand()` call sites | TransferHandler.java, RouteHandler.java, JobAssignmentHandler.java, AgentRegistrationHandler.java, JobStatusHandler.java | Ignore result or bare `onSuccess` | Handle `CommandResult` variants explicitly | 2h |
+
+**Metrics eliminated:** 9 methods returning `Object`, 4 `instanceof` casts, 18 `yield null`.
+
+### E.3 [Phases 7–10] State Transition + Optional + CAS
+
+**Already tracked in Sections 14.2–14.5.** Cross-reference only.
+
+| Task | Scope | Est. |
+|---|---|---|
+| E.3.1 Phase 7: Enum transition infrastructure | 4 status enums + `InvalidTransitionException` | 3h |
+| E.3.2 Phase 8: `QuorusStateStore` query methods → `Optional<T>` | 4 getter methods | 1h |
+| E.3.3 Phase 9: Pre-commit CAS validation in handlers | 6–7 handler files | 4h |
+| E.3.4 Phase 10: Integration tests for transition rejection | 4+ test classes | 4h |
+
+---
+
+### E.7 Eager Collection Initialisation (Category 5 — Appendix C)
+
+**Goal:** Eliminate lazy null-check initialisation of collection fields. Every collection field
+must be non-null from construction. This removes ~15 null checks.
+
+| Task | File | Anti-Pattern | Target Pattern |
+|---|---|---|---|
+| E.7.1 | `AgentCapabilities.java` | `supportedProtocols` field can be null; `addSupportedProtocol()` checks `if (this.supportedProtocols == null)` before adding; `supportsProtocol()` checks `supportedProtocols != null` before reading | Initialise `supportedProtocols = new HashSet<>()` in constructor. Remove all null checks. Setter uses `this.supportedProtocols = supportedProtocols != null ? supportedProtocols : new HashSet<>()` → change to `this.supportedProtocols = Set.copyOf(supportedProtocols)` with `requireNonNull` |
+| E.7.2 | `AgentCapabilities.java` | Same pattern for `availableRegions` field | Same fix — eager `new HashSet<>()` |
+| E.7.3 | `AgentCapabilities.java` | Same pattern for `customCapabilities` field | Same fix — eager `new HashMap<>()` |
+| E.7.4 | `AgentInfo.java` | `metadata` field lazily initialised in `addMetadata()`, null-checked in access methods | Initialise `metadata = new HashMap<>()` in constructor |
+| E.7.5 | `TransferRequest.java` | `metadata` field lazily initialised | Same fix — eager init in Builder |
+
+**Files changed:** 3 files, ~15 null checks removed.
+
+**Test validation:** Run `AgentCapabilitiesTest`, `AgentInfoTest`, `TransferRequestTest`. All
+existing tests should pass — the only change is that collections are never null.
+
+### E.8 `RaftNode` Storage Optionality (Category 6 — Appendix C)
+
+**Goal:** `RaftNode` checks `if (storage == null)` in 5 separate methods. Express the optionality
+once, in the type, not 5 times at every usage.
+
+| Task | File | Anti-Pattern | Target Pattern |
+|---|---|---|---|
+| E.8.1 | `RaftNode.java` | `private final RaftStorage storage;` — field is nullable, checked at lines 334, 528, 1003, 1129, 1327 | Change to `private final Optional<RaftStorage> storage;` |
+| E.8.2 | `RaftNode.java` | `if (storage == null) { logger.info("No storage, volatile mode"); return Future.succeededFuture(); }` repeated 5 times | `storage.map(s -> s.loadMetadata()).orElse(Future.succeededFuture())` — express once per operation |
+| E.8.3 | `RaftNode.java` constructor | `this.storage = storage;` (nullable assignment) | `this.storage = Optional.ofNullable(storage);` — the single place where optionality is declared |
+
+**Files changed:** 1 file (`RaftNode.java`), ~10 null checks converted to `Optional` operations.
+
+**Trade-off:** `Optional` as a field is a debated pattern. In this case it's justified because
+storage is genuinely optional (volatile mode is a supported deployment), and the alternative is
+5 identical null guards scattered across the class.
+
+### E.9 Controller Verticle Shutdown Null Guards (Category 6 — Appendix C)
+
+**Goal:** `QuorusControllerVerticle` checks `apiServer != null`, `raftNode != null`,
+`grpcServer != null` in shutdown. These are non-null post-startup.
+
+| Task | File | Anti-Pattern | Target Pattern |
+|---|---|---|---|
+| E.9.1 | `QuorusControllerVerticle.java` | 8 `!= null` checks in shutdown sequence for fields that are always initialised during `start()` | Extract shutdown into a `ShutdownSequence` that is only constructed after `start()` completes — fields are constructor-injected and non-null by construction |
+
+**Alternative (simpler):** Keep the null checks but move startup to a builder pattern that
+guarantees all fields are set before the verticle is "ready". The verticle `stop()` method then
+operates on a guaranteed-populated `StartedState` record.
+
+**Files changed:** 1 file.
+
+### E.10 Handler Map-Lookup Null Checks → `Optional` (Category 4 — Appendix C)
+
+**Goal:** Convert `QuorusStateStore` query methods to return `Optional<T>`, then update all
+handler call sites to use `orElseThrow()`. This is Phase 8 (Section 14.3) plus the handler-side
+migration.
+
+**Prerequisite:** Phase 8 (E.3.2) must be complete first.
+
+| Task | File | Count | Anti-Pattern | Target Pattern |
+|---|---|---|---|---|
+| E.10.1 | `RouteHandler.java` | 6 | `if (route == null) { throw notFound(...); }` | `stateStore.getRoute(id).orElseThrow(() -> notFound(...))` |
+| E.10.2 | `JobAssignmentHandler.java` | 3 | `if (assignment == null) { throw notFound(...); }` | `.orElseThrow(...)` |
+| E.10.3 | `TransferHandler.java` | 1 | `if (job == null) { throw notFound(...); }` | `.orElseThrow(...)` |
+| E.10.4 | `HeartbeatHandler.java` | 1 | `if (existingAgent == null) { ... }` | `.orElseThrow(...)` |
+| E.10.5 | `JobAssignmentService.java` | 4 | `if (queuedJob == null) throw ...` | `.orElseThrow(...)` |
+| E.10.6 | `SimpleTenantService.java` | 8 | `if (tenant == null) { throw ... }` | `.orElseThrow(...)` |
+| E.10.7 | `SimpleResourceManagementService.java` | 4 | `if (config == null) { ... }` / `if (reservation == null) { ... }` | `.orElseThrow(...)` |
+
+**Files changed:** 7 files, ~27 null-check-then-throw blocks converted to one-liners.
+
+**Test validation:** All existing handler tests and service tests must pass. The only behavioural
+change is the `Optional` wrapper — the exception thrown is identical.
+
+### E.11 `NetworkStatistics.transferMetrics` — Type the `Object` Field
+
+**Goal:** Replace `Object transferMetrics` with an actual type.
+
+| Task | File | Anti-Pattern | Target Pattern |
+|---|---|---|---|
+| E.11.1 | `NetworkTopologyService.java` (`NetworkStatistics`) | `private final Object transferMetrics;` — field typed as `Object`, getter returns `Object` | Type as `NetworkMetrics` (the inner class that actually provides metrics) or `Optional<NetworkMetrics>` if it's genuinely optional |
+| E.11.2 | `NetworkTopologyService.java` (`NetworkStatistics.Builder`) | `private Object transferMetrics = null;` | `private NetworkMetrics transferMetrics = null;` |
+| E.11.3 | `NetworkTopologyService.java` (`NetworkMetrics`) | `public Object getAggregatedMetrics()` — returns a String literal `"Aggregated metrics for N hosts"` | Return `String` or create an `AggregatedMetrics` record with numeric fields |
+
+**Files changed:** 1 file, 3 signatures changed.
+
+### E.12 `TransferContext` Attribute Bag — Deprecate Untyped Accessor
+
+**Goal:** The untyped `Object getAttribute(String key)` forces callers to cast. The typed
+overload `<T> getAttribute(String key, Class<T> type)` already exists.
+
+| Task | File | Anti-Pattern | Target Pattern |
+|---|---|---|---|
+| E.12.1 | `TransferContext.java` | `public Object getAttribute(String key)` — returns bare `Object` | Add `@Deprecated(forRemoval = true)` annotation. All callers should use the typed overload. |
+| E.12.2 | All callers of `getAttribute(key)` | Grep for `getAttribute(` without a `Class` second argument | Migrate to `getAttribute(key, ExpectedType.class)` |
+| E.12.3 | `TransferContext.java` | Typed overload returns `null` when type doesn't match | Return `Optional<T>` instead: `public <T> Optional<T> getAttribute(String key, Class<T> type)` |
+
+**Files changed:** `TransferContext.java` + all callers (audit needed — likely 3–5 files in
+`quorus-core`).
+
+### E.13 Health Check DTOs — Replace `Map<String, Object>` with Typed Records
+
+**Goal:** Health check endpoints use `Map<String, Object>` for response building. These should be
+typed records that serialise cleanly to JSON.
+
+| Task | File | Anti-Pattern | Target Pattern |
+|---|---|---|---|
+| E.13.1 | Create `HealthDetail.java` | Does not exist | `record HealthDetail(String component, HealthStatus status, String message, Map<String, String> metadata)` |
+| E.13.2 | `ProtocolHealthCheck.java` | `toDetailMap()` returns `Map<String, Object>` | Return `HealthDetail` record |
+| E.13.3 | `TransferEngineHealthCheck.java` | Same `Map<String, Object>` pattern | Return `HealthDetail` |
+| E.13.4 | `HealthResource.java` (quorus-api) | Builds `Map<String, Object>` response inline | Use `HealthDetail` records |
+| E.13.5 | `HealthService.java` (quorus-agent) | `Map<String, Object>` for health response | Use `HealthDetail` records |
+
+**Files changed:** 5 files + 1 new record class.
+
+### E.14 Singleton Metrics — Initialization-on-Demand Holder
+
+**Goal:** Replace double-checked locking `if (instance == null)` with thread-safe holder idiom.
+
+| Task | File | Anti-Pattern | Target Pattern |
+|---|---|---|---|
+| E.14.1 | `TransferTelemetryMetrics.java` | `synchronized getInstance()` + `if (instance == null)` | Inner `Holder` class with static `INSTANCE` field |
+| E.14.2 | `WorkflowMetrics.java` | Same DCL pattern | Same holder fix |
+| E.14.3 | `TenantMetrics.java` | Same DCL pattern | Same holder fix |
+| E.14.4 | `RaftMetrics.java` | Same DCL pattern | Same holder fix |
+
+**Files changed:** 4 files, 4 null checks removed. Mechanical refactoring — no behavioural
+change.
+
+### E.15 Boundary Input Validation — Builder Fail-Fast (Category 7 — Appendix C)
+
+**Goal:** Push validation from downstream code into builders and constructors so that once an
+object is constructed, all required fields are guaranteed non-null. This doesn't remove null
+checks — it moves them to the single correct location and removes them from everywhere else.
+
+| Task | File | Anti-Pattern | Target Pattern |
+|---|---|---|---|
+| E.15.1 | `TransferRequest.Builder.build()` | Downstream null checks: `FtpTransferProtocol` checks `request.getSourceUri() == null`, `HttpTransferProtocol` checks `request.getDestinationPath() == null` | `build()` validates all required fields with `requireNonNull`. Protocol adapters can trust the object. |
+| E.15.2 | `RouteConfiguration` construction | `RouteHandler.validateRouteConfiguration()` has 7 null checks for required fields | Move validation into constructor or static factory. Handler calls factory, trusts the result. |
+| E.15.3 | `AgentInfo` construction | `AgentRegistrationHandler` checks `agentInfo.getAgentId() == null` | Move to constructor |
+| E.15.4 | HTTP body middleware | Multiple handlers check `if (body == null)` after `ctx.body().asJsonObject()` | Create a shared `RequireBody` handler that rejects null/empty bodies before routing. Handlers receive guaranteed non-null body. |
+
+**Files changed:** ~12 files. This is the largest and most incremental task — can be done
+per-domain-object over multiple PRs.
+
+---
+
+### E.16 Task Dependency Graph
+
+```
+E.1 (Sealed Records, Phases 1–6)
+  │
+  ├──→ E.2 (CommandResult<T>, Phase 6) ──→ E.10 (Handler Optional migration)
+  │                                              │
+  │                                              ↓
+  │                                         E.3.3 (CAS validation, Phase 9)
+  │                                              │
+  │                                              ↓
+  │                                         E.3.4 (Integration tests, Phase 10)
+  │
+  └──→ E.3.1 (Transition enums, Phase 7)
+       E.3.2 (Optional queries, Phase 8) ──→ E.10
+
+Independent (can start immediately, no prerequisites):
+  E.7  (Eager collection init)
+  E.8  (RaftNode storage Optional)
+  E.9  (Verticle shutdown guards)
+  E.11 (NetworkStatistics typing)
+  E.12 (TransferContext deprecation)
+  E.13 (Health check typed records)
+  E.14 (Singleton holder idiom)
+  E.15 (Builder fail-fast validation)
+```
+
+### E.17 Estimated Effort Summary
+
+| Work Package | Tasks | Files | Null Checks Eliminated | `Object` Uses Eliminated | Est. Hours |
+|---|---|---|---|---|---|
+| Sealed records (Phases 1–6) | E.1.1–E.1.6 | ~18 | ~177 (structural + validate + equals) | 0 | 18h |
+| CommandResult ADT (Phase 6) | E.2.1–E.2.6 | ~8 | 18 (`yield null`) | 13 (`Object` returns + casts) | 10h |
+| State transitions (Phases 7–10) | E.3.1–E.3.4 | ~15 | 0 | 0 | 12h |
+| Eager collection init | E.7.1–E.7.5 | 3 | ~15 | 0 | 2h |
+| RaftNode storage Optional | E.8.1–E.8.3 | 1 | ~10 | 0 | 2h |
+| Verticle shutdown | E.9.1 | 1 | ~8 | 0 | 1h |
+| Handler Optional migration | E.10.1–E.10.7 | 7 | ~27 | 0 | 3h |
+| NetworkStatistics typing | E.11.1–E.11.3 | 1 | 0 | 3 | 1h |
+| TransferContext deprecation | E.12.1–E.12.3 | ~5 | 0 | 3 | 1h |
+| Health check records | E.13.1–E.13.5 | 6 | 0 | ~12 | 3h |
+| Singleton holder | E.14.1–E.14.4 | 4 | 4 | 0 | 1h |
+| Builder fail-fast | E.15.1–E.15.4 | ~12 | ~30 (moved, not removed) | 0 | 6h |
+| **Total** | **~50 tasks** | **~81 files** | **~289 eliminated** | **~31 eliminated** | **~60h** |
+
+---
+
+## Appendix F: Verification Scripts & Automation
+
+### F.1 Metric Snapshot Script
+
+Run before and after every phase to capture quantifiable progress. Save output to the
+Progress Log (Section 16.8).
+
+```powershell
+# verify-metrics.ps1 — Run from project root
+Write-Host "=== Quorus Refactoring Metrics Snapshot ==="
+Write-Host "Date: $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
+Write-Host ""
+
+# Null checks in command/codec/state machine paths
+$nullChecks = (Select-String -Path "quorus-controller/src/main/java/**/*.java" `
+    -Pattern "== null|!= null" -Recurse).Count
+Write-Host "Null checks (quorus-controller):  $nullChecks"
+
+$coreNullChecks = (Select-String -Path "quorus-core/src/main/java/**/*.java" `
+    -Pattern "== null|!= null" -Recurse).Count
+Write-Host "Null checks (quorus-core):        $coreNullChecks"
+
+# yield null in state machine
+$yieldNull = (Select-String -Path "quorus-controller/src/main/java/**/*.java" `
+    -Pattern "yield null" -Recurse).Count
+Write-Host "yield null (state machine):       $yieldNull"
+
+# getType() calls
+$getType = (Select-String -Path "quorus-controller/src/main/java/**/*.java" `
+    -Pattern "\.getType\(\)" -Recurse).Count
+Write-Host "getType() calls (controller):     $getType"
+
+# Object return types in Raft path
+$objectReturns = (Select-String -Path "quorus-controller/src/main/java/**/*.java" `
+    -Pattern "Object>" -Recurse).Count
+Write-Host "Object return types (controller): $objectReturns"
+
+# instanceof casts from Object
+$instanceOf = (Select-String -Path "quorus-controller/src/main/java/**/*.java" `
+    -Pattern "instanceof" -Recurse).Count
+Write-Host "instanceof casts (controller):    $instanceOf"
+
+# Test count
+Write-Host ""
+Write-Host "Running tests..."
+$testOutput = mvn test --batch-mode -pl quorus-core,quorus-controller 2>&1
+$summary = $testOutput | Select-String "Tests run:" | Select-Object -Last 1
+Write-Host "Test summary: $($summary.Line)"
+```
+
+### F.2 Compilation-First Workflow
+
+After modifying any command class, codec, or state machine handler, follow this exact
+sequence. Do not skip steps.
+
+```bash
+# Step 1: Compile only — surfaces all API breakages
+mvn compile -pl quorus-controller
+# Fix every error. Do not proceed until clean.
+
+# Step 2: Compile dependent modules
+mvn compile -pl quorus-core,quorus-controller,quorus-agent
+# Fix any cross-module breakages.
+
+# Step 3: Run unit tests (fast — no Docker)
+mvn test -pl quorus-core,quorus-controller -Dtest='!*IntegrationTest'
+
+# Step 4: Run full test suite including integration tests
+mvn test -pl quorus-core,quorus-controller
+
+# Step 5: Full project verification (before PR)
+mvn clean verify
+```
+
+### F.3 Serialization Compatibility Test Template
+
+Copy this template for each domain when implementing Phases 1–6. Replace `Agent` with the
+domain being migrated.
+
+```java
+@ExtendWith(VertxExtension.class)
+class AgentCommandSerializationTest {
+
+    /**
+     * Verifies that every record variant survives a full
+     * Java object → Proto → Java object round-trip with all fields intact.
+     */
+    @ParameterizedTest
+    @MethodSource("allAgentCommands")
+    void roundTrip_preservesAllFields(AgentCommand original) {
+        RaftCommandMessage proto = ProtobufCommandCodec.toProto(original);
+        RaftCommand restored = ProtobufCommandCodec.fromProto(proto);
+        
+        assertEquals(original, restored, 
+            "Round-trip failed for: " + original.getClass().getSimpleName());
+    }
+
+    /**
+     * Verifies that proto bytes captured BEFORE the refactoring can still
+     * be decoded AFTER. Prevents silent field drops or default changes.
+     */
+    @ParameterizedTest
+    @MethodSource("legacyProtoBytes")
+    void backwardCompatibility_decodesLegacyBytes(
+            String label, byte[] legacyBytes, Class<?> expectedType) {
+        RaftCommandMessage proto = RaftCommandMessage.parseFrom(legacyBytes);
+        RaftCommand command = ProtobufCommandCodec.fromProto(proto);
+        assertInstanceOf(expectedType, command, 
+            "Legacy bytes for '" + label + "' decoded to wrong type");
+    }
+
+    static Stream<Arguments> allAgentCommands() {
+        return Stream.of(
+            Arguments.of(AgentCommand.Register.create(
+                "agent-1", "us-east", "dc-1", List.of("sftp"), 5)),
+            Arguments.of(AgentCommand.UpdateStatus.create(
+                "agent-1", AgentStatus.HEALTHY)),
+            Arguments.of(AgentCommand.Heartbeat.create(
+                "agent-1", Instant.now(), 42, "active", 2, 3)),
+            Arguments.of(AgentCommand.Deregister.create("agent-1")),
+            Arguments.of(AgentCommand.UpdateCapabilities.create(
+                "agent-1", List.of("sftp", "http"), 10))
+        );
+    }
+}
+```
+
+### F.4 Exhaustiveness Verification
+
+After converting a command to a sealed interface, verify that the compiler enforces
+exhaustiveness in all switch expressions. Temporarily add a new record to the sealed
+interface and confirm the build fails:
+
+```java
+// Temporarily add to AgentCommand sealed interface:
+record _ExhaustivenessProbe() implements AgentCommand {}
+
+// Run: mvn compile -pl quorus-controller
+// Expected: compile errors in AgentCodec, QuorusStateStore — every switch is incomplete
+// This proves the compiler will catch any future additions that forget to update handlers
+
+// Remove _ExhaustivenessProbe after verification
+```
+
+This is a one-time verification per domain. Once confirmed, the sealed interface permanently
+guarantees that adding a new command variant will produce compile errors in every handler
+that needs updating.
+
+### F.5 Test Categories for Phase Verification
+
+Each phase should have tests covering three categories:
+
+| Category | Purpose | Example |
+|---|---|---|
+| **Structural** | Record fields, factory methods, compact constructor validation | `assertThrows(NullPointerException.class, () -> AgentCommand.Register.create(null, ...))` |
+| **Serialization** | Proto round-trip, backward compatibility, snapshot round-trip | See F.3 template |
+| **Behavioral** | Full request path — HTTP → Raft → apply → response | `POST /api/v1/agents/register` returns 200 with correct JSON body |
+
+A phase is not complete unless all three categories have passing tests. Structural tests
+verify the type system. Serialization tests verify persistence. Behavioral tests verify the
+system still works end-to-end.

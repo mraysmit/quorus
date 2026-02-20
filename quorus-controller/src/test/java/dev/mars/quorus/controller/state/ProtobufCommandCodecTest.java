@@ -184,17 +184,17 @@ class ProtobufCommandCodecTest {
             TransferJobCommand original = TransferJobCommand.create(job);
 
             ByteString bytes = ProtobufCommandCodec.serialize(original);
-            TransferJobCommand restored = (TransferJobCommand) ProtobufCommandCodec.deserialize(bytes);
+            RaftCommand deserialized = ProtobufCommandCodec.deserialize(bytes);
 
-            assertNotNull(restored);
-            assertEquals(TransferJobCommand.Type.CREATE, restored.getType());
-            assertNotNull(restored.getTransferJob());
-            assertEquals("req-001", restored.getTransferJob().getJobId());
-            assertEquals(TransferStatus.PENDING, restored.getTransferJob().getStatus());
-            assertEquals(1024L, restored.getTransferJob().getTotalBytes());
+            assertInstanceOf(TransferJobCommand.Create.class, deserialized);
+            TransferJobCommand.Create restored = (TransferJobCommand.Create) deserialized;
+            assertNotNull(restored.transferJob());
+            assertEquals("req-001", restored.transferJob().getJobId());
+            assertEquals(TransferStatus.PENDING, restored.transferJob().getStatus());
+            assertEquals(1024L, restored.transferJob().getTotalBytes());
 
             // Verify TransferRequest fields
-            TransferRequest req = restored.getTransferJob().getRequest();
+            TransferRequest req = restored.transferJob().getRequest();
             assertEquals("req-001", req.getRequestId());
             assertEquals(URI.create("https://example.com/file.csv"), req.getSourceUri());
             assertEquals(URI.create("file:///data/output/file.csv"), req.getDestinationUri());
@@ -211,11 +211,12 @@ class ProtobufCommandCodecTest {
             TransferJobCommand original = TransferJobCommand.updateStatus("job-001", TransferStatus.COMPLETED);
 
             ByteString bytes = ProtobufCommandCodec.serialize(original);
-            TransferJobCommand restored = (TransferJobCommand) ProtobufCommandCodec.deserialize(bytes);
+            RaftCommand deserialized = ProtobufCommandCodec.deserialize(bytes);
 
-            assertEquals(TransferJobCommand.Type.UPDATE_STATUS, restored.getType());
-            assertEquals("job-001", restored.getJobId());
-            assertEquals(TransferStatus.COMPLETED, restored.getStatus());
+            assertInstanceOf(TransferJobCommand.UpdateStatus.class, deserialized);
+            TransferJobCommand.UpdateStatus restored = (TransferJobCommand.UpdateStatus) deserialized;
+            assertEquals("job-001", restored.jobId());
+            assertEquals(TransferStatus.COMPLETED, restored.status());
         }
 
         @Test
@@ -224,11 +225,12 @@ class ProtobufCommandCodecTest {
             TransferJobCommand original = TransferJobCommand.updateProgress("job-001", 512L);
 
             ByteString bytes = ProtobufCommandCodec.serialize(original);
-            TransferJobCommand restored = (TransferJobCommand) ProtobufCommandCodec.deserialize(bytes);
+            RaftCommand deserialized = ProtobufCommandCodec.deserialize(bytes);
 
-            assertEquals(TransferJobCommand.Type.UPDATE_PROGRESS, restored.getType());
-            assertEquals("job-001", restored.getJobId());
-            assertEquals(512L, restored.getBytesTransferred());
+            assertInstanceOf(TransferJobCommand.UpdateProgress.class, deserialized);
+            TransferJobCommand.UpdateProgress restored = (TransferJobCommand.UpdateProgress) deserialized;
+            assertEquals("job-001", restored.jobId());
+            assertEquals(512L, restored.bytesTransferred());
         }
 
         @Test
@@ -237,10 +239,11 @@ class ProtobufCommandCodecTest {
             TransferJobCommand original = TransferJobCommand.delete("job-001");
 
             ByteString bytes = ProtobufCommandCodec.serialize(original);
-            TransferJobCommand restored = (TransferJobCommand) ProtobufCommandCodec.deserialize(bytes);
+            RaftCommand deserialized = ProtobufCommandCodec.deserialize(bytes);
 
-            assertEquals(TransferJobCommand.Type.DELETE, restored.getType());
-            assertEquals("job-001", restored.getJobId());
+            assertInstanceOf(TransferJobCommand.Delete.class, deserialized);
+            TransferJobCommand.Delete restored = (TransferJobCommand.Delete) deserialized;
+            assertEquals("job-001", restored.jobId());
         }
 
         @Test
@@ -249,8 +252,10 @@ class ProtobufCommandCodecTest {
             for (TransferStatus status : TransferStatus.values()) {
                 TransferJobCommand original = TransferJobCommand.updateStatus("job-" + status.name(), status);
                 ByteString bytes = ProtobufCommandCodec.serialize(original);
-                TransferJobCommand restored = (TransferJobCommand) ProtobufCommandCodec.deserialize(bytes);
-                assertEquals(status, restored.getStatus(), "Failed for status: " + status);
+                RaftCommand deserialized = ProtobufCommandCodec.deserialize(bytes);
+                assertInstanceOf(TransferJobCommand.UpdateStatus.class, deserialized);
+                TransferJobCommand.UpdateStatus restored = (TransferJobCommand.UpdateStatus) deserialized;
+                assertEquals(status, restored.status(), "Failed for status: " + status);
             }
         }
     }
@@ -268,12 +273,13 @@ class ProtobufCommandCodecTest {
             AgentCommand original = AgentCommand.register(info);
 
             ByteString bytes = ProtobufCommandCodec.serialize(original);
-            AgentCommand restored = (AgentCommand) ProtobufCommandCodec.deserialize(bytes);
+            RaftCommand deserialized = ProtobufCommandCodec.deserialize(bytes);
 
-            assertEquals(AgentCommand.CommandType.REGISTER, restored.getType());
-            assertEquals("agent-nyc-01", restored.getAgentId());
+            assertInstanceOf(AgentCommand.Register.class, deserialized);
+            AgentCommand.Register restored = (AgentCommand.Register) deserialized;
+            assertEquals("agent-nyc-01", restored.agentId());
 
-            AgentInfo restoredInfo = restored.getAgentInfo();
+            AgentInfo restoredInfo = restored.agentInfo();
             assertNotNull(restoredInfo);
             assertEquals("agent-nyc-01", restoredInfo.getAgentId());
             assertEquals("nyc-host-1", restoredInfo.getHostname());
@@ -325,10 +331,11 @@ class ProtobufCommandCodecTest {
             AgentCommand original = AgentCommand.deregister("agent-nyc-01");
 
             ByteString bytes = ProtobufCommandCodec.serialize(original);
-            AgentCommand restored = (AgentCommand) ProtobufCommandCodec.deserialize(bytes);
+            RaftCommand deserialized = ProtobufCommandCodec.deserialize(bytes);
 
-            assertEquals(AgentCommand.CommandType.DEREGISTER, restored.getType());
-            assertEquals("agent-nyc-01", restored.getAgentId());
+            assertInstanceOf(AgentCommand.Deregister.class, deserialized);
+            AgentCommand.Deregister restored = (AgentCommand.Deregister) deserialized;
+            assertEquals("agent-nyc-01", restored.agentId());
         }
 
         @Test
@@ -337,11 +344,12 @@ class ProtobufCommandCodecTest {
             AgentCommand original = AgentCommand.updateStatus("agent-nyc-01", AgentStatus.DEGRADED);
 
             ByteString bytes = ProtobufCommandCodec.serialize(original);
-            AgentCommand restored = (AgentCommand) ProtobufCommandCodec.deserialize(bytes);
+            RaftCommand deserialized = ProtobufCommandCodec.deserialize(bytes);
 
-            assertEquals(AgentCommand.CommandType.UPDATE_STATUS, restored.getType());
-            assertEquals("agent-nyc-01", restored.getAgentId());
-            assertEquals(AgentStatus.DEGRADED, restored.getNewStatus());
+            assertInstanceOf(AgentCommand.UpdateStatus.class, deserialized);
+            AgentCommand.UpdateStatus restored = (AgentCommand.UpdateStatus) deserialized;
+            assertEquals("agent-nyc-01", restored.agentId());
+            assertEquals(AgentStatus.DEGRADED, restored.newStatus());
         }
 
         @Test
@@ -351,27 +359,29 @@ class ProtobufCommandCodecTest {
             AgentCommand original = AgentCommand.updateCapabilities("agent-nyc-01", caps);
 
             ByteString bytes = ProtobufCommandCodec.serialize(original);
-            AgentCommand restored = (AgentCommand) ProtobufCommandCodec.deserialize(bytes);
+            RaftCommand deserialized = ProtobufCommandCodec.deserialize(bytes);
 
-            assertEquals(AgentCommand.CommandType.UPDATE_CAPABILITIES, restored.getType());
-            assertEquals("agent-nyc-01", restored.getAgentId());
-            assertNotNull(restored.getNewCapabilities());
-            assertTrue(restored.getNewCapabilities().getSupportedProtocols().contains("https"));
+            assertInstanceOf(AgentCommand.UpdateCapabilities.class, deserialized);
+            AgentCommand.UpdateCapabilities restored = (AgentCommand.UpdateCapabilities) deserialized;
+            assertEquals("agent-nyc-01", restored.agentId());
+            assertNotNull(restored.newCapabilities());
+            assertTrue(restored.newCapabilities().getSupportedProtocols().contains("https"));
         }
 
         @Test
         @DisplayName("HEARTBEAT preserves timestamp across roundtrip")
         void heartbeatTimestampPreserved() {
             AgentCommand original = AgentCommand.heartbeat("agent-nyc-01");
-            Instant originalTimestamp = original.getTimestamp();
+            Instant originalTimestamp = original.timestamp();
 
             ByteString bytes = ProtobufCommandCodec.serialize(original);
-            AgentCommand restored = (AgentCommand) ProtobufCommandCodec.deserialize(bytes);
+            RaftCommand deserialized = ProtobufCommandCodec.deserialize(bytes);
 
-            assertEquals(AgentCommand.CommandType.HEARTBEAT, restored.getType());
-            assertEquals("agent-nyc-01", restored.getAgentId());
+            assertInstanceOf(AgentCommand.Heartbeat.class, deserialized);
+            AgentCommand.Heartbeat restored = (AgentCommand.Heartbeat) deserialized;
+            assertEquals("agent-nyc-01", restored.agentId());
             // Timestamp preserved to millisecond precision
-            assertEquals(originalTimestamp.toEpochMilli(), restored.getTimestamp().toEpochMilli());
+            assertEquals(originalTimestamp.toEpochMilli(), restored.timestamp().toEpochMilli());
         }
 
         @Test
@@ -380,8 +390,10 @@ class ProtobufCommandCodecTest {
             for (AgentStatus status : AgentStatus.values()) {
                 AgentCommand original = AgentCommand.updateStatus("agent-" + status.name(), status);
                 ByteString bytes = ProtobufCommandCodec.serialize(original);
-                AgentCommand restored = (AgentCommand) ProtobufCommandCodec.deserialize(bytes);
-                assertEquals(status, restored.getNewStatus(), "Failed for status: " + status);
+                RaftCommand deserialized = ProtobufCommandCodec.deserialize(bytes);
+                assertInstanceOf(AgentCommand.UpdateStatus.class, deserialized);
+                AgentCommand.UpdateStatus restored = (AgentCommand.UpdateStatus) deserialized;
+                assertEquals(status, restored.newStatus(), "Failed for status: " + status);
             }
         }
     }
@@ -398,11 +410,12 @@ class ProtobufCommandCodecTest {
             SystemMetadataCommand original = SystemMetadataCommand.set("cluster.name", "production-east");
 
             ByteString bytes = ProtobufCommandCodec.serialize(original);
-            SystemMetadataCommand restored = (SystemMetadataCommand) ProtobufCommandCodec.deserialize(bytes);
+            RaftCommand deserialized = ProtobufCommandCodec.deserialize(bytes);
 
-            assertEquals(SystemMetadataCommand.Type.SET, restored.getType());
-            assertEquals("cluster.name", restored.getKey());
-            assertEquals("production-east", restored.getValue());
+            assertInstanceOf(SystemMetadataCommand.Set.class, deserialized);
+            SystemMetadataCommand.Set restored = (SystemMetadataCommand.Set) deserialized;
+            assertEquals("cluster.name", restored.key());
+            assertEquals("production-east", restored.value());
         }
 
         @Test
@@ -411,10 +424,11 @@ class ProtobufCommandCodecTest {
             SystemMetadataCommand original = SystemMetadataCommand.delete("cluster.name");
 
             ByteString bytes = ProtobufCommandCodec.serialize(original);
-            SystemMetadataCommand restored = (SystemMetadataCommand) ProtobufCommandCodec.deserialize(bytes);
+            RaftCommand deserialized = ProtobufCommandCodec.deserialize(bytes);
 
-            assertEquals(SystemMetadataCommand.Type.DELETE, restored.getType());
-            assertEquals("cluster.name", restored.getKey());
+            assertInstanceOf(SystemMetadataCommand.Delete.class, deserialized);
+            SystemMetadataCommand.Delete restored = (SystemMetadataCommand.Delete) deserialized;
+            assertEquals("cluster.name", restored.key());
         }
     }
 
@@ -520,12 +534,12 @@ class ProtobufCommandCodecTest {
             JobQueueCommand original = JobQueueCommand.enqueue(queuedJob);
 
             ByteString bytes = ProtobufCommandCodec.serialize(original);
-            JobQueueCommand restored = (JobQueueCommand) ProtobufCommandCodec.deserialize(bytes);
+            JobQueueCommand.Enqueue restored = assertInstanceOf(JobQueueCommand.Enqueue.class,
+                    ProtobufCommandCodec.deserialize(bytes));
 
-            assertEquals(JobQueueCommand.CommandType.ENQUEUE, restored.getType());
-            assertNotNull(restored.getQueuedJob());
+            assertNotNull(restored.queuedJob());
 
-            QueuedJob restoredJob = restored.getQueuedJob();
+            QueuedJob restoredJob = restored.queuedJob();
             assertEquals("req-001", restoredJob.getJobId());
             assertEquals(JobPriority.HIGH, restoredJob.getPriority());
             assertEquals("admin", restoredJob.getSubmittedBy());
@@ -558,10 +572,10 @@ class ProtobufCommandCodecTest {
             JobQueueCommand original = JobQueueCommand.dequeue("job-001");
 
             ByteString bytes = ProtobufCommandCodec.serialize(original);
-            JobQueueCommand restored = (JobQueueCommand) ProtobufCommandCodec.deserialize(bytes);
+            JobQueueCommand.Dequeue restored = assertInstanceOf(JobQueueCommand.Dequeue.class,
+                    ProtobufCommandCodec.deserialize(bytes));
 
-            assertEquals(JobQueueCommand.CommandType.DEQUEUE, restored.getType());
-            assertEquals("job-001", restored.getJobId());
+            assertEquals("job-001", restored.jobId());
         }
 
         @Test
@@ -570,12 +584,12 @@ class ProtobufCommandCodecTest {
             JobQueueCommand original = JobQueueCommand.prioritize("job-001", JobPriority.CRITICAL, "Urgent request");
 
             ByteString bytes = ProtobufCommandCodec.serialize(original);
-            JobQueueCommand restored = (JobQueueCommand) ProtobufCommandCodec.deserialize(bytes);
+            JobQueueCommand.Prioritize restored = assertInstanceOf(JobQueueCommand.Prioritize.class,
+                    ProtobufCommandCodec.deserialize(bytes));
 
-            assertEquals(JobQueueCommand.CommandType.PRIORITIZE, restored.getType());
-            assertEquals("job-001", restored.getJobId());
-            assertEquals(JobPriority.CRITICAL, restored.getNewPriority());
-            assertEquals("Urgent request", restored.getReason());
+            assertEquals("job-001", restored.jobId());
+            assertEquals(JobPriority.CRITICAL, restored.newPriority());
+            assertEquals("Urgent request", restored.reason());
         }
 
         @Test
@@ -584,11 +598,11 @@ class ProtobufCommandCodecTest {
             JobQueueCommand original = JobQueueCommand.remove("job-001", "Cancelled by admin");
 
             ByteString bytes = ProtobufCommandCodec.serialize(original);
-            JobQueueCommand restored = (JobQueueCommand) ProtobufCommandCodec.deserialize(bytes);
+            JobQueueCommand.Remove restored = assertInstanceOf(JobQueueCommand.Remove.class,
+                    ProtobufCommandCodec.deserialize(bytes));
 
-            assertEquals(JobQueueCommand.CommandType.REMOVE, restored.getType());
-            assertEquals("job-001", restored.getJobId());
-            assertEquals("Cancelled by admin", restored.getReason());
+            assertEquals("job-001", restored.jobId());
+            assertEquals("Cancelled by admin", restored.reason());
         }
 
         @Test
@@ -597,11 +611,11 @@ class ProtobufCommandCodecTest {
             JobQueueCommand original = JobQueueCommand.expedite("job-001", "SLA breach imminent");
 
             ByteString bytes = ProtobufCommandCodec.serialize(original);
-            JobQueueCommand restored = (JobQueueCommand) ProtobufCommandCodec.deserialize(bytes);
+            JobQueueCommand.Expedite restored = assertInstanceOf(JobQueueCommand.Expedite.class,
+                    ProtobufCommandCodec.deserialize(bytes));
 
-            assertEquals(JobQueueCommand.CommandType.EXPEDITE, restored.getType());
-            assertEquals("job-001", restored.getJobId());
-            assertEquals("SLA breach imminent", restored.getReason());
+            assertEquals("job-001", restored.jobId());
+            assertEquals("SLA breach imminent", restored.reason());
         }
 
         @Test
@@ -610,8 +624,9 @@ class ProtobufCommandCodecTest {
             for (JobPriority priority : JobPriority.values()) {
                 JobQueueCommand original = JobQueueCommand.prioritize("job-" + priority.name(), priority, "test");
                 ByteString bytes = ProtobufCommandCodec.serialize(original);
-                JobQueueCommand restored = (JobQueueCommand) ProtobufCommandCodec.deserialize(bytes);
-                assertEquals(priority, restored.getNewPriority(), "Failed for priority: " + priority);
+                JobQueueCommand.Prioritize restored = assertInstanceOf(JobQueueCommand.Prioritize.class,
+                        ProtobufCommandCodec.deserialize(bytes));
+                assertEquals(priority, restored.newPriority(), "Failed for priority: " + priority);
             }
         }
 
@@ -619,12 +634,12 @@ class ProtobufCommandCodecTest {
         @DisplayName("Timestamp is preserved across roundtrip")
         void timestampPreserved() {
             JobQueueCommand original = JobQueueCommand.dequeue("job-001");
-            Instant originalTimestamp = original.getTimestamp();
+            Instant originalTimestamp = original.timestamp();
 
             ByteString bytes = ProtobufCommandCodec.serialize(original);
             JobQueueCommand restored = (JobQueueCommand) ProtobufCommandCodec.deserialize(bytes);
 
-            assertEquals(originalTimestamp.toEpochMilli(), restored.getTimestamp().toEpochMilli());
+            assertEquals(originalTimestamp.toEpochMilli(), restored.timestamp().toEpochMilli());
         }
     }
 
@@ -684,9 +699,10 @@ class ProtobufCommandCodecTest {
                 JobQueueCommand original = JobQueueCommand.enqueue(queuedJob);
 
                 ByteString bytes = ProtobufCommandCodec.serialize(original);
-                JobQueueCommand restored = (JobQueueCommand) ProtobufCommandCodec.deserialize(bytes);
+                JobQueueCommand.Enqueue restored = assertInstanceOf(JobQueueCommand.Enqueue.class,
+                        ProtobufCommandCodec.deserialize(bytes));
 
-                assertEquals(strategy, restored.getQueuedJob().getRequirements().getSelectionStrategy(),
+                assertEquals(strategy, restored.queuedJob().getRequirements().getSelectionStrategy(),
                         "Failed for strategy: " + strategy);
             }
         }
@@ -721,13 +737,12 @@ class ProtobufCommandCodecTest {
             RouteCommand original = RouteCommand.create(route);
 
             ByteString bytes = ProtobufCommandCodec.serialize(original);
-            RouteCommand restored = (RouteCommand) ProtobufCommandCodec.deserialize(bytes);
+            RouteCommand.Create restored = assertInstanceOf(RouteCommand.Create.class,
+                    ProtobufCommandCodec.deserialize(bytes));
 
-            assertNotNull(restored);
-            assertEquals(RouteCommand.CommandType.CREATE, restored.getType());
-            assertEquals("route-001", restored.getRouteId());
+            assertEquals("route-001", restored.routeId());
 
-            RouteConfiguration rc = restored.getRouteConfiguration();
+            RouteConfiguration rc = restored.routeConfiguration();
             assertNotNull(rc);
             assertEquals("route-001", rc.getRouteId());
             assertEquals("crm-to-warehouse", rc.getName());
@@ -758,12 +773,11 @@ class ProtobufCommandCodecTest {
             RouteCommand original = RouteCommand.update("route-001", updatedConfig);
 
             ByteString bytes = ProtobufCommandCodec.serialize(original);
-            RouteCommand restored = (RouteCommand) ProtobufCommandCodec.deserialize(bytes);
+            RouteCommand.Update restored = assertInstanceOf(RouteCommand.Update.class,
+                    ProtobufCommandCodec.deserialize(bytes));
 
-            assertNotNull(restored);
-            assertEquals(RouteCommand.CommandType.UPDATE, restored.getType());
-            assertEquals("route-001", restored.getRouteId());
-            assertNotNull(restored.getRouteConfiguration());
+            assertEquals("route-001", restored.routeId());
+            assertNotNull(restored.routeConfiguration());
         }
 
         @Test
@@ -772,41 +786,35 @@ class ProtobufCommandCodecTest {
             RouteCommand original = RouteCommand.delete("route-to-delete");
 
             ByteString bytes = ProtobufCommandCodec.serialize(original);
-            RouteCommand restored = (RouteCommand) ProtobufCommandCodec.deserialize(bytes);
+            RouteCommand.Delete restored = assertInstanceOf(RouteCommand.Delete.class,
+                    ProtobufCommandCodec.deserialize(bytes));
 
-            assertNotNull(restored);
-            assertEquals(RouteCommand.CommandType.DELETE, restored.getType());
-            assertEquals("route-to-delete", restored.getRouteId());
-            assertNull(restored.getRouteConfiguration());
+            assertEquals("route-to-delete", restored.routeId());
         }
 
         @Test
-        @DisplayName("SUSPEND preserves routeId, status, and reason")
+        @DisplayName("SUSPEND preserves routeId and reason")
         void suspendRoundtrip() {
             RouteCommand original = RouteCommand.suspend("route-sus", "scheduled maintenance");
 
             ByteString bytes = ProtobufCommandCodec.serialize(original);
-            RouteCommand restored = (RouteCommand) ProtobufCommandCodec.deserialize(bytes);
+            RouteCommand.Suspend restored = assertInstanceOf(RouteCommand.Suspend.class,
+                    ProtobufCommandCodec.deserialize(bytes));
 
-            assertNotNull(restored);
-            assertEquals(RouteCommand.CommandType.SUSPEND, restored.getType());
-            assertEquals("route-sus", restored.getRouteId());
-            assertEquals(RouteStatus.SUSPENDED, restored.getNewStatus());
-            assertEquals("scheduled maintenance", restored.getReason());
+            assertEquals("route-sus", restored.routeId());
+            assertEquals("scheduled maintenance", restored.reason());
         }
 
         @Test
-        @DisplayName("RESUME preserves routeId and status")
+        @DisplayName("RESUME preserves routeId")
         void resumeRoundtrip() {
             RouteCommand original = RouteCommand.resume("route-res");
 
             ByteString bytes = ProtobufCommandCodec.serialize(original);
-            RouteCommand restored = (RouteCommand) ProtobufCommandCodec.deserialize(bytes);
+            RouteCommand.Resume restored = assertInstanceOf(RouteCommand.Resume.class,
+                    ProtobufCommandCodec.deserialize(bytes));
 
-            assertNotNull(restored);
-            assertEquals(RouteCommand.CommandType.RESUME, restored.getType());
-            assertEquals("route-res", restored.getRouteId());
-            assertEquals(RouteStatus.ACTIVE, restored.getNewStatus());
+            assertEquals("route-res", restored.routeId());
         }
 
         @Test
@@ -815,13 +823,12 @@ class ProtobufCommandCodecTest {
             RouteCommand original = RouteCommand.updateStatus("route-st", RouteStatus.TRIGGERED, "file arrived");
 
             ByteString bytes = ProtobufCommandCodec.serialize(original);
-            RouteCommand restored = (RouteCommand) ProtobufCommandCodec.deserialize(bytes);
+            RouteCommand.UpdateStatus restored = assertInstanceOf(RouteCommand.UpdateStatus.class,
+                    ProtobufCommandCodec.deserialize(bytes));
 
-            assertNotNull(restored);
-            assertEquals(RouteCommand.CommandType.UPDATE_STATUS, restored.getType());
-            assertEquals("route-st", restored.getRouteId());
-            assertEquals(RouteStatus.TRIGGERED, restored.getNewStatus());
-            assertEquals("file arrived", restored.getReason());
+            assertEquals("route-st", restored.routeId());
+            assertEquals(RouteStatus.TRIGGERED, restored.newStatus());
+            assertEquals("file arrived", restored.reason());
         }
 
         @Test
@@ -831,9 +838,10 @@ class ProtobufCommandCodecTest {
                 RouteCommand original = RouteCommand.updateStatus("route-enum", status, "testing " + status);
 
                 ByteString bytes = ProtobufCommandCodec.serialize(original);
-                RouteCommand restored = (RouteCommand) ProtobufCommandCodec.deserialize(bytes);
+                RouteCommand.UpdateStatus restored = assertInstanceOf(RouteCommand.UpdateStatus.class,
+                        ProtobufCommandCodec.deserialize(bytes));
 
-                assertEquals(status, restored.getNewStatus(),
+                assertEquals(status, restored.newStatus(),
                         "Failed for status: " + status);
             }
         }
@@ -861,9 +869,10 @@ class ProtobufCommandCodecTest {
 
                 RouteCommand original = RouteCommand.create(route);
                 ByteString bytes = ProtobufCommandCodec.serialize(original);
-                RouteCommand restored = (RouteCommand) ProtobufCommandCodec.deserialize(bytes);
+                RouteCommand.Create restored = assertInstanceOf(RouteCommand.Create.class,
+                        ProtobufCommandCodec.deserialize(bytes));
 
-                assertEquals(entry.getKey(), restored.getRouteConfiguration().getTrigger().getType(),
+                assertEquals(entry.getKey(), restored.routeConfiguration().getTrigger().getType(),
                         "Failed for trigger type: " + entry.getKey());
             }
         }
@@ -872,13 +881,13 @@ class ProtobufCommandCodecTest {
         @DisplayName("Timestamp is preserved across serialization (millisecond precision)")
         void timestampPreserved() {
             RouteCommand original = RouteCommand.create(createRouteConfiguration());
-            Instant originalTimestamp = original.getTimestamp();
+            Instant originalTimestamp = original.timestamp();
 
             ByteString bytes = ProtobufCommandCodec.serialize(original);
             RouteCommand restored = (RouteCommand) ProtobufCommandCodec.deserialize(bytes);
 
             // Protobuf stores epoch millis, so compare at millisecond precision
-            assertEquals(originalTimestamp.toEpochMilli(), restored.getTimestamp().toEpochMilli());
+            assertEquals(originalTimestamp.toEpochMilli(), restored.timestamp().toEpochMilli());
         }
 
         @Test
@@ -894,17 +903,17 @@ class ProtobufCommandCodecTest {
 
             RouteCommand original = RouteCommand.create(route);
             ByteString bytes = ProtobufCommandCodec.serialize(original);
-            RouteCommand restored = (RouteCommand) ProtobufCommandCodec.deserialize(bytes);
+            RouteCommand.Create restored = assertInstanceOf(RouteCommand.Create.class,
+                    ProtobufCommandCodec.deserialize(bytes));
 
-            assertNotNull(restored);
-            RouteConfiguration rc = restored.getRouteConfiguration();
+            RouteConfiguration rc = restored.routeConfiguration();
             assertEquals("route-minimal", rc.getRouteId());
             assertEquals("minimal", rc.getName());
             // Description and options should be null/empty
         }
 
         @Test
-        @DisplayName("All RouteCommand.CommandType values roundtrip correctly")
+        @DisplayName("All RouteCommand subtypes roundtrip correctly")
         void allCommandTypesRoundtrip() {
             RouteConfiguration route = createRouteConfiguration();
 
@@ -920,9 +929,9 @@ class ProtobufCommandCodecTest {
                 ByteString bytes = ProtobufCommandCodec.serialize(original);
                 RouteCommand restored = (RouteCommand) ProtobufCommandCodec.deserialize(bytes);
 
-                assertEquals(original.getType(), restored.getType(),
-                        "Failed for command type: " + original.getType());
-                assertEquals(original.getRouteId(), restored.getRouteId());
+                assertEquals(original.getClass(), restored.getClass(),
+                        "Failed for command type: " + original.getClass().getSimpleName());
+                assertEquals(original.routeId(), restored.routeId());
             }
         }
     }

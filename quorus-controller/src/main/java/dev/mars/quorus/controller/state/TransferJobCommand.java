@@ -19,88 +19,120 @@ package dev.mars.quorus.controller.state;
 import dev.mars.quorus.core.TransferJob;
 import dev.mars.quorus.core.TransferStatus;
 
+import java.util.Objects;
+
 /**
- * Description for TransferJobCommand
+ * Sealed interface for transfer job lifecycle commands.
+ *
+ * <p>Each permitted subtype carries only the fields relevant to its operation,
+ * eliminating nullable "bag-of-fields" patterns. Pattern matching in
+ * {@code switch} expressions provides compile-time exhaustiveness.
+ *
+ * <h3>Permitted subtypes</h3>
+ * <ul>
+ *   <li>{@link Create} — create a new transfer job</li>
+ *   <li>{@link UpdateStatus} — change job status</li>
+ *   <li>{@link UpdateProgress} — update bytes transferred</li>
+ *   <li>{@link Delete} — remove a transfer job</li>
+ * </ul>
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @version 1.0
+ * @version 2.0
  * @since 2025-08-20
  */
+public sealed interface TransferJobCommand extends RaftCommand
+        permits TransferJobCommand.Create,
+                TransferJobCommand.UpdateStatus,
+                TransferJobCommand.UpdateProgress,
+                TransferJobCommand.Delete {
 
-public final class TransferJobCommand implements RaftCommand {
+    /** Common accessor: every subtype carries a job ID. */
+    String jobId();
 
-    private static final long serialVersionUID = 1L;
+    /**
+     * Create a new transfer job.
+     *
+     * @param jobId       the job identifier (derived from transferJob)
+     * @param transferJob the full transfer job object
+     */
+    record Create(String jobId, TransferJob transferJob) implements TransferJobCommand {
+        private static final long serialVersionUID = 1L;
 
-    public enum Type {
-        CREATE,
-        UPDATE_STATUS,
-        UPDATE_PROGRESS,
-        DELETE
-    }
-
-    private final Type type;
-    private final String jobId;
-    private final TransferJob transferJob;
-    private final TransferStatus status;
-    private final Long bytesTransferred;
-
-    private TransferJobCommand(Type type, String jobId, TransferJob transferJob, TransferStatus status, Long bytesTransferred) {
-        this.type = type;
-        this.jobId = jobId;
-        this.transferJob = transferJob;
-        this.status = status;
-        this.bytesTransferred = bytesTransferred;
-    }
-
-    public static TransferJobCommand create(TransferJob transferJob) {
-        return new TransferJobCommand(Type.CREATE, transferJob.getJobId(), transferJob, null, null);
-    }
-
-    public static TransferJobCommand updateStatus(String jobId, TransferStatus status) {
-        return new TransferJobCommand(Type.UPDATE_STATUS, jobId, null, status, null);
-    }
-    
-    public static TransferJobCommand updateProgress(String jobId, long bytesTransferred) {
-        return new TransferJobCommand(Type.UPDATE_PROGRESS, jobId, null, null, bytesTransferred);
-    }
-
-    public static TransferJobCommand delete(String jobId) {
-        return new TransferJobCommand(Type.DELETE, jobId, null, null, null);
-    }
-
-    public Type getType() {
-        return type;
-    }
-
-    public String getJobId() {
-        return jobId;
-    }
-
-    public TransferJob getTransferJob() {
-        return transferJob;
+        public Create {
+            Objects.requireNonNull(jobId, "jobId");
+            Objects.requireNonNull(transferJob, "transferJob");
+        }
     }
 
     /**
-     * Get the status (for UPDATE_STATUS commands).
+     * Update the status of an existing transfer job.
+     *
+     * @param jobId  the job identifier
+     * @param status the new status
      */
-    public TransferStatus getStatus() {
-        return status;
-    }
-    
-    /**
-     * Get the bytes transferred (for UPDATE_PROGRESS commands).
-     */
-    public Long getBytesTransferred() {
-        return bytesTransferred;
+    record UpdateStatus(String jobId, TransferStatus status) implements TransferJobCommand {
+        private static final long serialVersionUID = 1L;
+
+        public UpdateStatus {
+            Objects.requireNonNull(jobId, "jobId");
+            Objects.requireNonNull(status, "status");
+        }
     }
 
-    @Override
-    public String toString() {
-        return "TransferJobCommand{" +
-                "type=" + type +
-                ", jobId='" + jobId + '\'' +
-                ", status=" + status +
-                ", bytesTransferred=" + bytesTransferred +
-                '}';
+    /**
+     * Update the progress (bytes transferred) of an existing transfer job.
+     *
+     * @param jobId            the job identifier
+     * @param bytesTransferred the number of bytes transferred so far
+     */
+    record UpdateProgress(String jobId, long bytesTransferred) implements TransferJobCommand {
+        private static final long serialVersionUID = 1L;
+
+        public UpdateProgress {
+            Objects.requireNonNull(jobId, "jobId");
+        }
+    }
+
+    /**
+     * Delete a transfer job.
+     *
+     * @param jobId the job identifier
+     */
+    record Delete(String jobId) implements TransferJobCommand {
+        private static final long serialVersionUID = 1L;
+
+        public Delete {
+            Objects.requireNonNull(jobId, "jobId");
+        }
+    }
+
+    // ── Factory methods (preserve existing API) ─────────────────
+
+    /**
+     * Create a new transfer job command.
+     */
+    static TransferJobCommand create(TransferJob transferJob) {
+        return new Create(transferJob.getJobId(), transferJob);
+    }
+
+    /**
+     * Create an update-status command.
+     */
+    static TransferJobCommand updateStatus(String jobId, TransferStatus status) {
+        return new UpdateStatus(jobId, status);
+    }
+
+    /**
+     * Create an update-progress command.
+     */
+    static TransferJobCommand updateProgress(String jobId, long bytesTransferred) {
+        return new UpdateProgress(jobId, bytesTransferred);
+    }
+
+    /**
+     * Create a delete command.
+     */
+    static TransferJobCommand delete(String jobId) {
+        return new Delete(jobId);
     }
 }

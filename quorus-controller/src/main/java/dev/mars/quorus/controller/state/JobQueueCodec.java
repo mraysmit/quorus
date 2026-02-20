@@ -44,26 +44,61 @@ final class JobQueueCodec {
 
     static JobQueueCommandProto toProto(JobQueueCommand cmd) {
         JobQueueCommandProto.Builder builder = JobQueueCommandProto.newBuilder()
-                .setType(toProto(cmd.getType()));
-        Optional.ofNullable(cmd.getJobId()).ifPresent(builder::setJobId);
-        Optional.ofNullable(cmd.getQueuedJob()).ifPresent(q -> builder.setQueuedJob(toProto(q)));
-        Optional.ofNullable(cmd.getNewPriority()).ifPresent(p -> builder.setNewPriority(toProto(p)));
-        Optional.ofNullable(cmd.getReason()).ifPresent(builder::setReason);
-        Optional.ofNullable(cmd.getTimestamp()).ifPresent(t -> builder.setTimestampEpochMs(t.toEpochMilli()));
+                .setJobId(cmd.jobId())
+                .setTimestampEpochMs(cmd.timestamp().toEpochMilli());
+
+        switch (cmd) {
+            case JobQueueCommand.Enqueue e -> {
+                builder.setType(JobQueueCommandType.JOB_QUEUE_CMD_ENQUEUE);
+                builder.setQueuedJob(toProto(e.queuedJob()));
+            }
+            case JobQueueCommand.Dequeue d -> {
+                builder.setType(JobQueueCommandType.JOB_QUEUE_CMD_DEQUEUE);
+                if (d.reason() != null) builder.setReason(d.reason());
+            }
+            case JobQueueCommand.Prioritize p -> {
+                builder.setType(JobQueueCommandType.JOB_QUEUE_CMD_PRIORITIZE);
+                builder.setNewPriority(toProto(p.newPriority()));
+                if (p.reason() != null) builder.setReason(p.reason());
+            }
+            case JobQueueCommand.Remove r -> {
+                builder.setType(JobQueueCommandType.JOB_QUEUE_CMD_REMOVE);
+                if (r.reason() != null) builder.setReason(r.reason());
+            }
+            case JobQueueCommand.Expedite ex -> {
+                builder.setType(JobQueueCommandType.JOB_QUEUE_CMD_EXPEDITE);
+                if (ex.reason() != null) builder.setReason(ex.reason());
+            }
+            case JobQueueCommand.UpdateRequirements ur -> {
+                builder.setType(JobQueueCommandType.JOB_QUEUE_CMD_UPDATE_REQUIREMENTS);
+                builder.setQueuedJob(toProto(ur.queuedJob()));
+            }
+        }
+
         return builder.build();
     }
 
     static JobQueueCommand fromProto(JobQueueCommandProto proto) {
         Instant timestamp = proto.getTimestampEpochMs() > 0
-                ? Instant.ofEpochMilli(proto.getTimestampEpochMs()) : null;
-        JobQueueCommand.CommandType type = fromProto(proto.getType());
-        QueuedJob queuedJob = proto.hasQueuedJob() ? fromProto(proto.getQueuedJob()) : null;
-        JobPriority newPriority = proto.getNewPriority() != JobPriorityProto.JOB_PRIORITY_UNSPECIFIED
-                ? fromProto(proto.getNewPriority()) : null;
+                ? Instant.ofEpochMilli(proto.getTimestampEpochMs()) : Instant.now();
+        String jobId = proto.getJobId();
         String reason = proto.getReason().isEmpty() ? null : proto.getReason();
 
-        return new JobQueueCommand(type, proto.getJobId(),
-                queuedJob, newPriority, reason, timestamp);
+        return switch (proto.getType()) {
+            case JOB_QUEUE_CMD_ENQUEUE -> new JobQueueCommand.Enqueue(jobId,
+                    fromProto(proto.getQueuedJob()), timestamp);
+            case JOB_QUEUE_CMD_DEQUEUE -> new JobQueueCommand.Dequeue(jobId, reason, timestamp);
+            case JOB_QUEUE_CMD_PRIORITIZE -> {
+                JobPriority newPriority = proto.getNewPriority() != JobPriorityProto.JOB_PRIORITY_UNSPECIFIED
+                        ? fromProto(proto.getNewPriority()) : null;
+                yield new JobQueueCommand.Prioritize(jobId, newPriority, reason, timestamp);
+            }
+            case JOB_QUEUE_CMD_REMOVE -> new JobQueueCommand.Remove(jobId, reason, timestamp);
+            case JOB_QUEUE_CMD_EXPEDITE -> new JobQueueCommand.Expedite(jobId, reason, timestamp);
+            case JOB_QUEUE_CMD_UPDATE_REQUIREMENTS -> new JobQueueCommand.UpdateRequirements(jobId,
+                    fromProto(proto.getQueuedJob()), timestamp);
+            default -> throw new IllegalArgumentException("Unknown JobQueueCommandType: " + proto.getType());
+        };
     }
 
     // ── Domain models ───────────────────────────────────────────
@@ -167,29 +202,6 @@ final class JobQueueCodec {
     }
 
     // ── Enums ───────────────────────────────────────────────────
-
-    private static JobQueueCommandType toProto(JobQueueCommand.CommandType type) {
-        return switch (type) {
-            case ENQUEUE -> JobQueueCommandType.JOB_QUEUE_CMD_ENQUEUE;
-            case DEQUEUE -> JobQueueCommandType.JOB_QUEUE_CMD_DEQUEUE;
-            case PRIORITIZE -> JobQueueCommandType.JOB_QUEUE_CMD_PRIORITIZE;
-            case REMOVE -> JobQueueCommandType.JOB_QUEUE_CMD_REMOVE;
-            case EXPEDITE -> JobQueueCommandType.JOB_QUEUE_CMD_EXPEDITE;
-            case UPDATE_REQUIREMENTS -> JobQueueCommandType.JOB_QUEUE_CMD_UPDATE_REQUIREMENTS;
-        };
-    }
-
-    private static JobQueueCommand.CommandType fromProto(JobQueueCommandType type) {
-        return switch (type) {
-            case JOB_QUEUE_CMD_ENQUEUE -> JobQueueCommand.CommandType.ENQUEUE;
-            case JOB_QUEUE_CMD_DEQUEUE -> JobQueueCommand.CommandType.DEQUEUE;
-            case JOB_QUEUE_CMD_PRIORITIZE -> JobQueueCommand.CommandType.PRIORITIZE;
-            case JOB_QUEUE_CMD_REMOVE -> JobQueueCommand.CommandType.REMOVE;
-            case JOB_QUEUE_CMD_EXPEDITE -> JobQueueCommand.CommandType.EXPEDITE;
-            case JOB_QUEUE_CMD_UPDATE_REQUIREMENTS -> JobQueueCommand.CommandType.UPDATE_REQUIREMENTS;
-            default -> throw new IllegalArgumentException("Unknown JobQueueCommandType: " + type);
-        };
-    }
 
     private static JobPriorityProto toProto(JobPriority priority) {
         return switch (priority) {

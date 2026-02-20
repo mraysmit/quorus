@@ -41,21 +41,37 @@ final class TransferCodec {
     // ── Command ─────────────────────────────────────────────────
 
     static TransferJobCommandProto toProto(TransferJobCommand cmd) {
-        TransferJobCommandProto.Builder builder = TransferJobCommandProto.newBuilder()
-                .setType(toProto(cmd.getType()));
-        Optional.ofNullable(cmd.getJobId()).ifPresent(builder::setJobId);
-        Optional.ofNullable(cmd.getTransferJob()).ifPresent(tj -> builder.setTransferJob(toProto(tj)));
-        Optional.ofNullable(cmd.getStatus()).ifPresent(s -> builder.setStatus(toProto(s)));
-        Optional.ofNullable(cmd.getBytesTransferred()).ifPresent(builder::setBytesTransferred);
+        TransferJobCommandProto.Builder builder = TransferJobCommandProto.newBuilder();
+        builder.setJobId(cmd.jobId());
+
+        switch (cmd) {
+            case TransferJobCommand.Create c -> {
+                builder.setType(TransferJobCommandType.TRANSFER_JOB_CMD_CREATE);
+                builder.setTransferJob(toProto(c.transferJob()));
+            }
+            case TransferJobCommand.UpdateStatus u -> {
+                builder.setType(TransferJobCommandType.TRANSFER_JOB_CMD_UPDATE_STATUS);
+                builder.setStatus(toProto(u.status()));
+            }
+            case TransferJobCommand.UpdateProgress p -> {
+                builder.setType(TransferJobCommandType.TRANSFER_JOB_CMD_UPDATE_PROGRESS);
+                builder.setBytesTransferred(p.bytesTransferred());
+            }
+            case TransferJobCommand.Delete ignored -> {
+                builder.setType(TransferJobCommandType.TRANSFER_JOB_CMD_DELETE);
+            }
+        }
+
         return builder.build();
     }
 
     static TransferJobCommand fromProto(TransferJobCommandProto proto) {
-        return switch (fromProto(proto.getType())) {
-            case CREATE -> TransferJobCommand.create(fromProto(proto.getTransferJob()));
-            case UPDATE_STATUS -> TransferJobCommand.updateStatus(proto.getJobId(), fromProto(proto.getStatus()));
-            case UPDATE_PROGRESS -> TransferJobCommand.updateProgress(proto.getJobId(), proto.getBytesTransferred());
-            case DELETE -> TransferJobCommand.delete(proto.getJobId());
+        return switch (proto.getType()) {
+            case TRANSFER_JOB_CMD_CREATE -> TransferJobCommand.create(fromProto(proto.getTransferJob()));
+            case TRANSFER_JOB_CMD_UPDATE_STATUS -> TransferJobCommand.updateStatus(proto.getJobId(), fromProto(proto.getStatus()));
+            case TRANSFER_JOB_CMD_UPDATE_PROGRESS -> TransferJobCommand.updateProgress(proto.getJobId(), proto.getBytesTransferred());
+            case TRANSFER_JOB_CMD_DELETE -> TransferJobCommand.delete(proto.getJobId());
+            default -> throw new IllegalArgumentException("Unknown TransferJobCommandType: " + proto.getType());
         };
     }
 
@@ -125,25 +141,6 @@ final class TransferCodec {
     }
 
     // ── Enums ───────────────────────────────────────────────────
-
-    private static TransferJobCommandType toProto(TransferJobCommand.Type type) {
-        return switch (type) {
-            case CREATE -> TransferJobCommandType.TRANSFER_JOB_CMD_CREATE;
-            case UPDATE_STATUS -> TransferJobCommandType.TRANSFER_JOB_CMD_UPDATE_STATUS;
-            case UPDATE_PROGRESS -> TransferJobCommandType.TRANSFER_JOB_CMD_UPDATE_PROGRESS;
-            case DELETE -> TransferJobCommandType.TRANSFER_JOB_CMD_DELETE;
-        };
-    }
-
-    private static TransferJobCommand.Type fromProto(TransferJobCommandType type) {
-        return switch (type) {
-            case TRANSFER_JOB_CMD_CREATE -> TransferJobCommand.Type.CREATE;
-            case TRANSFER_JOB_CMD_UPDATE_STATUS -> TransferJobCommand.Type.UPDATE_STATUS;
-            case TRANSFER_JOB_CMD_UPDATE_PROGRESS -> TransferJobCommand.Type.UPDATE_PROGRESS;
-            case TRANSFER_JOB_CMD_DELETE -> TransferJobCommand.Type.DELETE;
-            default -> throw new IllegalArgumentException("Unknown TransferJobCommandType: " + type);
-        };
-    }
 
     static TransferStatusProto toProto(TransferStatus status) {
         return switch (status) {
