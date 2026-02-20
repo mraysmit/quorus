@@ -23,237 +23,183 @@ import java.time.Instant;
 import java.util.Objects;
 
 /**
- * Command for job queue operations in the Raft state machine.
- * This class represents commands that can be submitted to the distributed controller
- * for managing the job queue and job prioritization.
- * 
+ * Sealed interface for job queue commands in the Raft state machine.
+ *
+ * <p>Each permitted subtype carries only the fields relevant to its operation,
+ * eliminating nullable "bag-of-fields" patterns. Pattern matching in
+ * {@code switch} expressions provides compile-time exhaustiveness.
+ *
+ * <h3>Permitted subtypes</h3>
+ * <ul>
+ *   <li>{@link Enqueue} — add a job to the queue</li>
+ *   <li>{@link Dequeue} — remove a job from the queue for assignment</li>
+ *   <li>{@link Prioritize} — change job priority</li>
+ *   <li>{@link Remove} — remove a job from the queue (cancel/delete)</li>
+ *   <li>{@link Expedite} — move job to front of queue</li>
+ *   <li>{@link UpdateRequirements} — update job requirements</li>
+ * </ul>
+ *
  * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 2.0
  * @since 2025-10-28
- * @version 1.0
  */
-public final class JobQueueCommand implements RaftCommand {
+public sealed interface JobQueueCommand extends RaftCommand
+        permits JobQueueCommand.Enqueue,
+                JobQueueCommand.Dequeue,
+                JobQueueCommand.Prioritize,
+                JobQueueCommand.Remove,
+                JobQueueCommand.Expedite,
+                JobQueueCommand.UpdateRequirements {
 
-    private static final long serialVersionUID = 1L;
+    /** Common accessor: every subtype carries a job ID. */
+    String jobId();
 
-    /**
-     * Types of job queue commands.
-     */
-    public enum CommandType {
-        /** Add a job to the queue */
-        ENQUEUE,
-        /** Remove a job from the queue (for assignment) */
-        DEQUEUE,
-        /** Change job priority */
-        PRIORITIZE,
-        /** Remove a job from the queue (cancel/delete) */
-        REMOVE,
-        /** Move job to front of queue */
-        EXPEDITE,
-        /** Update job requirements */
-        UPDATE_REQUIREMENTS
-    }
-
-    private final CommandType type;
-    private final String jobId;
-    private final QueuedJob queuedJob;
-    private final JobPriority newPriority;
-    private final String reason;
-    private final Instant timestamp;
+    /** Common accessor: every subtype carries a timestamp. */
+    Instant timestamp();
 
     /**
-     * Private constructor for creating commands.
+     * Add a job to the queue.
+     *
+     * @param jobId     the job identifier
+     * @param queuedJob the full queued job
+     * @param timestamp the command timestamp
      */
-    private JobQueueCommand(CommandType type, String jobId, QueuedJob queuedJob,
-                           JobPriority newPriority, String reason) {
-        this(type, jobId, queuedJob, newPriority, reason, null);
+    record Enqueue(String jobId, QueuedJob queuedJob, Instant timestamp) implements JobQueueCommand {
+        private static final long serialVersionUID = 1L;
+
+        public Enqueue {
+            Objects.requireNonNull(jobId, "jobId");
+            Objects.requireNonNull(queuedJob, "queuedJob");
+            Objects.requireNonNull(timestamp, "timestamp");
+        }
     }
 
     /**
-     * Package-private constructor for protobuf deserialization with explicit timestamp.
+     * Remove a job from the queue for assignment.
+     *
+     * @param jobId     the job identifier
+     * @param reason    the reason for dequeue (may be null)
+     * @param timestamp the command timestamp
      */
-    JobQueueCommand(CommandType type, String jobId, QueuedJob queuedJob,
-                    JobPriority newPriority, String reason, Instant timestamp) {
-        this.type = Objects.requireNonNull(type, "Command type cannot be null");
-        this.jobId = jobId;
-        this.queuedJob = queuedJob;
-        this.newPriority = newPriority;
-        this.reason = reason;
-        this.timestamp = (timestamp != null) ? timestamp : Instant.now();
-        
-        // Validate command parameters
-        validateCommand();
+    record Dequeue(String jobId, String reason, Instant timestamp) implements JobQueueCommand {
+        private static final long serialVersionUID = 1L;
+
+        public Dequeue {
+            Objects.requireNonNull(jobId, "jobId");
+            Objects.requireNonNull(timestamp, "timestamp");
+        }
     }
+
+    /**
+     * Change job priority.
+     *
+     * @param jobId       the job identifier
+     * @param newPriority the new priority level
+     * @param reason      optional reason for priority change (may be null)
+     * @param timestamp   the command timestamp
+     */
+    record Prioritize(String jobId, JobPriority newPriority, String reason, Instant timestamp) implements JobQueueCommand {
+        private static final long serialVersionUID = 1L;
+
+        public Prioritize {
+            Objects.requireNonNull(jobId, "jobId");
+            Objects.requireNonNull(newPriority, "newPriority");
+            Objects.requireNonNull(timestamp, "timestamp");
+        }
+    }
+
+    /**
+     * Remove a job from the queue (cancel/delete).
+     *
+     * @param jobId     the job identifier
+     * @param reason    the reason for removal (may be null)
+     * @param timestamp the command timestamp
+     */
+    record Remove(String jobId, String reason, Instant timestamp) implements JobQueueCommand {
+        private static final long serialVersionUID = 1L;
+
+        public Remove {
+            Objects.requireNonNull(jobId, "jobId");
+            Objects.requireNonNull(timestamp, "timestamp");
+        }
+    }
+
+    /**
+     * Move job to front of queue.
+     *
+     * @param jobId     the job identifier
+     * @param reason    the reason for expediting (may be null)
+     * @param timestamp the command timestamp
+     */
+    record Expedite(String jobId, String reason, Instant timestamp) implements JobQueueCommand {
+        private static final long serialVersionUID = 1L;
+
+        public Expedite {
+            Objects.requireNonNull(jobId, "jobId");
+            Objects.requireNonNull(timestamp, "timestamp");
+        }
+    }
+
+    /**
+     * Update job requirements.
+     *
+     * @param jobId     the job identifier
+     * @param queuedJob the updated queued job with new requirements
+     * @param timestamp the command timestamp
+     */
+    record UpdateRequirements(String jobId, QueuedJob queuedJob, Instant timestamp) implements JobQueueCommand {
+        private static final long serialVersionUID = 1L;
+
+        public UpdateRequirements {
+            Objects.requireNonNull(jobId, "jobId");
+            Objects.requireNonNull(queuedJob, "queuedJob");
+            Objects.requireNonNull(timestamp, "timestamp");
+        }
+    }
+
+    // ── Factory methods (preserve existing API) ─────────────────
 
     /**
      * Create a command to add a job to the queue.
-     * 
-     * @param queuedJob the job to add to the queue
-     * @return the command
-     * @throws IllegalArgumentException if queuedJob is null
      */
-    public static JobQueueCommand enqueue(QueuedJob queuedJob) {
+    static JobQueueCommand enqueue(QueuedJob queuedJob) {
         Objects.requireNonNull(queuedJob, "Queued job cannot be null");
-        return new JobQueueCommand(CommandType.ENQUEUE, queuedJob.getJobId(), 
-                                  queuedJob, null, null);
+        return new Enqueue(queuedJob.getJobId(), queuedJob, Instant.now());
     }
 
     /**
      * Create a command to remove a job from the queue for assignment.
-     * 
-     * @param jobId the job ID to dequeue
-     * @return the command
-     * @throws IllegalArgumentException if jobId is null or empty
      */
-    public static JobQueueCommand dequeue(String jobId) {
-        validateJobId(jobId);
-        return new JobQueueCommand(CommandType.DEQUEUE, jobId, null, null, "Job assigned to agent");
+    static JobQueueCommand dequeue(String jobId) {
+        return new Dequeue(jobId, "Job assigned to agent", Instant.now());
     }
 
     /**
      * Create a command to change job priority.
-     * 
-     * @param jobId the job ID to prioritize
-     * @param newPriority the new priority level
-     * @param reason the reason for priority change (optional)
-     * @return the command
-     * @throws IllegalArgumentException if jobId is null/empty or newPriority is null
      */
-    public static JobQueueCommand prioritize(String jobId, JobPriority newPriority, String reason) {
-        validateJobId(jobId);
-        Objects.requireNonNull(newPriority, "New priority cannot be null");
-        return new JobQueueCommand(CommandType.PRIORITIZE, jobId, null, newPriority, reason);
+    static JobQueueCommand prioritize(String jobId, JobPriority newPriority, String reason) {
+        return new Prioritize(jobId, newPriority, reason, Instant.now());
     }
 
     /**
      * Create a command to remove a job from the queue (cancel/delete).
-     * 
-     * @param jobId the job ID to remove
-     * @param reason the reason for removal
-     * @return the command
-     * @throws IllegalArgumentException if jobId is null or empty
      */
-    public static JobQueueCommand remove(String jobId, String reason) {
-        validateJobId(jobId);
-        return new JobQueueCommand(CommandType.REMOVE, jobId, null, null, reason);
+    static JobQueueCommand remove(String jobId, String reason) {
+        return new Remove(jobId, reason, Instant.now());
     }
 
     /**
      * Create a command to expedite a job (move to front of queue).
-     * 
-     * @param jobId the job ID to expedite
-     * @param reason the reason for expediting
-     * @return the command
-     * @throws IllegalArgumentException if jobId is null or empty
      */
-    public static JobQueueCommand expedite(String jobId, String reason) {
-        validateJobId(jobId);
-        return new JobQueueCommand(CommandType.EXPEDITE, jobId, null, null, reason);
+    static JobQueueCommand expedite(String jobId, String reason) {
+        return new Expedite(jobId, reason, Instant.now());
     }
 
     /**
      * Create a command to update job requirements.
-     * 
-     * @param queuedJob the updated queued job with new requirements
-     * @return the command
-     * @throws IllegalArgumentException if queuedJob is null
      */
-    public static JobQueueCommand updateRequirements(QueuedJob queuedJob) {
+    static JobQueueCommand updateRequirements(QueuedJob queuedJob) {
         Objects.requireNonNull(queuedJob, "Queued job cannot be null");
-        return new JobQueueCommand(CommandType.UPDATE_REQUIREMENTS, queuedJob.getJobId(), 
-                                  queuedJob, null, "Job requirements updated");
-    }
-
-    // Getters
-    public CommandType getType() {
-        return type;
-    }
-
-    public String getJobId() {
-        return jobId;
-    }
-
-    public QueuedJob getQueuedJob() {
-        return queuedJob;
-    }
-
-    public JobPriority getNewPriority() {
-        return newPriority;
-    }
-
-    public String getReason() {
-        return reason;
-    }
-
-    public Instant getTimestamp() {
-        return timestamp;
-    }
-
-    // Validation methods
-    private static void validateJobId(String jobId) {
-        if (jobId == null || jobId.trim().isEmpty()) {
-            throw new IllegalArgumentException("Job ID cannot be null or empty");
-        }
-    }
-
-    private void validateCommand() {
-        switch (type) {
-            case ENQUEUE:
-            case UPDATE_REQUIREMENTS:
-                if (queuedJob == null) {
-                    throw new IllegalArgumentException("Queued job is required for " + type + " command");
-                }
-                if (jobId == null || !jobId.equals(queuedJob.getJobId())) {
-                    throw new IllegalArgumentException("Job ID must match queued job ID");
-                }
-                break;
-                
-            case DEQUEUE:
-            case REMOVE:
-            case EXPEDITE:
-                if (jobId == null || jobId.trim().isEmpty()) {
-                    throw new IllegalArgumentException("Job ID is required for " + type + " command");
-                }
-                break;
-                
-            case PRIORITIZE:
-                if (jobId == null || jobId.trim().isEmpty()) {
-                    throw new IllegalArgumentException("Job ID is required for PRIORITIZE command");
-                }
-                if (newPriority == null) {
-                    throw new IllegalArgumentException("New priority is required for PRIORITIZE command");
-                }
-                break;
-                
-            default:
-                throw new IllegalArgumentException("Unknown command type: " + type);
-        }
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        JobQueueCommand that = (JobQueueCommand) o;
-        return type == that.type &&
-               Objects.equals(jobId, that.jobId) &&
-               Objects.equals(queuedJob, that.queuedJob) &&
-               newPriority == that.newPriority &&
-               Objects.equals(reason, that.reason);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(type, jobId, queuedJob, newPriority, reason);
-    }
-
-    @Override
-    public String toString() {
-        return "JobQueueCommand{" +
-                "type=" + type +
-                ", jobId='" + jobId + '\'' +
-                ", newPriority=" + newPriority +
-                ", reason='" + reason + '\'' +
-                ", timestamp=" + timestamp +
-                '}';
+        return new UpdateRequirements(queuedJob.getJobId(), queuedJob, Instant.now());
     }
 }

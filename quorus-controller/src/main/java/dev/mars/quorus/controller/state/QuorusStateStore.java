@@ -179,11 +179,11 @@ public class QuorusStateStore implements RaftLogApplicator {
     }
 
     private Object applyTransferJobCommand(TransferJobCommand command) {
-        String jobId = command.getJobId();
+        String jobId = command.jobId();
 
-        return switch (command.getType()) {
-            case CREATE -> {
-                TransferJob job = command.getTransferJob();
+        return switch (command) {
+            case TransferJobCommand.Create cmd -> {
+                TransferJob job = cmd.transferJob();
                 logger.debug("Creating transfer job: jobId={}, sourceUri={}, destPath={}", 
                     jobId, job.getRequest().getSourceUri(), job.getRequest().getDestinationPath());
                 TransferJobSnapshot snapshot = TransferJobSnapshot.fromTransferJob(job);
@@ -192,8 +192,8 @@ public class QuorusStateStore implements RaftLogApplicator {
                     jobId, job.getRequest().getProtocol(), transferJobs.size());
                 yield job;
             }
-            case UPDATE_STATUS -> {
-                logger.debug("Updating transfer job status: jobId={}, newStatus={}", jobId, command.getStatus());
+            case TransferJobCommand.UpdateStatus cmd -> {
+                logger.debug("Updating transfer job status: jobId={}, newStatus={}", jobId, cmd.status());
                 TransferJobSnapshot existingJob = getOrWarn(transferJobs, jobId, "Transfer job", "status update");
                 if (existingJob == null) yield null;
                 TransferStatus oldStatus = existingJob.getStatus();
@@ -201,7 +201,7 @@ public class QuorusStateStore implements RaftLogApplicator {
                         existingJob.getJobId(),
                         existingJob.getSourceUri(),
                         existingJob.getDestinationPath(),
-                        command.getStatus(),
+                        cmd.status(),
                         existingJob.getBytesTransferred(),
                         existingJob.getTotalBytes(),
                         existingJob.getStartTime(),
@@ -210,12 +210,12 @@ public class QuorusStateStore implements RaftLogApplicator {
                         existingJob.getDescription());
                 transferJobs.put(jobId, updatedJob);
                 logger.info("Updated transfer job status: jobId={}, oldStatus={}, newStatus={}", 
-                    jobId, oldStatus, command.getStatus());
+                    jobId, oldStatus, cmd.status());
                 yield updatedJob;
             }
-            case UPDATE_PROGRESS -> {
+            case TransferJobCommand.UpdateProgress cmd -> {
                 logger.debug("Updating transfer job progress: jobId={}, bytesTransferred={}", 
-                    jobId, command.getBytesTransferred());
+                    jobId, cmd.bytesTransferred());
                 TransferJobSnapshot progressJob = getOrWarn(transferJobs, jobId, "Transfer job", "progress update");
                 if (progressJob == null) yield null;
                 long oldBytes = progressJob.getBytesTransferred();
@@ -224,7 +224,7 @@ public class QuorusStateStore implements RaftLogApplicator {
                         progressJob.getSourceUri(),
                         progressJob.getDestinationPath(),
                         progressJob.getStatus(),
-                        command.getBytesTransferred(),
+                        cmd.bytesTransferred(),
                         progressJob.getTotalBytes(),
                         progressJob.getStartTime(),
                         java.time.Instant.now(),
@@ -232,10 +232,10 @@ public class QuorusStateStore implements RaftLogApplicator {
                         progressJob.getDescription());
                 transferJobs.put(jobId, updatedJob);
                 logger.debug("Updated transfer job progress: jobId={}, oldBytes={}, newBytes={}, totalBytes={}", 
-                    jobId, oldBytes, command.getBytesTransferred(), progressJob.getTotalBytes());
+                    jobId, oldBytes, cmd.bytesTransferred(), progressJob.getTotalBytes());
                 yield updatedJob;
             }
-            case DELETE -> {
+            case TransferJobCommand.Delete ignored -> {
                 logger.debug("Deleting transfer job: jobId={}", jobId);
                 TransferJobSnapshot removedJob = removeOrWarn(transferJobs, jobId, "Transfer job", "deletion");
                 if (removedJob == null) yield null;
@@ -247,12 +247,12 @@ public class QuorusStateStore implements RaftLogApplicator {
     }
 
     private Object applyAgentCommand(AgentCommand command) {
-        String agentId = command.getAgentId();
-        logger.debug("Processing agent command: agentId={}, type={}", agentId, command.getType());
+        String agentId = command.agentId();
+        logger.debug("Processing agent command: agentId={}, type={}", agentId, command.getClass().getSimpleName());
 
-        return switch (command.getType()) {
-            case REGISTER -> {
-                AgentInfo agentInfo = command.getAgentInfo();
+        return switch (command) {
+            case AgentCommand.Register cmd -> {
+                AgentInfo agentInfo = cmd.agentInfo();
                 logger.debug("Registering agent: agentId={}, endpoint={}, status={}", 
                     agentId, agentInfo.getEndpoint(), agentInfo.getStatus());
                 agents.put(agentId, agentInfo);
@@ -260,7 +260,7 @@ public class QuorusStateStore implements RaftLogApplicator {
                     agentId, agentInfo.getEndpoint(), agents.size());
                 yield agentInfo;
             }
-            case DEREGISTER -> {
+            case AgentCommand.Deregister ignored -> {
                 logger.debug("Deregistering agent: agentId={}", agentId);
                 AgentInfo removedAgent = removeOrWarn(agents, agentId, "Agent", "deregistration");
                 if (removedAgent == null) yield null;
@@ -268,12 +268,12 @@ public class QuorusStateStore implements RaftLogApplicator {
                     agentId, removedAgent.getEndpoint(), agents.size());
                 yield removedAgent;
             }
-            case UPDATE_STATUS -> {
-                logger.debug("Updating agent status: agentId={}, newStatus={}", agentId, command.getNewStatus());
+            case AgentCommand.UpdateStatus cmd -> {
+                logger.debug("Updating agent status: agentId={}, newStatus={}", agentId, cmd.newStatus());
                 AgentInfo existingAgent = getOrWarn(agents, agentId, "Agent", "status update");
                 if (existingAgent == null) yield null;
                 AgentStatus oldStatus = existingAgent.getStatus();
-                AgentStatus newStatus = command.getNewStatus();
+                AgentStatus newStatus = cmd.newStatus();
                 existingAgent.setStatus(newStatus);
                 existingAgent.setLastHeartbeat(Instant.now());
                 agents.put(agentId, existingAgent);
@@ -281,11 +281,11 @@ public class QuorusStateStore implements RaftLogApplicator {
                     agentId, oldStatus, newStatus);
                 yield existingAgent;
             }
-            case UPDATE_CAPABILITIES -> {
+            case AgentCommand.UpdateCapabilities cmd -> {
                 logger.debug("Updating agent capabilities: agentId={}", agentId);
                 AgentInfo agentToUpdate = getOrWarn(agents, agentId, "Agent", "capabilities update");
                 if (agentToUpdate == null) yield null;
-                AgentCapabilities newCapabilities = command.getNewCapabilities();
+                AgentCapabilities newCapabilities = cmd.newCapabilities();
                 agentToUpdate.setCapabilities(newCapabilities);
                 agentToUpdate.setLastHeartbeat(Instant.now());
                 agents.put(agentId, agentToUpdate);
@@ -293,7 +293,7 @@ public class QuorusStateStore implements RaftLogApplicator {
                     agentId, newCapabilities != null ? newCapabilities.getSupportedProtocols() : "null");
                 yield agentToUpdate;
             }
-            case HEARTBEAT -> {
+            case AgentCommand.Heartbeat ignored -> {
                 logger.debug("Processing heartbeat: agentId={}", agentId);
                 AgentInfo agentForHeartbeat = getOrWarn(agents, agentId, "Agent", "heartbeat");
                 if (agentForHeartbeat == null) yield null;
@@ -310,17 +310,17 @@ public class QuorusStateStore implements RaftLogApplicator {
     }
 
     private Object applySystemMetadataCommand(SystemMetadataCommand command) {
-        String key = command.getKey();
-        logger.debug("Processing system metadata command: key={}, type={}", key, command.getType());
+        String key = command.key();
+        logger.debug("Processing system metadata command: key={}, type={}", key, command.getClass().getSimpleName());
 
-        return switch (command.getType()) {
-            case SET -> {
-                String oldValue = systemMetadata.put(key, command.getValue());
+        return switch (command) {
+            case SystemMetadataCommand.Set cmd -> {
+                String oldValue = systemMetadata.put(key, cmd.value());
                 logger.info("Set system metadata: key={}, value={}, previousValue={}", 
-                    key, command.getValue(), oldValue);
+                    key, cmd.value(), oldValue);
                 yield oldValue;
             }
-            case DELETE -> {
+            case SystemMetadataCommand.Delete ignored -> {
                 String removedValue = systemMetadata.remove(key);
                 logger.info("Deleted system metadata: key={}, removedValue={}", key, removedValue);
                 yield removedValue;
@@ -412,54 +412,54 @@ public class QuorusStateStore implements RaftLogApplicator {
     }
 
     private Object applyJobQueueCommand(JobQueueCommand command) {
-        String jobId = command.getJobId();
-        logger.debug("Processing job queue command: jobId={}, type={}", jobId, command.getType());
+        String jobId = command.jobId();
+        logger.debug("Processing job queue command: jobId={}, type={}", jobId, command.getClass().getSimpleName());
 
-        return switch (command.getType()) {
-            case ENQUEUE -> {
-                QueuedJob queuedJob = command.getQueuedJob();
+        return switch (command) {
+            case JobQueueCommand.Enqueue cmd -> {
+                QueuedJob queuedJob = cmd.queuedJob();
                 logger.debug("Enqueueing job: jobId={}, priority={}", jobId, queuedJob.getPriority());
                 jobQueue.put(jobId, queuedJob);
                 logger.info("Enqueued job: jobId={}, priority={}, queueSize={}", 
                     jobId, queuedJob.getPriority(), jobQueue.size());
                 yield queuedJob;
             }
-            case DEQUEUE -> {
+            case JobQueueCommand.Dequeue ignored -> {
                 logger.debug("Dequeueing job: jobId={}", jobId);
                 QueuedJob dequeuedJob = removeOrWarn(jobQueue, jobId, "Job", "dequeue");
                 if (dequeuedJob == null) yield null;
                 logger.info("Dequeued job: jobId={}, queueSize={}", jobId, jobQueue.size());
                 yield dequeuedJob;
             }
-            case PRIORITIZE -> {
-                logger.debug("Updating job priority: jobId={}, newPriority={}", jobId, command.getNewPriority());
+            case JobQueueCommand.Prioritize cmd -> {
+                logger.debug("Updating job priority: jobId={}, newPriority={}", jobId, cmd.newPriority());
                 QueuedJob existingJob = getOrWarn(jobQueue, jobId, "Job", "prioritize");
                 if (existingJob == null) yield null;
                 JobPriority oldPriority = existingJob.getPriority();
-                QueuedJob updatedJob = existingJob.withPriority(command.getNewPriority());
+                QueuedJob updatedJob = existingJob.withPriority(cmd.newPriority());
                 jobQueue.put(jobId, updatedJob);
                 logger.info("Updated job priority: jobId={}, oldPriority={}, newPriority={}, reason={}", 
-                    jobId, oldPriority, command.getNewPriority(), command.getReason());
+                    jobId, oldPriority, cmd.newPriority(), cmd.reason());
                 yield updatedJob;
             }
-            case REMOVE -> {
+            case JobQueueCommand.Remove cmd -> {
                 logger.debug("Removing job from queue: jobId={}", jobId);
                 QueuedJob removedJob = removeOrWarn(jobQueue, jobId, "Job", "removal");
                 if (removedJob == null) yield null;
                 logger.info("Removed job from queue: jobId={}, reason={}, queueSize={}", 
-                    jobId, command.getReason(), jobQueue.size());
+                    jobId, cmd.reason(), jobQueue.size());
                 yield removedJob;
             }
-            case EXPEDITE -> {
+            case JobQueueCommand.Expedite cmd -> {
                 logger.debug("Expediting job: jobId={}", jobId);
                 QueuedJob expediteJob = getOrWarn(jobQueue, jobId, "Job", "expedite");
                 if (expediteJob == null) yield null;
-                logger.info("Expedited job: jobId={}, reason={}", jobId, command.getReason());
+                logger.info("Expedited job: jobId={}, reason={}", jobId, cmd.reason());
                 yield expediteJob;
             }
-            case UPDATE_REQUIREMENTS -> {
+            case JobQueueCommand.UpdateRequirements cmd -> {
                 logger.debug("Updating job requirements: jobId={}", jobId);
-                QueuedJob updatedJob = command.getQueuedJob();
+                QueuedJob updatedJob = cmd.queuedJob();
                 jobQueue.put(jobId, updatedJob);
                 logger.info("Updated job requirements: jobId={}", jobId);
                 yield updatedJob;
@@ -468,12 +468,12 @@ public class QuorusStateStore implements RaftLogApplicator {
     }
 
     private Object applyRouteCommand(RouteCommand command) {
-        String routeId = command.getRouteId();
-        logger.debug("Processing route command: routeId={}, type={}", routeId, command.getType());
+        String routeId = command.routeId();
+        logger.debug("Processing route command: routeId={}, type={}", routeId, command.getClass().getSimpleName());
 
-        return switch (command.getType()) {
-            case CREATE -> {
-                RouteConfiguration routeConfig = command.getRouteConfiguration();
+        return switch (command) {
+            case RouteCommand.Create cmd -> {
+                RouteConfiguration routeConfig = cmd.routeConfiguration();
                 logger.debug("Creating route: routeId={}, name={}", routeId, routeConfig.getName());
                 routes.put(routeId, routeConfig);
                 logger.info("Created route: routeId={}, name={}, triggerType={}, totalRoutes={}",
@@ -482,34 +482,34 @@ public class QuorusStateStore implements RaftLogApplicator {
                     routes.size());
                 yield routeConfig;
             }
-            case UPDATE -> {
+            case RouteCommand.Update cmd -> {
                 logger.debug("Updating route: routeId={}", routeId);
                 RouteConfiguration existingRoute = getOrWarn(routes, routeId, "Route", "update");
                 if (existingRoute == null) yield null;
-                RouteConfiguration updatedRoute = existingRoute.withUpdate(command.getRouteConfiguration());
+                RouteConfiguration updatedRoute = existingRoute.withUpdate(cmd.routeConfiguration());
                 routes.put(routeId, updatedRoute);
                 logger.info("Updated route: routeId={}, name={}", routeId, updatedRoute.getName());
                 yield updatedRoute;
             }
-            case DELETE -> {
+            case RouteCommand.Delete ignored -> {
                 logger.debug("Deleting route: routeId={}", routeId);
                 RouteConfiguration removedRoute = removeOrWarn(routes, routeId, "Route", "deletion");
                 if (removedRoute == null) yield null;
                 logger.info("Deleted route: routeId={}, totalRoutes={}", routeId, routes.size());
                 yield removedRoute;
             }
-            case SUSPEND -> {
-                logger.debug("Suspending route: routeId={}, reason={}", routeId, command.getReason());
+            case RouteCommand.Suspend cmd -> {
+                logger.debug("Suspending route: routeId={}, reason={}", routeId, cmd.reason());
                 RouteConfiguration suspendRoute = getOrWarn(routes, routeId, "Route", "suspend");
                 if (suspendRoute == null) yield null;
                 RouteStatus oldStatus = suspendRoute.getStatus();
                 RouteConfiguration suspended = suspendRoute.withStatus(RouteStatus.SUSPENDED);
                 routes.put(routeId, suspended);
                 logger.info("Suspended route: routeId={}, oldStatus={}, reason={}",
-                    routeId, oldStatus, command.getReason());
+                    routeId, oldStatus, cmd.reason());
                 yield suspended;
             }
-            case RESUME -> {
+            case RouteCommand.Resume ignored -> {
                 logger.debug("Resuming route: routeId={}", routeId);
                 RouteConfiguration resumeRoute = getOrWarn(routes, routeId, "Route", "resume");
                 if (resumeRoute == null) yield null;
@@ -519,15 +519,15 @@ public class QuorusStateStore implements RaftLogApplicator {
                 logger.info("Resumed route: routeId={}, oldStatus={}", routeId, oldStatus);
                 yield resumed;
             }
-            case UPDATE_STATUS -> {
-                logger.debug("Updating route status: routeId={}, newStatus={}", routeId, command.getNewStatus());
+            case RouteCommand.UpdateStatus cmd -> {
+                logger.debug("Updating route status: routeId={}, newStatus={}", routeId, cmd.newStatus());
                 RouteConfiguration statusRoute = getOrWarn(routes, routeId, "Route", "status update");
                 if (statusRoute == null) yield null;
                 RouteStatus oldStatus = statusRoute.getStatus();
-                RouteConfiguration updated = statusRoute.withStatus(command.getNewStatus());
+                RouteConfiguration updated = statusRoute.withStatus(cmd.newStatus());
                 routes.put(routeId, updated);
                 logger.info("Updated route status: routeId={}, oldStatus={}, newStatus={}",
-                    routeId, oldStatus, command.getNewStatus());
+                    routeId, oldStatus, cmd.newStatus());
                 yield updated;
             }
         };

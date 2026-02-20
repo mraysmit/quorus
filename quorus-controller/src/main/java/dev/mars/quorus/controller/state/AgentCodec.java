@@ -45,32 +45,54 @@ final class AgentCodec {
     // ── Command ─────────────────────────────────────────────────
 
     static AgentCommandProto toProto(AgentCommand cmd) {
-        AgentCommandProto.Builder builder = AgentCommandProto.newBuilder().setType(toProto(cmd.getType()));
-        Optional.ofNullable(cmd.getAgentId()).ifPresent(builder::setAgentId);
-        Optional.ofNullable(cmd.getAgentInfo()).ifPresent(i -> builder.setAgentInfo(toProto(i)));
-        Optional.ofNullable(cmd.getNewStatus()).ifPresent(s -> builder.setNewStatus(toProto(s)));
-        Optional.ofNullable(cmd.getNewCapabilities()).ifPresent(c -> builder.setNewCapabilities(toProto(c)));
-        Optional.ofNullable(cmd.getTimestamp()).ifPresent(t -> builder.setTimestampEpochMs(t.toEpochMilli()));
+        AgentCommandProto.Builder builder = AgentCommandProto.newBuilder()
+                .setAgentId(cmd.agentId())
+                .setTimestampEpochMs(cmd.timestamp().toEpochMilli());
+
+        switch (cmd) {
+            case AgentCommand.Register r -> {
+                builder.setType(AgentCommandType.AGENT_CMD_REGISTER);
+                builder.setAgentInfo(toProto(r.agentInfo()));
+            }
+            case AgentCommand.Deregister ignored -> {
+                builder.setType(AgentCommandType.AGENT_CMD_DEREGISTER);
+            }
+            case AgentCommand.UpdateStatus u -> {
+                builder.setType(AgentCommandType.AGENT_CMD_UPDATE_STATUS);
+                builder.setNewStatus(toProto(u.newStatus()));
+            }
+            case AgentCommand.UpdateCapabilities c -> {
+                builder.setType(AgentCommandType.AGENT_CMD_UPDATE_CAPABILITIES);
+                builder.setNewCapabilities(toProto(c.newCapabilities()));
+            }
+            case AgentCommand.Heartbeat h -> {
+                builder.setType(AgentCommandType.AGENT_CMD_HEARTBEAT);
+                if (h.status() != null) {
+                    builder.setNewStatus(toProto(h.status()));
+                }
+            }
+        }
+
         return builder.build();
     }
 
     static AgentCommand fromProto(AgentCommandProto proto) {
         Instant timestamp = proto.getTimestampEpochMs() > 0
-                ? Instant.ofEpochMilli(proto.getTimestampEpochMs()) : null;
-        AgentCommand.CommandType type = fromProto(proto.getType());
+                ? Instant.ofEpochMilli(proto.getTimestampEpochMs()) : Instant.now();
         AgentStatus newStatus = proto.getNewStatus() != AgentStatusProto.AGENT_STATUS_UNSPECIFIED
                 ? fromProto(proto.getNewStatus()) : null;
-        return switch (type) {
-            case REGISTER -> new AgentCommand(type, proto.getAgentId(),
-                    fromProto(proto.getAgentInfo()), null, null, timestamp);
-            case DEREGISTER -> new AgentCommand(type, proto.getAgentId(),
-                    null, null, null, timestamp);
-            case UPDATE_STATUS -> new AgentCommand(type, proto.getAgentId(),
-                    null, newStatus, null, timestamp);
-            case UPDATE_CAPABILITIES -> new AgentCommand(type, proto.getAgentId(),
-                    null, null, fromProto(proto.getNewCapabilities()), timestamp);
-            case HEARTBEAT -> new AgentCommand(type, proto.getAgentId(),
-                    null, newStatus, null, timestamp);
+        return switch (proto.getType()) {
+            case AGENT_CMD_REGISTER -> new AgentCommand.Register(
+                    proto.getAgentId(), fromProto(proto.getAgentInfo()), timestamp);
+            case AGENT_CMD_DEREGISTER -> new AgentCommand.Deregister(
+                    proto.getAgentId(), timestamp);
+            case AGENT_CMD_UPDATE_STATUS -> new AgentCommand.UpdateStatus(
+                    proto.getAgentId(), newStatus, timestamp);
+            case AGENT_CMD_UPDATE_CAPABILITIES -> new AgentCommand.UpdateCapabilities(
+                    proto.getAgentId(), fromProto(proto.getNewCapabilities()), timestamp);
+            case AGENT_CMD_HEARTBEAT -> new AgentCommand.Heartbeat(
+                    proto.getAgentId(), newStatus, timestamp);
+            default -> throw new IllegalArgumentException("Unknown AgentCommandType: " + proto.getType());
         };
     }
 
@@ -224,27 +246,6 @@ final class AgentCodec {
     }
 
     // ── Enums ───────────────────────────────────────────────────
-
-    private static AgentCommandType toProto(AgentCommand.CommandType type) {
-        return switch (type) {
-            case REGISTER -> AgentCommandType.AGENT_CMD_REGISTER;
-            case DEREGISTER -> AgentCommandType.AGENT_CMD_DEREGISTER;
-            case UPDATE_STATUS -> AgentCommandType.AGENT_CMD_UPDATE_STATUS;
-            case UPDATE_CAPABILITIES -> AgentCommandType.AGENT_CMD_UPDATE_CAPABILITIES;
-            case HEARTBEAT -> AgentCommandType.AGENT_CMD_HEARTBEAT;
-        };
-    }
-
-    private static AgentCommand.CommandType fromProto(AgentCommandType type) {
-        return switch (type) {
-            case AGENT_CMD_REGISTER -> AgentCommand.CommandType.REGISTER;
-            case AGENT_CMD_DEREGISTER -> AgentCommand.CommandType.DEREGISTER;
-            case AGENT_CMD_UPDATE_STATUS -> AgentCommand.CommandType.UPDATE_STATUS;
-            case AGENT_CMD_UPDATE_CAPABILITIES -> AgentCommand.CommandType.UPDATE_CAPABILITIES;
-            case AGENT_CMD_HEARTBEAT -> AgentCommand.CommandType.HEARTBEAT;
-            default -> throw new IllegalArgumentException("Unknown AgentCommandType: " + type);
-        };
-    }
 
     private static AgentStatusProto toProto(AgentStatus status) {
         return switch (status) {

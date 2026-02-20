@@ -18,12 +18,12 @@ package dev.mars.quorus.controller.state;
 
 import dev.mars.quorus.controller.raft.grpc.*;
 
-import java.util.Optional;
-
 /**
- * Protobuf codec for {@link SystemMetadataCommand} and its type enum.
+ * Protobuf codec for {@link SystemMetadataCommand} sealed subtypes.
  *
  * <p>Package-private utility class used by {@link ProtobufCommandCodec}.
+ * Pattern-matches on sealed record variants — the compiler enforces
+ * exhaustiveness, so adding a new variant produces a compile error here.
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @since 2025
@@ -36,34 +36,24 @@ final class SystemMetadataCodec {
     // ── Command ─────────────────────────────────────────────────
 
     static SystemMetadataCommandProto toProto(SystemMetadataCommand cmd) {
-        SystemMetadataCommandProto.Builder builder = SystemMetadataCommandProto.newBuilder()
-                .setType(toProto(cmd.getType()));
-        Optional.ofNullable(cmd.getKey()).ifPresent(builder::setKey);
-        Optional.ofNullable(cmd.getValue()).ifPresent(builder::setValue);
-        return builder.build();
+        var builder = SystemMetadataCommandProto.newBuilder()
+                .setKey(cmd.key());
+        return switch (cmd) {
+            case SystemMetadataCommand.Set s -> builder
+                    .setType(SystemMetadataCommandType.SYSTEM_METADATA_CMD_SET)
+                    .setValue(s.value())
+                    .build();
+            case SystemMetadataCommand.Delete ignored -> builder
+                    .setType(SystemMetadataCommandType.SYSTEM_METADATA_CMD_DELETE)
+                    .build();
+        };
     }
 
     static SystemMetadataCommand fromProto(SystemMetadataCommandProto proto) {
-        return switch (fromProto(proto.getType())) {
-            case SET -> SystemMetadataCommand.set(proto.getKey(), proto.getValue());
-            case DELETE -> SystemMetadataCommand.delete(proto.getKey());
-        };
-    }
-
-    // ── Enums ───────────────────────────────────────────────────
-
-    private static SystemMetadataCommandType toProto(SystemMetadataCommand.Type type) {
-        return switch (type) {
-            case SET -> SystemMetadataCommandType.SYSTEM_METADATA_CMD_SET;
-            case DELETE -> SystemMetadataCommandType.SYSTEM_METADATA_CMD_DELETE;
-        };
-    }
-
-    private static SystemMetadataCommand.Type fromProto(SystemMetadataCommandType type) {
-        return switch (type) {
-            case SYSTEM_METADATA_CMD_SET -> SystemMetadataCommand.Type.SET;
-            case SYSTEM_METADATA_CMD_DELETE -> SystemMetadataCommand.Type.DELETE;
-            default -> throw new IllegalArgumentException("Unknown SystemMetadataCommandType: " + type);
+        return switch (proto.getType()) {
+            case SYSTEM_METADATA_CMD_SET -> SystemMetadataCommand.set(proto.getKey(), proto.getValue());
+            case SYSTEM_METADATA_CMD_DELETE -> SystemMetadataCommand.delete(proto.getKey());
+            default -> throw new IllegalArgumentException("Unknown SystemMetadataCommandType: " + proto.getType());
         };
     }
 }

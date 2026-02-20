@@ -316,47 +316,42 @@ class RaftConsensusTest {
 
         // Test create command
         TransferJobCommand createCmd = TransferJobCommand.create(job);
-        assertEquals(TransferJobCommand.Type.CREATE, createCmd.getType());
-        assertEquals(job.getJobId(), createCmd.getJobId());
-        assertEquals(job, createCmd.getTransferJob());
-        assertNull(createCmd.getStatus());
+        assertInstanceOf(TransferJobCommand.Create.class, createCmd);
+        assertEquals(job.getJobId(), createCmd.jobId());
+        assertEquals(job, ((TransferJobCommand.Create) createCmd).transferJob());
 
         // Test update status command
         TransferJobCommand updateCmd = TransferJobCommand.updateStatus(job.getJobId(), TransferStatus.IN_PROGRESS);
-        assertEquals(TransferJobCommand.Type.UPDATE_STATUS, updateCmd.getType());
-        assertEquals(job.getJobId(), updateCmd.getJobId());
-        assertNull(updateCmd.getTransferJob());
-        assertEquals(TransferStatus.IN_PROGRESS, updateCmd.getStatus());
+        assertInstanceOf(TransferJobCommand.UpdateStatus.class, updateCmd);
+        assertEquals(job.getJobId(), updateCmd.jobId());
+        assertEquals(TransferStatus.IN_PROGRESS, ((TransferJobCommand.UpdateStatus) updateCmd).status());
 
         // Test delete command
         TransferJobCommand deleteCmd = TransferJobCommand.delete(job.getJobId());
-        assertEquals(TransferJobCommand.Type.DELETE, deleteCmd.getType());
-        assertEquals(job.getJobId(), deleteCmd.getJobId());
-        assertNull(deleteCmd.getTransferJob());
-        assertNull(deleteCmd.getStatus());
+        assertInstanceOf(TransferJobCommand.Delete.class, deleteCmd);
+        assertEquals(job.getJobId(), deleteCmd.jobId());
 
         // Test toString
         assertNotNull(createCmd.toString());
-        assertTrue(createCmd.toString().contains("CREATE"));
+        assertTrue(createCmd.toString().contains("Create"));
     }
 
     @Test
     void testSystemMetadataCommands() {
         // Test set command
         SystemMetadataCommand setCmd = SystemMetadataCommand.set("testKey", "testValue");
-        assertEquals(SystemMetadataCommand.Type.SET, setCmd.getType());
-        assertEquals("testKey", setCmd.getKey());
-        assertEquals("testValue", setCmd.getValue());
+        assertInstanceOf(SystemMetadataCommand.Set.class, setCmd);
+        assertEquals("testKey", setCmd.key());
+        assertEquals("testValue", ((SystemMetadataCommand.Set) setCmd).value());
 
         // Test delete command
         SystemMetadataCommand deleteCmd = SystemMetadataCommand.delete("testKey");
-        assertEquals(SystemMetadataCommand.Type.DELETE, deleteCmd.getType());
-        assertEquals("testKey", deleteCmd.getKey());
-        assertNull(deleteCmd.getValue());
+        assertInstanceOf(SystemMetadataCommand.Delete.class, deleteCmd);
+        assertEquals("testKey", deleteCmd.key());
 
         // Test toString
         assertNotNull(setCmd.toString());
-        assertTrue(setCmd.toString().contains("SET"));
+        assertTrue(setCmd.toString().contains("Set"));
         assertTrue(setCmd.toString().contains("testKey"));
     }
 

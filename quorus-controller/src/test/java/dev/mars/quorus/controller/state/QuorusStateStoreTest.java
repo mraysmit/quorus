@@ -273,27 +273,27 @@ class QuorusStateStoreTest {
         TransferJobCommand createCmd = TransferJobCommand.create(job);
         String createStr = createCmd.toString();
         assertNotNull(createStr);
-        assertTrue(createStr.contains("CREATE"));
+        assertTrue(createStr.contains("Create"));
         assertTrue(createStr.contains(job.getJobId()));
 
         TransferJobCommand updateCmd = TransferJobCommand.updateStatus(job.getJobId(), TransferStatus.IN_PROGRESS);
         String updateStr = updateCmd.toString();
         assertNotNull(updateStr);
-        assertTrue(updateStr.contains("UPDATE_STATUS"));
+        assertTrue(updateStr.contains("UpdateStatus"));
         assertTrue(updateStr.contains("IN_PROGRESS"));
 
-        // Test SystemMetadataCommand toString
+        // Test SystemMetadataCommand toString (records auto-generate toString)
         SystemMetadataCommand setCmd = SystemMetadataCommand.set("key", "value");
         String setStr = setCmd.toString();
         assertNotNull(setStr);
-        assertTrue(setStr.contains("SET"));
+        assertTrue(setStr.contains("Set"));
         assertTrue(setStr.contains("key"));
         assertTrue(setStr.contains("value"));
 
         SystemMetadataCommand deleteCmd = SystemMetadataCommand.delete("key");
         String deleteStr = deleteCmd.toString();
         assertNotNull(deleteStr);
-        assertTrue(deleteStr.contains("DELETE"));
+        assertTrue(deleteStr.contains("Delete"));
         assertTrue(deleteStr.contains("key"));
     }
 
