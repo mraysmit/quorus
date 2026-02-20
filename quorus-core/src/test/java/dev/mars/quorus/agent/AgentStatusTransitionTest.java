@@ -22,7 +22,6 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
@@ -32,7 +31,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Parameterized tests for AgentStatus transition validation.
- * Covers every (source, target) pair to ensure complete transition map coverage.
+ * Covers every (source, target) pair to ensure complete transition map
+ * coverage.
  */
 class AgentStatusTransitionTest {
 
@@ -92,8 +92,7 @@ class AgentStatusTransitionTest {
     @ParameterizedTest(name = "getValidTransitions consistent for {0}")
     @MethodSource("allAgentStatuses")
     void getValidTransitions_matchesCanTransitionTo(AgentStatus from) {
-        Set<AgentStatus> fromMethod = EnumSet.noneOf(AgentStatus.class);
-        fromMethod.addAll(Arrays.asList(from.getValidTransitions()));
+        Set<AgentStatus> fromMethod = from.getValidTransitions();
 
         Set<AgentStatus> fromCanTransition = EnumSet.noneOf(AgentStatus.class);
         for (AgentStatus to : AgentStatus.values()) {
@@ -107,7 +106,7 @@ class AgentStatusTransitionTest {
     }
 
     static Stream<AgentStatus> allAgentStatuses() {
-        return Arrays.stream(AgentStatus.values());
+        return Stream.of(AgentStatus.values());
     }
 
     // --- Self-transition is never valid ---
@@ -123,7 +122,7 @@ class AgentStatusTransitionTest {
 
     @Test
     void deregistered_hasNoTransitions() {
-        assertEquals(0, AgentStatus.DEREGISTERED.getValidTransitions().length);
+        assertTrue(AgentStatus.DEREGISTERED.getValidTransitions().isEmpty());
         for (AgentStatus target : AgentStatus.values()) {
             assertFalse(AgentStatus.DEREGISTERED.canTransitionTo(target),
                     () -> String.format("DEREGISTERED should not transition to %s", target));
@@ -134,21 +133,19 @@ class AgentStatusTransitionTest {
 
     @Test
     void failed_canOnlyTransitionToDeregistered() {
-        AgentStatus[] validFromFailed = AgentStatus.FAILED.getValidTransitions();
-        assertEquals(1, validFromFailed.length);
-        assertEquals(AgentStatus.DEREGISTERED, validFromFailed[0]);
+        Set<AgentStatus> validFromFailed = AgentStatus.FAILED.getValidTransitions();
+        assertEquals(1, validFromFailed.size());
+        assertTrue(validFromFailed.contains(AgentStatus.DEREGISTERED));
     }
 
     // --- REGISTERING can only go to HEALTHY or FAILED ---
 
     @Test
     void registering_hasLimitedTransitions() {
-        AgentStatus[] valid = AgentStatus.REGISTERING.getValidTransitions();
-        assertEquals(2, valid.length);
-        Set<AgentStatus> validSet = EnumSet.noneOf(AgentStatus.class);
-        validSet.addAll(Arrays.asList(valid));
-        assertTrue(validSet.contains(AgentStatus.HEALTHY));
-        assertTrue(validSet.contains(AgentStatus.FAILED));
+        Set<AgentStatus> valid = AgentStatus.REGISTERING.getValidTransitions();
+        assertEquals(2, valid.size());
+        assertTrue(valid.contains(AgentStatus.HEALTHY));
+        assertTrue(valid.contains(AgentStatus.FAILED));
     }
 
     // --- Non-terminal states have at least one transition ---
@@ -157,7 +154,7 @@ class AgentStatusTransitionTest {
     void nonTerminalStates_haveAtLeastOneTransition() {
         for (AgentStatus status : AgentStatus.values()) {
             if (!status.isTerminal()) {
-                assertTrue(status.getValidTransitions().length > 0,
+                assertFalse(status.getValidTransitions().isEmpty(),
                         () -> String.format("Non-terminal state %s should have at least one transition", status));
             }
         }
