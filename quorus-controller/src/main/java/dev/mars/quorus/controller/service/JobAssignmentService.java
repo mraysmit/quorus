@@ -20,6 +20,7 @@ import dev.mars.quorus.agent.AgentInfo;
 import dev.mars.quorus.controller.config.AppConfig;
 import dev.mars.quorus.core.*;
 import dev.mars.quorus.core.TransferJob;
+import dev.mars.quorus.controller.state.CommandResult;
 import dev.mars.quorus.controller.state.JobAssignmentCommand;
 import dev.mars.quorus.controller.state.JobQueueCommand;
 import dev.mars.quorus.controller.raft.RaftNode;
@@ -117,10 +118,11 @@ public class JobAssignmentService {
                 // Submit to Raft for distributed consensus
                 logger.debug("Submitting enqueue command to Raft: jobId={}", queuedJob.getJobId());
                 JobQueueCommand command = JobQueueCommand.enqueue(queuedJob);
-                Object result = raftNode.submitCommand(command);
+                CommandResult<?> result = raftNode.submitCommand(command)
+                        .toCompletionStage().toCompletableFuture().get();
                 
-                if (result instanceof QueuedJob) {
-                    QueuedJob enqueuedJob = (QueuedJob) result;
+                if (result instanceof CommandResult.Success<?> success
+                        && success.entity() instanceof QueuedJob enqueuedJob) {
                     jobQueue.put(enqueuedJob.getJobId(), enqueuedJob);
                     
                     logger.info("Job queued: jobId={}, priority={}, queueSize={}", 
@@ -189,10 +191,11 @@ public class JobAssignmentService {
                 // Submit assignment command to Raft
                 logger.debug("Submitting assignment to Raft: jobId={}, agentId={}", jobId, selectedAgentId);
                 JobAssignmentCommand assignCommand = JobAssignmentCommand.assign(assignment);
-                Object result = raftNode.submitCommand(assignCommand);
+                CommandResult<?> result = raftNode.submitCommand(assignCommand)
+                        .toCompletionStage().toCompletableFuture().get();
                 
-                if (result instanceof JobAssignment) {
-                    JobAssignment createdAssignment = (JobAssignment) result;
+                if (result instanceof CommandResult.Success<?> success
+                        && success.entity() instanceof JobAssignment createdAssignment) {
                     activeAssignments.put(createdAssignment.getJobId(), createdAssignment);
                     
                     // Remove from queue
@@ -240,10 +243,11 @@ public class JobAssignmentService {
                 JobAssignmentCommand updateCommand = JobAssignmentCommand.updateStatus(
                         existing.getJobId() + ":" + existing.getAgentId(), newStatus);
                 
-                Object result = raftNode.submitCommand(updateCommand);
+                CommandResult<?> result = raftNode.submitCommand(updateCommand)
+                        .toCompletionStage().toCompletableFuture().get();
                 
-                if (result instanceof JobAssignment) {
-                    JobAssignment updatedAssignment = (JobAssignment) result;
+                if (result instanceof CommandResult.Success<?> success
+                        && success.entity() instanceof JobAssignment updatedAssignment) {
                     activeAssignments.put(jobId, updatedAssignment);
                     
                     logger.info("Assignment status updated: jobId={}, oldStatus={}, newStatus={}", 

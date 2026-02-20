@@ -16,19 +16,20 @@
 
 package dev.mars.quorus.controller.raft;
 
+import dev.mars.quorus.controller.state.CommandResult;
 import dev.mars.quorus.controller.state.RaftCommand;
 
 /**
- * Description for RaftLogApplicator
+ * Applies committed Raft log entries to the state machine.
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @version 1.0
+ * @version 2.0
  * @since 2025-08-20
  */
 
 public interface RaftLogApplicator {
 
-    Object apply(RaftCommand command);
+    CommandResult<?> apply(RaftCommand command);
 
     byte[] takeSnapshot();
 

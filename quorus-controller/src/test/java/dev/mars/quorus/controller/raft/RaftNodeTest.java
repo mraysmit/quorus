@@ -19,6 +19,7 @@ package dev.mars.quorus.controller.raft;
 import dev.mars.quorus.controller.raft.grpc.VoteRequest;
 import dev.mars.quorus.controller.raft.grpc.VoteResponse;
 import io.vertx.core.Future;
+import dev.mars.quorus.controller.state.CommandResult;
 import dev.mars.quorus.controller.state.QuorusStateStore;
 import dev.mars.quorus.controller.state.SystemMetadataCommand;
 import org.awaitility.Awaitility;
@@ -162,7 +163,7 @@ class RaftNodeTest {
         // Node starts as follower, command submission should fail
         SystemMetadataCommand command = SystemMetadataCommand.set("test-key", "test-value");
         
-        Future<Object> future = node1.submitCommand(command);
+        Future<CommandResult<?>> future = node1.submitCommand(command);
         
         // Verify the exception
         assertThrows(Exception.class, () -> {
@@ -180,9 +181,10 @@ class RaftNodeTest {
     void testStateMachineOperations() {
         // Test state machine directly
         SystemMetadataCommand setCommand = SystemMetadataCommand.set("version", "2.1");
-        Object result = stateMachine1.apply(setCommand);
+        CommandResult<?> result = stateMachine1.apply(setCommand);
         
-        assertEquals("2.0", result); // Previous value
+        assertInstanceOf(CommandResult.Success.class, result);
+        assertEquals("2.0", ((CommandResult.Success<?>) result).entity()); // Previous value
         assertEquals("2.1", stateMachine1.getMetadata("version"));
         
         // Test snapshot

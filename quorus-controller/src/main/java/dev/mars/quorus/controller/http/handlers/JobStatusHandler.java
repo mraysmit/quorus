@@ -17,6 +17,7 @@
 package dev.mars.quorus.controller.http.handlers;
 
 import dev.mars.quorus.controller.raft.RaftNode;
+import dev.mars.quorus.controller.state.CommandResult;
 import dev.mars.quorus.controller.state.JobAssignmentCommand;
 import dev.mars.quorus.controller.state.TransferJobCommand;
 import dev.mars.quorus.core.JobAssignmentStatus;
@@ -70,7 +71,7 @@ public class JobStatusHandler implements Handler<RoutingContext> {
 
             // Update job assignment status
             JobAssignmentCommand assignmentCommand = JobAssignmentCommand.updateStatus(assignmentId, status);
-            Future<Object> assignmentFuture = raftNode.submitCommand(assignmentCommand);
+            Future<CommandResult<?>> assignmentFuture = raftNode.submitCommand(assignmentCommand);
 
             // Also update transfer job progress if bytes were reported
             if (bytesTransferred > 0) {

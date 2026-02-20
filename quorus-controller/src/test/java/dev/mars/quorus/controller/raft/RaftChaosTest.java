@@ -16,6 +16,7 @@
 
 package dev.mars.quorus.controller.raft;
 
+import dev.mars.quorus.controller.state.CommandResult;
 import dev.mars.quorus.controller.state.QuorusStateStore;
 import dev.mars.quorus.controller.state.TransferJobCommand;
 import dev.mars.quorus.core.TransferJob;
@@ -154,7 +155,7 @@ public class RaftChaosTest {
         TransferJobCommand command = TransferJobCommand.create(job);
         
         logger.info("Submitting job {} to leader", jobId);
-        Future<Object> future = leader.submitCommand(command);
+        Future<CommandResult<?>> future = leader.submitCommand(command);
         
         // Wait for commit (might take longer)
         try {
@@ -200,7 +201,7 @@ public class RaftChaosTest {
         
         // Submit multiple jobs to stress the latency
         int jobCount = 5;
-        List<Future<Object>> futures = new ArrayList<>();
+        List<Future<CommandResult<?>>> futures = new ArrayList<>();
         
         for (int i = 0; i < jobCount; i++) {
             String jobId = UUID.randomUUID().toString();
@@ -220,7 +221,7 @@ public class RaftChaosTest {
         
         // Wait for all to commit
         try {
-            for (Future<Object> future : futures) {
+            for (Future<CommandResult<?>> future : futures) {
                 future.toCompletionStage().toCompletableFuture().get(20, TimeUnit.SECONDS);
             }
             logger.info("All jobs committed successfully");

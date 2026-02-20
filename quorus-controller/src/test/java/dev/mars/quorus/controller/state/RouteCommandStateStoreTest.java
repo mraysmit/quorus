@@ -92,11 +92,11 @@ class RouteCommandStateStoreTest {
             RouteConfiguration route = createRoute("route-001", "test-route");
             RouteCommand command = RouteCommand.create(route);
 
-            Object result = stateMachine.apply(command);
+            CommandResult<?> result = stateMachine.apply(command);
 
-            assertNotNull(result);
-            assertTrue(result instanceof RouteConfiguration);
-            assertEquals("route-001", ((RouteConfiguration) result).getRouteId());
+            assertInstanceOf(CommandResult.Success.class, result);
+            assertInstanceOf(RouteConfiguration.class, ((CommandResult.Success<?>) result).entity());
+            assertEquals("route-001", ((RouteConfiguration) ((CommandResult.Success<?>) result).entity()).getRouteId());
             assertEquals(1, stateMachine.getRouteCount());
             assertTrue(stateMachine.hasRoute("route-001"));
         }
@@ -107,7 +107,9 @@ class RouteCommandStateStoreTest {
             RouteConfiguration route = createRoute("route-002", "another-route");
             RouteCommand command = RouteCommand.create(route);
 
-            RouteConfiguration result = (RouteConfiguration) stateMachine.apply(command);
+            CommandResult<?> cmdResult = stateMachine.apply(command);
+            assertInstanceOf(CommandResult.Success.class, cmdResult);
+            RouteConfiguration result = (RouteConfiguration) ((CommandResult.Success<?>) cmdResult).entity();
 
             assertEquals("route-002", result.getRouteId());
             assertEquals("another-route", result.getName());
@@ -125,9 +127,9 @@ class RouteCommandStateStoreTest {
             stateMachine.apply(RouteCommand.create(route));
 
             RouteConfiguration duplicate = createRoute("route-dup", "dup-route-v2");
-            Object result = stateMachine.apply(RouteCommand.create(duplicate));
+            CommandResult<?> result = stateMachine.apply(RouteCommand.create(duplicate));
 
-            assertNotNull(result);
+            assertInstanceOf(CommandResult.Success.class, result);
             assertEquals(1, stateMachine.getRouteCount());
             // Verify new version replaces old
             assertEquals("dup-route-v2", stateMachine.getRoute("route-dup").getName());
@@ -168,9 +170,9 @@ class RouteCommandStateStoreTest {
                     Map.of("retryCount", "5"),
                     null, null);
 
-            Object result = stateMachine.apply(RouteCommand.update("route-upd", updatedConfig));
+            CommandResult<?> result = stateMachine.apply(RouteCommand.update("route-upd", updatedConfig));
 
-            assertNotNull(result);
+            assertInstanceOf(CommandResult.Success.class, result);
             RouteConfiguration stored = stateMachine.getRoute("route-upd");
             assertEquals("updated-name", stored.getName());
             assertEquals("Updated description", stored.getDescription());
@@ -178,12 +180,12 @@ class RouteCommandStateStoreTest {
         }
 
         @Test
-        @DisplayName("Update non-existent route returns null")
-        void updateNonExistentRouteReturnsNull() {
+        @DisplayName("Update non-existent route returns NotFound")
+        void updateNonExistentRouteReturnsNotFound() {
             RouteConfiguration update = createRoute("ghost-route", "ghost");
-            Object result = stateMachine.apply(RouteCommand.update("ghost-route", update));
+            CommandResult<?> result = stateMachine.apply(RouteCommand.update("ghost-route", update));
 
-            assertNull(result);
+            assertInstanceOf(CommandResult.NotFound.class, result);
             assertFalse(stateMachine.hasRoute("ghost-route"));
         }
     }
@@ -200,19 +202,19 @@ class RouteCommandStateStoreTest {
             stateMachine.apply(RouteCommand.create(createRoute("route-del", "delete-me")));
             assertEquals(1, stateMachine.getRouteCount());
 
-            Object result = stateMachine.apply(RouteCommand.delete("route-del"));
+            CommandResult<?> result = stateMachine.apply(RouteCommand.delete("route-del"));
 
-            assertNotNull(result);
+            assertInstanceOf(CommandResult.Success.class, result);
             assertEquals(0, stateMachine.getRouteCount());
             assertFalse(stateMachine.hasRoute("route-del"));
             assertNull(stateMachine.getRoute("route-del"));
         }
 
         @Test
-        @DisplayName("Delete non-existent route returns null")
-        void deleteNonExistentRouteReturnsNull() {
-            Object result = stateMachine.apply(RouteCommand.delete("no-such-route"));
-            assertNull(result);
+        @DisplayName("Delete non-existent route returns NotFound")
+        void deleteNonExistentRouteReturnsNotFound() {
+            CommandResult<?> result = stateMachine.apply(RouteCommand.delete("no-such-route"));
+            assertInstanceOf(CommandResult.NotFound.class, result);
         }
     }
 
@@ -227,9 +229,9 @@ class RouteCommandStateStoreTest {
         void suspendRouteSetsStatus() {
             stateMachine.apply(RouteCommand.create(createRoute("route-sus", "suspend-test")));
 
-            Object result = stateMachine.apply(RouteCommand.suspend("route-sus", "maintenance window"));
+            CommandResult<?> result = stateMachine.apply(RouteCommand.suspend("route-sus", "maintenance window"));
 
-            assertNotNull(result);
+            assertInstanceOf(CommandResult.Success.class, result);
             RouteConfiguration stored = stateMachine.getRoute("route-sus");
             assertEquals(RouteStatus.SUSPENDED, stored.getStatus());
         }
@@ -240,25 +242,25 @@ class RouteCommandStateStoreTest {
             stateMachine.apply(RouteCommand.create(createRoute("route-res", "resume-test")));
             stateMachine.apply(RouteCommand.suspend("route-res", null));
 
-            Object result = stateMachine.apply(RouteCommand.resume("route-res"));
+            CommandResult<?> result = stateMachine.apply(RouteCommand.resume("route-res"));
 
-            assertNotNull(result);
+            assertInstanceOf(CommandResult.Success.class, result);
             RouteConfiguration stored = stateMachine.getRoute("route-res");
             assertEquals(RouteStatus.ACTIVE, stored.getStatus());
         }
 
         @Test
-        @DisplayName("Suspend non-existent route returns null")
-        void suspendNonExistentRouteReturnsNull() {
-            Object result = stateMachine.apply(RouteCommand.suspend("ghost", "reason"));
-            assertNull(result);
+        @DisplayName("Suspend non-existent route returns NotFound")
+        void suspendNonExistentRouteReturnsNotFound() {
+            CommandResult<?> result = stateMachine.apply(RouteCommand.suspend("ghost", "reason"));
+            assertInstanceOf(CommandResult.NotFound.class, result);
         }
 
         @Test
-        @DisplayName("Resume non-existent route returns null")
-        void resumeNonExistentRouteReturnsNull() {
-            Object result = stateMachine.apply(RouteCommand.resume("ghost"));
-            assertNull(result);
+        @DisplayName("Resume non-existent route returns NotFound")
+        void resumeNonExistentRouteReturnsNotFound() {
+            CommandResult<?> result = stateMachine.apply(RouteCommand.resume("ghost"));
+            assertInstanceOf(CommandResult.NotFound.class, result);
         }
     }
 
@@ -287,11 +289,11 @@ class RouteCommandStateStoreTest {
         }
 
         @Test
-        @DisplayName("Update status on non-existent route returns null")
+        @DisplayName("Update status on non-existent route returns NotFound")
         void updateStatusNonExistent() {
-            Object result = stateMachine.apply(
+            CommandResult<?> result = stateMachine.apply(
                     RouteCommand.updateStatus("ghost", RouteStatus.ACTIVE, "nope"));
-            assertNull(result);
+            assertInstanceOf(CommandResult.NotFound.class, result);
         }
 
         @Test
@@ -430,8 +432,8 @@ class RouteCommandStateStoreTest {
         assertEquals(RouteStatus.ACTIVE, stateMachine.getRoute(routeId).getStatus());
 
         // 8. Delete
-        Object deleted = stateMachine.apply(RouteCommand.delete(routeId));
-        assertNotNull(deleted);
+        CommandResult<?> deleted = stateMachine.apply(RouteCommand.delete(routeId));
+        assertInstanceOf(CommandResult.Success.class, deleted);
         assertEquals(0, stateMachine.getRouteCount());
     }
 }

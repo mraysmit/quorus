@@ -25,6 +25,7 @@ import dev.mars.quorus.controller.raft.grpc.VoteResponse;
 import dev.mars.quorus.controller.raft.storage.RaftStorage;
 import dev.mars.quorus.controller.raft.storage.RaftStorage.LogEntryData;
 import dev.mars.quorus.controller.raft.storage.RaftStorage.SnapshotData;
+import dev.mars.quorus.controller.state.CommandResult;
 import dev.mars.quorus.controller.state.ProtobufCommandCodec;
 import dev.mars.quorus.controller.state.RaftCommand;
 import com.google.protobuf.ByteString;
@@ -103,7 +104,7 @@ public class RaftNode {
     // ========== LEADER STATE ==========
     private final Map<String, Long> nextIndex = new HashMap<>();
     private final Map<String, Long> matchIndex = new HashMap<>();
-    private final Map<Long, Promise<Object>> pendingCommands = new ConcurrentHashMap<>();
+    private final Map<Long, Promise<CommandResult<?>>> pendingCommands = new ConcurrentHashMap<>();
 
     // ========== TIMING AND CONTROL ==========
     private volatile boolean running = false;
@@ -476,8 +477,8 @@ public class RaftNode {
         return promise.future();
     }
 
-    public Future<Object> submitCommand(RaftCommand command) {
-        Promise<Object> promise = Promise.promise();
+    public Future<CommandResult<?>> submitCommand(RaftCommand command) {
+        Promise<CommandResult<?>> promise = Promise.promise();
 
         vertx.runOnContext(v -> {
             if (state != State.LEADER) {
@@ -1250,7 +1251,7 @@ public class RaftNode {
                 continue;
             }
             LogEntry entry = log.get(toArrayIndex(lastApplied));
-            Object result = null;
+            CommandResult<?> result = null;
             Exception exception = null;
 
             if (entry.getCommand() != null) {
@@ -1264,7 +1265,7 @@ public class RaftNode {
             }
 
             // Complete future if this node is leader
-            Promise<Object> promise = pendingCommands.remove(lastApplied);
+            Promise<CommandResult<?>> promise = pendingCommands.remove(lastApplied);
             if (promise != null) {
                 if (exception != null) {
                     promise.fail(exception);

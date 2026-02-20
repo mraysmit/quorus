@@ -20,6 +20,7 @@ import dev.mars.quorus.agent.AgentInfo;
 import dev.mars.quorus.agent.AgentStatus;
 import dev.mars.quorus.controller.raft.RaftNode;
 import dev.mars.quorus.controller.state.AgentCommand;
+import dev.mars.quorus.controller.state.CommandResult;
 import dev.mars.quorus.controller.state.QuorusStateStore;
 import io.vertx.core.Handler;
 import io.vertx.core.json.JsonObject;
@@ -94,7 +95,8 @@ public class HeartbeatHandler implements Handler<RoutingContext> {
                                 .put("agentId", agentId)
                                 .put("message", "Heartbeat received");
 
-                        if (result instanceof AgentInfo updatedAgent) {
+                        if (result instanceof CommandResult.Success<?> success
+                                && success.entity() instanceof AgentInfo updatedAgent) {
                             response.put("status", updatedAgent.getStatus().toString());
                             response.put("lastHeartbeat", updatedAgent.getLastHeartbeat().toString());
                         }

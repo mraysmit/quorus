@@ -16,6 +16,7 @@
 
 package dev.mars.quorus.controller.raft;
 
+import dev.mars.quorus.controller.state.CommandResult;
 import dev.mars.quorus.controller.state.QuorusStateStore;
 import dev.mars.quorus.controller.state.TransferJobCommand;
 import dev.mars.quorus.core.TransferJob;
@@ -130,10 +131,10 @@ public class MetadataPersistenceTest {
         
         // Submit metadata to leader
         logger.info("Submitting transfer job metadata to leader: " + testJob.getJobId());
-        io.vertx.core.Future<Object> result = leader.submitCommand(command);
+        io.vertx.core.Future<CommandResult<?>> result = leader.submitCommand(command);
         
         // Wait for command to be processed
-        Object response = result.toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
+        CommandResult<?> response = result.toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
         assertNotNull(response, "Command should be processed successfully");
         logger.info("Command processed successfully: " + response);
         
@@ -171,7 +172,7 @@ public class MetadataPersistenceTest {
             testJobs.add(job);
             
             TransferJobCommand command = TransferJobCommand.create(job);
-            io.vertx.core.Future<Object> result = originalLeader.submitCommand(command);
+            io.vertx.core.Future<CommandResult<?>> result = originalLeader.submitCommand(command);
             result.toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
             logger.info("Submitted job " + job.getJobId() + " to original leader");
         }
@@ -227,7 +228,7 @@ public class MetadataPersistenceTest {
         // Submit new job to new leader to prove it's functional
         TransferJob newJob = createTestTransferJob("job-new", "Post leader change test");
         TransferJobCommand newCommand = TransferJobCommand.create(newJob);
-        io.vertx.core.Future<Object> newResult = newLeader.submitCommand(newCommand);
+        io.vertx.core.Future<CommandResult<?>> newResult = newLeader.submitCommand(newCommand);
         newResult.toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
         logger.info("Successfully submitted new job to new leader: " + newJob.getJobId());
         
@@ -276,7 +277,7 @@ public class MetadataPersistenceTest {
             jobsWhileDown.add(job);
             
             TransferJobCommand command = TransferJobCommand.create(job);
-            io.vertx.core.Future<Object> result = leader.submitCommand(command);
+            io.vertx.core.Future<CommandResult<?>> result = leader.submitCommand(command);
             result.toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
             logger.info("Submitted job " + job.getJobId() + " while follower was down");
         }
