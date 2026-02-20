@@ -40,26 +40,68 @@ final class JobAssignmentCodec {
 
     static JobAssignmentCommandProto toProto(JobAssignmentCommand cmd) {
         JobAssignmentCommandProto.Builder builder = JobAssignmentCommandProto.newBuilder()
-                .setType(toProto(cmd.getType()));
-        Optional.ofNullable(cmd.getAssignmentId()).ifPresent(builder::setAssignmentId);
-        Optional.ofNullable(cmd.getJobAssignment()).ifPresent(a -> builder.setJobAssignment(toProto(a)));
-        Optional.ofNullable(cmd.getNewStatus()).ifPresent(s -> builder.setNewStatus(toProto(s)));
-        Optional.ofNullable(cmd.getReason()).ifPresent(builder::setReason);
-        Optional.ofNullable(cmd.getTimestamp()).ifPresent(t -> builder.setTimestampEpochMs(t.toEpochMilli()));
+                .setAssignmentId(cmd.assignmentId())
+                .setTimestampEpochMs(cmd.timestamp().toEpochMilli());
+
+        switch (cmd) {
+            case JobAssignmentCommand.Assign c -> {
+                builder.setType(JobAssignmentCommandType.JOB_ASSIGNMENT_CMD_ASSIGN);
+                builder.setJobAssignment(toProto(c.jobAssignment()));
+            }
+            case JobAssignmentCommand.Accept c -> {
+                builder.setType(JobAssignmentCommandType.JOB_ASSIGNMENT_CMD_ACCEPT);
+                builder.setNewStatus(toProto(c.newStatus()));
+            }
+            case JobAssignmentCommand.Reject c -> {
+                builder.setType(JobAssignmentCommandType.JOB_ASSIGNMENT_CMD_REJECT);
+                builder.setNewStatus(toProto(c.newStatus()));
+                if (c.reason() != null) builder.setReason(c.reason());
+            }
+            case JobAssignmentCommand.UpdateStatus c -> {
+                builder.setType(JobAssignmentCommandType.JOB_ASSIGNMENT_CMD_UPDATE_STATUS);
+                builder.setNewStatus(toProto(c.newStatus()));
+            }
+            case JobAssignmentCommand.Timeout c -> {
+                builder.setType(JobAssignmentCommandType.JOB_ASSIGNMENT_CMD_TIMEOUT);
+                builder.setNewStatus(toProto(c.newStatus()));
+                if (c.reason() != null) builder.setReason(c.reason());
+            }
+            case JobAssignmentCommand.Cancel c -> {
+                builder.setType(JobAssignmentCommandType.JOB_ASSIGNMENT_CMD_CANCEL);
+                builder.setNewStatus(toProto(c.newStatus()));
+                if (c.reason() != null) builder.setReason(c.reason());
+            }
+            case JobAssignmentCommand.Remove ignored ->
+                builder.setType(JobAssignmentCommandType.JOB_ASSIGNMENT_CMD_REMOVE);
+        }
         return builder.build();
     }
 
     static JobAssignmentCommand fromProto(JobAssignmentCommandProto proto) {
         Instant timestamp = proto.getTimestampEpochMs() > 0
-                ? Instant.ofEpochMilli(proto.getTimestampEpochMs()) : null;
-        JobAssignmentCommand.CommandType type = fromProto(proto.getType());
-        JobAssignment assignment = proto.hasJobAssignment() ? fromProto(proto.getJobAssignment()) : null;
+                ? Instant.ofEpochMilli(proto.getTimestampEpochMs()) : Instant.now();
+        String assignmentId = proto.getAssignmentId();
         JobAssignmentStatus newStatus = proto.getNewStatus() != JobAssignmentStatusProto.JOB_ASSIGNMENT_STATUS_UNSPECIFIED
                 ? fromProto(proto.getNewStatus()) : null;
         String reason = proto.getReason().isEmpty() ? null : proto.getReason();
 
-        return new JobAssignmentCommand(type, proto.getAssignmentId(),
-                assignment, newStatus, reason, timestamp);
+        return switch (proto.getType()) {
+            case JOB_ASSIGNMENT_CMD_ASSIGN ->
+                new JobAssignmentCommand.Assign(assignmentId, fromProto(proto.getJobAssignment()), timestamp);
+            case JOB_ASSIGNMENT_CMD_ACCEPT ->
+                new JobAssignmentCommand.Accept(assignmentId, newStatus, timestamp);
+            case JOB_ASSIGNMENT_CMD_REJECT ->
+                new JobAssignmentCommand.Reject(assignmentId, newStatus, reason, timestamp);
+            case JOB_ASSIGNMENT_CMD_UPDATE_STATUS ->
+                new JobAssignmentCommand.UpdateStatus(assignmentId, newStatus, timestamp);
+            case JOB_ASSIGNMENT_CMD_TIMEOUT ->
+                new JobAssignmentCommand.Timeout(assignmentId, newStatus, reason, timestamp);
+            case JOB_ASSIGNMENT_CMD_CANCEL ->
+                new JobAssignmentCommand.Cancel(assignmentId, newStatus, reason, timestamp);
+            case JOB_ASSIGNMENT_CMD_REMOVE ->
+                new JobAssignmentCommand.Remove(assignmentId, timestamp);
+            default -> throw new IllegalArgumentException("Unknown JobAssignmentCommandType: " + proto.getType());
+        };
     }
 
     // ── Domain models ───────────────────────────────────────────
@@ -111,31 +153,6 @@ final class JobAssignmentCodec {
     }
 
     // ── Enums ───────────────────────────────────────────────────
-
-    private static JobAssignmentCommandType toProto(JobAssignmentCommand.CommandType type) {
-        return switch (type) {
-            case ASSIGN -> JobAssignmentCommandType.JOB_ASSIGNMENT_CMD_ASSIGN;
-            case ACCEPT -> JobAssignmentCommandType.JOB_ASSIGNMENT_CMD_ACCEPT;
-            case REJECT -> JobAssignmentCommandType.JOB_ASSIGNMENT_CMD_REJECT;
-            case UPDATE_STATUS -> JobAssignmentCommandType.JOB_ASSIGNMENT_CMD_UPDATE_STATUS;
-            case TIMEOUT -> JobAssignmentCommandType.JOB_ASSIGNMENT_CMD_TIMEOUT;
-            case CANCEL -> JobAssignmentCommandType.JOB_ASSIGNMENT_CMD_CANCEL;
-            case REMOVE -> JobAssignmentCommandType.JOB_ASSIGNMENT_CMD_REMOVE;
-        };
-    }
-
-    private static JobAssignmentCommand.CommandType fromProto(JobAssignmentCommandType type) {
-        return switch (type) {
-            case JOB_ASSIGNMENT_CMD_ASSIGN -> JobAssignmentCommand.CommandType.ASSIGN;
-            case JOB_ASSIGNMENT_CMD_ACCEPT -> JobAssignmentCommand.CommandType.ACCEPT;
-            case JOB_ASSIGNMENT_CMD_REJECT -> JobAssignmentCommand.CommandType.REJECT;
-            case JOB_ASSIGNMENT_CMD_UPDATE_STATUS -> JobAssignmentCommand.CommandType.UPDATE_STATUS;
-            case JOB_ASSIGNMENT_CMD_TIMEOUT -> JobAssignmentCommand.CommandType.TIMEOUT;
-            case JOB_ASSIGNMENT_CMD_CANCEL -> JobAssignmentCommand.CommandType.CANCEL;
-            case JOB_ASSIGNMENT_CMD_REMOVE -> JobAssignmentCommand.CommandType.REMOVE;
-            default -> throw new IllegalArgumentException("Unknown JobAssignmentCommandType: " + type);
-        };
-    }
 
     private static JobAssignmentStatusProto toProto(JobAssignmentStatus status) {
         return switch (status) {

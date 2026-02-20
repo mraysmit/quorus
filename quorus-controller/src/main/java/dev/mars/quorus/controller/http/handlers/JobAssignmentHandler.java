@@ -85,7 +85,7 @@ public class JobAssignmentHandler {
                             ctx.response().setStatusCode(201);
                             ctx.json(new JsonObject()
                                     .put("success", true)
-                                    .put("assignmentId", command.getAssignmentId()));
+                                    .put("assignmentId", command.assignmentId()));
                         })
                         .onFailure(ctx::fail);
             } catch (Exception e) {

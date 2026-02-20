@@ -23,6 +23,7 @@ import dev.mars.quorus.controller.raft.grpc.InstallSnapshotResponse;
 import io.vertx.core.Future;
 import dev.mars.quorus.controller.raft.grpc.VoteRequest;
 import dev.mars.quorus.controller.raft.grpc.VoteResponse;
+import dev.mars.quorus.controller.state.CommandResult;
 import dev.mars.quorus.controller.state.QuorusStateStore;
 import dev.mars.quorus.controller.state.RaftCommand;
 import dev.mars.quorus.controller.state.SystemMetadataCommand;
@@ -88,7 +89,7 @@ class RaftFailureTest {
         
         // Try to submit command to follower
         SystemMetadataCommand command = SystemMetadataCommand.set("key", "value");
-        Future<Object> future = node1.submitCommand(command);
+        Future<CommandResult<?>> future = node1.submitCommand(command);
         
         // Should fail
         ExecutionException exception = assertThrows(ExecutionException.class, () -> {
@@ -249,7 +250,7 @@ class RaftFailureTest {
         // Test state machine that throws exceptions
         RaftLogApplicator failingStateMachine = new RaftLogApplicator() {
             @Override
-            public Object apply(RaftCommand command) {
+            public CommandResult<?> apply(RaftCommand command) {
                 throw new RuntimeException("State machine error");
             }
             

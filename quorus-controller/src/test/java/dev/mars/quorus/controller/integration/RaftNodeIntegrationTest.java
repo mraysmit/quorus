@@ -4,6 +4,7 @@ import dev.mars.quorus.controller.raft.RaftMessage;
 import dev.mars.quorus.controller.raft.RaftNode;
 import dev.mars.quorus.controller.raft.RaftLogApplicator;
 import dev.mars.quorus.controller.raft.RaftTransport;
+import dev.mars.quorus.controller.state.CommandResult;
 import dev.mars.quorus.controller.state.RaftCommand;
 import dev.mars.quorus.controller.raft.grpc.AppendEntriesRequest;
 import dev.mars.quorus.controller.raft.grpc.AppendEntriesResponse;
@@ -111,8 +112,8 @@ public class RaftNodeIntegrationTest {
 
     static class TestRaftLogApplicator implements RaftLogApplicator {
         @Override
-        public Object apply(RaftCommand command) {
-            return null;
+        public CommandResult<?> apply(RaftCommand command) {
+            return new CommandResult.NoOp<>();
         }
 
         @Override

@@ -445,30 +445,32 @@ class ProtobufCommandCodecTest {
             JobAssignmentCommand original = JobAssignmentCommand.assign(assignment);
 
             ByteString bytes = ProtobufCommandCodec.serialize(original);
-            JobAssignmentCommand restored = (JobAssignmentCommand) ProtobufCommandCodec.deserialize(bytes);
+            RaftCommand deserialized = ProtobufCommandCodec.deserialize(bytes);
+            assertInstanceOf(JobAssignmentCommand.Assign.class, deserialized);
+            JobAssignmentCommand.Assign restored = (JobAssignmentCommand.Assign) deserialized;
 
-            assertEquals(JobAssignmentCommand.CommandType.ASSIGN, restored.getType());
-            assertNotNull(restored.getJobAssignment());
-            assertEquals("job-001", restored.getJobAssignment().getJobId());
-            assertEquals("agent-nyc-01", restored.getJobAssignment().getAgentId());
-            assertEquals(JobAssignmentStatus.ASSIGNED, restored.getJobAssignment().getStatus());
-            assertEquals(0, restored.getJobAssignment().getRetryCount());
-            assertEquals(30000L, restored.getJobAssignment().getEstimatedDurationMs());
-            assertEquals("WEIGHTED_SCORE", restored.getJobAssignment().getAssignmentStrategy());
+            assertNotNull(restored.jobAssignment());
+            assertEquals("job-001", restored.jobAssignment().getJobId());
+            assertEquals("agent-nyc-01", restored.jobAssignment().getAgentId());
+            assertEquals(JobAssignmentStatus.ASSIGNED, restored.jobAssignment().getStatus());
+            assertEquals(0, restored.jobAssignment().getRetryCount());
+            assertEquals(30000L, restored.jobAssignment().getEstimatedDurationMs());
+            assertEquals("WEIGHTED_SCORE", restored.jobAssignment().getAssignmentStrategy());
         }
 
         @Test
         @DisplayName("ACCEPT preserves assignmentId and timestamp")
         void acceptRoundtrip() {
             JobAssignmentCommand original = JobAssignmentCommand.accept("assign-001");
-            Instant originalTimestamp = original.getTimestamp();
+            Instant originalTimestamp = original.timestamp();
 
             ByteString bytes = ProtobufCommandCodec.serialize(original);
-            JobAssignmentCommand restored = (JobAssignmentCommand) ProtobufCommandCodec.deserialize(bytes);
+            RaftCommand deserialized = ProtobufCommandCodec.deserialize(bytes);
+            assertInstanceOf(JobAssignmentCommand.Accept.class, deserialized);
+            JobAssignmentCommand.Accept restored = (JobAssignmentCommand.Accept) deserialized;
 
-            assertEquals(JobAssignmentCommand.CommandType.ACCEPT, restored.getType());
-            assertEquals("assign-001", restored.getAssignmentId());
-            assertEquals(originalTimestamp.toEpochMilli(), restored.getTimestamp().toEpochMilli());
+            assertEquals("assign-001", restored.assignmentId());
+            assertEquals(originalTimestamp.toEpochMilli(), restored.timestamp().toEpochMilli());
         }
 
         @Test
@@ -477,11 +479,12 @@ class ProtobufCommandCodecTest {
             JobAssignmentCommand original = JobAssignmentCommand.reject("assign-001", "Capacity full");
 
             ByteString bytes = ProtobufCommandCodec.serialize(original);
-            JobAssignmentCommand restored = (JobAssignmentCommand) ProtobufCommandCodec.deserialize(bytes);
+            RaftCommand deserialized = ProtobufCommandCodec.deserialize(bytes);
+            assertInstanceOf(JobAssignmentCommand.Reject.class, deserialized);
+            JobAssignmentCommand.Reject restored = (JobAssignmentCommand.Reject) deserialized;
 
-            assertEquals(JobAssignmentCommand.CommandType.REJECT, restored.getType());
-            assertEquals("assign-001", restored.getAssignmentId());
-            assertEquals("Capacity full", restored.getReason());
+            assertEquals("assign-001", restored.assignmentId());
+            assertEquals("Capacity full", restored.reason());
         }
 
         @Test
@@ -490,11 +493,12 @@ class ProtobufCommandCodecTest {
             JobAssignmentCommand original = JobAssignmentCommand.updateStatus("assign-001", JobAssignmentStatus.IN_PROGRESS);
 
             ByteString bytes = ProtobufCommandCodec.serialize(original);
-            JobAssignmentCommand restored = (JobAssignmentCommand) ProtobufCommandCodec.deserialize(bytes);
+            RaftCommand deserialized = ProtobufCommandCodec.deserialize(bytes);
+            assertInstanceOf(JobAssignmentCommand.UpdateStatus.class, deserialized);
+            JobAssignmentCommand.UpdateStatus restored = (JobAssignmentCommand.UpdateStatus) deserialized;
 
-            assertEquals(JobAssignmentCommand.CommandType.UPDATE_STATUS, restored.getType());
-            assertEquals("assign-001", restored.getAssignmentId());
-            assertEquals(JobAssignmentStatus.IN_PROGRESS, restored.getNewStatus());
+            assertEquals("assign-001", restored.assignmentId());
+            assertEquals(JobAssignmentStatus.IN_PROGRESS, restored.newStatus());
         }
 
         @Test
@@ -503,10 +507,11 @@ class ProtobufCommandCodecTest {
             JobAssignmentCommand original = JobAssignmentCommand.timeout("assign-001");
 
             ByteString bytes = ProtobufCommandCodec.serialize(original);
-            JobAssignmentCommand restored = (JobAssignmentCommand) ProtobufCommandCodec.deserialize(bytes);
+            RaftCommand deserialized = ProtobufCommandCodec.deserialize(bytes);
+            assertInstanceOf(JobAssignmentCommand.Timeout.class, deserialized);
+            JobAssignmentCommand.Timeout restored = (JobAssignmentCommand.Timeout) deserialized;
 
-            assertEquals(JobAssignmentCommand.CommandType.TIMEOUT, restored.getType());
-            assertEquals("assign-001", restored.getAssignmentId());
+            assertEquals("assign-001", restored.assignmentId());
         }
 
         @Test
@@ -515,8 +520,10 @@ class ProtobufCommandCodecTest {
             for (JobAssignmentStatus status : JobAssignmentStatus.values()) {
                 JobAssignmentCommand original = JobAssignmentCommand.updateStatus("assign-" + status.name(), status);
                 ByteString bytes = ProtobufCommandCodec.serialize(original);
-                JobAssignmentCommand restored = (JobAssignmentCommand) ProtobufCommandCodec.deserialize(bytes);
-                assertEquals(status, restored.getNewStatus(), "Failed for status: " + status);
+                RaftCommand deserialized = ProtobufCommandCodec.deserialize(bytes);
+                assertInstanceOf(JobAssignmentCommand.UpdateStatus.class, deserialized);
+                JobAssignmentCommand.UpdateStatus restored = (JobAssignmentCommand.UpdateStatus) deserialized;
+                assertEquals(status, restored.newStatus(), "Failed for status: " + status);
             }
         }
     }

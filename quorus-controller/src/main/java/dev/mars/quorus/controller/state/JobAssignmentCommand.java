@@ -23,194 +23,162 @@ import java.time.Instant;
 import java.util.Objects;
 
 /**
- * Command for job assignment operations in the Raft state machine.
- * This class represents commands that can be submitted to the distributed controller
- * for managing job assignments to agents in the fleet.
- * 
+ * Sealed interface for job assignment commands in the Raft state machine.
+ *
+ * <p>Each permitted subtype carries only the fields relevant to its operation.
+ * Pattern matching in {@code switch} expressions provides compile-time exhaustiveness.
+ *
+ * <h3>Permitted subtypes</h3>
+ * <ul>
+ *   <li>{@link Assign} — assign a job to an agent</li>
+ *   <li>{@link Accept} — agent accepts the assignment</li>
+ *   <li>{@link Reject} — agent rejects the assignment</li>
+ *   <li>{@link UpdateStatus} — update assignment status</li>
+ *   <li>{@link Timeout} — assignment has timed out</li>
+ *   <li>{@link Cancel} — cancel the assignment</li>
+ *   <li>{@link Remove} — remove completed/failed assignment</li>
+ * </ul>
+ *
  * @author Mark Andrew Ray-Smith Cityline Ltd
+ * @version 2.0
  * @since 2025-10-28
- * @version 1.0
  */
-public final class JobAssignmentCommand implements RaftCommand {
+public sealed interface JobAssignmentCommand extends RaftCommand
+        permits JobAssignmentCommand.Assign,
+                JobAssignmentCommand.Accept,
+                JobAssignmentCommand.Reject,
+                JobAssignmentCommand.UpdateStatus,
+                JobAssignmentCommand.Timeout,
+                JobAssignmentCommand.Cancel,
+                JobAssignmentCommand.Remove {
 
-    private static final long serialVersionUID = 1L;
+    /** Common accessor: every subtype carries an assignment ID. */
+    String assignmentId();
 
-    /**
-     * Types of job assignment commands.
-     */
-    public enum CommandType {
-        /** Assign a job to an agent */
-        ASSIGN,
-        /** Agent accepts the assignment */
-        ACCEPT,
-        /** Agent rejects the assignment */
-        REJECT,
-        /** Update assignment status */
-        UPDATE_STATUS,
-        /** Assignment has timed out */
-        TIMEOUT,
-        /** Cancel the assignment */
-        CANCEL,
-        /** Remove completed/failed assignment */
-        REMOVE
-    }
-
-    private final CommandType type;
-    private final String assignmentId;
-    private final JobAssignment jobAssignment;
-    private final JobAssignmentStatus newStatus;
-    private final String reason;
-    private final Instant timestamp;
+    /** Common accessor: every subtype carries a timestamp. */
+    Instant timestamp();
 
     /**
-     * Private constructor for creating commands.
-     */
-    private JobAssignmentCommand(CommandType type, String assignmentId, JobAssignment jobAssignment,
-                                JobAssignmentStatus newStatus, String reason) {
-        this(type, assignmentId, jobAssignment, newStatus, reason, null);
-    }
-
-    /**
-     * Package-private constructor for protobuf deserialization with explicit timestamp.
-     */
-    JobAssignmentCommand(CommandType type, String assignmentId, JobAssignment jobAssignment,
-                         JobAssignmentStatus newStatus, String reason, Instant timestamp) {
-        this.type = Objects.requireNonNull(type, "Command type cannot be null");
-        this.assignmentId = assignmentId;
-        this.jobAssignment = jobAssignment;
-        this.newStatus = newStatus;
-        this.reason = reason;
-        this.timestamp = (timestamp != null) ? timestamp : Instant.now();
-        
-        // Validate command parameters
-        validateCommand();
-    }
-
-    /**
-     * Create a command to assign a job to an agent.
+     * Assign a job to an agent.
      *
-     * @param jobAssignment the job assignment to create
-     * @return the command
-     * @throws IllegalArgumentException if jobAssignment is null
+     * @param assignmentId  the assignment identifier
+     * @param jobAssignment the full job assignment
+     * @param timestamp     the command timestamp
      */
-    public static JobAssignmentCommand assign(JobAssignment jobAssignment) {
-        Objects.requireNonNull(jobAssignment, "Job assignment cannot be null");
-        String assignmentId = generateAssignmentId(jobAssignment.getJobId(), jobAssignment.getAgentId());
-        return new JobAssignmentCommand(CommandType.ASSIGN, assignmentId,
-                                       jobAssignment, null, null);
-    }
+    record Assign(String assignmentId, JobAssignment jobAssignment, Instant timestamp) implements JobAssignmentCommand {
+        private static final long serialVersionUID = 1L;
 
-    /**
-     * Create a command for an agent to accept an assignment.
-     * 
-     * @param assignmentId the assignment ID to accept
-     * @return the command
-     * @throws IllegalArgumentException if assignmentId is null or empty
-     */
-    public static JobAssignmentCommand accept(String assignmentId) {
-        validateAssignmentId(assignmentId);
-        return new JobAssignmentCommand(CommandType.ACCEPT, assignmentId, null, 
-                                       JobAssignmentStatus.ACCEPTED, null);
-    }
-
-    /**
-     * Create a command for an agent to reject an assignment.
-     * 
-     * @param assignmentId the assignment ID to reject
-     * @param reason the reason for rejection (optional)
-     * @return the command
-     * @throws IllegalArgumentException if assignmentId is null or empty
-     */
-    public static JobAssignmentCommand reject(String assignmentId, String reason) {
-        validateAssignmentId(assignmentId);
-        return new JobAssignmentCommand(CommandType.REJECT, assignmentId, null, 
-                                       JobAssignmentStatus.REJECTED, reason);
-    }
-
-    /**
-     * Create a command to update assignment status.
-     * 
-     * @param assignmentId the assignment ID to update
-     * @param newStatus the new status
-     * @return the command
-     * @throws IllegalArgumentException if assignmentId is null/empty or newStatus is null
-     */
-    public static JobAssignmentCommand updateStatus(String assignmentId, JobAssignmentStatus newStatus) {
-        validateAssignmentId(assignmentId);
-        Objects.requireNonNull(newStatus, "New status cannot be null");
-        return new JobAssignmentCommand(CommandType.UPDATE_STATUS, assignmentId, null, newStatus, null);
-    }
-
-    /**
-     * Create a command to mark an assignment as timed out.
-     * 
-     * @param assignmentId the assignment ID that timed out
-     * @return the command
-     * @throws IllegalArgumentException if assignmentId is null or empty
-     */
-    public static JobAssignmentCommand timeout(String assignmentId) {
-        validateAssignmentId(assignmentId);
-        return new JobAssignmentCommand(CommandType.TIMEOUT, assignmentId, null, 
-                                       JobAssignmentStatus.TIMEOUT, "Assignment timed out");
-    }
-
-    /**
-     * Create a command to cancel an assignment.
-     * 
-     * @param assignmentId the assignment ID to cancel
-     * @param reason the reason for cancellation (optional)
-     * @return the command
-     * @throws IllegalArgumentException if assignmentId is null or empty
-     */
-    public static JobAssignmentCommand cancel(String assignmentId, String reason) {
-        validateAssignmentId(assignmentId);
-        return new JobAssignmentCommand(CommandType.CANCEL, assignmentId, null, 
-                                       JobAssignmentStatus.CANCELLED, reason);
-    }
-
-    /**
-     * Create a command to remove a completed or failed assignment.
-     * 
-     * @param assignmentId the assignment ID to remove
-     * @return the command
-     * @throws IllegalArgumentException if assignmentId is null or empty
-     */
-    public static JobAssignmentCommand remove(String assignmentId) {
-        validateAssignmentId(assignmentId);
-        return new JobAssignmentCommand(CommandType.REMOVE, assignmentId, null, null, null);
-    }
-
-    // Getters
-    public CommandType getType() {
-        return type;
-    }
-
-    public String getAssignmentId() {
-        return assignmentId;
-    }
-
-    public JobAssignment getJobAssignment() {
-        return jobAssignment;
-    }
-
-    public JobAssignmentStatus getNewStatus() {
-        return newStatus;
-    }
-
-    public String getReason() {
-        return reason;
-    }
-
-    public Instant getTimestamp() {
-        return timestamp;
-    }
-
-    // Validation methods
-    private static void validateAssignmentId(String assignmentId) {
-        if (assignmentId == null || assignmentId.trim().isEmpty()) {
-            throw new IllegalArgumentException("Assignment ID cannot be null or empty");
+        public Assign {
+            Objects.requireNonNull(assignmentId, "assignmentId");
+            Objects.requireNonNull(jobAssignment, "jobAssignment");
+            Objects.requireNonNull(timestamp, "timestamp");
         }
     }
+
+    /**
+     * Agent accepts the assignment.
+     *
+     * @param assignmentId the assignment identifier
+     * @param newStatus    the new status (ACCEPTED)
+     * @param timestamp    the command timestamp
+     */
+    record Accept(String assignmentId, JobAssignmentStatus newStatus, Instant timestamp) implements JobAssignmentCommand {
+        private static final long serialVersionUID = 1L;
+
+        public Accept {
+            Objects.requireNonNull(assignmentId, "assignmentId");
+            Objects.requireNonNull(newStatus, "newStatus");
+            Objects.requireNonNull(timestamp, "timestamp");
+        }
+    }
+
+    /**
+     * Agent rejects the assignment.
+     *
+     * @param assignmentId the assignment identifier
+     * @param newStatus    the new status (REJECTED)
+     * @param reason       optional reason for rejection (may be null)
+     * @param timestamp    the command timestamp
+     */
+    record Reject(String assignmentId, JobAssignmentStatus newStatus, String reason, Instant timestamp) implements JobAssignmentCommand {
+        private static final long serialVersionUID = 1L;
+
+        public Reject {
+            Objects.requireNonNull(assignmentId, "assignmentId");
+            Objects.requireNonNull(newStatus, "newStatus");
+            Objects.requireNonNull(timestamp, "timestamp");
+        }
+    }
+
+    /**
+     * Update assignment status.
+     *
+     * @param assignmentId the assignment identifier
+     * @param newStatus    the new status
+     * @param timestamp    the command timestamp
+     */
+    record UpdateStatus(String assignmentId, JobAssignmentStatus newStatus, Instant timestamp) implements JobAssignmentCommand {
+        private static final long serialVersionUID = 1L;
+
+        public UpdateStatus {
+            Objects.requireNonNull(assignmentId, "assignmentId");
+            Objects.requireNonNull(newStatus, "newStatus");
+            Objects.requireNonNull(timestamp, "timestamp");
+        }
+    }
+
+    /**
+     * Assignment has timed out.
+     *
+     * @param assignmentId the assignment identifier
+     * @param newStatus    the new status (TIMEOUT)
+     * @param reason       the timeout reason (may be null)
+     * @param timestamp    the command timestamp
+     */
+    record Timeout(String assignmentId, JobAssignmentStatus newStatus, String reason, Instant timestamp) implements JobAssignmentCommand {
+        private static final long serialVersionUID = 1L;
+
+        public Timeout {
+            Objects.requireNonNull(assignmentId, "assignmentId");
+            Objects.requireNonNull(newStatus, "newStatus");
+            Objects.requireNonNull(timestamp, "timestamp");
+        }
+    }
+
+    /**
+     * Cancel the assignment.
+     *
+     * @param assignmentId the assignment identifier
+     * @param newStatus    the new status (CANCELLED)
+     * @param reason       optional reason for cancellation (may be null)
+     * @param timestamp    the command timestamp
+     */
+    record Cancel(String assignmentId, JobAssignmentStatus newStatus, String reason, Instant timestamp) implements JobAssignmentCommand {
+        private static final long serialVersionUID = 1L;
+
+        public Cancel {
+            Objects.requireNonNull(assignmentId, "assignmentId");
+            Objects.requireNonNull(newStatus, "newStatus");
+            Objects.requireNonNull(timestamp, "timestamp");
+        }
+    }
+
+    /**
+     * Remove a completed or failed assignment.
+     *
+     * @param assignmentId the assignment identifier
+     * @param timestamp    the command timestamp
+     */
+    record Remove(String assignmentId, Instant timestamp) implements JobAssignmentCommand {
+        private static final long serialVersionUID = 1L;
+
+        public Remove {
+            Objects.requireNonNull(assignmentId, "assignmentId");
+            Objects.requireNonNull(timestamp, "timestamp");
+        }
+    }
+
+    // ── Factory methods (preserve existing API) ─────────────────
 
     /**
      * Generate a unique assignment ID from job ID and agent ID.
@@ -219,59 +187,55 @@ public final class JobAssignmentCommand implements RaftCommand {
         return jobId + ":" + agentId;
     }
 
-    private void validateCommand() {
-        switch (type) {
-            case ASSIGN:
-                if (jobAssignment == null) {
-                    throw new IllegalArgumentException("Job assignment is required for ASSIGN command");
-                }
-                String expectedId = generateAssignmentId(jobAssignment.getJobId(), jobAssignment.getAgentId());
-                if (assignmentId == null || !assignmentId.equals(expectedId)) {
-                    throw new IllegalArgumentException("Assignment ID must match job assignment ID (expected: " + expectedId + ")");
-                }
-                break;
-                
-            case ACCEPT:
-            case REJECT:
-            case UPDATE_STATUS:
-            case TIMEOUT:
-            case CANCEL:
-            case REMOVE:
-                if (assignmentId == null || assignmentId.trim().isEmpty()) {
-                    throw new IllegalArgumentException("Assignment ID is required for " + type + " command");
-                }
-                break;
-                
-            default:
-                throw new IllegalArgumentException("Unknown command type: " + type);
-        }
+    /**
+     * Create a command to assign a job to an agent.
+     */
+    static JobAssignmentCommand assign(JobAssignment jobAssignment) {
+        Objects.requireNonNull(jobAssignment, "Job assignment cannot be null");
+        String assignmentId = generateAssignmentId(jobAssignment.getJobId(), jobAssignment.getAgentId());
+        return new Assign(assignmentId, jobAssignment, Instant.now());
     }
 
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        JobAssignmentCommand that = (JobAssignmentCommand) o;
-        return type == that.type &&
-               Objects.equals(assignmentId, that.assignmentId) &&
-               Objects.equals(jobAssignment, that.jobAssignment) &&
-               newStatus == that.newStatus &&
-               Objects.equals(reason, that.reason);
+    /**
+     * Create a command for an agent to accept an assignment.
+     */
+    static JobAssignmentCommand accept(String assignmentId) {
+        return new Accept(assignmentId, JobAssignmentStatus.ACCEPTED, Instant.now());
     }
 
-    @Override
-    public int hashCode() {
-        return Objects.hash(type, assignmentId, jobAssignment, newStatus, reason);
+    /**
+     * Create a command for an agent to reject an assignment.
+     */
+    static JobAssignmentCommand reject(String assignmentId, String reason) {
+        return new Reject(assignmentId, JobAssignmentStatus.REJECTED, reason, Instant.now());
     }
 
-    @Override
-    public String toString() {
-        return "JobAssignmentCommand{" +
-                "type=" + type +
-                ", assignmentId='" + assignmentId + '\'' +
-                ", newStatus=" + newStatus +
-                ", reason='" + reason + '\'' +
-                ", timestamp=" + timestamp +
-                '}';
+    /**
+     * Create a command to update assignment status.
+     */
+    static JobAssignmentCommand updateStatus(String assignmentId, JobAssignmentStatus newStatus) {
+        Objects.requireNonNull(newStatus, "New status cannot be null");
+        return new UpdateStatus(assignmentId, newStatus, Instant.now());
+    }
+
+    /**
+     * Create a command to mark an assignment as timed out.
+     */
+    static JobAssignmentCommand timeout(String assignmentId) {
+        return new Timeout(assignmentId, JobAssignmentStatus.TIMEOUT, "Assignment timed out", Instant.now());
+    }
+
+    /**
+     * Create a command to cancel an assignment.
+     */
+    static JobAssignmentCommand cancel(String assignmentId, String reason) {
+        return new Cancel(assignmentId, JobAssignmentStatus.CANCELLED, reason, Instant.now());
+    }
+
+    /**
+     * Create a command to remove a completed or failed assignment.
+     */
+    static JobAssignmentCommand remove(String assignmentId) {
+        return new Remove(assignmentId, Instant.now());
     }
 }

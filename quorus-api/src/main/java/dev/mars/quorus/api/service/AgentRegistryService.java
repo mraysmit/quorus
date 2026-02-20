@@ -22,6 +22,7 @@ import dev.mars.quorus.agent.AgentCapabilities;
 import dev.mars.quorus.api.dto.AgentRegistrationRequest;
 import dev.mars.quorus.controller.raft.RaftNode;
 import dev.mars.quorus.controller.state.AgentCommand;
+import dev.mars.quorus.controller.state.CommandResult;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -87,7 +88,7 @@ public class AgentRegistryService {
                 if (raftNode.isLeader()) {
                     logger.debug("This node is leader, submitting registration command to Raft cluster");
                     // Submit command to distributed state machine
-                    CompletableFuture<Object> future = raftNode.submitCommand(command)
+                    CompletableFuture<CommandResult<?>> future = raftNode.submitCommand(command)
                             .toCompletionStage().toCompletableFuture();
                     
                     try {
@@ -152,7 +153,7 @@ public class AgentRegistryService {
                 
                 if (raftNode.isLeader()) {
                     logger.debug("This node is leader, submitting deregistration command to Raft cluster");
-                    CompletableFuture<Object> future = raftNode.submitCommand(command)
+                    CompletableFuture<CommandResult<?>> future = raftNode.submitCommand(command)
                             .toCompletionStage().toCompletableFuture();
                     
                     try {
@@ -215,7 +216,7 @@ public class AgentRegistryService {
                 
                 if (raftNode.isLeader()) {
                     logger.debug("This node is leader, submitting capabilities update command to Raft cluster");
-                    CompletableFuture<Object> future = raftNode.submitCommand(command)
+                    CompletableFuture<CommandResult<?>> future = raftNode.submitCommand(command)
                             .toCompletionStage().toCompletableFuture();
                     
                     try {

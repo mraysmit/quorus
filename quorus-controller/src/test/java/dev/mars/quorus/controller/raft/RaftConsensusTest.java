@@ -20,6 +20,7 @@ import dev.mars.quorus.controller.raft.grpc.AppendEntriesRequest;
 import dev.mars.quorus.controller.raft.grpc.AppendEntriesResponse;
 import dev.mars.quorus.controller.raft.grpc.VoteRequest;
 import dev.mars.quorus.controller.raft.grpc.VoteResponse;
+import dev.mars.quorus.controller.state.CommandResult;
 import dev.mars.quorus.controller.state.QuorusStateStore;
 import dev.mars.quorus.controller.state.SystemMetadataCommand;
 import dev.mars.quorus.controller.state.TransferJobCommand;
@@ -154,14 +155,15 @@ class RaftConsensusTest {
         TransferJob job = new TransferJob(request);
         TransferJobCommand command = TransferJobCommand.create(job);
 
-        Future<Object> future = currentLeader.submitCommand(command);
+        Future<CommandResult<?>> future = currentLeader.submitCommand(command);
 
         // Command should complete successfully
-        Object result = future.toCompletionStage().toCompletableFuture().get(2, TimeUnit.SECONDS);
+        CommandResult<?> result = future.toCompletionStage().toCompletableFuture().get(2, TimeUnit.SECONDS);
         assertNotNull(result);
-        assertTrue(result instanceof TransferJob);
+        assertInstanceOf(CommandResult.Success.class, result);
+        assertInstanceOf(TransferJob.class, ((CommandResult.Success<?>) result).entity());
 
-        TransferJob resultJob = (TransferJob) result;
+        TransferJob resultJob = (TransferJob) ((CommandResult.Success<?>) result).entity();
         assertEquals(job.getJobId(), resultJob.getJobId());
     }
 
@@ -184,9 +186,9 @@ class RaftConsensusTest {
         SystemMetadataCommand cmd2 = SystemMetadataCommand.set("key2", "value2");
         SystemMetadataCommand cmd3 = SystemMetadataCommand.set("key3", "value3");
 
-        Future<Object> future1 = single.submitCommand(cmd1);
-        Future<Object> future2 = single.submitCommand(cmd2);
-        Future<Object> future3 = single.submitCommand(cmd3);
+        Future<CommandResult<?>> future1 = single.submitCommand(cmd1);
+        Future<CommandResult<?>> future2 = single.submitCommand(cmd2);
+        Future<CommandResult<?>> future3 = single.submitCommand(cmd3);
 
         future1.toCompletionStage().toCompletableFuture().get(1, TimeUnit.SECONDS);
         future2.toCompletionStage().toCompletableFuture().get(1, TimeUnit.SECONDS);

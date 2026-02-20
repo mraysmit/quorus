@@ -68,11 +68,12 @@ class QuorusStateStoreTest {
 
         // Test CREATE command
         TransferJobCommand createCmd = TransferJobCommand.create(job);
-        Object result = stateMachine.apply(createCmd);
+        CommandResult<?> result = stateMachine.apply(createCmd);
 
         assertNotNull(result);
-        assertTrue(result instanceof TransferJob);
-        assertEquals(job.getJobId(), ((TransferJob) result).getJobId());
+        assertInstanceOf(CommandResult.Success.class, result);
+        assertInstanceOf(TransferJob.class, ((CommandResult.Success<?>) result).entity());
+        assertEquals(job.getJobId(), ((TransferJob) ((CommandResult.Success<?>) result).entity()).getJobId());
         assertEquals(1, stateMachine.getTransferJobCount());
 
         // Verify job is stored
@@ -82,13 +83,13 @@ class QuorusStateStoreTest {
 
         // Test UPDATE_STATUS command
         TransferJobCommand updateCmd = TransferJobCommand.updateStatus(job.getJobId(), TransferStatus.IN_PROGRESS);
-        Object updateResult = stateMachine.apply(updateCmd);
-        assertNotNull(updateResult);
+        CommandResult<?> updateResult = stateMachine.apply(updateCmd);
+        assertInstanceOf(CommandResult.Success.class, updateResult);
 
         // Test DELETE command
         TransferJobCommand deleteCmd = TransferJobCommand.delete(job.getJobId());
-        Object deleteResult = stateMachine.apply(deleteCmd);
-        assertNotNull(deleteResult);
+        CommandResult<?> deleteResult = stateMachine.apply(deleteCmd);
+        assertInstanceOf(CommandResult.Success.class, deleteResult);
         assertEquals(0, stateMachine.getTransferJobCount());
 
         // Verify job is removed
@@ -99,52 +100,56 @@ class QuorusStateStoreTest {
     void testTransferJobNotFound() {
         // Test update non-existent job
         TransferJobCommand updateCmd = TransferJobCommand.updateStatus("non-existent", TransferStatus.IN_PROGRESS);
-        Object result = stateMachine.apply(updateCmd);
-        assertNull(result);
+        CommandResult<?> result = stateMachine.apply(updateCmd);
+        assertInstanceOf(CommandResult.NotFound.class, result);
 
         // Test delete non-existent job
         TransferJobCommand deleteCmd = TransferJobCommand.delete("non-existent");
-        Object deleteResult = stateMachine.apply(deleteCmd);
-        assertNull(deleteResult);
+        CommandResult<?> deleteResult = stateMachine.apply(deleteCmd);
+        assertInstanceOf(CommandResult.NotFound.class, deleteResult);
     }
 
     @Test
     void testSystemMetadataOperations() {
         // Test SET command
         SystemMetadataCommand setCmd = SystemMetadataCommand.set("testKey", "testValue");
-        Object result = stateMachine.apply(setCmd);
+        CommandResult<?> result = stateMachine.apply(setCmd);
 
-        // Should return previous value (null for new key)
-        assertNull(result);
+        // Should return Success with previous value (null for new key)
+        assertInstanceOf(CommandResult.Success.class, result);
+        assertNull(((CommandResult.Success<?>) result).entity());
         assertEquals("testValue", stateMachine.getMetadata("testKey"));
 
         // Test SET command with existing key
         SystemMetadataCommand updateCmd = SystemMetadataCommand.set("testKey", "newValue");
-        Object updateResult = stateMachine.apply(updateCmd);
+        CommandResult<?> updateResult = stateMachine.apply(updateCmd);
 
-        // Should return previous value
-        assertEquals("testValue", updateResult);
+        // Should return Success with previous value
+        assertInstanceOf(CommandResult.Success.class, updateResult);
+        assertEquals("testValue", ((CommandResult.Success<?>) updateResult).entity());
         assertEquals("newValue", stateMachine.getMetadata("testKey"));
 
         // Test DELETE command
         SystemMetadataCommand deleteCmd = SystemMetadataCommand.delete("testKey");
-        Object deleteResult = stateMachine.apply(deleteCmd);
+        CommandResult<?> deleteResult = stateMachine.apply(deleteCmd);
 
-        // Should return deleted value
-        assertEquals("newValue", deleteResult);
+        // Should return Success with deleted value
+        assertInstanceOf(CommandResult.Success.class, deleteResult);
+        assertEquals("newValue", ((CommandResult.Success<?>) deleteResult).entity());
         assertNull(stateMachine.getMetadata("testKey"));
 
         // Test DELETE non-existent key
         SystemMetadataCommand deleteNonExistentCmd = SystemMetadataCommand.delete("nonExistent");
-        Object deleteNonExistentResult = stateMachine.apply(deleteNonExistentCmd);
-        assertNull(deleteNonExistentResult);
+        CommandResult<?> deleteNonExistentResult = stateMachine.apply(deleteNonExistentCmd);
+        assertInstanceOf(CommandResult.Success.class, deleteNonExistentResult);
+        assertNull(((CommandResult.Success<?>) deleteNonExistentResult).entity());
     }
 
     @Test
     void testNoOpCommand() {
         // Test null command (no-op)
-        Object result = stateMachine.apply(null);
-        assertNull(result);
+        CommandResult<?> result = stateMachine.apply(null);
+        assertInstanceOf(CommandResult.NoOp.class, result);
 
         // State should be unchanged
         assertEquals(0, stateMachine.getTransferJobCount());
