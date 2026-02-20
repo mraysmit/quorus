@@ -25,6 +25,7 @@ import dev.mars.quorus.controller.raft.grpc.*;
 
 import java.time.Instant;
 import java.util.*;
+import java.util.Optional;
 
 /**
  * Protobuf codec for agent-related types: {@link AgentCommand},
@@ -45,21 +46,11 @@ final class AgentCodec {
 
     static AgentCommandProto toProto(AgentCommand cmd) {
         AgentCommandProto.Builder builder = AgentCommandProto.newBuilder().setType(toProto(cmd.getType()));
-        if (cmd.getAgentId() != null) {
-            builder.setAgentId(cmd.getAgentId());
-        }
-        if (cmd.getAgentInfo() != null) {
-            builder.setAgentInfo(toProto(cmd.getAgentInfo()));
-        }
-        if (cmd.getNewStatus() != null) {
-            builder.setNewStatus(toProto(cmd.getNewStatus()));
-        }
-        if (cmd.getNewCapabilities() != null) {
-            builder.setNewCapabilities(toProto(cmd.getNewCapabilities()));
-        }
-        if (cmd.getTimestamp() != null) {
-            builder.setTimestampEpochMs(cmd.getTimestamp().toEpochMilli());
-        }
+        Optional.ofNullable(cmd.getAgentId()).ifPresent(builder::setAgentId);
+        Optional.ofNullable(cmd.getAgentInfo()).ifPresent(i -> builder.setAgentInfo(toProto(i)));
+        Optional.ofNullable(cmd.getNewStatus()).ifPresent(s -> builder.setNewStatus(toProto(s)));
+        Optional.ofNullable(cmd.getNewCapabilities()).ifPresent(c -> builder.setNewCapabilities(toProto(c)));
+        Optional.ofNullable(cmd.getTimestamp()).ifPresent(t -> builder.setTimestampEpochMs(t.toEpochMilli()));
         return builder.build();
     }
 
@@ -88,39 +79,17 @@ final class AgentCodec {
     private static AgentInfoProto toProto(AgentInfo info) {
         AgentInfoProto.Builder builder = AgentInfoProto.newBuilder()
                 .setPort(info.getPort());
-        if (info.getAgentId() != null) {
-            builder.setAgentId(info.getAgentId());
-        }
-        if (info.getHostname() != null) {
-            builder.setHostname(info.getHostname());
-        }
-        if (info.getAddress() != null) {
-            builder.setAddress(info.getAddress());
-        }
-        if (info.getCapabilities() != null) {
-            builder.setCapabilities(toProto(info.getCapabilities()));
-        }
-        if (info.getStatus() != null) {
-            builder.setStatus(toProto(info.getStatus()));
-        }
-        if (info.getRegistrationTime() != null) {
-            builder.setRegistrationTimeEpochMs(info.getRegistrationTime().toEpochMilli());
-        }
-        if (info.getLastHeartbeat() != null) {
-            builder.setLastHeartbeatEpochMs(info.getLastHeartbeat().toEpochMilli());
-        }
-        if (info.getVersion() != null) {
-            builder.setVersion(info.getVersion());
-        }
-        if (info.getRegion() != null) {
-            builder.setRegion(info.getRegion());
-        }
-        if (info.getDatacenter() != null) {
-            builder.setDatacenter(info.getDatacenter());
-        }
-        if (info.getMetadata() != null) {
-            builder.putAllMetadata(info.getMetadata());
-        }
+        Optional.ofNullable(info.getAgentId()).ifPresent(builder::setAgentId);
+        Optional.ofNullable(info.getHostname()).ifPresent(builder::setHostname);
+        Optional.ofNullable(info.getAddress()).ifPresent(builder::setAddress);
+        Optional.ofNullable(info.getCapabilities()).ifPresent(c -> builder.setCapabilities(toProto(c)));
+        Optional.ofNullable(info.getStatus()).ifPresent(s -> builder.setStatus(toProto(s)));
+        Optional.ofNullable(info.getRegistrationTime()).ifPresent(t -> builder.setRegistrationTimeEpochMs(t.toEpochMilli()));
+        Optional.ofNullable(info.getLastHeartbeat()).ifPresent(t -> builder.setLastHeartbeatEpochMs(t.toEpochMilli()));
+        Optional.ofNullable(info.getVersion()).ifPresent(builder::setVersion);
+        Optional.ofNullable(info.getRegion()).ifPresent(builder::setRegion);
+        Optional.ofNullable(info.getDatacenter()).ifPresent(builder::setDatacenter);
+        Optional.ofNullable(info.getMetadata()).ifPresent(builder::putAllMetadata);
         return builder.build();
     }
 
@@ -162,28 +131,14 @@ final class AgentCodec {
                 .setMaxConcurrentTransfers(caps.getMaxConcurrentTransfers())
                 .setMaxTransferSize(caps.getMaxTransferSize())
                 .setMaxBandwidth(caps.getMaxBandwidth());
-        if (caps.getSupportedProtocols() != null) {
-            builder.addAllSupportedProtocols(caps.getSupportedProtocols());
-        }
-        if (caps.getAvailableRegions() != null) {
-            builder.addAllAvailableRegions(caps.getAvailableRegions());
-        }
-        if (caps.getSupportedCompressionTypes() != null) {
-            builder.addAllSupportedCompressionTypes(caps.getSupportedCompressionTypes());
-        }
-        if (caps.getSupportedEncryptionTypes() != null) {
-            builder.addAllSupportedEncryptionTypes(caps.getSupportedEncryptionTypes());
-        }
-        if (caps.getCustomCapabilities() != null) {
-            caps.getCustomCapabilities().forEach((k, v) ->
-                    builder.putCustomCapabilities(k, v != null ? v.toString() : ""));
-        }
-        if (caps.getSystemInfo() != null) {
-            builder.setSystemInfo(toProto(caps.getSystemInfo()));
-        }
-        if (caps.getNetworkInfo() != null) {
-            builder.setNetworkInfo(toProto(caps.getNetworkInfo()));
-        }
+        Optional.ofNullable(caps.getSupportedProtocols()).ifPresent(builder::addAllSupportedProtocols);
+        Optional.ofNullable(caps.getAvailableRegions()).ifPresent(builder::addAllAvailableRegions);
+        Optional.ofNullable(caps.getSupportedCompressionTypes()).ifPresent(builder::addAllSupportedCompressionTypes);
+        Optional.ofNullable(caps.getSupportedEncryptionTypes()).ifPresent(builder::addAllSupportedEncryptionTypes);
+        Optional.ofNullable(caps.getCustomCapabilities()).ifPresent(cc ->
+                cc.forEach((k, v) -> builder.putCustomCapabilities(k, v != null ? v.toString() : "")));
+        Optional.ofNullable(caps.getSystemInfo()).ifPresent(si -> builder.setSystemInfo(toProto(si)));
+        Optional.ofNullable(caps.getNetworkInfo()).ifPresent(ni -> builder.setNetworkInfo(toProto(ni)));
         return builder.build();
     }
 
@@ -217,15 +172,9 @@ final class AgentCodec {
                 .setCpuCores(info.getCpuCores())
                 .setCpuUsage(info.getCpuUsage())
                 .setLoadAverage(info.getLoadAverage());
-        if (info.getOperatingSystem() != null) {
-            builder.setOperatingSystem(info.getOperatingSystem());
-        }
-        if (info.getArchitecture() != null) {
-            builder.setArchitecture(info.getArchitecture());
-        }
-        if (info.getJavaVersion() != null) {
-            builder.setJavaVersion(info.getJavaVersion());
-        }
+        Optional.ofNullable(info.getOperatingSystem()).ifPresent(builder::setOperatingSystem);
+        Optional.ofNullable(info.getArchitecture()).ifPresent(builder::setArchitecture);
+        Optional.ofNullable(info.getJavaVersion()).ifPresent(builder::setJavaVersion);
         return builder.build();
     }
 
@@ -251,21 +200,11 @@ final class AgentCodec {
                 .setLatencyMs(info.getLatencyMs())
                 .setPacketLossPercentage(info.getPacketLossPercentage())
                 .setIsNatTraversal(info.isNatTraversal());
-        if (info.getPublicIpAddress() != null) {
-            builder.setPublicIpAddress(info.getPublicIpAddress());
-        }
-        if (info.getPrivateIpAddress() != null) {
-            builder.setPrivateIpAddress(info.getPrivateIpAddress());
-        }
-        if (info.getNetworkInterfaces() != null) {
-            builder.addAllNetworkInterfaces(info.getNetworkInterfaces());
-        }
-        if (info.getConnectionType() != null) {
-            builder.setConnectionType(info.getConnectionType());
-        }
-        if (info.getFirewallPorts() != null) {
-            builder.addAllFirewallPorts(info.getFirewallPorts());
-        }
+        Optional.ofNullable(info.getPublicIpAddress()).ifPresent(builder::setPublicIpAddress);
+        Optional.ofNullable(info.getPrivateIpAddress()).ifPresent(builder::setPrivateIpAddress);
+        Optional.ofNullable(info.getNetworkInterfaces()).ifPresent(builder::addAllNetworkInterfaces);
+        Optional.ofNullable(info.getConnectionType()).ifPresent(builder::setConnectionType);
+        Optional.ofNullable(info.getFirewallPorts()).ifPresent(builder::addAllFirewallPorts);
         return builder.build();
     }
 

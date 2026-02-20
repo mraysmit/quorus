@@ -19,7 +19,7 @@ package dev.mars.quorus.controller.http;
 import dev.mars.quorus.controller.raft.InMemoryTransportSimulator;
 import dev.mars.quorus.controller.raft.RaftNode;
 import dev.mars.quorus.controller.raft.RaftTransport;
-import dev.mars.quorus.controller.state.QuorusStateMachine;
+import dev.mars.quorus.controller.state.QuorusStateStore;
 import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.client.WebClient;
@@ -74,9 +74,9 @@ class LeaderGuardHandlerTest {
         RaftTransport transport2 = new InMemoryTransportSimulator("guard-node-2");
         RaftTransport transport3 = new InMemoryTransportSimulator("guard-node-3");
 
-        QuorusStateMachine sm1 = new QuorusStateMachine();
-        QuorusStateMachine sm2 = new QuorusStateMachine();
-        QuorusStateMachine sm3 = new QuorusStateMachine();
+        QuorusStateStore sm1 = new QuorusStateStore();
+        QuorusStateStore sm2 = new QuorusStateStore();
+        QuorusStateStore sm3 = new QuorusStateStore();
 
         RaftNode node1 = new RaftNode(vertx, "guard-node-1", clusterNodes, transport1, sm1, 500, 100);
         RaftNode node2 = new RaftNode(vertx, "guard-node-2", clusterNodes, transport2, sm2, 500, 100);

@@ -94,7 +94,7 @@ public class HealthHandler implements Handler<RoutingContext> {
             return freeSpaceMb >= MIN_FREE_DISK_MB;
         } catch (Exception e) {
             logger.warn("Failed to check disk space: {}", e.getMessage());
-            logger.trace("Stack trace for disk space check failure", e);
+            logger.debug("Stack trace for disk space check failure", e);
             return true; // Assume OK if we can't check
         }
     }
@@ -110,7 +110,7 @@ public class HealthHandler implements Handler<RoutingContext> {
             return (double) availableMemory / maxMemory >= MIN_FREE_MEMORY_RATIO;
         } catch (Exception e) {
             logger.warn("Failed to check memory: {}", e.getMessage());
-            logger.trace("Stack trace for memory check failure", e);
+            logger.debug("Stack trace for memory check failure", e);
             return true; // Assume OK if we can't check
         }
     }

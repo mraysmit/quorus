@@ -18,10 +18,10 @@ package dev.mars.quorus.api.config;
 
 import dev.mars.quorus.controller.raft.RaftClusterConfig;
 import dev.mars.quorus.controller.raft.RaftNode;
-import dev.mars.quorus.controller.raft.RaftStateMachine;
+import dev.mars.quorus.controller.raft.RaftLogApplicator;
 import dev.mars.quorus.controller.raft.RaftTransport;
 import dev.mars.quorus.controller.raft.GrpcRaftTransport;
-import dev.mars.quorus.controller.state.QuorusStateMachine;
+import dev.mars.quorus.controller.state.QuorusStateStore;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Produces;
@@ -102,8 +102,8 @@ public class DistributedControllerConfiguration {
         );
 
         // Create state machine for transfer jobs
-        logger.debug("Creating QuorusStateMachine for state management");
-        RaftStateMachine stateMachine = new QuorusStateMachine();
+        logger.debug("Creating QuorusStateStore for state management");
+        RaftLogApplicator stateMachine = new QuorusStateStore();
         
         // Create and configure the Raft node
         logger.debug("Constructing RaftNode: nodeId={}, clusterSize={}", nodeId, clusterNodes.size());

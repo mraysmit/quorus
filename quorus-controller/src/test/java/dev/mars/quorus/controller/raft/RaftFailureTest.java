@@ -23,8 +23,8 @@ import dev.mars.quorus.controller.raft.grpc.InstallSnapshotResponse;
 import io.vertx.core.Future;
 import dev.mars.quorus.controller.raft.grpc.VoteRequest;
 import dev.mars.quorus.controller.raft.grpc.VoteResponse;
-import dev.mars.quorus.controller.state.QuorusStateMachine;
-import dev.mars.quorus.controller.state.StateMachineCommand;
+import dev.mars.quorus.controller.state.QuorusStateStore;
+import dev.mars.quorus.controller.state.RaftCommand;
 import dev.mars.quorus.controller.state.SystemMetadataCommand;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterEach;
@@ -65,9 +65,9 @@ class RaftFailureTest {
         transport2 = new InMemoryTransportSimulator("node2");
         transport3 = new InMemoryTransportSimulator("node3");
 
-        node1 = new RaftNode(vertx, "node1", clusterNodes, transport1, new QuorusStateMachine(), 600, 120);
-        node2 = new RaftNode(vertx, "node2", clusterNodes, transport2, new QuorusStateMachine(), 600, 120);
-        node3 = new RaftNode(vertx, "node3", clusterNodes, transport3, new QuorusStateMachine(), 600, 120);
+        node1 = new RaftNode(vertx, "node1", clusterNodes, transport1, new QuorusStateStore(), 600, 120);
+        node2 = new RaftNode(vertx, "node2", clusterNodes, transport2, new QuorusStateStore(), 600, 120);
+        node3 = new RaftNode(vertx, "node3", clusterNodes, transport3, new QuorusStateStore(), 600, 120);
     }
 
     @AfterEach
@@ -188,7 +188,7 @@ class RaftFailureTest {
     @Test
     void testInvalidClusterConfiguration() {
         // Test empty cluster - should not throw exception but should handle gracefully
-        RaftNode emptyClusterNode = new RaftNode(vertx, "test", Set.of(), transport1, new QuorusStateMachine());
+        RaftNode emptyClusterNode = new RaftNode(vertx, "test", Set.of(), transport1, new QuorusStateStore());
         assertNotNull(emptyClusterNode);
         assertEquals("test", emptyClusterNode.getNodeId());
         assertEquals(RaftNode.State.FOLLOWER, emptyClusterNode.getState());
@@ -231,7 +231,7 @@ class RaftFailureTest {
         };
         
         RaftNode failingNode = new RaftNode(vertx, "failing", Set.of("failing"), 
-                failingTransport, new QuorusStateMachine());
+                failingTransport, new QuorusStateStore());
         
         // Should handle transport failure gracefully
         Future<Void> future = failingNode.start();
@@ -247,9 +247,9 @@ class RaftFailureTest {
     @Test
     void testStateMachineFailures() {
         // Test state machine that throws exceptions
-        RaftStateMachine failingStateMachine = new RaftStateMachine() {
+        RaftLogApplicator failingStateMachine = new RaftLogApplicator() {
             @Override
-            public Object apply(StateMachineCommand command) {
+            public Object apply(RaftCommand command) {
                 throw new RuntimeException("State machine error");
             }
             
@@ -301,11 +301,11 @@ class RaftFailureTest {
         Set<String> clusterNodes = Set.of("fast1", "fast2", "fast3");
         
         RaftNode fast1 = new RaftNode(vertx, "fast1", clusterNodes, 
-                new InMemoryTransportSimulator("fast1"), new QuorusStateMachine(), 100, 50);
+                new InMemoryTransportSimulator("fast1"), new QuorusStateStore(), 100, 50);
         RaftNode fast2 = new RaftNode(vertx, "fast2", clusterNodes, 
-                new InMemoryTransportSimulator("fast2"), new QuorusStateMachine(), 100, 50);
+                new InMemoryTransportSimulator("fast2"), new QuorusStateStore(), 100, 50);
         RaftNode fast3 = new RaftNode(vertx, "fast3", clusterNodes, 
-                new InMemoryTransportSimulator("fast3"), new QuorusStateMachine(), 100, 50);
+                new InMemoryTransportSimulator("fast3"), new QuorusStateStore(), 100, 50);
         
         try {
             // Start all nodes simultaneously
@@ -391,7 +391,7 @@ class RaftFailureTest {
         // Test single node becoming leader
         Set<String> singleNode = Set.of("single");
         RaftNode single = new RaftNode(vertx, "single", singleNode, 
-                new InMemoryTransportSimulator("single"), new QuorusStateMachine(), 300, 100);
+                new InMemoryTransportSimulator("single"), new QuorusStateStore(), 300, 100);
         
         single.start();
         

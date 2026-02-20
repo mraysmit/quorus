@@ -24,7 +24,7 @@ package dev.mars.quorus.controller.state;
  * @since 2025-08-20
  */
 
-public final class SystemMetadataCommand implements StateMachineCommand {
+public final class SystemMetadataCommand implements RaftCommand {
 
     private static final long serialVersionUID = 1L;
 

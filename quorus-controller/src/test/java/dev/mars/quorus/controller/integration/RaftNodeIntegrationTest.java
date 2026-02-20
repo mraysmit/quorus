@@ -2,9 +2,9 @@ package dev.mars.quorus.controller.integration;
 
 import dev.mars.quorus.controller.raft.RaftMessage;
 import dev.mars.quorus.controller.raft.RaftNode;
-import dev.mars.quorus.controller.raft.RaftStateMachine;
+import dev.mars.quorus.controller.raft.RaftLogApplicator;
 import dev.mars.quorus.controller.raft.RaftTransport;
-import dev.mars.quorus.controller.state.StateMachineCommand;
+import dev.mars.quorus.controller.state.RaftCommand;
 import dev.mars.quorus.controller.raft.grpc.AppendEntriesRequest;
 import dev.mars.quorus.controller.raft.grpc.AppendEntriesResponse;
 import dev.mars.quorus.controller.raft.grpc.InstallSnapshotRequest;
@@ -40,7 +40,7 @@ public class RaftNodeIntegrationTest {
     @Test
     void testRaftNodeStartStop(VertxTestContext testContext) {
         TestRaftTransport transport = new TestRaftTransport();
-        TestRaftStateMachine stateMachine = new TestRaftStateMachine();
+        TestRaftLogApplicator stateMachine = new TestRaftLogApplicator();
         RaftNode node = new RaftNode(vertx, "node1", Set.of("node1"), transport, stateMachine);
 
         node.start()
@@ -61,7 +61,7 @@ public class RaftNodeIntegrationTest {
     @Test
     void testTimerCleanup(VertxTestContext testContext) {
         TestRaftTransport transport = new TestRaftTransport();
-        TestRaftStateMachine stateMachine = new TestRaftStateMachine();
+        TestRaftLogApplicator stateMachine = new TestRaftLogApplicator();
         RaftNode node = new RaftNode(vertx, "node1", Set.of("node1"), transport, stateMachine);
 
         node.start()
@@ -109,9 +109,9 @@ public class RaftNodeIntegrationTest {
         }
     }
 
-    static class TestRaftStateMachine implements RaftStateMachine {
+    static class TestRaftLogApplicator implements RaftLogApplicator {
         @Override
-        public Object apply(StateMachineCommand command) {
+        public Object apply(RaftCommand command) {
             return null;
         }
 

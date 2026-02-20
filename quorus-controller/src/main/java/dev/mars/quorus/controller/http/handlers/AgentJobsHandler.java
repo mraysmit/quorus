@@ -17,7 +17,7 @@
 package dev.mars.quorus.controller.http.handlers;
 
 import dev.mars.quorus.controller.raft.RaftNode;
-import dev.mars.quorus.controller.state.QuorusStateMachine;
+import dev.mars.quorus.controller.state.QuorusStateStore;
 import dev.mars.quorus.controller.state.TransferJobSnapshot;
 import dev.mars.quorus.core.JobAssignment;
 import dev.mars.quorus.core.JobAssignmentStatus;
@@ -54,7 +54,7 @@ public class AgentJobsHandler implements Handler<RoutingContext> {
     @Override
     public void handle(RoutingContext ctx) {
         String agentId = ctx.pathParam("agentId");
-        QuorusStateMachine stateMachine = (QuorusStateMachine) raftNode.getStateMachine();
+        QuorusStateStore stateMachine = (QuorusStateStore) raftNode.getStateStore();
 
         Map<String, JobAssignment> allAssignments = stateMachine.getJobAssignments();
         JsonArray pendingJobs = new JsonArray();

@@ -148,7 +148,7 @@ public class HttpApiServer {
                 .onSuccess(server -> logger.info("HTTP API Server listening on port {}", port))
                 .onFailure(err -> {
                     logger.error("Failed to start HTTP API Server: {}", err.getMessage());
-                    logger.trace("Stack trace for HTTP API Server start failure", err);
+                    logger.debug("Stack trace for HTTP API Server start failure", err);
                 })
                 .mapEmpty();
     }

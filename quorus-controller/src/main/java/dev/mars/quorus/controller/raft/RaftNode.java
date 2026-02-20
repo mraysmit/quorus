@@ -26,7 +26,7 @@ import dev.mars.quorus.controller.raft.storage.RaftStorage;
 import dev.mars.quorus.controller.raft.storage.RaftStorage.LogEntryData;
 import dev.mars.quorus.controller.raft.storage.RaftStorage.SnapshotData;
 import dev.mars.quorus.controller.state.ProtobufCommandCodec;
-import dev.mars.quorus.controller.state.StateMachineCommand;
+import dev.mars.quorus.controller.state.RaftCommand;
 import com.google.protobuf.ByteString;
 import io.vertx.core.Future;
 import io.vertx.core.Promise;
@@ -77,7 +77,7 @@ public class RaftNode {
     private final String nodeId;
     private final Set<String> clusterNodes;
     private final RaftTransport transport;
-    private final RaftStateMachine stateMachine;
+    private final RaftLogApplicator stateMachine;
     private final RaftStorage storage;  // WAL storage for durability
 
     // ========== PERSISTENT STATE ==========
@@ -144,7 +144,7 @@ public class RaftNode {
      * For production, use the constructor that accepts RaftStorage.
      */
     public RaftNode(Vertx vertx, String nodeId, Set<String> clusterNodes, RaftTransport transport,
-            RaftStateMachine stateMachine) {
+            RaftLogApplicator stateMachine) {
         this(vertx, nodeId, clusterNodes, transport, stateMachine, null, 5000, 1000,
                 false, 10000, 60000);
     }
@@ -154,7 +154,7 @@ public class RaftNode {
      * <p>If storage is null, runs in volatile mode (no persistence).
      */
     public RaftNode(Vertx vertx, String nodeId, Set<String> clusterNodes, RaftTransport transport,
-            RaftStateMachine stateMachine, long electionTimeoutMs, long heartbeatIntervalMs) {
+            RaftLogApplicator stateMachine, long electionTimeoutMs, long heartbeatIntervalMs) {
         this(vertx, nodeId, clusterNodes, transport, stateMachine, null, electionTimeoutMs, heartbeatIntervalMs,
                 false, 10000, 60000);
     }
@@ -173,7 +173,7 @@ public class RaftNode {
      * @param heartbeatIntervalMs Heartbeat interval in milliseconds
      */
     public RaftNode(Vertx vertx, String nodeId, Set<String> clusterNodes, RaftTransport transport,
-            RaftStateMachine stateMachine, RaftStorage storage, long electionTimeoutMs, long heartbeatIntervalMs) {
+            RaftLogApplicator stateMachine, RaftStorage storage, long electionTimeoutMs, long heartbeatIntervalMs) {
         this(vertx, nodeId, clusterNodes, transport, stateMachine, storage, electionTimeoutMs, heartbeatIntervalMs,
                 true, 10000, 60000);
     }
@@ -194,7 +194,7 @@ public class RaftNode {
      * @param snapshotCheckIntervalMs Interval between snapshot eligibility checks
      */
     public RaftNode(Vertx vertx, String nodeId, Set<String> clusterNodes, RaftTransport transport,
-            RaftStateMachine stateMachine, RaftStorage storage, long electionTimeoutMs, long heartbeatIntervalMs,
+            RaftLogApplicator stateMachine, RaftStorage storage, long electionTimeoutMs, long heartbeatIntervalMs,
             boolean snapshotEnabled, long snapshotThreshold, long snapshotCheckIntervalMs) {
         this.vertx = vertx;
         this.nodeId = nodeId;
@@ -313,13 +313,13 @@ public class RaftNode {
                     })
                     .onFailure(err -> {
                         logger.error("Failed to recover Raft state from storage: {}", err.getMessage());
-                        logger.trace("Stack trace for recovery failure", err);
+                        logger.debug("Stack trace for recovery failure", err);
                         promise.fail(err);
                     });
 
             } catch (Exception e) {
                 logger.error("Failed to start Raft node: {}", e.getMessage());
-                logger.trace("Stack trace for Raft node start failure", e);
+                logger.debug("Stack trace for Raft node start failure", e);
                 promise.fail(e);
             }
         });
@@ -377,7 +377,7 @@ public class RaftNode {
                     int replayedCount = 0;
                     for (LogEntryData entry : entries) {
                         if (entry.index() > snapshotLastIndex) {
-                            StateMachineCommand command = deserialize(ByteString.copyFrom(entry.payload()));
+                            RaftCommand command = deserialize(ByteString.copyFrom(entry.payload()));
                             log.add(new LogEntry(entry.term(), entry.index(), command));
                             replayedCount++;
                         }
@@ -401,7 +401,7 @@ public class RaftNode {
                     log.clear();
                     log.add(new LogEntry(0, 0, null));
                     for (LogEntryData entry : entries) {
-                        StateMachineCommand command = deserialize(ByteString.copyFrom(entry.payload()));
+                        RaftCommand command = deserialize(ByteString.copyFrom(entry.payload()));
                         log.add(new LogEntry(entry.term(), entry.index(), command));
                     }
                     logger.info("Recovered {} log entries from storage", entries.size());
@@ -414,7 +414,7 @@ public class RaftNode {
                                         currentTerm, log.size(), lastApplied, snapshotLastIndex))
             .onFailure(err -> {
                 logger.error("Recovery failed: {}", err.getMessage());
-                logger.trace("Stack trace for recovery failure", err);
+                logger.debug("Stack trace for recovery failure", err);
             });
     }
 
@@ -460,7 +460,7 @@ public class RaftNode {
                         })
                         .onFailure(err -> {
                             logger.warn("Error closing storage during shutdown: {}", err.getMessage());
-                            logger.trace("Stack trace for storage close error", err);
+                            logger.debug("Stack trace for storage close error", err);
                             promise.complete(); // Still complete, just log the warning
                         });
                 } else {
@@ -469,14 +469,14 @@ public class RaftNode {
                 }
             } catch (Exception e) {
                 logger.error("Failed to stop Raft node: {}", e.getMessage());
-                logger.trace("Stack trace for Raft node stop failure", e);
+                logger.debug("Stack trace for Raft node stop failure", e);
                 promise.fail(e);
             }
         });
         return promise.future();
     }
 
-    public Future<Object> submitCommand(StateMachineCommand command) {
+    public Future<Object> submitCommand(RaftCommand command) {
         Promise<Object> promise = Promise.promise();
 
         vertx.runOnContext(v -> {
@@ -513,7 +513,7 @@ public class RaftNode {
                 })
                 .onFailure(err -> {
                     logger.error("Failed to persist command to WAL: {}", err.getMessage());
-                    logger.trace("Stack trace for WAL persist failure", err);
+                    logger.debug("Stack trace for WAL persist failure", err);
                     promise.fail(err);
                 });
         });
@@ -545,7 +545,7 @@ public class RaftNode {
         return state == State.LEADER ? nodeId : votedFor;
     }
 
-    public RaftStateMachine getStateMachine() {
+    public RaftLogApplicator getStateStore() {
         return stateMachine;
     }
 
@@ -973,7 +973,7 @@ public class RaftNode {
                         })
                         .onFailure(err -> {
                             logger.error("Failed to persist vote metadata: {}", err.getMessage());
-                            logger.trace("Stack trace for vote metadata persist failure", err);
+                            logger.debug("Stack trace for vote metadata persist failure", err);
                             // Vote not granted if we can't persist
                             promise.complete(VoteResponse.newBuilder()
                                     .setTerm(currentTerm)
@@ -989,7 +989,7 @@ public class RaftNode {
                 }
             } catch (Exception e) {
                 logger.error("Error handling vote request: {}", e.getMessage());
-                logger.trace("Stack trace for vote request handling error", e);
+                logger.debug("Stack trace for vote request handling error", e);
                 promise.fail(e);
             }
         });
@@ -1058,7 +1058,7 @@ public class RaftNode {
 
                 long currentIndex = startIndex;
                 for (dev.mars.quorus.controller.raft.grpc.LogEntry entryProto : request.getEntriesList()) {
-                    StateMachineCommand command = deserialize(entryProto.getData());
+                    RaftCommand command = deserialize(entryProto.getData());
                     LogEntry newEntry = new LogEntry(entryProto.getTerm(), currentIndex, command);
 
                     if (hasLogEntry(currentIndex)) {
@@ -1106,7 +1106,7 @@ public class RaftNode {
                     })
                     .onFailure(err -> {
                         logger.error("AppendEntries failed during WAL persist: {}", err.getMessage());
-                        logger.trace("Stack trace for AppendEntries WAL persist failure", err);
+                        logger.debug("Stack trace for AppendEntries WAL persist failure", err);
                         promise.complete(AppendEntriesResponse.newBuilder()
                                 .setTerm(currentTerm)
                                 .setSuccess(false)
@@ -1115,7 +1115,7 @@ public class RaftNode {
 
             } catch (Exception e) {
                 logger.error("Error handling append entries request: {}", e.getMessage());
-                logger.trace("Stack trace for append entries handling error", e);
+                logger.debug("Stack trace for append entries handling error", e);
                 promise.fail(e);
             }
         });
@@ -1258,7 +1258,7 @@ public class RaftNode {
                     result = stateMachine.apply(entry.getCommand());
                 } catch (Exception e) {
                     logger.error("Failed to apply command at index {}: {}", lastApplied, e.getMessage());
-                    logger.trace("Stack trace for command apply failure at index {}", lastApplied, e);
+                    logger.debug("Stack trace for command apply failure at index {}", lastApplied, e);
                     exception = e;
                 }
             }
@@ -1715,11 +1715,11 @@ public class RaftNode {
 
     // ========== SERIALIZATION ==========
 
-    private ByteString serialize(StateMachineCommand cmd) {
+    private ByteString serialize(RaftCommand cmd) {
         return ProtobufCommandCodec.serialize(cmd);
     }
 
-    private StateMachineCommand deserialize(ByteString data) {
+    private RaftCommand deserialize(ByteString data) {
         return ProtobufCommandCodec.deserialize(data);
     }
 }

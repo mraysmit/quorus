@@ -21,7 +21,7 @@ import dev.mars.quorus.controller.raft.grpc.AppendEntriesResponse;
 import dev.mars.quorus.controller.raft.grpc.RaftServiceGrpc;
 import dev.mars.quorus.controller.raft.grpc.VoteRequest;
 import dev.mars.quorus.controller.raft.grpc.VoteResponse;
-import dev.mars.quorus.controller.state.QuorusStateMachine;
+import dev.mars.quorus.controller.state.QuorusStateStore;
 import io.grpc.*;
 import io.grpc.stub.StreamObserver;
 import io.vertx.core.Vertx;
@@ -76,7 +76,7 @@ class GrpcRaftServerTest {
         // Create a minimal RaftNode for testing
         Set<String> clusterNodes = Set.of("node1");
         InMemoryTransportSimulator transport = new InMemoryTransportSimulator("node1");
-        QuorusStateMachine stateMachine = new QuorusStateMachine();
+        QuorusStateStore stateMachine = new QuorusStateStore();
         raftNode = new RaftNode(vertx, "node1", clusterNodes, transport, stateMachine, 5000, 1000);
         raftNode.start();
         
@@ -923,8 +923,8 @@ class GrpcRaftServerTest {
         InMemoryTransportSimulator transport1 = new InMemoryTransportSimulator("nodeA");
         InMemoryTransportSimulator transport2 = new InMemoryTransportSimulator("nodeB");
         
-        QuorusStateMachine sm1 = new QuorusStateMachine();
-        QuorusStateMachine sm2 = new QuorusStateMachine();
+        QuorusStateStore sm1 = new QuorusStateStore();
+        QuorusStateStore sm2 = new QuorusStateStore();
         
         RaftNode node1 = new RaftNode(vertx, "nodeA", cluster1, transport1, sm1, 5000, 1000);
         RaftNode node2 = new RaftNode(vertx, "nodeB", cluster2, transport2, sm2, 5000, 1000);

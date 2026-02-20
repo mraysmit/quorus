@@ -17,7 +17,7 @@
 package dev.mars.quorus.controller.raft;
 
 import dev.mars.quorus.controller.raft.storage.InMemoryRaftStorage;
-import dev.mars.quorus.controller.state.QuorusStateMachine;
+import dev.mars.quorus.controller.state.QuorusStateStore;
 import dev.mars.quorus.controller.state.SystemMetadataCommand;
 import io.vertx.core.Vertx;
 import io.vertx.junit5.VertxExtension;
@@ -47,7 +47,7 @@ class RaftSnapshotTest {
 
     private Vertx vertx;
     private RaftNode leaderNode;
-    private QuorusStateMachine stateMachine;
+    private QuorusStateStore stateMachine;
     private InMemoryRaftStorage storage;
     private InMemoryTransportSimulator transport;
 
@@ -56,7 +56,7 @@ class RaftSnapshotTest {
         this.vertx = vertx;
         InMemoryTransportSimulator.clearAllTransports();
 
-        stateMachine = new QuorusStateMachine();
+        stateMachine = new QuorusStateStore();
         storage = new InMemoryRaftStorage();
         transport = new InMemoryTransportSimulator("node1");
 
@@ -201,7 +201,7 @@ class RaftSnapshotTest {
                             assertTrue(snapshotData.length > 0);
 
                             // Restore to a new state machine and verify
-                            QuorusStateMachine newSm = new QuorusStateMachine();
+                            QuorusStateStore newSm = new QuorusStateStore();
                             newSm.restoreSnapshot(snapshotData);
                             assertEquals("test-value", newSm.getMetadata("test-key"),
                                     "Restored state machine should have the metadata");
@@ -222,7 +222,7 @@ class RaftSnapshotTest {
         InMemoryRaftStorage storage2 = new InMemoryRaftStorage();
         InMemoryTransportSimulator transport2 = new InMemoryTransportSimulator("node-no-snap");
         Set<String> cluster = Set.of("node-no-snap");
-        RaftNode noSnapNode = new RaftNode(vertx, "node-no-snap", cluster, transport2, new QuorusStateMachine(),
+        RaftNode noSnapNode = new RaftNode(vertx, "node-no-snap", cluster, transport2, new QuorusStateStore(),
                 storage2, 1000, 200,
                 false, 5, 500);
 

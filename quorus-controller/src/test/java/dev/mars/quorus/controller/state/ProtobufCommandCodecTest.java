@@ -168,7 +168,7 @@ class ProtobufCommandCodecTest {
     }
 
     // NOTE: "Unsupported command type throws" test removed.
-    // With the StateMachineCommand sealed interface, the compiler prevents
+    // With the RaftCommand sealed interface, the compiler prevents
     // passing non-command types to serialize() — no runtime check needed.
 
     // ========== TransferJobCommand ==========
@@ -646,17 +646,17 @@ class ProtobufCommandCodecTest {
         @Test
         @DisplayName("Each command type is correctly dispatched via pattern matching after deserialization")
         void instanceofDispatchWorksAfterDeserialization() {
-            // Simulate what QuorusStateMachine.apply() does
-            List<StateMachineCommand> commands = List.of(
+            // Simulate what QuorusStateStore.apply() does
+            List<RaftCommand> commands = List.of(
                     TransferJobCommand.create(createTransferJob()),
                     AgentCommand.register(createAgentInfo()),
                     SystemMetadataCommand.set("key", "value"),
                     JobAssignmentCommand.assign(createJobAssignment()),
                     JobQueueCommand.dequeue("job-001"));
 
-            for (StateMachineCommand original : commands) {
+            for (RaftCommand original : commands) {
                 ByteString bytes = ProtobufCommandCodec.serialize(original);
-                StateMachineCommand restored = ProtobufCommandCodec.deserialize(bytes);
+                RaftCommand restored = ProtobufCommandCodec.deserialize(bytes);
 
                 // Exhaustive switch — compiler guarantees all cases covered
                 switch (original) {

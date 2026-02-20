@@ -22,6 +22,7 @@ import dev.mars.quorus.core.*;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Optional;
 
 /**
  * Protobuf codec for {@link JobQueueCommand}, {@link QueuedJob},
@@ -44,21 +45,11 @@ final class JobQueueCodec {
     static JobQueueCommandProto toProto(JobQueueCommand cmd) {
         JobQueueCommandProto.Builder builder = JobQueueCommandProto.newBuilder()
                 .setType(toProto(cmd.getType()));
-        if (cmd.getJobId() != null) {
-            builder.setJobId(cmd.getJobId());
-        }
-        if (cmd.getQueuedJob() != null) {
-            builder.setQueuedJob(toProto(cmd.getQueuedJob()));
-        }
-        if (cmd.getNewPriority() != null) {
-            builder.setNewPriority(toProto(cmd.getNewPriority()));
-        }
-        if (cmd.getReason() != null) {
-            builder.setReason(cmd.getReason());
-        }
-        if (cmd.getTimestamp() != null) {
-            builder.setTimestampEpochMs(cmd.getTimestamp().toEpochMilli());
-        }
+        Optional.ofNullable(cmd.getJobId()).ifPresent(builder::setJobId);
+        Optional.ofNullable(cmd.getQueuedJob()).ifPresent(q -> builder.setQueuedJob(toProto(q)));
+        Optional.ofNullable(cmd.getNewPriority()).ifPresent(p -> builder.setNewPriority(toProto(p)));
+        Optional.ofNullable(cmd.getReason()).ifPresent(builder::setReason);
+        Optional.ofNullable(cmd.getTimestamp()).ifPresent(t -> builder.setTimestampEpochMs(t.toEpochMilli()));
         return builder.build();
     }
 
@@ -80,30 +71,14 @@ final class JobQueueCodec {
     private static QueuedJobProto toProto(QueuedJob queuedJob) {
         QueuedJobProto.Builder builder = QueuedJobProto.newBuilder()
                 .setRetryCount(queuedJob.getRetryCount());
-        if (queuedJob.getTransferJob() != null) {
-            builder.setTransferJob(TransferCodec.toProto(queuedJob.getTransferJob()));
-        }
-        if (queuedJob.getPriority() != null) {
-            builder.setPriority(toProto(queuedJob.getPriority()));
-        }
-        if (queuedJob.getQueueTime() != null) {
-            builder.setQueueTimeEpochMs(queuedJob.getQueueTime().toEpochMilli());
-        }
-        if (queuedJob.getRequirements() != null) {
-            builder.setRequirements(toProto(queuedJob.getRequirements()));
-        }
-        if (queuedJob.getSubmittedBy() != null) {
-            builder.setSubmittedBy(queuedJob.getSubmittedBy());
-        }
-        if (queuedJob.getWorkflowId() != null) {
-            builder.setWorkflowId(queuedJob.getWorkflowId());
-        }
-        if (queuedJob.getGroupName() != null) {
-            builder.setGroupName(queuedJob.getGroupName());
-        }
-        if (queuedJob.getEarliestStartTime() != null) {
-            builder.setEarliestStartTimeEpochMs(queuedJob.getEarliestStartTime().toEpochMilli());
-        }
+        Optional.ofNullable(queuedJob.getTransferJob()).ifPresent(j -> builder.setTransferJob(TransferCodec.toProto(j)));
+        Optional.ofNullable(queuedJob.getPriority()).ifPresent(p -> builder.setPriority(toProto(p)));
+        Optional.ofNullable(queuedJob.getQueueTime()).ifPresent(t -> builder.setQueueTimeEpochMs(t.toEpochMilli()));
+        Optional.ofNullable(queuedJob.getRequirements()).ifPresent(r -> builder.setRequirements(toProto(r)));
+        Optional.ofNullable(queuedJob.getSubmittedBy()).ifPresent(builder::setSubmittedBy);
+        Optional.ofNullable(queuedJob.getWorkflowId()).ifPresent(builder::setWorkflowId);
+        Optional.ofNullable(queuedJob.getGroupName()).ifPresent(builder::setGroupName);
+        Optional.ofNullable(queuedJob.getEarliestStartTime()).ifPresent(t -> builder.setEarliestStartTimeEpochMs(t.toEpochMilli()));
         return builder.build();
     }
 
@@ -142,33 +117,15 @@ final class JobQueueCodec {
                 .setRequiresEncryption(req.isRequiresEncryption())
                 .setRequiresCompression(req.isRequiresCompression())
                 .setMaxConcurrentJobs(req.getMaxConcurrentJobs());
-        if (req.getTargetRegion() != null) {
-            builder.setTargetRegion(req.getTargetRegion());
-        }
-        if (req.getRequiredProtocols() != null) {
-            builder.addAllRequiredProtocols(req.getRequiredProtocols());
-        }
-        if (req.getPreferredRegions() != null) {
-            builder.addAllPreferredRegions(req.getPreferredRegions());
-        }
-        if (req.getExcludedAgents() != null) {
-            builder.addAllExcludedAgents(req.getExcludedAgents());
-        }
-        if (req.getPreferredAgents() != null) {
-            builder.addAllPreferredAgents(req.getPreferredAgents());
-        }
-        if (req.getSelectionStrategy() != null) {
-            builder.setSelectionStrategy(toProto(req.getSelectionStrategy()));
-        }
-        if (req.getCustomAttributes() != null) {
-            builder.putAllCustomAttributes(req.getCustomAttributes());
-        }
-        if (req.getTenantId() != null) {
-            builder.setTenantId(req.getTenantId());
-        }
-        if (req.getNamespace() != null) {
-            builder.setNamespace(req.getNamespace());
-        }
+        Optional.ofNullable(req.getTargetRegion()).ifPresent(builder::setTargetRegion);
+        Optional.ofNullable(req.getRequiredProtocols()).ifPresent(builder::addAllRequiredProtocols);
+        Optional.ofNullable(req.getPreferredRegions()).ifPresent(builder::addAllPreferredRegions);
+        Optional.ofNullable(req.getExcludedAgents()).ifPresent(builder::addAllExcludedAgents);
+        Optional.ofNullable(req.getPreferredAgents()).ifPresent(builder::addAllPreferredAgents);
+        Optional.ofNullable(req.getSelectionStrategy()).ifPresent(s -> builder.setSelectionStrategy(toProto(s)));
+        Optional.ofNullable(req.getCustomAttributes()).ifPresent(builder::putAllCustomAttributes);
+        Optional.ofNullable(req.getTenantId()).ifPresent(builder::setTenantId);
+        Optional.ofNullable(req.getNamespace()).ifPresent(builder::setNamespace);
         return builder.build();
     }
 

@@ -70,7 +70,7 @@ public class AgentRegistrationHandler implements Handler<RoutingContext> {
                     .onFailure(ctx::fail);
         } catch (Exception e) {
             logger.error("Failed to register agent: {}", e.getMessage());
-            logger.trace("Stack trace for agent registration failure", e);
+            logger.debug("Stack trace for agent registration failure", e);
             ctx.fail(e);
         }
     }

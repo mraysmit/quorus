@@ -380,7 +380,7 @@ public final class AppConfig {
             }
         } catch (IOException e) {
             logger.error("Error loading configuration file: {}", e.getMessage());
-            logger.trace("Stack trace for configuration load error", e);
+            logger.debug("Stack trace for configuration load error", e);
         }
     }
 

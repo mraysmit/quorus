@@ -19,7 +19,7 @@ package dev.mars.quorus.controller.http;
 import dev.mars.quorus.controller.raft.InMemoryTransportSimulator;
 import dev.mars.quorus.controller.raft.RaftNode;
 import dev.mars.quorus.controller.raft.RaftTransport;
-import dev.mars.quorus.controller.state.QuorusStateMachine;
+import dev.mars.quorus.controller.state.QuorusStateStore;
 import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.client.WebClient;
@@ -64,7 +64,7 @@ class JobAssignmentHandlerTest {
     static void setUp() throws Exception {
         vertx = Vertx.vertx();
 
-        QuorusStateMachine stateMachine = new QuorusStateMachine();
+        QuorusStateStore stateMachine = new QuorusStateStore();
         RaftTransport transport = new InMemoryTransportSimulator("assign-test-node");
         Set<String> clusterNodes = Set.of("assign-test-node");
 

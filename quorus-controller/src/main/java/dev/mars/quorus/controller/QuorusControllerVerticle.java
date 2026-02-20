@@ -30,7 +30,7 @@ import dev.mars.quorus.controller.raft.GrpcRaftTransport;
 import dev.mars.quorus.controller.raft.GrpcRaftServer;
 import dev.mars.quorus.controller.raft.storage.RaftStorage;
 import dev.mars.quorus.controller.raft.storage.RaftStorageFactory;
-import dev.mars.quorus.controller.state.QuorusStateMachine;
+import dev.mars.quorus.controller.state.QuorusStateStore;
 import dev.mars.quorus.controller.http.HttpApiServer;
 
 import java.nio.file.Path;
@@ -124,7 +124,7 @@ public class QuorusControllerVerticle extends AbstractVerticle {
             Map<String, String> initialMetadata = new HashMap<>();
             initialMetadata.put("version", config.getVersion());
 
-            QuorusStateMachine stateMachine = new QuorusStateMachine(initialMetadata);
+            QuorusStateStore stateMachine = new QuorusStateStore(initialMetadata);
 
             // Use the constructor with storage and snapshot configuration
             this.raftNode = new RaftNode(vertx, nodeId, clusterNodeIds, transport, 
@@ -252,7 +252,7 @@ public class QuorusControllerVerticle extends AbstractVerticle {
                 stopPromise.complete();
             } catch (Exception e) {
                 logger.warn("Error during shutdown: {}", e.getMessage());
-                logger.trace("Stack trace for shutdown error", e);
+                logger.debug("Stack trace for shutdown error", e);
                 stopPromise.complete();
             }
         }

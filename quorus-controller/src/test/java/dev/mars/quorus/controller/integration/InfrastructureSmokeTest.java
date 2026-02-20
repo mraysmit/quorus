@@ -23,7 +23,7 @@ import dev.mars.quorus.controller.http.HttpApiServer;
 import dev.mars.quorus.controller.raft.InMemoryTransportSimulator;
 import dev.mars.quorus.controller.raft.RaftNode;
 import dev.mars.quorus.controller.raft.RaftTransport;
-import dev.mars.quorus.controller.state.QuorusStateMachine;
+import dev.mars.quorus.controller.state.QuorusStateStore;
 import io.vertx.core.Vertx;
 import org.junit.jupiter.api.*;
 
@@ -71,7 +71,7 @@ class InfrastructureSmokeTest {
 
     private static Vertx vertx;
     private static RaftNode raftNode;
-    private static QuorusStateMachine stateMachine;
+    private static QuorusStateStore stateMachine;
     private static HttpApiServer httpServer;
     private static HttpClient httpClient;
     private static ObjectMapper objectMapper;
@@ -92,7 +92,7 @@ class InfrastructureSmokeTest {
                 .build();
 
         // Initialize state machine
-        stateMachine = new QuorusStateMachine();
+        stateMachine = new QuorusStateStore();
 
         // Create transport and Raft node
         RaftTransport transport = new InMemoryTransportSimulator("smoke-test-node");

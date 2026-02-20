@@ -255,7 +255,7 @@ public class SimpleTransferEngine implements TransferEngine {
                         }
                     } catch (Exception e) {
                         logger.warn("Error aborting protocol for job {}: {}", jobId, e.getMessage());
-                        logger.trace("Stack trace for abort error on job {}", jobId, e);
+                        logger.debug("Stack trace for abort error on job {}", jobId, e);
                     }
                 }
             }
@@ -543,7 +543,7 @@ public class SimpleTransferEngine implements TransferEngine {
 
                 logger.warn("Transfer attempt {} failed for job {}: {}",
                         attempt, job.getJobId(), e.getMessage());
-                logger.trace("Stack trace for failed attempt {} on job {}", attempt, job.getJobId(), e);
+                logger.debug("Stack trace for failed attempt {} on job {}", attempt, job.getJobId(), e);
 
                 if (attempt <= maxRetryAttempts && context.shouldContinue()) {
                     long delay = retryDelayMs * attempt;
@@ -586,7 +586,7 @@ public class SimpleTransferEngine implements TransferEngine {
 
         logger.error("{} transfer failed permanently: {} - {}", direction, job.getJobId(), errorMessage);
         if (logger.isTraceEnabled() && lastException != null) {
-            logger.trace("Full stack trace for failed transfer {}", job.getJobId(), lastException);
+            logger.debug("Full stack trace for failed transfer {}", job.getJobId(), lastException);
         }
         return job.toResult();
     }

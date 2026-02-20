@@ -31,7 +31,7 @@ import java.time.Instant;
  * @since 2025-08-26
  * @version 1.0
  */
-public final class AgentCommand implements StateMachineCommand {
+public final class AgentCommand implements RaftCommand {
 
     private static final long serialVersionUID = 1L;
 

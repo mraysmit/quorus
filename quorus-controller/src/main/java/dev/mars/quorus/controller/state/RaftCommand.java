@@ -27,7 +27,7 @@ import java.io.Serializable;
  * will flag any new permitted subtype that is missing from a switch.
  *
  * <p>All permitted subtypes represent a distinct category of state
- * mutation that the {@link QuorusStateMachine} can apply:
+ * mutation that the {@link QuorusStateStore} can apply:
  * <ul>
  *   <li>{@link TransferJobCommand} — transfer lifecycle operations</li>
  *   <li>{@link AgentCommand} — agent registration, heartbeat, capability updates</li>
@@ -41,7 +41,7 @@ import java.io.Serializable;
  * @version 1.0
  * @since 2026-02-19
  */
-public sealed interface StateMachineCommand extends Serializable
+public sealed interface RaftCommand extends Serializable
         permits TransferJobCommand, AgentCommand, SystemMetadataCommand,
                 JobAssignmentCommand, JobQueueCommand, RouteCommand {
 }

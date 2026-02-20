@@ -377,8 +377,8 @@ message RouteCommandProto {
 // ===== RAFT COMMAND WRAPPER =====
 
 // Top-level wrapper for all state machine commands.
-// Each Raft log entry's data field contains a serialized RaftCommand.
-message RaftCommand {
+// Each Raft log entry's data field contains a serialized RaftCommandMessage.
+message RaftCommandMessage {
   oneof command {
     TransferJobCommandProto transfer_job_command = 1;
     AgentCommandProto agent_command = 2;

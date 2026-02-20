@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -45,21 +46,11 @@ final class RouteCodec {
     static RouteCommandProto toProto(RouteCommand cmd) {
         RouteCommandProto.Builder builder = RouteCommandProto.newBuilder()
                 .setType(toProto(cmd.getType()));
-        if (cmd.getRouteId() != null) {
-            builder.setRouteId(cmd.getRouteId());
-        }
-        if (cmd.getRouteConfiguration() != null) {
-            builder.setRouteConfiguration(toProto(cmd.getRouteConfiguration()));
-        }
-        if (cmd.getNewStatus() != null) {
-            builder.setNewStatus(toProto(cmd.getNewStatus()));
-        }
-        if (cmd.getReason() != null) {
-            builder.setReason(cmd.getReason());
-        }
-        if (cmd.getTimestamp() != null) {
-            builder.setTimestampEpochMs(cmd.getTimestamp().toEpochMilli());
-        }
+        Optional.ofNullable(cmd.getRouteId()).ifPresent(builder::setRouteId);
+        Optional.ofNullable(cmd.getRouteConfiguration()).ifPresent(c -> builder.setRouteConfiguration(toProto(c)));
+        Optional.ofNullable(cmd.getNewStatus()).ifPresent(s -> builder.setNewStatus(toProto(s)));
+        Optional.ofNullable(cmd.getReason()).ifPresent(builder::setReason);
+        Optional.ofNullable(cmd.getTimestamp()).ifPresent(t -> builder.setTimestampEpochMs(t.toEpochMilli()));
         return builder.build();
     }
 
@@ -81,18 +72,18 @@ final class RouteCodec {
 
     private static RouteConfigurationProto toProto(RouteConfiguration config) {
         RouteConfigurationProto.Builder builder = RouteConfigurationProto.newBuilder();
-        if (config.getRouteId() != null) builder.setRouteId(config.getRouteId());
-        if (config.getName() != null) builder.setName(config.getName());
-        if (config.getDescription() != null) builder.setDescription(config.getDescription());
-        if (config.getSourceAgentId() != null) builder.setSourceAgentId(config.getSourceAgentId());
-        if (config.getSourceLocation() != null) builder.setSourceLocation(config.getSourceLocation());
-        if (config.getDestinationAgentId() != null) builder.setDestinationAgentId(config.getDestinationAgentId());
-        if (config.getDestinationLocation() != null) builder.setDestinationLocation(config.getDestinationLocation());
-        if (config.getTrigger() != null) builder.setTrigger(toProto(config.getTrigger()));
-        if (config.getStatus() != null) builder.setStatus(toProto(config.getStatus()));
-        if (config.getOptions() != null) builder.putAllOptions(config.getOptions());
-        if (config.getCreatedAt() != null) builder.setCreatedAtEpochMs(config.getCreatedAt().toEpochMilli());
-        if (config.getUpdatedAt() != null) builder.setUpdatedAtEpochMs(config.getUpdatedAt().toEpochMilli());
+        Optional.ofNullable(config.getRouteId()).ifPresent(builder::setRouteId);
+        Optional.ofNullable(config.getName()).ifPresent(builder::setName);
+        Optional.ofNullable(config.getDescription()).ifPresent(builder::setDescription);
+        Optional.ofNullable(config.getSourceAgentId()).ifPresent(builder::setSourceAgentId);
+        Optional.ofNullable(config.getSourceLocation()).ifPresent(builder::setSourceLocation);
+        Optional.ofNullable(config.getDestinationAgentId()).ifPresent(builder::setDestinationAgentId);
+        Optional.ofNullable(config.getDestinationLocation()).ifPresent(builder::setDestinationLocation);
+        Optional.ofNullable(config.getTrigger()).ifPresent(t -> builder.setTrigger(toProto(t)));
+        Optional.ofNullable(config.getStatus()).ifPresent(s -> builder.setStatus(toProto(s)));
+        Optional.ofNullable(config.getOptions()).ifPresent(builder::putAllOptions);
+        Optional.ofNullable(config.getCreatedAt()).ifPresent(t -> builder.setCreatedAtEpochMs(t.toEpochMilli()));
+        Optional.ofNullable(config.getUpdatedAt()).ifPresent(t -> builder.setUpdatedAtEpochMs(t.toEpochMilli()));
         return builder.build();
     }
 
@@ -125,21 +116,18 @@ final class RouteCodec {
     private static TriggerConfigurationProto toProto(TriggerConfiguration trigger) {
         TriggerConfigurationProto.Builder builder = TriggerConfigurationProto.newBuilder()
                 .setType(toProto(trigger.getType()));
-        if (trigger.getEventPatterns() != null) builder.addAllEventPatterns(trigger.getEventPatterns());
-        if (trigger.getExcludePatterns() != null) builder.addAllExcludePatterns(trigger.getExcludePatterns());
+        Optional.ofNullable(trigger.getEventPatterns()).ifPresent(builder::addAllEventPatterns);
+        Optional.ofNullable(trigger.getExcludePatterns()).ifPresent(builder::addAllExcludePatterns);
         builder.setDebounceMs(trigger.getDebounceMs());
-        if (trigger.getCronExpression() != null) builder.setCronExpression(trigger.getCronExpression());
-        if (trigger.getTimezone() != null) builder.setTimezone(trigger.getTimezone());
+        Optional.ofNullable(trigger.getCronExpression()).ifPresent(builder::setCronExpression);
+        Optional.ofNullable(trigger.getTimezone()).ifPresent(builder::setTimezone);
         builder.setIntervalMinutes(trigger.getIntervalMinutes());
         builder.setFileCountThreshold(trigger.getFileCountThreshold());
         builder.setSizeThresholdMb(trigger.getSizeThresholdMb());
         builder.setMaxWaitMinutes(trigger.getMaxWaitMinutes());
-        if (trigger.getCompositeOperator() != null) builder.setCompositeOperator(trigger.getCompositeOperator());
-        if (trigger.getChildTriggers() != null) {
-            for (TriggerConfiguration child : trigger.getChildTriggers()) {
-                builder.addChildTriggers(toProto(child));
-            }
-        }
+        Optional.ofNullable(trigger.getCompositeOperator()).ifPresent(builder::setCompositeOperator);
+        Optional.ofNullable(trigger.getChildTriggers()).ifPresent(children ->
+                children.forEach(c -> builder.addChildTriggers(toProto(c))));
         return builder.build();
     }
 
