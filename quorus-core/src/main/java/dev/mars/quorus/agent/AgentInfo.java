@@ -25,7 +25,8 @@ import java.util.Objects;
 
 /**
  * Represents comprehensive information about a Quorus agent in the fleet.
- * This class contains all the metadata needed to manage and communicate with an agent.
+ * This class contains all the metadata needed to manage and communicate with an
+ * agent.
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @since 2025-08-26
@@ -81,10 +82,10 @@ public class AgentInfo {
     /**
      * Constructor for creating agent info with basic details.
      * 
-     * @param agentId unique identifier for the agent
+     * @param agentId  unique identifier for the agent
      * @param hostname the hostname of the agent
-     * @param address the IP address of the agent
-     * @param port the port the agent is listening on
+     * @param address  the IP address of the agent
+     * @param port     the port the agent is listening on
      */
     public AgentInfo(String agentId, String hostname, String address, int port) {
         this();
@@ -313,7 +314,7 @@ public class AgentInfo {
     /**
      * Add a metadata entry.
      * 
-     * @param key the metadata key
+     * @param key   the metadata key
      * @param value the metadata value
      */
     public void addMetadata(String key, String value) {
@@ -334,11 +335,12 @@ public class AgentInfo {
 
     /**
      * Check if the agent is currently healthy.
-     * 
+     * Delegates to {@link AgentStatus#isHealthy()} for consistent classification.
+     *
      * @return true if the agent is healthy
      */
     public boolean isHealthy() {
-        return status == AgentStatus.HEALTHY || status == AgentStatus.ACTIVE;
+        return status != null && status.isHealthy();
     }
 
     /**
@@ -347,15 +349,17 @@ public class AgentInfo {
      * @return true if the agent is available
      */
     public boolean isAvailable() {
-        return status == AgentStatus.HEALTHY || 
-               status == AgentStatus.ACTIVE || 
-               status == AgentStatus.IDLE;
+        return status == AgentStatus.HEALTHY ||
+                status == AgentStatus.ACTIVE ||
+                status == AgentStatus.IDLE;
     }
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (this == o)
+            return true;
+        if (o == null || getClass() != o.getClass())
+            return false;
         AgentInfo agentInfo = (AgentInfo) o;
         return Objects.equals(agentId, agentInfo.agentId);
     }

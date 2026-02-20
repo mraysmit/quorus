@@ -31,9 +31,11 @@ import java.util.Map;
 /**
  * HTTP handler for listing registered agents.
  *
- * <p>Endpoint: {@code GET /api/v1/agents}
+ * <p>
+ * Endpoint: {@code GET /api/v1/agents}
  *
- * <p>Returns a list of all registered agents from the Raft state machine.
+ * <p>
+ * Returns a list of all registered agents from the Raft state machine.
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @version 2.0 (Vert.x reactive)
@@ -76,4 +78,3 @@ public class AgentListHandler implements Handler<RoutingContext> {
                 .put("count", agents.size()));
     }
 }
-

@@ -43,7 +43,7 @@ class AgentInfoTest {
     @Test
     void testDefaultConstructor() {
         AgentInfo agentInfo = new AgentInfo();
-        
+
         assertNotNull(agentInfo.getMetadata());
         assertEquals(AgentStatus.REGISTERING, agentInfo.getStatus());
         assertNotNull(agentInfo.getRegistrationTime());
@@ -53,7 +53,7 @@ class AgentInfoTest {
     @Test
     void testParameterizedConstructor() {
         AgentInfo agentInfo = new AgentInfo("agent-001", "host1.example.com", "192.168.1.100", 8080);
-        
+
         assertEquals("agent-001", agentInfo.getAgentId());
         assertEquals("host1.example.com", agentInfo.getHostname());
         assertEquals("192.168.1.100", agentInfo.getAddress());
@@ -100,7 +100,7 @@ class AgentInfoTest {
     @Test
     void testAddMetadata() {
         AgentInfo agentInfo = new AgentInfo();
-        
+
         agentInfo.addMetadata("environment", "production");
         agentInfo.addMetadata("tier", "premium");
 
@@ -126,7 +126,7 @@ class AgentInfoTest {
     void testToString() {
         AgentInfo agentInfo = new AgentInfo("agent-001", "host1", "192.168.1.1", 8080);
         String toString = agentInfo.toString();
-        
+
         assertNotNull(toString);
         assertTrue(toString.contains("agent-001"));
         assertTrue(toString.contains("host1"));
@@ -144,7 +144,7 @@ class AgentInfoTest {
         assertTrue(json.contains("agent-001"));
         assertTrue(json.contains("1.0.0"));
         assertTrue(json.contains("us-west-2"));
-        
+
         AgentInfo deserialized = objectMapper.readValue(json, AgentInfo.class);
         assertEquals("agent-001", deserialized.getAgentId());
         assertEquals("host1", deserialized.getHostname());
@@ -157,19 +157,19 @@ class AgentInfoTest {
     @Test
     void testIsHealthy() {
         AgentInfo agentInfo = new AgentInfo();
-        
+
         agentInfo.setStatus(AgentStatus.HEALTHY);
         assertTrue(agentInfo.isHealthy());
-        
+
         agentInfo.setStatus(AgentStatus.ACTIVE);
         assertTrue(agentInfo.isHealthy());
-        
+
         agentInfo.setStatus(AgentStatus.IDLE);
-        assertFalse(agentInfo.isHealthy()); // IDLE is available but not healthy
-        
+        assertTrue(agentInfo.isHealthy()); // IDLE delegates to AgentStatus.isHealthy()
+
         agentInfo.setStatus(AgentStatus.FAILED);
         assertFalse(agentInfo.isHealthy());
-        
+
         agentInfo.setStatus(AgentStatus.UNREACHABLE);
         assertFalse(agentInfo.isHealthy());
     }
@@ -177,16 +177,16 @@ class AgentInfoTest {
     @Test
     void testIsAvailable() {
         AgentInfo agentInfo = new AgentInfo();
-        
+
         agentInfo.setStatus(AgentStatus.HEALTHY);
         assertTrue(agentInfo.isAvailable());
-        
+
         agentInfo.setStatus(AgentStatus.IDLE);
         assertTrue(agentInfo.isAvailable());
-        
+
         agentInfo.setStatus(AgentStatus.OVERLOADED);
         assertFalse(agentInfo.isAvailable());
-        
+
         agentInfo.setStatus(AgentStatus.MAINTENANCE);
         assertFalse(agentInfo.isAvailable());
     }

@@ -175,4 +175,70 @@ class AgentStatusTest {
             assertFalse(status.getDescription().isEmpty());
         }
     }
+
+    @Test
+    void testIsHealthy() {
+        assertTrue(AgentStatus.HEALTHY.isHealthy());
+        assertTrue(AgentStatus.ACTIVE.isHealthy());
+        assertTrue(AgentStatus.IDLE.isHealthy());
+
+        assertFalse(AgentStatus.REGISTERING.isHealthy());
+        assertFalse(AgentStatus.DEGRADED.isHealthy());
+        assertFalse(AgentStatus.OVERLOADED.isHealthy());
+        assertFalse(AgentStatus.MAINTENANCE.isHealthy());
+        assertFalse(AgentStatus.DRAINING.isHealthy());
+        assertFalse(AgentStatus.UNREACHABLE.isHealthy());
+        assertFalse(AgentStatus.FAILED.isHealthy());
+        assertFalse(AgentStatus.DEREGISTERED.isHealthy());
+    }
+
+    @Test
+    void testIsTerminal() {
+        assertTrue(AgentStatus.DEREGISTERED.isTerminal());
+
+        // FAILED is NOT terminal — it can transition to DEREGISTERED
+        assertFalse(AgentStatus.FAILED.isTerminal());
+
+        assertFalse(AgentStatus.REGISTERING.isTerminal());
+        assertFalse(AgentStatus.HEALTHY.isTerminal());
+        assertFalse(AgentStatus.ACTIVE.isTerminal());
+        assertFalse(AgentStatus.IDLE.isTerminal());
+        assertFalse(AgentStatus.DEGRADED.isTerminal());
+        assertFalse(AgentStatus.OVERLOADED.isTerminal());
+        assertFalse(AgentStatus.MAINTENANCE.isTerminal());
+        assertFalse(AgentStatus.DRAINING.isTerminal());
+        assertFalse(AgentStatus.UNREACHABLE.isTerminal());
+    }
+
+    @Test
+    void testIsProblematic() {
+        assertTrue(AgentStatus.DEGRADED.isProblematic());
+        assertTrue(AgentStatus.OVERLOADED.isProblematic());
+        assertTrue(AgentStatus.UNREACHABLE.isProblematic());
+        assertTrue(AgentStatus.FAILED.isProblematic());
+
+        assertFalse(AgentStatus.HEALTHY.isProblematic());
+        assertFalse(AgentStatus.ACTIVE.isProblematic());
+        assertFalse(AgentStatus.IDLE.isProblematic());
+        assertFalse(AgentStatus.REGISTERING.isProblematic());
+        assertFalse(AgentStatus.MAINTENANCE.isProblematic());
+        assertFalse(AgentStatus.DRAINING.isProblematic());
+        assertFalse(AgentStatus.DEREGISTERED.isProblematic());
+    }
+
+    @Test
+    void testIsTransitional() {
+        assertTrue(AgentStatus.REGISTERING.isTransitional());
+        assertTrue(AgentStatus.MAINTENANCE.isTransitional());
+        assertTrue(AgentStatus.DRAINING.isTransitional());
+
+        assertFalse(AgentStatus.HEALTHY.isTransitional());
+        assertFalse(AgentStatus.ACTIVE.isTransitional());
+        assertFalse(AgentStatus.IDLE.isTransitional());
+        assertFalse(AgentStatus.DEGRADED.isTransitional());
+        assertFalse(AgentStatus.OVERLOADED.isTransitional());
+        assertFalse(AgentStatus.UNREACHABLE.isTransitional());
+        assertFalse(AgentStatus.FAILED.isTransitional());
+        assertFalse(AgentStatus.DEREGISTERED.isTransitional());
+    }
 }
