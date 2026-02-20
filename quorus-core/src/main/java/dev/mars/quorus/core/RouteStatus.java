@@ -78,5 +78,74 @@ public enum RouteStatus {
     /**
      * Route has been deleted. Terminal state.
      */
-    DELETED
+    DELETED;
+
+    /**
+     * Check if this status represents a terminal state.
+     * Terminal states cannot transition to other states (except FAILED which can be reconfigured).
+     *
+     * @return {@code true} if the route is in a terminal state
+     */
+    public boolean isTerminal() {
+        return this == DELETED;
+    }
+
+    /**
+     * Check if this status indicates the route is currently active or processing.
+     *
+     * @return {@code true} if the route is in an active processing state
+     */
+    public boolean isActive() {
+        return this == ACTIVE || this == TRIGGERED || this == TRANSFERRING;
+    }
+
+    /**
+     * Checks whether a transition from this status to the given target status is valid.
+     *
+     * <p><strong>Valid transitions:</strong></p>
+     * <pre>
+     *   CONFIGURED   → ACTIVE, DELETED
+     *   ACTIVE       → TRIGGERED, SUSPENDED, DEGRADED, DELETED
+     *   TRIGGERED    → TRANSFERRING, ACTIVE
+     *   TRANSFERRING → ACTIVE, FAILED
+     *   SUSPENDED    → ACTIVE, DELETED
+     *   DEGRADED     → ACTIVE, DELETED
+     *   FAILED       → CONFIGURED, DELETED
+     *   DELETED      → (terminal — no transitions)
+     * </pre>
+     *
+     * @param target the target status to transition to
+     * @return {@code true} if the transition is valid, {@code false} otherwise
+     */
+    public boolean canTransitionTo(RouteStatus target) {
+        return switch (this) {
+            case CONFIGURED -> target == ACTIVE || target == DELETED;
+            case ACTIVE -> target == TRIGGERED || target == SUSPENDED
+                        || target == DEGRADED || target == DELETED;
+            case TRIGGERED -> target == TRANSFERRING || target == ACTIVE;
+            case TRANSFERRING -> target == ACTIVE || target == FAILED;
+            case SUSPENDED -> target == ACTIVE || target == DELETED;
+            case DEGRADED -> target == ACTIVE || target == DELETED;
+            case FAILED -> target == CONFIGURED || target == DELETED;
+            case DELETED -> false;
+        };
+    }
+
+    /**
+     * Returns all valid target statuses that this status can transition to.
+     *
+     * @return array of valid target statuses (empty for terminal states)
+     */
+    public RouteStatus[] getValidTransitions() {
+        return switch (this) {
+            case CONFIGURED -> new RouteStatus[]{ACTIVE, DELETED};
+            case ACTIVE -> new RouteStatus[]{TRIGGERED, SUSPENDED, DEGRADED, DELETED};
+            case TRIGGERED -> new RouteStatus[]{TRANSFERRING, ACTIVE};
+            case TRANSFERRING -> new RouteStatus[]{ACTIVE, FAILED};
+            case SUSPENDED -> new RouteStatus[]{ACTIVE, DELETED};
+            case DEGRADED -> new RouteStatus[]{ACTIVE, DELETED};
+            case FAILED -> new RouteStatus[]{CONFIGURED, DELETED};
+            case DELETED -> new RouteStatus[0];
+        };
+    }
 }

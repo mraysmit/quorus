@@ -78,4 +78,46 @@ public enum TransferStatus {
     public boolean canResume() {
         return this == PAUSED || this == FAILED;
     }
+
+    /**
+     * Checks whether a transition from this status to the given target status is valid.
+     *
+     * <p><strong>Valid transitions:</strong></p>
+     * <pre>
+     *   PENDING     → IN_PROGRESS, CANCELLED
+     *   IN_PROGRESS → COMPLETED, FAILED, CANCELLED, PAUSED
+     *   PAUSED      → IN_PROGRESS, CANCELLED
+     *   FAILED      → PENDING (retry)
+     *   COMPLETED   → (terminal — no transitions)
+     *   CANCELLED   → (terminal — no transitions)
+     * </pre>
+     *
+     * @param target the target status to transition to
+     * @return {@code true} if the transition is valid, {@code false} otherwise
+     */
+    public boolean canTransitionTo(TransferStatus target) {
+        return switch (this) {
+            case PENDING -> target == IN_PROGRESS || target == CANCELLED;
+            case IN_PROGRESS -> target == COMPLETED || target == FAILED
+                             || target == CANCELLED || target == PAUSED;
+            case PAUSED -> target == IN_PROGRESS || target == CANCELLED;
+            case FAILED -> target == PENDING;
+            case COMPLETED, CANCELLED -> false;
+        };
+    }
+
+    /**
+     * Returns all valid target statuses that this status can transition to.
+     *
+     * @return array of valid target statuses (empty for terminal states)
+     */
+    public TransferStatus[] getValidTransitions() {
+        return switch (this) {
+            case PENDING -> new TransferStatus[]{IN_PROGRESS, CANCELLED};
+            case IN_PROGRESS -> new TransferStatus[]{COMPLETED, FAILED, CANCELLED, PAUSED};
+            case PAUSED -> new TransferStatus[]{IN_PROGRESS, CANCELLED};
+            case FAILED -> new TransferStatus[]{PENDING};
+            case COMPLETED, CANCELLED -> new TransferStatus[0];
+        };
+    }
 }
