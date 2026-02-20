@@ -234,6 +234,82 @@ public enum AgentStatus {
         throw new IllegalArgumentException("Unknown agent status: " + value);
     }
 
+    /**
+     * Checks whether a transition from this status to the given target status is valid.
+     *
+     * <p><strong>Valid transitions:</strong></p>
+     * <pre>
+     *   REGISTERING → HEALTHY, FAILED
+     *   HEALTHY     → ACTIVE, IDLE, DEGRADED, OVERLOADED, MAINTENANCE, DRAINING, UNREACHABLE, FAILED, DEREGISTERED
+     *   ACTIVE      → HEALTHY, IDLE, DEGRADED, OVERLOADED, DRAINING, UNREACHABLE, FAILED, DEREGISTERED
+     *   IDLE        → HEALTHY, ACTIVE, DEGRADED, MAINTENANCE, DRAINING, UNREACHABLE, FAILED, DEREGISTERED
+     *   DEGRADED    → HEALTHY, ACTIVE, IDLE, OVERLOADED, MAINTENANCE, DRAINING, UNREACHABLE, FAILED, DEREGISTERED
+     *   OVERLOADED  → HEALTHY, ACTIVE, IDLE, DEGRADED, DRAINING, UNREACHABLE, FAILED, DEREGISTERED
+     *   MAINTENANCE → HEALTHY, DRAINING, UNREACHABLE, FAILED, DEREGISTERED
+     *   DRAINING    → HEALTHY, UNREACHABLE, FAILED, DEREGISTERED
+     *   UNREACHABLE → HEALTHY, FAILED, DEREGISTERED
+     *   FAILED      → DEREGISTERED
+     *   DEREGISTERED→ (terminal — no transitions)
+     * </pre>
+     *
+     * @param target the target status to transition to
+     * @return {@code true} if the transition is valid, {@code false} otherwise
+     */
+    public boolean canTransitionTo(AgentStatus target) {
+        return switch (this) {
+            case REGISTERING -> target == HEALTHY || target == FAILED;
+            case HEALTHY -> target == ACTIVE || target == IDLE || target == DEGRADED
+                         || target == OVERLOADED || target == MAINTENANCE || target == DRAINING
+                         || target == UNREACHABLE || target == FAILED || target == DEREGISTERED;
+            case ACTIVE -> target == HEALTHY || target == IDLE || target == DEGRADED
+                        || target == OVERLOADED || target == DRAINING || target == UNREACHABLE
+                        || target == FAILED || target == DEREGISTERED;
+            case IDLE -> target == HEALTHY || target == ACTIVE || target == DEGRADED
+                      || target == MAINTENANCE || target == DRAINING || target == UNREACHABLE
+                      || target == FAILED || target == DEREGISTERED;
+            case DEGRADED -> target == HEALTHY || target == ACTIVE || target == IDLE
+                          || target == OVERLOADED || target == MAINTENANCE || target == DRAINING
+                          || target == UNREACHABLE || target == FAILED || target == DEREGISTERED;
+            case OVERLOADED -> target == HEALTHY || target == ACTIVE || target == IDLE
+                            || target == DEGRADED || target == DRAINING || target == UNREACHABLE
+                            || target == FAILED || target == DEREGISTERED;
+            case MAINTENANCE -> target == HEALTHY || target == DRAINING || target == UNREACHABLE
+                             || target == FAILED || target == DEREGISTERED;
+            case DRAINING -> target == HEALTHY || target == UNREACHABLE
+                          || target == FAILED || target == DEREGISTERED;
+            case UNREACHABLE -> target == HEALTHY || target == FAILED || target == DEREGISTERED;
+            case FAILED -> target == DEREGISTERED;
+            case DEREGISTERED -> false;
+        };
+    }
+
+    /**
+     * Returns all valid target statuses that this status can transition to.
+     *
+     * @return array of valid target statuses (empty for terminal states)
+     */
+    public AgentStatus[] getValidTransitions() {
+        return switch (this) {
+            case REGISTERING -> new AgentStatus[]{HEALTHY, FAILED};
+            case HEALTHY -> new AgentStatus[]{ACTIVE, IDLE, DEGRADED, OVERLOADED,
+                    MAINTENANCE, DRAINING, UNREACHABLE, FAILED, DEREGISTERED};
+            case ACTIVE -> new AgentStatus[]{HEALTHY, IDLE, DEGRADED, OVERLOADED,
+                    DRAINING, UNREACHABLE, FAILED, DEREGISTERED};
+            case IDLE -> new AgentStatus[]{HEALTHY, ACTIVE, DEGRADED, MAINTENANCE,
+                    DRAINING, UNREACHABLE, FAILED, DEREGISTERED};
+            case DEGRADED -> new AgentStatus[]{HEALTHY, ACTIVE, IDLE, OVERLOADED,
+                    MAINTENANCE, DRAINING, UNREACHABLE, FAILED, DEREGISTERED};
+            case OVERLOADED -> new AgentStatus[]{HEALTHY, ACTIVE, IDLE, DEGRADED,
+                    DRAINING, UNREACHABLE, FAILED, DEREGISTERED};
+            case MAINTENANCE -> new AgentStatus[]{HEALTHY, DRAINING, UNREACHABLE,
+                    FAILED, DEREGISTERED};
+            case DRAINING -> new AgentStatus[]{HEALTHY, UNREACHABLE, FAILED, DEREGISTERED};
+            case UNREACHABLE -> new AgentStatus[]{HEALTHY, FAILED, DEREGISTERED};
+            case FAILED -> new AgentStatus[]{DEREGISTERED};
+            case DEREGISTERED -> new AgentStatus[0];
+        };
+    }
+
     @Override
     public String toString() {
         return value;
