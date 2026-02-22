@@ -96,7 +96,7 @@ public class AgentRegistrationResource {
             ctx.response().setStatusCode(201).end(JsonObject.mapFrom(response).encode());
 
         } catch (IllegalArgumentException e) {
-            logger.warn("Invalid registration request: {}", e.getMessage());
+            logger.error("Invalid registration request: {}", e.getMessage());
             logger.debug("Stack trace", e);
             AgentRegistrationResponse response = AgentRegistrationResponse.failure(
                 e.getMessage(), "INVALID_REQUEST");
@@ -235,7 +235,7 @@ public class AgentRegistrationResource {
             ctx.json(Map.of("message", "Capabilities updated successfully", "agentId", agentId));
 
         } catch (IllegalArgumentException e) {
-            logger.warn("Agent not found", e);
+            logger.error("Agent not found", e);
             ctx.response().setStatusCode(404)
                 .end(JsonObject.mapFrom(new ErrorResponse("Agent not found")).encode());
         } catch (Exception e) {
@@ -271,7 +271,7 @@ public class AgentRegistrationResource {
                 .collect(java.util.stream.Collectors.toList());
             ctx.json(agents);
         } catch (IllegalArgumentException e) {
-            logger.warn("Invalid status parameter: {}", ctx.pathParam("status"));
+            logger.error("Invalid status parameter: {}", ctx.pathParam("status"));
             ctx.response().setStatusCode(400)
                 .end(JsonObject.mapFrom(new ErrorResponse("Invalid status")).encode());
         } catch (Exception e) {

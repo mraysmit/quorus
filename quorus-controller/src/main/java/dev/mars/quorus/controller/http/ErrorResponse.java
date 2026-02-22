@@ -31,6 +31,7 @@ import java.util.UUID;
  * <pre>{@code
  * {
  *   "error": {
+ *     "shortCode": "Q-2001",
  *     "code": "TRANSFER_NOT_FOUND",
  *     "message": "Transfer job with ID 'xyz' not found",
  *     "timestamp": "2026-02-04T10:00:00Z",
@@ -44,6 +45,7 @@ import java.util.UUID;
  * @since 2026-02-04
  */
 public record ErrorResponse(
+    String shortCode,
     String code,
     String message,
     Instant timestamp,
@@ -56,6 +58,7 @@ public record ErrorResponse(
      */
     public static ErrorResponse withMessage(ErrorCode code, String path, String message) {
         return new ErrorResponse(
+            code.shortCode(),
             code.code(),
             message,
             Instant.now(),
@@ -70,6 +73,7 @@ public record ErrorResponse(
      */
     public static ErrorResponse withMessage(ErrorCode code, String path, String message, String requestId) {
         return new ErrorResponse(
+            code.shortCode(),
             code.code(),
             message,
             Instant.now(),
@@ -84,6 +88,7 @@ public record ErrorResponse(
      */
     public static ErrorResponse of(ErrorCode code, String path, Object... messageArgs) {
         return new ErrorResponse(
+            code.shortCode(),
             code.code(),
             String.format(code.messageTemplate(), messageArgs),
             Instant.now(),
@@ -100,6 +105,7 @@ public record ErrorResponse(
             ? cause.getMessage() 
             : code.messageTemplate();
         return new ErrorResponse(
+            code.shortCode(),
             code.code(),
             message,
             Instant.now(),
@@ -116,6 +122,7 @@ public record ErrorResponse(
             ? cause.getMessage() 
             : code.messageTemplate();
         return new ErrorResponse(
+            code.shortCode(),
             code.code(),
             message,
             Instant.now(),
@@ -130,6 +137,7 @@ public record ErrorResponse(
     public JsonObject toJson() {
         return new JsonObject()
             .put("error", new JsonObject()
+                .put("shortCode", shortCode)
                 .put("code", code)
                 .put("message", message)
                 .put("timestamp", timestamp.toString())

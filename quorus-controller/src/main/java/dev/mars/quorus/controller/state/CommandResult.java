@@ -40,7 +40,8 @@ import java.util.Objects;
 public sealed interface CommandResult<T>
         permits CommandResult.Success,
                 CommandResult.NotFound,
-                CommandResult.NoOp {
+                CommandResult.NoOp,
+                CommandResult.CasMismatch {
 
     /**
      * The command was applied successfully.
@@ -71,5 +72,22 @@ public sealed interface CommandResult<T>
      * @param <T> entity type (phantom)
      */
     record NoOp<T>() implements CommandResult<T> {
+    }
+
+    /**
+     * Compare-and-swap mismatch: the entity's current state did not match
+     * the expected state carried by the command. The command was deterministically
+     * rejected on all Raft nodes.
+     *
+     * <p>The {@code entity} field contains the entity in its <em>current</em> state,
+     * allowing the caller to inspect the actual status and optionally retry.
+     *
+     * @param entity the entity in its current (mismatched) state
+     * @param <T>    entity type
+     */
+    record CasMismatch<T>(T entity) implements CommandResult<T> {
+        public CasMismatch {
+            Objects.requireNonNull(entity, "entity");
+        }
     }
 }

@@ -275,16 +275,16 @@ class RouteCommandStateStoreTest {
         void updateStatusTransitions() {
             stateMachine.apply(RouteCommand.create(createRoute("route-st", "status-test")));
 
-            stateMachine.apply(RouteCommand.updateStatus("route-st", RouteStatus.ACTIVE, "activated"));
+            stateMachine.apply(RouteCommand.updateStatus("route-st", RouteStatus.CONFIGURED, RouteStatus.ACTIVE, "activated"));
             assertEquals(RouteStatus.ACTIVE, stateMachine.getRoute("route-st").getStatus());
 
-            stateMachine.apply(RouteCommand.updateStatus("route-st", RouteStatus.TRIGGERED, "file arrived"));
+            stateMachine.apply(RouteCommand.updateStatus("route-st", RouteStatus.ACTIVE, RouteStatus.TRIGGERED, "file arrived"));
             assertEquals(RouteStatus.TRIGGERED, stateMachine.getRoute("route-st").getStatus());
 
-            stateMachine.apply(RouteCommand.updateStatus("route-st", RouteStatus.TRANSFERRING, "transfer started"));
+            stateMachine.apply(RouteCommand.updateStatus("route-st", RouteStatus.TRIGGERED, RouteStatus.TRANSFERRING, "transfer started"));
             assertEquals(RouteStatus.TRANSFERRING, stateMachine.getRoute("route-st").getStatus());
 
-            stateMachine.apply(RouteCommand.updateStatus("route-st", RouteStatus.ACTIVE, "transfer completed"));
+            stateMachine.apply(RouteCommand.updateStatus("route-st", RouteStatus.TRANSFERRING, RouteStatus.ACTIVE, "transfer completed"));
             assertEquals(RouteStatus.ACTIVE, stateMachine.getRoute("route-st").getStatus());
         }
 
@@ -292,7 +292,7 @@ class RouteCommandStateStoreTest {
         @DisplayName("Update status on non-existent route returns NotFound")
         void updateStatusNonExistent() {
             CommandResult<?> result = stateMachine.apply(
-                    RouteCommand.updateStatus("ghost", RouteStatus.ACTIVE, "nope"));
+                    RouteCommand.updateStatus("ghost", RouteStatus.CONFIGURED, RouteStatus.ACTIVE, "nope"));
             assertInstanceOf(CommandResult.NotFound.class, result);
         }
 
@@ -301,10 +301,10 @@ class RouteCommandStateStoreTest {
         void degradedAndFailedStatuses() {
             stateMachine.apply(RouteCommand.create(createRoute("route-fail", "fail-test")));
 
-            stateMachine.apply(RouteCommand.updateStatus("route-fail", RouteStatus.DEGRADED, "partial failure"));
+            stateMachine.apply(RouteCommand.updateStatus("route-fail", RouteStatus.CONFIGURED, RouteStatus.DEGRADED, "partial failure"));
             assertEquals(RouteStatus.DEGRADED, stateMachine.getRoute("route-fail").getStatus());
 
-            stateMachine.apply(RouteCommand.updateStatus("route-fail", RouteStatus.FAILED, "permanent failure"));
+            stateMachine.apply(RouteCommand.updateStatus("route-fail", RouteStatus.DEGRADED, RouteStatus.FAILED, "permanent failure"));
             assertEquals(RouteStatus.FAILED, stateMachine.getRoute("route-fail").getStatus());
         }
     }
@@ -408,19 +408,19 @@ class RouteCommandStateStoreTest {
         assertEquals(RouteStatus.CONFIGURED, stateMachine.getRoute(routeId).getStatus());
 
         // 2. Activate
-        stateMachine.apply(RouteCommand.updateStatus(routeId, RouteStatus.ACTIVE, "activated by admin"));
+        stateMachine.apply(RouteCommand.updateStatus(routeId, RouteStatus.CONFIGURED, RouteStatus.ACTIVE, "activated by admin"));
         assertEquals(RouteStatus.ACTIVE, stateMachine.getRoute(routeId).getStatus());
 
         // 3. Trigger fires
-        stateMachine.apply(RouteCommand.updateStatus(routeId, RouteStatus.TRIGGERED, "interval elapsed"));
+        stateMachine.apply(RouteCommand.updateStatus(routeId, RouteStatus.ACTIVE, RouteStatus.TRIGGERED, "interval elapsed"));
         assertEquals(RouteStatus.TRIGGERED, stateMachine.getRoute(routeId).getStatus());
 
         // 4. Transfer starts
-        stateMachine.apply(RouteCommand.updateStatus(routeId, RouteStatus.TRANSFERRING, "transfer initiated"));
+        stateMachine.apply(RouteCommand.updateStatus(routeId, RouteStatus.TRIGGERED, RouteStatus.TRANSFERRING, "transfer initiated"));
         assertEquals(RouteStatus.TRANSFERRING, stateMachine.getRoute(routeId).getStatus());
 
         // 5. Transfer completes → back to ACTIVE
-        stateMachine.apply(RouteCommand.updateStatus(routeId, RouteStatus.ACTIVE, "transfer completed"));
+        stateMachine.apply(RouteCommand.updateStatus(routeId, RouteStatus.TRANSFERRING, RouteStatus.ACTIVE, "transfer completed"));
         assertEquals(RouteStatus.ACTIVE, stateMachine.getRoute(routeId).getStatus());
 
         // 6. Suspend for maintenance

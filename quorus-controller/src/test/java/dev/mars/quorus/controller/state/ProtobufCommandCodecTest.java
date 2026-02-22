@@ -208,7 +208,7 @@ class ProtobufCommandCodecTest {
         @Test
         @DisplayName("UPDATE_STATUS preserves jobId and status")
         void updateStatusRoundtrip() {
-            TransferJobCommand original = TransferJobCommand.updateStatus("job-001", TransferStatus.COMPLETED);
+            TransferJobCommand original = TransferJobCommand.updateStatus("job-001", TransferStatus.PENDING, TransferStatus.COMPLETED);
 
             ByteString bytes = ProtobufCommandCodec.serialize(original);
             RaftCommand deserialized = ProtobufCommandCodec.deserialize(bytes);
@@ -216,7 +216,7 @@ class ProtobufCommandCodecTest {
             assertInstanceOf(TransferJobCommand.UpdateStatus.class, deserialized);
             TransferJobCommand.UpdateStatus restored = (TransferJobCommand.UpdateStatus) deserialized;
             assertEquals("job-001", restored.jobId());
-            assertEquals(TransferStatus.COMPLETED, restored.status());
+            assertEquals(TransferStatus.COMPLETED, restored.newStatus());
         }
 
         @Test
@@ -250,12 +250,12 @@ class ProtobufCommandCodecTest {
         @DisplayName("All TransferStatus enum values roundtrip correctly")
         void allTransferStatusValuesRoundtrip() {
             for (TransferStatus status : TransferStatus.values()) {
-                TransferJobCommand original = TransferJobCommand.updateStatus("job-" + status.name(), status);
+                TransferJobCommand original = TransferJobCommand.updateStatus("job-" + status.name(), TransferStatus.PENDING, status);
                 ByteString bytes = ProtobufCommandCodec.serialize(original);
                 RaftCommand deserialized = ProtobufCommandCodec.deserialize(bytes);
                 assertInstanceOf(TransferJobCommand.UpdateStatus.class, deserialized);
                 TransferJobCommand.UpdateStatus restored = (TransferJobCommand.UpdateStatus) deserialized;
-                assertEquals(status, restored.status(), "Failed for status: " + status);
+                assertEquals(status, restored.newStatus(), "Failed for status: " + status);
             }
         }
     }
@@ -341,7 +341,7 @@ class ProtobufCommandCodecTest {
         @Test
         @DisplayName("UPDATE_STATUS preserves agentId and status")
         void updateStatusRoundtrip() {
-            AgentCommand original = AgentCommand.updateStatus("agent-nyc-01", AgentStatus.DEGRADED);
+            AgentCommand original = AgentCommand.updateStatus("agent-nyc-01", AgentStatus.HEALTHY, AgentStatus.DEGRADED);
 
             ByteString bytes = ProtobufCommandCodec.serialize(original);
             RaftCommand deserialized = ProtobufCommandCodec.deserialize(bytes);
@@ -388,7 +388,7 @@ class ProtobufCommandCodecTest {
         @DisplayName("All AgentStatus enum values roundtrip correctly")
         void allAgentStatusValuesRoundtrip() {
             for (AgentStatus status : AgentStatus.values()) {
-                AgentCommand original = AgentCommand.updateStatus("agent-" + status.name(), status);
+                AgentCommand original = AgentCommand.updateStatus("agent-" + status.name(), AgentStatus.HEALTHY, status);
                 ByteString bytes = ProtobufCommandCodec.serialize(original);
                 RaftCommand deserialized = ProtobufCommandCodec.deserialize(bytes);
                 assertInstanceOf(AgentCommand.UpdateStatus.class, deserialized);
@@ -490,7 +490,7 @@ class ProtobufCommandCodecTest {
         @Test
         @DisplayName("UPDATE_STATUS preserves new status")
         void updateStatusRoundtrip() {
-            JobAssignmentCommand original = JobAssignmentCommand.updateStatus("assign-001", JobAssignmentStatus.IN_PROGRESS);
+            JobAssignmentCommand original = JobAssignmentCommand.updateStatus("assign-001", JobAssignmentStatus.ASSIGNED, JobAssignmentStatus.IN_PROGRESS);
 
             ByteString bytes = ProtobufCommandCodec.serialize(original);
             RaftCommand deserialized = ProtobufCommandCodec.deserialize(bytes);
@@ -518,7 +518,7 @@ class ProtobufCommandCodecTest {
         @DisplayName("All JobAssignmentStatus enum values roundtrip correctly")
         void allJobAssignmentStatusValuesRoundtrip() {
             for (JobAssignmentStatus status : JobAssignmentStatus.values()) {
-                JobAssignmentCommand original = JobAssignmentCommand.updateStatus("assign-" + status.name(), status);
+                JobAssignmentCommand original = JobAssignmentCommand.updateStatus("assign-" + status.name(), JobAssignmentStatus.ASSIGNED, status);
                 ByteString bytes = ProtobufCommandCodec.serialize(original);
                 RaftCommand deserialized = ProtobufCommandCodec.deserialize(bytes);
                 assertInstanceOf(JobAssignmentCommand.UpdateStatus.class, deserialized);
@@ -659,7 +659,7 @@ class ProtobufCommandCodecTest {
         @Test
         @DisplayName("Protobuf encoding is much smaller than Java serialization")
         void protobufIsSmallerThanJavaSerialization() {
-            TransferJobCommand cmd = TransferJobCommand.updateStatus("job-001", TransferStatus.COMPLETED);
+            TransferJobCommand cmd = TransferJobCommand.updateStatus("job-001", TransferStatus.PENDING, TransferStatus.COMPLETED);
             ByteString proto = ProtobufCommandCodec.serialize(cmd);
             // Protobuf encoding for a simple command should be tiny
             assertTrue(proto.size() < 50, "Expected small protobuf size, got: " + proto.size());
@@ -827,7 +827,7 @@ class ProtobufCommandCodecTest {
         @Test
         @DisplayName("UPDATE_STATUS preserves all status transition fields")
         void updateStatusRoundtrip() {
-            RouteCommand original = RouteCommand.updateStatus("route-st", RouteStatus.TRIGGERED, "file arrived");
+            RouteCommand original = RouteCommand.updateStatus("route-st", RouteStatus.CONFIGURED, RouteStatus.TRIGGERED, "file arrived");
 
             ByteString bytes = ProtobufCommandCodec.serialize(original);
             RouteCommand.UpdateStatus restored = assertInstanceOf(RouteCommand.UpdateStatus.class,
@@ -842,7 +842,7 @@ class ProtobufCommandCodecTest {
         @DisplayName("All RouteStatus enum values roundtrip correctly")
         void allRouteStatusValuesRoundtrip() {
             for (RouteStatus status : RouteStatus.values()) {
-                RouteCommand original = RouteCommand.updateStatus("route-enum", status, "testing " + status);
+                RouteCommand original = RouteCommand.updateStatus("route-enum", RouteStatus.CONFIGURED, status, "testing " + status);
 
                 ByteString bytes = ProtobufCommandCodec.serialize(original);
                 RouteCommand.UpdateStatus restored = assertInstanceOf(RouteCommand.UpdateStatus.class,
@@ -930,7 +930,7 @@ class ProtobufCommandCodecTest {
                     RouteCommand.delete("route-001"),
                     RouteCommand.suspend("route-001", "reason"),
                     RouteCommand.resume("route-001"),
-                    RouteCommand.updateStatus("route-001", RouteStatus.ACTIVE, "reason"));
+                    RouteCommand.updateStatus("route-001", RouteStatus.CONFIGURED, RouteStatus.ACTIVE, "reason"));
 
             for (RouteCommand original : commands) {
                 ByteString bytes = ProtobufCommandCodec.serialize(original);

@@ -155,7 +155,7 @@ public class QuorusAgent {
                     if (ar.succeeded()) {
                         logger.info("Vert.x instance closed successfully");
                     } else {
-                        logger.error("Error closing Vert.x instance", ar.cause());
+                        logger.warn("Error closing Vert.x instance", ar.cause());
                     }
                 });
             }));
@@ -262,7 +262,7 @@ public class QuorusAgent {
     public void shutdown() {
         // Idempotent shutdown with AtomicBoolean
         if (closed.getAndSet(true)) {
-            logger.info("Agent already closed, skipping shutdown");
+            logger.warn("Agent already closed, skipping shutdown");
             return;
         }
 

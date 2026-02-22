@@ -91,15 +91,17 @@ public sealed interface AgentCommand extends RaftCommand
     /**
      * Update the status of an existing agent.
      *
-     * @param agentId   the agent identifier
-     * @param newStatus the new status
-     * @param timestamp the command timestamp
+     * @param agentId        the agent identifier
+     * @param expectedStatus the expected current status for CAS validation (null to skip check)
+     * @param newStatus      the new status
+     * @param timestamp      the command timestamp
      */
-    record UpdateStatus(String agentId, AgentStatus newStatus, Instant timestamp) implements AgentCommand {
+    record UpdateStatus(String agentId, AgentStatus expectedStatus, AgentStatus newStatus, Instant timestamp) implements AgentCommand {
         private static final long serialVersionUID = 1L;
 
         public UpdateStatus {
             Objects.requireNonNull(agentId, "agentId");
+            Objects.requireNonNull(expectedStatus, "expectedStatus");
             Objects.requireNonNull(newStatus, "newStatus");
             Objects.requireNonNull(timestamp, "timestamp");
         }
@@ -156,10 +158,14 @@ public sealed interface AgentCommand extends RaftCommand
     }
 
     /**
-     * Create a command to update an agent's status.
+     * Create a command to update an agent's status with CAS protection.
+     *
+     * @param agentId        the agent identifier
+     * @param expectedStatus the expected current status (must match for command to apply)
+     * @param newStatus      the new status
      */
-    static AgentCommand updateStatus(String agentId, AgentStatus newStatus) {
-        return new UpdateStatus(agentId, newStatus, Instant.now());
+    static AgentCommand updateStatus(String agentId, AgentStatus expectedStatus, AgentStatus newStatus) {
+        return new UpdateStatus(agentId, expectedStatus, newStatus, Instant.now());
     }
 
     /**

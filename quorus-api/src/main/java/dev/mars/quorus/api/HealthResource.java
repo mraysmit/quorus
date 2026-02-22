@@ -165,7 +165,7 @@ public class HealthResource {
 
             ctx.json(status);
         } catch (Exception e) {
-            logger.error("Error generating service status: {}", e.getMessage());
+            logger.warn("Error generating service status: {}", e.getMessage());
             logger.debug("Stack trace", e);
             ctx.response()
                 .setStatusCode(500)

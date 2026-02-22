@@ -308,18 +308,19 @@ class JobAssignmentHandlerTest {
                     .put("jobId", "job-status-test")
                     .put("agentId", "agent-status-test");
 
+            // Flow: ASSIGNED → ACCEPTED (valid transition per canTransitionTo)
             webClient.post(HTTP_PORT, "localhost", "/api/v1/assignments")
                     .sendJsonObject(createBody)
                     .compose(createResp -> {
                         String id = createResp.bodyAsJsonObject().getString("assignmentId");
-                        JsonObject statusBody = new JsonObject().put("status", "IN_PROGRESS");
+                        JsonObject statusBody = new JsonObject().put("status", "ACCEPTED");
                         return webClient.put(HTTP_PORT, "localhost", "/api/v1/assignments/" + id + "/status")
                                 .sendJsonObject(statusBody);
                     })
                     .onComplete(ctx.succeeding(response -> ctx.verify(() -> {
                         assertEquals(200, response.statusCode());
                         JsonObject json = response.bodyAsJsonObject();
-                        assertEquals("IN_PROGRESS", json.getString("status"));
+                        assertEquals("ACCEPTED", json.getString("status"));
                         assertEquals("Assignment status updated", json.getString("message"));
                         ctx.completeNow();
                     })));

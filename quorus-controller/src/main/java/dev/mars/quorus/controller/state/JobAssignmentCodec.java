@@ -60,6 +60,7 @@ final class JobAssignmentCodec {
             case JobAssignmentCommand.UpdateStatus c -> {
                 builder.setType(JobAssignmentCommandType.JOB_ASSIGNMENT_CMD_UPDATE_STATUS);
                 builder.setNewStatus(toProto(c.newStatus()));
+                builder.setExpectedStatus(toProto(c.expectedStatus()));
             }
             case JobAssignmentCommand.Timeout c -> {
                 builder.setType(JobAssignmentCommandType.JOB_ASSIGNMENT_CMD_TIMEOUT);
@@ -92,8 +93,9 @@ final class JobAssignmentCodec {
                 new JobAssignmentCommand.Accept(assignmentId, newStatus, timestamp);
             case JOB_ASSIGNMENT_CMD_REJECT ->
                 new JobAssignmentCommand.Reject(assignmentId, newStatus, reason, timestamp);
-            case JOB_ASSIGNMENT_CMD_UPDATE_STATUS ->
-                new JobAssignmentCommand.UpdateStatus(assignmentId, newStatus, timestamp);
+            case JOB_ASSIGNMENT_CMD_UPDATE_STATUS -> {
+                yield new JobAssignmentCommand.UpdateStatus(assignmentId, fromProto(proto.getExpectedStatus()), newStatus, timestamp);
+            }
             case JOB_ASSIGNMENT_CMD_TIMEOUT ->
                 new JobAssignmentCommand.Timeout(assignmentId, newStatus, reason, timestamp);
             case JOB_ASSIGNMENT_CMD_CANCEL ->

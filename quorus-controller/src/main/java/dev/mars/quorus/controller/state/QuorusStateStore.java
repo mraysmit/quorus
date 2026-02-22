@@ -175,12 +175,18 @@ public class QuorusStateStore implements RaftLogApplicator {
                     logger.warn("Transfer job not found for status update: id={}", jobId);
                     yield new CommandResult.NotFound<>(jobId, "TransferJob");
                 }
+                // CAS check: reject if current status doesn't match expected
+                if (existingJob.getStatus() != cmd.expectedStatus()) {
+                    logger.debug("CAS mismatch for transfer job: jobId={}, expected={}, actual={}",
+                        jobId, cmd.expectedStatus(), existingJob.getStatus());
+                    yield new CommandResult.CasMismatch<>(existingJob);
+                }
                 TransferStatus oldStatus = existingJob.getStatus();
                 TransferJobSnapshot updatedJob = new TransferJobSnapshot(
                         existingJob.getJobId(),
                         existingJob.getSourceUri(),
                         existingJob.getDestinationPath(),
-                        cmd.status(),
+                        cmd.newStatus(),
                         existingJob.getBytesTransferred(),
                         existingJob.getTotalBytes(),
                         existingJob.getStartTime(),
@@ -262,6 +268,12 @@ public class QuorusStateStore implements RaftLogApplicator {
                 if (existingAgent == null) {
                     logger.warn("Agent not found for status update: id={}", agentId);
                     yield new CommandResult.NotFound<>(agentId, "Agent");
+                }
+                // CAS check: reject if current status doesn't match expected
+                if (existingAgent.getStatus() != cmd.expectedStatus()) {
+                    logger.debug("CAS mismatch for agent: agentId={}, expected={}, actual={}",
+                        agentId, cmd.expectedStatus(), existingAgent.getStatus());
+                    yield new CommandResult.CasMismatch<>(existingAgent);
                 }
                 AgentStatus oldStatus = existingAgent.getStatus();
                 AgentStatus newStatus = cmd.newStatus();
@@ -375,6 +387,12 @@ public class QuorusStateStore implements RaftLogApplicator {
                 if (statusAssignment == null) {
                     logger.warn("Job assignment not found for status update: id={}", assignmentId);
                     yield new CommandResult.NotFound<>(assignmentId, "JobAssignment");
+                }
+                // CAS check: reject if current status doesn't match expected
+                if (statusAssignment.getStatus() != cmd.expectedStatus()) {
+                    logger.debug("CAS mismatch for job assignment: assignmentId={}, expected={}, actual={}",
+                        assignmentId, cmd.expectedStatus(), statusAssignment.getStatus());
+                    yield new CommandResult.CasMismatch<>(statusAssignment);
                 }
                 JobAssignment updated = statusAssignment.withStatusAndTimestamp(cmd.newStatus(),
                         cmd.timestamp());
@@ -564,6 +582,12 @@ public class QuorusStateStore implements RaftLogApplicator {
                 if (statusRoute == null) {
                     logger.warn("Route not found for status update: id={}", routeId);
                     yield new CommandResult.NotFound<>(routeId, "Route");
+                }
+                // CAS check: reject if current status doesn't match expected
+                if (statusRoute.getStatus() != cmd.expectedStatus()) {
+                    logger.debug("CAS mismatch for route: routeId={}, expected={}, actual={}",
+                        routeId, cmd.expectedStatus(), statusRoute.getStatus());
+                    yield new CommandResult.CasMismatch<>(statusRoute);
                 }
                 RouteStatus oldStatus = statusRoute.getStatus();
                 RouteConfiguration updated = statusRoute.withStatus(cmd.newStatus());
@@ -758,5 +782,67 @@ public class QuorusStateStore implements RaftLogApplicator {
      */
     public int getRouteCount() {
         return routes.size();
+    }
+
+    // ── Optional query methods ─────────────────────────────────────────────
+
+    /**
+     * Find a transfer job by ID.
+     *
+     * @param jobId the transfer job identifier
+     * @return an Optional containing the snapshot, or empty if not found
+     */
+    public Optional<TransferJobSnapshot> findTransferJob(String jobId) {
+        return Optional.ofNullable(transferJobs.get(jobId));
+    }
+
+    /**
+     * Find an agent by ID.
+     *
+     * @param agentId the agent identifier
+     * @return an Optional containing the agent info, or empty if not found
+     */
+    public Optional<AgentInfo> findAgent(String agentId) {
+        return Optional.ofNullable(agents.get(agentId));
+    }
+
+    /**
+     * Find a job assignment by ID.
+     *
+     * @param assignmentId the assignment identifier
+     * @return an Optional containing the assignment, or empty if not found
+     */
+    public Optional<JobAssignment> findJobAssignment(String assignmentId) {
+        return Optional.ofNullable(jobAssignments.get(assignmentId));
+    }
+
+    /**
+     * Find a route configuration by ID.
+     *
+     * @param routeId the route identifier
+     * @return an Optional containing the route, or empty if not found
+     */
+    public Optional<RouteConfiguration> findRoute(String routeId) {
+        return Optional.ofNullable(routes.get(routeId));
+    }
+
+    /**
+     * Find a queued job by ID.
+     *
+     * @param jobId the queued job identifier
+     * @return an Optional containing the queued job, or empty if not found
+     */
+    public Optional<QueuedJob> findQueuedJob(String jobId) {
+        return Optional.ofNullable(jobQueue.get(jobId));
+    }
+
+    /**
+     * Find a system metadata value by key.
+     *
+     * @param key the metadata key
+     * @return an Optional containing the value, or empty if not found
+     */
+    public Optional<String> findMetadata(String key) {
+        return Optional.ofNullable(systemMetadata.get(key));
     }
 }

@@ -82,7 +82,7 @@ class QuorusStateStoreTest {
         assertEquals(job.getJobId(), storedJob.getJobId());
 
         // Test UPDATE_STATUS command
-        TransferJobCommand updateCmd = TransferJobCommand.updateStatus(job.getJobId(), TransferStatus.IN_PROGRESS);
+        TransferJobCommand updateCmd = TransferJobCommand.updateStatus(job.getJobId(), TransferStatus.PENDING, TransferStatus.IN_PROGRESS);
         CommandResult<?> updateResult = stateMachine.apply(updateCmd);
         assertInstanceOf(CommandResult.Success.class, updateResult);
 
@@ -99,7 +99,7 @@ class QuorusStateStoreTest {
     @Test
     void testTransferJobNotFound() {
         // Test update non-existent job
-        TransferJobCommand updateCmd = TransferJobCommand.updateStatus("non-existent", TransferStatus.IN_PROGRESS);
+        TransferJobCommand updateCmd = TransferJobCommand.updateStatus("non-existent", TransferStatus.PENDING, TransferStatus.IN_PROGRESS);
         CommandResult<?> result = stateMachine.apply(updateCmd);
         assertInstanceOf(CommandResult.NotFound.class, result);
 
@@ -281,7 +281,7 @@ class QuorusStateStoreTest {
         assertTrue(createStr.contains("Create"));
         assertTrue(createStr.contains(job.getJobId()));
 
-        TransferJobCommand updateCmd = TransferJobCommand.updateStatus(job.getJobId(), TransferStatus.IN_PROGRESS);
+        TransferJobCommand updateCmd = TransferJobCommand.updateStatus(job.getJobId(), TransferStatus.PENDING, TransferStatus.IN_PROGRESS);
         String updateStr = updateCmd.toString();
         assertNotNull(updateStr);
         assertTrue(updateStr.contains("UpdateStatus"));

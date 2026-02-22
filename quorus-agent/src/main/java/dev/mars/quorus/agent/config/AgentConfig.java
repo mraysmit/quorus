@@ -71,7 +71,7 @@ public final class AgentConfig {
         if (agentId == null || agentId.isEmpty()) {
             // Derive from hostname as fallback
             agentId = deriveAgentIdFromHostname();
-            logger.info("Agent ID not configured, derived from hostname: {}", agentId);
+            logger.warn("Agent ID not configured, derived from hostname: {}", agentId);
         }
         return agentId;
     }

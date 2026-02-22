@@ -19,6 +19,7 @@ package dev.mars.quorus.controller.http.handlers;
 import dev.mars.quorus.controller.http.ErrorCode;
 import dev.mars.quorus.controller.http.QuorusApiException;
 import dev.mars.quorus.controller.raft.RaftNode;
+import dev.mars.quorus.controller.state.CommandResult;
 import dev.mars.quorus.controller.state.JobAssignmentCommand;
 import dev.mars.quorus.controller.state.QuorusStateStore;
 import dev.mars.quorus.core.JobAssignment;
@@ -138,7 +139,8 @@ public class JobAssignmentHandler {
     public Handler<RoutingContext> handleAccept() {
         return ctx -> {
             String assignmentId = ctx.pathParam("assignmentId");
-            verifyAssignmentExists(assignmentId);
+            JobAssignment existing = lookupAssignment(assignmentId);
+            validateTransition(existing, JobAssignmentStatus.ACCEPTED, assignmentId, "accept");
 
             JobAssignmentCommand command = JobAssignmentCommand.accept(assignmentId);
             raftNode.submitCommand(command)
@@ -156,7 +158,8 @@ public class JobAssignmentHandler {
     public Handler<RoutingContext> handleReject() {
         return ctx -> {
             String assignmentId = ctx.pathParam("assignmentId");
-            verifyAssignmentExists(assignmentId);
+            JobAssignment existing = lookupAssignment(assignmentId);
+            validateTransition(existing, JobAssignmentStatus.REJECTED, assignmentId, "reject");
 
             JsonObject body = ctx.body().asJsonObject();
             String reason = body != null ? body.getString("reason") : null;
@@ -173,12 +176,16 @@ public class JobAssignmentHandler {
 
     /**
      * Handles {@code PUT /api/v1/assignments/:assignmentId/status} — updates assignment status.
+     *
+     * <p>Uses CAS (Compare-And-Swap) protection: the command carries the current status
+     * as {@code expectedStatus}. If the state machine detects a mismatch (concurrent
+     * modification), a 409 Conflict is returned.</p>
      */
     public Handler<RoutingContext> handleUpdateStatus() {
         return ctx -> {
             try {
                 String assignmentId = ctx.pathParam("assignmentId");
-                verifyAssignmentExists(assignmentId);
+                JobAssignment existing = lookupAssignment(assignmentId);
 
                 JsonObject body = ctx.body().asJsonObject();
                 if (body == null || !body.containsKey("status")) {
@@ -193,12 +200,28 @@ public class JobAssignmentHandler {
                             "Invalid status: " + body.getString("status"));
                 }
 
-                JobAssignmentCommand command = JobAssignmentCommand.updateStatus(assignmentId, newStatus);
+                // Pre-commit transition validation
+                validateTransition(existing, newStatus, assignmentId, "transition to " + newStatus);
+
+                // CAS: pass current status as expectedStatus for race protection
+                JobAssignmentStatus currentStatus = existing.getStatus();
+                JobAssignmentCommand command = JobAssignmentCommand.updateStatus(
+                        assignmentId, currentStatus, newStatus);
                 raftNode.submitCommand(command)
-                        .onSuccess(result -> ctx.json(new JsonObject()
-                                .put("assignmentId", assignmentId)
-                                .put("status", newStatus.name())
-                                .put("message", "Assignment status updated")))
+                        .onSuccess(result -> {
+                            if (result instanceof CommandResult.CasMismatch<?>) {
+                                ctx.response().setStatusCode(409);
+                                ctx.json(new JsonObject()
+                                        .put("error", "ASSIGNMENT_STATE_CONFLICT")
+                                        .put("message", "Assignment status changed concurrently, please retry")
+                                        .put("assignmentId", assignmentId));
+                            } else {
+                                ctx.json(new JsonObject()
+                                        .put("assignmentId", assignmentId)
+                                        .put("status", newStatus.name())
+                                        .put("message", "Assignment status updated"));
+                            }
+                        })
                         .onFailure(ctx::fail);
             } catch (Exception e) {
                 ctx.fail(e);
@@ -212,7 +235,8 @@ public class JobAssignmentHandler {
     public Handler<RoutingContext> handleCancel() {
         return ctx -> {
             String assignmentId = ctx.pathParam("assignmentId");
-            verifyAssignmentExists(assignmentId);
+            JobAssignment existing = lookupAssignment(assignmentId);
+            validateTransition(existing, JobAssignmentStatus.CANCELLED, assignmentId, "cancel");
 
             JsonObject body = ctx.body().asJsonObject();
             String reason = body != null ? body.getString("reason") : null;
@@ -233,7 +257,7 @@ public class JobAssignmentHandler {
     public Handler<RoutingContext> handleRemove() {
         return ctx -> {
             String assignmentId = ctx.pathParam("assignmentId");
-            verifyAssignmentExists(assignmentId);
+            lookupAssignment(assignmentId); // verify exists
 
             JobAssignmentCommand command = JobAssignmentCommand.remove(assignmentId);
             raftNode.submitCommand(command)
@@ -247,14 +271,29 @@ public class JobAssignmentHandler {
     // ==================== Internal helpers ====================
 
     /**
-     * Verifies that the assignment exists in the state machine.
+     * Looks up the assignment in the state machine and returns it.
      *
      * @throws QuorusApiException with ASSIGNMENT_NOT_FOUND if it doesn't exist
      */
-    private void verifyAssignmentExists(String assignmentId) {
+    private JobAssignment lookupAssignment(String assignmentId) {
         QuorusStateStore stateMachine = (QuorusStateStore) raftNode.getStateStore();
-        if (stateMachine.getJobAssignment(assignmentId) == null) {
+        JobAssignment assignment = stateMachine.getJobAssignment(assignmentId);
+        if (assignment == null) {
             throw QuorusApiException.notFound(ErrorCode.ASSIGNMENT_NOT_FOUND, assignmentId);
+        }
+        return assignment;
+    }
+
+    /**
+     * Validates that the assignment can transition from its current status to the target status.
+     *
+     * @throws QuorusApiException with ASSIGNMENT_STATE_CONFLICT if the transition is invalid
+     */
+    private void validateTransition(JobAssignment assignment, JobAssignmentStatus targetStatus,
+                                     String assignmentId, String operation) {
+        if (!assignment.getStatus().canTransitionTo(targetStatus)) {
+            throw QuorusApiException.conflict(ErrorCode.ASSIGNMENT_STATE_CONFLICT,
+                    assignmentId, assignment.getStatus().name(), operation);
         }
     }
 
