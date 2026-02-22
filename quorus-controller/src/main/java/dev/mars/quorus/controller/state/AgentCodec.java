@@ -60,6 +60,7 @@ final class AgentCodec {
             case AgentCommand.UpdateStatus u -> {
                 builder.setType(AgentCommandType.AGENT_CMD_UPDATE_STATUS);
                 builder.setNewStatus(toProto(u.newStatus()));
+                builder.setExpectedStatus(toProto(u.expectedStatus()));
             }
             case AgentCommand.UpdateCapabilities c -> {
                 builder.setType(AgentCommandType.AGENT_CMD_UPDATE_CAPABILITIES);
@@ -86,8 +87,10 @@ final class AgentCodec {
                     proto.getAgentId(), fromProto(proto.getAgentInfo()), timestamp);
             case AGENT_CMD_DEREGISTER -> new AgentCommand.Deregister(
                     proto.getAgentId(), timestamp);
-            case AGENT_CMD_UPDATE_STATUS -> new AgentCommand.UpdateStatus(
-                    proto.getAgentId(), newStatus, timestamp);
+            case AGENT_CMD_UPDATE_STATUS -> {
+                yield new AgentCommand.UpdateStatus(
+                        proto.getAgentId(), fromProto(proto.getExpectedStatus()), newStatus, timestamp);
+            }
             case AGENT_CMD_UPDATE_CAPABILITIES -> new AgentCommand.UpdateCapabilities(
                     proto.getAgentId(), fromProto(proto.getNewCapabilities()), timestamp);
             case AGENT_CMD_HEARTBEAT -> new AgentCommand.Heartbeat(

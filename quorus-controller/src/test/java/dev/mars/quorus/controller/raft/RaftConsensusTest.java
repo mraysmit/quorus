@@ -323,10 +323,10 @@ class RaftConsensusTest {
         assertEquals(job, ((TransferJobCommand.Create) createCmd).transferJob());
 
         // Test update status command
-        TransferJobCommand updateCmd = TransferJobCommand.updateStatus(job.getJobId(), TransferStatus.IN_PROGRESS);
+        TransferJobCommand updateCmd = TransferJobCommand.updateStatus(job.getJobId(), TransferStatus.PENDING, TransferStatus.IN_PROGRESS);
         assertInstanceOf(TransferJobCommand.UpdateStatus.class, updateCmd);
         assertEquals(job.getJobId(), updateCmd.jobId());
-        assertEquals(TransferStatus.IN_PROGRESS, ((TransferJobCommand.UpdateStatus) updateCmd).status());
+        assertEquals(TransferStatus.IN_PROGRESS, ((TransferJobCommand.UpdateStatus) updateCmd).newStatus());
 
         // Test delete command
         TransferJobCommand deleteCmd = TransferJobCommand.delete(job.getJobId());

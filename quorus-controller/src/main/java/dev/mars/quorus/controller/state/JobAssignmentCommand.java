@@ -113,15 +113,17 @@ public sealed interface JobAssignmentCommand extends RaftCommand
     /**
      * Update assignment status.
      *
-     * @param assignmentId the assignment identifier
-     * @param newStatus    the new status
-     * @param timestamp    the command timestamp
+     * @param assignmentId   the assignment identifier
+     * @param expectedStatus the expected current status for CAS validation (null to skip check)
+     * @param newStatus      the new status
+     * @param timestamp      the command timestamp
      */
-    record UpdateStatus(String assignmentId, JobAssignmentStatus newStatus, Instant timestamp) implements JobAssignmentCommand {
+    record UpdateStatus(String assignmentId, JobAssignmentStatus expectedStatus, JobAssignmentStatus newStatus, Instant timestamp) implements JobAssignmentCommand {
         private static final long serialVersionUID = 1L;
 
         public UpdateStatus {
             Objects.requireNonNull(assignmentId, "assignmentId");
+            Objects.requireNonNull(expectedStatus, "expectedStatus");
             Objects.requireNonNull(newStatus, "newStatus");
             Objects.requireNonNull(timestamp, "timestamp");
         }
@@ -211,11 +213,14 @@ public sealed interface JobAssignmentCommand extends RaftCommand
     }
 
     /**
-     * Create a command to update assignment status.
+     * Create a command to update assignment status with CAS protection.
+     *
+     * @param assignmentId   the assignment identifier
+     * @param expectedStatus the expected current status (must match for command to apply)
+     * @param newStatus      the new status
      */
-    static JobAssignmentCommand updateStatus(String assignmentId, JobAssignmentStatus newStatus) {
-        Objects.requireNonNull(newStatus, "New status cannot be null");
-        return new UpdateStatus(assignmentId, newStatus, Instant.now());
+    static JobAssignmentCommand updateStatus(String assignmentId, JobAssignmentStatus expectedStatus, JobAssignmentStatus newStatus) {
+        return new UpdateStatus(assignmentId, expectedStatus, newStatus, Instant.now());
     }
 
     /**

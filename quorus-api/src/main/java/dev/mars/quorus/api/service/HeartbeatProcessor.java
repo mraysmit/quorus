@@ -417,7 +417,7 @@ public class HeartbeatProcessor {
                     logger.debug("Submitting failed agent status to distributed state: agentId={}", agentInfo.getAgentId());
                     raftNode.submitCommand(command);
                 } catch (Exception e) {
-                    logger.warn("Failed to update failed agent status in distributed state: agentId={}, error={}", 
+                    logger.error("Failed to update failed agent status in distributed state: agentId={}, error={}", 
                             agentInfo.getAgentId(), e.getMessage(), e);
                 }
             }

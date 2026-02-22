@@ -19,7 +19,9 @@ package dev.mars.quorus.controller.http.handlers;
 import dev.mars.quorus.controller.raft.RaftNode;
 import dev.mars.quorus.controller.state.CommandResult;
 import dev.mars.quorus.controller.state.JobAssignmentCommand;
+import dev.mars.quorus.controller.state.QuorusStateStore;
 import dev.mars.quorus.controller.state.TransferJobCommand;
+import dev.mars.quorus.core.JobAssignment;
 import dev.mars.quorus.core.JobAssignmentStatus;
 import io.vertx.core.Future;
 import io.vertx.core.Handler;
@@ -69,8 +71,17 @@ public class JobStatusHandler implements Handler<RoutingContext> {
             // Reconstruct assignment ID based on convention: jobId:agentId
             String assignmentId = jobId + ":" + agentId;
 
-            // Update job assignment status
-            JobAssignmentCommand assignmentCommand = JobAssignmentCommand.updateStatus(assignmentId, status);
+            // Look up current assignment status for CAS protection
+            QuorusStateStore stateMachine = (QuorusStateStore) raftNode.getStateStore();
+            JobAssignment existing = stateMachine.getJobAssignment(assignmentId);
+            if (existing == null) {
+                ctx.fail(404, new IllegalArgumentException("Assignment not found: " + assignmentId));
+                return;
+            }
+
+            // Update job assignment status with CAS
+            JobAssignmentCommand assignmentCommand = JobAssignmentCommand.updateStatus(
+                    assignmentId, existing.getStatus(), status);
             Future<CommandResult<?>> assignmentFuture = raftNode.submitCommand(assignmentCommand);
 
             // Also update transfer job progress if bytes were reported
@@ -86,7 +97,7 @@ public class JobStatusHandler implements Handler<RoutingContext> {
                         .onFailure(ctx::fail);
             }
         } catch (Exception e) {
-            logger.error("Failed to update status: {}", e.getMessage());
+            logger.warn("Failed to update status: {}", e.getMessage());
             logger.debug("Stack trace for status update failure", e);
             ctx.fail(e);
         }

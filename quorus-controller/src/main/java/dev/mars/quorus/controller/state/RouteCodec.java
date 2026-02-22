@@ -71,6 +71,7 @@ final class RouteCodec {
                 builder.setType(RouteCommandType.ROUTE_CMD_UPDATE_STATUS);
                 builder.setNewStatus(toProto(us.newStatus()));
                 if (us.reason() != null) builder.setReason(us.reason());
+                builder.setExpectedStatus(toProto(us.expectedStatus()));
             }
         }
 
@@ -94,7 +95,7 @@ final class RouteCodec {
             case ROUTE_CMD_UPDATE_STATUS -> {
                 RouteStatus newStatus = proto.getNewStatus() != RouteStatusProto.ROUTE_STATUS_UNSPECIFIED
                         ? fromProto(proto.getNewStatus()) : null;
-                yield new RouteCommand.UpdateStatus(routeId, newStatus, reason, timestamp);
+                yield new RouteCommand.UpdateStatus(routeId, fromProto(proto.getExpectedStatus()), newStatus, reason, timestamp);
             }
             default -> throw new IllegalArgumentException("Unknown RouteCommandType: " + proto.getType());
         };

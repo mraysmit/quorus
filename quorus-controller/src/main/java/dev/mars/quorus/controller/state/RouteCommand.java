@@ -141,16 +141,18 @@ public sealed interface RouteCommand extends RaftCommand
     /**
      * Update a route's status.
      *
-     * @param routeId   the route identifier
-     * @param newStatus the new status
-     * @param reason    optional reason for the status change (may be null)
-     * @param timestamp the command timestamp
+     * @param routeId        the route identifier
+     * @param expectedStatus the expected current status for CAS validation (null to skip check)
+     * @param newStatus      the new status
+     * @param reason         optional reason for the status change (may be null)
+     * @param timestamp      the command timestamp
      */
-    record UpdateStatus(String routeId, RouteStatus newStatus, String reason, Instant timestamp) implements RouteCommand {
+    record UpdateStatus(String routeId, RouteStatus expectedStatus, RouteStatus newStatus, String reason, Instant timestamp) implements RouteCommand {
         private static final long serialVersionUID = 1L;
 
         public UpdateStatus {
             Objects.requireNonNull(routeId, "routeId");
+            Objects.requireNonNull(expectedStatus, "expectedStatus");
             Objects.requireNonNull(newStatus, "newStatus");
             Objects.requireNonNull(timestamp, "timestamp");
             // reason may be null
@@ -195,9 +197,14 @@ public sealed interface RouteCommand extends RaftCommand
     }
 
     /**
-     * Create a command to update a route's status.
+     * Create a command to update a route's status with CAS protection.
+     *
+     * @param routeId        the route identifier
+     * @param expectedStatus the expected current status (must match for command to apply)
+     * @param newStatus      the new status
+     * @param reason         optional reason for the status change
      */
-    static RouteCommand updateStatus(String routeId, RouteStatus newStatus, String reason) {
-        return new UpdateStatus(routeId, newStatus, reason, Instant.now());
+    static RouteCommand updateStatus(String routeId, RouteStatus expectedStatus, RouteStatus newStatus, String reason) {
+        return new UpdateStatus(routeId, expectedStatus, newStatus, reason, Instant.now());
     }
 }

@@ -330,6 +330,7 @@ message TransferJobCommandProto {
   TransferJobProto transfer_job = 3;
   TransferStatusProto status = 4;
   int64 bytes_transferred = 5;
+  TransferStatusProto expected_status = 6;  // CAS: expected current status (must match for command to apply)
 }
 
 message AgentCommandProto {
@@ -339,6 +340,7 @@ message AgentCommandProto {
   AgentStatusProto new_status = 4;
   AgentCapabilitiesProto new_capabilities = 5;
   int64 timestamp_epoch_ms = 6;
+  AgentStatusProto expected_status = 7;  // CAS: expected current status (must match for command to apply)
 }
 
 message SystemMetadataCommandProto {
@@ -354,6 +356,7 @@ message JobAssignmentCommandProto {
   JobAssignmentStatusProto new_status = 4;
   string reason = 5;
   int64 timestamp_epoch_ms = 6;
+  JobAssignmentStatusProto expected_status = 7;  // CAS: expected current status (must match for command to apply)
 }
 
 message JobQueueCommandProto {
@@ -372,6 +375,7 @@ message RouteCommandProto {
   RouteStatusProto new_status = 4;
   string reason = 5;
   int64 timestamp_epoch_ms = 6;
+  RouteStatusProto expected_status = 7;  // CAS: expected current status (must match for command to apply)
 }
 
 // ===== RAFT COMMAND WRAPPER =====

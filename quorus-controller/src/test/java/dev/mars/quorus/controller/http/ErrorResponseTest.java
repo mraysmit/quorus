@@ -66,6 +66,46 @@ class ErrorResponseTest {
         }
 
         @Test
+        @DisplayName("Short codes are unique and follow Q-xxxx convention")
+        void testShortCodesAreUniqueAndFormatted() {
+            var shortCodes = java.util.Arrays.stream(ErrorCode.values())
+                .map(ErrorCode::shortCode)
+                .toList();
+
+            var uniqueShortCodes = new java.util.HashSet<>(shortCodes);
+            assertEquals(shortCodes.size(), uniqueShortCodes.size(), "All short codes should be unique");
+
+            for (String sc : shortCodes) {
+                assertTrue(sc.matches("Q-\\d{4}"), "Short code '" + sc + "' should match Q-xxxx pattern");
+            }
+        }
+
+        @Test
+        @DisplayName("Short codes use correct category ranges")
+        void testShortCodeCategoryRanges() {
+            assertEquals("Q-1001", ErrorCode.BAD_REQUEST.shortCode());
+            assertEquals("Q-2001", ErrorCode.TRANSFER_NOT_FOUND.shortCode());
+            assertEquals("Q-3001", ErrorCode.AGENT_NOT_FOUND.shortCode());
+            assertEquals("Q-4001", ErrorCode.ASSIGNMENT_NOT_FOUND.shortCode());
+            assertEquals("Q-5001", ErrorCode.NOT_LEADER.shortCode());
+            assertEquals("Q-6001", ErrorCode.ROUTE_NOT_FOUND.shortCode());
+            assertEquals("Q-7001", ErrorCode.WORKFLOW_NOT_FOUND.shortCode());
+            assertEquals("Q-8001", ErrorCode.TENANT_NOT_FOUND.shortCode());
+            assertEquals("Q-9001", ErrorCode.INTERNAL_ERROR.shortCode());
+        }
+
+        @Test
+        @DisplayName("fromShortCode returns correct ErrorCode")
+        void testFromShortCode() {
+            var code = ErrorCode.fromShortCode("Q-2001");
+            assertTrue(code.isPresent());
+            assertEquals(ErrorCode.TRANSFER_NOT_FOUND, code.get());
+
+            var unknown = ErrorCode.fromShortCode("Q-0000");
+            assertTrue(unknown.isEmpty());
+        }
+
+        @Test
         @DisplayName("formatMessage substitutes placeholders correctly")
         void testFormatMessage() {
             String message = ErrorCode.TRANSFER_NOT_FOUND.formatMessage("job-123");
@@ -103,6 +143,7 @@ class ErrorResponseTest {
                 "job-123"
             );
 
+            assertEquals("Q-2001", response.shortCode());
             assertEquals("TRANSFER_NOT_FOUND", response.code());
             assertEquals("Transfer job 'job-123' not found", response.message());
             assertEquals("/api/v1/transfers/job-123", response.path());
@@ -121,6 +162,7 @@ class ErrorResponseTest {
                 "Custom error message"
             );
 
+            assertEquals("Q-1001", response.shortCode());
             assertEquals("BAD_REQUEST", response.code());
             assertEquals("Custom error message", response.message());
             assertEquals("/api/v1/test", response.path());
@@ -140,6 +182,7 @@ class ErrorResponseTest {
             assertTrue(json.containsKey("error"));
             JsonObject error = json.getJsonObject("error");
             
+            assertEquals("Q-3001", error.getString("shortCode"));
             assertEquals("AGENT_NOT_FOUND", error.getString("code"));
             assertEquals("Agent 'agent-1' not found", error.getString("message"));
             assertEquals("/api/v1/agents/agent-1", error.getString("path"));
@@ -170,6 +213,7 @@ class ErrorResponseTest {
                 "/api/v1/transfers"
             );
 
+            assertEquals("Q-2002", response.shortCode());
             assertEquals("TRANSFER_INVALID", response.code());
             assertEquals("Invalid transfer request", response.message());
             assertEquals(400, response.httpStatus());

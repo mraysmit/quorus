@@ -67,15 +67,17 @@ public sealed interface TransferJobCommand extends RaftCommand
     /**
      * Update the status of an existing transfer job.
      *
-     * @param jobId  the job identifier
-     * @param status the new status
+     * @param jobId          the job identifier
+     * @param expectedStatus the expected current status for CAS validation (null to skip check)
+     * @param newStatus      the new status
      */
-    record UpdateStatus(String jobId, TransferStatus status) implements TransferJobCommand {
+    record UpdateStatus(String jobId, TransferStatus expectedStatus, TransferStatus newStatus) implements TransferJobCommand {
         private static final long serialVersionUID = 1L;
 
         public UpdateStatus {
             Objects.requireNonNull(jobId, "jobId");
-            Objects.requireNonNull(status, "status");
+            Objects.requireNonNull(expectedStatus, "expectedStatus");
+            Objects.requireNonNull(newStatus, "newStatus");
         }
     }
 
@@ -116,10 +118,14 @@ public sealed interface TransferJobCommand extends RaftCommand
     }
 
     /**
-     * Create an update-status command.
+     * Create an update-status command with CAS protection.
+     *
+     * @param jobId          the job identifier
+     * @param expectedStatus the expected current status (must match for command to apply)
+     * @param newStatus      the new status
      */
-    static TransferJobCommand updateStatus(String jobId, TransferStatus status) {
-        return new UpdateStatus(jobId, status);
+    static TransferJobCommand updateStatus(String jobId, TransferStatus expectedStatus, TransferStatus newStatus) {
+        return new UpdateStatus(jobId, expectedStatus, newStatus);
     }
 
     /**

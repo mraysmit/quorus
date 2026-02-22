@@ -51,7 +51,8 @@ final class TransferCodec {
             }
             case TransferJobCommand.UpdateStatus u -> {
                 builder.setType(TransferJobCommandType.TRANSFER_JOB_CMD_UPDATE_STATUS);
-                builder.setStatus(toProto(u.status()));
+                builder.setStatus(toProto(u.newStatus()));
+                builder.setExpectedStatus(toProto(u.expectedStatus()));
             }
             case TransferJobCommand.UpdateProgress p -> {
                 builder.setType(TransferJobCommandType.TRANSFER_JOB_CMD_UPDATE_PROGRESS);
@@ -68,7 +69,9 @@ final class TransferCodec {
     static TransferJobCommand fromProto(TransferJobCommandProto proto) {
         return switch (proto.getType()) {
             case TRANSFER_JOB_CMD_CREATE -> TransferJobCommand.create(fromProto(proto.getTransferJob()));
-            case TRANSFER_JOB_CMD_UPDATE_STATUS -> TransferJobCommand.updateStatus(proto.getJobId(), fromProto(proto.getStatus()));
+            case TRANSFER_JOB_CMD_UPDATE_STATUS -> {
+                yield new TransferJobCommand.UpdateStatus(proto.getJobId(), fromProto(proto.getExpectedStatus()), fromProto(proto.getStatus()));
+            }
             case TRANSFER_JOB_CMD_UPDATE_PROGRESS -> TransferJobCommand.updateProgress(proto.getJobId(), proto.getBytesTransferred());
             case TRANSFER_JOB_CMD_DELETE -> TransferJobCommand.delete(proto.getJobId());
             default -> throw new IllegalArgumentException("Unknown TransferJobCommandType: " + proto.getType());

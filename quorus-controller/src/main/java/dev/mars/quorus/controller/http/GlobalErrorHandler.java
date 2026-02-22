@@ -124,7 +124,7 @@ public class GlobalErrorHandler implements Handler<RoutingContext> {
         if (code.httpStatus() >= 500) {
             logger.error("Server error [{}] at {}: {}", code.code(), path, failure.getMessage(), failure);
         } else if (code.httpStatus() >= 400) {
-            logger.warn("Client error [{}] at {}: {}", code.code(), path, failure.getMessage());
+            logger.error("Client error [{}] at {}: {}", code.code(), path, failure.getMessage());
         } else {
             logger.debug("Error [{}] at {}: {}", code.code(), path, failure.getMessage());
         }
