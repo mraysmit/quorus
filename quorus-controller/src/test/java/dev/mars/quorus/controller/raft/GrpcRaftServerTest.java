@@ -77,7 +77,14 @@ class GrpcRaftServerTest {
         Set<String> clusterNodes = Set.of("node1");
         InMemoryTransportSimulator transport = new InMemoryTransportSimulator("node1");
         QuorusStateStore stateMachine = new QuorusStateStore();
-        raftNode = new RaftNode(vertx, "node1", clusterNodes, transport, stateMachine, 5000, 1000);
+        raftNode = RaftNode.builder().vertx(vertx)
+            .nodeId("node1")
+            .clusterNodes(clusterNodes)
+            .transport(transport)
+            .stateMachine(stateMachine)
+            .mode(RaftNodeMode.volatileMode())
+            .electionTimeout(5000)
+            .heartbeatInterval(1000).build();
         raftNode.start();
         
         // Wait for node to be running (reactive polling instead of fixed sleep)
@@ -926,8 +933,8 @@ class GrpcRaftServerTest {
         QuorusStateStore sm1 = new QuorusStateStore();
         QuorusStateStore sm2 = new QuorusStateStore();
         
-        RaftNode node1 = new RaftNode(vertx, "nodeA", cluster1, transport1, sm1, 5000, 1000);
-        RaftNode node2 = new RaftNode(vertx, "nodeB", cluster2, transport2, sm2, 5000, 1000);
+        RaftNode node1 = RaftNode.builder().vertx(vertx).nodeId("nodeA").clusterNodes(cluster1).transport(transport1).stateMachine(sm1).mode(RaftNodeMode.volatileMode()).electionTimeout(5000).heartbeatInterval(1000).build();
+        RaftNode node2 = RaftNode.builder().vertx(vertx).nodeId("nodeB").clusterNodes(cluster2).transport(transport2).stateMachine(sm2).mode(RaftNodeMode.volatileMode()).electionTimeout(5000).heartbeatInterval(1000).build();
         
         node1.start();
         node2.start();
