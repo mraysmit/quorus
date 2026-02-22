@@ -62,9 +62,19 @@ class RaftSnapshotTest {
 
         // Single-node cluster with snapshot enabled, threshold=5, check every 500ms
         Set<String> cluster = Set.of("node1");
-        leaderNode = new RaftNode(vertx, "node1", cluster, transport, stateMachine,
-                storage, 1000, 200,
-                true, 5, 500);
+        leaderNode = RaftNode.builder()
+                .vertx(vertx)
+                .nodeId("node1")
+                .clusterNodes(cluster)
+                .transport(transport)
+                .stateMachine(stateMachine)
+                .mode(RaftNodeMode.durable(storage))
+                .electionTimeout(1000)
+                .heartbeatInterval(200)
+                .snapshotEnabled(true)
+                .snapshotThreshold(5)
+                .snapshotCheckInterval(500)
+                .build();
     }
 
     @AfterEach
@@ -222,9 +232,19 @@ class RaftSnapshotTest {
         InMemoryRaftStorage storage2 = new InMemoryRaftStorage();
         InMemoryTransportSimulator transport2 = new InMemoryTransportSimulator("node-no-snap");
         Set<String> cluster = Set.of("node-no-snap");
-        RaftNode noSnapNode = new RaftNode(vertx, "node-no-snap", cluster, transport2, new QuorusStateStore(),
-                storage2, 1000, 200,
-                false, 5, 500);
+        RaftNode noSnapNode = RaftNode.builder()
+                .vertx(vertx)
+                .nodeId("node-no-snap")
+                .clusterNodes(cluster)
+                .transport(transport2)
+                .stateMachine(new QuorusStateStore())
+                .mode(RaftNodeMode.durable(storage2))
+                .electionTimeout(1000)
+                .heartbeatInterval(200)
+                .snapshotEnabled(false)
+                .snapshotThreshold(5)
+                .snapshotCheckInterval(500)
+                .build();
 
         storage2.open(Path.of("/tmp/test2")).onComplete(ctx.succeeding(v -> {
             noSnapNode.start().onComplete(ctx.succeeding(v2 -> {

@@ -66,9 +66,9 @@ class RaftFailureTest {
         transport2 = new InMemoryTransportSimulator("node2");
         transport3 = new InMemoryTransportSimulator("node3");
 
-        node1 = new RaftNode(vertx, "node1", clusterNodes, transport1, new QuorusStateStore(), 600, 120);
-        node2 = new RaftNode(vertx, "node2", clusterNodes, transport2, new QuorusStateStore(), 600, 120);
-        node3 = new RaftNode(vertx, "node3", clusterNodes, transport3, new QuorusStateStore(), 600, 120);
+        node1 = RaftNode.builder().vertx(vertx).nodeId("node1").clusterNodes(clusterNodes).transport(transport1).stateMachine(new QuorusStateStore()).mode(RaftNodeMode.volatileMode()).electionTimeout(600).heartbeatInterval(120).build();
+        node2 = RaftNode.builder().vertx(vertx).nodeId("node2").clusterNodes(clusterNodes).transport(transport2).stateMachine(new QuorusStateStore()).mode(RaftNodeMode.volatileMode()).electionTimeout(600).heartbeatInterval(120).build();
+        node3 = RaftNode.builder().vertx(vertx).nodeId("node3").clusterNodes(clusterNodes).transport(transport3).stateMachine(new QuorusStateStore()).mode(RaftNodeMode.volatileMode()).electionTimeout(600).heartbeatInterval(120).build();
     }
 
     @AfterEach
@@ -189,7 +189,7 @@ class RaftFailureTest {
     @Test
     void testInvalidClusterConfiguration() {
         // Test empty cluster - should not throw exception but should handle gracefully
-        RaftNode emptyClusterNode = new RaftNode(vertx, "test", Set.of(), transport1, new QuorusStateStore());
+        RaftNode emptyClusterNode = RaftNode.builder().vertx(vertx).nodeId("test").clusterNodes(Set.of()).transport(transport1).stateMachine(new QuorusStateStore()).mode(RaftNodeMode.volatileMode()).build();
         assertNotNull(emptyClusterNode);
         assertEquals("test", emptyClusterNode.getNodeId());
         assertEquals(RaftNode.State.FOLLOWER, emptyClusterNode.getState());
@@ -231,8 +231,8 @@ class RaftFailureTest {
             }
         };
         
-        RaftNode failingNode = new RaftNode(vertx, "failing", Set.of("failing"), 
-                failingTransport, new QuorusStateStore());
+        RaftNode failingNode = RaftNode.builder().vertx(vertx).nodeId("failing").clusterNodes(Set.of("failing"))
+                .transport(failingTransport).stateMachine(new QuorusStateStore()).mode(RaftNodeMode.volatileMode()).build();
         
         // Should handle transport failure gracefully
         Future<Void> future = failingNode.start();
@@ -301,12 +301,12 @@ class RaftFailureTest {
         // Start nodes with very short election timeouts to force concurrent elections
         Set<String> clusterNodes = Set.of("fast1", "fast2", "fast3");
         
-        RaftNode fast1 = new RaftNode(vertx, "fast1", clusterNodes, 
-                new InMemoryTransportSimulator("fast1"), new QuorusStateStore(), 100, 50);
-        RaftNode fast2 = new RaftNode(vertx, "fast2", clusterNodes, 
-                new InMemoryTransportSimulator("fast2"), new QuorusStateStore(), 100, 50);
-        RaftNode fast3 = new RaftNode(vertx, "fast3", clusterNodes, 
-                new InMemoryTransportSimulator("fast3"), new QuorusStateStore(), 100, 50);
+        RaftNode fast1 = RaftNode.builder().vertx(vertx).nodeId("fast1").clusterNodes(clusterNodes)
+                .transport(new InMemoryTransportSimulator("fast1")).stateMachine(new QuorusStateStore()).mode(RaftNodeMode.volatileMode()).electionTimeout(100).heartbeatInterval(50).build();
+        RaftNode fast2 = RaftNode.builder().vertx(vertx).nodeId("fast2").clusterNodes(clusterNodes)
+                .transport(new InMemoryTransportSimulator("fast2")).stateMachine(new QuorusStateStore()).mode(RaftNodeMode.volatileMode()).electionTimeout(100).heartbeatInterval(50).build();
+        RaftNode fast3 = RaftNode.builder().vertx(vertx).nodeId("fast3").clusterNodes(clusterNodes)
+                .transport(new InMemoryTransportSimulator("fast3")).stateMachine(new QuorusStateStore()).mode(RaftNodeMode.volatileMode()).electionTimeout(100).heartbeatInterval(50).build();
         
         try {
             // Start all nodes simultaneously
@@ -391,8 +391,8 @@ class RaftFailureTest {
         
         // Test single node becoming leader
         Set<String> singleNode = Set.of("single");
-        RaftNode single = new RaftNode(vertx, "single", singleNode, 
-                new InMemoryTransportSimulator("single"), new QuorusStateStore(), 300, 100);
+        RaftNode single = RaftNode.builder().vertx(vertx).nodeId("single").clusterNodes(singleNode)
+                .transport(new InMemoryTransportSimulator("single")).stateMachine(new QuorusStateStore()).mode(RaftNodeMode.volatileMode()).electionTimeout(300).heartbeatInterval(100).build();
         
         single.start();
         

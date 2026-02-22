@@ -85,7 +85,7 @@ public class RaftChaosTest {
         for (String nodeId : NODE_IDS) {
             QuorusStateStore stateMachine = new QuorusStateStore();
             // Use standard timeouts: 1000ms election, 200ms heartbeat
-            RaftNode node = new RaftNode(vertx, nodeId, clusterNodes, transports.get(nodeId), stateMachine, 1000, 200);
+            RaftNode node = RaftNode.builder().vertx(vertx).nodeId(nodeId).clusterNodes(clusterNodes).transport(transports.get(nodeId)).stateMachine(stateMachine).mode(RaftNodeMode.volatileMode()).electionTimeout(1000).heartbeatInterval(200).build();
             cluster.add(node);
         }
         

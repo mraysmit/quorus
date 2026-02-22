@@ -44,6 +44,7 @@ import io.opentelemetry.api.metrics.Meter;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
+import static java.util.Objects.requireNonNull;
 
 /**
  * Reactive Raft Node implementation with durable WAL storage.
@@ -79,7 +80,7 @@ public class RaftNode {
     private final Set<String> clusterNodes;
     private final RaftTransport transport;
     private final RaftLogApplicator stateMachine;
-    private final RaftStorage storage;  // WAL storage for durability
+    private final Optional<RaftStorage> storage;  // WAL storage for durability (empty for volatile mode)
 
     // ========== PERSISTENT STATE ==========
     private volatile long currentTerm = 0;
@@ -139,73 +140,141 @@ public class RaftNode {
     private LongCounter installSnapshotSent;
     private LongCounter installSnapshotReceived;
 
-    /**
-     * Creates a RaftNode with default timing parameters and in-memory storage.
-     * <p>Use this constructor for testing or single-node development only.
-     * For production, use the constructor that accepts RaftStorage.
-     */
-    public RaftNode(Vertx vertx, String nodeId, Set<String> clusterNodes, RaftTransport transport,
-            RaftLogApplicator stateMachine) {
-        this(vertx, nodeId, clusterNodes, transport, stateMachine, null, 5000, 1000,
-                false, 10000, 60000);
-    }
+    // ========== BUILDER ==========
 
     /**
-     * Creates a RaftNode with custom timing parameters and optional storage.
-     * <p>If storage is null, runs in volatile mode (no persistence).
-     */
-    public RaftNode(Vertx vertx, String nodeId, Set<String> clusterNodes, RaftTransport transport,
-            RaftLogApplicator stateMachine, long electionTimeoutMs, long heartbeatIntervalMs) {
-        this(vertx, nodeId, clusterNodes, transport, stateMachine, null, electionTimeoutMs, heartbeatIntervalMs,
-                false, 10000, 60000);
-    }
-
-    /**
-     * Creates a RaftNode with durable WAL storage.
-     * <p>This is the recommended constructor for production use.
+     * Creates a new builder for constructing a {@link RaftNode}.
      *
-     * @param vertx             The Vert.x instance
-     * @param nodeId            Unique node identifier
-     * @param clusterNodes      Set of all node IDs in the cluster
-     * @param transport         Transport for inter-node communication
-     * @param stateMachine      State machine for applying committed entries
-     * @param storage           WAL storage for durability (null for volatile mode)
-     * @param electionTimeoutMs Base election timeout in milliseconds
-     * @param heartbeatIntervalMs Heartbeat interval in milliseconds
+     * <p>All infrastructure parameters are set via fluent methods. The six required
+     * parameters — {@code vertx}, {@code nodeId}, {@code clusterNodes}, {@code transport},
+     * {@code stateMachine}, and {@code mode} — are validated at {@link Builder#build()} time.
+     *
+     * <p>Usage:
+     * <pre>{@code
+     * // Minimal (volatile, default timing)
+     * RaftNode node = RaftNode.builder()
+     *     .vertx(vertx)
+     *     .nodeId("node1")
+     *     .clusterNodes(cluster)
+     *     .transport(transport)
+     *     .stateMachine(sm)
+     *     .mode(RaftNodeMode.volatileMode())
+     *     .build();
+     *
+     * // Production (durable, custom timing, snapshots)
+     * RaftNode node = RaftNode.builder()
+     *     .vertx(vertx)
+     *     .nodeId("node1")
+     *     .clusterNodes(cluster)
+     *     .transport(transport)
+     *     .stateMachine(sm)
+     *     .mode(RaftNodeMode.durable(storage))
+     *     .electionTimeout(5000)
+     *     .heartbeatInterval(1000)
+     *     .snapshotEnabled(true)
+     *     .snapshotThreshold(10000)
+     *     .snapshotCheckInterval(60000)
+     *     .build();
+     * }</pre>
+     *
+     * @return a new builder
      */
-    public RaftNode(Vertx vertx, String nodeId, Set<String> clusterNodes, RaftTransport transport,
-            RaftLogApplicator stateMachine, RaftStorage storage, long electionTimeoutMs, long heartbeatIntervalMs) {
-        this(vertx, nodeId, clusterNodes, transport, stateMachine, storage, electionTimeoutMs, heartbeatIntervalMs,
-                true, 10000, 60000);
+    public static Builder builder() {
+        return new Builder();
     }
 
     /**
-     * Creates a RaftNode with full configuration including snapshot scheduling.
+     * Fluent builder for {@link RaftNode}.
      *
-     * @param vertx                   The Vert.x instance
-     * @param nodeId                  Unique node identifier
-     * @param clusterNodes            Set of all node IDs in the cluster
-     * @param transport               Transport for inter-node communication
-     * @param stateMachine            State machine for applying committed entries
-     * @param storage                 WAL storage for durability (null for volatile mode)
-     * @param electionTimeoutMs       Base election timeout in milliseconds
-     * @param heartbeatIntervalMs     Heartbeat interval in milliseconds
-     * @param snapshotEnabled         Whether to enable automatic snapshot scheduling
-     * @param snapshotThreshold       Number of entries between snapshots
-     * @param snapshotCheckIntervalMs Interval between snapshot eligibility checks
+     * <p>Every setter returns {@code this} for chaining. The six required fields
+     * ({@code vertx}, {@code nodeId}, {@code clusterNodes}, {@code transport},
+     * {@code stateMachine}, {@code mode}) are validated when {@link #build()} is called;
+     * omitting any of them produces an {@link IllegalStateException}.
      */
-    public RaftNode(Vertx vertx, String nodeId, Set<String> clusterNodes, RaftTransport transport,
-            RaftLogApplicator stateMachine, RaftStorage storage, long electionTimeoutMs, long heartbeatIntervalMs,
+    public static final class Builder {
+        // Required (validated at build())
+        private Vertx vertx;
+        private String nodeId;
+        private Set<String> clusterNodes;
+        private RaftTransport transport;
+        private RaftLogApplicator stateMachine;
+        private RaftNodeMode mode;
+
+        // Optional with defaults
+        private long electionTimeoutMs = 5000;
+        private long heartbeatIntervalMs = 1000;
+        private Boolean snapshotEnabled;       // null = derive from mode
+        private long snapshotThreshold = 10000;
+        private long snapshotCheckIntervalMs = 60000;
+
+        private Builder() {}
+
+        /** The Vert.x instance (required). */
+        public Builder vertx(Vertx vertx) { this.vertx = vertx; return this; }
+
+        /** Unique node identifier (required). */
+        public Builder nodeId(String nodeId) { this.nodeId = nodeId; return this; }
+
+        /** Set of all node IDs in the cluster (required). */
+        public Builder clusterNodes(Set<String> clusterNodes) { this.clusterNodes = clusterNodes; return this; }
+
+        /** Transport for inter-node communication (required). */
+        public Builder transport(RaftTransport transport) { this.transport = transport; return this; }
+
+        /** State machine for applying committed entries (required). */
+        public Builder stateMachine(RaftLogApplicator stateMachine) { this.stateMachine = stateMachine; return this; }
+
+        /** Storage mode — {@link RaftNodeMode#volatileMode()} or {@link RaftNodeMode#durable} (required). */
+        public Builder mode(RaftNodeMode mode) { this.mode = mode; return this; }
+
+        /** Base election timeout in milliseconds (default: 5000). */
+        public Builder electionTimeout(long ms) { this.electionTimeoutMs = ms; return this; }
+
+        /** Heartbeat interval in milliseconds (default: 1000). */
+        public Builder heartbeatInterval(long ms) { this.heartbeatIntervalMs = ms; return this; }
+
+        /** Whether to enable automatic snapshots (default: true for durable, false for volatile). */
+        public Builder snapshotEnabled(boolean enabled) { this.snapshotEnabled = enabled; return this; }
+
+        /** Number of log entries between snapshots (default: 10000). */
+        public Builder snapshotThreshold(long threshold) { this.snapshotThreshold = threshold; return this; }
+
+        /** Interval between snapshot eligibility checks in ms (default: 60000). */
+        public Builder snapshotCheckInterval(long ms) { this.snapshotCheckIntervalMs = ms; return this; }
+
+        /**
+         * Builds the {@link RaftNode}.
+         *
+         * @throws IllegalStateException if any required parameter is missing
+         */
+        public RaftNode build() {
+            if (vertx == null) throw new IllegalStateException("vertx is required");
+            if (nodeId == null) throw new IllegalStateException("nodeId is required");
+            if (clusterNodes == null) throw new IllegalStateException("clusterNodes is required");
+            if (transport == null) throw new IllegalStateException("transport is required");
+            if (stateMachine == null) throw new IllegalStateException("stateMachine is required");
+            if (mode == null) throw new IllegalStateException("mode is required");
+
+            boolean snap = (snapshotEnabled != null) ? snapshotEnabled : mode.isDurable();
+            return new RaftNode(vertx, nodeId, clusterNodes, transport, stateMachine,
+                    mode, electionTimeoutMs, heartbeatIntervalMs, snap, snapshotThreshold, snapshotCheckIntervalMs);
+        }
+    }
+
+    // ========== CONSTRUCTOR (private) ==========
+
+    private RaftNode(Vertx vertx, String nodeId, Set<String> clusterNodes, RaftTransport transport,
+            RaftLogApplicator stateMachine, RaftNodeMode mode, long electionTimeoutMs, long heartbeatIntervalMs,
             boolean snapshotEnabled, long snapshotThreshold, long snapshotCheckIntervalMs) {
         this.vertx = vertx;
         this.nodeId = nodeId;
         this.clusterNodes = new HashSet<>(clusterNodes);
         this.transport = transport;
         this.stateMachine = stateMachine;
-        this.storage = storage;
+        this.storage = requireNonNull(mode, "mode").storage();
         this.electionTimeoutMs = electionTimeoutMs;
         this.heartbeatIntervalMs = heartbeatIntervalMs;
-        this.snapshotEnabled = snapshotEnabled && storage != null;
+        this.snapshotEnabled = snapshotEnabled && this.storage.isPresent();
         this.snapshotThreshold = snapshotThreshold;
         this.snapshotCheckIntervalMs = snapshotCheckIntervalMs;
 
@@ -332,21 +401,22 @@ public class RaftNode {
      * <p>Order: Metadata → Snapshot (if any) → Log Replay → State Machine Rebuild
      */
     private Future<Void> recoverFromStorage() {
-        if (storage == null) {
+        if (storage.isEmpty()) {
             logger.info("No storage configured, running in volatile mode");
             return Future.succeededFuture();
         }
 
+        RaftStorage store = storage.get();
         logger.info("Recovering Raft state from storage...");
 
-        return storage.loadMetadata()
+        return store.loadMetadata()
             .compose(meta -> {
                 this.currentTerm = meta.currentTerm();
                 this.votedFor = meta.votedFor().orElse(null);
                 logger.info("Recovered metadata: term={}, votedFor={}", currentTerm, votedFor);
 
                 // Try to load snapshot
-                return storage.loadSnapshot();
+                return store.loadSnapshot();
             })
             .compose(snapshotOpt -> {
                 if (snapshotOpt.isPresent()) {
@@ -370,7 +440,7 @@ public class RaftNode {
                     logger.info("No snapshot found, will rebuild from full log replay");
                 }
 
-                return storage.replayLog();
+                return store.replayLog();
             })
             .compose(entries -> {
                 if (snapshotLastIndex > 0) {
@@ -453,21 +523,17 @@ public class RaftNode {
                 transport.stop();
                 
                 // Close storage
-                if (storage != null) {
-                    storage.close()
-                        .onSuccess(v2 -> {
-                            logger.info("Raft node stopped: {}", nodeId);
-                            promise.complete();
-                        })
-                        .onFailure(err -> {
-                            logger.warn("Error closing storage during shutdown: {}", err.getMessage());
-                            logger.debug("Stack trace for storage close error", err);
-                            promise.complete(); // Still complete, just log the warning
-                        });
-                } else {
-                    logger.info("Raft node stopped: {}", nodeId);
-                    promise.complete();
-                }
+                storage.map(RaftStorage::close)
+                    .orElseGet(Future::succeededFuture)
+                    .onSuccess(v2 -> {
+                        logger.info("Raft node stopped: {}", nodeId);
+                        promise.complete();
+                    })
+                    .onFailure(err -> {
+                        logger.warn("Error closing storage during shutdown: {}", err.getMessage());
+                        logger.debug("Stack trace for storage close error", err);
+                        promise.complete(); // Still complete, just log the warning
+                    });
             } catch (Exception e) {
                 logger.error("Failed to stop Raft node: {}", e.getMessage());
                 logger.debug("Stack trace for Raft node stop failure", e);
@@ -526,15 +592,13 @@ public class RaftNode {
      * Persists a log entry to the WAL with sync barrier.
      */
     private Future<Void> persistLogEntry(LogEntry entry) {
-        if (storage == null) {
-            return Future.succeededFuture();  // Volatile mode
-        }
+        return storage.map(s -> {
+            ByteString serialized = serialize(entry.getCommand());
+            LogEntryData entryData = new LogEntryData(entry.getIndex(), entry.getTerm(), serialized.toByteArray());
 
-        ByteString serialized = serialize(entry.getCommand());
-        LogEntryData entryData = new LogEntryData(entry.getIndex(), entry.getTerm(), serialized.toByteArray());
-        
-        return storage.appendEntries(List.of(entryData))
-            .compose(v -> storage.sync());  // Durability barrier
+            return s.appendEntries(List.of(entryData))
+                .compose(v -> s.sync());  // Durability barrier
+        }).orElseGet(Future::succeededFuture);  // Volatile mode
     }
 
     // ... Getters ...
@@ -1001,10 +1065,8 @@ public class RaftNode {
      * Persists vote metadata to WAL.
      */
     private Future<Void> persistVote(long term, String candidateId) {
-        if (storage == null) {
-            return Future.succeededFuture();  // Volatile mode
-        }
-        return storage.updateMetadata(term, Optional.of(candidateId));
+        return storage.map(s -> s.updateMetadata(term, Optional.of(candidateId)))
+            .orElseGet(Future::succeededFuture);  // Volatile mode
     }
 
     /**
@@ -1127,7 +1189,7 @@ public class RaftNode {
      * Persists append entries to WAL with optional truncation.
      */
     private Future<Void> persistAppendEntries(Long truncateFromIndex, List<LogEntry> entries) {
-        if (storage == null) {
+        if (storage.isEmpty()) {
             return Future.succeededFuture();  // Volatile mode
         }
         
@@ -1135,11 +1197,12 @@ public class RaftNode {
             return Future.succeededFuture();  // Nothing to persist (heartbeat)
         }
 
+        RaftStorage s = storage.get();
         Future<Void> f = Future.succeededFuture();
 
         // Truncate if needed
         if (truncateFromIndex != null) {
-            f = f.compose(v -> storage.truncateSuffix(truncateFromIndex));
+            f = f.compose(v -> s.truncateSuffix(truncateFromIndex));
         }
 
         // Append entries
@@ -1148,11 +1211,11 @@ public class RaftNode {
                 .map(e -> new LogEntryData(e.getIndex(), e.getTerm(), 
                                            serialize(e.getCommand()).toByteArray()))
                 .toList();
-            f = f.compose(v -> storage.appendEntries(entryDataList));
+            f = f.compose(v -> s.appendEntries(entryDataList));
         }
 
         // Sync for durability
-        return f.compose(v -> storage.sync());
+        return f.compose(v -> s.sync());
     }
 
     private void sendAppendEntries(String target, boolean heartbeat) {
@@ -1325,10 +1388,11 @@ public class RaftNode {
      * @return a Future that completes when the snapshot is saved and log is compacted
      */
     public Future<Void> takeSnapshot() {
-        if (storage == null) {
+        if (storage.isEmpty()) {
             return Future.failedFuture(new IllegalStateException("Cannot take snapshot in volatile mode"));
         }
 
+        RaftStorage store = storage.get();
         long snapshotIndex = lastApplied;
         if (snapshotIndex <= snapshotLastIndex) {
             logger.debug("No new entries to snapshot (lastApplied={}, snapshotLastIndex={})",
@@ -1360,10 +1424,10 @@ public class RaftNode {
                 snapshotIndex - snapshotLastIndex);
 
         // Step 2: Persist snapshot to storage (async)
-        return storage.saveSnapshot(snapshotData, snapshotIndex, snapshotTerm)
+        return store.saveSnapshot(snapshotData, snapshotIndex, snapshotTerm)
                 .compose(v -> {
                     // Step 3: Truncate log prefix in storage
-                    return storage.truncatePrefix(snapshotIndex);
+                    return store.truncatePrefix(snapshotIndex);
                 })
                 .compose(v -> {
                     // Step 4: Trim in-memory log
@@ -1425,7 +1489,7 @@ public class RaftNode {
             logger.debug("InstallSnapshot already in progress for {}, skipping", target);
             return;
         }
-        if (storage == null) {
+        if (storage.isEmpty()) {
             logger.warn("Cannot send InstallSnapshot: no storage configured");
             return;
         }
@@ -1434,7 +1498,7 @@ public class RaftNode {
         logger.info("Sending InstallSnapshot to lagging follower {} (nextIndex={}, snapshotLastIndex={})",
                 target, nextIndex.getOrDefault(target, 1L), snapshotLastIndex);
 
-        storage.loadSnapshot()
+        storage.get().loadSnapshot()
                 .onSuccess(snapshotOpt -> {
                     if (snapshotOpt.isEmpty()) {
                         logger.warn("No snapshot available to send to {}", target);
@@ -1616,17 +1680,15 @@ public class RaftNode {
                         snapshotData.length, lastIncludedIndex, lastIncludedTerm);
 
                 // Step 7: Persist snapshot and restore state
-                Future<Void> saveFuture = (storage != null)
-                        ? storage.saveSnapshot(snapshotData, lastIncludedIndex, lastIncludedTerm)
-                        : Future.succeededFuture();
+                Future<Void> saveFuture = storage
+                        .map(s -> s.saveSnapshot(snapshotData, lastIncludedIndex, lastIncludedTerm))
+                        .orElseGet(Future::succeededFuture);
 
                 saveFuture
                     .compose(v2 -> {
                         // Truncate old log entries from storage
-                        if (storage != null) {
-                            return storage.truncatePrefix(lastIncludedIndex);
-                        }
-                        return Future.succeededFuture();
+                        return storage.map(s -> s.truncatePrefix(lastIncludedIndex))
+                                .orElseGet(Future::succeededFuture);
                     })
                     .onSuccess(v2 -> {
                         // Step 8: Restore state machine

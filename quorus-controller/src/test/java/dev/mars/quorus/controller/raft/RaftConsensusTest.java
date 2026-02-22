@@ -77,9 +77,9 @@ class RaftConsensusTest {
         stateMachine2 = new QuorusStateStore();
         stateMachine3 = new QuorusStateStore();
 
-        leader = new RaftNode(vertx, "leader", clusterNodes, transport1, stateMachine1, 800, 150);
-        follower1 = new RaftNode(vertx, "follower1", clusterNodes, transport2, stateMachine2, 800, 150);
-        follower2 = new RaftNode(vertx, "follower2", clusterNodes, transport3, stateMachine3, 800, 150);
+        leader = RaftNode.builder().vertx(vertx).nodeId("leader").clusterNodes(clusterNodes).transport(transport1).stateMachine(stateMachine1).mode(RaftNodeMode.volatileMode()).electionTimeout(800).heartbeatInterval(150).build();
+        follower1 = RaftNode.builder().vertx(vertx).nodeId("follower1").clusterNodes(clusterNodes).transport(transport2).stateMachine(stateMachine2).mode(RaftNodeMode.volatileMode()).electionTimeout(800).heartbeatInterval(150).build();
+        follower2 = RaftNode.builder().vertx(vertx).nodeId("follower2").clusterNodes(clusterNodes).transport(transport3).stateMachine(stateMachine3).mode(RaftNodeMode.volatileMode()).electionTimeout(800).heartbeatInterval(150).build();
     }
 
     @AfterEach
@@ -171,8 +171,8 @@ class RaftConsensusTest {
     void testMultipleCommandSubmission() throws Exception {
         // Start single node for simplicity
         Set<String> singleNode = Set.of("single");
-        RaftNode single = new RaftNode(vertx, "single", singleNode,
-                new InMemoryTransportSimulator("single"), new QuorusStateStore(), 500, 100);
+        RaftNode single = RaftNode.builder().vertx(vertx).nodeId("single").clusterNodes(singleNode)
+                .transport(new InMemoryTransportSimulator("single")).stateMachine(new QuorusStateStore()).mode(RaftNodeMode.volatileMode()).electionTimeout(500).heartbeatInterval(100).build();
 
         single.start().toCompletionStage().toCompletableFuture().join();
 
@@ -210,8 +210,8 @@ class RaftConsensusTest {
 
         // After some time, should attempt election (single node cluster behavior)
         Set<String> singleNode = Set.of("test");
-        RaftNode testNode = new RaftNode(vertx, "test", singleNode,
-                new InMemoryTransportSimulator("test"), new QuorusStateStore(), 300, 100);
+        RaftNode testNode = RaftNode.builder().vertx(vertx).nodeId("test").clusterNodes(singleNode)
+                .transport(new InMemoryTransportSimulator("test")).stateMachine(new QuorusStateStore()).mode(RaftNodeMode.volatileMode()).electionTimeout(300).heartbeatInterval(100).build();
 
         testNode.start();
 

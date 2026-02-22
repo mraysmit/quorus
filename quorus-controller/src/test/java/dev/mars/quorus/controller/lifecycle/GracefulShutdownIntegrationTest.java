@@ -19,6 +19,7 @@ package dev.mars.quorus.controller.lifecycle;
 import dev.mars.quorus.controller.http.HttpApiServer;
 import dev.mars.quorus.controller.raft.InMemoryTransportSimulator;
 import dev.mars.quorus.controller.raft.RaftNode;
+import dev.mars.quorus.controller.raft.RaftNodeMode;
 import dev.mars.quorus.controller.raft.RaftTransport;
 import dev.mars.quorus.controller.state.QuorusStateStore;
 import io.vertx.core.Future;
@@ -70,8 +71,9 @@ class GracefulShutdownIntegrationTest {
             RaftTransport transport = new InMemoryTransportSimulator("shutdown-test");
             Set<String> clusterNodes = Set.of("shutdown-test");
 
-            RaftNode raftNode = new RaftNode(vertx, "shutdown-test", clusterNodes, 
-                    transport, stateMachine, 500, 100);
+            RaftNode raftNode = RaftNode.builder().vertx(vertx).nodeId("shutdown-test").clusterNodes(clusterNodes)
+                    .transport(transport).stateMachine(stateMachine).mode(RaftNodeMode.volatileMode())
+                    .electionTimeout(500).heartbeatInterval(100).build();
             raftNode.start();
 
             await().atMost(Duration.ofSeconds(10))
@@ -121,8 +123,9 @@ class GracefulShutdownIntegrationTest {
             Set<String> clusterNodes = Set.of("drain-seq-test");
             
             int port = 18098;
-            RaftNode raftNode = new RaftNode(vertx, "drain-seq-test", clusterNodes,
-                    transport, stateMachine, 500, 100);
+            RaftNode raftNode = RaftNode.builder().vertx(vertx).nodeId("drain-seq-test").clusterNodes(clusterNodes)
+                    .transport(transport).stateMachine(stateMachine).mode(RaftNodeMode.volatileMode())
+                    .electionTimeout(500).heartbeatInterval(100).build();
             raftNode.start();
 
             await().atMost(Duration.ofSeconds(10))

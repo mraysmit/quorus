@@ -90,12 +90,15 @@ class InstallSnapshotTest {
         QuorusStateStore sm2 = new QuorusStateStore();
         QuorusStateStore sm3 = new QuorusStateStore();
 
-        RaftNode node1 = new RaftNode(vertx, "node1", cluster, t1, sm1,
-                leaderStorage, 1000, 200, true, 5, 300);
-        RaftNode node2 = new RaftNode(vertx, "node2", cluster, t2, sm2,
-                node2Storage, 1500, 200, true, 5, 300);
-        RaftNode node3 = new RaftNode(vertx, "node3", cluster, t3, sm3,
-                followerStorage, 15000, 200, true, 5, 300);
+        RaftNode node1 = RaftNode.builder().vertx(vertx).nodeId("node1").clusterNodes(cluster).transport(t1).stateMachine(sm1).mode(RaftNodeMode.durable(leaderStorage))
+                .electionTimeout(1000).heartbeatInterval(200)
+                .snapshotEnabled(true).snapshotThreshold(5).snapshotCheckInterval(300).build();
+        RaftNode node2 = RaftNode.builder().vertx(vertx).nodeId("node2").clusterNodes(cluster).transport(t2).stateMachine(sm2).mode(RaftNodeMode.durable(node2Storage))
+                .electionTimeout(1500).heartbeatInterval(200)
+                .snapshotEnabled(true).snapshotThreshold(5).snapshotCheckInterval(300).build();
+        RaftNode node3 = RaftNode.builder().vertx(vertx).nodeId("node3").clusterNodes(cluster).transport(t3).stateMachine(sm3).mode(RaftNodeMode.durable(followerStorage))
+                .electionTimeout(15000).heartbeatInterval(200)
+                .snapshotEnabled(true).snapshotThreshold(5).snapshotCheckInterval(300).build();
 
         AtomicReference<RaftNode> leaderRef = new AtomicReference<>();
 
@@ -172,12 +175,15 @@ class InstallSnapshotTest {
         QuorusStateStore sm2 = new QuorusStateStore();
         QuorusStateStore sm3 = new QuorusStateStore();
 
-        RaftNode node1 = new RaftNode(vertx, "node1", cluster, t1, sm1,
-                leaderStorage, 1000, 200, true, 5, 300);
-        RaftNode node2 = new RaftNode(vertx, "node2", cluster, t2, sm2,
-                node2Storage, 1500, 200, true, 5, 300);
-        RaftNode node3 = new RaftNode(vertx, "node3", cluster, t3, sm3,
-                followerStorage, 15000, 200, true, 5, 300);
+        RaftNode node1 = RaftNode.builder().vertx(vertx).nodeId("node1").clusterNodes(cluster).transport(t1).stateMachine(sm1).mode(RaftNodeMode.durable(leaderStorage))
+                .electionTimeout(1000).heartbeatInterval(200)
+                .snapshotEnabled(true).snapshotThreshold(5).snapshotCheckInterval(300).build();
+        RaftNode node2 = RaftNode.builder().vertx(vertx).nodeId("node2").clusterNodes(cluster).transport(t2).stateMachine(sm2).mode(RaftNodeMode.durable(node2Storage))
+                .electionTimeout(1500).heartbeatInterval(200)
+                .snapshotEnabled(true).snapshotThreshold(5).snapshotCheckInterval(300).build();
+        RaftNode node3 = RaftNode.builder().vertx(vertx).nodeId("node3").clusterNodes(cluster).transport(t3).stateMachine(sm3).mode(RaftNodeMode.durable(followerStorage))
+                .electionTimeout(15000).heartbeatInterval(200)
+                .snapshotEnabled(true).snapshotThreshold(5).snapshotCheckInterval(300).build();
 
         // Partition node3
         InMemoryTransportSimulator.createPartition(Set.of("node1", "node2"), Set.of("node3"));
@@ -259,12 +265,15 @@ class InstallSnapshotTest {
         QuorusStateStore sm2 = new QuorusStateStore();
         QuorusStateStore sm3 = new QuorusStateStore();
 
-        RaftNode node1 = new RaftNode(vertx, "node1", cluster, t1, sm1,
-                leaderStorage, 1000, 200, true, 5, 300);
-        RaftNode node2 = new RaftNode(vertx, "node2", cluster, t2, sm2,
-                node2Storage, 1500, 200, true, 5, 300);
-        RaftNode node3 = new RaftNode(vertx, "node3", cluster, t3, sm3,
-                followerStorage, 15000, 200, true, 5, 300);
+        RaftNode node1 = RaftNode.builder().vertx(vertx).nodeId("node1").clusterNodes(cluster).transport(t1).stateMachine(sm1).mode(RaftNodeMode.durable(leaderStorage))
+                .electionTimeout(1000).heartbeatInterval(200)
+                .snapshotEnabled(true).snapshotThreshold(5).snapshotCheckInterval(300).build();
+        RaftNode node2 = RaftNode.builder().vertx(vertx).nodeId("node2").clusterNodes(cluster).transport(t2).stateMachine(sm2).mode(RaftNodeMode.durable(node2Storage))
+                .electionTimeout(1500).heartbeatInterval(200)
+                .snapshotEnabled(true).snapshotThreshold(5).snapshotCheckInterval(300).build();
+        RaftNode node3 = RaftNode.builder().vertx(vertx).nodeId("node3").clusterNodes(cluster).transport(t3).stateMachine(sm3).mode(RaftNodeMode.durable(followerStorage))
+                .electionTimeout(15000).heartbeatInterval(200)
+                .snapshotEnabled(true).snapshotThreshold(5).snapshotCheckInterval(300).build();
 
         InMemoryTransportSimulator.createPartition(Set.of("node1", "node2"), Set.of("node3"));
 
@@ -328,9 +337,9 @@ class InstallSnapshotTest {
         QuorusStateStore sm = new QuorusStateStore();
         Set<String> cluster = Set.of("node1");
 
-        RaftNode node = new RaftNode(vertx, "node1", cluster, transport, sm,
-                storage, 1000, 200,
-                false, 100, 5000);
+        RaftNode node = RaftNode.builder().vertx(vertx).nodeId("node1").clusterNodes(cluster).transport(transport).stateMachine(sm).mode(RaftNodeMode.durable(storage))
+                .electionTimeout(1000).heartbeatInterval(200)
+                .snapshotEnabled(false).snapshotThreshold(100).snapshotCheckInterval(5000).build();
 
         storage.open(Path.of("/tmp/stale-test")).onComplete(ctx.succeeding(v -> {
             node.start().onComplete(ctx.succeeding(v2 -> {
@@ -425,9 +434,9 @@ class InstallSnapshotTest {
         QuorusStateStore sm = new QuorusStateStore();
         Set<String> cluster = Set.of("follower-persist");
 
-        RaftNode node = new RaftNode(vertx, "follower-persist", cluster, transport, sm,
-                storage, 15000, 200,
-                false, 100, 5000);
+        RaftNode node = RaftNode.builder().vertx(vertx).nodeId("follower-persist").clusterNodes(cluster).transport(transport).stateMachine(sm).mode(RaftNodeMode.durable(storage))
+                .electionTimeout(15000).heartbeatInterval(200)
+                .snapshotEnabled(false).snapshotThreshold(100).snapshotCheckInterval(5000).build();
 
         storage.open(Path.of("/tmp/persist-test")).onComplete(ctx.succeeding(v -> {
             node.start().onComplete(ctx.succeeding(v2 -> {

@@ -18,6 +18,7 @@ package dev.mars.quorus.controller.http;
 
 import dev.mars.quorus.controller.raft.InMemoryTransportSimulator;
 import dev.mars.quorus.controller.raft.RaftNode;
+import dev.mars.quorus.controller.raft.RaftNodeMode;
 import dev.mars.quorus.controller.raft.RaftTransport;
 import dev.mars.quorus.controller.state.QuorusStateStore;
 import io.vertx.core.Vertx;
@@ -68,7 +69,8 @@ class HttpApiServerHealthTest {
         RaftTransport transport = new InMemoryTransportSimulator("health-test-node");
         Set<String> clusterNodes = Set.of("health-test-node");
 
-        raftNode = new RaftNode(vertx, "health-test-node", clusterNodes, transport, stateMachine, 500, 100);
+        raftNode = RaftNode.builder().vertx(vertx).nodeId("health-test-node").clusterNodes(clusterNodes).transport(transport).stateMachine(stateMachine).mode(RaftNodeMode.volatileMode())
+                .electionTimeout(500).heartbeatInterval(100).build();
         raftNode.start();
 
         // Wait for single-node cluster to elect itself as leader

@@ -114,7 +114,7 @@ class GrpcRaftIntegrationTest {
         QuorusStateStore stateMachine = new QuorusStateStore();
         
         // Use shorter timeouts for faster tests
-        RaftNode raftNode = new RaftNode(vertx, nodeId, clusterNodes, transport, stateMachine, 1000, 200);
+        RaftNode raftNode = RaftNode.builder().vertx(vertx).nodeId(nodeId).clusterNodes(clusterNodes).transport(transport).stateMachine(stateMachine).mode(RaftNodeMode.volatileMode()).electionTimeout(1000).heartbeatInterval(200).build();
         transport.setRaftNode(raftNode);
         
         GrpcRaftServer grpcServer = new GrpcRaftServer(vertx, port, raftNode);

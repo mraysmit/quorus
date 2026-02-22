@@ -531,16 +531,16 @@ class RaftLogClusterIntegrationTest {
         QuorusStateStore stateMachine = new QuorusStateStore();
         Set<String> clusterNodes = Set.of(NODE_IDS);
         
-        return new RaftNode(
-            vertx, 
-            nodeId, 
-            clusterNodes, 
-            transports.get(nodeId), 
-            stateMachine,
-            storage,
-            2000,  // Election timeout
-            500    // Heartbeat interval
-        );
+        return RaftNode.builder()
+            .vertx(vertx)
+            .nodeId(nodeId)
+            .clusterNodes(clusterNodes)
+            .transport(transports.get(nodeId))
+            .stateMachine(stateMachine)
+            .mode(RaftNodeMode.durable(storage))
+            .electionTimeout(2000)
+            .heartbeatInterval(500)
+            .build();
     }
 
     private RaftNode waitForLeader(long timeoutMs) {

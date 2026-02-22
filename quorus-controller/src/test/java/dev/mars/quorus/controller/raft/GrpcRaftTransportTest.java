@@ -72,7 +72,7 @@ class GrpcRaftTransportTest {
         Set<String> clusterNodes = Set.of("target");
         InMemoryTransportSimulator transport = new InMemoryTransportSimulator("target");
         QuorusStateStore stateMachine = new QuorusStateStore();
-        targetNode = new RaftNode(vertx, "target", clusterNodes, transport, stateMachine, 5000, 1000);
+        targetNode = RaftNode.builder().vertx(vertx).nodeId("target").clusterNodes(clusterNodes).transport(transport).stateMachine(stateMachine).mode(RaftNodeMode.volatileMode()).electionTimeout(5000).heartbeatInterval(1000).build();
         targetNode.start();
         await().atMost(Duration.ofSeconds(5))
             .pollInterval(Duration.ofMillis(10))
@@ -357,7 +357,7 @@ class GrpcRaftTransportTest {
         Set<String> cluster2 = Set.of("target2");
         InMemoryTransportSimulator transport2 = new InMemoryTransportSimulator("target2");
         QuorusStateStore sm2 = new QuorusStateStore();
-        RaftNode node2 = new RaftNode(vertx, "target2", cluster2, transport2, sm2, 5000, 1000);
+        RaftNode node2 = RaftNode.builder().vertx(vertx).nodeId("target2").clusterNodes(cluster2).transport(transport2).stateMachine(sm2).mode(RaftNodeMode.volatileMode()).electionTimeout(5000).heartbeatInterval(1000).build();
         node2.start();
         await().atMost(Duration.ofSeconds(5))
             .pollInterval(Duration.ofMillis(10))
