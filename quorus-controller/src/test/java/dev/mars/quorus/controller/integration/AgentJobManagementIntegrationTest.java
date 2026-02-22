@@ -22,6 +22,7 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import dev.mars.quorus.controller.http.HttpApiServer;
 import dev.mars.quorus.controller.raft.InMemoryTransportSimulator;
 import dev.mars.quorus.controller.raft.RaftNode;
+import dev.mars.quorus.controller.raft.RaftNodeMode;
 import dev.mars.quorus.controller.raft.RaftTransport;
 import dev.mars.quorus.controller.state.QuorusStateStore;
 import org.junit.jupiter.api.*;
@@ -89,7 +90,8 @@ class AgentJobManagementIntegrationTest {
 
         // Initialize Raft node (single node cluster for testing with short election timeout)
         Set<String> clusterNodes = Set.of("test-node-1");
-        raftNode = new RaftNode(vertx, "test-node-1", clusterNodes, transport, stateMachine, 500, 100);
+        raftNode = RaftNode.builder().vertx(vertx).nodeId("test-node-1").clusterNodes(clusterNodes).transport(transport).stateMachine(stateMachine).mode(RaftNodeMode.volatileMode())
+                .electionTimeout(500).heartbeatInterval(100).build();
         raftNode.start();
 
         // Wait for node to become leader reactively

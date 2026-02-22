@@ -18,6 +18,7 @@ package dev.mars.quorus.controller.http;
 
 import dev.mars.quorus.controller.raft.InMemoryTransportSimulator;
 import dev.mars.quorus.controller.raft.RaftNode;
+import dev.mars.quorus.controller.raft.RaftNodeMode;
 import dev.mars.quorus.controller.raft.RaftTransport;
 import dev.mars.quorus.controller.state.QuorusStateStore;
 import io.vertx.core.Vertx;
@@ -78,9 +79,12 @@ class LeaderGuardHandlerTest {
         QuorusStateStore sm2 = new QuorusStateStore();
         QuorusStateStore sm3 = new QuorusStateStore();
 
-        RaftNode node1 = new RaftNode(vertx, "guard-node-1", clusterNodes, transport1, sm1, 500, 100);
-        RaftNode node2 = new RaftNode(vertx, "guard-node-2", clusterNodes, transport2, sm2, 500, 100);
-        RaftNode node3 = new RaftNode(vertx, "guard-node-3", clusterNodes, transport3, sm3, 500, 100);
+        RaftNode node1 = RaftNode.builder().vertx(vertx).nodeId("guard-node-1").clusterNodes(clusterNodes).transport(transport1).stateMachine(sm1).mode(RaftNodeMode.volatileMode())
+                .electionTimeout(500).heartbeatInterval(100).build();
+        RaftNode node2 = RaftNode.builder().vertx(vertx).nodeId("guard-node-2").clusterNodes(clusterNodes).transport(transport2).stateMachine(sm2).mode(RaftNodeMode.volatileMode())
+                .electionTimeout(500).heartbeatInterval(100).build();
+        RaftNode node3 = RaftNode.builder().vertx(vertx).nodeId("guard-node-3").clusterNodes(clusterNodes).transport(transport3).stateMachine(sm3).mode(RaftNodeMode.volatileMode())
+                .electionTimeout(500).heartbeatInterval(100).build();
 
         node1.start();
         node2.start();

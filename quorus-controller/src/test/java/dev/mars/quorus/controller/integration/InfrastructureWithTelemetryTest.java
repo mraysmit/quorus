@@ -22,6 +22,7 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import dev.mars.quorus.controller.http.HttpApiServer;
 import dev.mars.quorus.controller.raft.InMemoryTransportSimulator;
 import dev.mars.quorus.controller.raft.RaftNode;
+import dev.mars.quorus.controller.raft.RaftNodeMode;
 import dev.mars.quorus.controller.raft.RaftTransport;
 import dev.mars.quorus.controller.state.QuorusStateStore;
 import io.opentelemetry.api.GlobalOpenTelemetry;
@@ -170,7 +171,8 @@ class InfrastructureWithTelemetryTest {
         logger.info("  -> Transport: InMemoryTransportSimulator");
         
         Set<String> clusterNodes = Set.of("otel-test-node");
-        raftNode = new RaftNode(vertx, "otel-test-node", clusterNodes, transport, stateMachine, 500, 100);
+        raftNode = RaftNode.builder().vertx(vertx).nodeId("otel-test-node").clusterNodes(clusterNodes).transport(transport).stateMachine(stateMachine).mode(RaftNodeMode.volatileMode())
+                .electionTimeout(500).heartbeatInterval(100).build();
         logger.info("  -> Election timeout: 500ms, Heartbeat: 100ms");
         
         raftNode.start();

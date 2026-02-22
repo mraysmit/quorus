@@ -22,6 +22,7 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import dev.mars.quorus.controller.http.HttpApiServer;
 import dev.mars.quorus.controller.raft.InMemoryTransportSimulator;
 import dev.mars.quorus.controller.raft.RaftNode;
+import dev.mars.quorus.controller.raft.RaftNodeMode;
 import dev.mars.quorus.controller.raft.RaftTransport;
 import dev.mars.quorus.controller.state.QuorusStateStore;
 import io.vertx.core.Vertx;
@@ -97,7 +98,7 @@ class InfrastructureSmokeTest {
         // Create transport and Raft node
         RaftTransport transport = new InMemoryTransportSimulator("smoke-test-node");
         Set<String> clusterNodes = Set.of("smoke-test-node");
-        raftNode = new RaftNode(vertx, "smoke-test-node", clusterNodes, transport, stateMachine, 500, 100);
+        raftNode = RaftNode.builder().vertx(vertx).nodeId("smoke-test-node").clusterNodes(clusterNodes).transport(transport).stateMachine(stateMachine).mode(RaftNodeMode.volatileMode()).electionTimeout(500).heartbeatInterval(100).build();
         raftNode.start();
 
         // Wait for leader election reactively

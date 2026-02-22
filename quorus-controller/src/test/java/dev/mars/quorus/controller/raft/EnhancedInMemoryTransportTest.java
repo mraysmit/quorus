@@ -96,9 +96,15 @@ class EnhancedInMemoryTransportTest {
         QuorusStateStore sm2 = new QuorusStateStore();
         QuorusStateStore sm3 = new QuorusStateStore();
 
-        RaftNode node1 = new RaftNode(vertx, "node1", clusterNodes, transport1, sm1, 1000, 200);
-        RaftNode node2 = new RaftNode(vertx, "node2", clusterNodes, transport2, sm2, 1000, 200);
-        RaftNode node3 = new RaftNode(vertx, "node3", clusterNodes, transport3, sm3, 1000, 200);
+        RaftNode node1 = RaftNode.builder()
+                .vertx(vertx).nodeId("node1").clusterNodes(clusterNodes).transport(transport1).stateMachine(sm1).mode(RaftNodeMode.volatileMode())
+                .electionTimeout(1000).heartbeatInterval(200).build();
+        RaftNode node2 = RaftNode.builder()
+                .vertx(vertx).nodeId("node2").clusterNodes(clusterNodes).transport(transport2).stateMachine(sm2).mode(RaftNodeMode.volatileMode())
+                .electionTimeout(1000).heartbeatInterval(200).build();
+        RaftNode node3 = RaftNode.builder()
+                .vertx(vertx).nodeId("node3").clusterNodes(clusterNodes).transport(transport3).stateMachine(sm3).mode(RaftNodeMode.volatileMode())
+                .electionTimeout(1000).heartbeatInterval(200).build();
 
         startAndTrack(node1, node2, node3);
 
@@ -151,8 +157,12 @@ class EnhancedInMemoryTransportTest {
         QuorusStateStore sm1 = new QuorusStateStore();
         QuorusStateStore sm2 = new QuorusStateStore();
 
-        RaftNode node1 = new RaftNode(vertx, "leader", clusterNodes, transport1, sm1, 1000, 200);
-        RaftNode node2 = new RaftNode(vertx, "follower", clusterNodes, transport2, sm2, 1000, 200);
+        RaftNode node1 = RaftNode.builder()
+                .vertx(vertx).nodeId("leader").clusterNodes(clusterNodes).transport(transport1).stateMachine(sm1).mode(RaftNodeMode.volatileMode())
+                .electionTimeout(1000).heartbeatInterval(200).build();
+        RaftNode node2 = RaftNode.builder()
+                .vertx(vertx).nodeId("follower").clusterNodes(clusterNodes).transport(transport2).stateMachine(sm2).mode(RaftNodeMode.volatileMode())
+                .electionTimeout(1000).heartbeatInterval(200).build();
 
         startAndTrack(node1, node2);
 
@@ -183,8 +193,12 @@ class EnhancedInMemoryTransportTest {
         QuorusStateStore sm1 = new QuorusStateStore();
         QuorusStateStore sm2 = new QuorusStateStore();
 
-        RaftNode node1 = new RaftNode(vertx, "node1", clusterNodes, transport1, sm1, 1000, 200);
-        RaftNode node2 = new RaftNode(vertx, "node2", clusterNodes, transport2, sm2, 1000, 200);
+        RaftNode node1 = RaftNode.builder()
+                .vertx(vertx).nodeId("node1").clusterNodes(clusterNodes).transport(transport1).stateMachine(sm1).mode(RaftNodeMode.volatileMode())
+                .electionTimeout(1000).heartbeatInterval(200).build();
+        RaftNode node2 = RaftNode.builder()
+                .vertx(vertx).nodeId("node2").clusterNodes(clusterNodes).transport(transport2).stateMachine(sm2).mode(RaftNodeMode.volatileMode())
+                .electionTimeout(1000).heartbeatInterval(200).build();
 
         long startTime = System.currentTimeMillis();
 
@@ -216,9 +230,15 @@ class EnhancedInMemoryTransportTest {
         QuorusStateStore sm2 = new QuorusStateStore();
         QuorusStateStore sm3 = new QuorusStateStore();
 
-        RaftNode node1 = new RaftNode(vertx, "node1", clusterNodes, transport1, sm1, 800, 150);
-        RaftNode node2 = new RaftNode(vertx, "node2", clusterNodes, transport2, sm2, 800, 150);
-        RaftNode node3 = new RaftNode(vertx, "node3", clusterNodes, transport3, sm3, 800, 150);
+        RaftNode node1 = RaftNode.builder()
+                .vertx(vertx).nodeId("node1").clusterNodes(clusterNodes).transport(transport1).stateMachine(sm1).mode(RaftNodeMode.volatileMode())
+                .electionTimeout(800).heartbeatInterval(150).build();
+        RaftNode node2 = RaftNode.builder()
+                .vertx(vertx).nodeId("node2").clusterNodes(clusterNodes).transport(transport2).stateMachine(sm2).mode(RaftNodeMode.volatileMode())
+                .electionTimeout(800).heartbeatInterval(150).build();
+        RaftNode node3 = RaftNode.builder()
+                .vertx(vertx).nodeId("node3").clusterNodes(clusterNodes).transport(transport3).stateMachine(sm3).mode(RaftNodeMode.volatileMode())
+                .electionTimeout(800).heartbeatInterval(150).build();
 
         startAndTrack(node1, node2, node3);
 
@@ -271,9 +291,15 @@ class EnhancedInMemoryTransportTest {
         QuorusStateStore sm2 = new QuorusStateStore();
         QuorusStateStore sm3 = new QuorusStateStore();
 
-        RaftNode node1 = new RaftNode(vertx, "node1", clusterNodes, transport1, sm1, 1000, 200);
-        RaftNode node2 = new RaftNode(vertx, "node2", clusterNodes, transport2, sm2, 1000, 200);
-        RaftNode node3 = new RaftNode(vertx, "node3", clusterNodes, transport3, sm3, 1000, 200);
+        RaftNode node1 = RaftNode.builder()
+                .vertx(vertx).nodeId("node1").clusterNodes(clusterNodes).transport(transport1).stateMachine(sm1).mode(RaftNodeMode.volatileMode())
+                .electionTimeout(1000).heartbeatInterval(200).build();
+        RaftNode node2 = RaftNode.builder()
+                .vertx(vertx).nodeId("node2").clusterNodes(clusterNodes).transport(transport2).stateMachine(sm2).mode(RaftNodeMode.volatileMode())
+                .electionTimeout(1000).heartbeatInterval(200).build();
+        RaftNode node3 = RaftNode.builder()
+                .vertx(vertx).nodeId("node3").clusterNodes(clusterNodes).transport(transport3).stateMachine(sm3).mode(RaftNodeMode.volatileMode())
+                .electionTimeout(1000).heartbeatInterval(200).build();
 
         startAndTrack(node1, node2, node3);
 
@@ -304,8 +330,12 @@ class EnhancedInMemoryTransportTest {
         QuorusStateStore sm1 = new QuorusStateStore();
         QuorusStateStore sm2 = new QuorusStateStore();
 
-        RaftNode node1 = new RaftNode(vertx, "node1", clusterNodes, transport1, sm1, 1000, 200);
-        RaftNode node2 = new RaftNode(vertx, "node2", clusterNodes, transport2, sm2, 1000, 200);
+        RaftNode node1 = RaftNode.builder()
+                .vertx(vertx).nodeId("node1").clusterNodes(clusterNodes).transport(transport1).stateMachine(sm1).mode(RaftNodeMode.volatileMode())
+                .electionTimeout(1000).heartbeatInterval(200).build();
+        RaftNode node2 = RaftNode.builder()
+                .vertx(vertx).nodeId("node2").clusterNodes(clusterNodes).transport(transport2).stateMachine(sm2).mode(RaftNodeMode.volatileMode())
+                .electionTimeout(1000).heartbeatInterval(200).build();
 
         long startTime = System.currentTimeMillis();
 
@@ -340,9 +370,15 @@ class EnhancedInMemoryTransportTest {
         QuorusStateStore sm2 = new QuorusStateStore();
         QuorusStateStore sm3 = new QuorusStateStore();
 
-        RaftNode node1 = new RaftNode(vertx, "node1", clusterNodes, transport1, sm1, 800, 150);
-        RaftNode node2 = new RaftNode(vertx, "node2", clusterNodes, transport2, sm2, 800, 150);
-        RaftNode node3 = new RaftNode(vertx, "node3", clusterNodes, transport3, sm3, 800, 150);
+        RaftNode node1 = RaftNode.builder()
+                .vertx(vertx).nodeId("node1").clusterNodes(clusterNodes).transport(transport1).stateMachine(sm1).mode(RaftNodeMode.volatileMode())
+                .electionTimeout(800).heartbeatInterval(150).build();
+        RaftNode node2 = RaftNode.builder()
+                .vertx(vertx).nodeId("node2").clusterNodes(clusterNodes).transport(transport2).stateMachine(sm2).mode(RaftNodeMode.volatileMode())
+                .electionTimeout(800).heartbeatInterval(150).build();
+        RaftNode node3 = RaftNode.builder()
+                .vertx(vertx).nodeId("node3").clusterNodes(clusterNodes).transport(transport3).stateMachine(sm3).mode(RaftNodeMode.volatileMode())
+                .electionTimeout(800).heartbeatInterval(150).build();
 
         startAndTrack(node1, node2, node3);
 
@@ -380,9 +416,15 @@ class EnhancedInMemoryTransportTest {
         QuorusStateStore sm2 = new QuorusStateStore();
         QuorusStateStore sm3 = new QuorusStateStore();
 
-        RaftNode node1 = new RaftNode(vertx, "node1", clusterNodes, transport1, sm1, 1000, 200);
-        RaftNode node2 = new RaftNode(vertx, "node2", clusterNodes, transport2, sm2, 1000, 200);
-        RaftNode node3 = new RaftNode(vertx, "node3", clusterNodes, transport3, sm3, 1000, 200);
+        RaftNode node1 = RaftNode.builder()
+                .vertx(vertx).nodeId("node1").clusterNodes(clusterNodes).transport(transport1).stateMachine(sm1).mode(RaftNodeMode.volatileMode())
+                .electionTimeout(1000).heartbeatInterval(200).build();
+        RaftNode node2 = RaftNode.builder()
+                .vertx(vertx).nodeId("node2").clusterNodes(clusterNodes).transport(transport2).stateMachine(sm2).mode(RaftNodeMode.volatileMode())
+                .electionTimeout(1000).heartbeatInterval(200).build();
+        RaftNode node3 = RaftNode.builder()
+                .vertx(vertx).nodeId("node3").clusterNodes(clusterNodes).transport(transport3).stateMachine(sm3).mode(RaftNodeMode.volatileMode())
+                .electionTimeout(1000).heartbeatInterval(200).build();
 
         startAndTrack(node1, node2, node3);
 

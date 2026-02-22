@@ -2,6 +2,7 @@ package dev.mars.quorus.controller.integration;
 
 import dev.mars.quorus.controller.raft.RaftMessage;
 import dev.mars.quorus.controller.raft.RaftNode;
+import dev.mars.quorus.controller.raft.RaftNodeMode;
 import dev.mars.quorus.controller.raft.RaftLogApplicator;
 import dev.mars.quorus.controller.raft.RaftTransport;
 import dev.mars.quorus.controller.state.CommandResult;
@@ -42,7 +43,7 @@ public class RaftNodeIntegrationTest {
     void testRaftNodeStartStop(VertxTestContext testContext) {
         TestRaftTransport transport = new TestRaftTransport();
         TestRaftLogApplicator stateMachine = new TestRaftLogApplicator();
-        RaftNode node = new RaftNode(vertx, "node1", Set.of("node1"), transport, stateMachine);
+        RaftNode node = RaftNode.builder().vertx(vertx).nodeId("node1").clusterNodes(Set.of("node1")).transport(transport).stateMachine(stateMachine).mode(RaftNodeMode.volatileMode()).build();
 
         node.start()
             .onComplete(testContext.succeeding(v -> {
@@ -63,7 +64,7 @@ public class RaftNodeIntegrationTest {
     void testTimerCleanup(VertxTestContext testContext) {
         TestRaftTransport transport = new TestRaftTransport();
         TestRaftLogApplicator stateMachine = new TestRaftLogApplicator();
-        RaftNode node = new RaftNode(vertx, "node1", Set.of("node1"), transport, stateMachine);
+        RaftNode node = RaftNode.builder().vertx(vertx).nodeId("node1").clusterNodes(Set.of("node1")).transport(transport).stateMachine(stateMachine).mode(RaftNodeMode.volatileMode()).build();
 
         node.start()
             .onComplete(testContext.succeeding(v -> {

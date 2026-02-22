@@ -318,9 +318,6 @@ public class AgentInfo {
      * @param value the metadata value
      */
     public void addMetadata(String key, String value) {
-        if (this.metadata == null) {
-            this.metadata = new HashMap<>();
-        }
         this.metadata.put(key, value);
     }
 

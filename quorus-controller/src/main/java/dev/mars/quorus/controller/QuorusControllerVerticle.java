@@ -25,6 +25,7 @@ import io.vertx.core.Vertx;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import dev.mars.quorus.controller.raft.RaftNode;
+import dev.mars.quorus.controller.raft.RaftNodeMode;
 import dev.mars.quorus.controller.raft.RaftTransport;
 import dev.mars.quorus.controller.raft.GrpcRaftTransport;
 import dev.mars.quorus.controller.raft.GrpcRaftServer;
@@ -126,12 +127,20 @@ public class QuorusControllerVerticle extends AbstractVerticle {
 
             QuorusStateStore stateMachine = new QuorusStateStore(initialMetadata);
 
-            // Use the constructor with storage and snapshot configuration
-            this.raftNode = new RaftNode(vertx, nodeId, clusterNodeIds, transport, 
-                                         stateMachine, raftStorage, 5000, 1000,
-                                         config.isSnapshotEnabled(),
-                                         config.getSnapshotThreshold(),
-                                         config.getSnapshotCheckIntervalMs());
+            // Use the builder with storage and snapshot configuration
+            this.raftNode = RaftNode.builder()
+                    .vertx(vertx)
+                    .nodeId(nodeId)
+                    .clusterNodes(clusterNodeIds)
+                    .transport(transport)
+                    .stateMachine(stateMachine)
+                    .mode(RaftNodeMode.durable(raftStorage))
+                    .electionTimeout(5000)
+                    .heartbeatInterval(1000)
+                    .snapshotEnabled(config.isSnapshotEnabled())
+                    .snapshotThreshold(config.getSnapshotThreshold())
+                    .snapshotCheckInterval(config.getSnapshotCheckIntervalMs())
+                    .build();
 
             transport.setRaftNode(raftNode);
 

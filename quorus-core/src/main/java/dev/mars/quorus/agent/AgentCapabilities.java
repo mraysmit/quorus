@@ -101,9 +101,6 @@ public class AgentCapabilities {
      * @param protocol the protocol to add
      */
     public void addSupportedProtocol(String protocol) {
-        if (this.supportedProtocols == null) {
-            this.supportedProtocols = new HashSet<>();
-        }
         this.supportedProtocols.add(protocol);
     }
 
@@ -114,7 +111,7 @@ public class AgentCapabilities {
      * @return true if the protocol is supported
      */
     public boolean supportsProtocol(String protocol) {
-        return supportedProtocols != null && supportedProtocols.contains(protocol);
+        return supportedProtocols.contains(protocol);
     }
 
     /**
@@ -195,9 +192,6 @@ public class AgentCapabilities {
      * @param region the region to add
      */
     public void addAvailableRegion(String region) {
-        if (this.availableRegions == null) {
-            this.availableRegions = new HashSet<>();
-        }
         this.availableRegions.add(region);
     }
 
@@ -262,9 +256,6 @@ public class AgentCapabilities {
      * @param value the capability value
      */
     public void addCustomCapability(String key, Object value) {
-        if (this.customCapabilities == null) {
-            this.customCapabilities = new HashMap<>();
-        }
         this.customCapabilities.put(key, value);
     }
 
@@ -321,7 +312,7 @@ public class AgentCapabilities {
      * @return true if the agent is available in the region
      */
     public boolean isAvailableInRegion(String region) {
-        return availableRegions == null || availableRegions.isEmpty() || availableRegions.contains(region);
+        return availableRegions.isEmpty() || availableRegions.contains(region);
     }
 
     /**

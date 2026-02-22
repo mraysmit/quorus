@@ -18,6 +18,7 @@ package dev.mars.quorus.controller.http;
 
 import dev.mars.quorus.controller.raft.InMemoryTransportSimulator;
 import dev.mars.quorus.controller.raft.RaftNode;
+import dev.mars.quorus.controller.raft.RaftNodeMode;
 import dev.mars.quorus.controller.raft.RaftTransport;
 import dev.mars.quorus.controller.state.QuorusStateStore;
 import io.vertx.core.Vertx;
@@ -66,7 +67,8 @@ class HttpApiServerDrainModeTest {
         RaftTransport transport = new InMemoryTransportSimulator("drain-test-node");
         Set<String> clusterNodes = Set.of("drain-test-node");
 
-        raftNode = new RaftNode(vertx, "drain-test-node", clusterNodes, transport, stateMachine, 500, 100);
+        raftNode = RaftNode.builder().vertx(vertx).nodeId("drain-test-node").clusterNodes(clusterNodes).transport(transport).stateMachine(stateMachine).mode(RaftNodeMode.volatileMode())
+                .electionTimeout(500).heartbeatInterval(100).build();
         raftNode.start();
 
         // Wait for single-node cluster to elect itself as leader

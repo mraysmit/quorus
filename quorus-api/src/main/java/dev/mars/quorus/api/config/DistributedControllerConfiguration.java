@@ -18,6 +18,7 @@ package dev.mars.quorus.api.config;
 
 import dev.mars.quorus.controller.raft.RaftClusterConfig;
 import dev.mars.quorus.controller.raft.RaftNode;
+import dev.mars.quorus.controller.raft.RaftNodeMode;
 import dev.mars.quorus.controller.raft.RaftLogApplicator;
 import dev.mars.quorus.controller.raft.RaftTransport;
 import dev.mars.quorus.controller.raft.GrpcRaftTransport;
@@ -107,15 +108,16 @@ public class DistributedControllerConfiguration {
         
         // Create and configure the Raft node
         logger.debug("Constructing RaftNode: nodeId={}, clusterSize={}", nodeId, clusterNodes.size());
-        RaftNode node = new RaftNode(
-            vertx,
-            nodeId,
-            clusterNodes,
-            transport,
-            stateMachine,
-            clusterConfig.getElectionTimeoutMs(),
-            clusterConfig.getHeartbeatIntervalMs()
-        );
+        RaftNode node = RaftNode.builder()
+                .vertx(vertx)
+                .nodeId(nodeId)
+                .clusterNodes(clusterNodes)
+                .transport(transport)
+                .stateMachine(stateMachine)
+                .mode(RaftNodeMode.volatileMode())
+                .electionTimeout(clusterConfig.getElectionTimeoutMs())
+                .heartbeatInterval(clusterConfig.getHeartbeatIntervalMs())
+                .build();
         
         // Start the node
         logger.debug("Starting Raft node: {}", nodeId);
