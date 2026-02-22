@@ -262,6 +262,42 @@ class RouteCommandStateStoreTest {
             CommandResult<?> result = stateMachine.apply(RouteCommand.resume("ghost"));
             assertInstanceOf(CommandResult.NotFound.class, result);
         }
+
+        @Test
+        @DisplayName("Suspend with null reason succeeds")
+        void suspendWithNullReasonSucceeds() {
+            stateMachine.apply(RouteCommand.create(createRoute("route-null-reason", "null-reason-test")));
+            CommandResult<?> result = stateMachine.apply(RouteCommand.suspend("route-null-reason", null));
+
+            assertInstanceOf(CommandResult.Success.class, result);
+            assertEquals(RouteStatus.SUSPENDED, stateMachine.getRoute("route-null-reason").getStatus());
+        }
+
+        @Test
+        @DisplayName("Suspend already-suspended route overwrites status (idempotent)")
+        void suspendAlreadySuspendedRouteIsIdempotent() {
+            stateMachine.apply(RouteCommand.create(createRoute("route-double-sus", "double-suspend")));
+            stateMachine.apply(RouteCommand.suspend("route-double-sus", "first suspension"));
+            assertEquals(RouteStatus.SUSPENDED, stateMachine.getRoute("route-double-sus").getStatus());
+
+            // Suspend again — state store doesn't validate, should still succeed
+            CommandResult<?> result = stateMachine.apply(RouteCommand.suspend("route-double-sus", "second suspension"));
+            assertInstanceOf(CommandResult.Success.class, result);
+            assertEquals(RouteStatus.SUSPENDED, stateMachine.getRoute("route-double-sus").getStatus());
+        }
+
+        @Test
+        @DisplayName("Resume non-suspended route sets ACTIVE regardless")
+        void resumeNonSuspendedRouteSetsActive() {
+            // Route starts CONFIGURED — resume sets to ACTIVE without transition validation
+            stateMachine.apply(RouteCommand.create(createRoute("route-resume-cfg", "resume-configured")));
+            assertEquals(RouteStatus.CONFIGURED, stateMachine.getRoute("route-resume-cfg").getStatus());
+
+            CommandResult<?> result = stateMachine.apply(RouteCommand.resume("route-resume-cfg"));
+            assertInstanceOf(CommandResult.Success.class, result);
+            // State store does not validate transitions for suspend/resume commands
+            assertEquals(RouteStatus.ACTIVE, stateMachine.getRoute("route-resume-cfg").getStatus());
+        }
     }
 
     // ========== UPDATE_STATUS ==========
@@ -297,15 +333,86 @@ class RouteCommandStateStoreTest {
         }
 
         @Test
-        @DisplayName("Degraded and Failed statuses apply correctly")
+        @DisplayName("Degraded and Failed statuses apply via valid transitions")
         void degradedAndFailedStatuses() {
             stateMachine.apply(RouteCommand.create(createRoute("route-fail", "fail-test")));
 
-            stateMachine.apply(RouteCommand.updateStatus("route-fail", RouteStatus.CONFIGURED, RouteStatus.DEGRADED, "partial failure"));
+            // CONFIGURED → ACTIVE (valid transition)
+            stateMachine.apply(RouteCommand.updateStatus("route-fail", RouteStatus.CONFIGURED, RouteStatus.ACTIVE, "activated"));
+            assertEquals(RouteStatus.ACTIVE, stateMachine.getRoute("route-fail").getStatus());
+
+            // ACTIVE → DEGRADED (valid transition)
+            stateMachine.apply(RouteCommand.updateStatus("route-fail", RouteStatus.ACTIVE, RouteStatus.DEGRADED, "partial failure"));
             assertEquals(RouteStatus.DEGRADED, stateMachine.getRoute("route-fail").getStatus());
 
-            stateMachine.apply(RouteCommand.updateStatus("route-fail", RouteStatus.DEGRADED, RouteStatus.FAILED, "permanent failure"));
-            assertEquals(RouteStatus.FAILED, stateMachine.getRoute("route-fail").getStatus());
+            // DEGRADED → DELETED (valid transition; DEGRADED cannot go to FAILED directly)
+            stateMachine.apply(RouteCommand.updateStatus("route-fail", RouteStatus.DEGRADED, RouteStatus.DELETED, "decommissioned"));
+            assertEquals(RouteStatus.DELETED, stateMachine.getRoute("route-fail").getStatus());
+        }
+
+        @Test
+        @DisplayName("Failed status via TRANSFERRING → FAILED transition")
+        void failedStatusViaTransferring() {
+            stateMachine.apply(RouteCommand.create(createRoute("route-xfer-fail", "xfer-fail-test")));
+
+            stateMachine.apply(RouteCommand.updateStatus("route-xfer-fail", RouteStatus.CONFIGURED, RouteStatus.ACTIVE, "activated"));
+            stateMachine.apply(RouteCommand.updateStatus("route-xfer-fail", RouteStatus.ACTIVE, RouteStatus.TRIGGERED, "triggered"));
+            stateMachine.apply(RouteCommand.updateStatus("route-xfer-fail", RouteStatus.TRIGGERED, RouteStatus.TRANSFERRING, "transferring"));
+            stateMachine.apply(RouteCommand.updateStatus("route-xfer-fail", RouteStatus.TRANSFERRING, RouteStatus.FAILED, "max retries exceeded"));
+            assertEquals(RouteStatus.FAILED, stateMachine.getRoute("route-xfer-fail").getStatus());
+
+            // FAILED → CONFIGURED (reconfigure)
+            stateMachine.apply(RouteCommand.updateStatus("route-xfer-fail", RouteStatus.FAILED, RouteStatus.CONFIGURED, "reconfigured"));
+            assertEquals(RouteStatus.CONFIGURED, stateMachine.getRoute("route-xfer-fail").getStatus());
+        }
+
+        @Test
+        @DisplayName("CAS mismatch returns CasMismatch when expectedStatus is wrong")
+        void casMismatchReturnsError() {
+            stateMachine.apply(RouteCommand.create(createRoute("route-cas", "cas-test")));
+            // Route is CONFIGURED, but we claim it's ACTIVE
+            CommandResult<?> result = stateMachine.apply(
+                    RouteCommand.updateStatus("route-cas", RouteStatus.ACTIVE, RouteStatus.TRIGGERED, "wrong expectation"));
+
+            assertInstanceOf(CommandResult.CasMismatch.class, result);
+            // Route status should be unchanged
+            assertEquals(RouteStatus.CONFIGURED, stateMachine.getRoute("route-cas").getStatus());
+        }
+
+        @Test
+        @DisplayName("CAS mismatch preserves route state across concurrent-style updates")
+        void casMismatchPreservesState() {
+            stateMachine.apply(RouteCommand.create(createRoute("route-cas2", "cas-race-test")));
+            // Move to ACTIVE
+            stateMachine.apply(RouteCommand.updateStatus("route-cas2", RouteStatus.CONFIGURED, RouteStatus.ACTIVE, "activated"));
+
+            // Simulate two concurrent updates: first one succeeds
+            CommandResult<?> first = stateMachine.apply(
+                    RouteCommand.updateStatus("route-cas2", RouteStatus.ACTIVE, RouteStatus.TRIGGERED, "trigger 1"));
+            assertInstanceOf(CommandResult.Success.class, first);
+
+            // Second one still thinks it's ACTIVE → CAS mismatch
+            CommandResult<?> second = stateMachine.apply(
+                    RouteCommand.updateStatus("route-cas2", RouteStatus.ACTIVE, RouteStatus.SUSPENDED, "suspend concurrent"));
+            assertInstanceOf(CommandResult.CasMismatch.class, second);
+
+            // Route should be TRIGGERED (from the first successful update)
+            assertEquals(RouteStatus.TRIGGERED, stateMachine.getRoute("route-cas2").getStatus());
+        }
+
+        @Test
+        @DisplayName("CAS mismatch entity contains current state for retry")
+        void casMismatchEntityContainsCurrentState() {
+            stateMachine.apply(RouteCommand.create(createRoute("route-cas3", "cas-entity-test")));
+            stateMachine.apply(RouteCommand.updateStatus("route-cas3", RouteStatus.CONFIGURED, RouteStatus.ACTIVE, "activated"));
+
+            CommandResult<?> result = stateMachine.apply(
+                    RouteCommand.updateStatus("route-cas3", RouteStatus.CONFIGURED, RouteStatus.DELETED, "stale expectation"));
+
+            assertInstanceOf(CommandResult.CasMismatch.class, result);
+            CommandResult.CasMismatch<?> mismatch = (CommandResult.CasMismatch<?>) result;
+            RouteConfiguration current = (RouteConfiguration) mismatch.entity();
+            assertEquals(RouteStatus.ACTIVE, current.getStatus(), "CasMismatch should return current route state for retry");
         }
     }
 

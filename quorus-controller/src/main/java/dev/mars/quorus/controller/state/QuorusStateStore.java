@@ -169,7 +169,7 @@ public class QuorusStateStore implements RaftLogApplicator {
                 yield new CommandResult.Success<>(job);
             }
             case TransferJobCommand.UpdateStatus cmd -> {
-                logger.debug("Updating transfer job status: jobId={}, newStatus={}", jobId, cmd.status());
+                logger.debug("Updating transfer job status: jobId={}, newStatus={}", jobId, cmd.newStatus());
                 TransferJobSnapshot existingJob = transferJobs.get(jobId);
                 if (existingJob == null) {
                     logger.warn("Transfer job not found for status update: id={}", jobId);
@@ -195,7 +195,7 @@ public class QuorusStateStore implements RaftLogApplicator {
                         existingJob.getDescription());
                 transferJobs.put(jobId, updatedJob);
                 logger.info("Updated transfer job status: jobId={}, oldStatus={}, newStatus={}", 
-                    jobId, oldStatus, cmd.status());
+                    jobId, oldStatus, cmd.newStatus());
                 yield new CommandResult.Success<>(updatedJob);
             }
             case TransferJobCommand.UpdateProgress cmd -> {

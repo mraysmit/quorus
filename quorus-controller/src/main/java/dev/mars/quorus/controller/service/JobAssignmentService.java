@@ -241,7 +241,7 @@ public class JobAssignmentService {
                 
                 // Create update command
                 JobAssignmentCommand updateCommand = JobAssignmentCommand.updateStatus(
-                        existing.getJobId() + ":" + existing.getAgentId(), newStatus);
+                        existing.getJobId() + ":" + existing.getAgentId(), oldStatus, newStatus);
                 
                 CommandResult<?> result = raftNode.submitCommand(updateCommand)
                         .toCompletionStage().toCompletableFuture().get();
