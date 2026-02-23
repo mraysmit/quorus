@@ -54,6 +54,17 @@ Config classes use singleton pattern: `AppConfig.get()`, `AgentConfig.get()`
 
 ## Build & Test Commands
 
+**MANDATORY: When running Maven or any test commands in the terminal, ALWAYS use `Tee-Object` so output is visible in the console AND saved to a file. NEVER use `Out-File` or `>` redirection alone — this hides output from the user.**
+
+```powershell
+# CORRECT — output visible in console AND saved to file:
+mvn test -pl quorus-core 2>&1 | Tee-Object -FilePath temp\test-output.txt
+
+# WRONG — output hidden from user (NEVER DO THIS):
+mvn test -pl quorus-core 2>&1 | Out-File temp\test-output.txt
+mvn test -pl quorus-core > temp\test-output.txt
+```
+
 ```bash
 # Full build with tests
 mvn clean verify

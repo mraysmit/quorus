@@ -210,13 +210,7 @@ public class NfsTransferProtocol implements TransferProtocol {
             logger.debug("performNfsDownload: parsed connection info - host={}, export={}, path={}",
                     connectionInfo.host, connectionInfo.exportPath, connectionInfo.filePath);
 
-            Path sourcePath;
-            if (isSimulatedRequest(connectionInfo.host)) {
-                logger.debug("Detected simulated NFS request, using local path");
-                sourcePath = resolveSimulatedPath(connectionInfo);
-            } else {
-                sourcePath = resolveNfsMountPath(connectionInfo);
-            }
+            Path sourcePath = resolveNfsMountPath(connectionInfo);
             logger.debug("performNfsDownload: resolved source path={}", sourcePath);
 
             if (!Files.exists(sourcePath)) {
@@ -287,11 +281,6 @@ public class NfsTransferProtocol implements TransferProtocol {
 
             NfsConnectionInfo connectionInfo = parseNfsUri(destinationUri);
 
-            if (isSimulatedRequest(connectionInfo.host)) {
-                logger.debug("Detected simulated upload request, using local path");
-                return performSimulatedUpload(request, progressTracker, sourcePath, startTime);
-            }
-
             Path destinationPath = resolveNfsMountPath(connectionInfo);
             logger.debug("performNfsUpload: resolved destination path={}", destinationPath);
 
@@ -335,59 +324,6 @@ public class NfsTransferProtocol implements TransferProtocol {
             logger.debug("NFS upload exception details for request: {}", requestId, e);
             throw new TransferException(requestId, "NFS upload failed", e);
         }
-    }
-
-    /**
-     * Performs a simulated upload for unit testing without a real NFS mount.
-     */
-    private TransferResult performSimulatedUpload(TransferRequest request, ProgressTracker progressTracker,
-                                                   Path sourcePath, Instant startTime) throws IOException {
-        logger.debug("Performing simulated NFS upload for testing");
-
-        URI destinationUri = request.getDestinationUri();
-        String host = destinationUri.getHost();
-        String path = destinationUri.getPath();
-
-        if (host == null || host.isEmpty()) {
-            throw new IOException("Invalid destination URI: missing host");
-        }
-        if (path == null || path.isEmpty()) {
-            throw new IOException("Invalid destination URI: missing path");
-        }
-
-        long fileSize = Files.size(sourcePath);
-        progressTracker.setTotalBytes(fileSize);
-
-        long bytesTransferred = 0;
-        try (InputStream inputStream = Files.newInputStream(sourcePath);
-             BufferedInputStream bufferedInput = new BufferedInputStream(inputStream, DEFAULT_BUFFER_SIZE)) {
-
-            byte[] buffer = new byte[DEFAULT_BUFFER_SIZE];
-            int bytesRead;
-
-            while ((bytesRead = bufferedInput.read(buffer)) != -1) {
-                bytesTransferred += bytesRead;
-                progressTracker.updateProgress(bytesTransferred);
-
-                if (Thread.currentThread().isInterrupted()) {
-                    throw new IOException("Transfer was cancelled");
-                }
-            }
-        }
-
-        Instant endTime = Instant.now();
-        Duration transferTime = Duration.between(startTime, endTime);
-
-        logger.info("Simulated NFS upload completed: bytesTransferred={}, duration={}ms",
-                bytesTransferred, transferTime.toMillis());
-
-        return TransferResult.builder()
-                .requestId(request.getRequestId())
-                .finalStatus(TransferStatus.COMPLETED)
-                .bytesTransferred(bytesTransferred)
-                .startTime(startTime)
-                .endTime(endTime)
-                .build();
     }
 
     private long transferFile(Path sourcePath, Path destinationPath, ProgressTracker progressTracker)
@@ -544,32 +480,6 @@ public class NfsTransferProtocol implements TransferProtocol {
             logger.warn("Failed to calculate checksum for {}: {}", filePath, e.getMessage());
             return "checksum-error";
         }
-    }
-
-    /**
-     * Determines if the host indicates a simulated/test server.
-     */
-    private boolean isSimulatedRequest(String host) {
-        return host != null && (
-                host.equals("testserver") ||
-                host.equals("localhost.test") ||
-                host.equals("simulated-nfs-server")
-        );
-    }
-
-    private static String getDefaultMountRoot() {
-        String os = System.getProperty("os.name", "").toLowerCase();
-        if (os.contains("win")) {
-            return "C:\\nfs";
-        }
-        return "/mnt";
-    }
-
-    /**
-     * Returns the configured mount root path.
-     */
-    public String getMountRoot() {
-        return mountRoot;
     }
 
     /**
