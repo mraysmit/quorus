@@ -62,24 +62,32 @@ public class NetworkTestUtils {
     /**
      * Creates a network partition by moving containers to different Docker networks.
      * This provides true network isolation at the Docker level.
+     *
+     * @return {@code true} if all network operations succeeded, {@code false} if any failed
      */
-    public static void createDockerNetworkPartition(List<String> partition1, List<String> partition2) {
+    public static boolean createDockerNetworkPartition(List<String> partition1, List<String> partition2) {
         logger.info("Creating Docker network partition: " + partition1 + " vs " + partition2);
 
+        boolean allSucceeded = true;
         try {
             // Move partition1 to raft-partition-a network
             for (String node : partition1) {
-                disconnectFromNetwork(node, "raft-cluster");
-                connectToNetwork(node, "raft-partition-a", getPartitionIpAddress(node, "a"));
+                if (!disconnectFromNetwork(node, "raft-cluster")) allSucceeded = false;
+                if (!connectToNetwork(node, "raft-partition-a", getPartitionIpAddress(node, "a"))) allSucceeded = false;
             }
 
             // Move partition2 to raft-partition-b network
             for (String node : partition2) {
-                disconnectFromNetwork(node, "raft-cluster");
-                connectToNetwork(node, "raft-partition-b", getPartitionIpAddress(node, "b"));
+                if (!disconnectFromNetwork(node, "raft-cluster")) allSucceeded = false;
+                if (!connectToNetwork(node, "raft-partition-b", getPartitionIpAddress(node, "b"))) allSucceeded = false;
             }
 
-            logger.info("Docker network partition created successfully");
+            if (allSucceeded) {
+                logger.info("Docker network partition created successfully");
+            } else {
+                logger.severe("Docker network partition partially failed — some nodes may not be isolated");
+            }
+            return allSucceeded;
 
         } catch (Exception e) {
             logger.severe("Failed to create Docker network partition: " + e.getMessage());
@@ -89,18 +97,22 @@ public class NetworkTestUtils {
 
     /**
      * Restores the original network configuration by moving all containers back to the main network.
+     * <p>This method is typically called defensively in setUp/tearDown to ensure a clean state.
+     * Failures are expected when no partition was previously created (the partition networks
+     * don't exist and the containers are already on raft-cluster), so disconnect/connect
+     * failures are logged at {@code FINE} level rather than {@code WARNING}.</p>
      */
     public static void restoreDockerNetworkPartition(List<String> allNodes) {
         logger.info("Restoring Docker network partition for nodes: " + allNodes);
 
         try {
             for (String node : allNodes) {
-                // Disconnect from partition networks
-                disconnectFromNetwork(node, "raft-partition-a");
-                disconnectFromNetwork(node, "raft-partition-b");
+                // Disconnect from partition networks (expected to fail if no partition exists)
+                disconnectFromNetworkQuietly(node, "raft-partition-a");
+                disconnectFromNetworkQuietly(node, "raft-partition-b");
 
-                // Reconnect to main cluster network
-                connectToNetwork(node, "raft-cluster", getOriginalIpAddress(node));
+                // Reconnect to main cluster network (expected to fail if already connected)
+                connectToNetworkQuietly(node, "raft-cluster", getOriginalIpAddress(node));
             }
 
             logger.info("Docker network partition restored successfully");
@@ -132,8 +144,11 @@ public class NetworkTestUtils {
 
     /**
      * Simulates network latency by adding delay to packets.
+     * Requires {@code iproute2} (the {@code tc} command) to be installed in the container image.
+     *
+     * @return {@code true} if the latency was applied successfully, {@code false} otherwise
      */
-    public static void addNetworkLatency(ComposeContainer environment, String nodeName, int delayMs) {
+    public static boolean addNetworkLatency(ComposeContainer environment, String nodeName, int delayMs) {
         logger.info("Adding " + delayMs + "ms network latency to " + nodeName);
         
         try {
@@ -142,20 +157,26 @@ public class NetworkTestUtils {
                     .execInContainer("tc", "qdisc", "add", "dev", "eth0", "root", "netem", "delay", delayMs + "ms");
             
             if (result.getExitCode() != 0) {
-                logger.warning("Failed to add latency to " + nodeName + ": " + result.getStderr());
+                logger.severe("Failed to add latency to " + nodeName + ": " + result.getStderr()
+                        + " (is 'iproute2' installed in the container image?)");
+                return false;
             } else {
                 logger.info("Network latency added to " + nodeName);
+                return true;
             }
             
         } catch (Exception e) {
-            logger.warning("Error adding network latency to " + nodeName + ": " + e.getMessage());
+            logger.severe("Error adding network latency to " + nodeName + ": " + e.getMessage());
+            return false;
         }
     }
 
     /**
      * Removes network latency by clearing traffic control rules.
+     *
+     * @return {@code true} if the latency was removed successfully, {@code false} otherwise
      */
-    public static void removeNetworkLatency(ComposeContainer environment, String nodeName) {
+    public static boolean removeNetworkLatency(ComposeContainer environment, String nodeName) {
         logger.info("Removing network latency from " + nodeName);
         
         try {
@@ -164,20 +185,26 @@ public class NetworkTestUtils {
                     .execInContainer("tc", "qdisc", "del", "dev", "eth0", "root");
             
             if (result.getExitCode() != 0) {
-                logger.warning("Failed to remove latency from " + nodeName + ": " + result.getStderr());
+                logger.severe("Failed to remove latency from " + nodeName + ": " + result.getStderr());
+                return false;
             } else {
                 logger.info("Network latency removed from " + nodeName);
+                return true;
             }
             
         } catch (Exception e) {
-            logger.warning("Error removing network latency from " + nodeName + ": " + e.getMessage());
+            logger.severe("Error removing network latency from " + nodeName + ": " + e.getMessage());
+            return false;
         }
     }
 
     /**
      * Simulates packet loss between nodes.
+     * Requires {@code iproute2} (the {@code tc} command) to be installed in the container image.
+     *
+     * @return {@code true} if packet loss was applied successfully, {@code false} otherwise
      */
-    public static void addPacketLoss(ComposeContainer environment, String nodeName, int lossPercent) {
+    public static boolean addPacketLoss(ComposeContainer environment, String nodeName, int lossPercent) {
         logger.info("Adding " + lossPercent + "% packet loss to " + nodeName);
         
         try {
@@ -186,20 +213,27 @@ public class NetworkTestUtils {
                     .execInContainer("tc", "qdisc", "add", "dev", "eth0", "root", "netem", "loss", lossPercent + "%");
             
             if (result.getExitCode() != 0) {
-                logger.warning("Failed to add packet loss to " + nodeName + ": " + result.getStderr());
+                logger.severe("Failed to add packet loss to " + nodeName + ": " + result.getStderr()
+                        + " (is 'iproute2' installed in the container image?)");
+                return false;
             } else {
                 logger.info("Packet loss added to " + nodeName);
+                return true;
             }
             
         } catch (Exception e) {
-            logger.warning("Error adding packet loss to " + nodeName + ": " + e.getMessage());
+            logger.severe("Error adding packet loss to " + nodeName + ": " + e.getMessage());
+            return false;
         }
     }
 
     /**
      * Completely isolates a node from the network.
+     * Requires {@code iptables} to be installed in the container image.
+     *
+     * @return {@code true} if the node was isolated successfully, {@code false} otherwise
      */
-    public static void isolateNode(ComposeContainer environment, String nodeName) {
+    public static boolean isolateNode(ComposeContainer environment, String nodeName) {
         logger.info("Isolating node from network: " + nodeName);
         
         try {
@@ -215,34 +249,48 @@ public class NetworkTestUtils {
             
             if (result1.getExitCode() == 0 && result2.getExitCode() == 0) {
                 logger.info("Node " + nodeName + " isolated successfully");
+                return true;
             } else {
-                logger.warning("Failed to isolate node " + nodeName);
+                logger.severe("Failed to isolate node " + nodeName
+                        + " (is 'iptables' installed in the container image?)");
+                return false;
             }
             
         } catch (Exception e) {
-            logger.warning("Error isolating node " + nodeName + ": " + e.getMessage());
+            logger.severe("Error isolating node " + nodeName + ": " + e.getMessage());
+            return false;
         }
     }
 
     /**
      * Restores network connectivity for an isolated node.
      */
-    public static void restoreNode(ComposeContainer environment, String nodeName) {
+    /**
+     * Restores network connectivity for an isolated node by clearing all iptables and tc rules.
+     *
+     * @return {@code true} if the rules were cleared successfully, {@code false} otherwise
+     */
+    public static boolean restoreNode(ComposeContainer environment, String nodeName) {
         logger.info("Restoring network connectivity for node: " + nodeName);
         
         try {
             clearNetworkRules(environment, nodeName);
             logger.info("Node " + nodeName + " connectivity restored");
+            return true;
             
         } catch (Exception e) {
-            logger.warning("Error restoring node " + nodeName + ": " + e.getMessage());
+            logger.severe("Error restoring node " + nodeName + ": " + e.getMessage());
+            return false;
         }
     }
 
     /**
      * Simulates a slow network by adding both latency and packet loss.
+     * Requires {@code iproute2} (the {@code tc} command) to be installed in the container image.
+     *
+     * @return {@code true} if the slow network simulation was applied, {@code false} otherwise
      */
-    public static void simulateSlowNetwork(ComposeContainer environment, String nodeName, 
+    public static boolean simulateSlowNetwork(ComposeContainer environment, String nodeName, 
                                          int delayMs, int lossPercent) {
         logger.info("Simulating slow network for " + nodeName + 
                    " (delay: " + delayMs + "ms, loss: " + lossPercent + "%)");
@@ -255,12 +303,16 @@ public class NetworkTestUtils {
             
             if (result.getExitCode() == 0) {
                 logger.info("Slow network simulation applied to " + nodeName);
+                return true;
             } else {
-                logger.warning("Failed to simulate slow network for " + nodeName + ": " + result.getStderr());
+                logger.severe("Failed to simulate slow network for " + nodeName + ": " + result.getStderr()
+                        + " (is 'iproute2' installed in the container image?)");
+                return false;
             }
             
         } catch (Exception e) {
-            logger.warning("Error simulating slow network for " + nodeName + ": " + e.getMessage());
+            logger.severe("Error simulating slow network for " + nodeName + ": " + e.getMessage());
+            return false;
         }
     }
 
@@ -277,12 +329,13 @@ public class NetworkTestUtils {
                     .execInContainer("iptables", "-A", "OUTPUT", "-d", targetIp, "-j", "DROP");
             
             if (result.getExitCode() != 0) {
-                logger.warning("Failed to block traffic from " + sourceNode + " to " + targetNode + 
-                             ": " + result.getStderr());
+                logger.severe("Failed to block traffic from " + sourceNode + " to " + targetNode + 
+                             ": " + result.getStderr()
+                             + " (is 'iptables' installed in the container image?)");
             }
             
         } catch (Exception e) {
-            logger.warning("Error blocking traffic from " + sourceNode + " to " + targetNode + 
+            logger.severe("Error blocking traffic from " + sourceNode + " to " + targetNode + 
                          ": " + e.getMessage());
         }
     }
@@ -324,7 +377,36 @@ public class NetworkTestUtils {
 
     // Docker network manipulation methods
 
-    private static void disconnectFromNetwork(String containerName, String networkName) {
+    /**
+     * Disconnects a container from a Docker network.
+     *
+     * @return {@code true} if the disconnect succeeded, {@code false} if it failed
+     */
+    private static boolean disconnectFromNetwork(String containerName, String networkName) {
+        try {
+            String command = String.format("docker network disconnect %s %s", networkName, containerName);
+            Process process = Runtime.getRuntime().exec(command);
+            int exitCode = process.waitFor();
+
+            if (exitCode == 0) {
+                logger.info("Disconnected " + containerName + " from network " + networkName);
+                return true;
+            } else {
+                logger.severe("Failed to disconnect " + containerName + " from network " + networkName);
+                return false;
+            }
+
+        } catch (Exception e) {
+            logger.severe("Error disconnecting " + containerName + " from network " + networkName + ": " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Disconnects a container from a Docker network, logging failures at {@code FINE} level.
+     * Used for defensive cleanup where failure is expected (e.g., the network doesn't exist).
+     */
+    private static void disconnectFromNetworkQuietly(String containerName, String networkName) {
         try {
             String command = String.format("docker network disconnect %s %s", networkName, containerName);
             Process process = Runtime.getRuntime().exec(command);
@@ -333,15 +415,47 @@ public class NetworkTestUtils {
             if (exitCode == 0) {
                 logger.info("Disconnected " + containerName + " from network " + networkName);
             } else {
-                logger.warning("Failed to disconnect " + containerName + " from network " + networkName);
+                logger.fine("Skipped disconnect of " + containerName + " from network " + networkName
+                        + " (not connected or network does not exist)");
             }
 
         } catch (Exception e) {
-            logger.warning("Error disconnecting " + containerName + " from network " + networkName + ": " + e.getMessage());
+            logger.fine("Skipped disconnect of " + containerName + " from network " + networkName
+                    + ": " + e.getMessage());
         }
     }
 
-    private static void connectToNetwork(String containerName, String networkName, String ipAddress) {
+    /**
+     * Connects a container to a Docker network.
+     *
+     * @return {@code true} if the connect succeeded, {@code false} if it failed
+     */
+    private static boolean connectToNetwork(String containerName, String networkName, String ipAddress) {
+        try {
+            String command = String.format("docker network connect --ip %s %s %s",
+                                         ipAddress, networkName, containerName);
+            Process process = Runtime.getRuntime().exec(command);
+            int exitCode = process.waitFor();
+
+            if (exitCode == 0) {
+                logger.info("Connected " + containerName + " to network " + networkName + " with IP " + ipAddress);
+                return true;
+            } else {
+                logger.severe("Failed to connect " + containerName + " to network " + networkName);
+                return false;
+            }
+
+        } catch (Exception e) {
+            logger.severe("Error connecting " + containerName + " to network " + networkName + ": " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Connects a container to a Docker network, logging failures at {@code FINE} level.
+     * Used for defensive cleanup where failure is expected (e.g., already connected).
+     */
+    private static void connectToNetworkQuietly(String containerName, String networkName, String ipAddress) {
         try {
             String command = String.format("docker network connect --ip %s %s %s",
                                          ipAddress, networkName, containerName);
@@ -351,11 +465,13 @@ public class NetworkTestUtils {
             if (exitCode == 0) {
                 logger.info("Connected " + containerName + " to network " + networkName + " with IP " + ipAddress);
             } else {
-                logger.warning("Failed to connect " + containerName + " to network " + networkName);
+                logger.fine("Skipped connect of " + containerName + " to network " + networkName
+                        + " (already connected or network does not exist)");
             }
 
         } catch (Exception e) {
-            logger.warning("Error connecting " + containerName + " to network " + networkName + ": " + e.getMessage());
+            logger.fine("Skipped connect of " + containerName + " to network " + networkName
+                    + ": " + e.getMessage());
         }
     }
 

@@ -17,16 +17,12 @@
 package dev.mars.quorus.protocol;
 
 import dev.mars.quorus.core.TransferRequest;
-import dev.mars.quorus.core.TransferResult;
-import dev.mars.quorus.core.TransferStatus;
-import dev.mars.quorus.core.exceptions.TransferException;
 import dev.mars.quorus.transfer.TransferContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.net.URI;
-import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -124,199 +120,9 @@ class SftpTransferProtocolTest {
         assertEquals(-1, protocol.getMaxFileSize());
     }
     
-    @Test
-    void testTransferWithValidSftpUri() throws TransferException {
-        TransferRequest request = TransferRequest.builder()
-                .requestId("test-sftp-transfer")
-                .sourceUri(URI.create("sftp://testserver/path/testfile.txt"))
-                .destinationPath(tempDir.resolve("testfile.txt"))
-                .build();
-        
-        // This should succeed as it's a simulation
-        TransferResult result = protocol.transfer(request, context);
-        
-        assertNotNull(result);
-        assertEquals("test-sftp-transfer", result.getRequestId());
-        assertEquals(TransferStatus.COMPLETED, result.getFinalStatus());
-        assertTrue(result.getBytesTransferred() > 0);
-        assertTrue(Files.exists(tempDir.resolve("testfile.txt")));
-    }
-    
     // Error handling tests moved to dev.mars.quorus.protocol.errorhandling.SftpTransferProtocolErrorHandlingTest
     
-    @Test
-    void testSftpUriWithAuthentication() throws TransferException {
-        TransferRequest request = TransferRequest.builder()
-                .requestId("test-auth")
-                .sourceUri(URI.create("sftp://username:password@server/path/file.txt"))
-                .destinationPath(tempDir.resolve("testfile.txt"))
-                .build();
-        
-        assertTrue(protocol.canHandle(request));
-        
-        // Should succeed with simulation
-        TransferResult result = protocol.transfer(request, context);
-        assertNotNull(result);
-        assertEquals(TransferStatus.COMPLETED, result.getFinalStatus());
-    }
-    
-    @Test
-    void testSftpUriWithUsernameOnly() throws TransferException {
-        TransferRequest request = TransferRequest.builder()
-                .requestId("test-username-only")
-                .sourceUri(URI.create("sftp://username@server/path/file.txt"))
-                .destinationPath(tempDir.resolve("testfile.txt"))
-                .build();
-        
-        assertTrue(protocol.canHandle(request));
-        
-        // Should succeed with simulation
-        TransferResult result = protocol.transfer(request, context);
-        assertNotNull(result);
-        assertEquals(TransferStatus.COMPLETED, result.getFinalStatus());
-    }
-    
-    @Test
-    void testSftpUriWithCustomPort() throws TransferException {
-        TransferRequest request = TransferRequest.builder()
-                .requestId("test-custom-port")
-                .sourceUri(URI.create("sftp://server:2222/path/file.txt"))
-                .destinationPath(tempDir.resolve("testfile.txt"))
-                .build();
-        
-        assertTrue(protocol.canHandle(request));
-        
-        // Should succeed with simulation
-        TransferResult result = protocol.transfer(request, context);
-        assertNotNull(result);
-        assertEquals(TransferStatus.COMPLETED, result.getFinalStatus());
-    }
-    
-    @Test
-    void testSftpUriWithDefaultPort() throws TransferException {
-        TransferRequest request = TransferRequest.builder()
-                .requestId("test-default-port")
-                .sourceUri(URI.create("sftp://server/path/file.txt"))
-                .destinationPath(tempDir.resolve("testfile.txt"))
-                .build();
-        
-        assertTrue(protocol.canHandle(request));
-        // Default port 22 should be used internally
-        
-        TransferResult result = protocol.transfer(request, context);
-        assertNotNull(result);
-        assertEquals(TransferStatus.COMPLETED, result.getFinalStatus());
-    }
-    
     // Additional error handling tests moved to dev.mars.quorus.protocol.errorhandling.SftpTransferProtocolErrorHandlingTest
-    
-    @Test
-    void testChecksumHandling() throws TransferException {
-        TransferRequest request = TransferRequest.builder()
-                .requestId("test-checksum")
-                .sourceUri(URI.create("sftp://server/path/file.txt"))
-                .destinationPath(tempDir.resolve("testfile.txt"))
-                .expectedChecksum("abc123")
-                .build();
-        
-        assertTrue(protocol.canHandle(request));
-        
-        // Should handle checksum verification in simulation
-        TransferResult result = protocol.transfer(request, context);
-        assertNotNull(result);
-        assertEquals(TransferStatus.COMPLETED, result.getFinalStatus());
-        assertNotNull(result.getActualChecksum());
-    }
-    
-    @Test
-    void testProgressTracking() throws TransferException {
-        TransferRequest request = TransferRequest.builder()
-                .requestId("test-progress")
-                .sourceUri(URI.create("sftp://server/path/largefile.txt"))
-                .destinationPath(tempDir.resolve("largefile.txt"))
-                .build();
-        
-        // Should track progress during simulation
-        TransferResult result = protocol.transfer(request, context);
-        assertNotNull(result);
-        assertEquals(TransferStatus.COMPLETED, result.getFinalStatus());
-        assertTrue(result.getBytesTransferred() > 0);
-    }
-    
-    @Test
-    void testEncryptedTransfer() throws TransferException {
-        TransferRequest request = TransferRequest.builder()
-                .requestId("test-encrypted")
-                .sourceUri(URI.create("sftp://secure.server.com/confidential/data.txt"))
-                .destinationPath(tempDir.resolve("data.txt"))
-                .build();
-        
-        assertTrue(protocol.canHandle(request));
-        
-        // Should handle encrypted transfer (simulation)
-        TransferResult result = protocol.transfer(request, context);
-        assertNotNull(result);
-        assertEquals(TransferStatus.COMPLETED, result.getFinalStatus());
-    }
-    
-    @Test
-    void testKeyBasedAuthentication() throws TransferException {
-        TransferRequest request = TransferRequest.builder()
-                .requestId("test-key-auth")
-                .sourceUri(URI.create("sftp://keyuser@server/path/file.txt"))
-                .destinationPath(tempDir.resolve("testfile.txt"))
-                .build();
-        
-        assertTrue(protocol.canHandle(request));
-        
-        // Should handle key-based authentication (simulation)
-        TransferResult result = protocol.transfer(request, context);
-        assertNotNull(result);
-        assertEquals(TransferStatus.COMPLETED, result.getFinalStatus());
-    }
-    
-    @Test
-    void testTransferResultTiming() throws TransferException {
-        TransferRequest request = TransferRequest.builder()
-                .requestId("test-timing")
-                .sourceUri(URI.create("sftp://server/path/file.txt"))
-                .destinationPath(tempDir.resolve("testfile.txt"))
-                .build();
-        
-        TransferResult result = protocol.transfer(request, context);
-        
-        assertNotNull(result);
-        assertTrue(result.getStartTime().isPresent());
-        assertTrue(result.getEndTime().isPresent());
-        assertTrue(result.getEndTime().get().isAfter(result.getStartTime().get()) || 
-                  result.getEndTime().get().equals(result.getStartTime().get()));
-    }
-    
-    @Test
-    void testSimulationCreatesFile() throws TransferException {
-        TransferRequest request = TransferRequest.builder()
-                .requestId("test-file-creation")
-                .sourceUri(URI.create("sftp://server/path/testfile.txt"))
-                .destinationPath(tempDir.resolve("created-file.txt"))
-                .build();
-        
-        assertFalse(Files.exists(tempDir.resolve("created-file.txt")));
-        
-        TransferResult result = protocol.transfer(request, context);
-        
-        assertNotNull(result);
-        assertEquals(TransferStatus.COMPLETED, result.getFinalStatus());
-        assertTrue(Files.exists(tempDir.resolve("created-file.txt")));
-        
-        // Verify file content
-        try {
-            String content = Files.readString(tempDir.resolve("created-file.txt"));
-            assertTrue(content.contains("SFTP Transfer Simulation"));
-            assertTrue(content.contains("Quorus"));
-        } catch (Exception e) {
-            fail("Failed to read created file: " + e.getMessage());
-        }
-    }
     
     @Test
     void testSftpUriAuthenticationEdgeCase() {
@@ -356,20 +162,4 @@ class SftpTransferProtocolTest {
     
     // Additional edge case error tests moved to dev.mars.quorus.protocol.errorhandling.SftpTransferProtocolErrorHandlingTest
     
-    @Test
-    void testIsTestHostnameDetection() {
-        // Test that simulation mode is triggered for test hostnames
-        TransferRequest request = TransferRequest.builder()
-                .requestId("test-hostname-detection")
-                .sourceUri(URI.create("sftp://test.example.com/path/file.txt"))
-                .destinationPath(tempDir.resolve("file.txt"))
-                .build();
-        
-        // Should use simulation mode for test hostnames
-        TransferResult result = assertDoesNotThrow(() -> protocol.transfer(request, context));
-        assertNotNull(result);
-        assertEquals(TransferStatus.COMPLETED, result.getFinalStatus());
-    }
-    
 }
-

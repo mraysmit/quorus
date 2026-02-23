@@ -20,8 +20,10 @@ force_local_logins_ssl=NO\n\
 # Disable TLS session reuse requirement — needed because control (port 21)\n\
 # and passive data (port 30000) present as different endpoints to the client\n\
 require_ssl_reuse=NO\n\
-# Protocol versions: disable old/insecure, keep TLS 1.2+\n\
-ssl_tlsv1=NO\n\
+# Protocol versions: SSLv2/v3 disabled. ssl_tlsv1=YES enables TLS generally\n\
+# (in Alpine vsftpd, this flag gates ALL TLS versions, not just 1.0).\n\
+# OpenSSL negotiates the highest mutually-supported version (TLS 1.2/1.3).\n\
+ssl_tlsv1=YES\n\
 ssl_sslv2=NO\n\
 ssl_sslv3=NO\n\
 ssl_ciphers=HIGH\n\

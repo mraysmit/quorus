@@ -33,7 +33,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.StandardOpenOption;
 import java.time.Duration;
@@ -54,9 +53,6 @@ public class SftpTransferProtocol implements TransferProtocol {
     private static final Duration DEFAULT_TIMEOUT = Duration.ofMinutes(30);
     private static final Duration CONNECTION_TIMEOUT = Duration.ofSeconds(30);
 
-    // Test simulation mode - enabled when system property is set
-    private static final boolean SIMULATION_MODE = Boolean.getBoolean("quorus.sftp.simulation");
-    
     // Track active SFTP client for abort capability
     private volatile SftpClient activeClient;
     
@@ -189,12 +185,6 @@ public class SftpTransferProtocol implements TransferProtocol {
             logger.debug("performSftpDownload: parsed connection info - host={}, port={}, path={}", 
                 connectionInfo.host, connectionInfo.port, connectionInfo.path);
 
-            // Check if we should use simulation mode for this request
-            if (SIMULATION_MODE || isTestHostname(connectionInfo.host)) {
-                logger.debug("performSftpDownload: using simulation mode for host={}", connectionInfo.host);
-                return performSimulatedDownload(request, progressTracker, startTime);
-            }
-
             // Create SFTP client and perform transfer
             logger.debug("performSftpDownload: creating SFTP client");
             SftpClient sftpClient = new SftpClient(connectionInfo);
@@ -292,12 +282,6 @@ public class SftpTransferProtocol implements TransferProtocol {
             if (!Files.exists(sourcePath)) {
                 logger.debug("performSftpUpload: validation failed - source file not found");
                 throw new TransferException(requestId, "Source file does not exist: " + sourcePath);
-            }
-
-            // Check if we should use simulation mode for this request
-            if (SIMULATION_MODE || isTestHostname(connectionInfo.host)) {
-                logger.debug("performSftpUpload: using simulation mode for host={}", connectionInfo.host);
-                return performSimulatedUpload(request, progressTracker, startTime);
             }
 
             // Create SFTP client and perform upload
@@ -664,153 +648,6 @@ public class SftpTransferProtocol implements TransferProtocol {
                     ", username='" + username + '\'' +
                     ", hasAuth=" + hasAuthentication() +
                     '}';
-        }
-    }
-
-    /**
-     * Checks if the hostname indicates a test environment
-     */
-    private boolean isTestHostname(String hostname) {
-        if (hostname == null) return false;
-
-        // Common test hostnames that should trigger simulation
-        return hostname.equals("testserver") ||
-               hostname.equals("server") ||
-               hostname.equals("secure.server.com") ||
-               hostname.equals("localhost") ||
-               hostname.equals("127.0.0.1") ||
-               hostname.startsWith("test-") ||
-               hostname.contains("test") ||
-               hostname.contains("mock") ||
-               hostname.contains("fake");
-    }
-
-    /**
-     * Performs a simulated SFTP download for testing purposes
-     */
-    private TransferResult performSimulatedDownload(TransferRequest request,
-                                                    ProgressTracker progressTracker,
-                                                    Instant startTime) throws TransferException {
-
-        String requestId = request.getRequestId();
-        logger.info("SIMULATION: Performing simulated SFTP download for {}", requestId);
-        logger.debug("performSimulatedDownload: starting for requestId={}, destination={}", 
-            requestId, request.getDestinationPath());
-
-        try {
-            // Simulate connection delay
-            logger.debug("performSimulatedDownload: simulating connection delay");
-            Thread.sleep(100);
-
-            // Create a simulated file with test content that matches test expectations
-            String testContent = "SFTP Transfer Simulation\n" +
-                               "Quorus Distributed File Transfer System\n" +
-                               "Simulated download for request: " + requestId + "\n" +
-                               "Generated at: " + Instant.now() + "\n" +
-                               "Source: " + request.getSourceUri();
-
-            // Ensure destination directory exists
-            Files.createDirectories(request.getDestinationPath().getParent());
-            logger.debug("performSimulatedDownload: destination directory ensured");
-
-            // Write simulated content to destination
-            logger.debug("performSimulatedDownload: writing simulated content to file");
-            Files.write(request.getDestinationPath(), testContent.getBytes(StandardCharsets.UTF_8),
-                       StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING);
-
-            long bytesTransferred = testContent.length();
-            logger.debug("performSimulatedDownload: wrote {} bytes to destination", bytesTransferred);
-
-            // Update progress tracker
-            progressTracker.setTotalBytes(bytesTransferred);
-            progressTracker.updateProgress(bytesTransferred);
-
-            // Calculate simulated checksum
-            String checksum = null;
-            if (request.getExpectedChecksum() != null) {
-                checksum = "sim-checksum-" + bytesTransferred;
-                logger.debug("performSimulatedDownload: generated simulated checksum={}", checksum);
-            }
-
-            Instant endTime = Instant.now();
-
-            logger.info("SIMULATION: Completed simulated SFTP download for {} ({} bytes)", requestId, bytesTransferred);
-
-            return TransferResult.builder()
-                    .requestId(requestId)
-                    .finalStatus(TransferStatus.COMPLETED)
-                    .bytesTransferred(bytesTransferred)
-                    .startTime(startTime)
-                    .endTime(endTime)
-                    .actualChecksum(checksum)
-                    .build();
-
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            logger.debug("performSimulatedDownload: interrupted");
-            throw new TransferException(requestId, "Simulated download interrupted", e);
-        } catch (IOException e) {
-            logger.debug("performSimulatedDownload: IO exception={}", e.getMessage());
-            throw new TransferException(requestId, "Simulated download failed", e);
-        }
-    }
-
-    /**
-     * Performs a simulated SFTP upload for testing purposes
-     */
-    private TransferResult performSimulatedUpload(TransferRequest request,
-                                                  ProgressTracker progressTracker,
-                                                  Instant startTime) throws TransferException {
-
-        String requestId = request.getRequestId();
-        logger.info("SIMULATION: Performing simulated SFTP upload for {}", requestId);
-        logger.debug("performSimulatedUpload: starting for requestId={}, source={}", 
-            requestId, request.getSourceUri());
-
-        try {
-            // Simulate connection delay
-            logger.debug("performSimulatedUpload: simulating connection delay");
-            Thread.sleep(100);
-
-            // Read the source file content
-            java.nio.file.Path sourcePath = java.nio.file.Paths.get(request.getSourceUri());
-            logger.debug("performSimulatedUpload: reading source file from {}", sourcePath);
-            byte[] sourceContent = Files.readAllBytes(sourcePath);
-            long bytesTransferred = sourceContent.length;
-            logger.debug("performSimulatedUpload: read {} bytes from source", bytesTransferred);
-
-            // Update progress tracker
-            progressTracker.setTotalBytes(bytesTransferred);
-            progressTracker.updateProgress(bytesTransferred);
-
-            // Calculate simulated checksum
-            String checksum = null;
-            if (request.getExpectedChecksum() != null) {
-                checksum = "sim-checksum-" + bytesTransferred;
-                logger.debug("performSimulatedUpload: generated simulated checksum={}", checksum);
-            }
-
-            Instant endTime = Instant.now();
-
-            logger.info("SIMULATION: Completed simulated SFTP upload for {} ({} bytes to {})", 
-                requestId, bytesTransferred, request.getDestinationUri());
-
-            return TransferResult.builder()
-                    .requestId(requestId)
-                    .finalStatus(TransferStatus.COMPLETED)
-                    .bytesTransferred(bytesTransferred)
-                    .startTime(startTime)
-                    .endTime(endTime)
-                    .actualChecksum(checksum)
-                    .build();
-
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            logger.debug("performSimulatedUpload: interrupted");
-            throw new TransferException(requestId, "Simulated upload interrupted", e);
-        } catch (IOException e) {
-            logger.debug("performSimulatedUpload: IO exception={}", e.getMessage());
-            throw new TransferException(requestId, "Simulated upload failed", e);
         }
     }
 }

@@ -125,8 +125,19 @@ public final class SharedTestContainers {
         return sftpContainer != null;
     }
 
+    // Fixed ports for FTP — avoids Testcontainers socat proxy which changes
+    // source IP, triggering vsftpd's "425 Security: Bad IP connecting" error
+    // when the passive data connection comes from a different IP than control.
+    private static final int FTP_CONTROL_PORT = 2100;
+    private static final int FTP_DATA_PORT = 21100;
+
     /**
      * Gets the shared FTP container, starting it if necessary.
+     * 
+     * <p>Uses <b>fixed port mappings</b> (2100:21 for control, 21100:21100 for
+     * passive data) to bypass Testcontainers' socat proxy. This is necessary
+     * because vsftpd verifies that data connections come from the same IP as
+     * the control connection, and the socat proxy changes the source IP.
      * 
      * @return the FTP ComposeContainer
      */
@@ -138,10 +149,11 @@ public final class SharedTestContainers {
 
                     ftpContainer = new ComposeContainer(
                             new File("src/test/resources/docker-compose-ftp-test.yml"))
-                            .withExposedService("ftp", 21, Wait.forListeningPort())
                             .withStartupTimeout(Duration.ofMinutes(2));
                     ftpContainer.start();
                     registerShutdownHook();
+                    // Wait for vsftpd to be fully ready (accept connections)
+                    waitForFtpReady("localhost", FTP_CONTROL_PORT, Duration.ofMinutes(1));
                     logger.info("Shared FTP container started at {}:{}", getFtpHost(), getFtpPort());
                 }
             }
@@ -150,17 +162,19 @@ public final class SharedTestContainers {
     }
 
     /**
-     * Gets the FTP host, starting the container if necessary.
+     * Gets the FTP host. Returns localhost since FTP uses fixed port mapping.
      */
     public static String getFtpHost() {
-        return getFtpContainer().getServiceHost("ftp", 21);
+        getFtpContainer(); // Ensure container is started
+        return "localhost";
     }
 
     /**
-     * Gets the FTP port, starting the container if necessary.
+     * Gets the FTP control port. Returns the fixed mapped port (2100).
      */
     public static int getFtpPort() {
-        return getFtpContainer().getServicePort("ftp", 21);
+        getFtpContainer(); // Ensure container is started
+        return FTP_CONTROL_PORT;
     }
 
     /**

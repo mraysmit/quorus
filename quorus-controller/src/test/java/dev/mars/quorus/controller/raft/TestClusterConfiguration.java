@@ -25,7 +25,7 @@ import java.util.Map;
  * Provides predefined configurations for different test types.
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @version 1.0
- * @since 2025-08-20
+ * @since 2025-08-21
  */
 public class TestClusterConfiguration {
 

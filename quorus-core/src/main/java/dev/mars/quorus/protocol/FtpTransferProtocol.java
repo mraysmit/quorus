@@ -293,12 +293,6 @@ public class FtpTransferProtocol implements TransferProtocol {
             
             logger.info("Starting FTP upload: {} -> {}", sourcePath, destinationUri);
             
-            // Check if this is a test request with simulated server
-            if (isSimulatedUploadRequest(destinationUri)) {
-                logger.debug("Detected simulated upload request, using mock FTP server");
-                return performSimulatedUpload(request, progressTracker, sourcePath, startTime);
-            }
-            
             // Parse FTP URI and extract connection details
             FtpConnectionInfo connectionInfo = parseFtpUri(destinationUri);
             logger.debug("Connection info parsed: host={}, port={}, path={}", 
@@ -365,67 +359,6 @@ public class FtpTransferProtocol implements TransferProtocol {
             logger.debug("FTP upload exception details for request: {}", requestId, e);
             throw new TransferException(requestId, "FTP upload failed", e);
         }
-    }
-
-    /**
-     * Determines if the destination URI indicates a simulated/test server.
-     * This allows unit tests to run without a real FTP server.
-     */
-    private boolean isSimulatedUploadRequest(URI destinationUri) {
-        String host = destinationUri.getHost();
-        return host != null && (
-            host.equals("testserver") ||
-            host.equals("localhost.test") ||
-            host.equals("simulated-ftp-server")
-        );
-    }
-
-    /**
-     * Performs a simulated upload for unit testing without a real FTP server.
-     * This allows tests to verify the upload logic and result handling.
-     */
-    private TransferResult performSimulatedUpload(TransferRequest request, ProgressTracker progressTracker,
-            java.nio.file.Path sourcePath, Instant startTime) throws IOException {
-        logger.debug("Performing simulated FTP upload for testing");
-        
-        // Validate destination URI
-        URI destinationUri = request.getDestinationUri();
-        String host = destinationUri.getHost();
-        String path = destinationUri.getPath();
-        
-        if (host == null || host.isEmpty()) {
-            logger.error("[{}] FTP destination URI must specify a host", QUORUS_1007.code());
-            throw new IOException("FTP destination URI must specify a host");
-        }
-        if (path == null || path.isEmpty()) {
-            logger.error("[{}] FTP destination URI must specify a path", QUORUS_1008.code());
-            throw new IOException("FTP destination URI must specify a path");
-        }
-        
-        long bytesTransferred = Files.size(sourcePath);
-        logger.debug("Simulated upload: bytes={}, host={}, path={}", bytesTransferred, host, path);
-        
-        // Simulate progress updates
-        progressTracker.updateProgress(bytesTransferred);
-        
-        // Calculate checksum if required
-        String checksum = null;
-        if (request.getExpectedChecksum() != null) {
-            checksum = "demo-checksum-" + bytesTransferred;
-        }
-        
-        Instant endTime = Instant.now();
-        
-        logger.info("FTP simulated upload completed: {} bytes", bytesTransferred);
-        
-        return TransferResult.builder()
-                .requestId(request.getRequestId())
-                .finalStatus(TransferStatus.COMPLETED)
-                .bytesTransferred(bytesTransferred)
-                .startTime(startTime)
-                .endTime(endTime)
-                .actualChecksum(checksum)
-                .build();
     }
 
     /**
