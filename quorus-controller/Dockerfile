@@ -92,7 +92,7 @@ ENV JAVA_OPTS="-Xmx512m -Xms256m" \
     HEARTBEAT_INTERVAL_MS=1000
 
 # Health check using controller's health endpoint
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+HEALTHCHECK --interval=10s --timeout=5s --start-period=15s --retries=3 \
     CMD curl -f http://localhost:${HTTP_PORT}/health || exit 1
 
 # Run the Quorus Controller application

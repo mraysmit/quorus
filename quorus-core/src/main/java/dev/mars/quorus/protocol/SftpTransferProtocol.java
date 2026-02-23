@@ -19,9 +19,12 @@ package dev.mars.quorus.protocol;
 import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferResult;
 import dev.mars.quorus.core.TransferStatus;
+import dev.mars.quorus.core.exceptions.QuorusErrorCode;
 import dev.mars.quorus.core.exceptions.TransferException;
 import dev.mars.quorus.transfer.TransferContext;
 import dev.mars.quorus.transfer.ProgressTracker;
+
+import static dev.mars.quorus.core.exceptions.QuorusErrorCode.*;
 
 import com.jcraft.jsch.*;
 
@@ -107,11 +110,11 @@ public class SftpTransferProtocol implements TransferProtocol {
             TransferResult result = performSftpTransfer(request, progressTracker);
             logger.debug("transfer: completed successfully, bytesTransferred={}", result.getBytesTransferred());
             return result;
+        } catch (TransferException e) {
+            throw e; // Already logged at inner method level
         } catch (Exception e) {
-            logger.error("SFTP transfer failed: {} ({})", e.getMessage(), e.getClass().getSimpleName());
-            if (logger.isDebugEnabled()) {
-                logger.debug("SFTP transfer exception details for request: {}", request.getRequestId(), e);
-            }
+            logger.error("[{}] SFTP transfer failed: requestId={}, error={}", QUORUS_1100.code(), request.getRequestId(), e.getMessage());
+            logger.debug("SFTP transfer exception details for request: {}", request.getRequestId(), e);
             throw new TransferException(context.getJobId(), "SFTP transfer failed", e);
         }
     }
@@ -163,10 +166,8 @@ public class SftpTransferProtocol implements TransferProtocol {
             }
 
         } catch (Exception e) {
-            logger.error("SFTP transfer failed for request {}: {} ({})", requestId, e.getMessage(), e.getClass().getSimpleName());
-            if (logger.isDebugEnabled()) {
-                logger.debug("SFTP transfer exception details for request: {}", requestId, e);
-            }
+            logger.error("[{}] SFTP transfer routing failed: requestId={}, error={}", QUORUS_1101.code(), requestId, e.getMessage());
+            logger.debug("SFTP transfer routing exception details for request: {}", requestId, e);
             throw new TransferException(requestId, "SFTP transfer failed", e);
         }
     }
@@ -249,7 +250,8 @@ public class SftpTransferProtocol implements TransferProtocol {
             }
 
         } catch (Exception e) {
-            logger.debug("performSftpDownload: failed with exception={}", e.getMessage());
+            logger.error("[{}] SFTP download failed: requestId={}, error={}", QUORUS_1102.code(), requestId, e.getMessage());
+            logger.debug("SFTP download exception details for request: {}", requestId, e);
             throw new TransferException(requestId, "SFTP download failed", e);
         }
     }
@@ -349,6 +351,8 @@ public class SftpTransferProtocol implements TransferProtocol {
             }
 
         } catch (Exception e) {
+            logger.error("[{}] SFTP upload failed: requestId={}, error={}", QUORUS_1103.code(), requestId, e.getMessage());
+            logger.debug("SFTP upload exception details for request: {}", requestId, e);
             throw new TransferException(requestId, "SFTP upload failed", e);
         }
     }

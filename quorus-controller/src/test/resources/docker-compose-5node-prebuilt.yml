@@ -13,8 +13,8 @@ services:
       - QUORUS_RAFT_PORT=9080
       - QUORUS_HTTP_PORT=8080
       - QUORUS_CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080,controller4=controller4:9080,controller5=controller5:9080
-      - QUORUS_RAFT_ELECTION_TIMEOUT_MS=3000
-      - QUORUS_RAFT_HEARTBEAT_INTERVAL_MS=500
+      - QUORUS_RAFT_ELECTION_TIMEOUT_MS=1500
+      - QUORUS_RAFT_HEARTBEAT_INTERVAL_MS=300
       - JAVA_OPTS=-Xmx256m -Xms128m
     ports:
       - "8080"
@@ -22,10 +22,10 @@ services:
       - raft-cluster
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
 
   controller2:
     image: quorus-controller:test
@@ -36,8 +36,8 @@ services:
       - QUORUS_RAFT_PORT=9080
       - QUORUS_HTTP_PORT=8080
       - QUORUS_CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080,controller4=controller4:9080,controller5=controller5:9080
-      - QUORUS_RAFT_ELECTION_TIMEOUT_MS=3000
-      - QUORUS_RAFT_HEARTBEAT_INTERVAL_MS=500
+      - QUORUS_RAFT_ELECTION_TIMEOUT_MS=1500
+      - QUORUS_RAFT_HEARTBEAT_INTERVAL_MS=300
       - JAVA_OPTS=-Xmx256m -Xms128m
     ports:
       - "8080"
@@ -45,10 +45,10 @@ services:
       - raft-cluster
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
 
   controller3:
     image: quorus-controller:test
@@ -59,8 +59,8 @@ services:
       - QUORUS_RAFT_PORT=9080
       - QUORUS_HTTP_PORT=8080
       - QUORUS_CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080,controller4=controller4:9080,controller5=controller5:9080
-      - QUORUS_RAFT_ELECTION_TIMEOUT_MS=3000
-      - QUORUS_RAFT_HEARTBEAT_INTERVAL_MS=500
+      - QUORUS_RAFT_ELECTION_TIMEOUT_MS=1500
+      - QUORUS_RAFT_HEARTBEAT_INTERVAL_MS=300
       - JAVA_OPTS=-Xmx256m -Xms128m
     ports:
       - "8080"
@@ -68,10 +68,10 @@ services:
       - raft-cluster
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
 
   controller4:
     image: quorus-controller:test
@@ -82,8 +82,8 @@ services:
       - QUORUS_RAFT_PORT=9080
       - QUORUS_HTTP_PORT=8080
       - QUORUS_CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080,controller4=controller4:9080,controller5=controller5:9080
-      - QUORUS_RAFT_ELECTION_TIMEOUT_MS=3000
-      - QUORUS_RAFT_HEARTBEAT_INTERVAL_MS=500
+      - QUORUS_RAFT_ELECTION_TIMEOUT_MS=1500
+      - QUORUS_RAFT_HEARTBEAT_INTERVAL_MS=300
       - JAVA_OPTS=-Xmx256m -Xms128m
     ports:
       - "8080"
@@ -91,10 +91,10 @@ services:
       - raft-cluster
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
 
   controller5:
     image: quorus-controller:test
@@ -105,8 +105,8 @@ services:
       - QUORUS_RAFT_PORT=9080
       - QUORUS_HTTP_PORT=8080
       - QUORUS_CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080,controller4=controller4:9080,controller5=controller5:9080
-      - QUORUS_RAFT_ELECTION_TIMEOUT_MS=3000
-      - QUORUS_RAFT_HEARTBEAT_INTERVAL_MS=500
+      - QUORUS_RAFT_ELECTION_TIMEOUT_MS=1500
+      - QUORUS_RAFT_HEARTBEAT_INTERVAL_MS=300
       - JAVA_OPTS=-Xmx256m -Xms128m
     ports:
       - "8080"
@@ -114,10 +114,10 @@ services:
       - raft-cluster
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
 
 networks:
   raft-cluster:

@@ -1,10 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
     
-    <!-- Console appender with DEBUG level for tests -->
+    <!-- Console appender with DEBUG level for tests.
+         %ex{short} truncates stack traces to first few frames to reduce noise
+         from JUnit/Surefire internals while keeping exception type and source visible.
+         Full stack traces are still available in the FILE appender for detailed debugging. -->
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n%ex{short}</pattern>
         </encoder>
     </appender>
     

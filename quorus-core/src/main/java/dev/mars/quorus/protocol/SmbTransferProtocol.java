@@ -20,9 +20,12 @@ import dev.mars.quorus.core.TransferDirection;
 import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferResult;
 import dev.mars.quorus.core.TransferStatus;
+import dev.mars.quorus.core.exceptions.QuorusErrorCode;
 import dev.mars.quorus.core.exceptions.TransferException;
 import dev.mars.quorus.transfer.TransferContext;
 import dev.mars.quorus.transfer.ProgressTracker;
+
+import static dev.mars.quorus.core.exceptions.QuorusErrorCode.*;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -104,11 +107,11 @@ public class SmbTransferProtocol implements TransferProtocol {
             TransferResult result = performSmbTransfer(request, progressTracker);
             logger.debug("transfer: completed successfully, bytesTransferred={}", result.getBytesTransferred());
             return result;
+        } catch (TransferException e) {
+            throw e; // Already logged at inner method level
         } catch (Exception e) {
-            logger.error("SMB transfer failed: jobId={}, error={} ({})", context.getJobId(), e.getMessage(), e.getClass().getSimpleName());
-            if (logger.isDebugEnabled()) {
-                logger.debug("SMB transfer exception details for job: {}", context.getJobId(), e);
-            }
+            logger.error("[{}] SMB transfer failed: jobId={}, error={}", QUORUS_1300.code(), context.getJobId(), e.getMessage());
+            logger.debug("SMB transfer exception details for job: {}", context.getJobId(), e);
             throw new TransferException(context.getJobId(), "SMB transfer failed", e);
         }
     }
@@ -206,10 +209,8 @@ public class SmbTransferProtocol implements TransferProtocol {
                     .build();
             
         } catch (Exception e) {
-            logger.error("SMB download failed for request {}: {} ({})", requestId, e.getMessage(), e.getClass().getSimpleName());
-            if (logger.isDebugEnabled()) {
-                logger.debug("SMB download exception details for request: {}", requestId, e);
-            }
+            logger.error("[{}] SMB download failed: requestId={}, error={}", QUORUS_1301.code(), requestId, e.getMessage());
+            logger.debug("SMB download exception details for request: {}", requestId, e);
             throw new TransferException(requestId, "SMB download failed", e);
         }
     }
@@ -226,7 +227,7 @@ public class SmbTransferProtocol implements TransferProtocol {
             
             // Validate source file exists
             if (!Files.exists(sourcePath)) {
-                logger.error("Source file does not exist: {}", sourcePath);
+                logger.error("[{}] SMB upload source file not found: {}", QUORUS_1303.code(), sourcePath);
                 throw new IOException("Source file does not exist: " + sourcePath);
             }
             
@@ -289,10 +290,8 @@ public class SmbTransferProtocol implements TransferProtocol {
                     .build();
             
         } catch (Exception e) {
-            logger.error("SMB upload failed for request {}: {}", requestId, e.getMessage());
-            if (logger.isDebugEnabled()) {
-                logger.debug("SMB upload exception details for request: {}", requestId, e);
-            }
+            logger.error("[{}] SMB upload failed: requestId={}, error={}", QUORUS_1302.code(), requestId, e.getMessage());
+            logger.debug("SMB upload exception details for request: {}", requestId, e);
             throw new TransferException(requestId, "SMB upload failed", e);
         }
     }

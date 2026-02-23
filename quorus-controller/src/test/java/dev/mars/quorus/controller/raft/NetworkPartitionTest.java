@@ -39,18 +39,19 @@ import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Advanced network partition testing for Raft cluster.
- * Tests split-brain prevention and network recovery scenarios.
+ * Network partition testing for a 5-node Raft cluster running in Docker Compose.
+ * Validates split-brain prevention and network recovery scenarios by
+ * manipulating Docker network connectivity between containers.
  * 
- * <p>NOTE: These tests are marked as flaky because they are timing-sensitive and
- * may fail when run as part of the full test suite due to resource contention.
- * They pass reliably when run in isolation.</p>
+ * <p>Requires Docker to be running. Excluded from the default
+ * {@code mvn test} cycle; run explicitly with
+ * {@code mvn test -Dgroups=docker}.</p>
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @version 1.0
  * @since 2025-08-20
  */
-@Tag("flaky")
+@Tag("docker")
 public class NetworkPartitionTest {
 
     private static final Logger logger = Logger.getLogger(NetworkPartitionTest.class.getName());
@@ -71,8 +72,8 @@ public class NetworkPartitionTest {
 
         nodeEndpoints = SharedDockerCluster.getNodeEndpoints(environment, 5);
 
-        // Wait for all nodes to be healthy
-        await().atMost(Duration.ofMinutes(2))
+        // After network restoration, briefly verify nodes are reachable
+        await().atMost(Duration.ofSeconds(15))
                 .pollInterval(Duration.ofSeconds(2))
                 .until(this::allNodesHealthy);
         

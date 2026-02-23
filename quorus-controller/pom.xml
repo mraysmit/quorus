@@ -232,6 +232,13 @@
                     <useModulePath>false</useModulePath>
                     <!-- Ensure required JDK modules are available at test runtime -->
                     <argLine>--add-modules java.net.http,java.logging</argLine>
+                    <!--
+                      Exclude heavyweight tests from the default build:
+                        docker - requires Docker; starts multi-node Compose clusters
+                        slow   - timing-sensitive in-memory Raft cluster tests
+                      Run them explicitly:  mvn test -Dgroups=docker,slow
+                    -->
+                    <excludedGroups>docker,slow</excludedGroups>
                     <systemPropertyVariables>
                         <java.util.logging.manager>java.util.logging.LogManager</java.util.logging.manager>
                     </systemPropertyVariables>

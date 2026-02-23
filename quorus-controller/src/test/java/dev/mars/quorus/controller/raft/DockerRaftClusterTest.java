@@ -40,17 +40,18 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Integration tests for Raft cluster using Docker Compose.
- * Tests real network communication and cluster behavior.
+ * Tests real network communication and cluster behavior by starting
+ * a 3-node containerised cluster via {@link SharedDockerCluster}.
  * 
- * <p>NOTE: These tests are marked as flaky because they are timing-sensitive and
- * may fail when run as part of the full test suite due to resource contention.
- * They pass reliably when run in isolation.</p>
+ * <p>Requires Docker to be running. Excluded from the default
+ * {@code mvn test} cycle; run explicitly with
+ * {@code mvn test -Dgroups=docker}.</p>
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @version 1.0
  * @since 2025-08-20
  */
-@Tag("flaky")
+@Tag("docker")
 public class DockerRaftClusterTest {
 
     private static final Logger logger = Logger.getLogger(DockerRaftClusterTest.class.getName());
@@ -66,12 +67,7 @@ public class DockerRaftClusterTest {
     void setUp(TestInfo testInfo) {
         logger.info("Starting test: " + testInfo.getDisplayName());
         nodeEndpoints = SharedDockerCluster.getNodeEndpoints(environment, 3);
-
-        // Wait for all nodes to be healthy
-        await().atMost(Duration.ofMinutes(2))
-                .pollInterval(Duration.ofSeconds(2))
-                .until(this::allNodesHealthy);
-        
+        // Testcontainers already verified /health returns 200 for all nodes
         logger.info("All nodes are healthy and ready for testing");
     }
 

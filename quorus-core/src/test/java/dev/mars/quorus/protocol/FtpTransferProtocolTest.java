@@ -20,6 +20,7 @@ import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferResult;
 import dev.mars.quorus.core.TransferStatus;
 import dev.mars.quorus.core.exceptions.TransferException;
+import dev.mars.quorus.testing.ExpectsError;
 import dev.mars.quorus.transfer.TransferContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -124,14 +125,15 @@ class FtpTransferProtocolTest {
     }
     
     @Test
+    @ExpectsError("Connection refused — no FTP server at 127.0.0.1")
     void testTransferWithValidFtpUri() {
         TransferRequest request = TransferRequest.builder()
                 .requestId("test-ftp-transfer")
-                .sourceUri(URI.create("ftp://testserver/path/testfile.txt"))
+                .sourceUri(URI.create("ftp://127.0.0.1/path/testfile.txt"))
                 .destinationPath(tempDir.resolve("testfile.txt"))
                 .build();
         
-        // Note: This will fail since we don't have a real FTP server
+        // Uses 127.0.0.1 for instant connection-refused instead of DNS timeout
         assertThrows(TransferException.class, () -> {
             protocol.transfer(request, context);
         });
@@ -140,10 +142,11 @@ class FtpTransferProtocolTest {
     // Error handling tests moved to dev.mars.quorus.protocol.errorhandling.FtpTransferProtocolErrorHandlingTest
     
     @Test
+    @ExpectsError("Connection refused with auth credentials — no FTP server")
     void testFtpUriWithAuthentication() {
         TransferRequest request = TransferRequest.builder()
                 .requestId("test-auth")
-                .sourceUri(URI.create("ftp://username:password@server/path/file.txt"))
+                .sourceUri(URI.create("ftp://username:password@127.0.0.1/path/file.txt"))
                 .destinationPath(tempDir.resolve("testfile.txt"))
                 .build();
         
@@ -204,10 +207,11 @@ class FtpTransferProtocolTest {
     // Additional error handling tests moved to dev.mars.quorus.protocol.errorhandling.FtpTransferProtocolErrorHandlingTest
     
     @Test
+    @ExpectsError("Connection refused with checksum request — no FTP server")
     void testChecksumHandling() {
         TransferRequest request = TransferRequest.builder()
                 .requestId("test-checksum")
-                .sourceUri(URI.create("ftp://server/path/file.txt"))
+                .sourceUri(URI.create("ftp://127.0.0.1/path/file.txt"))
                 .destinationPath(tempDir.resolve("testfile.txt"))
                 .expectedChecksum("abc123")
                 .build();
@@ -247,14 +251,15 @@ class FtpTransferProtocolTest {
     }
     
     @Test
+    @ExpectsError("Connection refused — verifies timeout error handling")
     void testConnectionTimeout() {
         // INTENTIONAL FAILURE TEST: Testing connection timeout handling
         // This test verifies that the protocol correctly handles connection timeouts
-        // Expected behavior: TransferException should be thrown for unreachable servers
+        // Uses 127.0.0.1:1 for instant connection-refused instead of 30-second DNS timeout
 
         TransferRequest request = TransferRequest.builder()
                 .requestId("test-timeout")
-                .sourceUri(URI.create("ftp://timeout.server.com/path/file.txt"))  // Non-existent server
+                .sourceUri(URI.create("ftp://127.0.0.1:1/path/file.txt"))
                 .destinationPath(tempDir.resolve("testfile.txt"))
                 .build();
 
@@ -267,11 +272,12 @@ class FtpTransferProtocolTest {
     }
     
     @Test
+    @ExpectsError("Connection refused with auth edge case URI — no FTP server")
     void testFtpUriAuthenticationEdgeCase() {
         // Test FTP URI with username and password
         TransferRequest request = TransferRequest.builder()
                 .requestId("test-auth-edge")
-                .sourceUri(URI.create("ftp://user:pass@server.com:21/path/file.txt"))
+                .sourceUri(URI.create("ftp://user:pass@127.0.0.1:21/path/file.txt"))
                 .destinationPath(tempDir.resolve("file.txt"))
                 .build();
         
@@ -284,11 +290,12 @@ class FtpTransferProtocolTest {
     }
     
     @Test
+    @ExpectsError("Connection refused on custom port — no FTP server")
     void testFtpUriCustomPortEdgeCase() {
         // Test FTP URI with custom port
         TransferRequest request = TransferRequest.builder()
                 .requestId("test-port-edge")
-                .sourceUri(URI.create("ftp://server.com:2121/path/file.txt"))
+                .sourceUri(URI.create("ftp://127.0.0.1:2121/path/file.txt"))
                 .destinationPath(tempDir.resolve("file.txt"))
                 .build();
         

@@ -18,7 +18,10 @@ package dev.mars.quorus.protocol;
 
 import dev.mars.quorus.core.TransferDirection;
 import dev.mars.quorus.core.TransferRequest;
+import dev.mars.quorus.core.exceptions.QuorusErrorCode;
 import io.vertx.core.Vertx;
+
+import static dev.mars.quorus.core.exceptions.QuorusErrorCode.*;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -159,12 +162,12 @@ public class ProtocolFactory {
                 logger.debug("getProtocol(TransferRequest): UPLOAD - using destination scheme: {}", protocolScheme);
                 break;
             case REMOTE_TO_REMOTE:
-                logger.error("getProtocol(TransferRequest): REMOTE_TO_REMOTE transfers not supported");
+                logger.error("[{}] Remote-to-remote transfers not supported", QUORUS_9001.code());
                 throw new UnsupportedOperationException(
                     "Remote-to-remote transfers not yet implemented. " +
                     "At least one endpoint must be file:// (local filesystem).");
             default:
-                logger.error("getProtocol(TransferRequest): Unknown direction: {}", direction);
+                logger.error("[{}] Unknown transfer direction: {}", QUORUS_9002.code(), direction);
                 throw new IllegalArgumentException("Unknown transfer direction: " + direction);
         }
         
