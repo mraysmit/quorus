@@ -21,10 +21,13 @@ import dev.mars.quorus.core.TransferDirection;
 import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferResult;
 import dev.mars.quorus.core.TransferStatus;
+import dev.mars.quorus.core.exceptions.QuorusErrorCode;
 import dev.mars.quorus.core.exceptions.TransferException;
 import dev.mars.quorus.storage.ChecksumCalculator;
 import dev.mars.quorus.transfer.ProgressTracker;
 import dev.mars.quorus.transfer.TransferContext;
+
+import static dev.mars.quorus.core.exceptions.QuorusErrorCode.*;
 import io.vertx.core.Vertx;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.ext.web.client.WebClient;
@@ -123,10 +126,8 @@ public class HttpTransferProtocol implements TransferProtocol {
                 throw (TransferException) cause;
             }
             String errorMsg = cause != null ? cause.getMessage() : e.getMessage();
-            logger.error("HTTP transfer failed: jobId={}, error={}", context.getJobId(), errorMsg);
-            if (logger.isDebugEnabled()) {
-                logger.debug("HTTP transfer exception details for job: {}", context.getJobId(), cause != null ? cause : e);
-            }
+            logger.error("[{}] HTTP transfer failed: jobId={}, error={}", QUORUS_1200.code(), context.getJobId(), errorMsg);
+            logger.debug("HTTP transfer exception details for job: {}", context.getJobId(), cause != null ? cause : e);
             throw new TransferException(context.getJobId(), "Transfer failed", cause != null ? cause : e);
         }
     }
@@ -152,7 +153,7 @@ public class HttpTransferProtocol implements TransferProtocol {
                 return performHttpDownload(request, context, startTime, progressTracker);
             }
         } catch (Exception e) {
-            logger.error("Transfer validation failed: jobId={}, error={}", context.getJobId(), e.getMessage());
+            logger.error("[{}] HTTP request validation failed: jobId={}, error={}", QUORUS_1201.code(), context.getJobId(), e.getMessage());
             return io.vertx.core.Future.failedFuture(e);
         }
     }
@@ -176,7 +177,7 @@ public class HttpTransferProtocol implements TransferProtocol {
                 Files.createDirectories(destinationPath.getParent());
                 logger.debug("Created destination directory: {}", destinationPath.getParent());
             } catch (IOException e) {
-                logger.error("Failed to create directory for job {}: {}", context.getJobId(), e.getMessage());
+                logger.error("[{}] HTTP destination directory creation failed: jobId={}, error={}", QUORUS_1202.code(), context.getJobId(), e.getMessage());
                 return io.vertx.core.Future.failedFuture(new TransferException(context.getJobId(), "Failed to create directory", e));
             }
 
@@ -191,7 +192,7 @@ public class HttpTransferProtocol implements TransferProtocol {
                                 response.statusCode(), response.statusMessage());
                     
                     if (response.statusCode() != 200) {
-                        logger.error("HTTP download failed: statusCode={}, statusMessage={}", 
+                        logger.error("[{}] HTTP download failed: statusCode={}, statusMessage={}", QUORUS_1203.code(),
                                     response.statusCode(), response.statusMessage());
                         return io.vertx.core.Future.failedFuture(new TransferException(context.getJobId(),
                             "HTTP " + response.statusCode() + ": " + response.statusMessage()));
@@ -199,7 +200,7 @@ public class HttpTransferProtocol implements TransferProtocol {
 
                     Buffer body = response.body();
                     if (body == null) {
-                        logger.error("HTTP download failed: empty response body");
+                        logger.error("[{}] HTTP download failed: empty response body", QUORUS_1204.code());
                         return io.vertx.core.Future.failedFuture(new TransferException(context.getJobId(), "Empty response body"));
                     }
 
@@ -221,7 +222,7 @@ public class HttpTransferProtocol implements TransferProtocol {
                     // Verify checksum if provided
                     if (request.getExpectedChecksum() != null && !request.getExpectedChecksum().isEmpty()) {
                         if (!request.getExpectedChecksum().equals(actualChecksum)) {
-                            logger.error("Checksum mismatch: expected={}, actual={}", 
+                            logger.error("[{}] HTTP download checksum mismatch: expected={}, actual={}", QUORUS_1205.code(),
                                         request.getExpectedChecksum(), actualChecksum);
                             return io.vertx.core.Future.failedFuture(new TransferException(context.getJobId(),
                                 "Checksum mismatch - expected: " + request.getExpectedChecksum() +
@@ -253,14 +254,12 @@ public class HttpTransferProtocol implements TransferProtocol {
                         });
                 })
                 .recover(err -> {
-                    logger.error("HTTP download failed for job {}: {}", context.getJobId(), err.getMessage());
-                    if (logger.isDebugEnabled()) {
-                        logger.debug("HTTP download exception details for job: {}", context.getJobId(), err);
-                    }
+                    logger.error("[{}] HTTP download pipeline failed: jobId={}, error={}", QUORUS_1206.code(), context.getJobId(), err.getMessage());
+                    logger.debug("HTTP download exception details for job: {}", context.getJobId(), err);
                     return io.vertx.core.Future.failedFuture(err);
                 });
         } catch (Exception e) {
-            logger.error("HTTP download setup failed: {}", e.getMessage());
+            logger.error("[{}] HTTP download setup failed: error={}", QUORUS_1207.code(), e.getMessage());
             return io.vertx.core.Future.failedFuture(e);
         }
     }
@@ -280,7 +279,7 @@ public class HttpTransferProtocol implements TransferProtocol {
             
             // Validate source file exists
             if (!Files.exists(sourcePath)) {
-                logger.error("Source file not found: {}", sourcePath);
+                logger.error("[{}] HTTP upload source file not found: {}", QUORUS_1208.code(), sourcePath);
                 return io.vertx.core.Future.failedFuture(
                     new TransferException(context.getJobId(), "Source file not found: " + sourcePath));
             }
@@ -309,7 +308,7 @@ public class HttpTransferProtocol implements TransferProtocol {
                     // Verify expected checksum if provided
                     if (request.getExpectedChecksum() != null && !request.getExpectedChecksum().isEmpty()) {
                         if (!request.getExpectedChecksum().equals(actualChecksum)) {
-                            logger.error("Checksum mismatch before upload: expected={}, actual={}",
+                            logger.error("[{}] HTTP upload checksum mismatch: expected={}, actual={}", QUORUS_1209.code(),
                                         request.getExpectedChecksum(), actualChecksum);
                             return io.vertx.core.Future.failedFuture(new TransferException(context.getJobId(),
                                 "Checksum mismatch - expected: " + request.getExpectedChecksum() +
@@ -330,7 +329,7 @@ public class HttpTransferProtocol implements TransferProtocol {
                             
                             // Accept 200 OK, 201 Created, 204 No Content as success
                             if (statusCode != 200 && statusCode != 201 && statusCode != 204) {
-                                logger.error("HTTP PUT failed: statusCode={}, statusMessage={}",
+                                logger.error("[{}] HTTP PUT failed: statusCode={}, statusMessage={}", QUORUS_1210.code(),
                                             statusCode, response.statusMessage());
                                 throw new RuntimeException(new TransferException(context.getJobId(),
                                     "HTTP PUT failed - " + statusCode + ": " + response.statusMessage()));
@@ -354,7 +353,8 @@ public class HttpTransferProtocol implements TransferProtocol {
                         });
                 })
                 .recover(err -> {
-                    logger.error("HTTP upload failed for job {}: {}", context.getJobId(), err.getMessage());
+                    logger.error("[{}] HTTP upload pipeline failed: jobId={}, error={}", QUORUS_1211.code(), context.getJobId(), err.getMessage());
+                    logger.debug("HTTP upload exception details for job: {}", context.getJobId(), err);
                     Throwable cause = err.getCause();
                     if (cause instanceof TransferException) {
                         return io.vertx.core.Future.failedFuture(cause);
@@ -362,7 +362,7 @@ public class HttpTransferProtocol implements TransferProtocol {
                     return io.vertx.core.Future.failedFuture(err);
                 });
         } catch (Exception e) {
-            logger.error("HTTP upload setup failed: {}", e.getMessage());
+            logger.error("[{}] HTTP upload setup failed: error={}", QUORUS_1212.code(), e.getMessage());
             return io.vertx.core.Future.failedFuture(e);
         }
     }
@@ -393,7 +393,7 @@ public class HttpTransferProtocol implements TransferProtocol {
         logger.debug("Validating HTTP transfer request: requestId={}", request.getRequestId());
         
         if (request.getSourceUri() == null) {
-            logger.error("Validation failed: Source URI is null");
+            logger.error("[{}] HTTP validation: source URI is null", QUORUS_1213.code());
             throw new TransferException(request.getRequestId(), "Source URI cannot be null");
         }
         
@@ -401,18 +401,18 @@ public class HttpTransferProtocol implements TransferProtocol {
         
         if (direction == TransferDirection.DOWNLOAD) {
             if (request.getDestinationPath() == null) {
-                logger.error("Validation failed: Destination path is null for download");
+                logger.error("[{}] HTTP validation: destination path is null for download", QUORUS_1214.code());
                 throw new TransferException(request.getRequestId(), "Destination path cannot be null for download");
             }
         } else if (direction == TransferDirection.UPLOAD) {
             if (request.getDestinationUri() == null) {
-                logger.error("Validation failed: Destination URI is null for upload");
+                logger.error("[{}] HTTP validation: destination URI is null for upload", QUORUS_1215.code());
                 throw new TransferException(request.getRequestId(), "Destination URI cannot be null for upload");
             }
         }
         
         if (!canHandle(request)) {
-            logger.error("Validation failed: HTTP protocol cannot handle this request type");
+            logger.error("[{}] HTTP validation: protocol cannot handle this request type", QUORUS_1216.code());
             throw new TransferException(request.getRequestId(), "HTTP protocol cannot handle this request");
         }
         

@@ -29,7 +29,7 @@
         <junit.version>5.10.1</junit.version>
         <vertx.version>5.0.2</vertx.version>
         <testcontainers.version>2.0.3</testcontainers.version>
-        <jacoco.version>0.8.12</jacoco.version>
+        <jacoco.version>0.8.13</jacoco.version>
         <!-- Shared timestamp for consolidated test log file across all modules -->
         <maven.build.timestamp.format>yyyy-MM-dd_HH-mm-ss</maven.build.timestamp.format>
     </properties>
@@ -102,11 +102,15 @@
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
                 <configuration>
-                    <!-- Exclude JDK internal classes that cause instrumentation errors -->
+                    <!-- Exclude JDK internal classes that cause instrumentation errors.
+                         com/sun/** and org/jcp/** are JDK-shipped classes that JaCoCo's
+                         runtime agent tries to instrument when the JVM loads them. -->
                     <excludes>
                         <exclude>sun/**</exclude>
                         <exclude>jdk/**</exclude>
                         <exclude>java/**</exclude>
+                        <exclude>com/sun/**</exclude>
+                        <exclude>org/jcp/**</exclude>
                     </excludes>
                 </configuration>
                 <executions>

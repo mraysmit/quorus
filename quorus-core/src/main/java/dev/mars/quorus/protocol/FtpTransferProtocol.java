@@ -19,9 +19,12 @@ package dev.mars.quorus.protocol;
 import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferResult;
 import dev.mars.quorus.core.TransferStatus;
+import dev.mars.quorus.core.exceptions.QuorusErrorCode;
 import dev.mars.quorus.core.exceptions.TransferException;
 import dev.mars.quorus.transfer.TransferContext;
 import dev.mars.quorus.transfer.ProgressTracker;
+
+import static dev.mars.quorus.core.exceptions.QuorusErrorCode.*;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -151,11 +154,11 @@ public class FtpTransferProtocol implements TransferProtocol {
 
         try {
             return performFtpTransfer(request, progressTracker);
+        } catch (TransferException e) {
+            throw e; // Already logged at inner method level
         } catch (Exception e) {
-            logger.error("FTP transfer failed: jobId={}, error={}", context.getJobId(), e.getMessage());
-            if (logger.isDebugEnabled()) {
-                logger.debug("FTP transfer exception details for job: {}", context.getJobId(), e);
-            }
+            logger.error("[{}] FTP transfer failed: jobId={}, error={}", QUORUS_1000.code(), context.getJobId(), e.getMessage());
+            logger.debug("FTP transfer exception details for job: {}", context.getJobId(), e);
             throw new TransferException(context.getJobId(), "FTP transfer failed", e);
         }
     }
@@ -266,10 +269,8 @@ public class FtpTransferProtocol implements TransferProtocol {
             }
             
         } catch (Exception e) {
-            logger.error("FTP download failed for request {}: {}", requestId, e.getMessage());
-            if (logger.isDebugEnabled()) {
-                logger.debug("FTP download exception details for request: {}", requestId, e);
-            }
+            logger.error("[{}] FTP download failed: requestId={}, error={}", QUORUS_1001.code(), requestId, e.getMessage());
+            logger.debug("FTP download exception details for request: {}", requestId, e);
             throw new TransferException(requestId, "FTP download failed", e);
         }
     }
@@ -286,7 +287,7 @@ public class FtpTransferProtocol implements TransferProtocol {
             
             // Validate source file exists
             if (!Files.exists(sourcePath)) {
-                logger.error("Source file does not exist: {}", sourcePath);
+                logger.error("[{}] FTP upload source file not found: {}", QUORUS_1003.code(), sourcePath);
                 throw new IOException("Source file does not exist: " + sourcePath);
             }
             
@@ -360,10 +361,8 @@ public class FtpTransferProtocol implements TransferProtocol {
             }
             
         } catch (Exception e) {
-            logger.error("FTP upload failed for request {}: {}", requestId, e.getMessage());
-            if (logger.isDebugEnabled()) {
-                logger.debug("FTP upload exception details for request: {}", requestId, e);
-            }
+            logger.error("[{}] FTP upload failed: requestId={}, error={}", QUORUS_1002.code(), requestId, e.getMessage());
+            logger.debug("FTP upload exception details for request: {}", requestId, e);
             throw new TransferException(requestId, "FTP upload failed", e);
         }
     }
@@ -395,11 +394,11 @@ public class FtpTransferProtocol implements TransferProtocol {
         String path = destinationUri.getPath();
         
         if (host == null || host.isEmpty()) {
-            logger.error("FTP destination URI must specify a host");
+            logger.error("[{}] FTP destination URI must specify a host", QUORUS_1007.code());
             throw new IOException("FTP destination URI must specify a host");
         }
         if (path == null || path.isEmpty()) {
-            logger.error("FTP destination URI must specify a path");
+            logger.error("[{}] FTP destination URI must specify a path", QUORUS_1008.code());
             throw new IOException("FTP destination URI must specify a path");
         }
         
@@ -554,7 +553,7 @@ public class FtpTransferProtocol implements TransferProtocol {
             // Read welcome message
             String response = readResponse();
             if (!response.startsWith("220")) {
-                logger.error("FTP connection failed: {}", response);
+                logger.error("[{}] FTP connection rejected by server: {}", QUORUS_1004.code(), response);
                 throw new IOException("FTP connection failed: " + response);
             }
             logger.debug("Received FTP welcome message");
@@ -574,7 +573,7 @@ public class FtpTransferProtocol implements TransferProtocol {
             }
             
             if (!response.startsWith("230")) {
-                logger.error("FTP login failed: {}", response);
+                logger.error("[{}] FTP authentication failed: {}", QUORUS_1005.code(), response);
                 throw new IOException("FTP login failed: " + response);
             }
             logger.debug("FTP authentication successful");
@@ -589,7 +588,7 @@ public class FtpTransferProtocol implements TransferProtocol {
             sendCommand("TYPE I");
             response = readResponse();
             if (!response.startsWith("200")) {
-                logger.error("Failed to set binary mode: {}", response);
+                logger.error("[{}] FTP binary mode setup failed: {}", QUORUS_1006.code(), response);
                 throw new IOException("Failed to set binary mode: " + response);
             }
             
@@ -885,7 +884,7 @@ public class FtpTransferProtocol implements TransferProtocol {
         private String readResponse() throws IOException {
             String response = controlReader.readLine();
             if (response == null) {
-                logger.error("FTP server closed connection unexpectedly (EOF)");
+                logger.error("[{}] FTP server closed connection unexpectedly (EOF)", QUORUS_1009.code());
                 throw new IOException("FTP server closed connection unexpectedly");
             }
             logger.debug("FTP Response: {}", response);

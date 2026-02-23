@@ -42,18 +42,21 @@ import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Chaos testing for the Raft cluster using InMemoryTransportSimulator's fault injection capabilities.
- * Tests resilience against packet loss and high latency.
+ * Chaos testing for a 5-node in-memory Raft cluster using
+ * {@link InMemoryTransportSimulator} fault injection.
+ * Validates consensus resilience under packet loss and high latency
+ * by injecting faults at the transport layer.
  * 
- * <p>NOTE: These tests are marked as flaky because they are timing-sensitive and
- * may fail when run as part of the full test suite due to resource contention.
- * They pass reliably when run in isolation.</p>
+ * <p>These tests are timing-sensitive because they rely on Awaitility
+ * polling to observe asynchronous leader election and replication
+ * under degraded conditions. Excluded from the default {@code mvn test}
+ * cycle; run explicitly with {@code mvn test -Dgroups=slow}.</p>
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @version 1.0
  * @since 2026-01-05
  */
-@Tag("flaky")
+@Tag("slow")
 public class RaftChaosTest {
 
     private static final Logger logger = LoggerFactory.getLogger(RaftChaosTest.class);

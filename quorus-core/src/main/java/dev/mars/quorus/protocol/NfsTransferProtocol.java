@@ -20,9 +20,12 @@ import dev.mars.quorus.core.TransferDirection;
 import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferResult;
 import dev.mars.quorus.core.TransferStatus;
+import dev.mars.quorus.core.exceptions.QuorusErrorCode;
 import dev.mars.quorus.core.exceptions.TransferException;
 import dev.mars.quorus.transfer.TransferContext;
 import dev.mars.quorus.transfer.ProgressTracker;
+
+import static dev.mars.quorus.core.exceptions.QuorusErrorCode.*;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -153,11 +156,9 @@ public class NfsTransferProtocol implements TransferProtocol {
         } catch (TransferException e) {
             throw e;
         } catch (Exception e) {
-            logger.error("NFS transfer failed: jobId={}, error={} ({})",
-                    context.getJobId(), e.getMessage(), e.getClass().getSimpleName());
-            if (logger.isDebugEnabled()) {
-                logger.debug("NFS transfer exception details for job: {}", context.getJobId(), e);
-            }
+            logger.error("[{}] NFS transfer failed: jobId={}, error={}", QUORUS_1400.code(), 
+                    context.getJobId(), e.getMessage());
+            logger.debug("NFS transfer exception details for job: {}", context.getJobId(), e);
             throw new TransferException(context.getJobId(), "NFS transfer failed", e);
         }
     }
@@ -259,11 +260,9 @@ public class NfsTransferProtocol implements TransferProtocol {
         } catch (TransferException e) {
             throw e;
         } catch (Exception e) {
-            logger.error("NFS download failed for request {}: {} ({})",
-                    requestId, e.getMessage(), e.getClass().getSimpleName());
-            if (logger.isDebugEnabled()) {
-                logger.debug("NFS download exception details for request: {}", requestId, e);
-            }
+            logger.error("[{}] NFS download failed: requestId={}, error={}",
+                    QUORUS_1401.code(), requestId, e.getMessage());
+            logger.debug("NFS download exception details for request: {}", requestId, e);
             throw new TransferException(requestId, "NFS download failed", e);
         }
     }
@@ -278,7 +277,7 @@ public class NfsTransferProtocol implements TransferProtocol {
             Path sourcePath = Paths.get(request.getSourceUri());
 
             if (!Files.exists(sourcePath)) {
-                logger.error("Source file does not exist: {}", sourcePath);
+                logger.error("[{}] NFS upload source file not found: {}", QUORUS_1403.code(), sourcePath);
                 throw new TransferException(requestId,
                         "Source file does not exist: " + sourcePath);
             }
@@ -332,10 +331,8 @@ public class NfsTransferProtocol implements TransferProtocol {
         } catch (TransferException e) {
             throw e;
         } catch (Exception e) {
-            logger.error("NFS upload failed for request {}: {}", requestId, e.getMessage());
-            if (logger.isDebugEnabled()) {
-                logger.debug("NFS upload exception details for request: {}", requestId, e);
-            }
+            logger.error("[{}] NFS upload failed: requestId={}, error={}", QUORUS_1402.code(), requestId, e.getMessage());
+            logger.debug("NFS upload exception details for request: {}", requestId, e);
             throw new TransferException(requestId, "NFS upload failed", e);
         }
     }

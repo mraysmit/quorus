@@ -19,7 +19,6 @@ package dev.mars.quorus.controller.raft;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
@@ -32,7 +31,6 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
@@ -41,18 +39,20 @@ import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Configurable Raft cluster tests using different test configurations.
- * Demonstrates how to run the same tests with different cluster setups.
+ * Parameterised Raft cluster tests that exercise different Docker Compose
+ * cluster configurations (fast, standard, development). Uses
+ * {@link TestClusterConfiguration} to vary cluster size, timeouts,
+ * and election parameters.
  * 
- * <p>NOTE: These tests are marked as flaky because they are timing-sensitive and
- * may fail when run as part of the full test suite due to resource contention.
- * They pass reliably when run in isolation.</p>
+ * <p>Requires Docker to be running. Excluded from the default
+ * {@code mvn test} cycle; run explicitly with
+ * {@code mvn test -Dgroups=docker}.</p>
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @version 1.0
  * @since 2025-08-20
  */
-@Tag("flaky")
+@Tag("docker")
 public class ConfigurableRaftClusterTest {
 
     private static final Logger logger = Logger.getLogger(ConfigurableRaftClusterTest.class.getName());
@@ -103,8 +103,8 @@ public class ConfigurableRaftClusterTest {
         // Get the exposed ports from the shared container
         nodeEndpoints = SharedDockerCluster.getNodeEndpoints(environment, config.getNodeCount());
 
-        // Wait for all nodes to be healthy
-        await().atMost(config.getStartupTimeout())
+        // Brief sanity check — Testcontainers already verified /health
+        await().atMost(Duration.ofSeconds(15))
                 .pollInterval(Duration.ofSeconds(2))
                 .until(this::allNodesHealthy);
 

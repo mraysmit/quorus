@@ -49,7 +49,8 @@ import org.junit.jupiter.api.Tag;
 
 /**
  * Integration test proving that RaftLog (WAL) persistence works correctly
- * in a Raft cluster. This test uses actual file-based storage to verify:
+ * in a 3-node in-memory Raft cluster. Uses {@code @TempDir} file-based
+ * storage to verify:
  * 
  * <ul>
  *   <li>WAL files are created and written to disk</li>
@@ -58,11 +59,10 @@ import org.junit.jupiter.api.Tag;
  *   <li>State machine rebuilds correctly from WAL on recovery</li>
  * </ul>
  * 
- * <p>This is the definitive proof that raftlog-core works in Quorus.</p>
- * 
- * <p>NOTE: The testVoteMetadataPersistence test is marked as flaky because it is
- * timing-sensitive and may fail when run as part of the full test suite due to
- * resource contention. It passes reliably when run in isolation.</p>
+ * <p>These tests are timing-sensitive because they rely on Awaitility
+ * polling to observe asynchronous leader election and WAL replication.
+ * Excluded from the default {@code mvn test} cycle; run explicitly with
+ * {@code mvn test -Dgroups=slow}.</p>
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @since 2026-01-29
@@ -70,7 +70,7 @@ import org.junit.jupiter.api.Tag;
 @ExtendWith(VertxExtension.class)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @DisplayName("RaftLog Cluster Integration Tests")
-@Tag("flaky")
+@Tag("slow")
 class RaftLogClusterIntegrationTest {
 
     private static final Logger LOG = LoggerFactory.getLogger(RaftLogClusterIntegrationTest.class);

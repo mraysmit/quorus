@@ -35,35 +35,9 @@ fi
 
 echo "Cluster Nodes: $CLUSTER_NODES"
 
-# Wait for other nodes to be available (basic readiness check)
-echo "Checking cluster node availability..."
-IFS=',' read -ra NODES <<< "$CLUSTER_NODES"
-for node in "${NODES[@]}"; do
-    node_name=$(echo "$node" | cut -d'=' -f1)
-    node_address=$(echo "$node" | cut -d'=' -f2)
-    node_host=$(echo "$node_address" | cut -d':' -f1)
-    node_port=$(echo "$node_address" | cut -d':' -f2)
-    
-    # Skip self
-    if [ "$node_name" = "$NODE_ID" ]; then
-        continue
-    fi
-    
-    echo "Waiting for $node_name at $node_host:$node_port..."
-    timeout=60
-    while [ $timeout -gt 0 ]; do
-        if nc -z "$node_host" "$node_port" 2>/dev/null; then
-            echo "$node_name is available"
-            break
-        fi
-        sleep 2
-        timeout=$((timeout - 2))
-    done
-    
-    if [ $timeout -le 0 ]; then
-        echo "WARNING: $node_name at $node_host:$node_port is not available after 60 seconds"
-    fi
-done
+# Raft protocol handles peer reconnection natively — no need to block
+# startup waiting for other nodes. This avoids 30–60s of unnecessary delay
+# when the cluster starts simultaneously on the same Docker network.
 
 # Set Java system properties
 JAVA_OPTS="$JAVA_OPTS -Dquorus.raft.nodeId=$NODE_ID"

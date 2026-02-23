@@ -21,6 +21,7 @@ import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferResult;
 import dev.mars.quorus.core.TransferStatus;
 import dev.mars.quorus.core.exceptions.TransferException;
+import dev.mars.quorus.testing.ExpectsError;
 import dev.mars.quorus.transfer.TransferContext;
 import io.vertx.core.Vertx;
 import io.vertx.junit5.VertxExtension;
@@ -186,10 +187,11 @@ class HttpTransferProtocolTest {
     }
 
     @Test
+    @ExpectsError("Connection refused — invalid URL triggers connection error")
     void testTransferReactiveWithInvalidUrl(VertxTestContext testContext) {
         TransferRequest request = TransferRequest.builder()
                 .requestId("test-invalid-url")
-                .sourceUri(URI.create("http://nonexistent.invalid.domain.example.com.test/file.txt"))
+                .sourceUri(URI.create("http://127.0.0.1:1/file.txt"))
                 .destinationPath(tempDir.resolve("file.txt"))
                 .build();
 
@@ -234,6 +236,7 @@ class HttpTransferProtocolTest {
     }
 
     @Test
+    @ExpectsError("Wrong protocol scheme — HTTP rejects ftp:// URI")
     void testTransferReactiveWithNonHttpProtocol(VertxTestContext testContext) {
         TransferRequest request = TransferRequest.builder()
                 .requestId("test-wrong-protocol")
@@ -255,10 +258,11 @@ class HttpTransferProtocolTest {
     }
 
     @Test
+    @ExpectsError("Connection refused — blocking transfer wraps reactive failure")
     void testTransferBlockingCallsReactive() {
         TransferRequest request = TransferRequest.builder()
                 .requestId("test-blocking")
-                .sourceUri(URI.create("http://nonexistent.test.invalid/file.txt"))
+                .sourceUri(URI.create("http://127.0.0.1:1/file.txt"))
                 .destinationPath(tempDir.resolve("file.txt"))
                 .build();
 
@@ -339,12 +343,13 @@ class HttpTransferProtocolTest {
     }
 
     @Test
+    @ExpectsError("Connection refused — verifies destination directory created before failure")
     void testCreatesDestinationDirectoryIfNeeded(VertxTestContext testContext) {
         Path nestedDir = tempDir.resolve("level1/level2/level3");
         
         TransferRequest request = TransferRequest.builder()
                 .requestId("test-create-dir")
-                .sourceUri(URI.create("http://nonexistent.test.invalid/file.txt"))
+                .sourceUri(URI.create("http://127.0.0.1:1/file.txt"))
                 .destinationPath(nestedDir.resolve("file.txt"))
                 .build();
 

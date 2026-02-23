@@ -20,6 +20,7 @@ import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferResult;
 import dev.mars.quorus.core.TransferStatus;
 import dev.mars.quorus.core.exceptions.TransferException;
+import dev.mars.quorus.testing.ExpectsError;
 import dev.mars.quorus.transfer.TransferContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -125,15 +126,15 @@ class SmbTransferProtocolTest {
     }
     
     @Test
+    @ExpectsError("UNC path resolve fails — no SMB server at 127.0.0.1")
     void testTransferWithValidSmbUri() throws TransferException {
         TransferRequest request = TransferRequest.builder()
                 .requestId("test-smb-transfer")
-                .sourceUri(URI.create("smb://testserver/share/testfile.txt"))
+                .sourceUri(URI.create("smb://127.0.0.1/share/testfile.txt"))
                 .destinationPath(tempDir.resolve("testfile.txt"))
                 .build();
         
-        // Note: This will fail in the actual transfer since we don't have a real SMB server
-        // but it should handle the error gracefully
+        // Uses 127.0.0.1 for instant UNC path failure instead of SMB name resolution timeout
         assertThrows(TransferException.class, () -> {
             protocol.transfer(request, context);
         });
@@ -142,10 +143,11 @@ class SmbTransferProtocolTest {
     // Error handling tests moved to dev.mars.quorus.protocol.errorhandling.SmbTransferProtocolErrorHandlingTest
     
     @Test
+    @ExpectsError("UNC path with auth — no SMB server")
     void testSmbUriWithAuthentication() {
         TransferRequest request = TransferRequest.builder()
                 .requestId("test-auth")
-                .sourceUri(URI.create("smb://domain;username:password@server/share/file.txt"))
+                .sourceUri(URI.create("smb://domain;username:password@127.0.0.1/share/file.txt"))
                 .destinationPath(tempDir.resolve("testfile.txt"))
                 .build();
         
@@ -191,10 +193,11 @@ class SmbTransferProtocolTest {
     }
     
     @Test
+    @ExpectsError("UNC path not found — verifies exception contains SMB context")
     void testTransferExceptionContainsRequestId() {
         TransferRequest request = TransferRequest.builder()
                 .requestId("test-exception-id")
-                .sourceUri(URI.create("smb://nonexistent/share/file.txt"))
+                .sourceUri(URI.create("smb://127.0.0.1/share/file.txt"))
                 .destinationPath(tempDir.resolve("testfile.txt"))
                 .build();
         
@@ -225,10 +228,11 @@ class SmbTransferProtocolTest {
     }
     
     @Test
+    @ExpectsError("UNC path with checksum — no SMB server")
     void testChecksumHandling() {
         TransferRequest request = TransferRequest.builder()
                 .requestId("test-checksum")
-                .sourceUri(URI.create("smb://server/share/file.txt"))
+                .sourceUri(URI.create("smb://127.0.0.1/share/file.txt"))
                 .destinationPath(tempDir.resolve("testfile.txt"))
                 .expectedChecksum("abc123")
                 .build();
@@ -280,11 +284,12 @@ class SmbTransferProtocolTest {
     // Additional edge case error tests moved to dev.mars.quorus.protocol.errorhandling.SmbTransferProtocolErrorHandlingTest
     
     @Test
+    @ExpectsError("UNC path with spaces — no SMB server")
     void testSmbPathWithSpaces() {
         // Test SMB URI with spaces in path
         TransferRequest request = TransferRequest.builder()
                 .requestId("test-spaces")
-                .sourceUri(URI.create("smb://server/share/folder%20name/file%20name.txt"))
+                .sourceUri(URI.create("smb://127.0.0.1/share/folder%20name/file%20name.txt"))
                 .destinationPath(tempDir.resolve("file.txt"))
                 .build();
         
@@ -310,11 +315,12 @@ class SmbTransferProtocolTest {
     }
     
     @Test
+    @ExpectsError("UNC nested path — no SMB server")
     void testNestedSharePath() {
         // Test SMB URI with nested directory structure
         TransferRequest request = TransferRequest.builder()
                 .requestId("test-nested")
-                .sourceUri(URI.create("smb://server/share/dir1/dir2/dir3/file.txt"))
+                .sourceUri(URI.create("smb://127.0.0.1/share/dir1/dir2/dir3/file.txt"))
                 .destinationPath(tempDir.resolve("file.txt"))
                 .build();
         

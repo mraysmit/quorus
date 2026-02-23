@@ -18,6 +18,7 @@ package dev.mars.quorus.protocol;
 
 import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.exceptions.TransferException;
+import dev.mars.quorus.testing.ExpectsError;
 import dev.mars.quorus.transfer.TransferContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -143,12 +144,14 @@ class FtpsTransferProtocolTest {
     // ========================================================================
 
     @Test
+    @ExpectsError("Connection refused on default FTPS port — verifies TransferException")
     void testFtpsDefaultPortUsesExplicitMode() {
         log("testFtpsDefaultPortUsesExplicitMode", "Testing ftps:// default port → explicit FTPS mode");
         // ftps:// without explicit port should default to port 21 (explicit FTPS)
+        // Uses 127.0.0.1 for instant connection-refused instead of DNS timeout
         TransferRequest request = TransferRequest.builder()
                 .requestId("test-ftps-default-port")
-                .sourceUri(URI.create("ftps://server.com/path/file.txt"))
+                .sourceUri(URI.create("ftps://127.0.0.1/path/file.txt"))
                 .destinationPath(tempDir.resolve("file.txt"))
                 .build();
 
@@ -159,12 +162,14 @@ class FtpsTransferProtocolTest {
     }
 
     @Test
+    @ExpectsError("Connection refused on implicit FTPS port 990 — verifies TransferException")
     void testFtpsPort990UsesImplicitMode() {
         log("testFtpsPort990UsesImplicitMode", "Testing ftps://:990 → implicit FTPS mode");
         // ftps:// with port 990 should use implicit FTPS
+        // Uses 127.0.0.1 for instant connection-refused instead of DNS timeout
         TransferRequest request = TransferRequest.builder()
                 .requestId("test-ftps-implicit")
-                .sourceUri(URI.create("ftps://server.com:990/path/file.txt"))
+                .sourceUri(URI.create("ftps://127.0.0.1:990/path/file.txt"))
                 .destinationPath(tempDir.resolve("file.txt"))
                 .build();
 
@@ -174,12 +179,14 @@ class FtpsTransferProtocolTest {
     }
 
     @Test
+    @ExpectsError("Connection refused on custom FTPS port — verifies TransferException")
     void testFtpsCustomPortUsesExplicitMode() {
         log("testFtpsCustomPortUsesExplicitMode", "Testing ftps://:2121 → explicit FTPS mode");
         // ftps:// with a custom port (not 990) should use explicit FTPS
+        // Uses 127.0.0.1 for instant connection-refused instead of DNS timeout
         TransferRequest request = TransferRequest.builder()
                 .requestId("test-ftps-custom-port")
-                .sourceUri(URI.create("ftps://server.com:2121/path/file.txt"))
+                .sourceUri(URI.create("ftps://127.0.0.1:2121/path/file.txt"))
                 .destinationPath(tempDir.resolve("file.txt"))
                 .build();
 
@@ -193,11 +200,12 @@ class FtpsTransferProtocolTest {
     // ========================================================================
 
     @Test
+    @ExpectsError("Connection refused with credentials — verifies TransferException")
     void testFtpsUriWithAuthentication() {
-        log("testFtpsUriWithAuthentication", "Testing ftps:// URI with user:password authentication");
+        // Uses 127.0.0.1 for instant connection-refused instead of DNS timeout
         TransferRequest request = TransferRequest.builder()
                 .requestId("test-ftps-auth")
-                .sourceUri(URI.create("ftps://user:secret@secure.corp.com/exports/data.zip"))
+                .sourceUri(URI.create("ftps://user:secret@127.0.0.1/exports/data.zip"))
                 .destinationPath(tempDir.resolve("data.zip"))
                 .build();
 
@@ -318,12 +326,13 @@ class FtpsTransferProtocolTest {
     }
 
     @Test
+    @ExpectsError("Upload with missing source file — verifies TransferException")
     void testFtpsUploadSourceFileNotFound() {
         log("testFtpsUploadSourceFileNotFound", "Testing upload of non-existent file throws TransferException");
         TransferRequest request = TransferRequest.builder()
                 .requestId("test-ftps-upload-missing")
                 .sourceUri(tempDir.resolve("nonexistent-file.txt").toUri())
-                .destinationUri(URI.create("ftps://server.com/uploads/file.txt"))
+                .destinationUri(URI.create("ftps://127.0.0.1/uploads/file.txt"))
                 .build();
 
         assertTrue(protocol.canHandle(request));
@@ -332,12 +341,14 @@ class FtpsTransferProtocolTest {
     }
 
     @Test
+    @ExpectsError("Connection refused to unreachable server — verifies TransferException")
     void testFtpsConnectionTimeout() {
         log("testFtpsConnectionTimeout", "Testing connection timeout to unreachable FTPS server");
-        // INTENTIONAL FAILURE TEST: verifying timeout behaviour for unreachable FTPS servers
+        // Verifies error handling for unreachable FTPS servers.
+        // Uses 127.0.0.1:1 for instant connection-refused instead of 30-second DNS timeout.
         TransferRequest request = TransferRequest.builder()
                 .requestId("test-ftps-timeout")
-                .sourceUri(URI.create("ftps://unreachable.server.invalid/path/file.txt"))
+                .sourceUri(URI.create("ftps://127.0.0.1:1/path/file.txt"))
                 .destinationPath(tempDir.resolve("file.txt"))
                 .build();
 

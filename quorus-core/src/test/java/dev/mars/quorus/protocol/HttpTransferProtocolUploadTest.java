@@ -22,6 +22,7 @@ import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferResult;
 import dev.mars.quorus.core.TransferStatus;
 import dev.mars.quorus.core.exceptions.TransferException;
+import dev.mars.quorus.testing.ExpectsError;
 import dev.mars.quorus.transfer.TransferContext;
 import io.vertx.core.Vertx;
 import io.vertx.junit5.VertxExtension;
@@ -124,6 +125,7 @@ class HttpTransferProtocolUploadTest {
 
         @Test
         @DisplayName("Upload transfer executes with valid request")
+        @ExpectsError("Connection refused — upload to non-existent server")
         void uploadExecutesWithValidRequest(VertxTestContext testContext) throws IOException {
             Path localFile = tempDir.resolve("upload-execute.txt");
             String content = "Test content for HTTP upload";
@@ -132,7 +134,7 @@ class HttpTransferProtocolUploadTest {
             TransferRequest request = TransferRequest.builder()
                     .requestId("upload-exec-test")
                     .sourceUri(localFile.toUri())
-                    .destinationUri(URI.create("http://nonexistent.test.invalid/uploads/file.txt"))
+                    .destinationUri(URI.create("http://127.0.0.1:1/uploads/file.txt"))
                     .build();
 
             TransferContext context = new TransferContext(new TransferJob(request));
@@ -150,6 +152,7 @@ class HttpTransferProtocolUploadTest {
 
         @Test
         @DisplayName("Upload transfer reads local file correctly")
+        @ExpectsError("Connection refused — upload reads file then fails on send")
         void uploadReadsLocalFile(VertxTestContext testContext) throws IOException {
             Path localFile = tempDir.resolve("upload-read-test.txt");
             String content = "Test content for reading local file during HTTP upload";
@@ -158,7 +161,7 @@ class HttpTransferProtocolUploadTest {
             TransferRequest request = TransferRequest.builder()
                     .requestId("upload-read-local-test")
                     .sourceUri(localFile.toUri())
-                    .destinationUri(URI.create("http://nonexistent.test.invalid/uploads/file.txt"))
+                    .destinationUri(URI.create("http://127.0.0.1:1/uploads/file.txt"))
                     .build();
 
             TransferContext context = new TransferContext(new TransferJob(request));
@@ -177,6 +180,7 @@ class HttpTransferProtocolUploadTest {
 
         @Test
         @DisplayName("Upload uses PUT method by default")
+        @ExpectsError("Connection refused — PUT method used but server unreachable")
         void uploadUsesPutMethod(VertxTestContext testContext) throws IOException {
             Path localFile = tempDir.resolve("upload-put-test.txt");
             Files.writeString(localFile, "PUT method test content");
@@ -184,7 +188,7 @@ class HttpTransferProtocolUploadTest {
             TransferRequest request = TransferRequest.builder()
                     .requestId("upload-put-method-test")
                     .sourceUri(localFile.toUri())
-                    .destinationUri(URI.create("http://nonexistent.test.invalid/uploads/file.txt"))
+                    .destinationUri(URI.create("http://127.0.0.1:1/uploads/file.txt"))
                     .build();
 
             TransferContext context = new TransferContext(new TransferJob(request));
@@ -207,6 +211,7 @@ class HttpTransferProtocolUploadTest {
 
         @Test
         @DisplayName("Upload fails with non-existent local file")
+        @ExpectsError("Source file missing — verifies TransferException before connect")
         void uploadFailsWithNonExistentFile(VertxTestContext testContext) {
             Path nonExistentFile = tempDir.resolve("does-not-exist.txt");
 
@@ -230,6 +235,7 @@ class HttpTransferProtocolUploadTest {
 
         @Test
         @DisplayName("Upload fails with connection timeout")
+        @ExpectsError("Connection refused — verifies timeout error handling")
         void uploadFailsWithConnectionTimeout(VertxTestContext testContext) throws IOException {
             Path localFile = tempDir.resolve("upload-timeout.txt");
             Files.writeString(localFile, "Content for timeout test");
@@ -237,7 +243,7 @@ class HttpTransferProtocolUploadTest {
             TransferRequest request = TransferRequest.builder()
                     .requestId("upload-timeout-test")
                     .sourceUri(localFile.toUri())
-                    .destinationUri(URI.create("http://nonexistent.test.invalid/uploads/file.txt"))
+                    .destinationUri(URI.create("http://127.0.0.1:1/uploads/file.txt"))
                     .build();
 
             TransferContext context = new TransferContext(new TransferJob(request));
@@ -279,6 +285,7 @@ class HttpTransferProtocolUploadTest {
 
         @Test
         @DisplayName("Upload calculates checksum for local file")
+        @ExpectsError("Connection refused — checksum calculated before send fails")
         void uploadCalculatesChecksum(VertxTestContext testContext) throws IOException {
             Path localFile = tempDir.resolve("upload-checksum.txt");
             String content = "Content for checksum calculation during upload";
@@ -287,7 +294,7 @@ class HttpTransferProtocolUploadTest {
             TransferRequest request = TransferRequest.builder()
                     .requestId("upload-checksum-test")
                     .sourceUri(localFile.toUri())
-                    .destinationUri(URI.create("http://nonexistent.test.invalid/uploads/file.txt"))
+                    .destinationUri(URI.create("http://127.0.0.1:1/uploads/file.txt"))
                     .build();
 
             TransferContext context = new TransferContext(new TransferJob(request));

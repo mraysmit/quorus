@@ -74,10 +74,7 @@ public final class SharedDockerCluster {
                     .withExposedService("controller1", 8080, Wait.forHttp("/health").forStatusCode(200))
                     .withExposedService("controller2", 8080, Wait.forHttp("/health").forStatusCode(200))
                     .withExposedService("controller3", 8080, Wait.forHttp("/health").forStatusCode(200))
-                    .waitingFor("controller1", Wait.forLogMessage(".*Starting Raft node.*", 1))
-                    .waitingFor("controller2", Wait.forLogMessage(".*Starting Raft node.*", 1))
-                    .waitingFor("controller3", Wait.forLogMessage(".*Starting Raft node.*", 1))
-                    .withStartupTimeout(Duration.ofMinutes(3));
+                    .withStartupTimeout(Duration.ofSeconds(90));
 
             threeNodeCluster.start();
             logger.info("Shared 3-node cluster started successfully");
@@ -100,12 +97,7 @@ public final class SharedDockerCluster {
                     .withExposedService("controller3", 8080, Wait.forHttp("/health").forStatusCode(200))
                     .withExposedService("controller4", 8080, Wait.forHttp("/health").forStatusCode(200))
                     .withExposedService("controller5", 8080, Wait.forHttp("/health").forStatusCode(200))
-                    .waitingFor("controller1", Wait.forLogMessage(".*Starting Raft node.*", 1))
-                    .waitingFor("controller2", Wait.forLogMessage(".*Starting Raft node.*", 1))
-                    .waitingFor("controller3", Wait.forLogMessage(".*Starting Raft node.*", 1))
-                    .waitingFor("controller4", Wait.forLogMessage(".*Starting Raft node.*", 1))
-                    .waitingFor("controller5", Wait.forLogMessage(".*Starting Raft node.*", 1))
-                    .withStartupTimeout(Duration.ofMinutes(3));
+                    .withStartupTimeout(Duration.ofSeconds(90));
 
             fiveNodeCluster.start();
             logger.info("Shared 5-node cluster started successfully");
@@ -126,13 +118,19 @@ public final class SharedDockerCluster {
     }
 
     /**
-     * Builds the quorus-controller:test Docker image using the build compose file.
-     * This reuses the same build mechanism as the existing compose files (including
-     * BuildKit cache mounts and the m2cache additional context), but builds only once
-     * per JVM rather than once per test class.
+     * Builds the quorus-controller:test Docker image using the build compose file,
+     * unless the image already exists locally. On a local Docker Desktop, skipping
+     * a redundant build saves 30–120 seconds.
      */
     private static synchronized void ensureImageBuilt() {
         if (imageBuilt) return;
+
+        // Fast path: skip the build entirely if the image is already cached
+        if (isImageCached("quorus-controller:test")) {
+            logger.info("Docker image quorus-controller:test already exists — skipping build");
+            imageBuilt = true;
+            return;
+        }
 
         File buildComposeFile = new File("src/test/resources/docker-compose-build-image.yml");
         if (!buildComposeFile.exists()) {
@@ -173,6 +171,24 @@ public final class SharedDockerCluster {
             throw e;
         } catch (Exception e) {
             throw new RuntimeException("Failed to build Docker image", e);
+        }
+    }
+
+    /**
+     * Returns {@code true} if the named Docker image exists in the local cache.
+     * Uses {@code docker image inspect} which returns exit code 0 when found.
+     */
+    private static boolean isImageCached(String imageName) {
+        try {
+            Process process = new ProcessBuilder("docker", "image", "inspect", imageName)
+                    .redirectErrorStream(true)
+                    .start();
+            // Drain output to prevent blocking
+            process.getInputStream().readAllBytes();
+            return process.waitFor() == 0;
+        } catch (Exception e) {
+            logger.fine("Could not check for cached image: " + e.getMessage());
+            return false;
         }
     }
 
