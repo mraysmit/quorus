@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
     
-    <!-- Console appender with correlation ID for Docker logs -->
+    <!-- Console appender with MDC context for Docker logs -->
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} [%X{requestId:-}] - %msg%n</pattern>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36}%replace( [%X{nodeId}]){' \[\]', ''}%replace( [%X{raftRole}/%X{raftTerm}]){' \[/\]', ''}%replace( [%X{requestId}]){' \[\]', ''}%replace( [%X{rpcType}]){' \[\]', ''} - %msg%n</pattern>
         </encoder>
     </appender>
     
@@ -18,7 +18,7 @@
             <totalSizeCap>1GB</totalSizeCap>
         </rollingPolicy>
         <encoder>
-            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} [%X{requestId:-}] - %msg%n</pattern>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36}%replace( [%X{nodeId}]){' \[\]', ''}%replace( [%X{raftRole}/%X{raftTerm}]){' \[/\]', ''}%replace( [%X{requestId}]){' \[\]', ''}%replace( [%X{rpcType}]){' \[\]', ''} - %msg%n</pattern>
         </encoder>
     </appender>
     

@@ -31,6 +31,7 @@ import io.vertx.core.Promise;
 import io.vertx.core.Vertx;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
@@ -126,6 +127,9 @@ public class GrpcRaftServer {
 
         @Override
         public void requestVote(VoteRequest request, StreamObserver<VoteResponse> responseObserver) {
+            MDC.put("nodeId", raftNode.getNodeId());
+            MDC.put("rpcType", "RequestVote");
+            try {
             logger.debug("Received RequestVote from {} for term {}", 
                     request.getCandidateId(), request.getTerm());
 
@@ -141,10 +145,16 @@ public class GrpcRaftServer {
                         logger.debug("Stack trace for RequestVote handling error", e);
                         responseObserver.onError(e);
                     });
+            } finally {
+                MDC.remove("rpcType");
+            }
         }
 
         @Override
         public void appendEntries(AppendEntriesRequest request, StreamObserver<AppendEntriesResponse> responseObserver) {
+            MDC.put("nodeId", raftNode.getNodeId());
+            MDC.put("rpcType", "AppendEntries");
+            try {
             logger.debug("Received AppendEntries from {} for term {}, entries={}", 
                     request.getLeaderId(), request.getTerm(), request.getEntriesCount());
 
@@ -160,10 +170,16 @@ public class GrpcRaftServer {
                         logger.debug("Stack trace for AppendEntries handling error", e);
                         responseObserver.onError(e);
                     });
+            } finally {
+                MDC.remove("rpcType");
+            }
         }
 
         @Override
         public void installSnapshot(InstallSnapshotRequest request, StreamObserver<InstallSnapshotResponse> responseObserver) {
+            MDC.put("nodeId", raftNode.getNodeId());
+            MDC.put("rpcType", "InstallSnapshot");
+            try {
             logger.debug("Received InstallSnapshot from {} for term {}, lastIncludedIndex={}, chunk {}/{}",
                     request.getLeaderId(), request.getTerm(),
                     request.getLastIncludedIndex(), request.getChunkIndex() + 1, request.getTotalChunks());
@@ -180,6 +196,9 @@ public class GrpcRaftServer {
                         logger.debug("Stack trace for InstallSnapshot handling error", e);
                         responseObserver.onError(e);
                     });
+            } finally {
+                MDC.remove("rpcType");
+            }
         }
     }
 }

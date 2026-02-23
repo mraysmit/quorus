@@ -34,6 +34,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import java.util.stream.Collectors;
 
 /**
@@ -173,10 +174,14 @@ public class SimpleWorkflowEngine implements WorkflowEngine {
                 .metadata(context.getMetadata())
                 .build();
 
-        // Use Vert.x WorkerExecutor with Promise/Future bridging
+        // Use Vert.x WorkerExecutor with Promise/Future bridging (propagate MDC to worker thread)
         Promise<WorkflowExecution> promise = Promise.promise();
+        Map<String, String> mdcContext = MDC.getCopyOfContextMap();
 
         workerExecutor.<WorkflowExecution>executeBlocking(() -> {
+            if (mdcContext != null) {
+                MDC.setContextMap(mdcContext);
+            }
             try {
                 return executeWorkflowInternal(definition, executionContext);
             } catch (Exception e) {
@@ -189,6 +194,8 @@ public class SimpleWorkflowEngine implements WorkflowEngine {
                 }
 
                 return createFailedExecution(definition, executionContext, e);
+            } finally {
+                MDC.clear();
             }
         }).onComplete(ar -> {
             if (ar.succeeded()) {

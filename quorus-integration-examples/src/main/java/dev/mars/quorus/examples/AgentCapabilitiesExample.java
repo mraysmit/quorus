@@ -207,10 +207,10 @@ public class AgentCapabilitiesExample {
         
         log.indentedKeyValue("File size", sizeStr);
         log.indentedKeyValue("Capable agents", String.valueOf(capable.size()));
-        capable.forEach(a -> log.bullet("✓ " + a));
+        capable.forEach(a -> log.bullet("[OK] " + a));
         if (!notCapable.isEmpty()) {
             log.detail("Not capable:");
-            notCapable.forEach(a -> log.bullet("✗ " + a));
+            notCapable.forEach(a -> log.bullet("[FAIL] " + a));
         }
     }
     
@@ -491,11 +491,11 @@ public class AgentCapabilitiesExample {
         
         // Display results
         log.detail("Passed checks:");
-        passed.forEach(p -> log.bullet("✓ " + p));
+        passed.forEach(p -> log.bullet("[OK] " + p));
         
         if (!warnings.isEmpty()) {
             log.detail("Warnings:");
-            warnings.forEach(w -> log.bullet("⚠ " + w));
+            warnings.forEach(w -> log.bullet("[WARN] " + w));
         }
     }
     

@@ -36,6 +36,7 @@ import io.vertx.core.WorkerExecutor;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -192,9 +193,13 @@ public class SimpleTransferEngine implements TransferEngine {
         // Record OpenTelemetry metric (Phase 8 - Jan 2026)
         telemetryMetrics.recordTransferStarted(request.getProtocol(), direction.name());
         
-        // Execute transfer on Vert.x worker pool
+        // Execute transfer on Vert.x worker pool (propagate MDC to worker thread)
         logger.debug("submitTransfer: submitting to worker executor");
+        Map<String, String> mdcContext = MDC.getCopyOfContextMap();
         Future<TransferResult> future = workerExecutor.<TransferResult>executeBlocking(() -> {
+            if (mdcContext != null) {
+                MDC.setContextMap(mdcContext);
+            }
             try {
                 return executeTransfer(context);
             } catch (Exception e) {
@@ -211,6 +216,7 @@ public class SimpleTransferEngine implements TransferEngine {
                 activeJobs.remove(job.getJobId());
                 activeContexts.remove(job.getJobId());
                 activeFutures.remove(job.getJobId());
+                MDC.clear();
             }
         });
 

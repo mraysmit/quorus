@@ -32,6 +32,7 @@ import io.vertx.core.Vertx;
 import io.vertx.core.VertxOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 
 import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
@@ -179,6 +180,9 @@ public class QuorusAgent {
         if (closed.get()) {
             throw new IllegalStateException("Agent is closed, cannot start");
         }
+
+        // Set process-lifetime MDC context for all agent logs
+        MDC.put("agentId", config.getAgentId());
 
         logger.info("Starting Quorus Agent services (Vert.x reactive mode)...");
 

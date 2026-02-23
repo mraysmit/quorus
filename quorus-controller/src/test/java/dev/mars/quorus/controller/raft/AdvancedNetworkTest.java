@@ -89,7 +89,7 @@ public class AdvancedNetworkTest {
 
     @AfterEach
     void tearDown(TestInfo testInfo) {
-        // Restore network state after test (container is shared — do NOT stop it)
+        // Restore network state after test (container is shared -- do NOT stop it)
         try {
             NetworkTestUtils.restoreDockerNetworkPartition(nodeNames);
         } catch (Exception e) {
@@ -138,7 +138,7 @@ public class AdvancedNetworkTest {
     }
 
     @Test
-    @ExpectsError("Container image lacks iproute2 — tc latency commands fail with SEVERE")
+    @ExpectsError("Container image lacks iproute2 -- tc latency commands fail with SEVERE")
     void testGeographicDistribution() {
         // Wait for initial stable cluster
         await().atMost(Duration.ofSeconds(45))
@@ -166,7 +166,7 @@ public class AdvancedNetworkTest {
     }
 
     @Test
-    @ExpectsError("Container image lacks iproute2 — tc latency/packet-loss commands fail with SEVERE")
+    @ExpectsError("Container image lacks iproute2 -- tc latency/packet-loss commands fail with SEVERE")
     void testComplexNetworkScenario() {
         // Wait for initial stable cluster
         await().atMost(Duration.ofSeconds(45))
@@ -203,7 +203,7 @@ public class AdvancedNetworkTest {
     }
 
     @Test
-    @ExpectsError("Container image lacks iptables/iproute2 — isolation and latency commands fail with SEVERE")
+    @ExpectsError("Container image lacks iptables/iproute2 -- isolation and latency commands fail with SEVERE")
     void testNetworkRecoveryScenarios() {
         // Wait for initial stable cluster
         await().atMost(Duration.ofSeconds(45))

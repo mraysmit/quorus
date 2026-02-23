@@ -85,12 +85,12 @@ public class NetworkPartitionTest {
 
     @AfterEach
     void tearDown(TestInfo testInfo) {
-        // Restore network state after test (container is shared — do NOT stop it)
+        // Restore network state after test (container is shared -- do NOT stop it)
         restoreNetworkConnectivity();
         logger.info("Completed network partition test: " + testInfo.getDisplayName());
     }
 
-    @Disabled("Node isolation is not implemented — simulateNodeIsolation() is a no-op")
+    @Disabled("Node isolation is not implemented -- simulateNodeIsolation() is a no-op")
     @Test
     void testMajorityPartition() {
         // Wait for initial leader election

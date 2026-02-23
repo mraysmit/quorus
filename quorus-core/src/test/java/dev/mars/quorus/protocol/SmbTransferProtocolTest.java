@@ -126,7 +126,7 @@ class SmbTransferProtocolTest {
     }
     
     @Test
-    @ExpectsError("UNC path resolve fails — no SMB server at 127.0.0.1")
+    @ExpectsError("UNC path resolve fails -- no SMB server at 127.0.0.1")
     void testTransferWithValidSmbUri() throws TransferException {
         TransferRequest request = TransferRequest.builder()
                 .requestId("test-smb-transfer")
@@ -143,7 +143,7 @@ class SmbTransferProtocolTest {
     // Error handling tests moved to dev.mars.quorus.protocol.errorhandling.SmbTransferProtocolErrorHandlingTest
     
     @Test
-    @ExpectsError("UNC path with auth — no SMB server")
+    @ExpectsError("UNC path with auth -- no SMB server")
     void testSmbUriWithAuthentication() {
         TransferRequest request = TransferRequest.builder()
                 .requestId("test-auth")
@@ -193,7 +193,7 @@ class SmbTransferProtocolTest {
     }
     
     @Test
-    @ExpectsError("UNC path not found — verifies exception contains SMB context")
+    @ExpectsError("UNC path not found -- verifies exception contains SMB context")
     void testTransferExceptionContainsRequestId() {
         TransferRequest request = TransferRequest.builder()
                 .requestId("test-exception-id")
@@ -228,7 +228,7 @@ class SmbTransferProtocolTest {
     }
     
     @Test
-    @ExpectsError("UNC path with checksum — no SMB server")
+    @ExpectsError("UNC path with checksum -- no SMB server")
     void testChecksumHandling() {
         TransferRequest request = TransferRequest.builder()
                 .requestId("test-checksum")
@@ -284,7 +284,7 @@ class SmbTransferProtocolTest {
     // Additional edge case error tests moved to dev.mars.quorus.protocol.errorhandling.SmbTransferProtocolErrorHandlingTest
     
     @Test
-    @ExpectsError("UNC path with spaces — no SMB server")
+    @ExpectsError("UNC path with spaces -- no SMB server")
     void testSmbPathWithSpaces() {
         // Test SMB URI with spaces in path
         TransferRequest request = TransferRequest.builder()
@@ -315,7 +315,7 @@ class SmbTransferProtocolTest {
     }
     
     @Test
-    @ExpectsError("UNC nested path — no SMB server")
+    @ExpectsError("UNC nested path -- no SMB server")
     void testNestedSharePath() {
         // Test SMB URI with nested directory structure
         TransferRequest request = TransferRequest.builder()

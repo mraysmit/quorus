@@ -508,7 +508,7 @@ public class SimulatorTestLoggingExtension implements
         long memoryDelta = memoryStart != null ? getUsedMemoryMB() - memoryStart : 0;
         int threadDelta = threadStart != null ? threadBean.getThreadCount() - threadStart : 0;
         
-        log.trace("  │  [TRACE] {} in {}ms, mem={}, threads={}", 
+        log.debug("  |  [TRACE] {} in {}ms, mem={}, threads={}", 
             status, duration.toMillis(),
             memoryDelta >= 0 ? "+" + memoryDelta + "MB" : memoryDelta + "MB",
             threadDelta >= 0 ? "+" + threadDelta : threadDelta);
@@ -528,13 +528,13 @@ public class SimulatorTestLoggingExtension implements
         long cpuTimeDelta = cpuTimeStart != null ? getCurrentThreadCpuTimeMs() - cpuTimeStart : 0;
         int classCountDelta = classCountStart != null ? getLoadedClassCount() - classCountStart : 0;
         
-        log.debug("  │  [DEBUG] WALL TIME: {}ms, CPU: {}ms (delta: {}ms)", 
+        log.debug("  |  [DEBUG] WALL TIME: {}ms, CPU: {}ms (delta: {}ms)", 
             duration.toMillis(), getCurrentThreadCpuTimeMs(), 
             cpuTimeDelta >= 0 ? "+" + cpuTimeDelta : cpuTimeDelta);
-        log.debug("  │  [DEBUG] MEMORY: {}MB (current: {}MB), THREADS: {} (current: {})", 
+        log.debug("  |  [DEBUG] MEMORY: {}MB (current: {}MB), THREADS: {} (current: {})", 
             memoryDelta >= 0 ? "+" + memoryDelta : memoryDelta, getUsedMemoryMB(),
             threadDelta >= 0 ? "+" + threadDelta : threadDelta, threadBean.getThreadCount());
-        log.debug("  │  [DEBUG] CLASSES: {} (loaded: {}), GC: {} collections, {}ms", 
+        log.debug("  |  [DEBUG] CLASSES: {} (loaded: {}), GC: {} collections, {}ms", 
             classCountDelta >= 0 ? "+" + classCountDelta : classCountDelta, getLoadedClassCount(),
             getGcCount(), getGcTimeMs());
     }

@@ -163,7 +163,7 @@ class AgentJobManagementIntegrationTest {
         assertTrue(responseJson.get("success").asBoolean(), "Response should indicate success");
         assertEquals(testAgentId, responseJson.get("agentId").asText(), "Agent ID should match");
 
-        logger.info("✅ Agent registered: " + testAgentId);
+        logger.info("[PASS] Agent registered: " + testAgentId);
     }
 
     @Test
@@ -196,7 +196,7 @@ class AgentJobManagementIntegrationTest {
         JsonNode responseJson = objectMapper.readTree(response.body());
         assertTrue(responseJson.get("success").asBoolean(), "Response should indicate success");
 
-        logger.info("✅ Transfer job created: " + testJobId);
+        logger.info("[PASS] Transfer job created: " + testJobId);
     }
 
     @Test
@@ -227,7 +227,7 @@ class AgentJobManagementIntegrationTest {
         JsonNode responseJson = objectMapper.readTree(response.body());
         assertTrue(responseJson.get("success").asBoolean(), "Response should indicate success");
 
-        logger.info("✅ Job assigned to agent: " + testAssignmentId);
+        logger.info("[PASS] Job assigned to agent: " + testAssignmentId);
     }
 
     @Test
@@ -252,7 +252,7 @@ class AgentJobManagementIntegrationTest {
         assertEquals(testJobId, firstJob.get("jobId").asText(), "Job ID should match");
         assertEquals(testAgentId, firstJob.get("agentId").asText(), "Agent ID should match");
 
-        logger.info("✅ Agent polled and found " + responseJson.size() + " pending job(s)");
+        logger.info("[PASS] Agent polled and found " + responseJson.size() + " pending job(s)");
     }
 
     @Test
@@ -280,7 +280,7 @@ class AgentJobManagementIntegrationTest {
         JsonNode responseJson = objectMapper.readTree(response.body());
         assertTrue(responseJson.get("success").asBoolean(), "Response should indicate success");
 
-        logger.info("✅ Agent reported job accepted");
+        logger.info("[PASS] Agent reported job accepted");
     }
 
     @Test
@@ -309,7 +309,7 @@ class AgentJobManagementIntegrationTest {
         JsonNode responseJson = objectMapper.readTree(response.body());
         assertTrue(responseJson.get("success").asBoolean(), "Response should indicate success");
 
-        logger.info("✅ Agent reported job in progress (50% complete)");
+        logger.info("[PASS] Agent reported job in progress (50% complete)");
     }
 
 
@@ -339,7 +339,7 @@ class AgentJobManagementIntegrationTest {
         JsonNode responseJson = objectMapper.readTree(response.body());
         assertTrue(responseJson.get("success").asBoolean(), "Response should indicate success");
 
-        logger.info("✅ Agent reported job completed");
+        logger.info("[PASS] Agent reported job completed");
     }
 
     @Test
@@ -360,7 +360,7 @@ class AgentJobManagementIntegrationTest {
         assertEquals("COMPLETED", responseJson.get("status").asText(), "Job status should be COMPLETED");
         assertEquals(1048576, responseJson.get("bytesTransferred").asLong(), "Bytes transferred should match");
 
-        logger.info("✅ Job completion verified");
+        logger.info("[PASS] Job completion verified");
     }
 
     @Test
@@ -381,24 +381,24 @@ class AgentJobManagementIntegrationTest {
         assertTrue(responseJson.isArray(), "Response should be an array");
         assertEquals(0, responseJson.size(), "Should have no pending jobs after completion");
 
-        logger.info("✅ No pending jobs found (as expected)");
+        logger.info("[PASS] No pending jobs found (as expected)");
     }
 
     @Test
     @Order(10)
     void testCompleteFlowSummary() {
         logger.info("\n" + "=".repeat(60));
-        logger.info("🎉 AGENT JOB MANAGEMENT INTEGRATION TEST COMPLETE!");
+        logger.info("[DONE] AGENT JOB MANAGEMENT INTEGRATION TEST COMPLETE!");
         logger.info("=".repeat(60));
-        logger.info("✅ Agent Registration - PASSED");
-        logger.info("✅ Transfer Job Creation - PASSED");
-        logger.info("✅ Job Assignment - PASSED");
-        logger.info("✅ Agent Job Polling - PASSED");
-        logger.info("✅ Status Reporting (ACCEPTED) - PASSED");
-        logger.info("✅ Status Reporting (IN_PROGRESS) - PASSED");
-        logger.info("✅ Status Reporting (COMPLETED) - PASSED");
-        logger.info("✅ Job Completion Verification - PASSED");
-        logger.info("✅ Post-Completion Polling - PASSED");
+        logger.info("[PASS] Agent Registration - PASSED");
+        logger.info("[PASS] Transfer Job Creation - PASSED");
+        logger.info("[PASS] Job Assignment - PASSED");
+        logger.info("[PASS] Agent Job Polling - PASSED");
+        logger.info("[PASS] Status Reporting (ACCEPTED) - PASSED");
+        logger.info("[PASS] Status Reporting (IN_PROGRESS) - PASSED");
+        logger.info("[PASS] Status Reporting (COMPLETED) - PASSED");
+        logger.info("[PASS] Job Completion Verification - PASSED");
+        logger.info("[PASS] Post-Completion Polling - PASSED");
         logger.info("=".repeat(60));
         logger.info("Complete flow tested successfully!");
         logger.info("Agent ID: " + testAgentId);

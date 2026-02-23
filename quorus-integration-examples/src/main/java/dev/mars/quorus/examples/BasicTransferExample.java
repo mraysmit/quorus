@@ -154,7 +154,7 @@ public class BasicTransferExample {
         logger.info("All transfers submitted. Waiting for completion...");
         for (int i = 0; i < futures.length; i++) {
             TransferResult result = futures[i].toCompletionStage().toCompletableFuture().get();
-            String status = result.isSuccessful() ? "SUCCESS ✓" : "FAILED ✗";
+            String status = result.isSuccessful() ? "SUCCESS [OK]" : "FAILED [FAIL]";
             logger.info("  Transfer " + (i + 1) + " result: " + status +
                        " (" + result.getBytesTransferred() + " bytes)");
         }
@@ -186,12 +186,12 @@ public class BasicTransferExample {
         logger.info("Resilience test results:");
         logger.info("  Status: " + result.getFinalStatus());
         if (result.isSuccessful()) {
-            logger.info("  ✓ SUCCESS: System handled slow response correctly");
+            logger.info("  [OK] SUCCESS: System handled slow response correctly");
         } else {
-            logger.severe("  ✗ UNEXPECTED: Resilience test failed - this indicates a problem");
+            logger.severe("  [FAIL] UNEXPECTED: Resilience test failed - this indicates a problem");
         }
         logger.info("  Total time: " + duration + "ms (includes 2-second server delay)");
-        logger.info("  System behavior: Patient waiting for slow responses ✓");
+        logger.info("  System behavior: Patient waiting for slow responses [OK]");
         logger.info("");
 
         // Demonstrate configuration-based retry settings
@@ -251,7 +251,7 @@ public class BasicTransferExample {
     private static void displayTransferResult(TransferResult result) {
         logger.info("Transfer Results:");
         logger.info("  Status: " + result.getFinalStatus());
-        logger.info("  Success: " + (result.isSuccessful() ? "✓" : "✗"));
+        logger.info("  Success: " + (result.isSuccessful() ? "[OK]" : "[FAIL]"));
         logger.info("  Bytes transferred: " + result.getBytesTransferred());
         
         result.getDuration().ifPresent(duration -> 

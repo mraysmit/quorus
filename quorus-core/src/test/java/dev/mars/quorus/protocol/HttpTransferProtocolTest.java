@@ -187,7 +187,7 @@ class HttpTransferProtocolTest {
     }
 
     @Test
-    @ExpectsError("Connection refused — invalid URL triggers connection error")
+    @ExpectsError("Connection refused -- invalid URL triggers connection error")
     void testTransferReactiveWithInvalidUrl(VertxTestContext testContext) {
         TransferRequest request = TransferRequest.builder()
                 .requestId("test-invalid-url")
@@ -236,7 +236,7 @@ class HttpTransferProtocolTest {
     }
 
     @Test
-    @ExpectsError("Wrong protocol scheme — HTTP rejects ftp:// URI")
+    @ExpectsError("Wrong protocol scheme -- HTTP rejects ftp:// URI")
     void testTransferReactiveWithNonHttpProtocol(VertxTestContext testContext) {
         TransferRequest request = TransferRequest.builder()
                 .requestId("test-wrong-protocol")
@@ -258,7 +258,7 @@ class HttpTransferProtocolTest {
     }
 
     @Test
-    @ExpectsError("Connection refused — blocking transfer wraps reactive failure")
+    @ExpectsError("Connection refused -- blocking transfer wraps reactive failure")
     void testTransferBlockingCallsReactive() {
         TransferRequest request = TransferRequest.builder()
                 .requestId("test-blocking")
@@ -343,7 +343,7 @@ class HttpTransferProtocolTest {
     }
 
     @Test
-    @ExpectsError("Connection refused — verifies destination directory created before failure")
+    @ExpectsError("Connection refused -- verifies destination directory created before failure")
     void testCreatesDestinationDirectoryIfNeeded(VertxTestContext testContext) {
         Path nestedDir = tempDir.resolve("level1/level2/level3");
         

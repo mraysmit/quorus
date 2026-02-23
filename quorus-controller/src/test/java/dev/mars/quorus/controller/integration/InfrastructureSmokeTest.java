@@ -133,7 +133,7 @@ class InfrastructureSmokeTest {
     void testVertxRuntime() {
         assertNotNull(vertx, "Vert.x instance should be created");
         assertFalse(vertx.isClustered(), "Should not be in clustered mode for tests");
-        logger.info("✓ Vert.x runtime is available");
+        logger.info("[OK] Vert.x runtime is available");
     }
 
     // ========== Raft Node Tests ==========
@@ -145,7 +145,7 @@ class InfrastructureSmokeTest {
         assertNotNull(raftNode, "Raft node should be created");
         assertTrue(raftNode.isLeader(), "Single-node cluster should elect itself as leader");
         assertEquals("smoke-test-node", raftNode.getNodeId(), "Node ID should match");
-        logger.info("✓ Raft node is leader (node: " + raftNode.getNodeId() + ")");
+        logger.info("[OK] Raft node is leader (node: " + raftNode.getNodeId() + ")");
     }
 
     @Test
@@ -156,7 +156,7 @@ class InfrastructureSmokeTest {
         assertNotNull(stateMachine.getAgents(), "Agents map should be available");
         assertNotNull(stateMachine.getJobAssignments(), "Job assignments map should be available");
         assertNotNull(stateMachine.getTransferJobs(), "Transfer jobs map should be available");
-        logger.info("✓ State machine is initialized");
+        logger.info("[OK] State machine is initialized");
     }
 
     // ========== HTTP API Tests ==========
@@ -179,7 +179,7 @@ class InfrastructureSmokeTest {
         assertEquals("UP", json.get("status").asText(), "Status should be UP");
         assertEquals("smoke-test-node", json.get("nodeId").asText(), "Node ID should match");
         
-        logger.info("✓ Health endpoint responds: " + json.get("status").asText());
+        logger.info("[OK] Health endpoint responds: " + json.get("status").asText());
     }
 
     @Test
@@ -200,7 +200,7 @@ class InfrastructureSmokeTest {
         assertEquals("UP", json.get("status").asText(), "Liveness status should be UP");
         assertTrue(json.has("timestamp"), "Liveness should include timestamp");
         
-        logger.info("✓ Health/live endpoint responds: " + json.get("status").asText());
+        logger.info("[OK] Health/live endpoint responds: " + json.get("status").asText());
     }
 
     @Test
@@ -223,7 +223,7 @@ class InfrastructureSmokeTest {
         assertEquals("UP", json.get("checks").get("raftRunning").asText(), "Raft should be running");
         assertEquals("UP", json.get("checks").get("clusterHasLeader").asText(), "Cluster should have leader");
         
-        logger.info("✓ Health/ready endpoint responds: " + json.get("status").asText());
+        logger.info("[OK] Health/ready endpoint responds: " + json.get("status").asText());
     }
 
     @Test
@@ -259,7 +259,7 @@ class InfrastructureSmokeTest {
         assertTrue(checks.has("diskSpace"), "Checks should include diskSpace");
         assertTrue(checks.has("memory"), "Checks should include memory");
         
-        logger.info("✓ Full health endpoint responds with detailed checks");
+        logger.info("[OK] Full health endpoint responds with detailed checks");
     }
 
     @Test
@@ -281,7 +281,7 @@ class InfrastructureSmokeTest {
         assertTrue(json.has("currentTerm"), "Response should include currentTerm");
         assertTrue(json.has("isLeader"), "Response should include isLeader");
         
-        logger.info("✓ Raft status endpoint responds: state=" + json.get("state").asText() + 
+        logger.info("[OK] Raft status endpoint responds: state=" + json.get("state").asText() + 
                    ", currentTerm=" + json.get("currentTerm").asInt());
     }
 
@@ -301,7 +301,7 @@ class InfrastructureSmokeTest {
         assertEquals(200, response.statusCode(),
                 "Assignments endpoint should respond with 200 (status: " + response.statusCode() + ")");
         
-        logger.info("✓ Assignments endpoint responds (status: " + response.statusCode() + ")");
+        logger.info("[OK] Assignments endpoint responds (status: " + response.statusCode() + ")");
     }
 
     // ========== Metrics Endpoint Tests ==========
@@ -328,13 +328,13 @@ class InfrastructureSmokeTest {
             String body = response.body();
             assertTrue(body.contains("# ") || body.contains("TYPE") || body.isEmpty() == false,
                     "Metrics response should contain Prometheus-format data");
-            logger.info("✓ Metrics endpoint responds with Prometheus data");
+            logger.info("[OK] Metrics endpoint responds with Prometheus data");
         } else {
             // Verify we get a meaningful error message, not a crash
             String body = response.body();
             assertTrue(body.contains("Metrics unavailable") || body.contains("Internal Server Error"),
                     "Metrics endpoint should return descriptive error when OTel exporter unavailable");
-            logger.info("✓ Metrics endpoint responds with expected error (OTel exporter not running in test)");
+            logger.info("[OK] Metrics endpoint responds with expected error (OTel exporter not running in test)");
         }
     }
 
@@ -352,7 +352,7 @@ class InfrastructureSmokeTest {
         assertEquals(now.getEpochSecond(), deserialized.getEpochSecond(), 
                     "Instant serialization should round-trip correctly");
         
-        logger.info("✓ JSON serialization with Java Time module works");
+        logger.info("[OK] JSON serialization with Java Time module works");
     }
 
     // ========== Performance Baseline ==========
@@ -362,7 +362,7 @@ class InfrastructureSmokeTest {
     @DisplayName("12. Startup time is acceptable")
     void testStartupTime() {
         assertTrue(startupTime < 10000, "Infrastructure should start in under 10 seconds");
-        logger.info("✓ Startup time: " + startupTime + "ms (threshold: 10000ms)");
+        logger.info("[OK] Startup time: " + startupTime + "ms (threshold: 10000ms)");
     }
 
     @Test
@@ -382,7 +382,7 @@ class InfrastructureSmokeTest {
         long latency = System.currentTimeMillis() - start;
         assertTrue(latency < 1000, "Health endpoint should respond in under 1 second");
         
-        logger.info("✓ Health endpoint latency: " + latency + "ms (threshold: 1000ms)");
+        logger.info("[OK] Health endpoint latency: " + latency + "ms (threshold: 1000ms)");
     }
 
     // ========== Summary ==========
@@ -393,11 +393,11 @@ class InfrastructureSmokeTest {
     void testInfrastructureSummary() {
         logger.info("");
         logger.info("=== Infrastructure Smoke Test Summary ===");
-        logger.info("  Vert.x:        ✓ Running");
-        logger.info("  Raft Node:     ✓ Leader elected");
-        logger.info("  State Machine: ✓ Initialized");
-        logger.info("  HTTP Server:   ✓ Listening on port " + HTTP_PORT);
-        logger.info("  Metrics:       ✓ Endpoint available");
+        logger.info("  Vert.x:        [OK] Running");
+        logger.info("  Raft Node:     [OK] Leader elected");
+        logger.info("  State Machine: [OK] Initialized");
+        logger.info("  HTTP Server:   [OK] Listening on port " + HTTP_PORT);
+        logger.info("  Metrics:       [OK] Endpoint available");
         logger.info("  Startup Time:  " + startupTime + "ms");
         logger.info("=========================================");
         logger.info("");

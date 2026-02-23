@@ -24,6 +24,7 @@ import io.vertx.core.Promise;
 import io.vertx.core.Vertx;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import dev.mars.quorus.controller.raft.RaftNode;
 import dev.mars.quorus.controller.raft.RaftNodeMode;
 import dev.mars.quorus.controller.raft.RaftTransport;
@@ -67,6 +68,10 @@ public class QuorusControllerVerticle extends AbstractVerticle {
             // 1. Load configuration
             AppConfig config = AppConfig.get();
             String nodeId = config.getNodeId();
+
+            // Set process-lifetime MDC context for all controller logs
+            MDC.put("nodeId", nodeId);
+
             int port = config.getHttpPort();
             int raftPort = config.getRaftPort();
             String clusterNodesEnv = config.getClusterNodes();

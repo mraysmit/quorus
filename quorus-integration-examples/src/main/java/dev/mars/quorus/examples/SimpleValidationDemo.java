@@ -32,7 +32,7 @@ public class SimpleValidationDemo {
     public static void main(String[] args) {
         log.exampleStart("Quorus Error Handling Demonstration",
                 "This example demonstrates the improved error handling approach.\n" +
-                "Expected failures are marked with ✓ and are part of the demonstration.");
+                "Expected failures are marked with [OK] and are part of the demonstration.");
         
         try {
             SimpleValidationDemo demo = new SimpleValidationDemo();

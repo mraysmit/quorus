@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Tests for RouteCommand operations in the QuorusStateStore.
- * Verifies the full lifecycle: create → update → suspend → resume → delete,
+ * Verifies the full lifecycle: create -> update -> suspend -> resume -> delete,
  * plus snapshot/restore preservation of route state.
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
@@ -280,7 +280,7 @@ class RouteCommandStateStoreTest {
             stateMachine.apply(RouteCommand.suspend("route-double-sus", "first suspension"));
             assertEquals(RouteStatus.SUSPENDED, stateMachine.getRoute("route-double-sus").getStatus());
 
-            // Suspend again — state store doesn't validate, should still succeed
+            // Suspend again -- state store doesn't validate, should still succeed
             CommandResult<?> result = stateMachine.apply(RouteCommand.suspend("route-double-sus", "second suspension"));
             assertInstanceOf(CommandResult.Success.class, result);
             assertEquals(RouteStatus.SUSPENDED, stateMachine.getRoute("route-double-sus").getStatus());
@@ -289,7 +289,7 @@ class RouteCommandStateStoreTest {
         @Test
         @DisplayName("Resume non-suspended route sets ACTIVE regardless")
         void resumeNonSuspendedRouteSetsActive() {
-            // Route starts CONFIGURED — resume sets to ACTIVE without transition validation
+            // Route starts CONFIGURED -- resume sets to ACTIVE without transition validation
             stateMachine.apply(RouteCommand.create(createRoute("route-resume-cfg", "resume-configured")));
             assertEquals(RouteStatus.CONFIGURED, stateMachine.getRoute("route-resume-cfg").getStatus());
 
@@ -337,21 +337,21 @@ class RouteCommandStateStoreTest {
         void degradedAndFailedStatuses() {
             stateMachine.apply(RouteCommand.create(createRoute("route-fail", "fail-test")));
 
-            // CONFIGURED → ACTIVE (valid transition)
+            // CONFIGURED -> ACTIVE (valid transition)
             stateMachine.apply(RouteCommand.updateStatus("route-fail", RouteStatus.CONFIGURED, RouteStatus.ACTIVE, "activated"));
             assertEquals(RouteStatus.ACTIVE, stateMachine.getRoute("route-fail").getStatus());
 
-            // ACTIVE → DEGRADED (valid transition)
+            // ACTIVE -> DEGRADED (valid transition)
             stateMachine.apply(RouteCommand.updateStatus("route-fail", RouteStatus.ACTIVE, RouteStatus.DEGRADED, "partial failure"));
             assertEquals(RouteStatus.DEGRADED, stateMachine.getRoute("route-fail").getStatus());
 
-            // DEGRADED → DELETED (valid transition; DEGRADED cannot go to FAILED directly)
+            // DEGRADED -> DELETED (valid transition; DEGRADED cannot go to FAILED directly)
             stateMachine.apply(RouteCommand.updateStatus("route-fail", RouteStatus.DEGRADED, RouteStatus.DELETED, "decommissioned"));
             assertEquals(RouteStatus.DELETED, stateMachine.getRoute("route-fail").getStatus());
         }
 
         @Test
-        @DisplayName("Failed status via TRANSFERRING → FAILED transition")
+        @DisplayName("Failed status via TRANSFERRING -> FAILED transition")
         void failedStatusViaTransferring() {
             stateMachine.apply(RouteCommand.create(createRoute("route-xfer-fail", "xfer-fail-test")));
 
@@ -361,7 +361,7 @@ class RouteCommandStateStoreTest {
             stateMachine.apply(RouteCommand.updateStatus("route-xfer-fail", RouteStatus.TRANSFERRING, RouteStatus.FAILED, "max retries exceeded"));
             assertEquals(RouteStatus.FAILED, stateMachine.getRoute("route-xfer-fail").getStatus());
 
-            // FAILED → CONFIGURED (reconfigure)
+            // FAILED -> CONFIGURED (reconfigure)
             stateMachine.apply(RouteCommand.updateStatus("route-xfer-fail", RouteStatus.FAILED, RouteStatus.CONFIGURED, "reconfigured"));
             assertEquals(RouteStatus.CONFIGURED, stateMachine.getRoute("route-xfer-fail").getStatus());
         }
@@ -391,7 +391,7 @@ class RouteCommandStateStoreTest {
                     RouteCommand.updateStatus("route-cas2", RouteStatus.ACTIVE, RouteStatus.TRIGGERED, "trigger 1"));
             assertInstanceOf(CommandResult.Success.class, first);
 
-            // Second one still thinks it's ACTIVE → CAS mismatch
+            // Second one still thinks it's ACTIVE -> CAS mismatch
             CommandResult<?> second = stateMachine.apply(
                     RouteCommand.updateStatus("route-cas2", RouteStatus.ACTIVE, RouteStatus.SUSPENDED, "suspend concurrent"));
             assertInstanceOf(CommandResult.CasMismatch.class, second);
@@ -506,7 +506,7 @@ class RouteCommandStateStoreTest {
     // ========== Full Lifecycle ==========
 
     @Test
-    @DisplayName("Full route lifecycle: create → activate → trigger → transfer → complete → suspend → resume → delete")
+    @DisplayName("Full route lifecycle: create -> activate -> trigger -> transfer -> complete -> suspend -> resume -> delete")
     void fullRouteLifecycle() {
         String routeId = "lifecycle-route";
 
@@ -526,7 +526,7 @@ class RouteCommandStateStoreTest {
         stateMachine.apply(RouteCommand.updateStatus(routeId, RouteStatus.TRIGGERED, RouteStatus.TRANSFERRING, "transfer initiated"));
         assertEquals(RouteStatus.TRANSFERRING, stateMachine.getRoute(routeId).getStatus());
 
-        // 5. Transfer completes → back to ACTIVE
+        // 5. Transfer completes -> back to ACTIVE
         stateMachine.apply(RouteCommand.updateStatus(routeId, RouteStatus.TRANSFERRING, RouteStatus.ACTIVE, "transfer completed"));
         assertEquals(RouteStatus.ACTIVE, stateMachine.getRoute(routeId).getStatus());
 

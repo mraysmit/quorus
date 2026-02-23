@@ -44,7 +44,7 @@ public class InvalidTransitionException extends QuorusException {
      */
     public InvalidTransitionException(String entityId, Enum<?> currentState,
                                       Enum<?> requestedState, Enum<?>[] validTransitions) {
-        super(String.format("Invalid transition for '%s': %s → %s. Valid targets: %s",
+        super(String.format("Invalid transition for '%s': %s -> %s. Valid targets: %s",
                 entityId, currentState, requestedState, formatTransitions(validTransitions)));
         this.entityId = entityId;
         this.currentState = currentState;

@@ -158,7 +158,7 @@ class RaftLogClusterIntegrationTest {
             long walSize = Files.size(walFile);
             boolean metaExists = Files.exists(metaFile);
             
-            LOG.info("✓ {} has WAL at {} ({} bytes, meta={})", 
+            LOG.info("[OK] {} has WAL at {} ({} bytes, meta={})", 
                 nodeId, walFile, walSize, metaExists ? Files.size(metaFile) + "b" : "N/A");
         }
         
@@ -222,7 +222,7 @@ class RaftLogClusterIntegrationTest {
             RaftStorage.PersistentMeta meta = storage.loadMetadata()
                 .toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
             
-            LOG.info("✓ {} recovered metadata: term={}, votedFor={}", 
+            LOG.info("[OK] {} recovered metadata: term={}, votedFor={}", 
                 nodeId, meta.currentTerm(), meta.votedFor().orElse("(none)"));
             
             // At least the followers should have persisted their vote
@@ -305,7 +305,7 @@ class RaftLogClusterIntegrationTest {
             assertTrue(leaderSM.hasTransferJob(jobId), 
                 "Leader should have job " + jobId + " before restart");
         }
-        LOG.info("✓ All jobs exist in state machine before restart");
+        LOG.info("[OK] All jobs exist in state machine before restart");
         
         // Remember which node was leader
         String leaderId = leader.getNodeId();
@@ -335,7 +335,7 @@ class RaftLogClusterIntegrationTest {
                 assertTrue(sm.hasTransferJob(jobId), 
                     "Node " + node.getNodeId() + " should have recovered job " + jobId);
             }
-            LOG.info("✓ {} recovered all {} jobs from WAL", node.getNodeId(), jobIds.size());
+            LOG.info("[OK] {} recovered all {} jobs from WAL", node.getNodeId(), jobIds.size());
         }
         
         ctx.completeNow();
@@ -435,7 +435,7 @@ class RaftLogClusterIntegrationTest {
         assertTrue(recoveredSM.hasTransferJob(jobId), 
             "Recovered follower should have job from WAL replay");
         
-        LOG.info("✓ Follower {} recovered job {} from WAL", followerId, jobId);
+        LOG.info("[OK] Follower {} recovered job {} from WAL", followerId, jobId);
         
         ctx.completeNow();
     }
@@ -623,9 +623,9 @@ class RaftLogClusterIntegrationTest {
             for (String jobId : jobIds) {
                 if (sm.hasTransferJob(jobId)) {
                     found++;
-                    sb.append("✓");
+                    sb.append("[OK]");
                 } else {
-                    sb.append("✗");
+                    sb.append("[FAIL]");
                 }
             }
             sb.append(" (").append(found).append("/").append(jobIds.size()).append(" jobs)");

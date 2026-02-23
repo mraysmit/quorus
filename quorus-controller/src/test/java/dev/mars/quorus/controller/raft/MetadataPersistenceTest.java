@@ -151,10 +151,10 @@ public class MetadataPersistenceTest {
             QuorusStateStore stateMachine = (QuorusStateStore) node.getStateStore();
             assertTrue(stateMachine.hasTransferJob(testJob.getJobId()), 
                 "Node " + node.getNodeId() + " should have transfer job " + testJob.getJobId());
-            logger.info("✓ Node " + node.getNodeId() + " has transfer job " + testJob.getJobId());
+            logger.info("[OK] Node " + node.getNodeId() + " has transfer job " + testJob.getJobId());
         }
         
-        logger.info("✅ Basic metadata replication test PASSED");
+        logger.info("[PASS] Basic metadata replication test PASSED");
     }
 
     @Test
@@ -223,7 +223,7 @@ public class MetadataPersistenceTest {
             for (TransferJob job : testJobs) {
                 assertTrue(stateMachine.hasTransferJob(job.getJobId()),
                     "Node " + node.getNodeId() + " should still have job " + job.getJobId() + " after leader change");
-                logger.info("✓ Node " + node.getNodeId() + " preserved job " + job.getJobId());
+                logger.info("[OK] Node " + node.getNodeId() + " preserved job " + job.getJobId());
             }
         }
         
@@ -245,10 +245,10 @@ public class MetadataPersistenceTest {
             QuorusStateStore stateMachine = (QuorusStateStore) node.getStateStore();
             assertTrue(stateMachine.hasTransferJob(newJob.getJobId()),
                 "Node " + node.getNodeId() + " should have new job " + newJob.getJobId());
-            logger.info("✓ Node " + node.getNodeId() + " received new job " + newJob.getJobId());
+            logger.info("[OK] Node " + node.getNodeId() + " received new job " + newJob.getJobId());
         }
         
-        logger.info("✅ Metadata preservation during leader change test PASSED");
+        logger.info("[PASS] Metadata preservation during leader change test PASSED");
     }
 
     @Test
@@ -315,10 +315,10 @@ public class MetadataPersistenceTest {
         for (TransferJob job : jobsWhileDown) {
             assertTrue(recoveredStateMachine.hasTransferJob(job.getJobId()),
                 "Recovered node should have job " + job.getJobId() + " that was submitted while it was down");
-            logger.info("✓ Recovered node has job " + job.getJobId());
+            logger.info("[OK] Recovered node has job " + job.getJobId());
         }
         
-        logger.info("✅ Failed node recovery test PASSED");
+        logger.info("[PASS] Failed node recovery test PASSED");
     }
 
     // Helper methods
