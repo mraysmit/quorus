@@ -23,6 +23,14 @@
             <artifactId>quorus-core</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- Test utilities from quorus-core (ExpectsError annotation) -->
+        <dependency>
+            <groupId>dev.mars</groupId>
+            <artifactId>quorus-core</artifactId>
+            <version>${project.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
 
         <!-- OpenTelemetry API (Phase 9 - Jan 2026) -->
         <dependency>
