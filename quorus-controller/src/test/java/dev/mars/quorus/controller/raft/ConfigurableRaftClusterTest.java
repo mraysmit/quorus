@@ -22,6 +22,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.testcontainers.containers.ComposeContainer;
@@ -53,6 +55,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * @since 2025-08-20
  */
 @Tag("docker")
+@Execution(ExecutionMode.CONCURRENT)
 public class ConfigurableRaftClusterTest {
 
     private static final Logger logger = Logger.getLogger(ConfigurableRaftClusterTest.class.getName());

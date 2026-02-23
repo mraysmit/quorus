@@ -16,12 +16,25 @@
     <name>Quorus Distributed Controller</name>
     <description>Distributed controller with Raft consensus for Quorus file transfer system</description>
 
+    <properties>
+        <!-- Default: skip heavyweight tests. Override with -Dtest.excludedGroups= to run all -->
+        <test.excludedGroups>docker,slow</test.excludedGroups>
+    </properties>
+
     <dependencies>
         <!-- Quorus Core Dependencies -->
         <dependency>
             <groupId>dev.mars</groupId>
             <artifactId>quorus-core</artifactId>
             <version>${project.version}</version>
+        </dependency>
+        <!-- Test utilities from quorus-core (ExpectsError annotation) -->
+        <dependency>
+            <groupId>dev.mars</groupId>
+            <artifactId>quorus-core</artifactId>
+            <version>${project.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>dev.mars</groupId>
@@ -238,7 +251,7 @@
                         slow   - timing-sensitive in-memory Raft cluster tests
                       Run them explicitly:  mvn test -Dgroups=docker,slow
                     -->
-                    <excludedGroups>docker,slow</excludedGroups>
+                    <excludedGroups>${test.excludedGroups}</excludedGroups>
                     <systemPropertyVariables>
                         <java.util.logging.manager>java.util.logging.LogManager</java.util.logging.manager>
                     </systemPropertyVariables>

@@ -18,12 +18,14 @@ package dev.mars.quorus.controller.raft;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.mars.quorus.testing.ExpectsError;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
+import org.junit.jupiter.api.parallel.Isolated;
 import org.testcontainers.containers.ComposeContainer;
 
 import java.net.URI;
@@ -31,7 +33,6 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Logger;
 
@@ -52,6 +53,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * @since 2025-08-20
  */
 @Tag("docker")
+@Isolated("Mutates the shared 5-node cluster network via NetworkTestUtils")
 public class AdvancedNetworkTest {
 
     private static final Logger logger = Logger.getLogger(AdvancedNetworkTest.class.getName());
@@ -136,6 +138,7 @@ public class AdvancedNetworkTest {
     }
 
     @Test
+    @ExpectsError("Container image lacks iproute2 — tc latency commands fail with SEVERE")
     void testGeographicDistribution() {
         // Wait for initial stable cluster
         await().atMost(Duration.ofSeconds(45))
@@ -163,6 +166,7 @@ public class AdvancedNetworkTest {
     }
 
     @Test
+    @ExpectsError("Container image lacks iproute2 — tc latency/packet-loss commands fail with SEVERE")
     void testComplexNetworkScenario() {
         // Wait for initial stable cluster
         await().atMost(Duration.ofSeconds(45))
@@ -199,6 +203,7 @@ public class AdvancedNetworkTest {
     }
 
     @Test
+    @ExpectsError("Container image lacks iptables/iproute2 — isolation and latency commands fail with SEVERE")
     void testNetworkRecoveryScenarios() {
         // Wait for initial stable cluster
         await().atMost(Duration.ofSeconds(45))
