@@ -233,12 +233,6 @@ public class SmbTransferProtocol implements TransferProtocol {
             
             logger.info("Starting SMB upload: {} -> {}", sourcePath, destinationUri);
             
-            // Check if this is a test request with simulated server
-            if (isSimulatedUploadRequest(destinationUri)) {
-                logger.debug("Detected simulated upload request, using mock SMB server");
-                return performSimulatedUpload(request, progressTracker, sourcePath, startTime);
-            }
-            
             // Parse SMB URI and extract connection details
             SmbConnectionInfo connectionInfo = parseSmbUri(destinationUri);
             logger.debug("performSmbUpload: parsed connection info - host={}, path={}, hasAuth={}", 
@@ -296,76 +290,6 @@ public class SmbTransferProtocol implements TransferProtocol {
         }
     }
 
-    /**
-     * Determines if the destination URI indicates a simulated/test server.
-     * This allows unit tests to run without a real SMB server.
-     */
-    private boolean isSimulatedUploadRequest(URI destinationUri) {
-        String host = destinationUri.getHost();
-        return host != null && (
-            host.equals("testserver") ||
-            host.equals("localhost.test") ||
-            host.equals("simulated-smb-server")
-        );
-    }
-
-    /**
-     * Performs a simulated upload for unit testing without a real SMB server.
-     * This allows tests to verify the upload logic and result handling.
-     */
-    private TransferResult performSimulatedUpload(TransferRequest request, ProgressTracker progressTracker,
-            Path sourcePath, Instant startTime) throws IOException {
-        logger.debug("Performing simulated SMB upload for testing");
-        
-        // Validate destination URI
-        URI destinationUri = request.getDestinationUri();
-        String host = destinationUri.getHost();
-        String path = destinationUri.getPath();
-        
-        if (host == null || host.isEmpty()) {
-            throw new IOException("Invalid destination URI: missing host");
-        }
-        if (path == null || path.isEmpty()) {
-            throw new IOException("Invalid destination URI: missing path");
-        }
-        
-        // Read the source file to simulate transfer
-        long fileSize = Files.size(sourcePath);
-        progressTracker.setTotalBytes(fileSize);
-        
-        // Simulate reading the file (validates file is readable)
-        long bytesTransferred = 0;
-        try (InputStream inputStream = Files.newInputStream(sourcePath);
-             BufferedInputStream bufferedInput = new BufferedInputStream(inputStream, DEFAULT_BUFFER_SIZE)) {
-            
-            byte[] buffer = new byte[DEFAULT_BUFFER_SIZE];
-            int bytesRead;
-            
-            while ((bytesRead = bufferedInput.read(buffer)) != -1) {
-                bytesTransferred += bytesRead;
-                progressTracker.updateProgress(bytesTransferred);
-                
-                // Check for cancellation
-                if (Thread.currentThread().isInterrupted()) {
-                    throw new IOException("Transfer was cancelled");
-                }
-            }
-        }
-        
-        Instant endTime = Instant.now();
-        Duration transferTime = Duration.between(startTime, endTime);
-        
-        logger.info("Simulated SMB upload completed: bytesTransferred={}, duration={}ms",
-                   bytesTransferred, transferTime.toMillis());
-        
-        return TransferResult.builder()
-                .requestId(request.getRequestId())
-                .finalStatus(TransferStatus.COMPLETED)
-                .bytesTransferred(bytesTransferred)
-                .startTime(startTime)
-                .endTime(endTime)
-                .build();
-    }
     
     private long transferFile(Path sourcePath, Path destinationPath, ProgressTracker progressTracker) 
             throws IOException {

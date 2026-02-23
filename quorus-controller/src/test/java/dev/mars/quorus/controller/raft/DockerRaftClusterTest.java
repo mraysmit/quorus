@@ -29,11 +29,12 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Logger;
 
 import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.*;
@@ -52,6 +53,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * @since 2025-08-20
  */
 @Tag("docker")
+@Execution(ExecutionMode.CONCURRENT)
 public class DockerRaftClusterTest {
 
     private static final Logger logger = Logger.getLogger(DockerRaftClusterTest.class.getName());

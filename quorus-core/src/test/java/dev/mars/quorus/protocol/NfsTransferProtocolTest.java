@@ -409,24 +409,6 @@ class NfsTransferProtocolTest {
     class UploadTransfers {
 
         @Test
-        void uploadToSimulatedNfsServer() throws Exception {
-            Path sourceFile = tempDir.resolve("upload-source.txt");
-            Files.writeString(sourceFile, "NFS upload test content");
-
-            TransferRequest request = TransferRequest.builder()
-                    .requestId("nfs-upload-1")
-                    .sourceUri(sourceFile.toUri())
-                    .destinationUri(URI.create("nfs://simulated-nfs-server/export/upload-dest.txt"))
-                    .build();
-
-            TransferResult result = protocol.transfer(request, context);
-
-            assertEquals(TransferStatus.COMPLETED, result.getFinalStatus());
-            assertTrue(result.getBytesTransferred() > 0);
-            assertEquals("NFS upload test content".length(), result.getBytesTransferred());
-        }
-
-        @Test
         void uploadMissingSourceFileThrows() {
             Path nonExistent = tempDir.resolve("does-not-exist.txt");
 

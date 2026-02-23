@@ -61,8 +61,8 @@ public class SimulatorTestLoggingExtension implements
 
     private static final Logger log = LoggerFactory.getLogger("SimulatorTestRunner");
     
-    private static final String BANNER_LINE = "═".repeat(80);
-    private static final String SECTION_LINE = "─".repeat(60);
+    private static final String BANNER_LINE = "=".repeat(80);
+    private static final String SECTION_LINE = "-".repeat(60);
     private static final DateTimeFormatter TIMESTAMP_FORMAT = 
         DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS z").withZone(ZoneId.systemDefault());
     
@@ -100,17 +100,17 @@ public class SimulatorTestLoggingExtension implements
             MDC.put(MDC_TEST_CLASS, testClassName);
             
             log.info("\n{}", BANNER_LINE);
-            log.info("▶ SIMULATOR TEST SUITE: {}", simulatorName);
+            log.info(">> SIMULATOR TEST SUITE: {}", simulatorName);
             log.info("  Display Name: {}", displayName);
             log.info("  Test Class: {}", testClassName);
             log.info("{}", BANNER_LINE);
             
             // Enhanced TRACE logging for environment/OS context
-            log.trace("  [TRACE] ══════════════════════════ ENVIRONMENT ══════════════════════════");
+            log.trace("  [TRACE] ========================= ENVIRONMENT =========================");
             log.trace("  [TRACE] Initializing test suite for simulator: {}", simulatorName);
             log.trace("  [TRACE] Test class location: {}", context.getRequiredTestClass().getName());
             logEnvironmentContext();
-            log.trace("  [TRACE] ══════════════════════════════════════════════════════════════════");
+            log.trace("  [TRACE] =====================================================================");
         } catch (Exception e) {
             // Graceful recovery - never let logging failure affect tests
             System.err.println("[SimulatorTestLoggingExtension] Failed in beforeAll: " + e.getMessage());
@@ -124,12 +124,12 @@ public class SimulatorTestLoggingExtension implements
             String simulatorName = extractSimulatorName(context);
             
             // Suite summary at TRACE level (avoid log spam)
-            log.trace("  [TRACE] ══════════════════════ SUITE SUMMARY ════════════════════════════");
+            log.trace("  [TRACE] ====================== SUITE SUMMARY =========================");
             logJvmStatsTrace("Suite End");
-            log.trace("  [TRACE] ══════════════════════════════════════════════════════════════════");
+            log.trace("  [TRACE] =====================================================================");
             
             // Minimal suite completion at INFO
-            log.info("◀ {} complete", simulatorName);
+            log.info("<< {} complete", simulatorName);
         } catch (Exception e) {
             // Graceful recovery - never let logging failure affect tests
             System.err.println("[SimulatorTestLoggingExtension] Failed in afterAll: " + e.getMessage());
@@ -165,31 +165,31 @@ public class SimulatorTestLoggingExtension implements
             MDC.put(MDC_CORRELATION_ID, correlationId);
             
             // Minimal INFO logging - just test name (one line)
-            log.info("  ▶ {}", displayName);
+            log.info("  >> {}", displayName);
             
             // Detailed metrics at TRACE level only (for deep debugging)
-            log.trace("  │  [TRACE] ════════════════════════════════════════════════════════");
-            log.trace("  │  [TRACE] CORRELATION ID: {}", correlationId);
-            log.trace("  │  [TRACE] SIMULATOR: {}", simulatorName);
-            log.trace("  │  [TRACE] TEST METHOD: {}", methodName);
-            log.trace("  │  [TRACE] FULL PATH: {}", testPath);
-            log.trace("  │  [TRACE] START TIME: {}", TIMESTAMP_FORMAT.format(startTime));
-            log.trace("  │  [TRACE] THREAD: name={}, id={}, priority={}, group={}", 
+            log.trace("  |  [TRACE] ========================================================");
+            log.trace("  |  [TRACE] CORRELATION ID: {}", correlationId);
+            log.trace("  |  [TRACE] SIMULATOR: {}", simulatorName);
+            log.trace("  |  [TRACE] TEST METHOD: {}", methodName);
+            log.trace("  |  [TRACE] FULL PATH: {}", testPath);
+            log.trace("  |  [TRACE] START TIME: {}", TIMESTAMP_FORMAT.format(startTime));
+            log.trace("  |  [TRACE] THREAD: name={}, id={}, priority={}, group={}", 
                 Thread.currentThread().getName(), 
                 Thread.currentThread().threadId(),
                 Thread.currentThread().getPriority(),
                 Thread.currentThread().getThreadGroup().getName());
-            log.trace("  │  [TRACE] MEMORY: heap={}MB, nonHeap={}MB, free={}MB, used={}MB", 
+            log.trace("  |  [TRACE] MEMORY: heap={}MB, nonHeap={}MB, free={}MB, used={}MB", 
                 getHeapMemoryMB(), getNonHeapMemoryMB(), getFreeMemoryMB(), getUsedMemoryMB());
-            log.trace("  │  [TRACE] THREADS: active={}, peak={}, daemon={}", 
+            log.trace("  |  [TRACE] THREADS: active={}, peak={}, daemon={}", 
                 threadBean.getThreadCount(),
                 threadBean.getPeakThreadCount(),
                 threadBean.getDaemonThreadCount());
-            log.trace("  │  [TRACE] CLASSES: loaded={}, total={}, unloaded={}", 
+            log.trace("  |  [TRACE] CLASSES: loaded={}, total={}, unloaded={}", 
                 getLoadedClassCount(),
                 getTotalLoadedClassCount(),
                 getUnloadedClassCount());
-            log.trace("  │  [TRACE] ════════════════════════════════════════════════════════");
+            log.trace("  |  [TRACE] ========================================================");
         } catch (Exception e) {
             // Graceful recovery - never let logging failure affect tests
             System.err.println("[SimulatorTestLoggingExtension] Failed in beforeEach: " + e.getMessage());
@@ -215,7 +215,7 @@ public class SimulatorTestLoggingExtension implements
         try {
             Duration duration = calculateDuration(context);
             // Minimal success logging - just result (no metrics spam)
-            log.info("    ✓ PASSED ({}ms)", duration.toMillis());
+            log.info("    [PASS] ({}ms)", duration.toMillis());
             // Detailed completion metrics only at TRACE level for successful tests
             logTestCompletionTrace(context, "PASSED", duration);
         } catch (Exception e) {
@@ -230,40 +230,40 @@ public class SimulatorTestLoggingExtension implements
             Duration duration = calculateDuration(context);
             
             // Brief failure summary at ERROR level - no stack trace
-            log.error("    ✗ FAILED ({}ms) - {} - {}", 
+            log.error("    [FAIL] ({}ms) - {} - {}", 
                 duration.toMillis(),
                 cause.getClass().getSimpleName(), 
                 truncateMessage(cause.getMessage(), 80));
             
             // Detailed failure info at DEBUG level (failures warrant more detail)
-            log.debug("  │  [DEBUG] ════════════════════ FAILURE DETAILS ════════════════════");
-            log.debug("  │  [DEBUG] ERROR TYPE: {}", cause.getClass().getName());
-            log.debug("  │  [DEBUG] ERROR MESSAGE: {}", cause.getMessage());
+            log.debug("  |  [DEBUG] ==================== FAILURE DETAILS ====================");
+            log.debug("  |  [DEBUG] ERROR TYPE: {}", cause.getClass().getName());
+            log.debug("  |  [DEBUG] ERROR MESSAGE: {}", cause.getMessage());
             if (cause.getCause() != null) {
-                log.debug("  │  [DEBUG] ROOT CAUSE: {} - {}", 
+                log.debug("  |  [DEBUG] ROOT CAUSE: {} - {}", 
                     cause.getCause().getClass().getName(), cause.getCause().getMessage());
             }
             // Show completion metrics at DEBUG for failures (helps diagnose resource issues)
             logTestCompletionDebug(context, "FAILED", duration);
-            log.debug("  │  [DEBUG] ══════════════════════════════════════════════════════════");
+            log.debug("  |  [DEBUG] =================================================================");
             
             // Full stack trace ONLY at TRACE level
-            log.trace("  │  [TRACE] ════════════════════ FULL STACK TRACE ════════════════════");
+            log.trace("  |  [TRACE] ==================== FULL STACK TRACE ====================");
             StackTraceElement[] stack = cause.getStackTrace();
             for (int i = 0; i < stack.length; i++) {
-                log.trace("  │  [TRACE]   at {}", stack[i]);
+                log.trace("  |  [TRACE]   at {}", stack[i]);
             }
             // Log nested causes at TRACE level
             Throwable nested = cause.getCause();
             while (nested != null) {
-                log.trace("  │  [TRACE] Caused by: {}: {}", 
+                log.trace("  |  [TRACE] Caused by: {}: {}", 
                     nested.getClass().getName(), nested.getMessage());
                 for (StackTraceElement element : nested.getStackTrace()) {
-                    log.trace("  │  [TRACE]   at {}", element);
+                    log.trace("  |  [TRACE]   at {}", element);
                 }
                 nested = nested.getCause();
             }
-            log.trace("  │  [TRACE] ══════════════════════════════════════════════════════════");
+            log.trace("  |  [TRACE] =================================================================");
         } catch (Exception e) {
             // Graceful recovery - never let logging failure propagate
             System.err.println("[SimulatorTestLoggingExtension] Failed to log test failure: " + e.getMessage());
@@ -287,7 +287,7 @@ public class SimulatorTestLoggingExtension implements
     public void testAborted(ExtensionContext context, Throwable cause) {
         try {
             Duration duration = calculateDuration(context);
-            log.warn("    ⊘ ABORTED ({}ms) - {}", duration.toMillis(), 
+            log.warn("    [SKIP] ABORTED ({}ms) - {}", duration.toMillis(), 
                 cause != null ? cause.getMessage() : "unknown");
             
             // Log full abort details at TRACE level only

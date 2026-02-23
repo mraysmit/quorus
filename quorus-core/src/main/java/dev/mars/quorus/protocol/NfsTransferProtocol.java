@@ -443,13 +443,18 @@ public class NfsTransferProtocol implements TransferProtocol {
     }
 
     /**
-     * Resolves a simulated NFS path for test scenarios.
-     * When running tests, the export path is used as a direct local path.
+     * Returns the configured mount root path.
      */
-    private Path resolveSimulatedPath(NfsConnectionInfo connectionInfo) {
-        // For simulation, treat the full path as a local filesystem path
-        String localPath = "/" + connectionInfo.exportPath + connectionInfo.filePath;
-        return Paths.get(localPath);
+    public String getMountRoot() {
+        return mountRoot;
+    }
+
+    private static String getDefaultMountRoot() {
+        String os = System.getProperty("os.name", "").toLowerCase();
+        if (os.contains("win")) {
+            return "C:\\nfs";
+        }
+        return "/mnt";
     }
 
     /**

@@ -24,6 +24,8 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.testcontainers.containers.ComposeContainer;
 
 import java.net.URI;
@@ -52,6 +54,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * @since 2025-08-20
  */
 @Tag("docker")
+@Execution(ExecutionMode.CONCURRENT)
 public class NetworkPartitionTest {
 
     private static final Logger logger = Logger.getLogger(NetworkPartitionTest.class.getName());

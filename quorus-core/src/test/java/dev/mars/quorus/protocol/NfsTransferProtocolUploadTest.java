@@ -76,61 +76,6 @@ class NfsTransferProtocolUploadTest {
     }
 
     @Test
-    void uploadToSimulatedServer() throws Exception {
-        Path sourceFile = tempDir.resolve("upload-source.txt");
-        Files.writeString(sourceFile, "Upload content via simulated NFS");
-
-        TransferRequest request = TransferRequest.builder()
-                .requestId("nfs-sim-upload")
-                .sourceUri(sourceFile.toUri())
-                .destinationUri(URI.create("nfs://simulated-nfs-server/data/upload-target.txt"))
-                .build();
-
-        TransferResult result = protocol.transfer(request, context);
-
-        assertEquals(TransferStatus.COMPLETED, result.getFinalStatus());
-        assertEquals("Upload content via simulated NFS".length(), result.getBytesTransferred());
-        assertNotNull(result.getRequestId());
-        assertEquals("nfs-sim-upload", result.getRequestId());
-    }
-
-    @Test
-    void uploadToSimulatedTestServer() throws Exception {
-        Path sourceFile = tempDir.resolve("test-upload.bin");
-        byte[] data = new byte[1024];
-        java.util.Arrays.fill(data, (byte) 0x42);
-        Files.write(sourceFile, data);
-
-        TransferRequest request = TransferRequest.builder()
-                .requestId("nfs-test-upload")
-                .sourceUri(sourceFile.toUri())
-                .destinationUri(URI.create("nfs://testserver/export/test-upload.bin"))
-                .build();
-
-        TransferResult result = protocol.transfer(request, context);
-
-        assertEquals(TransferStatus.COMPLETED, result.getFinalStatus());
-        assertEquals(1024, result.getBytesTransferred());
-    }
-
-    @Test
-    void uploadToLocalhostTestServer() throws Exception {
-        Path sourceFile = tempDir.resolve("localhost-upload.txt");
-        Files.writeString(sourceFile, "localhost test content");
-
-        TransferRequest request = TransferRequest.builder()
-                .requestId("nfs-localhost-upload")
-                .sourceUri(sourceFile.toUri())
-                .destinationUri(URI.create("nfs://localhost.test/share/file.txt"))
-                .build();
-
-        TransferResult result = protocol.transfer(request, context);
-
-        assertEquals(TransferStatus.COMPLETED, result.getFinalStatus());
-        assertTrue(result.getBytesTransferred() > 0);
-    }
-
-    @Test
     void uploadToMountedPath() throws Exception {
         Path sourceFile = tempDir.resolve("mounted-upload-src.dat");
         Files.writeString(sourceFile, "content for mounted upload");
