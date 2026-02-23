@@ -19,6 +19,7 @@ package dev.mars.quorus.workflow;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import dev.mars.quorus.testing.ExpectsError;
 import io.vertx.core.Future;
 import java.time.Duration;
 import java.util.List;
@@ -120,6 +121,7 @@ class SimpleWorkflowEngineTest {
     }
     
     @Test
+    @ExpectsError("Simulated transfer failure -- verifies workflow marks group as FAILED")
     void testFailedTransfer() throws Exception {
         testTransferEngine.simulateFailure();
 
@@ -136,6 +138,7 @@ class SimpleWorkflowEngineTest {
     }
     
     @Test
+    @ExpectsError("Simulated transfer exception -- verifies workflow catches and marks FAILED")
     void testTransferException() throws Exception {
         testTransferEngine.simulateException(new RuntimeException("Transfer failed"));
 
@@ -202,6 +205,7 @@ class SimpleWorkflowEngineTest {
     }
     
     @Test
+    @ExpectsError("Empty workflow name -- verifies validation rejects and returns FAILED status")
     void testInvalidWorkflow() throws Exception {
         // Create invalid workflow (missing required fields)
         WorkflowDefinition invalidWorkflow = createInvalidWorkflow();
@@ -241,7 +245,7 @@ class SimpleWorkflowEngineTest {
 
         // Create metadata with all required fields for schema validation
         WorkflowDefinition.WorkflowMetadata metadata = new WorkflowDefinition.WorkflowMetadata(
-                "Test Workflow Engine",                    // name - required, descriptive
+                "test-workflow-engine",                    // name - required, alphanumeric with hyphens
                 "1.0.0",                                   // version - required, semantic versioning
                 "Test workflow for SimpleWorkflowEngine unit tests", // description - required, min 10 chars
                 "validation-test-workflow",                // type - required, standard type
@@ -290,7 +294,7 @@ class SimpleWorkflowEngineTest {
 
         // Create metadata with all required fields for schema validation
         WorkflowDefinition.WorkflowMetadata metadata = new WorkflowDefinition.WorkflowMetadata(
-                "Variable Resolution Test Workflow",       // name - required, descriptive
+                "variable-resolution-test-workflow",       // name - required, alphanumeric with hyphens
                 "1.0.0",                                   // version - required, semantic versioning
                 "Test workflow for variable resolution functionality", // description - required
                 "validation-test-workflow",                // type - required, standard type
