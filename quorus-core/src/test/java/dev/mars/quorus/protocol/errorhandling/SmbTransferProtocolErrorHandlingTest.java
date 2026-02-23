@@ -64,7 +64,7 @@ class SmbTransferProtocolErrorHandlingTest extends ProtocolErrorHandlingTestBase
 
         @Test
         @DisplayName("Transfer should fail with invalid SMB URI (no path)")
-        @ExpectsError("Invalid SMB URI — no path in host-only URI")
+        @ExpectsError("Invalid SMB URI -- no path in host-only URI")
         void transfer_failsWithInvalidSmbUri() {
             // URI.create("smb://") throws IllegalArgumentException due to missing authority
             assertThrows(IllegalArgumentException.class, () -> {
@@ -85,7 +85,7 @@ class SmbTransferProtocolErrorHandlingTest extends ProtocolErrorHandlingTestBase
 
         @Test
         @DisplayName("Transfer should fail with SMB URI missing host")
-        @ExpectsError("Malformed SMB URI — no hostname")
+        @ExpectsError("Malformed SMB URI -- no hostname")
         void transfer_failsWithSmbUriMissingHost() {
             TransferRequest request = TransferRequest.builder()
                     .requestId("test-missing-host")
@@ -100,7 +100,7 @@ class SmbTransferProtocolErrorHandlingTest extends ProtocolErrorHandlingTestBase
 
         @Test
         @DisplayName("Transfer should fail with SMB URI missing path")
-        @ExpectsError("Malformed SMB URI — no file path")
+        @ExpectsError("Malformed SMB URI -- no file path")
         void transfer_failsWithSmbUriMissingPath() {
             TransferRequest request = TransferRequest.builder()
                     .requestId("test-missing-path")
@@ -127,7 +127,7 @@ class SmbTransferProtocolErrorHandlingTest extends ProtocolErrorHandlingTestBase
 
         @Test
         @DisplayName("Exception should contain protocol context information")
-        @ExpectsError("UNC path not found — verifies SMB context in exception message")
+        @ExpectsError("UNC path not found -- verifies SMB context in exception message")
         void exception_containsProtocolContext() {
             TransferRequest request = TransferRequest.builder()
                     .requestId("test-exception-id")
@@ -150,7 +150,7 @@ class SmbTransferProtocolErrorHandlingTest extends ProtocolErrorHandlingTestBase
 
         @Test
         @DisplayName("Upload should fail when source file does not exist")
-        @ExpectsError("Source file missing — verifies upload pre-check")
+        @ExpectsError("Source file missing -- verifies upload pre-check")
         void upload_failsWhenSourceNotExists() {
             Path nonExistentFile = tempDir.resolve("does-not-exist.txt");
 
@@ -176,7 +176,7 @@ class SmbTransferProtocolErrorHandlingTest extends ProtocolErrorHandlingTestBase
 
         @Test
         @DisplayName("Upload should fail with empty destination host")
-        @ExpectsError("Malformed destination URI — no hostname")
+        @ExpectsError("Malformed destination URI -- no hostname")
         void upload_failsWithEmptyDestinationHost() throws IOException {
             Path localFile = tempDir.resolve("test-file.txt");
             Files.writeString(localFile, "Test content");
@@ -196,7 +196,7 @@ class SmbTransferProtocolErrorHandlingTest extends ProtocolErrorHandlingTestBase
 
         @Test
         @DisplayName("Upload should fail with empty destination path")
-        @ExpectsError("Malformed destination URI — no file path")
+        @ExpectsError("Malformed destination URI -- no file path")
         void upload_failsWithEmptyDestinationPath() throws IOException {
             Path localFile = tempDir.resolve("test-file.txt");
             Files.writeString(localFile, "Test content");
@@ -216,7 +216,7 @@ class SmbTransferProtocolErrorHandlingTest extends ProtocolErrorHandlingTestBase
 
         @Test
         @DisplayName("Upload exception should contain transfer ID from context")
-        @ExpectsError("Malformed URI — verifies transferId in exception")
+        @ExpectsError("Malformed URI -- verifies transferId in exception")
         void upload_exceptionContainsTransferId() throws IOException {
             Path localFile = tempDir.resolve("test-file.txt");
             Files.writeString(localFile, "Test content");

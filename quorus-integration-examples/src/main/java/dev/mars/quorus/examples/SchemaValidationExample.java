@@ -262,32 +262,32 @@ public class SchemaValidationExample {
         // Valid email format
         String emailWorkflow = createTestWorkflow("test@company.com");
         ValidationResult emailResult = parser.validateSchema(emailWorkflow);
-        log.keyValue("Email author format", (emailResult.isValid() ? "✓ Valid" : "✗ Invalid"));
+        log.keyValue("Email author format", (emailResult.isValid() ? "[OK] Valid" : "[FAIL] Invalid"));
         
         // Valid name format
         String nameWorkflow = createTestWorkflow("John Doe");
         ValidationResult nameResult = parser.validateSchema(nameWorkflow);
-        log.keyValue("Name author format", (nameResult.isValid() ? "✓ Valid" : "✗ Invalid"));
+        log.keyValue("Name author format", (nameResult.isValid() ? "[OK] Valid" : "[FAIL] Invalid"));
     }
     
     private void testDateValidation(WorkflowDefinitionParser parser) {
         String validDateWorkflow = createTestWorkflowWithDate("2025-08-21");
         ValidationResult validResult = parser.validateSchema(validDateWorkflow);
-        log.keyValue("Valid date format", (validResult.isValid() ? "✓ Valid" : "✗ Invalid"));
+        log.keyValue("Valid date format", (validResult.isValid() ? "[OK] Valid" : "[FAIL] Invalid"));
         
         String invalidDateWorkflow = createTestWorkflowWithDate("21-08-2025");
         ValidationResult invalidResult = parser.validateSchema(invalidDateWorkflow);
-        log.keyValue("Invalid date format", (!invalidResult.isValid() ? "✓ Correctly rejected" : "✗ Incorrectly accepted"));
+        log.keyValue("Invalid date format", (!invalidResult.isValid() ? "[OK] Correctly rejected" : "[FAIL] Incorrectly accepted"));
     }
     
     private void testTagValidation(WorkflowDefinitionParser parser) {
         String validTagsWorkflow = createTestWorkflowWithTags("[\"test\", \"validation\", \"example\"]");
         ValidationResult validResult = parser.validateSchema(validTagsWorkflow);
-        log.keyValue("Valid tags format", (validResult.isValid() ? "✓ Valid" : "✗ Invalid"));
+        log.keyValue("Valid tags format", (validResult.isValid() ? "[OK] Valid" : "[FAIL] Invalid"));
         
         String invalidTagsWorkflow = createTestWorkflowWithTags("[\"INVALID\", \"invalid_underscore\"]");
         ValidationResult invalidResult = parser.validateSchema(invalidTagsWorkflow);
-        log.keyValue("Invalid tags format", (!invalidResult.isValid() ? "✓ Correctly rejected" : "✗ Incorrectly accepted"));
+        log.keyValue("Invalid tags format", (!invalidResult.isValid() ? "[OK] Correctly rejected" : "[FAIL] Incorrectly accepted"));
     }
     
     private String createTestWorkflow(String author) {

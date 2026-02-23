@@ -85,7 +85,7 @@ public class NetworkTestUtils {
             if (allSucceeded) {
                 logger.info("Docker network partition created successfully");
             } else {
-                logger.severe("Docker network partition partially failed — some nodes may not be isolated");
+                logger.severe("Docker network partition partially failed -- some nodes may not be isolated");
             }
             return allSucceeded;
 

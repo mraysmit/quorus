@@ -152,7 +152,7 @@ class FtpsUploadIntegrationTest {
             // Use Apache Commons Net FTPSClient for raw connectivity validation.
             // In explicit mode (isImplicit=false), FTPSClient.connect() automatically
             // executes AUTH TLS during _connectAction_(), so we must NOT call
-            // execAUTH("TLS") manually — doing so would get reply 530 (already upgraded).
+            // execAUTH("TLS") manually -- doing so would get reply 530 (already upgraded).
             FTPSClient ftpsClient = new FTPSClient("TLS", false); // explicit FTPS
             ftpsClient.setTrustManager(new org.apache.commons.net.util.TrustManagerUtils()
                     .getAcceptAllTrustManager());
@@ -160,7 +160,7 @@ class FtpsUploadIntegrationTest {
             ftpsClient.setDefaultTimeout(10_000);
 
             try {
-                // Connect — this reads the 220 banner and performs AUTH TLS + SSL handshake
+                // Connect -- this reads the 220 banner and performs AUTH TLS + SSL handshake
                 long startConnect = System.currentTimeMillis();
                 ftpsClient.connect(ftpsHost, ftpsPort);
                 int reply = ftpsClient.getReplyCode();
@@ -336,10 +336,10 @@ class FtpsUploadIntegrationTest {
             assertEquals(TransferStatus.COMPLETED, downloadResult.getFinalStatus());
             log("uploadDownloadRoundtrip", "Download phase completed: " + downloadResult.getBytesTransferred() + " bytes");
 
-            // Verify content matches — this proves end-to-end FTPS data integrity
+            // Verify content matches -- this proves end-to-end FTPS data integrity
             String downloadedContent = Files.readString(downloadedFile);
             assertEquals(originalContent, downloadedContent,
-                    "Content after FTPS upload→download roundtrip must match original");
+                    "Content after FTPS upload->download roundtrip must match original");
             log("uploadDownloadRoundtrip", "[PASS] FTPS roundtrip data integrity verified");
         }
 

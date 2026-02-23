@@ -345,7 +345,7 @@ public class MultiTenantExample {
         if (tenant == null) return;
         
         String indent = "  ".repeat(depth);
-        log.info(indent + "├─ " + tenant.getName() + " (" + tenant.getTenantId() + ")");
+        log.info(indent + "+-- " + tenant.getName() + " (" + tenant.getTenantId() + ")");
         
         List<Tenant> children = tenantService.getChildTenants(tenantId);
         for (Tenant child : children) {

@@ -20,6 +20,7 @@ import io.vertx.core.Future;
 import io.vertx.core.Vertx;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 
 import java.net.InetAddress;
 import java.time.Duration;
@@ -59,9 +60,19 @@ public class NetworkTopologyService {
             return Future.succeededFuture(cachedNode);
         }
         
-        // Perform network discovery (blocking)
+        // Perform network discovery (blocking, propagate MDC to worker thread)
         logger.debug("Cache miss or stale for '{}', performing network discovery", hostname);
-        return vertx.executeBlocking(() -> performNetworkDiscovery(hostname))
+        Map<String, String> mdcContext = MDC.getCopyOfContextMap();
+        return vertx.<NetworkNode>executeBlocking(() -> {
+            if (mdcContext != null) {
+                MDC.setContextMap(mdcContext);
+            }
+            try {
+                return performNetworkDiscovery(hostname);
+            } finally {
+                MDC.clear();
+            }
+        })
             .onSuccess(node -> {
                 networkNodes.put(hostname, node);
                 logger.info("Network discovery completed for {} - Latency: {}ms, Bandwidth: {} MB/s, Type: {}",

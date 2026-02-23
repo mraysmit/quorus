@@ -41,6 +41,7 @@ import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.metrics.LongCounter;
 import io.opentelemetry.api.metrics.LongHistogram;
 import io.opentelemetry.api.metrics.Meter;
+import org.slf4j.MDC;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -363,6 +364,10 @@ public class RaftNode {
                 }
 
                 logger.info("Starting Raft node: {}", nodeId);
+
+                // Set initial Raft MDC context
+                MDC.put("raftRole", "FOLLOWER");
+                MDC.put("raftTerm", String.valueOf(currentTerm));
 
                 // Set reference to this node in transport
                 transport.setRaftNode(this);
@@ -850,6 +855,8 @@ public class RaftNode {
         state = State.CANDIDATE;
         currentTerm++;
         votedFor = nodeId;
+        MDC.put("raftRole", "CANDIDATE");
+        MDC.put("raftTerm", String.valueOf(currentTerm));
         notifyStateChangeListeners(State.CANDIDATE);
 
         resetElectionTimer();
@@ -917,6 +924,8 @@ public class RaftNode {
             return;
 
         state = State.LEADER;
+        MDC.put("raftRole", "LEADER");
+        MDC.put("raftTerm", String.valueOf(currentTerm));
         logger.info("Node {} became LEADER for term {}", nodeId, currentTerm);
         notifyStateChangeListeners(State.LEADER);
 
@@ -959,6 +968,8 @@ public class RaftNode {
             currentTerm = newTerm;
             votedFor = null;
             state = State.FOLLOWER;
+            MDC.put("raftRole", "FOLLOWER");
+            MDC.put("raftTerm", String.valueOf(currentTerm));
             notifyStateChangeListeners(State.FOLLOWER);
 
             cancelTimers();

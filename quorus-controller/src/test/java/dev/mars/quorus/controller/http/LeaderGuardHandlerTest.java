@@ -135,7 +135,7 @@ class LeaderGuardHandlerTest {
     // ==================== Leader: writes pass through ====================
 
     @Nested
-    @DisplayName("Leader node — writes allowed")
+    @DisplayName("Leader node -- writes allowed")
     class LeaderWrites {
 
         @Test
@@ -158,7 +158,7 @@ class LeaderGuardHandlerTest {
     // ==================== Follower: writes rejected ====================
 
     @Nested
-    @DisplayName("Follower node — writes rejected")
+    @DisplayName("Follower node -- writes rejected")
     class FollowerWrites {
 
         @Test

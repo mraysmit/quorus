@@ -106,9 +106,9 @@ public class ValidationExamplesRunner {
                 ValidationResult result = parser.validate(workflow);
                 
                 if (result.isValid()) {
-                    log.subDetail("✓ Valid - " + workflow.getMetadata().getName());
+                    log.subDetail("[OK] Valid - " + workflow.getMetadata().getName());
                 } else {
-                    log.subDetail("✗ Invalid:");
+                    log.subDetail("[FAIL] Invalid:");
                     result.getErrors().forEach(error ->
                         log.deepDetail(error.toString()));
                 }
@@ -120,7 +120,7 @@ public class ValidationExamplesRunner {
                 }
                 
             } catch (Exception e) {
-                log.subDetail("✗ Error: " + e.getMessage());
+                log.subDetail("[FAIL] Error: " + e.getMessage());
             }
         }
     }
@@ -189,7 +189,7 @@ public class ValidationExamplesRunner {
         log.detail("Best practices for YAML workflow definitions:");
         log.blank();
         
-        log.detail("✓ Required Metadata Fields:");
+        log.detail("[OK] Required Metadata Fields:");
         log.subDetail("name: Descriptive workflow name (2-100 chars)");
         log.subDetail("version: Semantic versioning (e.g., '1.0.0')");
         log.subDetail("description: Clear description (10-500 chars)");
@@ -199,7 +199,7 @@ public class ValidationExamplesRunner {
         log.subDetail("tags: Array of lowercase tags");
         log.blank();
         
-        log.detail("✓ Recommended Workflow Types:");
+        log.detail("[OK] Recommended Workflow Types:");
         log.subDetail("transfer-workflow: File transfer operations");
         log.subDetail("data-pipeline-workflow: ETL and data processing");
         log.subDetail("download-workflow: Download operations");
@@ -210,7 +210,7 @@ public class ValidationExamplesRunner {
         log.subDetail("sync-workflow: Synchronization operations");
         log.blank();
         
-        log.detail("✓ Tag Guidelines:");
+        log.detail("[OK] Tag Guidelines:");
         log.subDetail("Use lowercase letters and numbers");
         log.subDetail("Separate words with hyphens (not underscores)");
         log.subDetail("Keep tags short and descriptive");
@@ -218,7 +218,7 @@ public class ValidationExamplesRunner {
         log.subDetail("Maximum 20 tags per workflow");
         log.blank();
         
-        log.detail("✓ Version Guidelines:");
+        log.detail("[OK] Version Guidelines:");
         log.subDetail("Follow semantic versioning (MAJOR.MINOR.PATCH)");
         log.subDetail("Use pre-release identifiers for testing (1.0.0-beta)");
         log.subDetail("Include build metadata when needed (1.0.0+build.1)");

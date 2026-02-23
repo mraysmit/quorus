@@ -593,7 +593,7 @@ public class DynamicAgentPoolExample {
     private String createLoadBar(int percentage) {
         int filled = percentage / 10;
         int empty = 10 - filled;
-        return "[" + "█".repeat(filled) + "░".repeat(empty) + "]";
+        return "[" + "#".repeat(filled) + ".".repeat(empty) + "]";
     }
     
     // Helper class for scored selection

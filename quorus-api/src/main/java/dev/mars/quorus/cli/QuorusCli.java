@@ -87,9 +87,9 @@ public class QuorusCli {
         // Test connection
         try {
             String info = client.getServiceInfo();
-            System.out.println("✓ Connected to Quorus API");
+            System.out.println("[OK] Connected to Quorus API");
         } catch (QuorusClientException e) {
-            System.err.println("✗ Failed to connect to Quorus API: " + e.getMessage());
+            System.err.println("[FAIL] Failed to connect to Quorus API: " + e.getMessage());
             System.err.println("Please check the URL and credentials.");
             return;
         }

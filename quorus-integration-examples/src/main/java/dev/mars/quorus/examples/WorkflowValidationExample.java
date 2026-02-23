@@ -36,7 +36,7 @@ import java.util.Map;
  * 6. Error handling and reporting
  *
  * IMPORTANT: This example intentionally tests failure scenarios to demonstrate
- * validation capabilities. Expected failures are clearly marked with ✓ symbols
+ * validation capabilities. Expected failures are clearly marked with [OK] symbols
  * and do not indicate actual problems with the system.
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
@@ -51,7 +51,7 @@ public class WorkflowValidationExample {
         log.exampleStart("Workflow Validation Example");
         log.info("This example demonstrates validation capabilities by testing both");
         log.info("valid workflows and intentional failure scenarios.");
-        log.info("Expected failures are marked with ✓ and are part of the demonstration.");
+        log.info("Expected failures are marked with [OK] and are part of the demonstration.");
         log.blank();
 
         try {

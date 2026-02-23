@@ -356,7 +356,7 @@ public class AgentDiscoveryExample {
         log.section("Matching Agents (ranked)");
         for (int i = 0; i < matchingAgents.size(); i++) {
             AgentInfo agent = matchingAgents.get(i);
-            String regionMatch = preferredRegion.equals(agent.getRegion()) ? "✓" : "✗";
+            String regionMatch = preferredRegion.equals(agent.getRegion()) ? "[OK]" : "[FAIL]";
             log.numberedItem(i + 1, String.format("%s [Region: %s %s, Capacity: %d]",
                     agent.getAgentId(), agent.getRegion(), regionMatch,
                     agent.getCapabilities().getMaxConcurrentTransfers()));

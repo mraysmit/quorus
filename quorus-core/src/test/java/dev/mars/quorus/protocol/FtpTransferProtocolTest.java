@@ -125,7 +125,7 @@ class FtpTransferProtocolTest {
     }
     
     @Test
-    @ExpectsError("Connection refused — no FTP server at 127.0.0.1")
+    @ExpectsError("Connection refused -- no FTP server at 127.0.0.1")
     void testTransferWithValidFtpUri() {
         TransferRequest request = TransferRequest.builder()
                 .requestId("test-ftp-transfer")
@@ -142,7 +142,7 @@ class FtpTransferProtocolTest {
     // Error handling tests moved to dev.mars.quorus.protocol.errorhandling.FtpTransferProtocolErrorHandlingTest
     
     @Test
-    @ExpectsError("Connection refused with auth credentials — no FTP server")
+    @ExpectsError("Connection refused with auth credentials -- no FTP server")
     void testFtpUriWithAuthentication() {
         TransferRequest request = TransferRequest.builder()
                 .requestId("test-auth")
@@ -207,7 +207,7 @@ class FtpTransferProtocolTest {
     // Additional error handling tests moved to dev.mars.quorus.protocol.errorhandling.FtpTransferProtocolErrorHandlingTest
     
     @Test
-    @ExpectsError("Connection refused with checksum request — no FTP server")
+    @ExpectsError("Connection refused with checksum request -- no FTP server")
     void testChecksumHandling() {
         TransferRequest request = TransferRequest.builder()
                 .requestId("test-checksum")
@@ -251,7 +251,7 @@ class FtpTransferProtocolTest {
     }
     
     @Test
-    @ExpectsError("Connection refused — verifies timeout error handling")
+    @ExpectsError("Connection refused -- verifies timeout error handling")
     void testConnectionTimeout() {
         // INTENTIONAL FAILURE TEST: Testing connection timeout handling
         // This test verifies that the protocol correctly handles connection timeouts
@@ -272,7 +272,7 @@ class FtpTransferProtocolTest {
     }
     
     @Test
-    @ExpectsError("Connection refused with auth edge case URI — no FTP server")
+    @ExpectsError("Connection refused with auth edge case URI -- no FTP server")
     void testFtpUriAuthenticationEdgeCase() {
         // Test FTP URI with username and password
         TransferRequest request = TransferRequest.builder()
@@ -290,7 +290,7 @@ class FtpTransferProtocolTest {
     }
     
     @Test
-    @ExpectsError("Connection refused on custom port — no FTP server")
+    @ExpectsError("Connection refused on custom port -- no FTP server")
     void testFtpUriCustomPortEdgeCase() {
         // Test FTP URI with custom port
         TransferRequest request = TransferRequest.builder()

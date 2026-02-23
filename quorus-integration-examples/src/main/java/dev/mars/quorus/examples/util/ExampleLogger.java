@@ -60,12 +60,12 @@ public class ExampleLogger {
     private final PrintStream out;
     private final PrintStream err;
     
-    // Unicode symbols for visual feedback
-    private static final String SYMBOL_SUCCESS = "✓";
-    private static final String SYMBOL_FAILURE = "✗";
-    private static final String SYMBOL_WARNING = "⚠";
-    private static final String SYMBOL_INFO = "•";
-    private static final String SYMBOL_ARROW = "→";
+    // ASCII symbols for visual feedback
+    private static final String SYMBOL_SUCCESS = "[OK]";
+    private static final String SYMBOL_FAILURE = "[FAIL]";
+    private static final String SYMBOL_WARNING = "[WARN]";
+    private static final String SYMBOL_INFO = "-";
+    private static final String SYMBOL_ARROW = "->";
     
     // Indentation constants
     private static final String INDENT = "   ";
@@ -140,7 +140,7 @@ public class ExampleLogger {
     
     /**
      * Print a step description (without step number).
-     * Example: → Initializing...
+     * Example: -> Initializing...
      */
     public void step(String description) {
         out.println(SYMBOL_ARROW + " " + description);
@@ -151,7 +151,7 @@ public class ExampleLogger {
      * Print a separator line.
      */
     public void separator() {
-        out.println("─".repeat(60));
+        out.println("-".repeat(60));
     }
     
     /**

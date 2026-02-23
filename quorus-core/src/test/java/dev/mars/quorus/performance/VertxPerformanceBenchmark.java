@@ -171,7 +171,7 @@ public class VertxPerformanceBenchmark {
         logger.info("Max: {}", max / 1000);
 
         // Vert.x should provide low latency
-        assertTrue(p95 / 1000 < 100, "P95 latency should be under 100μs: " + (p95 / 1000));
+        assertTrue(p95 / 1000 < 100, "P95 latency should be under 100us: " + (p95 / 1000));
     }
 
     @Test
@@ -256,7 +256,7 @@ public class VertxPerformanceBenchmark {
 
         // Vertx is so efficient it can complete shutdown quickly
         // Just verify it completed successfully (no exception thrown)
-        logger.info("✓ Graceful shutdown completed successfully");
+        logger.info("[OK] Graceful shutdown completed successfully");
     }
 
     private void runOperations(int count) throws Exception {

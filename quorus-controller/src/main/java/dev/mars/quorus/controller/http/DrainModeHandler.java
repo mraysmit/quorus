@@ -85,7 +85,7 @@ public class DrainModeHandler implements Handler<RoutingContext> {
      */
     public void enterDrainMode() {
         if (draining.compareAndSet(false, true)) {
-            logger.info("HTTP API Server entered drain mode — rejecting new requests");
+            logger.info("HTTP API Server entered drain mode -- rejecting new requests");
         } else {
             logger.debug("Already in drain mode");
         }

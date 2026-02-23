@@ -39,7 +39,7 @@ import java.util.logging.Logger;
  *   <li>Image built ONCE via {@code docker compose build} (not per test class)</li>
  *   <li>Clusters started ONCE and reused across DockerRaftClusterTest,
  *       ConfigurableRaftClusterTest, AdvancedNetworkTest, NetworkPartitionTest</li>
- *   <li>Pre-built compose files use {@code image:} — no build context transfer on start</li>
+ *   <li>Pre-built compose files use {@code image:} -- no build context transfer on start</li>
  * </ul>
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
@@ -127,7 +127,7 @@ public final class SharedDockerCluster {
 
         // Fast path: skip the build entirely if the image is already cached
         if (isImageCached("quorus-controller:test")) {
-            logger.info("Docker image quorus-controller:test already exists — skipping build");
+            logger.info("Docker image quorus-controller:test already exists -- skipping build");
             imageBuilt = true;
             return;
         }
@@ -136,7 +136,7 @@ public final class SharedDockerCluster {
         if (!buildComposeFile.exists()) {
             throw new RuntimeException(
                     "Build compose file not found: " + buildComposeFile.getAbsolutePath()
-                    + " — ensure working directory is the quorus-controller module root");
+                    + " -- ensure working directory is the quorus-controller module root");
         }
 
         logger.info("Building Docker image via: " + buildComposeFile.getAbsolutePath());

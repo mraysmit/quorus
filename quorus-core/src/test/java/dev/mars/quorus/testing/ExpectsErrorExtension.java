@@ -49,7 +49,7 @@ public class ExpectsErrorExtension implements BeforeEachCallback, AfterEachCallb
         String testName = method.getName();
         String reason = annotation.value();
 
-        log.warn("\n{}\n  EXPECTED ERROR TEST: {}\n  Reason: {}\n  Errors below are INTENTIONAL — testing error handling paths\n{}",
+        log.warn("\n{}\n  EXPECTED ERROR TEST: {}\n  Reason: {}\n  Errors below are INTENTIONAL -- testing error handling paths\n{}",
                 TOP, testName, reason, BOTTOM);
     }
 

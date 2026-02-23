@@ -144,9 +144,9 @@ class FtpsTransferProtocolTest {
     // ========================================================================
 
     @Test
-    @ExpectsError("Connection refused on default FTPS port — verifies TransferException")
+    @ExpectsError("Connection refused on default FTPS port -- verifies TransferException")
     void testFtpsDefaultPortUsesExplicitMode() {
-        log("testFtpsDefaultPortUsesExplicitMode", "Testing ftps:// default port → explicit FTPS mode");
+        log("testFtpsDefaultPortUsesExplicitMode", "Testing ftps:// default port -> explicit FTPS mode");
         // ftps:// without explicit port should default to port 21 (explicit FTPS)
         // Uses 127.0.0.1 for instant connection-refused instead of DNS timeout
         TransferRequest request = TransferRequest.builder()
@@ -162,9 +162,9 @@ class FtpsTransferProtocolTest {
     }
 
     @Test
-    @ExpectsError("Connection refused on implicit FTPS port 990 — verifies TransferException")
+    @ExpectsError("Connection refused on implicit FTPS port 990 -- verifies TransferException")
     void testFtpsPort990UsesImplicitMode() {
-        log("testFtpsPort990UsesImplicitMode", "Testing ftps://:990 → implicit FTPS mode");
+        log("testFtpsPort990UsesImplicitMode", "Testing ftps://:990 -> implicit FTPS mode");
         // ftps:// with port 990 should use implicit FTPS
         // Uses 127.0.0.1 for instant connection-refused instead of DNS timeout
         TransferRequest request = TransferRequest.builder()
@@ -179,9 +179,9 @@ class FtpsTransferProtocolTest {
     }
 
     @Test
-    @ExpectsError("Connection refused on custom FTPS port — verifies TransferException")
+    @ExpectsError("Connection refused on custom FTPS port -- verifies TransferException")
     void testFtpsCustomPortUsesExplicitMode() {
-        log("testFtpsCustomPortUsesExplicitMode", "Testing ftps://:2121 → explicit FTPS mode");
+        log("testFtpsCustomPortUsesExplicitMode", "Testing ftps://:2121 -> explicit FTPS mode");
         // ftps:// with a custom port (not 990) should use explicit FTPS
         // Uses 127.0.0.1 for instant connection-refused instead of DNS timeout
         TransferRequest request = TransferRequest.builder()
@@ -196,7 +196,7 @@ class FtpsTransferProtocolTest {
     }
 
     // ========================================================================
-    // FTPS URI parsing — authentication
+    // FTPS URI parsing -- authentication
     // ========================================================================
 
     @Test
@@ -326,7 +326,7 @@ class FtpsTransferProtocolTest {
     }
 
     @Test
-    @ExpectsError("Upload with missing source file — verifies TransferException")
+    @ExpectsError("Upload with missing source file -- verifies TransferException")
     void testFtpsUploadSourceFileNotFound() {
         log("testFtpsUploadSourceFileNotFound", "Testing upload of non-existent file throws TransferException");
         TransferRequest request = TransferRequest.builder()
@@ -341,7 +341,7 @@ class FtpsTransferProtocolTest {
     }
 
     @Test
-    @ExpectsError("Connection refused to unreachable server — verifies TransferException")
+    @ExpectsError("Connection refused to unreachable server -- verifies TransferException")
     void testFtpsConnectionTimeout() {
         log("testFtpsConnectionTimeout", "Testing connection timeout to unreachable FTPS server");
         // Verifies error handling for unreachable FTPS servers.

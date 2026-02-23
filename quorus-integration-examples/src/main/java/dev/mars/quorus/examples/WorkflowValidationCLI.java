@@ -223,7 +223,7 @@ public class WorkflowValidationCLI {
             } catch (Exception e) {
                 errorFiles++;
                 if (!quiet) {
-                    System.err.println("✗ " + filePath + " - Error: " + e.getMessage());
+                    System.err.println("[FAIL] " + filePath + " - Error: " + e.getMessage());
                     if (verbose) {
                         e.printStackTrace();
                     }
@@ -320,12 +320,12 @@ public class WorkflowValidationCLI {
         String status;
         if (result.isValid()) {
             if (result.hasWarnings()) {
-                status = strict ? "✗ FAILED (warnings in strict mode)" : "⚠ VALID (with warnings)";
+                status = strict ? "[FAIL] FAILED (warnings in strict mode)" : "[WARN] VALID (with warnings)";
             } else {
-                status = "✓ VALID";
+                status = "[OK] VALID";
             }
         } else {
-            status = "✗ INVALID";
+            status = "[FAIL] INVALID";
         }
 
         System.out.println("  " + status);

@@ -79,11 +79,11 @@ class TransferStatusTransitionTest {
         return pairs.stream();
     }
 
-    @ParameterizedTest(name = "{0} → {1} should be {2}")
+    @ParameterizedTest(name = "{0} -> {1} should be {2}")
     @MethodSource("allTransferStatusPairs")
     void canTransitionTo_coversAllPairs(TransferStatus from, TransferStatus to, boolean expected) {
         assertEquals(expected, from.canTransitionTo(to),
-                () -> String.format("%s → %s should be %s", from, to, expected ? "valid" : "invalid"));
+                () -> String.format("%s -> %s should be %s", from, to, expected ? "valid" : "invalid"));
     }
 
     // --- getValidTransitions consistency ---
@@ -111,11 +111,11 @@ class TransferStatusTransitionTest {
 
     // --- Self-transition is never valid ---
 
-    @ParameterizedTest(name = "{0} → {0} self-transition should be invalid")
+    @ParameterizedTest(name = "{0} -> {0} self-transition should be invalid")
     @MethodSource("allTransferStatuses")
     void selfTransition_isNeverValid(TransferStatus status) {
         assertFalse(status.canTransitionTo(status),
-                () -> String.format("Self-transition %s → %s should not be valid", status, status));
+                () -> String.format("Self-transition %s -> %s should not be valid", status, status));
     }
 
     // --- Terminal states ---
