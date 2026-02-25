@@ -17,7 +17,6 @@
 package dev.mars.quorus.agent.observability;
 
 import dev.mars.quorus.agent.config.AgentConfig;
-import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
 import io.opentelemetry.sdk.metrics.SdkMeterProvider;
 import io.opentelemetry.sdk.resources.Resource;
@@ -79,14 +78,14 @@ public class AgentTelemetryConfig {
                 .registerMetricReader(prometheusReader)
                 .build();
 
-        // 4. Initialize OpenTelemetry SDK
-        OpenTelemetrySdk openTelemetry = OpenTelemetrySdk.builder()
+        // 4. Initialize OpenTelemetry SDK (registered globally)
+        OpenTelemetrySdk.builder()
                 .setTracerProvider(tracerProvider)
                 .setMeterProvider(meterProvider)
                 .buildAndRegisterGlobal();
 
-        // 5. Configure Vert.x Options
-        return options.setTracingOptions(new OpenTelemetryOptions(openTelemetry));
+        // 5. Configure Vert.x Options (picks up globally registered SDK)
+        return options.setTracingOptions(new OpenTelemetryOptions());
     }
 
     /**

@@ -158,7 +158,7 @@ public class InternalNetworkTransferExample {
             // Interrupt and cleanup monitoring threads
             shutdownMonitoringThreads();
 
-            transferEngine.shutdown(10);
+            transferEngine.shutdown(10).toCompletionStage().toCompletableFuture().join();
             vertx.close();
             log.exampleComplete("Corporate network transfer example");
         }

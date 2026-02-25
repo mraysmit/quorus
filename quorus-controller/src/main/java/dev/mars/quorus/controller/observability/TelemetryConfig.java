@@ -1,7 +1,6 @@
 package dev.mars.quorus.controller.observability;
 
 import dev.mars.quorus.controller.config.AppConfig;
-import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
 import io.opentelemetry.sdk.metrics.SdkMeterProvider;
 import io.opentelemetry.sdk.resources.Resource;
@@ -60,8 +59,8 @@ public class TelemetryConfig {
                 .registerMetricReader(prometheusReader)
                 .build();
 
-        // 4. Initialize OpenTelemetry SDK
-        OpenTelemetrySdk openTelemetry = OpenTelemetrySdk.builder()
+        // 4. Initialize OpenTelemetry SDK (registered globally)
+        OpenTelemetrySdk.builder()
                 .setTracerProvider(tracerProvider)
                 .setMeterProvider(meterProvider)
                 .buildAndRegisterGlobal();
@@ -69,8 +68,8 @@ public class TelemetryConfig {
         logger.info("OpenTelemetry configured: service={}, otlp={}, prometheus={}",
                 serviceName, configuredOtlpEndpoint, configuredPrometheusPort);
 
-        // 5. Configure Vert.x Options
-        return options.setTracingOptions(new OpenTelemetryOptions(openTelemetry));
+        // 5. Configure Vert.x Options (picks up globally registered SDK)
+        return options.setTracingOptions(new OpenTelemetryOptions());
     }
 
     /**

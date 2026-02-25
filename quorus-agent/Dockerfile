@@ -1,5 +1,5 @@
 # Multi-stage build for Quorus Agent
-FROM maven:3.9.9-eclipse-temurin-21 AS builder
+FROM maven:3.9.9-eclipse-temurin-25 AS builder
 
 # Set working directory
 WORKDIR /app
@@ -23,7 +23,7 @@ RUN mvn clean package -pl quorus-agent -am -DskipTests
 
 # ============================================================================
 # Runtime stage
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:25-jre-alpine
 
 # Install required packages
 RUN apk add --no-cache \

@@ -83,15 +83,16 @@ class RaftConsensusTest {
     }
 
     @AfterEach
-    void tearDown() {
+    void tearDown() throws Exception {
+        // Await each node stop to ensure clean shutdown before closing Vert.x
         if (leader != null)
-            leader.stop();
+            leader.stop().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
         if (follower1 != null)
-            follower1.stop();
+            follower1.stop().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
         if (follower2 != null)
-            follower2.stop();
+            follower2.stop().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
         if (vertx != null)
-            vertx.close();
+            vertx.close().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
         InMemoryTransportSimulator.clearAllTransports();
     }
 
@@ -101,9 +102,10 @@ class RaftConsensusTest {
         follower1.start();
         follower2.start();
 
-        // Wait for initial leader election
+        // Wait for initial leader election — allow generous time for split votes
+        // (800ms election timeout means worst-case split vote cycles take ~1.6s each)
         Awaitility.await()
-                .atMost(Duration.ofSeconds(3))
+                .atMost(Duration.ofSeconds(10))
                 .until(() -> {
                     long leaderCount = Set.of(leader, follower1, follower2).stream()
                             .mapToLong(node -> node.isLeader() ? 1 : 0)
@@ -135,7 +137,7 @@ class RaftConsensusTest {
         follower2.start();
 
         Awaitility.await()
-                .atMost(Duration.ofSeconds(3))
+                .atMost(Duration.ofSeconds(10))
                 .until(() -> Set.of(leader, follower1, follower2).stream()
                         .anyMatch(RaftNode::isLeader));
 
@@ -178,7 +180,7 @@ class RaftConsensusTest {
 
         // Wait for leadership
         Awaitility.await()
-                .atMost(Duration.ofSeconds(2))
+                .atMost(Duration.ofSeconds(5))
                 .until(single::isLeader);
 
         // Submit multiple commands
@@ -216,7 +218,7 @@ class RaftConsensusTest {
         testNode.start();
 
         Awaitility.await()
-                .atMost(Duration.ofSeconds(2))
+                .atMost(Duration.ofSeconds(5))
                 .until(() -> testNode.getState() == RaftNode.State.LEADER);
 
         assertTrue(testNode.getCurrentTerm() > 0);

@@ -139,17 +139,16 @@ public class TransferExecutionService {
         return config.getMaxConcurrentTransfers() - getActiveTransferCount();
     }
     
-    public void shutdown() {
+    public Future<Void> shutdown() {
         if (closed.getAndSet(true)) {
-            return; // Already shutdown
+            return Future.succeededFuture(); // Already shutdown
         }
 
         logger.info("Shutting down transfer execution service...");
         running = false;
 
-        // Shutdown transfer engine (which will close Vert.x WorkerExecutor)
-        transferEngine.shutdown(30); // 30 seconds timeout
-
-        logger.info("Transfer execution service shutdown complete");
+        // Reactively shutdown transfer engine (awaits in-flight transfers, then closes WorkerExecutor)
+        return transferEngine.shutdown(30)
+                .onComplete(ar -> logger.info("Transfer execution service shutdown complete"));
     }
 }

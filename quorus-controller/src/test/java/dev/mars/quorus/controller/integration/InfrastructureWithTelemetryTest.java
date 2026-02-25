@@ -141,8 +141,9 @@ class InfrastructureWithTelemetryTest {
         logger.info("[PHASE 3/5] Initializing Vert.x with OpenTelemetry Tracing");
 
         // Initialize Vert.x with OpenTelemetry tracing
+        // SDK is already registered globally via buildAndRegisterGlobal()
         VertxOptions options = new VertxOptions()
-                .setTracingOptions(new OpenTelemetryOptions(openTelemetry));
+                .setTracingOptions(new OpenTelemetryOptions());
         vertx = Vertx.vertx(options);
         logger.info("  -> Vert.x type: " + vertx.getClass().getSimpleName());
         logger.info("  -> Tracing options: OpenTelemetryOptions enabled");

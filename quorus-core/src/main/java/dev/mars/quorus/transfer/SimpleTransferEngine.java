@@ -317,12 +317,12 @@ public class SimpleTransferEngine implements TransferEngine {
     }
     
     @Override
-    public boolean shutdown(long timeoutSeconds) {
-        logger.debug("shutdown: initiating shutdown with timeout={}s", timeoutSeconds);
-        
+    public Future<Void> shutdown(long timeoutSeconds) {
+        logger.debug("shutdown: initiating with timeout={}s", timeoutSeconds);
+
         if (shutdown.getAndSet(true)) {
             logger.debug("shutdown: already shutdown");
-            return true; // Already shutdown
+            return Future.succeededFuture();
         }
 
         logger.info("Shutting down transfer engine...");
@@ -331,13 +331,13 @@ public class SimpleTransferEngine implements TransferEngine {
         // Cancel all active transfers
         activeContexts.values().forEach(TransferContext::cancel);
 
-        // Close Vert.x worker executor (non-blocking)
-        logger.debug("shutdown: closing worker executor");
-        workerExecutor.close();
-
-        logger.info("Transfer engine shutdown completed (Vert.x WorkerExecutor closed)");
-        logger.debug("shutdown: complete");
-        return true;
+        // Reactively wait for in-flight transfers to drain, then close resources
+        return awaitActiveTransfers(timeoutSeconds * 1000)
+                .andThen(ar -> {
+                    logger.debug("shutdown: closing worker executor");
+                    workerExecutor.close();
+                    logger.info("Transfer engine shutdown completed (Vert.x WorkerExecutor closed)");
+                });
     }
     
     /**

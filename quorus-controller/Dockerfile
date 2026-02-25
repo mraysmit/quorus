@@ -10,7 +10,7 @@
 # The raftlog-core dependency (not on Maven Central) is pulled from your
 # local Maven cache via BuildKit's named context feature.
 
-FROM maven:3.9.9-eclipse-temurin-21 AS builder
+FROM maven:3.9.9-eclipse-temurin-25 AS builder
 
 # Set working directory
 WORKDIR /app
@@ -56,7 +56,7 @@ RUN --mount=type=cache,target=/root/.m2/repository/org \
     mvn package -pl quorus-controller -am -DskipTests
 
 # Runtime stage
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:25-jre-alpine
 
 # Install curl for health checks
 RUN apk add --no-cache curl

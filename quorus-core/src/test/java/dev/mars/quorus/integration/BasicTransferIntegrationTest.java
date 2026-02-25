@@ -61,7 +61,7 @@ class BasicTransferIntegrationTest {
     @AfterEach
     void tearDown() {
         if (transferEngine != null) {
-            transferEngine.shutdown(5);
+            transferEngine.shutdown(5).toCompletionStage().toCompletableFuture().join();
         }
         if (testServer != null) {
             testServer.stop();
@@ -254,7 +254,7 @@ class BasicTransferIntegrationTest {
         assertTrue(result.isSuccessful());
 
         // Shutdown should succeed
-        assertTrue(transferEngine.shutdown(5));
+        transferEngine.shutdown(5).toCompletionStage().toCompletableFuture().join();
         assertEquals(0, transferEngine.getActiveTransferCount());
     }
 }

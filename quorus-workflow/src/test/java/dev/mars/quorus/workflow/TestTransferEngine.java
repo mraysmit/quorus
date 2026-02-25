@@ -164,11 +164,11 @@ class TestTransferEngine implements TransferEngine {
     }
     
     @Override
-    public boolean shutdown(long timeoutSeconds) {
+    public Future<Void> shutdown(long timeoutSeconds) {
         shutdown = true;
         jobs.clear();
         activeTransferCount.set(0);
-        return true;
+        return Future.succeededFuture();
     }
 
     @Override

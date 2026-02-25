@@ -57,9 +57,12 @@ class SimpleTransferEngineTest {
     }
 
     @AfterEach
-    void tearDown() {
+    void tearDown(VertxTestContext testContext) {
         if (engine != null) {
-            engine.shutdown(5);
+            engine.shutdown(5)
+                    .onComplete(ar -> testContext.completeNow());
+        } else {
+            testContext.completeNow();
         }
     }
 
@@ -133,12 +136,10 @@ class SimpleTransferEngineTest {
     }
 
     @Test
-    void testShutdownIdempotent() {
-        boolean firstShutdown = engine.shutdown(5);
-        assertTrue(firstShutdown);
-        
-        boolean secondShutdown = engine.shutdown(5);
-        assertTrue(secondShutdown);
+    void testShutdownIdempotent(VertxTestContext testContext) {
+        engine.shutdown(5)
+                .compose(v -> engine.shutdown(5))
+                .onComplete(testContext.succeedingThenComplete());
     }
 
     @Test
