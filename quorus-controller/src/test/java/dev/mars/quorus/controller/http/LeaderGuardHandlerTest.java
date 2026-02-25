@@ -95,13 +95,18 @@ class LeaderGuardHandlerTest {
                 .pollInterval(Duration.ofMillis(100))
                 .until(() -> node1.isLeader() || node2.isLeader() || node3.isLeader());
 
-        // Identify leader and a follower
+        // Identify leader and a follower with their state stores
         RaftNode[] allNodes = {node1, node2, node3};
-        for (RaftNode node : allNodes) {
-            if (node.isLeader()) {
-                leaderNode = node;
+        QuorusStateStore[] allStores = {sm1, sm2, sm3};
+        QuorusStateStore leaderStateStore = null;
+        QuorusStateStore followerStateStore = null;
+        for (int i = 0; i < allNodes.length; i++) {
+            if (allNodes[i].isLeader()) {
+                leaderNode = allNodes[i];
+                leaderStateStore = allStores[i];
             } else if (followerNode == null) {
-                followerNode = node;
+                followerNode = allNodes[i];
+                followerStateStore = allStores[i];
             }
         }
 
@@ -109,11 +114,11 @@ class LeaderGuardHandlerTest {
         assertNotNull(followerNode, "Cluster should have a follower");
 
         // Start HTTP servers on leader and follower
-        leaderServer = new HttpApiServer(vertx, LEADER_PORT, leaderNode);
+        leaderServer = new HttpApiServer(vertx, LEADER_PORT, leaderNode, leaderStateStore);
         leaderServer.start().toCompletionStage().toCompletableFuture()
                 .get(5, java.util.concurrent.TimeUnit.SECONDS);
 
-        followerServer = new HttpApiServer(vertx, FOLLOWER_PORT, followerNode);
+        followerServer = new HttpApiServer(vertx, FOLLOWER_PORT, followerNode, followerStateStore);
         followerServer.start().toCompletionStage().toCompletableFuture()
                 .get(5, java.util.concurrent.TimeUnit.SECONDS);
 

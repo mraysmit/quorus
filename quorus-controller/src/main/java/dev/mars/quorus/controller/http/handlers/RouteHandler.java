@@ -57,9 +57,11 @@ public class RouteHandler {
 
     private static final Logger logger = LoggerFactory.getLogger(RouteHandler.class);
     private final RaftNode raftNode;
+    private final QuorusStateStore stateStore;
 
-    public RouteHandler(RaftNode raftNode) {
+    public RouteHandler(RaftNode raftNode, QuorusStateStore stateStore) {
         this.raftNode = raftNode;
+        this.stateStore = stateStore;
     }
 
     /**
@@ -76,18 +78,23 @@ public class RouteHandler {
                 RouteConfiguration route = body.mapTo(RouteConfiguration.class);
                 validateRouteConfiguration(route);
 
-                QuorusStateStore stateMachine = (QuorusStateStore) raftNode.getStateStore();
-                if (stateMachine.hasRoute(route.getRouteId())) {
-                    throw QuorusApiException.conflict(ErrorCode.ROUTE_DUPLICATE, route.getRouteId());
+                // Ensure route is always created with CONFIGURED status regardless of client input
+                RouteConfiguration routeToStore = (route.getStatus() != RouteStatus.CONFIGURED)
+                        ? route.withStatus(RouteStatus.CONFIGURED)
+                        : route;
+
+                QuorusStateStore stateMachine = this.stateStore;
+                if (stateMachine.hasRoute(routeToStore.getRouteId())) {
+                    throw QuorusApiException.conflict(ErrorCode.ROUTE_DUPLICATE, routeToStore.getRouteId());
                 }
 
-                RouteCommand command = RouteCommand.create(route);
+                RouteCommand command = RouteCommand.create(routeToStore);
                 raftNode.submitCommand(command)
                         .onSuccess(result -> {
                             ctx.response().setStatusCode(201);
                             ctx.json(new JsonObject()
                                     .put("success", true)
-                                    .put("routeId", route.getRouteId())
+                                    .put("routeId", routeToStore.getRouteId())
                                     .put("status", RouteStatus.CONFIGURED.name()));
                         })
                         .onFailure(ctx::fail);
@@ -106,7 +113,7 @@ public class RouteHandler {
      */
     public Handler<RoutingContext> handleList() {
         return ctx -> {
-            QuorusStateStore stateMachine = (QuorusStateStore) raftNode.getStateStore();
+            QuorusStateStore stateMachine = this.stateStore;
             Map<String, RouteConfiguration> routes = stateMachine.getRoutes();
 
             // Optional status filter
@@ -132,7 +139,7 @@ public class RouteHandler {
     public Handler<RoutingContext> handleGet() {
         return ctx -> {
             String routeId = ctx.pathParam("routeId");
-            QuorusStateStore stateMachine = (QuorusStateStore) raftNode.getStateStore();
+            QuorusStateStore stateMachine = this.stateStore;
 
             RouteConfiguration route = stateMachine.getRoute(routeId);
             if (route == null) {
@@ -155,7 +162,7 @@ public class RouteHandler {
                     throw QuorusApiException.badRequest(ErrorCode.BAD_REQUEST, "Request body is required");
                 }
 
-                QuorusStateStore stateMachine = (QuorusStateStore) raftNode.getStateStore();
+                QuorusStateStore stateMachine = this.stateStore;
                 RouteConfiguration existing = stateMachine.getRoute(routeId);
                 if (existing == null) {
                     throw QuorusApiException.notFound(ErrorCode.ROUTE_NOT_FOUND, routeId);
@@ -193,7 +200,7 @@ public class RouteHandler {
     public Handler<RoutingContext> handleDelete() {
         return ctx -> {
             String routeId = ctx.pathParam("routeId");
-            QuorusStateStore stateMachine = (QuorusStateStore) raftNode.getStateStore();
+            QuorusStateStore stateMachine = this.stateStore;
 
             if (!stateMachine.hasRoute(routeId)) {
                 throw QuorusApiException.notFound(ErrorCode.ROUTE_NOT_FOUND, routeId);
@@ -222,7 +229,7 @@ public class RouteHandler {
     public Handler<RoutingContext> handleSuspend() {
         return ctx -> {
             String routeId = ctx.pathParam("routeId");
-            QuorusStateStore stateMachine = (QuorusStateStore) raftNode.getStateStore();
+            QuorusStateStore stateMachine = this.stateStore;
 
             RouteConfiguration existing = stateMachine.getRoute(routeId);
             if (existing == null) {
@@ -264,7 +271,7 @@ public class RouteHandler {
     public Handler<RoutingContext> handleResume() {
         return ctx -> {
             String routeId = ctx.pathParam("routeId");
-            QuorusStateStore stateMachine = (QuorusStateStore) raftNode.getStateStore();
+            QuorusStateStore stateMachine = this.stateStore;
 
             RouteConfiguration existing = stateMachine.getRoute(routeId);
             if (existing == null) {
@@ -272,8 +279,9 @@ public class RouteHandler {
             }
 
             if (existing.getStatus() != RouteStatus.SUSPENDED) {
+                String currentStatus = existing.getStatus() != null ? existing.getStatus().name() : "UNKNOWN";
                 throw QuorusApiException.conflict(ErrorCode.ROUTE_STATE_CONFLICT,
-                        routeId, existing.getStatus().name(), "resume (not suspended)");
+                        routeId, currentStatus, "resume (not suspended)");
             }
 
             RouteCommand command = RouteCommand.resume(routeId);

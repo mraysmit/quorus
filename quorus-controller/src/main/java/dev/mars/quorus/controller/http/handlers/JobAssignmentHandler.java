@@ -63,9 +63,11 @@ public class JobAssignmentHandler {
     private static final Logger logger = LoggerFactory.getLogger(JobAssignmentHandler.class);
 
     private final RaftNode raftNode;
+    private final QuorusStateStore stateStore;
 
-    public JobAssignmentHandler(RaftNode raftNode) {
+    public JobAssignmentHandler(RaftNode raftNode, QuorusStateStore stateStore) {
         this.raftNode = raftNode;
+        this.stateStore = stateStore;
     }
 
     /**
@@ -102,7 +104,7 @@ public class JobAssignmentHandler {
      */
     public Handler<RoutingContext> handleList() {
         return ctx -> {
-            QuorusStateStore stateMachine = (QuorusStateStore) raftNode.getStateStore();
+            QuorusStateStore stateMachine = this.stateStore;
             Map<String, JobAssignment> assignments = stateMachine.getJobAssignments();
 
             JsonArray array = new JsonArray();
@@ -122,7 +124,7 @@ public class JobAssignmentHandler {
     public Handler<RoutingContext> handleGet() {
         return ctx -> {
             String assignmentId = ctx.pathParam("assignmentId");
-            QuorusStateStore stateMachine = (QuorusStateStore) raftNode.getStateStore();
+            QuorusStateStore stateMachine = this.stateStore;
 
             JobAssignment assignment = stateMachine.getJobAssignment(assignmentId);
             if (assignment == null) {
@@ -276,7 +278,7 @@ public class JobAssignmentHandler {
      * @throws QuorusApiException with ASSIGNMENT_NOT_FOUND if it doesn't exist
      */
     private JobAssignment lookupAssignment(String assignmentId) {
-        QuorusStateStore stateMachine = (QuorusStateStore) raftNode.getStateStore();
+        QuorusStateStore stateMachine = this.stateStore;
         JobAssignment assignment = stateMachine.getJobAssignment(assignmentId);
         if (assignment == null) {
             throw QuorusApiException.notFound(ErrorCode.ASSIGNMENT_NOT_FOUND, assignmentId);

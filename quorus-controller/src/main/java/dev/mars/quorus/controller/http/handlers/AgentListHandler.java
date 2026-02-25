@@ -45,14 +45,16 @@ public class AgentListHandler implements Handler<RoutingContext> {
 
     private static final Logger logger = LoggerFactory.getLogger(AgentListHandler.class);
     private final RaftNode raftNode;
+    private final QuorusStateStore stateStore;
 
-    public AgentListHandler(RaftNode raftNode) {
+    public AgentListHandler(RaftNode raftNode, QuorusStateStore stateStore) {
         this.raftNode = raftNode;
+        this.stateStore = stateStore;
     }
 
     @Override
     public void handle(RoutingContext ctx) {
-        QuorusStateStore stateMachine = (QuorusStateStore) raftNode.getStateStore();
+        QuorusStateStore stateMachine = this.stateStore;
         Map<String, AgentInfo> agents = stateMachine.getAgents();
 
         JsonArray agentArray = new JsonArray();

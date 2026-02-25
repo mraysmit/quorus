@@ -18,6 +18,7 @@ package dev.mars.quorus.controller.http;
 
 import dev.mars.quorus.controller.http.handlers.*;
 import dev.mars.quorus.controller.raft.RaftNode;
+import dev.mars.quorus.controller.state.QuorusStateStore;
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
 import io.vertx.core.http.HttpServer;
@@ -54,6 +55,7 @@ public class HttpApiServer {
     private final Vertx vertx;
     private final int port;
     private final RaftNode raftNode;
+    private final QuorusStateStore stateStore;
     private final int prometheusPort;
     private final DrainModeHandler drainModeHandler;
     private HttpServer httpServer;
@@ -61,8 +63,8 @@ public class HttpApiServer {
     /**
      * Creates an HttpApiServer with default Prometheus port from configuration.
      */
-    public HttpApiServer(Vertx vertx, int port, RaftNode raftNode) {
-        this(vertx, port, raftNode, -1);
+    public HttpApiServer(Vertx vertx, int port, RaftNode raftNode, QuorusStateStore stateStore) {
+        this(vertx, port, raftNode, stateStore, -1);
     }
 
     /**
@@ -70,10 +72,11 @@ public class HttpApiServer {
      *
      * @param prometheusPort the port where Prometheus metrics are exposed, or -1 to use config default
      */
-    public HttpApiServer(Vertx vertx, int port, RaftNode raftNode, int prometheusPort) {
+    public HttpApiServer(Vertx vertx, int port, RaftNode raftNode, QuorusStateStore stateStore, int prometheusPort) {
         this.vertx = vertx;
         this.port = port;
         this.raftNode = raftNode;
+        this.stateStore = stateStore;
         this.prometheusPort = prometheusPort;
         this.drainModeHandler = new DrainModeHandler();
     }
@@ -107,21 +110,21 @@ public class HttpApiServer {
 
         // ==================== Agent Endpoints ====================
         router.post("/api/v1/agents/register").handler(new AgentRegistrationHandler(raftNode));
-        router.post("/api/v1/agents/heartbeat").handler(new HeartbeatHandler(raftNode));
-        router.get("/api/v1/agents").handler(new AgentListHandler(raftNode));
-        router.get("/api/v1/agents/:agentId/jobs").handler(new AgentJobsHandler(raftNode));
+        router.post("/api/v1/agents/heartbeat").handler(new HeartbeatHandler(raftNode, stateStore));
+        router.get("/api/v1/agents").handler(new AgentListHandler(raftNode, stateStore));
+        router.get("/api/v1/agents/:agentId/jobs").handler(new AgentJobsHandler(raftNode, stateStore));
 
         // ==================== Transfer Endpoints ====================
-        TransferHandler transferHandler = new TransferHandler(raftNode);
+        TransferHandler transferHandler = new TransferHandler(raftNode, stateStore);
         router.post("/api/v1/transfers").handler(transferHandler.handleCreate());
         router.get("/api/v1/transfers/:jobId").handler(transferHandler.handleGet());
         router.delete("/api/v1/transfers/:jobId").handler(transferHandler.handleDelete());
 
         // ==================== Job Status Endpoint ====================
-        router.post("/api/v1/jobs/:jobId/status").handler(new JobStatusHandler(raftNode));
+        router.post("/api/v1/jobs/:jobId/status").handler(new JobStatusHandler(raftNode, stateStore));
 
         // ==================== Job Assignment Endpoints ====================
-        JobAssignmentHandler assignmentHandler = new JobAssignmentHandler(raftNode);
+        JobAssignmentHandler assignmentHandler = new JobAssignmentHandler(raftNode, stateStore);
         router.post("/api/v1/assignments").handler(assignmentHandler.handleAssign());
         router.get("/api/v1/assignments").handler(assignmentHandler.handleList());
         router.get("/api/v1/assignments/:assignmentId").handler(assignmentHandler.handleGet());
@@ -132,7 +135,7 @@ public class HttpApiServer {
         router.delete("/api/v1/assignments/:assignmentId").handler(assignmentHandler.handleRemove());
 
         // ==================== Route Endpoints ====================
-        RouteHandler routeHandler = new RouteHandler(raftNode);
+        RouteHandler routeHandler = new RouteHandler(raftNode, stateStore);
         router.post("/api/v1/routes").handler(routeHandler.handleCreate());
         router.get("/api/v1/routes").handler(routeHandler.handleList());
         router.get("/api/v1/routes/:routeId").handler(routeHandler.handleGet());
