@@ -49,12 +49,13 @@ public interface TransferEngine {
     int getActiveTransferCount();
 
     /**
-     * Shutdown the transfer engine gracefully, completing active transfers.
+     * Shut down the transfer engine, cancelling active transfers and waiting
+     * up to {@code timeoutSeconds} for them to drain before closing resources.
      *
      * @param timeoutSeconds maximum time to wait for active transfers to complete
-     * @return true if shutdown completed within timeout, false otherwise
+     * @return a Future that completes when shutdown is finished
      */
-    boolean shutdown(long timeoutSeconds);
+    Future<Void> shutdown(long timeoutSeconds);
 
     /**
      * Get comprehensive health check for the transfer engine.

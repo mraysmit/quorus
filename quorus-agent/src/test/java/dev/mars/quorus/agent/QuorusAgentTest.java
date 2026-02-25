@@ -186,22 +186,28 @@ class QuorusAgentTest {
     @DisplayName("Should communicate with real HTTP server (no mocks)")
     void testRealHttpCommunication(Vertx vertx, VertxTestContext testContext) {
         // This test verifies we're using a REAL HTTP server, not mocks
+        // Server is already started in @BeforeAll — no timer delay needed
 
-        // Wait a bit for server to be fully ready
-        vertx.setTimer(100, id -> {
-            // Make a real HTTP request to our test controller
-            vertx.createHttpClient()
-                    .request(io.vertx.core.http.HttpMethod.POST, controllerPort, "localhost", "/api/v1/agents/register")
-                    .compose(req -> req.send()
-                            .compose(io.vertx.core.http.HttpClientResponse::body))
-                    .onSuccess(body -> {
-                        JsonObject response = body.toJsonObject();
-                        assertEquals("registered", response.getString("status"));
-                        assertEquals("test-agent-001", response.getString("agentId"));
-                        testContext.completeNow();
-                    })
-                    .onFailure(testContext::failNow);
-        });
+        var httpClient = vertx.createHttpClient();
+        httpClient
+                .request(io.vertx.core.http.HttpMethod.POST, controllerPort, "localhost", "/api/v1/agents/register")
+                .compose(req -> req.send()
+                        .compose(io.vertx.core.http.HttpClientResponse::body))
+                .onComplete(ar -> {
+                    // Close the client before completing test to prevent Pool closed errors
+                    httpClient.close().onComplete(v -> {
+                        if (ar.succeeded()) {
+                            testContext.verify(() -> {
+                                JsonObject response = ar.result().toJsonObject();
+                                assertEquals("registered", response.getString("status"));
+                                assertEquals("test-agent-001", response.getString("agentId"));
+                            });
+                            testContext.completeNow();
+                        } else {
+                            testContext.failNow(ar.cause());
+                        }
+                    });
+                });
     }
 
     @Test

@@ -99,7 +99,7 @@ public class BasicTransferExample {
             // Always shutdown transfer engine gracefully
             logger.info("");
             logger.info("Shutting down transfer engine...");
-            transferEngine.shutdown(10);
+            transferEngine.shutdown(10).toCompletionStage().toCompletableFuture().join();
             vertx.close();
             logger.info("=== Example completed successfully ===");
         }

@@ -404,6 +404,7 @@ public class HeartbeatProcessor {
                     agentInfo.getAgentId(), timeSinceLastHeartbeat.toSeconds(), agentInfo.getStatus());
             
             // Update status to unreachable
+            AgentStatus previousStatus = agentInfo.getStatus();
             agentInfo.setStatus(AgentStatus.UNREACHABLE);
             logger.debug("Agent status changed to UNREACHABLE: agentId={}", agentInfo.getAgentId());
             
@@ -412,6 +413,7 @@ public class HeartbeatProcessor {
                 try {
                     AgentCommand command = AgentCommand.updateStatus(
                         agentInfo.getAgentId(), 
+                        previousStatus,
                         AgentStatus.UNREACHABLE
                     );
                     logger.debug("Submitting failed agent status to distributed state: agentId={}", agentInfo.getAgentId());

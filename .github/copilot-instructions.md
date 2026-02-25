@@ -1,7 +1,7 @@
 # Quorus Copilot Instructions
 
 ## Project Overview
-Quorus is an enterprise-grade distributed file transfer system built with **Java 21** and **Vert.x 5.0.2**. It uses a **controller-first architecture** with Raft consensus for distributed state management.
+Quorus is an enterprise-grade distributed file transfer system built with **Java 25** and **Vert.x 5.0.8**. It uses a **controller-first architecture** with Raft consensus for distributed state management.
 
 ## Architecture (Controller-First Pattern)
 

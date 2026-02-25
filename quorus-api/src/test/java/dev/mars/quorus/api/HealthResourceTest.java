@@ -21,6 +21,8 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import dev.mars.quorus.api.service.ClusterStatus;
 import dev.mars.quorus.api.service.DistributedTransferService;
+import dev.mars.quorus.controller.raft.RaftNode;
+import dev.mars.quorus.transfer.SimpleTransferEngine;
 import dev.mars.quorus.transfer.TransferEngine;
 import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonObject;
@@ -34,13 +36,17 @@ import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.util.Collections;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
 
 /**
  * Tests for HealthResource using Vert.x testing framework.
- * Uses real HTTP server - no mocking of Vert.x components.
+ * Uses real HTTP server - no mocking of Vert.x components or service layer.
+ * Real SimpleTransferEngine provides actual transfer metrics. A minimal
+ * DistributedTransferService subclass supplies a real ClusterStatus without
+ * requiring a live Raft cluster.
+ *
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @version 1.0
  * @since 2025-08-20
@@ -51,36 +57,57 @@ class HealthResourceTest {
 
     private static final int TEST_PORT = 8081;
     private WebClient client;
-    private TransferEngine mockTransferEngine;
-    private DistributedTransferService mockDistributedService;
+    private SimpleTransferEngine transferEngine;
+
+    /**
+     * A minimal DistributedTransferService that returns a fixed ClusterStatus
+     * without requiring a live RaftNode or ControllerDiscoveryService.
+     */
+    static class StandaloneDistributedTransferService extends DistributedTransferService {
+        private final ClusterStatus clusterStatus;
+
+        StandaloneDistributedTransferService(ClusterStatus clusterStatus) {
+            this.clusterStatus = clusterStatus;
+        }
+
+        @Override
+        public ClusterStatus getClusterStatus() {
+            return clusterStatus;
+        }
+
+        @Override
+        public boolean isControllerAvailable() {
+            return clusterStatus.isAvailable();
+        }
+    }
 
     @BeforeEach
     void setUp(Vertx vertx, VertxTestContext testContext) {
-        // Configure Jackson for Java 8 date/time support
+        // Configure Jackson for Java 8 date/time support (java.time.* via JavaTimeModule)
         ObjectMapper mapper = DatabindCodec.mapper();
         mapper.registerModule(new JavaTimeModule());
         mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
-        // Create mock services (allowed for unit tests)
-        mockTransferEngine = mock(TransferEngine.class);
-        when(mockTransferEngine.getActiveTransferCount()).thenReturn(5);
+        // Create a real SimpleTransferEngine — no active transfers, so count is 0
+        transferEngine = new SimpleTransferEngine(vertx, 5, 3, 100);
 
-        mockDistributedService = mock(DistributedTransferService.class);
-        ClusterStatus mockStatus = mock(ClusterStatus.class);
-        when(mockStatus.isAvailable()).thenReturn(true);
-        when(mockStatus.isHealthy()).thenReturn(true);
-        when(mockStatus.getNodeId()).thenReturn("test-node");
-        when(mockStatus.getState()).thenReturn(dev.mars.quorus.controller.raft.RaftNode.State.FOLLOWER);
-        when(mockStatus.getTerm()).thenReturn(1L);
-        when(mockStatus.isLeader()).thenReturn(false);
-        when(mockStatus.getKnownNodes()).thenReturn(Collections.emptySet());
-        when(mockStatus.getStatusDescription()).thenReturn("Healthy");
-        when(mockDistributedService.getClusterStatus()).thenReturn(mockStatus);
+        // Create a real ClusterStatus representing a healthy follower node
+        ClusterStatus clusterStatus = new ClusterStatus(
+                "test-node",
+                RaftNode.State.FOLLOWER,
+                1L,
+                false,
+                Set.of("test-node")
+        );
 
-        // Create HealthResource with mocked dependencies
+        // Wire up a DistributedTransferService subclass with fixed cluster status
+        StandaloneDistributedTransferService distributedService =
+                new StandaloneDistributedTransferService(clusterStatus);
+
+        // Create HealthResource with real dependencies
         HealthResource healthResource = new HealthResource();
-        healthResource.transferEngine = mockTransferEngine;
-        healthResource.distributedTransferService = mockDistributedService;
+        healthResource.transferEngine = transferEngine;
+        healthResource.distributedTransferService = distributedService;
 
         // Create router and register routes
         Router router = Router.router(vertx);
@@ -132,12 +159,12 @@ class HealthResourceTest {
                 assertTrue(body.containsKey("cluster"));
                 assertTrue(body.containsKey("system"));
                 
-                // Verify transfer engine metrics
-                JsonObject transferEngine = body.getJsonObject("transferEngine");
-                assertEquals(5, transferEngine.getInteger("activeTransfers"));
-                assertEquals("operational", transferEngine.getString("engineStatus"));
+                // Verify transfer engine metrics — real engine with no active transfers
+                JsonObject transferEngineJson = body.getJsonObject("transferEngine");
+                assertEquals(0, transferEngineJson.getInteger("activeTransfers"));
+                assertEquals("operational", transferEngineJson.getString("engineStatus"));
                 
-                // Verify cluster metrics
+                // Verify cluster metrics from the real ClusterStatus
                 JsonObject cluster = body.getJsonObject("cluster");
                 assertTrue(cluster.getBoolean("available"));
                 assertTrue(cluster.getBoolean("healthy"));
@@ -152,7 +179,12 @@ class HealthResourceTest {
         if (client != null) {
             client.close();
         }
-        testContext.completeNow();
+        if (transferEngine != null) {
+            transferEngine.shutdown(3)
+                    .onComplete(ar -> testContext.completeNow());
+        } else {
+            testContext.completeNow();
+        }
     }
 }
 
