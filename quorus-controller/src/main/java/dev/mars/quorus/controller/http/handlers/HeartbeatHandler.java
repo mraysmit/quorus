@@ -47,9 +47,11 @@ public class HeartbeatHandler implements Handler<RoutingContext> {
 
     private static final Logger logger = LoggerFactory.getLogger(HeartbeatHandler.class);
     private final RaftNode raftNode;
+    private final QuorusStateStore stateStore;
 
-    public HeartbeatHandler(RaftNode raftNode) {
+    public HeartbeatHandler(RaftNode raftNode, QuorusStateStore stateStore) {
         this.raftNode = raftNode;
+        this.stateStore = stateStore;
     }
 
     @Override
@@ -64,7 +66,7 @@ public class HeartbeatHandler implements Handler<RoutingContext> {
             }
 
             // Verify agent exists
-            QuorusStateStore stateMachine = (QuorusStateStore) raftNode.getStateStore();
+            QuorusStateStore stateMachine = this.stateStore;
             AgentInfo existingAgent = stateMachine.getAgent(agentId);
             if (existingAgent == null) {
                 ctx.fail(404, new IllegalArgumentException(

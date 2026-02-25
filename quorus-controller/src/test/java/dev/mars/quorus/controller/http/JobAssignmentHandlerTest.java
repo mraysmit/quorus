@@ -77,7 +77,7 @@ class JobAssignmentHandlerTest {
                 .pollInterval(Duration.ofMillis(50))
                 .until(() -> raftNode.isLeader());
 
-        httpServer = new HttpApiServer(vertx, HTTP_PORT, raftNode);
+        httpServer = new HttpApiServer(vertx, HTTP_PORT, raftNode, stateMachine);
         httpServer.start().toCompletionStage().toCompletableFuture()
                 .get(5, java.util.concurrent.TimeUnit.SECONDS);
 

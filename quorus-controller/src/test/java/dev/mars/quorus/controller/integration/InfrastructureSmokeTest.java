@@ -107,7 +107,7 @@ class InfrastructureSmokeTest {
             .until(() -> raftNode.isLeader());
 
         // Start HTTP server and wait for it to be ready
-        httpServer = new HttpApiServer(vertx, HTTP_PORT, raftNode);
+        httpServer = new HttpApiServer(vertx, HTTP_PORT, raftNode, stateMachine);
         httpServer.start().toCompletionStage().toCompletableFuture().get(5, java.util.concurrent.TimeUnit.SECONDS);
 
         startupTime = System.currentTimeMillis() - start;

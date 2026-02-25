@@ -50,9 +50,11 @@ public class TransferHandler {
 
     private static final Logger logger = LoggerFactory.getLogger(TransferHandler.class);
     private final RaftNode raftNode;
+    private final QuorusStateStore stateStore;
 
-    public TransferHandler(RaftNode raftNode) {
+    public TransferHandler(RaftNode raftNode, QuorusStateStore stateStore) {
         this.raftNode = raftNode;
+        this.stateStore = stateStore;
     }
 
     /**
@@ -87,7 +89,7 @@ public class TransferHandler {
     public Handler<RoutingContext> handleGet() {
         return ctx -> {
             String jobId = ctx.pathParam("jobId");
-            QuorusStateStore stateMachine = (QuorusStateStore) raftNode.getStateStore();
+            QuorusStateStore stateMachine = this.stateStore;
 
             TransferJobSnapshot job = stateMachine.getTransferJobs().get(jobId);
             if (job == null) {
@@ -140,7 +142,7 @@ public class TransferHandler {
     public Handler<RoutingContext> handleDelete() {
         return ctx -> {
             String jobId = ctx.pathParam("jobId");
-            QuorusStateStore stateMachine = (QuorusStateStore) raftNode.getStateStore();
+            QuorusStateStore stateMachine = this.stateStore;
 
             if (!stateMachine.hasTransferJob(jobId)) {
                 throw QuorusApiException.notFound(ErrorCode.TRANSFER_NOT_FOUND, jobId);

@@ -158,7 +158,7 @@ public class QuorusControllerVerticle extends AbstractVerticle {
                 // 7. Start Raft (includes recovery from WAL)
                 raftNode.start().onSuccess(v2 -> {
                     // 8. Start HTTP API
-                    this.apiServer = new HttpApiServer(vertx, port, raftNode);
+                    this.apiServer = new HttpApiServer(vertx, port, raftNode, stateMachine);
 
                     apiServer.start()
                             .onSuccess(server -> {

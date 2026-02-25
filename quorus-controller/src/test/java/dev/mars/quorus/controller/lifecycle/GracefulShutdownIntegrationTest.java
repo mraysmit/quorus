@@ -80,7 +80,7 @@ class GracefulShutdownIntegrationTest {
                     .pollInterval(Duration.ofMillis(50))
                     .until(raftNode::isLeader);
 
-            HttpApiServer apiServer = new HttpApiServer(vertx, HTTP_PORT, raftNode);
+            HttpApiServer apiServer = new HttpApiServer(vertx, HTTP_PORT, raftNode, stateMachine);
             apiServer.start().toCompletionStage().toCompletableFuture()
                     .get(5, TimeUnit.SECONDS);
 
@@ -132,7 +132,7 @@ class GracefulShutdownIntegrationTest {
                     .pollInterval(Duration.ofMillis(50))
                     .until(raftNode::isLeader);
 
-            HttpApiServer apiServer = new HttpApiServer(vertx, port, raftNode);
+            HttpApiServer apiServer = new HttpApiServer(vertx, port, raftNode, stateMachine);
             apiServer.start().toCompletionStage().toCompletableFuture()
                     .get(5, TimeUnit.SECONDS);
 

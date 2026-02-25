@@ -46,15 +46,17 @@ public class AgentJobsHandler implements Handler<RoutingContext> {
 
     private static final Logger logger = LoggerFactory.getLogger(AgentJobsHandler.class);
     private final RaftNode raftNode;
+    private final QuorusStateStore stateStore;
 
-    public AgentJobsHandler(RaftNode raftNode) {
+    public AgentJobsHandler(RaftNode raftNode, QuorusStateStore stateStore) {
         this.raftNode = raftNode;
+        this.stateStore = stateStore;
     }
 
     @Override
     public void handle(RoutingContext ctx) {
         String agentId = ctx.pathParam("agentId");
-        QuorusStateStore stateMachine = (QuorusStateStore) raftNode.getStateStore();
+        QuorusStateStore stateMachine = this.stateStore;
 
         Map<String, JobAssignment> allAssignments = stateMachine.getJobAssignments();
         JsonArray pendingJobs = new JsonArray();

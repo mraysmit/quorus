@@ -193,7 +193,7 @@ class InfrastructureWithTelemetryTest {
         logger.info("  -> Prometheus port for MetricsHandler: " + PROMETHEUS_PORT);
 
         // Start HTTP server with the correct Prometheus port for metrics proxy
-        httpServer = new HttpApiServer(vertx, HTTP_PORT, raftNode, PROMETHEUS_PORT);
+        httpServer = new HttpApiServer(vertx, HTTP_PORT, raftNode, stateMachine, PROMETHEUS_PORT);
         httpServer.start().toCompletionStage().toCompletableFuture().get(5, java.util.concurrent.TimeUnit.SECONDS);
         logger.info("  [OK] HTTP Server deployed and listening");
 

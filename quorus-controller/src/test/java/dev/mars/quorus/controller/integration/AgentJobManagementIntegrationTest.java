@@ -102,7 +102,7 @@ class AgentJobManagementIntegrationTest {
         assertTrue(raftNode.isLeader(), "Node should become leader");
 
         // Start HTTP API server and wait for it to be ready
-        httpServer = new HttpApiServer(vertx, HTTP_PORT, raftNode);
+        httpServer = new HttpApiServer(vertx, HTTP_PORT, raftNode, stateMachine);
         httpServer.start().toCompletionStage().toCompletableFuture().get(5, java.util.concurrent.TimeUnit.SECONDS);
 
         logger.info("Test environment ready");

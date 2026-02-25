@@ -46,9 +46,11 @@ public class JobStatusHandler implements Handler<RoutingContext> {
 
     private static final Logger logger = LoggerFactory.getLogger(JobStatusHandler.class);
     private final RaftNode raftNode;
+    private final QuorusStateStore stateStore;
 
-    public JobStatusHandler(RaftNode raftNode) {
+    public JobStatusHandler(RaftNode raftNode, QuorusStateStore stateStore) {
         this.raftNode = raftNode;
+        this.stateStore = stateStore;
     }
 
     @Override
@@ -72,7 +74,7 @@ public class JobStatusHandler implements Handler<RoutingContext> {
             String assignmentId = jobId + ":" + agentId;
 
             // Look up current assignment status for CAS protection
-            QuorusStateStore stateMachine = (QuorusStateStore) raftNode.getStateStore();
+            QuorusStateStore stateMachine = this.stateStore;
             JobAssignment existing = stateMachine.getJobAssignment(assignmentId);
             if (existing == null) {
                 ctx.fail(404, new IllegalArgumentException("Assignment not found: " + assignmentId));
