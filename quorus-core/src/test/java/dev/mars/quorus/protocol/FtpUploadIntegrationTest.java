@@ -48,7 +48,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * Integration tests for FTP upload functionality using shared Testcontainers.
  * 
  * These tests verify upload operations against a real FTP server running
- * in a Docker container (fauria/vsftpd), ensuring the implementation
+ * in a Docker container (delfer/alpine-ftp-server), ensuring the implementation
  * works in actual network transfer scenarios.
  * 
  * Uses SharedTestContainers to reuse the FTP container across test classes,

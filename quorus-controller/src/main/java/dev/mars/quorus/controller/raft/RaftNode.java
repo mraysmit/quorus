@@ -44,6 +44,7 @@ import io.opentelemetry.api.metrics.Meter;
 import org.slf4j.MDC;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicLong;
 import static java.util.Objects.requireNonNull;
 
@@ -114,7 +115,7 @@ public class RaftNode {
     private long heartbeatTimerId = -1;
 
     // ========== STATE CHANGE LISTENERS ==========
-    private final List<io.vertx.core.Handler<State>> stateChangeListeners = new ArrayList<>();
+    private final List<io.vertx.core.Handler<State>> stateChangeListeners = new CopyOnWriteArrayList<>();
 
     // ========== EDGE METRICS ==========
     private LongCounter rpcCounter;
@@ -125,6 +126,7 @@ public class RaftNode {
     private final boolean snapshotEnabled;
     private final long snapshotThreshold;
     private final long snapshotCheckIntervalMs;
+    private final long logHardLimit;
 
     // ========== INSTALL SNAPSHOT STATE ==========
     /** Maximum chunk size for InstallSnapshot RPC (default 1 MB). */
@@ -207,6 +209,7 @@ public class RaftNode {
         private Boolean snapshotEnabled;       // null = derive from mode
         private long snapshotThreshold = 10000;
         private long snapshotCheckIntervalMs = 60000;
+        private long logHardLimit = 100000;
 
         private Builder() {}
 
@@ -243,6 +246,9 @@ public class RaftNode {
         /** Interval between snapshot eligibility checks in ms (default: 60000). */
         public Builder snapshotCheckInterval(long ms) { this.snapshotCheckIntervalMs = ms; return this; }
 
+        /** Maximum in-memory log entries before rejecting commands (default: 100000). */
+        public Builder logHardLimit(long limit) { this.logHardLimit = limit; return this; }
+
         /**
          * Builds the {@link RaftNode}.
          *
@@ -258,7 +264,7 @@ public class RaftNode {
 
             boolean snap = (snapshotEnabled != null) ? snapshotEnabled : mode.isDurable();
             return new RaftNode(vertx, nodeId, clusterNodes, transport, stateMachine,
-                    mode, electionTimeoutMs, heartbeatIntervalMs, snap, snapshotThreshold, snapshotCheckIntervalMs);
+                    mode, electionTimeoutMs, heartbeatIntervalMs, snap, snapshotThreshold, snapshotCheckIntervalMs, logHardLimit);
         }
     }
 
@@ -266,7 +272,7 @@ public class RaftNode {
 
     private RaftNode(Vertx vertx, String nodeId, Set<String> clusterNodes, RaftTransport transport,
             RaftLogApplicator stateMachine, RaftNodeMode mode, long electionTimeoutMs, long heartbeatIntervalMs,
-            boolean snapshotEnabled, long snapshotThreshold, long snapshotCheckIntervalMs) {
+            boolean snapshotEnabled, long snapshotThreshold, long snapshotCheckIntervalMs, long logHardLimit) {
         this.vertx = vertx;
         this.nodeId = nodeId;
         this.clusterNodes = new HashSet<>(clusterNodes);
@@ -278,6 +284,7 @@ public class RaftNode {
         this.snapshotEnabled = snapshotEnabled && this.storage.isPresent();
         this.snapshotThreshold = snapshotThreshold;
         this.snapshotCheckIntervalMs = snapshotCheckIntervalMs;
+        this.logHardLimit = logHardLimit;
 
         // Initialize log with a dummy entry
         log.add(new LogEntry(0, 0, null));
@@ -555,6 +562,14 @@ public class RaftNode {
             if (state != State.LEADER) {
                 promise.fail(
                         new IllegalStateException("Not the leader. Current state: " + state));
+                return;
+            }
+
+            // Hard limit check - reject if log is at capacity to prevent OOM
+            if (log.size() >= logHardLimit) {
+                logger.warn("Raft log at capacity ({}/{}), rejecting command", log.size(), logHardLimit);
+                promise.fail(new IllegalStateException(
+                        "Raft log at capacity (" + log.size() + "/" + logHardLimit + "). Wait for snapshot."));
                 return;
             }
 

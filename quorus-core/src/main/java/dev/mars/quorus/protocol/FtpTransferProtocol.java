@@ -448,7 +448,7 @@ public class FtpTransferProtocol implements TransferProtocol {
         void connect() throws IOException {
             boolean useTls = connectionInfo.ftpsMode != FtpsMode.NONE;
             String modeLabel = useTls ? "FTPS (" + connectionInfo.ftpsMode + ")" : "FTP";
-            logger.info("Connecting to {} server: {}:{}", modeLabel, connectionInfo.host, connectionInfo.port);
+            logger.debug("Connecting to {} server: {}:{}", modeLabel, connectionInfo.host, connectionInfo.port);
             
             // Initialise SSL context if TLS is required
             if (useTls) {

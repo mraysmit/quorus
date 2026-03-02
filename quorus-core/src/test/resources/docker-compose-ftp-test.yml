@@ -1,27 +1,31 @@
 # FTP server for upload/download integration testing
-# Uses fauria/vsftpd - a lightweight vsftpd container
+# Uses delfer/alpine-ftp-server - actively maintained Alpine-based vsftpd
+# (same image used for FTPS tests, but without TLS configuration)
 #
 # IMPORTANT: Uses FIXED port mappings (2100:21 control, 21100:21100 data)
 # instead of Testcontainers' socat proxy. This is necessary because vsftpd
 # verifies that data connections come from the same IP as the control
 # connection (425 Security: Bad IP connecting). The socat proxy changes
 # the source IP, breaking this check.
+#
+# Migrated from fauria/vsftpd (unmaintained since 2023) on 2026-03-02.
 
 services:
-  # FTP Server for testing
+  # FTP Server for testing (plain FTP, no TLS)
   ftp:
-    image: fauria/vsftpd
+    build:
+      context: ./ftp-docker
+      dockerfile: Dockerfile
     ports:
       - "2100:21"     # Control port - FIXED (bypasses socat proxy)
       - "21100:21100" # Passive mode data port - FIXED (must match PASV response)
     environment:
-      - FTP_USER=testuser
-      - FTP_PASS=testpass
-      - PASV_ENABLE=YES
-      - PASV_MIN_PORT=21100
-      - PASV_MAX_PORT=21100
-      - PASV_ADDRESS=127.0.0.1
-      - LOCAL_UMASK=022
+      # FTP credentials (delfer format: name|password)
+      USERS: "testuser|testpass"
+      # Passive mode configuration
+      ADDRESS: "127.0.0.1"
+      MIN_PORT: "21100"
+      MAX_PORT: "21100"
     healthcheck:
       test: ["CMD-SHELL", "nc -z localhost 21 || exit 1"]
       interval: 5s

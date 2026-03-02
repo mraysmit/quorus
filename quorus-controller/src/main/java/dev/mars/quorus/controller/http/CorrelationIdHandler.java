@@ -85,9 +85,10 @@ public class CorrelationIdHandler implements io.vertx.core.Handler<RoutingContex
     }
 
     /**
-     * Generates a compact request ID in the format {@code req-XXXXXXXX}.
+     * Generates a request ID using a full UUID for high-volume systems.
+     * Format: {@code req-XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}
      */
     private static String generateRequestId() {
-        return "req-" + UUID.randomUUID().toString().substring(0, 8);
+        return "req-" + UUID.randomUUID().toString();
     }
 }

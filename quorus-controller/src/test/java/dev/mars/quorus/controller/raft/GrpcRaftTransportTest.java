@@ -617,7 +617,7 @@ class GrpcRaftTransportTest {
         cluster.put("target", "localhost:" + targetPort);
         
         // Test with custom pool size
-        GrpcRaftTransport transport = new GrpcRaftTransport(vertx, "client", cluster, 5);
+        GrpcRaftTransport transport = new GrpcRaftTransport(vertx, "client", cluster, 5, 500);
         assertEquals(5, transport.getPoolSize(), "Pool size should be configurable");
         transport.stop();
     }
@@ -639,7 +639,7 @@ class GrpcRaftTransportTest {
         Map<String, String> cluster = new HashMap<>();
         cluster.put("target", "localhost:" + targetPort);
         
-        GrpcRaftTransport transport = new GrpcRaftTransport(vertx, "client", cluster, 5);
+        GrpcRaftTransport transport = new GrpcRaftTransport(vertx, "client", cluster, 5, 500);
         transport.start(msg -> {});
         
         VoteRequest request = VoteRequest.newBuilder()

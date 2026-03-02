@@ -62,6 +62,7 @@ public class GrpcRaftTransport implements RaftTransport {
     private final Map<String, RaftServiceGrpc.RaftServiceFutureStub> clients = new ConcurrentHashMap<>();
     private final ExecutorService executor;
     private final int poolSize;
+    private final int queueSize;
 
     private RaftNode raftNode; // Circular dependency injection
 
@@ -73,7 +74,7 @@ public class GrpcRaftTransport implements RaftTransport {
      * @param clusterNodes map of nodeId to host:port
      */
     public GrpcRaftTransport(Vertx vertx, String selfId, Map<String, String> clusterNodes) {
-        this(vertx, selfId, clusterNodes, 10);
+        this(vertx, selfId, clusterNodes, 10, 1000);
     }
 
     /**
@@ -83,13 +84,15 @@ public class GrpcRaftTransport implements RaftTransport {
      * @param selfId this node's ID
      * @param clusterNodes map of nodeId to host:port
      * @param poolSize maximum number of worker threads for gRPC callbacks
+     * @param queueSize maximum number of queued tasks before back-pressure
      */
     public GrpcRaftTransport(Vertx vertx, String selfId, Map<String, String> clusterNodes,
-                              int poolSize) {
+                              int poolSize, int queueSize) {
         this.vertx = vertx;
         this.selfId = selfId;
         this.clusterNodes = clusterNodes;
         this.poolSize = poolSize;
+        this.queueSize = queueSize;
         
         // Create a bounded thread pool with named threads for gRPC callbacks
         AtomicInteger threadCounter = new AtomicInteger(0);
@@ -97,7 +100,7 @@ public class GrpcRaftTransport implements RaftTransport {
                 poolSize,           // core pool size
                 poolSize,           // max pool size (fixed)
                 60L, TimeUnit.SECONDS,  // keep-alive for idle threads
-                new LinkedBlockingQueue<>(1000),  // bounded work queue
+                new LinkedBlockingQueue<>(queueSize),  // bounded work queue
                 r -> {
                     Thread t = new Thread(r, THREAD_NAME_PREFIX + selfId + "-" + threadCounter.getAndIncrement());
                     t.setDaemon(true);
@@ -110,8 +113,8 @@ public class GrpcRaftTransport implements RaftTransport {
         // Register with metrics for monitoring
         RaftMetrics.getInstance().registerThreadPool(threadPool);
         
-        logger.debug("GrpcRaftTransport created with bounded ThreadPoolExecutor (poolSize={}, queueSize=1000)",
-                poolSize);
+        logger.debug("GrpcRaftTransport created with bounded ThreadPoolExecutor (poolSize={}, queueSize={})",
+                poolSize, queueSize);
     }
     
     /**
@@ -123,6 +126,15 @@ public class GrpcRaftTransport implements RaftTransport {
         return poolSize;
     }
 
+    /**
+     * Gets the current queue size configuration.
+     * 
+     * @return the queue size
+     */
+    public int getQueueSize() {
+        return queueSize;
+    }
+
     public void setRaftNode(RaftNode raftNode) {
         this.raftNode = raftNode;
     }
@@ -131,7 +143,7 @@ public class GrpcRaftTransport implements RaftTransport {
     public void start(Consumer<RaftMessage> messageHandler) {
         // Server side should be started in the Verticle separately (GrpcRaftServer)
         // Client side just needs to be ready
-        logger.info("GrpcRaftTransport initialized for node: {} (poolSize={})", selfId, poolSize);
+        logger.info("GrpcRaftTransport initialized for node: {} (poolSize={}, queueSize={})", selfId, poolSize, queueSize);
     }
 
     @Override

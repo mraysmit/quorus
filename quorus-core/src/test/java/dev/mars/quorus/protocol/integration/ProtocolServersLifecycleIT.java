@@ -65,7 +65,7 @@ class ProtocolServersLifecycleIT {
         System.out.println("  cd docker/compose");
         System.out.println("  docker-compose -f docker-compose-protocol-servers.yml up -d");
         System.out.println("\nExpected services:");
-        System.out.println("  - FTP server (stilliard/pure-ftpd) on localhost:21");
+        System.out.println("  - FTP server (delfer/alpine-ftp-server) on localhost:21");
         System.out.println("  - SFTP server (atmoz/sftp) on localhost:2222");
         System.out.println("  - SMB server (dperson/samba) on localhost:4445");
         System.out.println("=".repeat(80) + "\n");
