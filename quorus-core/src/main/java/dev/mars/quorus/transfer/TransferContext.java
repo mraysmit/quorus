@@ -76,6 +76,13 @@ public class TransferContext {
         return null;
     }
     
+    /**
+     * Gets an attribute by key without type safety.
+     * 
+     * @deprecated Use {@link #getAttribute(String, Class)} for type-safe access.
+     *             This method will be removed in a future release.
+     */
+    @Deprecated(forRemoval = true)
     public Object getAttribute(String key) {
         return attributes.get(key);
     }

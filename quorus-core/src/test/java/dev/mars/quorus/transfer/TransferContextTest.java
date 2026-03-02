@@ -82,9 +82,9 @@ class TransferContextTest {
         context.setAttribute("key2", 123);
         context.setAttribute("key3", true);
         
-        assertEquals("value1", context.getAttribute("key1"));
-        assertEquals(123, context.getAttribute("key2"));
-        assertEquals(true, context.getAttribute("key3"));
+        assertEquals("value1", context.getAttribute("key1", String.class));
+        assertEquals(123, context.getAttribute("key2", Integer.class));
+        assertEquals(true, context.getAttribute("key3", Boolean.class));
     }
 
     @Test
@@ -113,9 +113,6 @@ class TransferContextTest {
 
     @Test
     void testGetAttributeNonExistent() {
-        Object value = context.getAttribute("nonExistent");
-        assertNull(value);
-        
         String typedValue = context.getAttribute("nonExistent", String.class);
         assertNull(typedValue);
     }
@@ -123,10 +120,10 @@ class TransferContextTest {
     @Test
     void testRemoveAttribute() {
         context.setAttribute("key1", "value1");
-        assertEquals("value1", context.getAttribute("key1"));
+        assertEquals("value1", context.getAttribute("key1", String.class));
         
         context.removeAttribute("key1");
-        assertNull(context.getAttribute("key1"));
+        assertNull(context.getAttribute("key1", String.class));
     }
 
     @Test

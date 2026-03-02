@@ -32,10 +32,36 @@ import java.util.Map;
  */
 public class TransferEngineHealthCheck {
     
+    /**
+     * @deprecated Use {@link HealthStatus} instead. This inner enum will be removed in a future release.
+     */
+    @Deprecated(forRemoval = true)
     public enum Status {
         UP,      // All systems operational
         DOWN,    // Transfer engine is not operational
-        DEGRADED // Some protocols are experiencing issues
+        DEGRADED; // Some protocols are experiencing issues
+        
+        /**
+         * Converts this deprecated Status to the new HealthStatus enum.
+         */
+        public HealthStatus toHealthStatus() {
+            return switch (this) {
+                case UP -> HealthStatus.UP;
+                case DOWN -> HealthStatus.DOWN;
+                case DEGRADED -> HealthStatus.DEGRADED;
+            };
+        }
+        
+        /**
+         * Converts from the new HealthStatus enum.
+         */
+        public static Status fromHealthStatus(HealthStatus healthStatus) {
+            return switch (healthStatus) {
+                case UP -> UP;
+                case DOWN -> DOWN;
+                case DEGRADED -> DEGRADED;
+            };
+        }
     }
     
     private final Status status;
@@ -52,8 +78,20 @@ public class TransferEngineHealthCheck {
         this.message = builder.message;
     }
     
+    /**
+     * @deprecated Use {@link #getHealthStatus()} instead.
+     */
+    @Deprecated(forRemoval = true)
     public Status getStatus() {
         return status;
+    }
+    
+    /**
+     * Returns the health status using the unified HealthStatus enum.
+     * @return the health status
+     */
+    public HealthStatus getHealthStatus() {
+        return status.toHealthStatus();
     }
     
     public Instant getTimestamp() {
@@ -76,6 +114,49 @@ public class TransferEngineHealthCheck {
         return status == Status.UP;
     }
     
+    /**
+     * Converts this health check to a HealthDetail record for the transfer engine component.
+     * @return a HealthDetail representation of this health check
+     */
+    public HealthDetail toHealthDetail() {
+        HealthDetail.Builder builder = HealthDetail.builder("transfer-engine")
+            .status(getHealthStatus())
+            .timestamp(timestamp);
+        
+        if (message != null) {
+            builder.message(message);
+        }
+        
+        // Add protocol count as metadata
+        long healthyCount = protocolHealthChecks.stream()
+            .filter(ProtocolHealthCheck::isHealthy)
+            .count();
+        builder.metadata("totalProtocols", protocolHealthChecks.size());
+        builder.metadata("healthyProtocols", healthyCount);
+        builder.metadata("unhealthyProtocols", protocolHealthChecks.size() - healthyCount);
+        
+        // Convert system metrics to String metadata
+        for (Map.Entry<String, Object> entry : systemMetrics.entrySet()) {
+            builder.metadata(entry.getKey(), String.valueOf(entry.getValue()));
+        }
+        
+        return builder.build();
+    }
+    
+    /**
+     * Returns a list of HealthDetail records for all protocol health checks.
+     * @return list of HealthDetail records
+     */
+    public List<HealthDetail> getProtocolHealthDetails() {
+        return protocolHealthChecks.stream()
+            .map(ProtocolHealthCheck::toHealthDetail)
+            .toList();
+    }
+    
+    /**
+     * @deprecated Use {@link #toHealthDetail()} and then {@link HealthDetail#toMap()} if needed.
+     */
+    @Deprecated(forRemoval = true)
     public Map<String, Object> toMap() {
         Map<String, Object> map = new HashMap<>();
         map.put("status", status.name());
@@ -123,8 +204,20 @@ public class TransferEngineHealthCheck {
         private final Map<String, Object> systemMetrics = new HashMap<>();
         private String message;
         
+        /**
+         * @deprecated Use {@link #healthStatus(HealthStatus)} instead.
+         */
+        @Deprecated(forRemoval = true)
         public Builder status(Status status) {
             this.status = status;
+            return this;
+        }
+        
+        /**
+         * Sets the status using the unified HealthStatus enum.
+         */
+        public Builder healthStatus(HealthStatus healthStatus) {
+            this.status = Status.fromHealthStatus(healthStatus);
             return this;
         }
         

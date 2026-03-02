@@ -18,6 +18,8 @@ package dev.mars.quorus.controller.http.handlers;
 
 import dev.mars.quorus.agent.AgentInfo;
 import dev.mars.quorus.agent.AgentStatus;
+import dev.mars.quorus.controller.http.ErrorCode;
+import dev.mars.quorus.controller.http.QuorusApiException;
 import dev.mars.quorus.controller.raft.RaftNode;
 import dev.mars.quorus.controller.state.AgentCommand;
 import dev.mars.quorus.controller.state.CommandResult;
@@ -65,14 +67,9 @@ public class HeartbeatHandler implements Handler<RoutingContext> {
                 return;
             }
 
-            // Verify agent exists
-            QuorusStateStore stateMachine = this.stateStore;
-            AgentInfo existingAgent = stateMachine.getAgent(agentId);
-            if (existingAgent == null) {
-                ctx.fail(404, new IllegalArgumentException(
-                        "Agent not found: " + agentId + ". Agent must be registered before sending heartbeats"));
-                return;
-            }
+            // Verify agent exists (throws HTTP 404 if not found)
+            stateStore.findAgent(agentId)
+                    .orElseThrow(() -> QuorusApiException.notFound(ErrorCode.AGENT_NOT_FOUND, agentId));
 
             // Extract optional status
             AgentStatus status = null;

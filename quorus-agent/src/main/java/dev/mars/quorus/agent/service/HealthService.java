@@ -17,6 +17,8 @@
 package dev.mars.quorus.agent.service;
 
 import dev.mars.quorus.agent.config.AgentConfiguration;
+import dev.mars.quorus.monitoring.HealthDetail;
+import dev.mars.quorus.monitoring.HealthStatus;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
 import com.sun.net.httpserver.HttpHandler;
@@ -74,13 +76,14 @@ public class HealthService {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
             if ("GET".equals(exchange.getRequestMethod())) {
-                Map<String, Object> health = new HashMap<>();
-                health.put("status", "UP");
-                health.put("timestamp", Instant.now());
-                health.put("agentId", config.getAgentId());
-                health.put("uptime", Instant.now().toEpochMilli() - startTime.toEpochMilli());
+                HealthDetail health = HealthDetail.builder("agent")
+                    .status(HealthStatus.UP)
+                    .timestamp(Instant.now())
+                    .metadata("agentId", config.getAgentId())
+                    .metadata("uptime", Instant.now().toEpochMilli() - startTime.toEpochMilli())
+                    .build();
                 
-                String response = objectMapper.writeValueAsString(health);
+                String response = objectMapper.writeValueAsString(health.toMap());
                 exchange.getResponseHeaders().set("Content-Type", "application/json");
                 exchange.sendResponseHeaders(200, response.getBytes().length);
                 

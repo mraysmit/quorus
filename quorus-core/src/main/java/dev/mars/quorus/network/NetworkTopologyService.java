@@ -499,7 +499,7 @@ public class NetworkTopologyService {
         private final Duration averageLatency;
         private final long totalBandwidth;
         private final int networkPaths;
-        private final Object transferMetrics;
+        private final String transferMetrics;
 
         private NetworkStatistics(Builder builder) {
             this.totalNodes = builder.totalNodes;
@@ -515,7 +515,7 @@ public class NetworkTopologyService {
         public Duration getAverageLatency() { return averageLatency; }
         public long getTotalBandwidth() { return totalBandwidth; }
         public int getNetworkPaths() { return networkPaths; }
-        public Object getTransferMetrics() { return transferMetrics; }
+        public String getTransferMetrics() { return transferMetrics; }
 
         public static Builder builder() { return new Builder(); }
 
@@ -525,14 +525,14 @@ public class NetworkTopologyService {
             private Duration averageLatency = Duration.ZERO;
             private long totalBandwidth = 0;
             private int networkPaths = 0;
-            private Object transferMetrics = null;
+            private String transferMetrics = null;
 
             public Builder totalNodes(int totalNodes) { this.totalNodes = totalNodes; return this; }
             public Builder reachableNodes(int reachableNodes) { this.reachableNodes = reachableNodes; return this; }
             public Builder averageLatency(Duration averageLatency) { this.averageLatency = averageLatency; return this; }
             public Builder totalBandwidth(long totalBandwidth) { this.totalBandwidth = totalBandwidth; return this; }
             public Builder networkPaths(int networkPaths) { this.networkPaths = networkPaths; return this; }
-            public Builder transferMetrics(Object transferMetrics) { this.transferMetrics = transferMetrics; return this; }
+            public Builder transferMetrics(String transferMetrics) { this.transferMetrics = transferMetrics; return this; }
 
             public NetworkStatistics build() { return new NetworkStatistics(this); }
         }
@@ -549,7 +549,7 @@ public class NetworkTopologyService {
             hostMetrics.computeIfAbsent(hostname, k -> new ArrayList<>()).add(metric);
         }
 
-        public Object getAggregatedMetrics() {
+        public String getAggregatedMetrics() {
             return "Aggregated metrics for " + hostMetrics.size() + " hosts";
         }
 

@@ -53,7 +53,11 @@ public class TransferTelemetryMetrics {
     private static final String METER_NAME = "quorus-core";
 
     // Singleton instance
-    private static TransferTelemetryMetrics instance;
+    // Singleton implemented using Initialization-on-Demand Holder idiom
+    // Thread-safe, lazy initialization without synchronization
+    private static final class Holder {
+        private static final TransferTelemetryMetrics INSTANCE = new TransferTelemetryMetrics();
+    }
 
     // Counters
     private final LongCounter transfersTotal;
@@ -133,11 +137,8 @@ public class TransferTelemetryMetrics {
     /**
      * Get the singleton instance of TransferTelemetryMetrics.
      */
-    public static synchronized TransferTelemetryMetrics getInstance() {
-        if (instance == null) {
-            instance = new TransferTelemetryMetrics();
-        }
-        return instance;
+    public static TransferTelemetryMetrics getInstance() {
+        return Holder.INSTANCE;
     }
 
     /**

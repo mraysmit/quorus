@@ -51,7 +51,11 @@ public class RaftMetrics {
     private static final String METER_NAME = "quorus-controller-raft";
 
     // Singleton instance
-    private static RaftMetrics instance;
+    // Singleton implemented using Initialization-on-Demand Holder idiom
+    // Thread-safe, lazy initialization without synchronization
+    private static final class Holder {
+        private static final RaftMetrics INSTANCE = new RaftMetrics();
+    }
 
     // Counters
     private final LongCounter voteRequestsCounter;
@@ -121,11 +125,8 @@ public class RaftMetrics {
     /**
      * Gets the singleton RaftMetrics instance.
      */
-    public static synchronized RaftMetrics getInstance() {
-        if (instance == null) {
-            instance = new RaftMetrics();
-        }
-        return instance;
+    public static RaftMetrics getInstance() {
+        return Holder.INSTANCE;
     }
 
     /**
