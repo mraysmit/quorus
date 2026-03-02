@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.io.Serializable;
 import java.time.Instant;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Configuration for a route — the primary orchestration primitive in Quorus.
@@ -96,6 +97,64 @@ public class RouteConfiguration implements Serializable {
         this.options = options;
         this.createdAt = createdAt != null ? createdAt : Instant.now();
         this.updatedAt = updatedAt != null ? updatedAt : Instant.now();
+    }
+
+    /**
+     * Creates a validated RouteConfiguration, ensuring all required fields are non-null and non-blank.
+     * Use this factory method when creating routes from untrusted input (e.g., HTTP requests).
+     *
+     * @throws IllegalArgumentException if any required field is null or blank
+     */
+    public static RouteConfiguration validated(
+            String routeId,
+            String name,
+            String description,
+            String sourceAgentId,
+            String sourceLocation,
+            String destinationAgentId,
+            String destinationLocation,
+            TriggerConfiguration trigger,
+            RouteStatus status,
+            Map<String, String> options,
+            Instant createdAt,
+            Instant updatedAt) {
+        
+        requireNonBlank(routeId, "routeId");
+        requireNonBlank(name, "name");
+        requireNonBlank(sourceAgentId, "sourceAgentId");
+        requireNonBlank(sourceLocation, "sourceLocation");
+        requireNonBlank(destinationAgentId, "destinationAgentId");
+        requireNonBlank(destinationLocation, "destinationLocation");
+        Objects.requireNonNull(trigger, "trigger must not be null");
+        
+        return new RouteConfiguration(
+            routeId, name, description,
+            sourceAgentId, sourceLocation,
+            destinationAgentId, destinationLocation,
+            trigger, status, options,
+            createdAt, updatedAt
+        );
+    }
+    
+    private static void requireNonBlank(String value, String fieldName) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(fieldName + " must not be null or blank");
+        }
+    }
+    
+    /**
+     * Validates this RouteConfiguration instance.
+     *
+     * @throws IllegalArgumentException if any required field is null or blank
+     */
+    public void validate() {
+        requireNonBlank(routeId, "routeId");
+        requireNonBlank(name, "name");
+        requireNonBlank(sourceAgentId, "sourceAgentId");
+        requireNonBlank(sourceLocation, "sourceLocation");
+        requireNonBlank(destinationAgentId, "destinationAgentId");
+        requireNonBlank(destinationLocation, "destinationLocation");
+        Objects.requireNonNull(trigger, "trigger must not be null");
     }
 
     /**

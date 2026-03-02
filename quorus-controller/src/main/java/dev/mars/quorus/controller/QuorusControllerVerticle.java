@@ -39,6 +39,7 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -54,11 +55,11 @@ public class QuorusControllerVerticle extends AbstractVerticle {
     private static final Logger logger = LoggerFactory.getLogger(QuorusControllerVerticle.class);
 
     private RaftTransport transport;
-    private RaftNode raftNode;
+    private Optional<RaftNode> raftNode = Optional.empty();
     private RaftStorage raftStorage;
-    private HttpApiServer apiServer;
-    private GrpcRaftServer grpcServer;
-    private ShutdownCoordinator shutdownCoordinator;
+    private Optional<HttpApiServer> apiServer = Optional.empty();
+    private Optional<GrpcRaftServer> grpcServer = Optional.empty();
+    private Optional<ShutdownCoordinator> shutdownCoordinator = Optional.empty();
 
     @Override
     public void start(Promise<Void> startPromise) throws Exception {
@@ -135,7 +136,7 @@ public class QuorusControllerVerticle extends AbstractVerticle {
             QuorusStateStore stateMachine = new QuorusStateStore(initialMetadata);
 
             // Use the builder with storage and snapshot configuration
-            this.raftNode = RaftNode.builder()
+            RaftNode node = RaftNode.builder()
                     .vertx(vertx)
                     .nodeId(nodeId)
                     .clusterNodes(clusterNodeIds)
@@ -149,21 +150,24 @@ public class QuorusControllerVerticle extends AbstractVerticle {
                     .snapshotCheckInterval(config.getSnapshotCheckIntervalMs())
                     .logHardLimit(config.getLogHardLimit())
                     .build();
+            this.raftNode = Optional.of(node);
 
-            transport.setRaftNode(raftNode);
+            transport.setRaftNode(node);
 
             // 6. Create and start gRPC server for inter-node communication
-            this.grpcServer = new GrpcRaftServer(vertx, raftPort, raftNode);
+            GrpcRaftServer grpc = new GrpcRaftServer(vertx, raftPort, node);
+            this.grpcServer = Optional.of(grpc);
 
-            grpcServer.start().onSuccess(v1 -> {
+            grpc.start().onSuccess(v1 -> {
                 logger.info("gRPC server started on port {}", raftPort);
 
                 // 7. Start Raft (includes recovery from WAL)
-                raftNode.start().onSuccess(v2 -> {
+                node.start().onSuccess(v2 -> {
                     // 8. Start HTTP API
-                    this.apiServer = new HttpApiServer(vertx, port, raftNode, stateMachine);
+                    HttpApiServer api = new HttpApiServer(vertx, port, node, stateMachine);
+                    this.apiServer = Optional.of(api);
 
-                    apiServer.start()
+                    api.start()
                             .onSuccess(server -> {
                                 // 9. Setup shutdown coordinator for graceful shutdown
                                 setupShutdownCoordinator();
@@ -196,38 +200,29 @@ public class QuorusControllerVerticle extends AbstractVerticle {
         long drainTimeoutMs = config.getLong("quorus.shutdown.drain.timeout.ms", 5000L);
         long shutdownTimeoutMs = config.getLong("quorus.shutdown.timeout.ms", 30000L);
         
-        this.shutdownCoordinator = new ShutdownCoordinator(vertx, drainTimeoutMs, shutdownTimeoutMs);
+        ShutdownCoordinator coordinator = new ShutdownCoordinator(vertx, drainTimeoutMs, shutdownTimeoutMs);
+        this.shutdownCoordinator = Optional.of(coordinator);
         
         // Stop accepting new requests
-        shutdownCoordinator.onDrain("http-api-drain", () -> {
-            if (apiServer != null) {
-                return apiServer.enterDrainMode();
-            }
-            return Future.succeededFuture();
-        });
+        coordinator.onDrain("http-api-drain", () -> 
+            apiServer.map(HttpApiServer::enterDrainMode).orElseGet(Future::succeededFuture)
+        );
         
         // Phase 2: AWAIT_COMPLETION - No active jobs tracked at controller level yet
         // (Agents track their own transfers - controller just routes requests)
         
         // Phase 3: STOP_SERVICES - Stop in reverse order of startup
-        shutdownCoordinator.onServiceStop("http-api-stop", () -> {
-            if (apiServer != null) {
-                return apiServer.stop();
-            }
+        coordinator.onServiceStop("http-api-stop", () -> 
+            apiServer.map(HttpApiServer::stop).orElseGet(Future::succeededFuture)
+        );
+        
+        coordinator.onServiceStop("raft-node-stop", () -> {
+            raftNode.ifPresent(RaftNode::stop);
             return Future.succeededFuture();
         });
         
-        shutdownCoordinator.onServiceStop("raft-node-stop", () -> {
-            if (raftNode != null) {
-                raftNode.stop();
-            }
-            return Future.succeededFuture();
-        });
-        
-        shutdownCoordinator.onServiceStop("grpc-server-stop", () -> {
-            if (grpcServer != null) {
-                grpcServer.stop();
-            }
+        coordinator.onServiceStop("grpc-server-stop", () -> {
+            grpcServer.ifPresent(GrpcRaftServer::stop);
             return Future.succeededFuture();
         });
         
@@ -241,9 +236,8 @@ public class QuorusControllerVerticle extends AbstractVerticle {
     public void stop(Promise<Void> stopPromise) throws Exception {
         logger.info("Stopping QuorusControllerVerticle...");
 
-        if (shutdownCoordinator != null) {
-            // Use graceful shutdown coordinator
-            shutdownCoordinator.shutdown()
+        shutdownCoordinator.ifPresentOrElse(
+            coordinator -> coordinator.shutdown()
                     .onSuccess(v -> {
                         logger.info("QuorusControllerVerticle stopped successfully (graceful)");
                         stopPromise.complete();
@@ -252,26 +246,21 @@ public class QuorusControllerVerticle extends AbstractVerticle {
                         logger.warn("Error during graceful shutdown", err);
                         // Still complete - we tried our best
                         stopPromise.complete();
-                    });
-        } else {
-            // Fallback to immediate shutdown if coordinator wasn't initialized
-            try {
-                if (apiServer != null) {
-                    apiServer.stop();
+                    }),
+            () -> {
+                // Fallback to immediate shutdown if coordinator wasn't initialized
+                try {
+                    apiServer.ifPresent(HttpApiServer::stop);
+                    raftNode.ifPresent(RaftNode::stop);
+                    grpcServer.ifPresent(GrpcRaftServer::stop);
+                    logger.info("QuorusControllerVerticle stopped successfully (immediate)");
+                    stopPromise.complete();
+                } catch (Exception e) {
+                    logger.warn("Error during shutdown: {}", e.getMessage());
+                    logger.debug("Stack trace for shutdown error", e);
+                    stopPromise.complete();
                 }
-                if (raftNode != null) {
-                    raftNode.stop();
-                }
-                if (grpcServer != null) {
-                    grpcServer.stop();
-                }
-                logger.info("QuorusControllerVerticle stopped successfully (immediate)");
-                stopPromise.complete();
-            } catch (Exception e) {
-                logger.warn("Error during shutdown: {}", e.getMessage());
-                logger.debug("Stack trace for shutdown error", e);
-                stopPromise.complete();
             }
-        }
+        );
     }
 }

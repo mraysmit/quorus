@@ -89,15 +89,12 @@ public class TransferHandler {
     public Handler<RoutingContext> handleGet() {
         return ctx -> {
             String jobId = ctx.pathParam("jobId");
-            QuorusStateStore stateMachine = this.stateStore;
 
-            TransferJobSnapshot job = stateMachine.getTransferJobs().get(jobId);
-            if (job == null) {
-                throw QuorusApiException.notFound(ErrorCode.TRANSFER_NOT_FOUND, jobId);
-            }
+            TransferJobSnapshot job = stateStore.findTransferJob(jobId)
+                    .orElseThrow(() -> QuorusApiException.notFound(ErrorCode.TRANSFER_NOT_FOUND, jobId));
 
             // Get the latest assignment status for this job
-            JobAssignment latestAssignment = stateMachine.getJobAssignments().values().stream()
+            JobAssignment latestAssignment = stateStore.getJobAssignments().values().stream()
                     .filter(a -> a.getJobId().equals(jobId))
                     .findFirst()
                     .orElse(null);

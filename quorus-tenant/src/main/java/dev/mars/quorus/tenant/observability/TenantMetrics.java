@@ -56,7 +56,11 @@ public class TenantMetrics {
     private static final String METER_NAME = "quorus-tenant";
 
     // Singleton instance
-    private static TenantMetrics instance;
+    // Singleton implemented using Initialization-on-Demand Holder idiom
+    // Thread-safe, lazy initialization without synchronization
+    private static final class Holder {
+        private static final TenantMetrics INSTANCE = new TenantMetrics();
+    }
 
     // Counters
     private final LongCounter tenantsCreated;
@@ -152,11 +156,8 @@ public class TenantMetrics {
     /**
      * Get the singleton instance of TenantMetrics.
      */
-    public static synchronized TenantMetrics getInstance() {
-        if (instance == null) {
-            instance = new TenantMetrics();
-        }
-        return instance;
+    public static TenantMetrics getInstance() {
+        return Holder.INSTANCE;
     }
 
     // Tenant lifecycle methods

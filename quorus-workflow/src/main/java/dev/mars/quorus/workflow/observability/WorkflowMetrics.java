@@ -53,7 +53,11 @@ public class WorkflowMetrics {
     private static final String METER_NAME = "quorus-workflow";
 
     // Singleton instance
-    private static WorkflowMetrics instance;
+    // Singleton implemented using Initialization-on-Demand Holder idiom
+    // Thread-safe, lazy initialization without synchronization
+    private static final class Holder {
+        private static final WorkflowMetrics INSTANCE = new WorkflowMetrics();
+    }
 
     // Counters
     private final LongCounter workflowsTotal;
@@ -133,11 +137,8 @@ public class WorkflowMetrics {
     /**
      * Get the singleton instance of WorkflowMetrics.
      */
-    public static synchronized WorkflowMetrics getInstance() {
-        if (instance == null) {
-            instance = new WorkflowMetrics();
-        }
-        return instance;
+    public static WorkflowMetrics getInstance() {
+        return Holder.INSTANCE;
     }
 
     /**

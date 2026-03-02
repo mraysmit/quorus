@@ -124,12 +124,9 @@ public class JobAssignmentHandler {
     public Handler<RoutingContext> handleGet() {
         return ctx -> {
             String assignmentId = ctx.pathParam("assignmentId");
-            QuorusStateStore stateMachine = this.stateStore;
 
-            JobAssignment assignment = stateMachine.getJobAssignment(assignmentId);
-            if (assignment == null) {
-                throw QuorusApiException.notFound(ErrorCode.ASSIGNMENT_NOT_FOUND, assignmentId);
-            }
+            JobAssignment assignment = stateStore.findJobAssignment(assignmentId)
+                    .orElseThrow(() -> QuorusApiException.notFound(ErrorCode.ASSIGNMENT_NOT_FOUND, assignmentId));
 
             ctx.json(toJson(assignmentId, assignment));
         };
@@ -278,12 +275,8 @@ public class JobAssignmentHandler {
      * @throws QuorusApiException with ASSIGNMENT_NOT_FOUND if it doesn't exist
      */
     private JobAssignment lookupAssignment(String assignmentId) {
-        QuorusStateStore stateMachine = this.stateStore;
-        JobAssignment assignment = stateMachine.getJobAssignment(assignmentId);
-        if (assignment == null) {
-            throw QuorusApiException.notFound(ErrorCode.ASSIGNMENT_NOT_FOUND, assignmentId);
-        }
-        return assignment;
+        return stateStore.findJobAssignment(assignmentId)
+                .orElseThrow(() -> QuorusApiException.notFound(ErrorCode.ASSIGNMENT_NOT_FOUND, assignmentId));
     }
 
     /**

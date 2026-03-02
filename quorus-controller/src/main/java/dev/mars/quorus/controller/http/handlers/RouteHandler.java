@@ -139,12 +139,9 @@ public class RouteHandler {
     public Handler<RoutingContext> handleGet() {
         return ctx -> {
             String routeId = ctx.pathParam("routeId");
-            QuorusStateStore stateMachine = this.stateStore;
 
-            RouteConfiguration route = stateMachine.getRoute(routeId);
-            if (route == null) {
-                throw QuorusApiException.notFound(ErrorCode.ROUTE_NOT_FOUND, routeId);
-            }
+            RouteConfiguration route = stateStore.findRoute(routeId)
+                    .orElseThrow(() -> QuorusApiException.notFound(ErrorCode.ROUTE_NOT_FOUND, routeId));
 
             ctx.json(routeToJson(route));
         };
@@ -162,11 +159,8 @@ public class RouteHandler {
                     throw QuorusApiException.badRequest(ErrorCode.BAD_REQUEST, "Request body is required");
                 }
 
-                QuorusStateStore stateMachine = this.stateStore;
-                RouteConfiguration existing = stateMachine.getRoute(routeId);
-                if (existing == null) {
-                    throw QuorusApiException.notFound(ErrorCode.ROUTE_NOT_FOUND, routeId);
-                }
+                RouteConfiguration existing = stateStore.findRoute(routeId)
+                        .orElseThrow(() -> QuorusApiException.notFound(ErrorCode.ROUTE_NOT_FOUND, routeId));
 
 // Cannot update routes that are actively transferring or deleted
             if (existing.getStatus() == RouteStatus.TRANSFERRING || existing.getStatus() == RouteStatus.DELETED) {
@@ -200,13 +194,9 @@ public class RouteHandler {
     public Handler<RoutingContext> handleDelete() {
         return ctx -> {
             String routeId = ctx.pathParam("routeId");
-            QuorusStateStore stateMachine = this.stateStore;
 
-            if (!stateMachine.hasRoute(routeId)) {
-                throw QuorusApiException.notFound(ErrorCode.ROUTE_NOT_FOUND, routeId);
-            }
-
-            RouteConfiguration existing = stateMachine.getRoute(routeId);
+            RouteConfiguration existing = stateStore.findRoute(routeId)
+                    .orElseThrow(() -> QuorusApiException.notFound(ErrorCode.ROUTE_NOT_FOUND, routeId));
 
             // Pre-commit transition validation: can we transition to DELETED?
             validateTransition(existing, RouteStatus.DELETED, routeId, "delete");
@@ -228,12 +218,9 @@ public class RouteHandler {
     public Handler<RoutingContext> handleSuspend() {
         return ctx -> {
             String routeId = ctx.pathParam("routeId");
-            QuorusStateStore stateMachine = this.stateStore;
 
-            RouteConfiguration existing = stateMachine.getRoute(routeId);
-            if (existing == null) {
-                throw QuorusApiException.notFound(ErrorCode.ROUTE_NOT_FOUND, routeId);
-            }
+            RouteConfiguration existing = stateStore.findRoute(routeId)
+                    .orElseThrow(() -> QuorusApiException.notFound(ErrorCode.ROUTE_NOT_FOUND, routeId));
 
             // Pre-commit transition validation: can we transition to SUSPENDED?
             validateTransition(existing, RouteStatus.SUSPENDED, routeId, "suspend");
@@ -267,12 +254,9 @@ public class RouteHandler {
     public Handler<RoutingContext> handleResume() {
         return ctx -> {
             String routeId = ctx.pathParam("routeId");
-            QuorusStateStore stateMachine = this.stateStore;
 
-            RouteConfiguration existing = stateMachine.getRoute(routeId);
-            if (existing == null) {
-                throw QuorusApiException.notFound(ErrorCode.ROUTE_NOT_FOUND, routeId);
-            }
+            RouteConfiguration existing = stateStore.findRoute(routeId)
+                    .orElseThrow(() -> QuorusApiException.notFound(ErrorCode.ROUTE_NOT_FOUND, routeId));
 
             // Resume operation requires SUSPENDED state specifically (not just canTransitionTo ACTIVE)
             if (existing.getStatus() != RouteStatus.SUSPENDED) {
@@ -311,29 +295,29 @@ public class RouteHandler {
 
     /**
      * Validates required fields in a RouteConfiguration.
+     * Delegates to RouteConfiguration.validate() and converts exceptions to HTTP-specific errors.
      */
     private void validateRouteConfiguration(RouteConfiguration route) {
-        if (route.getRouteId() == null || route.getRouteId().isBlank()) {
-            throw QuorusApiException.badRequest(ErrorCode.MISSING_REQUIRED_FIELD, "routeId");
+        try {
+            route.validate();
+        } catch (IllegalArgumentException e) {
+            // Extract field name from message: "fieldName must not be null or blank"
+            String fieldName = extractFieldName(e.getMessage());
+            throw QuorusApiException.badRequest(ErrorCode.MISSING_REQUIRED_FIELD, fieldName);
+        } catch (NullPointerException e) {
+            // Extract field name from message: "fieldName must not be null"
+            String fieldName = extractFieldName(e.getMessage());
+            throw QuorusApiException.badRequest(ErrorCode.MISSING_REQUIRED_FIELD, fieldName);
         }
-        if (route.getName() == null || route.getName().isBlank()) {
-            throw QuorusApiException.badRequest(ErrorCode.MISSING_REQUIRED_FIELD, "name");
+    }
+    
+    private String extractFieldName(String message) {
+        if (message == null) {
+            return "unknown";
         }
-        if (route.getSourceAgentId() == null || route.getSourceAgentId().isBlank()) {
-            throw QuorusApiException.badRequest(ErrorCode.MISSING_REQUIRED_FIELD, "sourceAgentId");
-        }
-        if (route.getSourceLocation() == null || route.getSourceLocation().isBlank()) {
-            throw QuorusApiException.badRequest(ErrorCode.MISSING_REQUIRED_FIELD, "sourceLocation");
-        }
-        if (route.getDestinationAgentId() == null || route.getDestinationAgentId().isBlank()) {
-            throw QuorusApiException.badRequest(ErrorCode.MISSING_REQUIRED_FIELD, "destinationAgentId");
-        }
-        if (route.getDestinationLocation() == null || route.getDestinationLocation().isBlank()) {
-            throw QuorusApiException.badRequest(ErrorCode.MISSING_REQUIRED_FIELD, "destinationLocation");
-        }
-        if (route.getTrigger() == null) {
-            throw QuorusApiException.badRequest(ErrorCode.MISSING_REQUIRED_FIELD, "trigger");
-        }
+        // Message format: "fieldName must not be null or blank" or "fieldName must not be null"
+        int spaceIndex = message.indexOf(' ');
+        return spaceIndex > 0 ? message.substring(0, spaceIndex) : message;
     }
 
     // ==================== JSON Serialization ====================

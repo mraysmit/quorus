@@ -31,10 +31,36 @@ import java.util.Objects;
  */
 public class ProtocolHealthCheck {
     
+    /**
+     * @deprecated Use {@link HealthStatus} instead. This inner enum will be removed in a future release.
+     */
+    @Deprecated(forRemoval = true)
     public enum Status {
         UP,      // Protocol is healthy and operational
         DOWN,    // Protocol is not operational
-        DEGRADED // Protocol is operational but experiencing issues
+        DEGRADED; // Protocol is operational but experiencing issues
+        
+        /**
+         * Converts this deprecated Status to the new HealthStatus enum.
+         */
+        public HealthStatus toHealthStatus() {
+            return switch (this) {
+                case UP -> HealthStatus.UP;
+                case DOWN -> HealthStatus.DOWN;
+                case DEGRADED -> HealthStatus.DEGRADED;
+            };
+        }
+        
+        /**
+         * Converts from the new HealthStatus enum.
+         */
+        public static Status fromHealthStatus(HealthStatus healthStatus) {
+            return switch (healthStatus) {
+                case UP -> UP;
+                case DOWN -> DOWN;
+                case DEGRADED -> DEGRADED;
+            };
+        }
     }
     
     private final String protocolName;
@@ -55,8 +81,20 @@ public class ProtocolHealthCheck {
         return protocolName;
     }
     
+    /**
+     * @deprecated Use {@link #getHealthStatus()} instead.
+     */
+    @Deprecated(forRemoval = true)
     public Status getStatus() {
         return status;
+    }
+    
+    /**
+     * Returns the health status using the unified HealthStatus enum.
+     * @return the health status
+     */
+    public HealthStatus getHealthStatus() {
+        return status.toHealthStatus();
     }
     
     public Instant getTimestamp() {
@@ -75,6 +113,31 @@ public class ProtocolHealthCheck {
         return status == Status.UP;
     }
     
+    /**
+     * Converts this protocol health check to a HealthDetail record.
+     * @return a HealthDetail representation of this health check
+     */
+    public HealthDetail toHealthDetail() {
+        HealthDetail.Builder builder = HealthDetail.builder(protocolName)
+            .status(getHealthStatus())
+            .timestamp(timestamp);
+        
+        if (message != null) {
+            builder.message(message);
+        }
+        
+        // Convert Object details to String metadata
+        for (Map.Entry<String, Object> entry : details.entrySet()) {
+            builder.metadata(entry.getKey(), String.valueOf(entry.getValue()));
+        }
+        
+        return builder.build();
+    }
+    
+    /**
+     * @deprecated Use {@link #toHealthDetail()} and then {@link HealthDetail#toMap()} if needed.
+     */
+    @Deprecated(forRemoval = true)
     public Map<String, Object> toMap() {
         Map<String, Object> map = new HashMap<>();
         map.put("protocol", protocolName);
@@ -104,8 +167,20 @@ public class ProtocolHealthCheck {
             this.protocolName = protocolName;
         }
         
+        /**
+         * @deprecated Use {@link #healthStatus(HealthStatus)} instead.
+         */
+        @Deprecated(forRemoval = true)
         public Builder status(Status status) {
             this.status = status;
+            return this;
+        }
+        
+        /**
+         * Sets the status using the unified HealthStatus enum.
+         */
+        public Builder healthStatus(HealthStatus healthStatus) {
+            this.status = Status.fromHealthStatus(healthStatus);
             return this;
         }
         
