@@ -73,11 +73,19 @@ public class JobStatusHandler implements Handler<RoutingContext> {
             // Reconstruct assignment ID based on convention: jobId:agentId
             String assignmentId = jobId + ":" + agentId;
 
-            // Look up current assignment status for CAS protection
+            // Look up current assignment status for pre-commit validation and CAS protection
             QuorusStateStore stateMachine = this.stateStore;
             JobAssignment existing = stateMachine.getJobAssignment(assignmentId);
             if (existing == null) {
                 ctx.fail(404, new IllegalArgumentException("Assignment not found: " + assignmentId));
+                return;
+            }
+
+            // Pre-commit transition validation
+            if (!existing.getStatus().canTransitionTo(status)) {
+                ctx.fail(409, new IllegalArgumentException(String.format(
+                        "Invalid transition from %s to %s for assignment %s",
+                        existing.getStatus(), status, assignmentId)));
                 return;
             }
 

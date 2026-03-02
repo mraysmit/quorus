@@ -93,7 +93,9 @@ public class QuorusControllerVerticle extends AbstractVerticle {
             logger.info("Cluster configuration: nodeId={}, peers={}", nodeId, peerAddresses);
 
             // 3. Setup Raft Transport (gRPC)
-            this.transport = new GrpcRaftTransport(vertx, nodeId, peerAddresses);
+            int raftPoolSize = config.getRaftIoPoolSize();
+            int raftQueueSize = config.getRaftIoQueueSize();
+            this.transport = new GrpcRaftTransport(vertx, nodeId, peerAddresses, raftPoolSize, raftQueueSize);
 
             // 4. Create Raft Storage (WAL)
             String storageType = config.getRaftStorageType();
@@ -145,6 +147,7 @@ public class QuorusControllerVerticle extends AbstractVerticle {
                     .snapshotEnabled(config.isSnapshotEnabled())
                     .snapshotThreshold(config.getSnapshotThreshold())
                     .snapshotCheckInterval(config.getSnapshotCheckIntervalMs())
+                    .logHardLimit(config.getLogHardLimit())
                     .build();
 
             transport.setRaftNode(raftNode);

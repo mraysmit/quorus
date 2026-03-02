@@ -64,11 +64,11 @@ public final class SharedTestContainers {
     private static volatile ComposeContainer sftpContainer;
     private static final Object SFTP_LOCK = new Object();
 
-    // FTP container (fauria/vsftpd)
+    // FTP container (delfer/alpine-ftp-server)
     private static volatile ComposeContainer ftpContainer;
     private static final Object FTP_LOCK = new Object();
 
-    // FTPS container (stilliard/pure-ftpd with TLS)
+    // FTPS container (delfer/alpine-ftp-server with TLS)
     private static volatile ComposeContainer ftpsContainer;
     private static final Object FTPS_LOCK = new Object();
 
@@ -191,7 +191,7 @@ public final class SharedTestContainers {
 
     /**
      * Gets the shared FTPS container, starting it if necessary.
-     * Uses stilliard/pure-ftpd with TLS enabled (explicit FTPS via AUTH TLS).
+     * Uses delfer/alpine-ftp-server with TLS enabled (explicit FTPS via AUTH TLS).
      * The container auto-generates a self-signed certificate.
      * 
      * <p>Unlike FTP/SFTP containers, the FTPS container uses <b>fixed port mappings</b>

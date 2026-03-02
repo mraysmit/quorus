@@ -1,7 +1,7 @@
 # Quorus Alpha Implementation Plan
 
-**Version:** 1.7  
-**Date:** February 19, 2026  
+**Version:** 1.8  
+**Date:** March 2, 2026  
 **Author:** Mark Andrew Ray-Smith Cityline Ltd
 
 ---
@@ -10,6 +10,7 @@
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.8 | 2026-03-02 | Extracted Stage 6 details to [QUORUS_STAGE6_SECURITY_ROUTES.md](QUORUS_STAGE6_SECURITY_ROUTES.md); main document now contains summary only |
 | 1.7 | 2026-02-19 | Consistency fixes: updated Appendix A to match completed tasks (T4.1, T4.2, T5.2, T5.3, T5.4), corrected summary counts (14/22 completed), fixed version header, fixed 2025→2026 date in T3.1, expanded route risk mitigation |
 | 1.6 | 2026-02-13 | Consolidated: merged IMPLEMENTATION_STATUS, CHANGELOG, .env.example into appendices |
 | 1.5 | 2026-02-13 | Stage 1 & Stage 2 COMPLETE: All documentation, config, logging, health, error, and shutdown tasks |
@@ -448,191 +449,29 @@ Larger changes that improve system reliability.
 
 ## Stage 6: Security & Enterprise Features (2-4 weeks each)
 
+> **📄 Full details moved to:** [QUORUS_STAGE6_SECURITY_ROUTES.md](QUORUS_STAGE6_SECURITY_ROUTES.md)
+
 Security features implemented **after** core functionality is stable and well-tested.
 
 > **Rationale:** Security layers are easier to add to a stable, well-tested core. Adding authentication/TLS to buggy infrastructure creates debugging complexity. Complete Stages 1-5 first.
 
-### T6.1: API Key Authentication (Basic)
+### Task Summary
 
-**Goal:** Simple API authentication to protect endpoints.
+| Task | Name | Effort | Priority | Status |
+|------|------|--------|----------|--------|
+| T6.1 | API Key Authentication | 1-2 days | 🟠 MEDIUM | ⬜ Pending |
+| T6.2 | TLS for HTTP API | 2 days | 🟠 MEDIUM | ⬜ Pending |
+| T6.3 | TLS for gRPC Raft | 2-3 days | 🟠 MEDIUM | ⬜ Pending |
+| T6.4 | TenantSecurityService | 5 days | 🟠 MEDIUM | ⬜ Pending |
+| T6.5 | Request Rate Limiting | 2 days | 🟠 MEDIUM | ⬜ Pending |
+| T6.6 | OAuth2/JWT Authentication | 3 weeks | 🟠 MEDIUM | ⬜ Pending |
+| T6.7 | Route Architecture | 4-6 weeks | 🟡 HIGH | ⬜ Pending |
+| T6.8 | TenantAwareStorageService | 2 weeks | 🟠 MEDIUM | ⬜ Pending |
 
-**Effort:** 1-2 days  
-**Priority:** 🟠 MEDIUM (deferred until core complete)  
-**Dependencies:** T5.1-T5.4 (core stability)
+**Total Estimated Effort:** 10-14 weeks
 
-| Task | Module | Effort | Status |
-|------|--------|--------|--------|
-| Create `ApiKeyAuthHandler` | quorus-controller | 2 hours | ⬜ Pending |
-| Add API key configuration property | quorus-controller | 30 min | ⬜ Pending |
-| Apply handler to protected routes | HttpApiServer | 1 hour | ⬜ Pending |
-| Add tests for auth handler | quorus-controller/test | 2 hours | ⬜ Pending |
-| Document API key usage | docs/ | 30 min | ⬜ Pending |
-
-**Acceptance Criteria:**
-- [ ] All `/api/v1/*` endpoints require `X-API-Key` header
-- [ ] `/health` and `/metrics` remain public
-- [ ] Invalid/missing key returns 401 Unauthorized
-- [ ] API keys loaded from configuration/environment
-
----
-
-### T6.2: TLS for HTTP API
-
-**Goal:** Encrypted HTTP communication.
-
-**Effort:** 2 days  
-**Priority:** 🟠 MEDIUM  
-**Dependencies:** T6.1 (API Key Auth)
-
-| Task | Module | Effort | Status |
-|------|--------|--------|--------|
-| Add TLS configuration properties | AppConfig | 1 hour | ⬜ Pending |
-| Configure Vert.x HttpServerOptions for TLS | HttpApiServer | 2 hours | ⬜ Pending |
-| Generate dev/test certificates | scripts/ | 1 hour | ⬜ Pending |
-| Update Docker compose with TLS | docker/compose/ | 2 hours | ⬜ Pending |
-| Add TLS health check | HttpApiServer | 1 hour | ⬜ Pending |
-| Document TLS setup | docs/ | 2 hours | ⬜ Pending |
-
----
-
-### T6.3: TLS for gRPC Raft
-
-**Goal:** Encrypted Raft cluster communication.
-
-**Effort:** 2-3 days  
-**Priority:** 🟠 MEDIUM  
-**Dependencies:** T6.2 (TLS HTTP)
-
-| Task | Module | Effort | Status |
-|------|--------|--------|--------|
-| Add TLS to GrpcRaftServer | quorus-controller | 3 hours | ⬜ Pending |
-| Add TLS to GrpcRaftTransport | quorus-controller | 3 hours | ⬜ Pending |
-| Configure mutual TLS (mTLS) | quorus-controller | 4 hours | ⬜ Pending |
-| Update cluster configuration | docker/compose/ | 2 hours | ⬜ Pending |
-| Add TLS validation tests | quorus-controller/test | 4 hours | ⬜ Pending |
-
----
-
-### T6.4: TenantSecurityService
-
-**Goal:** Tenant-level access control foundation.
-
-**Effort:** 5 days  
-**Priority:** 🟠 MEDIUM  
-**Dependencies:** T6.1 (API Key Auth)
-
-| Task | Module | Effort | Status |
-|------|--------|--------|--------|
-| Create TenantSecurityService interface | quorus-tenant | 2 hours | ⬜ Pending |
-| Implement SimpleTenantSecurityService | quorus-tenant | 8 hours | ⬜ Pending |
-| Add tenant isolation checks | quorus-tenant | 4 hours | ⬜ Pending |
-| Integrate with HTTP handlers | quorus-controller | 4 hours | ⬜ Pending |
-| Add permission model | quorus-tenant | 4 hours | ⬜ Pending |
-| Create security tests | quorus-tenant/test | 8 hours | ⬜ Pending |
-
----
-
-### T6.5: Request Rate Limiting
-
-**Goal:** Protect API from abuse.
-
-**Effort:** 2 days  
-**Priority:** 🟠 MEDIUM  
-**Dependencies:** T6.1 (API Key for per-client limits)
-
-| Task | Module | Effort | Status |
-|------|--------|--------|--------|
-| Implement RateLimitHandler | quorus-controller | 4 hours | ⬜ Pending |
-| Add rate limit configuration | AppConfig | 1 hour | ⬜ Pending |
-| Apply to API endpoints | HttpApiServer | 2 hours | ⬜ Pending |
-| Add 429 response handling | HttpApiServer | 1 hour | ⬜ Pending |
-| Add rate limit tests | quorus-controller/test | 3 hours | ⬜ Pending |
-
----
-
-### T6.6: OAuth2/JWT Authentication
-
-**Goal:** Enterprise authentication integration.
-
-**Effort:** 3 weeks  
-**Priority:** 🟠 MEDIUM  
-**Dependencies:** T6.2 (TLS), T6.1 (API Key as fallback)
-
-| Task | Module | Effort | Status |
-|------|--------|--------|--------|
-| Add JWT validation library | pom.xml | 2 hours | ⬜ Pending |
-| Implement JwtAuthHandler | quorus-controller | 3 days | ⬜ Pending |
-| Add JWKS endpoint support | quorus-controller | 2 days | ⬜ Pending |
-| Implement token refresh handling | quorus-controller | 2 days | ⬜ Pending |
-| Add OAuth2 provider configuration | AppConfig | 1 day | ⬜ Pending |
-| Create auth integration tests | quorus-controller/test | 3 days | ⬜ Pending |
-| Document OAuth2 setup | docs/ | 2 days | ⬜ Pending |
-
----
-
-### T6.7: Route Architecture Implementation
-
-**Goal:** Implement the route-based transfer system as specified in QUORUS_SYSTEM_DESIGN.md.
-
-**Effort:** 4-6 weeks  
-**Priority:** 🟡 HIGH (Core feature, not optional)  
-**Dependencies:** T5.1-T5.3 (Raft stability)
-
-> **Note (2026-02-01):** Routes are **core** to Quorus architecture, not a decision point.
-> The system is explicitly designed as a "route-based distributed file transfer system."
-> See [QUORUS_SYSTEM_DESIGN.md](../design/QUORUS_SYSTEM_DESIGN.md) for full specification.
-> 
-> **Routes vs Workflows:**
-> - **Routes**: Event-driven, continuous monitoring, predefined source→destination with triggers
-> - **Workflows**: Manual/scheduled submission, complex multi-step operations, batch processing
-> - Both are core features serving different use cases.
-
-**Implementation Tasks:**
-
-| Task | Module | Effort | Status |
-|------|--------|--------|--------|
-| Create RouteConfiguration model | quorus-controller | 2 days | ⬜ Pending |
-| Implement RouteStatus lifecycle (CONFIGURED→ACTIVE→TRIGGERED) | quorus-controller | 2 days | ⬜ Pending |
-| Implement Trigger Evaluation Engine (Leader-only) | quorus-controller | 1 week | ⬜ Pending |
-| Add EVENT trigger (file watching on agent) | quorus-agent | 1 week | ⬜ Pending |
-| Add TIME trigger (cron scheduler) | quorus-controller | 3 days | ⬜ Pending |
-| Add INTERVAL trigger (periodic) | quorus-controller | 2 days | ⬜ Pending |
-| Add BATCH trigger (file count threshold) | quorus-controller | 2 days | ⬜ Pending |
-| Add SIZE trigger (cumulative size) | quorus-controller | 2 days | ⬜ Pending |
-| Add COMPOSITE trigger (AND/OR logic) | quorus-controller | 3 days | ⬜ Pending |
-| Create route API endpoints | HttpApiServer | 3 days | ⬜ Pending |
-| Replicate routes via Raft | quorus-controller | 2 days | ⬜ Pending |
-| Create route integration tests | quorus-controller/test | 1 week | ⬜ Pending |
-
-**Route Trigger Types (from design):**
-
-| Trigger | Description | Configuration |
-|---------|-------------|---------------|
-| EVENT | File system events (CREATE, MODIFY, DELETE) | patterns, event types |
-| TIME | Cron-based scheduling | cron expression, timezone |
-| INTERVAL | Periodic execution | duration (e.g., "15m") |
-| BATCH | File count threshold | minFiles, maxWait |
-| SIZE | Cumulative size threshold | sizeThreshold, maxWait |
-| COMPOSITE | AND/OR of multiple triggers | operator, triggers[] |
-
----
-
-### T6.8: TenantAwareStorageService
-
-**Goal:** Storage isolation per tenant.
-
-**Effort:** 2 weeks  
-**Priority:** 🟠 MEDIUM  
-**Dependencies:** T6.4 (TenantSecurityService)
-
-| Task | Module | Effort | Status |
-|------|--------|--------|--------|
-| Design storage isolation strategy | docs-design/ | 1 day | ⬜ Pending |
-| Create TenantAwareStorageService interface | quorus-tenant | 2 hours | ⬜ Pending |
-| Implement path-based isolation | quorus-tenant | 3 days | ⬜ Pending |
-| Add storage quota enforcement | quorus-tenant | 2 days | ⬜ Pending |
-| Integrate with TransferEngine | quorus-core | 2 days | ⬜ Pending |
-| Create isolation tests | quorus-tenant/test | 3 days | ⬜ Pending |
+> **Note:** Routes (T6.7) are **core** to Quorus architecture, not optional.
+> See [QUORUS_STAGE6_SECURITY_ROUTES.md](QUORUS_STAGE6_SECURITY_ROUTES.md) for full implementation details.
 
 ---
 
@@ -1021,6 +860,6 @@ Environment variable naming: replace dots with underscores, uppercase (`quorus.h
 ---
 
 **Document Status**: Active Implementation Plan  
-**Last Updated**: 2026-02-19  
-**Version**: 1.7  
+**Last Updated**: March 2, 2026  
+**Version**: 1.8  
 **Owner**: Development Team

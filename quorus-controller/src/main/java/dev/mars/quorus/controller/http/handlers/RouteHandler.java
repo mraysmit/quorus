@@ -168,8 +168,8 @@ public class RouteHandler {
                     throw QuorusApiException.notFound(ErrorCode.ROUTE_NOT_FOUND, routeId);
                 }
 
-                // Cannot update routes that are actively transferring
-                if (existing.getStatus() == RouteStatus.TRANSFERRING) {
+// Cannot update routes that are actively transferring or deleted
+            if (existing.getStatus() == RouteStatus.TRANSFERRING || existing.getStatus() == RouteStatus.DELETED) {
                     throw QuorusApiException.conflict(ErrorCode.ROUTE_STATE_CONFLICT,
                             routeId, existing.getStatus().name(), "update");
                 }
@@ -207,10 +207,9 @@ public class RouteHandler {
             }
 
             RouteConfiguration existing = stateMachine.getRoute(routeId);
-            if (existing.getStatus() == RouteStatus.TRANSFERRING) {
-                throw QuorusApiException.conflict(ErrorCode.ROUTE_STATE_CONFLICT,
-                        routeId, existing.getStatus().name(), "delete");
-            }
+
+            // Pre-commit transition validation: can we transition to DELETED?
+            validateTransition(existing, RouteStatus.DELETED, routeId, "delete");
 
             RouteCommand command = RouteCommand.delete(routeId);
             raftNode.submitCommand(command)
@@ -236,14 +235,8 @@ public class RouteHandler {
                 throw QuorusApiException.notFound(ErrorCode.ROUTE_NOT_FOUND, routeId);
             }
 
-            if (existing.getStatus() == RouteStatus.SUSPENDED) {
-                throw QuorusApiException.conflict(ErrorCode.ROUTE_STATE_CONFLICT,
-                        routeId, existing.getStatus().name(), "suspend (already suspended)");
-            }
-            if (existing.getStatus() == RouteStatus.DELETED) {
-                throw QuorusApiException.conflict(ErrorCode.ROUTE_STATE_CONFLICT,
-                        routeId, existing.getStatus().name(), "suspend");
-            }
+            // Pre-commit transition validation: can we transition to SUSPENDED?
+            validateTransition(existing, RouteStatus.SUSPENDED, routeId, "suspend");
 
             // Optional reason from request body
             String reason = null;
@@ -267,6 +260,9 @@ public class RouteHandler {
 
     /**
      * Handles {@code PUT /api/v1/routes/:routeId/resume} — resumes a suspended route.
+     *
+     * <p>Note: Resume specifically requires SUSPENDED state (semantic constraint),
+     * not just any state that can transition to ACTIVE.
      */
     public Handler<RoutingContext> handleResume() {
         return ctx -> {
@@ -278,6 +274,7 @@ public class RouteHandler {
                 throw QuorusApiException.notFound(ErrorCode.ROUTE_NOT_FOUND, routeId);
             }
 
+            // Resume operation requires SUSPENDED state specifically (not just canTransitionTo ACTIVE)
             if (existing.getStatus() != RouteStatus.SUSPENDED) {
                 String currentStatus = existing.getStatus() != null ? existing.getStatus().name() : "UNKNOWN";
                 throw QuorusApiException.conflict(ErrorCode.ROUTE_STATE_CONFLICT,
@@ -298,6 +295,19 @@ public class RouteHandler {
     }
 
     // ==================== Validation ====================
+
+    /**
+     * Validates that the route can transition from its current status to the target status.
+     *
+     * @throws QuorusApiException with ROUTE_STATE_CONFLICT if the transition is invalid
+     */
+    private void validateTransition(RouteConfiguration route, RouteStatus targetStatus,
+                                     String routeId, String operation) {
+        if (!route.getStatus().canTransitionTo(targetStatus)) {
+            throw QuorusApiException.conflict(ErrorCode.ROUTE_STATE_CONFLICT,
+                    routeId, route.getStatus().name(), operation);
+        }
+    }
 
     /**
      * Validates required fields in a RouteConfiguration.

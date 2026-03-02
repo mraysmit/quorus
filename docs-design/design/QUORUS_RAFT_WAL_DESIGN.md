@@ -311,6 +311,59 @@ This is significant implementation effort that can be deferred.
 
 ---
 
+## 13.9 In-Memory Log Capacity Limits
+
+**What this means:** The in-memory `List<LogEntry>` grows unbounded until snapshots compact old entries. Without explicit limits, memory exhaustion can crash the node.
+
+**Risk Scenarios:**
+- Burst traffic: Commands arrive faster than snapshots can compact
+- Delayed commits: Entries accumulate but aren't applied → can't snapshot
+- Follower memory: Slow followers accumulate entries while waiting for InstallSnapshot
+- Recovery storm: Large WAL → long replay → OOM during startup
+
+**Solution: Two-Tier Protection**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     Log Entry Limits                            │
+├─────────────────────────────────────────────────────────────────┤
+│  Tier 1: Soft Limit (emergency snapshot trigger)               │
+│  ├── quorus.raft.log.soft-limit = 50000 (default)              │
+│  ├── Triggers immediate snapshot when exceeded                 │
+│  └── Non-blocking — maintains availability                     │
+├─────────────────────────────────────────────────────────────────┤
+│  Tier 2: Hard Limit (command rejection)                        │
+│  ├── quorus.raft.log.hard-limit = 100000 (default)             │
+│  ├── Rejects new commands with LogCapacityExceededException    │
+│  └── Last resort to prevent OOM crash                          │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Configuration Properties:**
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `quorus.raft.log.soft-limit` | 50000 | Log size that triggers emergency snapshot |
+| `quorus.raft.log.hard-limit` | 100000 | Log size that rejects new commands |
+
+**Implementation Points:**
+
+1. **Leader `submitCommand()`**: Check hard limit before accepting; trigger emergency snapshot at soft limit
+2. **Follower `handleAppendEntries()`**: NACK with specific error if hard limit exceeded
+3. **Metric**: `quorus.cluster.log_utilization` gauge (log.size / hardLimit)
+
+**Rationale for Defaults:**
+- Soft limit at 50K gives ~50K entries of runway for snapshot completion
+- Hard limit at 100K (2x soft) provides safety margin
+- With conservative 1KB per entry, 100K entries ≈ 100MB memory — acceptable for metadata operations
+
+**Recovery Behavior:**
+- Hard limit applies during WAL replay as well
+- If WAL contains more entries than hard limit, replay fails with clear error
+- This indicates a snapshot was needed but never taken — operational alert required
+
+---
+
 ## 14. Generic Raft Storage Interface (`RaftStorage`)
 
 To ensure the system can switch between a **Custom WAL** (simple, pure Java) and **RocksDB** (high performance, key-value), we define a backend-agnostic interface. The `RaftNode` will depend solely on this interface.

@@ -234,14 +234,16 @@ services:
   # ============================================================================
   
   ftp-server:
-    image: stilliard/pure-ftpd:hardened
+    image: delfer/alpine-ftp-server
     container_name: quorus-ftp-server
     hostname: ftp-server
     environment:
-      - PUBLICHOST=172.22.0.10
-      - FTP_USER_NAME=testuser
-      - FTP_USER_PASS=testpass
-      - FTP_USER_HOME=/home/testuser
+      # FTP credentials (delfer format: name|password)
+      USERS: "testuser|testpass"
+      # Passive mode configuration
+      ADDRESS: "172.22.0.10"
+      MIN_PORT: "30000"
+      MAX_PORT: "30009"
     ports:
       - "21:21"
       - "30000-30009:30000-30009"

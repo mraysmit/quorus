@@ -183,6 +183,17 @@ public final class AppConfig {
         return getLong("quorus.raft.snapshot.check-interval-ms", 60000);
     }
 
+    // ==================== Log Capacity Configuration ====================
+
+    /**
+     * Maximum number of entries allowed in the in-memory Raft log.
+     * When exceeded, new commands are rejected to prevent OOM.
+     * Default: 100000 entries.
+     */
+    public long getLogHardLimit() {
+        return getLong("quorus.raft.log.hard-limit", 100000);
+    }
+
     // ==================== Telemetry Configuration ====================
 
     public boolean isTelemetryEnabled() {
@@ -211,6 +222,16 @@ public final class AppConfig {
      */
     public int getRaftIoPoolSize() {
         return getInt("quorus.raft.io.pool-size", 10);
+    }
+
+    /**
+     * Gets the maximum queue size for Raft I/O thread pool.
+     * When the queue is full, the CallerRunsPolicy provides back-pressure.
+     * 
+     * @return queue size (default: 1000)
+     */
+    public int getRaftIoQueueSize() {
+        return getInt("quorus.raft.io.queue-size", 1000);
     }
 
     // ==================== Job Assignment Configuration ====================
@@ -340,6 +361,13 @@ public final class AppConfig {
                     "Raft I/O pool size must be between 1 and 100, got: " + poolSize);
         }
 
+        // Validate queue size
+        int queueSize = getRaftIoQueueSize();
+        if (queueSize < 10 || queueSize > 100000) {
+            throw new IllegalStateException(
+                    "Raft I/O queue size must be between 10 and 100000, got: " + queueSize);
+        }
+
         // Validate positive intervals
         if (getAssignmentIntervalMs() <= 0) {
             throw new IllegalStateException(
@@ -395,6 +423,7 @@ public final class AppConfig {
         logger.info("  Version:              {}", getVersion());
         logger.info("  --- Thread Pools ---");
         logger.info("  Raft I/O Pool Size:   {}", getRaftIoPoolSize());
+        logger.info("  Raft I/O Queue Size:  {}", getRaftIoQueueSize());
         logger.info("  --- Job Assignment ---");
         logger.info("  Initial Delay:        {}ms", getAssignmentInitialDelayMs());
         logger.info("  Assignment Interval:  {}ms", getAssignmentIntervalMs());

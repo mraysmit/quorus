@@ -104,7 +104,7 @@ public enum RouteStatus {
      *
      * <p><strong>Valid transitions:</strong></p>
      * <pre>
-     *   CONFIGURED   → ACTIVE, DELETED
+     *   CONFIGURED   → ACTIVE, SUSPENDED, DELETED
      *   ACTIVE       → TRIGGERED, SUSPENDED, DEGRADED, DELETED
      *   TRIGGERED    → TRANSFERRING, ACTIVE
      *   TRANSFERRING → ACTIVE, FAILED
@@ -119,7 +119,7 @@ public enum RouteStatus {
      */
     public boolean canTransitionTo(RouteStatus target) {
         return switch (this) {
-            case CONFIGURED -> target == ACTIVE || target == DELETED;
+            case CONFIGURED -> target == ACTIVE || target == SUSPENDED || target == DELETED;
             case ACTIVE -> target == TRIGGERED || target == SUSPENDED
                         || target == DEGRADED || target == DELETED;
             case TRIGGERED -> target == TRANSFERRING || target == ACTIVE;
@@ -138,7 +138,7 @@ public enum RouteStatus {
      */
     public RouteStatus[] getValidTransitions() {
         return switch (this) {
-            case CONFIGURED -> new RouteStatus[]{ACTIVE, DELETED};
+            case CONFIGURED -> new RouteStatus[]{ACTIVE, SUSPENDED, DELETED};
             case ACTIVE -> new RouteStatus[]{TRIGGERED, SUSPENDED, DEGRADED, DELETED};
             case TRIGGERED -> new RouteStatus[]{TRANSFERRING, ACTIVE};
             case TRANSFERRING -> new RouteStatus[]{ACTIVE, FAILED};

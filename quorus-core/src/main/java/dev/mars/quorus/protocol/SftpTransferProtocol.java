@@ -356,7 +356,7 @@ public class SftpTransferProtocol implements TransferProtocol {
         }
 
         void connect() throws JSchException {
-            logger.info("Connecting to SFTP server: {}:{}", connectionInfo.host, connectionInfo.port);
+            logger.debug("Connecting to SFTP server: {}:{}", connectionInfo.host, connectionInfo.port);
             logger.debug("SftpClient.connect: username={}, hasPassword={}", 
                 connectionInfo.username, connectionInfo.password != null);
 

@@ -10,9 +10,9 @@ networks:
     driver: bridge
 
 services:
-  # FTP Server - Pure-FTPd with passive mode configuration
+  # FTP Server - Alpine vsftpd (delfer/alpine-ftp-server)
   ftp:
-    image: stilliard/pure-ftpd:latest
+    image: delfer/alpine-ftp-server
     container_name: quorus-ftp-test
     networks:
       protocol-test:
@@ -24,18 +24,17 @@ services:
       # Passive mode data ports (10 ports for concurrent connections)
       - "30000-30009:30000-30009"
     environment:
-      # Critical: Use 'localhost' for host access, 'ftp' for container-to-container
-      PUBLICHOST: "localhost"
-      FTP_USER_NAME: testuser
-      FTP_USER_PASS: testpass
-      FTP_USER_HOME: /home/ftpusers/testuser
-      # Passive port range configuration
-      ADDED_FLAGS: "-p 30000:30009"
+      # FTP credentials (delfer format: name|password)
+      USERS: "testuser|testpass"
+      # Passive mode configuration
+      ADDRESS: "localhost"
+      MIN_PORT: "30000"
+      MAX_PORT: "30009"
     volumes:
-      - ftp-data:/home/ftpusers/testuser
+      - ftp-data:/home/testuser
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "nc", "-z", "localhost", "21"]
+      test: ["CMD-SHELL", "nc -z localhost 21 || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 3
