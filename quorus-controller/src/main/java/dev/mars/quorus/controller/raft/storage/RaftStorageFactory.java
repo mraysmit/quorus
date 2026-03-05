@@ -45,7 +45,7 @@ import java.nio.file.Path;
  */
 public final class RaftStorageFactory {
 
-    private static final Logger LOG = LoggerFactory.getLogger(RaftStorageFactory.class);
+    private static final Logger logger = LoggerFactory.getLogger(RaftStorageFactory.class);
 
     /**
      * Supported storage backend types.
@@ -85,11 +85,11 @@ public final class RaftStorageFactory {
                                               Path storagePath, boolean fsync) {
         StorageType type = parseStorageType(storageType);
         
-        LOG.info("Creating RaftStorage: type={}, path={}, fsync={}", type, storagePath, fsync);
+        logger.info("Creating RaftStorage: type={}, path={}, fsync={}", type, storagePath, fsync);
 
         return switch (type) {
             case RAFTLOG -> {
-                LOG.info("Using RaftLogStorageAdapter (raftlog-core library)");
+                logger.info("Using RaftLogStorageAdapter (raftlog-core library)");
                 var config = dev.mars.raftlog.storage.RaftStorageConfig.builder()
                         .dataDir(storagePath)
                         .syncEnabled(fsync)
@@ -111,7 +111,7 @@ public final class RaftStorageFactory {
                 yield createRocksDbStorageAsync(vertx, executor, storagePath, fsync);
             }
             case MEMORY -> {
-                LOG.warn("Using InMemoryRaftStorage - DATA WILL NOT SURVIVE RESTART!");
+                logger.warn("Using InMemoryRaftStorage - DATA WILL NOT SURVIVE RESTART!");
                 InMemoryRaftStorage storage = new InMemoryRaftStorage();
                 yield storage.open(storagePath).map(v -> (RaftStorage) storage);
             }
@@ -164,24 +164,24 @@ public final class RaftStorageFactory {
      * @throws IllegalStateException if RocksDB is requested but not on classpath
      */
     public static RaftStorage create(Vertx vertx, WorkerExecutor executor, StorageType type) {
-        LOG.info("Creating RaftStorage: type={}", type);
+        logger.info("Creating RaftStorage: type={}", type);
 
         return switch (type) {
             case RAFTLOG -> {
-                LOG.info("Using RaftLogStorageAdapter (raftlog-core library)");
+                logger.info("Using RaftLogStorageAdapter (raftlog-core library)");
                 yield new RaftLogStorageAdapter(vertx);
             }
             case FILE -> {
-                LOG.info("Using FileRaftStorage (custom WAL, zero dependencies)");
+                logger.info("Using FileRaftStorage (custom WAL, zero dependencies)");
                 yield new FileRaftStorage(vertx, executor);
             }
             case ROCKSDB -> {
                 validateRocksDbAvailable();
-                LOG.info("Using RocksDbRaftStorage (high-performance key-value store)");
+                logger.info("Using RocksDbRaftStorage (high-performance key-value store)");
                 yield createRocksDbStorage(vertx, executor);
             }
             case MEMORY -> {
-                LOG.warn("Using InMemoryRaftStorage - DATA WILL NOT SURVIVE RESTART!");
+                logger.warn("Using InMemoryRaftStorage - DATA WILL NOT SURVIVE RESTART!");
                 yield new InMemoryRaftStorage();
             }
         };

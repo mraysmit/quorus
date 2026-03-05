@@ -1,14 +1,15 @@
 # OpenTelemetry Integration & Testing Plan
 
-**Version:** 2.0  
+**Version:** 2.3  
 **Author:** Mark Andrew Ray-Smith Cityline Ltd  
-**Date:** 2026-01-26  
+**Date:** 2026-03-05  
 
 ## Table of Contents
 
 1. [Overview](#overview)
 2. [Controller Migration Status (Phases 1-5 Complete)](#controller-migration-status-phases-1-5-complete)
 3. [Module Analysis: System-Wide Observability](#module-analysis-system-wide-observability)
+   - [Logging & OTel Integration Gaps (2026-03-05 Audit)](#logging--otel-integration-gaps-new--2026-03-05-audit)
 4. [Existing Infrastructure Analysis](#existing-infrastructure-analysis)
 5. [Testing Strategy](#testing-strategy)
 6. [Implementation Plan](#implementation-plan)
@@ -25,6 +26,7 @@
 8. [Test Scenarios](#test-scenarios)
 9. [Expected Outcomes](#expected-outcomes)
 10. [Troubleshooting Guide](#troubleshooting-guide)
+11. [Implementation Task Grid](#implementation-task-grid)
 
 ---
 
@@ -68,11 +70,11 @@ The OpenTelemetry migration for **quorus-controller** is complete as of January 
 **Objective**: Enable OpenTelemetry libraries in the project.
 
 **Implementation:**
-- ✅ Added OpenTelemetry BOM 1.34.1 to root `pom.xml`
-- ✅ Added `vertx-opentelemetry` dependency (from Vert.x BOM 5.0.2)
-- ✅ Added `opentelemetry-sdk` 1.34.1
-- ✅ Added `opentelemetry-exporter-otlp` 1.34.1 for trace export
-- ✅ Added `opentelemetry-exporter-prometheus` 1.34.1-alpha for metrics
+- ✅ Added OpenTelemetry BOM 1.59.0 to root `pom.xml` (upgraded from initial 1.34.1)
+- ✅ Added `vertx-opentelemetry` dependency (from Vert.x BOM 5.0.8)
+- ✅ Added `opentelemetry-sdk` (version managed by BOM)
+- ✅ Added `opentelemetry-exporter-otlp` for trace export
+- ✅ Added `opentelemetry-exporter-prometheus` 1.59.0-alpha for metrics
 
 **Verification:**
 ```bash
@@ -412,15 +414,18 @@ The OpenTelemetry migration is **more advanced than originally documented**:
 
 ### Module Comparison
 
-| Aspect | quorus-controller | quorus-agent | quorus-tenant | quorus-core | quorus-workflow | quorus-api |
-|--------|------------------|--------------|---------------|-------------|-----------------|------------|
-| **Type** | Standalone app | Standalone app | Library | Library | Library | Standalone (deprecated) |
-| **Deployment** | Cluster nodes | Edge locations | In controller | In agent/API | In API/controller | Standalone (legacy) |
-| **Logging** | SLF4J ✅ | SLF4J ✅ | SLF4J ✅ | SLF4J ✅ | SLF4J ✅ | SLF4J ✅ |
-| **OTel Status** | ✅ Complete | ✅ Complete | ✅ Complete | ⚠️ Dual (Old+New) | ✅ Complete | ❌ None (deprecated) |
-| **Metrics** | 5 Raft gauges | 12 agent metrics | 7 tenant metrics | Both manual + OTel | 9 workflow metrics | None |
-| **Tracing** | ✅ Vert.x | ✅ Vert.x | ❌ None | ❌ None | ❌ None | ❌ None |
-| **Priority** | ✅ Done | ✅ Done | ⚠️ Logging Migration | ⚠️ Remove Old Metrics | ⚠️ Logging Migration | N/A (EOL) |
+| Aspect | quorus-controller | quorus-agent | quorus-tenant | quorus-core | quorus-workflow |
+|--------|------------------|--------------|---------------|-------------|-----------------|
+| **Type** | Standalone app | Standalone app | Library | Library | Library |
+| **Deployment** | Cluster nodes | Edge locations | In controller | In agent | In controller |
+| **Logging** | SLF4J ✅ | SLF4J ✅ | SLF4J ✅ | SLF4J ✅ | SLF4J ✅ |
+| **OTel Status** | ✅ Complete | ✅ Complete | ✅ Complete | ⚠️ Dual (Old+New) | ✅ Complete |
+| **Metrics** | 5 Raft gauges | 12 agent metrics | 7 tenant metrics | Both manual + OTel | 9 workflow metrics |
+| **Tracing** | ✅ Vert.x | ✅ Vert.x | ❌ None | ❌ None | ❌ None |
+| **Log-OTel Bridge** | ❌ Not configured | ❌ Not configured | N/A (library) | N/A (library) | N/A (library) |
+| **Priority** | ✅ Done | ✅ Done | ✅ Done | ⚠️ Remove Old Metrics | ✅ Done |
+
+> **Note:** The `quorus-api` module was removed from the codebase on 2026-03-05. All API functionality is served by the embedded HTTP API in `quorus-controller`.
 
 ---
 
@@ -556,25 +561,34 @@ private Instant lastTransferTime;
 
 ### Gap Analysis Summary
 
-#### Immediate Gaps (Phases 1-5 Complete)
+> **📅 Updated: 2026-03-05** — Reflects quorus-api removal, completed SLF4J migrations, and codebase-wide logging audit.
+
+#### Resolved Gaps
 
 ✅ **quorus-controller:** Fully instrumented with OpenTelemetry
 - 5 Raft metrics exported via Prometheus
 - Distributed tracing enabled via Vert.x OpenTelemetry integration
-- OTLP span export to Jaeger configured
+- OTLP span export configured
 - Metrics endpoint on port 9464
+- All 6 HTTP handlers have structured entry/success/warn logging (added 2026-03-05)
 
-❌ **quorus-agent:** No OpenTelemetry instrumentation
-- Critical gap: Transfer operations are not traced end-to-end
-- Missing metrics: Transfer duration, bytes transferred, error rates
+✅ **quorus-tenant:** SLF4J migration complete, TenantMetrics integrated (verified 2026-02-01)
+
+✅ **quorus-workflow:** SLF4J migration complete, WorkflowMetrics integrated (verified 2026-02-01)
+
+✅ **quorus-api:** Module removed from codebase (2026-03-05) — no longer a gap
+
+#### Remaining Gaps
+
+❌ **quorus-agent:** Missing end-to-end transfer tracing
+- Transfer operations are not traced across controller → agent → protocol execution
+- `JobStatusReportingService` does not log successful status reports at INFO level
 - No local metrics endpoint for agent health monitoring
-- Heartbeat metrics are insufficient for operational visibility
 
-❌ **quorus-tenant:** Inconsistent logging + No telemetry
-- Logging framework mismatch (JUL vs SLF4J)
-- No metrics export for quota usage/violations
-- No visibility into tenant operation performance
-- ResourceUsage data is not exposed to monitoring systems
+❌ **quorus-core:** Dual metrics system (manual `TransferMetrics` + OTel `TransferTelemetryMetrics`)
+- Old `TransferMetrics.java` still exists alongside new OTel metrics class
+- `SimpleTransferEngine` has 53 DEBUG statements (over-logging, needs optimization)
+- No distributed tracing for protocol operations
 
 #### Impact Assessment
 
@@ -583,11 +597,150 @@ private Instant lastTransferTime;
 | **Critical** | Cannot trace file transfers end-to-end across controller → agent → **protocol execution** | Users, SRE teams, Protocol debugging |
 | **Critical** | **quorus-core has manual metrics (`TransferMetrics`) not integrated with OTel** | Observability stack fragmentation |
 | **High** | No transfer performance metrics exported to Prometheus (latency, throughput, success rate) | Operations, Dashboards |
-| **High** | No workflow execution metrics or tracing for complex orchestrations | Multi-step workflows |
-| **Medium** | No tenant quota violation alerts or metrics | Multi-tenant deployments |
-| **Medium** | Inconsistent logging (JUL vs SLF4J) makes log aggregation complex | Log analysis tools |
-| **Low** | Agent health metrics only via heartbeat (not pull-based) | Monitoring systems |
-| **N/A** | quorus-api is deprecated and being phased out | Legacy migration |
+| **High** | No logging-OTel bridge — logs and traces are in separate systems | Grafana correlation |
+| **High** | `requestId` (MDC) and OTel `traceId` are disconnected parallel systems | Trace-to-log navigation |
+| **Medium** | Inconsistent logger field naming (`LOG` vs `logger` in Raft storage classes) | Code consistency |
+| **Medium** | 5 HTTP handlers have no logger: `StatusHandler`, `ReadinessHandler`, `LivenessHandler`, `InfoHandler`, `ClusterHandler` | Operational visibility |
+| **Medium** | `YamlWorkflowDefinitionParser` and `WorkflowSchemaValidator` have no loggers | Debugging |
+| **Low** | Several classes declare loggers but contain zero log statements (`MetricsHandler`, `ProtocolFactory`, `FileManager`) | Dead code |
+
+---
+
+### Logging & OTel Integration Gaps (NEW — 2026-03-05 Audit)
+
+The following gaps were identified during a comprehensive codebase-wide logging and OTel audit. These are cross-cutting concerns that affect multiple modules.
+
+#### Gap 1: No Logging-OTel Bridge (OpenTelemetryAppender)
+
+**Problem:** SLF4J/Logback logs and OTel traces/metrics are collected by completely separate pipelines. Logs go to stdout/Loki via Logback; traces go to Tempo via OTLP. There is no bridge connecting them.
+
+**Impact:** In Grafana, operators cannot jump from a log line to the corresponding OTel trace. The "Logs for this trace" and "Trace for this log" features in Grafana require a shared `traceId` field in log records.
+
+**Solution:** Add the `opentelemetry-logback-appender-1.x` dependency and configure `OpenTelemetryAppender` in `logback.xml`. This automatically injects `trace_id` and `span_id` into log MDC, enabling Grafana trace-to-log correlation.
+
+```xml
+<!-- Add to quorus-controller/pom.xml and quorus-agent/pom.xml -->
+<dependency>
+    <groupId>io.opentelemetry.instrumentation</groupId>
+    <artifactId>opentelemetry-logback-appender-1.33</artifactId>
+    <version>2.12.0-alpha</version>
+</dependency>
+```
+
+```xml
+<!-- logback.xml configuration -->
+<appender name="OpenTelemetry" class="io.opentelemetry.instrumentation.logback.appender.v1_0.OpenTelemetryAppender">
+    <captureExperimentalAttributes>true</captureExperimentalAttributes>
+</appender>
+```
+
+**Priority:** 🟡 HIGH — Required for production Grafana trace↔log correlation  
+**Target:** Q2 2026
+
+#### Gap 2: `requestId` ↔ OTel `traceId` Disconnect
+
+**Problem:** `CorrelationIdHandler` generates `X-Request-ID` and stores it in MDC as `requestId`. However, this is a separate UUID from the OTel `traceId`. Two parallel correlation systems exist with no bridge — operators cannot use a `requestId` from a log to find the matching OTel trace in Tempo.
+
+**Impact:** Error responses include `requestId` in JSON, but searching for that ID in Tempo yields no results. Operators must manually correlate by timestamp.
+
+**Solution:** Either:
+1. **Option A (Recommended):** Include both `requestId` and `traceId` in HTTP error responses, and ensure both appear in log MDC. The Logging-OTel Bridge (Gap 1) handles the `traceId` side automatically.
+2. **Option B:** Replace `requestId` with the OTel `traceId` entirely. Simpler but loses backward compatibility with existing log queries.
+
+**Priority:** 🟡 HIGH — Critical for incident investigation  
+**Target:** Q2 2026
+
+#### Gap 3: Inconsistent Logger Field Naming
+
+**Problem:** Most classes use `private static final Logger logger = ...` but Raft storage classes use `private static final Logger LOG = ...`. This inconsistency makes codebase searches unreliable and violates the project's naming conventions.
+
+**Affected classes:**
+- `RaftLogStorageAdapter` — uses `LOG`
+- `FileRaftStorage` — uses `LOG`
+
+**Solution:** Rename `LOG` to `logger` in both files.
+
+**Priority:** 🟢 LOW — Code hygiene  
+**Target:** Q3 2026
+
+#### Gap 4: HTTP Handlers Missing Loggers
+
+**Problem:** 5 controller HTTP handler classes have no logger declaration at all. Requests to these endpoints produce no application-level log output, making debugging production issues difficult.
+
+**Affected handlers (all in `quorus-controller/src/main/java/dev/mars/quorus/controller/http/handlers/`):**
+- `StatusHandler` — returns cluster/system status
+- `ReadinessHandler` — Kubernetes readiness probe
+- `LivenessHandler` — Kubernetes liveness probe
+- `InfoHandler` — returns system info
+- `ClusterHandler` — cluster membership operations
+
+**Solution:** Add `private static final Logger logger = LoggerFactory.getLogger(XxxHandler.class);` and structured log statements (at minimum: WARN on failures, DEBUG on successful probes).
+
+**Priority:** 🟠 MEDIUM — Important for production debugging  
+**Target:** Q2 2026
+
+#### Gap 5: Classes With Declared but Unused Loggers
+
+**Problem:** Several classes declare a logger field but contain zero `logger.xxx()` calls. This is dead code that suggests logging was intended but never implemented.
+
+**Affected classes:**
+- `MetricsHandler` — logger declared, zero usage
+- `ProtocolFactory` — logger declared, zero usage
+- `FileManager` — logger declared, zero usage
+
+**Solution:** Either add meaningful log statements or remove the unused logger field.
+
+**Priority:** 🟢 LOW — Code hygiene  
+**Target:** Q3 2026
+
+#### Gap 6: `SimpleTransferEngine` Over-Logging (53 DEBUG Statements)
+
+**Problem:** `SimpleTransferEngine` contains 53 DEBUG-level log statements. In production with DEBUG enabled (common during initial deployment), this creates excessive log volume that obscures important events and increases Loki storage costs.
+
+**Solution:** Audit all 53 statements. Promote critical state changes to INFO. Convert high-frequency repetitive messages (e.g., per-chunk progress) to TRACE. Remove redundant messages.
+
+**Priority:** 🟠 MEDIUM — Log noise reduction  
+**Target:** Q3 2026
+
+#### Gap 7: `JobStatusReportingService` Missing INFO Success Logs
+
+**Problem:** The agent's `JobStatusReportingService` reports job status to the controller via HTTP but does not log successful reports at INFO level. Only failures are logged. This makes it impossible to confirm from agent logs alone that status reports were sent.
+
+**Solution:** Add `logger.info("Job status reported to controller: jobId={}, status={}", jobId, status);` after successful HTTP response.
+
+**Priority:** 🟠 MEDIUM — Agent operational visibility  
+**Target:** Q2 2026
+
+#### Gap 8: Workflow Parsing Classes Missing Loggers
+
+**Problem:** `YamlWorkflowDefinitionParser` and `WorkflowSchemaValidator` have no logger at all. These are key entry points for workflow processing — failures during YAML parsing or schema validation produce no application log output.
+
+**Note:** Phase 9 in the Implementation Task Grid has "Instrument YamlWorkflowDefinitionParser" but only for OTel tracing, not basic SLF4J logging.
+
+**Solution:** Add SLF4J loggers with INFO for parse start/success, WARN for validation failures, DEBUG for resolved variables.
+
+**Priority:** 🟠 MEDIUM — Debugging workflow issues  
+**Target:** Q2 2026
+
+#### Gap 9: Completed Handler Logging Patterns (Documentation)
+
+**Status:** ✅ COMPLETED (2026-03-05)
+
+The following 6 HTTP handlers in `quorus-controller` now have structured logging patterns:
+
+| Handler | Entry Level | Success | Warn Conditions |
+|---------|-------------|---------|-----------------|
+| `TransferHandler` | INFO (create/delete), DEBUG (get) | INFO with transferId | NotFound race |
+| `AgentRegistrationHandler` | INFO | INFO with agentId/hostname | — |
+| `HeartbeatHandler` | DEBUG (high-frequency) | INFO with agentId | NotFound race |
+| `JobAssignmentHandler` | INFO (all 6 write methods) | INFO with jobId | NotFound race, CasMismatch conflict |
+| `JobStatusHandler` | INFO with jobId/agentId/status | INFO on success | CasMismatch, NotFound race |
+| `RouteHandler` | INFO (all 5 write methods) | INFO with routeName | NotFound race, CasMismatch conflict |
+
+**Pattern:**
+- **Entry:** Log at method entry with key identifiers from the request
+- **Success:** Log after Raft commit/state operation succeeds with entity ID
+- **Warn:** Log `NotFound` (race condition) and `CasMismatch` (concurrent modification) at WARN
 
 ---
 
@@ -597,7 +750,7 @@ private Instant lastTransferTime;
 
 #### Architecture & Components
 
-- **Deployment Model:** Library module embedded in quorus-agent and quorus-api
+- **Deployment Model:** Library module embedded in quorus-agent
 - **Reactive Architecture:** Uses Vert.x 5 WorkerExecutor for blocking I/O operations
 - **Core Classes:**
   - `SimpleTransferEngine` - Main transfer orchestration with job queue
@@ -698,7 +851,7 @@ public HealthCheckResult performCheck() {
 
 #### Architecture & Components
 
-- **Deployment Model:** Library module used by quorus-api and quorus-controller
+- **Deployment Model:** Library module used by quorus-controller
 - **Reactive Architecture:** Uses Vert.x WorkerExecutor for async workflow execution
 - **Core Classes:**
   - `SimpleWorkflowEngine` - Main workflow execution engine
@@ -756,228 +909,13 @@ logger.info("Performing virtual run simulation with parallel execution");
 
 ---
 
-### quorus-api Analysis (DEPRECATED)
+### quorus-api Analysis (REMOVED)
 
-**Purpose:** Legacy REST API layer using Vert.x 5 + Weld CDI (being phased out in favor of controller-first architecture).
+> **✅ RESOLVED (2026-03-05):** The `quorus-api` module has been fully removed from the codebase and the root `pom.xml`. All REST API functionality is now served by the embedded HTTP API in `quorus-controller` via `HttpApiServer`. No telemetry work is needed for this module.
 
-#### Deprecation Status
+#### Admin UI Consideration (Future — Post-Launch)
 
-⚠️ **IMPORTANT:** This module is being replaced by embedded HTTP API in quorus-controller
-
-**From System Design Document:**
-> "Controller-first architecture where each controller is a self-contained node with embedded HTTP API capabilities"
->
-> "Legacy API-first architecture (deprecated): API Layer (Main) → Controller (Embedded Library)"
-
-#### Current State
-
-- **Logging:** SLF4J + Logback ✅ (consistent)
-- **Framework:** Vert.x 5 HTTP server + Weld CDI for dependency injection
-- **Resources:** `TransferResource`, `AgentRegistrationResource`, `HealthResource`
-- **Services:** `DistributedTransferService`, `AgentRegistryService`, `ControllerDiscoveryService`
-- **Telemetry Status:** ❌ No OpenTelemetry instrumentation
-
-#### Repurposing Consideration: Admin UI Module
-
-**Future Possibility:** The quorus-api module could potentially be repurposed as a dedicated admin/management UI rather than being fully retired.
-
-**Option A: Repurpose as quorus-admin-ui**
-
-Instead of completely retiring quorus-api, it could be transformed into a management console:
-
-```
-quorus-api (current) → quorus-admin-ui (future)
-- Remove: Redundant REST endpoints (use controller API instead)
-- Add: Web-based admin dashboard (React/Vue/Angular SPA)
-- Add: WebSocket support for real-time monitoring
-- Add: Static file serving for UI assets
-- Keep: Authentication/authorization layer
-- Keep: CDI infrastructure for service integration
-```
-
-**Architecture Options:**
-
-**1. Standalone Admin UI (Recommended)**
-```
-┌─────────────────────────────────────────┐
-│         quorus-admin-ui                 │
-│  ┌───────────────────────────────────┐  │
-│  │   Frontend (SPA)                  │  │
-│  │   - React/Vue Dashboard           │  │
-│  │   - Prometheus/Grafana embedded   │  │
-│  │   - WebSocket for live updates    │  │
-│  └───────────────────────────────────┘  │
-│  ┌───────────────────────────────────┐  │
-│  │   Backend (Vert.x + CDI)          │  │
-│  │   - Static file server            │  │
-│  │   - WebSocket server              │  │
-│  │   - Proxy to controller cluster   │  │
-│  │   - Authentication/Session mgmt   │  │
-│  └───────────────────────────────────┘  │
-└─────────────────────────────────────────┘
-           │ HTTP/WS
-           ▼
-    ┌────────────────┐
-    │ Load Balancer  │
-    └────────────────┘
-           │
-           ▼
-    ┌─────────────────────────┐
-    │  Controller Cluster     │
-    │  (Embedded HTTP API)    │
-    └─────────────────────────┘
-```
-
-**Benefits:**
-- ✅ Separate deployment lifecycle from controllers
-- ✅ Can scale independently for large admin teams
-- ✅ Easier to add UI-specific features (charting, dashboards)
-- ✅ Maintains separation of concerns
-- ✅ Can leverage existing quorus-api infrastructure
-
-**2. Embedded in Controller**
-```
-Each controller serves admin UI directly
-- Simpler deployment (fewer components)
-- But: Multiple UI instances need sync/session management
-- Complexity increases with cluster size
-```
-
-**Admin UI Feature Set (Future Vision):**
-
-**Dashboard:**
-- Real-time cluster health (controller nodes, Raft status)
-- Active transfers map (source → destination visualization)
-- Agent fleet status and capacity
-- Transfer throughput graphs (Prometheus integration)
-- Queue depth and SLA compliance metrics
-
-**Management:**
-- Route configuration (CRUD operations)
-- Agent registration and decommissioning
-- Workflow definition editor (YAML with validation)
-- Tenant management (quotas, hierarchy, policies)
-- User/role management (RBAC)
-
-**Monitoring:**
-- Live transfer monitoring (WebSocket updates)
-- Error logs and failure analysis
-- Prometheus metrics browser
-- Jaeger trace viewer integration
-- Audit log viewer
-
-**Operations:**
-- Manual transfer triggering
-- Workflow execution (dry run, virtual run, actual run)
-- Agent health checks and diagnostics
-- Controller leadership election status
-- Database operations (backup/restore)
-
-**Technology Stack for Admin UI:**
-
-```xml
-<!-- Frontend -->
-- React/Vue/Angular (SPA framework)
-- Chart.js/D3.js (visualization)
-- Monaco Editor (YAML/JSON editing)
-- WebSocket client for real-time updates
-
-<!-- Backend (Vert.x 5) -->
-- vertx-web (HTTP server + routing)
-- vertx-web-client (proxy to controllers)
-- vertx-auth-jwt (authentication)
-- vertx-bridge-common (WebSocket/EventBus)
-
-<!-- Observability Integration -->
-- Prometheus client for metrics scraping
-- Jaeger UI embedded iframe
-- Grafana embedded dashboards
-```
-
-**OpenTelemetry for Admin UI:**
-
-If repurposed, quorus-admin-ui would need its own telemetry:
-
-```java
-// Metrics for admin UI operations
-quorus.admin.login.attempts - Counter by status (success/failure)
-quorus.admin.active_sessions - Gauge of logged-in users
-quorus.admin.api_requests - Counter by endpoint and status
-quorus.admin.websocket_connections - Gauge of active WS connections
-quorus.admin.route_operations - Counter by operation (create/update/delete)
-
-// Traces for admin operations
-Span: admin.route.create
-  └─ Span: controller.api.post_route
-      └─ Span: raft.replicate
-```
-
-#### Migration Path
-
-**Phase 1: Assessment (Q1 2026 - Pre-Production)**
-- ✅ Document existing quorus-api architecture
-- ✅ Identify components to keep vs remove
-- ⏳ User research: What admin features are needed?
-- ⏳ Technology selection: Frontend framework choice
-- ⏳ Decision: Keep module for future admin UI or retire completely
-
-**Phase 2: Production Launch (Q2-Q3 2026)**
-- Mark quorus-api as deprecated (production uses controller-first)
-- Maintain minimal stability for existing deployments
-- Monitor operator feedback on management needs
-- Document CLI-based admin workflows
-
-**Phase 3: Post-Production Assessment (Q4 2026)**
-- Analyze operational pain points from 6 months of production use
-- Determine if admin UI justifies development effort
-- If needed: Create prototype admin dashboard
-- If not needed: Schedule module retirement
-
-**Phase 4: Admin UI Development (2027 - If Justified)**
-- Rename module: quorus-api → quorus-admin-ui
-- Remove redundant REST endpoints
-- Add production SPA dashboard (React/Vue)
-- Implement authentication (JWT/RBAC)
-- WebSocket integration for real-time updates
-- Integrate with controller cluster
-
-**Phase 5: Advanced Features (2027-2028+)**
-- Embedded Prometheus/Grafana/Jaeger viewers
-- Complete feature set (routes, agents, workflows, tenants)
-- Advanced workflow designer (drag-and-drop)
-- Multi-cluster management
-- Mobile companion app (if needed)
-
-#### Decision: Keep or Retire?
-
-**Option A: Full Retirement**
-- Delete quorus-api module after production stabilization
-- Admin operations via CLI or direct controller API calls
-- Use external tools (Grafana, Jaeger UI) for monitoring
-- Simpler architecture, fewer components
-- **Timeline:** Delete in Q1 2027 if no admin UI needed
-
-**Option B: Repurpose as Admin UI**
-- Rename to quorus-admin-ui post-production
-- Transform into dedicated management console
-- Provides better UX for operators
-- More complex, requires ongoing UI development
-- **Timeline:** Start development Q4 2026 if operators request it
-
-**Recommendation:** 
-- **Q1-Q2 2026 (Pre-Launch):** Finalize controller-first architecture, mark quorus-api deprecated
-- **Q2-Q3 2026 (Production Launch):** Launch with CLI + controller APIs, external monitoring tools
-- **Q4 2026 (Post-Launch Review):** Evaluate 6 months of operational feedback
-  - If operators struggle with CLI → Proceed with admin UI
-  - If CLI is sufficient → Schedule module retirement
-- **2027+ (Based on Decision):** Either build quorus-admin-ui or delete quorus-api
-
-**Current Action (January 2026):**
-- Mark quorus-api as deprecated but **do not delete**
-- Document as "Under evaluation for admin UI repurposing"
-- Focus on production-ready controller OpenTelemetry (Phases 1-5 ✅)
-- Monitor production feedback post-launch (mid-2026)
-- Revisit decision in Q4 2026 based on real operational experience
+If an admin UI is needed post-launch, it would be created as a **new** `quorus-admin-ui` module (not a repurposing of the deleted quorus-api code). See the Admin UI Decision section in the Implementation Task Grid for timeline.
 
 ---
 
@@ -2452,20 +2390,18 @@ logger.error("Transfer failed", e);
 ### Step 2: OpenTelemetry Dependencies
 
 ```xml
-<!-- Add to quorus-core/pom.xml -->
+<!-- Add to quorus-core/pom.xml (versions managed by opentelemetry-bom 1.59.0 in root pom) -->
 <dependencies>
     <!-- OpenTelemetry API -->
     <dependency>
         <groupId>io.opentelemetry</groupId>
         <artifactId>opentelemetry-api</artifactId>
-        <version>1.34.1</version>
     </dependency>
     
     <!-- OpenTelemetry SDK (for standalone testing) -->
     <dependency>
         <groupId>io.opentelemetry</groupId>
         <artifactId>opentelemetry-sdk</artifactId>
-        <version>1.34.1</version>
         <scope>provided</scope> <!-- Provided by agent/controller -->
     </dependency>
 </dependencies>
@@ -2837,15 +2773,14 @@ The following phases represent planned work for extending OpenTelemetry instrume
 |-------|--------|----------|-----------------|--------|
 | 1-5 | quorus-controller | ✅ Complete | Q1 2026 | Done |
 | Test 1-5 | Integration Testing | 🔶 High | Q1-Q2 2026 | In Progress |
-| 6 | quorus-agent | 🔴 Critical | Q2-Q3 2026 | Post-Launch |
-| 7 | quorus-tenant | 🟡 Medium | Q3 2026 | Post-Launch |
-| 8 | quorus-core | 🔴 Critical | Q2-Q3 2026 | Post-Launch |
-| 9 | quorus-workflow | 🟡 High | Q3-Q4 2026 | Post-Launch |
-| - | quorus-api | ⚪ N/A | TBD/Deprecated | Under Review |
+| 6 | quorus-agent | ✅ Complete | Q1 2026 | Done |
+| 7 | quorus-tenant | ✅ Complete | Q1 2026 | Done |
+| 8 | quorus-core | 🔴 Critical | Q2-Q3 2026 | Partial ⚠️ |
+| 9 | quorus-workflow | ✅ Complete | Q1 2026 | Done |
 
 **Production Launch:** Mid-2026 with Phases 1-5 complete
 
-**Post-Launch Assessment:** Q4 2026 - Evaluate operational needs and prioritize Phases 6-9 based on production feedback
+**Post-Launch Assessment:** Q4 2026 - Evaluate operational needs and prioritize remaining Phase 8 tasks based on production feedback
 
 ---
 
@@ -2858,7 +2793,7 @@ Instrument the quorus-agent module with OpenTelemetry to enable distributed trac
 ### Dependencies
 
 ```xml
-<!-- Add to quorus-agent/pom.xml -->
+<!-- Add to quorus-agent/pom.xml (versions managed by opentelemetry-bom 1.59.0 in root pom) -->
 <dependencies>
     <!-- Vert.x OpenTelemetry Integration -->
     <dependency>
@@ -2870,21 +2805,18 @@ Instrument the quorus-agent module with OpenTelemetry to enable distributed trac
     <dependency>
         <groupId>io.opentelemetry</groupId>
         <artifactId>opentelemetry-sdk</artifactId>
-        <version>1.34.1</version>
     </dependency>
     
     <!-- OTLP Exporter for Traces -->
     <dependency>
         <groupId>io.opentelemetry</groupId>
         <artifactId>opentelemetry-exporter-otlp</artifactId>
-        <version>1.34.1</version>
     </dependency>
     
     <!-- Prometheus Exporter -->
     <dependency>
         <groupId>io.opentelemetry</groupId>
         <artifactId>opentelemetry-exporter-prometheus</artifactId>
-        <version>1.34.1-alpha</version>
     </dependency>
 </dependencies>
 ```
@@ -3585,7 +3517,7 @@ Track progress on all OpenTelemetry migration, testing, and critical fixes. Chec
 
 | Task | Status | Priority | Target Date | Notes |
 |------|--------|----------|-------------|-------|
-| Phase 1: Setup OpenTelemetry dependencies | ✅ Complete | CRITICAL | Q4 2025 | Added SDK 1.34.1, OTLP exporter, Prometheus exporter |
+| Phase 1: Setup OpenTelemetry dependencies | ✅ Complete | CRITICAL | Q4 2025 | Added SDK (BOM 1.59.0), OTLP exporter, Prometheus exporter |
 | Phase 2: Static configuration class (TelemetryConfig) | ✅ Complete | CRITICAL | Q4 2025 | Created static configure() method |
 | Phase 3: Integrate into QuorusControllerApplication | ✅ Complete | CRITICAL | Q4 2025 | Added TelemetryConfig.configure() |
 | Phase 4: Add 5 Raft metrics to RaftNode | ✅ Complete | CRITICAL | Q4 2025 | state, term, commit_index, last_applied, is_leader |
@@ -3662,15 +3594,31 @@ Track progress on all OpenTelemetry migration, testing, and critical fixes. Chec
 | Instrument SimpleWorkflowEngine tracing | ⬜ Pending | 🟢 LOW | Q4 2026 | Tracing for workflow execution |
 | Instrument YamlWorkflowDefinitionParser | ⬜ Pending | 🟢 LOW | Q4 2026 | Tracing for YAML parsing |
 
+### Logging & OTel Audit Fixes (2026-03-05 Audit)
+
+| Task | Status | Priority | Target Date | Notes |
+|------|--------|----------|-------------|-------|
+| Configure Logging-OTel Bridge (OpenTelemetryAppender) | ⬜ Pending | 🟡 HIGH | Q2 2026 | Enables Grafana trace↔log correlation |
+| Bridge requestId ↔ OTel traceId | ⬜ Pending | 🟡 HIGH | Q2 2026 | Include both in error responses + MDC |
+| Standardize logger field naming (`LOG` → `logger`) | ⬜ Pending | 🟢 LOW | Q3 2026 | RaftLogStorageAdapter, FileRaftStorage |
+| Add loggers to 5 HTTP handlers | ⬜ Pending | 🟠 MEDIUM | Q2 2026 | Status, Readiness, Liveness, Info, Cluster |
+| Remove/use unused logger declarations | ⬜ Pending | 🟢 LOW | Q3 2026 | MetricsHandler, ProtocolFactory, FileManager |
+| Optimize SimpleTransferEngine logging (53 DEBUG) | ⬜ Pending | 🟠 MEDIUM | Q3 2026 | Promote, demote to TRACE, or remove |
+| Add INFO success log to JobStatusReportingService | ⬜ Pending | 🟠 MEDIUM | Q2 2026 | Agent operational visibility |
+| Add loggers to YamlWorkflowDefinitionParser + WorkflowSchemaValidator | ⬜ Pending | 🟠 MEDIUM | Q2 2026 | Workflow debugging |
+| Document completed handler logging patterns | ✅ Complete | 🟢 LOW | Q1 2026 | 6 handlers: entry/success/warn patterns |
+
 ### Admin UI Decision (POST-LAUNCH)
+
+> **Note:** The `quorus-api` module was removed from the codebase on 2026-03-05. If an admin UI is built, it will be a new `quorus-admin-ui` module.
 
 | Task | Status | Priority | Target Date | Notes |
 |------|--------|----------|-------------|-------|
 | Production launch | ⬜ Pending | 🔴 CRITICAL | Mid-2026 | Go-live with current modules |
 | Collect 6 months operational feedback | ⬜ Pending | 🟡 HIGH | Q4 2026 | Understand operator needs |
-| Decide: Retire or repurpose quorus-api | ⬜ Pending | 🟠 MEDIUM | Q4 2026 | Full retirement vs admin UI |
-| If repurpose: Design admin UI architecture | ⬜ Pending | 🟠 MEDIUM | Q1 2027 | Standalone vs embedded decision |
-| If repurpose: Implement quorus-admin-ui | ⬜ Pending | 🟠 MEDIUM | Q2-Q3 2027 | React/Vue + WebSocket + Prometheus |
+| Decide: Build admin UI or rely on CLI + Grafana | ⬜ Pending | 🟠 MEDIUM | Q4 2026 | Based on operator feedback |
+| If needed: Design admin UI architecture | ⬜ Pending | 🟠 MEDIUM | Q1 2027 | Standalone vs embedded decision |
+| If needed: Implement quorus-admin-ui | ⬜ Pending | 🟠 MEDIUM | Q2-Q3 2027 | React/Vue + WebSocket + Prometheus |
 
 ### Summary Progress
 
@@ -3683,8 +3631,9 @@ Track progress on all OpenTelemetry migration, testing, and critical fixes. Chec
 | **Tenant Migration (Phase 7)** | 5 | 5 | 0 | 100% ✅ |
 | **Core Migration (Phase 8)** | 8 | 3 | 5 | 38% ⚠️ |
 | **Workflow Migration (Phase 9)** | 7 | 4 | 3 | 57% ✅ |
+| **Logging & OTel Audit Fixes** | 9 | 1 | 8 | 11% |
 | **Admin UI Decision** | 5 | 0 | 5 | 0% |
-| **TOTAL** | **51** | **22** | **29** | **43%** |
+| **TOTAL** | **60** | **23** | **37** | **38%** |
 
 ### Priority Legend
 
@@ -3693,7 +3642,7 @@ Track progress on all OpenTelemetry migration, testing, and critical fixes. Chec
 - 🟠 **MEDIUM**: Enhances observability (complete Q4 2026)
 - 🟢 **LOW**: Nice to have (post-2026)
 
-### Next Immediate Actions (Q1 2026)
+### Next Immediate Actions (Q1-Q2 2026)
 
 #### OpenTelemetry Completion Tasks (Priority Order)
 
@@ -3704,6 +3653,15 @@ Track progress on all OpenTelemetry migration, testing, and critical fixes. Chec
 5. ✅ ~~**Wire WorkflowMetrics into SimpleWorkflowEngine**~~ - COMPLETE (verified 2026-02-01)
 6. ⬜ **Create OTel integration test infrastructure** - Test Phases 1-5 (Docker Compose, Collector, Tests)
 
+#### Logging & OTel Audit Tasks (Priority Order)
+
+1. ⬜ **Configure Logging-OTel Bridge** - Add opentelemetry-logback-appender to controller + agent
+2. ⬜ **Bridge requestId ↔ traceId** - Include both in HTTP error responses and log MDC
+3. ⬜ **Add loggers to 5 HTTP handlers** - StatusHandler, ReadinessHandler, LivenessHandler, InfoHandler, ClusterHandler
+4. ⬜ **Add loggers to workflow parsing** - YamlWorkflowDefinitionParser, WorkflowSchemaValidator
+5. ⬜ **Add INFO success log to JobStatusReportingService** - Agent operational visibility
+6. ⬜ **Optimize SimpleTransferEngine logging** - 53 DEBUG statements → audit, promote/demote/remove
+
 #### Critical Pre-Production Fixes (Blocking Production)
 
 1. ⬜ **Implement Raft persistence** - Custom WAL with RocksDB
@@ -3712,9 +3670,21 @@ Track progress on all OpenTelemetry migration, testing, and critical fixes. Chec
 
 ---
 
-**Document Status**: Updated Based on Code Review  
-**Last Updated**: 2026-02-01  
-**Version**: 2.2
+**Document Status**: Updated with Logging & OTel Audit findings  
+**Last Updated**: 2026-03-05  
+**Version**: 2.3
+
+**Changes in v2.3:**
+- Added "Logging & OTel Integration Gaps" section (9 gaps from codebase-wide audit)
+- Removed quorus-api from Module Comparison table (module deleted 2026-03-05)
+- Updated quorus-api Analysis section to reflect removal
+- Updated Admin UI Decision section (no longer "repurpose" — would be new module)
+- Updated OTel BOM version references from 1.34.1 to 1.59.0 (matches actual pom.xml)
+- Added Logging & OTel Audit Fixes to Implementation Task Grid (9 tasks, 1 complete)
+- Updated Summary Progress table (60 total tasks, 38% complete)
+- Documented completed handler logging patterns (6 handlers with entry/success/warn)
+- Updated Gap Analysis Summary to reflect completed SLF4J migrations (tenant, workflow)
+- Updated quorus-core deployment model (no longer references quorus-api)
 
 **Changes in v2.2:**
 - Corrected logging status for quorus-tenant and quorus-workflow (both use SLF4J, not JUL)

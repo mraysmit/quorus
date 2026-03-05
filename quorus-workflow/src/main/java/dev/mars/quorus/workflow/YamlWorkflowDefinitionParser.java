@@ -16,6 +16,8 @@
 
 package dev.mars.quorus.workflow;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.SafeConstructor;
 import org.yaml.snakeyaml.LoaderOptions;
@@ -40,6 +42,8 @@ import java.util.*;
  * @version 1.0
  */
 public class YamlWorkflowDefinitionParser implements WorkflowDefinitionParser {
+
+    private static final Logger logger = LoggerFactory.getLogger(YamlWorkflowDefinitionParser.class);
 
     /**
      * Static singleton Yaml parser - thread-safe and reused across all instances.
@@ -73,10 +77,15 @@ public class YamlWorkflowDefinitionParser implements WorkflowDefinitionParser {
     
     @Override
     public WorkflowDefinition parse(Path yamlFile) throws WorkflowParseException {
+        logger.info("Parsing workflow definition from file: {}", yamlFile);
         try {
             String content = Files.readString(yamlFile);
-            return parseFromString(content);
+            WorkflowDefinition definition = parseFromString(content);
+            logger.info("Successfully parsed workflow '{}' v{} from {}",
+                    definition.getMetadata().getName(), definition.getMetadata().getVersion(), yamlFile);
+            return definition;
         } catch (IOException e) {
+            logger.warn("Failed to read YAML file: {}", yamlFile, e);
             throw new WorkflowParseException("Failed to read YAML file: " + yamlFile, e);
         }
     }
@@ -86,11 +95,13 @@ public class YamlWorkflowDefinitionParser implements WorkflowDefinitionParser {
         try {
             Map<String, Object> data = YAML_PARSER.load(yamlContent);
             if (data == null) {
+                logger.warn("Empty or invalid YAML content received");
                 throw new WorkflowParseException("Empty or invalid YAML content");
             }
 
             return parseWorkflowDefinition(data);
         } catch (YAMLException e) {
+            logger.warn("YAML syntax error: {}", e.getMessage());
             throw new WorkflowParseException("YAML parsing failed", e);
         }
     }
@@ -150,7 +161,13 @@ public class YamlWorkflowDefinitionParser implements WorkflowDefinitionParser {
             schemaResult.getWarnings().forEach(warning ->
                 result.addWarning(warning.getFieldPath(), warning.getMessage()));
 
+            if (!result.isValid()) {
+                logger.warn("Schema validation failed with {} errors and {} warnings",
+                        result.getErrors().size(), result.getWarnings().size());
+            }
+
         } catch (YAMLException e) {
+            logger.warn("YAML syntax error during schema validation: {}", e.getMessage());
             result.addError("YAML syntax error: " + e.getMessage());
         }
 

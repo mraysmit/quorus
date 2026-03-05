@@ -16,6 +16,8 @@
 
 package dev.mars.quorus.controller.http;
 
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanContext;
 import io.vertx.ext.web.RoutingContext;
 import org.slf4j.MDC;
 
@@ -47,6 +49,12 @@ public class CorrelationIdHandler implements io.vertx.core.Handler<RoutingContex
     /** MDC key name */
     public static final String MDC_REQUEST_ID = "requestId";
 
+    /** MDC key for OTel trace ID */
+    public static final String MDC_TRACE_ID = "traceId";
+
+    /** MDC key for OTel span ID */
+    public static final String MDC_SPAN_ID = "spanId";
+
     /** Routing context data key */
     public static final String CTX_REQUEST_ID = "requestId";
 
@@ -61,6 +69,13 @@ public class CorrelationIdHandler implements io.vertx.core.Handler<RoutingContex
         // Set in MDC for SLF4J log correlation
         MDC.put(MDC_REQUEST_ID, requestId);
 
+        // Bridge OTel trace context into MDC for log correlation
+        SpanContext spanContext = Span.current().getSpanContext();
+        if (spanContext.isValid()) {
+            MDC.put(MDC_TRACE_ID, spanContext.getTraceId());
+            MDC.put(MDC_SPAN_ID, spanContext.getSpanId());
+        }
+
         // Store in routing context for downstream handlers
         ctx.put(CTX_REQUEST_ID, requestId);
 
@@ -71,6 +86,8 @@ public class CorrelationIdHandler implements io.vertx.core.Handler<RoutingContex
         final String id = requestId;
         ctx.addEndHandler(v -> {
             MDC.remove(MDC_REQUEST_ID);
+            MDC.remove(MDC_TRACE_ID);
+            MDC.remove(MDC_SPAN_ID);
         });
 
         ctx.next();

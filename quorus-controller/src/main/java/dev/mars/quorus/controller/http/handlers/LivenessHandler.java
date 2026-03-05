@@ -19,6 +19,8 @@ package dev.mars.quorus.controller.http.handlers;
 import io.vertx.core.Handler;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.RoutingContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
 
@@ -36,8 +38,11 @@ import java.time.Instant;
  */
 public class LivenessHandler implements Handler<RoutingContext> {
 
+    private static final Logger logger = LoggerFactory.getLogger(LivenessHandler.class);
+
     @Override
     public void handle(RoutingContext ctx) {
+        logger.trace("Liveness check");
         ctx.json(new JsonObject()
                 .put("status", "UP")
                 .put("timestamp", Instant.now().toString()));

@@ -56,19 +56,70 @@ class ProtocolServersLifecycleIT {
     private static final int SMB_PORT = 4445;
 
     @BeforeAll
-    static void checkPrerequisites() {
+    static void startProtocolServers() throws Exception {
         System.out.println("\n" + "=".repeat(80));
         System.out.println("PROTOCOL SERVER INTEGRATION TEST SUITE");
         System.out.println("=".repeat(80));
-        System.out.println("\nPrerequisite: Docker Compose stack must be running before test execution");
-        System.out.println("\nTo start protocol servers:");
-        System.out.println("  cd docker/compose");
-        System.out.println("  docker-compose -f docker-compose-protocol-servers.yml up -d");
-        System.out.println("\nExpected services:");
-        System.out.println("  - FTP server (delfer/alpine-ftp-server) on localhost:21");
-        System.out.println("  - SFTP server (atmoz/sftp) on localhost:2222");
-        System.out.println("  - SMB server (dperson/samba) on localhost:4445");
+
+        java.io.File currentDir = new java.io.File(System.getProperty("user.dir"));
+        java.io.File projectRoot = currentDir.getName().equals("quorus-core")
+            ? currentDir.getParentFile()
+            : currentDir;
+        java.io.File composeDir = new java.io.File(projectRoot, "docker/compose");
+
+        if (!composeDir.exists()) {
+            throw new IllegalStateException(
+                "Docker compose directory not found: " + composeDir.getAbsolutePath());
+        }
+
+        System.out.println("Starting protocol servers via docker-compose...");
+        ProcessBuilder pb = new ProcessBuilder(
+            "docker-compose", "-f", "docker-compose-protocol-servers.yml", "up", "-d"
+        );
+        pb.directory(composeDir);
+        pb.redirectErrorStream(true);
+
+        Process process = pb.start();
+        try (java.io.BufferedReader reader = new java.io.BufferedReader(
+                new java.io.InputStreamReader(process.getInputStream()))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                System.out.println("  " + line);
+            }
+        }
+
+        int exitCode = process.waitFor();
+        if (exitCode != 0) {
+            throw new IllegalStateException("docker-compose up -d failed with exit code: " + exitCode);
+        }
+
+        System.out.println("Waiting for protocol servers to become ready...");
+        waitForPort(FTP_HOST, FTP_PORT, "FTP", 30);
+        waitForPort(SFTP_HOST, SFTP_PORT, "SFTP", 30);
+        waitForPort(SMB_HOST, SMB_PORT, "SMB", 30);
+
+        System.out.println("All protocol servers ready.");
         System.out.println("=".repeat(80) + "\n");
+    }
+
+    private static void waitForPort(String host, int port, String name, int timeoutSeconds) {
+        long deadline = System.currentTimeMillis() + timeoutSeconds * 1000L;
+        while (System.currentTimeMillis() < deadline) {
+            try (java.net.Socket socket = new java.net.Socket()) {
+                socket.connect(new java.net.InetSocketAddress(host, port), 1000);
+                System.out.println("  " + name + " server ready on " + host + ":" + port);
+                return;
+            } catch (java.io.IOException e) {
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException("Interrupted while waiting for " + name, ie);
+                }
+            }
+        }
+        throw new IllegalStateException(
+            name + " server not ready after " + timeoutSeconds + "s on " + host + ":" + port);
     }
 
     @Test

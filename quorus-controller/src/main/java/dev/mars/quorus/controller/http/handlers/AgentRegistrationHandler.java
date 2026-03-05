@@ -19,6 +19,7 @@ package dev.mars.quorus.controller.http.handlers;
 import dev.mars.quorus.agent.AgentInfo;
 import dev.mars.quorus.controller.raft.RaftNode;
 import dev.mars.quorus.controller.state.AgentCommand;
+import dev.mars.quorus.controller.state.CommandResult;
 import io.vertx.core.Handler;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.RoutingContext;
@@ -62,10 +63,22 @@ public class AgentRegistrationHandler implements Handler<RoutingContext> {
             AgentCommand command = AgentCommand.register(agentInfo);
             raftNode.submitCommand(command)
                     .onSuccess(result -> {
-                        ctx.response().setStatusCode(201);
-                        ctx.json(new JsonObject()
-                                .put("success", true)
-                                .put("agentId", agentInfo.getAgentId()));
+                        if (result instanceof CommandResult.Success<?> success
+                                && success.entity() instanceof AgentInfo registered) {
+                            logger.info("Agent registered via Raft: agentId={}, hostname={}",
+                                    registered.getAgentId(), registered.getHostname());
+                            ctx.response().setStatusCode(201);
+                            ctx.json(new JsonObject()
+                                    .put("success", true)
+                                    .put("agentId", registered.getAgentId()));
+                        } else {
+                            logger.info("Agent registered via Raft: agentId={}",
+                                    agentInfo.getAgentId());
+                            ctx.response().setStatusCode(201);
+                            ctx.json(new JsonObject()
+                                    .put("success", true)
+                                    .put("agentId", agentInfo.getAgentId()));
+                        }
                     })
                     .onFailure(ctx::fail);
         } catch (Exception e) {

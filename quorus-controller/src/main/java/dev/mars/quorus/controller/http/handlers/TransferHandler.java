@@ -19,6 +19,7 @@ package dev.mars.quorus.controller.http.handlers;
 import dev.mars.quorus.controller.http.ErrorCode;
 import dev.mars.quorus.controller.http.QuorusApiException;
 import dev.mars.quorus.controller.raft.RaftNode;
+import dev.mars.quorus.controller.state.CommandResult;
 import dev.mars.quorus.controller.state.QuorusStateStore;
 import dev.mars.quorus.controller.state.TransferJobCommand;
 import dev.mars.quorus.controller.state.TransferJobSnapshot;
@@ -65,14 +66,21 @@ public class TransferHandler {
             try {
                 JsonObject body = ctx.body().asJsonObject();
                 TransferJob job = body.mapTo(TransferJob.class);
+                logger.info("Creating transfer job: jobId={}", job.getJobId());
                 TransferJobCommand command = TransferJobCommand.create(job);
 
                 raftNode.submitCommand(command)
                         .onSuccess(result -> {
-                            ctx.response().setStatusCode(201);
-                            ctx.json(new JsonObject()
-                                    .put("success", true)
-                                    .put("jobId", job.getJobId()));
+                            if (result instanceof CommandResult.NotFound<?> nf) {
+                                logger.warn("Transfer job disappeared during creation (race condition): jobId={}", nf.id());
+                                ctx.fail(QuorusApiException.notFound(ErrorCode.TRANSFER_NOT_FOUND, nf.id()));
+                            } else {
+                                logger.info("Transfer job created: jobId={}", job.getJobId());
+                                ctx.response().setStatusCode(201);
+                                ctx.json(new JsonObject()
+                                        .put("success", true)
+                                        .put("jobId", job.getJobId()));
+                            }
                         })
                         .onFailure(ctx::fail);
             } catch (Exception e) {
@@ -89,6 +97,7 @@ public class TransferHandler {
     public Handler<RoutingContext> handleGet() {
         return ctx -> {
             String jobId = ctx.pathParam("jobId");
+            logger.debug("Getting transfer job: jobId={}", jobId);
 
             TransferJobSnapshot job = stateStore.findTransferJob(jobId)
                     .orElseThrow(() -> QuorusApiException.notFound(ErrorCode.TRANSFER_NOT_FOUND, jobId));
@@ -139,6 +148,7 @@ public class TransferHandler {
     public Handler<RoutingContext> handleDelete() {
         return ctx -> {
             String jobId = ctx.pathParam("jobId");
+            logger.info("Deleting transfer job: jobId={}", jobId);
             QuorusStateStore stateMachine = this.stateStore;
 
             if (!stateMachine.hasTransferJob(jobId)) {
@@ -148,9 +158,15 @@ public class TransferHandler {
             TransferJobCommand command = TransferJobCommand.delete(jobId);
             raftNode.submitCommand(command)
                     .onSuccess(result -> {
-                        ctx.json(new JsonObject()
-                                .put("jobId", jobId)
-                                .put("message", "Transfer job cancelled and deleted successfully"));
+                        if (result instanceof CommandResult.NotFound<?> nf) {
+                            logger.warn("Transfer job disappeared during deletion (race condition): jobId={}", nf.id());
+                            ctx.fail(QuorusApiException.notFound(ErrorCode.TRANSFER_NOT_FOUND, nf.id()));
+                        } else {
+                            logger.info("Transfer job deleted: jobId={}", jobId);
+                            ctx.json(new JsonObject()
+                                    .put("jobId", jobId)
+                                    .put("message", "Transfer job cancelled and deleted successfully"));
+                        }
                     })
                     .onFailure(ctx::fail);
         };

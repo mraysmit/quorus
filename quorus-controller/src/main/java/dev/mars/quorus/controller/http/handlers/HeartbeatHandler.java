@@ -67,6 +67,8 @@ public class HeartbeatHandler implements Handler<RoutingContext> {
                 return;
             }
 
+            logger.debug("Processing heartbeat: agentId={}", agentId);
+
             // Verify agent exists (throws HTTP 404 if not found)
             stateStore.findAgent(agentId)
                     .orElseThrow(() -> QuorusApiException.notFound(ErrorCode.AGENT_NOT_FOUND, agentId));
@@ -89,6 +91,14 @@ public class HeartbeatHandler implements Handler<RoutingContext> {
 
             raftNode.submitCommand(command)
                     .onSuccess(result -> {
+                        if (result instanceof CommandResult.NotFound<?> nf) {
+                            logger.warn("Agent disappeared during heartbeat (race condition): agentId={}", nf.id());
+                            ctx.fail(QuorusApiException.notFound(ErrorCode.AGENT_NOT_FOUND, nf.id()));
+                            return;
+                        }
+
+                        logger.info("Heartbeat processed: agentId={}", agentId);
+
                         JsonObject response = new JsonObject()
                                 .put("success", true)
                                 .put("agentId", agentId)

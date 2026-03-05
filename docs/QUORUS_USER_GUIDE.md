@@ -388,7 +388,7 @@ Secure token-based authentication designed for automated systems and integration
   "payload": {
     "sub": "api-service-account",
     "iss": "quorus-auth-server",
-    "aud": "quorus-api",
+    "aud": "quorus-controller",
     "exp": 1640995200,
     "iat": 1640908800,
     "scope": ["transfer:read", "workflow:execute"]
@@ -5920,8 +5920,8 @@ wget https://releases.quorus.dev/v2.0/quorus-2.0.tar.gz
 tar -xzf quorus-2.0.tar.gz
 cd quorus-2.0
 
-# Start the API service
-java -jar quorus-api-2.0.jar
+# Start the controller service
+java -jar quorus-controller-1.0.jar
 
 # Verify installation
 curl http://localhost:8080/api/v1/info
@@ -6356,7 +6356,7 @@ Quorus supports multiple authentication methods designed for enterprise security
 curl -X POST https://sso.corp.com/oauth/token \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "grant_type=client_credentials" \
-  -d "client_id=quorus-api-client" \
+  -d "client_id=quorus-controller-client" \
   -d "client_secret=your-client-secret" \
   -d "scope=quorus:transfers:read quorus:transfers:write quorus:workflows:execute"
 
@@ -7892,20 +7892,14 @@ curl -X POST http://localhost:8080/api/v1/admin/restore/tenants \
 #### TLS Configuration
 
 ```yaml
-# application.yml
-quarkus:
-  http:
-    ssl:
-      certificate:
-        files: /etc/ssl/certs/quorus.crt
-        key-files: /etc/ssl/private/quorus.key
-    ssl-port: 8443
+# quorus-controller.properties
+quorus.http.ssl.certificate=/etc/ssl/certs/quorus.crt
+quorus.http.ssl.key=/etc/ssl/private/quorus.key
+quorus.http.ssl.port=8443
 
-  oidc:
-    auth-server-url: https://sso.corp.com/auth/realms/corporate
-    client-id: quorus-api
-    credentials:
-      secret: your-client-secret
+quorus.oidc.auth-server-url=https://sso.corp.com/auth/realms/corporate
+quorus.oidc.client-id=quorus-controller
+quorus.oidc.credentials.secret=your-client-secret
 ```
 
 #### Access Control
@@ -8380,7 +8374,6 @@ Each Quorus module has its own properties file located in `src/main/resources/`.
 | `quorus-core` | `quorus.properties` | `QuorusConfiguration` |
 | `quorus-controller` | `quorus-controller.properties` | `AppConfig` |
 | `quorus-agent` | `quorus-agent.properties` | `AgentConfig` |
-| `quorus-api` | `quorus-api.properties` | `ApiConfig` |
 
 ---
 
@@ -8600,9 +8593,9 @@ quorus.agent.telemetry.otlp.endpoint=http://localhost:4317
 
 ---
 
-### API Configuration (`quorus-api.properties`)
+### Controller HTTP Configuration (`quorus-controller.properties`)
 
-The API configuration manages the REST API service and agent fleet coordination.
+The controller configuration includes HTTP API, agent fleet coordination, and transfer service settings. These settings are part of `quorus-controller.properties`.
 
 ```properties
 # ==============================================================================
@@ -8613,12 +8606,6 @@ quorus.http.port=8080
 
 # HTTP server bind address (0.0.0.0 = all interfaces)
 quorus.http.host=0.0.0.0
-
-# ==============================================================================
-# Application Info
-# ==============================================================================
-quorus.api.name=quorus-api
-quorus.api.version=2.0
 
 # ==============================================================================
 # Agent Fleet Configuration

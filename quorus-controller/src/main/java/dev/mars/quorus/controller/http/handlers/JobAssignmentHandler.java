@@ -81,14 +81,22 @@ public class JobAssignmentHandler {
                     throw QuorusApiException.badRequest(ErrorCode.BAD_REQUEST, "Request body is required");
                 }
                 JobAssignment assignment = body.mapTo(JobAssignment.class);
+                logger.info("Assigning job: jobId={}, agentId={}",
+                        assignment.getJobId(), assignment.getAgentId());
                 JobAssignmentCommand command = JobAssignmentCommand.assign(assignment);
 
                 raftNode.submitCommand(command)
                         .onSuccess(result -> {
-                            ctx.response().setStatusCode(201);
-                            ctx.json(new JsonObject()
-                                    .put("success", true)
-                                    .put("assignmentId", command.assignmentId()));
+                            if (result instanceof CommandResult.NotFound<?> nf) {
+                                logger.warn("Assignment disappeared during creation (race condition): assignmentId={}", nf.id());
+                                ctx.fail(QuorusApiException.notFound(ErrorCode.ASSIGNMENT_NOT_FOUND, nf.id()));
+                            } else {
+                                logger.info("Job assigned: assignmentId={}", command.assignmentId());
+                                ctx.response().setStatusCode(201);
+                                ctx.json(new JsonObject()
+                                        .put("success", true)
+                                        .put("assignmentId", command.assignmentId()));
+                            }
                         })
                         .onFailure(ctx::fail);
             } catch (Exception e) {
@@ -138,15 +146,28 @@ public class JobAssignmentHandler {
     public Handler<RoutingContext> handleAccept() {
         return ctx -> {
             String assignmentId = ctx.pathParam("assignmentId");
+            logger.info("Accepting assignment: assignmentId={}", assignmentId);
             JobAssignment existing = lookupAssignment(assignmentId);
             validateTransition(existing, JobAssignmentStatus.ACCEPTED, assignmentId, "accept");
 
             JobAssignmentCommand command = JobAssignmentCommand.accept(assignmentId);
             raftNode.submitCommand(command)
-                    .onSuccess(result -> ctx.json(new JsonObject()
-                            .put("assignmentId", assignmentId)
-                            .put("status", "ACCEPTED")
-                            .put("message", "Assignment accepted")))
+                    .onSuccess(result -> {
+                        if (result instanceof CommandResult.NotFound<?> nf) {
+                            logger.warn("Assignment disappeared during accept (race condition): assignmentId={}", nf.id());
+                            ctx.fail(QuorusApiException.notFound(ErrorCode.ASSIGNMENT_NOT_FOUND, nf.id()));
+                        } else if (result instanceof CommandResult.CasMismatch<?>) {
+                            logger.warn("Assignment state conflict during accept: assignmentId={}", assignmentId);
+                            ctx.fail(QuorusApiException.conflict(ErrorCode.ASSIGNMENT_STATE_CONFLICT,
+                                    assignmentId, "unknown", "accept (concurrent modification)"));
+                        } else {
+                            logger.info("Assignment accepted: assignmentId={}", assignmentId);
+                            ctx.json(new JsonObject()
+                                    .put("assignmentId", assignmentId)
+                                    .put("status", "ACCEPTED")
+                                    .put("message", "Assignment accepted"));
+                        }
+                    })
                     .onFailure(ctx::fail);
         };
     }
@@ -157,6 +178,7 @@ public class JobAssignmentHandler {
     public Handler<RoutingContext> handleReject() {
         return ctx -> {
             String assignmentId = ctx.pathParam("assignmentId");
+            logger.info("Rejecting assignment: assignmentId={}", assignmentId);
             JobAssignment existing = lookupAssignment(assignmentId);
             validateTransition(existing, JobAssignmentStatus.REJECTED, assignmentId, "reject");
 
@@ -165,10 +187,22 @@ public class JobAssignmentHandler {
 
             JobAssignmentCommand command = JobAssignmentCommand.reject(assignmentId, reason);
             raftNode.submitCommand(command)
-                    .onSuccess(result -> ctx.json(new JsonObject()
-                            .put("assignmentId", assignmentId)
-                            .put("status", "REJECTED")
-                            .put("message", "Assignment rejected")))
+                    .onSuccess(result -> {
+                        if (result instanceof CommandResult.NotFound<?> nf) {
+                            logger.warn("Assignment disappeared during reject (race condition): assignmentId={}", nf.id());
+                            ctx.fail(QuorusApiException.notFound(ErrorCode.ASSIGNMENT_NOT_FOUND, nf.id()));
+                        } else if (result instanceof CommandResult.CasMismatch<?>) {
+                            logger.warn("Assignment state conflict during reject: assignmentId={}", assignmentId);
+                            ctx.fail(QuorusApiException.conflict(ErrorCode.ASSIGNMENT_STATE_CONFLICT,
+                                    assignmentId, "unknown", "reject (concurrent modification)"));
+                        } else {
+                            logger.info("Assignment rejected: assignmentId={}", assignmentId);
+                            ctx.json(new JsonObject()
+                                    .put("assignmentId", assignmentId)
+                                    .put("status", "REJECTED")
+                                    .put("message", "Assignment rejected"));
+                        }
+                    })
                     .onFailure(ctx::fail);
         };
     }
@@ -184,6 +218,7 @@ public class JobAssignmentHandler {
         return ctx -> {
             try {
                 String assignmentId = ctx.pathParam("assignmentId");
+                logger.info("Updating assignment status: assignmentId={}", assignmentId);
                 JobAssignment existing = lookupAssignment(assignmentId);
 
                 JsonObject body = ctx.body().asJsonObject();
@@ -209,12 +244,18 @@ public class JobAssignmentHandler {
                 raftNode.submitCommand(command)
                         .onSuccess(result -> {
                             if (result instanceof CommandResult.CasMismatch<?>) {
+                                logger.warn("Assignment state conflict during status update: assignmentId={}, expected={}, target={}",
+                                        assignmentId, currentStatus, newStatus);
                                 ctx.response().setStatusCode(409);
                                 ctx.json(new JsonObject()
                                         .put("error", "ASSIGNMENT_STATE_CONFLICT")
                                         .put("message", "Assignment status changed concurrently, please retry")
                                         .put("assignmentId", assignmentId));
+                            } else if (result instanceof CommandResult.NotFound<?> nf) {
+                                logger.warn("Assignment disappeared during status update (race condition): assignmentId={}", nf.id());
+                                ctx.fail(QuorusApiException.notFound(ErrorCode.ASSIGNMENT_NOT_FOUND, nf.id()));
                             } else {
+                                logger.info("Assignment status updated: assignmentId={}, status={}", assignmentId, newStatus);
                                 ctx.json(new JsonObject()
                                         .put("assignmentId", assignmentId)
                                         .put("status", newStatus.name())
@@ -234,6 +275,7 @@ public class JobAssignmentHandler {
     public Handler<RoutingContext> handleCancel() {
         return ctx -> {
             String assignmentId = ctx.pathParam("assignmentId");
+            logger.info("Cancelling assignment: assignmentId={}", assignmentId);
             JobAssignment existing = lookupAssignment(assignmentId);
             validateTransition(existing, JobAssignmentStatus.CANCELLED, assignmentId, "cancel");
 
@@ -242,10 +284,22 @@ public class JobAssignmentHandler {
 
             JobAssignmentCommand command = JobAssignmentCommand.cancel(assignmentId, reason);
             raftNode.submitCommand(command)
-                    .onSuccess(result -> ctx.json(new JsonObject()
-                            .put("assignmentId", assignmentId)
-                            .put("status", "CANCELLED")
-                            .put("message", "Assignment cancelled")))
+                    .onSuccess(result -> {
+                        if (result instanceof CommandResult.NotFound<?> nf) {
+                            logger.warn("Assignment disappeared during cancel (race condition): assignmentId={}", nf.id());
+                            ctx.fail(QuorusApiException.notFound(ErrorCode.ASSIGNMENT_NOT_FOUND, nf.id()));
+                        } else if (result instanceof CommandResult.CasMismatch<?>) {
+                            logger.warn("Assignment state conflict during cancel: assignmentId={}", assignmentId);
+                            ctx.fail(QuorusApiException.conflict(ErrorCode.ASSIGNMENT_STATE_CONFLICT,
+                                    assignmentId, "unknown", "cancel (concurrent modification)"));
+                        } else {
+                            logger.info("Assignment cancelled: assignmentId={}", assignmentId);
+                            ctx.json(new JsonObject()
+                                    .put("assignmentId", assignmentId)
+                                    .put("status", "CANCELLED")
+                                    .put("message", "Assignment cancelled"));
+                        }
+                    })
                     .onFailure(ctx::fail);
         };
     }
@@ -256,13 +310,22 @@ public class JobAssignmentHandler {
     public Handler<RoutingContext> handleRemove() {
         return ctx -> {
             String assignmentId = ctx.pathParam("assignmentId");
+            logger.info("Removing assignment: assignmentId={}", assignmentId);
             lookupAssignment(assignmentId); // verify exists
 
             JobAssignmentCommand command = JobAssignmentCommand.remove(assignmentId);
             raftNode.submitCommand(command)
-                    .onSuccess(result -> ctx.json(new JsonObject()
-                            .put("assignmentId", assignmentId)
-                            .put("message", "Assignment removed")))
+                    .onSuccess(result -> {
+                        if (result instanceof CommandResult.NotFound<?> nf) {
+                            logger.warn("Assignment disappeared during removal (race condition): assignmentId={}", nf.id());
+                            ctx.fail(QuorusApiException.notFound(ErrorCode.ASSIGNMENT_NOT_FOUND, nf.id()));
+                        } else {
+                            logger.info("Assignment removed: assignmentId={}", assignmentId);
+                            ctx.json(new JsonObject()
+                                    .put("assignmentId", assignmentId)
+                                    .put("message", "Assignment removed"));
+                        }
+                    })
                     .onFailure(ctx::fail);
         };
     }

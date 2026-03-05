@@ -65,7 +65,7 @@ import java.util.zip.CRC32C;
  */
 public final class FileRaftStorage implements RaftStorage {
 
-    private static final Logger LOG = LoggerFactory.getLogger(FileRaftStorage.class);
+    private static final Logger logger = LoggerFactory.getLogger(FileRaftStorage.class);
 
     // =========================================================================
     // WAL Record Format Constants
@@ -173,7 +173,7 @@ public final class FileRaftStorage implements RaftStorage {
             logChannel.position(logChannel.size());
 
             opened = true;
-            LOG.info("FileRaftStorage opened: {} (log size: {} bytes)", dataDir, logChannel.size());
+            logger.info("FileRaftStorage opened: {} (log size: {} bytes)", dataDir, logChannel.size());
             return null;
         }, false);
     }
@@ -185,9 +185,9 @@ public final class FileRaftStorage implements RaftStorage {
             if (logChannel != null) {
                 try {
                     logChannel.close();
-                    LOG.info("FileRaftStorage closed: {}", dataDir);
+                    logger.info("FileRaftStorage closed: {}", dataDir);
                 } catch (IOException e) {
-                    LOG.warn("Error closing log channel", e);
+                    logger.warn("Error closing log channel", e);
                 }
             }
             return null;
@@ -244,7 +244,7 @@ public final class FileRaftStorage implements RaftStorage {
                 syncDirectory(dataDir);
             }
 
-            LOG.debug("Metadata updated: term={}, votedFor={}", currentTerm, votedFor.orElse("(none)"));
+            logger.debug("Metadata updated: term={}, votedFor={}", currentTerm, votedFor.orElse("(none)"));
             return null;
         }, false);
     }
@@ -255,7 +255,7 @@ public final class FileRaftStorage implements RaftStorage {
             Path metaPath = dataDir.resolve("meta.dat");
 
             if (!Files.exists(metaPath)) {
-                LOG.debug("No metadata file found, returning empty metadata");
+                logger.debug("No metadata file found, returning empty metadata");
                 return PersistentMeta.empty();
             }
 
@@ -295,7 +295,7 @@ public final class FileRaftStorage implements RaftStorage {
                     ? Optional.empty()
                     : Optional.of(new String(voteBytes, StandardCharsets.UTF_8));
 
-            LOG.debug("Metadata loaded: term={}, votedFor={}", term, votedFor.orElse("(none)"));
+            logger.debug("Metadata loaded: term={}, votedFor={}", term, votedFor.orElse("(none)"));
             return new PersistentMeta(term, votedFor);
         }, false);
     }
@@ -314,7 +314,7 @@ public final class FileRaftStorage implements RaftStorage {
             for (LogEntryData entry : entries) {
                 writeRecord(TYPE_APPEND, entry.index(), entry.term(), entry.payload());
             }
-            LOG.debug("Appended {} entries to WAL", entries.size());
+            logger.debug("Appended {} entries to WAL", entries.size());
             return null;
         }, false);
     }
@@ -323,7 +323,7 @@ public final class FileRaftStorage implements RaftStorage {
     public Future<Void> truncateSuffix(long fromIndex) {
         return vertx.executeBlocking(() -> {
             writeRecord(TYPE_TRUNCATE, fromIndex, 0L, new byte[0]);
-            LOG.debug("Recorded truncation from index {}", fromIndex);
+            logger.debug("Recorded truncation from index {}", fromIndex);
             return null;
         }, false);
     }
@@ -333,9 +333,9 @@ public final class FileRaftStorage implements RaftStorage {
         return vertx.executeBlocking(() -> {
             if (fsyncEnabled) {
                 logChannel.force(true);
-                LOG.trace("WAL synced to disk");
+                logger.trace("WAL synced to disk");
             } else {
-                LOG.trace("WAL sync skipped (fsync disabled)");
+                logger.trace("WAL sync skipped (fsync disabled)");
             }
             return null;
         }, false);
@@ -347,7 +347,7 @@ public final class FileRaftStorage implements RaftStorage {
             Path logPath = dataDir.resolve("raft.log");
 
             if (!Files.exists(logPath)) {
-                LOG.debug("No WAL file found, starting with empty log");
+                logger.debug("No WAL file found, starting with empty log");
                 return List.of();
             }
 
@@ -381,16 +381,16 @@ public final class FileRaftStorage implements RaftStorage {
 
                     // Validate header
                     if (magic != MAGIC) {
-                        LOG.warn("Invalid magic at position {}: expected 0x{}, got 0x{}",
+                        logger.warn("Invalid magic at position {}: expected 0x{}, got 0x{}",
                                 pos, Integer.toHexString(MAGIC), Integer.toHexString(magic));
                         break;
                     }
                     if (version != VERSION) {
-                        LOG.warn("Unsupported version at position {}: {}", pos, version);
+                        logger.warn("Unsupported version at position {}: {}", pos, version);
                         break;
                     }
                     if (payloadLen < 0 || payloadLen > MAX_PAYLOAD_SIZE) {
-                        LOG.warn("Invalid payload length at position {}: {}", pos, payloadLen);
+                        logger.warn("Invalid payload length at position {}: {}", pos, payloadLen);
                         break;
                     }
 
@@ -398,7 +398,7 @@ public final class FileRaftStorage implements RaftStorage {
                     ByteBuffer payloadBuf = ByteBuffer.allocate(payloadLen);
                     int payloadRead = ch.read(payloadBuf, pos + HEADER_SIZE);
                     if (payloadRead < payloadLen) {
-                        LOG.warn("Incomplete payload at position {}", pos);
+                        logger.warn("Incomplete payload at position {}", pos);
                         break;
                     }
                     payloadBuf.flip();
@@ -407,7 +407,7 @@ public final class FileRaftStorage implements RaftStorage {
                     ByteBuffer crcBuf = ByteBuffer.allocate(CRC_SIZE);
                     int crcRead = ch.read(crcBuf, pos + HEADER_SIZE + payloadLen);
                     if (crcRead < CRC_SIZE) {
-                        LOG.warn("Incomplete CRC at position {}", pos);
+                        logger.warn("Incomplete CRC at position {}", pos);
                         break;
                     }
                     crcBuf.flip();
@@ -419,7 +419,7 @@ public final class FileRaftStorage implements RaftStorage {
                     crc.update(headerBuf);
                     crc.update(payloadBuf.duplicate());
                     if ((int) crc.getValue() != storedCrc) {
-                        LOG.warn("CRC mismatch at position {}", pos);
+                        logger.warn("CRC mismatch at position {}", pos);
                         break;
                     }
 
@@ -429,15 +429,15 @@ public final class FileRaftStorage implements RaftStorage {
                         long truncateFrom = index;
                         int originalSize = result.size();
                         result.removeIf(e -> e.index() >= truncateFrom);
-                        LOG.debug("Replay: truncated {} entries from index {}",
+                        logger.debug("Replay: truncated {} entries from index {}",
                                 originalSize - result.size(), truncateFrom);
                     } else if (type == TYPE_APPEND) {
                         byte[] payload = new byte[payloadLen];
                         payloadBuf.get(payload);
                         result.add(new LogEntryData(index, term, payload));
-                        LOG.trace("Replay: appended entry at index {}, term {}", index, term);
+                        logger.trace("Replay: appended entry at index {}, term {}", index, term);
                     } else {
-                        LOG.warn("Unknown record type at position {}: {}", pos, type);
+                        logger.warn("Unknown record type at position {}: {}", pos, type);
                         break;
                     }
 
@@ -448,13 +448,13 @@ public final class FileRaftStorage implements RaftStorage {
 
                 // Truncate file to last good position (removes torn writes)
                 if (ch.size() > lastGoodPos) {
-                    LOG.info("Truncating WAL from {} to {} bytes (removing torn writes)",
+                    logger.info("Truncating WAL from {} to {} bytes (removing torn writes)",
                             ch.size(), lastGoodPos);
                     ch.truncate(lastGoodPos);
                 }
             }
 
-            LOG.info("WAL replay complete: {} entries recovered", result.size());
+            logger.info("WAL replay complete: {} entries recovered", result.size());
             return result;
         }, false);
     }
@@ -504,7 +504,7 @@ public final class FileRaftStorage implements RaftStorage {
                 syncDirectory(dataDir);
             }
 
-            LOG.info("Snapshot saved: lastIncludedIndex={}, lastIncludedTerm={}, size={}bytes",
+            logger.info("Snapshot saved: lastIncludedIndex={}, lastIncludedTerm={}, size={}bytes",
                     lastIncludedIndex, lastIncludedTerm, data.length);
             return null;
         }, false);
@@ -516,7 +516,7 @@ public final class FileRaftStorage implements RaftStorage {
             Path snapshotPath = dataDir.resolve("snapshot.dat");
 
             if (!Files.exists(snapshotPath)) {
-                LOG.debug("No snapshot file found");
+                logger.debug("No snapshot file found");
                 return Optional.<SnapshotData>empty();
             }
 
@@ -553,7 +553,7 @@ public final class FileRaftStorage implements RaftStorage {
                 throw new IOException("Corrupt snapshot.dat: CRC mismatch");
             }
 
-            LOG.info("Snapshot loaded: lastIncludedIndex={}, lastIncludedTerm={}, size={}bytes",
+            logger.info("Snapshot loaded: lastIncludedIndex={}, lastIncludedTerm={}, size={}bytes",
                     lastIncludedIndex, lastIncludedTerm, dataLen);
             return Optional.of(new SnapshotData(data, lastIncludedIndex, lastIncludedTerm));
         }, false);
@@ -565,7 +565,7 @@ public final class FileRaftStorage implements RaftStorage {
             // Prefix truncation in a WAL is achieved by rewriting the log file
             // excluding entries with index <= toIndex.
             // For efficiency, we replay the current log, filter, and rewrite.
-            LOG.info("Truncating WAL prefix: removing entries with index <= {}", toIndex);
+            logger.info("Truncating WAL prefix: removing entries with index <= {}", toIndex);
 
             Path logPath = dataDir.resolve("raft.log");
             Path tmpLogPath = dataDir.resolve("raft.log.tmp");
@@ -613,7 +613,7 @@ public final class FileRaftStorage implements RaftStorage {
                     StandardOpenOption.WRITE);
             logChannel.position(logChannel.size());
 
-            LOG.info("WAL prefix truncation complete: removed {} entries, {} remaining",
+            logger.info("WAL prefix truncation complete: removed {} entries, {} remaining",
                     originalSize - entries.size(), entries.size());
             return null;
         }, false);

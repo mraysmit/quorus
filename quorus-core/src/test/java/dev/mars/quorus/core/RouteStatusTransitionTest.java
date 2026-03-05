@@ -40,7 +40,7 @@ class RouteStatusTransitionTest {
 
     private static EnumSet<RouteStatus> validTargets(RouteStatus from) {
         return switch (from) {
-            case CONFIGURED -> EnumSet.of(RouteStatus.ACTIVE, RouteStatus.DELETED);
+            case CONFIGURED -> EnumSet.of(RouteStatus.ACTIVE, RouteStatus.SUSPENDED, RouteStatus.DELETED);
             case ACTIVE -> EnumSet.of(RouteStatus.TRIGGERED, RouteStatus.SUSPENDED,
                     RouteStatus.DEGRADED, RouteStatus.DELETED);
             case TRIGGERED -> EnumSet.of(RouteStatus.TRANSFERRING, RouteStatus.ACTIVE);

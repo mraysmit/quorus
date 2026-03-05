@@ -19,6 +19,7 @@ package dev.mars.quorus.controller.http.handlers;
 import dev.mars.quorus.controller.http.ErrorCode;
 import dev.mars.quorus.controller.http.QuorusApiException;
 import dev.mars.quorus.controller.raft.RaftNode;
+import dev.mars.quorus.controller.state.CommandResult;
 import dev.mars.quorus.controller.state.QuorusStateStore;
 import dev.mars.quorus.controller.state.RouteCommand;
 import dev.mars.quorus.core.RouteConfiguration;
@@ -89,13 +90,21 @@ public class RouteHandler {
                 }
 
                 RouteCommand command = RouteCommand.create(routeToStore);
+                logger.info("Creating route: routeId={}, name={}",
+                        routeToStore.getRouteId(), routeToStore.getName());
                 raftNode.submitCommand(command)
                         .onSuccess(result -> {
-                            ctx.response().setStatusCode(201);
-                            ctx.json(new JsonObject()
-                                    .put("success", true)
-                                    .put("routeId", routeToStore.getRouteId())
-                                    .put("status", RouteStatus.CONFIGURED.name()));
+                            if (result instanceof CommandResult.NotFound<?> nf) {
+                                logger.warn("Route disappeared during creation (race condition): routeId={}", nf.id());
+                                ctx.fail(QuorusApiException.notFound(ErrorCode.ROUTE_NOT_FOUND, nf.id()));
+                            } else {
+                                logger.info("Route created: routeId={}", routeToStore.getRouteId());
+                                ctx.response().setStatusCode(201);
+                                ctx.json(new JsonObject()
+                                        .put("success", true)
+                                        .put("routeId", routeToStore.getRouteId())
+                                        .put("status", RouteStatus.CONFIGURED.name()));
+                            }
                         })
                         .onFailure(ctx::fail);
             } catch (QuorusApiException e) {
@@ -169,13 +178,24 @@ public class RouteHandler {
                 }
 
                 RouteConfiguration update = body.mapTo(RouteConfiguration.class);
+                logger.info("Updating route: routeId={}", routeId);
                 RouteCommand command = RouteCommand.update(routeId, update);
                 raftNode.submitCommand(command)
                         .onSuccess(result -> {
-                            ctx.json(new JsonObject()
-                                    .put("success", true)
-                                    .put("routeId", routeId)
-                                    .put("message", "Route updated successfully"));
+                            if (result instanceof CommandResult.NotFound<?> nf) {
+                                logger.warn("Route disappeared during update (race condition): routeId={}", nf.id());
+                                ctx.fail(QuorusApiException.notFound(ErrorCode.ROUTE_NOT_FOUND, nf.id()));
+                            } else if (result instanceof CommandResult.CasMismatch<?>) {
+                                logger.warn("Route state conflict during update: routeId={}", routeId);
+                                ctx.fail(QuorusApiException.conflict(ErrorCode.ROUTE_STATE_CONFLICT,
+                                        routeId, "unknown", "update (concurrent modification)"));
+                            } else {
+                                logger.info("Route updated: routeId={}", routeId);
+                                ctx.json(new JsonObject()
+                                        .put("success", true)
+                                        .put("routeId", routeId)
+                                        .put("message", "Route updated successfully"));
+                            }
                         })
                         .onFailure(ctx::fail);
             } catch (QuorusApiException e) {
@@ -202,11 +222,18 @@ public class RouteHandler {
             validateTransition(existing, RouteStatus.DELETED, routeId, "delete");
 
             RouteCommand command = RouteCommand.delete(routeId);
+            logger.info("Deleting route: routeId={}", routeId);
             raftNode.submitCommand(command)
                     .onSuccess(result -> {
-                        ctx.json(new JsonObject()
-                                .put("routeId", routeId)
-                                .put("message", "Route deleted successfully"));
+                        if (result instanceof CommandResult.NotFound<?> nf) {
+                            logger.warn("Route disappeared during deletion (race condition): routeId={}", nf.id());
+                            ctx.fail(QuorusApiException.notFound(ErrorCode.ROUTE_NOT_FOUND, nf.id()));
+                        } else {
+                            logger.info("Route deleted: routeId={}", routeId);
+                            ctx.json(new JsonObject()
+                                    .put("routeId", routeId)
+                                    .put("message", "Route deleted successfully"));
+                        }
                     })
                     .onFailure(ctx::fail);
         };
@@ -233,13 +260,24 @@ public class RouteHandler {
             }
 
             RouteCommand command = RouteCommand.suspend(routeId, reason);
+            logger.info("Suspending route: routeId={}, reason={}", routeId, reason);
             raftNode.submitCommand(command)
                     .onSuccess(result -> {
-                        ctx.json(new JsonObject()
-                                .put("success", true)
-                                .put("routeId", routeId)
-                                .put("status", RouteStatus.SUSPENDED.name())
-                                .put("message", "Route suspended successfully"));
+                        if (result instanceof CommandResult.NotFound<?> nf) {
+                            logger.warn("Route disappeared during suspend (race condition): routeId={}", nf.id());
+                            ctx.fail(QuorusApiException.notFound(ErrorCode.ROUTE_NOT_FOUND, nf.id()));
+                        } else if (result instanceof CommandResult.CasMismatch<?>) {
+                            logger.warn("Route state conflict during suspend: routeId={}", routeId);
+                            ctx.fail(QuorusApiException.conflict(ErrorCode.ROUTE_STATE_CONFLICT,
+                                    routeId, "unknown", "suspend (concurrent modification)"));
+                        } else {
+                            logger.info("Route suspended: routeId={}", routeId);
+                            ctx.json(new JsonObject()
+                                    .put("success", true)
+                                    .put("routeId", routeId)
+                                    .put("status", RouteStatus.SUSPENDED.name())
+                                    .put("message", "Route suspended successfully"));
+                        }
                     })
                     .onFailure(ctx::fail);
         };
@@ -266,13 +304,24 @@ public class RouteHandler {
             }
 
             RouteCommand command = RouteCommand.resume(routeId);
+            logger.info("Resuming route: routeId={}", routeId);
             raftNode.submitCommand(command)
                     .onSuccess(result -> {
-                        ctx.json(new JsonObject()
-                                .put("success", true)
-                                .put("routeId", routeId)
-                                .put("status", RouteStatus.ACTIVE.name())
-                                .put("message", "Route resumed successfully"));
+                        if (result instanceof CommandResult.NotFound<?> nf) {
+                            logger.warn("Route disappeared during resume (race condition): routeId={}", nf.id());
+                            ctx.fail(QuorusApiException.notFound(ErrorCode.ROUTE_NOT_FOUND, nf.id()));
+                        } else if (result instanceof CommandResult.CasMismatch<?>) {
+                            logger.warn("Route state conflict during resume: routeId={}", routeId);
+                            ctx.fail(QuorusApiException.conflict(ErrorCode.ROUTE_STATE_CONFLICT,
+                                    routeId, "unknown", "resume (concurrent modification)"));
+                        } else {
+                            logger.info("Route resumed: routeId={}", routeId);
+                            ctx.json(new JsonObject()
+                                    .put("success", true)
+                                    .put("routeId", routeId)
+                                    .put("status", RouteStatus.ACTIVE.name())
+                                    .put("message", "Route resumed successfully"));
+                        }
                     })
                     .onFailure(ctx::fail);
         };

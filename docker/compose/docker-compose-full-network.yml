@@ -31,6 +31,8 @@ services:
     networks:
       control-plane:
         ipv4_address: 172.20.0.10
+      agent-network:
+        ipv4_address: 172.21.0.20
     volumes:
       - controller1-data:/app/data
       - controller1-logs:/app/logs
@@ -109,38 +111,6 @@ services:
       - controller1
       - controller2
 
-  # API service for agent communication
-  api:
-    build:
-      context: ../..
-      dockerfile: quorus-api/Dockerfile
-    container_name: quorus-api
-    hostname: api
-    environment:
-      - QUARKUS_HTTP_HOST=0.0.0.0
-      - QUARKUS_HTTP_PORT=8080
-      - JAVA_OPTS=-Xmx512m -Xms256m
-    ports:
-      - "8080:8080"
-    networks:
-      control-plane:
-        ipv4_address: 172.20.0.20
-      agent-network:
-        ipv4_address: 172.21.0.20
-    volumes:
-      - api-logs:/app/logs
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
-    restart: unless-stopped
-    depends_on:
-      - controller1
-      - controller2
-      - controller3
-
   # ============================================================================
   # AGENT NETWORK - Quorus Agents in different regions
   # ============================================================================
@@ -155,7 +125,7 @@ services:
       - AGENT_ID=agent-nyc-001
       - AGENT_REGION=us-east-1
       - AGENT_DATACENTER=nyc-dc1
-      - CONTROLLER_URL=http://api:8080/api/v1
+      - CONTROLLER_URL=http://controller1:8080/api/v1
       - SUPPORTED_PROTOCOLS=HTTP,HTTPS,FTP,SFTP
       - MAX_CONCURRENT_TRANSFERS=5
       - HEARTBEAT_INTERVAL=30000
@@ -163,6 +133,7 @@ services:
     networks:
       agent-network:
         ipv4_address: 172.21.0.10
+      control-plane:
       transfer-servers:
         ipv4_address: 172.22.0.100
     volumes:
@@ -171,7 +142,7 @@ services:
       - shared-files:/shared
     restart: unless-stopped
     depends_on:
-      - api
+      - controller1
 
   agent-london:
     build:
@@ -183,7 +154,7 @@ services:
       - AGENT_ID=agent-lon-001
       - AGENT_REGION=eu-west-1
       - AGENT_DATACENTER=lon-dc1
-      - CONTROLLER_URL=http://api:8080/api/v1
+      - CONTROLLER_URL=http://controller1:8080/api/v1
       - SUPPORTED_PROTOCOLS=HTTP,HTTPS,SFTP,SMB
       - MAX_CONCURRENT_TRANSFERS=3
       - HEARTBEAT_INTERVAL=30000
@@ -191,6 +162,7 @@ services:
     networks:
       agent-network:
         ipv4_address: 172.21.0.11
+      control-plane:
       transfer-servers:
         ipv4_address: 172.22.0.101
     volumes:
@@ -199,7 +171,7 @@ services:
       - shared-files:/shared
     restart: unless-stopped
     depends_on:
-      - api
+      - controller1
 
   agent-tokyo:
     build:
@@ -211,7 +183,7 @@ services:
       - AGENT_ID=agent-tky-001
       - AGENT_REGION=ap-northeast-1
       - AGENT_DATACENTER=tky-dc1
-      - CONTROLLER_URL=http://api:8080/api/v1
+      - CONTROLLER_URL=http://controller1:8080/api/v1
       - SUPPORTED_PROTOCOLS=HTTP,HTTPS,FTP
       - MAX_CONCURRENT_TRANSFERS=4
       - HEARTBEAT_INTERVAL=30000
@@ -219,6 +191,7 @@ services:
     networks:
       agent-network:
         ipv4_address: 172.21.0.12
+      control-plane:
       transfer-servers:
         ipv4_address: 172.22.0.102
     volumes:
@@ -227,7 +200,7 @@ services:
       - shared-files:/shared
     restart: unless-stopped
     depends_on:
-      - api
+      - controller1
 
   # ============================================================================
   # FILE TRANSFER SERVERS - Various protocol endpoints
@@ -347,7 +320,6 @@ volumes:
   controller2-logs:
   controller3-data:
   controller3-logs:
-  api-logs:
   
   # Agent data
   agent-nyc-data:
