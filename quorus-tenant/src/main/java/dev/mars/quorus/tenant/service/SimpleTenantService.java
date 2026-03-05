@@ -103,11 +103,9 @@ public class SimpleTenantService implements TenantService {
     
     @Override
     public Tenant updateTenant(Tenant tenant) throws TenantServiceException {
-        if (!tenants.containsKey(tenant.getTenantId())) {
-            throw new TenantServiceException("Tenant not found: " + tenant.getTenantId());
-        }
+        Tenant existingTenant = Optional.ofNullable(tenants.get(tenant.getTenantId()))
+                .orElseThrow(() -> new TenantServiceException("Tenant not found: " + tenant.getTenantId()));
 
-        Tenant existingTenant = tenants.get(tenant.getTenantId());
         if (existingTenant.getStatus() == Tenant.TenantStatus.DELETED) {
             throw new TenantServiceException("Cannot update deleted tenant: " + tenant.getTenantId());
         }
@@ -141,10 +139,8 @@ public class SimpleTenantService implements TenantService {
     
     @Override
     public void deleteTenant(String tenantId) throws TenantServiceException {
-        Tenant tenant = tenants.get(tenantId);
-        if (tenant == null) {
-            throw new TenantServiceException("Tenant not found: " + tenantId);
-        }
+        Tenant tenant = Optional.ofNullable(tenants.get(tenantId))
+                .orElseThrow(() -> new TenantServiceException("Tenant not found: " + tenantId));
 
         if (tenant.getStatus() == Tenant.TenantStatus.DELETED) {
             return; // Already deleted
@@ -235,10 +231,8 @@ public class SimpleTenantService implements TenantService {
     @Override
     public Tenant updateTenantConfiguration(String tenantId, TenantConfiguration configuration)
             throws TenantServiceException {
-        Tenant tenant = tenants.get(tenantId);
-        if (tenant == null) {
-            throw new TenantServiceException("Tenant not found: " + tenantId);
-        }
+        Tenant tenant = Optional.ofNullable(tenants.get(tenantId))
+                .orElseThrow(() -> new TenantServiceException("Tenant not found: " + tenantId));
 
         if (tenant.getStatus() == Tenant.TenantStatus.DELETED) {
             throw new TenantServiceException("Cannot update configuration for deleted tenant: " + tenantId);
@@ -288,11 +282,10 @@ public class SimpleTenantService implements TenantService {
             return; // Root tenant is always valid
         }
         
-        // Check if parent exists
-        Tenant parent = tenants.get(tenant.getParentTenantId());
-        if (parent == null || parent.getStatus() == Tenant.TenantStatus.DELETED) {
-            throw new TenantServiceException("Parent tenant not found: " + tenant.getParentTenantId());
-        }
+        // Check if parent exists and is not deleted
+        Tenant parent = Optional.ofNullable(tenants.get(tenant.getParentTenantId()))
+                .filter(p -> p.getStatus() != Tenant.TenantStatus.DELETED)
+                .orElseThrow(() -> new TenantServiceException("Parent tenant not found: " + tenant.getParentTenantId()));
         
         // Check for circular references
         if (wouldCreateCircularReference(tenant.getTenantId(), tenant.getParentTenantId())) {
@@ -348,10 +341,8 @@ public class SimpleTenantService implements TenantService {
     }
     
     private void updateTenantStatus(String tenantId, Tenant.TenantStatus status) throws TenantServiceException {
-        Tenant tenant = tenants.get(tenantId);
-        if (tenant == null) {
-            throw new TenantServiceException("Tenant not found: " + tenantId);
-        }
+        Tenant tenant = Optional.ofNullable(tenants.get(tenantId))
+                .orElseThrow(() -> new TenantServiceException("Tenant not found: " + tenantId));
 
         if (tenant.getStatus() == Tenant.TenantStatus.DELETED) {
             throw new TenantServiceException("Cannot update status for deleted tenant: " + tenantId);

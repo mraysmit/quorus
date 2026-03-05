@@ -126,25 +126,19 @@ public class SimpleResourceManagementService implements ResourceManagementServic
     
     @Override
     public Optional<ResourceUsage> getUsageForDate(String tenantId, LocalDate date) {
-        Map<LocalDate, ResourceUsage> tenantHistory = usageHistory.get(tenantId);
-        if (tenantHistory != null) {
-            return Optional.ofNullable(tenantHistory.get(date));
-        }
-        return Optional.empty();
+        return Optional.ofNullable(usageHistory.get(tenantId))
+                .flatMap(history -> Optional.ofNullable(history.get(date)));
     }
     
     @Override
     public List<ResourceUsage> getUsageHistory(String tenantId, LocalDate fromDate, LocalDate toDate) {
-        Map<LocalDate, ResourceUsage> tenantHistory = usageHistory.get(tenantId);
-        if (tenantHistory == null) {
-            return List.of();
-        }
-        
-        return tenantHistory.entrySet().stream()
-                .filter(entry -> !entry.getKey().isBefore(fromDate) && !entry.getKey().isAfter(toDate))
-                .map(Map.Entry::getValue)
-                .sorted(Comparator.comparing(ResourceUsage::getUsageDate))
-                .collect(Collectors.toList());
+        return Optional.ofNullable(usageHistory.get(tenantId))
+                .map(history -> history.entrySet().stream()
+                        .filter(entry -> !entry.getKey().isBefore(fromDate) && !entry.getKey().isAfter(toDate))
+                        .map(Map.Entry::getValue)
+                        .sorted(Comparator.comparing(ResourceUsage::getUsageDate))
+                        .collect(Collectors.toList()))
+                .orElse(List.of());
     }
     
     @Override
@@ -247,10 +241,8 @@ public class SimpleResourceManagementService implements ResourceManagementServic
     public void releaseResources(String reservationToken, long actualBytesTransferred, long actualBandwidthUsed) 
             throws ResourceManagementException {
         
-        ResourceReservation reservation = reservations.remove(reservationToken);
-        if (reservation == null) {
-            throw new ResourceManagementException("Reservation not found: " + reservationToken);
-        }
+        ResourceReservation reservation = Optional.ofNullable(reservations.remove(reservationToken))
+                .orElseThrow(() -> new ResourceManagementException("Reservation not found: " + reservationToken));
         
         TenantCounters counters = getOrCreateCounters(reservation.tenantId);
         long stamp = counters.lock.writeLock();

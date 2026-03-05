@@ -272,7 +272,7 @@ class TransferContextTest {
         assertTrue(latch.await(5, TimeUnit.SECONDS));
         
         for (int i = 0; i < threadCount; i++) {
-            assertEquals("value" + i, context.getAttribute("key" + i));
+            assertEquals("value" + i, context.getAttribute("key" + i, String.class));
         }
     }
 
