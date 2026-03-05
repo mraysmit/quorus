@@ -44,6 +44,12 @@
         </encoder>
     </appender>
     
+    <!-- OpenTelemetry log bridge appender -->
+    <appender name="OTEL" class="io.opentelemetry.instrumentation.logback.appender.v1_0.OpenTelemetryAppender">
+        <captureExperimentalAttributes>true</captureExperimentalAttributes>
+        <captureMdcAttributes>*</captureMdcAttributes>
+    </appender>
+    
     <!-- Logger configurations -->
     <logger name="dev.mars.quorus" level="INFO"/>
     <logger name="io.grpc" level="WARN"/>
@@ -54,6 +60,7 @@
     <root level="INFO">
         <appender-ref ref="CONSOLE"/>
         <appender-ref ref="FILE"/>
+        <appender-ref ref="OTEL"/>
     </root>
     
 </configuration>

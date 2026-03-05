@@ -58,7 +58,7 @@ import java.util.Optional;
  */
 public final class RocksDbRaftStorage implements RaftStorage {
 
-    private static final Logger LOG = LoggerFactory.getLogger(RocksDbRaftStorage.class);
+    private static final Logger logger = LoggerFactory.getLogger(RocksDbRaftStorage.class);
 
     // =========================================================================
     // Key Schema
@@ -156,7 +156,7 @@ public final class RocksDbRaftStorage implements RaftStorage {
             asyncWriteOptions = new WriteOptions().setSync(false);
 
             opened = true;
-            LOG.info("RocksDbRaftStorage opened: {}", dataDir);
+            logger.info("RocksDbRaftStorage opened: {}", dataDir);
             return null;
         }, false);
     }
@@ -181,7 +181,7 @@ public final class RocksDbRaftStorage implements RaftStorage {
             if (db != null) {
                 db.close();
                 db = null;
-                LOG.info("RocksDbRaftStorage closed");
+                logger.info("RocksDbRaftStorage closed");
             }
             return null;
         }, false);
@@ -210,7 +210,7 @@ public final class RocksDbRaftStorage implements RaftStorage {
                 // Atomic, synchronous write
                 db.write(syncWriteOptions, batch);
             }
-            LOG.debug("Metadata updated: term={}, votedFor={}", currentTerm, votedFor.orElse("(none)"));
+            logger.debug("Metadata updated: term={}, votedFor={}", currentTerm, votedFor.orElse("(none)"));
             return null;
         }, false);
     }
@@ -231,7 +231,7 @@ public final class RocksDbRaftStorage implements RaftStorage {
                 votedFor = Optional.of(new String(voteBytes, StandardCharsets.UTF_8));
             }
 
-            LOG.debug("Metadata loaded: term={}, votedFor={}", term, votedFor.orElse("(none)"));
+            logger.debug("Metadata loaded: term={}, votedFor={}", term, votedFor.orElse("(none)"));
             return new PersistentMeta(term, votedFor);
         }, false);
     }
@@ -256,7 +256,7 @@ public final class RocksDbRaftStorage implements RaftStorage {
                 // Async write - sync() will be called separately
                 db.write(asyncWriteOptions, batch);
             }
-            LOG.debug("Appended {} entries to RocksDB", entries.size());
+            logger.debug("Appended {} entries to RocksDB", entries.size());
             return null;
         }, false);
     }
@@ -272,7 +272,7 @@ public final class RocksDbRaftStorage implements RaftStorage {
                 batch.deleteRange(startKey, endKey);
                 db.write(asyncWriteOptions, batch);
             }
-            LOG.debug("Truncated entries from index {} onwards", fromIndex);
+            logger.debug("Truncated entries from index {} onwards", fromIndex);
             return null;
         }, false);
     }
@@ -280,7 +280,7 @@ public final class RocksDbRaftStorage implements RaftStorage {
     @Override
     public Future<Void> sync() {
         if (!fsyncEnabled) {
-            LOG.trace("RocksDB sync skipped (fsync disabled)");
+            logger.trace("RocksDB sync skipped (fsync disabled)");
             return Future.succeededFuture();
         }
         return vertx.executeBlocking(() -> {
@@ -288,7 +288,7 @@ public final class RocksDbRaftStorage implements RaftStorage {
             try (FlushOptions flushOptions = new FlushOptions().setWaitForFlush(true)) {
                 db.flush(flushOptions);
             }
-            LOG.trace("RocksDB synced to disk");
+            logger.trace("RocksDB synced to disk");
             return null;
         }, false);
     }
@@ -315,7 +315,7 @@ public final class RocksDbRaftStorage implements RaftStorage {
                     byte[] value = iter.value();
 
                     if (value.length < 8) {
-                        LOG.warn("Corrupt entry at index {}: value too short", index);
+                        logger.warn("Corrupt entry at index {}: value too short", index);
                         iter.next();
                         continue;
                     }
@@ -329,7 +329,7 @@ public final class RocksDbRaftStorage implements RaftStorage {
                 }
             }
 
-            LOG.info("RocksDB replay complete: {} entries recovered", entries.size());
+            logger.info("RocksDB replay complete: {} entries recovered", entries.size());
             return entries;
         }, false);
     }
@@ -354,7 +354,7 @@ public final class RocksDbRaftStorage implements RaftStorage {
                         ByteBuffer.allocate(8).putLong(lastIncludedTerm).array());
                 db.write(opts, batch);
             }
-            LOG.info("Snapshot saved to RocksDB: lastIncludedIndex={}, lastIncludedTerm={}, size={}bytes",
+            logger.info("Snapshot saved to RocksDB: lastIncludedIndex={}, lastIncludedTerm={}, size={}bytes",
                     lastIncludedIndex, lastIncludedTerm, data.length);
             return null;
         }, false);
@@ -374,7 +374,7 @@ public final class RocksDbRaftStorage implements RaftStorage {
             }
             long lastIncludedIndex = ByteBuffer.wrap(indexBytes).getLong();
             long lastIncludedTerm = ByteBuffer.wrap(termBytes).getLong();
-            LOG.info("Snapshot loaded from RocksDB: lastIncludedIndex={}, lastIncludedTerm={}, size={}bytes",
+            logger.info("Snapshot loaded from RocksDB: lastIncludedIndex={}, lastIncludedTerm={}, size={}bytes",
                     lastIncludedIndex, lastIncludedTerm, data.length);
             return Optional.of(new SnapshotData(data, lastIncludedIndex, lastIncludedTerm));
         }, false);
@@ -390,7 +390,7 @@ public final class RocksDbRaftStorage implements RaftStorage {
             } catch (RocksDBException e) {
                 throw new RuntimeException("Failed to truncate prefix", e);
             }
-            LOG.info("RocksDB prefix truncation complete: removed entries with index <= {}", toIndex);
+            logger.info("RocksDB prefix truncation complete: removed entries with index <= {}", toIndex);
             return null;
         }, false);
     }

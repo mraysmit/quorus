@@ -16,6 +16,8 @@
 
 package dev.mars.quorus.controller.http.handlers;
 
+import dev.mars.quorus.controller.http.ErrorCode;
+import dev.mars.quorus.controller.http.QuorusApiException;
 import dev.mars.quorus.controller.raft.RaftNode;
 import dev.mars.quorus.controller.state.CommandResult;
 import dev.mars.quorus.controller.state.JobAssignmentCommand;
@@ -68,6 +70,9 @@ public class JobStatusHandler implements Handler<RoutingContext> {
                 return;
             }
 
+            logger.info("Updating job status: jobId={}, agentId={}, status={}, bytesTransferred={}",
+                    jobId, agentId, statusStr, bytesTransferred);
+
             JobAssignmentStatus status = JobAssignmentStatus.valueOf(statusStr);
 
             // Reconstruct assignment ID based on convention: jobId:agentId
@@ -88,18 +93,46 @@ public class JobStatusHandler implements Handler<RoutingContext> {
             // Update job assignment status with CAS
             JobAssignmentCommand assignmentCommand = JobAssignmentCommand.updateStatus(
                     assignmentId, existing.getStatus(), status);
-            Future<CommandResult<?>> assignmentFuture = raftNode.submitCommand(assignmentCommand);
+            Future<CommandResult<?>> assignmentFuture = raftNode.submitCommand(assignmentCommand)
+                    .compose(assignmentResult -> {
+                        if (assignmentResult instanceof CommandResult.CasMismatch<?>) {
+                            logger.warn("Assignment state conflict during job status update: assignmentId={}, expected={}",
+                                    assignmentId, existing.getStatus());
+                            return Future.failedFuture(QuorusApiException.conflict(
+                                    ErrorCode.ASSIGNMENT_STATE_CONFLICT,
+                                    assignmentId, existing.getStatus().name(), "update (concurrent modification)"));
+                        }
+                        if (assignmentResult instanceof CommandResult.NotFound<?> nf) {
+                            logger.warn("Assignment disappeared during job status update (race condition): assignmentId={}", nf.id());
+                            return Future.failedFuture(QuorusApiException.notFound(
+                                    ErrorCode.ASSIGNMENT_NOT_FOUND, nf.id()));
+                        }
+                        return Future.succeededFuture(assignmentResult);
+                    });
 
             // Also update transfer job progress if bytes were reported
             if (bytesTransferred > 0) {
                 TransferJobCommand jobCommand = TransferJobCommand.updateProgress(jobId, bytesTransferred);
                 assignmentFuture
                         .compose(res -> raftNode.submitCommand(jobCommand))
-                        .onSuccess(res -> ctx.json(new JsonObject().put("success", true)))
+                        .onSuccess(res -> {
+                            if (res instanceof CommandResult.NotFound<?> nf) {
+                                logger.warn("Transfer job not found during progress update: jobId={}", nf.id());
+                                ctx.fail(QuorusApiException.notFound(ErrorCode.TRANSFER_NOT_FOUND, nf.id()));
+                            } else {
+                                logger.info("Job status updated: jobId={}, agentId={}, status={}, bytesTransferred={}",
+                                        jobId, agentId, status, bytesTransferred);
+                                ctx.json(new JsonObject().put("success", true));
+                            }
+                        })
                         .onFailure(ctx::fail);
             } else {
                 assignmentFuture
-                        .onSuccess(res -> ctx.json(new JsonObject().put("success", true)))
+                        .onSuccess(res -> {
+                            logger.info("Job status updated: jobId={}, agentId={}, status={}",
+                                    jobId, agentId, status);
+                            ctx.json(new JsonObject().put("success", true));
+                        })
                         .onFailure(ctx::fail);
             }
         } catch (Exception e) {

@@ -188,7 +188,7 @@ docker-compose -f docker/compose/docker-compose-loki.yml up -d
 docker logs quorus-promtail
 
 # Query logs directly
-curl "http://localhost:3100/loki/api/v1/query_range?query={container_name=\"quorus-api\"}"
+curl "http://localhost:3100/loki/api/v1/query_range?query={container_name=\"quorus-controller1\"}"
 ```
 
 ### Testing and Debugging

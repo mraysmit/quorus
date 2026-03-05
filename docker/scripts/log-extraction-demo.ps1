@@ -7,18 +7,18 @@ Write-Host ""
 
 # 1. Show application log configuration
 Write-Host "1. APPLICATION LAYER - Java Logging Configuration" -ForegroundColor Yellow
-Write-Host "   Quarkus API logging format:" -ForegroundColor Cyan
+Write-Host "   Controller logging format:" -ForegroundColor Cyan
 Write-Host "   %d{yyyy-MM-dd HH:mm:ss,SSS} %-5p [%c{3.}] (%t) %s%e%n" -ForegroundColor White
-Write-Host "   Example: 2025-08-26 10:36:39,337 INFO [dev.mar.quo.api] (main) Application started" -ForegroundColor Gray
+Write-Host "   Example: 2025-08-26 10:36:39,337 INFO [dev.mar.quo.controller] (main) Application started" -ForegroundColor Gray
 Write-Host ""
 
 # 2. Show Docker container logging
 Write-Host "2. DOCKER CONTAINER LAYER - JSON File Driver" -ForegroundColor Yellow
-$logPath = docker inspect quorus-api --format="{{.LogPath}}" 2>$null
+$logPath = docker inspect quorus-controller1 --format="{{.LogPath}}" 2>$null
 if ($logPath) {
     Write-Host "   Docker log file location: $logPath" -ForegroundColor Cyan
 }
-$logConfig = docker inspect quorus-api --format="{{.HostConfig.LogConfig}}" 2>$null
+$logConfig = docker inspect quorus-controller1 --format="{{.HostConfig.LogConfig}}" 2>$null
 if ($logConfig) {
     Write-Host "   Docker log driver: $logConfig" -ForegroundColor Cyan
 }
@@ -64,14 +64,14 @@ $json = @{
 
 Write-Host "   Sending heartbeat to generate logs..." -ForegroundColor White
 try {
-    $response = Invoke-RestMethod -Uri "http://localhost:8080/api/v1/agents/heartbeat" -Method POST -Body $json -ContentType "application/json" -ErrorAction Stop
+    $response = Invoke-RestMethod -Uri \"http://localhost:8081/api/v1/agents/heartbeat\" -Method POST -Body $json -ContentType \"application/json\" -ErrorAction Stop
     Write-Host "   ✓ Heartbeat sent successfully" -ForegroundColor Green
 } catch {
     Write-Host "   ⚠ Need to register agent first..." -ForegroundColor Yellow
     try {
-        $regResponse = Invoke-RestMethod -Uri "http://localhost:8080/api/v1/agents/register" -Method POST -Body (Get-Content test-registration.json -Raw) -ContentType "application/json" -ErrorAction Stop
+        $regResponse = Invoke-RestMethod -Uri "http://localhost:8081/api/v1/agents/register" -Method POST -Body (Get-Content test-registration.json -Raw) -ContentType "application/json" -ErrorAction Stop
         Write-Host "   ✓ Agent registered" -ForegroundColor Green
-        $response = Invoke-RestMethod -Uri "http://localhost:8080/api/v1/agents/heartbeat" -Method POST -Body $json -ContentType "application/json" -ErrorAction Stop
+        $response = Invoke-RestMethod -Uri "http://localhost:8081/api/v1/agents/heartbeat" -Method POST -Body $json -ContentType "application/json" -ErrorAction Stop
         Write-Host "   ✓ Heartbeat sent successfully" -ForegroundColor Green
     } catch {
         Write-Host "   ✗ Failed to generate logs: $($_.Exception.Message)" -ForegroundColor Red
@@ -82,7 +82,7 @@ Write-Host ""
 
 # 5. Show raw Docker logs
 Write-Host "5. RAW DOCKER LOGS (Last 3 lines)" -ForegroundColor Yellow
-$dockerLogs = docker logs quorus-api --tail 3 2>$null
+$dockerLogs = docker logs quorus-controller1 --tail 3 2>$null
 if ($dockerLogs) {
     foreach ($line in $dockerLogs) {
         Write-Host "   $line" -ForegroundColor Gray
@@ -95,7 +95,7 @@ Write-Host ""
 # 6. Show Loki query results
 Write-Host "6. LOKI AGGREGATED LOGS (Via API)" -ForegroundColor Yellow
 try {
-    $lokiQuery = "http://localhost:3100/loki/api/v1/query_range?query={container_name=`"quorus-api`"}&limit=3"
+    $lokiQuery = "http://localhost:3100/loki/api/v1/query_range?query={container_name=`"quorus-controller1`"}&limit=3"
     $lokiResponse = Invoke-RestMethod -Uri $lokiQuery -ErrorAction Stop
     if ($lokiResponse.data.result -and $lokiResponse.data.result.Count -gt 0) {
         Write-Host "   Recent aggregated logs:" -ForegroundColor Cyan
@@ -132,7 +132,7 @@ Write-Host "                                                              └─
 Write-Host ""
 
 Write-Host "8. ACCESS POINTS" -ForegroundColor Yellow
-Write-Host "   - Raw Docker logs: docker logs quorus-api" -ForegroundColor Cyan
+Write-Host "   - Raw Docker logs: docker logs quorus-controller1" -ForegroundColor Cyan
 Write-Host "   - Loki API: http://localhost:3100/loki/api/v1/query" -ForegroundColor Cyan
 Write-Host "   - Grafana UI: http://localhost:3000 (admin/admin)" -ForegroundColor Cyan
 Write-Host ""

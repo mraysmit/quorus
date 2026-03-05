@@ -16,6 +16,9 @@
 
 package dev.mars.quorus.workflow;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
@@ -33,6 +36,8 @@ import java.util.regex.Pattern;
  * @version 1.0
  */
 public class WorkflowSchemaValidator {
+
+    private static final Logger logger = LoggerFactory.getLogger(WorkflowSchemaValidator.class);
     
     // Regex patterns for validation
     private static final Pattern NAME_PATTERN = Pattern.compile("^[a-zA-Z0-9][a-zA-Z0-9\\-_]*[a-zA-Z0-9]$");
@@ -60,6 +65,7 @@ public class WorkflowSchemaValidator {
      * Validates the complete workflow schema including metadata and spec.
      */
     public ValidationResult validateWorkflowSchema(Map<String, Object> data) {
+        logger.debug("Validating workflow schema");
         ValidationResult result = new ValidationResult();
         
         // Validate root level structure
@@ -77,6 +83,13 @@ public class WorkflowSchemaValidator {
             @SuppressWarnings("unchecked")
             Map<String, Object> spec = (Map<String, Object>) data.get("spec");
             validateSpecSchema(spec, result);
+        }
+
+        if (result.isValid()) {
+            logger.debug("Workflow schema validation passed");
+        } else {
+            logger.warn("Workflow schema validation failed: {} errors, {} warnings",
+                    result.getErrors().size(), result.getWarnings().size());
         }
         
         return result;

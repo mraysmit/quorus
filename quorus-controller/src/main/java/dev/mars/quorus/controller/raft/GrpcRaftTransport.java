@@ -29,6 +29,11 @@ import dev.mars.quorus.controller.raft.grpc.VoteResponse;
 import dev.mars.quorus.controller.observability.RaftMetrics;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+import io.opentelemetry.api.GlobalOpenTelemetry;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.api.trace.StatusCode;
+import io.opentelemetry.api.trace.Tracer;
 import io.vertx.core.Future;
 import io.vertx.core.Promise;
 import io.vertx.core.Vertx;
@@ -55,6 +60,7 @@ public class GrpcRaftTransport implements RaftTransport {
 
     private static final Logger logger = LoggerFactory.getLogger(GrpcRaftTransport.class);
     private static final String THREAD_NAME_PREFIX = "raft-grpc-io-";
+    private static final Tracer tracer = GlobalOpenTelemetry.getTracer("quorus-controller");
 
     private final Vertx vertx;
     private final String selfId;
@@ -171,17 +177,67 @@ public class GrpcRaftTransport implements RaftTransport {
 
     @Override
     public Future<VoteResponse> sendVoteRequest(String targetId, VoteRequest request) {
-        return toVertxFuture(getStub(targetId).requestVote(request));
+        Span span = tracer.spanBuilder("raft.RequestVote")
+                .setSpanKind(SpanKind.CLIENT)
+                .setAttribute("rpc.system", "grpc")
+                .setAttribute("rpc.method", "RequestVote")
+                .setAttribute("raft.target", targetId)
+                .setAttribute("raft.term", request.getTerm())
+                .setAttribute("raft.candidate", request.getCandidateId())
+                .startSpan();
+        return toVertxFuture(getStub(targetId).requestVote(request))
+                .onSuccess(r -> {
+                    span.setAttribute("raft.vote_granted", r.getVoteGranted());
+                    span.end();
+                })
+                .onFailure(e -> {
+                    span.setStatus(StatusCode.ERROR, e.getMessage());
+                    span.recordException(e);
+                    span.end();
+                });
     }
 
     @Override
     public Future<AppendEntriesResponse> sendAppendEntries(String targetId, AppendEntriesRequest request) {
-        return toVertxFuture(getStub(targetId).appendEntries(request));
+        Span span = tracer.spanBuilder("raft.AppendEntries")
+                .setSpanKind(SpanKind.CLIENT)
+                .setAttribute("rpc.system", "grpc")
+                .setAttribute("rpc.method", "AppendEntries")
+                .setAttribute("raft.target", targetId)
+                .setAttribute("raft.term", request.getTerm())
+                .setAttribute("raft.entries_count", request.getEntriesCount())
+                .startSpan();
+        return toVertxFuture(getStub(targetId).appendEntries(request))
+                .onSuccess(r -> {
+                    span.setAttribute("raft.success", r.getSuccess());
+                    span.end();
+                })
+                .onFailure(e -> {
+                    span.setStatus(StatusCode.ERROR, e.getMessage());
+                    span.recordException(e);
+                    span.end();
+                });
     }
 
     @Override
     public Future<InstallSnapshotResponse> sendInstallSnapshot(String targetId, InstallSnapshotRequest request) {
-        return toVertxFuture(getStub(targetId).installSnapshot(request));
+        Span span = tracer.spanBuilder("raft.InstallSnapshot")
+                .setSpanKind(SpanKind.CLIENT)
+                .setAttribute("rpc.system", "grpc")
+                .setAttribute("rpc.method", "InstallSnapshot")
+                .setAttribute("raft.target", targetId)
+                .setAttribute("raft.term", request.getTerm())
+                .startSpan();
+        return toVertxFuture(getStub(targetId).installSnapshot(request))
+                .onSuccess(r -> {
+                    span.setAttribute("raft.success", r.getSuccess());
+                    span.end();
+                })
+                .onFailure(e -> {
+                    span.setStatus(StatusCode.ERROR, e.getMessage());
+                    span.recordException(e);
+                    span.end();
+                });
     }
 
     private RaftServiceGrpc.RaftServiceFutureStub getStub(String targetId) {

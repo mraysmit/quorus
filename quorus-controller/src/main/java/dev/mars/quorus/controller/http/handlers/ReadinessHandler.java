@@ -20,6 +20,8 @@ import dev.mars.quorus.controller.raft.RaftNode;
 import io.vertx.core.Handler;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.RoutingContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
 
@@ -36,6 +38,8 @@ import java.time.Instant;
  * @since 2025-08-26
  */
 public class ReadinessHandler implements Handler<RoutingContext> {
+
+    private static final Logger logger = LoggerFactory.getLogger(ReadinessHandler.class);
 
     private final RaftNode raftNode;
 
@@ -57,6 +61,7 @@ public class ReadinessHandler implements Handler<RoutingContext> {
                         .put("clusterHasLeader", clusterReady ? "UP" : "DOWN"));
 
         if (!isReady) {
+            logger.warn("Readiness check failed: raftRunning={}, clusterHasLeader={}", raftReady, clusterReady);
             ctx.response().setStatusCode(503);
         }
         ctx.json(readiness);

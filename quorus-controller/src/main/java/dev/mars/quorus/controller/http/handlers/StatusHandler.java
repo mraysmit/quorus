@@ -20,6 +20,8 @@ import dev.mars.quorus.controller.raft.RaftNode;
 import io.vertx.core.Handler;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.RoutingContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Status handler - provides simple controller status information.
@@ -32,6 +34,8 @@ import io.vertx.ext.web.RoutingContext;
  */
 public class StatusHandler implements Handler<RoutingContext> {
 
+    private static final Logger logger = LoggerFactory.getLogger(StatusHandler.class);
+
     private final RaftNode raftNode;
 
     public StatusHandler(RaftNode raftNode) {
@@ -40,6 +44,7 @@ public class StatusHandler implements Handler<RoutingContext> {
 
     @Override
     public void handle(RoutingContext ctx) {
+        logger.debug("Status check requested");
         ctx.json(new JsonObject()
                 .put("status", "Controller running")
                 .put("nodeId", raftNode != null ? raftNode.getNodeId() : "unknown"));

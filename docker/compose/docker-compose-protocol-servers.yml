@@ -60,9 +60,9 @@ services:
       timeout: 5s
       retries: 3
 
-  # SMB/CIFS Server - Samba file sharing
+  # SMB/CIFS Server - Samba file sharing (servercontainers/samba - actively maintained)
   smb:
-    image: dperson/samba:latest
+    image: ghcr.io/servercontainers/samba:latest
     container_name: quorus-smb-test
     networks:
       protocol-test:
@@ -71,26 +71,22 @@ services:
     ports:
       # SMB/CIFS port (using 4445 to avoid conflict with Windows SMB on 445)
       - "4445:445"
-      # NetBIOS ports (optional, for Windows discovery)
-      - "1137-1139:137-139"
     environment:
-      # User format: username;password
-      USER: "testuser;testpass"
-      # Share format: name;path;browseable;readonly;guest;users;admins;writelist
-      SHARE: "testshare;/share;yes;no;no;testuser;testuser;testuser"
-      PERMISSIONS: "yes"
-      # Workgroup name
-      WORKGROUP: "WORKGROUP"
-    tmpfs:
-      - /tmp
+      # Account setup (UID-based)
+      ACCOUNT_testuser: "testpass"
+      UID_testuser: "1000"
+      # Share configuration
+      SAMBA_VOLUME_CONFIG_testshare: "[testshare]; path=/share; valid users = testuser; guest ok = no; read only = no; browseable = yes"
+      # Workgroup
+      SAMBA_GLOBAL_CONFIG_workgroup: "WORKGROUP"
     volumes:
       - smb-data:/share
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "smbclient -L localhost -U testuser%testpass -m SMB3 || exit 1"]
+      test: ["CMD-SHELL", "smbclient -L localhost -N || exit 1"]
       interval: 15s
       timeout: 10s
-      retries: 3
+      retries: 5
 
 volumes:
   ftp-data:

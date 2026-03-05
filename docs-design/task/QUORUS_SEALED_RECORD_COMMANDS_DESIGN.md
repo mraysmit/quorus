@@ -572,6 +572,75 @@ By pushing null-handling into `Optional.map().orElseGet()`, we:
 
 Returning `CommandResult.NotFound` completely replaces the explicit `getOrWarn` and `return null` checks. In a Raft state machine, committed commands must be applied deterministically on every node. A DELETE followed by an UPDATE for the same entity (both committed) would break log replay if UPDATE threw an exception. Returning a `NotFound` record safely handles these edge cases without breaking log determinism, while providing full context to the caller.
 
+### 5.6 HTTP Handler Propagation of CommandResult
+
+> **Implementation note:** `CommandResult<T>` is **already implemented** in the codebase as a sealed interface in `QuorusStateStore`. `RaftNode.submitCommand()` returns `Future<CommandResult<?>>`, and `QuorusStateStore.apply()` yields `CommandResult` variants (`Success`, `NotFound`, `CasMismatch`, `NoOp`) — never `null`. The propagation path is fully established.
+
+The full data flow from state machine to HTTP response is:
+
+```
+QuorusStateStore.apply(command)          → CommandResult<T>
+  ↓ (via Raft log commit)
+RaftNode.submitCommand(command)          → Future<CommandResult<?>>
+  ↓ (.onSuccess handler)
+HTTP Handler                             → pattern-match on result → HTTP status + JSON body
+```
+
+#### Current handler patterns
+
+Only 2 of ~14 HTTP handlers currently inspect the `CommandResult`. Most ignore it:
+
+| Pattern | Handlers | Behaviour |
+|---------|----------|-----------|
+| **Ignore result** | `AgentRegistrationHandler`, `TransferHandler`, `JobStatusHandler` | Returns fixed status code (200/201) regardless of `CommandResult` variant |
+| **Inspect Success entity** | `HeartbeatHandler` | Pattern-matches on `Success<AgentInfo>` to enrich the response body, but always returns 200 |
+| **Handle CasMismatch** | `JobAssignmentHandler.handleUpdateStatus()` | Returns 409 on `CasMismatch`, 200 otherwise |
+
+#### Target pattern (post-refactoring)
+
+After this refactoring, handlers should exhaustively pattern-match on `CommandResult`:
+
+```java
+raftNode.submitCommand(command)
+    .onSuccess(result -> {
+        switch (result) {
+            case CommandResult.Success<?> s -> {
+                ctx.response().setStatusCode(200);
+                ctx.json(JsonObject.mapFrom(s.entity()));
+            }
+            case CommandResult.NotFound<?> nf -> {
+                ctx.response().setStatusCode(404);
+                ctx.json(new JsonObject()
+                    .put("error", nf.entityType() + "_NOT_FOUND")
+                    .put("id", nf.id()));
+            }
+            case CommandResult.CasMismatch<?> cm -> {
+                ctx.response().setStatusCode(409);
+                ctx.json(new JsonObject()
+                    .put("error", "STATE_CONFLICT")
+                    .put("message", "Entity was modified concurrently, please retry"));
+            }
+            case CommandResult.NoOp<?> ignored -> {
+                ctx.response().setStatusCode(204);
+            }
+        }
+    })
+    .onFailure(ctx::fail);
+```
+
+This ensures every `CommandResult` variant maps to a well-defined HTTP status code:
+
+| CommandResult variant | HTTP Status | Meaning |
+|---|---|---|
+| `Success<T>` | 200 / 201 | Operation succeeded, entity in body |
+| `NotFound<T>` | 404 | Referenced entity does not exist |
+| `CasMismatch<T>` | 409 | Concurrent modification detected |
+| `NoOp<T>` | 204 | Command accepted but no state change |
+
+#### Migration approach
+
+Updating handlers to inspect `CommandResult` is **independent** of the sealed record command refactoring itself. It can be done incrementally — one handler at a time — without changing any state machine or codec code. Handlers that currently ignore the result will continue to work correctly during migration; they simply won't return precise status codes for edge cases.
+
 ---
 
 ## 6. Codec Layer Impact

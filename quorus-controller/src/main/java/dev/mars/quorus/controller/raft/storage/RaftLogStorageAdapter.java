@@ -58,7 +58,7 @@ import java.util.concurrent.CompletableFuture;
  */
 public final class RaftLogStorageAdapter implements RaftStorage {
 
-    private static final Logger LOG = LoggerFactory.getLogger(RaftLogStorageAdapter.class);
+    private static final Logger logger = LoggerFactory.getLogger(RaftLogStorageAdapter.class);
 
     private final Vertx vertx;
     private final dev.mars.raftlog.storage.RaftStorage delegate;
@@ -111,7 +111,7 @@ public final class RaftLogStorageAdapter implements RaftStorage {
     public RaftLogStorageAdapter(Vertx vertx, dev.mars.raftlog.storage.RaftStorage delegate) {
         this.vertx = vertx;
         this.delegate = delegate;
-        LOG.info("RaftLogStorageAdapter created with delegate: {}", delegate.getClass().getSimpleName());
+        logger.info("RaftLogStorageAdapter created with delegate: {}", delegate.getClass().getSimpleName());
     }
 
     // =========================================================================
@@ -120,19 +120,19 @@ public final class RaftLogStorageAdapter implements RaftStorage {
 
     @Override
     public Future<Void> open(Path dataDir) {
-        LOG.info("Opening RaftLog storage at: {}", dataDir);
+        logger.info("Opening RaftLog storage at: {}", dataDir);
         return toVertxFuture(delegate.open(dataDir));
     }
 
     @Override
     public Future<Void> close() {
-        LOG.info("Closing RaftLog storage");
+        logger.info("Closing RaftLog storage");
         // The raftlog library's close() is synchronous
         try {
             delegate.close();
             return Future.succeededFuture();
         } catch (Exception e) {
-            LOG.error("Error closing RaftLog storage: {}", e.getMessage(), e);
+            logger.error("Error closing RaftLog storage: {}", e.getMessage(), e);
             return Future.failedFuture(e);
         }
     }
@@ -143,13 +143,13 @@ public final class RaftLogStorageAdapter implements RaftStorage {
 
     @Override
     public Future<Void> updateMetadata(long currentTerm, Optional<String> votedFor) {
-        LOG.debug("Updating metadata: term={}, votedFor={}", currentTerm, votedFor.orElse("(none)"));
+        logger.debug("Updating metadata: term={}, votedFor={}", currentTerm, votedFor.orElse("(none)"));
         return toVertxFuture(delegate.updateMetadata(currentTerm, votedFor));
     }
 
     @Override
     public Future<PersistentMeta> loadMetadata() {
-        LOG.debug("Loading metadata");
+        logger.debug("Loading metadata");
         return toVertxFuture(delegate.loadMetadata())
                 .map(meta -> new PersistentMeta(meta.currentTerm(), meta.votedFor()));
     }
@@ -164,7 +164,7 @@ public final class RaftLogStorageAdapter implements RaftStorage {
             return Future.succeededFuture();
         }
 
-        LOG.debug("Appending {} entries (indices {}-{})",
+        logger.debug("Appending {} entries (indices {}-{})",
                 entries.size(),
                 entries.getFirst().index(),
                 entries.getLast().index());
@@ -180,19 +180,19 @@ public final class RaftLogStorageAdapter implements RaftStorage {
 
     @Override
     public Future<Void> truncateSuffix(long fromIndex) {
-        LOG.debug("Truncating log suffix from index {}", fromIndex);
+        logger.debug("Truncating log suffix from index {}", fromIndex);
         return toVertxFuture(delegate.truncateSuffix(fromIndex));
     }
 
     @Override
     public Future<Void> sync() {
-        LOG.trace("Syncing WAL to disk");
+        logger.trace("Syncing WAL to disk");
         return toVertxFuture(delegate.sync());
     }
 
     @Override
     public Future<List<LogEntryData>> replayLog() {
-        LOG.info("Replaying WAL");
+        logger.info("Replaying WAL");
         return toVertxFuture(delegate.replayLog())
                 .map(raftlogEntries -> raftlogEntries.stream()
                         .map(e -> new LogEntryData(e.index(), e.term(), e.payload()))
@@ -214,7 +214,7 @@ public final class RaftLogStorageAdapter implements RaftStorage {
 
     @Override
     public Future<Void> saveSnapshot(byte[] data, long lastIncludedIndex, long lastIncludedTerm) {
-        LOG.info("Saving snapshot: lastIncludedIndex={}, lastIncludedTerm={}, size={}bytes",
+        logger.info("Saving snapshot: lastIncludedIndex={}, lastIncludedTerm={}, size={}bytes",
                 lastIncludedIndex, lastIncludedTerm, data.length);
         // Store in memory - the raftlog-core library doesn't have snapshot support
         this.snapshotData = data.clone();
@@ -234,7 +234,7 @@ public final class RaftLogStorageAdapter implements RaftStorage {
 
     @Override
     public Future<Void> truncatePrefix(long toIndex) {
-        LOG.info("Prefix truncation requested for index <= {} (no-op for RaftLogStorageAdapter)", toIndex);
+        logger.info("Prefix truncation requested for index <= {} (no-op for RaftLogStorageAdapter)", toIndex);
         // The raftlog-core library doesn't support prefix truncation.
         // Log entries will accumulate but snapshots still work for state machine recovery.
         return Future.succeededFuture();

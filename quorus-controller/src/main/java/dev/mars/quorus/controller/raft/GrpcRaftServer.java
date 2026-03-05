@@ -26,6 +26,11 @@ import dev.mars.quorus.controller.raft.grpc.VoteResponse;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.stub.StreamObserver;
+import io.opentelemetry.api.GlobalOpenTelemetry;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.api.trace.StatusCode;
+import io.opentelemetry.api.trace.Tracer;
 import io.vertx.core.Future;
 import io.vertx.core.Promise;
 import io.vertx.core.Vertx;
@@ -47,6 +52,7 @@ import java.util.concurrent.TimeUnit;
 public class GrpcRaftServer {
 
     private static final Logger logger = LoggerFactory.getLogger(GrpcRaftServer.class);
+    private static final Tracer tracer = GlobalOpenTelemetry.getTracer("quorus-controller");
 
     private final Vertx vertx;
     private final int port;
@@ -129,18 +135,30 @@ public class GrpcRaftServer {
         public void requestVote(VoteRequest request, StreamObserver<VoteResponse> responseObserver) {
             MDC.put("nodeId", raftNode.getNodeId());
             MDC.put("rpcType", "RequestVote");
+            Span span = tracer.spanBuilder("raft.RequestVote")
+                    .setSpanKind(SpanKind.SERVER)
+                    .setAttribute("rpc.system", "grpc")
+                    .setAttribute("rpc.method", "RequestVote")
+                    .setAttribute("raft.candidate", request.getCandidateId())
+                    .setAttribute("raft.term", request.getTerm())
+                    .startSpan();
             try {
             logger.debug("Received RequestVote from {} for term {}", 
                     request.getCandidateId(), request.getTerm());
 
             raftNode.handleVoteRequest(request)
                     .onSuccess(response -> {
+                        span.setAttribute("raft.vote_granted", response.getVoteGranted());
+                        span.end();
                         logger.debug("Responding to RequestVote: granted={}, term={}", 
                                 response.getVoteGranted(), response.getTerm());
                         responseObserver.onNext(response);
                         responseObserver.onCompleted();
                     })
                     .onFailure(e -> {
+                        span.setStatus(StatusCode.ERROR, e.getMessage());
+                        span.recordException(e);
+                        span.end();
                         logger.error("Error handling RequestVote: {}", e.getMessage());
                         logger.debug("Stack trace for RequestVote handling error", e);
                         responseObserver.onError(e);
@@ -154,18 +172,31 @@ public class GrpcRaftServer {
         public void appendEntries(AppendEntriesRequest request, StreamObserver<AppendEntriesResponse> responseObserver) {
             MDC.put("nodeId", raftNode.getNodeId());
             MDC.put("rpcType", "AppendEntries");
+            Span span = tracer.spanBuilder("raft.AppendEntries")
+                    .setSpanKind(SpanKind.SERVER)
+                    .setAttribute("rpc.system", "grpc")
+                    .setAttribute("rpc.method", "AppendEntries")
+                    .setAttribute("raft.leader", request.getLeaderId())
+                    .setAttribute("raft.term", request.getTerm())
+                    .setAttribute("raft.entries_count", request.getEntriesCount())
+                    .startSpan();
             try {
             logger.debug("Received AppendEntries from {} for term {}, entries={}", 
                     request.getLeaderId(), request.getTerm(), request.getEntriesCount());
 
             raftNode.handleAppendEntriesRequest(request)
                     .onSuccess(response -> {
+                        span.setAttribute("raft.success", response.getSuccess());
+                        span.end();
                         logger.debug("Responding to AppendEntries: success={}, term={}", 
                                 response.getSuccess(), response.getTerm());
                         responseObserver.onNext(response);
                         responseObserver.onCompleted();
                     })
                     .onFailure(e -> {
+                        span.setStatus(StatusCode.ERROR, e.getMessage());
+                        span.recordException(e);
+                        span.end();
                         logger.error("Error handling AppendEntries: {}", e.getMessage());
                         logger.debug("Stack trace for AppendEntries handling error", e);
                         responseObserver.onError(e);
@@ -179,6 +210,13 @@ public class GrpcRaftServer {
         public void installSnapshot(InstallSnapshotRequest request, StreamObserver<InstallSnapshotResponse> responseObserver) {
             MDC.put("nodeId", raftNode.getNodeId());
             MDC.put("rpcType", "InstallSnapshot");
+            Span span = tracer.spanBuilder("raft.InstallSnapshot")
+                    .setSpanKind(SpanKind.SERVER)
+                    .setAttribute("rpc.system", "grpc")
+                    .setAttribute("rpc.method", "InstallSnapshot")
+                    .setAttribute("raft.leader", request.getLeaderId())
+                    .setAttribute("raft.term", request.getTerm())
+                    .startSpan();
             try {
             logger.debug("Received InstallSnapshot from {} for term {}, lastIncludedIndex={}, chunk {}/{}",
                     request.getLeaderId(), request.getTerm(),
@@ -186,12 +224,17 @@ public class GrpcRaftServer {
 
             raftNode.handleInstallSnapshot(request)
                     .onSuccess(response -> {
+                        span.setAttribute("raft.success", response.getSuccess());
+                        span.end();
                         logger.debug("Responding to InstallSnapshot: success={}, term={}",
                                 response.getSuccess(), response.getTerm());
                         responseObserver.onNext(response);
                         responseObserver.onCompleted();
                     })
                     .onFailure(e -> {
+                        span.setStatus(StatusCode.ERROR, e.getMessage());
+                        span.recordException(e);
+                        span.end();
                         logger.error("Error handling InstallSnapshot: {}", e.getMessage());
                         logger.debug("Stack trace for InstallSnapshot handling error", e);
                         responseObserver.onError(e);

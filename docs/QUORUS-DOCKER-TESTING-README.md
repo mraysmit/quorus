@@ -1094,14 +1094,13 @@ The log aggregation pipeline follows a multi-layer approach:
 
 #### 1. Application Layer (Java → STDOUT/STDERR)
 
-Quorus applications use **Quarkus logging** configured to output structured logs to standard streams:
+Quorus applications use **Vert.x logging** configured to output structured logs to standard streams:
 
 ```properties
-# quorus-api/src/main/resources/application.properties
-quarkus.log.level=INFO
-quarkus.log.category."dev.mars.quorus".level=DEBUG
-quarkus.log.console.enable=true
-quarkus.log.console.format=%d{yyyy-MM-dd HH:mm:ss,SSS} %-5p [%c{3.}] (%t) %s%e%n
+# quorus-controller/src/main/resources/quorus-controller.properties
+quorus.log.level=INFO
+quorus.log.console.enable=true
+quorus.log.console.format=%d{yyyy-MM-dd HH:mm:ss,SSS} %-5p [%c{3.}] (%t) %s%e%n
 ```
 
 **Example log output:**
@@ -1122,7 +1121,7 @@ logging:
     max-file: "3"
 labels:
   - "logging=promtail"
-  - "service=quorus-api"
+  - "service=quorus-controller1"
 ```
 
 **Docker stores logs in:** `/var/lib/docker/containers/{container-id}/{container-id}-json.log`
@@ -1139,7 +1138,7 @@ labels:
 ```yaml
 # promtail/config.yml
 scrape_configs:
-  - job_name: quorus-api
+  - job_name: quorus-controller
     docker_sd_configs:
       - host: unix:///var/run/docker.sock
         filters:
@@ -1238,27 +1237,27 @@ scrape_configs:
 #### Basic Queries
 
 ```logql
-# All API logs
-{container_name="quorus-api"}
+# All controller logs
+{container_name="quorus-controller1"}
 
 # All controller logs
 {container_name=~"quorus-controller.*"}
 
 # Logs from specific service
-{service="quorus-api"}
+{service="quorus-controller1"}
 ```
 
 #### Filtered Queries
 
 ```logql
 # Heartbeat processing logs
-{container_name="quorus-api"} |= "heartbeat"
+{container_name="quorus-controller1"} |= "heartbeat"
 
 # Error logs across all services
 {container_name=~"quorus-.*"} |= "ERROR"
 
 # Agent registration events
-{container_name="quorus-api"} |= "registration"
+{container_name="quorus-controller1"} |= "registration"
 
 # Raft consensus logs
 {container_name=~"quorus-.*"} |= "Raft"
@@ -1267,7 +1266,7 @@ scrape_configs:
 {container_name=~"quorus-.*"} |= "failed"
 
 # Specific log levels
-{container_name="quorus-api"} | json | level="ERROR"
+{container_name="quorus-controller1"} | json | level="ERROR"
 ```
 
 #### Advanced Queries
@@ -1277,17 +1276,17 @@ scrape_configs:
 rate({container_name=~"quorus-.*"} |= "ERROR"[1m])
 
 # Count of heartbeat failures
-count_over_time({container_name="quorus-api"} |= "heartbeat" |= "failed"[5m])
+count_over_time({container_name="quorus-controller1"} |= "heartbeat" |= "failed"[5m])
 
 # Logs with specific thread patterns
-{container_name="quorus-api"} | regex "\\((?P<thread>[^)]+)\\)" | thread =~ "pool-.*"
+{container_name="quorus-controller1"} | regex "\\((?P<thread>[^)]+)\\)" | thread =~ "pool-.*"
 ```
 
 ### Log Processing Pipeline Details
 
 | Stage | Input | Processing | Output |
 |-------|-------|------------|--------|
-| **Java App** | Application events | Quarkus logging framework | Formatted log lines to STDOUT |
+| **Java App** | Application events | Vert.x logging framework | Formatted log lines to STDOUT |
 | **Docker** | STDOUT/STDERR streams | JSON file driver | JSON log files with metadata |
 | **Promtail** | Docker log files | Parse JSON, extract content, add labels | Structured log entries |
 | **Loki** | Log streams from Promtail | Index by labels, store content | Queryable log database |
@@ -1336,15 +1335,15 @@ count_over_time({container_name="quorus-api"} |= "heartbeat" |= "failed"[5m])
    rate({container_name=~"quorus-.*"} |= "ERROR"[5m]) > 0.1
 
    # Alert on agent failures
-   count_over_time({container_name="quorus-api"} |= "Agent failed"[1m]) > 0
+   count_over_time({container_name="quorus-controller1"} |= "Agent failed"[1m]) > 0
    ```
 
 #### Key Metrics to Monitor
 
 - **Error Rate:** `rate({container_name=~"quorus-.*"} |= "ERROR"[1m])`
-- **Heartbeat Failures:** `{container_name="quorus-api"} |= "heartbeat" |= "failed"`
+- **Heartbeat Failures:** `{container_name="quorus-controller1"} |= "heartbeat" |= "failed"`
 - **Raft Leader Elections:** `{container_name=~"quorus-.*"} |= "Leader elected"`
-- **Agent Registrations:** `{container_name="quorus-api"} |= "Agent registered"`
+- **Agent Registrations:** `{container_name="quorus-controller1"} |= "Agent registered"`
 - **Network Partitions:** `{container_name=~"quorus-.*"} |= "partition"`
 
 ### Verification and Testing
@@ -1353,16 +1352,16 @@ count_over_time({container_name="quorus-api"} |= "heartbeat" |= "failed"[5m])
 
 ```bash
 # Check Docker log configuration
-docker inspect quorus-api --format="{{.HostConfig.LogConfig}}"
+docker inspect quorus-controller1 --format="{{.HostConfig.LogConfig}}"
 
 # View raw Docker logs
-docker logs quorus-api --tail 10
+docker logs quorus-controller1 --tail 10
 
 # Check Promtail is collecting
 docker logs quorus-promtail --tail 5
 
 # Query Loki directly
-curl "http://localhost:3100/loki/api/v1/query_range?query={container_name=\"quorus-api\"}"
+curl "http://localhost:3100/loki/api/v1/query_range?query={container_name=\"quorus-controller1\"}"
 
 # Test log generation
 powershell -ExecutionPolicy Bypass -File demo-logging.ps1
@@ -1456,7 +1455,7 @@ table_manager:
    docker logs quorus-promtail
 
    # Verify Docker labels are set
-   docker inspect quorus-api --format="{{.Config.Labels}}"
+   docker inspect quorus-controller1 --format="{{.Config.Labels}}"
 
    # Test Loki connectivity
    curl http://localhost:3100/ready

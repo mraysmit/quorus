@@ -34,12 +34,6 @@ scrape_configs:
     static_configs:
       - targets: ['localhost:9090']
 
-  - job_name: 'quorus-api'
-    static_configs:
-      - targets: ['api:8080']
-    metrics_path: '/q/metrics'
-    scrape_interval: 5s
-
   - job_name: 'quorus-controllers'
     static_configs:
       - targets: ['controller1:8080', 'controller2:8080', 'controller3:8080']
@@ -84,10 +78,10 @@ Write-Host "To view logs in Grafana:" -ForegroundColor Yellow
 Write-Host "  1. Open http://localhost:3000" -ForegroundColor White
 Write-Host "  2. Login with admin/admin" -ForegroundColor White
 Write-Host "  3. Go to Explore -> Select Loki datasource" -ForegroundColor White
-Write-Host "  4. Use queries like: {service=\"quorus-api\"}" -ForegroundColor White
+Write-Host "  4. Use queries like: {service=`"quorus-controller1`"}" -ForegroundColor White
 Write-Host ""
 Write-Host "Useful LogQL queries:" -ForegroundColor Yellow
-Write-Host "  - All API logs: {service=\"quorus-api\"}" -ForegroundColor White
-Write-Host "  - Error logs: {service=\"quorus-api\"} |= \"ERROR\"" -ForegroundColor White
-Write-Host "  - Heartbeat logs: {service=\"quorus-api\"} |= \"heartbeat\"" -ForegroundColor White
+Write-Host "  - All controller logs: {service=`"quorus-controller1`"}" -ForegroundColor White
+Write-Host "  - Error logs: {service=`"quorus-controller1`"} |= `"ERROR`"" -ForegroundColor White
+Write-Host "  - Heartbeat logs: {service=`"quorus-controller1`"} |= `"heartbeat`"" -ForegroundColor White
 Write-Host "  - Controller logs: {service=~\"quorus-controller.*\"}" -ForegroundColor White

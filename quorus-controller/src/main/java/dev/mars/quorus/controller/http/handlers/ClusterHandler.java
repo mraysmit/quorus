@@ -20,6 +20,8 @@ import dev.mars.quorus.controller.raft.RaftNode;
 import io.vertx.core.Handler;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.RoutingContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * HTTP handler for cluster status.
@@ -34,6 +36,8 @@ import io.vertx.ext.web.RoutingContext;
  */
 public class ClusterHandler implements Handler<RoutingContext> {
 
+    private static final Logger logger = LoggerFactory.getLogger(ClusterHandler.class);
+
     private final RaftNode raftNode;
 
     public ClusterHandler(RaftNode raftNode) {
@@ -42,6 +46,7 @@ public class ClusterHandler implements Handler<RoutingContext> {
 
     @Override
     public void handle(RoutingContext ctx) {
+        logger.debug("Cluster status requested");
         JsonObject status = new JsonObject()
                 .put("nodeId", raftNode.getNodeId())
                 .put("state", raftNode.getState().toString())
@@ -54,6 +59,8 @@ public class ClusterHandler implements Handler<RoutingContext> {
             status.put("leaderId", leaderId);
         }
 
+        logger.debug("Cluster status: state={}, term={}, leader={}",
+                raftNode.getState(), raftNode.getCurrentTerm(), leaderId);
         ctx.json(status);
     }
 }

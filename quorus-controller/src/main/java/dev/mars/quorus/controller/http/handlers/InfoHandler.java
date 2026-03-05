@@ -21,6 +21,8 @@ import io.vertx.core.Handler;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.RoutingContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
 
@@ -38,6 +40,7 @@ import java.time.Instant;
  */
 public class InfoHandler implements Handler<RoutingContext> {
 
+    private static final Logger logger = LoggerFactory.getLogger(InfoHandler.class);
     private static final String API_VERSION = "v1";
 
     private final RaftNode raftNode;
@@ -50,6 +53,7 @@ public class InfoHandler implements Handler<RoutingContext> {
 
     @Override
     public void handle(RoutingContext ctx) {
+        logger.debug("API info requested");
         JsonObject info = new JsonObject()
                 .put("api", new JsonObject()
                         .put("version", API_VERSION)
