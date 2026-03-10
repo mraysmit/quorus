@@ -43,6 +43,7 @@ final class TransferCodec {
     static TransferJobCommandProto toProto(TransferJobCommand cmd) {
         TransferJobCommandProto.Builder builder = TransferJobCommandProto.newBuilder();
         builder.setJobId(cmd.jobId());
+        builder.setTimestampEpochMs(cmd.timestamp().toEpochMilli());
 
         switch (cmd) {
             case TransferJobCommand.Create c -> {
@@ -67,13 +68,18 @@ final class TransferCodec {
     }
 
     static TransferJobCommand fromProto(TransferJobCommandProto proto) {
+        Instant timestamp = proto.getTimestampEpochMs() > 0
+                ? Instant.ofEpochMilli(proto.getTimestampEpochMs()) : Instant.now();
         return switch (proto.getType()) {
-            case TRANSFER_JOB_CMD_CREATE -> TransferJobCommand.create(fromProto(proto.getTransferJob()));
+            case TRANSFER_JOB_CMD_CREATE -> new TransferJobCommand.Create(
+                    proto.getJobId(), fromProto(proto.getTransferJob()), timestamp);
             case TRANSFER_JOB_CMD_UPDATE_STATUS -> {
-                yield new TransferJobCommand.UpdateStatus(proto.getJobId(), fromProto(proto.getExpectedStatus()), fromProto(proto.getStatus()));
+                yield new TransferJobCommand.UpdateStatus(proto.getJobId(),
+                        fromProto(proto.getExpectedStatus()), fromProto(proto.getStatus()), timestamp);
             }
-            case TRANSFER_JOB_CMD_UPDATE_PROGRESS -> TransferJobCommand.updateProgress(proto.getJobId(), proto.getBytesTransferred());
-            case TRANSFER_JOB_CMD_DELETE -> TransferJobCommand.delete(proto.getJobId());
+            case TRANSFER_JOB_CMD_UPDATE_PROGRESS -> new TransferJobCommand.UpdateProgress(
+                    proto.getJobId(), proto.getBytesTransferred(), timestamp);
+            case TRANSFER_JOB_CMD_DELETE -> new TransferJobCommand.Delete(proto.getJobId(), timestamp);
             default -> throw new IllegalArgumentException("Unknown TransferJobCommandType: " + proto.getType());
         };
     }

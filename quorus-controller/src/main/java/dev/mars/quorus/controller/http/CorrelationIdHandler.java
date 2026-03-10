@@ -83,7 +83,6 @@ public class CorrelationIdHandler implements io.vertx.core.Handler<RoutingContex
         ctx.response().putHeader(REQUEST_ID_HEADER, requestId);
 
         // Clean up MDC after response is sent
-        final String id = requestId;
         ctx.addEndHandler(v -> {
             MDC.remove(MDC_REQUEST_ID);
             MDC.remove(MDC_TRACE_ID);

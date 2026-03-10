@@ -35,7 +35,6 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
 import java.util.Objects;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -73,7 +72,7 @@ public class QuorusAgent {
     // Shutdown coordination
     private final AtomicBoolean closed = new AtomicBoolean(false);
     private volatile boolean running = false;
-    private final CountDownLatch shutdownLatch = new CountDownLatch(1);
+    private final io.vertx.core.Promise<Void> shutdownPromise = io.vertx.core.Promise.promise();
 
     /**
      * Creates a QuorusAgent with Vert.x dependency injection.
@@ -93,7 +92,7 @@ public class QuorusAgent {
         this.registrationService = new AgentRegistrationService(vertx, config);
         this.heartbeatService = new HeartbeatService(vertx, config, registrationService);
         this.transferService = new TransferExecutionService(vertx, config);  // Pass Vertx
-        this.healthService = new HealthService(config);
+        this.healthService = new HealthService(vertx, config);
         this.jobPollingService = new JobPollingService(vertx, config);
         this.jobStatusReportingService = new JobStatusReportingService(vertx, config);
 
@@ -167,6 +166,10 @@ public class QuorusAgent {
             // Wait for shutdown
             agent.awaitShutdown();
 
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            logger.error("Agent interrupted: {}", e.getMessage());
+            System.exit(1);
         } catch (Exception e) {
             logger.error("Failed to start Quorus Agent: {}", e.getMessage());
             logger.debug("Stack trace", e);
@@ -191,9 +194,12 @@ public class QuorusAgent {
         // Set metrics status
         metrics.setStatusRunning();
 
-        // Start health service first
-        healthService.start();
-        logger.info("Health service started on port {}", config.getAgentPort());
+        // Start health service first (reactive)
+        healthService.start()
+            .onFailure(err -> {
+                logger.error("Health service failed to start: {}", err.getMessage());
+                metrics.setStatusError();
+            });
 
         // Register with controller (reactive WebClient)
         registrationService.register()
@@ -272,7 +278,7 @@ public class QuorusAgent {
 
         if (!running) {
             logger.info("Agent not running, performing cleanup only");
-            shutdownLatch.countDown();
+            shutdownPromise.tryComplete();
             return;
         }
 
@@ -294,15 +300,15 @@ public class QuorusAgent {
                 jobPollingTimerId = 0;
             }
 
-            // Stop services (Future-based shutdown)
+            // Stop services
             transferService.shutdown();
             heartbeatService.shutdown();
-            healthService.shutdown();
             jobPollingService.shutdown();
             jobStatusReportingService.shutdown();
 
-            // Deregister from controller (reactive WebClient)
-            registrationService.deregister()
+            // Shutdown health service (reactive) then deregister from controller
+            healthService.shutdown()
+                .compose(v -> registrationService.deregister())
                 .onComplete(ar -> {
                     if (ar.succeeded() && ar.result()) {
                         logger.info("Agent deregistered from controller");
@@ -310,20 +316,20 @@ public class QuorusAgent {
                         logger.warn("Failed to deregister from controller: {}", ar.cause().getMessage());
                     }
                     logger.info("Quorus Agent shutdown complete (0 threads to cleanup)");
-                    shutdownLatch.countDown();
+                    shutdownPromise.tryComplete();
                 });
-            return; // Early return - shutdownLatch will be counted down in callback
+            return; // Early return - promise will be completed in callback
 
         } catch (Exception e) {
             logger.error("Error during shutdown: {}", e.getMessage());
             logger.debug("Stack trace", e);
         } finally {
-            shutdownLatch.countDown();
+            shutdownPromise.tryComplete();
         }
     }
     
     public void awaitShutdown() throws InterruptedException {
-        shutdownLatch.await();
+        shutdownPromise.future().toCompletionStage().toCompletableFuture().join();
     }
     
     private void pollForJobs() {

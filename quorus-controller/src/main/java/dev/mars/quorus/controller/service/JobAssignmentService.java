@@ -31,7 +31,6 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -101,45 +100,38 @@ public class JobAssignmentService {
                                                  JobPriority priority) {
         logger.debug("Submitting job: requestId={}, priority={}, requirements={}", 
             transferRequest.getRequestId(), priority, requirements);
-        return vertx.executeBlocking(() -> {
-            try {
-                // Create transfer job first
-                TransferJob transferJob = new TransferJob(transferRequest);
-                logger.debug("Created transfer job: jobId={}, source={}, dest={}", 
-                    transferJob.getJobId(), transferRequest.getSourceUri(), transferRequest.getDestinationPath());
 
-                // Create queued job
-                QueuedJob queuedJob = new QueuedJob.Builder()
-                        .transferJob(transferJob)
-                        .requirements(requirements)
-                        .priority(priority)
-                        .build();
-                
-                // Submit to Raft for distributed consensus
-                logger.debug("Submitting enqueue command to Raft: jobId={}", queuedJob.getJobId());
-                JobQueueCommand command = JobQueueCommand.enqueue(queuedJob);
-                CommandResult<?> result = raftNode.submitCommand(command)
-                        .toCompletionStage().toCompletableFuture().get();
-                
+        // Create transfer job
+        TransferJob transferJob = new TransferJob(transferRequest);
+        logger.debug("Created transfer job: jobId={}, source={}, dest={}", 
+            transferJob.getJobId(), transferRequest.getSourceUri(), transferRequest.getDestinationPath());
+
+        // Create queued job
+        QueuedJob queuedJob = new QueuedJob.Builder()
+                .transferJob(transferJob)
+                .requirements(requirements)
+                .priority(priority)
+                .build();
+
+        // Submit to Raft for distributed consensus (reactive)
+        logger.debug("Submitting enqueue command to Raft: jobId={}", queuedJob.getJobId());
+        JobQueueCommand command = JobQueueCommand.enqueue(queuedJob);
+
+        return raftNode.submitCommand(command)
+            .compose(result -> {
                 if (result instanceof CommandResult.Success<?> success
                         && success.entity() instanceof QueuedJob enqueuedJob) {
                     jobQueue.put(enqueuedJob.getJobId(), enqueuedJob);
-                    
                     logger.info("Job queued: jobId={}, priority={}, queueSize={}", 
                         enqueuedJob.getJobId(), priority, jobQueue.size());
-                    
-                    return enqueuedJob;
+                    return Future.succeededFuture(enqueuedJob);
                 } else {
                     logger.error("Failed to enqueue job: requestId={}, resultType={}", 
                         transferRequest.getRequestId(), result != null ? result.getClass().getName() : "null");
-                    throw new RuntimeException("Failed to enqueue job: " + transferRequest.getRequestId());
+                    return Future.failedFuture(
+                        new RuntimeException("Failed to enqueue job: " + transferRequest.getRequestId()));
                 }
-                
-            } catch (Exception e) {
-                logger.error("Error submitting job: requestId={}", transferRequest.getRequestId(), e);
-                throw new RuntimeException("Failed to submit job", e);
-            }
-        });
+            });
     }
     
     /**
@@ -151,73 +143,67 @@ public class JobAssignmentService {
      */
     public Future<JobAssignment> assignJob(String jobId, String agentId) {
         logger.debug("Assigning job: jobId={}, requestedAgentId={}", jobId, agentId);
-        return vertx.executeBlocking(() -> {
-            try {
-                QueuedJob queuedJob = jobQueue.get(jobId);
-                if (queuedJob == null) {
-                    logger.warn("Job not found in queue: jobId={}", jobId);
-                    throw new IllegalArgumentException("Job not found in queue: " + jobId);
-                }
-                
-                // Select agent if not specified
-                String selectedAgentId = agentId;
-                if (selectedAgentId == null) {
-                    logger.debug("Auto-selecting agent for job: jobId={}, availableAgents={}", 
-                        jobId, availableAgents.size());
-                    selectedAgentId = agentSelectionService.selectAgent(queuedJob, availableAgents, agentLoads);
-                    if (selectedAgentId == null) {
-                        logger.warn("No suitable agent found: jobId={}, availableAgents={}", jobId, availableAgents.size());
-                        throw new RuntimeException("No suitable agent found for job: " + jobId);
-                    }
-                    logger.debug("Auto-selected agent: jobId={}, selectedAgentId={}", jobId, selectedAgentId);
-                }
-                
-                // Validate agent availability
-                AgentInfo agent = availableAgents.get(selectedAgentId);
-                if (agent == null || !agent.getStatus().isAvailableForWork()) {
-                    logger.warn("Agent not available: agentId={}, exists={}, status={}", 
-                        selectedAgentId, agent != null, agent != null ? agent.getStatus() : "N/A");
-                    throw new IllegalArgumentException("Agent not available: " + selectedAgentId);
-                }
-                
-                // Create job assignment
-                JobAssignment assignment = new JobAssignment.Builder()
-                        .jobId(jobId)
-                        .agentId(selectedAgentId)
-                        .status(JobAssignmentStatus.ASSIGNED)
-                        .assignedAt(Instant.now())
-                        .build();
-                
-                // Submit assignment command to Raft
-                logger.debug("Submitting assignment to Raft: jobId={}, agentId={}", jobId, selectedAgentId);
-                JobAssignmentCommand assignCommand = JobAssignmentCommand.assign(assignment);
-                CommandResult<?> result = raftNode.submitCommand(assignCommand)
-                        .toCompletionStage().toCompletableFuture().get();
-                
+
+        QueuedJob queuedJob = jobQueue.get(jobId);
+        if (queuedJob == null) {
+            logger.warn("Job not found in queue: jobId={}", jobId);
+            return Future.failedFuture(new IllegalArgumentException("Job not found in queue: " + jobId));
+        }
+
+        // Select agent if not specified
+        String selectedAgentId = agentId;
+        if (selectedAgentId == null) {
+            logger.debug("Auto-selecting agent for job: jobId={}, availableAgents={}", 
+                jobId, availableAgents.size());
+            selectedAgentId = agentSelectionService.selectAgent(queuedJob, availableAgents, agentLoads);
+            if (selectedAgentId == null) {
+                logger.warn("No suitable agent found: jobId={}, availableAgents={}", jobId, availableAgents.size());
+                return Future.failedFuture(new RuntimeException("No suitable agent found for job: " + jobId));
+            }
+            logger.debug("Auto-selected agent: jobId={}, selectedAgentId={}", jobId, selectedAgentId);
+        }
+
+        // Validate agent availability
+        AgentInfo agent = availableAgents.get(selectedAgentId);
+        if (agent == null || !agent.getStatus().isAvailableForWork()) {
+            logger.warn("Agent not available: agentId={}, exists={}, status={}", 
+                selectedAgentId, agent != null, agent != null ? agent.getStatus() : "N/A");
+            return Future.failedFuture(new IllegalArgumentException("Agent not available: " + selectedAgentId));
+        }
+
+        // Create job assignment
+        JobAssignment assignment = new JobAssignment.Builder()
+                .jobId(jobId)
+                .agentId(selectedAgentId)
+                .status(JobAssignmentStatus.ASSIGNED)
+                .assignedAt(Instant.now())
+                .build();
+
+        // Submit assignment command to Raft (reactive)
+        logger.debug("Submitting assignment to Raft: jobId={}, agentId={}", jobId, selectedAgentId);
+        JobAssignmentCommand assignCommand = JobAssignmentCommand.assign(assignment);
+
+        return raftNode.submitCommand(assignCommand)
+            .compose(result -> {
                 if (result instanceof CommandResult.Success<?> success
                         && success.entity() instanceof JobAssignment createdAssignment) {
                     activeAssignments.put(createdAssignment.getJobId(), createdAssignment);
-                    
+
                     // Remove from queue
                     JobQueueCommand dequeueCommand = JobQueueCommand.dequeue(jobId);
                     raftNode.submitCommand(dequeueCommand);
                     jobQueue.remove(jobId);
-                    
+
                     logger.info("Job assigned: jobId={}, agentId={}, activeAssignments={}, queueSize={}", 
-                        jobId, selectedAgentId, activeAssignments.size(), jobQueue.size());
-                    
-                    return createdAssignment;
+                        jobId, createdAssignment.getAgentId(), activeAssignments.size(), jobQueue.size());
+
+                    return Future.succeededFuture(createdAssignment);
                 } else {
                     logger.error("Failed to create assignment: jobId={}", jobId);
-                    throw new RuntimeException("Failed to create assignment for job: " + jobId);
+                    return Future.failedFuture(
+                        new RuntimeException("Failed to create assignment for job: " + jobId));
                 }
-                
-            } catch (Exception e) {
-                logger.error("Error assigning job: jobId={}, agentId={}, error={}", jobId, agentId, e.getMessage());
-                logger.debug("Stack trace for job assignment error", e);
-                throw new RuntimeException("Failed to assign job", e);
-            }
-        });
+            });
     }
     
     /**
@@ -229,49 +215,42 @@ public class JobAssignmentService {
      */
     public Future<JobAssignment> updateAssignmentStatus(String jobId, JobAssignmentStatus newStatus) {
         logger.debug("Updating assignment status: jobId={}, newStatus={}", jobId, newStatus);
-        return vertx.executeBlocking(() -> {
-            try {
-                JobAssignment existing = activeAssignments.get(jobId);
-                if (existing == null) {
-                    logger.warn("Assignment not found for status update: jobId={}", jobId);
-                    throw new IllegalArgumentException("Assignment not found: " + jobId);
-                }
-                
-                JobAssignmentStatus oldStatus = existing.getStatus();
-                
-                // Create update command
-                JobAssignmentCommand updateCommand = JobAssignmentCommand.updateStatus(
-                        existing.getJobId() + ":" + existing.getAgentId(), oldStatus, newStatus);
-                
-                CommandResult<?> result = raftNode.submitCommand(updateCommand)
-                        .toCompletionStage().toCompletableFuture().get();
-                
+
+        JobAssignment existing = activeAssignments.get(jobId);
+        if (existing == null) {
+            logger.warn("Assignment not found for status update: jobId={}", jobId);
+            return Future.failedFuture(new IllegalArgumentException("Assignment not found: " + jobId));
+        }
+
+        JobAssignmentStatus oldStatus = existing.getStatus();
+
+        // Create update command
+        JobAssignmentCommand updateCommand = JobAssignmentCommand.updateStatus(
+                existing.getJobId() + ":" + existing.getAgentId(), oldStatus, newStatus);
+
+        return raftNode.submitCommand(updateCommand)
+            .compose(result -> {
                 if (result instanceof CommandResult.Success<?> success
                         && success.entity() instanceof JobAssignment updatedAssignment) {
                     activeAssignments.put(jobId, updatedAssignment);
-                    
+
                     logger.info("Assignment status updated: jobId={}, oldStatus={}, newStatus={}", 
                         jobId, oldStatus, newStatus);
-                    
+
                     // Clean up completed/failed assignments
                     if (newStatus.isTerminal()) {
                         activeAssignments.remove(jobId);
                         logger.debug("Removed terminal assignment: jobId={}, activeAssignments={}", 
                             jobId, activeAssignments.size());
                     }
-                    
-                    return updatedAssignment;
+
+                    return Future.succeededFuture(updatedAssignment);
                 } else {
                     logger.error("Failed to update assignment status: jobId={}", jobId);
-                    throw new RuntimeException("Failed to update assignment status: " + jobId);
+                    return Future.failedFuture(
+                        new RuntimeException("Failed to update assignment status: " + jobId));
                 }
-                
-            } catch (Exception e) {
-                logger.error("Error updating assignment status: jobId={}, newStatus={}, error={}", jobId, newStatus, e.getMessage());
-                logger.debug("Stack trace for assignment status update error", e);
-                throw new RuntimeException("Failed to update assignment status", e);
-            }
-        });
+            });
     }
     
     /**
@@ -282,35 +261,31 @@ public class JobAssignmentService {
      */
     public Future<Void> cancelAssignment(String jobId) {
         logger.debug("Cancelling assignment: jobId={}", jobId);
-        return vertx.executeBlocking(() -> {
-            try {
-                JobAssignment existing = activeAssignments.get(jobId);
-                if (existing != null) {
-                    logger.debug("Cancelling active assignment: jobId={}, agentId={}", jobId, existing.getAgentId());
-                    JobAssignmentCommand cancelCommand = JobAssignmentCommand.cancel(
-                            existing.getJobId() + ":" + existing.getAgentId(), "User requested cancellation");
-                    raftNode.submitCommand(cancelCommand);
-                    activeAssignments.remove(jobId);
-                }
-                
-                // Also remove from queue if still there
-                if (jobQueue.containsKey(jobId)) {
-                    logger.debug("Removing job from queue: jobId={}", jobId);
-                    JobQueueCommand removeCommand = JobQueueCommand.remove(jobId, "Job cancelled by user");
-                    raftNode.submitCommand(removeCommand);
-                    jobQueue.remove(jobId);
-                }
-                
-                logger.info("Job cancelled: jobId={}, activeAssignments={}, queueSize={}", 
-                    jobId, activeAssignments.size(), jobQueue.size());
-                return null;
-                
-            } catch (Exception e) {
-                logger.error("Error cancelling job: jobId={}, error={}", jobId, e.getMessage());
-                logger.debug("Stack trace for job cancellation error", e);
-                throw new RuntimeException("Failed to cancel job", e);
+
+        Future<Void> cancelFuture = Future.succeededFuture();
+
+        JobAssignment existing = activeAssignments.get(jobId);
+        if (existing != null) {
+            logger.debug("Cancelling active assignment: jobId={}, agentId={}", jobId, existing.getAgentId());
+            JobAssignmentCommand cancelCommand = JobAssignmentCommand.cancel(
+                    existing.getJobId() + ":" + existing.getAgentId(), "User requested cancellation");
+            cancelFuture = raftNode.submitCommand(cancelCommand).mapEmpty();
+            activeAssignments.remove(jobId);
+        }
+
+        return cancelFuture.compose(v -> {
+            if (jobQueue.containsKey(jobId)) {
+                logger.debug("Removing job from queue: jobId={}", jobId);
+                JobQueueCommand removeCommand = JobQueueCommand.remove(jobId, "Job cancelled by user");
+                return raftNode.submitCommand(removeCommand)
+                    .map(r -> {
+                        jobQueue.remove(jobId);
+                        return (Void) null;
+                    });
             }
-        });
+            return Future.succeededFuture();
+        }).onSuccess(v -> logger.info("Job cancelled: jobId={}, activeAssignments={}, queueSize={}", 
+            jobId, activeAssignments.size(), jobQueue.size()));
     }
     
     /**

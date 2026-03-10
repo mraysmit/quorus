@@ -138,11 +138,10 @@ class QuorusStateStoreTest {
         assertEquals("newValue", ((CommandResult.Success<?>) deleteResult).entity());
         assertNull(stateMachine.getMetadata("testKey"));
 
-        // Test DELETE non-existent key
+        // Test DELETE non-existent key — should return NotFound
         SystemMetadataCommand deleteNonExistentCmd = SystemMetadataCommand.delete("nonExistent");
         CommandResult<?> deleteNonExistentResult = stateMachine.apply(deleteNonExistentCmd);
-        assertInstanceOf(CommandResult.Success.class, deleteNonExistentResult);
-        assertNull(((CommandResult.Success<?>) deleteNonExistentResult).entity());
+        assertInstanceOf(CommandResult.NotFound.class, deleteNonExistentResult);
     }
 
     @Test

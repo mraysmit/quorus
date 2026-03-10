@@ -22,10 +22,13 @@ import dev.mars.quorus.core.TransferResult;
 import dev.mars.quorus.core.TransferStatus;
 import dev.mars.quorus.core.exceptions.QuorusErrorCode;
 import dev.mars.quorus.core.exceptions.TransferException;
+import dev.mars.quorus.storage.ChecksumCalculator;
 import dev.mars.quorus.transfer.TransferContext;
 import dev.mars.quorus.transfer.ProgressTracker;
 
 import static dev.mars.quorus.core.exceptions.QuorusErrorCode.*;
+import io.vertx.core.Context;
+import io.vertx.core.Vertx;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -94,6 +97,12 @@ public class SmbTransferProtocol implements TransferProtocol {
 
     @Override
     public TransferResult transfer(TransferRequest request, TransferContext context) throws TransferException {
+        Context vertxContext = Vertx.currentContext();
+        if (vertxContext != null && vertxContext.isEventLoopContext()) {
+            throw new TransferException(context.getJobId(),
+                    "Blocking SMB transfer() invoked on event loop. Use transferReactive() instead.");
+        }
+
         logger.info("Starting SMB transfer: jobId={}, isUpload={}", context.getJobId(), request.isUpload());
         // Use destinationUri for logging to support both uploads and downloads
         logger.debug("Transfer details: sourceUri={}, destinationUri={}", 
@@ -184,11 +193,10 @@ public class SmbTransferProtocol implements TransferProtocol {
             
             // Calculate checksum if required
             String checksum = null;
-            if (request.getExpectedChecksum() != null) {
+            if (request.getExpectedChecksum() != null && !request.getExpectedChecksum().isEmpty()) {
                 logger.info("Calculating checksum for transferred file");
                 logger.debug("performSmbDownload: checksum calculation requested");
-                // For demo purposes, we'll skip actual checksum calculation
-                checksum = "demo-checksum-" + bytesTransferred;
+                checksum = ChecksumCalculator.calculateFileChecksum(request.getDestinationPath());
             }
             
             Instant endTime = Instant.now();
@@ -261,9 +269,9 @@ public class SmbTransferProtocol implements TransferProtocol {
             
             // Calculate checksum if required
             String checksum = null;
-            if (request.getExpectedChecksum() != null) {
+            if (request.getExpectedChecksum() != null && !request.getExpectedChecksum().isEmpty()) {
                 logger.debug("Calculating checksum for uploaded file");
-                checksum = "demo-checksum-" + bytesTransferred;
+                checksum = ChecksumCalculator.calculateFileChecksum(sourcePath);
             }
             
             Instant endTime = Instant.now();

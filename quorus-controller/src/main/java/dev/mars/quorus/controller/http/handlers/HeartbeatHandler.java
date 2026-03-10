@@ -97,7 +97,7 @@ public class HeartbeatHandler implements Handler<RoutingContext> {
                             return;
                         }
 
-                        logger.info("Heartbeat processed: agentId={}", agentId);
+                        logger.debug("Heartbeat processed: agentId={}", agentId);
 
                         JsonObject response = new JsonObject()
                                 .put("success", true)

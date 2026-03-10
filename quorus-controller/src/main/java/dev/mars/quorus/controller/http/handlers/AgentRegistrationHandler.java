@@ -56,6 +56,14 @@ public class AgentRegistrationHandler implements Handler<RoutingContext> {
                 ctx.fail(400, new IllegalArgumentException("Missing required field: agentId"));
                 return;
             }
+            if (agentInfo.getHostname() == null || agentInfo.getHostname().isEmpty()) {
+                ctx.fail(400, new IllegalArgumentException("Missing required field: hostname"));
+                return;
+            }
+            if (agentInfo.getAddress() == null || agentInfo.getAddress().isEmpty()) {
+                ctx.fail(400, new IllegalArgumentException("Missing required field: address"));
+                return;
+            }
 
             logger.info("Registering agent: agentId={}, hostname={}", 
                     agentInfo.getAgentId(), agentInfo.getHostname());

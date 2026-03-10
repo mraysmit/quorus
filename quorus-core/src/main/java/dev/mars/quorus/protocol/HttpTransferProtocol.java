@@ -28,6 +28,7 @@ import dev.mars.quorus.transfer.ProgressTracker;
 import dev.mars.quorus.transfer.TransferContext;
 
 import static dev.mars.quorus.core.exceptions.QuorusErrorCode.*;
+import io.vertx.core.Context;
 import io.vertx.core.Vertx;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.ext.web.client.WebClient;
@@ -116,20 +117,13 @@ public class HttpTransferProtocol implements TransferProtocol {
     
     @Override
     public TransferResult transfer(TransferRequest request, TransferContext context) throws TransferException {
-        logger.debug("Starting synchronous HTTP transfer: jobId={}, direction={}", 
-                    context.getJobId(), request.getDirection());
-        try {
-            return transferReactive(request, context).toCompletionStage().toCompletableFuture().get();
-        } catch (Exception e) {
-            Throwable cause = e.getCause();
-            if (cause instanceof TransferException) {
-                throw (TransferException) cause;
-            }
-            String errorMsg = cause != null ? cause.getMessage() : e.getMessage();
-            logger.error("[{}] HTTP transfer failed: jobId={}, error={}", QUORUS_1200.code(), context.getJobId(), errorMsg);
-            logger.debug("HTTP transfer exception details for job: {}", context.getJobId(), cause != null ? cause : e);
-            throw new TransferException(context.getJobId(), "Transfer failed", cause != null ? cause : e);
+        Context vertxContext = Vertx.currentContext();
+        if (vertxContext != null && vertxContext.isEventLoopContext()) {
+            throw new TransferException(context.getJobId(),
+                    "Blocking HTTP transfer() invoked on event loop. Use transferReactive() instead.");
         }
+        throw new TransferException(context.getJobId(),
+                "Synchronous HTTP transfer() is disabled in reactive-only mode. Use transferReactive().");
     }
 
     @Override

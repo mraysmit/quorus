@@ -80,13 +80,12 @@ public class JobStatusHandler implements Handler<RoutingContext> {
 
             // Look up current assignment status for pre-commit validation and CAS protection
             JobAssignment existing = stateStore.findJobAssignment(assignmentId)
-                    .orElseThrow(() -> new IllegalArgumentException("Assignment not found: " + assignmentId));
+                    .orElseThrow(() -> QuorusApiException.notFound(ErrorCode.ASSIGNMENT_NOT_FOUND, assignmentId));
 
             // Pre-commit transition validation
             if (!existing.getStatus().canTransitionTo(status)) {
-                ctx.fail(409, new IllegalArgumentException(String.format(
-                        "Invalid transition from %s to %s for assignment %s",
-                        existing.getStatus(), status, assignmentId)));
+                ctx.fail(QuorusApiException.conflict(ErrorCode.ASSIGNMENT_STATE_CONFLICT,
+                        assignmentId, existing.getStatus().name(), "transition to " + status));
                 return;
             }
 

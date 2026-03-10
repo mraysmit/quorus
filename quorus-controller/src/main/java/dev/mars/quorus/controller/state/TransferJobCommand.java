@@ -19,6 +19,7 @@ package dev.mars.quorus.controller.state;
 import dev.mars.quorus.core.TransferJob;
 import dev.mars.quorus.core.TransferStatus;
 
+import java.time.Instant;
 import java.util.Objects;
 
 /**
@@ -49,18 +50,23 @@ public sealed interface TransferJobCommand extends RaftCommand
     /** Common accessor: every subtype carries a job ID. */
     String jobId();
 
+    /** Common accessor: every subtype carries a timestamp. */
+    Instant timestamp();
+
     /**
      * Create a new transfer job.
      *
      * @param jobId       the job identifier (derived from transferJob)
      * @param transferJob the full transfer job object
+     * @param timestamp   the command timestamp
      */
-    record Create(String jobId, TransferJob transferJob) implements TransferJobCommand {
+    record Create(String jobId, TransferJob transferJob, Instant timestamp) implements TransferJobCommand {
         private static final long serialVersionUID = 1L;
 
         public Create {
             Objects.requireNonNull(jobId, "jobId");
             Objects.requireNonNull(transferJob, "transferJob");
+            Objects.requireNonNull(timestamp, "timestamp");
         }
     }
 
@@ -68,16 +74,18 @@ public sealed interface TransferJobCommand extends RaftCommand
      * Update the status of an existing transfer job.
      *
      * @param jobId          the job identifier
-     * @param expectedStatus the expected current status for CAS validation (null to skip check)
+     * @param expectedStatus the expected current status for CAS validation
      * @param newStatus      the new status
+     * @param timestamp      the command timestamp
      */
-    record UpdateStatus(String jobId, TransferStatus expectedStatus, TransferStatus newStatus) implements TransferJobCommand {
+    record UpdateStatus(String jobId, TransferStatus expectedStatus, TransferStatus newStatus, Instant timestamp) implements TransferJobCommand {
         private static final long serialVersionUID = 1L;
 
         public UpdateStatus {
             Objects.requireNonNull(jobId, "jobId");
             Objects.requireNonNull(expectedStatus, "expectedStatus");
             Objects.requireNonNull(newStatus, "newStatus");
+            Objects.requireNonNull(timestamp, "timestamp");
         }
     }
 
@@ -86,25 +94,29 @@ public sealed interface TransferJobCommand extends RaftCommand
      *
      * @param jobId            the job identifier
      * @param bytesTransferred the number of bytes transferred so far
+     * @param timestamp        the command timestamp
      */
-    record UpdateProgress(String jobId, long bytesTransferred) implements TransferJobCommand {
+    record UpdateProgress(String jobId, long bytesTransferred, Instant timestamp) implements TransferJobCommand {
         private static final long serialVersionUID = 1L;
 
         public UpdateProgress {
             Objects.requireNonNull(jobId, "jobId");
+            Objects.requireNonNull(timestamp, "timestamp");
         }
     }
 
     /**
      * Delete a transfer job.
      *
-     * @param jobId the job identifier
+     * @param jobId     the job identifier
+     * @param timestamp the command timestamp
      */
-    record Delete(String jobId) implements TransferJobCommand {
+    record Delete(String jobId, Instant timestamp) implements TransferJobCommand {
         private static final long serialVersionUID = 1L;
 
         public Delete {
             Objects.requireNonNull(jobId, "jobId");
+            Objects.requireNonNull(timestamp, "timestamp");
         }
     }
 
@@ -114,7 +126,7 @@ public sealed interface TransferJobCommand extends RaftCommand
      * Create a new transfer job command.
      */
     static TransferJobCommand create(TransferJob transferJob) {
-        return new Create(transferJob.getJobId(), transferJob);
+        return new Create(transferJob.getJobId(), transferJob, Instant.now());
     }
 
     /**
@@ -125,20 +137,20 @@ public sealed interface TransferJobCommand extends RaftCommand
      * @param newStatus      the new status
      */
     static TransferJobCommand updateStatus(String jobId, TransferStatus expectedStatus, TransferStatus newStatus) {
-        return new UpdateStatus(jobId, expectedStatus, newStatus);
+        return new UpdateStatus(jobId, expectedStatus, newStatus, Instant.now());
     }
 
     /**
      * Create an update-progress command.
      */
     static TransferJobCommand updateProgress(String jobId, long bytesTransferred) {
-        return new UpdateProgress(jobId, bytesTransferred);
+        return new UpdateProgress(jobId, bytesTransferred, Instant.now());
     }
 
     /**
      * Create a delete command.
      */
     static TransferJobCommand delete(String jobId) {
-        return new Delete(jobId);
+        return new Delete(jobId, Instant.now());
     }
 }
