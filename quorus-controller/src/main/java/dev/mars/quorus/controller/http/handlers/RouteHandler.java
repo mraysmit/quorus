@@ -107,8 +107,6 @@ public class RouteHandler {
                             }
                         })
                         .onFailure(ctx::fail);
-            } catch (QuorusApiException e) {
-                throw e;
             } catch (Exception e) {
                 logger.error("Failed to create route: {}", e.getMessage());
                 logger.debug("Stack trace for route creation failure", e);
@@ -171,8 +169,8 @@ public class RouteHandler {
                 RouteConfiguration existing = stateStore.findRoute(routeId)
                         .orElseThrow(() -> QuorusApiException.notFound(ErrorCode.ROUTE_NOT_FOUND, routeId));
 
-// Cannot update routes that are actively transferring or deleted
-            if (existing.getStatus() == RouteStatus.TRANSFERRING || existing.getStatus() == RouteStatus.DELETED) {
+                // Cannot update routes that are actively transferring or deleted
+                if (existing.getStatus() == RouteStatus.TRANSFERRING || existing.getStatus() == RouteStatus.DELETED) {
                     throw QuorusApiException.conflict(ErrorCode.ROUTE_STATE_CONFLICT,
                             routeId, existing.getStatus().name(), "update");
                 }
@@ -198,8 +196,6 @@ public class RouteHandler {
                             }
                         })
                         .onFailure(ctx::fail);
-            } catch (QuorusApiException e) {
-                throw e;
             } catch (Exception e) {
                 logger.error("Failed to update route '{}': {}", ctx.pathParam("routeId"), e.getMessage());
                 logger.debug("Stack trace for route update failure", e);

@@ -32,7 +32,6 @@ import dev.mars.quorus.transfer.observability.TransferTelemetryMetrics;
 import io.vertx.core.Future;
 import io.vertx.core.Promise;
 import io.vertx.core.Vertx;
-import io.vertx.core.WorkerExecutor;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,7 +51,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * Simple implementation of the TransferEngine interface.
  * Handles basic file transfers with retry logic and progress tracking.
- * Converted to Vert.x WorkerExecutor
+ * Uses Vert.x Futures/timers for non-blocking execution.
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @since 2025-08-17
@@ -62,7 +61,6 @@ public class SimpleTransferEngine implements TransferEngine {
     private static final Logger logger = LoggerFactory.getLogger(SimpleTransferEngine.class);
 
     private final Vertx vertx;
-    private final WorkerExecutor workerExecutor;
     private final ConcurrentHashMap<String, TransferJob> activeJobs;
     private final ConcurrentHashMap<String, TransferContext> activeContexts;
     private final ConcurrentHashMap<String, Future<TransferResult>> activeFutures;
@@ -118,14 +116,6 @@ public class SimpleTransferEngine implements TransferEngine {
         this.maxRetryAttempts = maxRetryAttempts;
         this.retryDelayMs = retryDelayMs;
 
-        // Create Vert.x worker executor instead of ExecutorService
-        logger.debug("Creating Vert.x worker executor pool");
-        this.workerExecutor = vertx.createSharedWorkerExecutor(
-                "quorus-transfer-pool",
-                maxConcurrentTransfers,
-                TimeUnit.MINUTES.toNanos(10)  // 10 minute max execution time
-        );
-
         this.activeJobs = new ConcurrentHashMap<>();
         this.activeContexts = new ConcurrentHashMap<>();
         this.activeFutures = new ConcurrentHashMap<>();
@@ -156,7 +146,7 @@ public class SimpleTransferEngine implements TransferEngine {
         // Initialize OpenTelemetry metrics (Phase 8 - Jan 2026)
         this.telemetryMetrics = TransferTelemetryMetrics.getInstance();
 
-        logger.info("SimpleTransferEngine initialized with {} max concurrent transfers (Vert.x WorkerExecutor mode, OpenTelemetry enabled)",
+        logger.info("SimpleTransferEngine initialized with {} max concurrent transfers (reactive mode, OpenTelemetry enabled)",
             maxConcurrentTransfers);
         logger.debug("SimpleTransferEngine initialization complete - startTime={}", startTime);
     }
@@ -193,32 +183,35 @@ public class SimpleTransferEngine implements TransferEngine {
         // Record OpenTelemetry metric (Phase 8 - Jan 2026)
         telemetryMetrics.recordTransferStarted(request.getProtocol(), direction.name());
         
-        // Execute transfer on Vert.x worker pool (propagate MDC to worker thread)
-        logger.debug("submitTransfer: submitting to worker executor");
+        // Execute transfer reactively (no blocking waits)
+        logger.debug("submitTransfer: executing transfer via reactive pipeline");
         Map<String, String> mdcContext = MDC.getCopyOfContextMap();
-        Future<TransferResult> future = workerExecutor.<TransferResult>executeBlocking(() -> {
+        Promise<TransferResult> executionPromise = Promise.promise();
+        vertx.runOnContext(v -> {
             if (mdcContext != null) {
                 MDC.setContextMap(mdcContext);
             }
-            try {
-                return executeTransfer(context);
-            } catch (Exception e) {
-                logger.error("Transfer execution failed for job {}: {} ({})", 
-                            job.getJobId(), e.getMessage(), e.getClass().getSimpleName());
+            executeTransfer(context).onComplete(executionPromise);
+        });
+
+        Future<TransferResult> future = executionPromise.future()
+            .recover(err -> {
+                logger.error("Transfer execution failed for job {}: {} ({})",
+                        job.getJobId(), err.getMessage(), err.getClass().getSimpleName());
                 if (logger.isDebugEnabled()) {
-                    logger.debug("Transfer execution exception details for job: {}", job.getJobId(), e);
+                    logger.debug("Transfer execution exception details for job: {}", job.getJobId(), err);
                 }
-                job.fail("Transfer execution failed: " + e.getMessage(), e);
-                return job.toResult();
-            } finally {
-                // Clean up
+                job.fail("Transfer execution failed: " + err.getMessage(), err);
+                return Future.succeededFuture(job.toResult());
+            })
+            .eventually(() -> {
                 logger.debug("submitTransfer: cleaning up job {} from active collections", job.getJobId());
                 activeJobs.remove(job.getJobId());
                 activeContexts.remove(job.getJobId());
                 activeFutures.remove(job.getJobId());
                 MDC.clear();
-            }
-        });
+                return Future.succeededFuture();
+            });
 
         activeFutures.put(job.getJobId(), future);
 
@@ -331,13 +324,9 @@ public class SimpleTransferEngine implements TransferEngine {
         // Cancel all active transfers
         activeContexts.values().forEach(TransferContext::cancel);
 
-        // Reactively wait for in-flight transfers to drain, then close resources
+        // Reactively wait for in-flight transfers to drain
         return awaitActiveTransfers(timeoutSeconds * 1000)
-                .andThen(ar -> {
-                    logger.debug("shutdown: closing worker executor");
-                    workerExecutor.close();
-                    logger.info("Transfer engine shutdown completed (Vert.x WorkerExecutor closed)");
-                });
+            .onSuccess(v -> logger.info("Transfer engine shutdown completed"));
     }
     
     /**
@@ -470,7 +459,7 @@ public class SimpleTransferEngine implements TransferEngine {
         return new HashMap<>(protocolMetrics);
     }
 
-    private TransferResult executeTransfer(TransferContext context) {
+    private Future<TransferResult> executeTransfer(TransferContext context) {
         TransferJob job = context.getJob();
         TransferRequest request = job.getRequest();
         TransferDirection direction = request.getDirection();
@@ -496,105 +485,130 @@ public class SimpleTransferEngine implements TransferEngine {
         }
 
         Instant transferStartTime = Instant.now();
-        int attempt = 0;
-        Exception lastException = null;
+        return executeAttempt(context, request, direction, transferStartTime, directionMetrics,
+                legacyMetrics, metricsKey, protocolName, 0, null);
+    }
 
-        while (attempt <= maxRetryAttempts && context.shouldContinue()) {
-            logger.debug("executeTransfer: attempt {} of {} for jobId={}", attempt + 1, maxRetryAttempts + 1, job.getJobId());
-            try {
-                // Get appropriate protocol
-                TransferProtocol protocol = protocolFactory.getProtocol(request.getProtocol());
-                if (protocol == null) {
-                    logger.debug("executeTransfer: unsupported protocol={}", request.getProtocol());
-                    throw new TransferException(job.getJobId(), "Unsupported protocol: " + request.getProtocol());
-                }
-                logger.debug("executeTransfer: using protocol handler={}", protocol.getClass().getSimpleName());
+    private Future<TransferResult> executeAttempt(
+            TransferContext context,
+            TransferRequest request,
+            TransferDirection direction,
+            Instant transferStartTime,
+            TransferMetrics directionMetrics,
+            TransferMetrics legacyMetrics,
+            String metricsKey,
+            String protocolName,
+            int attempt,
+            Throwable lastError) {
 
-                // Execute the transfer
-                logger.debug("executeTransfer: invoking protocol.transfer()");
-                TransferResult result = protocol.transfer(request, context);
+        TransferJob job = context.getJob();
+        if (!context.shouldContinue()) {
+            String message = "Transfer cancelled or paused before completion";
+            logger.warn("executeTransfer: {} for jobId={}", message, job.getJobId());
+            job.fail(message, lastError);
+            return Future.succeededFuture(job.toResult());
+        }
 
-                if (result.isSuccessful()) {
+        logger.debug("executeTransfer: attempt {} of {} for jobId={}",
+                attempt + 1, maxRetryAttempts + 1, job.getJobId());
+
+        TransferProtocol protocol = protocolFactory.getProtocol(protocolName);
+        if (protocol == null) {
+            TransferException error = new TransferException(job.getJobId(), "Unsupported protocol: " + protocolName);
+            return failTransfer(job, direction, directionMetrics, legacyMetrics, metricsKey, protocolName, error);
+        }
+        if (!protocol.canHandle(request)) {
+            TransferException error = new TransferException(job.getJobId(),
+                    "Protocol '" + protocolName + "' cannot handle request direction/URI combination");
+            return failTransfer(job, direction, directionMetrics, legacyMetrics, metricsKey, protocolName, error);
+        }
+
+        return protocol.transferReactive(request, context)
+                .compose(result -> {
+                    if (!result.isSuccessful()) {
+                        String errorMsg = result.getErrorMessage().orElse("Unknown error");
+                        return Future.failedFuture(new TransferException(job.getJobId(), "Transfer failed: " + errorMsg));
+                    }
+
                     logger.info("{} transfer completed successfully: {}", direction, job.getJobId());
-
-                    // Record success in metrics (both direction-specific and legacy)
                     Duration duration = Duration.between(transferStartTime, Instant.now());
                     long bytesTransferred = result.getBytesTransferred();
-                    
+
                     if (directionMetrics != null) {
                         directionMetrics.recordTransferSuccess(bytesTransferred, duration);
-                        logger.debug("executeTransfer: recorded success in direction metrics - key={}, bytes={}, duration={}ms", 
-                            metricsKey, bytesTransferred, duration.toMillis());
+                        logger.debug("executeTransfer: recorded success in direction metrics - key={}, bytes={}, duration={}ms",
+                                metricsKey, bytesTransferred, duration.toMillis());
                     }
                     if (legacyMetrics != null) {
                         legacyMetrics.recordTransferSuccess(bytesTransferred, duration);
                         logger.debug("executeTransfer: recorded success in legacy metrics - protocol={}", protocolName);
                     }
 
-                    // Record OpenTelemetry metric (Phase 8 - Jan 2026)
-                    telemetryMetrics.recordTransferCompleted(protocolName, direction.name(), 
+                    telemetryMetrics.recordTransferCompleted(protocolName, direction.name(),
                             bytesTransferred, duration.toMillis() / 1000.0);
 
-                    return result;
-                } else {
-                    String errorMsg = result.getErrorMessage().orElse("Unknown error");
-                    logger.debug("executeTransfer: transfer returned unsuccessful result - {}", errorMsg);
-                    throw new TransferException(job.getJobId(), "Transfer failed: " + errorMsg);
-                }
+                    return Future.succeededFuture(result);
+                })
+                .recover(err -> {
+                    int nextAttempt = attempt + 1;
+                    context.incrementRetryCount();
 
-            } catch (Exception e) {
-                lastException = e;
-                attempt++;
-                context.incrementRetryCount();
+                    logger.warn("Transfer attempt {} failed for job {}: {}",
+                            nextAttempt, job.getJobId(), err.getMessage());
+                    logger.debug("Stack trace for failed attempt {} on job {}", nextAttempt, job.getJobId(), err);
 
-                logger.warn("Transfer attempt {} failed for job {}: {}",
-                        attempt, job.getJobId(), e.getMessage());
-                logger.debug("Stack trace for failed attempt {} on job {}", attempt, job.getJobId(), e);
+                    if (nextAttempt <= maxRetryAttempts && context.shouldContinue()) {
+                        long delay = retryDelayMs * nextAttempt;
+                        logger.debug("executeTransfer: scheduling retry after {}ms", delay);
+                        telemetryMetrics.recordRetryAttempt(protocolName, direction.name(), nextAttempt);
 
-                if (attempt <= maxRetryAttempts && context.shouldContinue()) {
-                    long delay = retryDelayMs * attempt;
-                    logger.debug("executeTransfer: scheduling retry after {}ms", delay);
-                    
-                    // Record OpenTelemetry retry metric (Phase 8 - Jan 2026)
-                    telemetryMetrics.recordRetryAttempt(protocolName, direction.name(), attempt);
-                    
-                    try {
-                        Thread.sleep(delay); // Exponential backoff
-                    } catch (InterruptedException ie) {
-                        Thread.currentThread().interrupt();
-                        logger.debug("executeTransfer: interrupted during retry wait");
-                        context.cancel();
-                        break;
+                        return delayFuture(delay)
+                                .compose(v -> executeAttempt(context, request, direction, transferStartTime,
+                                        directionMetrics, legacyMetrics, metricsKey, protocolName, nextAttempt, err));
                     }
-                }
-            }
-        }
 
-        // All attempts failed
-        String errorMessage = lastException != null ? lastException.getMessage() : "Transfer failed after " + maxRetryAttempts + " attempts";
+                    return failTransfer(job, direction, directionMetrics, legacyMetrics,
+                            metricsKey, protocolName, err);
+                });
+    }
+
+    private Future<Void> delayFuture(long delayMs) {
+        Promise<Void> delayPromise = Promise.promise();
+        vertx.setTimer(delayMs, id -> delayPromise.complete());
+        return delayPromise.future();
+    }
+
+    private Future<TransferResult> failTransfer(
+            TransferJob job,
+            TransferDirection direction,
+            TransferMetrics directionMetrics,
+            TransferMetrics legacyMetrics,
+            String metricsKey,
+            String protocolName,
+            Throwable error) {
+        String errorMessage = error != null ? error.getMessage() :
+                "Transfer failed after " + maxRetryAttempts + " attempts";
         logger.debug("executeTransfer: all attempts exhausted for jobId={}, direction={}", job.getJobId(), direction);
-        job.fail(errorMessage, lastException);
+        job.fail(errorMessage, error);
 
-        // Record failure in metrics (both direction-specific and legacy)
-        String errorType = lastException != null ? lastException.getClass().getSimpleName() : "UnknownError";
-        
+        String errorType = error != null ? error.getClass().getSimpleName() : "UnknownError";
         if (directionMetrics != null) {
             directionMetrics.recordTransferFailure(errorType);
-            logger.debug("executeTransfer: recorded failure in direction metrics - key={}, errorType={}", metricsKey, errorType);
+            logger.debug("executeTransfer: recorded failure in direction metrics - key={}, errorType={}",
+                    metricsKey, errorType);
         }
         if (legacyMetrics != null) {
             legacyMetrics.recordTransferFailure(errorType);
             logger.debug("executeTransfer: recorded failure in legacy metrics - protocol={}", protocolName);
         }
 
-        // Record OpenTelemetry metric (Phase 8 - Jan 2026)
         telemetryMetrics.recordTransferFailed(protocolName, direction.name(), errorType);
-
         logger.error("{} transfer failed permanently: {} - {}", direction, job.getJobId(), errorMessage);
-        if (logger.isTraceEnabled() && lastException != null) {
-            logger.debug("Full stack trace for failed transfer {}", job.getJobId(), lastException);
+        if (logger.isTraceEnabled() && error != null) {
+            logger.debug("Full stack trace for failed transfer {}", job.getJobId(), error);
         }
-        return job.toResult();
+
+        return Future.succeededFuture(job.toResult());
     }
     
     /**
@@ -631,20 +645,22 @@ public class SimpleTransferEngine implements TransferEngine {
                 "Both source and destination are local files. Use Files.copy() for local file-to-file operations.");
         }
         
-        // Validate protocol is supported
-        TransferDirection direction = request.getDirection();
-        String protocolScheme = direction == TransferDirection.UPLOAD 
-            ? dest.getScheme() 
-            : source.getScheme();
-        
-        if (!protocolFactory.isProtocolSupported(protocolScheme)) {
+        // Validate configured protocol (protocol is authoritative from job configuration)
+        String configuredProtocol = request.getProtocol();
+        if (!protocolFactory.isProtocolSupported(configuredProtocol)) {
             throw new TransferException(request.getRequestId(),
-                "Unsupported protocol: " + protocolScheme + ". Supported: " + 
+                "Unsupported protocol: " + configuredProtocol + ". Supported: " +
                 String.join(", ", protocolFactory.getSupportedProtocols()));
+        }
+
+        TransferProtocol protocol = protocolFactory.getProtocol(configuredProtocol);
+        if (protocol == null || !protocol.canHandle(request)) {
+            throw new TransferException(request.getRequestId(),
+                "Configured protocol '" + configuredProtocol + "' cannot handle this request direction or URIs");
         }
         
         logger.debug("validateTransferRequest: request {} validated successfully (direction={}, protocol={})",
-            request.getRequestId(), direction, protocolScheme);
+            request.getRequestId(), request.getDirection(), configuredProtocol);
     }
     
     /**

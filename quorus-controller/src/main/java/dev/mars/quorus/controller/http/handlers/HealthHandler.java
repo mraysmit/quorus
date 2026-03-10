@@ -18,6 +18,7 @@ package dev.mars.quorus.controller.http.handlers;
 
 import dev.mars.quorus.controller.raft.RaftNode;
 import io.vertx.core.Handler;
+import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.RoutingContext;
 import org.slf4j.Logger;
@@ -25,6 +26,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.time.Instant;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Full health check handler for Quorus Controller.
@@ -34,14 +36,14 @@ import java.time.Instant;
  * <p>Provides comprehensive health status including:
  * <ul>
  *   <li>Raft node state, term, commitIndex, leader info</li>
- *   <li>Disk space check</li>
- *   <li>Memory usage check</li>
+ *   <li>Disk space check (cached, refreshed every 30s on worker thread)</li>
+ *   <li>Memory usage check (cached, refreshed every 30s on worker thread)</li>
  * </ul>
  *
  * <p>Returns 503 when any check is degraded.
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @version 2.0 (Vert.x reactive)
+ * @version 2.1 (Non-blocking cached health checks)
  * @since 2025-08-26
  */
 public class HealthHandler implements Handler<RoutingContext> {
@@ -49,21 +51,54 @@ public class HealthHandler implements Handler<RoutingContext> {
     private static final Logger logger = LoggerFactory.getLogger(HealthHandler.class);
     private static final long MIN_FREE_DISK_MB = 100;
     private static final double MIN_FREE_MEMORY_RATIO = 0.1;
+    private static final long HEALTH_CHECK_INTERVAL_MS = 30_000;
 
     private final RaftNode raftNode;
     private final String version;
+    private final AtomicBoolean diskOk = new AtomicBoolean(true);
+    private final AtomicBoolean memoryOk = new AtomicBoolean(true);
+    private long timerId = -1;
 
     public HealthHandler(RaftNode raftNode, String version) {
         this.raftNode = raftNode;
         this.version = version;
     }
 
+    /**
+     * Starts periodic background health checks on a worker thread.
+     * Must be called once after construction.
+     */
+    public void startPeriodicChecks(Vertx vertx) {
+        // Run initial check immediately on worker
+        vertx.executeBlocking(() -> {
+            diskOk.set(checkDiskSpace());
+            memoryOk.set(checkMemory());
+            return null;
+        });
+        // Schedule periodic refresh
+        timerId = vertx.setPeriodic(HEALTH_CHECK_INTERVAL_MS, id ->
+            vertx.executeBlocking(() -> {
+                diskOk.set(checkDiskSpace());
+                memoryOk.set(checkMemory());
+                return null;
+            })
+        );
+    }
+
+    /**
+     * Stops periodic background health checks.
+     */
+    public void stopPeriodicChecks(Vertx vertx) {
+        if (timerId >= 0) {
+            vertx.cancelTimer(timerId);
+            timerId = -1;
+        }
+    }
+
     @Override
     public void handle(RoutingContext ctx) {
         boolean raftOk = raftNode.isRunning();
-        boolean diskOk = checkDiskSpace();
-        boolean memoryOk = checkMemory();
-        boolean allHealthy = raftOk && diskOk && memoryOk;
+        boolean allHealthy = raftOk && diskOk.get() && memoryOk.get();
 
         JsonObject health = new JsonObject()
                 .put("status", allHealthy ? "UP" : "DEGRADED")
@@ -78,8 +113,8 @@ public class HealthHandler implements Handler<RoutingContext> {
                         .put("leaderId", raftNode.getLeaderId()))
                 .put("checks", new JsonObject()
                         .put("raftCluster", raftOk ? "UP" : "DOWN")
-                        .put("diskSpace", diskOk ? "UP" : "WARNING")
-                        .put("memory", memoryOk ? "UP" : "WARNING"));
+                        .put("diskSpace", diskOk.get() ? "UP" : "WARNING")
+                        .put("memory", memoryOk.get() ? "UP" : "WARNING"));
 
         if (!allHealthy) {
             ctx.response().setStatusCode(503);

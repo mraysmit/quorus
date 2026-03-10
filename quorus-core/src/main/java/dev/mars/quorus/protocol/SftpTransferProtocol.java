@@ -21,10 +21,13 @@ import dev.mars.quorus.core.TransferResult;
 import dev.mars.quorus.core.TransferStatus;
 import dev.mars.quorus.core.exceptions.QuorusErrorCode;
 import dev.mars.quorus.core.exceptions.TransferException;
+import dev.mars.quorus.storage.ChecksumCalculator;
 import dev.mars.quorus.transfer.TransferContext;
 import dev.mars.quorus.transfer.ProgressTracker;
 
 import static dev.mars.quorus.core.exceptions.QuorusErrorCode.*;
+import io.vertx.core.Context;
+import io.vertx.core.Vertx;
 
 import com.jcraft.jsch.*;
 
@@ -94,6 +97,12 @@ public class SftpTransferProtocol implements TransferProtocol {
 
     @Override
     public TransferResult transfer(TransferRequest request, TransferContext context) throws TransferException {
+        Context vertxContext = Vertx.currentContext();
+        if (vertxContext != null && vertxContext.isEventLoopContext()) {
+            throw new TransferException(context.getJobId(),
+                    "Blocking SFTP transfer() invoked on event loop. Use transferReactive() instead.");
+        }
+
         logger.info("Starting SFTP transfer for job: {}", context.getJobId());
         logger.debug("transfer: request={}, sourceUri={}, destinationUri={}, isUpload={}", 
             request.getRequestId(), request.getSourceUri(), request.getDestinationUri(), request.isUpload());
@@ -211,10 +220,10 @@ public class SftpTransferProtocol implements TransferProtocol {
 
                 // Calculate checksum if required
                 String checksum = null;
-                if (request.getExpectedChecksum() != null) {
+                if (request.getExpectedChecksum() != null && !request.getExpectedChecksum().isEmpty()) {
                     logger.info("Calculating checksum for transferred file");
                     logger.debug("performSftpDownload: checksum calculation requested");
-                    checksum = "demo-checksum-" + bytesTransferred;
+                    checksum = ChecksumCalculator.calculateFileChecksum(request.getDestinationPath());
                 }
 
                 Instant endTime = Instant.now();
@@ -306,10 +315,10 @@ public class SftpTransferProtocol implements TransferProtocol {
 
                 // Calculate checksum if required
                 String checksum = null;
-                if (request.getExpectedChecksum() != null) {
+                if (request.getExpectedChecksum() != null && !request.getExpectedChecksum().isEmpty()) {
                     logger.info("Calculating checksum for uploaded file");
                     logger.debug("performSftpUpload: checksum calculation requested");
-                    checksum = "demo-checksum-" + bytesTransferred;
+                    checksum = ChecksumCalculator.calculateFileChecksum(sourcePath);
                 }
 
                 Instant endTime = Instant.now();

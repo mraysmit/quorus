@@ -147,28 +147,34 @@ public class TransferHandler {
      */
     public Handler<RoutingContext> handleDelete() {
         return ctx -> {
-            String jobId = ctx.pathParam("jobId");
-            logger.info("Deleting transfer job: jobId={}", jobId);
-            QuorusStateStore stateMachine = this.stateStore;
+            try {
+                String jobId = ctx.pathParam("jobId");
+                logger.info("Deleting transfer job: jobId={}", jobId);
+                QuorusStateStore stateMachine = this.stateStore;
 
-            if (!stateMachine.hasTransferJob(jobId)) {
-                throw QuorusApiException.notFound(ErrorCode.TRANSFER_NOT_FOUND, jobId);
+                if (!stateMachine.hasTransferJob(jobId)) {
+                    throw QuorusApiException.notFound(ErrorCode.TRANSFER_NOT_FOUND, jobId);
+                }
+
+                TransferJobCommand command = TransferJobCommand.delete(jobId);
+                raftNode.submitCommand(command)
+                        .onSuccess(result -> {
+                            if (result instanceof CommandResult.NotFound<?> nf) {
+                                logger.warn("Transfer job disappeared during deletion (race condition): jobId={}", nf.id());
+                                ctx.fail(QuorusApiException.notFound(ErrorCode.TRANSFER_NOT_FOUND, nf.id()));
+                            } else {
+                                logger.info("Transfer job deleted: jobId={}", jobId);
+                                ctx.json(new JsonObject()
+                                        .put("jobId", jobId)
+                                        .put("message", "Transfer job cancelled and deleted successfully"));
+                            }
+                        })
+                        .onFailure(ctx::fail);
+            } catch (Exception e) {
+                logger.error("Failed to delete transfer job: {}", e.getMessage());
+                logger.debug("Stack trace for transfer job deletion failure", e);
+                ctx.fail(e);
             }
-
-            TransferJobCommand command = TransferJobCommand.delete(jobId);
-            raftNode.submitCommand(command)
-                    .onSuccess(result -> {
-                        if (result instanceof CommandResult.NotFound<?> nf) {
-                            logger.warn("Transfer job disappeared during deletion (race condition): jobId={}", nf.id());
-                            ctx.fail(QuorusApiException.notFound(ErrorCode.TRANSFER_NOT_FOUND, nf.id()));
-                        } else {
-                            logger.info("Transfer job deleted: jobId={}", jobId);
-                            ctx.json(new JsonObject()
-                                    .put("jobId", jobId)
-                                    .put("message", "Transfer job cancelled and deleted successfully"));
-                        }
-                    })
-                    .onFailure(ctx::fail);
         };
     }
 }

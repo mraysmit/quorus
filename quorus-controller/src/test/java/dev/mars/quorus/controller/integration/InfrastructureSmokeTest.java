@@ -318,10 +318,10 @@ class InfrastructureSmokeTest {
 
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
         
-        // Metrics endpoint should respond - either with metrics (200) or with error if OTel exporter is not running (500)
-        // In test environment without OTel exporter, we expect 500 with a descriptive error
-        assertTrue(response.statusCode() == 200 || response.statusCode() == 500,
-                "Metrics endpoint should respond with 200 (if OTel running) or 500 (if not)");
+        // Metrics endpoint should respond - either with metrics (200) or with error if OTel exporter is not running (503)
+        // In test environment without OTel exporter, we expect 503 with a standard error envelope
+        assertTrue(response.statusCode() == 200 || response.statusCode() == 503,
+                "Metrics endpoint should respond with 200 (if OTel running) or 503 (if not)");
         
         if (response.statusCode() == 200) {
             // If OTel exporter is running, verify we get Prometheus-format metrics
@@ -330,10 +330,10 @@ class InfrastructureSmokeTest {
                     "Metrics response should contain Prometheus-format data");
             logger.info("[OK] Metrics endpoint responds with Prometheus data");
         } else {
-            // Verify we get a meaningful error message, not a crash
+            // Verify we get a standard error envelope
             String body = response.body();
-            assertTrue(body.contains("Metrics unavailable") || body.contains("Internal Server Error"),
-                    "Metrics endpoint should return descriptive error when OTel exporter unavailable");
+            assertTrue(body.contains("Metrics unavailable") || body.contains("SERVICE_UNAVAILABLE") || body.contains("error"),
+                    "Metrics endpoint should return standard error envelope when OTel exporter unavailable");
             logger.info("[OK] Metrics endpoint responds with expected error (OTel exporter not running in test)");
         }
     }

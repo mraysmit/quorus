@@ -47,6 +47,6 @@ public class StatusHandler implements Handler<RoutingContext> {
         logger.debug("Status check requested");
         ctx.json(new JsonObject()
                 .put("status", "Controller running")
-                .put("nodeId", raftNode != null ? raftNode.getNodeId() : "unknown"));
+                .put("nodeId", raftNode.getNodeId()));
     }
 }

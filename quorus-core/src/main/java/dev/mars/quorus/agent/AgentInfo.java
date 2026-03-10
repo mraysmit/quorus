@@ -96,6 +96,29 @@ public class AgentInfo {
     }
 
     /**
+     * Create a deep copy of the given AgentInfo.
+     * Used by the Raft state machine to avoid in-place mutation of
+     * objects visible to concurrent readers.
+     *
+     * @param source the agent info to copy
+     * @return a new AgentInfo instance with the same field values
+     */
+    public static AgentInfo copyOf(AgentInfo source) {
+        AgentInfo copy = new AgentInfo(source.agentId, source.hostname, source.address, source.port);
+        copy.capabilities = source.capabilities;
+        copy.status = source.status;
+        copy.registrationTime = source.registrationTime;
+        copy.lastHeartbeat = source.lastHeartbeat;
+        copy.version = source.version;
+        copy.region = source.region;
+        copy.datacenter = source.datacenter;
+        if (source.metadata != null) {
+            copy.metadata = new HashMap<>(source.metadata);
+        }
+        return copy;
+    }
+
+    /**
      * Get the unique agent identifier.
      * 
      * @return the agent ID

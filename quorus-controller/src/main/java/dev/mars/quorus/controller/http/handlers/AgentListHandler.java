@@ -17,7 +17,6 @@
 package dev.mars.quorus.controller.http.handlers;
 
 import dev.mars.quorus.agent.AgentInfo;
-import dev.mars.quorus.controller.raft.RaftNode;
 import dev.mars.quorus.controller.state.QuorusStateStore;
 import io.vertx.core.Handler;
 import io.vertx.core.json.JsonArray;
@@ -44,11 +43,9 @@ import java.util.Map;
 public class AgentListHandler implements Handler<RoutingContext> {
 
     private static final Logger logger = LoggerFactory.getLogger(AgentListHandler.class);
-    private final RaftNode raftNode;
     private final QuorusStateStore stateStore;
 
-    public AgentListHandler(RaftNode raftNode, QuorusStateStore stateStore) {
-        this.raftNode = raftNode;
+    public AgentListHandler(QuorusStateStore stateStore) {
         this.stateStore = stateStore;
     }
 
@@ -74,7 +71,7 @@ public class AgentListHandler implements Handler<RoutingContext> {
                     .put("available", agent.isAvailable()));
         }
 
-        logger.info("Returning {} agents", agents.size());
+        logger.debug("Returning {} agents", agents.size());
         ctx.json(new JsonObject()
                 .put("agents", agentArray)
                 .put("count", agents.size()));

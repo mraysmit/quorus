@@ -190,7 +190,7 @@ public class QuorusStateStore implements RaftLogApplicator {
                         existingJob.getBytesTransferred(),
                         existingJob.getTotalBytes(),
                         existingJob.getStartTime(),
-                        java.time.Instant.now(),
+                        cmd.timestamp(),
                         existingJob.getErrorMessage(),
                         existingJob.getDescription());
                 transferJobs.put(jobId, updatedJob);
@@ -215,7 +215,7 @@ public class QuorusStateStore implements RaftLogApplicator {
                         cmd.bytesTransferred(),
                         progressJob.getTotalBytes(),
                         progressJob.getStartTime(),
-                        java.time.Instant.now(),
+                        cmd.timestamp(),
                         progressJob.getErrorMessage(),
                         progressJob.getDescription());
                 transferJobs.put(jobId, updatedJob);
@@ -276,13 +276,13 @@ public class QuorusStateStore implements RaftLogApplicator {
                     yield new CommandResult.CasMismatch<>(existingAgent);
                 }
                 AgentStatus oldStatus = existingAgent.getStatus();
-                AgentStatus newStatus = cmd.newStatus();
-                existingAgent.setStatus(newStatus);
-                existingAgent.setLastHeartbeat(Instant.now());
-                agents.put(agentId, existingAgent);
+                AgentInfo updated = AgentInfo.copyOf(existingAgent);
+                updated.setStatus(cmd.newStatus());
+                updated.setLastHeartbeat(cmd.timestamp());
+                agents.put(agentId, updated);
                 logger.info("Updated agent status: agentId={}, oldStatus={}, newStatus={}", 
-                    agentId, oldStatus, newStatus);
-                yield new CommandResult.Success<>(existingAgent);
+                    agentId, oldStatus, cmd.newStatus());
+                yield new CommandResult.Success<>(updated);
             }
             case AgentCommand.UpdateCapabilities cmd -> {
                 logger.debug("Updating agent capabilities: agentId={}", agentId);
@@ -292,28 +292,30 @@ public class QuorusStateStore implements RaftLogApplicator {
                     yield new CommandResult.NotFound<>(agentId, "Agent");
                 }
                 AgentCapabilities newCapabilities = cmd.newCapabilities();
-                agentToUpdate.setCapabilities(newCapabilities);
-                agentToUpdate.setLastHeartbeat(Instant.now());
-                agents.put(agentId, agentToUpdate);
+                AgentInfo updated = AgentInfo.copyOf(agentToUpdate);
+                updated.setCapabilities(newCapabilities);
+                updated.setLastHeartbeat(cmd.timestamp());
+                agents.put(agentId, updated);
                 logger.info("Updated agent capabilities: agentId={}, protocols={}", 
                     agentId, newCapabilities != null ? newCapabilities.getSupportedProtocols() : "null");
-                yield new CommandResult.Success<>(agentToUpdate);
+                yield new CommandResult.Success<>(updated);
             }
-            case AgentCommand.Heartbeat ignored -> {
+            case AgentCommand.Heartbeat cmd -> {
                 logger.debug("Processing heartbeat: agentId={}", agentId);
                 AgentInfo agentForHeartbeat = agents.get(agentId);
                 if (agentForHeartbeat == null) {
                     logger.warn("Agent not found for heartbeat: id={}", agentId);
                     yield new CommandResult.NotFound<>(agentId, "Agent");
                 }
-                agentForHeartbeat.setLastHeartbeat(Instant.now());
+                AgentInfo updated = AgentInfo.copyOf(agentForHeartbeat);
+                updated.setLastHeartbeat(cmd.timestamp());
                 if (agentForHeartbeat.getStatus() == AgentStatus.REGISTERING) {
                     logger.debug("Agent transitioning from REGISTERING to HEALTHY: agentId={}", agentId);
-                    agentForHeartbeat.setStatus(AgentStatus.HEALTHY);
+                    updated.setStatus(AgentStatus.HEALTHY);
                 }
-                agents.put(agentId, agentForHeartbeat);
-                logger.debug("Heartbeat received: agentId={}, status={}", agentId, agentForHeartbeat.getStatus());
-                yield new CommandResult.Success<>(agentForHeartbeat);
+                agents.put(agentId, updated);
+                logger.debug("Heartbeat received: agentId={}, status={}", agentId, updated.getStatus());
+                yield new CommandResult.Success<>(updated);
             }
         };
     }
@@ -331,6 +333,10 @@ public class QuorusStateStore implements RaftLogApplicator {
             }
             case SystemMetadataCommand.Delete ignored -> {
                 String removedValue = systemMetadata.remove(key);
+                if (removedValue == null) {
+                    logger.warn("System metadata not found for deletion: key={}", key);
+                    yield new CommandResult.NotFound<>(key, "SystemMetadata");
+                }
                 logger.info("Deleted system metadata: key={}, removedValue={}", key, removedValue);
                 yield new CommandResult.Success<>(removedValue);
             }
@@ -499,8 +505,11 @@ public class QuorusStateStore implements RaftLogApplicator {
                     logger.warn("Job not found for expedite: id={}", jobId);
                     yield new CommandResult.NotFound<>(jobId, "QueuedJob");
                 }
-                logger.info("Expedited job: jobId={}, reason={}", jobId, cmd.reason());
-                yield new CommandResult.Success<>(expediteJob);
+                QueuedJob expedited = expediteJob.withPriority(JobPriority.CRITICAL);
+                jobQueue.put(jobId, expedited);
+                logger.info("Expedited job: jobId={}, oldPriority={}, newPriority=CRITICAL, reason={}",
+                    jobId, expediteJob.getPriority(), cmd.reason());
+                yield new CommandResult.Success<>(expedited);
             }
             case JobQueueCommand.UpdateRequirements cmd -> {
                 logger.debug("Updating job requirements: jobId={}", jobId);
@@ -630,13 +639,13 @@ public class QuorusStateStore implements RaftLogApplicator {
             QuorusSnapshot restoredSnapshot = objectMapper.readValue(snapshot, QuorusSnapshot.class);
 
             transferJobs.clear();
-            transferJobs.putAll(restoredSnapshot.getTransferJobs());
+            Optional.ofNullable(restoredSnapshot.getTransferJobs()).ifPresent(transferJobs::putAll);
 
             agents.clear();
             Optional.ofNullable(restoredSnapshot.getAgents()).ifPresent(agents::putAll);
 
             systemMetadata.clear();
-            systemMetadata.putAll(restoredSnapshot.getSystemMetadata());
+            Optional.ofNullable(restoredSnapshot.getSystemMetadata()).ifPresent(systemMetadata::putAll);
 
             jobAssignments.clear();
             Optional.ofNullable(restoredSnapshot.getJobAssignments()).ifPresent(jobAssignments::putAll);

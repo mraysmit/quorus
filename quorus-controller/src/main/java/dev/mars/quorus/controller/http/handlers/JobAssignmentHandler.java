@@ -246,11 +246,8 @@ public class JobAssignmentHandler {
                             if (result instanceof CommandResult.CasMismatch<?>) {
                                 logger.warn("Assignment state conflict during status update: assignmentId={}, expected={}, target={}",
                                         assignmentId, currentStatus, newStatus);
-                                ctx.response().setStatusCode(409);
-                                ctx.json(new JsonObject()
-                                        .put("error", "ASSIGNMENT_STATE_CONFLICT")
-                                        .put("message", "Assignment status changed concurrently, please retry")
-                                        .put("assignmentId", assignmentId));
+                                ctx.fail(QuorusApiException.conflict(ErrorCode.ASSIGNMENT_STATE_CONFLICT,
+                                        assignmentId, currentStatus.name(), "update (concurrent modification)"));
                             } else if (result instanceof CommandResult.NotFound<?> nf) {
                                 logger.warn("Assignment disappeared during status update (race condition): assignmentId={}", nf.id());
                                 ctx.fail(QuorusApiException.notFound(ErrorCode.ASSIGNMENT_NOT_FOUND, nf.id()));

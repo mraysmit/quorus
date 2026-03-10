@@ -245,14 +245,19 @@ class AgentJobManagementIntegrationTest {
         assertEquals(200, response.statusCode(), "Job polling should succeed");
 
         JsonNode responseJson = objectMapper.readTree(response.body());
-        assertTrue(responseJson.isArray(), "Response should be an array");
-        assertTrue(responseJson.size() > 0, "Should have at least one pending job");
+        assertTrue(responseJson.has("pendingJobs"), "Response should have pendingJobs field");
+        assertTrue(responseJson.has("total"), "Response should have total field");
 
-        JsonNode firstJob = responseJson.get(0);
+        JsonNode pendingJobs = responseJson.get("pendingJobs");
+        assertTrue(pendingJobs.isArray(), "pendingJobs should be an array");
+        assertTrue(pendingJobs.size() > 0, "Should have at least one pending job");
+        assertEquals(pendingJobs.size(), responseJson.get("total").asInt(), "total should match array size");
+
+        JsonNode firstJob = pendingJobs.get(0);
         assertEquals(testJobId, firstJob.get("jobId").asText(), "Job ID should match");
         assertEquals(testAgentId, firstJob.get("agentId").asText(), "Agent ID should match");
 
-        logger.info("[PASS] Agent polled and found " + responseJson.size() + " pending job(s)");
+        logger.info("[PASS] Agent polled and found " + pendingJobs.size() + " pending job(s)");
     }
 
     @Test
@@ -378,8 +383,11 @@ class AgentJobManagementIntegrationTest {
         assertEquals(200, response.statusCode(), "Job polling should succeed");
 
         JsonNode responseJson = objectMapper.readTree(response.body());
-        assertTrue(responseJson.isArray(), "Response should be an array");
-        assertEquals(0, responseJson.size(), "Should have no pending jobs after completion");
+        assertTrue(responseJson.has("pendingJobs"), "Response should have pendingJobs field");
+        JsonNode pendingJobs = responseJson.get("pendingJobs");
+        assertTrue(pendingJobs.isArray(), "pendingJobs should be an array");
+        assertEquals(0, pendingJobs.size(), "Should have no pending jobs after completion");
+        assertEquals(0, responseJson.get("total").asInt(), "total should be 0");
 
         logger.info("[PASS] No pending jobs found (as expected)");
     }

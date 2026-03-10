@@ -21,7 +21,9 @@ import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferResult;
 import dev.mars.quorus.core.exceptions.TransferException;
 import dev.mars.quorus.transfer.TransferContext;
+import io.vertx.core.Context;
 import io.vertx.core.Future;
+import io.vertx.core.Vertx;
 
 /**
  * Protocol interface for file transfers.
@@ -45,16 +47,17 @@ public interface TransferProtocol {
 
     /**
      * Execute transfer asynchronously (reactive).
-     * Default implementation wraps the blocking transfer method.
+     * Default implementation offloads the deprecated blocking transfer method to
+     * a Vert.x worker thread, preserving event-loop non-blocking behavior.
      */
     default Future<TransferResult> transferReactive(TransferRequest request, TransferContext context) {
-        return Future.future(promise -> {
-            try {
-                promise.complete(transfer(request, context));
-            } catch (Exception e) {
-                promise.fail(e);
-            }
-        });
+        Context vertxContext = Vertx.currentContext();
+        if (vertxContext == null) {
+            return Future.failedFuture(new TransferException(context.getJobId(),
+                    "No Vert.x context available for reactive protocol execution"));
+        }
+
+        return vertxContext.owner().executeBlocking(() -> transfer(request, context), false);
     }
     
     boolean supportsResume();

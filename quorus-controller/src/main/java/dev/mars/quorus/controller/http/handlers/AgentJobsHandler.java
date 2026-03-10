@@ -16,7 +16,6 @@
 
 package dev.mars.quorus.controller.http.handlers;
 
-import dev.mars.quorus.controller.raft.RaftNode;
 import dev.mars.quorus.controller.state.QuorusStateStore;
 import dev.mars.quorus.controller.state.TransferJobSnapshot;
 import dev.mars.quorus.core.JobAssignment;
@@ -45,11 +44,9 @@ import java.util.Map;
 public class AgentJobsHandler implements Handler<RoutingContext> {
 
     private static final Logger logger = LoggerFactory.getLogger(AgentJobsHandler.class);
-    private final RaftNode raftNode;
     private final QuorusStateStore stateStore;
 
-    public AgentJobsHandler(RaftNode raftNode, QuorusStateStore stateStore) {
-        this.raftNode = raftNode;
+    public AgentJobsHandler(QuorusStateStore stateStore) {
         this.stateStore = stateStore;
     }
 
@@ -71,7 +68,7 @@ public class AgentJobsHandler implements Handler<RoutingContext> {
             }
 
             JsonObject jobInfo = new JsonObject()
-                    .put("assignmentId", assignment.getJobId() + "-" + assignment.getAgentId())
+                    .put("assignmentId", assignment.getJobId() + ":" + assignment.getAgentId())
                     .put("jobId", assignment.getJobId())
                     .put("agentId", assignment.getAgentId())
                     .put("status", assignment.getStatus().toString())
@@ -92,9 +89,9 @@ public class AgentJobsHandler implements Handler<RoutingContext> {
         }
 
         logger.debug("Returning {} pending jobs for agent: agentId={}", pendingJobs.size(), agentId);
-        ctx.response()
-                .putHeader("Content-Type", "application/json")
-                .end(pendingJobs.encode());
+        ctx.json(new JsonObject()
+                .put("pendingJobs", pendingJobs)
+                .put("total", pendingJobs.size()));
     }
 }
 

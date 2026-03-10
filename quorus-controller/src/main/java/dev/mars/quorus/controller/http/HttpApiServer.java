@@ -58,6 +58,7 @@ public class HttpApiServer {
     private final QuorusStateStore stateStore;
     private final int prometheusPort;
     private final DrainModeHandler drainModeHandler;
+    private HealthHandler healthHandler;
     private HttpServer httpServer;
 
     /**
@@ -99,9 +100,11 @@ public class HttpApiServer {
         }
 
         // ==================== Health Endpoints ====================
+        this.healthHandler = new HealthHandler(raftNode, VERSION);
+        healthHandler.startPeriodicChecks(vertx);
         router.get("/health/live").handler(new LivenessHandler());
         router.get("/health/ready").handler(new ReadinessHandler(raftNode));
-        router.get("/health").handler(new HealthHandler(raftNode, VERSION));
+        router.get("/health").handler(healthHandler);
         router.get("/status").handler(new StatusHandler(raftNode));
 
         // ==================== Cluster / Info Endpoints ====================
@@ -111,8 +114,8 @@ public class HttpApiServer {
         // ==================== Agent Endpoints ====================
         router.post("/api/v1/agents/register").handler(new AgentRegistrationHandler(raftNode));
         router.post("/api/v1/agents/heartbeat").handler(new HeartbeatHandler(raftNode, stateStore));
-        router.get("/api/v1/agents").handler(new AgentListHandler(raftNode, stateStore));
-        router.get("/api/v1/agents/:agentId/jobs").handler(new AgentJobsHandler(raftNode, stateStore));
+        router.get("/api/v1/agents").handler(new AgentListHandler(stateStore));
+        router.get("/api/v1/agents/:agentId/jobs").handler(new AgentJobsHandler(stateStore));
 
         // ==================== Transfer Endpoints ====================
         TransferHandler transferHandler = new TransferHandler(raftNode, stateStore);
@@ -157,6 +160,9 @@ public class HttpApiServer {
     }
 
     public Future<Void> stop() {
+        if (healthHandler != null) {
+            healthHandler.stopPeriodicChecks(vertx);
+        }
         if (httpServer != null) {
             return httpServer.close()
                     .onSuccess(v -> logger.info("HTTP API Server stopped"));

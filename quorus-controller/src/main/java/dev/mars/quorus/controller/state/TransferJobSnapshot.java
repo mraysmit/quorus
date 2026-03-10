@@ -87,28 +87,23 @@ public class TransferJobSnapshot implements Serializable {
     }
 
     /**
-     * Convert back to a TransferJob (simplified reconstruction).
+     * Convert back to a TransferJob.
+     * Note: TransferJob uses AtomicReference for status management,
+     * so the restored job always starts in PENDING. Use the snapshot
+     * fields directly when current state is needed.
      */
     public TransferJob toTransferJob() {
-        try {
-            TransferRequest request = TransferRequest.builder()
-                    .sourceUri(java.net.URI.create(sourceUri))
-                    .destinationPath(java.nio.file.Paths.get(destinationPath))
-                    .expectedSize(totalBytes)
-                    .build();
-            
-            if (description != null) {
-                request.getMetadata().put("description", description);
-            }
-            
-            TransferJob job = new TransferJob(request);
-            
-            // Set the status and other fields (simplified)
-            // In a real implementation, we'd need to properly restore the atomic references
-            return job;
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to reconstruct TransferJob from snapshot", e);
+        TransferRequest.Builder builder = TransferRequest.builder()
+                .requestId(jobId)
+                .sourceUri(java.net.URI.create(sourceUri))
+                .destinationUri(java.net.URI.create(destinationPath))
+                .expectedSize(totalBytes);
+
+        if (description != null) {
+            builder.metadata("description", description);
         }
+
+        return new TransferJob(builder.build());
     }
 
     // Getters

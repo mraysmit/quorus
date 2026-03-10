@@ -50,7 +50,8 @@ public record ErrorResponse(
     String message,
     Instant timestamp,
     String path,
-    String requestId
+    String requestId,
+    int httpStatus
 ) {
     /**
      * Creates an ErrorResponse with an explicit message.
@@ -63,7 +64,8 @@ public record ErrorResponse(
             message,
             Instant.now(),
             path,
-            generateRequestId()
+            generateRequestId(),
+            code.httpStatus()
         );
     }
 
@@ -78,7 +80,8 @@ public record ErrorResponse(
             message,
             Instant.now(),
             path,
-            requestId != null ? requestId : generateRequestId()
+            requestId != null ? requestId : generateRequestId(),
+            code.httpStatus()
         );
     }
 
@@ -93,7 +96,8 @@ public record ErrorResponse(
             String.format(code.messageTemplate(), messageArgs),
             Instant.now(),
             path,
-            generateRequestId()
+            generateRequestId(),
+            code.httpStatus()
         );
     }
 
@@ -110,7 +114,8 @@ public record ErrorResponse(
             message,
             Instant.now(),
             path,
-            generateRequestId()
+            generateRequestId(),
+            code.httpStatus()
         );
     }
 
@@ -127,7 +132,8 @@ public record ErrorResponse(
             message,
             Instant.now(),
             path,
-            requestId != null ? requestId : generateRequestId()
+            requestId != null ? requestId : generateRequestId(),
+            code.httpStatus()
         );
     }
 
@@ -145,16 +151,7 @@ public record ErrorResponse(
                 .put("requestId", requestId));
     }
 
-    /**
-     * Gets the HTTP status code for this error based on the error code.
-     */
-    public int httpStatus() {
-        return ErrorCode.fromCode(code)
-            .map(ErrorCode::httpStatus)
-            .orElse(500);
-    }
-
     private static String generateRequestId() {
-        return "req-" + UUID.randomUUID().toString().substring(0, 8);
+        return "req-" + UUID.randomUUID().toString();
     }
 }
