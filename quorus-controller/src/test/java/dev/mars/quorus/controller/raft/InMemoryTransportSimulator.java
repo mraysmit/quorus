@@ -599,7 +599,8 @@ public class InMemoryTransportSimulator implements RaftTransport {
             try {
                 action.run();
             } catch (Exception e) {
-                logger.error("Error delivering delayed message", e);
+                logger.error("Error delivering delayed message: {}", e.getMessage());
+                logger.debug("Stack trace for delayed message delivery failure", e);
             }
         }
         

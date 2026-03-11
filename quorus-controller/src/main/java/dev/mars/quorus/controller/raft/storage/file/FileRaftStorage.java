@@ -187,7 +187,8 @@ public final class FileRaftStorage implements RaftStorage {
                     logChannel.close();
                     logger.info("FileRaftStorage closed: {}", dataDir);
                 } catch (IOException e) {
-                    logger.warn("Error closing log channel", e);
+                    logger.warn("Error closing log channel: {}", e.getMessage());
+                    logger.debug("Stack trace for log channel close failure", e);
                 }
             }
             return null;

@@ -215,7 +215,8 @@ public class ShutdownCoordinator {
                 })
                 .onFailure(err -> {
                     state.set(State.STOPPED);
-                    logger.warn("Shutdown completed with errors", err);
+                    logger.warn("Shutdown completed with errors: {}", err.getMessage());
+                    logger.debug("Stack trace for graceful shutdown errors", err);
                 });
     }
     

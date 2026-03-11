@@ -815,7 +815,8 @@ public class RaftNode {
             try {
                 listener.handle(newState);
             } catch (Exception e) {
-                logger.warn("State change listener threw exception", e);
+                logger.warn("State change listener threw exception: {}", e.getMessage());
+                logger.debug("Stack trace for state change listener exception", e);
             }
         }
     }
@@ -1066,6 +1067,11 @@ public class RaftNode {
         vertx.runOnContext(v -> {
             try {
                 long reqTerm = request.getTerm();
+                boolean higherTermObserved = reqTerm > currentTerm;
+
+                logger.debug("Handling vote request: candidateId={}, requestTerm={}, localTerm={}, localVotedFor={}, candidateLastLogTerm={}, candidateLastLogIndex={}",
+                        request.getCandidateId(), reqTerm, currentTerm, votedFor,
+                        request.getLastLogTerm(), request.getLastLogIndex());
 
                 // Step 1: Reject if stale term
                 if (reqTerm < currentTerm) {
@@ -1081,6 +1087,8 @@ public class RaftNode {
                 if (reqTerm > currentTerm) {
                     // Vote path persists metadata explicitly via persistVote().
                     // Avoid racing an empty-vote persistence from stepDown.
+                    logger.debug("Higher term observed in vote request: requestTerm={} > localTerm={}. Stepping down without immediate metadata persistence.",
+                            reqTerm, currentTerm);
                     stepDown(reqTerm, false);
                 }
 
@@ -1088,6 +1096,9 @@ public class RaftNode {
                 boolean canGrantVoteForCandidate = (votedFor == null || votedFor.equals(request.getCandidateId()));
                 boolean candidateLogUpToDate = isCandidateLogUpToDate(request.getLastLogTerm(), request.getLastLogIndex());
                 boolean canGrant = canGrantVoteForCandidate && candidateLogUpToDate;
+
+                logger.debug("Vote decision inputs: canGrantVoteForCandidate={}, candidateLogUpToDate={}, canGrant={}, effectiveLocalTerm={}",
+                    canGrantVoteForCandidate, candidateLogUpToDate, canGrant, currentTerm);
 
                 if (canGrant) {
                     // Step 4: Persist metadata BEFORE granting vote (Persist-before-Grant)
@@ -1130,10 +1141,32 @@ public class RaftNode {
                         logger.debug("Vote rejected: candidate log is not up-to-date (candidateTerm={}, candidateIndex={}, localTerm={}, localIndex={})",
                                 request.getLastLogTerm(), request.getLastLogIndex(), getLastLogTerm(), getLastLogIndex());
                     }
-                    promise.complete(VoteResponse.newBuilder()
-                            .setTerm(currentTerm)
-                            .setVoteGranted(false)
-                            .build());
+
+                    // If a higher term was observed, persist it even when rejecting the vote.
+                    // This prevents term regression after restart.
+                    if (higherTermObserved) {
+                        logger.debug("Persisting higher observed term {} with empty vote before rejecting vote request from candidate {}",
+                                reqTerm, request.getCandidateId());
+                        persistMetadata(reqTerm, Optional.empty())
+                            .onSuccess(v3 -> promise.complete(VoteResponse.newBuilder()
+                                .setTerm(currentTerm)
+                                .setVoteGranted(false)
+                                .build()))
+                            .onFailure(termPersistErr -> {
+                                logger.error("Failed to persist higher term {} on vote rejection: {}",
+                                    reqTerm, termPersistErr.getMessage());
+                                logger.debug("Stack trace for higher-term persist failure on vote rejection", termPersistErr);
+                                promise.complete(VoteResponse.newBuilder()
+                                    .setTerm(currentTerm)
+                                    .setVoteGranted(false)
+                                    .build());
+                            });
+                    } else {
+                        promise.complete(VoteResponse.newBuilder()
+                                .setTerm(currentTerm)
+                                .setVoteGranted(false)
+                                .build());
+                    }
                 }
             } catch (Exception e) {
                 logger.error("Error handling vote request: {}", e.getMessage());
@@ -1148,6 +1181,7 @@ public class RaftNode {
      * Persists vote metadata to WAL.
      */
     private Future<Void> persistVote(long term, String candidateId) {
+        logger.debug("Persisting granted vote metadata: term={}, candidateId={}", term, candidateId);
         return persistMetadata(term, Optional.of(candidateId));
     }
 
@@ -1160,6 +1194,10 @@ public class RaftNode {
     }
 
     private Future<Void> persistMetadata(long term, Optional<String> votedForCandidate) {
+        if (logger.isDebugEnabled()) {
+            logger.debug("Persisting raft metadata: term={}, votedForPresent={}, votedFor={}",
+                    term, votedForCandidate.isPresent(), votedForCandidate.orElse("<none>"));
+        }
         return storage.map(s -> s.updateMetadata(term, votedForCandidate))
             .orElseGet(Future::succeededFuture);  // Volatile mode
     }
@@ -1525,7 +1563,8 @@ public class RaftNode {
         try {
             snapshotData = stateMachine.takeSnapshot();
         } catch (Exception e) {
-            logger.error("Failed to take state machine snapshot: {}", e.getMessage(), e);
+            logger.error("Failed to take state machine snapshot: {}", e.getMessage());
+            logger.debug("Stack trace for state machine snapshot failure", e);
             return Future.failedFuture(e);
         }
 
@@ -1571,7 +1610,10 @@ public class RaftNode {
                             snapshotIndex, log.size(), duration);
                     return Future.<Void>succeededFuture();
                 })
-                .onFailure(err -> logger.error("Snapshot failed: {}", err.getMessage(), err));
+                .onFailure(err -> {
+                    logger.error("Snapshot failed: {}", err.getMessage());
+                    logger.debug("Stack trace for snapshot operation failure", err);
+                });
     }
 
     /**
@@ -1750,7 +1792,8 @@ public class RaftNode {
                 continueInstallSnapshotAfterTermCheck(request, promise);
 
             } catch (Exception e) {
-                logger.error("Error handling InstallSnapshot: {}", e.getMessage(), e);
+                logger.error("Error handling InstallSnapshot: {}", e.getMessage());
+                logger.debug("Stack trace for InstallSnapshot handling error", e);
                 promise.fail(e);
             }
         });
@@ -1848,7 +1891,8 @@ public class RaftNode {
                                 .build());
                     })
                     .onFailure(err -> {
-                        logger.error("Failed to persist installed snapshot: {}", err.getMessage(), err);
+                        logger.error("Failed to persist installed snapshot: {}", err.getMessage());
+                        logger.debug("Stack trace for installed snapshot persistence failure", err);
                         pendingInstalls.remove(leaderId);
                         promise.complete(InstallSnapshotResponse.newBuilder()
                                 .setTerm(currentTerm)

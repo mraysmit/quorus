@@ -85,7 +85,8 @@ public class YamlWorkflowDefinitionParser implements WorkflowDefinitionParser {
                     definition.getMetadata().getName(), definition.getMetadata().getVersion(), yamlFile);
             return definition;
         } catch (IOException e) {
-            logger.warn("Failed to read YAML file: {}", yamlFile, e);
+            logger.warn("Failed to read YAML file: {}: {}", yamlFile, e.getMessage());
+            logger.debug("Stack trace for YAML file read failure: {}", yamlFile, e);
             throw new WorkflowParseException("Failed to read YAML file: " + yamlFile, e);
         }
     }

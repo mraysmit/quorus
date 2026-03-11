@@ -236,7 +236,8 @@ public class QuorusAgent {
                     heartbeatService.sendHeartbeat()
                         .onSuccess(success -> metrics.recordHeartbeat(success))
                         .onFailure(err -> {
-                            logger.error("Error sending heartbeat", err);
+                            logger.error("Error sending heartbeat: {}", err.getMessage());
+                            logger.debug("Stack trace for heartbeat send failure", err);
                             metrics.recordHeartbeat(false);
                         });
                 }
@@ -402,7 +403,8 @@ public class QuorusAgent {
     }
 
     private void handleTransferError(String jobId, Throwable throwable) {
-        logger.error("Transfer error: {}", jobId, throwable);
+        logger.error("Transfer error: {}: {}", jobId, throwable.getMessage());
+        logger.debug("Stack trace for transfer error: jobId={}", jobId, throwable);
         jobStatusReportingService.reportFailed(jobId, throwable.getMessage());
     }
     

@@ -73,7 +73,8 @@ public class QuorusControllerApplication {
                     logger.info("QuorusControllerVerticle deployed successfully (Deployment ID: {})", id);
                 })
                 .onFailure(err -> {
-                    logger.error("Failed to deploy QuorusControllerVerticle", err);
+                    logger.error("Failed to deploy QuorusControllerVerticle: {}", err.getMessage());
+                    logger.debug("Stack trace for QuorusControllerVerticle deployment failure", err);
                     System.exit(1);
                 });
 
@@ -82,7 +83,10 @@ public class QuorusControllerApplication {
             logger.info("Shutdown signal received, closing Vert.x...");
             vertx.close()
                     .onSuccess(v -> logger.info("Vert.x closed successfully"))
-                    .onFailure(err -> logger.error("Error closing Vert.x", err));
+                    .onFailure(err -> {
+                        logger.error("Error closing Vert.x: {}", err.getMessage());
+                        logger.debug("Stack trace for Vert.x close failure", err);
+                    });
         }));
     }
 }
