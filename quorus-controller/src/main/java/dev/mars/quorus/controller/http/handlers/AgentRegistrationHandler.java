@@ -50,6 +50,10 @@ public class AgentRegistrationHandler implements Handler<RoutingContext> {
     public void handle(RoutingContext ctx) {
         try {
             JsonObject body = ctx.body().asJsonObject();
+            if (body == null) {
+                ctx.fail(400, new IllegalArgumentException("Request body is required"));
+                return;
+            }
             AgentInfo agentInfo = body.mapTo(AgentInfo.class);
 
             if (agentInfo.getAgentId() == null || agentInfo.getAgentId().isEmpty()) {

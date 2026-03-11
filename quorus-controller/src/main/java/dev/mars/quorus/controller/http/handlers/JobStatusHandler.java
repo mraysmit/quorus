@@ -60,6 +60,10 @@ public class JobStatusHandler implements Handler<RoutingContext> {
         try {
             String jobId = ctx.pathParam("jobId");
             JsonObject body = ctx.body().asJsonObject();
+            if (body == null) {
+                ctx.fail(400, new IllegalArgumentException("Request body is required"));
+                return;
+            }
 
             String agentId = body.getString("agentId");
             String statusStr = body.getString("status");

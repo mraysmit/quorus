@@ -16,10 +16,18 @@
 
 package dev.mars.quorus.controller.raft;
 
+import dev.mars.quorus.controller.raft.storage.InMemoryRaftStorage;
+import dev.mars.quorus.controller.raft.storage.RaftStorage;
+import dev.mars.quorus.controller.raft.storage.RaftStorage.LogEntryData;
+import dev.mars.quorus.controller.raft.grpc.AppendEntriesRequest;
+import dev.mars.quorus.controller.raft.grpc.AppendEntriesResponse;
+import dev.mars.quorus.controller.raft.grpc.InstallSnapshotRequest;
+import dev.mars.quorus.controller.raft.grpc.InstallSnapshotResponse;
 import dev.mars.quorus.controller.raft.grpc.VoteRequest;
 import dev.mars.quorus.controller.raft.grpc.VoteResponse;
 import io.vertx.core.Future;
 import dev.mars.quorus.controller.state.CommandResult;
+import dev.mars.quorus.controller.state.ProtobufCommandCodec;
 import dev.mars.quorus.controller.state.QuorusStateStore;
 import dev.mars.quorus.controller.state.SystemMetadataCommand;
 import org.awaitility.Awaitility;
@@ -29,6 +37,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
@@ -291,4 +300,268 @@ class RaftNodeTest {
         
         singleNode.stop();
     }
+
+        @Test
+        void testDurableElectionPersistsTermAndVote() {
+        InMemoryRaftStorage storage = new InMemoryRaftStorage();
+        storage.open(null).toCompletionStage().toCompletableFuture().join();
+
+        Set<String> singleNodeCluster = Set.of("node1");
+        RaftNode singleNode = RaftNode.builder().vertx(vertx).nodeId("node1").clusterNodes(singleNodeCluster)
+            .transport(new InMemoryTransportSimulator("node1"))
+            .stateMachine(new QuorusStateStore()).mode(RaftNodeMode.durable(storage)).electionTimeout(500).heartbeatInterval(100).build();
+
+        singleNode.start().toCompletionStage().toCompletableFuture().join();
+
+        Awaitility.await()
+            .atMost(Duration.ofSeconds(3))
+            .untilAsserted(() -> {
+                assertTrue(storage.getCurrentTerm() > 0, "Election term should be persisted");
+                assertEquals(Optional.of("node1"), storage.getVotedFor(), "Self vote should be persisted");
+            });
+
+        singleNode.stop().toCompletionStage().toCompletableFuture().join();
+        }
+
+        @Test
+        void testMultiNodeRecoveryDoesNotApplyUncommittedTail() {
+        InMemoryRaftStorage storage = new InMemoryRaftStorage();
+        storage.open(null).toCompletionStage().toCompletableFuture().join();
+
+        SystemMetadataCommand command = SystemMetadataCommand.set("recovery-key", "tail-value");
+        byte[] payload = ProtobufCommandCodec.serialize(command).toByteArray();
+        storage.appendEntries(java.util.List.of(new LogEntryData(1L, 1L, payload)))
+            .toCompletionStage().toCompletableFuture().join();
+        storage.updateMetadata(1L, Optional.empty()).toCompletionStage().toCompletableFuture().join();
+
+        QuorusStateStore recoveredState = new QuorusStateStore();
+        RaftNode recovered = RaftNode.builder().vertx(vertx).nodeId("node1")
+            .clusterNodes(Set.of("node1", "node2", "node3"))
+            .transport(new InMemoryTransportSimulator("node1"))
+            .stateMachine(recoveredState).mode(RaftNodeMode.durable(storage)).electionTimeout(10_000).heartbeatInterval(200).build();
+
+        recovered.start().toCompletionStage().toCompletableFuture().join();
+
+        await().atMost(Duration.ofSeconds(2))
+            .untilAsserted(() -> assertNull(recoveredState.getMetadata("recovery-key"),
+                "Recovered follower must not apply uncertain log tail before leader commit"));
+
+        recovered.stop().toCompletionStage().toCompletableFuture().join();
+        }
+
+        @Test
+        void testSingleNodeRecoveryReappliesLocalLog() {
+        InMemoryRaftStorage storage = new InMemoryRaftStorage();
+        storage.open(null).toCompletionStage().toCompletableFuture().join();
+
+        SystemMetadataCommand command = SystemMetadataCommand.set("single-recovery-key", "single-value");
+        byte[] payload = ProtobufCommandCodec.serialize(command).toByteArray();
+        storage.appendEntries(java.util.List.of(new LogEntryData(1L, 1L, payload)))
+            .toCompletionStage().toCompletableFuture().join();
+        storage.updateMetadata(1L, Optional.of("node1")).toCompletionStage().toCompletableFuture().join();
+
+        QuorusStateStore recoveredState = new QuorusStateStore();
+        RaftNode recovered = RaftNode.builder().vertx(vertx).nodeId("node1")
+            .clusterNodes(Set.of("node1"))
+            .transport(new InMemoryTransportSimulator("node1"))
+            .stateMachine(recoveredState).mode(RaftNodeMode.durable(storage)).electionTimeout(10_000).heartbeatInterval(200).build();
+
+        recovered.start().toCompletionStage().toCompletableFuture().join();
+
+        await().atMost(Duration.ofSeconds(2))
+            .untilAsserted(() -> assertEquals("single-value", recoveredState.getMetadata("single-recovery-key")));
+
+        recovered.stop().toCompletionStage().toCompletableFuture().join();
+        }
+
+        @Test
+        void testRejectVoteWhenCandidateLogIsBehind() {
+        Set<String> singleNodeCluster = Set.of("node1");
+        RaftNode singleNode = RaftNode.builder().vertx(vertx).nodeId("node1").clusterNodes(singleNodeCluster)
+            .transport(new InMemoryTransportSimulator("node1"))
+            .stateMachine(new QuorusStateStore()).mode(RaftNodeMode.volatileMode()).electionTimeout(500).heartbeatInterval(100).build();
+
+        singleNode.start().toCompletionStage().toCompletableFuture().join();
+
+        await().atMost(Duration.ofSeconds(3)).until(singleNode::isLeader);
+
+        CommandResult<?> submitted = singleNode.submitCommand(SystemMetadataCommand.set("vote-log-key", "vote-log-value"))
+            .toCompletionStage().toCompletableFuture().join();
+        assertInstanceOf(CommandResult.Success.class, submitted);
+
+        VoteRequest staleCandidate = VoteRequest.newBuilder()
+            .setTerm(singleNode.getCurrentTerm() + 1)
+            .setCandidateId("candidate-behind")
+            .setLastLogTerm(0)
+            .setLastLogIndex(0)
+            .build();
+
+        VoteResponse response = singleNode.handleVoteRequest(staleCandidate)
+            .toCompletionStage().toCompletableFuture().join();
+
+        assertFalse(response.getVoteGranted(), "Vote must be rejected when candidate log is behind");
+
+        singleNode.stop().toCompletionStage().toCompletableFuture().join();
+        }
+
+        @Test
+        void testHigherTermIsPersistedWhenVotePersistenceFails() {
+        InMemoryRaftStorage delegate = new InMemoryRaftStorage();
+        RaftStorage flakyMetadataStorage = oneShotMetadataFailureStorage(delegate);
+
+        flakyMetadataStorage.open(null).toCompletionStage().toCompletableFuture().join();
+
+        Set<String> singleNodeCluster = Set.of("node1");
+        RaftNode durableNode = RaftNode.builder().vertx(vertx).nodeId("node1").clusterNodes(singleNodeCluster)
+            .transport(new InMemoryTransportSimulator("node1"))
+            .stateMachine(new QuorusStateStore()).mode(RaftNodeMode.durable(flakyMetadataStorage)).electionTimeout(10_000).heartbeatInterval(200).build();
+
+        durableNode.start().toCompletionStage().toCompletableFuture().join();
+
+        VoteRequest voteRequest = VoteRequest.newBuilder()
+            .setTerm(7)
+            .setCandidateId("candidate-x")
+            .setLastLogIndex(99)
+            .setLastLogTerm(99)
+            .build();
+
+        VoteResponse response = durableNode.handleVoteRequest(voteRequest)
+            .toCompletionStage().toCompletableFuture().join();
+
+        assertFalse(response.getVoteGranted(), "Vote should be rejected when metadata persistence fails");
+        assertEquals(7, response.getTerm(), "Response should still reflect higher observed term");
+
+        RaftStorage.PersistentMeta persistedMeta = flakyMetadataStorage.loadMetadata()
+            .toCompletionStage().toCompletableFuture().join();
+        assertEquals(7, persistedMeta.currentTerm(), "Higher term must be persisted to avoid term regression after restart");
+        assertEquals(Optional.empty(), persistedMeta.votedFor(), "No vote should be persisted when vote write failed");
+
+        durableNode.stop().toCompletionStage().toCompletableFuture().join();
+        }
+
+        @Test
+        void testAppendEntriesRejectsWhenHigherTermMetadataPersistFails() {
+        InMemoryRaftStorage delegate = new InMemoryRaftStorage();
+        RaftStorage flakyMetadataStorage = oneShotMetadataFailureStorage(delegate);
+        flakyMetadataStorage.open(null).toCompletionStage().toCompletableFuture().join();
+
+        RaftNode durableNode = RaftNode.builder().vertx(vertx).nodeId("node1").clusterNodes(Set.of("node1"))
+            .transport(new InMemoryTransportSimulator("node1"))
+            .stateMachine(new QuorusStateStore()).mode(RaftNodeMode.durable(flakyMetadataStorage)).electionTimeout(10_000).heartbeatInterval(200).build();
+
+        durableNode.start().toCompletionStage().toCompletableFuture().join();
+
+        AppendEntriesRequest request = AppendEntriesRequest.newBuilder()
+            .setTerm(9)
+            .setLeaderId("leader-x")
+            .setPrevLogIndex(0)
+            .setPrevLogTerm(0)
+            .setLeaderCommit(0)
+            .build();
+
+        AppendEntriesResponse response = durableNode.handleAppendEntriesRequest(request)
+            .toCompletionStage().toCompletableFuture().join();
+
+        assertFalse(response.getSuccess(), "AppendEntries must be rejected if higher-term metadata cannot be durably persisted first");
+        assertEquals(9, response.getTerm());
+
+        durableNode.stop().toCompletionStage().toCompletableFuture().join();
+        }
+
+        @Test
+        void testInstallSnapshotRejectsWhenHigherTermMetadataPersistFails() {
+        InMemoryRaftStorage delegate = new InMemoryRaftStorage();
+        RaftStorage flakyMetadataStorage = oneShotMetadataFailureStorage(delegate);
+        flakyMetadataStorage.open(null).toCompletionStage().toCompletableFuture().join();
+
+        RaftNode durableNode = RaftNode.builder().vertx(vertx).nodeId("node1").clusterNodes(Set.of("node1"))
+            .transport(new InMemoryTransportSimulator("node1"))
+            .stateMachine(new QuorusStateStore()).mode(RaftNodeMode.durable(flakyMetadataStorage)).electionTimeout(10_000).heartbeatInterval(200).build();
+
+        durableNode.start().toCompletionStage().toCompletableFuture().join();
+
+        InstallSnapshotRequest request = InstallSnapshotRequest.newBuilder()
+            .setTerm(11)
+            .setLeaderId("leader-y")
+            .setLastIncludedIndex(1)
+            .setLastIncludedTerm(1)
+            .setChunkIndex(0)
+            .setTotalChunks(1)
+            .setData(com.google.protobuf.ByteString.copyFrom(new byte[] {1}))
+            .setDone(false)
+            .build();
+
+        InstallSnapshotResponse response = durableNode.handleInstallSnapshot(request)
+            .toCompletionStage().toCompletableFuture().join();
+
+        assertFalse(response.getSuccess(), "InstallSnapshot must be rejected if higher-term metadata cannot be durably persisted first");
+        assertEquals(11, response.getTerm());
+
+        durableNode.stop().toCompletionStage().toCompletableFuture().join();
+        }
+
+        private static RaftStorage oneShotMetadataFailureStorage(InMemoryRaftStorage delegate) {
+        return new RaftStorage() {
+            private int metadataUpdateCalls = 0;
+
+            @Override
+            public Future<Void> open(java.nio.file.Path dataDir) {
+                return delegate.open(dataDir);
+            }
+
+            @Override
+            public Future<Void> close() {
+                return delegate.close();
+            }
+
+            @Override
+            public Future<Void> updateMetadata(long currentTerm, Optional<String> votedFor) {
+                metadataUpdateCalls++;
+                if (metadataUpdateCalls == 1) {
+                    return Future.failedFuture(new IllegalStateException("Simulated one-shot metadata failure"));
+                }
+                return delegate.updateMetadata(currentTerm, votedFor);
+            }
+
+            @Override
+            public Future<PersistentMeta> loadMetadata() {
+                return delegate.loadMetadata();
+            }
+
+            @Override
+            public Future<Void> appendEntries(java.util.List<LogEntryData> entries) {
+                return delegate.appendEntries(entries);
+            }
+
+            @Override
+            public Future<Void> truncateSuffix(long fromIndex) {
+                return delegate.truncateSuffix(fromIndex);
+            }
+
+            @Override
+            public Future<Void> sync() {
+                return delegate.sync();
+            }
+
+            @Override
+            public Future<java.util.List<LogEntryData>> replayLog() {
+                return delegate.replayLog();
+            }
+
+            @Override
+            public Future<Void> saveSnapshot(byte[] data, long lastIncludedIndex, long lastIncludedTerm) {
+                return delegate.saveSnapshot(data, lastIncludedIndex, lastIncludedTerm);
+            }
+
+            @Override
+            public Future<Optional<SnapshotData>> loadSnapshot() {
+                return delegate.loadSnapshot();
+            }
+
+            @Override
+            public Future<Void> truncatePrefix(long toIndex) {
+                return delegate.truncatePrefix(toIndex);
+            }
+        };
+        }
 }
