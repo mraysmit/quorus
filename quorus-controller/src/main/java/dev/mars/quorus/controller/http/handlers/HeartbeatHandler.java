@@ -60,6 +60,10 @@ public class HeartbeatHandler implements Handler<RoutingContext> {
     public void handle(RoutingContext ctx) {
         try {
             JsonObject body = ctx.body().asJsonObject();
+            if (body == null) {
+                ctx.fail(400, new IllegalArgumentException("Request body is required"));
+                return;
+            }
 
             String agentId = body.getString("agentId");
             if (agentId == null || agentId.isEmpty()) {

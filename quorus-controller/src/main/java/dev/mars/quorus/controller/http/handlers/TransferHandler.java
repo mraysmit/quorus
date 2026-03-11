@@ -31,6 +31,8 @@ import io.vertx.ext.web.RoutingContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Instant;
+
 /**
  * HTTP handler for transfer job operations.
  *
@@ -65,6 +67,10 @@ public class TransferHandler {
         return ctx -> {
             try {
                 JsonObject body = ctx.body().asJsonObject();
+                if (body == null) {
+                    ctx.fail(400, new IllegalArgumentException("Request body is required"));
+                    return;
+                }
                 TransferJob job = body.mapTo(TransferJob.class);
                 logger.info("Creating transfer job: jobId={}", job.getJobId());
                 TransferJobCommand command = TransferJobCommand.create(job);
@@ -102,10 +108,10 @@ public class TransferHandler {
             TransferJobSnapshot job = stateStore.findTransferJob(jobId)
                     .orElseThrow(() -> QuorusApiException.notFound(ErrorCode.TRANSFER_NOT_FOUND, jobId));
 
-            // Get the latest assignment status for this job
+                // Get the latest assignment status for this job
             JobAssignment latestAssignment = stateStore.getJobAssignments().values().stream()
                     .filter(a -> a.getJobId().equals(jobId))
-                    .findFirst()
+                    .max((a, b) -> assignmentLastActivity(a).compareTo(assignmentLastActivity(b)))
                     .orElse(null);
 
             JsonObject response = new JsonObject()
@@ -140,6 +146,19 @@ public class TransferHandler {
 
             ctx.json(response);
         };
+    }
+
+    private static Instant assignmentLastActivity(JobAssignment assignment) {
+        if (assignment.getCompletedAt() != null) {
+            return assignment.getCompletedAt();
+        }
+        if (assignment.getStartedAt() != null) {
+            return assignment.getStartedAt();
+        }
+        if (assignment.getAcceptedAt() != null) {
+            return assignment.getAcceptedAt();
+        }
+        return assignment.getAssignedAt();
     }
 
     /**

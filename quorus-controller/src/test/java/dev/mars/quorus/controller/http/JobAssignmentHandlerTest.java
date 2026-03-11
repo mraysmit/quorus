@@ -22,6 +22,7 @@ import dev.mars.quorus.controller.raft.RaftNodeMode;
 import dev.mars.quorus.controller.raft.RaftTransport;
 import dev.mars.quorus.controller.state.QuorusStateStore;
 import io.vertx.core.Vertx;
+import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.client.WebClient;
 import io.vertx.junit5.VertxExtension;
@@ -435,6 +436,240 @@ class JobAssignmentHandlerTest {
                     .send()
                     .onComplete(ctx.succeeding(response -> ctx.verify(() -> {
                         assertEquals(404, response.statusCode());
+                        ctx.completeNow();
+                    })));
+        }
+    }
+
+    // ==================== Regression coverage moved from aggregate suite ====================
+
+    @Nested
+    @DisplayName("Assignment/Agent jobs regression behaviors")
+    class AssignmentRegressionBehaviors {
+
+        @Test
+        @DisplayName("invalid assignment transition returns standard conflict envelope")
+        void testInvalidTransitionReturnsConflictEnvelope(VertxTestContext ctx) {
+            JsonObject createBody = new JsonObject()
+                    .put("jobId", "job-cas-envelope")
+                    .put("agentId", "agent-cas-envelope");
+
+            webClient.post(HTTP_PORT, "localhost", "/api/v1/assignments")
+                    .sendJsonObject(createBody)
+                    .compose(createResp -> {
+                        String id = createResp.bodyAsJsonObject().getString("assignmentId");
+                        JsonObject statusBody = new JsonObject().put("status", "COMPLETED");
+                        return webClient.put(HTTP_PORT, "localhost", "/api/v1/assignments/" + id + "/status")
+                                .sendJsonObject(statusBody);
+                    })
+                    .onComplete(ctx.succeeding(response -> ctx.verify(() -> {
+                        assertEquals(409, response.statusCode());
+                        JsonObject error = response.bodyAsJsonObject().getJsonObject("error");
+                        assertNotNull(error);
+                        assertEquals("ASSIGNMENT_STATE_CONFLICT", error.getString("code"));
+                        assertNotNull(error.getString("shortCode"));
+                        assertNotNull(error.getString("timestamp"));
+                        assertNotNull(error.getString("path"));
+                        ctx.completeNow();
+                    })));
+        }
+
+        @Test
+        @DisplayName("agent jobs endpoint returns envelope and colon-separated assignment ID")
+        void testAgentJobsEnvelopeAndAssignmentId(VertxTestContext ctx) {
+            String agentId = "agent-separator-test";
+            String jobId = "job-separator-test";
+
+            JsonObject createBody = new JsonObject()
+                    .put("jobId", jobId)
+                    .put("agentId", agentId);
+
+            webClient.post(HTTP_PORT, "localhost", "/api/v1/assignments")
+                    .sendJsonObject(createBody)
+                    .compose(createResp -> webClient.get(HTTP_PORT, "localhost", "/api/v1/agents/" + agentId + "/jobs")
+                            .send())
+                    .onComplete(ctx.succeeding(response -> ctx.verify(() -> {
+                        assertEquals(200, response.statusCode());
+                        JsonObject body = response.bodyAsJsonObject();
+                        assertNotNull(body.getJsonArray("pendingJobs"));
+                        assertNotNull(body.getInteger("total"));
+                        JsonArray pendingJobs = body.getJsonArray("pendingJobs");
+                        assertTrue(pendingJobs.size() > 0);
+
+                        JsonObject job = pendingJobs.getJsonObject(0);
+                        String assignmentId = job.getString("assignmentId");
+                        assertEquals(jobId + ":" + agentId, assignmentId);
+                        ctx.completeNow();
+                    })));
+        }
+
+        @Test
+        @DisplayName("agent jobs endpoint excludes terminal assignments from pending list")
+        void testAgentJobsExcludesTerminalAssignments(VertxTestContext ctx) {
+            String agentId = "agent-terminal-test";
+            String jobId = "job-terminal-test";
+
+            JsonObject createBody = new JsonObject()
+                    .put("jobId", jobId)
+                    .put("agentId", agentId);
+
+            webClient.post(HTTP_PORT, "localhost", "/api/v1/assignments")
+                    .sendJsonObject(createBody)
+                    .compose(createResp -> {
+                        String id = createResp.bodyAsJsonObject().getString("assignmentId");
+                        return webClient.put(HTTP_PORT, "localhost", "/api/v1/assignments/" + id + "/reject")
+                                .sendJsonObject(new JsonObject().put("reason", "declined"));
+                    })
+                    .compose(r -> webClient.get(HTTP_PORT, "localhost", "/api/v1/agents/" + agentId + "/jobs")
+                            .send())
+                    .onComplete(ctx.succeeding(response -> ctx.verify(() -> {
+                        assertEquals(200, response.statusCode());
+                        JsonObject body = response.bodyAsJsonObject();
+                        assertEquals(0, body.getInteger("total"));
+                        assertEquals(0, body.getJsonArray("pendingJobs").size());
+                        ctx.completeNow();
+                    })));
+        }
+    }
+
+    @Nested
+    @DisplayName("Cross-endpoint input validation")
+    class CrossEndpointInputValidation {
+
+        @Test
+        @DisplayName("agent registration with empty body returns 400 envelope")
+        void testAgentRegistrationEmptyBodyReturns400(VertxTestContext ctx) {
+            webClient.post(HTTP_PORT, "localhost", "/api/v1/agents/register")
+                    .send()
+                    .onComplete(ctx.succeeding(response -> ctx.verify(() -> {
+                        assertEquals(400, response.statusCode());
+                        JsonObject error = response.bodyAsJsonObject().getJsonObject("error");
+                        assertNotNull(error);
+                        assertEquals("VALIDATION_ERROR", error.getString("code"));
+                        ctx.completeNow();
+                    })));
+        }
+
+        @Test
+        @DisplayName("heartbeat with empty body returns 400 envelope")
+        void testHeartbeatEmptyBodyReturns400(VertxTestContext ctx) {
+            webClient.post(HTTP_PORT, "localhost", "/api/v1/agents/heartbeat")
+                    .send()
+                    .onComplete(ctx.succeeding(response -> ctx.verify(() -> {
+                        assertEquals(400, response.statusCode());
+                        JsonObject error = response.bodyAsJsonObject().getJsonObject("error");
+                        assertNotNull(error);
+                        assertEquals("VALIDATION_ERROR", error.getString("code"));
+                        ctx.completeNow();
+                    })));
+        }
+
+        @Test
+        @DisplayName("transfer creation with empty body returns 400 envelope")
+        void testTransferCreateEmptyBodyReturns400(VertxTestContext ctx) {
+            webClient.post(HTTP_PORT, "localhost", "/api/v1/transfers")
+                    .send()
+                    .onComplete(ctx.succeeding(response -> ctx.verify(() -> {
+                        assertEquals(400, response.statusCode());
+                        JsonObject error = response.bodyAsJsonObject().getJsonObject("error");
+                        assertNotNull(error);
+                        assertEquals("VALIDATION_ERROR", error.getString("code"));
+                        ctx.completeNow();
+                    })));
+        }
+
+        @Test
+        @DisplayName("job status update with empty body returns 400 envelope")
+        void testJobStatusEmptyBodyReturns400(VertxTestContext ctx) {
+            webClient.post(HTTP_PORT, "localhost", "/api/v1/jobs/job-empty-body/status")
+                    .send()
+                    .onComplete(ctx.succeeding(response -> ctx.verify(() -> {
+                        assertEquals(400, response.statusCode());
+                        JsonObject error = response.bodyAsJsonObject().getJsonObject("error");
+                        assertNotNull(error);
+                        assertEquals("VALIDATION_ERROR", error.getString("code"));
+                        ctx.completeNow();
+                    })));
+        }
+    }
+
+    @Nested
+    @DisplayName("Job status/transfer status regression")
+    class JobAndTransferStatusRegression {
+
+        @Test
+        @DisplayName("job status endpoint returns standard 404 envelope for unknown assignment")
+        void testJobStatusNotFoundReturnsEnvelope(VertxTestContext ctx) {
+            JsonObject body = new JsonObject()
+                    .put("agentId", "no-such-agent")
+                    .put("status", "ACCEPTED");
+
+            webClient.post(HTTP_PORT, "localhost", "/api/v1/jobs/no-such-job/status")
+                    .sendJsonObject(body)
+                    .onComplete(ctx.succeeding(response -> ctx.verify(() -> {
+                        assertEquals(404, response.statusCode());
+                        JsonObject error = response.bodyAsJsonObject().getJsonObject("error");
+                        assertNotNull(error);
+                        assertEquals("ASSIGNMENT_NOT_FOUND", error.getString("code"));
+                        ctx.completeNow();
+                    })));
+        }
+
+        @Test
+        @DisplayName("job status invalid transition returns standard 409 envelope")
+        void testJobStatusInvalidTransitionReturnsEnvelope(VertxTestContext ctx) {
+            String jobId = "job-status-transition";
+            String agentId = "agent-status-transition";
+
+            JsonObject transferBody = new JsonObject()
+                    .put("jobId", jobId)
+                    .put("sourceUri", "https://example.com/file.csv")
+                    .put("destinationPath", "/data/file.csv");
+
+            JsonObject assignBody = new JsonObject()
+                    .put("jobId", jobId)
+                    .put("agentId", agentId);
+
+            webClient.post(HTTP_PORT, "localhost", "/api/v1/transfers")
+                    .sendJsonObject(transferBody)
+                    .compose(r -> webClient.post(HTTP_PORT, "localhost", "/api/v1/assignments")
+                            .sendJsonObject(assignBody))
+                    .compose(r -> webClient.post(HTTP_PORT, "localhost", "/api/v1/jobs/" + jobId + "/status")
+                            .sendJsonObject(new JsonObject().put("agentId", agentId).put("status", "COMPLETED")))
+                    .onComplete(ctx.succeeding(response -> ctx.verify(() -> {
+                        assertEquals(409, response.statusCode());
+                        JsonObject error = response.bodyAsJsonObject().getJsonObject("error");
+                        assertNotNull(error);
+                        assertEquals("ASSIGNMENT_STATE_CONFLICT", error.getString("code"));
+                        ctx.completeNow();
+                    })));
+        }
+
+        @Test
+        @DisplayName("transfer status reflects most recently active assignment")
+        void testTransferStatusUsesLatestAssignmentActivity(VertxTestContext ctx) {
+            String jobId = "job-latest-assignment-status";
+            String agentA = "agent-latest-a";
+            String agentB = "agent-latest-b";
+
+            JsonObject transferBody = new JsonObject()
+                    .put("jobId", jobId)
+                    .put("sourceUri", "https://example.com/latest.csv")
+                    .put("destinationPath", "/data/latest.csv");
+
+            JsonObject assignA = new JsonObject().put("jobId", jobId).put("agentId", agentA);
+            JsonObject assignB = new JsonObject().put("jobId", jobId).put("agentId", agentB);
+
+            webClient.post(HTTP_PORT, "localhost", "/api/v1/transfers")
+                    .sendJsonObject(transferBody)
+                    .compose(r -> webClient.post(HTTP_PORT, "localhost", "/api/v1/assignments").sendJsonObject(assignA))
+                    .compose(r -> webClient.post(HTTP_PORT, "localhost", "/api/v1/assignments").sendJsonObject(assignB))
+                    .compose(r -> webClient.put(HTTP_PORT, "localhost", "/api/v1/assignments/" + jobId + ":" + agentA + "/status")
+                            .sendJsonObject(new JsonObject().put("status", "ACCEPTED")))
+                    .compose(r -> webClient.get(HTTP_PORT, "localhost", "/api/v1/transfers/" + jobId).send())
+                    .onComplete(ctx.succeeding(response -> ctx.verify(() -> {
+                        assertEquals(200, response.statusCode());
+                        assertEquals("ACCEPTED", response.bodyAsJsonObject().getString("status"));
                         ctx.completeNow();
                     })));
         }

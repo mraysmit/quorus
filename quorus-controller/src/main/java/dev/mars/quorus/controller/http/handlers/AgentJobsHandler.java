@@ -19,7 +19,6 @@ package dev.mars.quorus.controller.http.handlers;
 import dev.mars.quorus.controller.state.QuorusStateStore;
 import dev.mars.quorus.controller.state.TransferJobSnapshot;
 import dev.mars.quorus.core.JobAssignment;
-import dev.mars.quorus.core.JobAssignmentStatus;
 import io.vertx.core.Handler;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
@@ -62,8 +61,7 @@ public class AgentJobsHandler implements Handler<RoutingContext> {
             if (!assignment.getAgentId().equals(agentId)) {
                 continue;
             }
-            if (assignment.getStatus() == JobAssignmentStatus.COMPLETED
-                    || assignment.getStatus() == JobAssignmentStatus.FAILED) {
+            if (!assignment.isActive()) {
                 continue;
             }
 

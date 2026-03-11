@@ -468,16 +468,14 @@ public class RaftNode {
                     logger.info("Replayed {} post-snapshot entries (skipped {} compacted entries)",
                             replayedCount, entries.size() - replayedCount);
 
-                    // Apply post-snapshot entries to state machine
-                    commitIndex = lastLogIndex() > snapshotLastIndex ? lastLogIndex() : snapshotLastIndex;
-                    while (lastApplied < commitIndex) {
-                        lastApplied++;
-                        if (hasLogEntry(lastApplied)) {
-                            LogEntry entry = log.get(toArrayIndex(lastApplied));
-                            if (entry.getCommand() != null) {
-                                stateMachine.apply(entry.getCommand());
-                            }
-                        }
+                    // Safety first: on multi-node recovery, do not assume replayed
+                    // entries were committed before crash. Wait for leaderCommit updates.
+                    if (clusterNodes.size() == 1) {
+                        commitIndex = Math.max(snapshotLastIndex, lastLogIndex());
+                        applyLog();
+                    } else {
+                        commitIndex = snapshotLastIndex;
+                        logger.info("Snapshot recovery loaded {} post-snapshot entries; awaiting leader commit to apply", replayedCount);
                     }
                 } else {
                     // Full rebuild: no snapshot, replay everything
@@ -511,10 +509,16 @@ public class RaftNode {
         // Reset state machine to blank state
         stateMachine.reset();
         lastApplied = snapshotLastIndex;
-        
-        // Re-apply all entries (assume all recovered entries were committed)
-        // In a more sophisticated implementation, we'd also persist commitIndex
-        commitIndex = lastLogIndex() > snapshotLastIndex ? lastLogIndex() : snapshotLastIndex;
+
+        // Safety first: only single-node recovery can treat the full local log
+        // as committed without additional quorum confirmation.
+        if (clusterNodes.size() == 1) {
+            commitIndex = Math.max(snapshotLastIndex, lastLogIndex());
+            logger.info("Single-node recovery: restoring committed log up to index {}", commitIndex);
+        } else {
+            commitIndex = snapshotLastIndex;
+            logger.info("Multi-node recovery: deferring log application until leader commit advances");
+        }
         
         applyLog();
         return Future.succeededFuture();
@@ -870,13 +874,32 @@ public class RaftNode {
         state = State.CANDIDATE;
         currentTerm++;
         votedFor = nodeId;
+        long electionTerm = currentTerm;
         MDC.put("raftRole", "CANDIDATE");
         MDC.put("raftTerm", String.valueOf(currentTerm));
         notifyStateChangeListeners(State.CANDIDATE);
 
-        resetElectionTimer();
+        // Persist term + self vote before sending RequestVote RPCs.
+        persistMetadata(currentTerm, Optional.of(nodeId))
+                .onSuccess(v -> {
+                    if (state != State.CANDIDATE || currentTerm != electionTerm || !running) {
+                        return;
+                    }
+                    resetElectionTimer();
+                    requestVotes();
+                })
+                .onFailure(err -> {
+                    logger.error("Failed to persist election metadata for term {}: {}", electionTerm, err.getMessage());
+                    logger.debug("Stack trace for election metadata persist failure", err);
 
-        requestVotes();
+                    // Fall back to follower and retry via election timer.
+                    state = State.FOLLOWER;
+                    votedFor = null;
+                    MDC.put("raftRole", "FOLLOWER");
+                    MDC.put("raftTerm", String.valueOf(currentTerm));
+                    notifyStateChangeListeners(State.FOLLOWER);
+                    resetElectionTimer();
+                });
     }
 
     private void requestVotes() {
@@ -979,6 +1002,14 @@ public class RaftNode {
     }
 
     private void stepDown(long newTerm) {
+        stepDown(newTerm, true)
+                .onFailure(err -> {
+                    logger.error("Failed to persist step-down metadata for term {}: {}", currentTerm, err.getMessage());
+                    logger.debug("Stack trace for step-down metadata persist failure", err);
+                });
+    }
+
+    private Future<Void> stepDown(long newTerm, boolean persistMetadataRequired) {
         if (newTerm > currentTerm) {
             currentTerm = newTerm;
             votedFor = null;
@@ -990,7 +1021,13 @@ public class RaftNode {
             cancelTimers();
             resetElectionTimer();
             logger.info("Stepped down to FOLLOWER. Term: {}", currentTerm);
+
+            if (persistMetadataRequired) {
+                return persistMetadata(currentTerm, Optional.empty());
+            }
         }
+
+        return Future.succeededFuture();
     }
 
     // Message Handlers running on Event Loop
@@ -1042,11 +1079,15 @@ public class RaftNode {
 
                 // Step 2: Step down if higher term
                 if (reqTerm > currentTerm) {
-                    stepDown(reqTerm);
+                    // Vote path persists metadata explicitly via persistVote().
+                    // Avoid racing an empty-vote persistence from stepDown.
+                    stepDown(reqTerm, false);
                 }
 
                 // Step 3: Check if we can grant vote
-                boolean canGrant = (votedFor == null || votedFor.equals(request.getCandidateId()));
+                boolean canGrantVoteForCandidate = (votedFor == null || votedFor.equals(request.getCandidateId()));
+                boolean candidateLogUpToDate = isCandidateLogUpToDate(request.getLastLogTerm(), request.getLastLogIndex());
+                boolean canGrant = canGrantVoteForCandidate && candidateLogUpToDate;
 
                 if (canGrant) {
                     // Step 4: Persist metadata BEFORE granting vote (Persist-before-Grant)
@@ -1065,14 +1106,30 @@ public class RaftNode {
                         .onFailure(err -> {
                             logger.error("Failed to persist vote metadata: {}", err.getMessage());
                             logger.debug("Stack trace for vote metadata persist failure", err);
-                            // Vote not granted if we can't persist
-                            promise.complete(VoteResponse.newBuilder()
+
+                            // Even if voting fails, persist the higher term to avoid term regression after restart.
+                            persistMetadata(reqTerm, Optional.empty())
+                                .onSuccess(v3 -> promise.complete(VoteResponse.newBuilder()
+                                    .setTerm(currentTerm)
+                                    .setVoteGranted(false)
+                                    .build()))
+                                .onFailure(termPersistErr -> {
+                                logger.error("Failed to persist higher term {} after vote persist failure: {}",
+                                    reqTerm, termPersistErr.getMessage());
+                                logger.debug("Stack trace for higher-term persist failure", termPersistErr);
+                                promise.complete(VoteResponse.newBuilder()
                                     .setTerm(currentTerm)
                                     .setVoteGranted(false)
                                     .build());
+                                });
                         });
                 } else {
-                    logger.debug("Vote rejected: already voted for {} in term {}", votedFor, currentTerm);
+                    if (!canGrantVoteForCandidate) {
+                        logger.debug("Vote rejected: already voted for {} in term {}", votedFor, currentTerm);
+                    } else {
+                        logger.debug("Vote rejected: candidate log is not up-to-date (candidateTerm={}, candidateIndex={}, localTerm={}, localIndex={})",
+                                request.getLastLogTerm(), request.getLastLogIndex(), getLastLogTerm(), getLastLogIndex());
+                    }
                     promise.complete(VoteResponse.newBuilder()
                             .setTerm(currentTerm)
                             .setVoteGranted(false)
@@ -1091,7 +1148,19 @@ public class RaftNode {
      * Persists vote metadata to WAL.
      */
     private Future<Void> persistVote(long term, String candidateId) {
-        return storage.map(s -> s.updateMetadata(term, Optional.of(candidateId)))
+        return persistMetadata(term, Optional.of(candidateId));
+    }
+
+    private boolean isCandidateLogUpToDate(long candidateLastLogTerm, long candidateLastLogIndex) {
+        long localLastLogTerm = getLastLogTerm();
+        if (candidateLastLogTerm != localLastLogTerm) {
+            return candidateLastLogTerm > localLastLogTerm;
+        }
+        return candidateLastLogIndex >= getLastLogIndex();
+    }
+
+    private Future<Void> persistMetadata(long term, Optional<String> votedForCandidate) {
+        return storage.map(s -> s.updateMetadata(term, votedForCandidate))
             .orElseGet(Future::succeededFuture);  // Volatile mode
     }
 
@@ -1122,85 +1191,21 @@ public class RaftNode {
 
                 // Step 2: Step down if higher term
                 if (request.getTerm() > currentTerm) {
-                    stepDown(request.getTerm());
-                }
-
-                resetElectionTimer();
-
-                // Step 3: Consistency check
-                if (!hasLogEntry(request.getPrevLogIndex()) ||
-                        log.get(toArrayIndex(request.getPrevLogIndex())).getTerm() != request.getPrevLogTerm()) {
-                    logger.debug("Rejecting AppendEntries: log inconsistent at prevLogIndex={}",
-                                request.getPrevLogIndex());
-                    promise.complete(AppendEntriesResponse.newBuilder()
-                            .setTerm(currentTerm)
-                            .setSuccess(false)
-                            .setMatchIndex(lastLogIndex()) // Hint for leader
-                            .build());
+                    stepDown(request.getTerm(), true)
+                            .onSuccess(v2 -> continueAppendEntriesAfterTermCheck(request, promise))
+                            .onFailure(err -> {
+                                logger.error("Failed to persist higher term {} before AppendEntries response: {}",
+                                        request.getTerm(), err.getMessage());
+                                logger.debug("Stack trace for AppendEntries higher-term persistence failure", err);
+                                promise.complete(AppendEntriesResponse.newBuilder()
+                                        .setTerm(currentTerm)
+                                        .setSuccess(false)
+                                        .build());
+                            });
                     return;
                 }
 
-                // Step 4: Prepare entries for persistence (handle conflicts)
-                long startIndex = request.getPrevLogIndex() + 1;
-                List<LogEntry> entriesToPersist = new ArrayList<>();
-                Long truncateFromIndex = null;
-
-                long currentIndex = startIndex;
-                for (dev.mars.quorus.controller.raft.grpc.LogEntry entryProto : request.getEntriesList()) {
-                    RaftCommand command = deserialize(entryProto.getData());
-                    LogEntry newEntry = new LogEntry(entryProto.getTerm(), currentIndex, command);
-
-                    if (hasLogEntry(currentIndex)) {
-                        if (log.get(toArrayIndex(currentIndex)).getTerm() != entryProto.getTerm()) {
-                            // Conflict detected - need to truncate
-                            if (truncateFromIndex == null) {
-                                truncateFromIndex = currentIndex;
-                            }
-                            entriesToPersist.add(newEntry);
-                        }
-                        // Else matches, skip (idempotent)
-                    } else {
-                        entriesToPersist.add(newEntry);
-                    }
-                    currentIndex++;
-                }
-
-                // Step 5: Persist to WAL (Durability Barrier)
-                final Long finalTruncateFrom = truncateFromIndex;
-                persistAppendEntries(truncateFromIndex, entriesToPersist)
-                    .onSuccess(v2 -> {
-                        // Step 6: Apply to in-memory log AFTER durability confirmed
-                        if (finalTruncateFrom != null) {
-                            int truncateArrayIdx = toArrayIndex(finalTruncateFrom);
-                            log.subList(truncateArrayIdx, log.size()).clear();
-                        }
-                        for (LogEntry entry : entriesToPersist) {
-                            if (!hasLogEntry(entry.getIndex())) {
-                                log.add(entry);
-                            }
-                        }
-
-                        // Step 7: Update commit index and apply
-                        if (request.getLeaderCommit() > commitIndex) {
-                            commitIndex = Math.min(request.getLeaderCommit(), lastLogIndex());
-                            applyLog();
-                        }
-
-                        logger.debug("AppendEntries success: logSize={}, commitIndex={}", log.size(), commitIndex);
-                        promise.complete(AppendEntriesResponse.newBuilder()
-                                .setTerm(currentTerm)
-                                .setSuccess(true)
-                                .setMatchIndex(lastLogIndex())
-                                .build());
-                    })
-                    .onFailure(err -> {
-                        logger.error("AppendEntries failed during WAL persist: {}", err.getMessage());
-                        logger.debug("Stack trace for AppendEntries WAL persist failure", err);
-                        promise.complete(AppendEntriesResponse.newBuilder()
-                                .setTerm(currentTerm)
-                                .setSuccess(false)
-                                .build());
-                    });
+                continueAppendEntriesAfterTermCheck(request, promise);
 
             } catch (Exception e) {
                 logger.error("Error handling append entries request: {}", e.getMessage());
@@ -1209,6 +1214,85 @@ public class RaftNode {
             }
         });
         return promise.future();
+    }
+
+    private void continueAppendEntriesAfterTermCheck(AppendEntriesRequest request, Promise<AppendEntriesResponse> promise) {
+        resetElectionTimer();
+
+        // Step 3: Consistency check
+        if (!hasLogEntry(request.getPrevLogIndex()) ||
+                log.get(toArrayIndex(request.getPrevLogIndex())).getTerm() != request.getPrevLogTerm()) {
+            logger.debug("Rejecting AppendEntries: log inconsistent at prevLogIndex={}",
+                        request.getPrevLogIndex());
+            promise.complete(AppendEntriesResponse.newBuilder()
+                    .setTerm(currentTerm)
+                    .setSuccess(false)
+                    .setMatchIndex(lastLogIndex()) // Hint for leader
+                    .build());
+            return;
+        }
+
+        // Step 4: Prepare entries for persistence (handle conflicts)
+        long startIndex = request.getPrevLogIndex() + 1;
+        List<LogEntry> entriesToPersist = new ArrayList<>();
+        Long truncateFromIndex = null;
+
+        long currentIndex = startIndex;
+        for (dev.mars.quorus.controller.raft.grpc.LogEntry entryProto : request.getEntriesList()) {
+            RaftCommand command = deserialize(entryProto.getData());
+            LogEntry newEntry = new LogEntry(entryProto.getTerm(), currentIndex, command);
+
+            if (hasLogEntry(currentIndex)) {
+                if (log.get(toArrayIndex(currentIndex)).getTerm() != entryProto.getTerm()) {
+                    // Conflict detected - need to truncate
+                    if (truncateFromIndex == null) {
+                        truncateFromIndex = currentIndex;
+                    }
+                    entriesToPersist.add(newEntry);
+                }
+                // Else matches, skip (idempotent)
+            } else {
+                entriesToPersist.add(newEntry);
+            }
+            currentIndex++;
+        }
+
+        // Step 5: Persist to WAL (Durability Barrier)
+        final Long finalTruncateFrom = truncateFromIndex;
+        persistAppendEntries(truncateFromIndex, entriesToPersist)
+            .onSuccess(v2 -> {
+                // Step 6: Apply to in-memory log AFTER durability confirmed
+                if (finalTruncateFrom != null) {
+                    int truncateArrayIdx = toArrayIndex(finalTruncateFrom);
+                    log.subList(truncateArrayIdx, log.size()).clear();
+                }
+                for (LogEntry entry : entriesToPersist) {
+                    if (!hasLogEntry(entry.getIndex())) {
+                        log.add(entry);
+                    }
+                }
+
+                // Step 7: Update commit index and apply
+                if (request.getLeaderCommit() > commitIndex) {
+                    commitIndex = Math.min(request.getLeaderCommit(), lastLogIndex());
+                    applyLog();
+                }
+
+                logger.debug("AppendEntries success: logSize={}, commitIndex={}", log.size(), commitIndex);
+                promise.complete(AppendEntriesResponse.newBuilder()
+                        .setTerm(currentTerm)
+                        .setSuccess(true)
+                        .setMatchIndex(lastLogIndex())
+                        .build());
+            })
+            .onFailure(err -> {
+                logger.error("AppendEntries failed during WAL persist: {}", err.getMessage());
+                logger.debug("Stack trace for AppendEntries WAL persist failure", err);
+                promise.complete(AppendEntriesResponse.newBuilder()
+                        .setTerm(currentTerm)
+                        .setSuccess(false)
+                        .build());
+            });
     }
 
     /**
@@ -1648,9 +1732,33 @@ public class RaftNode {
 
                 // Step 2: Step down if higher or equal term (we're receiving from a leader)
                 if (request.getTerm() > currentTerm) {
-                    stepDown(request.getTerm());
+                    stepDown(request.getTerm(), true)
+                            .onSuccess(v2 -> continueInstallSnapshotAfterTermCheck(request, promise))
+                            .onFailure(err -> {
+                                logger.error("Failed to persist higher term {} before InstallSnapshot response: {}",
+                                        request.getTerm(), err.getMessage());
+                                logger.debug("Stack trace for InstallSnapshot higher-term persistence failure", err);
+                                promise.complete(InstallSnapshotResponse.newBuilder()
+                                        .setTerm(currentTerm)
+                                        .setSuccess(false)
+                                        .setNextChunkIndex(0)
+                                        .build());
+                            });
+                    return;
                 }
-                resetElectionTimer();
+
+                continueInstallSnapshotAfterTermCheck(request, promise);
+
+            } catch (Exception e) {
+                logger.error("Error handling InstallSnapshot: {}", e.getMessage(), e);
+                promise.fail(e);
+            }
+        });
+        return promise.future();
+    }
+
+    private void continueInstallSnapshotAfterTermCheck(InstallSnapshotRequest request, Promise<InstallSnapshotResponse> promise) {
+        resetElectionTimer();
 
                 String leaderId = request.getLeaderId();
                 int chunkIndex = request.getChunkIndex();
@@ -1749,12 +1857,6 @@ public class RaftNode {
                                 .build());
                     });
 
-            } catch (Exception e) {
-                logger.error("Error handling InstallSnapshot: {}", e.getMessage(), e);
-                promise.fail(e);
-            }
-        });
-        return promise.future();
     }
 
     // ========== SNAPSHOT CHUNK ASSEMBLER ==========
