@@ -396,7 +396,8 @@ public class JobAssignmentService {
                 assignJob(queuedJob.getJobId(), null);
                 
             } catch (Exception e) {
-                logger.warn("Failed to auto-assign job: jobId={}", queuedJob.getJobId(), e);
+                logger.warn("Failed to auto-assign job: jobId={}, message={}", queuedJob.getJobId(), e.getMessage());
+                logger.debug("Stack trace for auto-assignment failure: jobId={}", queuedJob.getJobId(), e);
             }
         }
     }
@@ -425,7 +426,8 @@ public class JobAssignmentService {
                             assignment.getJobId());
                         
                     } catch (Exception e) {
-                        logger.error("Error handling timeout: jobId={}", assignment.getJobId(), e);
+                        logger.error("Error handling timeout: jobId={}, message={}", assignment.getJobId(), e.getMessage());
+                        logger.debug("Stack trace for assignment timeout handling failure: jobId={}", assignment.getJobId(), e);
                     }
                 }
             }

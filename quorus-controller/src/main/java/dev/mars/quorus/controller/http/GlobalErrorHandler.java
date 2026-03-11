@@ -77,11 +77,13 @@ public class GlobalErrorHandler implements Handler<RoutingContext> {
         } else if (failure instanceof NullPointerException) {
             // NPE - don't expose details to client
             errorResponse = ErrorResponse.withMessage(ErrorCode.INTERNAL_ERROR, path, "Unexpected error occurred", requestId);
-            logger.error("NullPointerException at path {}", path, failure);
+            logger.error("NullPointerException at path {}", path);
+            logger.debug("Stack trace for NullPointerException at path {}", path, failure);
         } else {
             // Generic server error - don't expose internal details
             errorResponse = ErrorResponse.withMessage(ErrorCode.INTERNAL_ERROR, path, "An unexpected error occurred", requestId);
-            logger.error("Unhandled exception at path {}: {}", path, failure.getMessage(), failure);
+            logger.error("Unhandled exception at path {}: {}", path, failure.getMessage());
+            logger.debug("Stack trace for unhandled exception at path {}", path, failure);
         }
 
         sendErrorResponse(ctx, errorResponse);
@@ -122,7 +124,8 @@ public class GlobalErrorHandler implements Handler<RoutingContext> {
      */
     private void logError(ErrorCode code, Throwable failure, String path) {
         if (code.httpStatus() >= 500) {
-            logger.error("Server error [{}] at {}: {}", code.code(), path, failure.getMessage(), failure);
+            logger.error("Server error [{}] at {}: {}", code.code(), path, failure.getMessage());
+            logger.debug("Stack trace for server error [{}] at {}", code.code(), path, failure);
         } else if (code.httpStatus() >= 400) {
             logger.warn("Client error [{}] at {}: {}", code.code(), path, failure.getMessage());
         } else {

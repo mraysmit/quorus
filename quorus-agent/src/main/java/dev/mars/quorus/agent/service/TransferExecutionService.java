@@ -100,7 +100,8 @@ public class TransferExecutionService {
             return transferEngine.submitTransfer(request)
                 .onComplete(ar -> {
                     if (ar.failed()) {
-                        logger.error("Transfer failed: " + request.getRequestId(), ar.cause());
+                        logger.error("Transfer failed: {}", request.getRequestId());
+                        logger.debug("Stack trace for transfer failure: requestId={}", request.getRequestId(), ar.cause());
                     } else {
                         TransferResult result = ar.result();
                         if (result.isSuccessful()) {
@@ -119,7 +120,8 @@ public class TransferExecutionService {
                     }
                 });
         } catch (Exception e) {
-            logger.error("Failed to submit transfer: " + request.getRequestId(), e);
+            logger.error("Failed to submit transfer: {}", request.getRequestId());
+            logger.debug("Stack trace for transfer submission failure: requestId={}", request.getRequestId(), e);
             return Future.failedFuture(e);
         }
     }

@@ -149,7 +149,8 @@ public class QuorusStateStore implements RaftLogApplicator {
                 command.getClass().getSimpleName(), result.getClass().getSimpleName());
             return result;
         } catch (Exception e) {
-            logger.error("Failed to apply command: type={}", command.getClass().getSimpleName(), e);
+            logger.error("Failed to apply command: type={}, message={}", command.getClass().getSimpleName(), e.getMessage());
+            logger.debug("Stack trace for command apply failure: type={}", command.getClass().getSimpleName(), e);
             throw new RuntimeException("Failed to apply command", e);
         }
     }
@@ -627,7 +628,8 @@ public class QuorusStateStore implements RaftLogApplicator {
                 data.length, transferJobs.size(), agents.size(), jobAssignments.size(), jobQueue.size(), routes.size(), lastAppliedIndex.get());
             return data;
         } catch (IOException e) {
-            logger.error("Failed to create snapshot: jobs={}, agents={}", transferJobs.size(), agents.size(), e);
+            logger.error("Failed to create snapshot: jobs={}, agents={}, message={}", transferJobs.size(), agents.size(), e.getMessage());
+            logger.debug("Stack trace for state store snapshot creation failure", e);
             throw new RuntimeException("Failed to create snapshot", e);
         }
     }

@@ -19,6 +19,7 @@ package dev.mars.quorus.controller.raft;
 import dev.mars.quorus.controller.raft.storage.InMemoryRaftStorage;
 import dev.mars.quorus.controller.raft.storage.RaftStorage;
 import dev.mars.quorus.controller.raft.storage.RaftStorage.LogEntryData;
+import dev.mars.quorus.controller.raft.storage.file.FileRaftStorage;
 import dev.mars.quorus.controller.raft.grpc.AppendEntriesRequest;
 import dev.mars.quorus.controller.raft.grpc.AppendEntriesResponse;
 import dev.mars.quorus.controller.raft.grpc.InstallSnapshotRequest;
@@ -26,6 +27,7 @@ import dev.mars.quorus.controller.raft.grpc.InstallSnapshotResponse;
 import dev.mars.quorus.controller.raft.grpc.VoteRequest;
 import dev.mars.quorus.controller.raft.grpc.VoteResponse;
 import io.vertx.core.Future;
+import io.vertx.core.WorkerExecutor;
 import dev.mars.quorus.controller.state.CommandResult;
 import dev.mars.quorus.controller.state.ProtobufCommandCodec;
 import dev.mars.quorus.controller.state.QuorusStateStore;
@@ -35,7 +37,9 @@ import static org.awaitility.Awaitility.await;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.Set;
@@ -50,6 +54,9 @@ import static org.junit.jupiter.api.Assertions.*;
  * @since 2025-08-20
  */
 class RaftNodeTest {
+
+    @TempDir
+    Path tempDir;
 
     private io.vertx.core.Vertx vertx;
     private RaftNode node1;
@@ -438,6 +445,118 @@ class RaftNodeTest {
 
         durableNode.stop().toCompletionStage().toCompletableFuture().join();
         }
+
+    @Test
+    void testRejectHigherTermVoteWithStaleCandidateLogPersistsTermAcrossRestart() {
+        WorkerExecutor executor = vertx.createSharedWorkerExecutor("vote-persist-test", 1);
+        Path storageDir = tempDir.resolve("vote-reject-higher-term");
+
+        RaftStorage storage = new FileRaftStorage(vertx, executor);
+        storage.open(storageDir).toCompletionStage().toCompletableFuture().join();
+
+        Set<String> singleNodeCluster = Set.of("node1");
+        RaftNode durableNode = RaftNode.builder().vertx(vertx).nodeId("node1").clusterNodes(singleNodeCluster)
+            .transport(new InMemoryTransportSimulator("node1"))
+            .stateMachine(new QuorusStateStore()).mode(RaftNodeMode.durable(storage)).electionTimeout(500).heartbeatInterval(100).build();
+
+        durableNode.start().toCompletionStage().toCompletableFuture().join();
+        await().atMost(Duration.ofSeconds(3)).until(durableNode::isLeader);
+
+        CommandResult<?> submitted = durableNode.submitCommand(SystemMetadataCommand.set("vote-log-key", "vote-log-value"))
+            .toCompletionStage().toCompletableFuture().join();
+        assertInstanceOf(CommandResult.Success.class, submitted);
+
+        long higherTerm = durableNode.getCurrentTerm() + 5;
+        VoteRequest staleCandidate = VoteRequest.newBuilder()
+            .setTerm(higherTerm)
+            .setCandidateId("candidate-behind")
+            .setLastLogTerm(0)
+            .setLastLogIndex(0)
+            .build();
+
+        VoteResponse response = durableNode.handleVoteRequest(staleCandidate)
+            .toCompletionStage().toCompletableFuture().join();
+
+        assertFalse(response.getVoteGranted(), "Vote must be rejected when candidate log is behind");
+        assertEquals(higherTerm, response.getTerm(), "Node should report observed higher term in response");
+
+        durableNode.stop().toCompletionStage().toCompletableFuture().join();
+
+        WorkerExecutor recoveryExecutor = vertx.createSharedWorkerExecutor("vote-persist-recovery-test", 1);
+        RaftStorage recoveryStorage = new FileRaftStorage(vertx, recoveryExecutor);
+        recoveryStorage.open(storageDir).toCompletionStage().toCompletableFuture().join();
+
+        RaftNode recovered = RaftNode.builder().vertx(vertx).nodeId("node1")
+            .clusterNodes(singleNodeCluster)
+            .transport(new InMemoryTransportSimulator("node1"))
+            .stateMachine(new QuorusStateStore())
+            .mode(RaftNodeMode.durable(recoveryStorage))
+            .electionTimeout(10_000)
+            .heartbeatInterval(200)
+            .build();
+
+        recovered.start().toCompletionStage().toCompletableFuture().join();
+
+        assertEquals(higherTerm, recovered.getCurrentTerm(),
+            "Higher observed term must be durable after rejecting stale candidate to prevent term regression");
+
+        recovered.stop().toCompletionStage().toCompletableFuture().join();
+        executor.close();
+        recoveryExecutor.close();
+    }
+
+    @Test
+    void testRejectHigherTermVoteWithStaleCandidateLogPersistsEmptyVoteAcrossRestart() {
+        WorkerExecutor executor = vertx.createSharedWorkerExecutor("vote-persist-vote-state-test", 1);
+        Path storageDir = tempDir.resolve("vote-reject-higher-term-empty-vote");
+
+        RaftStorage storage = new FileRaftStorage(vertx, executor);
+        storage.open(storageDir).toCompletionStage().toCompletableFuture().join();
+
+        Set<String> singleNodeCluster = Set.of("node1");
+        RaftNode durableNode = RaftNode.builder().vertx(vertx).nodeId("node1").clusterNodes(singleNodeCluster)
+            .transport(new InMemoryTransportSimulator("node1"))
+            .stateMachine(new QuorusStateStore()).mode(RaftNodeMode.durable(storage)).electionTimeout(500).heartbeatInterval(100).build();
+
+        durableNode.start().toCompletionStage().toCompletableFuture().join();
+        await().atMost(Duration.ofSeconds(3)).until(durableNode::isLeader);
+
+        CommandResult<?> submitted = durableNode.submitCommand(SystemMetadataCommand.set("vote-log-key-2", "vote-log-value-2"))
+            .toCompletionStage().toCompletableFuture().join();
+        assertInstanceOf(CommandResult.Success.class, submitted);
+
+        long higherTerm = durableNode.getCurrentTerm() + 7;
+        VoteRequest staleCandidate = VoteRequest.newBuilder()
+            .setTerm(higherTerm)
+            .setCandidateId("candidate-behind-2")
+            .setLastLogTerm(0)
+            .setLastLogIndex(0)
+            .build();
+
+        VoteResponse response = durableNode.handleVoteRequest(staleCandidate)
+            .toCompletionStage().toCompletableFuture().join();
+
+        assertFalse(response.getVoteGranted());
+        assertEquals(higherTerm, response.getTerm());
+
+        durableNode.stop().toCompletionStage().toCompletableFuture().join();
+
+        WorkerExecutor recoveryExecutor = vertx.createSharedWorkerExecutor("vote-persist-vote-state-recovery-test", 1);
+        RaftStorage recoveryStorage = new FileRaftStorage(vertx, recoveryExecutor);
+        recoveryStorage.open(storageDir).toCompletionStage().toCompletableFuture().join();
+
+        RaftStorage.PersistentMeta persistedMeta = recoveryStorage.loadMetadata()
+            .toCompletionStage().toCompletableFuture().join();
+
+        assertEquals(higherTerm, persistedMeta.currentTerm(),
+            "Rejecting higher-term stale candidate should still persist the observed term");
+        assertEquals(Optional.empty(), persistedMeta.votedFor(),
+            "No candidate should be persisted when vote is rejected");
+
+        recoveryStorage.close().toCompletionStage().toCompletableFuture().join();
+        executor.close();
+        recoveryExecutor.close();
+    }
 
         @Test
         void testAppendEntriesRejectsWhenHigherTermMetadataPersistFails() {

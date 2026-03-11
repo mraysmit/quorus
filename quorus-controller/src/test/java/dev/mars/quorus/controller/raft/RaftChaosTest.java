@@ -120,7 +120,8 @@ public class RaftChaosTest {
                 Future.all(futures)
                     .toCompletionStage().toCompletableFuture().join();
             } catch (Exception e) {
-                logger.warn("Error waiting for nodes to stop", e);
+                logger.warn("Error waiting for nodes to stop: {}", e.getMessage());
+                logger.debug("Stack trace for node stop wait failure", e);
             }
         }
         

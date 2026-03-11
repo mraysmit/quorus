@@ -113,7 +113,8 @@ public class QuorusControllerVerticle extends AbstractVerticle {
                     continueStartup(startPromise, config, nodeId, port, raftPort, clusterNodeIds);
                 })
                 .onFailure(err -> {
-                    logger.error("Failed to initialize Raft storage", err);
+                    logger.error("Failed to initialize Raft storage: {}", err.getMessage());
+                    logger.debug("Stack trace for Raft storage initialization failure", err);
                     startPromise.fail(err);
                 });
 
@@ -243,7 +244,8 @@ public class QuorusControllerVerticle extends AbstractVerticle {
                         stopPromise.complete();
                     })
                     .onFailure(err -> {
-                        logger.warn("Error during graceful shutdown", err);
+                        logger.warn("Error during graceful shutdown: {}", err.getMessage());
+                        logger.debug("Stack trace for graceful shutdown failure", err);
                         // Still complete - we tried our best
                         stopPromise.complete();
                     }),

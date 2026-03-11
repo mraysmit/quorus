@@ -77,7 +77,8 @@ public class MetricsHandler implements Handler<RoutingContext> {
                     }
                 })
                 .onFailure(err -> {
-                    logger.error("Failed to fetch metrics from OTel exporter on port {}", prometheusPort, err);
+                    logger.error("Failed to fetch metrics from OTel exporter on port {}: {}", prometheusPort, err.getMessage());
+                    logger.debug("Stack trace for metrics fetch failure on port {}", prometheusPort, err);
                     ctx.fail(new dev.mars.quorus.controller.http.QuorusApiException(
                             dev.mars.quorus.controller.http.ErrorCode.SERVICE_UNAVAILABLE,
                             "Metrics unavailable: " + err.getMessage()));

@@ -132,7 +132,8 @@ public final class RaftLogStorageAdapter implements RaftStorage {
             delegate.close();
             return Future.succeededFuture();
         } catch (Exception e) {
-            logger.error("Error closing RaftLog storage: {}", e.getMessage(), e);
+            logger.error("Error closing RaftLog storage: {}", e.getMessage());
+            logger.debug("Stack trace for RaftLog storage close failure", e);
             return Future.failedFuture(e);
         }
     }

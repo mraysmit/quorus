@@ -65,7 +65,10 @@ public class HealthService {
                 this.server = s;
                 logger.info("Health service started on port {}", s.actualPort());
             })
-            .onFailure(err -> logger.error("Failed to start health service on port {}", config.getAgentPort(), err))
+            .onFailure(err -> {
+                logger.error("Failed to start health service on port {}: {}", config.getAgentPort(), err.getMessage());
+                logger.debug("Stack trace for health service start failure on port {}", config.getAgentPort(), err);
+            })
             .mapEmpty();
     }
     
@@ -73,7 +76,10 @@ public class HealthService {
         if (server != null) {
             return server.close()
                 .onSuccess(v -> logger.info("Health service stopped"))
-                .onFailure(err -> logger.warn("Error stopping health service", err));
+                .onFailure(err -> {
+                    logger.warn("Error stopping health service: {}", err.getMessage());
+                    logger.debug("Stack trace for health service shutdown failure", err);
+                });
         }
         return Future.succeededFuture();
     }
