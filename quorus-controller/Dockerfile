@@ -10,7 +10,10 @@
 # The raftlog-core dependency (not on Maven Central) is pulled from your
 # local Maven cache via BuildKit's named context feature.
 
-FROM maven:3.9.9-eclipse-temurin-25 AS builder
+ARG BUILDER_IMAGE=maven:3.9.11-eclipse-temurin-25
+ARG RUNTIME_IMAGE=eclipse-temurin:25-jre-alpine
+
+FROM ${BUILDER_IMAGE} AS builder
 
 # Set working directory
 WORKDIR /app
@@ -20,13 +23,14 @@ COPY pom.xml .
 COPY quorus-core/pom.xml quorus-core/
 COPY quorus-workflow/pom.xml quorus-workflow/
 COPY quorus-tenant/pom.xml quorus-tenant/
-COPY quorus-api/pom.xml quorus-api/
 COPY quorus-controller/pom.xml quorus-controller/
 
 # Create empty stub poms for modules not needed for controller build
 RUN mkdir -p quorus-integration-examples && echo '<?xml version="1.0" encoding="UTF-8"?><project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"><modelVersion>4.0.0</modelVersion><parent><groupId>dev.mars</groupId><artifactId>quorus</artifactId><version>1.0-SNAPSHOT</version></parent><artifactId>quorus-integration-examples</artifactId><packaging>pom</packaging></project>' > quorus-integration-examples/pom.xml
 
 RUN mkdir -p quorus-agent && echo '<?xml version="1.0" encoding="UTF-8"?><project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"><modelVersion>4.0.0</modelVersion><parent><groupId>dev.mars</groupId><artifactId>quorus</artifactId><version>1.0-SNAPSHOT</version></parent><artifactId>quorus-agent</artifactId><packaging>pom</packaging></project>' > quorus-agent/pom.xml
+
+RUN mkdir -p quorus-api && echo '<?xml version="1.0" encoding="UTF-8"?><project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"><modelVersion>4.0.0</modelVersion><parent><groupId>dev.mars</groupId><artifactId>quorus</artifactId><version>1.0-SNAPSHOT</version></parent><artifactId>quorus-api</artifactId><packaging>pom</packaging></project>' > quorus-api/pom.xml
 
 # Copy local Maven artifacts from named build context (raftlog-core not on Maven Central)
 # BuildKit pulls these from host's ~/.m2/repository/dev/mars via --build-context m2cache=...
@@ -44,7 +48,6 @@ RUN --mount=type=cache,target=/root/.m2/repository/org \
 COPY quorus-core/src quorus-core/src
 COPY quorus-workflow/src quorus-workflow/src
 COPY quorus-tenant/src quorus-tenant/src
-COPY quorus-api/src quorus-api/src
 COPY quorus-controller/src quorus-controller/src
 
 # Build the application
@@ -56,7 +59,7 @@ RUN --mount=type=cache,target=/root/.m2/repository/org \
     mvn package -pl quorus-controller -am -DskipTests
 
 # Runtime stage
-FROM eclipse-temurin:25-jre-alpine
+FROM ${RUNTIME_IMAGE}
 
 # Install curl for health checks
 RUN apk add --no-cache curl

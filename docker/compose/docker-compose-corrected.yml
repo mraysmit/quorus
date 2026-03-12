@@ -1,5 +1,3 @@
-version: '3.8'
-
 # Quorus Single-Node Development Configuration
 # The controller is embedded within the API service
 # For production, multiple API instances would form a Raft cluster

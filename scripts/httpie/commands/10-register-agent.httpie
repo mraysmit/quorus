@@ -1,0 +1,9 @@
+http POST "$BASE_URL/api/v1/agents/register" \
+  agentId="$AGENT_ID" \
+  hostname="$HOSTNAME" \
+  address="$ADDRESS" \
+  port:=${PORT:-9090} \
+  status="ACTIVE" \
+  version="1.0.0" \
+  region="$REGION" \
+  datacenter="$DATACENTER"

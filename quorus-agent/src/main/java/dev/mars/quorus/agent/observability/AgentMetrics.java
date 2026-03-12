@@ -20,9 +20,7 @@ import io.opentelemetry.api.GlobalOpenTelemetry;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.metrics.LongCounter;
-import io.opentelemetry.api.metrics.LongUpDownCounter;
 import io.opentelemetry.api.metrics.Meter;
-import io.opentelemetry.api.metrics.ObservableLongGauge;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,6 +44,7 @@ import java.util.function.Supplier;
  * - quorus.agent.transfers.bytes.total (counter) - Total bytes transferred
  * - quorus.agent.transfers.duration.seconds (counter) - Total transfer duration
  * - quorus.agent.uptime.seconds (gauge) - Agent uptime in seconds
+ * - quorus.agent.assignments.foreign.total (counter) - Foreign assignment mismatches detected
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @since 2026-01-27
@@ -66,6 +65,7 @@ public class AgentMetrics {
     private final LongCounter jobsFailed;
     private final LongCounter transferBytesTotal;
     private final LongCounter transferDurationSeconds;
+        private final LongCounter foreignAssignmentsTotal;
 
     // Gauges (backed by AtomicLong for thread-safe updates)
     private final AtomicLong agentStatus = new AtomicLong(0);
@@ -76,6 +76,7 @@ public class AgentMetrics {
     private static final AttributeKey<String> AGENT_ID_KEY = AttributeKey.stringKey("agent.id");
     private static final AttributeKey<String> PROTOCOL_KEY = AttributeKey.stringKey("protocol");
     private static final AttributeKey<String> DIRECTION_KEY = AttributeKey.stringKey("direction");
+        private static final AttributeKey<String> ASSIGNED_AGENT_ID_KEY = AttributeKey.stringKey("assigned.agent.id");
 
     private final String agentId;
 
@@ -135,6 +136,11 @@ public class AgentMetrics {
         transferDurationSeconds = meter.counterBuilder("quorus.agent.transfers.duration.seconds")
                 .setDescription("Total transfer duration in seconds")
                 .setUnit("s")
+                .build();
+
+        foreignAssignmentsTotal = meter.counterBuilder("quorus.agent.assignments.foreign.total")
+                .setDescription("Total number of foreign-assignment mismatches detected")
+                .setUnit("1")
                 .build();
 
         // Initialize gauges
@@ -221,4 +227,13 @@ public class AgentMetrics {
         transferBytesTotal.add(bytesTransferred, attrs);
         transferDurationSeconds.add(durationSeconds, attrs);
     }
+
+        public void recordForeignAssignmentMismatch(String assignedAgentId) {
+                String assignedId = (assignedAgentId == null || assignedAgentId.isBlank()) ? "unknown" : assignedAgentId;
+                Attributes attrs = Attributes.builder()
+                                .put(AGENT_ID_KEY, agentId)
+                                .put(ASSIGNED_AGENT_ID_KEY, assignedId)
+                                .build();
+                foreignAssignmentsTotal.add(1, attrs);
+        }
 }

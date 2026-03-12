@@ -1,0 +1,10 @@
+{
+  "agentId": "agent-demo-001",
+  "hostname": "agent-demo-001.local",
+  "address": "10.10.0.21",
+  "port": 9090,
+  "status": "ACTIVE",
+  "version": "1.0.0",
+  "region": "uk-south",
+  "datacenter": "dc-lon-1"
+}

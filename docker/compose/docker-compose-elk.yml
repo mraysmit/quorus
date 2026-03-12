@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Elasticsearch for log storage
   elasticsearch:

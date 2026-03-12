@@ -1,0 +1,1 @@
+http GET "$BASE_URL/raft/status"

@@ -20,16 +20,16 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "description": "Visual network topology of the Raft cluster showing node states and connections.",
+      "description": "Live Raft topology with node states and directional peer links.",
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "thresholds" },
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "#3274D9", "value": null },
-              { "color": "#FF9830", "value": 1 },
-              { "color": "#73BF69", "value": 2 }
+              { "color": "#5A6C85", "value": null },
+              { "color": "#E8B14A", "value": 1 },
+              { "color": "#FF3B30", "value": 2 }
             ]
           },
           "mappings": [
@@ -38,153 +38,43 @@
             { "options": { "2": { "text": "★ LEADER", "index": 2 } }, "type": "value" }
           ]
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Value" },
+            "properties": [
+              { "id": "displayName", "value": "State" }
+            ]
+          }
+        ]
       },
       "gridPos": { "h": 14, "w": 8, "x": 0, "y": 5 },
       "id": 100,
       "options": {
-        "inlineEditing": false,
-        "showAdvancedTypes": false,
-        "panZoom": false,
-        "infinitePan": false,
-        "root": {
-          "background": { "color": { "fixed": "transparent" } },
-          "border": { "color": { "fixed": "transparent" } },
-          "constraint": { "horizontal": "left", "vertical": "top" },
-          "elements": [
-            {
-              "background": { "color": { "field": "node-1", "fixed": "#3274D9" } },
-              "border": { "color": { "fixed": "#FFFFFF" }, "width": 3 },
-              "config": {
-                "align": "center",
-                "color": { "fixed": "#FFFFFF" },
-                "size": 16,
-                "text": { "fixed": "node-1" },
-                "valign": "middle"
-              },
-              "constraint": { "horizontal": "center", "vertical": "top" },
-              "name": "node-1",
-              "placement": { "height": 70, "left": 115, "top": 30, "width": 70 },
-              "type": "ellipse"
-            },
-            {
-              "background": { "color": { "field": "node-2", "fixed": "#3274D9" } },
-              "border": { "color": { "fixed": "#FFFFFF" }, "width": 3 },
-              "config": {
-                "align": "center",
-                "color": { "fixed": "#FFFFFF" },
-                "size": 16,
-                "text": { "fixed": "node-2" },
-                "valign": "middle"
-              },
-              "constraint": { "horizontal": "left", "vertical": "top" },
-              "name": "node-2",
-              "placement": { "height": 70, "left": 40, "top": 180, "width": 70 },
-              "type": "ellipse"
-            },
-            {
-              "background": { "color": { "field": "node-3", "fixed": "#3274D9" } },
-              "border": { "color": { "fixed": "#FFFFFF" }, "width": 3 },
-              "config": {
-                "align": "center",
-                "color": { "fixed": "#FFFFFF" },
-                "size": 16,
-                "text": { "fixed": "node-3" },
-                "valign": "middle"
-              },
-              "constraint": { "horizontal": "left", "vertical": "top" },
-              "name": "node-3",
-              "placement": { "height": 70, "left": 190, "top": 180, "width": 70 },
-              "type": "ellipse"
-            },
-            {
-              "background": { "color": { "fixed": "transparent" } },
-              "config": {
-                "align": "center",
-                "color": { "field": "node-1", "fixed": "#AAAAAA" },
-                "size": 12,
-                "text": { "field": "node-1", "mode": "field" },
-                "valign": "middle"
-              },
-              "constraint": { "horizontal": "center", "vertical": "top" },
-              "name": "label-1",
-              "placement": { "height": 20, "left": 115, "top": 105, "width": 70 },
-              "type": "text"
-            },
-            {
-              "background": { "color": { "fixed": "transparent" } },
-              "config": {
-                "align": "center",
-                "color": { "field": "node-2", "fixed": "#AAAAAA" },
-                "size": 12,
-                "text": { "field": "node-2", "mode": "field" },
-                "valign": "middle"
-              },
-              "constraint": { "horizontal": "left", "vertical": "top" },
-              "name": "label-2",
-              "placement": { "height": 20, "left": 40, "top": 255, "width": 70 },
-              "type": "text"
-            },
-            {
-              "background": { "color": { "fixed": "transparent" } },
-              "config": {
-                "align": "center",
-                "color": { "field": "node-3", "fixed": "#AAAAAA" },
-                "size": 12,
-                "text": { "field": "node-3", "mode": "field" },
-                "valign": "middle"
-              },
-              "constraint": { "horizontal": "left", "vertical": "top" },
-              "name": "label-3",
-              "placement": { "height": 20, "left": 190, "top": 255, "width": 70 },
-              "type": "text"
-            },
-            {
-              "background": { "color": { "fixed": "transparent" } },
-              "config": {
-                "align": "center",
-                "color": { "fixed": "#666666" },
-                "size": 14,
-                "text": { "fixed": "Raft Consensus" },
-                "valign": "middle"
-              },
-              "constraint": { "horizontal": "center", "vertical": "top" },
-              "name": "title",
-              "placement": { "height": 25, "left": 100, "top": 135, "width": 100 },
-              "type": "text"
-            }
-          ],
-          "name": "canvas",
-          "placement": { "height": 300, "left": 0, "top": 0, "width": 300 },
-          "type": "frame"
+        "legend": {
+          "showLegend": false
         }
       },
       "pluginVersion": "10.3.1",
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "quorus_cluster_state{node=\"node-1\"}",
-          "legendFormat": "node-1",
+          "expr": "label_replace(label_replace(label_replace(label_replace(quorus_cluster_state{job=\"quorus-controllers-compose\",node=~\"controller1|controller2|controller3\"} == 0, \"detail__role\", \"FOLLOWER\", \"__name__\", \".*\"), \"color\", \"#4F6A8A\", \"__name__\", \".*\"), \"id\", \"$1\", \"node\", \"(.*)\"), \"title\", \"$1\", \"node\", \"(.*)\") or label_replace(label_replace(label_replace(label_replace(quorus_cluster_state{job=\"quorus-controllers-compose\",node=~\"controller1|controller2|controller3\"} == 1, \"detail__role\", \"CANDIDATE\", \"__name__\", \".*\"), \"color\", \"#D99B2B\", \"__name__\", \".*\"), \"id\", \"$1\", \"node\", \"(.*)\"), \"title\", \"$1\", \"node\", \"(.*)\") or label_replace(label_replace(label_replace(label_replace(quorus_cluster_state{job=\"quorus-controllers-compose\",node=~\"controller1|controller2|controller3\"} == 2, \"detail__role\", \"LEADER\", \"__name__\", \".*\"), \"color\", \"#FF2D55\", \"__name__\", \".*\"), \"id\", \"$1\", \"node\", \"(.*)\"), \"title\", \"$1\", \"node\", \"(.*)\")",
+          "format": "table",
+          "legendFormat": "{{node}}",
           "refId": "A",
           "instant": true
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "quorus_cluster_state{node=\"node-2\"}",
-          "legendFormat": "node-2",
+          "expr": "label_join(sum by (source, target) (quorus_raft_rpc_ratio_total{job=\"quorus-controllers-compose\"}), \"id\", \"->\", \"source\", \"target\")",
+          "format": "table",
+          "legendFormat": "{{source}} -> {{target}}",
           "refId": "B",
-          "instant": true
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "quorus_cluster_state{node=\"node-3\"}",
-          "legendFormat": "node-3",
-          "refId": "C",
           "instant": true
         }
       ],
       "title": "Raft Cluster Network",
-      "type": "canvas"
+      "type": "nodeGraph"
     },
     {
       "datasource": { "type": "prometheus", "uid": "prometheus" },
@@ -847,6 +737,599 @@
       ],
       "title": "Log Size Over Time",
       "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 36 },
+      "id": 110,
+      "panels": [],
+      "title": "Transfer Jobs (Real-Time)",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Current number of assigned jobs being worked by agents cluster-wide",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#3274D9", "value": null },
+              { "color": "#E0B400", "value": 1 },
+              { "color": "#73BF69", "value": 3 }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 3, "w": 6, "x": 0, "y": 37 },
+      "id": 111,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "pluginVersion": "10.3.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "max(quorus_jobs_assignments{job=\"quorus-controllers-compose\"}) or vector(0)",
+          "legendFormat": "Assigned",
+          "refId": "A"
+        }
+      ],
+      "title": "Running Assignments",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Current number of queued jobs waiting for assignment",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#73BF69", "value": null },
+              { "color": "#E0B400", "value": 1 },
+              { "color": "#FF780A", "value": 5 },
+              { "color": "#E02F44", "value": 10 }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 3, "w": 6, "x": 6, "y": 37 },
+      "id": 112,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "pluginVersion": "10.3.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "max(quorus_jobs_queued{job=\"quorus-controllers-compose\"}) or vector(0)",
+          "legendFormat": "Queued",
+          "refId": "A"
+        }
+      ],
+      "title": "Queued Jobs",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Total jobs tracked in controller state",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#56A64B", "value": null }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 3, "w": 6, "x": 12, "y": 37 },
+      "id": 113,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "pluginVersion": "10.3.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "max(quorus_jobs{job=\"quorus-controllers-compose\"}) or vector(0)",
+          "legendFormat": "Total",
+          "refId": "A"
+        }
+      ],
+      "title": "Total Jobs",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Active registered agents in controller state",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#E02F44", "value": null },
+              { "color": "#E0B400", "value": 1 },
+              { "color": "#73BF69", "value": 2 }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 3, "w": 6, "x": 18, "y": 37 },
+      "id": 114,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "pluginVersion": "10.3.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "max(quorus_agents{job=\"quorus-controllers-compose\"}) or vector(0)",
+          "legendFormat": "Agents",
+          "refId": "A"
+        }
+      ],
+      "title": "Registered Agents",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Live queue/assignment totals over time (deduplicated across controller replicas)",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 20,
+            "showPoints": "auto",
+            "pointSize": 5,
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 14, "x": 0, "y": 40 },
+      "id": 115,
+      "options": {
+        "legend": { "calcs": ["lastNotNull"], "displayMode": "table", "placement": "right", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "pluginVersion": "10.3.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "max(quorus_jobs_assignments{job=\"quorus-controllers-compose\"})",
+          "legendFormat": "Running assignments",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "max(quorus_jobs_queued{job=\"quorus-controllers-compose\"})",
+          "legendFormat": "Queued jobs",
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "max(quorus_jobs{job=\"quorus-controllers-compose\"})",
+          "legendFormat": "Total jobs",
+          "refId": "C"
+        }
+      ],
+      "title": "Job Pipeline Over Time",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Controller-by-controller view for running assignments; lines should stay aligned in a healthy replicated state",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "auto",
+            "pointSize": 4,
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 10, "x": 14, "y": 40 },
+      "id": 116,
+      "options": {
+        "legend": { "calcs": ["lastNotNull"], "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "pluginVersion": "10.3.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "quorus_jobs_assignments{job=\"quorus-controllers-compose\"}",
+          "legendFormat": "{{node}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Assignment Consistency By Controller",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 48 },
+      "id": 120,
+      "panels": [],
+      "title": "Agents and Topology",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Live topology from controller nodes to the agent pool. Edge weight equals agents visible by each controller.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#5A6C85", "value": null },
+              { "color": "#E0B400", "value": 1 },
+              { "color": "#56A64B", "value": 2 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 10, "w": 10, "x": 0, "y": 49 },
+      "id": 121,
+      "options": {
+        "legend": { "showLegend": false }
+      },
+      "pluginVersion": "10.3.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "label_replace(label_replace(label_replace(quorus_cluster_state{job=\"quorus-controllers-compose\",node=~\"controller1|controller2|controller3\"}, \"id\", \"$1\", \"node\", \"(.*)\"), \"title\", \"$1\", \"node\", \"(.*)\"), \"detail__type\", \"Controller\", \"__name__\", \".*\") or label_replace(label_replace(label_replace(vector(1), \"id\", \"agent-pool\", \"__name__\", \".*\"), \"title\", \"Agent Pool\", \"__name__\", \".*\"), \"detail__type\", \"Agents\", \"__name__\", \".*\")",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "label_join(label_replace(label_replace(quorus_agents{job=\"quorus-controllers-compose\"}, \"source\", \"$1\", \"node\", \"(.*)\"), \"target\", \"agent-pool\", \"__name__\", \".*\"), \"id\", \"->\", \"source\", \"target\")",
+          "format": "table",
+          "instant": true,
+          "refId": "B"
+        }
+      ],
+      "title": "Agent Connectivity Topology",
+      "type": "nodeGraph"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Controller-side view of registered agents over time",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 20,
+            "showPoints": "auto",
+            "pointSize": 5,
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 10, "w": 14, "x": 10, "y": 49 },
+      "id": 122,
+      "options": {
+        "legend": { "calcs": ["lastNotNull"], "displayMode": "table", "placement": "right", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "pluginVersion": "10.3.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "quorus_agents{job=\"quorus-controllers-compose\"}",
+          "legendFormat": "{{node}}",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "max(quorus_agents{job=\"quorus-controllers-compose\"})",
+          "legendFormat": "cluster max",
+          "refId": "B"
+        }
+      ],
+      "title": "Agents Seen By Each Controller",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Current controller and agent counts with per-node context",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "custom": {
+            "align": "left",
+            "cellOptions": { "type": "auto" }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#56A64B", "value": null },
+              { "color": "#E0B400", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 59 },
+      "id": 123,
+      "options": {
+        "cellHeight": "sm",
+        "footer": { "show": false, "reducer": ["sum"], "fields": "", "countRows": false },
+        "showHeader": true
+      },
+      "pluginVersion": "10.3.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "quorus_agents{job=\"quorus-controllers-compose\"}",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "quorus_cluster_state{job=\"quorus-controllers-compose\"}",
+          "format": "table",
+          "instant": true,
+          "refId": "B"
+        }
+      ],
+      "title": "Agent Topology Snapshot",
+      "transformations": [
+        {
+          "id": "seriesToColumns",
+          "options": { "byField": "node" }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time 1": true,
+              "Time 2": true,
+              "__name__ 1": true,
+              "__name__ 2": true,
+              "deployment 1": true,
+              "deployment 2": true,
+              "service 1": true,
+              "service 2": true,
+              "job 1": true,
+              "job 2": true,
+              "instance 2": true,
+              "otel_scope_name 1": true,
+              "otel_scope_name 2": true,
+              "node 2": true
+            },
+            "indexByName": {
+              "node 1": 0,
+              "instance 1": 1,
+              "Value #A": 2,
+              "Value #B": 3
+            },
+            "renameByName": {
+              "node 1": "Controller",
+              "instance 1": "Address",
+              "Value #A": "Agents",
+              "Value #B": "State(0F/1C/2L)"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Health signal: green when all controllers agree on agent count and at least one agent is registered",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": { "text": "UNHEALTHY", "color": "#E02F44", "index": 0 },
+                "1": { "text": "HEALTHY", "color": "#56A64B", "index": 1 }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#E02F44", "value": null },
+              { "color": "#56A64B", "value": 1 }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 65 },
+      "id": 124,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "value"
+      },
+      "pluginVersion": "10.3.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "((max(quorus_agents{job=\"quorus-controllers-compose\"}) > bool 0) * (stddev(quorus_agents{job=\"quorus-controllers-compose\"}) == bool 0))",
+          "legendFormat": "health",
+          "refId": "A"
+        }
+      ],
+      "title": "Agent Visibility Health",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Difference between highest and lowest controller-reported agent counts; should be 0",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#56A64B", "value": null },
+              { "color": "#E0B400", "value": 1 },
+              { "color": "#E02F44", "value": 2 }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 65 },
+      "id": 125,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "pluginVersion": "10.3.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "max(quorus_agents{job=\"quorus-controllers-compose\"}) - min(quorus_agents{job=\"quorus-controllers-compose\"})",
+          "legendFormat": "drift",
+          "refId": "A"
+        }
+      ],
+      "title": "Controller Agent Count Drift",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "infinity" },
+      "description": "Live agent identity from controller API (agentId, region, datacenter, health and heartbeat)",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "custom": {
+            "align": "left",
+            "cellOptions": { "type": "auto" }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "healthy" },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "true": { "text": "HEALTHY", "color": "#56A64B", "index": 0 },
+                      "false": { "text": "UNHEALTHY", "color": "#E02F44", "index": 1 }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 65 },
+      "id": 126,
+      "options": {
+        "cellHeight": "sm",
+        "footer": { "show": false, "reducer": ["sum"], "fields": "", "countRows": false },
+        "showHeader": true
+      },
+      "pluginVersion": "10.3.1",
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "source": "url",
+          "type": "json",
+          "url": "http://host.docker.internal:8080/api/v1/agents",
+          "root_selector": "agents",
+          "columns": [
+            { "selector": "agentId", "text": "agentId", "type": "string" },
+            { "selector": "hostname", "text": "hostname", "type": "string" },
+            { "selector": "address", "text": "address", "type": "string" },
+            { "selector": "port", "text": "port", "type": "number" },
+            { "selector": "status", "text": "status", "type": "string" },
+            { "selector": "version", "text": "version", "type": "string" },
+            { "selector": "region", "text": "region", "type": "string" },
+            { "selector": "datacenter", "text": "datacenter", "type": "string" },
+            { "selector": "healthy", "text": "healthy", "type": "string" },
+            { "selector": "available", "text": "available", "type": "string" },
+            { "selector": "lastHeartbeat", "text": "lastHeartbeat", "type": "string" }
+          ]
+        }
+      ],
+      "title": "Agent Identity (API)",
+      "type": "table"
     }
   ],
   "refresh": "5s",
@@ -858,6 +1341,6 @@
   "timezone": "",
   "title": "Quorus Controller Cluster",
   "uid": "quorus-controller",
-  "version": 5,
+  "version": 65,
   "weekStart": ""
 }

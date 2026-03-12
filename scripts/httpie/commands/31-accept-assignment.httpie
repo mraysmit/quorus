@@ -1,0 +1,1 @@
+http PUT "$BASE_URL/api/v1/assignments/$ASSIGNMENT_ID/accept"

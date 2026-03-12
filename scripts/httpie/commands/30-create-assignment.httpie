@@ -1,0 +1,5 @@
+http POST "$BASE_URL/api/v1/assignments" \
+  assignmentId="$ASSIGNMENT_ID" \
+  jobId="$JOB_ID" \
+  agentId="$AGENT_ID" \
+  status="ASSIGNED"

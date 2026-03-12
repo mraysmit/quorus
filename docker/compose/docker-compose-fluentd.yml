@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Fluentd for log aggregation
   fluentd:

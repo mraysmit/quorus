@@ -53,7 +53,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class QuorusAgent {
 
     private static final Logger logger = LoggerFactory.getLogger(QuorusAgent.class);
-    private static final int MAX_FOREIGN_ASSIGNMENT_MISMATCHES = 3;
 
     private final Vertx vertx;
     private final boolean closeVertxOnShutdown;
@@ -77,6 +76,7 @@ public class QuorusAgent {
     private volatile boolean running = false;
     private final io.vertx.core.Promise<Void> shutdownPromise = io.vertx.core.Promise.promise();
     private final AtomicInteger foreignAssignmentMismatchCount = new AtomicInteger(0);
+    private final int foreignAssignmentMismatchThreshold;
 
     /**
      * Creates a QuorusAgent with Vert.x dependency injection.
@@ -93,6 +93,7 @@ public class QuorusAgent {
         this.vertx = Objects.requireNonNull(vertx, "Vertx instance cannot be null");
         this.closeVertxOnShutdown = closeVertxOnShutdown;
         this.config = Objects.requireNonNull(config, "AgentConfiguration cannot be null");
+        this.foreignAssignmentMismatchThreshold = AgentConfig.get().getForeignAssignmentMismatchThreshold();
 
         logger.info("Creating QuorusAgent with Vert.x instance: {} (using Vert.x timers, no ScheduledExecutorService)",
                     System.identityHashCode(vertx));
@@ -109,6 +110,7 @@ public class QuorusAgent {
         this.metrics = new AgentMetrics(config.getAgentId(), System.currentTimeMillis());
 
         logger.info("Quorus Agent initialized: {} (reactive mode with OpenTelemetry)", config.getAgentId());
+        logger.info("Foreign-assignment mismatch threshold configured to {}", foreignAssignmentMismatchThreshold);
     }
 
     /**
@@ -391,13 +393,14 @@ public class QuorusAgent {
 
         if (assignedAgentId == null || !config.getAgentId().equals(assignedAgentId)) {
             int mismatchCount = foreignAssignmentMismatchCount.incrementAndGet();
+            metrics.recordForeignAssignmentMismatch(assignedAgentId);
             logger.error("Refusing to process job {} because assignment agentId {} does not match local agentId {}",
                     jobId, assignedAgentId, config.getAgentId());
-            logger.error("Foreign assignment mismatch count: {}/{}", mismatchCount, MAX_FOREIGN_ASSIGNMENT_MISMATCHES);
+            logger.error("Foreign assignment mismatch count: {}/{}", mismatchCount, foreignAssignmentMismatchThreshold);
 
-            if (mismatchCount >= MAX_FOREIGN_ASSIGNMENT_MISMATCHES) {
+            if (mismatchCount >= foreignAssignmentMismatchThreshold) {
                 logger.error("Foreign assignment mismatch threshold reached ({}). Initiating fail-fast shutdown.",
-                        MAX_FOREIGN_ASSIGNMENT_MISMATCHES);
+                foreignAssignmentMismatchThreshold);
                 metrics.setStatusError();
                 shutdown();
             }

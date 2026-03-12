@@ -126,6 +126,14 @@ public final class AgentConfig {
         return getLong("quorus.agent.jobs.polling.interval-ms", 10000);
     }
 
+    /**
+     * Number of foreign-assignment mismatches allowed before fail-fast shutdown.
+     * Default is 1 for strict operation in critical systems.
+     */
+    public int getForeignAssignmentMismatchThreshold() {
+        return getInt("quorus.agent.security.foreign-assignment-threshold", 1);
+    }
+
     // ==================== Telemetry Configuration ====================
 
     public boolean isTelemetryEnabled() {
@@ -204,6 +212,10 @@ public final class AgentConfig {
         if (getMaxConcurrentTransfers() <= 0) {
             throw new IllegalStateException(
                     "Max concurrent transfers must be positive, got: " + getMaxConcurrentTransfers());
+        }
+        if (getForeignAssignmentMismatchThreshold() <= 0) {
+            throw new IllegalStateException(
+                "Foreign assignment mismatch threshold must be positive, got: " + getForeignAssignmentMismatchThreshold());
         }
 
         logger.info("Agent configuration validated successfully");
@@ -284,6 +296,8 @@ public final class AgentConfig {
         logger.info("  --- Job Polling ---");
         logger.info("  Initial Delay:        {}ms", getJobPollingInitialDelayMs());
         logger.info("  Poll Interval:        {}ms", getJobPollingIntervalMs());
+        logger.info("  --- Security ---");
+        logger.info("  Foreign Assignment Threshold: {}", getForeignAssignmentMismatchThreshold());
         logger.info("  --- Telemetry ---");
         logger.info("  Enabled:              {}", isTelemetryEnabled());
         logger.info("  Prometheus Port:      {}", getPrometheusPort());

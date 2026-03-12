@@ -1,0 +1,4 @@
+http POST "$BASE_URL/api/v1/jobs/$JOB_ID/status" \
+  agentId="$AGENT_ID" \
+  status="COMPLETED" \
+  bytesTransferred:=1048576
