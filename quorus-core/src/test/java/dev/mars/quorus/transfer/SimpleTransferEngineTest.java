@@ -23,6 +23,7 @@ import dev.mars.quorus.core.exceptions.TransferException;
 import dev.mars.quorus.monitoring.TransferEngineHealthCheck;
 import dev.mars.quorus.monitoring.TransferMetrics;
 import io.vertx.core.Future;
+import io.vertx.core.Promise;
 import io.vertx.core.Vertx;
 import io.vertx.junit5.VertxExtension;
 import io.vertx.junit5.VertxTestContext;
@@ -31,7 +32,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
+import java.lang.reflect.Field;
+import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Instant;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -73,19 +81,8 @@ class SimpleTransferEngineTest {
     }
 
     @Test
-    void testDeprecatedConstructor() {
-        @SuppressWarnings("deprecation")
-        SimpleTransferEngine deprecatedEngine = new SimpleTransferEngine();
-        assertNotNull(deprecatedEngine);
-        deprecatedEngine.shutdown(5);
-    }
-
-    @Test
-    void testDeprecatedConstructorWithParams() {
-        @SuppressWarnings("deprecation")
-        SimpleTransferEngine deprecatedEngine = new SimpleTransferEngine(10, 3, 1000);
-        assertNotNull(deprecatedEngine);
-        deprecatedEngine.shutdown(5);
+    void testInjectedVertxConstructorDoesNotOwnVertxLifecycle() {
+        assertFalse(engine.isClosingOwnedVertxOnShutdown());
     }
 
     @Test
@@ -256,4 +253,74 @@ class SimpleTransferEngineTest {
         assertEquals(0L, metricsMap.get("failedTransfers"));
         assertEquals(0L, metricsMap.get("activeTransfers"));
     }
+
+        @Test
+        void testSubmitTransferRetriesWithBackoffThenFails() throws Exception {
+        Path localFile = Files.createTempFile("retry-failure", ".txt");
+        Files.writeString(localFile, "retry-me");
+
+        TransferRequest request = TransferRequest.builder()
+            .requestId("retry-backoff-test")
+            .sourceUri(localFile.toUri())
+            .destinationUri(URI.create("ftp://user:pass@127.0.0.1:1/unreachable.txt"))
+            .protocol("ftp")
+            .build();
+
+        Instant start = Instant.now();
+        TransferResult result = engine.submitTransfer(request)
+            .toCompletionStage()
+            .toCompletableFuture()
+            .get(10, TimeUnit.SECONDS);
+        long elapsedMs = java.time.Duration.between(start, Instant.now()).toMillis();
+
+        assertNotNull(result);
+        assertFalse(result.isSuccessful());
+        assertEquals(dev.mars.quorus.core.TransferStatus.FAILED, result.getFinalStatus());
+        assertTrue(result.getErrorMessage().isPresent());
+
+        // Retry delay is 100ms with linear backoff (100 + 200 + 300ms) before final failure.
+        assertTrue(elapsedMs >= 500,
+            "Expected retry backoff to delay completion; elapsed=" + elapsedMs + "ms");
+        }
+
+        @Test
+        void testAwaitActiveTransfersReturnsAfterTimeoutForStuckFuture() throws Exception {
+        TransferRequest request = TransferRequest.builder()
+            .requestId("stuck-future-test")
+            .sourceUri(URI.create("http://example.com/file.txt"))
+            .destinationPath("/tmp/file.txt")
+            .protocol("http")
+            .build();
+        TransferJob job = new TransferJob(request);
+        TransferContext context = new TransferContext(job);
+        Promise<TransferResult> neverCompletes = Promise.promise();
+
+        mapField("activeJobs").put(job.getJobId(), job);
+        mapField("activeContexts").put(job.getJobId(), context);
+        @SuppressWarnings("unchecked")
+        ConcurrentHashMap<String, Future<TransferResult>> activeFutures =
+            (ConcurrentHashMap<String, Future<TransferResult>>) getField("activeFutures");
+        activeFutures.put(job.getJobId(), neverCompletes.future());
+
+        Instant start = Instant.now();
+        engine.awaitActiveTransfers(150)
+            .toCompletionStage()
+            .toCompletableFuture()
+            .get(2, TimeUnit.SECONDS);
+        long elapsedMs = java.time.Duration.between(start, Instant.now()).toMillis();
+
+        assertTrue(elapsedMs >= 120,
+            "awaitActiveTransfers should wait close to timeout before recovering; elapsed=" + elapsedMs + "ms");
+        }
+
+        @SuppressWarnings("unchecked")
+        private ConcurrentHashMap<String, Object> mapField(String fieldName) throws Exception {
+        return (ConcurrentHashMap<String, Object>) getField(fieldName);
+        }
+
+        private Object getField(String fieldName) throws Exception {
+        Field field = SimpleTransferEngine.class.getDeclaredField(fieldName);
+        field.setAccessible(true);
+        return field.get(engine);
+        }
 }

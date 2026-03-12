@@ -16,9 +16,15 @@
 
 package dev.mars.quorus.network;
 
+import io.vertx.core.Future;
 import io.vertx.core.Vertx;
 import io.vertx.sqlclient.Pool;
 import org.junit.jupiter.api.*;
+
+import java.lang.reflect.Field;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -40,12 +46,12 @@ class ConnectionPoolServiceTest {
     }
 
     @AfterEach
-    void tearDown() {
+    void tearDown() throws Exception {
         if (service != null) {
-            service.shutdown();
+            service.shutdownAsync().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
         }
         if (vertx != null) {
-            vertx.close();
+            vertx.close().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
         }
     }
 
@@ -67,7 +73,7 @@ class ConnectionPoolServiceTest {
 
     @Test
     @DisplayName("Should remove pool")
-    void testRemovePool() {
+    void testRemovePool() throws Exception {
         ConnectionPoolService.PgConnectionConfig config = new ConnectionPoolService.PgConnectionConfig(
             "localhost", 5432, "testdb", "user", "pass"
         );
@@ -77,8 +83,40 @@ class ConnectionPoolServiceTest {
         assertNotNull(pool);
 
         service.removePoolAsync("test-service")
-            .onComplete(ar -> {
-                assertTrue(ar.succeeded());
-            });
+            .toCompletionStage()
+            .toCompletableFuture()
+            .get(5, TimeUnit.SECONDS);
+    }
+
+    @Test
+    @DisplayName("Shutdown should not close externally-managed Vert.x")
+    void testShutdownDoesNotCloseExternalVertx() throws Exception {
+        service.shutdownAsync().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
+
+        CountDownLatch latch = new CountDownLatch(1);
+        long timerId = vertx.setTimer(10, id -> latch.countDown());
+        assertTrue(timerId >= 0);
+        assertTrue(latch.await(5, TimeUnit.SECONDS));
+    }
+
+    @Test
+    @DisplayName("Shutdown should close internally-managed Vert.x")
+    void testShutdownClosesInternalVertx() throws Exception {
+        ConnectionPoolService internalService = new ConnectionPoolService();
+        Vertx internalVertx = extractVertx(internalService);
+
+        internalService.shutdownAsync().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
+
+        RejectedExecutionException ex = assertThrows(RejectedExecutionException.class,
+            () -> internalVertx.timer(10, TimeUnit.MILLISECONDS));
+        assertTrue(ex.getMessage().toLowerCase().contains("terminated"));
+
+        internalService = null;
+    }
+
+    private static Vertx extractVertx(ConnectionPoolService service) throws Exception {
+        Field field = ConnectionPoolService.class.getDeclaredField("vertx");
+        field.setAccessible(true);
+        return (Vertx) field.get(service);
     }
 }

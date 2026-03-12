@@ -56,6 +56,7 @@ import java.util.function.Consumer;
 public class InMemoryTransferEngineSimulator {
 
     private static final Logger log = LoggerFactory.getLogger(InMemoryTransferEngineSimulator.class);
+    private static final int LOG_JOB_ID_MAX_LENGTH = 120;
 
     // Configuration
     private int maxConcurrentTransfers = 10;
@@ -146,8 +147,8 @@ public class InMemoryTransferEngineSimulator {
      * @return a future containing the transfer result
      */
     public CompletableFuture<TransferResult> submitTransfer(TransferRequest request) {
-        log.debug("submitTransfer: Received request jobId={}, source={}", 
-            request.jobId(), request.sourceUri());
+        log.debug("submitTransfer: Received request jobId={}, source={}",
+            abbreviateJobId(request.jobId()), request.sourceUri());
         
         // Check for immediate failures
         if (failureMode == TransferEngineFailureMode.QUEUE_FULL) {
@@ -173,16 +174,16 @@ public class InMemoryTransferEngineSimulator {
         SimulatedTransfer transfer = new SimulatedTransfer(jobId, request, transferSize);
         transfers.put(jobId, transfer);
         totalSubmitted.incrementAndGet();
-        log.info("submitTransfer: Created transfer jobId={}, size={} bytes", jobId, transferSize);
+        log.info("submitTransfer: Created transfer jobId={}, size={} bytes", abbreviateJobId(jobId), transferSize);
         
         // Try to start immediately or queue
         if (concurrencySemaphore.tryAcquire()) {
-            log.debug("submitTransfer: Starting immediately jobId={}", jobId);
+            log.debug("submitTransfer: Starting immediately jobId={}", abbreviateJobId(jobId));
             startTransfer(transfer);
         } else {
             transfer.status = TransferStatus.QUEUED;
             pendingQueue.offer(transfer);
-            log.debug("submitTransfer: Queued for later jobId={}, queueSize={}", jobId, pendingQueue.size());
+            log.debug("submitTransfer: Queued for later jobId={}, queueSize={}", abbreviateJobId(jobId), pendingQueue.size());
             fireEvent(TransferEvent.queued(jobId));
         }
         
@@ -219,10 +220,10 @@ public class InMemoryTransferEngineSimulator {
      * @return true if the transfer was cancelled
      */
     public boolean cancelTransfer(String jobId) {
-        log.debug("cancelTransfer: Request to cancel jobId={}", jobId);
+        log.debug("cancelTransfer: Request to cancel jobId={}", abbreviateJobId(jobId));
         SimulatedTransfer transfer = transfers.get(jobId);
         if (transfer == null) {
-            log.warn("cancelTransfer: Job not found jobId={}", jobId);
+            log.warn("cancelTransfer: Job not found jobId={}", abbreviateJobId(jobId));
             return false;
         }
         
@@ -230,7 +231,7 @@ public class InMemoryTransferEngineSimulator {
             transfer.status == TransferStatus.FAILED ||
             transfer.status == TransferStatus.CANCELLED) {
             log.debug("cancelTransfer: Cannot cancel - already in terminal state jobId={}, status={}", 
-                jobId, transfer.status);
+                abbreviateJobId(jobId), transfer.status);
             return false;
         }
         
@@ -245,7 +246,7 @@ public class InMemoryTransferEngineSimulator {
             transfer.progressTask.cancel(true);
         }
         
-        log.info("cancelTransfer: Successfully cancelled jobId={}", jobId);
+        log.info("cancelTransfer: Successfully cancelled jobId={}", abbreviateJobId(jobId));
         fireEvent(TransferEvent.cancelled(jobId));
         return true;
     }
@@ -257,15 +258,15 @@ public class InMemoryTransferEngineSimulator {
      * @return true if the transfer was paused
      */
     public boolean pauseTransfer(String jobId) {
-        log.debug("pauseTransfer: Request to pause jobId={}", jobId);
+        log.debug("pauseTransfer: Request to pause jobId={}", abbreviateJobId(jobId));
         SimulatedTransfer transfer = transfers.get(jobId);
         if (transfer == null || transfer.status != TransferStatus.IN_PROGRESS) {
-            log.debug("pauseTransfer: Cannot pause - not in progress jobId={}", jobId);
+            log.debug("pauseTransfer: Cannot pause - not in progress jobId={}", abbreviateJobId(jobId));
             return false;
         }
         
         transfer.status = TransferStatus.PAUSED;
-        log.info("pauseTransfer: Successfully paused jobId={}", jobId);
+        log.info("pauseTransfer: Successfully paused jobId={}", abbreviateJobId(jobId));
         fireEvent(TransferEvent.paused(jobId));
         return true;
     }
@@ -277,15 +278,15 @@ public class InMemoryTransferEngineSimulator {
      * @return true if the transfer was resumed
      */
     public boolean resumeTransfer(String jobId) {
-        log.debug("resumeTransfer: Request to resume jobId={}", jobId);
+        log.debug("resumeTransfer: Request to resume jobId={}", abbreviateJobId(jobId));
         SimulatedTransfer transfer = transfers.get(jobId);
         if (transfer == null || transfer.status != TransferStatus.PAUSED) {
-            log.debug("resumeTransfer: Cannot resume - not paused jobId={}", jobId);
+            log.debug("resumeTransfer: Cannot resume - not paused jobId={}", abbreviateJobId(jobId));
             return false;
         }
         
         transfer.status = TransferStatus.IN_PROGRESS;
-        log.info("resumeTransfer: Successfully resumed jobId={}", jobId);
+        log.info("resumeTransfer: Successfully resumed jobId={}", abbreviateJobId(jobId));
         fireEvent(TransferEvent.resumed(jobId));
         return true;
     }
@@ -587,7 +588,7 @@ public class InMemoryTransferEngineSimulator {
     }
 
     private void startTransfer(SimulatedTransfer transfer) {
-        log.debug("startTransfer: Starting transfer jobId={}", transfer.jobId);
+        log.debug("startTransfer: Starting transfer jobId={}", abbreviateJobId(transfer.jobId));
         transfer.status = TransferStatus.IN_PROGRESS;
         transfer.startTime = Instant.now();
         activeTransferCount.incrementAndGet();
@@ -624,7 +625,7 @@ public class InMemoryTransferEngineSimulator {
     }
 
     private void completeTransfer(SimulatedTransfer transfer) {
-        log.debug("completeTransfer: Processing completion for jobId={}", transfer.jobId);
+        log.debug("completeTransfer: Processing completion for jobId={}", abbreviateJobId(transfer.jobId));
         if (transfer.progressTask != null) {
             transfer.progressTask.cancel(false);
         }
@@ -633,7 +634,7 @@ public class InMemoryTransferEngineSimulator {
             transfer.status == TransferStatus.COMPLETED ||
             transfer.status == TransferStatus.FAILED) {
             log.debug("completeTransfer: Skipping - already in terminal state jobId={}, status={}", 
-                transfer.jobId, transfer.status);
+                abbreviateJobId(transfer.jobId), transfer.status);
             concurrencySemaphore.release();
             activeTransferCount.decrementAndGet();
             return;
@@ -652,7 +653,7 @@ public class InMemoryTransferEngineSimulator {
             transfer.endTime = Instant.now();
             totalFailed.incrementAndGet();
             
-            log.warn("completeTransfer: Transfer failed jobId={}, error={}", transfer.jobId, transfer.error);
+            log.warn("completeTransfer: Transfer failed jobId={}, error={}", abbreviateJobId(transfer.jobId), transfer.error);
             transfer.completionFuture.completeExceptionally(
                 new TransferException(transfer.error));
             
@@ -667,7 +668,7 @@ public class InMemoryTransferEngineSimulator {
             Duration duration = Duration.between(transfer.startTime, transfer.endTime);
             TransferDirection direction = transfer.request.getDirection();
             log.info("completeTransfer: Transfer completed successfully jobId={}, direction={}, bytes={}, duration={}ms", 
-                transfer.jobId, direction, transfer.totalBytes, duration.toMillis());
+                abbreviateJobId(transfer.jobId), direction, transfer.totalBytes, duration.toMillis());
             
             // Update protocol metrics with direction
             String protocol = transfer.request.protocol();
@@ -704,6 +705,16 @@ public class InMemoryTransferEngineSimulator {
                 // Ignore callback errors
             }
         }
+    }
+
+    private String abbreviateJobId(String jobId) {
+        if (jobId == null) {
+            return "null";
+        }
+        if (jobId.length() <= LOG_JOB_ID_MAX_LENGTH) {
+            return jobId;
+        }
+        return jobId.substring(0, LOG_JOB_ID_MAX_LENGTH) + "...(" + jobId.length() + " chars)";
     }
 
     private String generateJobId() {

@@ -54,6 +54,7 @@ public class QuorusAgent {
     private static final Logger logger = LoggerFactory.getLogger(QuorusAgent.class);
 
     private final Vertx vertx;
+    private final boolean closeVertxOnShutdown;
     private final AgentConfiguration config;
     private final AgentRegistrationService registrationService;
     private final HeartbeatService heartbeatService;
@@ -82,7 +83,12 @@ public class QuorusAgent {
      * @throws NullPointerException if vertx or config is null
      */
     public QuorusAgent(Vertx vertx, AgentConfiguration config) {
+        this(vertx, config, false);
+    }
+
+    private QuorusAgent(Vertx vertx, AgentConfiguration config, boolean closeVertxOnShutdown) {
         this.vertx = Objects.requireNonNull(vertx, "Vertx instance cannot be null");
+        this.closeVertxOnShutdown = closeVertxOnShutdown;
         this.config = Objects.requireNonNull(config, "AgentConfiguration cannot be null");
 
         logger.info("Creating QuorusAgent with Vert.x instance: {} (using Vert.x timers, no ScheduledExecutorService)",
@@ -111,7 +117,7 @@ public class QuorusAgent {
      */
     @Deprecated(since = "1.0", forRemoval = true)
     public QuorusAgent(AgentConfiguration config) {
-        this(Vertx.vertx(), config);
+        this(Vertx.vertx(), config, true);
         logger.warn("Using deprecated constructor - consider passing shared Vert.x instance");
     }
     
@@ -279,7 +285,8 @@ public class QuorusAgent {
 
         if (!running) {
             logger.info("Agent not running, performing cleanup only");
-            shutdownPromise.tryComplete();
+            closeOwnedVertxIfNeeded()
+                    .onComplete(ar -> shutdownPromise.tryComplete());
             return;
         }
 
@@ -302,7 +309,8 @@ public class QuorusAgent {
             }
 
             // Stop services
-            transferService.shutdown();
+            transferService.shutdown()
+                .onFailure(err -> logger.warn("Error shutting down transfer service: {}", err.getMessage()));
             heartbeatService.shutdown();
             jobPollingService.shutdown();
             jobStatusReportingService.shutdown();
@@ -310,11 +318,14 @@ public class QuorusAgent {
             // Shutdown health service (reactive) then deregister from controller
             healthService.shutdown()
                 .compose(v -> registrationService.deregister())
+                .recover(err -> {
+                    logger.warn("Failed during health shutdown/deregister sequence: {}", err.getMessage());
+                    return io.vertx.core.Future.succeededFuture(Boolean.FALSE);
+                })
+                .compose(deregistered -> closeOwnedVertxIfNeeded().map(deregistered))
                 .onComplete(ar -> {
-                    if (ar.succeeded() && ar.result()) {
+                    if (ar.succeeded() && Boolean.TRUE.equals(ar.result())) {
                         logger.info("Agent deregistered from controller");
-                    } else if (ar.failed()) {
-                        logger.warn("Failed to deregister from controller: {}", ar.cause().getMessage());
                     }
                     logger.info("Quorus Agent shutdown complete (0 threads to cleanup)");
                     shutdownPromise.tryComplete();
@@ -324,9 +335,23 @@ public class QuorusAgent {
         } catch (Exception e) {
             logger.error("Error during shutdown: {}", e.getMessage());
             logger.debug("Stack trace", e);
-        } finally {
-            shutdownPromise.tryComplete();
+            closeOwnedVertxIfNeeded()
+                    .onComplete(ar -> shutdownPromise.tryComplete());
         }
+    }
+
+    private io.vertx.core.Future<Void> closeOwnedVertxIfNeeded() {
+        if (!closeVertxOnShutdown) {
+            return io.vertx.core.Future.succeededFuture();
+        }
+
+        logger.info("Closing internally managed Vert.x instance for QuorusAgent");
+        return vertx.close()
+                .onSuccess(v -> logger.info("Internally managed Vert.x instance closed for QuorusAgent"))
+                .recover(err -> {
+                    logger.warn("Failed to close internally managed Vert.x instance: {}", err.getMessage());
+                    return io.vertx.core.Future.succeededFuture();
+                });
     }
     
     public void awaitShutdown() throws InterruptedException {

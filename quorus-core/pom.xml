@@ -154,10 +154,6 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
-                <configuration>
-                    <!-- Exclude negative/error handling tests by default -->
-                    <excludedGroups>negative</excludedGroups>
-                </configuration>
             </plugin>
             <!-- Publish test classes (ExpectsError, ExpectsErrorExtension) for use by other modules -->
             <plugin>

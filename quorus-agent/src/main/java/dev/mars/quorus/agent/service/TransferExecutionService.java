@@ -42,6 +42,7 @@ public class TransferExecutionService {
     private static final Logger logger = LoggerFactory.getLogger(TransferExecutionService.class);
 
     private final Vertx vertx;
+    private final boolean closeVertxOnShutdown;
     private final AgentConfiguration config;
     private final TransferEngine transferEngine;
 
@@ -55,7 +56,12 @@ public class TransferExecutionService {
      * @param config Agent configuration
      */
     public TransferExecutionService(Vertx vertx, AgentConfiguration config) {
+        this(vertx, config, false);
+    }
+
+    private TransferExecutionService(Vertx vertx, AgentConfiguration config, boolean closeVertxOnShutdown) {
         this.vertx = Objects.requireNonNull(vertx, "Vertx cannot be null");
+        this.closeVertxOnShutdown = closeVertxOnShutdown;
         this.config = Objects.requireNonNull(config, "AgentConfiguration cannot be null");
         this.transferEngine = new SimpleTransferEngine(
                 vertx,  // Pass Vertx to SimpleTransferEngine
@@ -73,7 +79,7 @@ public class TransferExecutionService {
      */
     @Deprecated
     public TransferExecutionService(AgentConfiguration config) {
-        this(Vertx.vertx(), config);
+        this(Vertx.vertx(), config, true);
         logger.warn("Using deprecated constructor - Vert.x instance created internally");
     }
     
@@ -151,6 +157,25 @@ public class TransferExecutionService {
 
         // Reactively shutdown transfer engine (awaits in-flight transfers, then closes WorkerExecutor)
         return transferEngine.shutdown(30)
+                .recover(err -> {
+                    logger.warn("Error shutting down transfer engine: {}", err.getMessage());
+                    return Future.succeededFuture();
+                })
+                .compose(v -> closeOwnedVertxIfNeeded())
                 .onComplete(ar -> logger.info("Transfer execution service shutdown complete"));
+    }
+
+    private Future<Void> closeOwnedVertxIfNeeded() {
+        if (!closeVertxOnShutdown) {
+            return Future.succeededFuture();
+        }
+
+        logger.info("Closing internally managed Vert.x instance for TransferExecutionService");
+        return vertx.close()
+                .onSuccess(v -> logger.info("Internally managed Vert.x instance closed for TransferExecutionService"))
+                .recover(err -> {
+                    logger.warn("Failed to close internally managed Vert.x instance: {}", err.getMessage());
+                    return Future.succeededFuture();
+                });
     }
 }

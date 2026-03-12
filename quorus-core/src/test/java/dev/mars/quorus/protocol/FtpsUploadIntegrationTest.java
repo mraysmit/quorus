@@ -111,7 +111,21 @@ class FtpsUploadIntegrationTest {
                 "Docker is not available - skipping FTPS integration tests");
         // Start the shared FTPS container (will be reused across tests)
         SharedTestContainers.getFtpsContainer();
+        waitForFtpsTlsWarmup();
         log("checkDockerAvailable", "FTPS container started successfully");
+    }
+
+    private static void waitForFtpsTlsWarmup() {
+        // The daemon can accept control connections before FTPS AUTH TLS is fully ready.
+        // A short warm-up avoids immediate handshake EOF/connection-close errors.
+        final long warmupMillis = 3000L;
+        log("checkDockerAvailable", "Waiting " + warmupMillis + "ms for FTPS TLS warm-up");
+        try {
+            Thread.sleep(warmupMillis);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Interrupted while waiting for FTPS TLS warm-up", e);
+        }
     }
 
     @BeforeEach

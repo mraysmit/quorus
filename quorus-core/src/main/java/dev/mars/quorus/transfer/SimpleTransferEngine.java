@@ -61,6 +61,7 @@ public class SimpleTransferEngine implements TransferEngine {
     private static final Logger logger = LoggerFactory.getLogger(SimpleTransferEngine.class);
 
     private final Vertx vertx;
+    private final boolean closeVertxOnShutdown;
     private final ConcurrentHashMap<String, TransferJob> activeJobs;
     private final ConcurrentHashMap<String, TransferContext> activeContexts;
     private final ConcurrentHashMap<String, Future<TransferResult>> activeFutures;
@@ -80,26 +81,6 @@ public class SimpleTransferEngine implements TransferEngine {
     private final TransferTelemetryMetrics telemetryMetrics;
 
     /**
-     * Default constructor - creates internal Vert.x instance.
-     * @deprecated Use {@link #SimpleTransferEngine(Vertx, int, int, long)} instead
-     */
-    @Deprecated
-    public SimpleTransferEngine() {
-        this(Vertx.vertx(), 10, 3, 1000);
-        logger.warn("Using deprecated constructor - Vert.x instance created internally");
-    }
-
-    /**
-     * Constructor without Vertx for backward compatibility.
-     * @deprecated Use {@link #SimpleTransferEngine(Vertx, int, int, long)} instead
-     */
-    @Deprecated
-    public SimpleTransferEngine(int maxConcurrentTransfers, int maxRetryAttempts, long retryDelayMs) {
-        this(Vertx.vertx(), maxConcurrentTransfers, maxRetryAttempts, retryDelayMs);
-        logger.warn("Using deprecated constructor - Vert.x instance created internally");
-    }
-
-    /**
      * Constructor with Vert.x dependency injection (recommended).
      *
      * @param vertx Vert.x instance for reactive operations
@@ -108,10 +89,16 @@ public class SimpleTransferEngine implements TransferEngine {
      * @param retryDelayMs Base delay between retries in milliseconds
      */
     public SimpleTransferEngine(Vertx vertx, int maxConcurrentTransfers, int maxRetryAttempts, long retryDelayMs) {
+        this(vertx, maxConcurrentTransfers, maxRetryAttempts, retryDelayMs, false);
+    }
+
+    private SimpleTransferEngine(Vertx vertx, int maxConcurrentTransfers, int maxRetryAttempts, long retryDelayMs,
+                                 boolean closeVertxOnShutdown) {
         logger.debug("Initializing SimpleTransferEngine: maxConcurrent={}, maxRetries={}, retryDelay={}ms",
             maxConcurrentTransfers, maxRetryAttempts, retryDelayMs);
         
         this.vertx = Objects.requireNonNull(vertx, "Vertx cannot be null");
+        this.closeVertxOnShutdown = closeVertxOnShutdown;
         this.maxConcurrentTransfers = maxConcurrentTransfers;
         this.maxRetryAttempts = maxRetryAttempts;
         this.retryDelayMs = retryDelayMs;
@@ -326,7 +313,17 @@ public class SimpleTransferEngine implements TransferEngine {
 
         // Reactively wait for in-flight transfers to drain
         return awaitActiveTransfers(timeoutSeconds * 1000)
+            .compose(v -> closeOwnedVertx())
             .onSuccess(v -> logger.info("Transfer engine shutdown completed"));
+    }
+
+    private Future<Void> closeOwnedVertx() {
+        if (!closeVertxOnShutdown) {
+            return Future.succeededFuture();
+        }
+
+        logger.info("Closing internally-managed Vert.x instance");
+        return vertx.close();
     }
     
     /**
@@ -378,6 +375,10 @@ public class SimpleTransferEngine implements TransferEngine {
      */
     public boolean isShutdown() {
         return shutdown.get();
+    }
+
+    boolean isClosingOwnedVertxOnShutdown() {
+        return closeVertxOnShutdown;
     }
 
     @Override

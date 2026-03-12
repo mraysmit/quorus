@@ -66,6 +66,7 @@ public class GrpcRaftTransport implements RaftTransport {
     private final String selfId;
     private final Map<String, String> clusterNodes; // nodeId -> host:port
     private final Map<String, RaftServiceGrpc.RaftServiceFutureStub> clients = new ConcurrentHashMap<>();
+    private final Map<String, ManagedChannel> channels = new ConcurrentHashMap<>();
     private final ExecutorService executor;
     private final int poolSize;
     private final int queueSize;
@@ -157,22 +158,48 @@ public class GrpcRaftTransport implements RaftTransport {
         // Unregister from metrics
         RaftMetrics.getInstance().unregisterThreadPool();
         
-        // Clean up clients
+        // Clean up stubs immediately; channel and executor shutdown is handled asynchronously below.
         clients.clear();
-        // Shutdown the executor gracefully
-        if (executor != null) {
-            executor.shutdown();
-            try {
-                if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
-                    executor.shutdownNow();
-                    logger.warn("GrpcRaftTransport executor forced shutdown for node: {}", selfId);
-                }
-            } catch (InterruptedException e) {
-                executor.shutdownNow();
-                Thread.currentThread().interrupt();
+
+        // Avoid blocking the Vert.x event loop during shutdown.
+        vertx.executeBlocking(() -> {
+            for (ManagedChannel channel : channels.values()) {
+                channel.shutdown();
             }
-            logger.debug("GrpcRaftTransport executor closed for node: {}", selfId);
-        }
+
+            for (Map.Entry<String, ManagedChannel> entry : channels.entrySet()) {
+                ManagedChannel channel = entry.getValue();
+                try {
+                    if (!channel.awaitTermination(5, TimeUnit.SECONDS)) {
+                        channel.shutdownNow();
+                        logger.warn("Forced gRPC channel shutdown for peer: {}", entry.getKey());
+                    }
+                } catch (InterruptedException e) {
+                    channel.shutdownNow();
+                    Thread.currentThread().interrupt();
+                }
+            }
+            channels.clear();
+
+            if (executor != null) {
+                executor.shutdown();
+                try {
+                    if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+                        executor.shutdownNow();
+                        logger.warn("GrpcRaftTransport executor forced shutdown for node: {}", selfId);
+                    }
+                } catch (InterruptedException e) {
+                    executor.shutdownNow();
+                    Thread.currentThread().interrupt();
+                }
+                logger.debug("GrpcRaftTransport executor closed for node: {}", selfId);
+            }
+
+            return null;
+        }, false).onFailure(err -> {
+            logger.warn("Error during GrpcRaftTransport shutdown: {}", err.getMessage());
+            logger.debug("Stack trace for GrpcRaftTransport shutdown failure", err);
+        });
     }
 
     @Override
@@ -253,6 +280,7 @@ public class GrpcRaftTransport implements RaftTransport {
             ManagedChannel channel = ManagedChannelBuilder.forAddress(host, port)
                     .usePlaintext()
                     .build();
+            channels.put(id, channel);
             return RaftServiceGrpc.newFutureStub(channel);
         });
     }

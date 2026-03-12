@@ -22,6 +22,7 @@ import dev.mars.quorus.core.TransferResult;
 import dev.mars.quorus.core.TransferStatus;
 import dev.mars.quorus.transfer.SimpleTransferEngine;
 import dev.mars.quorus.transfer.TransferEngine;
+import io.vertx.core.Vertx;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -48,12 +49,14 @@ class BasicTransferIntegrationTest {
     Path tempDir;
 
     private TransferEngine transferEngine;
+    private Vertx vertx;
     private LocalHttpTestServer testServer;
     private String baseUrl;
 
     @BeforeEach
     void setUp() throws Exception {
-        transferEngine = new SimpleTransferEngine(5, 2, 500);
+        vertx = Vertx.vertx();
+        transferEngine = new SimpleTransferEngine(vertx, 5, 2, 500);
         testServer = new LocalHttpTestServer();
         baseUrl = testServer.getBaseUrl();
     }
@@ -62,6 +65,9 @@ class BasicTransferIntegrationTest {
     void tearDown() {
         if (transferEngine != null) {
             transferEngine.shutdown(5).toCompletionStage().toCompletableFuture().join();
+        }
+        if (vertx != null) {
+            vertx.close().toCompletionStage().toCompletableFuture().join();
         }
         if (testServer != null) {
             testServer.stop();

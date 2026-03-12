@@ -218,13 +218,11 @@ public class QuorusControllerVerticle extends AbstractVerticle {
         );
         
         coordinator.onServiceStop("raft-node-stop", () -> {
-            raftNode.ifPresent(RaftNode::stop);
-            return Future.succeededFuture();
+            return raftNode.map(RaftNode::stop).orElseGet(Future::succeededFuture);
         });
         
         coordinator.onServiceStop("grpc-server-stop", () -> {
-            grpcServer.ifPresent(GrpcRaftServer::stop);
-            return Future.succeededFuture();
+            return grpcServer.map(GrpcRaftServer::stop).orElseGet(Future::succeededFuture);
         });
         
         // Phase 4: CLOSE_RESOURCES - Storage is closed by raftNode.stop()
@@ -252,11 +250,20 @@ public class QuorusControllerVerticle extends AbstractVerticle {
             () -> {
                 // Fallback to immediate shutdown if coordinator wasn't initialized
                 try {
-                    apiServer.ifPresent(HttpApiServer::stop);
-                    raftNode.ifPresent(RaftNode::stop);
-                    grpcServer.ifPresent(GrpcRaftServer::stop);
-                    logger.info("QuorusControllerVerticle stopped successfully (immediate)");
-                    stopPromise.complete();
+                    Future<Void> apiStop = apiServer.map(HttpApiServer::stop).orElseGet(Future::succeededFuture);
+                    Future<Void> raftStop = raftNode.map(RaftNode::stop).orElseGet(Future::succeededFuture);
+                    Future<Void> grpcStop = grpcServer.map(GrpcRaftServer::stop).orElseGet(Future::succeededFuture);
+
+                    Future.all(apiStop, raftStop, grpcStop)
+                            .onSuccess(v -> {
+                                logger.info("QuorusControllerVerticle stopped successfully (immediate)");
+                                stopPromise.complete();
+                            })
+                            .onFailure(err -> {
+                                logger.warn("Error during immediate shutdown: {}", err.getMessage());
+                                logger.debug("Stack trace for immediate shutdown failure", err);
+                                stopPromise.complete();
+                            });
                 } catch (Exception e) {
                     logger.warn("Error during shutdown: {}", e.getMessage());
                     logger.debug("Stack trace for shutdown error", e);

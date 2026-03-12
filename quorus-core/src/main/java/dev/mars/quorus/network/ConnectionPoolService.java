@@ -46,10 +46,16 @@ public class ConnectionPoolService {
     private static final Logger logger = LoggerFactory.getLogger(ConnectionPoolService.class);
 
     private final Vertx vertx;
+    private final boolean closeVertxOnShutdown;
     private final ConcurrentHashMap<String, Pool> pools = new ConcurrentHashMap<>();
 
     public ConnectionPoolService(Vertx vertx) {
+        this(vertx, false);
+    }
+
+    private ConnectionPoolService(Vertx vertx, boolean closeVertxOnShutdown) {
         this.vertx = Objects.requireNonNull(vertx, "Vertx cannot be null");
+        this.closeVertxOnShutdown = closeVertxOnShutdown;
         logger.debug("ConnectionPoolService initialized with external Vert.x instance");
     }
 
@@ -59,7 +65,7 @@ public class ConnectionPoolService {
      */
     @Deprecated
     public ConnectionPoolService() {
-        this(Vertx.vertx());
+        this(Vertx.vertx(), true);
         logger.warn("ConnectionPoolService created with internal Vert.x instance (deprecated)");
     }
 
@@ -129,10 +135,21 @@ public class ConnectionPoolService {
         logger.debug("All pools cleared, waiting for {} close operations", futures.size());
         return Future.all(futures).mapEmpty();
     }
+
+    public Future<Void> shutdownAsync() {
+        return closeAllAsync().compose(v -> {
+            if (!closeVertxOnShutdown) {
+                return Future.succeededFuture();
+            }
+
+            logger.info("Closing internally-managed Vert.x instance for ConnectionPoolService");
+            return vertx.close().mapEmpty();
+        });
+    }
     
     public void shutdown() {
         logger.debug("Initiating shutdown of ConnectionPoolService");
-        closeAllAsync().onFailure(err -> logger.warn("Error shutting down pools: {}", err.getMessage()));
+        shutdownAsync().onFailure(err -> logger.warn("Error shutting down pools: {}", err.getMessage()));
     }
 
     public Future<Boolean> checkHealth(String serviceId) {

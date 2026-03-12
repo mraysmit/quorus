@@ -51,6 +51,7 @@ public class SimpleWorkflowEngine implements WorkflowEngine {
     private static final Logger logger = LoggerFactory.getLogger(SimpleWorkflowEngine.class);
 
     private final Vertx vertx;
+    private final boolean closeVertxOnShutdown;
     private final TransferEngine transferEngine;
     private final WorkflowDefinitionParser parser;
     private final Map<String, WorkflowExecution> activeExecutions;
@@ -66,7 +67,12 @@ public class SimpleWorkflowEngine implements WorkflowEngine {
      * @param transferEngine the transfer engine for executing transfers
      */
     public SimpleWorkflowEngine(Vertx vertx, TransferEngine transferEngine) {
+        this(vertx, transferEngine, false);
+    }
+
+    private SimpleWorkflowEngine(Vertx vertx, TransferEngine transferEngine, boolean closeVertxOnShutdown) {
         this.vertx = Objects.requireNonNull(vertx, "Vertx cannot be null");
+        this.closeVertxOnShutdown = closeVertxOnShutdown;
         this.transferEngine = Objects.requireNonNull(transferEngine, "Transfer engine cannot be null");
         this.parser = new YamlWorkflowDefinitionParser();
         this.activeExecutions = new ConcurrentHashMap<>();
@@ -80,7 +86,7 @@ public class SimpleWorkflowEngine implements WorkflowEngine {
      * @param transferEngine the transfer engine for executing transfers
      */
     public SimpleWorkflowEngine(TransferEngine transferEngine) {
-        this(Vertx.vertx(), transferEngine);
+        this(Vertx.vertx(), transferEngine, true);
     }
     
     @Override
@@ -144,6 +150,15 @@ public class SimpleWorkflowEngine implements WorkflowEngine {
         }
 
         logger.info("SimpleWorkflowEngine shutdown initiated");
+
+        if (closeVertxOnShutdown) {
+            logger.info("Closing internally managed Vert.x instance for SimpleWorkflowEngine");
+            vertx.close()
+                    .onSuccess(v -> logger.info("SimpleWorkflowEngine shutdown completed"))
+                    .onFailure(err -> logger.warn("SimpleWorkflowEngine Vert.x close failed: {}", err.getMessage()));
+            return;
+        }
+
         logger.info("SimpleWorkflowEngine shutdown completed");
     }
     
