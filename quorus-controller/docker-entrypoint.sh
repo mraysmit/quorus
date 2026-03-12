@@ -47,8 +47,7 @@ JAVA_OPTS="$JAVA_OPTS -Dquorus.raft.clusterNodes=$CLUSTER_NODES"
 JAVA_OPTS="$JAVA_OPTS -Dquorus.raft.electionTimeoutMs=$ELECTION_TIMEOUT_MS"
 JAVA_OPTS="$JAVA_OPTS -Dquorus.raft.heartbeatIntervalMs=$HEARTBEAT_INTERVAL_MS"
 
-# Logging configuration
-JAVA_OPTS="$JAVA_OPTS -Djava.util.logging.config.file=/app/logging.properties"
+# JUL logs are bridged to SLF4J/Logback in application startup.
 
 # JVM tuning for containers
 JAVA_OPTS="$JAVA_OPTS -XX:+UseContainerSupport"

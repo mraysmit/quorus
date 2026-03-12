@@ -243,6 +243,7 @@ class RaftFailureTest {
         
         assertTrue(exception.getCause() instanceof RuntimeException);
         assertEquals("Transport failed to start", exception.getCause().getMessage());
+        logExpectedFailure("transport start failure", exception.getCause());
     }
 
     @Test
@@ -281,19 +282,26 @@ class RaftFailureTest {
         };
         
         // Test snapshot failure
-        assertThrows(RuntimeException.class, () -> {
+        RuntimeException snapshotFailure = assertThrows(RuntimeException.class, () -> {
             failingStateMachine.takeSnapshot();
         });
+        logExpectedFailure("state-machine snapshot failure", snapshotFailure);
         
         // Test restore failure
-        assertThrows(RuntimeException.class, () -> {
+        RuntimeException restoreFailure = assertThrows(RuntimeException.class, () -> {
             failingStateMachine.restoreSnapshot(new byte[0]);
         });
+        logExpectedFailure("state-machine restore failure", restoreFailure);
         
         // Test reset failure
-        assertThrows(RuntimeException.class, () -> {
+        RuntimeException resetFailure = assertThrows(RuntimeException.class, () -> {
             failingStateMachine.reset();
         });
+        logExpectedFailure("state-machine reset failure", resetFailure);
+    }
+
+    private static void logExpectedFailure(String scenario, Throwable failure) {
+        System.out.println("[EXPECTED-TEST-FAILURE] Scenario=" + scenario + " message=" + failure.getMessage());
     }
 
     @Test

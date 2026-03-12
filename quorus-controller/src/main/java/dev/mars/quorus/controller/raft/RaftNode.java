@@ -1156,10 +1156,8 @@ public class RaftNode {
                                 logger.error("Failed to persist higher term {} on vote rejection: {}",
                                     reqTerm, termPersistErr.getMessage());
                                 logger.debug("Stack trace for higher-term persist failure on vote rejection", termPersistErr);
-                                promise.complete(VoteResponse.newBuilder()
-                                    .setTerm(currentTerm)
-                                    .setVoteGranted(false)
-                                    .build());
+                                // Fail closed: a higher-term transition must be durable before responding.
+                                promise.fail(termPersistErr);
                             });
                     } else {
                         promise.complete(VoteResponse.newBuilder()
@@ -1892,7 +1890,7 @@ public class RaftNode {
                     })
                     .onFailure(err -> {
                         logger.error("Failed to persist installed snapshot: {}", err.getMessage());
-                        logger.debug("Stack trace for installed snapshot persistence failure", err);
+                        logger.debug("Failed to persist installed snapshot", err);
                         pendingInstalls.remove(leaderId);
                         promise.complete(InstallSnapshotResponse.newBuilder()
                                 .setTerm(currentTerm)
