@@ -1,0 +1,4 @@
+http POST "$BASE_URL/api/v1/agents/heartbeat" \
+  agentId="$AGENT_ID" \
+  status="ACTIVE" \
+  sequenceNumber:=1

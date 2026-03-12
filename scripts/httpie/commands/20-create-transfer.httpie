@@ -1,0 +1,6 @@
+http POST "$BASE_URL/api/v1/transfers" \
+  jobId="$JOB_ID" \
+  sourceUri="https://example.com/data/demo.csv" \
+  destinationPath="/data/incoming/demo.csv" \
+  totalBytes:=1048576 \
+  description="HTTPie demo transfer"

@@ -1,0 +1,66 @@
+HTTPie Quorus Runbook
+
+1) Set environment variables from quorus.env.example.
+   Linux/macOS:
+     set -a
+     . ./scripts/httpie/quorus.env
+     set +a
+
+2) Discovery:
+   sh scripts/httpie/commands/01-info.httpie
+   sh scripts/httpie/commands/02-raft-status.httpie
+
+2b) Controller unavailability drill (switch one controller off/on):
+   - Note: this is an infrastructure action (not a REST endpoint).
+
+   Stop one controller (example: controller2):
+   docker stop quorus-controller2
+
+   Validate cluster still serves API (quorum should remain):
+   http GET "$BASE_URL/raft/status"
+   http GET "$CONTROLLER1_URL/raft/status"
+   http GET "$CONTROLLER3_URL/raft/status"
+
+   Optional check against stopped node (should fail/unavailable):
+   http GET "$CONTROLLER2_URL/health"
+
+   Grafana behavior to watch:
+   - Cluster Topology / Node Details: one node unavailable.
+   - Raft leader/follower metrics continue updating on remaining nodes.
+   - Transfer and agent views continue if quorum is healthy.
+
+   Bring controller back:
+   docker start quorus-controller2
+
+   Re-check recovery:
+   http GET "$CONTROLLER2_URL/health"
+   http GET "$BASE_URL/raft/status"
+   http GET "$BASE_URL/api/v1/agents"
+
+3) Agent lifecycle:
+   sh scripts/httpie/commands/10-register-agent.httpie
+   sh scripts/httpie/commands/11-heartbeat-agent.httpie
+   sh scripts/httpie/commands/12-list-agents.httpie
+
+4) Transfer lifecycle:
+   sh scripts/httpie/commands/20-create-transfer.httpie
+   sh scripts/httpie/commands/30-create-assignment.httpie
+   sh scripts/httpie/commands/31-accept-assignment.httpie
+   sh scripts/httpie/commands/33-job-progress.httpie
+   sh scripts/httpie/commands/34-job-complete.httpie
+   sh scripts/httpie/commands/21-get-transfer.httpie
+
+5) Route operations:
+   sh scripts/httpie/commands/40-create-route.httpie
+   sh scripts/httpie/commands/41-list-routes.httpie
+   sh scripts/httpie/commands/42-suspend-route.httpie
+   sh scripts/httpie/commands/43-resume-route.httpie
+
+6) Cleanup:
+   sh scripts/httpie/commands/91-remove-assignment.httpie
+   sh scripts/httpie/commands/90-remove-transfer.httpie
+
+Grafana effects to watch in real time:
+- Transfer Jobs (Real-Time): running assignments / queued / totals.
+- Agents and Topology: agent connectivity, identity table, health and drift.
+- Cluster Topology and Node Details: controller availability and leadership changes.

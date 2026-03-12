@@ -1,0 +1,2 @@
+http PUT "$BASE_URL/api/v1/assignments/$ASSIGNMENT_ID/status" \
+  status="IN_PROGRESS"

@@ -1,5 +1,3 @@
-version: '3.8'
-
 # Quorus Controller-First Architecture
 # Each controller is a self-contained node with embedded HTTP API
 # This provides natural scaling and fault tolerance
@@ -15,6 +13,9 @@ services:
     build:
       context: ../..
       dockerfile: quorus-controller/Dockerfile
+      args:
+        BUILDER_IMAGE: maven:3.9.11-eclipse-temurin-25
+        RUNTIME_IMAGE: eclipse-temurin:25-jre-alpine
       additional_contexts:
         m2cache: ${M2_REPO}/dev/mars
     container_name: quorus-controller1
@@ -57,6 +58,9 @@ services:
     build:
       context: ../..
       dockerfile: quorus-controller/Dockerfile
+      args:
+        BUILDER_IMAGE: maven:3.9.11-eclipse-temurin-25
+        RUNTIME_IMAGE: eclipse-temurin:25-jre-alpine
       additional_contexts:
         m2cache: ${M2_REPO}/dev/mars
     container_name: quorus-controller2
@@ -101,6 +105,9 @@ services:
     build:
       context: ../..
       dockerfile: quorus-controller/Dockerfile
+      args:
+        BUILDER_IMAGE: maven:3.9.11-eclipse-temurin-25
+        RUNTIME_IMAGE: eclipse-temurin:25-jre-alpine
       additional_contexts:
         m2cache: ${M2_REPO}/dev/mars
     container_name: quorus-controller3

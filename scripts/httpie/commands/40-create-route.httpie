@@ -1,0 +1,10 @@
+http POST "$BASE_URL/api/v1/routes" \
+  routeId="$ROUTE_ID" \
+  name="Demo Route" \
+  description="Demo route created by HTTPie" \
+  sourceAgentId="$AGENT_ID" \
+  sourceLocation="/corporate-data/source/" \
+  destinationAgentId="$AGENT_ID" \
+  destinationLocation="/corporate-data/destination/" \
+  trigger:='{"type":"INTERVAL","intervalMinutes":5}' \
+  options:='{"priority":"normal","owner":"httpie-demo"}'

@@ -1,5 +1,3 @@
-version: '3.8'
-
 # Protocol servers for integration testing (standalone)
 # These can be started independently for manual testing and debugging
 # Usage: docker-compose -f docker-compose-protocol-servers.yml up

@@ -1,0 +1,2 @@
+http PUT "$BASE_URL/api/v1/routes/$ROUTE_ID/suspend" \
+  reason="demo pause"

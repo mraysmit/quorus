@@ -1,0 +1,1 @@
+http GET "$BASE_URL/api/v1/info"
