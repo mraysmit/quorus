@@ -17,6 +17,7 @@
 package dev.mars.quorus.agent;
 
 import dev.mars.quorus.agent.config.AgentConfiguration;
+import dev.mars.quorus.agent.service.JobPollingService;
 import io.vertx.core.Vertx;
 import io.vertx.core.http.HttpServer;
 import io.vertx.core.json.JsonObject;
@@ -54,11 +55,13 @@ class QuorusAgentTest {
     private int controllerPort;
     private AtomicInteger registrationCount;
     private AtomicInteger heartbeatCount;
+    private AtomicInteger statusReportCount;
 
     @BeforeAll
     void setUp(Vertx vertx, VertxTestContext testContext) {
         registrationCount = new AtomicInteger(0);
         heartbeatCount = new AtomicInteger(0);
+        statusReportCount = new AtomicInteger(0);
 
         // Create a real HTTP server to simulate the controller (no mocking!)
         Router router = Router.router(vertx);
@@ -89,10 +92,20 @@ class QuorusAgentTest {
         // Job polling endpoint
         router.get("/api/v1/agents/:agentId/jobs").handler(ctx -> {
             JsonObject response = new JsonObject()
-                    .put("jobs", new io.vertx.core.json.JsonArray());
+                .put("jobs", new io.vertx.core.json.JsonArray())
+                .put("pendingJobs", new io.vertx.core.json.JsonArray());
             ctx.response()
                     .putHeader("content-type", "application/json")
                     .end(response.encode());
+        });
+
+        // Job status endpoint
+        router.post("/api/v1/jobs/:jobId/status").handler(ctx -> {
+            statusReportCount.incrementAndGet();
+            ctx.response()
+                .setStatusCode(200)
+                .putHeader("content-type", "application/json")
+                .end(new JsonObject().put("status", "ok").encode());
         });
 
         // Start the mock controller server
@@ -295,6 +308,56 @@ class QuorusAgentTest {
         testContext.completeNow();
     }
 
+    @Test
+    @DisplayName("Should refuse job assigned to different agent")
+    void testRefuseForeignAssignedJob(Vertx vertx, VertxTestContext testContext) {
+        QuorusAgent agent = new QuorusAgent(vertx, config);
+
+        JobPollingService.PendingJob foreignJob = new JobPollingService.PendingJob(
+                "assign-foreign-1",
+                "job-foreign-1",
+                "another-agent",
+                "https://example.com/file.txt",
+                "C:/tmp/file.txt",
+                128L,
+                "foreign assignment"
+        );
+
+        invokeProcessJob(agent, foreignJob);
+
+        vertx.setTimer(200, id -> {
+            testContext.verify(() -> assertEquals(0, statusReportCount.get(),
+                    "Foreign-assigned job must not trigger any status reporting"));
+            testContext.completeNow();
+        });
+    }
+
+    @Test
+    @DisplayName("Should fail fast after repeated foreign assignments")
+    void testFailFastAfterRepeatedForeignAssignments(Vertx vertx, VertxTestContext testContext) {
+        QuorusAgent agent = new QuorusAgent(vertx, config);
+
+        JobPollingService.PendingJob foreignJob = new JobPollingService.PendingJob(
+                "assign-foreign-failfast",
+                "job-foreign-failfast",
+                "wrong-agent",
+                "https://example.com/file.txt",
+                "C:/tmp/file.txt",
+                256L,
+                "foreign assignment"
+        );
+
+        invokeProcessJob(agent, foreignJob);
+        invokeProcessJob(agent, foreignJob);
+        invokeProcessJob(agent, foreignJob);
+
+        assertDoesNotThrow(agent::awaitShutdown, "Agent should shutdown after mismatch threshold is reached");
+        assertThrows(IllegalStateException.class, agent::start,
+                "Agent should be closed after fail-fast shutdown");
+
+        testContext.completeNow();
+    }
+
     private static Vertx extractVertx(QuorusAgent agent) {
         try {
             Field vertxField = QuorusAgent.class.getDeclaredField("vertx");
@@ -302,6 +365,16 @@ class QuorusAgentTest {
             return (Vertx) vertxField.get(agent);
         } catch (ReflectiveOperationException e) {
             throw new AssertionError("Failed to extract Vert.x from QuorusAgent", e);
+        }
+    }
+
+    private static void invokeProcessJob(QuorusAgent agent, JobPollingService.PendingJob pendingJob) {
+        try {
+            var method = QuorusAgent.class.getDeclaredMethod("processJob", JobPollingService.PendingJob.class);
+            method.setAccessible(true);
+            method.invoke(agent, pendingJob);
+        } catch (ReflectiveOperationException e) {
+            throw new AssertionError("Failed to invoke processJob on QuorusAgent", e);
         }
     }
 }

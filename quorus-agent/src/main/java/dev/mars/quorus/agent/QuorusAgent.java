@@ -36,6 +36,7 @@ import org.slf4j.MDC;
 
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Main class for the Quorus Agent.
@@ -52,6 +53,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class QuorusAgent {
 
     private static final Logger logger = LoggerFactory.getLogger(QuorusAgent.class);
+    private static final int MAX_FOREIGN_ASSIGNMENT_MISMATCHES = 3;
 
     private final Vertx vertx;
     private final boolean closeVertxOnShutdown;
@@ -74,6 +76,7 @@ public class QuorusAgent {
     private final AtomicBoolean closed = new AtomicBoolean(false);
     private volatile boolean running = false;
     private final io.vertx.core.Promise<Void> shutdownPromise = io.vertx.core.Promise.promise();
+    private final AtomicInteger foreignAssignmentMismatchCount = new AtomicInteger(0);
 
     /**
      * Creates a QuorusAgent with Vert.x dependency injection.
@@ -384,12 +387,28 @@ public class QuorusAgent {
 
     private void processJob(JobPollingService.PendingJob pendingJob) {
         String jobId = pendingJob.getJobId();
+        String assignedAgentId = pendingJob.getAgentId();
+
+        if (assignedAgentId == null || !config.getAgentId().equals(assignedAgentId)) {
+            int mismatchCount = foreignAssignmentMismatchCount.incrementAndGet();
+            logger.error("Refusing to process job {} because assignment agentId {} does not match local agentId {}",
+                    jobId, assignedAgentId, config.getAgentId());
+            logger.error("Foreign assignment mismatch count: {}/{}", mismatchCount, MAX_FOREIGN_ASSIGNMENT_MISMATCHES);
+
+            if (mismatchCount >= MAX_FOREIGN_ASSIGNMENT_MISMATCHES) {
+                logger.error("Foreign assignment mismatch threshold reached ({}). Initiating fail-fast shutdown.",
+                        MAX_FOREIGN_ASSIGNMENT_MISMATCHES);
+                metrics.setStatusError();
+                shutdown();
+            }
+            return;
+        }
 
         logger.info("Processing job: {} ({})", jobId, pendingJob.getDescription());
 
-        // Report that we've accepted the job (reactive)
+        // Strict contract: do not execute unless ACCEPTED status is acknowledged by controller
         jobStatusReportingService.reportAccepted(jobId)
-            .onComplete(ar -> {
+            .onSuccess(v -> {
                 // Convert to transfer request
                 TransferRequest request = pendingJob.toTransferRequest();
 
@@ -400,6 +419,10 @@ public class QuorusAgent {
                 transferService.executeTransfer(request)
                     .onSuccess(result -> handleTransferComplete(jobId, result))
                     .onFailure(throwable -> handleTransferError(jobId, throwable));
+            })
+            .onFailure(err -> {
+                logger.error("Refusing to execute job {} because ACCEPTED status was not acknowledged: {}",
+                        jobId, err.getMessage());
             });
     }
 
@@ -417,12 +440,14 @@ public class QuorusAgent {
                        jobId,
                        result.getBytesTransferred(),
                        durationStr);
-            jobStatusReportingService.reportCompleted(jobId, result.getBytesTransferred());
+            jobStatusReportingService.reportCompleted(jobId, result.getBytesTransferred())
+                    .onFailure(err -> logger.error("Failed to report COMPLETED for job {}: {}", jobId, err.getMessage()));
             metrics.recordJobCompleted(true, protocol, direction, result.getBytesTransferred(), durationSeconds);
         } else {
             String errorMessage = result.getErrorMessage().orElse("Unknown error");
             logger.warn("Transfer failed: {} - {}", jobId, errorMessage);
-            jobStatusReportingService.reportFailed(jobId, errorMessage);
+            jobStatusReportingService.reportFailed(jobId, errorMessage)
+                    .onFailure(err -> logger.error("Failed to report FAILED for job {}: {}", jobId, err.getMessage()));
             metrics.recordJobCompleted(false, protocol, direction, 0, durationSeconds);
         }
     }
@@ -430,7 +455,9 @@ public class QuorusAgent {
     private void handleTransferError(String jobId, Throwable throwable) {
         logger.error("Transfer error: {}: {}", jobId, throwable.getMessage());
         logger.debug("Stack trace for transfer error: jobId={}", jobId, throwable);
-        jobStatusReportingService.reportFailed(jobId, throwable.getMessage());
+        jobStatusReportingService.reportFailed(jobId, throwable.getMessage())
+                .onFailure(err -> logger.error("Failed to report FAILED for job {}: {}", jobId, err.getMessage()));
+        metrics.recordJobCompleted(false, "unknown", "DOWNLOAD", 0, 0);
     }
     
     public boolean isRunning() {
