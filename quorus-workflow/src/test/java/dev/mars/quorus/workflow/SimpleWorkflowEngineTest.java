@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test;
 
 import dev.mars.quorus.testing.ExpectsError;
 import io.vertx.core.Future;
+import io.vertx.core.Vertx;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -189,6 +190,18 @@ class SimpleWorkflowEngineTest {
         assertThrows(Exception.class, () -> {
             future.toCompletionStage().toCompletableFuture().get();
         });
+    }
+
+    @Test
+    void testShutdownDoesNotCloseInjectedVertx() {
+        Vertx sharedVertx = Vertx.vertx();
+        SimpleWorkflowEngine engineWithSharedVertx = new SimpleWorkflowEngine(sharedVertx, testTransferEngine);
+
+        engineWithSharedVertx.shutdown();
+
+        assertDoesNotThrow(() -> sharedVertx.setTimer(10, id -> {}),
+                "Shutdown should not close externally managed Vert.x");
+        sharedVertx.close().toCompletionStage().toCompletableFuture().join();
     }
     
     @Test

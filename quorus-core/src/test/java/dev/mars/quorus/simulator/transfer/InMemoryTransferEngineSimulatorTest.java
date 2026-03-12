@@ -303,8 +303,14 @@ class InMemoryTransferEngineSimulatorTest {
         void testEventCallbacks() throws Exception {
             List<InMemoryTransferEngineSimulator.TransferEvent> events = 
                 new CopyOnWriteArrayList<>();
+            CountDownLatch completedEventReceived = new CountDownLatch(1);
 
-            engine.setEventCallback(events::add);
+            engine.setEventCallback(event -> {
+                events.add(event);
+                if (event.type() == InMemoryTransferEngineSimulator.TransferEvent.EventType.COMPLETED) {
+                    completedEventReceived.countDown();
+                }
+            });
             engine.setDefaultTransferDurationMs(200);
 
             var request = InMemoryTransferEngineSimulator.TransferRequest.builder()
@@ -315,6 +321,7 @@ class InMemoryTransferEngineSimulatorTest {
 
             var future = engine.submitTransfer(request);
             future.get(5, TimeUnit.SECONDS);
+            assertThat(completedEventReceived.await(2, TimeUnit.SECONDS)).isTrue();
 
             // Should have STARTED and COMPLETED at minimum
             assertThat(events).extracting(

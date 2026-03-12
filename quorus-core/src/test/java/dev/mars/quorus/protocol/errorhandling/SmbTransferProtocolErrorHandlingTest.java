@@ -233,8 +233,8 @@ class SmbTransferProtocolErrorHandlingTest extends ProtocolErrorHandlingTestBase
 
             assertNotNull(exception.getTransferId(),
                     "Exception should contain a transfer ID");
-            assertEquals(context.getJobId(), exception.getTransferId(),
-                    "Exception should contain the context job ID");
+                assertEquals(uploadRequest.getRequestId(), exception.getTransferId(),
+                    "Exception should contain the transfer request ID");
         }
     }
 }

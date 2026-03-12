@@ -101,7 +101,7 @@ public final class RaftStorageFactory {
                 // Create a dedicated single-threaded executor for serialized WAL I/O
                 WorkerExecutor executor = vertx.createSharedWorkerExecutor(
                         "raft-wal-executor", 1, 60_000_000_000L); // 60s max exec time
-                FileRaftStorage storage = new FileRaftStorage(vertx, executor, storagePath, fsync);
+                FileRaftStorage storage = new FileRaftStorage(vertx, executor, storagePath, fsync, true);
                 yield storage.open(storagePath).map(v -> (RaftStorage) storage);
             }
             case ROCKSDB -> {
@@ -274,8 +274,8 @@ public final class RaftStorageFactory {
             Class<?> clazz = Class.forName(
                     "dev.mars.quorus.controller.raft.storage.rocksdb.RocksDbRaftStorage");
             RaftStorage storage = (RaftStorage) clazz
-                    .getConstructor(Vertx.class, WorkerExecutor.class, Path.class, boolean.class)
-                    .newInstance(vertx, executor, storagePath, fsync);
+                .getConstructor(Vertx.class, WorkerExecutor.class, Path.class, boolean.class, boolean.class)
+                .newInstance(vertx, executor, storagePath, fsync, true);
             return storage.open(storagePath).map(v -> storage);
         } catch (ClassNotFoundException e) {
             return Future.failedFuture(new IllegalStateException(

@@ -86,6 +86,7 @@ public final class RocksDbRaftStorage implements RaftStorage {
     private final Vertx vertx;
     private final WorkerExecutor executor;
     private final boolean fsyncEnabled;
+    private final boolean closeExecutorOnClose;
 
     private Path dataDir;
     private RocksDB db;
@@ -101,7 +102,7 @@ public final class RocksDbRaftStorage implements RaftStorage {
      * @param executor the worker executor for blocking I/O operations
      */
     public RocksDbRaftStorage(Vertx vertx, WorkerExecutor executor) {
-        this(vertx, executor, null, true);
+        this(vertx, executor, null, true, false);
     }
 
     /**
@@ -113,10 +114,25 @@ public final class RocksDbRaftStorage implements RaftStorage {
      * @param fsyncEnabled whether to fsync on writes
      */
     public RocksDbRaftStorage(Vertx vertx, WorkerExecutor executor, Path dataDir, boolean fsyncEnabled) {
+        this(vertx, executor, dataDir, fsyncEnabled, false);
+    }
+
+    /**
+     * Creates a new RocksDbRaftStorage with explicit executor ownership semantics.
+     *
+     * @param vertx the Vert.x instance
+     * @param executor the worker executor for blocking I/O operations
+     * @param dataDir the directory for storage files
+     * @param fsyncEnabled whether to fsync on writes
+     * @param closeExecutorOnClose true when storage should close the supplied executor
+     */
+    public RocksDbRaftStorage(Vertx vertx, WorkerExecutor executor, Path dataDir,
+                              boolean fsyncEnabled, boolean closeExecutorOnClose) {
         this.vertx = vertx;
         this.executor = executor;
         this.dataDir = dataDir;
         this.fsyncEnabled = fsyncEnabled;
+        this.closeExecutorOnClose = closeExecutorOnClose;
     }
 
     /**
@@ -182,6 +198,11 @@ public final class RocksDbRaftStorage implements RaftStorage {
                 db.close();
                 db = null;
                 logger.info("RocksDbRaftStorage closed");
+            }
+
+            if (closeExecutorOnClose) {
+                executor.close();
+                logger.debug("Closed owned WorkerExecutor for RocksDbRaftStorage");
             }
             return null;
         }, false);

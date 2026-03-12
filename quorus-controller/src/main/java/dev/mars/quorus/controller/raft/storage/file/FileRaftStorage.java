@@ -101,6 +101,7 @@ public final class FileRaftStorage implements RaftStorage {
     private final Vertx vertx;
     private final WorkerExecutor executor;
     private final boolean fsyncEnabled;
+    private final boolean closeExecutorOnClose;
 
     private Path dataDir;
     private FileChannel logChannel;
@@ -113,7 +114,7 @@ public final class FileRaftStorage implements RaftStorage {
      * @param executor the worker executor for blocking I/O (should have pool size 1)
      */
     public FileRaftStorage(Vertx vertx, WorkerExecutor executor) {
-        this(vertx, executor, null, true);
+        this(vertx, executor, null, true, false);
     }
 
     /**
@@ -125,10 +126,25 @@ public final class FileRaftStorage implements RaftStorage {
      * @param fsyncEnabled whether to fsync after writes (true for durability, false for testing)
      */
     public FileRaftStorage(Vertx vertx, WorkerExecutor executor, Path dataDir, boolean fsyncEnabled) {
+        this(vertx, executor, dataDir, fsyncEnabled, false);
+    }
+
+    /**
+     * Creates a new FileRaftStorage with explicit executor ownership semantics.
+     *
+     * @param vertx the Vert.x instance
+     * @param executor the worker executor for blocking I/O operations
+     * @param dataDir the directory for storage files (will be created if not exists)
+     * @param fsyncEnabled whether to fsync after writes
+     * @param closeExecutorOnClose true when storage should close the supplied executor
+     */
+    public FileRaftStorage(Vertx vertx, WorkerExecutor executor, Path dataDir,
+                           boolean fsyncEnabled, boolean closeExecutorOnClose) {
         this.vertx = vertx;
         this.executor = executor;
         this.dataDir = dataDir;
         this.fsyncEnabled = fsyncEnabled;
+        this.closeExecutorOnClose = closeExecutorOnClose;
     }
 
     // =========================================================================
@@ -190,6 +206,11 @@ public final class FileRaftStorage implements RaftStorage {
                     logger.warn("Error closing log channel: {}", e.getMessage());
                     logger.debug("Stack trace for log channel close failure", e);
                 }
+            }
+
+            if (closeExecutorOnClose) {
+                executor.close();
+                logger.debug("Closed owned WorkerExecutor for FileRaftStorage");
             }
             return null;
         }, false);

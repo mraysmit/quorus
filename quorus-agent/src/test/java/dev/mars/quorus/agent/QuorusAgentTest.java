@@ -27,6 +27,8 @@ import io.vertx.junit5.VertxTestContext;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 
+import java.lang.reflect.Field;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -180,6 +182,27 @@ class QuorusAgentTest {
 
         assertNotNull(agent, "Agent should be created with legacy constructor");
         assertEquals(config, agent.getConfiguration(), "Configuration should match");
+
+        agent.shutdown();
+        assertDoesNotThrow(() -> agent.awaitShutdown(), "Shutdown should complete cleanly");
+
+        Vertx ownedVertx = extractVertx(agent);
+        assertThrows(RejectedExecutionException.class,
+                () -> ownedVertx.setTimer(10, id -> {}),
+                "Legacy constructor should close internally managed Vert.x");
+    }
+
+    @Test
+    @DisplayName("Should not close externally managed Vert.x on shutdown")
+    void testShutdownDoesNotCloseExternallyManagedVertx(Vertx vertx, VertxTestContext testContext) {
+        QuorusAgent agent = new QuorusAgent(vertx, config);
+
+        agent.shutdown();
+        assertDoesNotThrow(() -> agent.awaitShutdown(), "Shutdown should complete cleanly");
+
+        assertDoesNotThrow(() -> vertx.setTimer(10, id -> {}),
+                "Shutdown should not close externally managed Vert.x");
+        testContext.completeNow();
     }
 
     @Test
@@ -270,6 +293,16 @@ class QuorusAgentTest {
         assertNotNull(agent);
 
         testContext.completeNow();
+    }
+
+    private static Vertx extractVertx(QuorusAgent agent) {
+        try {
+            Field vertxField = QuorusAgent.class.getDeclaredField("vertx");
+            vertxField.setAccessible(true);
+            return (Vertx) vertxField.get(agent);
+        } catch (ReflectiveOperationException e) {
+            throw new AssertionError("Failed to extract Vert.x from QuorusAgent", e);
+        }
     }
 }
 
