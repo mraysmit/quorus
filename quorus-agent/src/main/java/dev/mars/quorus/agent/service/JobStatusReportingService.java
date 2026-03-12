@@ -108,19 +108,19 @@ public class JobStatusReportingService {
         return webClient.postAbs(url)
             .putHeader("Content-Type", "application/json")
             .sendJsonObject(request)
-            .<Void>map(response -> {
+            .compose(response -> {
                 int statusCode = response.statusCode();
-                if (statusCode == 200) {
+                if (statusCode >= 200 && statusCode < 300) {
                     logger.debug("Job status reported: {} -> {}", jobId, status);
+                    return Future.<Void>succeededFuture();
                 } else {
-                    logger.warn("Failed to report job status: {} -> {} (HTTP {})", 
-                              jobId, status, statusCode);
+                    String message = "Failed to report job status: " + jobId + " -> " + status + " (HTTP " + statusCode + ")";
+                    logger.error(message);
+                    return Future.<Void>failedFuture(message);
                 }
-                return null;
             })
-            .recover(err -> {
+            .onFailure(err -> {
                 logger.error("Error reporting job status: {} -> {}: {}", jobId, status, err.getMessage());
-                return Future.succeededFuture();
             });
     }
 

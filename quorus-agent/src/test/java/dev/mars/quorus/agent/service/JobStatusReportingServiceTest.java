@@ -194,16 +194,15 @@ class JobStatusReportingServiceTest {
     }
 
     @Test
-    @DisplayName("Should handle HTTP error gracefully (no exception)")
+    @DisplayName("Should fail on HTTP error response")
     void testHttpErrorGraceful(Vertx vertx, VertxTestContext testContext) {
         responseStatus.set(500);
         
         JobStatusReportingService service = new JobStatusReportingService(vertx, config);
         
         service.reportCompleted("job-fail", 1000L)
-            .onComplete(testContext.succeeding(v -> {
+            .onComplete(testContext.failing(err -> {
                 testContext.verify(() -> {
-                    // Should complete without exception even on HTTP 500
                     assertEquals(1, reportCount.get(), "Request should still be made");
                 });
                 testContext.completeNow();
@@ -211,14 +210,14 @@ class JobStatusReportingServiceTest {
     }
 
     @Test
-    @DisplayName("Should handle HTTP 404 gracefully")
+    @DisplayName("Should fail on HTTP 404 response")
     void testHttp404Graceful(Vertx vertx, VertxTestContext testContext) {
         responseStatus.set(404);
         
         JobStatusReportingService service = new JobStatusReportingService(vertx, config);
         
         service.reportFailed("nonexistent-job", "Some error")
-            .onComplete(testContext.succeeding(v -> {
+            .onComplete(testContext.failing(err -> {
                 testContext.verify(() -> {
                     assertEquals(1, reportCount.get());
                 });
@@ -227,7 +226,7 @@ class JobStatusReportingServiceTest {
     }
 
     @Test
-    @DisplayName("Should handle connection error gracefully")
+    @DisplayName("Should fail on connection error")
     void testConnectionErrorGraceful(Vertx vertx, VertxTestContext testContext) {
         AgentConfiguration badConfig = new AgentConfiguration.Builder()
             .agentId("test-agent-bad")
@@ -240,8 +239,7 @@ class JobStatusReportingServiceTest {
         JobStatusReportingService service = new JobStatusReportingService(vertx, badConfig);
         
         service.reportCompleted("job-conn-err", 500L)
-            .onComplete(testContext.succeeding(v -> {
-                // Should complete without exception
+            .onComplete(testContext.failing(err -> {
                 testContext.completeNow();
             }));
     }
