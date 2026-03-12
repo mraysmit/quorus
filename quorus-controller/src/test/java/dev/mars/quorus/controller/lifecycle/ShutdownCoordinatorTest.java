@@ -150,6 +150,7 @@ class ShutdownCoordinatorTest {
             
             coordinator.onDrain("failing", () -> {
                 callCount.incrementAndGet();
+                System.out.println("[EXPECTED-TEST-FAILURE] Scenario=shutdown-hook failure message=Simulated failure");
                 return Future.failedFuture("Simulated failure");
             });
             coordinator.onDrain("succeeding", () -> {

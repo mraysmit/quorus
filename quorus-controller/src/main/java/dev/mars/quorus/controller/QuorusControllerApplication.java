@@ -22,6 +22,7 @@ import io.vertx.core.Vertx;
 import io.vertx.core.VertxOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.bridge.SLF4JBridgeHandler;
 
 /**
  * Main application class for Quorus Controller.
@@ -50,6 +51,7 @@ public class QuorusControllerApplication {
             """;
 
     public static void main(String[] args) {
+        configureJulToSlf4jBridge();
         System.out.println(BANNER);
         logger.info("Initializing Quorus Controller with OpenTelemetry (Vert.x 5)...");
 
@@ -88,5 +90,13 @@ public class QuorusControllerApplication {
                         logger.debug("Stack trace for Vert.x close failure", err);
                     });
         }));
+    }
+
+    private static void configureJulToSlf4jBridge() {
+        if (!SLF4JBridgeHandler.isInstalled()) {
+            SLF4JBridgeHandler.removeHandlersForRootLogger();
+            SLF4JBridgeHandler.install();
+            logger.info("Installed JUL to SLF4J bridge");
+        }
     }
 }

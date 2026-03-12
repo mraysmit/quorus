@@ -121,6 +121,7 @@ class InMemoryRaftStorageTest {
 
         storage.sync()
                 .onComplete(ctx.failing(err -> {
+                    logExpectedFailure("in-memory storage sync failure simulation", err);
                     assertTrue(err.getMessage().contains("Simulated sync failure"));
                     ctx.completeNow();
                 }));
@@ -133,6 +134,7 @@ class InMemoryRaftStorageTest {
 
         storage.appendEntries(List.of(new LogEntryData(1, 1, "test".getBytes())))
                 .onComplete(ctx.failing(err -> {
+                    logExpectedFailure("in-memory storage append failure simulation", err);
                     assertTrue(err.getMessage().contains("Simulated append failure"));
                     ctx.completeNow();
                 }));
@@ -145,6 +147,7 @@ class InMemoryRaftStorageTest {
 
         storage.updateMetadata(5L, Optional.of("node-1"))
                 .onComplete(ctx.failing(err -> {
+                    logExpectedFailure("in-memory storage metadata failure simulation", err);
                     assertTrue(err.getMessage().contains("Simulated metadata update failure"));
                     ctx.completeNow();
                 }));
@@ -259,6 +262,10 @@ class InMemoryRaftStorageTest {
               assertEquals(4, remaining.get(1).index());
               ctx.completeNow();
           }));
+    }
+
+    private static void logExpectedFailure(String scenario, Throwable failure) {
+        System.out.println("[EXPECTED-TEST-FAILURE] Scenario=" + scenario + " message=" + failure.getMessage());
     }
 
     @Test
