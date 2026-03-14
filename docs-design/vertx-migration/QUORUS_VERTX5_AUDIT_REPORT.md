@@ -167,7 +167,7 @@ public boolean waitForResumeOrCancel(long maxWaitMs) {
 - ✅ Replaced polling with `Condition.awaitNanos()` for efficient waiting
 - ✅ Updated `resume()` and `cancel()` to signal waiting threads with `signalAll()`
 - ✅ Maintains timeout behavior with nanosecond precision
-- ✅ All 199 tests passing
+- ✅ Module test suite passing after the change set
 
 **Location 2**: `quorus-core/src/test/java/dev/mars/quorus/integration/LocalHttpTestServer.java` ✅ **APPROVED**
 
@@ -501,7 +501,7 @@ Tests run: 7, Failures: 0, Errors: 0, Skipped: 0
 - ✅ **Zero Vert.x instance management violations**
 
 ### ✅ Phase 2: Protocol & Transfer Layer (COMPLETE)
-- ✅ 199/199 tests passing (all quorus-core tests)
+- ✅ quorus-core module test suite passing
 - ✅ HTTP protocol migrated to Vert.x Web Client (reactive)
 - ✅ Virtual threads verified for blocking protocols (already optimal)
 - ✅ Comprehensive health checks and metrics infrastructure
@@ -631,7 +631,7 @@ The Vert.x 5.x migration is complete and the system is ready for production depl
    - `transferWithHttpURLConnection()` - Blocking mode for backward compatibility
 4. ✅ Updated `SimpleTransferEngine` to pass Vertx instance to ProtocolFactory
 5. ✅ Maintained backward compatibility with deprecated no-arg constructors
-6. ✅ All 199 tests passing (no regressions)
+6. ✅ Module test suite passing with no regressions
 
 **Actual Impact**:
 - ✅ HTTP transfers now use reactive Vert.x Web Client when Vertx instance is available
@@ -653,18 +653,18 @@ The blocking protocols (FTP, SFTP, SMB) already run in Vert.x `WorkerExecutor` t
 
 **Key Findings**:
 1. ✅ **Current Implementation is Optimal**: Blocking protocols already execute in `WorkerExecutor` threads
-2. ✅ **Java 21 Virtual Thread Support**: Vert.x 5.x supports virtual threads via `ThreadingModel.VIRTUAL_THREAD`
-3. ✅ **Automatic Benefit**: Worker threads automatically benefit from Java 21 virtual threads when JVM supports them
+2. ✅ **Java 25 Baseline**: The repository now targets Java 25, which includes the virtual thread capabilities relevant to Vert.x 5.x worker execution
+3. ✅ **Automatic Benefit**: Worker threads benefit from modern JVM virtual thread support when the Vert.x worker model is configured to use it
 4. ✅ **No Changes Needed**: The current architecture is already optimized for blocking I/O
 
 **Technical Details**:
 - `SimpleTransferEngine` creates a shared `WorkerExecutor` with configurable pool size
 - All protocol `transfer()` methods execute in worker threads (not event loop threads)
-- Vert.x 5.x can use virtual threads for worker pools when running on Java 21+
-- The project already targets Java 21 (`maven.compiler.source=21`)
+- Vert.x 5.x can use virtual-thread-backed worker execution on current JDKs
+- The project now targets Java 25 (`maven.compiler.source=25`)
 
 **Recommendation**:
-No code changes required. The current implementation already provides optimal performance for blocking protocols. When running on Java 21+, the JVM will automatically use virtual threads for the worker pool, providing better scalability for blocking I/O operations.
+No code changes required. The current implementation already provides optimal performance for blocking protocols. Under the Java 25 repository baseline, the JVM provides the modern threading capabilities needed for scalable blocking I/O execution.
 
 **Actual Effort**: 1 hour (research and documentation)
 
@@ -701,7 +701,7 @@ No code changes required. The current implementation already provides optimal pe
    - Automatic metrics recording on transfer start/success/failure
    - Health status based on failure rates (>50% = DOWN, >20% = DEGRADED)
    - System metrics (memory, uptime, active transfers)
-6. ✅ All 199 tests passing (no regressions)
+6. ✅ Module test suite passing with no regressions
 
 **Actual Impact**:
 - ✅ Real-time protocol health monitoring
@@ -719,7 +719,7 @@ No code changes required. The current implementation already provides optimal pe
 **Status**: ✅ COMPLETE
 
 **Test Results**:
-- ✅ All 199 tests passing
+- ✅ Module test suite passing
 - ✅ No regressions from Phase 2 changes
 - ✅ HTTP protocol using reactive Web Client confirmed
 - ✅ Metrics collection working correctly
@@ -747,12 +747,12 @@ No code changes required. The current implementation already provides optimal pe
 2. ✅ **Virtual Thread Support** - Verified optimal architecture for blocking protocols
 3. ✅ **Health Checks** - Comprehensive protocol and system health monitoring
 4. ✅ **Metrics Collection** - Real-time performance tracking for all protocols
-5. ✅ **All Tests Passing** - 199/199 tests with no regressions
+5. ✅ **All Tests Passing** - module test suite passing with no regressions
 
 ### Key Benefits
 
 - **Reactive HTTP** - Non-blocking I/O for HTTP transfers
-- **Optimal Blocking I/O** - WorkerExecutor with Java 21 virtual thread support
+- **Optimal Blocking I/O** - WorkerExecutor aligned with the Java 25 repository baseline
 - **Production Monitoring** - Real-time health and performance metrics
 - **Backward Compatible** - Gradual migration path maintained
 - **Performance Validated** - 388.2% throughput improvement from connection pool optimization

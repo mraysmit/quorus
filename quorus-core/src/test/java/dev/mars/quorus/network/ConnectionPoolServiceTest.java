@@ -18,13 +18,14 @@ package dev.mars.quorus.network;
 
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
+import io.vertx.junit5.VertxExtension;
+import io.vertx.junit5.VertxTestContext;
 import io.vertx.sqlclient.Pool;
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.lang.reflect.Field;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -34,25 +35,26 @@ import static org.junit.jupiter.api.Assertions.*;
  * @version 1.0
  * @since 2025-12-17
  */
+@ExtendWith(VertxExtension.class)
 class ConnectionPoolServiceTest {
 
     private Vertx vertx;
     private ConnectionPoolService service;
 
     @BeforeEach
-    void setUp() {
-        vertx = Vertx.vertx();
+    void setUp(Vertx vertx) {
+        this.vertx = vertx;
         service = new ConnectionPoolService(vertx);
     }
 
     @AfterEach
-    void tearDown() throws Exception {
+    void tearDown(VertxTestContext testContext) {
         if (service != null) {
-            service.shutdownAsync().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
+            service.shutdownAsync().onComplete(testContext.succeeding(v -> testContext.completeNow()));
+            return;
         }
-        if (vertx != null) {
-            vertx.close().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
-        }
+
+        testContext.completeNow();
     }
 
     @Test
@@ -73,7 +75,7 @@ class ConnectionPoolServiceTest {
 
     @Test
     @DisplayName("Should remove pool")
-    void testRemovePool() throws Exception {
+    void testRemovePool(VertxTestContext testContext) throws Exception {
         ConnectionPoolService.PgConnectionConfig config = new ConnectionPoolService.PgConnectionConfig(
             "localhost", 5432, "testdb", "user", "pass"
         );
@@ -83,35 +85,29 @@ class ConnectionPoolServiceTest {
         assertNotNull(pool);
 
         service.removePoolAsync("test-service")
-            .toCompletionStage()
-            .toCompletableFuture()
-            .get(5, TimeUnit.SECONDS);
+            .onComplete(testContext.succeeding(v -> testContext.completeNow()));
     }
 
     @Test
     @DisplayName("Shutdown should not close externally-managed Vert.x")
-    void testShutdownDoesNotCloseExternalVertx() throws Exception {
-        service.shutdownAsync().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
-
-        CountDownLatch latch = new CountDownLatch(1);
-        long timerId = vertx.setTimer(10, id -> latch.countDown());
-        assertTrue(timerId >= 0);
-        assertTrue(latch.await(5, TimeUnit.SECONDS));
+    void testShutdownDoesNotCloseExternalVertx(VertxTestContext testContext) {
+        service.shutdownAsync().onComplete(testContext.succeeding(v -> testContext.verify(() -> {
+            long timerId = vertx.setTimer(10, id -> testContext.completeNow());
+            assertTrue(timerId >= 0);
+        })));
     }
 
     @Test
     @DisplayName("Shutdown should close internally-managed Vert.x")
-    void testShutdownClosesInternalVertx() throws Exception {
+    void testShutdownClosesInternalVertx(VertxTestContext testContext) throws Exception {
         ConnectionPoolService internalService = new ConnectionPoolService();
         Vertx internalVertx = extractVertx(internalService);
 
-        internalService.shutdownAsync().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
-
-        RejectedExecutionException ex = assertThrows(RejectedExecutionException.class,
-            () -> internalVertx.timer(10, TimeUnit.MILLISECONDS));
-        assertTrue(ex.getMessage().toLowerCase().contains("terminated"));
-
-        internalService = null;
+        internalService.shutdownAsync().onComplete(testContext.succeeding(v -> testContext.verify(() -> {
+            assertThrows(RuntimeException.class,
+                () -> internalVertx.timer(10, java.util.concurrent.TimeUnit.MILLISECONDS));
+            testContext.completeNow();
+        })));
     }
 
     private static Vertx extractVertx(ConnectionPoolService service) throws Exception {

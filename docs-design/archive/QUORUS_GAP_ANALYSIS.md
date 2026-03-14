@@ -517,7 +517,7 @@ The following are documented extensively but represent future capabilities:
 ### 17.3 Documentation Improvements
 
 1. **Split documentation** - Separate "Architecture Vision" from "Implementation Guide"
-2. **Add API documentation** - Create OpenAPI/Swagger specs for implemented endpoints
+2. **Add API documentation** - Expand the controller-first HTTP endpoint reference for implemented endpoints
 3. **Version documentation** - Tag documentation versions aligned with releases
 
 ---

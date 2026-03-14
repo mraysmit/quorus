@@ -1,294 +1,146 @@
 <div align="center">
   <img src="docs/quorus-logo.png" alt="Quorus Logo" width="300"/>
- 
+
 # Quorus File Transfer System
 
-  [![Java](https://img.shields.io/badge/Java-21+-orange.svg)](https://openjdk.java.net/projects/jdk/21/)
-  [![Vert.x](https://img.shields.io/badge/Vert.x-5.0.2-purple.svg)](https://vertx.io/)
+  [![Java](https://img.shields.io/badge/Java-25-orange.svg)](https://openjdk.org/projects/jdk/25/)
+  [![Vert.x](https://img.shields.io/badge/Vert.x-5.0.8-purple.svg)](https://vertx.io/)
   [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com/)
   [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 </div>
 
-**Version:** 1.0
-**Date:** 2025-08-27
-**Author:** Mark Andrew Ray-Smith Cityline Ltd
+Quorus is a Java 25 and Vert.x 5 based file transfer platform with two practical execution modes:
 
-🚀 **Enterprise-grade distributed file transfer system** with YAML workflows, Raft consensus clustering, real-time monitoring, and mathematical data persistence guarantees.
+- direct execution with `quorus-core` and `quorus-workflow`
+- distributed execution with `quorus-controller` and `quorus-agent`
 
-## 🌟 Key Features
+The current implementation centers on a controller-first architecture with embedded HTTP, Raft-backed replicated state, reactive transfer execution, and YAML workflow parsing and execution.
 
-### 🏗️ **Distributed Architecture**
-- **5-Node Raft Cluster** with automatic leader election and failover
-- **Mathematical data persistence guarantees** during leader changes
-- **Sub-second failover** with zero data loss
-- **Docker containerized** deployment with health monitoring
+## Current Capabilities
 
-### 📊 **Real-time Monitoring & Logging**
-- **Grafana dashboards** for live cluster visualization
-- **Loki log aggregation** with real-time Raft consensus tracking
-- **Comprehensive log integrity validation** (92.3% test success rate)
-- **Container-specific log isolation** for troubleshooting
+### Transfer Execution
 
-### 🔄 **YAML Workflow Engine**
-- **Declarative workflows** with metadata headers and dependency management
-- **Variable substitution** with `{{variable}}` syntax
-- **Multiple execution modes**: normal, dry run, virtual run
-- **Dependency graph validation** and topological sorting
+- direct transfer execution through `SimpleTransferEngine`
+- protocol registration for HTTP, HTTPS, FTP, FTPS, SFTP, SMB, CIFS, and NFS
+- progress tracking, retry handling, cancellation, and engine-level pause/resume operations
+- integrity and transfer metrics instrumentation
 
-### 🌐 **Enterprise REST API**
-- **OpenAPI 3.0 specification** with Swagger UI
-- **Role-based access control** (RBAC)
-- **Health monitoring** and metrics endpoints
-- **Fast Quarkus runtime** with low memory footprint
+### Workflow Execution
 
-### 🔒 **Security & Integrity**
-- **SHA-256 integrity verification** for all transfers
-- **Retry mechanisms** with exponential backoff
-- **Thread-safe concurrent operations**
-- **Comprehensive error handling** with custom exception hierarchy
+- YAML parsing through `YamlWorkflowDefinitionParser`
+- variable substitution with `{{variable}}` syntax
+- dependency graph construction and validation
+- `NORMAL`, `DRY_RUN`, and `VIRTUAL_RUN` execution modes
 
-## ⚙️ Configuration
+### Distributed Control Plane
 
-Quorus uses a layered configuration system. Values are resolved in this order (highest priority first):
+- embedded controller HTTP API
+- Raft-backed controller state
+- agent registration and heartbeat handling
+- transfer, assignment, and route CRUD endpoints
+- health, readiness, metrics, and cluster status endpoints
 
-1. **Environment variable** (e.g., `QUORUS_HTTP_PORT=8080`)
-2. **System property** (e.g., `-Dquorus.http.port=8080`)
-3. **Properties file** (`quorus-controller.properties` / `quorus-agent.properties`)
-4. **Default value**
+## Important Implementation Boundaries
 
-### Controller Configuration
+- The repository build targets Java 25.
+- The active controller runtime is the embedded Vert.x HTTP server in `quorus-controller`, not the deprecated `quorus-api` Quarkus path.
+- Route CRUD and route lifecycle endpoints are implemented, but controller startup does not currently show an autonomous route trigger evaluator being wired in.
+- Adapter-level resume support should be treated as not implemented in the current protocol adapters.
+- The workflow parser supports a narrower YAML vocabulary than older documentation claimed.
 
-| Environment Variable | Property | Default | Description |
-|---------------------|----------|---------|-------------|
-| `QUORUS_NODE_ID` | `quorus.node.id` | hostname | Unique node ID (required for multi-node) |
-| `QUORUS_HTTP_PORT` | `quorus.http.port` | `8080` | HTTP API port |
-| `QUORUS_HTTP_HOST` | `quorus.http.host` | `0.0.0.0` | HTTP bind address |
-| `QUORUS_RAFT_PORT` | `quorus.raft.port` | `9080` | gRPC Raft port |
-| `QUORUS_CLUSTER_NODES` | `quorus.cluster.nodes` | single-node | Cluster topology (`id=host:port,...`) |
-| `QUORUS_RAFT_STORAGE_TYPE` | `quorus.raft.storage.type` | `file` | Storage backend: `raftlog`, `file`, `memory` |
-| `QUORUS_RAFT_STORAGE_PATH` | `quorus.raft.storage.path` | `./data/raft/{nodeId}` | WAL data directory |
-| `QUORUS_TELEMETRY_ENABLED` | `quorus.telemetry.enabled` | `true` | Enable OpenTelemetry |
-| `QUORUS_TELEMETRY_PROMETHEUS_PORT` | `quorus.telemetry.prometheus.port` | `9464` | Prometheus scrape port |
+## Module Layout
 
-### Agent Configuration
+| Module | Purpose |
+|---|---|
+| `quorus-core` | Transfer models, protocol adapters, transfer engine, core services |
+| `quorus-workflow` | YAML parsing, validation, variable resolution, workflow execution |
+| `quorus-controller` | Embedded HTTP API, Raft transport, replicated controller state |
+| `quorus-agent` | Agent registration, heartbeat, job polling, execution reporting |
+| `quorus-tenant` | Tenant and quota related services |
+| `quorus-integration-examples` | Runnable examples for transfers, workflows, tenants, and agent models |
 
-| Environment Variable | Property | Default | Description |
-|---------------------|----------|---------|-------------|
-| `QUORUS_AGENT_ID` | `quorus.agent.id` | hostname-derived | Unique agent ID |
-| `QUORUS_AGENT_CONTROLLER_URL` | `quorus.agent.controller.url` | `http://localhost:8080/api/v1` | Controller URL |
-| `QUORUS_AGENT_PORT` | `quorus.agent.port` | `8080` | Health/status port |
-| `QUORUS_AGENT_REGION` | `quorus.agent.region` | `default` | Deployment region |
-| `QUORUS_AGENT_DATACENTER` | `quorus.agent.datacenter` | `default` | Datacenter name |
-| `QUORUS_AGENT_TRANSFERS_MAX_CONCURRENT` | `quorus.agent.transfers.max-concurrent` | `5` | Max parallel transfers |
-| `QUORUS_AGENT_HEARTBEAT_INTERVAL_MS` | `quorus.agent.heartbeat.interval-ms` | `30000` | Heartbeat interval (ms) |
-| `QUORUS_AGENT_JOBS_POLLING_INTERVAL_MS` | `quorus.agent.jobs.polling.interval-ms` | `10000` | Job poll interval (ms) |
-| `QUORUS_AGENT_TELEMETRY_PROMETHEUS_PORT` | `quorus.agent.telemetry.prometheus.port` | `9465` | Agent Prometheus port |
+## Build
 
----
+Use JDK 25 for all builds and tests.
 
-## 🚀 Quick Start
-
-### Prerequisites
-- **Java 21+** and Docker
-- **8GB RAM** recommended for full cluster deployment
-
-### 🐳 **Docker Deployment (Recommended)**
-```bash
-# Start the complete stack (5-node cluster + monitoring)
-docker-compose -f docker/compose/docker-compose.yml up -d
-docker-compose -f docker/compose/docker-compose-loki.yml up -d
-
-# Access services
-# API: http://localhost:8081
-# Grafana: http://localhost:3000 (admin/admin)
-# Swagger UI: http://localhost:8081/q/swagger-ui
+```powershell
+$env:JAVA_HOME = "C:\Users\mraysmit\.jdks\openjdk-25"
+$env:Path = "$env:JAVA_HOME\bin;$env:Path"
+mvn clean verify 2>&1 | Tee-Object -FilePath temp\build-output.txt
 ```
 
-### 📊 **Monitoring & Validation**
-```bash
-# View real-time Raft logs
-./scripts/loki-realtime-viewer.ps1 -RaftOnly -RealTime
+## Quick Start
 
-# Run comprehensive validation tests
-./scripts/test-logging-validation.ps1
-./scripts/test-log-integrity.ps1
+### Direct Usage
 
-# Prove metadata persistence during leader changes
-./scripts/prove-metadata-persistence.ps1
+Build the project, then run an example from `quorus-integration-examples`:
+
+```powershell
+mvn compile exec:java -pl quorus-integration-examples -Dexec.mainClass="dev.mars.quorus.examples.BasicTransferExample"
 ```
 
-### 💻 **Development Mode**
-```bash
-# Build and test
-mvn clean compile test
+Workflow-focused entry points are also available, including `BasicWorkflowExample` and `ComplexWorkflowExample`.
 
-# Start API service
-mvn quarkus:dev -pl quorus-api
+### Controller Cluster
 
-# Run examples
-mvn exec:java -pl quorus-integration-examples
+Start a controller environment with the compose files in `docker/compose`:
+
+```powershell
+docker compose -f docker/compose/docker-compose-single-controller.yml up -d
 ```
 
-## 📖 Usage Examples
+For a multi-node setup:
 
-### 🔄 **YAML Workflow**
+```powershell
+docker compose -f docker/compose/docker-compose-controller-first.yml up -d
+```
+
+Then verify:
+
+```powershell
+curl http://localhost:8080/health/live
+curl http://localhost:8080/health/ready
+curl http://localhost:8080/raft/status
+curl http://localhost:8080/api/v1/info
+curl http://localhost:8080/metrics
+```
+
+## Example Workflow
+
 ```yaml
-# enterprise-sync.yaml
 metadata:
-  name: "Enterprise Data Sync"
+  name: "daily-sync"
   version: "1.0.0"
-  description: "Daily synchronization of critical business data"
-  type: "enterprise-workflow"
-  author: "data-ops@company.com"
+  description: "Download and stage a daily dataset"
 
 spec:
   variables:
-    date: "{{TODAY}}"
-    source_host: "secure.company.com"
-    dest_path: "/data/warehouse"
+    sourceBase: "https://example.com"
+    outputDir: "/data/out"
 
   transferGroups:
-    - name: financial-data
-      description: "Download financial reports"
-      dependsOn: []
+    - name: fetch
       transfers:
-        - name: daily-revenue
-          source: "https://{{source_host}}/reports/revenue-{{date}}.csv"
-          destination: "{{dest_path}}/revenue-{{date}}.csv"
-          protocol: https
-        - name: expense-report
-          source: "https://{{source_host}}/reports/expenses-{{date}}.csv"
-          destination: "{{dest_path}}/expenses-{{date}}.csv"
-          protocol: https
-
-    - name: analytics-processing
-      description: "Process analytics data"
-      dependsOn: ["financial-data"]
-      transfers:
-        - name: customer-metrics
-          source: "https://{{source_host}}/analytics/customers-{{date}}.json"
-          destination: "{{dest_path}}/analytics/customers-{{date}}.json"
-          protocol: https
+        - name: dataset
+          source: "{{sourceBase}}/dataset.csv"
+          destination: "{{outputDir}}/dataset.csv"
+          protocol: http
 ```
 
-## Usage
+For the currently supported YAML fields, use the YAML guide rather than relying on older examples.
 
-### 🌐 **REST API Usage**
-```bash
-# Submit a transfer job
-curl -X POST http://localhost:8081/api/v1/transfers \
-  -H "Content-Type: application/json" \
-  -d '{
-    "source": "https://example.com/data.zip",
-    "destination": "/tmp/data.zip",
-    "protocol": "https"
-  }'
+## Key Documentation
 
-# Check transfer status
-curl http://localhost:8081/api/v1/transfers/{transfer-id}
-
-# Submit YAML workflow
-curl -X POST http://localhost:8081/api/v1/workflows \
-  -H "Content-Type: application/yaml" \
-  --data-binary @enterprise-sync.yaml
-
-# Health check with Raft status
-curl http://localhost:8081/health
-```
-
-### 🔍 **Monitoring Raft Consensus**
-```bash
-# View live Raft events with color coding
-./scripts/loki-realtime-viewer.ps1 -RaftOnly -RealTime
-
-# Capture leader change evidence
-./scripts/capture-leader-change-logs.ps1
-
-# Run comprehensive validation (94.4% success rate)
-./scripts/test-logging-validation.ps1 -Verbose
-```
-
-## 🏛️ Architecture
-
-### **Distributed Controller Cluster**
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Controller 1  │    │   Controller 2  │    │   Controller 3  │
-│   (Follower)    │◄──►│    (Leader)     │◄──►│   (Follower)    │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         ▲                        ▲                        ▲
-         │                        │                        │
-         ▼                        ▼                        ▼
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Controller 4  │◄──►│   Controller 5  │    │   API Gateway   │
-│   (Follower)    │    │   (Follower)    │    │   (Quarkus)     │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-```
-
-### **Key Components**
-- **🗳️ Raft Consensus**: 5-node cluster with automatic leader election
-- **📊 Loki + Grafana**: Real-time log aggregation and visualization
-- **🔄 Workflow Engine**: YAML-based transfer orchestration
-- **🌐 REST API**: Enterprise-grade API with OpenAPI specification
-- **🔒 Security**: SHA-256 integrity verification and RBAC
-
-## 🧪 **Validation & Testing**
-
-### **Comprehensive Test Suite**
-- **150+ tests** with **94.4% success rate** in validation
-- **Real-time log integrity testing** with **92.3% score**
-- **Raft consensus validation** with mathematical proof of data persistence
-- **Leader election testing** with sub-second failover validation
-
-### **Proof of Metadata Persistence**
-```bash
-# Mathematical proof that metadata survives leader changes
-./scripts/prove-metadata-persistence.ps1
-
-# Evidence captured:
-# ✅ Term progression: 997 → 1008 (monotonic)
-# ✅ Vote consensus: 3+ votes required (majority of 5 nodes)
-# ✅ Leader consistency: Only one leader per term
-# ✅ No data loss: All events captured and preserved
-```
-
-### **Enterprise Validation**
-- **Container-specific log isolation** for troubleshooting
-- **Cross-node consistency** validation across all 5 controllers
-- **Pipeline performance** testing with sub-second query times
-- **Data integrity** validation with format and encoding checks
-
-## 🎯 **Why Quorus?**
-
-### **Enterprise Ready**
-- **Mathematical guarantees** of data persistence during failures
-- **Sub-second failover** with zero data loss
-- **Comprehensive monitoring** with real-time dashboards
-- **Audit trails** for compliance and governance
-
-### **Developer Friendly**
-- **YAML workflows** for declarative transfer orchestration
-- **REST API** with OpenAPI specification and Swagger UI
-- **Docker deployment** with single command startup
-- **Extensive validation** with 94.4% test success rate
-
-### **Production Proven**
-- **5-node Raft cluster** with automatic leader election
-- **Real-time log aggregation** with Loki and Grafana
-- **Container-specific monitoring** for precise troubleshooting
-- **Performance validated** with sub-second query times
-
----
-
-## 📞 **Support & Documentation**
-
-- **🚀 Quick Start**: Follow the Docker deployment guide above
-- **📊 Monitoring**: Access Grafana at http://localhost:3000
-- **🔍 API Docs**: Swagger UI at http://localhost:8081/q/swagger-ui
-- **🧪 Validation**: Run `./scripts/comprehensive-logging-test.ps1`
-
-**Built for enterprise file transfer with mathematical reliability guarantees.**
+- [docs/QUORUS_ARCHITECTURE_QUICKSTART.md](docs/QUORUS_ARCHITECTURE_QUICKSTART.md)
+- [docs/QUORUS_API_REFERENCE.md](docs/QUORUS_API_REFERENCE.md)
+- [docs/QUORUS_USER_GUIDE.md](docs/QUORUS_USER_GUIDE.md)
+- [docs/QUORUS_WORKFLOWS_README.md](docs/QUORUS_WORKFLOWS_README.md)
+- [docs/QUORUS_YAML_SYNTAX_GUIDE.md](docs/QUORUS_YAML_SYNTAX_GUIDE.md)
+- [docs/QUORUS_INTEGRATION_EXAMPLES_README.md](docs/QUORUS_INTEGRATION_EXAMPLES_README.md)
+- [docs/QUORUS_CLUSTER_STARTUP_GUIDE.md](docs/QUORUS_CLUSTER_STARTUP_GUIDE.md)
+- [docs/QUORUS-DOCKER-TESTING-README.md](docs/QUORUS-DOCKER-TESTING-README.md)
+- [docs/QUORUS_SYSTEM_DESIGN.md](docs/QUORUS_SYSTEM_DESIGN.md)
 
 ## License
 
-Licensed under the Apache License, Version 2.0. See LICENSE file for details.
+Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE).

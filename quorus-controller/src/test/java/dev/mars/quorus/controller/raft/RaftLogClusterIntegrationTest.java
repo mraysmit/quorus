@@ -326,6 +326,14 @@ class RaftLogClusterIntegrationTest {
         RaftNode newLeader = waitForLeader(15_000);
         assertNotNull(newLeader, "New leader should be elected after restart");
         LOG.info("New leader after restart: {}", newLeader.getNodeId());
+
+        LOG.info("Waiting for recovered state to be re-applied after leader election...");
+        await().atMost(Duration.ofSeconds(10))
+            .pollInterval(Duration.ofMillis(200))
+            .until(() -> cluster.stream().allMatch(node -> {
+                QuorusStateStore sm = (QuorusStateStore) node.getStateStore();
+                return jobIds.stream().allMatch(sm::hasTransferJob);
+            }));
         
         // Verify ALL nodes recovered the jobs from WAL
         LOG.info("Verifying state machine rebuilt from WAL...");

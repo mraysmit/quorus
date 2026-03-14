@@ -65,12 +65,12 @@ This implementation plan delivers Quorus functionality through proven, testable 
 - **Planned**: REST API foundation, service discovery, basic auth
 - **Implemented**: ✅ **EXCEEDED EXPECTATIONS**
 
-**REST API (Quarkus-based):**
-- ✅ **TransferResource** - POST/GET/DELETE `/api/v1/transfers` with OpenAPI 3.0 annotations
+**REST API (historical API-first implementation at the time of this plan):**
+- ✅ **TransferResource** - POST/GET/DELETE `/api/v1/transfers` with structured endpoint documentation
 - ✅ **HealthResource** - `/api/v1/info`, `/api/v1/status` endpoints
 - ✅ **AgentRegistrationResource** - Agent fleet management API
 - ✅ **RBAC** - `@RolesAllowed({"ADMIN", "USER"})` implemented
-- ✅ **Service Discovery** - Info/status endpoints, OpenAPI documentation at `/q/openapi`, `/q/swagger-ui`
+- ✅ **Service Discovery** - Info/status endpoints and API discovery support in the then-current API layer
 - ✅ **Client SDK** - Java client library with async support
 
 #### **Milestone 2.2: Controller Quorum Architecture** 🔄 **FOUNDATION COMPLETE (70%)**
@@ -226,7 +226,7 @@ The Quorus implementation demonstrates exceptional engineering quality and is we
 | **1.1-1.4: Transfer Engine** | HTTP/HTTPS only | HTTP/HTTPS, FTP/FTPS, SFTP, SMB/CIFS | ✅ **EXCEEDED** |
 | **1.5: YAML Workflows** | Basic workflow engine | Enterprise-grade with 3 execution modes | ✅ **EXCEEDED** |
 | **1.6: Multi-Tenancy** | Basic tenant isolation | Hierarchical with quotas & inheritance | ✅ **EXCEEDED** |
-| **2.1: REST API** | Basic endpoints | Full OpenAPI 3.0 with RBAC | ✅ **EXCEEDED** |
+| **2.1: REST API** | Basic endpoints | Full documented REST surface with RBAC | ✅ **EXCEEDED** |
 | **2.2: Raft Consensus** | Leader election + replication | Complete Raft with state machine | ✅ **COMPLETE** |
 | **2.3: Agent Fleet** | Agent registration | Registration + heartbeat + assignment | 🔄 **70% COMPLETE** |
 
@@ -277,7 +277,7 @@ Phase 2 milestones are substantially implemented with integration work remaining
 - **Availability**: 99.9% uptime capability with automatic failover (Raft consensus)
 - **Performance**: <100ms API response time achieved, foundation for 10,000+ requests/second
 - **Resilience**: Distributed failure detection and recovery implemented
-- **Enterprise Integration**: Complete REST API with OpenAPI 3.0, RBAC, and service discovery
+- **Enterprise Integration**: Complete REST API with RBAC and service discovery in the then-current implementation
 - **Multi-Protocol Support**: 4 protocols (HTTP/HTTPS, FTP/FTPS, SFTP, SMB/CIFS) vs. planned 1
 - **Modularization**: 6 modules vs. planned single module
 
@@ -514,7 +514,7 @@ src/main/java/dev/mars/quorus/
 - REST API for all transfer operations
 - Service discovery and health checks
 - Basic authentication and authorization
-- API documentation and OpenAPI specifications
+- API documentation for implemented endpoints
 - Client SDK foundation (Java, CLI)
 - Service registration and lifecycle management
 
@@ -522,7 +522,7 @@ src/main/java/dev/mars/quorus/
 - REST API handles 1,000+ concurrent requests
 - Service health monitoring operational
 - API response time <100ms for status queries
-- Complete OpenAPI specification
+- Complete endpoint reference for the implemented API surface
 - Basic client SDKs functional
 - Service auto-registration working
 
@@ -531,7 +531,7 @@ src/main/java/dev/mars/quorus/
 - `ServiceRegistry` - Service discovery and registration
 - `HealthCheckService` - Service health monitoring
 - `AuthenticationService` - Basic auth and authorization
-- `ApiDocumentation` - OpenAPI specs and documentation
+- `ApiDocumentation` - API reference and endpoint documentation
 - `ClientSDK` - Basic client libraries
 
 ### Milestone 2.2: Controller Quorum Architecture (Weeks 19-22)
@@ -750,7 +750,7 @@ This updated implementation plan ensures that Quorus evolves into an enterprise-
 - **Workflow Engine**: Complete YAML-based workflow system with dependency resolution
 - **Multi-Tenancy**: Hierarchical tenant management with resource quotas
 - **Enterprise Features**: Configuration inheritance, security isolation, audit logging
-- **REST API**: Complete Quarkus-based API with OpenAPI 3.0 and RBAC
+- **REST API**: Complete API layer for the historical implementation snapshot with RBAC
 - **Raft Consensus**: Complete implementation with leader election and log replication
 
 **Phase 2: Service Architecture & Distributed Systems - 70% COMPLETE**
@@ -805,7 +805,7 @@ This updated implementation plan ensures that Quorus evolves into an enterprise-
 - ✅ Comprehensive testing framework in place (185+ tests, zero mocking)
 - ✅ Clean interfaces for service integration (TransferEngine, WorkflowEngine, TenantService, RaftNode)
 - ✅ Enterprise-grade configuration management
-- ✅ REST API with OpenAPI 3.0 and RBAC
+- ✅ REST API with documented endpoints and RBAC
 - ✅ Complete Raft consensus implementation
 - 🔄 Integration work needed to connect components
 

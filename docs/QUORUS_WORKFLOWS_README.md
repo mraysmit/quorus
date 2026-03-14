@@ -1,299 +1,149 @@
-# Quorus Workflow Examples
+# Quorus Workflow README
 
+**Version:** 2.0  
+**Date:** 2026-03-14
 
-**Version:** 1.0
-**Date:** 2025-04-14
-**Author:** Mark Andrew Ray-Smith Cityline Ltd
-**Updated:** 2025-12-11
+This document reflects the workflow functionality implemented in `quorus-workflow` today.
 
-This directory contains comprehensive examples demonstrating the YAML workflow capabilities of Quorus. These examples show how to create, validate, and execute complex file transfer workflows using declarative YAML definitions.
+## What the Workflow Module Does
 
-## Overview
+The workflow module provides:
 
-The Quorus workflow system provides YAML-based orchestration for complex file transfer operations. While **routes** handle simple, predefined agent-to-agent transfers with automatic triggering, **workflows** orchestrate multi-step operations that may span multiple routes, involve data transformations, or require complex dependency management.
+- YAML parsing with `YamlWorkflowDefinitionParser`
+- schema validation
+- semantic validation
+- variable resolution
+- dependency graph construction and topological sorting
+- workflow execution through `SimpleWorkflowEngine`
+- dry run and virtual run modes
 
-**When to Use Routes vs. Workflows:**
-- **Routes**: Simple agent-to-agent file replication with automatic triggers (e.g., "whenever a file appears in folder A, copy it to folder B")
-- **Workflows**: Complex multi-step operations with dependencies, transformations, and conditional logic (e.g., "download from 3 sources, merge data, split by region, distribute to 5 different destinations")
+## Current YAML Shape
 
-The Quorus workflow system provides:
-- **YAML-based workflow definitions** with variable substitution
-- **Dependency management** with topological sorting
-- **Multiple execution modes** (normal, dry run, virtual run)
-- **Error handling and retry logic**
-- **Progress tracking and monitoring**
-- **Integration with route configurations** for complex orchestration
-
-## Examples
-
-### 1. BasicWorkflowExample.java
-
-**Purpose**: Demonstrates basic workflow execution with YAML parsing and variable substitution.
-
-**Features**:
-- Simple YAML workflow parsing
-- Variable substitution with `{{variable}}` syntax
-- Virtual run execution for safe demonstration
-- Progress monitoring and result reporting
-
-**Run**:
-```bash
-mvn compile exec:java -pl quorus-integration-examples -Dexec.mainClass="dev.mars.quorus.examples.BasicWorkflowExample"
-```
-
-### 2. ComplexWorkflowExample.java
-
-**Purpose**: Shows advanced workflow features with complex dependencies and parallel execution.
-
-**Features**:
-- Multi-stage data processing pipeline
-- Complex dependency graphs with parallel execution
-- Multiple execution modes (dry run, virtual run)
-- Dependency graph analysis and visualization
-- Error handling with continue-on-error logic
-
-**Run**:
-```bash
-mvn compile exec:java -pl quorus-integration-examples -Dexec.mainClass="dev.mars.quorus.examples.ComplexWorkflowExample"
-```
-
-### 3. WorkflowValidationExample.java
-
-**Purpose**: Demonstrates comprehensive workflow validation and error handling.
-
-**Features**:
-- YAML schema validation
-- Semantic workflow validation
-- Dependency graph validation (circular dependencies, missing dependencies)
-- Variable resolution validation
-- Dry run validation for safe testing
-
-**Run**:
-```bash
-mvn compile exec:java -pl quorus-integration-examples -Dexec.mainClass="dev.mars.quorus.examples.WorkflowValidationExample"
-```
-
-## Sample YAML Workflows
-
-### Relationship Between Workflows and Routes
-
-Workflows can leverage existing route configurations for orchestration:
+Recommended structure:
 
 ```yaml
 apiVersion: v1
-kind: TransferWorkflow
 metadata:
-  name: multi-route-orchestration
-  description: Coordinate multiple routes in a workflow
-
-spec:
-  # Trigger existing routes
-  routes:
-    - name: crm-to-warehouse      # Reference existing route
-      action: trigger             # Manually trigger the route
-      waitForCompletion: true     # Wait for route to complete
-      
-    - name: warehouse-to-analytics
-      action: trigger
-      dependsOn: [crm-to-warehouse]  # Only after first route completes
-      
-  # Or define inline transfers not using routes
-  transferGroups:
-    - name: post-processing
-      dependsOn: [warehouse-to-analytics]
-      transfers:
-        - name: generate-report
-          source: "{{analyticsOutput}}/results.csv"
-          destination: "{{reportServer}}/daily-report.csv"
-```
-
-### Simple Download Workflow (`workflows/simple-download.yaml`)
-
-A basic workflow for downloading files from HTTP sources:
-
-```yaml
-apiVersion: v1
-kind: TransferWorkflow
-metadata:
-  name: simple-download-workflow
-  description: Simple workflow for downloading files from HTTP sources
+  name: "daily-sync"
+  version: "1.0.0"
+  description: "Download and stage a daily dataset"
+  type: "workflow"
+  author: "ops@example.com"
+  created: "2026-03-14"
+  tags: ["daily", "sync"]
 
 spec:
   variables:
-    baseUrl: "https://httpbin.org"
-    outputDir: "/tmp/downloads"
-    
+    sourceBase: "https://example.com"
+    outputDir: "/data/out"
+
   execution:
+    dryRun: false
+    virtualRun: false
     parallelism: 1
+    timeout: 3600s
     strategy: sequential
-    
+
   transferGroups:
-    - name: download-files
+    - name: fetch
+      description: "Download source files"
+      dependsOn: []
+      continueOnError: false
+      retryCount: 2
       transfers:
-        - name: download-json-data
-          source: "{{baseUrl}}/json"
-          destination: "{{outputDir}}/sample-data.json"
+        - name: dataset
+          source: "{{sourceBase}}/dataset.csv"
+          destination: "{{outputDir}}/dataset.csv"
           protocol: http
+          options:
+            timeout: 30s
 ```
 
-### Data Processing Pipeline (`workflows/data-pipeline.yaml`)
+## Parser-Supported Fields
 
-A complex multi-stage data processing pipeline with dependencies:
+### Metadata
 
-```yaml
-apiVersion: v1
-kind: TransferWorkflow
-metadata:
-  name: data-processing-pipeline
-  description: Multi-stage data processing pipeline with dependencies
+The parser supports these metadata fields:
 
-spec:
-  variables:
-    environment: "production"
-    sourceUrl: "https://httpbin.org"
-    inputDir: "/data/input"
-    outputDir: "/data/output"
-    
-  execution:
-    parallelism: 3
-    strategy: parallel
-    
-  transferGroups:
-    - name: download-configuration
-      description: Download processing configuration
-      transfers:
-        - name: download-config
-          source: "{{sourceUrl}}/json"
-          destination: "{{inputDir}}/config.json"
-          
-    - name: download-raw-data
-      description: Download raw data files
-      transfers:
-        - name: download-dataset-a
-          source: "{{sourceUrl}}/bytes/4096"
-          destination: "{{inputDir}}/dataset-a.bin"
-          
-    - name: process-data
-      description: Process downloaded data
-      dependsOn:
-        - download-configuration
-        - download-raw-data
-      transfers:
-        - name: process-dataset-a
-          source: "{{inputDir}}/dataset-a.bin"
-          destination: "{{outputDir}}/processed-a.bin"
-```
+- `name`
+- `version`
+- `description`
+- `type`
+- `author`
+- `created`
+- `tags`
+- `labels`
 
-## Key Concepts
+### Spec
 
-### 1. Variable Substitution
+The parser supports these spec fields:
 
-Variables can be defined at multiple levels and use `{{variableName}}` syntax:
+- `variables`
+- `execution`
+- `transferGroups`
 
-- **Global variables**: Defined in `spec.variables`
-- **Group variables**: Defined in `transferGroups[].variables`
-- **Context variables**: Provided at execution time
-- **Environment variables**: Automatically available
+### Execution
 
-**Precedence**: Context > Group > Global > Environment
+The parser supports:
 
-### 2. Dependencies
+- `dryRun`
+- `virtualRun`
+- `parallelism`
+- `timeout`
+- `strategy`
 
-Transfer groups can depend on other groups using the `dependsOn` field:
+### Transfer Groups
 
-```yaml
-transferGroups:
-  - name: group1
-    transfers: [...]
-    
-  - name: group2
-    dependsOn:
-      - group1
-    transfers: [...]
-```
+The parser supports:
 
-### 3. Execution Modes
+- `name`
+- `description`
+- `dependsOn`
+- `condition`
+- `variables`
+- `continueOnError`
+- `retryCount`
+- `transfers`
 
-- **Normal**: Execute actual transfers
-- **Dry Run**: Validate workflow without executing transfers
-- **Virtual Run**: Simulate execution with mock transfers
+### Transfers
 
-### 4. Error Handling
+The parser supports:
 
-Configure error handling behavior:
+- `name`
+- `source`
+- `destination`
+- `protocol`
+- `options`
+- `condition`
 
-```yaml
-transferGroups:
-  - name: resilient-group
-    continueOnError: true
-    retryCount: 3
-    transfers: [...]
-```
+## Execution Modes
 
-## Testing Your Workflows
+`SimpleWorkflowEngine` exposes three modes:
 
-### 1. Schema Validation
+- `NORMAL`
+- `DRY_RUN`
+- `VIRTUAL_RUN`
 
-```java
-WorkflowDefinitionParser parser = new YamlWorkflowDefinitionParser();
-ValidationResult result = parser.validateSchema(yamlContent);
-```
+## Important Current Limitations
 
-### 2. Semantic Validation
+- `condition` values are parsed and variable-resolved, but the current workflow engine does not expose a dedicated condition evaluator in execution flow.
+- Older documentation that described rich workflow notifications, cleanup policies, SLA sections, or advanced credential models does not match the current parser.
+- The current parser does not accept a broad workflow spec vocabulary beyond the fields listed above.
 
-```java
-WorkflowDefinition workflow = parser.parseFromString(yamlContent);
-ValidationResult result = parser.validate(workflow);
-```
+## Current Source of Truth
 
-### 3. Dependency Validation
+- `quorus-workflow/src/main/java/dev/mars/quorus/workflow/YamlWorkflowDefinitionParser.java`
+- `quorus-workflow/src/main/java/dev/mars/quorus/workflow/SimpleWorkflowEngine.java`
+- `quorus-workflow/src/main/java/dev/mars/quorus/workflow/VariableResolver.java`
 
-```java
-DependencyGraph graph = parser.buildDependencyGraph(List.of(workflow));
-ValidationResult result = graph.validate();
-```
+## Examples Available Now
 
-### 4. Dry Run Testing
+The `quorus-integration-examples` module currently includes workflow examples such as:
 
-```java
-ExecutionContext context = ExecutionContext.builder()
-    .mode(ExecutionContext.ExecutionMode.DRY_RUN)
-    .variables(variables)
-    .build();
-    
-WorkflowExecution result = workflowEngine.dryRun(workflow, context).get();
-```
+- `BasicWorkflowExample`
+- `ComplexWorkflowExample`
+- `WorkflowValidationExample`
+- `SchemaValidationExample`
+- `WorkflowValidationCLI`
 
-## Best Practices
-
-1. **Start with dry runs** to validate workflows before execution
-2. **Use meaningful variable names** and organize them logically
-3. **Design for failure** with appropriate retry counts and error handling
-4. **Test dependency graphs** to ensure correct execution order
-5. **Use virtual runs** for development and testing
-6. **Monitor execution progress** and handle errors gracefully
-
-## Integration with Transfer Engine
-
-The workflow system integrates seamlessly with the Quorus transfer engine:
-
-```java
-// Create transfer engine
-TransferEngine transferEngine = new SimpleTransferEngine();
-
-// Create workflow engine
-SimpleWorkflowEngine workflowEngine = new SimpleWorkflowEngine(transferEngine);
-
-// Execute workflow
-CompletableFuture<WorkflowExecution> future = workflowEngine.execute(workflow, context);
-WorkflowExecution result = future.get();
-```
-
-## Next Steps
-
-- Explore the example code to understand implementation details
-- Create your own YAML workflows using the provided templates
-- Experiment with different execution modes and error handling strategies
-- Integrate workflow execution into your applications
-
-For more information, see the main project documentation and the comprehensive system design document.
+See `docs/QUORUS_INTEGRATION_EXAMPLES_README.md` for the current example list.

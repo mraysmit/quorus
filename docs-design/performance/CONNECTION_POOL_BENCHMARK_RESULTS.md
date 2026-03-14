@@ -1,7 +1,7 @@
 # Connection Pool Optimization - Benchmark Results
 
 **Date**: 2025-12-17  
-**Test Environment**: Windows 11, Java 21, Vert.x 5.0.0.CR2  
+**Test Environment**: Windows 11, earlier repository JDK baseline, Vert.x 5.0.0.CR2  
 **Benchmark Tool**: JUnit 5 with custom ConnectionPoolBenchmarkTest  
 
 ---

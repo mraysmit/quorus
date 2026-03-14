@@ -1,35 +1,38 @@
 # Quorus Single-Node Development Configuration
-# The controller is embedded within the API service
-# For production, multiple API instances would form a Raft cluster
+# Retained for compatibility with older local workflows.
+# This file now starts the controller-first runtime directly.
+
+networks:
+  quorus-corrected:
+    driver: bridge
 
 services:
-  # Single API service with embedded Raft controller
-  api:
+  controller:
     build:
       context: ../..
-      dockerfile: quorus-api/Dockerfile
-    container_name: quorus-api
-    hostname: api
+      dockerfile: quorus-controller/Dockerfile
+      additional_contexts:
+        m2cache: ${M2_REPO}/dev/mars
+    container_name: quorus-controller-corrected
     environment:
-      - QUARKUS_HTTP_HOST=0.0.0.0
-      - QUARKUS_HTTP_PORT=8080
+      - NODE_ID=controller-corrected
+      - RAFT_HOST=0.0.0.0
+      - RAFT_PORT=8080
+      - HTTP_PORT=8080
+      - CLUSTER_NODES=controller-corrected=controller:8080
+      - ELECTION_TIMEOUT_MS=3000
+      - HEARTBEAT_INTERVAL_MS=500
       - JAVA_OPTS=-Xmx512m -Xms256m
-      # Raft configuration for single-node cluster
-      - QUORUS_RAFT_NODE_ID=api-node
-      - QUORUS_RAFT_CLUSTER_NODES=api-node=api:8080
-      - QUORUS_RAFT_ELECTION_TIMEOUT_MS=1000
-      - QUORUS_RAFT_HEARTBEAT_INTERVAL_MS=200
     ports:
       - "8080:8080"
     networks:
-      quorus-network:
-        ipv4_address: 172.20.0.10
+      - quorus-corrected
     volumes:
-      - api-data:/app/data
-      - api-logs:/app/logs
+      - controller-data:/app/data
+      - controller-logs:/app/logs
     labels:
       - "logging=promtail"
-      - "service=quorus-api"
+      - "service=quorus-controller"
     logging:
       driver: "json-file"
       options:
@@ -43,15 +46,8 @@ services:
       start_period: 30s
     restart: unless-stopped
 
-networks:
-  quorus-network:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 172.20.0.0/16
-
 volumes:
-  api-data:
+  controller-data:
     driver: local
-  api-logs:
+  controller-logs:
     driver: local

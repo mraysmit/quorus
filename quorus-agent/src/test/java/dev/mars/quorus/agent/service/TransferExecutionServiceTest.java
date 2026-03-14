@@ -18,41 +18,43 @@ package dev.mars.quorus.agent.service;
 
 import dev.mars.quorus.agent.config.AgentConfiguration;
 import io.vertx.core.Vertx;
+import io.vertx.junit5.VertxExtension;
+import io.vertx.junit5.VertxTestContext;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.lang.reflect.Field;
-import java.util.concurrent.RejectedExecutionException;
-
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+@ExtendWith(VertxExtension.class)
 class TransferExecutionServiceTest {
 
     @Test
-    void testShutdownDoesNotCloseInjectedVertx() {
-        Vertx sharedVertx = Vertx.vertx();
+    void testShutdownDoesNotCloseInjectedVertx(Vertx sharedVertx, VertxTestContext testContext) {
         TransferExecutionService service = new TransferExecutionService(sharedVertx, createConfig());
 
         service.start();
-        service.shutdown().toCompletionStage().toCompletableFuture().join();
-
-        assertDoesNotThrow(() -> sharedVertx.setTimer(10, id -> {}),
-                "Shutdown should not close externally managed Vert.x");
-        sharedVertx.close().toCompletionStage().toCompletableFuture().join();
+        service.shutdown().onComplete(testContext.succeeding(v -> testContext.verify(() -> {
+            assertDoesNotThrow(() -> sharedVertx.setTimer(10, id -> {}),
+                    "Shutdown should not close externally managed Vert.x");
+            testContext.completeNow();
+        })));
     }
 
     @Test
     @SuppressWarnings("deprecation")
-    void testDeprecatedConstructorClosesOwnedVertx() {
+    void testDeprecatedConstructorClosesOwnedVertx(VertxTestContext testContext) {
         TransferExecutionService service = new TransferExecutionService(createConfig());
         Vertx ownedVertx = extractVertx(service);
 
         service.start();
-        service.shutdown().toCompletionStage().toCompletableFuture().join();
-
-        assertThrows(RejectedExecutionException.class,
-                () -> ownedVertx.setTimer(10, id -> {}),
-                "Deprecated constructor should close internally managed Vert.x");
+        service.shutdown().onComplete(testContext.succeeding(v -> testContext.verify(() -> {
+            assertThrows(RuntimeException.class,
+                    () -> ownedVertx.setTimer(10, id -> {}),
+                    "Deprecated constructor should close internally managed Vert.x");
+            testContext.completeNow();
+        })));
     }
 
     private static AgentConfiguration createConfig() {

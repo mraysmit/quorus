@@ -800,7 +800,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - OpenTelemetry integration (metrics + tracing)
 - Multi-tenancy foundation
 - Docker Compose configurations for cluster deployment and monitoring
-- 150+ tests (JUnit 5, Testcontainers, no mocking)
+- Substantial JUnit 5 and Testcontainers coverage with no mocking in I/O integration layers
 
 ---
 

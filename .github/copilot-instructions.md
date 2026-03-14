@@ -75,8 +75,8 @@ mvn compile -pl quorus-core
 # Run tests with coverage
 mvn test jacoco:report
 
-# Start controller in dev mode (if using Quarkus legacy API)
-mvn quarkus:dev -pl quorus-api
+# Start controller via the current controller-first runtime
+# Prefer Docker compose or launch QuorusControllerVerticle from the IDE.
 ```
 
 ### Docker testing
@@ -173,11 +173,11 @@ Agents communicate with the controller via REST API at `{controller}/api/v1`:
 ```
 
 ## Key Files
-- [QuorusControllerVerticle.java](quorus-controller/src/main/java/dev/mars/quorus/controller/QuorusControllerVerticle.java) — Controller startup sequence
-- [RaftNode.java](quorus-controller/src/main/java/dev/mars/quorus/controller/raft/RaftNode.java) — Raft consensus implementation
-- [SimpleTransferEngine.java](quorus-core/src/main/java/dev/mars/quorus/transfer/SimpleTransferEngine.java) — Transfer execution
-- [YamlWorkflowDefinitionParser.java](quorus-workflow/src/main/java/dev/mars/quorus/workflow/YamlWorkflowDefinitionParser.java) — Workflow parsing
-- [docs/QUORUS_SYSTEM_DESIGN.md](docs/QUORUS_SYSTEM_DESIGN.md) — Comprehensive architecture documentation
+- [QuorusControllerVerticle.java](../quorus-controller/src/main/java/dev/mars/quorus/controller/QuorusControllerVerticle.java) — Controller startup sequence
+- [RaftNode.java](../quorus-controller/src/main/java/dev/mars/quorus/controller/raft/RaftNode.java) — Raft consensus implementation
+- [SimpleTransferEngine.java](../quorus-core/src/main/java/dev/mars/quorus/transfer/SimpleTransferEngine.java) — Transfer execution
+- [YamlWorkflowDefinitionParser.java](../quorus-workflow/src/main/java/dev/mars/quorus/workflow/YamlWorkflowDefinitionParser.java) — Workflow parsing
+- [docs-design/QUORUS_SYSTEM_DESIGN.md](../docs-design/design/QUORUS_SYSTEM_DESIGN.md) — Comprehensive architecture documentation
 
 ## OpenTelemetry Integration
 

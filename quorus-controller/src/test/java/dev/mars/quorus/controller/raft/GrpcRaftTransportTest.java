@@ -23,6 +23,7 @@ import dev.mars.quorus.controller.raft.grpc.VoteRequest;
 import dev.mars.quorus.controller.raft.grpc.VoteResponse;
 import dev.mars.quorus.controller.state.QuorusStateStore;
 import io.grpc.*;
+import io.vertx.core.AsyncResult;
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
 import org.junit.jupiter.api.*;
@@ -36,6 +37,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -58,6 +60,10 @@ import static org.junit.jupiter.api.Assertions.*;
 @Execution(ExecutionMode.SAME_THREAD)
 class GrpcRaftTransportTest {
 
+    private static final Duration SHORT_TIMEOUT = Duration.ofSeconds(5);
+    private static final Duration MEDIUM_TIMEOUT = Duration.ofSeconds(10);
+    private static final Duration LONG_TIMEOUT = Duration.ofSeconds(30);
+
     private Vertx vertx;
     private GrpcRaftServer targetServer;
     private RaftNode targetNode;
@@ -79,19 +85,19 @@ class GrpcRaftTransportTest {
             .until(() -> targetNode.isRunning());
         
         targetServer = new GrpcRaftServer(vertx, targetPort, targetNode);
-        targetServer.start().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
+        awaitSuccess(targetServer.start(), SHORT_TIMEOUT);
     }
 
     @AfterEach
     void tearDown() throws Exception {
         if (targetServer != null) {
-            targetServer.stop().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
+            awaitSuccess(targetServer.stop(), SHORT_TIMEOUT);
         }
         if (targetNode != null) {
             targetNode.stop();
         }
         if (vertx != null) {
-            vertx.close().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
+            awaitSuccess(vertx.close(), SHORT_TIMEOUT);
         }
     }
 
@@ -120,8 +126,7 @@ class GrpcRaftTransportTest {
                 .build();
         
         Future<VoteResponse> future = transport.sendVoteRequest("target", request);
-        VoteResponse response = future.toCompletionStage().toCompletableFuture()
-                .get(10, TimeUnit.SECONDS);
+        VoteResponse response = awaitSuccess(future, MEDIUM_TIMEOUT);
         
         assertNotNull(response);
         transport.stop();
@@ -145,8 +150,7 @@ class GrpcRaftTransportTest {
                 .build();
         
         Future<AppendEntriesResponse> future = transport.sendAppendEntries("target", request);
-        AppendEntriesResponse response = future.toCompletionStage().toCompletableFuture()
-                .get(10, TimeUnit.SECONDS);
+        AppendEntriesResponse response = awaitSuccess(future, MEDIUM_TIMEOUT);
         
         assertNotNull(response);
         transport.stop();
@@ -173,9 +177,8 @@ class GrpcRaftTransportTest {
                 .build();
         
         Future<VoteResponse> future = transport.sendVoteRequest("dead", request);
-        
-        assertThrows(ExecutionException.class, () -> 
-                future.toCompletionStage().toCompletableFuture().get(30, TimeUnit.SECONDS));
+
+        assertNotNull(awaitFailure(future, LONG_TIMEOUT));
         
         transport.stop();
     }
@@ -197,19 +200,18 @@ class GrpcRaftTransportTest {
                 .setLastLogTerm(0)
                 .build();
         
-        VoteResponse response1 = transport.sendVoteRequest("target", request)
-                .toCompletionStage().toCompletableFuture().get(10, TimeUnit.SECONDS);
+        VoteResponse response1 = awaitSuccess(transport.sendVoteRequest("target", request), MEDIUM_TIMEOUT);
         assertNotNull(response1);
+
         
         // Shut down the server
-        targetServer.stop().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
+        awaitSuccess(targetServer.stop(), SHORT_TIMEOUT);
         targetServer = null;
         
         // Next request should fail
         Future<VoteResponse> failFuture = transport.sendVoteRequest("target", request);
-        
-        assertThrows(ExecutionException.class, () -> 
-                failFuture.toCompletionStage().toCompletableFuture().get(30, TimeUnit.SECONDS));
+
+        assertNotNull(awaitFailure(failFuture, LONG_TIMEOUT));
         
         transport.stop();
     }
@@ -264,9 +266,7 @@ class GrpcRaftTransportTest {
                             .setLastLogTerm(0)
                             .build();
                     
-                    VoteResponse response = transport.sendVoteRequest("target", request)
-                            .toCompletionStage().toCompletableFuture()
-                            .get(10, TimeUnit.SECONDS);
+                    VoteResponse response = awaitSuccess(transport.sendVoteRequest("target", request), MEDIUM_TIMEOUT);
                     
                     if (response != null) {
                         successCount.incrementAndGet();
@@ -314,9 +314,7 @@ class GrpcRaftTransportTest {
                                 .setLastLogIndex(0)
                                 .setLastLogTerm(0)
                                 .build();
-                        transport.sendVoteRequest("target", request)
-                                .toCompletionStage().toCompletableFuture()
-                                .get(10, TimeUnit.SECONDS);
+                        awaitSuccess(transport.sendVoteRequest("target", request), MEDIUM_TIMEOUT);
                     } else {
                         AppendEntriesRequest request = AppendEntriesRequest.newBuilder()
                                 .setTerm(1)
@@ -325,9 +323,7 @@ class GrpcRaftTransportTest {
                                 .setPrevLogTerm(0)
                                 .setLeaderCommit(0)
                                 .build();
-                        transport.sendAppendEntries("target", request)
-                                .toCompletionStage().toCompletableFuture()
-                                .get(10, TimeUnit.SECONDS);
+                        awaitSuccess(transport.sendAppendEntries("target", request), MEDIUM_TIMEOUT);
                     }
                     successCount.incrementAndGet();
                 } catch (Exception e) {
@@ -364,7 +360,7 @@ class GrpcRaftTransportTest {
             .until(() -> node2.isRunning());
         
         GrpcRaftServer server2 = new GrpcRaftServer(vertx, targetPort2, node2);
-        server2.start().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
+        awaitSuccess(server2.start(), SHORT_TIMEOUT);
         
         try {
             Map<String, String> cluster = new HashMap<>();
@@ -382,17 +378,15 @@ class GrpcRaftTransportTest {
                     .build();
             
             // Send to both targets
-            VoteResponse response1 = transport.sendVoteRequest("target1", request)
-                    .toCompletionStage().toCompletableFuture().get(10, TimeUnit.SECONDS);
-            VoteResponse response2 = transport.sendVoteRequest("target2", request)
-                    .toCompletionStage().toCompletableFuture().get(10, TimeUnit.SECONDS);
+                VoteResponse response1 = awaitSuccess(transport.sendVoteRequest("target1", request), MEDIUM_TIMEOUT);
+                VoteResponse response2 = awaitSuccess(transport.sendVoteRequest("target2", request), MEDIUM_TIMEOUT);
             
             assertNotNull(response1);
             assertNotNull(response2);
             
             transport.stop();
         } finally {
-            server2.stop().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
+            awaitSuccess(server2.stop(), SHORT_TIMEOUT);
             node2.stop();
         }
     }
@@ -430,10 +424,9 @@ class GrpcRaftTransportTest {
         // Server may reject due to deserialization issues for non-Java-serialized data
         // The important thing is that the transport doesn't crash
         try {
-            AppendEntriesResponse response = transport.sendAppendEntries("target", request)
-                    .toCompletionStage().toCompletableFuture().get(10, TimeUnit.SECONDS);
+                AppendEntriesResponse response = awaitSuccess(transport.sendAppendEntries("target", request), MEDIUM_TIMEOUT);
             assertNotNull(response);
-        } catch (ExecutionException e) {
+        } catch (AssertionError e) {
             // Expected - server may fail to deserialize the large non-serialized entry
             // This is correct behavior - we're testing the transport handles this gracefully
         }
@@ -470,10 +463,9 @@ class GrpcRaftTransportTest {
         // Server may reject due to deserialization issues for non-Java-serialized data
         // The important thing is that the transport doesn't crash
         try {
-            AppendEntriesResponse response = transport.sendAppendEntries("target", requestBuilder.build())
-                    .toCompletionStage().toCompletableFuture().get(10, TimeUnit.SECONDS);
+                AppendEntriesResponse response = awaitSuccess(transport.sendAppendEntries("target", requestBuilder.build()), MEDIUM_TIMEOUT);
             assertNotNull(response);
-        } catch (ExecutionException e) {
+        } catch (AssertionError e) {
             // Expected - server may fail to deserialize the non-serialized entries
             // This is correct behavior - we're testing the transport handles this gracefully
         }
@@ -515,8 +507,7 @@ class GrpcRaftTransportTest {
         GrpcRaftTransport transport1 = new GrpcRaftTransport(vertx, "client", cluster);
         transport1.start(msg -> {});
         
-        VoteResponse response1 = transport1.sendVoteRequest("target", request)
-                .toCompletionStage().toCompletableFuture().get(10, TimeUnit.SECONDS);
+        VoteResponse response1 = awaitSuccess(transport1.sendVoteRequest("target", request), MEDIUM_TIMEOUT);
         assertNotNull(response1);
         
         // Stop first transport (properly shuts down executor - T3.2 fix)
@@ -527,8 +518,7 @@ class GrpcRaftTransportTest {
         transport2.start(msg -> {});
         
         // Second use with new instance
-        VoteResponse response2 = transport2.sendVoteRequest("target", request)
-                .toCompletionStage().toCompletableFuture().get(10, TimeUnit.SECONDS);
+        VoteResponse response2 = awaitSuccess(transport2.sendVoteRequest("target", request), MEDIUM_TIMEOUT);
         assertNotNull(response2);
         
         transport2.stop();
@@ -552,8 +542,7 @@ class GrpcRaftTransportTest {
                 .setLastLogTerm(0)
                 .build();
         
-        VoteResponse response = transport.sendVoteRequest("target", request)
-                .toCompletionStage().toCompletableFuture().get(10, TimeUnit.SECONDS);
+        VoteResponse response = awaitSuccess(transport.sendVoteRequest("target", request), MEDIUM_TIMEOUT);
         
         assertNotNull(response);
         
@@ -576,8 +565,7 @@ class GrpcRaftTransportTest {
                 .setLastLogTerm(Long.MAX_VALUE)
                 .build();
         
-        VoteResponse response = transport.sendVoteRequest("target", request)
-                .toCompletionStage().toCompletableFuture().get(10, TimeUnit.SECONDS);
+        VoteResponse response = awaitSuccess(transport.sendVoteRequest("target", request), MEDIUM_TIMEOUT);
         
         assertNotNull(response);
         
@@ -600,8 +588,7 @@ class GrpcRaftTransportTest {
                 .setLastLogTerm(0)
                 .build();
         
-        VoteResponse response = transport.sendVoteRequest("target", request)
-                .toCompletionStage().toCompletableFuture().get(10, TimeUnit.SECONDS);
+        VoteResponse response = awaitSuccess(transport.sendVoteRequest("target", request), MEDIUM_TIMEOUT);
         
         assertNotNull(response);
         
@@ -657,12 +644,71 @@ class GrpcRaftTransportTest {
         }
         
         // All should complete within timeout
-        CompletableFuture.allOf(futures).get(30, TimeUnit.SECONDS);
+        awaitSuccess(CompletableFuture.allOf(futures), LONG_TIMEOUT);
         
         for (CompletableFuture<?> f : futures) {
-            assertNotNull(f.get(), "All responses should be non-null");
+            assertNotNull(awaitSuccess(f, MEDIUM_TIMEOUT), "All responses should be non-null");
         }
         
         transport.stop();
+    }
+
+    private static <T> T awaitSuccess(Future<T> future, Duration timeout) {
+        AtomicReference<AsyncResult<T>> outcomeRef = new AtomicReference<>();
+
+        future.onComplete(outcomeRef::set);
+
+        await().atMost(timeout)
+                .pollInterval(Duration.ofMillis(10))
+                .until(() -> outcomeRef.get() != null);
+
+        AsyncResult<T> outcome = outcomeRef.get();
+        if (outcome.failed()) {
+            throw new AssertionError("Future failed", outcome.cause());
+        }
+        return outcome.result();
+    }
+
+    private static Throwable awaitFailure(Future<?> future, Duration timeout) {
+        AtomicReference<AsyncResult<?>> outcomeRef = new AtomicReference<>();
+
+        future.onComplete(outcomeRef::set);
+
+        await().atMost(timeout)
+                .pollInterval(Duration.ofMillis(10))
+                .until(() -> outcomeRef.get() != null);
+
+        AsyncResult<?> outcome = outcomeRef.get();
+        assertTrue(outcome.failed(), "Expected future to fail");
+        return outcome.cause();
+    }
+
+    private static <T> T awaitSuccess(CompletableFuture<T> future, Duration timeout) {
+        AtomicReference<T> resultRef = new AtomicReference<>();
+        AtomicReference<Throwable> errorRef = new AtomicReference<>();
+        AtomicBoolean completed = new AtomicBoolean(false);
+
+        future.whenComplete((result, error) -> {
+            resultRef.set(result);
+            errorRef.set(error);
+            completed.set(true);
+        });
+
+        await().atMost(timeout)
+                .pollInterval(Duration.ofMillis(10))
+                .until(completed::get);
+
+        Throwable error = unwrapCompletionError(errorRef.get());
+        if (error != null) {
+            throw new AssertionError("Future failed", error);
+        }
+        return resultRef.get();
+    }
+
+    private static Throwable unwrapCompletionError(Throwable error) {
+        if (error instanceof CompletionException || error instanceof ExecutionException) {
+            return error.getCause() == null ? error : error.getCause();
+        }
+        return error;
     }
 }

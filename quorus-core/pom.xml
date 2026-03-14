@@ -21,21 +21,18 @@
         <dependency>
             <groupId>io.vertx</groupId>
             <artifactId>vertx-core</artifactId>
-            <version>5.0.8</version>
         </dependency>
 
         <!-- Vert.x Web Client for HTTP protocol (Phase 2 - Dec 2025) -->
         <dependency>
             <groupId>io.vertx</groupId>
             <artifactId>vertx-web-client</artifactId>
-            <version>5.0.8</version>
         </dependency>
 
         <!-- Vert.x PostgreSQL Client (Phase 4 - Jan 2026) -->
         <dependency>
             <groupId>io.vertx</groupId>
             <artifactId>vertx-pg-client</artifactId>
-            <version>5.0.8</version>
         </dependency>
 
         <!-- OpenTelemetry API (Phase 8 - Jan 2026) -->
@@ -84,7 +81,6 @@
         <dependency>
             <groupId>io.vertx</groupId>
             <artifactId>vertx-junit5</artifactId>
-            <version>5.0.8</version>
             <scope>test</scope>
         </dependency>
         <dependency>

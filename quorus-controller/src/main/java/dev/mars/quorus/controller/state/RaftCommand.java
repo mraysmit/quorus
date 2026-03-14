@@ -22,8 +22,8 @@ import java.io.Serializable;
  * Sealed interface for all Raft state machine commands.
  *
  * <p>Using a sealed type provides compile-time exhaustiveness checking in
- * {@code switch} expressions (Java 21), eliminating the need for
- * {@code instanceof} chains and runtime fallback logic. The compiler
+ * {@code switch} expressions under the Java 25 baseline, eliminating the need
+ * for {@code instanceof} chains and runtime fallback logic. The compiler
  * will flag any new permitted subtype that is missing from a switch.
  *
  * <p>All permitted subtypes represent a distinct category of state

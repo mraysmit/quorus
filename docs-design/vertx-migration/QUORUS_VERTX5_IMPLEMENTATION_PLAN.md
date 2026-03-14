@@ -342,7 +342,7 @@ public class VertxProducer {
 - `TransferEngineHealthCheck.java` - Uses MicroProfile Health annotations
 - `AgentFleetStartupService.java` - Uses Quarkus lifecycle events
 - `TransferEngineProducer.java` - Uses MicroProfile Config
-- All DTO classes - Use MicroProfile OpenAPI `@Schema` annotations (can be removed)
+- All DTO classes - Legacy MicroProfile `@Schema` annotations slated for removal during migration cleanup
 
 **Estimated Effort**: 4-6 hours (14 endpoints + lifecycle + config + tests)
 

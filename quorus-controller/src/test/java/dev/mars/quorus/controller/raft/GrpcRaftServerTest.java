@@ -25,6 +25,7 @@ import dev.mars.quorus.controller.state.QuorusStateStore;
 import io.grpc.*;
 import io.grpc.stub.StreamObserver;
 import io.vertx.core.Vertx;
+import io.vertx.core.AsyncResult;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -59,6 +60,10 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 @Execution(ExecutionMode.SAME_THREAD)
 class GrpcRaftServerTest {
+
+    private static final Duration SHORT_TIMEOUT = Duration.ofSeconds(5);
+    private static final Duration MEDIUM_TIMEOUT = Duration.ofSeconds(10);
+    private static final Duration LONG_TIMEOUT = Duration.ofSeconds(60);
 
     private Vertx vertx;
     private RaftNode raftNode;
@@ -100,13 +105,13 @@ class GrpcRaftServerTest {
             channel.awaitTermination(5, TimeUnit.SECONDS);
         }
         if (grpcServer != null) {
-            grpcServer.stop().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
+            awaitSuccess(grpcServer.stop(), SHORT_TIMEOUT);
         }
         if (raftNode != null) {
             raftNode.stop();
         }
         if (vertx != null) {
-            vertx.close().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
+            awaitSuccess(vertx.close(), SHORT_TIMEOUT);
         }
     }
 
@@ -118,7 +123,7 @@ class GrpcRaftServerTest {
 
     private void startServerAndConnect() throws Exception {
         grpcServer = new GrpcRaftServer(vertx, serverPort, raftNode);
-        grpcServer.start().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
+        awaitSuccess(grpcServer.start(), SHORT_TIMEOUT);
         
         channel = ManagedChannelBuilder.forAddress("localhost", serverPort)
                 .usePlaintext()
@@ -133,11 +138,8 @@ class GrpcRaftServerTest {
     @DisplayName("Server should start successfully on available port")
     void testServerStartSuccess() throws Exception {
         grpcServer = new GrpcRaftServer(vertx, serverPort, raftNode);
-        
-        CompletableFuture<Void> startFuture = grpcServer.start()
-                .toCompletionStage().toCompletableFuture();
-        
-        assertDoesNotThrow(() -> startFuture.get(5, TimeUnit.SECONDS));
+
+        assertDoesNotThrow(() -> awaitSuccess(grpcServer.start(), SHORT_TIMEOUT));
     }
 
     @Test
@@ -145,15 +147,14 @@ class GrpcRaftServerTest {
     void testServerStartFailsOnOccupiedPort() throws Exception {
         // Start first server
         grpcServer = new GrpcRaftServer(vertx, serverPort, raftNode);
-        grpcServer.start().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
+        awaitSuccess(grpcServer.start(), SHORT_TIMEOUT);
         
         // Try to start second server on same port
         GrpcRaftServer secondServer = new GrpcRaftServer(vertx, serverPort, raftNode);
-        
-        CompletableFuture<Void> startFuture = secondServer.start()
-                .toCompletionStage().toCompletableFuture();
-        
-        assertThrows(ExecutionException.class, () -> startFuture.get(5, TimeUnit.SECONDS));
+
+        Throwable failure = awaitFailure(secondServer.start(), SHORT_TIMEOUT);
+
+        assertNotNull(failure);
     }
 
     @Test
@@ -172,10 +173,7 @@ class GrpcRaftServerTest {
         assertDoesNotThrow(() -> blockingStub.requestVote(request));
         
         // Stop server
-        CompletableFuture<Void> stopFuture = grpcServer.stop()
-                .toCompletionStage().toCompletableFuture();
-        
-        assertDoesNotThrow(() -> stopFuture.get(10, TimeUnit.SECONDS));
+        assertDoesNotThrow(() -> awaitSuccess(grpcServer.stop(), MEDIUM_TIMEOUT));
         
         // Verify server is stopped (requests should fail)
         assertThrows(StatusRuntimeException.class, () -> blockingStub.requestVote(request));
@@ -186,11 +184,8 @@ class GrpcRaftServerTest {
     void testStopOnNullServer() throws Exception {
         grpcServer = new GrpcRaftServer(vertx, serverPort, raftNode);
         // Don't start, just stop
-        
-        CompletableFuture<Void> stopFuture = grpcServer.stop()
-                .toCompletionStage().toCompletableFuture();
-        
-        assertDoesNotThrow(() -> stopFuture.get(5, TimeUnit.SECONDS));
+
+        assertDoesNotThrow(() -> awaitSuccess(grpcServer.stop(), SHORT_TIMEOUT));
     }
 
     @Test
@@ -199,8 +194,8 @@ class GrpcRaftServerTest {
         for (int i = 0; i < 3; i++) {
             int port = findAvailablePort();
             GrpcRaftServer server = new GrpcRaftServer(vertx, port, raftNode);
-            
-            server.start().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
+
+            awaitSuccess(server.start(), SHORT_TIMEOUT);
             
             // Quick health check
             ManagedChannel ch = ManagedChannelBuilder.forAddress("localhost", port)
@@ -220,7 +215,7 @@ class GrpcRaftServerTest {
             ch.shutdownNow();
             ch.awaitTermination(2, TimeUnit.SECONDS);
             
-            server.stop().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
+            awaitSuccess(server.stop(), SHORT_TIMEOUT);
         }
     }
 
@@ -622,7 +617,7 @@ class GrpcRaftServerTest {
         assertDoesNotThrow(() -> blockingStub.requestVote(request));
         
         // Stop server
-        grpcServer.stop().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
+        awaitSuccess(grpcServer.stop(), SHORT_TIMEOUT);
         grpcServer = null;
         
         // Client should get an error
@@ -758,12 +753,11 @@ class GrpcRaftServerTest {
         }
         
         // Wait for all to complete
-        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
-                .get(60, TimeUnit.SECONDS);
+        awaitSuccess(CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])), LONG_TIMEOUT);
         
         // Verify all succeeded
         for (CompletableFuture<VoteResponse> future : futures) {
-            assertNotNull(future.get());
+            assertNotNull(awaitSuccess(future, SHORT_TIMEOUT));
         }
     }
 
@@ -909,9 +903,9 @@ class GrpcRaftServerTest {
         for (int i = 0; i < 5; i++) {
             int port = findAvailablePort();
             GrpcRaftServer server = new GrpcRaftServer(vertx, port, raftNode);
-            
-            server.start().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
-            server.stop().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
+
+            awaitSuccess(server.start(), SHORT_TIMEOUT);
+            awaitSuccess(server.stop(), SHORT_TIMEOUT);
         }
     }
 
@@ -944,9 +938,9 @@ class GrpcRaftServerTest {
         
         GrpcRaftServer server1 = new GrpcRaftServer(vertx, port1, node1);
         GrpcRaftServer server2 = new GrpcRaftServer(vertx, port2, node2);
-        
-        server1.start().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
-        server2.start().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
+
+        awaitSuccess(server1.start(), SHORT_TIMEOUT);
+        awaitSuccess(server2.start(), SHORT_TIMEOUT);
         
         try {
             ManagedChannel ch1 = ManagedChannelBuilder.forAddress("localhost", port1)
@@ -974,10 +968,69 @@ class GrpcRaftServerTest {
             ch1.shutdownNow();
             ch2.shutdownNow();
         } finally {
-            server1.stop().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
-            server2.stop().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
+            awaitSuccess(server1.stop(), SHORT_TIMEOUT);
+            awaitSuccess(server2.stop(), SHORT_TIMEOUT);
             node1.stop();
             node2.stop();
         }
+    }
+
+    private static <T> T awaitSuccess(io.vertx.core.Future<T> future, Duration timeout) {
+        AtomicReference<AsyncResult<T>> outcomeRef = new AtomicReference<>();
+
+        future.onComplete(outcomeRef::set);
+
+        await().atMost(timeout)
+                .pollInterval(Duration.ofMillis(10))
+                .until(() -> outcomeRef.get() != null);
+
+        AsyncResult<T> outcome = outcomeRef.get();
+        if (outcome.failed()) {
+            throw new AssertionError("Future failed", outcome.cause());
+        }
+        return outcome.result();
+    }
+
+    private static Throwable awaitFailure(io.vertx.core.Future<?> future, Duration timeout) {
+        AtomicReference<AsyncResult<?>> outcomeRef = new AtomicReference<>();
+
+        future.onComplete(outcomeRef::set);
+
+        await().atMost(timeout)
+                .pollInterval(Duration.ofMillis(10))
+                .until(() -> outcomeRef.get() != null);
+
+        AsyncResult<?> outcome = outcomeRef.get();
+        assertTrue(outcome.failed(), "Expected future to fail");
+        return outcome.cause();
+    }
+
+    private static <T> T awaitSuccess(CompletableFuture<T> future, Duration timeout) {
+        AtomicReference<T> resultRef = new AtomicReference<>();
+        AtomicReference<Throwable> errorRef = new AtomicReference<>();
+        AtomicBoolean completed = new AtomicBoolean(false);
+
+        future.whenComplete((result, error) -> {
+            resultRef.set(result);
+            errorRef.set(error);
+            completed.set(true);
+        });
+
+        await().atMost(timeout)
+                .pollInterval(Duration.ofMillis(10))
+                .until(completed::get);
+
+        Throwable error = unwrapCompletionError(errorRef.get());
+        if (error != null) {
+            throw new AssertionError("Future failed", error);
+        }
+        return resultRef.get();
+    }
+
+    private static Throwable unwrapCompletionError(Throwable error) {
+        if (error instanceof CompletionException || error instanceof ExecutionException) {
+            return error.getCause() == null ? error : error.getCause();
+        }
+        return error;
     }
 }
