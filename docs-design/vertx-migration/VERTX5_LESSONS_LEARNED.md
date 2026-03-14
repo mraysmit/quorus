@@ -75,7 +75,7 @@ This document captures lessons learned, best practices, and recommendations from
 **Lesson**: Comprehensive test coverage enables confident refactoring and catches regressions immediately.
 
 **What We Did**:
-- Maintained 190 tests throughout migration
+- Maintained a fully passing module test suite throughout migration
 - Ran tests after every change
 - Achieved 100% test pass rate
 
@@ -95,7 +95,7 @@ This document captures lessons learned, best practices, and recommendations from
 **Key Concepts**:
 - **Event Loop Thread**: Single-threaded, non-blocking operations
 - **Worker Thread**: Blocking operations (use sparingly)
-- **Virtual Thread**: Lightweight threads for blocking I/O (Java 21+)
+- **Virtual Thread**: Lightweight threads for blocking I/O (available in modern Java; Quorus now targets Java 25)
 
 **What We Did**:
 - Removed `synchronized` blocks (not needed on event loop thread)

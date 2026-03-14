@@ -11,8 +11,8 @@
 
 | Technology | Version | Purpose |
 |------------|---------|---------|
-| **Java** | 21 (LTS) | Runtime platform with virtual threads support |
-| **Vert.x** | 5.0.2 | Reactive toolkit for HTTP server, event bus, and async operations |
+| **Java** | 25 | Runtime platform and repository build baseline |
+| **Vert.x** | 5.0.8 | Reactive toolkit for HTTP server, event bus, and async operations |
 | **gRPC** | 1.68.1 | High-performance RPC for Raft consensus transport |
 | **Protocol Buffers** | 3.25.5 | Binary serialization for Raft messages |
 | **Jackson** | 2.18.2 | JSON serialization for REST API |
@@ -28,7 +28,7 @@ Quorus is an enterprise-grade **route-based distributed file transfer system** d
 
 - **Mission & Scope**: Provide secure, controller-first orchestration for high-throughput, internal corporate transfers spanning data-center sync, departmental distribution, ETL staging, and compliance-driven backups. Transfers are orchestrated through predefined routes that define source and destination agents, with multiple trigger mechanisms (event-based, time-based, interval-based, batch-based). Reliability is anchored by Raft consensus, while extensibility comes from REST APIs plus declarative YAML workflows and route configurations.
 - **Platform Pillars**: (1) Workflow engine with dependency graphs, dry/virtual runs, and templating. (2) Multi-tenant governance with hierarchical quotas and policy inheritance. (3) Real-time observability through Prometheus/Grafana/Splunk hooks, predictive ETAs, and Loki-based log aggregation. (4) Zero-trust security posture using TLS 1.3, AES-256, OAuth2/JWT, MFA, PKI, and audit-ready telemetry that maps to SOX, GDPR, HIPAA, PCI, and ISO 27001 controls.
-- **Controller-First Architecture**: Every controller node embeds the HTTP API, Raft engine, scheduler, and state machine—removing the API-first bottleneck, offering sub-second failover, and enabling horizontal scale by simply adding nodes to the quorum.
+- **Controller-First Architecture**: Every controller node embeds the HTTP API, Raft engine, scheduler, and state machine—removing the API-first bottleneck and enabling horizontal scale by simply adding nodes to the quorum. Leader failover timing is configuration-dependent and should not be treated as a fixed sub-second guarantee.
 - **Module Snapshot**:
 
   | Module | Purpose | Key Classes |
@@ -963,7 +963,7 @@ graph TB
 
 ### Raft Transport Layer (v2.3)
 
-> **Updated in v2.3**: The Raft transport layer uses type-safe sealed interfaces with pattern matching (Java 21+).
+> **Updated in v2.3**: The Raft transport layer uses type-safe sealed interfaces with pattern matching under the current Java 25 baseline.
 
 The `RaftTransport` interface defines the communication layer for Raft consensus messages between controller nodes:
 
@@ -991,7 +991,7 @@ public sealed interface RaftMessage {
 **Benefits of Sealed Interfaces:**
 - **Exhaustive pattern matching**: Compiler ensures all message types are handled
 - **Type safety**: No runtime `instanceof` checks needed
-- **Modern Java idiom**: Leverages Java 21 record patterns
+- **Modern Java idiom**: Leverages sealed types and pattern matching under the Java 25 baseline
 
 **Usage in RaftNode:**
 ```java
@@ -1078,10 +1078,10 @@ Each Quorus Controller's `RaftNode` operates in one of three states:
 #### Election Timing and Randomization
 
 **Election Timeout Configuration (set via `ELECTION_TIMEOUT_MS` and `HEARTBEAT_INTERVAL_MS`):**
-- Base election timeout: 150-300ms (configurable; default 3000ms in `docker-compose-controller-first.yml`)
-- Randomized timeout: `baseTimeout + random(0, baseTimeout)`
-- Heartbeat interval: 50ms (typically 1/3 of election timeout; default 500ms in production)
-- Purpose: Prevents simultaneous elections and reduces split votes
+- Election timeout is deployment-specific
+- Repository examples commonly use `3000ms` election timeout and `500ms` heartbeat interval in compose-based cluster startup
+- Controller container defaults use `5000ms` election timeout and `1000ms` heartbeat interval
+- Purpose: Prevent simultaneous elections and reduce split votes
 
 **Timeout Behavior:**
 - FOLLOWER Quorus Controllers reset their election timer on each valid `AppendEntries` heartbeat
@@ -1182,10 +1182,10 @@ sequenceDiagram
 #### Failure Scenarios and Recovery
 
 **Leader Failure Detection:**
-1. **Heartbeat Monitoring**: Followers expect heartbeats every 50ms
-2. **Failure Detection**: Missing 3+ consecutive heartbeats triggers election
-3. **Automatic Recovery**: New leader elected within 150-300ms
-4. **Service Continuity**: Minimal disruption to ongoing operations
+1. **Heartbeat Monitoring**: Followers expect heartbeats according to the configured heartbeat interval
+2. **Failure Detection**: Missing heartbeats beyond the configured election window triggers election
+3. **Automatic Recovery**: New leader election timing depends on deployment configuration and network conditions
+4. **Service Continuity**: Brief write disruption during leader change is expected
 
 **Network Partition Handling:**
 - **Majority Partition**: Continues normal operations with new leader if needed
@@ -1202,10 +1202,10 @@ sequenceDiagram
 #### Performance Characteristics
 
 **Election Performance Metrics:**
-- **Election Duration**: Typically 150-300ms under normal conditions
-- **Availability Impact**: < 1 second service interruption during leader change
-- **Throughput**: No impact on read operations, brief pause for writes
-- **Scalability**: Election time increases logarithmically with cluster size
+- **Election Duration**: Configuration-dependent; use deployment-specific timeout settings as the planning baseline
+- **Availability Impact**: Dependent on election timeout, heartbeat interval, and network conditions
+- **Throughput**: No impact on read operations, brief pause for writes during leader transition
+- **Scalability**: Election behavior depends on quorum size, timing configuration, and network stability
 
 **Optimization Strategies:**
 - **Pre-Vote Phase**: Optional pre-election to reduce disruptions

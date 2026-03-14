@@ -38,8 +38,11 @@ import io.opentelemetry.exporter.otlp.trace.OtlpGrpcSpanExporter;
 import io.opentelemetry.exporter.prometheus.PrometheusHttpServer;
 import io.vertx.core.Vertx;
 import io.vertx.core.VertxOptions;
+import io.vertx.junit5.VertxExtension;
+import io.vertx.junit5.VertxTestContext;
 import io.vertx.tracing.opentelemetry.OpenTelemetryOptions;
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.junit.jupiter.Container;
@@ -81,6 +84,8 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 @Testcontainers
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@ExtendWith(VertxExtension.class)
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @DisplayName("Infrastructure Tests with OpenTelemetry")
 class InfrastructureWithTelemetryTest {
 
@@ -100,19 +105,19 @@ class InfrastructureWithTelemetryTest {
                     org.testcontainers.containers.BindMode.READ_ONLY)
             .waitingFor(Wait.forHttp("/").forPort(13133).forStatusCode(200));
 
-    private static Vertx vertx;
-    private static RaftNode raftNode;
-    private static QuorusStateStore stateMachine;
-    private static HttpApiServer httpServer;
-    private static HttpClient httpClient;
-    private static ObjectMapper objectMapper;
-    private static OpenTelemetrySdk openTelemetry;
-    private static PrometheusHttpServer prometheusServer;
+    private Vertx vertx;
+    private RaftNode raftNode;
+    private QuorusStateStore stateMachine;
+    private HttpApiServer httpServer;
+    private HttpClient httpClient;
+    private ObjectMapper objectMapper;
+    private OpenTelemetrySdk openTelemetry;
+    private PrometheusHttpServer prometheusServer;
 
-    private static long startupTime;
+    private long startupTime;
 
     @BeforeAll
-    static void setUp() throws Exception {
+    void setUp(VertxTestContext testContext) throws Exception {
         long start = System.currentTimeMillis();
         logger.info("");
         logger.info("+==================================================================+");
@@ -194,24 +199,26 @@ class InfrastructureWithTelemetryTest {
 
         // Start HTTP server with the correct Prometheus port for metrics proxy
         httpServer = new HttpApiServer(vertx, HTTP_PORT, raftNode, stateMachine, PROMETHEUS_PORT);
-        httpServer.start().toCompletionStage().toCompletableFuture().get(5, java.util.concurrent.TimeUnit.SECONDS);
-        logger.info("  [OK] HTTP Server deployed and listening");
+        httpServer.start().onComplete(testContext.succeeding(v -> {
+            logger.info("  [OK] HTTP Server deployed and listening");
 
-        startupTime = System.currentTimeMillis() - start;
-        logger.info("");
-        logger.info("====================================================================");
-        logger.info("  SETUP COMPLETE in " + startupTime + "ms");
-        logger.info("  HTTP API: http://localhost:" + HTTP_PORT);
-        logger.info("  Prometheus metrics: http://localhost:" + PROMETHEUS_PORT + "/metrics");
-        logger.info("  OTel Collector OTLP: localhost:" + otelCollector.getMappedPort(4317));
-        logger.info("====================================================================");
-        logger.info("");
+            startupTime = System.currentTimeMillis() - start;
+            logger.info("");
+            logger.info("====================================================================");
+            logger.info("  SETUP COMPLETE in " + startupTime + "ms");
+            logger.info("  HTTP API: http://localhost:" + HTTP_PORT);
+            logger.info("  Prometheus metrics: http://localhost:" + PROMETHEUS_PORT + "/metrics");
+            logger.info("  OTel Collector OTLP: localhost:" + otelCollector.getMappedPort(4317));
+            logger.info("====================================================================");
+            logger.info("");
+            testContext.completeNow();
+        }));
     }
 
     /**
      * Initialize OpenTelemetry SDK with Prometheus metrics and OTLP trace export.
      */
-    private static void initializeOpenTelemetry(String otlpEndpoint) {
+    private void initializeOpenTelemetry(String otlpEndpoint) {
         logger.info("  -> Resetting GlobalOpenTelemetry for test isolation");
         // Reset any previous global OpenTelemetry (important for test isolation)
         GlobalOpenTelemetry.resetForTest();
@@ -259,7 +266,7 @@ class InfrastructureWithTelemetryTest {
     }
 
     @AfterAll
-    static void tearDown() throws Exception {
+    void tearDown(VertxTestContext testContext) {
         logger.info("");
         logger.info("+==================================================================+");
         logger.info("|   TEARDOWN - CLEANING UP INFRASTRUCTURE                         |");
@@ -271,28 +278,36 @@ class InfrastructureWithTelemetryTest {
         if (httpServer != null) {
             logger.info("[TEARDOWN " + step++ + "] Stopping HTTP API Server...");
             httpServer.stop();
-            logger.info("  [OK] HTTP Server stopped");
+            logger.info("  [OK] HTTP Server stop requested");
         } else {
             logger.info("[TEARDOWN " + step++ + "] HTTP API Server was null, skipping");
         }
-        
+
         if (raftNode != null) {
             logger.info("[TEARDOWN " + step++ + "] Stopping Raft Node...");
             raftNode.stop();
-            logger.info("  [OK] Raft Node stopped");
+            logger.info("  [OK] Raft Node stop requested");
         } else {
             logger.info("[TEARDOWN " + step++ + "] Raft Node was null, skipping");
         }
-        
+
         if (vertx != null) {
             logger.info("[TEARDOWN " + step++ + "] Closing Vert.x instance...");
-            vertx.close();
-            logger.info("  [OK] Vert.x closed");
-        } else {
-            logger.info("[TEARDOWN " + step++ + "] Vert.x was null, skipping");
+            vertx.close().onComplete(testContext.succeeding(v -> {
+                logger.info("  [OK] Vert.x closed");
+                finishTelemetryCleanup();
+                testContext.completeNow();
+            }));
+            return;
         }
-        
-        // Shutdown OpenTelemetry SDK
+
+        finishTelemetryCleanup();
+        testContext.completeNow();
+    }
+
+    private void finishTelemetryCleanup() {
+        int step = 4;
+
         if (openTelemetry != null) {
             logger.info("[TEARDOWN " + step++ + "] Closing OpenTelemetry SDK...");
             openTelemetry.close();
@@ -300,23 +315,20 @@ class InfrastructureWithTelemetryTest {
         } else {
             logger.info("[TEARDOWN " + step++ + "] OpenTelemetry SDK was null, skipping");
         }
-        
-        // Reset global OpenTelemetry for test isolation
+
         logger.info("[TEARDOWN " + step++ + "] Resetting GlobalOpenTelemetry...");
         GlobalOpenTelemetry.resetForTest();
         logger.info("  [OK] GlobalOpenTelemetry reset");
-        
-        // Clear transports
+
         logger.info("[TEARDOWN " + step++ + "] Clearing InMemoryTransportSimulator...");
         InMemoryTransportSimulator.clearAllTransports();
         logger.info("  [OK] Transports cleared");
-        
-        // Note: OTel Collector container is managed by Testcontainers and stops automatically
+
         if (otelCollector != null && otelCollector.isRunning()) {
             logger.info("[TEARDOWN " + step++ + "] OTel Collector container will be stopped by Testcontainers");
             logger.info("  -> Container ID: " + otelCollector.getContainerId().substring(0, 12));
         }
-        
+
         logger.info("");
         logger.info("====================================================================");
         logger.info("  TEARDOWN COMPLETE - All resources released");

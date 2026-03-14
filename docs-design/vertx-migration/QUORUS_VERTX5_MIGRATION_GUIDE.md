@@ -347,7 +347,7 @@ public class RaftNode {
     private void startElectionTimer() {
         cancelElectionTimer(); // Cancel existing timer
 
-        long timeout = randomElectionTimeout(); // 150-300ms
+        long timeout = randomElectionTimeout(); // deployment-specific election timeout
         electionTimerId = vertx.setTimer(timeout, id -> {
             // Election timeout - become candidate
             becomeCandidate();

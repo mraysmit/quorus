@@ -33,8 +33,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.Set;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -90,41 +90,47 @@ class RaftFailureTest {
         // Try to submit command to follower
         SystemMetadataCommand command = SystemMetadataCommand.set("key", "value");
         Future<CommandResult<?>> future = node1.submitCommand(command);
-        
-        // Should fail
-        ExecutionException exception = assertThrows(ExecutionException.class, () -> {
-            future.toCompletionStage().toCompletableFuture().get(1, TimeUnit.SECONDS);
-        });
-        
-        assertTrue(exception.getCause() instanceof IllegalStateException);
-        assertTrue(exception.getCause().getMessage().contains("Not the leader"));
+
+        AtomicReference<Throwable> failureRef = new AtomicReference<>();
+        future.onComplete(ar -> failureRef.set(ar.cause()));
+
+        Awaitility.await()
+                .atMost(Duration.ofSeconds(1))
+                .until(() -> failureRef.get() != null);
+
+        assertInstanceOf(IllegalStateException.class, failureRef.get());
+        assertTrue(failureRef.get().getMessage().contains("Not the leader"));
     }
 
     @Test
     void testDoubleStartStop() {
         // Test double start
-        node1.start().toCompletionStage().toCompletableFuture().join();
+        node1.start();
+        Awaitility.await().atMost(Duration.ofSeconds(2)).until(transport1::isRunning);
         assertTrue(transport1.isRunning());
         
         // Second start should be safe
-        node1.start().toCompletionStage().toCompletableFuture().join();
+        node1.start();
+        Awaitility.await().atMost(Duration.ofSeconds(2)).until(transport1::isRunning);
         assertTrue(transport1.isRunning());
         
         // Test double stop
-        node1.stop().toCompletionStage().toCompletableFuture().join();
+        node1.stop();
+        Awaitility.await().atMost(Duration.ofSeconds(2)).until(() -> !transport1.isRunning());
         assertFalse(transport1.isRunning());
         
         // Second stop should be safe
-        node1.stop().toCompletionStage().toCompletableFuture().join();
+        node1.stop();
+        Awaitility.await().atMost(Duration.ofSeconds(2)).until(() -> !transport1.isRunning());
         assertFalse(transport1.isRunning());
     }
 
     @Test
     void testLeaderFailureAndRecovery() {
         // Start all nodes
-        node1.start().toCompletionStage().toCompletableFuture().join();
-        node2.start().toCompletionStage().toCompletableFuture().join();
-        node3.start().toCompletionStage().toCompletableFuture().join();
+        node1.start();
+        node2.start();
+        node3.start();
         
         // Wait for leader election
         Awaitility.await()
@@ -139,7 +145,7 @@ class RaftFailureTest {
                 .orElse(null);
         
         assertNotNull(leader);
-        leader.stop().toCompletionStage().toCompletableFuture().join();
+        leader.stop();
         
         // Wait for new leader election among remaining nodes
         Set<RaftNode> remainingNodes = Set.of(node1, node2, node3).stream()
@@ -161,9 +167,9 @@ class RaftFailureTest {
     @Test
     void testNetworkPartition() {
         // Start all nodes
-        node1.start().toCompletionStage().toCompletableFuture().join();
-        node2.start().toCompletionStage().toCompletableFuture().join();
-        node3.start().toCompletionStage().toCompletableFuture().join();
+        node1.start();
+        node2.start();
+        node3.start();
         
         // Wait for initial leader
         Awaitility.await()
@@ -172,7 +178,7 @@ class RaftFailureTest {
                         .anyMatch(RaftNode::isLeader));
         
         // Simulate network partition by stopping one node
-        node3.stop().toCompletionStage().toCompletableFuture().join();
+        node3.stop();
         
         // Remaining nodes should still have a leader (majority)
         Awaitility.await()
@@ -236,14 +242,17 @@ class RaftFailureTest {
         
         // Should handle transport failure gracefully
         Future<Void> future = failingNode.start();
-        
-        ExecutionException exception = assertThrows(ExecutionException.class, () -> {
-            future.toCompletionStage().toCompletableFuture().get(1, TimeUnit.SECONDS);
-        });
-        
-        assertTrue(exception.getCause() instanceof RuntimeException);
-        assertEquals("Transport failed to start", exception.getCause().getMessage());
-        logExpectedFailure("transport start failure", exception.getCause());
+
+        AtomicReference<Throwable> failureRef = new AtomicReference<>();
+        future.onComplete(ar -> failureRef.set(ar.cause()));
+
+        Awaitility.await()
+            .atMost(Duration.ofSeconds(1))
+            .until(() -> failureRef.get() != null);
+
+        assertInstanceOf(RuntimeException.class, failureRef.get());
+        assertEquals("Transport failed to start", failureRef.get().getMessage());
+        logExpectedFailure("transport start failure", failureRef.get());
     }
 
     @Test

@@ -26,7 +26,10 @@ import dev.mars.quorus.controller.raft.RaftNodeMode;
 import dev.mars.quorus.controller.raft.RaftTransport;
 import dev.mars.quorus.controller.state.QuorusStateStore;
 import io.vertx.core.Vertx;
+import io.vertx.junit5.VertxExtension;
+import io.vertx.junit5.VertxTestContext;
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import static org.awaitility.Awaitility.await;
 
@@ -63,6 +66,8 @@ import static org.junit.jupiter.api.Assertions.*;
  * @version 1.0
  */
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@ExtendWith(VertxExtension.class)
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @DisplayName("Infrastructure Smoke Tests")
 class InfrastructureSmokeTest {
 
@@ -70,17 +75,17 @@ class InfrastructureSmokeTest {
     private static final int HTTP_PORT = 18090;
     private static final String BASE_URL = "http://localhost:" + HTTP_PORT;
 
-    private static Vertx vertx;
-    private static RaftNode raftNode;
-    private static QuorusStateStore stateMachine;
-    private static HttpApiServer httpServer;
-    private static HttpClient httpClient;
-    private static ObjectMapper objectMapper;
+    private Vertx vertx;
+    private RaftNode raftNode;
+    private QuorusStateStore stateMachine;
+    private HttpApiServer httpServer;
+    private HttpClient httpClient;
+    private ObjectMapper objectMapper;
 
-    private static long startupTime;
+    private long startupTime;
 
     @BeforeAll
-    static void setUp() throws Exception {
+    void setUp(VertxTestContext testContext) throws Exception {
         long start = System.currentTimeMillis();
         logger.info("=== Starting Infrastructure Smoke Test ===");
 
@@ -108,21 +113,33 @@ class InfrastructureSmokeTest {
 
         // Start HTTP server and wait for it to be ready
         httpServer = new HttpApiServer(vertx, HTTP_PORT, raftNode, stateMachine);
-        httpServer.start().toCompletionStage().toCompletableFuture().get(5, java.util.concurrent.TimeUnit.SECONDS);
-
-        startupTime = System.currentTimeMillis() - start;
-        logger.info("Infrastructure started in " + startupTime + "ms");
+        httpServer.start().onComplete(testContext.succeeding(v -> {
+            startupTime = System.currentTimeMillis() - start;
+            logger.info("Infrastructure started in " + startupTime + "ms");
+            testContext.completeNow();
+        }));
     }
 
     @AfterAll
-    static void tearDown() throws Exception {
+    void tearDown(VertxTestContext testContext) {
         logger.info("=== Tearing Down Infrastructure ===");
-        if (httpServer != null) httpServer.stop();
-        if (raftNode != null) raftNode.stop();
-        if (vertx != null) {
-            vertx.close();
+
+        if (httpServer != null) {
+            httpServer.stop();
         }
+        if (raftNode != null) {
+            raftNode.stop();
+        }
+        if (vertx != null) {
+            vertx.close().onComplete(testContext.succeeding(v -> {
+                logger.info("=== Infrastructure Smoke Test Complete ===");
+                testContext.completeNow();
+            }));
+            return;
+        }
+
         logger.info("=== Infrastructure Smoke Test Complete ===");
+        testContext.completeNow();
     }
 
     // ========== Vert.x Runtime Tests ==========

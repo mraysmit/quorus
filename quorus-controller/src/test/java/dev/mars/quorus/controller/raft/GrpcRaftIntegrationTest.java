@@ -19,7 +19,10 @@ package dev.mars.quorus.controller.raft;
 import dev.mars.quorus.controller.raft.grpc.*;
 import dev.mars.quorus.controller.state.QuorusStateStore;
 import io.vertx.core.Vertx;
+import io.vertx.junit5.VertxExtension;
+import io.vertx.junit5.VertxTestContext;
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 
@@ -29,6 +32,7 @@ import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.awaitility.Awaitility.await;
@@ -48,6 +52,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * @since 2026-01-08
  */
 @Execution(ExecutionMode.SAME_THREAD)
+@ExtendWith(VertxExtension.class)
 class GrpcRaftIntegrationTest {
 
     private Vertx vertx;
@@ -68,9 +73,24 @@ class GrpcRaftIntegrationTest {
             this.transport = transport;
         }
 
-        void stop() throws Exception {
+        void stop() {
             if (grpcServer != null) {
-                grpcServer.stop().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
+                AtomicBoolean stopped = new AtomicBoolean(false);
+                AtomicReference<Throwable> failureRef = new AtomicReference<>();
+                grpcServer.stop().onComplete(ar -> {
+                    if (ar.succeeded()) {
+                        stopped.set(true);
+                    } else {
+                        failureRef.set(ar.cause());
+                    }
+                });
+
+                await().atMost(Duration.ofSeconds(5))
+                        .until(() -> stopped.get() || failureRef.get() != null);
+
+                if (failureRef.get() != null) {
+                    throw new AssertionError("Failed to stop gRPC server", failureRef.get());
+                }
             }
             if (raftNode != null) {
                 raftNode.stop();
@@ -79,13 +99,13 @@ class GrpcRaftIntegrationTest {
     }
 
     @BeforeEach
-    void setUp() {
-        vertx = Vertx.vertx();
+    void setUp(Vertx vertx) {
+        this.vertx = vertx;
         nodes.clear();
     }
 
     @AfterEach
-    void tearDown() throws Exception {
+    void tearDown(VertxTestContext testContext) {
         for (TestNode node : nodes) {
             try {
                 node.stop();
@@ -96,8 +116,11 @@ class GrpcRaftIntegrationTest {
         nodes.clear();
         
         if (vertx != null) {
-            vertx.close().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
+            vertx.close().onComplete(testContext.succeeding(v -> testContext.completeNow()));
+            return;
         }
+
+        testContext.completeNow();
     }
 
     private int findAvailablePort() throws IOException {
@@ -122,8 +145,25 @@ class GrpcRaftIntegrationTest {
         return new TestNode(nodeId, port, raftNode, grpcServer, transport);
     }
 
-    private void startNode(TestNode node) throws Exception {
-        node.grpcServer.start().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
+    private void startNode(TestNode node) {
+        AtomicBoolean started = new AtomicBoolean(false);
+        AtomicReference<Throwable> failureRef = new AtomicReference<>();
+
+        node.grpcServer.start().onComplete(ar -> {
+            if (ar.succeeded()) {
+                started.set(true);
+            } else {
+                failureRef.set(ar.cause());
+            }
+        });
+
+        await().atMost(Duration.ofSeconds(5))
+                .until(() -> started.get() || failureRef.get() != null);
+
+        if (failureRef.get() != null) {
+            throw new AssertionError("Failed to start gRPC server", failureRef.get());
+        }
+
         node.raftNode.start();
         node.transport.start(msg -> {});
     }

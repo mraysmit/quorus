@@ -28,10 +28,13 @@ import dev.mars.quorus.core.TransferJob;
 import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferStatus;
 import io.vertx.core.Future;
+import io.vertx.junit5.VertxExtension;
+import io.vertx.junit5.VertxTestContext;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.net.URI;
 import java.nio.file.Paths;
@@ -49,6 +52,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * @version 1.0
  * @since 2025-08-20
  */
+@ExtendWith(VertxExtension.class)
 class RaftConsensusTest {
 
     private RaftNode leader;
@@ -63,8 +67,8 @@ class RaftConsensusTest {
     private io.vertx.core.Vertx vertx;
 
     @BeforeEach
-    void setUp() {
-        vertx = io.vertx.core.Vertx.vertx();
+    void setUp(io.vertx.core.Vertx vertx) {
+        this.vertx = vertx;
         InMemoryTransportSimulator.clearAllTransports();
 
         Set<String> clusterNodes = Set.of("leader", "follower1", "follower2");
@@ -83,17 +87,26 @@ class RaftConsensusTest {
     }
 
     @AfterEach
-    void tearDown() throws Exception {
-        // Await each node stop to ensure clean shutdown before closing Vert.x
-        if (leader != null)
-            leader.stop().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
-        if (follower1 != null)
-            follower1.stop().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
-        if (follower2 != null)
-            follower2.stop().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
-        if (vertx != null)
-            vertx.close().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
+    void tearDown(VertxTestContext testContext) {
+        if (leader != null) {
+            leader.stop();
+        }
+        if (follower1 != null) {
+            follower1.stop();
+        }
+        if (follower2 != null) {
+            follower2.stop();
+        }
+        if (vertx != null) {
+            vertx.close().onComplete(testContext.succeeding(v -> {
+                InMemoryTransportSimulator.clearAllTransports();
+                testContext.completeNow();
+            }));
+            return;
+        }
+
         InMemoryTransportSimulator.clearAllTransports();
+        testContext.completeNow();
     }
 
     @Test
@@ -130,7 +143,7 @@ class RaftConsensusTest {
     }
 
     @Test
-    void testCommandReplicationToStateMachine() throws Exception {
+    void testCommandReplicationToStateMachine(VertxTestContext testContext) throws Exception {
         // Start cluster and wait for leader
         leader.start();
         follower1.start();
@@ -159,24 +172,25 @@ class RaftConsensusTest {
 
         Future<CommandResult<?>> future = currentLeader.submitCommand(command);
 
-        // Command should complete successfully
-        CommandResult<?> result = future.toCompletionStage().toCompletableFuture().get(2, TimeUnit.SECONDS);
-        assertNotNull(result);
-        assertInstanceOf(CommandResult.Success.class, result);
-        assertInstanceOf(TransferJob.class, ((CommandResult.Success<?>) result).entity());
+        future.onComplete(testContext.succeeding(result -> testContext.verify(() -> {
+            assertNotNull(result);
+            assertInstanceOf(CommandResult.Success.class, result);
+            assertInstanceOf(TransferJob.class, ((CommandResult.Success<?>) result).entity());
 
-        TransferJob resultJob = (TransferJob) ((CommandResult.Success<?>) result).entity();
-        assertEquals(job.getJobId(), resultJob.getJobId());
+            TransferJob resultJob = (TransferJob) ((CommandResult.Success<?>) result).entity();
+            assertEquals(job.getJobId(), resultJob.getJobId());
+            testContext.completeNow();
+        })));
     }
 
     @Test
-    void testMultipleCommandSubmission() throws Exception {
+    void testMultipleCommandSubmission(VertxTestContext testContext) throws Exception {
         // Start single node for simplicity
         Set<String> singleNode = Set.of("single");
         RaftNode single = RaftNode.builder().vertx(vertx).nodeId("single").clusterNodes(singleNode)
                 .transport(new InMemoryTransportSimulator("single")).stateMachine(new QuorusStateStore()).mode(RaftNodeMode.volatileMode()).electionTimeout(500).heartbeatInterval(100).build();
 
-        single.start().toCompletionStage().toCompletableFuture().join();
+        single.start();
 
         // Wait for leadership
         Awaitility.await()
@@ -192,11 +206,9 @@ class RaftConsensusTest {
         Future<CommandResult<?>> future2 = single.submitCommand(cmd2);
         Future<CommandResult<?>> future3 = single.submitCommand(cmd3);
 
-        future1.toCompletionStage().toCompletableFuture().get(1, TimeUnit.SECONDS);
-        future2.toCompletionStage().toCompletableFuture().get(1, TimeUnit.SECONDS);
-        future3.toCompletionStage().toCompletableFuture().get(1, TimeUnit.SECONDS);
-
-        single.stop().toCompletionStage().toCompletableFuture().join();
+        Future.all(future1, future2, future3).onComplete(testContext.succeeding(v -> {
+            single.stop().onComplete(testContext.succeeding(v2 -> testContext.completeNow()));
+        }));
     }
 
     @Test

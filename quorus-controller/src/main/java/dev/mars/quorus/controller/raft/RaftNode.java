@@ -972,6 +972,12 @@ public class RaftNode {
             vertx.cancelTimer(electionTimerId);
 
         initializeLeaderState();
+        submitCommand(null)
+                .onSuccess(result -> logger.debug("Committed leader no-op entry for term {}", currentTerm))
+                .onFailure(err -> {
+                    logger.error("Failed to append leader no-op entry for term {}: {}", currentTerm, err.getMessage());
+                    logger.debug("Stack trace for leader no-op append failure", err);
+                });
         startHeartbeats();
         sendHeartbeats(); // Immediate
         startSnapshotScheduler();
@@ -1034,9 +1040,9 @@ public class RaftNode {
     // Message Handlers running on Event Loop
 
     /**
-     * Handles incoming Raft messages using pattern matching.
-     * <p>Uses Java 21+ sealed interface pattern matching for type-safe,
-     * exhaustive message handling.
+    * Handles incoming Raft messages using pattern matching.
+    * <p>Uses sealed interface pattern matching under the Java 25 baseline for
+    * type-safe, exhaustive message handling.
      * 
      * @param message the incoming RaftMessage
      */

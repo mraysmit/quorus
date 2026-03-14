@@ -18,7 +18,10 @@ package dev.mars.quorus.controller.raft;
 
 import dev.mars.quorus.controller.state.QuorusStateStore;
 import io.vertx.core.Vertx;
+import io.vertx.junit5.VertxExtension;
+import io.vertx.junit5.VertxTestContext;
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -26,7 +29,6 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.*;
@@ -43,6 +45,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * @since 2026-01-20
  */
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@ExtendWith(VertxExtension.class)
 class EnhancedInMemoryTransportTest {
 
     private static final Logger logger = LoggerFactory.getLogger(EnhancedInMemoryTransportTest.class);
@@ -51,22 +54,25 @@ class EnhancedInMemoryTransportTest {
     private final List<RaftNode> activeNodes = new ArrayList<>();
 
     @BeforeEach
-    void setUp() {
-        vertx = Vertx.vertx();
+    void setUp(Vertx vertx) {
+        this.vertx = vertx;
         InMemoryTransportSimulator.clearAllTransports();
         activeNodes.clear();
     }
 
     @AfterEach
-    void tearDown() throws Exception {
+    void tearDown(VertxTestContext testContext) {
         InMemoryTransportSimulator.clearAllTransports();
         for (RaftNode node : activeNodes) {
             try { node.stop(); } catch (Exception ignored) {}
         }
         activeNodes.clear();
         if (vertx != null) {
-            vertx.close().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
+            vertx.close().onComplete(testContext.succeeding(v -> testContext.completeNow()));
+            return;
         }
+
+        testContext.completeNow();
     }
 
     private long leaderCount(RaftNode... nodes) {

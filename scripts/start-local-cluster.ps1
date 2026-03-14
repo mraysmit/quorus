@@ -5,7 +5,7 @@
 # Each node runs with its own configuration via environment variables.
 #
 # Prerequisites:
-#   - Java 21+ installed
+#   - Java 25 installed
 #   - quorus-controller JAR built: mvn package -pl quorus-controller -DskipTests
 #   - Observability stack running: docker-compose -f docker-compose-observability.yml up -d
 #

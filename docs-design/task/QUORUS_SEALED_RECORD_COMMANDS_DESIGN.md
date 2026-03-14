@@ -19,7 +19,7 @@
 8. [Dead Code Removal](#8-dead-code-removal)
 9. [Migration Strategy](#9-migration-strategy)
 10. [Risk Assessment](#10-risk-assessment)
-11. [Optional Enhancement: Record Patterns](#11-optional-enhancement-record-patterns-java-21)
+11. [Optional Enhancement: Record Patterns](#11-optional-enhancement-record-patterns-java-25-baseline)
 12. [State Transition Model — Problem Analysis](#12-state-transition-model--problem-analysis)
 13. [Proposed State Transition Model](#13-proposed-state-transition-model)
 14. [Migration Strategy — State Transition Phases](#14-migration-strategy--state-transition-phases)
@@ -38,10 +38,10 @@ Level 1 (compile-time safe):  switch (command) { case TransferJobCommand cmd -> 
 Level 2 (enum, runtime risk):  switch (cmd.getType()) { case CREATE -> ... }            ← enum, needs yield
 ```
 
-Level 1 uses Java 21 sealed interface pattern matching — adding a new `RaftCommand` subtype without
+Level 1 uses sealed interface pattern matching under the current Java 25 baseline — adding a new `RaftCommand` subtype without
 handling it in the switch produces a compile error. This is correct.
 
-Level 2 uses an inner `enum` inside each command class. While Java 21 switch expressions on enums are
+Level 2 uses an inner `enum` inside each command class. While switch expressions on enums are
 exhaustive, this level has three structural problems:
 
 ### 1.1 Tagged Union with Nullable Fields — Structural Lying
@@ -937,7 +937,7 @@ without affecting others.
 
 ---
 
-## 11. Optional Enhancement: Record Patterns (Java 21)
+## 11. Optional Enhancement: Record Patterns (Java 25 Baseline)
 
 With sealed record subtypes, the state machine can use **record deconstruction patterns** for
 zero-getter field access:
@@ -1884,7 +1884,7 @@ Record actual results after completing each phase. This becomes the audit trail.
 
 | Phase | Date | Tests Before | Tests After | Null Checks Removed | `getType()` Removed | Notes |
 |---|---|---|---|---|---|---|
-| 1 — SystemMetadata | 2026-02-20 | 369 | 369 | 2 (`Optional.ofNullable`) | 3 (`getType()`, enum mapping) | `enum Type` removed, compact constructors require `public` in interface records (Java 21) |
+| 1 — SystemMetadata | 2026-02-20 | 369 | 369 | 2 (`Optional.ofNullable`) | 3 (`getType()`, enum mapping) | `enum Type` removed, compact constructors require `public` in interface records under the Java 25 baseline |
 | 2 — TransferJob | 2026-02-20 | 369 | 369 | 4 (`Optional.ofNullable` in `toProto`) | 4 (`getType()`, `getJobId()→jobId()`, enum mapping×2) | `enum Type` removed, 4 records (Create, UpdateStatus, UpdateProgress, Delete), codec uses pattern matching |
 | 3 — Agent | 2026-02-20 | 369 | 369 | 5 (`Optional.ofNullable` in `toProto`) | 5 (`getType()`, `getAgentId()→agentId()`, enum mapping×2, `is*()` methods×5) | `enum CommandType` removed, 5 records (Register, Deregister, UpdateStatus, UpdateCapabilities, Heartbeat), equals/hashCode now auto-generated |
 | 4 — Route | 2026-02-20 | 369 | 369 | 6 (`Optional.ofNullable` in `toProto`) | 4 (`getType()`, `getRouteId()→routeId()`, enum mapping×2) | `enum CommandType` removed, 6 records (Create, Update, Delete, Suspend, Resume, UpdateStatus), Suspend/Resume no longer carry redundant newStatus field, equals/hashCode auto-generated |

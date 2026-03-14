@@ -33,7 +33,7 @@ import dev.mars.quorus.controller.raft.grpc.VoteResponse;
  *   <li>{@link AppendEntries} - AppendEntries RPC (request and response)</li>
  * </ul>
  * 
- * <h2>Usage with Pattern Matching (Java 21+):</h2>
+ * <h2>Usage with Pattern Matching (Java 25 Baseline):</h2>
  * <pre>{@code
  * void handleMessage(RaftMessage message) {
  *     switch (message) {

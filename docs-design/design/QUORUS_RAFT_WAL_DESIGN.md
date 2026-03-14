@@ -2232,7 +2232,7 @@ WantedBy=multi-user.target
 | **Network** | Raft ports open between nodes | `nc -zv node-2 9080` |
 | **Firewall** | Ports 8080, 9080 allowed | `iptables -L -n` |
 | **DNS/Hosts** | Peer hostnames resolvable | `getent hosts node-2` |
-| **JVM** | Java 21+ installed | `java -version` |
+| **JVM** | Java 25 installed | `java -version` |
 
 ### D.6 Path Handling Safety
 

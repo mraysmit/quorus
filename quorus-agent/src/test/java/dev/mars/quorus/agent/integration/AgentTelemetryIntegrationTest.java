@@ -24,10 +24,14 @@ import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
 import io.vertx.core.Vertx;
 import io.vertx.core.VertxOptions;
+import io.vertx.junit5.VertxExtension;
+import io.vertx.junit5.VertxTestContext;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.testcontainers.containers.BindMode;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
@@ -54,7 +58,9 @@ import static org.junit.jupiter.api.Assertions.*;
  * - Agent metrics are exported in Prometheus format
  * - OTLP collector is reachable and healthy while traces are emitted
  */
+@ExtendWith(VertxExtension.class)
 @Testcontainers
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @DisplayName("Agent Telemetry Integration")
 class AgentTelemetryIntegrationTest {
 
@@ -72,12 +78,12 @@ class AgentTelemetryIntegrationTest {
                     BindMode.READ_ONLY)
             .waitingFor(Wait.forHttp("/").forPort(13133).forStatusCode(200));
 
-    private static Vertx vertx;
-    private static HttpClient httpClient;
-    private static int prometheusPort;
+    private Vertx vertx;
+    private HttpClient httpClient;
+    private int prometheusPort;
 
     @BeforeAll
-    static void setUp() {
+    void setUp() {
         GlobalOpenTelemetry.resetForTest();
 
         prometheusPort = findAvailablePort();
@@ -104,11 +110,20 @@ class AgentTelemetryIntegrationTest {
     }
 
     @AfterAll
-    static void tearDown() {
+    void tearDown(VertxTestContext testContext) {
         if (vertx != null) {
-            vertx.close().toCompletionStage().toCompletableFuture().join();
+            vertx.close().onComplete(testContext.succeeding(v -> {
+                cleanupTelemetryState();
+                testContext.completeNow();
+            }));
+            return;
         }
 
+        cleanupTelemetryState();
+        testContext.completeNow();
+    }
+
+    private void cleanupTelemetryState() {
         if (GlobalOpenTelemetry.get() instanceof OpenTelemetrySdk sdk) {
             sdk.close();
         }

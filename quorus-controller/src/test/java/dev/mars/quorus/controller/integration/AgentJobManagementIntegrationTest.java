@@ -25,7 +25,10 @@ import dev.mars.quorus.controller.raft.RaftNode;
 import dev.mars.quorus.controller.raft.RaftNodeMode;
 import dev.mars.quorus.controller.raft.RaftTransport;
 import dev.mars.quorus.controller.state.QuorusStateStore;
+import io.vertx.junit5.VertxExtension;
+import io.vertx.junit5.VertxTestContext;
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import static org.awaitility.Awaitility.await;
 
@@ -50,25 +53,27 @@ import static org.junit.jupiter.api.Assertions.*;
  * @version 1.0
  */
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@ExtendWith(VertxExtension.class)
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class AgentJobManagementIntegrationTest {
 
     private static final Logger logger = Logger.getLogger(AgentJobManagementIntegrationTest.class.getName());
     private static final int HTTP_PORT = 18080;
     private static final String BASE_URL = "http://localhost:" + HTTP_PORT;
 
-    private static RaftNode raftNode;
-    private static QuorusStateStore stateMachine;
-    private static HttpApiServer httpServer;
-    private static HttpClient httpClient;
-    private static ObjectMapper objectMapper;
-    private static io.vertx.core.Vertx vertx;
+    private RaftNode raftNode;
+    private QuorusStateStore stateMachine;
+    private HttpApiServer httpServer;
+    private HttpClient httpClient;
+    private ObjectMapper objectMapper;
+    private io.vertx.core.Vertx vertx;
 
-    private static String testAgentId;
-    private static String testJobId;
-    private static String testAssignmentId;
+    private String testAgentId;
+    private String testJobId;
+    private String testAssignmentId;
 
     @BeforeAll
-    static void setUp() throws Exception {
+    void setUp(VertxTestContext testContext) throws Exception {
         logger.info("Setting up Agent Job Management Integration Test");
 
         vertx = io.vertx.core.Vertx.vertx();
@@ -103,13 +108,14 @@ class AgentJobManagementIntegrationTest {
 
         // Start HTTP API server and wait for it to be ready
         httpServer = new HttpApiServer(vertx, HTTP_PORT, raftNode, stateMachine);
-        httpServer.start().toCompletionStage().toCompletableFuture().get(5, java.util.concurrent.TimeUnit.SECONDS);
-
-        logger.info("Test environment ready");
+        httpServer.start().onComplete(testContext.succeeding(v -> {
+            logger.info("Test environment ready");
+            testContext.completeNow();
+        }));
     }
 
     @AfterAll
-    static void tearDown() throws Exception {
+    void tearDown(VertxTestContext testContext) {
         if (httpServer != null) {
             httpServer.stop();
         }
@@ -117,11 +123,17 @@ class AgentJobManagementIntegrationTest {
             raftNode.stop();
         }
         if (vertx != null) {
-            vertx.close();
+            vertx.close().onComplete(testContext.succeeding(v -> {
+                InMemoryTransportSimulator.clearAllTransports();
+                logger.info("Test environment cleaned up");
+                testContext.completeNow();
+            }));
+            return;
         }
-        // Clear the InMemoryTransportSimulator registry
-        InMemoryTransportSimulator.clearAllTransports();
-        logger.info("Test environment cleaned up");
+
+            InMemoryTransportSimulator.clearAllTransports();
+            logger.info("Test environment cleaned up");
+            testContext.completeNow();
     }
 
     @Test
