@@ -21,7 +21,6 @@ import dev.mars.quorus.controller.raft.RaftNode;
 import dev.mars.quorus.controller.raft.RaftNodeMode;
 import dev.mars.quorus.controller.raft.RaftTransport;
 import dev.mars.quorus.controller.state.QuorusStateStore;
-import io.vertx.core.AsyncResult;
 import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
@@ -33,8 +32,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.time.Duration;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicReference;
 
+import static dev.mars.quorus.testing.TestFutureUtils.awaitSuccess;
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -94,22 +93,6 @@ class HttpApiServerHealthTest {
         if (raftNode != null) raftNode.stop();
                 if (vertx != null) awaitSuccess(vertx.close(), Duration.ofSeconds(5));
     }
-
-        private static <T> T awaitSuccess(io.vertx.core.Future<T> future, Duration timeout) {
-                AtomicReference<AsyncResult<T>> outcomeRef = new AtomicReference<>();
-
-                future.onComplete(outcomeRef::set);
-
-                await().atMost(timeout)
-                                .pollInterval(Duration.ofMillis(10))
-                                .until(() -> outcomeRef.get() != null);
-
-                AsyncResult<T> outcome = outcomeRef.get();
-                if (outcome.failed()) {
-                        throw new AssertionError("Future failed", outcome.cause());
-                }
-                return outcome.result();
-        }
 
     // ==================== Liveness Probe Tests ====================
 

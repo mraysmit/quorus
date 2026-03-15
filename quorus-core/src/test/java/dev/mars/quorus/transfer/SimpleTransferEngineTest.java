@@ -22,13 +22,12 @@ import dev.mars.quorus.core.TransferResult;
 import dev.mars.quorus.core.exceptions.TransferException;
 import dev.mars.quorus.monitoring.TransferEngineHealthCheck;
 import dev.mars.quorus.monitoring.TransferMetrics;
-import io.vertx.core.AsyncResult;
 import io.vertx.core.Future;
 import io.vertx.core.Promise;
 import io.vertx.core.Vertx;
 import io.vertx.junit5.VertxExtension;
 import io.vertx.junit5.VertxTestContext;
-import org.awaitility.Awaitility;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -43,8 +42,9 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicReference;
 
+
+import static dev.mars.quorus.testing.TestFutureUtils.awaitSuccess;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -321,19 +321,4 @@ class SimpleTransferEngineTest {
         return field.get(engine);
         }
 
-        private static <T> T awaitSuccess(Future<T> future, Duration timeout) {
-        AtomicReference<AsyncResult<T>> outcomeRef = new AtomicReference<>();
-
-        future.onComplete(outcomeRef::set);
-
-        Awaitility.await().atMost(timeout)
-            .pollInterval(Duration.ofMillis(10))
-            .until(() -> outcomeRef.get() != null);
-
-        AsyncResult<T> outcome = outcomeRef.get();
-        if (outcome.failed()) {
-            throw new AssertionError("Future failed", outcome.cause());
-        }
-        return outcome.result();
-        }
 }

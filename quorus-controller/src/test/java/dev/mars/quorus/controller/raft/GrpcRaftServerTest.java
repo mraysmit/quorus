@@ -25,7 +25,6 @@ import dev.mars.quorus.controller.state.QuorusStateStore;
 import io.grpc.*;
 import io.grpc.stub.StreamObserver;
 import io.vertx.core.Vertx;
-import io.vertx.core.AsyncResult;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -41,6 +40,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static dev.mars.quorus.testing.TestFutureUtils.awaitSuccess;
+import static dev.mars.quorus.testing.TestFutureUtils.awaitFailure;
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -973,36 +974,6 @@ class GrpcRaftServerTest {
             node1.stop();
             node2.stop();
         }
-    }
-
-    private static <T> T awaitSuccess(io.vertx.core.Future<T> future, Duration timeout) {
-        AtomicReference<AsyncResult<T>> outcomeRef = new AtomicReference<>();
-
-        future.onComplete(outcomeRef::set);
-
-        await().atMost(timeout)
-                .pollInterval(Duration.ofMillis(10))
-                .until(() -> outcomeRef.get() != null);
-
-        AsyncResult<T> outcome = outcomeRef.get();
-        if (outcome.failed()) {
-            throw new AssertionError("Future failed", outcome.cause());
-        }
-        return outcome.result();
-    }
-
-    private static Throwable awaitFailure(io.vertx.core.Future<?> future, Duration timeout) {
-        AtomicReference<AsyncResult<?>> outcomeRef = new AtomicReference<>();
-
-        future.onComplete(outcomeRef::set);
-
-        await().atMost(timeout)
-                .pollInterval(Duration.ofMillis(10))
-                .until(() -> outcomeRef.get() != null);
-
-        AsyncResult<?> outcome = outcomeRef.get();
-        assertTrue(outcome.failed(), "Expected future to fail");
-        return outcome.cause();
     }
 
     private static <T> T awaitSuccess(CompletableFuture<T> future, Duration timeout) {

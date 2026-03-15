@@ -46,8 +46,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
-import java.time.Instant;
 
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -173,23 +173,11 @@ class AgentTelemetryIntegrationTest {
     @DisplayName("OTel collector receives emitted startup span")
     void testCollectorReceivesEmittedSpan() {
         String spanName = "agent.telemetry.integration.startup";
-        Instant deadline = Instant.now().plusSeconds(10);
 
-        while (Instant.now().isBefore(deadline)) {
-            String logs = otelCollector.getLogs();
-            if (logs.contains(spanName)) {
-                return;
-            }
-
-            try {
-                Thread.sleep(200);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                fail("Interrupted while waiting for collector to export span logs", e);
-            }
-        }
-
-        fail("Collector logs did not contain expected span name: " + spanName);
+        await().atMost(Duration.ofSeconds(10))
+            .pollInterval(Duration.ofMillis(200))
+            .failMessage("Collector logs did not contain expected span name: " + spanName)
+            .until(() -> otelCollector.getLogs().contains(spanName));
     }
 
     private static int findAvailablePort() {

@@ -275,13 +275,14 @@ public class InMemoryTransportSimulator implements RaftTransport {
     }
 
     @Override
-    public void stop() {
+    public Future<Void> stop() {
         this.running = false;
         transports.remove(nodeId);
         if (reorderExecutor != null && !reorderExecutor.isShutdown()) {
             reorderExecutor.shutdown();
         }
         logger.info("Stopped in-memory transport for node: {}", nodeId);
+        return Future.succeededFuture();
     }
 
     @Override

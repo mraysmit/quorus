@@ -91,7 +91,8 @@ public class RaftNodeIntegrationTest {
         }
 
         @Override
-        public void stop() {
+        public Future<Void> stop() {
+            return Future.succeededFuture();
         }
 
         @Override
