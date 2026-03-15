@@ -24,11 +24,14 @@ import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferStatus;
 import io.vertx.core.CompositeFuture;
 import io.vertx.core.Future;
+import io.vertx.core.Vertx;
+import io.vertx.junit5.VertxExtension;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,6 +60,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * @version 1.0
  * @since 2026-01-05
  */
+@ExtendWith(VertxExtension.class)
 @Tag("slow")
 public class RaftChaosTest {
 
@@ -66,18 +70,18 @@ public class RaftChaosTest {
     
     private List<RaftNode> cluster;
     private Map<String, InMemoryTransportSimulator> transports;
-    private io.vertx.core.Vertx vertx;
+    private Vertx vertx;
     private static final int CLUSTER_SIZE = 5;
     private static final String[] NODE_IDS = {"node1", "node2", "node3", "node4", "node5"};
 
     @BeforeEach
-    void setUp() {
+    void setUp(Vertx vertx) {
         logger.info("=== SETTING UP RAFT CHAOS TEST ===");
         
         // Clear any static state in InMemoryTransportSimulator
         InMemoryTransportSimulator.clearAllTransports();
         
-        vertx = io.vertx.core.Vertx.vertx();
+        this.vertx = vertx;
         cluster = new ArrayList<>();
         transports = new HashMap<>();
         
@@ -110,7 +114,7 @@ public class RaftChaosTest {
         logger.info("=== TEARING DOWN RAFT CHAOS TEST ===");
         
         if (cluster != null) {
-            List<io.vertx.core.Future<Void>> futures = new ArrayList<>();
+            List<Future<Void>> futures = new ArrayList<>();
             for (RaftNode node : cluster) {
                 try {
                     futures.add(node.stop());
@@ -124,10 +128,6 @@ public class RaftChaosTest {
                 logger.warn("Error waiting for nodes to stop: {}", e.getMessage());
                 logger.debug("Stack trace for node stop wait failure", e);
             }
-        }
-        
-        if (vertx != null) {
-            vertx.close();
         }
         
         InMemoryTransportSimulator.clearAllTransports();

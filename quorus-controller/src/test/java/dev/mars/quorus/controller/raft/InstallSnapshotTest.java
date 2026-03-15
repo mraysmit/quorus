@@ -22,6 +22,7 @@ import dev.mars.quorus.controller.raft.storage.InMemoryRaftStorage;
 import dev.mars.quorus.controller.state.QuorusStateStore;
 import dev.mars.quorus.controller.state.SystemMetadataCommand;
 import io.vertx.core.Future;
+import io.vertx.core.Promise;
 import io.vertx.core.Vertx;
 import io.vertx.junit5.VertxExtension;
 import io.vertx.junit5.VertxTestContext;
@@ -31,11 +32,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static dev.mars.quorus.testing.TestFutureUtils.awaitSuccess;
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -121,12 +123,12 @@ class InstallSnapshotTest {
         leaderRef.set(leader);
 
         // Phase 2: Submit commands via event loop, wait for completion on test thread
-        CompletableFuture<Void> commandsDone = new CompletableFuture<>();
+        Promise<Void> commandsDone = Promise.promise();
         vertx.runOnContext(v ->
                 submitCommands(leader, 0, 8)
-                        .onSuccess(r -> commandsDone.complete(null))
-                        .onFailure(commandsDone::completeExceptionally));
-        commandsDone.get(15, TimeUnit.SECONDS);
+                        .onSuccess(r -> commandsDone.complete())
+                        .onFailure(commandsDone::fail));
+        awaitSuccess(commandsDone.future(), Duration.ofSeconds(15));
 
         // Phase 3: Wait for snapshot on test thread
         await().atMost(12, TimeUnit.SECONDS).pollInterval(200, TimeUnit.MILLISECONDS)
@@ -203,12 +205,12 @@ class InstallSnapshotTest {
         RaftNode leader = (node1.getState() == RaftNode.State.LEADER) ? node1 : node2;
 
         // Submit initial commands
-        CompletableFuture<Void> batch1 = new CompletableFuture<>();
+        Promise<Void> batch1 = Promise.promise();
         vertx.runOnContext(v ->
                 submitCommands(leader, 0, 6)
-                        .onSuccess(r -> batch1.complete(null))
-                        .onFailure(batch1::completeExceptionally));
-        batch1.get(15, TimeUnit.SECONDS);
+                        .onSuccess(r -> batch1.complete())
+                        .onFailure(batch1::fail));
+        awaitSuccess(batch1.future(), Duration.ofSeconds(15));
 
         // Wait for snapshot
         await().atMost(12, TimeUnit.SECONDS).pollInterval(200, TimeUnit.MILLISECONDS)
@@ -223,12 +225,12 @@ class InstallSnapshotTest {
                         "node3 should have installed snapshot"));
 
         // Submit MORE commands after snapshot catch-up
-        CompletableFuture<Void> batch2 = new CompletableFuture<>();
+        Promise<Void> batch2 = Promise.promise();
         vertx.runOnContext(v ->
                 submitCommands(leader, 6, 3)
-                        .onSuccess(r -> batch2.complete(null))
-                        .onFailure(batch2::completeExceptionally));
-        batch2.get(15, TimeUnit.SECONDS);
+                        .onSuccess(r -> batch2.complete())
+                        .onFailure(batch2::fail));
+        awaitSuccess(batch2.future(), Duration.ofSeconds(15));
 
         // Wait for node3 to replicate post-snapshot entries
         await().atMost(12, TimeUnit.SECONDS).pollInterval(300, TimeUnit.MILLISECONDS)
@@ -291,12 +293,12 @@ class InstallSnapshotTest {
 
         RaftNode leader = (node1.getState() == RaftNode.State.LEADER) ? node1 : node2;
 
-        CompletableFuture<Void> commandsDone = new CompletableFuture<>();
+        Promise<Void> commandsDone = Promise.promise();
         vertx.runOnContext(v ->
                 submitCommands(leader, 0, 7)
-                        .onSuccess(r -> commandsDone.complete(null))
-                        .onFailure(commandsDone::completeExceptionally));
-        commandsDone.get(15, TimeUnit.SECONDS);
+                        .onSuccess(r -> commandsDone.complete())
+                        .onFailure(commandsDone::fail));
+        awaitSuccess(commandsDone.future(), Duration.ofSeconds(15));
 
         await().atMost(12, TimeUnit.SECONDS).pollInterval(200, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> assertTrue(leader.getSnapshotLastIndex() >= 5));

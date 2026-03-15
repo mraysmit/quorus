@@ -107,6 +107,81 @@ class MyTest {
 }
 ```
 
+### MANDATORY: Pure Vert.x Test Facilities Only
+
+**This is a pure Vert.x system. Tests MUST use exclusively Vert.x concurrency primitives. ZERO tolerance for Java concurrency shortcuts.**
+
+#### Banned Patterns → Required Replacements
+
+| BANNED (never use in tests) | REPLACEMENT (Vert.x equivalent) |
+|------------------------------|----------------------------------|
+| `CompletableFuture<T>` | `Promise<T>` / `Future<T>` |
+| `CompletableFuture.allOf()` | `Future.all(futures)` |
+| `CompletableFuture.supplyAsync()` | `vertx.executeBlocking(() -> ...)` |
+| `ExecutorService` / `Executors.newFixedThreadPool()` | `vertx.executeBlocking()` per task |
+| `CountDownLatch` | `Promise<Void>` or `Future.all()` to combine results |
+| `executor.submit(() -> ...)` loops | `List<Future<T>>` + `vertx.executeBlocking()` + `Future.all()` |
+| `.get(timeout, TimeUnit)` on CompletableFuture | `awaitSuccess(promise.future(), Duration.ofSeconds(n))` |
+| `.complete(null)` on CompletableFuture<Void> | `promise.complete()` on `Promise<Void>` |
+| `::completeExceptionally` | `::fail` on Promise |
+
+**Exceptions (acceptable):**
+- `TimeUnit` in gRPC API calls (`channel.awaitTermination`, `blockingStub.withDeadlineAfter`) — these are gRPC library API, not concurrency primitives
+- `AtomicInteger`, `AtomicReference`, `AtomicBoolean` — these are thread-safe accumulators, not concurrency control
+- `Thread.sleep` inside `vertx.executeBlocking()` for rate-limiting — acceptable because it's on a worker thread managed by Vert.x
+
+#### Common Test Patterns
+
+**Concurrent blocking calls (e.g., gRPC blocking stubs):**
+```java
+List<Future<Void>> futures = new ArrayList<>();
+for (int i = 0; i < numRequests; i++) {
+    futures.add(vertx.executeBlocking(() -> {
+        blockingStub.requestVote(request);
+        return null;
+    }));
+}
+awaitSuccess(Future.all(futures), Duration.ofSeconds(30));
+```
+
+**Async gRPC StreamObserver callbacks:**
+```java
+Promise<VoteResponse> promise = Promise.promise();
+asyncStub.requestVote(request, new StreamObserver<>() {
+    @Override public void onNext(VoteResponse r) { promise.complete(r); }
+    @Override public void onError(Throwable t) { promise.fail(t); }
+    @Override public void onCompleted() { }
+});
+VoteResponse response = awaitSuccess(promise.future(), Duration.ofSeconds(5));
+```
+
+**Bridging event-loop work to test thread:**
+```java
+Promise<Void> done = Promise.promise();
+vertx.runOnContext(v ->
+    someAsyncOp()
+        .onSuccess(r -> done.complete())
+        .onFailure(done::fail));
+awaitSuccess(done.future(), Duration.ofSeconds(15));
+```
+
+**tearDown with Future-returning stop():**
+```java
+@AfterEach
+void tearDown() {
+    List<Future<Void>> stopFutures = new ArrayList<>();
+    for (RaftNode node : cluster) {
+        stopFutures.add(node.stop());
+    }
+    awaitSuccess(Future.all(stopFutures), Duration.ofSeconds(10));
+}
+```
+
+#### Shared Test Utility
+`TestFutureUtils` in `quorus-core/src/test/java/dev/mars/quorus/testing/TestFutureUtils.java`:
+- `awaitSuccess(Future<T>, Duration)` — blocks test thread until future completes or times out
+- `awaitFailure(Future<?>, Duration)` — blocks until future fails, returns the cause
+
 ## Workflow YAML Structure
 ```yaml
 metadata:
@@ -311,3 +386,56 @@ Every feature must have at least one test that **exercises the full path a real 
 
 ### 4. No Document Proliferation
 Do not create new standalone documents (markdown files, changelog files, example files) unless explicitly requested. Consolidate into existing working documents. The single source of truth for implementation planning is `docs-design/task/QUORUS_ALPHA_IMPLEMENTATION_PLAN.md`.
+
+## Process Rules: Preventing Incomplete Work (MANDATORY)
+
+These rules exist because of repeated failures where work was declared done but wasn't.
+
+### 1. Complete Elimination, Not Partial Removal
+When instructed to remove a pattern (e.g., "remove CompletableFuture"), you MUST:
+1. **Grep the ENTIRE scope** for ALL variants of that pattern BEFORE making any changes (e.g., `CompletableFuture`, `CompletionException`, `ExecutionException`, `toCompletionStage`, helper methods that wrap it)
+2. **List every occurrence** with file and line number
+3. **Remove ALL occurrences** in one pass — not just the obvious ones
+4. **Remove helper methods** that only existed to support the banned pattern (e.g., `awaitCompletable()`, `unwrapCompletionError()`)
+5. **Verify with grep** after changes — zero matches means done
+
+**WRONG:** Fix the one instance the user pointed out, declare done. User finds more.
+**RIGHT:** Grep everything, fix everything, grep again to prove zero remain.
+
+### 2. Understand the Full Scope of a Directive
+When given a technical directive like "use exclusively Vert.x test facilities", interpret it broadly:
+- It means ALL Java concurrency primitives are banned, not just the one specifically named
+- `CompletableFuture` → also means `ExecutorService`, `CountDownLatch`, `Thread.sleep`, `Semaphore`, `CyclicBarrier`, etc.
+- Think: "What is the complete set of things that violate this directive?" — then scan for ALL of them upfront
+
+**WRONG:** Remove only CompletableFuture because that's what was named. Get yelled at. Then remove only ExecutorService. Get yelled at again.
+**RIGHT:** Immediately scan for CompletableFuture AND ExecutorService AND CountDownLatch AND Thread.sleep AND all other java.util.concurrent patterns. Fix them all in one pass.
+
+### 3. When Changing a Return Type, Update ALL Callers
+When a method signature changes (e.g., `void stop()` → `Future<Void> stop()`):
+1. Find ALL callers of that method across the entire codebase
+2. Update every caller to handle the new return type
+3. Pay special attention to `@AfterEach` / tearDown methods — they commonly fire-and-forget
+
+### 4. Don't Add Unused Imports
+When editing a file, only add imports for symbols you are actually introducing. Review your changes before finalizing:
+- If you removed the only usage of a symbol, remove its import too
+- If you're adding `VertxTestContext` to the imports, verify the test methods actually use it
+- Run a quick mental check: "Does every import I added correspond to a new usage in the code?"
+
+### 5. Verify Before Declaring Done
+After completing any removal or migration task:
+1. **Grep for the banned pattern** — must return zero matches
+2. **Grep for related patterns** — banned pattern often has companions
+3. **Compile** — catches missing imports, type mismatches
+4. **Run tests** — catches runtime issues
+Only mark a task complete after ALL four checks pass.
+
+### 6. One Pass, Not Incremental Discovery
+Don't discover problems one at a time across multiple user interactions. When asked to clean up a category of issues:
+1. Do a comprehensive audit FIRST (grep all test files, read results)
+2. Make a complete list of everything that needs to change
+3. Execute all changes
+4. Verify all changes
+
+The user should never have to point out a second instance of something you were already told to fix.

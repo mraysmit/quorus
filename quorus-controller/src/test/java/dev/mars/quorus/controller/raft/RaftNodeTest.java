@@ -27,7 +27,9 @@ import dev.mars.quorus.controller.raft.grpc.InstallSnapshotResponse;
 import dev.mars.quorus.controller.raft.grpc.VoteRequest;
 import dev.mars.quorus.controller.raft.grpc.VoteResponse;
 import io.vertx.core.Future;
+import io.vertx.core.Vertx;
 import io.vertx.core.WorkerExecutor;
+import io.vertx.junit5.VertxExtension;
 import dev.mars.quorus.controller.state.CommandResult;
 import dev.mars.quorus.controller.state.ProtobufCommandCodec;
 import dev.mars.quorus.controller.state.QuorusStateStore;
@@ -39,6 +41,7 @@ import static org.awaitility.Awaitility.await;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
@@ -55,6 +58,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * @version 1.0
  * @since 2025-08-20
  */
+@ExtendWith(VertxExtension.class)
 class RaftNodeTest {
 
     private static final Duration SHORT_TIMEOUT = Duration.ofSeconds(5);
@@ -63,7 +67,7 @@ class RaftNodeTest {
     @TempDir
     Path tempDir;
 
-    private io.vertx.core.Vertx vertx;
+    private Vertx vertx;
     private RaftNode node1;
     private RaftNode node2;
     private RaftNode node3;
@@ -75,8 +79,8 @@ class RaftNodeTest {
     private QuorusStateStore stateMachine3;
 
     @BeforeEach
-    void setUp() {
-        vertx = io.vertx.core.Vertx.vertx();
+    void setUp(Vertx vertx) {
+        this.vertx = vertx;
         // Clear any existing transports
         InMemoryTransportSimulator.clearAllTransports();
 
@@ -104,7 +108,6 @@ class RaftNodeTest {
         if (node1 != null) awaitSuccess(node1.stop(), SHORT_TIMEOUT);
         if (node2 != null) awaitSuccess(node2.stop(), SHORT_TIMEOUT);
         if (node3 != null) awaitSuccess(node3.stop(), SHORT_TIMEOUT);
-        if (vertx != null) awaitSuccess(vertx.close(), SHORT_TIMEOUT);
         InMemoryTransportSimulator.clearAllTransports();
     }
 
