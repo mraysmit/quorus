@@ -22,6 +22,7 @@ import dev.mars.quorus.controller.state.TransferJobCommand;
 import dev.mars.quorus.core.TransferJob;
 import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferStatus;
+import io.vertx.core.AsyncResult;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.AfterEach;
@@ -32,7 +33,7 @@ import java.net.URI;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Logger;
 
 import static org.awaitility.Awaitility.await;
@@ -55,6 +56,8 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 @Tag("slow")
 public class MetadataPersistenceTest {
+
+    private static final Duration SHORT_TIMEOUT = Duration.ofSeconds(5);
 
     private static final Logger logger = Logger.getLogger(MetadataPersistenceTest.class.getName());
     
@@ -136,7 +139,7 @@ public class MetadataPersistenceTest {
         io.vertx.core.Future<CommandResult<?>> result = leader.submitCommand(command);
         
         // Wait for command to be processed
-        CommandResult<?> response = result.toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
+        CommandResult<?> response = awaitSuccess(result, SHORT_TIMEOUT);
         assertNotNull(response, "Command should be processed successfully");
         logger.info("Command processed successfully: " + response);
         
@@ -175,7 +178,7 @@ public class MetadataPersistenceTest {
             
             TransferJobCommand command = TransferJobCommand.create(job);
             io.vertx.core.Future<CommandResult<?>> result = originalLeader.submitCommand(command);
-            result.toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
+            awaitSuccess(result, SHORT_TIMEOUT);
             logger.info("Submitted job " + job.getJobId() + " to original leader");
         }
         
@@ -231,7 +234,7 @@ public class MetadataPersistenceTest {
         TransferJob newJob = createTestTransferJob("job-new", "Post leader change test");
         TransferJobCommand newCommand = TransferJobCommand.create(newJob);
         io.vertx.core.Future<CommandResult<?>> newResult = newLeader.submitCommand(newCommand);
-        newResult.toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
+        awaitSuccess(newResult, SHORT_TIMEOUT);
         logger.info("Successfully submitted new job to new leader: " + newJob.getJobId());
         
         // Wait for replication (reactive: poll until remaining nodes have the new job)
@@ -280,7 +283,7 @@ public class MetadataPersistenceTest {
             
             TransferJobCommand command = TransferJobCommand.create(job);
             io.vertx.core.Future<CommandResult<?>> result = leader.submitCommand(command);
-            result.toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
+            awaitSuccess(result, SHORT_TIMEOUT);
             logger.info("Submitted job " + job.getJobId() + " while follower was down");
         }
         
@@ -356,5 +359,21 @@ public class MetadataPersistenceTest {
         } catch (Exception e) {
             throw new RuntimeException("Failed to create test transfer job", e);
         }
+    }
+
+    private static <T> T awaitSuccess(io.vertx.core.Future<T> future, Duration timeout) {
+        AtomicReference<AsyncResult<T>> outcomeRef = new AtomicReference<>();
+
+        future.onComplete(outcomeRef::set);
+
+        await().atMost(timeout)
+            .pollInterval(Duration.ofMillis(10))
+            .until(() -> outcomeRef.get() != null);
+
+        AsyncResult<T> outcome = outcomeRef.get();
+        if (outcome.failed()) {
+            throw new AssertionError("Future failed", outcome.cause());
+        }
+        return outcome.result();
     }
 }

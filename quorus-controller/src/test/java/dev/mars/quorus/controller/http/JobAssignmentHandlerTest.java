@@ -21,6 +21,7 @@ import dev.mars.quorus.controller.raft.RaftNode;
 import dev.mars.quorus.controller.raft.RaftNodeMode;
 import dev.mars.quorus.controller.raft.RaftTransport;
 import dev.mars.quorus.controller.state.QuorusStateStore;
+import io.vertx.core.AsyncResult;
 import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
@@ -32,6 +33,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.time.Duration;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.*;
@@ -79,8 +81,7 @@ class JobAssignmentHandlerTest {
                 .until(() -> raftNode.isLeader());
 
         httpServer = new HttpApiServer(vertx, HTTP_PORT, raftNode, stateMachine);
-        httpServer.start().toCompletionStage().toCompletableFuture()
-                .get(5, java.util.concurrent.TimeUnit.SECONDS);
+        awaitSuccess(httpServer.start(), Duration.ofSeconds(5));
 
         webClient = WebClient.create(vertx);
     }
@@ -88,12 +89,26 @@ class JobAssignmentHandlerTest {
     @AfterAll
     static void tearDown() throws Exception {
         if (webClient != null) webClient.close();
-        if (httpServer != null) httpServer.stop().toCompletionStage().toCompletableFuture()
-                .get(5, java.util.concurrent.TimeUnit.SECONDS);
+        if (httpServer != null) awaitSuccess(httpServer.stop(), Duration.ofSeconds(5));
         if (raftNode != null) raftNode.stop();
-        if (vertx != null) vertx.close().toCompletionStage().toCompletableFuture()
-                .get(5, java.util.concurrent.TimeUnit.SECONDS);
+        if (vertx != null) awaitSuccess(vertx.close(), Duration.ofSeconds(5));
         InMemoryTransportSimulator.clearAllTransports();
+    }
+
+    private static <T> T awaitSuccess(io.vertx.core.Future<T> future, Duration timeout) {
+        AtomicReference<AsyncResult<T>> outcomeRef = new AtomicReference<>();
+
+        future.onComplete(outcomeRef::set);
+
+        await().atMost(timeout)
+                .pollInterval(Duration.ofMillis(10))
+                .until(() -> outcomeRef.get() != null);
+
+        AsyncResult<T> outcome = outcomeRef.get();
+        if (outcome.failed()) {
+            throw new AssertionError("Future failed", outcome.cause());
+        }
+        return outcome.result();
     }
 
     // ==================== POST /api/v1/assignments ====================
