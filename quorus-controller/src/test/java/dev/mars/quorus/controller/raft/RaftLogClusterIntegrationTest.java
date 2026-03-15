@@ -23,6 +23,7 @@ import dev.mars.quorus.controller.state.TransferJobCommand;
 import dev.mars.quorus.core.TransferJob;
 import dev.mars.quorus.core.TransferRequest;
 import dev.mars.raftlog.storage.RaftStorageConfig;
+import io.vertx.core.AsyncResult;
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
 import io.vertx.junit5.VertxExtension;
@@ -76,6 +77,8 @@ class RaftLogClusterIntegrationTest {
     private static final Logger LOG = LoggerFactory.getLogger(RaftLogClusterIntegrationTest.class);
     private static final int CLUSTER_SIZE = 3;
     private static final String[] NODE_IDS = {"node1", "node2", "node3"};
+    private static final Duration SHORT_TIMEOUT = Duration.ofSeconds(5);
+    private static final Duration MEDIUM_TIMEOUT = Duration.ofSeconds(10);
 
     @TempDir
     Path tempDir;
@@ -200,7 +203,7 @@ class RaftLogClusterIntegrationTest {
         for (RaftNode node : cluster) {
             LOG.debug("Stopping node {} (state={}, term={})", 
                 node.getNodeId(), node.getState(), node.getCurrentTerm());
-            node.stop().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
+            awaitSuccess(node.stop(), SHORT_TIMEOUT);
             LOG.debug("Node {} stopped successfully", node.getNodeId());
         }
         cluster.clear();
@@ -217,10 +220,9 @@ class RaftLogClusterIntegrationTest {
                 .build();
             
             RaftLogStorageAdapter storage = new RaftLogStorageAdapter(vertx, config);
-            storage.open(dataDir).toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
+            awaitSuccess(storage.open(dataDir), SHORT_TIMEOUT);
             
-            RaftStorage.PersistentMeta meta = storage.loadMetadata()
-                .toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
+            RaftStorage.PersistentMeta meta = awaitSuccess(storage.loadMetadata(), SHORT_TIMEOUT);
             
             LOG.info("[OK] {} recovered metadata: term={}, votedFor={}", 
                 nodeId, meta.currentTerm(), meta.votedFor().orElse("(none)"));
@@ -275,8 +277,7 @@ class RaftLogClusterIntegrationTest {
             TransferJobCommand cmd = TransferJobCommand.create(job);
             
             long cmdStart = System.currentTimeMillis();
-            Object result = leader.submitCommand(cmd)
-                .toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
+            Object result = awaitSuccess(leader.submitCommand(cmd), SHORT_TIMEOUT);
             
             LOG.info("Submitted job {} to leader in {} ms, result: {}", 
                 jobId, System.currentTimeMillis() - cmdStart, result);
@@ -313,7 +314,7 @@ class RaftLogClusterIntegrationTest {
         // Stop all nodes
         LOG.info("Stopping all nodes to test recovery...");
         for (RaftNode node : cluster) {
-            node.stop().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
+            awaitSuccess(node.stop(), SHORT_TIMEOUT);
         }
         cluster.clear();
         storages.clear();
@@ -373,8 +374,7 @@ class RaftLogClusterIntegrationTest {
         String jobId = "recovery-test-job";
         TransferJob job = createTestJob(jobId);
         long cmdStart = System.currentTimeMillis();
-        leader.submitCommand(TransferJobCommand.create(job))
-            .toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
+        awaitSuccess(leader.submitCommand(TransferJobCommand.create(job)), SHORT_TIMEOUT);
         LOG.info("Submitted job: {} in {} ms", jobId, System.currentTimeMillis() - cmdStart);
         
         // Wait for replication
@@ -408,7 +408,7 @@ class RaftLogClusterIntegrationTest {
         
         // Stop the follower
         long stopStart = System.currentTimeMillis();
-        follower.stop().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
+        awaitSuccess(follower.stop(), SHORT_TIMEOUT);
         cluster.remove(follower);
         LOG.info("Stopped follower: {} in {} ms", followerId, System.currentTimeMillis() - stopStart);
         
@@ -420,7 +420,7 @@ class RaftLogClusterIntegrationTest {
         LOG.info("Restarting follower from WAL...");
         long restartStart = System.currentTimeMillis();
         RaftNode restartedFollower = createNodeWithStorage(followerId, followerDataDir, false);
-        restartedFollower.start().toCompletionStage().toCompletableFuture().get(10, TimeUnit.SECONDS);
+        awaitSuccess(restartedFollower.start(), MEDIUM_TIMEOUT);
         cluster.add(restartedFollower);
         LOG.info("Follower {} restarted in {} ms (term={}, logSize={})", 
             followerId, System.currentTimeMillis() - restartStart,
@@ -533,7 +533,7 @@ class RaftLogClusterIntegrationTest {
             .build();
         
         RaftLogStorageAdapter storage = new RaftLogStorageAdapter(vertx, config);
-        storage.open(dataDir).toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
+        awaitSuccess(storage.open(dataDir), SHORT_TIMEOUT);
         storages.put(nodeId, storage);
         
         QuorusStateStore stateMachine = new QuorusStateStore();
@@ -615,6 +615,22 @@ class RaftLogClusterIntegrationTest {
                 LOG.debug("  {} | Error reading WAL: {}", nodeId, e.getMessage());
             }
         }
+    }
+
+    private static <T> T awaitSuccess(Future<T> future, Duration timeout) {
+        AtomicReference<AsyncResult<T>> outcomeRef = new AtomicReference<>();
+
+        future.onComplete(outcomeRef::set);
+
+        await().atMost(timeout)
+            .pollInterval(Duration.ofMillis(10))
+            .until(() -> outcomeRef.get() != null);
+
+        AsyncResult<T> outcome = outcomeRef.get();
+        if (outcome.failed()) {
+            throw new AssertionError("Future failed", outcome.cause());
+        }
+        return outcome.result();
     }
     
     /**

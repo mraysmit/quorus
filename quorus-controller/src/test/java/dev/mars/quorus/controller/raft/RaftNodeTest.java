@@ -26,6 +26,7 @@ import dev.mars.quorus.controller.raft.grpc.InstallSnapshotRequest;
 import dev.mars.quorus.controller.raft.grpc.InstallSnapshotResponse;
 import dev.mars.quorus.controller.raft.grpc.VoteRequest;
 import dev.mars.quorus.controller.raft.grpc.VoteResponse;
+import io.vertx.core.AsyncResult;
 import io.vertx.core.Future;
 import io.vertx.core.WorkerExecutor;
 import dev.mars.quorus.controller.state.CommandResult;
@@ -43,7 +44,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -54,6 +55,9 @@ import static org.junit.jupiter.api.Assertions.*;
  * @since 2025-08-20
  */
 class RaftNodeTest {
+
+    private static final Duration SHORT_TIMEOUT = Duration.ofSeconds(5);
+    private static final Duration MEDIUM_TIMEOUT = Duration.ofSeconds(10);
 
     @TempDir
     Path tempDir;
@@ -96,10 +100,10 @@ class RaftNodeTest {
 
     @AfterEach
     void tearDown() throws Exception {
-        if (node1 != null) node1.stop().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
-        if (node2 != null) node2.stop().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
-        if (node3 != null) node3.stop().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
-        if (vertx != null) vertx.close().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS);
+        if (node1 != null) awaitSuccess(node1.stop(), SHORT_TIMEOUT);
+        if (node2 != null) awaitSuccess(node2.stop(), SHORT_TIMEOUT);
+        if (node3 != null) awaitSuccess(node3.stop(), SHORT_TIMEOUT);
+        if (vertx != null) awaitSuccess(vertx.close(), SHORT_TIMEOUT);
         InMemoryTransportSimulator.clearAllTransports();
     }
 
@@ -115,11 +119,11 @@ class RaftNodeTest {
     void testNodeStartAndStop() {
         assertFalse(transport1.isRunning());
         
-        node1.start().toCompletionStage().toCompletableFuture().join();
+        awaitSuccess(node1.start(), SHORT_TIMEOUT);
         assertTrue(transport1.isRunning());
         assertEquals(RaftNode.State.FOLLOWER, node1.getState());
         
-        node1.stop().toCompletionStage().toCompletableFuture().join();
+        awaitSuccess(node1.stop(), SHORT_TIMEOUT);
         assertFalse(transport1.isRunning());
     }
 
@@ -178,23 +182,16 @@ class RaftNodeTest {
 
     @Test
     void testCommandSubmissionToNonLeader() {
-        node1.start().toCompletionStage().toCompletableFuture().join();
+        awaitSuccess(node1.start(), SHORT_TIMEOUT);
         
         // Node starts as follower, command submission should fail
         SystemMetadataCommand command = SystemMetadataCommand.set("test-key", "test-value");
         
         Future<CommandResult<?>> future = node1.submitCommand(command);
-        
-        // Verify the exception
-        assertThrows(Exception.class, () -> {
-            try {
-                future.toCompletionStage().toCompletableFuture().get(1, TimeUnit.SECONDS);
-            } catch (Exception e) {
-                assertTrue(e.getCause() instanceof IllegalStateException);
-                assertTrue(e.getCause().getMessage().contains("Not the leader"));
-                throw e;
-            }
-        });
+
+        Throwable failure = awaitFailure(future, SHORT_TIMEOUT);
+        assertInstanceOf(IllegalStateException.class, failure);
+        assertTrue(failure.getMessage().contains("Not the leader"));
     }
 
     @Test
@@ -244,7 +241,7 @@ class RaftNodeTest {
         Future<VoteResponse> future = transport1.sendVoteRequest("node2", voteRequest);
         
         assertDoesNotThrow(() -> {
-            VoteResponse response = future.toCompletionStage().toCompletableFuture().get(1, TimeUnit.SECONDS);
+            VoteResponse response = awaitSuccess(future, SHORT_TIMEOUT);
             assertNotNull(response);
             assertEquals(1, response.getTerm());
         });
@@ -311,14 +308,14 @@ class RaftNodeTest {
         @Test
         void testDurableElectionPersistsTermAndVote() {
         InMemoryRaftStorage storage = new InMemoryRaftStorage();
-        storage.open(null).toCompletionStage().toCompletableFuture().join();
+        awaitSuccess(storage.open(null), SHORT_TIMEOUT);
 
         Set<String> singleNodeCluster = Set.of("node1");
         RaftNode singleNode = RaftNode.builder().vertx(vertx).nodeId("node1").clusterNodes(singleNodeCluster)
             .transport(new InMemoryTransportSimulator("node1"))
             .stateMachine(new QuorusStateStore()).mode(RaftNodeMode.durable(storage)).electionTimeout(500).heartbeatInterval(100).build();
 
-        singleNode.start().toCompletionStage().toCompletableFuture().join();
+        awaitSuccess(singleNode.start(), SHORT_TIMEOUT);
 
         Awaitility.await()
             .atMost(Duration.ofSeconds(3))
@@ -327,19 +324,18 @@ class RaftNodeTest {
                 assertEquals(Optional.of("node1"), storage.getVotedFor(), "Self vote should be persisted");
             });
 
-        singleNode.stop().toCompletionStage().toCompletableFuture().join();
+        awaitSuccess(singleNode.stop(), SHORT_TIMEOUT);
         }
 
         @Test
         void testMultiNodeRecoveryDoesNotApplyUncommittedTail() {
         InMemoryRaftStorage storage = new InMemoryRaftStorage();
-        storage.open(null).toCompletionStage().toCompletableFuture().join();
+        awaitSuccess(storage.open(null), SHORT_TIMEOUT);
 
         SystemMetadataCommand command = SystemMetadataCommand.set("recovery-key", "tail-value");
         byte[] payload = ProtobufCommandCodec.serialize(command).toByteArray();
-        storage.appendEntries(java.util.List.of(new LogEntryData(1L, 1L, payload)))
-            .toCompletionStage().toCompletableFuture().join();
-        storage.updateMetadata(1L, Optional.empty()).toCompletionStage().toCompletableFuture().join();
+        awaitSuccess(storage.appendEntries(java.util.List.of(new LogEntryData(1L, 1L, payload))), SHORT_TIMEOUT);
+        awaitSuccess(storage.updateMetadata(1L, Optional.empty()), SHORT_TIMEOUT);
 
         QuorusStateStore recoveredState = new QuorusStateStore();
         RaftNode recovered = RaftNode.builder().vertx(vertx).nodeId("node1")
@@ -347,25 +343,24 @@ class RaftNodeTest {
             .transport(new InMemoryTransportSimulator("node1"))
             .stateMachine(recoveredState).mode(RaftNodeMode.durable(storage)).electionTimeout(10_000).heartbeatInterval(200).build();
 
-        recovered.start().toCompletionStage().toCompletableFuture().join();
+        awaitSuccess(recovered.start(), SHORT_TIMEOUT);
 
         await().atMost(Duration.ofSeconds(2))
             .untilAsserted(() -> assertNull(recoveredState.getMetadata("recovery-key"),
                 "Recovered follower must not apply uncertain log tail before leader commit"));
 
-        recovered.stop().toCompletionStage().toCompletableFuture().join();
+        awaitSuccess(recovered.stop(), SHORT_TIMEOUT);
         }
 
         @Test
         void testSingleNodeRecoveryReappliesLocalLog() {
         InMemoryRaftStorage storage = new InMemoryRaftStorage();
-        storage.open(null).toCompletionStage().toCompletableFuture().join();
+        awaitSuccess(storage.open(null), SHORT_TIMEOUT);
 
         SystemMetadataCommand command = SystemMetadataCommand.set("single-recovery-key", "single-value");
         byte[] payload = ProtobufCommandCodec.serialize(command).toByteArray();
-        storage.appendEntries(java.util.List.of(new LogEntryData(1L, 1L, payload)))
-            .toCompletionStage().toCompletableFuture().join();
-        storage.updateMetadata(1L, Optional.of("node1")).toCompletionStage().toCompletableFuture().join();
+        awaitSuccess(storage.appendEntries(java.util.List.of(new LogEntryData(1L, 1L, payload))), SHORT_TIMEOUT);
+        awaitSuccess(storage.updateMetadata(1L, Optional.of("node1")), SHORT_TIMEOUT);
 
         QuorusStateStore recoveredState = new QuorusStateStore();
         RaftNode recovered = RaftNode.builder().vertx(vertx).nodeId("node1")
@@ -373,12 +368,12 @@ class RaftNodeTest {
             .transport(new InMemoryTransportSimulator("node1"))
             .stateMachine(recoveredState).mode(RaftNodeMode.durable(storage)).electionTimeout(10_000).heartbeatInterval(200).build();
 
-        recovered.start().toCompletionStage().toCompletableFuture().join();
+        awaitSuccess(recovered.start(), SHORT_TIMEOUT);
 
         await().atMost(Duration.ofSeconds(2))
             .untilAsserted(() -> assertEquals("single-value", recoveredState.getMetadata("single-recovery-key")));
 
-        recovered.stop().toCompletionStage().toCompletableFuture().join();
+        awaitSuccess(recovered.stop(), SHORT_TIMEOUT);
         }
 
         @Test
@@ -388,12 +383,13 @@ class RaftNodeTest {
             .transport(new InMemoryTransportSimulator("node1"))
             .stateMachine(new QuorusStateStore()).mode(RaftNodeMode.volatileMode()).electionTimeout(500).heartbeatInterval(100).build();
 
-        singleNode.start().toCompletionStage().toCompletableFuture().join();
+        awaitSuccess(singleNode.start(), SHORT_TIMEOUT);
 
         await().atMost(Duration.ofSeconds(3)).until(singleNode::isLeader);
 
-        CommandResult<?> submitted = singleNode.submitCommand(SystemMetadataCommand.set("vote-log-key", "vote-log-value"))
-            .toCompletionStage().toCompletableFuture().join();
+        CommandResult<?> submitted = awaitSuccess(
+            singleNode.submitCommand(SystemMetadataCommand.set("vote-log-key", "vote-log-value")),
+            SHORT_TIMEOUT);
         assertInstanceOf(CommandResult.Success.class, submitted);
 
         VoteRequest staleCandidate = VoteRequest.newBuilder()
@@ -403,12 +399,11 @@ class RaftNodeTest {
             .setLastLogIndex(0)
             .build();
 
-        VoteResponse response = singleNode.handleVoteRequest(staleCandidate)
-            .toCompletionStage().toCompletableFuture().join();
+        VoteResponse response = awaitSuccess(singleNode.handleVoteRequest(staleCandidate), SHORT_TIMEOUT);
 
         assertFalse(response.getVoteGranted(), "Vote must be rejected when candidate log is behind");
 
-        singleNode.stop().toCompletionStage().toCompletableFuture().join();
+        awaitSuccess(singleNode.stop(), SHORT_TIMEOUT);
         }
 
         @Test
@@ -416,14 +411,14 @@ class RaftNodeTest {
         InMemoryRaftStorage delegate = new InMemoryRaftStorage();
         RaftStorage flakyMetadataStorage = oneShotMetadataFailureStorage(delegate);
 
-        flakyMetadataStorage.open(null).toCompletionStage().toCompletableFuture().join();
+        awaitSuccess(flakyMetadataStorage.open(null), SHORT_TIMEOUT);
 
         Set<String> singleNodeCluster = Set.of("node1");
         RaftNode durableNode = RaftNode.builder().vertx(vertx).nodeId("node1").clusterNodes(singleNodeCluster)
             .transport(new InMemoryTransportSimulator("node1"))
             .stateMachine(new QuorusStateStore()).mode(RaftNodeMode.durable(flakyMetadataStorage)).electionTimeout(10_000).heartbeatInterval(200).build();
 
-        durableNode.start().toCompletionStage().toCompletableFuture().join();
+        awaitSuccess(durableNode.start(), SHORT_TIMEOUT);
 
         VoteRequest voteRequest = VoteRequest.newBuilder()
             .setTerm(7)
@@ -432,19 +427,17 @@ class RaftNodeTest {
             .setLastLogTerm(99)
             .build();
 
-        VoteResponse response = durableNode.handleVoteRequest(voteRequest)
-            .toCompletionStage().toCompletableFuture().join();
+        VoteResponse response = awaitSuccess(durableNode.handleVoteRequest(voteRequest), SHORT_TIMEOUT);
 
         assertFalse(response.getVoteGranted(), "Vote should be rejected when metadata persistence fails");
         assertEquals(7, response.getTerm(), "Response should still reflect higher observed term");
 
-        RaftStorage.PersistentMeta persistedMeta = flakyMetadataStorage.loadMetadata()
-            .toCompletionStage().toCompletableFuture().join();
+        RaftStorage.PersistentMeta persistedMeta = awaitSuccess(flakyMetadataStorage.loadMetadata(), SHORT_TIMEOUT);
         assertEquals(7, persistedMeta.currentTerm(), "Higher term must be persisted to avoid term regression after restart");
         assertEquals(Optional.empty(), persistedMeta.votedFor(), "No vote should be persisted when vote write failed");
         logExpectedFailure("vote-grant metadata persistence one-shot failure fallback", new IllegalStateException("Simulated one-shot metadata failure"));
 
-        durableNode.stop().toCompletionStage().toCompletableFuture().join();
+        awaitSuccess(durableNode.stop(), SHORT_TIMEOUT);
         }
 
     @Test
@@ -453,18 +446,19 @@ class RaftNodeTest {
         Path storageDir = tempDir.resolve("vote-reject-higher-term");
 
         RaftStorage storage = new FileRaftStorage(vertx, executor);
-        storage.open(storageDir).toCompletionStage().toCompletableFuture().join();
+        awaitSuccess(storage.open(storageDir), SHORT_TIMEOUT);
 
         Set<String> singleNodeCluster = Set.of("node1");
         RaftNode durableNode = RaftNode.builder().vertx(vertx).nodeId("node1").clusterNodes(singleNodeCluster)
             .transport(new InMemoryTransportSimulator("node1"))
             .stateMachine(new QuorusStateStore()).mode(RaftNodeMode.durable(storage)).electionTimeout(500).heartbeatInterval(100).build();
 
-        durableNode.start().toCompletionStage().toCompletableFuture().join();
+        awaitSuccess(durableNode.start(), SHORT_TIMEOUT);
         await().atMost(Duration.ofSeconds(3)).until(durableNode::isLeader);
 
-        CommandResult<?> submitted = durableNode.submitCommand(SystemMetadataCommand.set("vote-log-key", "vote-log-value"))
-            .toCompletionStage().toCompletableFuture().join();
+        CommandResult<?> submitted = awaitSuccess(
+            durableNode.submitCommand(SystemMetadataCommand.set("vote-log-key", "vote-log-value")),
+            SHORT_TIMEOUT);
         assertInstanceOf(CommandResult.Success.class, submitted);
 
         long higherTerm = durableNode.getCurrentTerm() + 5;
@@ -475,17 +469,16 @@ class RaftNodeTest {
             .setLastLogIndex(0)
             .build();
 
-        VoteResponse response = durableNode.handleVoteRequest(staleCandidate)
-            .toCompletionStage().toCompletableFuture().join();
+        VoteResponse response = awaitSuccess(durableNode.handleVoteRequest(staleCandidate), SHORT_TIMEOUT);
 
         assertFalse(response.getVoteGranted(), "Vote must be rejected when candidate log is behind");
         assertEquals(higherTerm, response.getTerm(), "Node should report observed higher term in response");
 
-        durableNode.stop().toCompletionStage().toCompletableFuture().join();
+        awaitSuccess(durableNode.stop(), SHORT_TIMEOUT);
 
         WorkerExecutor recoveryExecutor = vertx.createSharedWorkerExecutor("vote-persist-recovery-test", 1);
         RaftStorage recoveryStorage = new FileRaftStorage(vertx, recoveryExecutor);
-        recoveryStorage.open(storageDir).toCompletionStage().toCompletableFuture().join();
+        awaitSuccess(recoveryStorage.open(storageDir), SHORT_TIMEOUT);
 
         RaftNode recovered = RaftNode.builder().vertx(vertx).nodeId("node1")
             .clusterNodes(singleNodeCluster)
@@ -496,12 +489,12 @@ class RaftNodeTest {
             .heartbeatInterval(200)
             .build();
 
-        recovered.start().toCompletionStage().toCompletableFuture().join();
+        awaitSuccess(recovered.start(), SHORT_TIMEOUT);
 
         assertEquals(higherTerm, recovered.getCurrentTerm(),
             "Higher observed term must be durable after rejecting stale candidate to prevent term regression");
 
-        recovered.stop().toCompletionStage().toCompletableFuture().join();
+        awaitSuccess(recovered.stop(), SHORT_TIMEOUT);
         executor.close();
         recoveryExecutor.close();
     }
@@ -512,18 +505,19 @@ class RaftNodeTest {
         Path storageDir = tempDir.resolve("vote-reject-higher-term-empty-vote");
 
         RaftStorage storage = new FileRaftStorage(vertx, executor);
-        storage.open(storageDir).toCompletionStage().toCompletableFuture().join();
+        awaitSuccess(storage.open(storageDir), SHORT_TIMEOUT);
 
         Set<String> singleNodeCluster = Set.of("node1");
         RaftNode durableNode = RaftNode.builder().vertx(vertx).nodeId("node1").clusterNodes(singleNodeCluster)
             .transport(new InMemoryTransportSimulator("node1"))
             .stateMachine(new QuorusStateStore()).mode(RaftNodeMode.durable(storage)).electionTimeout(500).heartbeatInterval(100).build();
 
-        durableNode.start().toCompletionStage().toCompletableFuture().join();
+        awaitSuccess(durableNode.start(), SHORT_TIMEOUT);
         await().atMost(Duration.ofSeconds(3)).until(durableNode::isLeader);
 
-        CommandResult<?> submitted = durableNode.submitCommand(SystemMetadataCommand.set("vote-log-key-2", "vote-log-value-2"))
-            .toCompletionStage().toCompletableFuture().join();
+        CommandResult<?> submitted = awaitSuccess(
+            durableNode.submitCommand(SystemMetadataCommand.set("vote-log-key-2", "vote-log-value-2")),
+            SHORT_TIMEOUT);
         assertInstanceOf(CommandResult.Success.class, submitted);
 
         long higherTerm = durableNode.getCurrentTerm() + 7;
@@ -534,27 +528,25 @@ class RaftNodeTest {
             .setLastLogIndex(0)
             .build();
 
-        VoteResponse response = durableNode.handleVoteRequest(staleCandidate)
-            .toCompletionStage().toCompletableFuture().join();
+        VoteResponse response = awaitSuccess(durableNode.handleVoteRequest(staleCandidate), SHORT_TIMEOUT);
 
         assertFalse(response.getVoteGranted());
         assertEquals(higherTerm, response.getTerm());
 
-        durableNode.stop().toCompletionStage().toCompletableFuture().join();
+        awaitSuccess(durableNode.stop(), SHORT_TIMEOUT);
 
         WorkerExecutor recoveryExecutor = vertx.createSharedWorkerExecutor("vote-persist-vote-state-recovery-test", 1);
         RaftStorage recoveryStorage = new FileRaftStorage(vertx, recoveryExecutor);
-        recoveryStorage.open(storageDir).toCompletionStage().toCompletableFuture().join();
+        awaitSuccess(recoveryStorage.open(storageDir), SHORT_TIMEOUT);
 
-        RaftStorage.PersistentMeta persistedMeta = recoveryStorage.loadMetadata()
-            .toCompletionStage().toCompletableFuture().join();
+        RaftStorage.PersistentMeta persistedMeta = awaitSuccess(recoveryStorage.loadMetadata(), SHORT_TIMEOUT);
 
         assertEquals(higherTerm, persistedMeta.currentTerm(),
             "Rejecting higher-term stale candidate should still persist the observed term");
         assertEquals(Optional.empty(), persistedMeta.votedFor(),
             "No candidate should be persisted when vote is rejected");
 
-        recoveryStorage.close().toCompletionStage().toCompletableFuture().join();
+        awaitSuccess(recoveryStorage.close(), SHORT_TIMEOUT);
         executor.close();
         recoveryExecutor.close();
     }
@@ -624,17 +616,18 @@ class RaftNodeTest {
                 return delegate.truncatePrefix(toIndex);
             }
         };
-        flakyMetadataStorage.open(null).toCompletionStage().toCompletableFuture().join();
+        awaitSuccess(flakyMetadataStorage.open(null), SHORT_TIMEOUT);
 
         RaftNode durableNode = RaftNode.builder().vertx(vertx).nodeId("node1").clusterNodes(Set.of("node1"))
             .transport(new InMemoryTransportSimulator("node1"))
             .stateMachine(new QuorusStateStore()).mode(RaftNodeMode.durable(flakyMetadataStorage)).electionTimeout(500).heartbeatInterval(100).build();
 
-        durableNode.start().toCompletionStage().toCompletableFuture().join();
+        awaitSuccess(durableNode.start(), SHORT_TIMEOUT);
         await().atMost(Duration.ofSeconds(3)).until(durableNode::isLeader);
 
-        CommandResult<?> submitted = durableNode.submitCommand(SystemMetadataCommand.set("stale-check-key", "stale-check-value"))
-            .toCompletionStage().toCompletableFuture().join();
+        CommandResult<?> submitted = awaitSuccess(
+            durableNode.submitCommand(SystemMetadataCommand.set("stale-check-key", "stale-check-value")),
+            SHORT_TIMEOUT);
         assertInstanceOf(CommandResult.Success.class, submitted);
 
         VoteRequest staleCandidate = VoteRequest.newBuilder()
@@ -644,35 +637,31 @@ class RaftNodeTest {
             .setLastLogIndex(0)
             .build();
 
-        Exception voteFailure = assertThrows(Exception.class, () ->
-            durableNode.handleVoteRequest(staleCandidate)
-                .toCompletionStage().toCompletableFuture().join());
-        assertNotNull(voteFailure.getCause(), "Failure should carry the underlying persistence exception");
-        assertInstanceOf(IllegalStateException.class, voteFailure.getCause());
-        logExpectedFailure("vote-rejection higher-term metadata persistence", voteFailure.getCause());
+        Throwable voteFailure = awaitFailure(durableNode.handleVoteRequest(staleCandidate), SHORT_TIMEOUT);
+        assertInstanceOf(IllegalStateException.class, voteFailure, "Failure should carry the underlying persistence exception");
+        logExpectedFailure("vote-rejection higher-term metadata persistence", voteFailure);
         assertTrue(failedOnRejectWrite[0], "Test setup should fail the higher-term empty-vote persistence write");
 
-        RaftStorage.PersistentMeta persistedMeta = flakyMetadataStorage.loadMetadata()
-            .toCompletionStage().toCompletableFuture().join();
+        RaftStorage.PersistentMeta persistedMeta = awaitSuccess(flakyMetadataStorage.loadMetadata(), SHORT_TIMEOUT);
         assertTrue(persistedMeta.currentTerm() < higherTerm,
             "Failed persistence in rejection path should not durably advance term to the observed higher value");
         assertNotEquals(Optional.of("candidate-behind-failing-persist"), persistedMeta.votedFor(),
             "Rejecting stale candidate with failed metadata write must not persist vote for that candidate");
 
-        durableNode.stop().toCompletionStage().toCompletableFuture().join();
+        awaitSuccess(durableNode.stop(), SHORT_TIMEOUT);
     }
 
         @Test
         void testAppendEntriesRejectsWhenHigherTermMetadataPersistFails() {
         InMemoryRaftStorage delegate = new InMemoryRaftStorage();
         RaftStorage flakyMetadataStorage = oneShotMetadataFailureStorage(delegate);
-        flakyMetadataStorage.open(null).toCompletionStage().toCompletableFuture().join();
+        awaitSuccess(flakyMetadataStorage.open(null), SHORT_TIMEOUT);
 
         RaftNode durableNode = RaftNode.builder().vertx(vertx).nodeId("node1").clusterNodes(Set.of("node1"))
             .transport(new InMemoryTransportSimulator("node1"))
             .stateMachine(new QuorusStateStore()).mode(RaftNodeMode.durable(flakyMetadataStorage)).electionTimeout(10_000).heartbeatInterval(200).build();
 
-        durableNode.start().toCompletionStage().toCompletableFuture().join();
+        awaitSuccess(durableNode.start(), SHORT_TIMEOUT);
 
         AppendEntriesRequest request = AppendEntriesRequest.newBuilder()
             .setTerm(9)
@@ -682,27 +671,26 @@ class RaftNodeTest {
             .setLeaderCommit(0)
             .build();
 
-        AppendEntriesResponse response = durableNode.handleAppendEntriesRequest(request)
-            .toCompletionStage().toCompletableFuture().join();
+        AppendEntriesResponse response = awaitSuccess(durableNode.handleAppendEntriesRequest(request), SHORT_TIMEOUT);
 
         assertFalse(response.getSuccess(), "AppendEntries must be rejected if higher-term metadata cannot be durably persisted first");
         assertEquals(9, response.getTerm());
         logExpectedFailure("append-entries higher-term metadata persistence", new IllegalStateException("Injected one-shot metadata failure expected by test"));
 
-        durableNode.stop().toCompletionStage().toCompletableFuture().join();
+        awaitSuccess(durableNode.stop(), SHORT_TIMEOUT);
         }
 
         @Test
         void testInstallSnapshotRejectsWhenHigherTermMetadataPersistFails() {
         InMemoryRaftStorage delegate = new InMemoryRaftStorage();
         RaftStorage flakyMetadataStorage = oneShotMetadataFailureStorage(delegate);
-        flakyMetadataStorage.open(null).toCompletionStage().toCompletableFuture().join();
+        awaitSuccess(flakyMetadataStorage.open(null), SHORT_TIMEOUT);
 
         RaftNode durableNode = RaftNode.builder().vertx(vertx).nodeId("node1").clusterNodes(Set.of("node1"))
             .transport(new InMemoryTransportSimulator("node1"))
             .stateMachine(new QuorusStateStore()).mode(RaftNodeMode.durable(flakyMetadataStorage)).electionTimeout(10_000).heartbeatInterval(200).build();
 
-        durableNode.start().toCompletionStage().toCompletableFuture().join();
+        awaitSuccess(durableNode.start(), SHORT_TIMEOUT);
 
         InstallSnapshotRequest request = InstallSnapshotRequest.newBuilder()
             .setTerm(11)
@@ -715,14 +703,13 @@ class RaftNodeTest {
             .setDone(false)
             .build();
 
-        InstallSnapshotResponse response = durableNode.handleInstallSnapshot(request)
-            .toCompletionStage().toCompletableFuture().join();
+        InstallSnapshotResponse response = awaitSuccess(durableNode.handleInstallSnapshot(request), SHORT_TIMEOUT);
 
         assertFalse(response.getSuccess(), "InstallSnapshot must be rejected if higher-term metadata cannot be durably persisted first");
         assertEquals(11, response.getTerm());
         logExpectedFailure("install-snapshot higher-term metadata persistence", new IllegalStateException("Injected one-shot metadata failure expected by test"));
 
-        durableNode.stop().toCompletionStage().toCompletableFuture().join();
+        awaitSuccess(durableNode.stop(), SHORT_TIMEOUT);
         }
 
         private static void logExpectedFailure(String scenario, Throwable failure) {
@@ -793,4 +780,34 @@ class RaftNodeTest {
             }
         };
         }
+
+    private static <T> T awaitSuccess(Future<T> future, Duration timeout) {
+        AtomicReference<AsyncResult<T>> outcomeRef = new AtomicReference<>();
+
+        future.onComplete(outcomeRef::set);
+
+        await().atMost(timeout)
+            .pollInterval(Duration.ofMillis(10))
+            .until(() -> outcomeRef.get() != null);
+
+        AsyncResult<T> outcome = outcomeRef.get();
+        if (outcome.failed()) {
+            throw new AssertionError("Future failed", outcome.cause());
+        }
+        return outcome.result();
+    }
+
+    private static Throwable awaitFailure(Future<?> future, Duration timeout) {
+        AtomicReference<AsyncResult<?>> outcomeRef = new AtomicReference<>();
+
+        future.onComplete(outcomeRef::set);
+
+        await().atMost(timeout)
+            .pollInterval(Duration.ofMillis(10))
+            .until(() -> outcomeRef.get() != null);
+
+        AsyncResult<?> outcome = outcomeRef.get();
+        assertTrue(outcome.failed(), "Expected future to fail");
+        return outcome.cause();
+    }
 }

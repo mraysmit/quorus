@@ -329,12 +329,17 @@ public class InMemoryTransportSimulator implements RaftTransport {
                     DelayedMessage delayed = new DelayedMessage(
                         System.currentTimeMillis() + delay + reorderDelay,
                         () -> {
-                            VoteResponse response = targetTransport.handleVoteRequest(request);
-                            // Apply Byzantine corruption if enabled
-                            if (failureMode == FailureMode.BYZANTINE && random.nextDouble() < byzantineCorruptionRate) {
-                                response = corruptVoteResponse(response);
-                            }
-                            promise.complete(response);
+                            targetTransport.handleVoteRequest(request).onComplete(ar -> {
+                                if (ar.succeeded()) {
+                                    VoteResponse response = ar.result();
+                                    if (failureMode == FailureMode.BYZANTINE && random.nextDouble() < byzantineCorruptionRate) {
+                                        response = corruptVoteResponse(response);
+                                    }
+                                    promise.complete(response);
+                                } else {
+                                    promise.fail(ar.cause());
+                                }
+                            });
                         }
                     );
                     messageQueue.offer(delayed);
@@ -343,17 +348,19 @@ public class InMemoryTransportSimulator implements RaftTransport {
                 }
 
                 // Process vote request
-                VoteResponse response = targetTransport.handleVoteRequest(request);
-                
-                // Apply Byzantine corruption if enabled
-                if (failureMode == FailureMode.BYZANTINE && random.nextDouble() < byzantineCorruptionRate) {
-                    response = corruptVoteResponse(response);
-                    logger.debug("Corrupted VoteResponse from {} to {} (Byzantine)", targetNodeId, nodeId);
-                }
-                
-                logger.debug("Vote request from {} to {}: {}", nodeId, targetNodeId, response.getVoteGranted());
-                
-                promise.complete(response);
+                targetTransport.handleVoteRequest(request).onComplete(ar -> {
+                    if (ar.succeeded()) {
+                        VoteResponse response = ar.result();
+                        if (failureMode == FailureMode.BYZANTINE && random.nextDouble() < byzantineCorruptionRate) {
+                            response = corruptVoteResponse(response);
+                            logger.debug("Corrupted VoteResponse from {} to {} (Byzantine)", targetNodeId, nodeId);
+                        }
+                        logger.debug("Vote request from {} to {}: {}", nodeId, targetNodeId, response.getVoteGranted());
+                        promise.complete(response);
+                    } else {
+                        promise.fail(ar.cause());
+                    }
+                });
             } catch (Exception e) {
                 promise.fail(e);
             }
@@ -407,12 +414,17 @@ public class InMemoryTransportSimulator implements RaftTransport {
                     DelayedMessage delayed = new DelayedMessage(
                         System.currentTimeMillis() + delay + reorderDelay,
                         () -> {
-                            AppendEntriesResponse response = targetTransport.handleAppendEntries(request);
-                            // Apply Byzantine corruption if enabled
-                            if (failureMode == FailureMode.BYZANTINE && random.nextDouble() < byzantineCorruptionRate) {
-                                response = corruptAppendEntriesResponse(response);
-                            }
-                            promise.complete(response);
+                            targetTransport.handleAppendEntries(request).onComplete(ar -> {
+                                if (ar.succeeded()) {
+                                    AppendEntriesResponse response = ar.result();
+                                    if (failureMode == FailureMode.BYZANTINE && random.nextDouble() < byzantineCorruptionRate) {
+                                        response = corruptAppendEntriesResponse(response);
+                                    }
+                                    promise.complete(response);
+                                } else {
+                                    promise.fail(ar.cause());
+                                }
+                            });
                         }
                     );
                     messageQueue.offer(delayed);
@@ -421,17 +433,19 @@ public class InMemoryTransportSimulator implements RaftTransport {
                 }
 
                 // Process append entries request
-                AppendEntriesResponse response = targetTransport.handleAppendEntries(request);
-                
-                // Apply Byzantine corruption if enabled
-                if (failureMode == FailureMode.BYZANTINE && random.nextDouble() < byzantineCorruptionRate) {
-                    response = corruptAppendEntriesResponse(response);
-                    logger.debug("Corrupted AppendEntriesResponse from {} to {} (Byzantine)", targetNodeId, nodeId);
-                }
-                
-                logger.debug("Append entries from {} to {}: {}", nodeId, targetNodeId, response.getSuccess());
-                
-                promise.complete(response);
+                targetTransport.handleAppendEntries(request).onComplete(ar -> {
+                    if (ar.succeeded()) {
+                        AppendEntriesResponse response = ar.result();
+                        if (failureMode == FailureMode.BYZANTINE && random.nextDouble() < byzantineCorruptionRate) {
+                            response = corruptAppendEntriesResponse(response);
+                            logger.debug("Corrupted AppendEntriesResponse from {} to {} (Byzantine)", targetNodeId, nodeId);
+                        }
+                        logger.debug("Append entries from {} to {}: {}", nodeId, targetNodeId, response.getSuccess());
+                        promise.complete(response);
+                    } else {
+                        promise.fail(ar.cause());
+                    }
+                });
             } catch (Exception e) {
                 promise.fail(e);
             }
@@ -477,9 +491,9 @@ public class InMemoryTransportSimulator implements RaftTransport {
     }
 
 
-    private VoteResponse handleVoteRequest(VoteRequest request) {
+    private Future<VoteResponse> handleVoteRequest(VoteRequest request) {
         if (raftNode != null) {
-            return raftNode.handleVoteRequest(request).toCompletionStage().toCompletableFuture().join();
+            return raftNode.handleVoteRequest(request);
         }
         
         if (messageHandler != null) {
@@ -487,15 +501,15 @@ public class InMemoryTransportSimulator implements RaftTransport {
         }
         
         logger.warn("RaftNode not set for transport {}, returning failure", nodeId);
-        return VoteResponse.newBuilder()
+        return Future.succeededFuture(VoteResponse.newBuilder()
                 .setTerm(request.getTerm())
                 .setVoteGranted(false)
-                .build();
+                .build());
     }
 
-    private AppendEntriesResponse handleAppendEntries(AppendEntriesRequest request) {
+    private Future<AppendEntriesResponse> handleAppendEntries(AppendEntriesRequest request) {
         if (raftNode != null) {
-            return raftNode.handleAppendEntriesRequest(request).toCompletionStage().toCompletableFuture().join();
+            return raftNode.handleAppendEntriesRequest(request);
         }
 
         if (messageHandler != null) {
@@ -503,23 +517,23 @@ public class InMemoryTransportSimulator implements RaftTransport {
         }
         
         logger.warn("RaftNode not set for transport {}, returning failure", nodeId);
-        return AppendEntriesResponse.newBuilder()
+        return Future.succeededFuture(AppendEntriesResponse.newBuilder()
                 .setTerm(request.getTerm())
                 .setSuccess(false)
-                .build();
+                .build());
     }
 
-    private InstallSnapshotResponse handleInstallSnapshot(InstallSnapshotRequest request) {
+    private Future<InstallSnapshotResponse> handleInstallSnapshot(InstallSnapshotRequest request) {
         if (raftNode != null) {
-            return raftNode.handleInstallSnapshot(request).toCompletionStage().toCompletableFuture().join();
+            return raftNode.handleInstallSnapshot(request);
         }
 
         logger.warn("RaftNode not set for transport {}, returning failure for InstallSnapshot", nodeId);
-        return InstallSnapshotResponse.newBuilder()
+        return Future.succeededFuture(InstallSnapshotResponse.newBuilder()
                 .setTerm(request.getTerm())
                 .setSuccess(false)
                 .setNextChunkIndex(0)
-                .build();
+                .build());
     }
 
     @Override
@@ -559,11 +573,15 @@ public class InMemoryTransportSimulator implements RaftTransport {
                 Thread.sleep(delay);
 
                 // Process install snapshot request
-                InstallSnapshotResponse response = targetTransport.handleInstallSnapshot(request);
-
-                logger.debug("InstallSnapshot from {} to {}: success={}", nodeId, targetNodeId, response.getSuccess());
-
-                promise.complete(response);
+                targetTransport.handleInstallSnapshot(request).onComplete(ar -> {
+                    if (ar.succeeded()) {
+                        InstallSnapshotResponse response = ar.result();
+                        logger.debug("InstallSnapshot from {} to {}: success={}", nodeId, targetNodeId, response.getSuccess());
+                        promise.complete(response);
+                    } else {
+                        promise.fail(ar.cause());
+                    }
+                });
             } catch (Exception e) {
                 promise.fail(e);
             }

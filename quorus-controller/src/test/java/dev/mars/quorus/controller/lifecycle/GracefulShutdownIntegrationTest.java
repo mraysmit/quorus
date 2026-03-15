@@ -22,6 +22,7 @@ import dev.mars.quorus.controller.raft.RaftNode;
 import dev.mars.quorus.controller.raft.RaftNodeMode;
 import dev.mars.quorus.controller.raft.RaftTransport;
 import dev.mars.quorus.controller.state.QuorusStateStore;
+import io.vertx.core.AsyncResult;
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonObject;
@@ -33,7 +34,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.time.Duration;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.*;
@@ -81,8 +82,7 @@ class GracefulShutdownIntegrationTest {
                     .until(raftNode::isLeader);
 
             HttpApiServer apiServer = new HttpApiServer(vertx, HTTP_PORT, raftNode, stateMachine);
-            apiServer.start().toCompletionStage().toCompletableFuture()
-                    .get(5, TimeUnit.SECONDS);
+                awaitSuccess(apiServer.start(), Duration.ofSeconds(5));
 
             // Configure shutdown coordinator with real services
             ShutdownCoordinator coordinator = new ShutdownCoordinator(vertx, 2000, 10000);
@@ -133,14 +133,12 @@ class GracefulShutdownIntegrationTest {
                     .until(raftNode::isLeader);
 
             HttpApiServer apiServer = new HttpApiServer(vertx, port, raftNode, stateMachine);
-            apiServer.start().toCompletionStage().toCompletableFuture()
-                    .get(5, TimeUnit.SECONDS);
+                awaitSuccess(apiServer.start(), Duration.ofSeconds(5));
 
             WebClient webClient = WebClient.create(vertx);
 
             // Enter drain mode
-            apiServer.enterDrainMode().toCompletionStage().toCompletableFuture()
-                    .get(5, TimeUnit.SECONDS);
+                awaitSuccess(apiServer.enterDrainMode(), Duration.ofSeconds(5));
 
             // Health should still work
             webClient.get(port, "localhost", "/health/live")
@@ -196,5 +194,21 @@ class GracefulShutdownIntegrationTest {
                         ctx.completeNow();
                     })));
         }
+    }
+
+    private static <T> T awaitSuccess(Future<T> future, Duration timeout) {
+        AtomicReference<AsyncResult<T>> outcomeRef = new AtomicReference<>();
+
+        future.onComplete(outcomeRef::set);
+
+        await().atMost(timeout)
+                .pollInterval(Duration.ofMillis(10))
+                .until(() -> outcomeRef.get() != null);
+
+        AsyncResult<T> outcome = outcomeRef.get();
+        if (outcome.failed()) {
+            throw new AssertionError("Future failed", outcome.cause());
+        }
+        return outcome.result();
     }
 }

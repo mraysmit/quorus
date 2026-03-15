@@ -123,11 +123,16 @@ public class MockRaftTransport implements RaftTransport {
                 }
 
                 // Process vote request
-                VoteResponse response = targetTransport.handleVoteRequest(request);
-                logger.fine("Vote request from " + nodeId + " to " + targetNodeId + 
-                           ": " + response.getVoteGranted());
-                
-                promise.complete(response);
+                targetTransport.handleVoteRequest(request).onComplete(ar -> {
+                    if (ar.succeeded()) {
+                        VoteResponse response = ar.result();
+                        logger.fine("Vote request from " + nodeId + " to " + targetNodeId + 
+                                   ": " + response.getVoteGranted());
+                        promise.complete(response);
+                    } else {
+                        promise.fail(ar.cause());
+                    }
+                });
             } catch (Exception e) {
                 promise.fail(e);
             }
@@ -159,11 +164,16 @@ public class MockRaftTransport implements RaftTransport {
                 }
 
                 // Process append entries request
-                AppendEntriesResponse response = targetTransport.handleAppendEntries(request);
-                logger.fine("Append entries from " + nodeId + " to " + targetNodeId + 
-                           ": " + response.getSuccess());
-                
-                promise.complete(response);
+                targetTransport.handleAppendEntries(request).onComplete(ar -> {
+                    if (ar.succeeded()) {
+                        AppendEntriesResponse response = ar.result();
+                        logger.fine("Append entries from " + nodeId + " to " + targetNodeId + 
+                                   ": " + response.getSuccess());
+                        promise.complete(response);
+                    } else {
+                        promise.fail(ar.cause());
+                    }
+                });
             } catch (Exception e) {
                 promise.fail(e);
             }
@@ -172,9 +182,9 @@ public class MockRaftTransport implements RaftTransport {
         return promise.future();
     }
 
-    private VoteResponse handleVoteRequest(VoteRequest request) {
+    private Future<VoteResponse> handleVoteRequest(VoteRequest request) {
         if (raftNode != null) {
-            return raftNode.handleVoteRequest(request).toCompletionStage().toCompletableFuture().join();
+            return raftNode.handleVoteRequest(request);
         }
         
         if (messageHandler != null) {
@@ -184,15 +194,15 @@ public class MockRaftTransport implements RaftTransport {
         // Fallback if RaftNode is not set (should not happen in correct setup)
         boolean voteGranted = Math.random() > 0.1; 
         
-        return VoteResponse.newBuilder()
+        return Future.succeededFuture(VoteResponse.newBuilder()
                 .setTerm(request.getTerm())
                 .setVoteGranted(voteGranted)
-                .build();
+                .build());
     }
 
-    private AppendEntriesResponse handleAppendEntries(AppendEntriesRequest request) {
+    private Future<AppendEntriesResponse> handleAppendEntries(AppendEntriesRequest request) {
         if (raftNode != null) {
-            return raftNode.handleAppendEntriesRequest(request).toCompletionStage().toCompletableFuture().join();
+            return raftNode.handleAppendEntriesRequest(request);
         }
 
         if (messageHandler != null) {
@@ -203,11 +213,11 @@ public class MockRaftTransport implements RaftTransport {
         boolean success = Math.random() > 0.05; 
         long matchIndex = request.getPrevLogIndex() + request.getEntriesCount();
         
-        return AppendEntriesResponse.newBuilder()
+        return Future.succeededFuture(AppendEntriesResponse.newBuilder()
                 .setTerm(request.getTerm())
                 .setSuccess(success)
                 .setMatchIndex(matchIndex)
-                .build();
+            .build());
     }
 
     @Override
@@ -225,8 +235,13 @@ public class MockRaftTransport implements RaftTransport {
 
                 Thread.sleep(5 + (long) (Math.random() * 10));
 
-                InstallSnapshotResponse response = targetTransport.handleInstallSnapshot(request);
-                promise.complete(response);
+                targetTransport.handleInstallSnapshot(request).onComplete(ar -> {
+                    if (ar.succeeded()) {
+                        promise.complete(ar.result());
+                    } else {
+                        promise.fail(ar.cause());
+                    }
+                });
             } catch (Exception e) {
                 promise.fail(e);
             }
@@ -235,15 +250,15 @@ public class MockRaftTransport implements RaftTransport {
         return promise.future();
     }
 
-    private InstallSnapshotResponse handleInstallSnapshot(InstallSnapshotRequest request) {
+    private Future<InstallSnapshotResponse> handleInstallSnapshot(InstallSnapshotRequest request) {
         if (raftNode != null) {
-            return raftNode.handleInstallSnapshot(request).toCompletionStage().toCompletableFuture().join();
+            return raftNode.handleInstallSnapshot(request);
         }
 
-        return InstallSnapshotResponse.newBuilder()
+        return Future.succeededFuture(InstallSnapshotResponse.newBuilder()
                 .setTerm(request.getTerm())
                 .setSuccess(false)
                 .setNextChunkIndex(0)
-                .build();
+                .build());
     }
 }

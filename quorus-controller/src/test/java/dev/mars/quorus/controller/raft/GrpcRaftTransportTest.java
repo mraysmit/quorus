@@ -33,11 +33,12 @@ import org.junit.jupiter.api.parallel.ExecutionMode;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -637,16 +638,17 @@ class GrpcRaftTransportTest {
                 .build();
         
         // Send multiple concurrent requests (within pool limits)
-        CompletableFuture<?>[] futures = new CompletableFuture[5];
+        List<Future<VoteResponse>> futures = new ArrayList<>();
         for (int i = 0; i < 5; i++) {
-            futures[i] = transport.sendVoteRequest("target", request)
-                    .toCompletionStage().toCompletableFuture();
+            futures.add(transport.sendVoteRequest("target", request));
         }
         
         // All should complete within timeout
-        awaitSuccess(CompletableFuture.allOf(futures), LONG_TIMEOUT);
+        await().atMost(LONG_TIMEOUT)
+                .pollInterval(Duration.ofMillis(10))
+                .until(() -> futures.stream().allMatch(Future::isComplete));
         
-        for (CompletableFuture<?> f : futures) {
+        for (Future<VoteResponse> f : futures) {
             assertNotNull(awaitSuccess(f, MEDIUM_TIMEOUT), "All responses should be non-null");
         }
         
@@ -683,32 +685,4 @@ class GrpcRaftTransportTest {
         return outcome.cause();
     }
 
-    private static <T> T awaitSuccess(CompletableFuture<T> future, Duration timeout) {
-        AtomicReference<T> resultRef = new AtomicReference<>();
-        AtomicReference<Throwable> errorRef = new AtomicReference<>();
-        AtomicBoolean completed = new AtomicBoolean(false);
-
-        future.whenComplete((result, error) -> {
-            resultRef.set(result);
-            errorRef.set(error);
-            completed.set(true);
-        });
-
-        await().atMost(timeout)
-                .pollInterval(Duration.ofMillis(10))
-                .until(completed::get);
-
-        Throwable error = unwrapCompletionError(errorRef.get());
-        if (error != null) {
-            throw new AssertionError("Future failed", error);
-        }
-        return resultRef.get();
-    }
-
-    private static Throwable unwrapCompletionError(Throwable error) {
-        if (error instanceof CompletionException || error instanceof ExecutionException) {
-            return error.getCause() == null ? error : error.getCause();
-        }
-        return error;
-    }
 }

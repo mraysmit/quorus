@@ -21,6 +21,7 @@ import dev.mars.quorus.controller.raft.RaftNode;
 import dev.mars.quorus.controller.raft.RaftNodeMode;
 import dev.mars.quorus.controller.raft.RaftTransport;
 import dev.mars.quorus.controller.state.QuorusStateStore;
+import io.vertx.core.AsyncResult;
 import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.client.WebClient;
@@ -31,6 +32,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.time.Duration;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.*;
@@ -115,12 +117,10 @@ class LeaderGuardHandlerTest {
 
         // Start HTTP servers on leader and follower
         leaderServer = new HttpApiServer(vertx, LEADER_PORT, leaderNode, leaderStateStore);
-        leaderServer.start().toCompletionStage().toCompletableFuture()
-                .get(5, java.util.concurrent.TimeUnit.SECONDS);
+        awaitSuccess(leaderServer.start(), Duration.ofSeconds(5));
 
         followerServer = new HttpApiServer(vertx, FOLLOWER_PORT, followerNode, followerStateStore);
-        followerServer.start().toCompletionStage().toCompletableFuture()
-                .get(5, java.util.concurrent.TimeUnit.SECONDS);
+        awaitSuccess(followerServer.start(), Duration.ofSeconds(5));
 
         webClient = WebClient.create(vertx);
     }
@@ -128,13 +128,26 @@ class LeaderGuardHandlerTest {
     @AfterAll
     static void tearDown() throws Exception {
         if (webClient != null) webClient.close();
-        if (leaderServer != null) leaderServer.stop().toCompletionStage().toCompletableFuture()
-                .get(5, java.util.concurrent.TimeUnit.SECONDS);
-        if (followerServer != null) followerServer.stop().toCompletionStage().toCompletableFuture()
-                .get(5, java.util.concurrent.TimeUnit.SECONDS);
-        if (vertx != null) vertx.close().toCompletionStage().toCompletableFuture()
-                .get(5, java.util.concurrent.TimeUnit.SECONDS);
+        if (leaderServer != null) awaitSuccess(leaderServer.stop(), Duration.ofSeconds(5));
+        if (followerServer != null) awaitSuccess(followerServer.stop(), Duration.ofSeconds(5));
+        if (vertx != null) awaitSuccess(vertx.close(), Duration.ofSeconds(5));
         InMemoryTransportSimulator.clearAllTransports();
+    }
+
+    private static <T> T awaitSuccess(io.vertx.core.Future<T> future, Duration timeout) {
+        AtomicReference<AsyncResult<T>> outcomeRef = new AtomicReference<>();
+
+        future.onComplete(outcomeRef::set);
+
+        await().atMost(timeout)
+                .pollInterval(Duration.ofMillis(10))
+                .until(() -> outcomeRef.get() != null);
+
+        AsyncResult<T> outcome = outcomeRef.get();
+        if (outcome.failed()) {
+            throw new AssertionError("Future failed", outcome.cause());
+        }
+        return outcome.result();
     }
 
     // ==================== Leader: writes pass through ====================

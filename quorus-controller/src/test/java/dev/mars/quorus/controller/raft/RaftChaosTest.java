@@ -22,6 +22,7 @@ import dev.mars.quorus.controller.state.TransferJobCommand;
 import dev.mars.quorus.core.TransferJob;
 import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferStatus;
+import io.vertx.core.AsyncResult;
 import io.vertx.core.CompositeFuture;
 import io.vertx.core.Future;
 import org.junit.jupiter.api.AfterEach;
@@ -36,7 +37,7 @@ import java.net.URI;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.*;
@@ -60,6 +61,8 @@ import static org.junit.jupiter.api.Assertions.*;
 public class RaftChaosTest {
 
     private static final Logger logger = LoggerFactory.getLogger(RaftChaosTest.class);
+    private static final Duration SHORT_TIMEOUT = Duration.ofSeconds(10);
+    private static final Duration LONG_TIMEOUT = Duration.ofSeconds(20);
     
     private List<RaftNode> cluster;
     private Map<String, InMemoryTransportSimulator> transports;
@@ -97,8 +100,7 @@ public class RaftChaosTest {
         for (RaftNode node : cluster) {
             futures.add(node.start());
         }
-        Future.all(futures)
-            .toCompletionStage().toCompletableFuture().join();
+        awaitSuccess(Future.all(futures), SHORT_TIMEOUT);
         
         logger.info("Cluster started with {} nodes", CLUSTER_SIZE);
     }
@@ -117,8 +119,7 @@ public class RaftChaosTest {
                 }
             }
             try {
-                Future.all(futures)
-                    .toCompletionStage().toCompletableFuture().join();
+                awaitSuccess(Future.all(futures), SHORT_TIMEOUT);
             } catch (Exception e) {
                 logger.warn("Error waiting for nodes to stop: {}", e.getMessage());
                 logger.debug("Stack trace for node stop wait failure", e);
@@ -163,7 +164,7 @@ public class RaftChaosTest {
         
         // Wait for commit (might take longer)
         try {
-            future.toCompletionStage().toCompletableFuture().get(10, TimeUnit.SECONDS);
+            awaitSuccess(future, SHORT_TIMEOUT);
             logger.info("Job committed successfully");
         } catch (Exception e) {
             fail("Failed to commit job under packet loss conditions: " + e.getMessage());
@@ -226,7 +227,7 @@ public class RaftChaosTest {
         // Wait for all to commit
         try {
             for (Future<CommandResult<?>> future : futures) {
-                future.toCompletionStage().toCompletableFuture().get(20, TimeUnit.SECONDS);
+                awaitSuccess(future, LONG_TIMEOUT);
             }
             logger.info("All jobs committed successfully");
         } catch (Exception e) {
@@ -242,5 +243,21 @@ public class RaftChaosTest {
             .filter(n -> n.getState() == RaftNode.State.LEADER)
             .findFirst()
             .orElse(null);
+    }
+
+    private static <T> T awaitSuccess(Future<T> future, Duration timeout) {
+        AtomicReference<AsyncResult<T>> outcomeRef = new AtomicReference<>();
+
+        future.onComplete(outcomeRef::set);
+
+        await().atMost(timeout)
+            .pollInterval(Duration.ofMillis(10))
+            .until(() -> outcomeRef.get() != null);
+
+        AsyncResult<T> outcome = outcomeRef.get();
+        if (outcome.failed()) {
+            throw new AssertionError("Future failed", outcome.cause());
+        }
+        return outcome.result();
     }
 }
