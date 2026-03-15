@@ -65,7 +65,7 @@ public class AgentMetrics {
     private final LongCounter jobsFailed;
     private final LongCounter transferBytesTotal;
     private final LongCounter transferDurationSeconds;
-        private final LongCounter foreignAssignmentsTotal;
+    private final LongCounter foreignAssignmentsTotal;
 
     // Gauges (backed by AtomicLong for thread-safe updates)
     private final AtomicLong agentStatus = new AtomicLong(0);
@@ -76,7 +76,7 @@ public class AgentMetrics {
     private static final AttributeKey<String> AGENT_ID_KEY = AttributeKey.stringKey("agent.id");
     private static final AttributeKey<String> PROTOCOL_KEY = AttributeKey.stringKey("protocol");
     private static final AttributeKey<String> DIRECTION_KEY = AttributeKey.stringKey("direction");
-        private static final AttributeKey<String> ASSIGNED_AGENT_ID_KEY = AttributeKey.stringKey("assigned.agent.id");
+    private static final AttributeKey<String> ASSIGNED_AGENT_ID_KEY = AttributeKey.stringKey("assigned.agent.id");
 
     private final String agentId;
 
@@ -228,12 +228,12 @@ public class AgentMetrics {
         transferDurationSeconds.add(durationSeconds, attrs);
     }
 
-        public void recordForeignAssignmentMismatch(String assignedAgentId) {
-                String assignedId = (assignedAgentId == null || assignedAgentId.isBlank()) ? "unknown" : assignedAgentId;
-                Attributes attrs = Attributes.builder()
-                                .put(AGENT_ID_KEY, agentId)
-                                .put(ASSIGNED_AGENT_ID_KEY, assignedId)
-                                .build();
-                foreignAssignmentsTotal.add(1, attrs);
-        }
+    public void recordForeignAssignmentMismatch(String assignedAgentId) {
+        String assignedId = (assignedAgentId == null || assignedAgentId.isBlank()) ? "unknown" : assignedAgentId;
+        Attributes attrs = Attributes.builder()
+                .put(AGENT_ID_KEY, agentId)
+                .put(ASSIGNED_AGENT_ID_KEY, assignedId)
+                .build();
+        foreignAssignmentsTotal.add(1, attrs);
+    }
 }

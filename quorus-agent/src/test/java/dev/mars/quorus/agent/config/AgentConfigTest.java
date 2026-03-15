@@ -87,7 +87,7 @@ class AgentConfigTest {
             Arguments.of("heartbeatIntervalMs", 30000L, config.getHeartbeatIntervalMs()),
             Arguments.of("jobPollingInitialDelayMs", 5000L, config.getJobPollingInitialDelayMs()),
             Arguments.of("jobPollingIntervalMs", 10000L, config.getJobPollingIntervalMs()),
-            Arguments.of("foreignAssignmentMismatchThreshold", 1, config.getForeignAssignmentMismatchThreshold()),
+            Arguments.of("foreignAssignmentMismatchThreshold", 3, config.getForeignAssignmentMismatchThreshold()),
             Arguments.of("prometheusPort", 9465, config.getPrometheusPort())
         );
     }

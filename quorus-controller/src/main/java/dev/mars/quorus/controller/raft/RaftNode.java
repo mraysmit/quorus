@@ -536,18 +536,18 @@ public class RaftNode {
                 state = State.FOLLOWER;
 
                 cancelTimers();
-                transport.stop();
                 
-                // Close storage
-                storage.map(RaftStorage::close)
-                    .orElseGet(Future::succeededFuture)
+                // Stop transport and then close storage
+                transport.stop()
+                    .compose(v2 -> storage.map(RaftStorage::close)
+                        .orElseGet(Future::succeededFuture))
                     .onSuccess(v2 -> {
                         logger.info("Raft node stopped: {}", nodeId);
                         promise.complete();
                     })
                     .onFailure(err -> {
-                        logger.warn("Error closing storage during shutdown: {}", err.getMessage());
-                        logger.debug("Stack trace for storage close error", err);
+                        logger.warn("Error during shutdown: {}", err.getMessage());
+                        logger.debug("Stack trace for shutdown error", err);
                         promise.complete(); // Still complete, just log the warning
                     });
             } catch (Exception e) {

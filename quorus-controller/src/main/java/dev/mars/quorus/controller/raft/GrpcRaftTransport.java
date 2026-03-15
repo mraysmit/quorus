@@ -154,7 +154,7 @@ public class GrpcRaftTransport implements RaftTransport {
     }
 
     @Override
-    public void stop() {
+    public Future<Void> stop() {
         // Unregister from metrics
         RaftMetrics.getInstance().unregisterThreadPool();
         
@@ -162,7 +162,7 @@ public class GrpcRaftTransport implements RaftTransport {
         clients.clear();
 
         // Avoid blocking the Vert.x event loop during shutdown.
-        vertx.executeBlocking(() -> {
+        return vertx.<Void>executeBlocking(() -> {
             for (ManagedChannel channel : channels.values()) {
                 channel.shutdown();
             }
@@ -196,9 +196,10 @@ public class GrpcRaftTransport implements RaftTransport {
             }
 
             return null;
-        }, false).onFailure(err -> {
+        }, false).recover(err -> {
             logger.warn("Error during GrpcRaftTransport shutdown: {}", err.getMessage());
             logger.debug("Stack trace for GrpcRaftTransport shutdown failure", err);
+            return Future.succeededFuture();
         });
     }
 

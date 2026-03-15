@@ -30,6 +30,7 @@
         <vertx.version>5.0.8</vertx.version>
         <testcontainers.version>2.0.3</testcontainers.version>
         <jacoco.version>0.8.13</jacoco.version>
+        <raftlog.version>1.1.0</raftlog.version>
         <!-- Shared timestamp for consolidated test log file across all modules -->
         <maven.build.timestamp.format>yyyy-MM-dd_HH-mm-ss</maven.build.timestamp.format>
     </properties>
@@ -53,6 +54,13 @@
                 <scope>test</scope>
             </dependency>
             
+            <!-- RaftLog WAL - default storage implementation -->
+            <dependency>
+                <groupId>io.github.mraysmit</groupId>
+                <artifactId>raftlog-core</artifactId>
+                <version>${raftlog.version}</version>
+            </dependency>
+
             <!-- OpenTelemetry BOM -->
             <dependency>
                 <groupId>io.opentelemetry</groupId>

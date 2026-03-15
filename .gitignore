@@ -41,6 +41,8 @@ build/
 downloads/
 logs/
 test-logs/
+m2-repo/
+data/
 
 # IntelliJ (additional)
 .idea/

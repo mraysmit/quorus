@@ -211,7 +211,7 @@ class RaftFailureTest {
             }
             
             @Override
-            public void stop() {}
+            public Future<Void> stop() { return Future.succeededFuture(); }
             
             @Override
             public Future<VoteResponse> sendVoteRequest(String nodeId, VoteRequest request) {

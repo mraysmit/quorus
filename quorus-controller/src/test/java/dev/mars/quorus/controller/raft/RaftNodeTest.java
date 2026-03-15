@@ -26,7 +26,6 @@ import dev.mars.quorus.controller.raft.grpc.InstallSnapshotRequest;
 import dev.mars.quorus.controller.raft.grpc.InstallSnapshotResponse;
 import dev.mars.quorus.controller.raft.grpc.VoteRequest;
 import dev.mars.quorus.controller.raft.grpc.VoteResponse;
-import io.vertx.core.AsyncResult;
 import io.vertx.core.Future;
 import io.vertx.core.WorkerExecutor;
 import dev.mars.quorus.controller.state.CommandResult;
@@ -34,6 +33,8 @@ import dev.mars.quorus.controller.state.ProtobufCommandCodec;
 import dev.mars.quorus.controller.state.QuorusStateStore;
 import dev.mars.quorus.controller.state.SystemMetadataCommand;
 import org.awaitility.Awaitility;
+import static dev.mars.quorus.testing.TestFutureUtils.awaitFailure;
+import static dev.mars.quorus.testing.TestFutureUtils.awaitSuccess;
 import static org.awaitility.Awaitility.await;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,7 +45,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicReference;
+
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -781,33 +782,4 @@ class RaftNodeTest {
         };
         }
 
-    private static <T> T awaitSuccess(Future<T> future, Duration timeout) {
-        AtomicReference<AsyncResult<T>> outcomeRef = new AtomicReference<>();
-
-        future.onComplete(outcomeRef::set);
-
-        await().atMost(timeout)
-            .pollInterval(Duration.ofMillis(10))
-            .until(() -> outcomeRef.get() != null);
-
-        AsyncResult<T> outcome = outcomeRef.get();
-        if (outcome.failed()) {
-            throw new AssertionError("Future failed", outcome.cause());
-        }
-        return outcome.result();
-    }
-
-    private static Throwable awaitFailure(Future<?> future, Duration timeout) {
-        AtomicReference<AsyncResult<?>> outcomeRef = new AtomicReference<>();
-
-        future.onComplete(outcomeRef::set);
-
-        await().atMost(timeout)
-            .pollInterval(Duration.ofMillis(10))
-            .until(() -> outcomeRef.get() != null);
-
-        AsyncResult<?> outcome = outcomeRef.get();
-        assertTrue(outcome.failed(), "Expected future to fail");
-        return outcome.cause();
-    }
 }

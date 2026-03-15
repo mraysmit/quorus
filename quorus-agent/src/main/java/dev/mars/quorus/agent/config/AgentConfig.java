@@ -128,10 +128,10 @@ public final class AgentConfig {
 
     /**
      * Number of foreign-assignment mismatches allowed before fail-fast shutdown.
-     * Default is 1 for strict operation in critical systems.
+     * Default is 3 to tolerate transient routing issues while still detecting persistent problems.
      */
     public int getForeignAssignmentMismatchThreshold() {
-        return getInt("quorus.agent.security.foreign-assignment-threshold", 1);
+        return getInt("quorus.agent.security.foreign-assignment-threshold", 3);
     }
 
     // ==================== Telemetry Configuration ====================

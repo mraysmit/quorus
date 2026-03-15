@@ -23,7 +23,6 @@ import dev.mars.quorus.controller.state.TransferJobCommand;
 import dev.mars.quorus.core.TransferJob;
 import dev.mars.quorus.core.TransferRequest;
 import dev.mars.raftlog.storage.RaftStorageConfig;
-import io.vertx.core.AsyncResult;
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
 import io.vertx.junit5.VertxExtension;
@@ -41,8 +40,9 @@ import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 
+
+import static dev.mars.quorus.testing.TestFutureUtils.awaitSuccess;
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -615,22 +615,6 @@ class RaftLogClusterIntegrationTest {
                 LOG.debug("  {} | Error reading WAL: {}", nodeId, e.getMessage());
             }
         }
-    }
-
-    private static <T> T awaitSuccess(Future<T> future, Duration timeout) {
-        AtomicReference<AsyncResult<T>> outcomeRef = new AtomicReference<>();
-
-        future.onComplete(outcomeRef::set);
-
-        await().atMost(timeout)
-            .pollInterval(Duration.ofMillis(10))
-            .until(() -> outcomeRef.get() != null);
-
-        AsyncResult<T> outcome = outcomeRef.get();
-        if (outcome.failed()) {
-            throw new AssertionError("Future failed", outcome.cause());
-        }
-        return outcome.result();
     }
     
     /**

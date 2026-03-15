@@ -45,7 +45,7 @@ public interface RaftTransport {
      */
     void start(Consumer<RaftMessage> messageHandler);
 
-    void stop();
+    Future<Void> stop();
 
     Future<VoteResponse> sendVoteRequest(String targetId, VoteRequest request);
 

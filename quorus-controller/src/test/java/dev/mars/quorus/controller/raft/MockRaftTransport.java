@@ -88,9 +88,10 @@ public class MockRaftTransport implements RaftTransport {
     }
 
     @Override
-    public void stop() {
+    public Future<Void> stop() {
         this.running = false;
         logger.info("Stopped mock transport for node: " + nodeId);
+        return Future.succeededFuture();
     }
 
     public boolean isRunning() {
