@@ -23,11 +23,15 @@ import dev.mars.quorus.core.TransferJob;
 import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferStatus;
 import static dev.mars.quorus.testing.TestFutureUtils.awaitSuccess;
+import io.vertx.core.Future;
+import io.vertx.core.Vertx;
+import io.vertx.junit5.VertxExtension;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.net.URI;
 import java.nio.file.Paths;
@@ -54,6 +58,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * @version 1.0
  * @since 2025-08-27
  */
+@ExtendWith(VertxExtension.class)
 @Tag("slow")
 public class MetadataPersistenceTest {
 
@@ -63,15 +68,15 @@ public class MetadataPersistenceTest {
     
     private List<RaftNode> cluster;
     private Map<String, MockRaftTransport> transports;
-    private io.vertx.core.Vertx vertx;
+    private Vertx vertx;
     private static final int CLUSTER_SIZE = 5;
     private static final String[] NODE_IDS = {"node1", "node2", "node3", "node4", "node5"};
 
     @BeforeEach
-    void setUp() {
+    void setUp(Vertx vertx) {
         logger.info("=== SETTING UP METADATA PERSISTENCE TEST ===");
         
-        vertx = io.vertx.core.Vertx.vertx();
+        this.vertx = vertx;
         cluster = new ArrayList<>();
         transports = new HashMap<>();
         
@@ -107,16 +112,17 @@ public class MetadataPersistenceTest {
         logger.info("=== TEARING DOWN METADATA PERSISTENCE TEST ===");
         
         if (cluster != null) {
+            List<Future<Void>> stopFutures = new ArrayList<>();
             for (RaftNode node : cluster) {
                 try {
-                    node.stop();
+                    stopFutures.add(node.stop());
                 } catch (Exception e) {
                     logger.warning("Error stopping node " + node.getNodeId() + ": " + e.getMessage());
                 }
             }
-        }
-        if (vertx != null) {
-            vertx.close();
+            if (!stopFutures.isEmpty()) {
+                awaitSuccess(Future.all(stopFutures), Duration.ofSeconds(10));
+            }
         }
     }
 

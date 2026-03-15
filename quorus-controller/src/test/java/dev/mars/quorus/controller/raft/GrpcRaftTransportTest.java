@@ -25,7 +25,9 @@ import dev.mars.quorus.controller.state.QuorusStateStore;
 import io.grpc.*;
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
+import io.vertx.junit5.VertxExtension;
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 
@@ -37,7 +39,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.*;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static dev.mars.quorus.testing.TestFutureUtils.awaitFailure;
@@ -58,6 +60,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * @version 1.0
  * @since 2026-01-08
  */
+@ExtendWith(VertxExtension.class)
 @Execution(ExecutionMode.SAME_THREAD)
 class GrpcRaftTransportTest {
 
@@ -71,8 +74,8 @@ class GrpcRaftTransportTest {
     private int targetPort;
 
     @BeforeEach
-    void setUp() throws Exception {
-        vertx = Vertx.vertx();
+    void setUp(Vertx vertx) throws Exception {
+        this.vertx = vertx;
         targetPort = findAvailablePort();
         
         // Set up a target server to receive requests
@@ -96,9 +99,6 @@ class GrpcRaftTransportTest {
         }
         if (targetNode != null) {
             targetNode.stop();
-        }
-        if (vertx != null) {
-            awaitSuccess(vertx.close(), SHORT_TIMEOUT);
         }
     }
 
@@ -251,14 +251,13 @@ class GrpcRaftTransportTest {
         transport.start(msg -> {});
         
         int numRequests = 50;
-        ExecutorService executor = Executors.newFixedThreadPool(10);
-        CountDownLatch latch = new CountDownLatch(numRequests);
         AtomicInteger successCount = new AtomicInteger(0);
         AtomicInteger errorCount = new AtomicInteger(0);
         
+        List<Future<Void>> futures = new ArrayList<>();
         for (int i = 0; i < numRequests; i++) {
             final int term = i + 1;
-            executor.submit(() -> {
+            futures.add(vertx.executeBlocking(() -> {
                 try {
                     VoteRequest request = VoteRequest.newBuilder()
                             .setTerm(term)
@@ -274,14 +273,12 @@ class GrpcRaftTransportTest {
                     }
                 } catch (Exception e) {
                     errorCount.incrementAndGet();
-                } finally {
-                    latch.countDown();
                 }
-            });
+                return null;
+            }));
         }
         
-        assertTrue(latch.await(60, TimeUnit.SECONDS));
-        executor.shutdown();
+        awaitSuccess(Future.all(futures), Duration.ofSeconds(60));
         
         assertEquals(numRequests, successCount.get());
         assertEquals(0, errorCount.get());
@@ -299,14 +296,13 @@ class GrpcRaftTransportTest {
         transport.start(msg -> {});
         
         int numRequests = 100;
-        ExecutorService executor = Executors.newFixedThreadPool(10);
-        CountDownLatch latch = new CountDownLatch(numRequests);
         AtomicInteger successCount = new AtomicInteger(0);
         AtomicInteger errorCount = new AtomicInteger(0);
         
+        List<Future<Void>> futures = new ArrayList<>();
         for (int i = 0; i < numRequests; i++) {
             final int index = i;
-            executor.submit(() -> {
+            futures.add(vertx.executeBlocking(() -> {
                 try {
                     if (index % 2 == 0) {
                         VoteRequest request = VoteRequest.newBuilder()
@@ -329,14 +325,12 @@ class GrpcRaftTransportTest {
                     successCount.incrementAndGet();
                 } catch (Exception e) {
                     errorCount.incrementAndGet();
-                } finally {
-                    latch.countDown();
                 }
-            });
+                return null;
+            }));
         }
         
-        assertTrue(latch.await(60, TimeUnit.SECONDS));
-        executor.shutdown();
+        awaitSuccess(Future.all(futures), Duration.ofSeconds(60));
         
         assertEquals(numRequests, successCount.get());
         assertEquals(0, errorCount.get());

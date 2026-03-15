@@ -24,8 +24,12 @@ import dev.mars.quorus.controller.raft.grpc.VoteResponse;
 import dev.mars.quorus.controller.state.QuorusStateStore;
 import io.grpc.*;
 import io.grpc.stub.StreamObserver;
+import io.vertx.core.Future;
+import io.vertx.core.Promise;
 import io.vertx.core.Vertx;
+import io.vertx.junit5.VertxExtension;
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 
@@ -35,7 +39,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.*;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -60,6 +64,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * @since 2026-01-08
  */
 @Execution(ExecutionMode.SAME_THREAD)
+@ExtendWith(VertxExtension.class)
 class GrpcRaftServerTest {
 
     private static final Duration SHORT_TIMEOUT = Duration.ofSeconds(5);
@@ -75,8 +80,8 @@ class GrpcRaftServerTest {
     private int serverPort;
 
     @BeforeEach
-    void setUp() throws Exception {
-        vertx = Vertx.vertx();
+    void setUp(Vertx vertx) throws Exception {
+        this.vertx = vertx;
         serverPort = findAvailablePort();
         
         // Create a minimal RaftNode for testing
@@ -110,9 +115,6 @@ class GrpcRaftServerTest {
         }
         if (raftNode != null) {
             raftNode.stop();
-        }
-        if (vertx != null) {
-            awaitSuccess(vertx.close(), SHORT_TIMEOUT);
         }
     }
 
@@ -319,31 +321,29 @@ class GrpcRaftServerTest {
                 .setLastLogTerm(0)
                 .build();
         
-        CountDownLatch latch = new CountDownLatch(1);
-        AtomicReference<VoteResponse> responseRef = new AtomicReference<>();
+        Promise<VoteResponse> promise = Promise.promise();
         AtomicReference<Throwable> errorRef = new AtomicReference<>();
         
         asyncStub.requestVote(request, new StreamObserver<>() {
             @Override
             public void onNext(VoteResponse response) {
-                responseRef.set(response);
+                promise.complete(response);
             }
 
             @Override
             public void onError(Throwable t) {
                 errorRef.set(t);
-                latch.countDown();
+                promise.fail(t);
             }
 
             @Override
             public void onCompleted() {
-                latch.countDown();
             }
         });
         
-        assertTrue(latch.await(5, TimeUnit.SECONDS));
+        VoteResponse response = awaitSuccess(promise.future(), Duration.ofSeconds(5));
         assertNull(errorRef.get());
-        assertNotNull(responseRef.get());
+        assertNotNull(response);
     }
 
     // ========== APPEND ENTRIES TESTS ==========
@@ -440,31 +440,29 @@ class GrpcRaftServerTest {
                 .setLeaderCommit(0)
                 .build();
         
-        CountDownLatch latch = new CountDownLatch(1);
-        AtomicReference<AppendEntriesResponse> responseRef = new AtomicReference<>();
+        Promise<AppendEntriesResponse> promise = Promise.promise();
         AtomicReference<Throwable> errorRef = new AtomicReference<>();
         
         asyncStub.appendEntries(request, new StreamObserver<>() {
             @Override
             public void onNext(AppendEntriesResponse response) {
-                responseRef.set(response);
+                promise.complete(response);
             }
 
             @Override
             public void onError(Throwable t) {
                 errorRef.set(t);
-                latch.countDown();
+                promise.fail(t);
             }
 
             @Override
             public void onCompleted() {
-                latch.countDown();
             }
         });
         
-        assertTrue(latch.await(5, TimeUnit.SECONDS));
+        AppendEntriesResponse response = awaitSuccess(promise.future(), Duration.ofSeconds(5));
         assertNull(errorRef.get());
-        assertNotNull(responseRef.get());
+        assertNotNull(response);
     }
 
     // ========== CONCURRENT REQUEST TESTS ==========
@@ -475,14 +473,13 @@ class GrpcRaftServerTest {
         startServerAndConnect();
         
         int numRequests = 50;
-        ExecutorService executor = Executors.newFixedThreadPool(10);
-        CountDownLatch latch = new CountDownLatch(numRequests);
         AtomicInteger successCount = new AtomicInteger(0);
         AtomicInteger errorCount = new AtomicInteger(0);
         
+        List<Future<Void>> futures = new ArrayList<>();
         for (int i = 0; i < numRequests; i++) {
             final int term = i + 1;
-            executor.submit(() -> {
+            futures.add(vertx.executeBlocking(() -> {
                 try {
                     VoteRequest request = VoteRequest.newBuilder()
                             .setTerm(term)
@@ -497,14 +494,12 @@ class GrpcRaftServerTest {
                     }
                 } catch (Exception e) {
                     errorCount.incrementAndGet();
-                } finally {
-                    latch.countDown();
                 }
-            });
+                return null;
+            }));
         }
         
-        assertTrue(latch.await(30, TimeUnit.SECONDS));
-        executor.shutdown();
+        awaitSuccess(Future.all(futures), Duration.ofSeconds(30));
         
         assertEquals(numRequests, successCount.get());
         assertEquals(0, errorCount.get());
@@ -516,13 +511,12 @@ class GrpcRaftServerTest {
         startServerAndConnect();
         
         int numRequests = 50;
-        ExecutorService executor = Executors.newFixedThreadPool(10);
-        CountDownLatch latch = new CountDownLatch(numRequests);
         AtomicInteger successCount = new AtomicInteger(0);
         AtomicInteger errorCount = new AtomicInteger(0);
         
+        List<Future<Void>> futures = new ArrayList<>();
         for (int i = 0; i < numRequests; i++) {
-            executor.submit(() -> {
+            futures.add(vertx.executeBlocking(() -> {
                 try {
                     AppendEntriesRequest request = AppendEntriesRequest.newBuilder()
                             .setTerm(1)
@@ -538,14 +532,12 @@ class GrpcRaftServerTest {
                     }
                 } catch (Exception e) {
                     errorCount.incrementAndGet();
-                } finally {
-                    latch.countDown();
                 }
-            });
+                return null;
+            }));
         }
         
-        assertTrue(latch.await(30, TimeUnit.SECONDS));
-        executor.shutdown();
+        awaitSuccess(Future.all(futures), Duration.ofSeconds(30));
         
         assertEquals(numRequests, successCount.get());
         assertEquals(0, errorCount.get());
@@ -557,14 +549,13 @@ class GrpcRaftServerTest {
         startServerAndConnect();
         
         int numRequests = 100;
-        ExecutorService executor = Executors.newFixedThreadPool(20);
-        CountDownLatch latch = new CountDownLatch(numRequests);
         AtomicInteger successCount = new AtomicInteger(0);
         AtomicInteger errorCount = new AtomicInteger(0);
         
+        List<Future<Void>> futures = new ArrayList<>();
         for (int i = 0; i < numRequests; i++) {
             final int index = i;
-            executor.submit(() -> {
+            futures.add(vertx.executeBlocking(() -> {
                 try {
                     if (index % 2 == 0) {
                         VoteRequest request = VoteRequest.newBuilder()
@@ -587,14 +578,12 @@ class GrpcRaftServerTest {
                     successCount.incrementAndGet();
                 } catch (Exception e) {
                     errorCount.incrementAndGet();
-                } finally {
-                    latch.countDown();
                 }
-            });
+                return null;
+            }));
         }
         
-        assertTrue(latch.await(30, TimeUnit.SECONDS));
-        executor.shutdown();
+        awaitSuccess(Future.all(futures), Duration.ofSeconds(30));
         
         assertEquals(numRequests, successCount.get());
         assertEquals(0, errorCount.get());
@@ -737,11 +726,11 @@ class GrpcRaftServerTest {
         startServerAndConnect();
         
         int burstSize = 200;
-        List<CompletableFuture<VoteResponse>> futures = new ArrayList<>();
+        List<Future<VoteResponse>> futures = new ArrayList<>();
         
         for (int i = 0; i < burstSize; i++) {
             final int term = i + 1;
-            CompletableFuture<VoteResponse> future = CompletableFuture.supplyAsync(() -> {
+            Future<VoteResponse> future = vertx.executeBlocking(() -> {
                 VoteRequest request = VoteRequest.newBuilder()
                         .setTerm(term)
                         .setCandidateId("candidate" + term)
@@ -754,11 +743,11 @@ class GrpcRaftServerTest {
         }
         
         // Wait for all to complete
-        awaitSuccess(CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])), LONG_TIMEOUT);
+        awaitSuccess(Future.all(futures), LONG_TIMEOUT);
         
         // Verify all succeeded
-        for (CompletableFuture<VoteResponse> future : futures) {
-            assertNotNull(awaitSuccess(future, SHORT_TIMEOUT));
+        for (Future<VoteResponse> future : futures) {
+            assertNotNull(future.result());
         }
     }
 
@@ -773,11 +762,10 @@ class GrpcRaftServerTest {
         AtomicInteger successCount = new AtomicInteger(0);
         AtomicInteger errorCount = new AtomicInteger(0);
         
-        ExecutorService executor = Executors.newFixedThreadPool(5);
-        
-        // Submit continuous load
+        // Submit continuous load via vertx.executeBlocking
+        List<Future<Void>> workers = new ArrayList<>();
         for (int i = 0; i < 5; i++) {
-            executor.submit(() -> {
+            workers.add(vertx.executeBlocking(() -> {
                 while (running.get()) {
                     try {
                         VoteRequest request = VoteRequest.newBuilder()
@@ -796,7 +784,8 @@ class GrpcRaftServerTest {
                         errorCount.incrementAndGet();
                     }
                 }
-            });
+                return null;
+            }));
         }
         
         // Let it run for the specified duration
@@ -804,8 +793,7 @@ class GrpcRaftServerTest {
             .atMost(Duration.ofSeconds(durationSeconds + 1))
             .until(() -> true);
         running.set(false);
-        executor.shutdownNow();
-        executor.awaitTermination(5, TimeUnit.SECONDS);
+        awaitSuccess(Future.all(workers), Duration.ofSeconds(10));
         
         assertTrue(successCount.get() > 0, "Should have processed some requests");
         assertTrue(errorCount.get() < successCount.get() / 10, 
@@ -976,32 +964,4 @@ class GrpcRaftServerTest {
         }
     }
 
-    private static <T> T awaitSuccess(CompletableFuture<T> future, Duration timeout) {
-        AtomicReference<T> resultRef = new AtomicReference<>();
-        AtomicReference<Throwable> errorRef = new AtomicReference<>();
-        AtomicBoolean completed = new AtomicBoolean(false);
-
-        future.whenComplete((result, error) -> {
-            resultRef.set(result);
-            errorRef.set(error);
-            completed.set(true);
-        });
-
-        await().atMost(timeout)
-                .pollInterval(Duration.ofMillis(10))
-                .until(completed::get);
-
-        Throwable error = unwrapCompletionError(errorRef.get());
-        if (error != null) {
-            throw new AssertionError("Future failed", error);
-        }
-        return resultRef.get();
-    }
-
-    private static Throwable unwrapCompletionError(Throwable error) {
-        if (error instanceof CompletionException || error instanceof ExecutionException) {
-            return error.getCause() == null ? error : error.getCause();
-        }
-        return error;
-    }
 }
