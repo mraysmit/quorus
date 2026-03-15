@@ -257,6 +257,8 @@ public final class SharedTestContainers {
         long deadline = System.currentTimeMillis() + timeout.toMillis();
         logger.info("Waiting for FTP service at {}:{} (timeout: {})...", host, port, timeout);
         int attempt = 0;
+        int consecutiveSuccesses = 0;
+        final int requiredSuccesses = 3;
         while (System.currentTimeMillis() < deadline) {
             attempt++;
             try (java.net.Socket socket = new java.net.Socket()) {
@@ -268,14 +270,23 @@ public final class SharedTestContainers {
                         socket.getOutputStream());
                 String welcome = reader.readLine();
                 if (welcome != null && welcome.startsWith("220")) {
+                    consecutiveSuccesses++;
                     // Send QUIT to cleanly close the FTP session
                     writer.write("QUIT\r\n");
                     writer.flush();
-                    logger.info("FTP service ready at {}:{} after {} attempts: {}", host, port, attempt, welcome);
-                    return;
+                    if (consecutiveSuccesses >= requiredSuccesses) {
+                        logger.info("FTP service ready at {}:{} after {} attempts ({} consecutive 220 replies): {}",
+                                host, port, attempt, requiredSuccesses, welcome);
+                        return;
+                    }
+                    logger.debug("FTP readiness warm-up (attempt {}): got 220 ({} of {} required)",
+                            attempt, consecutiveSuccesses, requiredSuccesses);
+                } else {
+                    consecutiveSuccesses = 0;
+                    logger.debug("FTP not ready yet (attempt {}): {}", attempt, welcome);
                 }
-                logger.debug("FTP not ready yet (attempt {}): {}", attempt, welcome);
             } catch (java.io.IOException e) {
+                consecutiveSuccesses = 0;
                 logger.debug("FTP not ready yet (attempt {}): {}", attempt, e.getMessage());
             }
             try {

@@ -25,6 +25,9 @@ import io.opentelemetry.api.metrics.Meter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -73,6 +76,11 @@ public class TransferTelemetryMetrics {
 
     // Gauges (backed by AtomicLong)
     private final AtomicLong activeTransfers = new AtomicLong(0);
+
+    // Per-protocol read-back counters for health check (OTel counters are write-only)
+    private final ConcurrentHashMap<String, AtomicLong> perProtocolTotal = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, AtomicLong> perProtocolFailed = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, AtomicLong> perProtocolActive = new ConcurrentHashMap<>();
 
     // Attribute keys
     private static final AttributeKey<String> PROTOCOL_KEY = AttributeKey.stringKey("protocol");
@@ -142,6 +150,44 @@ public class TransferTelemetryMetrics {
     }
 
     /**
+     * Protocol statistics for health check read-back.
+     */
+    public record ProtocolStats(long totalTransfers, long failedTransfers, long activeTransfers) {}
+
+    /**
+     * Register a protocol so it appears in health checks even before any transfers occur.
+     */
+    public void registerProtocol(String protocol) {
+        perProtocolTotal.putIfAbsent(protocol, new AtomicLong(0));
+        perProtocolFailed.putIfAbsent(protocol, new AtomicLong(0));
+        perProtocolActive.putIfAbsent(protocol, new AtomicLong(0));
+    }
+
+    /**
+     * Get statistics for a specific protocol.
+     */
+    public ProtocolStats getProtocolStats(String protocol) {
+        AtomicLong total = perProtocolTotal.get(protocol);
+        if (total == null) {
+            return new ProtocolStats(0, 0, 0);
+        }
+        AtomicLong failed = perProtocolFailed.get(protocol);
+        AtomicLong active = perProtocolActive.get(protocol);
+        return new ProtocolStats(total.get(), failed != null ? failed.get() : 0, active != null ? active.get() : 0);
+    }
+
+    /**
+     * Get statistics for all registered protocols.
+     */
+    public Map<String, ProtocolStats> getAllProtocolStats() {
+        Map<String, ProtocolStats> stats = new LinkedHashMap<>();
+        for (String protocol : perProtocolTotal.keySet()) {
+            stats.put(protocol, getProtocolStats(protocol));
+        }
+        return stats;
+    }
+
+    /**
      * Record a transfer started.
      */
     public void recordTransferStarted(String protocol, String direction) {
@@ -151,6 +197,8 @@ public class TransferTelemetryMetrics {
                 .build();
         transfersTotal.add(1, attrs);
         activeTransfers.incrementAndGet();
+        perProtocolTotal.computeIfAbsent(protocol, k -> new AtomicLong(0)).incrementAndGet();
+        perProtocolActive.computeIfAbsent(protocol, k -> new AtomicLong(0)).incrementAndGet();
     }
 
     /**
@@ -159,6 +207,7 @@ public class TransferTelemetryMetrics {
     public void recordTransferCompleted(String protocol, String direction, 
                                         long bytes, double durationSeconds) {
         activeTransfers.decrementAndGet();
+        perProtocolActive.computeIfAbsent(protocol, k -> new AtomicLong(0)).decrementAndGet();
         
         Attributes attrs = Attributes.builder()
                 .put(PROTOCOL_KEY, protocol)
@@ -180,6 +229,8 @@ public class TransferTelemetryMetrics {
      */
     public void recordTransferFailed(String protocol, String direction, String errorType) {
         activeTransfers.decrementAndGet();
+        perProtocolFailed.computeIfAbsent(protocol, k -> new AtomicLong(0)).incrementAndGet();
+        perProtocolActive.computeIfAbsent(protocol, k -> new AtomicLong(0)).decrementAndGet();
         
         Attributes attrs = Attributes.builder()
                 .put(PROTOCOL_KEY, protocol)
@@ -195,6 +246,7 @@ public class TransferTelemetryMetrics {
      */
     public void recordTransferCancelled(String protocol, String direction) {
         activeTransfers.decrementAndGet();
+        perProtocolActive.computeIfAbsent(protocol, k -> new AtomicLong(0)).decrementAndGet();
         
         Attributes attrs = Attributes.builder()
                 .put(PROTOCOL_KEY, protocol)

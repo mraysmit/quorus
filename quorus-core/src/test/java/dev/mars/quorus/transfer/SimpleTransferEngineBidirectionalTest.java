@@ -19,7 +19,6 @@ package dev.mars.quorus.transfer;
 import dev.mars.quorus.core.TransferDirection;
 import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.exceptions.TransferException;
-import dev.mars.quorus.monitoring.TransferMetrics;
 import io.vertx.core.Vertx;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,8 +27,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import java.net.URI;
-import java.nio.file.Path;
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -59,66 +56,6 @@ class SimpleTransferEngineBidirectionalTest {
         }
         if (vertx != null) {
             vertx.close();
-        }
-    }
-
-    @Nested
-    @DisplayName("Direction-Aware Metrics Tests")
-    class DirectionAwareMetricsTests {
-
-        @Test
-        @DisplayName("Should have separate metrics for uploads and downloads")
-        void shouldHaveSeparateMetricsForUploadsAndDownloads() {
-            Map<String, TransferMetrics> allMetrics = engine.getAllProtocolMetrics();
-
-            // Verify direction-specific metrics exist for all protocols
-            String[] protocols = {"http", "ftp", "sftp", "smb"};
-            for (String protocol : protocols) {
-                assertTrue(allMetrics.containsKey(protocol + "-DOWNLOAD"),
-                    "Missing DOWNLOAD metrics for " + protocol);
-                assertTrue(allMetrics.containsKey(protocol + "-UPLOAD"),
-                    "Missing UPLOAD metrics for " + protocol);
-            }
-        }
-
-        @Test
-        @DisplayName("Should provide direction-specific metrics via new API")
-        void shouldProvideDirectionSpecificMetricsViaNewApi() {
-            TransferMetrics downloadMetrics = engine.getProtocolMetrics("sftp", TransferDirection.DOWNLOAD);
-            TransferMetrics uploadMetrics = engine.getProtocolMetrics("sftp", TransferDirection.UPLOAD);
-
-            assertNotNull(downloadMetrics, "Download metrics should not be null");
-            assertNotNull(uploadMetrics, "Upload metrics should not be null");
-            assertNotSame(downloadMetrics, uploadMetrics, "Upload and download metrics should be different instances");
-        }
-
-        @Test
-        @DisplayName("Direction metrics should be independent")
-        void directionMetricsShouldBeIndependent() {
-            TransferMetrics downloadMetrics = engine.getProtocolMetrics("ftp", TransferDirection.DOWNLOAD);
-            TransferMetrics uploadMetrics = engine.getProtocolMetrics("ftp", TransferDirection.UPLOAD);
-
-            // Record activity in download metrics
-            downloadMetrics.recordTransferStart();
-
-            // Verify upload metrics are unaffected
-            Map<String, Object> uploadMap = uploadMetrics.toMap();
-            assertEquals(0L, uploadMap.get("totalTransfers"),
-                "Upload metrics should be unaffected by download activity");
-        }
-
-        @Test
-        @DisplayName("Legacy metrics should still be available")
-        void legacyMetricsShouldStillBeAvailable() {
-            TransferMetrics legacyHttp = engine.getProtocolMetrics("http");
-            TransferMetrics legacyFtp = engine.getProtocolMetrics("ftp");
-            TransferMetrics legacySftp = engine.getProtocolMetrics("sftp");
-            TransferMetrics legacySmb = engine.getProtocolMetrics("smb");
-
-            assertNotNull(legacyHttp, "Legacy HTTP metrics should exist");
-            assertNotNull(legacyFtp, "Legacy FTP metrics should exist");
-            assertNotNull(legacySftp, "Legacy SFTP metrics should exist");
-            assertNotNull(legacySmb, "Legacy SMB metrics should exist");
         }
     }
 
@@ -191,8 +128,8 @@ class SimpleTransferEngineBidirectionalTest {
             var healthCheck = engine.getHealthCheck();
 
             assertNotNull(healthCheck);
-            // 4 legacy + 4 download + 4 upload = 12 total
-            assertEquals(12, healthCheck.getProtocolHealthChecks().size());
+            // 4 protocols: http, ftp, sftp, smb
+            assertEquals(4, healthCheck.getProtocolHealthChecks().size());
         }
     }
 }

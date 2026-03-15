@@ -21,7 +21,6 @@ import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferResult;
 import dev.mars.quorus.core.exceptions.TransferException;
 import dev.mars.quorus.monitoring.TransferEngineHealthCheck;
-import dev.mars.quorus.monitoring.TransferMetrics;
 import io.vertx.core.Future;
 import io.vertx.core.Promise;
 import io.vertx.core.Vertx;
@@ -162,69 +161,13 @@ class SimpleTransferEngineTest {
     }
 
     @Test
-    void testGetProtocolMetrics() {
-        TransferMetrics httpMetrics = engine.getProtocolMetrics("http");
-        assertNotNull(httpMetrics);
-        
-        TransferMetrics ftpMetrics = engine.getProtocolMetrics("ftp");
-        assertNotNull(ftpMetrics);
-        
-        TransferMetrics sftpMetrics = engine.getProtocolMetrics("sftp");
-        assertNotNull(sftpMetrics);
-        
-        TransferMetrics smbMetrics = engine.getProtocolMetrics("smb");
-        assertNotNull(smbMetrics);
-    }
-
-    @Test
-    void testGetProtocolMetricsNonExistent() {
-        TransferMetrics metrics = engine.getProtocolMetrics("unknown");
-        assertNull(metrics);
-    }
-
-    @Test
-    void testGetAllProtocolMetrics() {
-        Map<String, TransferMetrics> allMetrics = engine.getAllProtocolMetrics();
-        
-        assertNotNull(allMetrics);
-        // 4 legacy protocol metrics + 4 download + 4 upload = 12 total
-        assertEquals(12, allMetrics.size());
-        // Legacy metrics
-        assertTrue(allMetrics.containsKey("http"));
-        assertTrue(allMetrics.containsKey("ftp"));
-        assertTrue(allMetrics.containsKey("sftp"));
-        assertTrue(allMetrics.containsKey("smb"));
-        // Direction-specific metrics
-        assertTrue(allMetrics.containsKey("http-DOWNLOAD"));
-        assertTrue(allMetrics.containsKey("http-UPLOAD"));
-        assertTrue(allMetrics.containsKey("ftp-DOWNLOAD"));
-        assertTrue(allMetrics.containsKey("ftp-UPLOAD"));
-        assertTrue(allMetrics.containsKey("sftp-DOWNLOAD"));
-        assertTrue(allMetrics.containsKey("sftp-UPLOAD"));
-        assertTrue(allMetrics.containsKey("smb-DOWNLOAD"));
-        assertTrue(allMetrics.containsKey("smb-UPLOAD"));
-    }
-
-    @Test
-    void testGetAllProtocolMetricsReturnsDefensiveCopy() {
-        Map<String, TransferMetrics> allMetrics1 = engine.getAllProtocolMetrics();
-        Map<String, TransferMetrics> allMetrics2 = engine.getAllProtocolMetrics();
-        
-        // Should be different map instances
-        assertNotSame(allMetrics1, allMetrics2);
-        
-        // But same content
-        assertEquals(allMetrics1.keySet(), allMetrics2.keySet());
-    }
-
-    @Test
     void testHealthCheckIncludesProtocolChecks() {
         TransferEngineHealthCheck healthCheck = engine.getHealthCheck();
         
         assertNotNull(healthCheck);
         assertNotNull(healthCheck.getProtocolHealthChecks());
-        // 4 legacy + 4 download + 4 upload = 12 protocol metrics generate health checks
-        assertEquals(12, healthCheck.getProtocolHealthChecks().size());
+        // 4 protocols: http, ftp, sftp, smb
+        assertEquals(4, healthCheck.getProtocolHealthChecks().size());
     }
 
     @Test
@@ -244,17 +187,6 @@ class SimpleTransferEngineTest {
         
         assertEquals(0, systemMetrics.get("activeTransfers"));
         assertEquals(5, systemMetrics.get("maxConcurrentTransfers"));
-    }
-
-    @Test
-    void testProtocolMetricsInitialState() {
-        TransferMetrics httpMetrics = engine.getProtocolMetrics("http");
-        
-        Map<String, Object> metricsMap = httpMetrics.toMap();
-        assertEquals(0L, metricsMap.get("totalTransfers"));
-        assertEquals(0L, metricsMap.get("successfulTransfers"));
-        assertEquals(0L, metricsMap.get("failedTransfers"));
-        assertEquals(0L, metricsMap.get("activeTransfers"));
     }
 
         @Test

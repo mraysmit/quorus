@@ -34,6 +34,7 @@ chroot_local_user=YES\n' >> /etc/vsftpd/vsftpd.conf
 
 # Custom entrypoint: generate cert then delegate to original start script
 COPY ftps-entrypoint.sh /bin/ftps-entrypoint.sh
+RUN sed -i 's/\r$//' /bin/ftps-entrypoint.sh
 RUN chmod +x /bin/ftps-entrypoint.sh
 
 ENTRYPOINT ["/sbin/tini", "--", "/bin/ftps-entrypoint.sh"]

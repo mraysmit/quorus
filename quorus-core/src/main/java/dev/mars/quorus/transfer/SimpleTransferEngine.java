@@ -25,10 +25,14 @@ import dev.mars.quorus.core.TransferStatus;
 import dev.mars.quorus.core.exceptions.TransferException;
 import dev.mars.quorus.monitoring.ProtocolHealthCheck;
 import dev.mars.quorus.monitoring.TransferEngineHealthCheck;
-import dev.mars.quorus.monitoring.TransferMetrics;
 import dev.mars.quorus.protocol.ProtocolFactory;
 import dev.mars.quorus.protocol.TransferProtocol;
 import dev.mars.quorus.transfer.observability.TransferTelemetryMetrics;
+import io.opentelemetry.api.GlobalOpenTelemetry;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.api.trace.StatusCode;
+import io.opentelemetry.api.trace.Tracer;
 import io.vertx.core.Future;
 import io.vertx.core.Promise;
 import io.vertx.core.Vertx;
@@ -40,7 +44,6 @@ import org.slf4j.MDC;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -59,6 +62,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public class SimpleTransferEngine implements TransferEngine {
     private static final Logger logger = LoggerFactory.getLogger(SimpleTransferEngine.class);
+    private static final Tracer tracer = GlobalOpenTelemetry.getTracer("quorus-core");
 
     private final Vertx vertx;
     private final boolean closeVertxOnShutdown;
@@ -73,9 +77,8 @@ public class SimpleTransferEngine implements TransferEngine {
     private final int maxRetryAttempts;
     private final long retryDelayMs;
 
-    // Monitoring (Phase 2 - Dec 2025)
+    // Monitoring
     private final Instant startTime;
-    private final Map<String, TransferMetrics> protocolMetrics;
 
     // OpenTelemetry Metrics (Phase 8 - Jan 2026)
     private final TransferTelemetryMetrics telemetryMetrics;
@@ -109,29 +112,15 @@ public class SimpleTransferEngine implements TransferEngine {
         this.protocolFactory = new ProtocolFactory(vertx);  // Pass Vertx to ProtocolFactory
         this.shutdown = new AtomicBoolean(false);
 
-        // Initialize monitoring (Phase 2 - Dec 2025)
+        // Initialize monitoring
         this.startTime = Instant.now();
-        this.protocolMetrics = new ConcurrentHashMap<>();
-        // Initialize metrics for all supported protocols with direction tracking
-        logger.debug("Initializing protocol metrics for supported protocols (with direction tracking)");
-        // Download metrics
-        protocolMetrics.put("http-DOWNLOAD", new TransferMetrics("http-DOWNLOAD"));
-        protocolMetrics.put("ftp-DOWNLOAD", new TransferMetrics("ftp-DOWNLOAD"));
-        protocolMetrics.put("sftp-DOWNLOAD", new TransferMetrics("sftp-DOWNLOAD"));
-        protocolMetrics.put("smb-DOWNLOAD", new TransferMetrics("smb-DOWNLOAD"));
-        // Upload metrics
-        protocolMetrics.put("http-UPLOAD", new TransferMetrics("http-UPLOAD"));
-        protocolMetrics.put("ftp-UPLOAD", new TransferMetrics("ftp-UPLOAD"));
-        protocolMetrics.put("sftp-UPLOAD", new TransferMetrics("sftp-UPLOAD"));
-        protocolMetrics.put("smb-UPLOAD", new TransferMetrics("smb-UPLOAD"));
-        // Legacy protocol-only metrics (for backward compatibility)
-        protocolMetrics.put("http", new TransferMetrics("http"));
-        protocolMetrics.put("ftp", new TransferMetrics("ftp"));
-        protocolMetrics.put("sftp", new TransferMetrics("sftp"));
-        protocolMetrics.put("smb", new TransferMetrics("smb"));
 
-        // Initialize OpenTelemetry metrics (Phase 8 - Jan 2026)
+        // Initialize OpenTelemetry metrics
         this.telemetryMetrics = TransferTelemetryMetrics.getInstance();
+        telemetryMetrics.registerProtocol("http");
+        telemetryMetrics.registerProtocol("ftp");
+        telemetryMetrics.registerProtocol("sftp");
+        telemetryMetrics.registerProtocol("smb");
 
         logger.info("SimpleTransferEngine initialized with {} max concurrent transfers (reactive mode, OpenTelemetry enabled)",
             maxConcurrentTransfers);
@@ -393,17 +382,17 @@ public class SimpleTransferEngine implements TransferEngine {
                     .build();
         }
 
-        // Check protocol health
+        // Check protocol health from OTel metrics
         boolean allProtocolsHealthy = true;
-        for (String protocolName : protocolMetrics.keySet()) {
+        Map<String, TransferTelemetryMetrics.ProtocolStats> allStats = telemetryMetrics.getAllProtocolStats();
+
+        for (var entry : allStats.entrySet()) {
+            String protocolName = entry.getKey();
+            TransferTelemetryMetrics.ProtocolStats stats = entry.getValue();
+
             ProtocolHealthCheck.Builder protocolBuilder = ProtocolHealthCheck.builder(protocolName);
-
-            TransferMetrics metrics = protocolMetrics.get(protocolName);
-            Map<String, Object> metricsMap = metrics.toMap();
-
-            // Determine protocol health based on metrics
-            long totalTransfers = (long) metricsMap.get("totalTransfers");
-            long failedTransfers = (long) metricsMap.get("failedTransfers");
+            long totalTransfers = stats.totalTransfers();
+            long failedTransfers = stats.failedTransfers();
 
             if (totalTransfers > 0) {
                 double failureRate = (failedTransfers * 100.0) / totalTransfers;
@@ -426,7 +415,7 @@ public class SimpleTransferEngine implements TransferEngine {
 
             protocolBuilder.detail("totalTransfers", totalTransfers)
                     .detail("failedTransfers", failedTransfers)
-                    .detail("activeTransfers", metricsMap.get("activeTransfers"));
+                    .detail("activeTransfers", stats.activeTransfers());
 
             builder.addProtocolHealthCheck(protocolBuilder.build());
         }
@@ -450,16 +439,6 @@ public class SimpleTransferEngine implements TransferEngine {
         return builder.build();
     }
 
-    @Override
-    public TransferMetrics getProtocolMetrics(String protocolName) {
-        return protocolMetrics.get(protocolName);
-    }
-
-    @Override
-    public Map<String, TransferMetrics> getAllProtocolMetrics() {
-        return new HashMap<>(protocolMetrics);
-    }
-
     private Future<TransferResult> executeTransfer(TransferContext context) {
         TransferJob job = context.getJob();
         TransferRequest request = job.getRequest();
@@ -470,24 +449,19 @@ public class SimpleTransferEngine implements TransferEngine {
             job.getJobId(), request.getProtocol(), direction, request.getSourceUri(), request.getDestinationUri());
         job.start();
 
-        // Record transfer start in metrics (both direction-specific and legacy)
         String protocolName = request.getProtocol();
-        String metricsKey = protocolName + "-" + direction.name();
-        TransferMetrics directionMetrics = protocolMetrics.get(metricsKey);
-        TransferMetrics legacyMetrics = protocolMetrics.get(protocolName);
-        
-        if (directionMetrics != null) {
-            directionMetrics.recordTransferStart();
-            logger.debug("executeTransfer: recorded transfer start in direction metrics for key={}", metricsKey);
-        }
-        if (legacyMetrics != null) {
-            legacyMetrics.recordTransferStart();
-            logger.debug("executeTransfer: recorded transfer start in legacy metrics for protocol={}", protocolName);
-        }
+
+        // Create transfer tracing span (metrics already recorded in submitTransfer)
+        Span span = tracer.spanBuilder("quorus.transfer")
+                .setSpanKind(SpanKind.INTERNAL)
+                .setAttribute("transfer.id", job.getJobId())
+                .setAttribute("transfer.protocol", protocolName)
+                .setAttribute("transfer.direction", direction.name())
+                .startSpan();
 
         Instant transferStartTime = Instant.now();
-        return executeAttempt(context, request, direction, transferStartTime, directionMetrics,
-                legacyMetrics, metricsKey, protocolName, 0, null);
+        return executeAttempt(context, request, direction, transferStartTime,
+                protocolName, span, 0, null);
     }
 
     private Future<TransferResult> executeAttempt(
@@ -495,10 +469,8 @@ public class SimpleTransferEngine implements TransferEngine {
             TransferRequest request,
             TransferDirection direction,
             Instant transferStartTime,
-            TransferMetrics directionMetrics,
-            TransferMetrics legacyMetrics,
-            String metricsKey,
             String protocolName,
+            Span span,
             int attempt,
             Throwable lastError) {
 
@@ -506,6 +478,9 @@ public class SimpleTransferEngine implements TransferEngine {
         if (!context.shouldContinue()) {
             String message = "Transfer cancelled or paused before completion";
             logger.warn("executeTransfer: {} for jobId={}", message, job.getJobId());
+            telemetryMetrics.recordTransferCancelled(protocolName, direction.name());
+            span.setStatus(StatusCode.ERROR, message);
+            span.end();
             job.fail(message, lastError);
             return Future.succeededFuture(job.toResult());
         }
@@ -516,12 +491,12 @@ public class SimpleTransferEngine implements TransferEngine {
         TransferProtocol protocol = protocolFactory.getProtocol(protocolName);
         if (protocol == null) {
             TransferException error = new TransferException(job.getJobId(), "Unsupported protocol: " + protocolName);
-            return failTransfer(job, direction, directionMetrics, legacyMetrics, metricsKey, protocolName, error);
+            return failTransfer(job, direction, protocolName, span, error);
         }
         if (!protocol.canHandle(request)) {
             TransferException error = new TransferException(job.getJobId(),
                     "Protocol '" + protocolName + "' cannot handle request direction/URI combination");
-            return failTransfer(job, direction, directionMetrics, legacyMetrics, metricsKey, protocolName, error);
+            return failTransfer(job, direction, protocolName, span, error);
         }
 
         return protocol.transferReactive(request, context)
@@ -535,18 +510,13 @@ public class SimpleTransferEngine implements TransferEngine {
                     Duration duration = Duration.between(transferStartTime, Instant.now());
                     long bytesTransferred = result.getBytesTransferred();
 
-                    if (directionMetrics != null) {
-                        directionMetrics.recordTransferSuccess(bytesTransferred, duration);
-                        logger.debug("executeTransfer: recorded success in direction metrics - key={}, bytes={}, duration={}ms",
-                                metricsKey, bytesTransferred, duration.toMillis());
-                    }
-                    if (legacyMetrics != null) {
-                        legacyMetrics.recordTransferSuccess(bytesTransferred, duration);
-                        logger.debug("executeTransfer: recorded success in legacy metrics - protocol={}", protocolName);
-                    }
-
                     telemetryMetrics.recordTransferCompleted(protocolName, direction.name(),
                             bytesTransferred, duration.toMillis() / 1000.0);
+
+                    span.setAttribute("transfer.bytes", bytesTransferred);
+                    span.setAttribute("transfer.duration_ms", duration.toMillis());
+                    span.setStatus(StatusCode.OK);
+                    span.end();
 
                     return Future.succeededFuture(result);
                 })
@@ -565,11 +535,10 @@ public class SimpleTransferEngine implements TransferEngine {
 
                         return delayFuture(delay)
                                 .compose(v -> executeAttempt(context, request, direction, transferStartTime,
-                                        directionMetrics, legacyMetrics, metricsKey, protocolName, nextAttempt, err));
+                                        protocolName, span, nextAttempt, err));
                     }
 
-                    return failTransfer(job, direction, directionMetrics, legacyMetrics,
-                            metricsKey, protocolName, err);
+                    return failTransfer(job, direction, protocolName, span, err);
                 });
     }
 
@@ -582,10 +551,8 @@ public class SimpleTransferEngine implements TransferEngine {
     private Future<TransferResult> failTransfer(
             TransferJob job,
             TransferDirection direction,
-            TransferMetrics directionMetrics,
-            TransferMetrics legacyMetrics,
-            String metricsKey,
             String protocolName,
+            Span span,
             Throwable error) {
         String errorMessage = error != null ? error.getMessage() :
                 "Transfer failed after " + maxRetryAttempts + " attempts";
@@ -593,17 +560,14 @@ public class SimpleTransferEngine implements TransferEngine {
         job.fail(errorMessage, error);
 
         String errorType = error != null ? error.getClass().getSimpleName() : "UnknownError";
-        if (directionMetrics != null) {
-            directionMetrics.recordTransferFailure(errorType);
-            logger.debug("executeTransfer: recorded failure in direction metrics - key={}, errorType={}",
-                    metricsKey, errorType);
-        }
-        if (legacyMetrics != null) {
-            legacyMetrics.recordTransferFailure(errorType);
-            logger.debug("executeTransfer: recorded failure in legacy metrics - protocol={}", protocolName);
-        }
-
         telemetryMetrics.recordTransferFailed(protocolName, direction.name(), errorType);
+
+        span.setStatus(StatusCode.ERROR, errorMessage);
+        if (error != null) {
+            span.recordException(error);
+        }
+        span.end();
+
         logger.error("{} transfer failed permanently: {} - {}", direction, job.getJobId(), errorMessage);
         if (logger.isTraceEnabled() && error != null) {
             logger.debug("Full stack trace for failed transfer {}", job.getJobId(), error);
@@ -662,17 +626,5 @@ public class SimpleTransferEngine implements TransferEngine {
         
         logger.debug("validateTransferRequest: request {} validated successfully (direction={}, protocol={})",
             request.getRequestId(), request.getDirection(), configuredProtocol);
-    }
-    
-    /**
-     * Gets metrics for a specific protocol and direction combination.
-     * 
-     * @param protocolName the protocol name (e.g., "sftp")
-     * @param direction the transfer direction
-     * @return the metrics for the specified protocol and direction, or null if not found
-     */
-    public TransferMetrics getProtocolMetrics(String protocolName, TransferDirection direction) {
-        String key = protocolName + "-" + direction.name();
-        return protocolMetrics.get(key);
     }
 }

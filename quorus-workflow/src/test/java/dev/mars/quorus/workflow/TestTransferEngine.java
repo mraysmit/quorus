@@ -179,16 +179,6 @@ class TestTransferEngine implements TransferEngine {
                 .build();
     }
 
-    @Override
-    public dev.mars.quorus.monitoring.TransferMetrics getProtocolMetrics(String protocolName) {
-        return new dev.mars.quorus.monitoring.TransferMetrics(protocolName);
-    }
-
-    @Override
-    public java.util.Map<String, dev.mars.quorus.monitoring.TransferMetrics> getAllProtocolMetrics() {
-        return java.util.Collections.emptyMap();
-    }
-
     // Helper methods to create transfer results
 
     private TransferResult createSuccessResult(String requestId) {
