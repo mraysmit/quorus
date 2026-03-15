@@ -22,10 +22,7 @@ import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferResult;
 import dev.mars.quorus.core.exceptions.TransferException;
 import dev.mars.quorus.monitoring.TransferEngineHealthCheck;
-import dev.mars.quorus.monitoring.TransferMetrics;
 import io.vertx.core.Future;
-
-import java.util.Map;
 
 /**
  * Engine interface for managing file transfers.
@@ -65,21 +62,4 @@ public interface TransferEngine {
      * @since 2.0 (Phase 2 - Dec 2025)
      */
     TransferEngineHealthCheck getHealthCheck();
-
-    /**
-     * Get metrics for a specific protocol.
-     *
-     * @param protocolName protocol name (e.g., "http", "ftp", "sftp", "smb")
-     * @return metrics for the protocol, or null if protocol not found
-     * @since 2.0 (Phase 2 - Dec 2025)
-     */
-    TransferMetrics getProtocolMetrics(String protocolName);
-
-    /**
-     * Get metrics for all protocols.
-     *
-     * @return map of protocol name to metrics
-     * @since 2.0 (Phase 2 - Dec 2025)
-     */
-    Map<String, TransferMetrics> getAllProtocolMetrics();
 }

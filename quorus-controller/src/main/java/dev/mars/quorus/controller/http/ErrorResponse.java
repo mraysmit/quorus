@@ -17,6 +17,7 @@
 package dev.mars.quorus.controller.http;
 
 import io.vertx.core.json.JsonObject;
+import org.slf4j.MDC;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -51,6 +52,7 @@ public record ErrorResponse(
     Instant timestamp,
     String path,
     String requestId,
+    String traceId,
     int httpStatus
 ) {
     /**
@@ -65,6 +67,7 @@ public record ErrorResponse(
             Instant.now(),
             path,
             generateRequestId(),
+            currentTraceId(),
             code.httpStatus()
         );
     }
@@ -81,6 +84,7 @@ public record ErrorResponse(
             Instant.now(),
             path,
             requestId != null ? requestId : generateRequestId(),
+            currentTraceId(),
             code.httpStatus()
         );
     }
@@ -97,6 +101,7 @@ public record ErrorResponse(
             Instant.now(),
             path,
             generateRequestId(),
+            currentTraceId(),
             code.httpStatus()
         );
     }
@@ -115,6 +120,7 @@ public record ErrorResponse(
             Instant.now(),
             path,
             generateRequestId(),
+            currentTraceId(),
             code.httpStatus()
         );
     }
@@ -133,6 +139,7 @@ public record ErrorResponse(
             Instant.now(),
             path,
             requestId != null ? requestId : generateRequestId(),
+            currentTraceId(),
             code.httpStatus()
         );
     }
@@ -141,14 +148,21 @@ public record ErrorResponse(
      * Converts this error response to a JSON object suitable for HTTP response body.
      */
     public JsonObject toJson() {
-        return new JsonObject()
-            .put("error", new JsonObject()
-                .put("shortCode", shortCode)
-                .put("code", code)
-                .put("message", message)
-                .put("timestamp", timestamp.toString())
-                .put("path", path)
-                .put("requestId", requestId));
+        JsonObject error = new JsonObject()
+            .put("shortCode", shortCode)
+            .put("code", code)
+            .put("message", message)
+            .put("timestamp", timestamp.toString())
+            .put("path", path)
+            .put("requestId", requestId);
+        if (traceId != null) {
+            error.put("traceId", traceId);
+        }
+        return new JsonObject().put("error", error);
+    }
+
+    private static String currentTraceId() {
+        return MDC.get("traceId");
     }
 
     private static String generateRequestId() {
