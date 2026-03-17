@@ -1,7 +1,11 @@
+<img src="quorus-logo.png" alt="Quorus" width="120"/>
+
 # Quorus YAML Syntax Guide
 
 **Version:** 2.1  
-**Date:** 2026-03-17
+**Date:** 2026-03-17  
+**Author:** Mark Ray-Smith — Cityline Ltd  
+**License:** Apache 2.0
 
 This guide documents the YAML fields that the current `YamlWorkflowDefinitionParser` accepts.
 

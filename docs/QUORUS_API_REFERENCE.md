@@ -1,7 +1,11 @@
+<img src="quorus-logo.png" alt="Quorus" width="120"/>
+
 # Quorus HTTP API Reference
 
 **Version:** 2.1  
 **Date:** 2026-03-17  
+**Author:** Mark Ray-Smith — Cityline Ltd  
+**License:** Apache 2.0  
 **Implementation:** `quorus-controller/src/main/java/dev/mars/quorus/controller/http/HttpApiServer.java`
 
 This document reflects the endpoints currently registered by the embedded controller HTTP server.

@@ -1,7 +1,11 @@
+<img src="quorus-logo.png" alt="Quorus" width="120"/>
+
 # Quorus Integration Examples
 
 **Version:** 2.0  
-**Date:** 2026-03-14
+**Date:** 2026-03-14  
+**Author:** Mark Ray-Smith — Cityline Ltd  
+**License:** Apache 2.0
 
 This document lists the example entry points that actually exist in `quorus-integration-examples` today.
 
