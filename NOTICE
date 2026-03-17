@@ -1,4 +1,4 @@
-PeeGeeQ - Production-Ready PostgreSQL Message Queue
+Quorus - Enterprise Distributed File Transfer System
 Copyright 2025 Mark Andrew Ray-Smith Cityline Ltd
 
 This product includes software developed by Mark Andrew Ray-Smith Cityline Ltd.
@@ -7,70 +7,110 @@ This product includes software developed by Mark Andrew Ray-Smith Cityline Ltd.
 
 This software contains the following third-party components:
 
-PostgreSQL JDBC Driver (org.postgresql:postgresql:42.6.0)
-  License: BSD 2-Clause License
-  Copyright (c) 1997, PostgreSQL Global Development Group
-  https://github.com/pgjdbc/pgjdbc
+Eclipse Vert.x (io.vertx:vertx-core:5.0.8)
+  License: Apache License 2.0 and Eclipse Public License 2.0
+  Copyright (c) 2011-2024 The original author or authors
+  https://github.com/eclipse-vertx/vert.x
 
-HikariCP Connection Pool (com.zaxxer:HikariCP:5.0.1)
-  License: Apache License 2.0
-  Copyright (C) 2013 Brett Wooldridge
-  https://github.com/brettwooldridge/HikariCP
-
-Jackson JSON Processing (com.fasterxml.jackson.core:jackson-databind:2.15.2)
+Jackson JSON Processing (com.fasterxml.jackson.core:jackson-databind:2.19.4)
   License: Apache License 2.0
   Copyright (c) 2007- Tatu Saloranta, tatu.saloranta@iki.fi
   https://github.com/FasterXML/jackson-databind
 
-Eclipse Vert.x (io.vertx:vertx-core:4.5.11)
-  License: Apache License 2.0 and Eclipse Public License 2.0
-  Copyright (c) 2011-2023 The original author or authors
-  https://github.com/eclipse-vertx/vert.x
+SnakeYAML (org.yaml:snakeyaml:2.5)
+  License: Apache License 2.0
+  Copyright (c) 2008 Andrey Somov
+  https://bitbucket.org/snakeyaml/snakeyaml
 
-SLF4J Logging API (org.slf4j:slf4j-api:2.0.9)
+JSON Schema Validator (com.networknt:json-schema-validator:1.5.9)
+  License: Apache License 2.0
+  Copyright (c) 2016 Network New Technologies Inc.
+  https://github.com/networknt/json-schema-validator
+
+Spring Expression Language (org.springframework:spring-expression:6.2.16)
+  License: Apache License 2.0
+  Copyright (c) 2002-2024 Pivotal, Inc.
+  https://github.com/spring-projects/spring-framework
+
+OpenTelemetry (io.opentelemetry:opentelemetry-api:1.59.0)
+  License: Apache License 2.0
+  Copyright The OpenTelemetry Authors
+  https://github.com/open-telemetry/opentelemetry-java
+
+gRPC (io.grpc:grpc-core:1.68.1)
+  License: Apache License 2.0
+  Copyright 2014 gRPC authors
+  https://github.com/grpc/grpc-java
+
+Protocol Buffers (com.google.protobuf:protobuf-java:3.25.5)
+  License: BSD 3-Clause License
+  Copyright 2008 Google Inc.
+  https://github.com/protocolbuffers/protobuf
+
+Google Guava (com.google.guava:guava:33.5.0-jre)
+  License: Apache License 2.0
+  Copyright (C) 2010 The Guava Authors
+  https://github.com/google/guava
+
+RaftLog (io.github.mraysmit:raftlog-core:1.1.0)
+  License: Apache License 2.0
+  Copyright 2025 Mark Andrew Ray-Smith
+  https://github.com/mraysmit/raftlog
+
+RocksDB JNI (org.rocksdb:rocksdbjni:9.11.2)
+  License: Apache License 2.0
+  Copyright (c) 2011-present, Facebook, Inc.
+  https://github.com/facebook/rocksdb
+
+JSch (com.github.mwiede:jsch:0.2.26)
+  License: BSD 2-Clause License
+  Copyright (c) 2002-2015 Atsuhiko Yamanaka, JCraft, Inc.
+  https://github.com/mwiede/jsch
+
+jCIFS-ng (eu.agno3.jcifs:jcifs-ng:2.1.10)
+  License: GNU Lesser General Public License 2.1
+  Copyright (C) 2004 Michael B. Allen, (C) 2017 Moritz Bechler
+  https://github.com/AgNO3/jcifs-ng
+
+Commons Net (commons-net:commons-net:3.12.0)
+  License: Apache License 2.0
+  Copyright 2001-2024 The Apache Software Foundation
+  https://github.com/apache/commons-net
+
+SLF4J Logging API (org.slf4j:slf4j-api:2.0.17)
   License: MIT License
-  Copyright (c) 2004-2023 QOS.ch Sarl (Switzerland)
+  Copyright (c) 2004-2024 QOS.ch Sarl (Switzerland)
   https://github.com/qos-ch/slf4j
 
-Logback Classic (ch.qos.logback:logback-classic:1.4.11)
+Logback Classic (ch.qos.logback:logback-classic:1.5.32)
   License: Eclipse Public License 1.0 and GNU Lesser General Public License 2.1
-  Copyright (C) 1999-2023, QOS.ch
+  Copyright (C) 1999-2024, QOS.ch
   https://github.com/qos-ch/logback
 
-Micrometer Metrics (io.micrometer:micrometer-core:1.12.0)
+Jakarta Validation API (jakarta.validation:jakarta.validation-api:3.0.2)
   License: Apache License 2.0
-  Copyright 2017 VMware, Inc.
-  https://github.com/micrometer-metrics/micrometer
+  Copyright (c) 2017-2024 Eclipse Foundation
+  https://github.com/jakartaee/validation
 
-Resilience4j Circuit Breaker (io.github.resilience4j:resilience4j-circuitbreaker:2.1.0)
+AssertJ (org.assertj:assertj-core:3.27.7)
   License: Apache License 2.0
-  Copyright 2017 Robert Winkler, Bohdan Storozhuk
-  https://github.com/resilience4j/resilience4j
+  Copyright 2014-2024 the original author or authors
+  https://github.com/assertj/assertj
 
-SCRAM Authentication (com.ongres.scram:common:2.1)
-  License: BSD 2-Clause License
-  Copyright (c) 2017, OnGres, Inc.
-  https://github.com/ongres/scram
+Awaitility (org.awaitility:awaitility:4.3.0)
+  License: Apache License 2.0
+  Copyright 2010-2024 the original author or authors
+  https://github.com/awaitility/awaitility
 
-JUnit 5 Testing Framework (org.junit.jupiter:junit-jupiter:5.10.1)
+JUnit 5 (org.junit.jupiter:junit-jupiter:5.14.3)
   License: Eclipse Public License 2.0
-  Copyright 2015-2023 the original author or authors
+  Copyright 2015-2024 the original author or authors
   https://github.com/junit-team/junit5
 
-TestContainers (org.testcontainers:testcontainers:1.18.3)
+TestContainers (org.testcontainers:testcontainers:2.0.3)
   License: MIT License
-  Copyright (c) 2015-2023 Richard North and other authors
+  Copyright (c) 2015-2024 Richard North and other authors
   https://github.com/testcontainers/testcontainers-java
-
-Mockito Testing Framework (org.mockito:mockito-core:5.7.0)
-  License: MIT License
-  Copyright (c) 2007 Mockito contributors
-  https://github.com/mockito/mockito
-
-Awaitility Testing Utility (org.awaitility:awaitility:4.2.0)
-  License: Apache License 2.0
-  Copyright 2010-2023 the original author or authors
-  https://github.com/awaitility/awaitility
 
 ================================================================================
 
