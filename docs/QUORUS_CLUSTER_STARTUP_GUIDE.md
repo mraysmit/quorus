@@ -32,8 +32,6 @@ The repository currently ships these relevant compose files in `docker/compose`:
 Build with JDK 25 before starting containers.
 
 ```powershell
-$env:JAVA_HOME = "C:\Users\mraysmit\.jdks\openjdk-25"
-$env:Path = "$env:JAVA_HOME\bin;$env:Path"
 mvn clean package 2>&1 | Tee-Object -FilePath temp\cluster-build.txt
 ```
 
