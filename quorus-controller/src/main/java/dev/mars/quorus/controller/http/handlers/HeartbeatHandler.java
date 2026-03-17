@@ -74,8 +74,19 @@ public class HeartbeatHandler implements Handler<RoutingContext> {
             logger.debug("Processing heartbeat: agentId={}", agentId);
 
             // Verify agent exists (throws HTTP 404 if not found)
-            stateStore.findAgent(agentId)
+            AgentInfo registeredAgent = stateStore.findAgent(agentId)
                     .orElseThrow(() -> QuorusApiException.notFound(ErrorCode.AGENT_NOT_FOUND, agentId));
+
+            // Tenant isolation: if heartbeat carries tenantId, verify it matches the registered agent's tenant
+            String heartbeatTenantId = body.getString("tenantId");
+            if (heartbeatTenantId != null && registeredAgent.getTenantId() != null
+                    && !heartbeatTenantId.equals(registeredAgent.getTenantId())) {
+                logger.warn("Cross-tenant heartbeat blocked: agentId={}, heartbeatTenant={}, registeredTenant={}",
+                        agentId, heartbeatTenantId, registeredAgent.getTenantId());
+                ctx.fail(403, new IllegalArgumentException(
+                        "Heartbeat tenantId does not match agent's registered tenant"));
+                return;
+            }
 
             // Extract optional status
             AgentStatus status = null;

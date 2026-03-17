@@ -46,6 +46,7 @@ public class TransferJobSnapshot implements Serializable {
     private final Instant lastUpdateTime;
     private final String errorMessage;
     private final String description;
+    private final String tenantId;
 
     @JsonCreator
     public TransferJobSnapshot(
@@ -58,7 +59,8 @@ public class TransferJobSnapshot implements Serializable {
             @JsonProperty("startTime") Instant startTime,
             @JsonProperty("lastUpdateTime") Instant lastUpdateTime,
             @JsonProperty("errorMessage") String errorMessage,
-            @JsonProperty("description") String description) {
+            @JsonProperty("description") String description,
+            @JsonProperty("tenantId") String tenantId) {
         this.jobId = jobId;
         this.sourceUri = sourceUri;
         this.destinationPath = destinationPath;
@@ -69,9 +71,15 @@ public class TransferJobSnapshot implements Serializable {
         this.lastUpdateTime = lastUpdateTime;
         this.errorMessage = errorMessage;
         this.description = description;
+        this.tenantId = tenantId;
     }
 
     public static TransferJobSnapshot fromTransferJob(TransferJob job) {
+        String tenantId = job.getRequest().getMetadata().get("tenantId");
+        return fromTransferJob(job, tenantId);
+    }
+
+    public static TransferJobSnapshot fromTransferJob(TransferJob job, String tenantId) {
         return new TransferJobSnapshot(
                 job.getJobId(),
                 job.getRequest().getSourceUri().toString(),
@@ -82,8 +90,8 @@ public class TransferJobSnapshot implements Serializable {
                 job.getStartTime(),
                 job.getLastUpdateTime(),
                 job.getErrorMessage(),
-                job.getRequest().getMetadata().get("description")
-        );
+                job.getRequest().getMetadata().get("description"),
+                tenantId);
     }
 
     /**
@@ -117,6 +125,7 @@ public class TransferJobSnapshot implements Serializable {
     public Instant getLastUpdateTime() { return lastUpdateTime; }
     public String getErrorMessage() { return errorMessage; }
     public String getDescription() { return description; }
+    public String getTenantId() { return tenantId; }
 
     @Override
     public String toString() {

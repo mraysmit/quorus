@@ -1,7 +1,7 @@
 # Quorus Alpha Implementation Plan
 
-**Version:** 1.8  
-**Date:** March 2, 2026  
+**Version:** 1.9  
+**Date:** March 17, 2026  
 **Author:** Mark Andrew Ray-Smith Cityline Ltd
 
 ---
@@ -10,6 +10,7 @@
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.9 | 2026-03-17 | Added T4.3 Tenant-Agent Isolation (COMPLETE): 13-touchpoint enforcement across registration, job creation, selection, polling, status update, and heartbeat |
 | 1.8 | 2026-03-02 | Extracted Stage 6 details to [QUORUS_STAGE6_SECURITY_ROUTES.md](QUORUS_STAGE6_SECURITY_ROUTES.md); main document now contains summary only |
 | 1.7 | 2026-02-19 | Consistency fixes: updated Appendix A to match completed tasks (T4.1, T4.2, T5.2, T5.3, T5.4), corrected summary counts (14/22 completed), fixed version header, fixed 2025→2026 date in T3.1, expanded route risk mitigation |
 | 1.6 | 2026-02-13 | Consolidated: merged IMPLEMENTATION_STATUS, CHANGELOG, .env.example into appendices |
@@ -319,7 +320,66 @@ Extend capabilities with new protocols and services.
 
 ---
 
-## Stage 5: Architecture Improvements (1-2 weeks each)
+### T4.3: Tenant-Agent Isolation ✅ COMPLETE
+
+**Goal:** Enforce one-agent-one-tenant policy so agents can only execute jobs belonging to their own tenant. Closes a critical security gap where any agent could receive any tenant's jobs.
+
+**Effort:** 3 days  
+**Priority:** 🔴 CRITICAL (security gap)  
+**Dependencies:** T4.2 (Tenant Resource Management)  
+**Status:** ✅ **IMPLEMENTED** — end-to-end tenant enforcement across agent registration, job creation, selection, polling, status, and heartbeat
+
+| Task | Module | Effort | Status |
+|------|--------|--------|--------|
+| Add `tenantId` to `AgentInfo` + `JobAssignment` domain models | quorus-core | 2 hours | ✅ Complete |
+| Add `tenantId` to `TransferJobSnapshot` + `TransferJobCommand.Create` | quorus-controller | 2 hours | ✅ Complete |
+| Extend Protobuf `TransferJobCommandProto` with `tenant_id` field 8 | quorus-controller | 30 min | ✅ Complete |
+| Update `TransferCodec` encode/decode for tenantId | quorus-controller | 1 hour | ✅ Complete |
+| `AgentRegistrationHandler`: require `tenantId` in registration body | quorus-controller | 1 hour | ✅ Complete |
+| `TransferHandler`: extract and require `tenantId` in transfer creation | quorus-controller | 1 hour | ✅ Complete |
+| `AgentSelectionService`: tenant check as first gate in `isAgentEligible()` | quorus-controller | 1 hour | ✅ Complete |
+| `JobAssignmentService`: pre-filter agents by tenant before selection | quorus-controller | 1 hour | ✅ Complete |
+| `AgentJobsHandler`: agent lookup + cross-tenant job filtering | quorus-controller | 2 hours | ✅ Complete |
+| `JobStatusHandler`: agent lookup + cross-tenant access block (403) | quorus-controller | 2 hours | ✅ Complete |
+| `HeartbeatHandler`: tenant mismatch detection → 403 | quorus-controller | 1 hour | ✅ Complete |
+| Update `AgentRegistrationService`, `AgentConfiguration`, `AgentConfig` | quorus-agent | 2 hours | ✅ Complete |
+| Document `quorus.agent.tenant.id` in agent properties | quorus-agent | 30 min | ✅ Complete |
+| Fix and update all affected test suites | quorus-controller/test | 3 hours | ✅ Complete |
+
+**Design Decisions:**
+- **One agent = one tenant**: each agent registers with exactly one `tenantId`; cross-tenant agent sharing is not supported
+- **`tenantId` required at registration**: `AgentRegistrationHandler` returns 400 if missing
+- **`tenantId` required at transfer creation**: `TransferHandler` returns 400 if missing; extracted from body BEFORE `mapTo()` to avoid Jackson "Unrecognized field" exception
+- **Tenant check is the FIRST gate** in `isAgentEligible()` (before capability/status checks) for fast exclusion
+- **Null-safe for legacy data**: all checks use null-guard (`if tenantId != null`) — entities created before this change carry `null` tenantId and pass through without filtering (backward compatible)
+- **Protobuf field 8** (`string tenant_id`) is backward compatible — old Raft log entries deserialize with empty string → null
+- **Cross-tenant job access in polling**: silently skipped with WARN log (no 403, avoids timing-based enumeration)
+- **Cross-tenant status update**: returns 403 immediately
+- **Heartbeat tenant mismatch**: returns 403 if `tenantId` provided in heartbeat payload doesn't match registered agent's tenant
+
+**Enforcement Points (13 touchpoints):**
+| Touchpoint | Class | Enforcement |
+|-----------|-------|-------------|
+| Agent registration | `AgentRegistrationHandler` | `tenantId` required in body → 400 if missing |
+| Transfer job creation | `TransferHandler` | `tenantId` required in body → 400 if missing |
+| Agent selection (auto-assign) | `AgentSelectionService.isAgentEligible()` | First filter gate |
+| Job assignment (pre-filter) | `JobAssignmentService` | Pre-filter `availableAgents` by tenant before `selectAgent()` |
+| Job polling | `AgentJobsHandler` | Agent lookup; cross-tenant jobs silently filtered |
+| Job status update | `JobStatusHandler` | Agent lookup; cross-tenant update → 403 |
+| Heartbeat | `HeartbeatHandler` | Tenant mismatch in payload → 403 |
+| Transfer snapshot | `TransferJobSnapshot` | Carries `tenantId` from Raft log |
+| Raft log (create) | `TransferJobCommand.Create` | Carries `tenantId` from HTTP request |
+| Raft codec | `TransferCodec` | Serializes/deserializes `tenantId` via proto field 8 |
+| Agent domain model | `AgentInfo` | Carries `tenantId` with getter/setter |
+| Assignment domain model | `JobAssignment` | Carries `tenantId` for audit trail |
+| Agent configuration | `AgentConfig` / `AgentConfiguration` | Reads `AGENT_TENANT_ID` env var (required); `quorus.agent.tenant.id` property |
+
+**Implementation Notes:**
+- `TransferJob` (core domain model) intentionally does NOT get a `tenantId` field — the ID travels through `TransferJobCommand.Create` → Raft log → `TransferJobSnapshot`. This preserves separation of concerns.
+- `AgentJobsHandler` returns assignments even when no transfer job exists in state (backward compatible) — enrichment fields (sourceUri, destinationPath, totalBytes) are omitted when transfer job is absent
+- `AgentSelectionServiceTest`: test agents updated to carry `tenantId = "tenant-1"` to match the round-robin test's job requirements
+
+---
 
 Larger changes that improve system reliability.
 
@@ -490,6 +550,7 @@ Security features implemented **after** core functionality is stable and well-te
 ### Week 5-6: Protocols & Services
 - [x] **Stage 4**: T4.1 (NFS Protocol Adapter) - ✅ COMPLETE (44 tests)
 - [x] **Stage 4**: T4.2 (Tenant Resource Management) - ✅ COMPLETE (15 stress tests)
+- [x] **Stage 4**: T4.3 (Tenant-Agent Isolation) - ✅ COMPLETE (13 enforcement touchpoints across all modules)
 
 ### Week 7-10: Raft Persistence (CRITICAL)
 - [x] **Stage 5**: T5.1 (Raft WAL) - ✅ COMPLETE via raftlog-core

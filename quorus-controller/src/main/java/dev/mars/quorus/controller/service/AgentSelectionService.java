@@ -122,6 +122,13 @@ public class AgentSelectionService {
      * Check if an agent is eligible for a job assignment.
      */
     private boolean isAgentEligible(AgentInfo agent, JobRequirements requirements, TransferRequest request, AgentLoad load) {
+        // Tenant isolation: agent must belong to the same tenant as the job
+        if (requirements.getTenantId() != null && !requirements.getTenantId().equals(agent.getTenantId())) {
+            logger.debug("Agent excluded by tenant isolation: agentId={}, agentTenant={}, jobTenant={}",
+                agent.getAgentId(), agent.getTenantId(), requirements.getTenantId());
+            return false;
+        }
+
         // Check agent status - must be available for work
         if (!agent.getStatus().isAvailableForWork()) {
             return false;

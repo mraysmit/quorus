@@ -71,9 +71,21 @@ public class TransferHandler {
                     ctx.fail(400, new IllegalArgumentException("Request body is required"));
                     return;
                 }
-                TransferJob job = body.mapTo(TransferJob.class);
-                logger.info("Creating transfer job: jobId={}", job.getJobId());
-                TransferJobCommand command = TransferJobCommand.create(job);
+
+                // Extract tenantId BEFORE mapTo — TransferJob has no tenantId field and
+                // Jackson would throw "Unrecognized field" if we leave it in the body.
+                String tenantId = body.getString("tenantId");
+                if (tenantId == null || tenantId.isBlank()) {
+                    ctx.fail(400, new IllegalArgumentException("Missing required field: tenantId"));
+                    return;
+                }
+
+                JsonObject jobBody = body.copy();
+                jobBody.remove("tenantId");
+                TransferJob job = jobBody.mapTo(TransferJob.class);
+
+                logger.info("Creating transfer job: jobId={}, tenantId={}", job.getJobId(), tenantId);
+                TransferJobCommand command = TransferJobCommand.create(job, tenantId);
 
                 raftNode.submitCommand(command)
                         .onSuccess(result -> {

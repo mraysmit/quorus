@@ -163,7 +163,7 @@ public class QuorusStateStore implements RaftLogApplicator {
                 TransferJob job = cmd.transferJob();
                 logger.debug("Creating transfer job: jobId={}, sourceUri={}, destPath={}", 
                     jobId, job.getRequest().getSourceUri(), job.getRequest().getDestinationPath());
-                TransferJobSnapshot snapshot = TransferJobSnapshot.fromTransferJob(job);
+                TransferJobSnapshot snapshot = TransferJobSnapshot.fromTransferJob(job, cmd.tenantId());
                 transferJobs.put(jobId, snapshot);
                 logger.info("Created transfer job: jobId={}, protocol={}, totalJobs={}", 
                     jobId, job.getRequest().getProtocol(), transferJobs.size());
@@ -193,7 +193,8 @@ public class QuorusStateStore implements RaftLogApplicator {
                         existingJob.getStartTime(),
                         cmd.timestamp(),
                         existingJob.getErrorMessage(),
-                        existingJob.getDescription());
+                        existingJob.getDescription(),
+                        existingJob.getTenantId());
                 transferJobs.put(jobId, updatedJob);
                 logger.info("Updated transfer job status: jobId={}, oldStatus={}, newStatus={}", 
                     jobId, oldStatus, cmd.newStatus());
@@ -218,7 +219,8 @@ public class QuorusStateStore implements RaftLogApplicator {
                         progressJob.getStartTime(),
                         cmd.timestamp(),
                         progressJob.getErrorMessage(),
-                        progressJob.getDescription());
+                        progressJob.getDescription(),
+                        progressJob.getTenantId());
                 transferJobs.put(jobId, updatedJob);
                 logger.debug("Updated transfer job progress: jobId={}, oldBytes={}, newBytes={}, totalBytes={}", 
                     jobId, oldBytes, cmd.bytesTransferred(), progressJob.getTotalBytes());

@@ -76,6 +76,22 @@ public final class AgentConfig {
         return agentId;
     }
 
+    /**
+     * Gets the tenant ID this agent belongs to. Required - must be set via property or environment variable.
+     * @throws IllegalStateException if tenant ID is not configured
+     */
+    public String getTenantId() {
+        String tenantId = getString("quorus.agent.tenant.id", "");
+        if (tenantId.isEmpty()) {
+            tenantId = System.getenv("AGENT_TENANT_ID");
+        }
+        if (tenantId == null || tenantId.isEmpty()) {
+            throw new IllegalStateException(
+                    "Tenant ID not configured. Set quorus.agent.tenant.id or AGENT_TENANT_ID env var.");
+        }
+        return tenantId;
+    }
+
     public String getVersion() {
         return getString("quorus.agent.version", "1.0.0");
     }
@@ -283,6 +299,8 @@ public final class AgentConfig {
     private void logConfiguration() {
         logger.info("=== Quorus Agent Configuration ===");
         logger.info("  Agent ID:             {}", getAgentId());
+        try { logger.info("  Tenant ID:            {}", getTenantId()); }
+        catch (IllegalStateException e) { logger.warn("  Tenant ID:            NOT CONFIGURED"); }
         logger.info("  Agent Port:           {}", getAgentPort());
         logger.info("  Controller URL:       {}", getControllerUrl());
         logger.info("  Region:               {}", getRegion());

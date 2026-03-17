@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -153,11 +154,18 @@ public class JobAssignmentService {
         // Select agent if not specified
         String selectedAgentId = agentId;
         if (selectedAgentId == null) {
-            logger.debug("Auto-selecting agent for job: jobId={}, availableAgents={}", 
-                jobId, availableAgents.size());
-            selectedAgentId = agentSelectionService.selectAgent(queuedJob, availableAgents, agentLoads);
+            // Tenant isolation: only consider agents belonging to the same tenant as the job
+            String tenantId = queuedJob.getRequirements() != null ? queuedJob.getRequirements().getTenantId() : null;
+            Map<String, AgentInfo> tenantAgents = tenantId == null ? availableAgents
+                    : availableAgents.entrySet().stream()
+                            .filter(e -> tenantId.equals(e.getValue().getTenantId()))
+                            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
+            logger.debug("Auto-selecting agent for job: jobId={}, tenantId={}, tenantAgents={}, totalAgents={}",
+                jobId, tenantId, tenantAgents.size(), availableAgents.size());
+            selectedAgentId = agentSelectionService.selectAgent(queuedJob, tenantAgents, agentLoads);
             if (selectedAgentId == null) {
-                logger.warn("No suitable agent found: jobId={}, availableAgents={}", jobId, availableAgents.size());
+                logger.warn("No suitable agent found: jobId={}, tenantId={}, tenantAgents={}", jobId, tenantId, tenantAgents.size());
                 return Future.failedFuture(new RuntimeException("No suitable agent found for job: " + jobId));
             }
             logger.debug("Auto-selected agent: jobId={}, selectedAgentId={}", jobId, selectedAgentId);
@@ -171,10 +179,12 @@ public class JobAssignmentService {
             return Future.failedFuture(new IllegalArgumentException("Agent not available: " + selectedAgentId));
         }
 
-        // Create job assignment
+        // Create job assignment (carry tenantId for audit trail)
+        String reqTenantId = queuedJob.getRequirements() != null ? queuedJob.getRequirements().getTenantId() : null;
         JobAssignment assignment = new JobAssignment.Builder()
                 .jobId(jobId)
                 .agentId(selectedAgentId)
+                .tenantId(reqTenantId)
                 .status(JobAssignmentStatus.ASSIGNED)
                 .assignedAt(Instant.now())
                 .build();

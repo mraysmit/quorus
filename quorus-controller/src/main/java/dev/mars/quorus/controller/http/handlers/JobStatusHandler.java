@@ -16,6 +16,7 @@
 
 package dev.mars.quorus.controller.http.handlers;
 
+import dev.mars.quorus.agent.AgentInfo;
 import dev.mars.quorus.controller.http.ErrorCode;
 import dev.mars.quorus.controller.http.QuorusApiException;
 import dev.mars.quorus.controller.raft.RaftNode;
@@ -23,6 +24,7 @@ import dev.mars.quorus.controller.state.CommandResult;
 import dev.mars.quorus.controller.state.JobAssignmentCommand;
 import dev.mars.quorus.controller.state.QuorusStateStore;
 import dev.mars.quorus.controller.state.TransferJobCommand;
+import dev.mars.quorus.controller.state.TransferJobSnapshot;
 import dev.mars.quorus.core.JobAssignment;
 import dev.mars.quorus.core.JobAssignmentStatus;
 import io.vertx.core.Future;
@@ -76,6 +78,24 @@ public class JobStatusHandler implements Handler<RoutingContext> {
 
             logger.info("Updating job status: jobId={}, agentId={}, status={}, bytesTransferred={}",
                     jobId, agentId, statusStr, bytesTransferred);
+
+            // Tenant isolation: verify the agent belongs to the same tenant as the job
+            AgentInfo agent = stateStore.getAgent(agentId);
+            if (agent == null) {
+                ctx.fail(QuorusApiException.notFound(ErrorCode.AGENT_NOT_FOUND, agentId));
+                return;
+            }
+            TransferJobSnapshot transferJobSnapshot = stateStore.getTransferJob(jobId);
+            if (transferJobSnapshot != null
+                    && agent.getTenantId() != null
+                    && transferJobSnapshot.getTenantId() != null
+                    && !agent.getTenantId().equals(transferJobSnapshot.getTenantId())) {
+                logger.warn("Cross-tenant status update blocked: agentId={}, agentTenant={}, jobId={}, jobTenant={}",
+                        agentId, agent.getTenantId(), jobId, transferJobSnapshot.getTenantId());
+                ctx.fail(403, new IllegalArgumentException(
+                        "Agent does not belong to the same tenant as the job"));
+                return;
+            }
 
             JobAssignmentStatus status = JobAssignmentStatus.valueOf(statusStr);
 

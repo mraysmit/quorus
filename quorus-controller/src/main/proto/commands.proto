@@ -332,6 +332,7 @@ message TransferJobCommandProto {
   int64 bytes_transferred = 5;
   TransferStatusProto expected_status = 6;  // CAS: expected current status (must match for command to apply)
   int64 timestamp_epoch_ms = 7;  // Command timestamp for deterministic Raft replay
+  string tenant_id = 8;          // Tenant that owns this transfer job
 }
 
 message AgentCommandProto {

@@ -59,24 +59,28 @@ class AgentSelectionServiceTest {
         // Agent 1: US East, SFTP + HTTP specialist, low load
         AgentInfo agent1 = createAgent("agent-001", "us-east-1", "datacenter-1", 
                 Set.of("sftp", "http", "https"), 10, 1000000000L); // 1GB max transfer
+        agent1.setTenantId("tenant-1");
         availableAgents.put("agent-001", agent1);
         agentLoads.put("agent-001", createAgentLoad("agent-001", 2, 10, 0.3, 0.4, 0.2));
         
         // Agent 2: US West, Multi-protocol, medium load
         AgentInfo agent2 = createAgent("agent-002", "us-west-2", "datacenter-2", 
                 Set.of("sftp", "ftp", "smb", "http", "https"), 15, 2000000000L); // 2GB max transfer
+        agent2.setTenantId("tenant-1");
         availableAgents.put("agent-002", agent2);
         agentLoads.put("agent-002", createAgentLoad("agent-002", 8, 15, 0.6, 0.5, 0.4));
         
         // Agent 3: EU West, High capacity, high load
         AgentInfo agent3 = createAgent("agent-003", "eu-west-1", "datacenter-3", 
                 Set.of("sftp", "http", "https", "s3"), 20, 5000000000L); // 5GB max transfer
+        agent3.setTenantId("tenant-1");
         availableAgents.put("agent-003", agent3);
         agentLoads.put("agent-003", createAgentLoad("agent-003", 18, 20, 0.9, 0.8, 0.7));
         
         // Agent 4: US East, Overloaded (should be filtered out)
         AgentInfo agent4 = createAgent("agent-004", "us-east-1", "datacenter-1", 
                 Set.of("ftp", "http"), 5, 500000000L); // 500MB max transfer
+        agent4.setTenantId("tenant-1");
         agent4.setStatus(AgentStatus.OVERLOADED);
         availableAgents.put("agent-004", agent4);
         agentLoads.put("agent-004", createAgentLoad("agent-004", 5, 5, 1.0, 0.95, 0.9));

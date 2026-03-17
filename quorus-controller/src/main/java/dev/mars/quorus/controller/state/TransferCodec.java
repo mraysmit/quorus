@@ -49,6 +49,9 @@ final class TransferCodec {
             case TransferJobCommand.Create c -> {
                 builder.setType(TransferJobCommandType.TRANSFER_JOB_CMD_CREATE);
                 builder.setTransferJob(toProto(c.transferJob()));
+                if (c.tenantId() != null) {
+                    builder.setTenantId(c.tenantId());
+                }
             }
             case TransferJobCommand.UpdateStatus u -> {
                 builder.setType(TransferJobCommandType.TRANSFER_JOB_CMD_UPDATE_STATUS);
@@ -72,7 +75,8 @@ final class TransferCodec {
                 ? Instant.ofEpochMilli(proto.getTimestampEpochMs()) : Instant.now();
         return switch (proto.getType()) {
             case TRANSFER_JOB_CMD_CREATE -> new TransferJobCommand.Create(
-                    proto.getJobId(), fromProto(proto.getTransferJob()), timestamp);
+                    proto.getJobId(), fromProto(proto.getTransferJob()), timestamp,
+                    proto.getTenantId().isEmpty() ? null : proto.getTenantId());
             case TRANSFER_JOB_CMD_UPDATE_STATUS -> {
                 yield new TransferJobCommand.UpdateStatus(proto.getJobId(),
                         fromProto(proto.getExpectedStatus()), fromProto(proto.getStatus()), timestamp);

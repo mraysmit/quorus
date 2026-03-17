@@ -1,7 +1,7 @@
 # Quorus Cluster Startup Guide
 
-**Version:** 2.0  
-**Date:** 2026-03-14
+**Version:** 2.1  
+**Date:** 2026-03-17
 
 This guide documents the current repository-local path for starting a controller cluster and observability stack with the compose files that exist today.
 
@@ -92,6 +92,22 @@ Current controller startup brings up:
 - graceful shutdown coordinator
 
 It does not currently wire an autonomous route trigger evaluator in the startup path. Route CRUD and route replication are live; route-triggered autonomous execution should not be assumed from cluster startup alone.
+
+## Agent Tenant Configuration
+
+Each agent must be assigned to a tenant before it can receive jobs. Set the following environment variable in the agent container or process:
+
+```bash
+AGENT_TENANT_ID=<your-tenant-id>
+```
+
+Alternatively, set the property in `quorus-agent.properties`:
+
+```properties
+quorus.agent.tenant.id=<your-tenant-id>
+```
+
+An agent that registers without a `tenantId` is rejected by the controller with `400 Bad Request`. Transfer jobs without a `tenantId` are equally rejected. See `docs/QUORUS_USER_GUIDE.md` for the full tenant isolation model.
 
 ## Current Source of Truth
 
