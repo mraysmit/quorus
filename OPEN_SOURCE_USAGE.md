@@ -2,7 +2,7 @@
 
 ## Overview
 
-PeeGeeQ is an open source project licensed under the **Apache License 2.0**. This document outlines the open source components used, license requirements, and compliance guidelines.
+Quorus is an open source project licensed under the **Apache License 2.0**. This document outlines the open source components used, license requirements, and compliance guidelines.
 
 ## Project License
 
@@ -56,44 +56,70 @@ All Java source files must include the following license header:
 
 ### Runtime Dependencies
 
-#### Database & Connection Management
-- **PostgreSQL JDBC Driver** (42.6.0) - BSD 2-Clause License
-- **HikariCP** (5.0.1) - Apache License 2.0
-- **SCRAM Authentication** (2.1) - BSD 2-Clause License
-
-#### JSON Processing
-- **Jackson Databind** (2.15.2) - Apache License 2.0
-
 #### Reactive & Async Processing
-- **Eclipse Vert.x Core** (4.5.11) - Apache License 2.0 / EPL 2.0
-- **Vert.x PostgreSQL Client** (4.5.11) - Apache License 2.0 / EPL 2.0
-- **Vert.x SQL Client** (4.5.11) - Apache License 2.0 / EPL 2.0
+- **Eclipse Vert.x Core** (5.0.8) - Apache License 2.0 / EPL 2.0
+- **Vert.x Web** (5.0.8) - Apache License 2.0 / EPL 2.0
+- **Vert.x Web Client** (5.0.8) - Apache License 2.0 / EPL 2.0
+- **Vert.x PostgreSQL Client** (5.0.8) - Apache License 2.0 / EPL 2.0
+- **Vert.x gRPC Server** (5.0.8) - Apache License 2.0 / EPL 2.0
+- **Vert.x gRPC Client** (5.0.8) - Apache License 2.0 / EPL 2.0
+- **Vert.x OpenTelemetry** (5.0.8) - Apache License 2.0 / EPL 2.0
+
+#### JSON & YAML Processing
+- **Jackson Databind** (2.19.4) - Apache License 2.0
+- **Jackson Core** (2.19.4) - Apache License 2.0
+- **Jackson Annotations** (2.19.4) - Apache License 2.0
+- **Jackson Datatype JSR310** (2.19.4) - Apache License 2.0
+- **Jackson Dataformat YAML** (2.19.4) - Apache License 2.0
+- **SnakeYAML** (2.5) - Apache License 2.0
+
+#### gRPC & Protocol Buffers
+- **gRPC Protobuf** (1.68.1) - Apache License 2.0
+- **gRPC Stub** (1.68.1) - Apache License 2.0
+- **gRPC Netty** (1.68.1) - Apache License 2.0
+- **Protocol Buffers Java** (3.25.5) - BSD 3-Clause License
+- **Protocol Buffers Java Util** (3.25.5) - BSD 3-Clause License
+
+#### Raft Consensus & Storage
+- **RaftLog Core** (1.1.0) - Apache License 2.0
+- **RocksDB JNI** (9.11.2) - Apache License 2.0
+
+#### Observability
+- **OpenTelemetry API** (1.59.0) - Apache License 2.0
+- **OpenTelemetry SDK** (1.59.0) - Apache License 2.0
+- **OpenTelemetry OTLP Exporter** (1.59.0) - Apache License 2.0
+- **OpenTelemetry Prometheus Exporter** (1.59.0-alpha) - Apache License 2.0
+- **OpenTelemetry Logback Appender** (2.14.0-alpha) - Apache License 2.0
 
 #### Logging
-- **SLF4J API** (2.0.9) - MIT License
-- **Logback Classic** (1.4.11) - EPL 1.0 / LGPL 2.1
+- **SLF4J API** (2.0.17) - MIT License
+- **SLF4J JUL Bridge** (2.0.17) - MIT License
+- **Logback Classic** (1.5.32) - EPL 1.0 / LGPL 2.1
 
-#### Metrics & Monitoring
-- **Micrometer Core** (1.12.0) - Apache License 2.0
-- **Micrometer Prometheus Registry** (1.12.0) - Apache License 2.0
+#### Protocol Adapters
+- **JSch** (0.2.26) - BSD 2-Clause License
+- **jCIFS-ng** (2.1.10) - LGPL 2.1
+- **Commons Net** (3.12.0) - Apache License 2.0
 
-#### Resilience & Circuit Breaking
-- **Resilience4j Circuit Breaker** (2.1.0) - Apache License 2.0
-- **Resilience4j Rate Limiter** (2.1.0) - Apache License 2.0
-- **Resilience4j Micrometer** (2.1.0) - Apache License 2.0
+#### Validation & Expression
+- **Jakarta Validation API** (3.0.2) - Apache License 2.0
+- **JSON Schema Validator** (1.5.9) - Apache License 2.0
+- **Spring Expression Language** (6.2.16) - Apache License 2.0
+
+#### Utilities
+- **Google Guava** (33.5.0-jre) - Apache License 2.0
 
 ### Test Dependencies
 
 #### Testing Frameworks
-- **JUnit Jupiter** (5.10.1) - Eclipse Public License 2.0
-- **JUnit Platform Suite** (1.10.1) - Eclipse Public License 2.0
-- **Mockito Core** (5.7.0) - MIT License
-- **Awaitility** (4.2.0) - Apache License 2.0
+- **JUnit Jupiter** (5.14.3) - Eclipse Public License 2.0
+- **Vert.x JUnit5** (5.0.8) - Apache License 2.0 / EPL 2.0
+- **AssertJ Core** (3.27.7) - Apache License 2.0
+- **Awaitility** (4.3.0) - Apache License 2.0
 
 #### Integration Testing
-- **TestContainers** (1.18.3) - MIT License
-- **TestContainers JUnit Jupiter** (1.18.3) - MIT License
-- **TestContainers PostgreSQL** (1.18.3) - MIT License
+- **TestContainers** (2.0.3) - MIT License
+- **TestContainers JUnit Jupiter** (2.0.3) - MIT License
 
 ## License Compatibility Matrix
 
@@ -102,6 +128,7 @@ All Java source files must include the following license header:
 | Apache 2.0 | Yes | Same license |
 | MIT | Yes | Permissive, compatible |
 | BSD 2-Clause | Yes | Permissive, compatible |
+| BSD 3-Clause | Yes | Permissive, compatible |
 | EPL 2.0 | Yes | Compatible with Apache 2.0 |
 | LGPL 2.1 | Conditional | Dynamic linking only |
 
@@ -118,14 +145,14 @@ All Java source files must include the following license header:
 
 **Allowed:**
 - Use in commercial products
-- Sell products containing PeeGeeQ
+- Sell products containing Quorus
 - Modify for commercial purposes
 - Create proprietary derivatives
 
 **Required:**
 - Include license and copyright notices
 - Include NOTICE file in distributions
-- Don't use "PeeGeeQ" trademark without permission
+- Don't use "Quorus" trademark without permission
 
 ### For Modification
 
@@ -141,11 +168,11 @@ All Java source files must include the following license header:
 
 ## Attribution Requirements
 
-When using PeeGeeQ in your project, include:
+When using Quorus in your project, include:
 
 ### In Documentation
 ```
-This product includes PeeGeeQ (https://github.com/your-repo/peegeeq)
+This product includes Quorus (https://github.com/mraysmit/quorus)
 Copyright 2025 Mark Andrew Ray-Smith Cityline Ltd
 Licensed under the Apache License 2.0
 ```
@@ -163,10 +190,10 @@ Use the provided script to ensure all files have proper headers:
 
 ```powershell
 # Check current status
-.\update-java-headers.ps1 -DryRun
+.\scripts\update-java-headers.ps1 -DryRun
 
 # Update headers with license information
-.\update-java-headers.ps1
+.\scripts\update-java-headers.ps1
 ```
 
 ### Maven License Plugin
@@ -189,7 +216,7 @@ Consider adding the Maven License Plugin to your build:
 
 ## Frequently Asked Questions
 
-### Q: Can I use PeeGeeQ in my commercial product?
+### Q: Can I use Quorus in my commercial product?
 **A:** Yes, the Apache License 2.0 explicitly allows commercial use.
 
 ### Q: Do I need to open source my modifications?
@@ -197,36 +224,3 @@ Consider adding the Maven License Plugin to your build:
 
 ### Q: Can I remove the license headers?
 **A:** No, you must preserve all copyright and license notices.
-
-### Q: Do I need to contribute back my changes?
-**A:** No, but contributions are welcome and appreciated.
-
-### Q: Can I use the "PeeGeeQ" name for my product?
-**A:** The license doesn't grant trademark rights. Contact the copyright holder for trademark usage.
-
-## Implementation Status
-
-**Complete Implementation:**
-- Apache License 2.0 headers added to all 88 Java files
-- LICENSE file created with full Apache License 2.0 text
-- NOTICE file created with third-party attribution
-- POM.xml updated with license metadata
-- Automated scripts provided for maintenance
-
-## Contact
-
-For license questions or trademark permissions:
-- **Copyright Holder:** Mark Andrew Ray-Smith Cityline Ltd
-- **Project Repository:** [Your Repository URL]
-- **License Questions:** [Your Contact Email]
-
-## Resources
-
-- [Apache License 2.0 Full Text](https://www.apache.org/licenses/LICENSE-2.0)
-- [Apache License FAQ](https://www.apache.org/foundation/license-faq.html)
-- [Open Source Initiative](https://opensource.org/licenses/Apache-2.0)
-- [SPDX License Identifier](https://spdx.org/licenses/Apache-2.0.html)
-
----
-
-**Note:** This document provides general guidance. For specific legal questions, consult with a qualified attorney familiar with open source licensing.
