@@ -1,7 +1,7 @@
 # Quorus User Guide
 
-**Version:** 2.0  
-**Date:** 2026-03-14  
+**Version:** 2.1  
+**Date:** 2026-03-17  
 **Scope:** Current implementation guide
 
 ## Introduction
@@ -165,11 +165,47 @@ Current controller observability endpoints:
 
 Current core and workflow modules also emit OpenTelemetry-backed metrics through their observability components.
 
+## Tenant Isolation
+
+Quorus enforces strict tenant isolation between agents and transfer jobs. Every agent belongs to exactly one tenant and can only receive jobs from that tenant.
+
+### Agent Configuration
+
+Each agent must declare its tenant at startup. Two configuration paths are supported:
+
+**Environment variable (takes priority):**
+
+```bash
+export AGENT_TENANT_ID=acme-corp
+```
+
+**Properties file (`quorus-agent.properties`):**
+
+```properties
+quorus.agent.tenant.id=acme-corp
+```
+
+If `tenantId` is absent from the agent registration payload, the controller returns `400 Bad Request`.
+
+### Transfer Job Ownership
+
+Every transfer job must declare a `tenantId` at creation time (field in the `POST /api/v1/transfers` request body). The controller matches job tenant to agent tenant at assignment time — agents never see jobs belonging to other tenants.
+
+### Enforcement Points
+
+| Operation | Enforcement |
+|-----------|-------------|
+| Agent registration | `tenantId` required — `400` if absent |
+| Transfer creation | `tenantId` required — `400` if absent |
+| Job polling (`GET /agents/:id/jobs`) | Jobs filtered to agent's tenant only |
+| Job status update | Cross-tenant update blocked — `403` |
+| Heartbeat | Cross-tenant `tenantId` in payload blocked — `403` |
+
 ## Documentation Boundaries
 
 When reading older Quorus material, keep these distinctions in mind:
 
-- **Implemented now:** controller-first API, Raft-backed state, transfer execution, workflows, route CRUD
+- **Implemented now:** controller-first API, Raft-backed state, transfer execution, workflows, route CRUD, tenant-agent isolation
 - **Modeled but not fully wired for autonomous runtime execution:** automatic route trigger evaluation
 - **Not supported by current adapter code:** adapter-level resume, broad OAuth2 claims, workflow notification/cleanup/SLA YAML sections
 

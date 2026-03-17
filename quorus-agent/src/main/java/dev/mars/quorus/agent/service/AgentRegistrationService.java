@@ -125,6 +125,7 @@ public class AgentRegistrationService {
         
         JsonObject request = new JsonObject()
             .put("agentId", config.getAgentId())
+            .put("tenantId", config.getTenantId())
             .put("hostname", config.getHostname())
             .put("address", config.getAddress())
             .put("port", config.getAgentPort())

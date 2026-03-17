@@ -49,6 +49,7 @@ public class AgentConfiguration {
     private final int httpConnectionTimeout;
     private final int httpIdleTimeout;
     private final String version;
+    private final String tenantId;
     
     private AgentConfiguration(Builder builder) {
         this.agentId = builder.agentId;
@@ -64,6 +65,7 @@ public class AgentConfiguration {
         this.httpConnectionTimeout = builder.httpConnectionTimeout;
         this.httpIdleTimeout = builder.httpIdleTimeout;
         this.version = builder.version;
+        this.tenantId = builder.tenantId;
     }
     
     public static AgentConfiguration fromEnvironment() {
@@ -71,6 +73,7 @@ public class AgentConfiguration {
         
         // Required configuration
         builder.agentId(getEnvOrThrow("AGENT_ID"));
+        builder.tenantId(getEnvOrThrow("AGENT_TENANT_ID"));
         builder.controllerUrl(getEnvOrDefault("CONTROLLER_URL", "http://localhost:8080/api/v1"));
         
         // Optional configuration with defaults
@@ -142,6 +145,7 @@ public class AgentConfiguration {
     
     // Getters
     public String getAgentId() { return agentId; }
+    public String getTenantId() { return tenantId; }
     public String getHostname() { return hostname; }
     public String getAddress() { return address; }
     public int getAgentPort() { return agentPort; }
@@ -157,6 +161,7 @@ public class AgentConfiguration {
     
     public static class Builder {
         private String agentId;
+        private String tenantId;
         private String hostname;
         private String address;
         private int agentPort = 8080;
@@ -171,6 +176,7 @@ public class AgentConfiguration {
         private String version = "1.0.0";
         
         public Builder agentId(String agentId) { this.agentId = agentId; return this; }
+        public Builder tenantId(String tenantId) { this.tenantId = tenantId; return this; }
         public Builder hostname(String hostname) { this.hostname = hostname; return this; }
         public Builder address(String address) { this.address = address; return this; }
         public Builder agentPort(int agentPort) { this.agentPort = agentPort; return this; }
@@ -186,6 +192,7 @@ public class AgentConfiguration {
         
         public AgentConfiguration build() {
             if (agentId == null) throw new IllegalArgumentException("agentId is required");
+            if (tenantId == null) throw new IllegalArgumentException("tenantId is required (AGENT_TENANT_ID)");
             if (controllerUrl == null) throw new IllegalArgumentException("controllerUrl is required");
             return new AgentConfiguration(this);
         }

@@ -152,6 +152,7 @@ class AgentJobManagementIntegrationTest {
                 "version": "1.0.0",
                 "region": "us-east-1",
                 "datacenter": "dc1",
+                "tenantId": "test-tenant",
                 "capabilities": {
                     "supportedProtocols": ["http", "https", "ftp"],
                     "maxConcurrentTransfers": 5,
@@ -191,7 +192,8 @@ class AgentJobManagementIntegrationTest {
                 "sourceUri": "https://example.com/file.txt",
                 "destinationPath": "/data/file.txt",
                 "totalBytes": 1048576,
-                "description": "Test transfer job"
+                "description": "Test transfer job",
+                "tenantId": "test-tenant"
             }
             """.formatted(testJobId);
 

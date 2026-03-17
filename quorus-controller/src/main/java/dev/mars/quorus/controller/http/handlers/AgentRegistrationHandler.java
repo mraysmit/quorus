@@ -68,9 +68,13 @@ public class AgentRegistrationHandler implements Handler<RoutingContext> {
                 ctx.fail(400, new IllegalArgumentException("Missing required field: address"));
                 return;
             }
+            if (agentInfo.getTenantId() == null || agentInfo.getTenantId().isEmpty()) {
+                ctx.fail(400, new IllegalArgumentException("Missing required field: tenantId"));
+                return;
+            }
 
-            logger.info("Registering agent: agentId={}, hostname={}", 
-                    agentInfo.getAgentId(), agentInfo.getHostname());
+            logger.info("Registering agent: agentId={}, hostname={}, tenantId={}", 
+                    agentInfo.getAgentId(), agentInfo.getHostname(), agentInfo.getTenantId());
 
             AgentCommand command = AgentCommand.register(agentInfo);
             raftNode.submitCommand(command)

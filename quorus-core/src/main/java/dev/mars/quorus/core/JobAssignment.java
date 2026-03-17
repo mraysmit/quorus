@@ -50,6 +50,7 @@ public class JobAssignment implements Serializable {
     private final int retryCount;
     private final long estimatedDurationMs;
     private final String assignmentStrategy;
+    private final String tenantId;
     
     private JobAssignment(Builder builder) {
         this.jobId = Objects.requireNonNull(builder.jobId, "Job ID cannot be null");
@@ -63,6 +64,7 @@ public class JobAssignment implements Serializable {
         this.retryCount = Math.max(0, builder.retryCount);
         this.estimatedDurationMs = Math.max(0, builder.estimatedDurationMs);
         this.assignmentStrategy = builder.assignmentStrategy;
+        this.tenantId = builder.tenantId;
     }
     
     public String getJobId() {
@@ -107,6 +109,10 @@ public class JobAssignment implements Serializable {
     
     public String getAssignmentStrategy() {
         return assignmentStrategy;
+    }
+
+    public String getTenantId() {
+        return tenantId;
     }
     
     /**
@@ -223,6 +229,7 @@ public class JobAssignment implements Serializable {
         return "JobAssignment{" +
                 "jobId='" + jobId + '\'' +
                 ", agentId='" + agentId + '\'' +
+                ", tenantId='" + tenantId + '\'' +
                 ", status=" + status +
                 ", assignedAt=" + assignedAt +
                 ", retryCount=" + retryCount +
@@ -246,6 +253,7 @@ public class JobAssignment implements Serializable {
         private int retryCount;
         private long estimatedDurationMs;
         private String assignmentStrategy;
+        private String tenantId;
         
         public Builder() {
             this.assignedAt = Instant.now();
@@ -265,6 +273,7 @@ public class JobAssignment implements Serializable {
             this.retryCount = existing.retryCount;
             this.estimatedDurationMs = existing.estimatedDurationMs;
             this.assignmentStrategy = existing.assignmentStrategy;
+            this.tenantId = existing.tenantId;
         }
         
         public Builder jobId(String jobId) {
@@ -319,6 +328,11 @@ public class JobAssignment implements Serializable {
         
         public Builder assignmentStrategy(String assignmentStrategy) {
             this.assignmentStrategy = assignmentStrategy;
+            return this;
+        }
+
+        public Builder tenantId(String tenantId) {
+            this.tenantId = tenantId;
             return this;
         }
         

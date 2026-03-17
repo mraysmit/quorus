@@ -1,7 +1,7 @@
 # Quorus Architecture Quickstart
 
-**Version:** 2.0  
-**Date:** 2026-03-14  
+**Version:** 2.1  
+**Date:** 2026-03-17  
 **Scope:** Current implementation snapshot
 
 ## What Quorus Is
@@ -149,6 +149,20 @@ Current observability features include:
 - `/metrics`
 
 Controller metrics are exposed through the embedded HTTP server, and transfer and workflow execution record OpenTelemetry-backed metrics in the core and workflow modules.
+
+## Tenant-Agent Isolation
+
+From the controller's perspective, the agent fleet is partitioned by tenant. A single agent belongs to exactly one tenant and only sees jobs for that tenant.
+
+The enforcement path is:
+
+1. Agent registers with `tenantId` (required field — `400` if absent)
+2. Transfer job is created with `tenantId` (required field — `400` if absent)
+3. `AgentSelectionService` uses tenant as the first gate when selecting an agent for a job
+4. `GET /api/v1/agents/:agentId/jobs` filters the assignment list to the agent's own tenant before returning
+5. `POST /api/v1/jobs/:jobId/status` verifies the submitting agent's tenant matches the job's tenant (`403` if not)
+
+All these checks run inside the Vert.x controller, routed through Raft-replicated state. The tenant model is stored as a field on `AgentInfo` and `TransferJobSnapshot` in `QuorusStateStore`.
 
 ## Java Baseline
 

@@ -70,6 +70,9 @@ public class AgentInfo {
     @JsonProperty("metadata")
     private Map<String, String> metadata;
 
+    @JsonProperty("tenantId")
+    private String tenantId;
+
     /**
      * Default constructor for JSON deserialization.
      */
@@ -115,6 +118,7 @@ public class AgentInfo {
         if (source.metadata != null) {
             copy.metadata = new HashMap<>(source.metadata);
         }
+        copy.tenantId = source.tenantId;
         return copy;
     }
 
@@ -332,6 +336,24 @@ public class AgentInfo {
      */
     public void setMetadata(Map<String, String> metadata) {
         this.metadata = metadata != null ? metadata : new HashMap<>();
+    }
+
+    /**
+     * Get the tenant ID this agent belongs to.
+     *
+     * @return the tenant ID, or null if not associated with a tenant
+     */
+    public String getTenantId() {
+        return tenantId;
+    }
+
+    /**
+     * Set the tenant ID this agent belongs to.
+     *
+     * @param tenantId the tenant ID
+     */
+    public void setTenantId(String tenantId) {
+        this.tenantId = tenantId;
     }
 
     /**

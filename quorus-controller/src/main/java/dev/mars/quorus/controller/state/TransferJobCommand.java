@@ -60,7 +60,7 @@ public sealed interface TransferJobCommand extends RaftCommand
      * @param transferJob the full transfer job object
      * @param timestamp   the command timestamp
      */
-    record Create(String jobId, TransferJob transferJob, Instant timestamp) implements TransferJobCommand {
+    record Create(String jobId, TransferJob transferJob, Instant timestamp, String tenantId) implements TransferJobCommand {
         private static final long serialVersionUID = 1L;
 
         public Create {
@@ -126,7 +126,14 @@ public sealed interface TransferJobCommand extends RaftCommand
      * Create a new transfer job command.
      */
     static TransferJobCommand create(TransferJob transferJob) {
-        return new Create(transferJob.getJobId(), transferJob, Instant.now());
+        return new Create(transferJob.getJobId(), transferJob, Instant.now(), null);
+    }
+
+    /**
+     * Create a new transfer job command with tenant association.
+     */
+    static TransferJobCommand create(TransferJob transferJob, String tenantId) {
+        return new Create(transferJob.getJobId(), transferJob, Instant.now(), tenantId);
     }
 
     /**

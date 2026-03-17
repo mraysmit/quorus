@@ -67,6 +67,7 @@ class AgentTelemetryIntegrationTest {
     private static final String PROMETHEUS_PORT_PROPERTY = "quorus.agent.telemetry.prometheus.port";
     private static final String OTLP_ENDPOINT_PROPERTY = "quorus.agent.telemetry.otlp.endpoint";
 
+    @SuppressWarnings("resource")
     @Container
     static GenericContainer<?> otelCollector = new GenericContainer<>(
             DockerImageName.parse("otel/opentelemetry-collector-contrib:0.96.0"))
@@ -76,7 +77,9 @@ class AgentTelemetryIntegrationTest {
                     "otel-collector-config.yaml",
                     "/etc/otelcol-contrib/config.yaml",
                     BindMode.READ_ONLY)
-            .waitingFor(Wait.forHttp("/").forPort(13133).forStatusCode(200));
+            .waitingFor(Wait.forHttp("/")
+            .forPort(13133)
+            .forStatusCode(200));
 
     private Vertx vertx;
     private HttpClient httpClient;

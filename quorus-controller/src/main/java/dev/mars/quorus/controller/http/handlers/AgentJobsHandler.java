@@ -16,6 +16,7 @@
 
 package dev.mars.quorus.controller.http.handlers;
 
+import dev.mars.quorus.agent.AgentInfo;
 import dev.mars.quorus.controller.state.QuorusStateStore;
 import dev.mars.quorus.controller.state.TransferJobSnapshot;
 import dev.mars.quorus.core.JobAssignment;
@@ -54,6 +55,14 @@ public class AgentJobsHandler implements Handler<RoutingContext> {
         String agentId = ctx.pathParam("agentId");
         QuorusStateStore stateMachine = this.stateStore;
 
+        // Tenant isolation: resolve the agent's tenant before returning any jobs
+        AgentInfo agent = stateMachine.getAgent(agentId);
+        if (agent == null) {
+            ctx.fail(404, new IllegalArgumentException("Agent not found: " + agentId));
+            return;
+        }
+        String agentTenantId = agent.getTenantId();
+
         Map<String, JobAssignment> allAssignments = stateMachine.getJobAssignments();
         JsonArray pendingJobs = new JsonArray();
 
@@ -65,6 +74,15 @@ public class AgentJobsHandler implements Handler<RoutingContext> {
                 continue;
             }
 
+            // Tenant isolation: only return jobs whose tenant matches the agent's tenant
+            TransferJobSnapshot transferJob = stateMachine.getTransferJob(assignment.getJobId());
+            if (transferJob != null && agentTenantId != null && transferJob.getTenantId() != null
+                    && !agentTenantId.equals(transferJob.getTenantId())) {
+                logger.warn("Cross-tenant job access blocked: agentId={}, agentTenant={}, jobId={}, jobTenant={}",
+                        agentId, agentTenantId, assignment.getJobId(), transferJob.getTenantId());
+                continue;
+            }
+
             JsonObject jobInfo = new JsonObject()
                     .put("assignmentId", assignment.getJobId() + ":" + assignment.getAgentId())
                     .put("jobId", assignment.getJobId())
@@ -72,8 +90,6 @@ public class AgentJobsHandler implements Handler<RoutingContext> {
                     .put("status", assignment.getStatus().toString())
                     .put("assignedAt", assignment.getAssignedAt().toString());
 
-            // Enrich with transfer job details
-            TransferJobSnapshot transferJob = stateMachine.getTransferJob(assignment.getJobId());
             if (transferJob != null) {
                 jobInfo.put("sourceUri", transferJob.getSourceUri())
                         .put("destinationPath", transferJob.getDestinationPath())
@@ -86,7 +102,7 @@ public class AgentJobsHandler implements Handler<RoutingContext> {
             pendingJobs.add(jobInfo);
         }
 
-        logger.debug("Returning {} pending jobs for agent: agentId={}", pendingJobs.size(), agentId);
+        logger.debug("Returning {} pending jobs for agent: agentId={}, tenantId={}", pendingJobs.size(), agentId, agentTenantId);
         ctx.json(new JsonObject()
                 .put("pendingJobs", pendingJobs)
                 .put("total", pendingJobs.size()));

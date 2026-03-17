@@ -478,12 +478,20 @@ class JobAssignmentHandlerTest {
             String agentId = "agent-separator-test";
             String jobId = "job-separator-test";
 
+            JsonObject registerBody = new JsonObject()
+                    .put("agentId", agentId)
+                    .put("hostname", agentId + ".example.com")
+                    .put("address", "localhost:9000")
+                    .put("tenantId", "test-tenant");
+
             JsonObject createBody = new JsonObject()
                     .put("jobId", jobId)
                     .put("agentId", agentId);
 
-            webClient.post(HTTP_PORT, "localhost", "/api/v1/assignments")
-                    .sendJsonObject(createBody)
+            webClient.post(HTTP_PORT, "localhost", "/api/v1/agents/register")
+                    .sendJsonObject(registerBody)
+                    .compose(r -> webClient.post(HTTP_PORT, "localhost", "/api/v1/assignments")
+                            .sendJsonObject(createBody))
                     .compose(createResp -> webClient.get(HTTP_PORT, "localhost", "/api/v1/agents/" + agentId + "/jobs")
                             .send())
                     .onComplete(ctx.succeeding(response -> ctx.verify(() -> {
@@ -507,12 +515,20 @@ class JobAssignmentHandlerTest {
             String agentId = "agent-terminal-test";
             String jobId = "job-terminal-test";
 
+            JsonObject registerBody = new JsonObject()
+                    .put("agentId", agentId)
+                    .put("hostname", agentId + ".example.com")
+                    .put("address", "localhost:9000")
+                    .put("tenantId", "test-tenant");
+
             JsonObject createBody = new JsonObject()
                     .put("jobId", jobId)
                     .put("agentId", agentId);
 
-            webClient.post(HTTP_PORT, "localhost", "/api/v1/assignments")
-                    .sendJsonObject(createBody)
+            webClient.post(HTTP_PORT, "localhost", "/api/v1/agents/register")
+                    .sendJsonObject(registerBody)
+                    .compose(r -> webClient.post(HTTP_PORT, "localhost", "/api/v1/assignments")
+                            .sendJsonObject(createBody))
                     .compose(createResp -> {
                         String id = createResp.bodyAsJsonObject().getString("assignmentId");
                         return webClient.put(HTTP_PORT, "localhost", "/api/v1/assignments/" + id + "/reject")
@@ -598,12 +614,22 @@ class JobAssignmentHandlerTest {
         @Test
         @DisplayName("job status endpoint returns standard 404 envelope for unknown assignment")
         void testJobStatusNotFoundReturnsEnvelope(VertxTestContext ctx) {
-            JsonObject body = new JsonObject()
-                    .put("agentId", "no-such-agent")
+            // Register an agent first so the handler can look up the agent's tenant,
+            // then hit a nonexistent job to verify ASSIGNMENT_NOT_FOUND is returned.
+            JsonObject registerBody = new JsonObject()
+                    .put("agentId", "agent-404-test")
+                    .put("hostname", "agent-404-test.example.com")
+                    .put("address", "localhost:9000")
+                    .put("tenantId", "test-tenant");
+
+            JsonObject statusBody = new JsonObject()
+                    .put("agentId", "agent-404-test")
                     .put("status", "ACCEPTED");
 
-            webClient.post(HTTP_PORT, "localhost", "/api/v1/jobs/no-such-job/status")
-                    .sendJsonObject(body)
+            webClient.post(HTTP_PORT, "localhost", "/api/v1/agents/register")
+                    .sendJsonObject(registerBody)
+                    .compose(r -> webClient.post(HTTP_PORT, "localhost", "/api/v1/jobs/no-such-job/status")
+                            .sendJsonObject(statusBody))
                     .onComplete(ctx.succeeding(response -> ctx.verify(() -> {
                         assertEquals(404, response.statusCode());
                         JsonObject error = response.bodyAsJsonObject().getJsonObject("error");
@@ -619,17 +645,26 @@ class JobAssignmentHandlerTest {
             String jobId = "job-status-transition";
             String agentId = "agent-status-transition";
 
+            JsonObject registerBody = new JsonObject()
+                    .put("agentId", agentId)
+                    .put("hostname", agentId + ".example.com")
+                    .put("address", "localhost:9000")
+                    .put("tenantId", "test-tenant");
+
             JsonObject transferBody = new JsonObject()
                     .put("jobId", jobId)
                     .put("sourceUri", "https://example.com/file.csv")
-                    .put("destinationPath", "/data/file.csv");
+                    .put("destinationPath", "/data/file.csv")
+                    .put("tenantId", "test-tenant");
 
             JsonObject assignBody = new JsonObject()
                     .put("jobId", jobId)
                     .put("agentId", agentId);
 
-            webClient.post(HTTP_PORT, "localhost", "/api/v1/transfers")
-                    .sendJsonObject(transferBody)
+            webClient.post(HTTP_PORT, "localhost", "/api/v1/agents/register")
+                    .sendJsonObject(registerBody)
+                    .compose(r -> webClient.post(HTTP_PORT, "localhost", "/api/v1/transfers")
+                            .sendJsonObject(transferBody))
                     .compose(r -> webClient.post(HTTP_PORT, "localhost", "/api/v1/assignments")
                             .sendJsonObject(assignBody))
                     .compose(r -> webClient.post(HTTP_PORT, "localhost", "/api/v1/jobs/" + jobId + "/status")
@@ -653,7 +688,8 @@ class JobAssignmentHandlerTest {
             JsonObject transferBody = new JsonObject()
                     .put("jobId", jobId)
                     .put("sourceUri", "https://example.com/latest.csv")
-                    .put("destinationPath", "/data/latest.csv");
+                    .put("destinationPath", "/data/latest.csv")
+                    .put("tenantId", "test-tenant");
 
             JsonObject assignA = new JsonObject().put("jobId", jobId).put("agentId", agentA);
             JsonObject assignB = new JsonObject().put("jobId", jobId).put("agentId", agentB);
