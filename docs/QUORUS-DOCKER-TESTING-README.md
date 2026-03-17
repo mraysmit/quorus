@@ -1,7 +1,11 @@
+<img src="quorus-logo.png" alt="Quorus" width="120"/>
+
 # Quorus Docker Testing README
 
 **Version:** 2.0  
-**Date:** 2026-03-14
+**Date:** 2026-03-14  
+**Author:** Mark Ray-Smith — Cityline Ltd  
+**License:** Apache 2.0
 
 This document summarizes the Docker assets that exist in the repository today and the testing scenarios they support.
 
