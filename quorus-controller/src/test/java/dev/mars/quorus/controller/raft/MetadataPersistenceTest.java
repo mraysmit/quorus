@@ -21,7 +21,6 @@ import dev.mars.quorus.controller.state.QuorusStateStore;
 import dev.mars.quorus.controller.state.TransferJobCommand;
 import dev.mars.quorus.core.TransferJob;
 import dev.mars.quorus.core.TransferRequest;
-import dev.mars.quorus.core.TransferStatus;
 import static dev.mars.quorus.testing.TestFutureUtils.awaitSuccess;
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
@@ -68,15 +67,13 @@ public class MetadataPersistenceTest {
     
     private List<RaftNode> cluster;
     private Map<String, MockRaftTransport> transports;
-    private Vertx vertx;
     private static final int CLUSTER_SIZE = 5;
     private static final String[] NODE_IDS = {"node1", "node2", "node3", "node4", "node5"};
 
     @BeforeEach
     void setUp(Vertx vertx) {
         logger.info("=== SETTING UP METADATA PERSISTENCE TEST ===");
-        
-        this.vertx = vertx;
+
         cluster = new ArrayList<>();
         transports = new HashMap<>();
         

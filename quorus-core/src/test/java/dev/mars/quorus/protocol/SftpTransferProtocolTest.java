@@ -17,7 +17,6 @@
 package dev.mars.quorus.protocol;
 
 import dev.mars.quorus.core.TransferRequest;
-import dev.mars.quorus.transfer.TransferContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -37,7 +36,6 @@ import static org.junit.jupiter.api.Assertions.*;
 class SftpTransferProtocolTest {
     
     private SftpTransferProtocol protocol;
-    private TransferContext context;
     
     @TempDir
     Path tempDir;
@@ -45,12 +43,6 @@ class SftpTransferProtocolTest {
     @BeforeEach
     void setUp() {
         protocol = new SftpTransferProtocol();
-        TransferRequest dummyRequest = TransferRequest.builder()
-                .requestId("test-job-123")
-                .sourceUri(URI.create("http://example.com/test.txt"))
-                .destinationPath(tempDir.resolve("test.txt"))
-                .build();
-        context = new TransferContext(new dev.mars.quorus.core.TransferJob(dummyRequest));
     }
     
     @Test

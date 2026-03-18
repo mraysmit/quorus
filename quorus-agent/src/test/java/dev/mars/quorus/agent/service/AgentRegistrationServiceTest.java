@@ -428,8 +428,6 @@ class AgentRegistrationServiceTest {
     @Test
     @DisplayName("Should shutdown gracefully")
     void testShutdown(Vertx vertx, VertxTestContext testContext) {
-        AgentRegistrationService service = new AgentRegistrationService(vertx, config);
-        
         // Note: AgentRegistrationService doesn't have a shutdown() method currently
         // This test verifies the WebClient can be closed properly
         // If shutdown is needed, it should be added to the service

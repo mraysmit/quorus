@@ -40,7 +40,6 @@ import org.slf4j.LoggerFactory;
 public class MetricsHandler implements Handler<RoutingContext> {
 
     private static final Logger logger = LoggerFactory.getLogger(MetricsHandler.class);
-    private static final int DEFAULT_PROMETHEUS_PORT = 9464;
     
     private final WebClient webClient;
     private final int prometheusPort;

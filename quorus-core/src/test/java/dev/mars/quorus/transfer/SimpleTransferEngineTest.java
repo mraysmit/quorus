@@ -20,6 +20,7 @@ import dev.mars.quorus.core.TransferJob;
 import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferResult;
 import dev.mars.quorus.core.exceptions.TransferException;
+import dev.mars.quorus.monitoring.HealthStatus;
 import dev.mars.quorus.monitoring.TransferEngineHealthCheck;
 import io.vertx.core.Future;
 import io.vertx.core.Promise;
@@ -38,7 +39,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -58,11 +58,9 @@ import static org.junit.jupiter.api.Assertions.*;
 class SimpleTransferEngineTest {
 
     private SimpleTransferEngine engine;
-    private Vertx vertx;
 
     @BeforeEach
     void setUp(Vertx vertx) {
-        this.vertx = vertx;
         engine = new SimpleTransferEngine(vertx, 5, 3, 100);
     }
 
@@ -146,8 +144,8 @@ class SimpleTransferEngineTest {
         TransferEngineHealthCheck healthCheck = engine.getHealthCheck();
         
         assertNotNull(healthCheck);
-        assertTrue(healthCheck.getStatus() == TransferEngineHealthCheck.Status.UP || 
-                   healthCheck.getStatus() == TransferEngineHealthCheck.Status.DEGRADED);
+        assertTrue(healthCheck.getHealthStatus() == HealthStatus.UP || 
+                   healthCheck.getHealthStatus() == HealthStatus.DEGRADED);
     }
 
     @Test
@@ -157,7 +155,7 @@ class SimpleTransferEngineTest {
         TransferEngineHealthCheck healthCheck = engine.getHealthCheck();
         
         assertNotNull(healthCheck);
-        assertEquals(TransferEngineHealthCheck.Status.DOWN, healthCheck.getStatus());
+        assertEquals(HealthStatus.DOWN, healthCheck.getHealthStatus());
     }
 
     @Test
@@ -254,3 +252,4 @@ class SimpleTransferEngineTest {
         }
 
 }
+

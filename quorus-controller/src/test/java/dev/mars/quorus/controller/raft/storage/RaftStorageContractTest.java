@@ -17,7 +17,6 @@
 package dev.mars.quorus.controller.raft.storage;
 
 import dev.mars.quorus.controller.raft.storage.RaftStorage.LogEntryData;
-import dev.mars.quorus.controller.raft.storage.RaftStorage.PersistentMeta;
 import dev.mars.quorus.controller.raft.storage.file.FileRaftStorage;
 import io.vertx.core.Vertx;
 import io.vertx.core.WorkerExecutor;
@@ -30,12 +29,10 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 

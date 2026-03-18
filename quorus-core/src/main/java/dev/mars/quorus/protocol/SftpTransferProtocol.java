@@ -19,7 +19,6 @@ package dev.mars.quorus.protocol;
 import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferResult;
 import dev.mars.quorus.core.TransferStatus;
-import dev.mars.quorus.core.exceptions.QuorusErrorCode;
 import dev.mars.quorus.core.exceptions.TransferException;
 import dev.mars.quorus.storage.ChecksumCalculator;
 import dev.mars.quorus.transfer.TransferContext;
@@ -53,7 +52,6 @@ public class SftpTransferProtocol implements TransferProtocol {
     private static final Logger logger = LoggerFactory.getLogger(SftpTransferProtocol.class);
     private static final int DEFAULT_SFTP_PORT = 22;
     private static final int DEFAULT_BUFFER_SIZE = 32 * 1024; // 32KB buffer for SFTP
-    private static final Duration DEFAULT_TIMEOUT = Duration.ofMinutes(30);
     private static final Duration CONNECTION_TIMEOUT = Duration.ofSeconds(30);
 
     // Track active SFTP client for abort capability

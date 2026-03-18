@@ -38,9 +38,6 @@ public class ProgressTracker {
     private final AtomicLong lastTransferredBytes;
     private final AtomicReference<Double> currentRate; // bytes per second
     
-    // Rate calculation window (for smoothing)
-    private static final long RATE_CALCULATION_WINDOW_MS = 5000; // 5 seconds
-    
     public ProgressTracker(String jobId) {
         this.jobId = jobId;
         this.totalBytes = new AtomicLong(-1);
@@ -71,7 +68,7 @@ public class ProgressTracker {
     
     public void updateProgress(long bytesTransferred) {
         Instant now = Instant.now();
-        long previousBytes = this.transferredBytes.getAndSet(bytesTransferred);
+        this.transferredBytes.set(bytesTransferred);
         
         // Update rate calculation
         updateTransferRate(bytesTransferred, now);

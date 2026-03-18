@@ -39,7 +39,7 @@ class ProtocolHealthCheckTest {
                 .build();
 
         assertEquals("http", check.getProtocolName());
-        assertEquals(ProtocolHealthCheck.Status.UP, check.getStatus());
+        assertEquals(HealthStatus.UP, check.getHealthStatus());
         assertNotNull(check.getTimestamp());
         assertTrue(check.getDetails().isEmpty());
         assertNull(check.getMessage());
@@ -54,14 +54,14 @@ class ProtocolHealthCheckTest {
         details.put("latency", 50.5);
 
         ProtocolHealthCheck check = ProtocolHealthCheck.builder("sftp")
-                .status(ProtocolHealthCheck.Status.DEGRADED)
+            .status(HealthStatus.DEGRADED)
                 .timestamp(now)
                 .message("High latency detected")
                 .details(details)
                 .build();
 
         assertEquals("sftp", check.getProtocolName());
-        assertEquals(ProtocolHealthCheck.Status.DEGRADED, check.getStatus());
+        assertEquals(HealthStatus.DEGRADED, check.getHealthStatus());
         assertEquals(now, check.getTimestamp());
         assertEquals("High latency detected", check.getMessage());
         assertEquals(10, check.getDetails().get("connections"));
@@ -75,7 +75,7 @@ class ProtocolHealthCheckTest {
                 .up()
                 .build();
 
-        assertEquals(ProtocolHealthCheck.Status.UP, check.getStatus());
+        assertEquals(HealthStatus.UP, check.getHealthStatus());
         assertTrue(check.isHealthy());
     }
 
@@ -86,7 +86,7 @@ class ProtocolHealthCheckTest {
                 .message("Service unavailable")
                 .build();
 
-        assertEquals(ProtocolHealthCheck.Status.DOWN, check.getStatus());
+        assertEquals(HealthStatus.DOWN, check.getHealthStatus());
         assertFalse(check.isHealthy());
     }
 
@@ -97,7 +97,7 @@ class ProtocolHealthCheckTest {
                 .message("Slow response times")
                 .build();
 
-        assertEquals(ProtocolHealthCheck.Status.DEGRADED, check.getStatus());
+        assertEquals(HealthStatus.DEGRADED, check.getHealthStatus());
         assertFalse(check.isHealthy());
     }
 
@@ -131,46 +131,46 @@ class ProtocolHealthCheckTest {
     }
 
     @Test
-    void testToMap() {
+    void testToHealthDetailMap() {
         Instant timestamp = Instant.parse("2025-01-20T10:00:00Z");
         
         ProtocolHealthCheck check = ProtocolHealthCheck.builder("http")
-                .status(ProtocolHealthCheck.Status.UP)
+                .status(HealthStatus.UP)
                 .timestamp(timestamp)
                 .message("All systems operational")
                 .detail("connections", 100)
                 .build();
 
-        Map<String, Object> map = check.toMap();
+        Map<String, Object> map = check.toHealthDetail().toMap();
 
-        assertEquals("http", map.get("protocol"));
+        assertEquals("http", map.get("component"));
         assertEquals("UP", map.get("status"));
         assertEquals("2025-01-20T10:00:00Z", map.get("timestamp"));
         assertEquals("All systems operational", map.get("message"));
         
         @SuppressWarnings("unchecked")
-        Map<String, Object> details = (Map<String, Object>) map.get("details");
-        assertEquals(100, details.get("connections"));
+        Map<String, Object> metadata = (Map<String, Object>) map.get("metadata");
+        assertEquals("100", metadata.get("connections"));
     }
 
     @Test
-    void testToMapWithoutOptionalFields() {
+    void testToHealthDetailMapWithoutOptionalFields() {
         ProtocolHealthCheck check = ProtocolHealthCheck.builder("ftp")
                 .build();
 
-        Map<String, Object> map = check.toMap();
+        Map<String, Object> map = check.toHealthDetail().toMap();
 
-        assertEquals("ftp", map.get("protocol"));
+        assertEquals("ftp", map.get("component"));
         assertEquals("UP", map.get("status"));
         assertNotNull(map.get("timestamp"));
         assertNull(map.get("message"));
-        assertNull(map.get("details"));
+        assertNull(map.get("metadata"));
     }
 
     @Test
     void testIsHealthyForUpStatus() {
         ProtocolHealthCheck check = ProtocolHealthCheck.builder("http")
-                .status(ProtocolHealthCheck.Status.UP)
+            .status(HealthStatus.UP)
                 .build();
 
         assertTrue(check.isHealthy());
@@ -179,7 +179,7 @@ class ProtocolHealthCheckTest {
     @Test
     void testIsHealthyForDownStatus() {
         ProtocolHealthCheck check = ProtocolHealthCheck.builder("http")
-                .status(ProtocolHealthCheck.Status.DOWN)
+            .status(HealthStatus.DOWN)
                 .build();
 
         assertFalse(check.isHealthy());
@@ -188,7 +188,7 @@ class ProtocolHealthCheckTest {
     @Test
     void testIsHealthyForDegradedStatus() {
         ProtocolHealthCheck check = ProtocolHealthCheck.builder("http")
-                .status(ProtocolHealthCheck.Status.DEGRADED)
+            .status(HealthStatus.DEGRADED)
                 .build();
 
         assertFalse(check.isHealthy());
@@ -282,15 +282,15 @@ class ProtocolHealthCheckTest {
                 .build();
 
         assertNotNull(check);
-        assertEquals(ProtocolHealthCheck.Status.UP, check.getStatus());
+        assertEquals(HealthStatus.UP, check.getHealthStatus());
     }
 
     @Test
-    void testStatusEnumValues() {
-        assertEquals(3, ProtocolHealthCheck.Status.values().length);
-        assertEquals(ProtocolHealthCheck.Status.UP, ProtocolHealthCheck.Status.valueOf("UP"));
-        assertEquals(ProtocolHealthCheck.Status.DOWN, ProtocolHealthCheck.Status.valueOf("DOWN"));
-        assertEquals(ProtocolHealthCheck.Status.DEGRADED, ProtocolHealthCheck.Status.valueOf("DEGRADED"));
+    void testHealthStatusEnumValues() {
+        assertEquals(3, HealthStatus.values().length);
+        assertEquals(HealthStatus.UP, HealthStatus.valueOf("UP"));
+        assertEquals(HealthStatus.DOWN, HealthStatus.valueOf("DOWN"));
+        assertEquals(HealthStatus.DEGRADED, HealthStatus.valueOf("DEGRADED"));
     }
 
     @Test
@@ -327,7 +327,7 @@ class ProtocolHealthCheckTest {
                 .up()  // Should overwrite DOWN with UP
                 .build();
 
-        assertEquals(ProtocolHealthCheck.Status.UP, check.getStatus());
+        assertEquals(HealthStatus.UP, check.getHealthStatus());
     }
 
     @Test

@@ -21,7 +21,6 @@ import dev.mars.quorus.core.TransferDirection;
 import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferResult;
 import dev.mars.quorus.core.TransferStatus;
-import dev.mars.quorus.core.exceptions.QuorusErrorCode;
 import dev.mars.quorus.core.exceptions.TransferException;
 import dev.mars.quorus.storage.ChecksumCalculator;
 import dev.mars.quorus.transfer.ProgressTracker;
@@ -55,7 +54,6 @@ import java.time.Instant;
 public class HttpTransferProtocol implements TransferProtocol {
     private static final Logger logger = LoggerFactory.getLogger(HttpTransferProtocol.class);
 
-    private static final int BUFFER_SIZE = 8192; // 8KB buffer
     private static final int CONNECTION_TIMEOUT_MS = 30000; // 30 seconds
     private static final int READ_TIMEOUT_MS = 60000; // 60 seconds
     private static final long MAX_FILE_SIZE = 10L * 1024 * 1024 * 1024; // 10GB

@@ -54,8 +54,9 @@ final class AgentCodec {
                 builder.setType(AgentCommandType.AGENT_CMD_REGISTER);
                 builder.setAgentInfo(toProto(r.agentInfo()));
             }
-            case AgentCommand.Deregister ignored -> {
+            case AgentCommand.Deregister deregister -> {
                 builder.setType(AgentCommandType.AGENT_CMD_DEREGISTER);
+                builder.setTimestampEpochMs(deregister.timestamp().toEpochMilli());
             }
             case AgentCommand.UpdateStatus u -> {
                 builder.setType(AgentCommandType.AGENT_CMD_UPDATE_STATUS);

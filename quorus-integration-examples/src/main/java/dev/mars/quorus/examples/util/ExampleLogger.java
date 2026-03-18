@@ -56,7 +56,6 @@ import java.util.logging.Logger;
 public class ExampleLogger {
     
     private final Logger logger;
-    private final String className;
     private final PrintStream out;
     private final PrintStream err;
     
@@ -76,7 +75,6 @@ public class ExampleLogger {
      * Private constructor - use factory method.
      */
     private ExampleLogger(Class<?> clazz) {
-        this.className = clazz.getSimpleName();
         this.logger = Logger.getLogger(clazz.getName());
         this.out = System.out;
         this.err = System.err;

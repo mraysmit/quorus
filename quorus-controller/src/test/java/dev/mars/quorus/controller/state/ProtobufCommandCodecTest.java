@@ -682,12 +682,30 @@ class ProtobufCommandCodecTest {
 
                 // Exhaustive switch — compiler guarantees all cases covered
                 switch (original) {
-                    case TransferJobCommand ignored -> assertInstanceOf(TransferJobCommand.class, restored);
-                    case AgentCommand ignored -> assertInstanceOf(AgentCommand.class, restored);
-                    case SystemMetadataCommand ignored -> assertInstanceOf(SystemMetadataCommand.class, restored);
-                    case JobAssignmentCommand ignored -> assertInstanceOf(JobAssignmentCommand.class, restored);
-                    case JobQueueCommand ignored -> assertInstanceOf(JobQueueCommand.class, restored);
-                    case RouteCommand ignored -> assertInstanceOf(RouteCommand.class, restored);
+                    case TransferJobCommand transferJobCommand -> {
+                        assertNotNull(transferJobCommand);
+                        assertInstanceOf(TransferJobCommand.class, restored);
+                    }
+                    case AgentCommand agentCommand -> {
+                        assertNotNull(agentCommand);
+                        assertInstanceOf(AgentCommand.class, restored);
+                    }
+                    case SystemMetadataCommand systemMetadataCommand -> {
+                        assertNotNull(systemMetadataCommand);
+                        assertInstanceOf(SystemMetadataCommand.class, restored);
+                    }
+                    case JobAssignmentCommand jobAssignmentCommand -> {
+                        assertNotNull(jobAssignmentCommand);
+                        assertInstanceOf(JobAssignmentCommand.class, restored);
+                    }
+                    case JobQueueCommand jobQueueCommand -> {
+                        assertNotNull(jobQueueCommand);
+                        assertInstanceOf(JobQueueCommand.class, restored);
+                    }
+                    case RouteCommand routeCommand -> {
+                        assertNotNull(routeCommand);
+                        assertInstanceOf(RouteCommand.class, restored);
+                    }
                 }
             }
         }

@@ -18,7 +18,6 @@ package dev.mars.quorus.protocol;
 
 import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferResult;
-import dev.mars.quorus.core.TransferStatus;
 import dev.mars.quorus.transfer.SimpleTransferEngine;
 import dev.mars.quorus.transfer.TransferContext;
 import io.vertx.core.Vertx;
@@ -36,7 +35,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.slf4j.Logger;
@@ -71,7 +69,6 @@ class SftpAbortIntegrationTest {
     private static final Logger logger = LoggerFactory.getLogger(SftpAbortIntegrationTest.class);
 
     private SftpTransferProtocol protocol;
-    private Vertx vertx;
     private SimpleTransferEngine engine;
     private String sftpHost;
     private int sftpPort;
@@ -89,7 +86,6 @@ class SftpAbortIntegrationTest {
 
     @BeforeEach
     void setUp(Vertx vertx) throws IOException {
-        this.vertx = vertx;
         this.protocol = new SftpTransferProtocol();
         
         // Create protocol factory with SFTP support

@@ -168,7 +168,6 @@ class BasicTransferIntegrationTest {
 
         // Monitor progress
         String jobId = request.getRequestId();
-        boolean foundInProgress = false;
         boolean foundPending = false;
 
         // Check immediately for PENDING status

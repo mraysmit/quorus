@@ -64,6 +64,7 @@ public final class SharedDockerCluster {
     /**
      * Returns the shared 3-node cluster, building the image and starting containers on first call.
      */
+    @SuppressWarnings("resource")
     public static synchronized ComposeContainer getThreeNodeCluster() {
         if (threeNodeCluster == null) {
             ensureImageBuilt();
@@ -85,6 +86,7 @@ public final class SharedDockerCluster {
     /**
      * Returns the shared 5-node cluster, building the image and starting containers on first call.
      */
+    @SuppressWarnings("resource")
     public static synchronized ComposeContainer getFiveNodeCluster() {
         if (fiveNodeCluster == null) {
             ensureImageBuilt();

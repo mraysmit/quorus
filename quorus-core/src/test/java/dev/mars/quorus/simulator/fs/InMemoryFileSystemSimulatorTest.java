@@ -925,9 +925,7 @@ class InMemoryFileSystemSimulatorTest {
         @Test
         @DisplayName("Should write empty file via output stream")
         void testEmptyFileOutputStream() throws IOException {
-            try (OutputStream os = fs.openOutputStream("/empty.txt")) {
-                // Write nothing
-            }
+            fs.openOutputStream("/empty.txt").close();
 
             assertThat(fs.exists("/empty.txt")).isTrue();
             assertThat(fs.readFile("/empty.txt")).isEmpty();

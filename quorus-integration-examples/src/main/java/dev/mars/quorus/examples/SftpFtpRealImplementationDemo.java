@@ -17,7 +17,6 @@
 package dev.mars.quorus.examples;
 
 import dev.mars.quorus.core.TransferRequest;
-import dev.mars.quorus.core.TransferResult;
 import dev.mars.quorus.core.exceptions.TransferException;
 import dev.mars.quorus.examples.util.ExampleLogger;
 import dev.mars.quorus.protocol.FtpTransferProtocol;

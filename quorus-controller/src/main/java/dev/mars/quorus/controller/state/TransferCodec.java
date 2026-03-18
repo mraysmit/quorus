@@ -62,8 +62,9 @@ final class TransferCodec {
                 builder.setType(TransferJobCommandType.TRANSFER_JOB_CMD_UPDATE_PROGRESS);
                 builder.setBytesTransferred(p.bytesTransferred());
             }
-            case TransferJobCommand.Delete ignored -> {
+            case TransferJobCommand.Delete delete -> {
                 builder.setType(TransferJobCommandType.TRANSFER_JOB_CMD_DELETE);
+                builder.setJobId(delete.jobId());
             }
         }
 
