@@ -19,7 +19,6 @@ package dev.mars.quorus.protocol;
 import dev.mars.quorus.core.TransferDirection;
 import dev.mars.quorus.core.TransferJob;
 import dev.mars.quorus.core.TransferRequest;
-import dev.mars.quorus.core.TransferResult;
 import dev.mars.quorus.core.TransferStatus;
 import dev.mars.quorus.core.exceptions.TransferException;
 import dev.mars.quorus.testing.ExpectsError;

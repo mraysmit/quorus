@@ -39,11 +39,9 @@ import static org.junit.jupiter.api.Assertions.*;
 class NetworkTopologyServiceTest {
     
     private NetworkTopologyService service;
-    private Vertx vertx;
     
     @BeforeEach
     void setUp(Vertx vertx) {
-        this.vertx = vertx;
         service = new NetworkTopologyService(vertx);
     }
 

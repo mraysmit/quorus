@@ -18,8 +18,6 @@ package dev.mars.quorus.controller.raft;
 
 import dev.mars.quorus.controller.raft.grpc.AppendEntriesRequest;
 import dev.mars.quorus.controller.raft.grpc.AppendEntriesResponse;
-import dev.mars.quorus.controller.raft.grpc.VoteRequest;
-import dev.mars.quorus.controller.raft.grpc.VoteResponse;
 import dev.mars.quorus.controller.state.CommandResult;
 import dev.mars.quorus.controller.state.QuorusStateStore;
 import dev.mars.quorus.controller.state.SystemMetadataCommand;
@@ -40,7 +38,6 @@ import java.net.URI;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -241,7 +238,6 @@ class RaftConsensusTest {
     @Test
     void testLogEntryEquality() {
         SystemMetadataCommand cmd1 = SystemMetadataCommand.set("test", "value");
-        SystemMetadataCommand cmd2 = SystemMetadataCommand.set("test", "value");
 
         LogEntry entry1 = new LogEntry(1, 5, cmd1);
         LogEntry entry2 = new LogEntry(1, 5, cmd1); // Use same command object

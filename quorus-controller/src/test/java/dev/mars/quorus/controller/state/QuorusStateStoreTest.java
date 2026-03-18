@@ -20,8 +20,6 @@ import dev.mars.quorus.core.TransferJob;
 import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferStatus;
 import dev.mars.quorus.core.JobAssignment;
-import dev.mars.quorus.core.JobPriority;
-import dev.mars.quorus.core.QueuedJob;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -314,7 +312,7 @@ class QuorusStateStoreTest {
         stateMachine.apply(TransferJobCommand.create(job));
 
         // Take snapshot and test toString
-        byte[] snapshotData = stateMachine.takeSnapshot();
+        stateMachine.takeSnapshot();
 
         // Create QuorusSnapshot object for toString test
         QuorusSnapshot snapshot = new QuorusSnapshot();

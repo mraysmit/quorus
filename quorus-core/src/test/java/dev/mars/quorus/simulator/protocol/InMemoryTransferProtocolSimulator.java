@@ -24,7 +24,6 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
@@ -611,7 +610,7 @@ public class InMemoryTransferProtocolSimulator {
         }
         
         // Create active transfer record
-        ActiveTransfer activeTransfer = new ActiveTransfer(transferId, request, content.length);
+        ActiveTransfer activeTransfer = new ActiveTransfer(transferId);
         activeTransfers.put(transferId, activeTransfer);
         
         try {
@@ -838,15 +837,11 @@ public class InMemoryTransferProtocolSimulator {
 
     private static class ActiveTransfer {
         final String transferId;
-        final TransferRequest request;
-        final long totalBytes;
         final AtomicLong bytesTransferred = new AtomicLong(0);
         volatile TransferState state = TransferState.IN_PROGRESS;
 
-        ActiveTransfer(String transferId, TransferRequest request, long totalBytes) {
+        ActiveTransfer(String transferId) {
             this.transferId = transferId;
-            this.request = request;
-            this.totalBytes = totalBytes;
         }
     }
 

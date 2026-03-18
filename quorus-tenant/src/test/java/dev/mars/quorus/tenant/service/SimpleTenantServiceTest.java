@@ -18,7 +18,6 @@ package dev.mars.quorus.tenant.service;
 
 import dev.mars.quorus.tenant.model.Tenant;
 import dev.mars.quorus.tenant.model.TenantConfiguration;
-import dev.mars.quorus.tenant.model.ResourceUsage;
 import dev.mars.quorus.tenant.service.TenantService.TenantServiceException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -73,7 +72,7 @@ class SimpleTenantServiceTest {
                 .name("ACME Corporation")
                 .description("Root organization")
                 .build();
-        Tenant parent = tenantService.createTenant(parentToCreate);
+        tenantService.createTenant(parentToCreate);
 
         // Create child tenant
         Tenant childToCreate = Tenant.builder()

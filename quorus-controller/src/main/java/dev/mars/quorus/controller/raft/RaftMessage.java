@@ -17,9 +17,7 @@
 package dev.mars.quorus.controller.raft;
 
 import dev.mars.quorus.controller.raft.grpc.AppendEntriesRequest;
-import dev.mars.quorus.controller.raft.grpc.AppendEntriesResponse;
 import dev.mars.quorus.controller.raft.grpc.VoteRequest;
-import dev.mars.quorus.controller.raft.grpc.VoteResponse;
 
 /**
  * Sealed interface for Raft protocol messages.

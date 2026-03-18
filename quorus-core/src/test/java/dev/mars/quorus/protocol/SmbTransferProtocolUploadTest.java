@@ -163,6 +163,7 @@ class SmbTransferProtocolUploadTest {
 
             // Verify original file content unchanged
             assertEquals(content, Files.readString(localFile));
+            assertTrue(protocol.canHandle(request));
         }
 
         @Test

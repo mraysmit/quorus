@@ -17,7 +17,6 @@
 package dev.mars.quorus.controller.raft;
 
 import dev.mars.quorus.controller.raft.grpc.InstallSnapshotRequest;
-import dev.mars.quorus.controller.raft.grpc.InstallSnapshotResponse;
 import dev.mars.quorus.controller.raft.storage.InMemoryRaftStorage;
 import dev.mars.quorus.controller.state.QuorusStateStore;
 import dev.mars.quorus.controller.state.SystemMetadataCommand;

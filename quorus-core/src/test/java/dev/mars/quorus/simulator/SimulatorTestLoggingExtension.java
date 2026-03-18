@@ -62,7 +62,6 @@ public class SimulatorTestLoggingExtension implements
     private static final Logger log = LoggerFactory.getLogger("SimulatorTestRunner");
     
     private static final String BANNER_LINE = "=".repeat(80);
-    private static final String SECTION_LINE = "-".repeat(60);
     private static final DateTimeFormatter TIMESTAMP_FORMAT = 
         DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS z").withZone(ZoneId.systemDefault());
     
@@ -345,8 +344,6 @@ public class SimulatorTestLoggingExtension implements
      * E.g., "InMemoryAgentSimulatorTest > ChaosEngineeringTests > testNetworkPartition"
      */
     private String buildTestPath(ExtensionContext context) {
-        StringBuilder path = new StringBuilder();
-        
         // Build the path from parent to current
         ExtensionContext current = context;
         java.util.Deque<String> segments = new java.util.ArrayDeque<>();

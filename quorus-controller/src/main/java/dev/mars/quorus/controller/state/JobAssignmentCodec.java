@@ -72,8 +72,10 @@ final class JobAssignmentCodec {
                 builder.setNewStatus(toProto(c.newStatus()));
                 if (c.reason() != null) builder.setReason(c.reason());
             }
-            case JobAssignmentCommand.Remove ignored ->
+            case JobAssignmentCommand.Remove remove -> {
                 builder.setType(JobAssignmentCommandType.JOB_ASSIGNMENT_CMD_REMOVE);
+                builder.setTimestampEpochMs(remove.timestamp().toEpochMilli());
+            }
         }
         return builder.build();
     }

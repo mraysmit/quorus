@@ -28,8 +28,6 @@ import java.util.*;
 import java.util.concurrent.*;
 
 import static org.assertj.core.api.Assertions.*;
-import static org.awaitility.Awaitility.*;
-import static java.util.concurrent.TimeUnit.*;
 
 /**
  * Unit tests for {@link InMemoryWorkflowEngineSimulator}.

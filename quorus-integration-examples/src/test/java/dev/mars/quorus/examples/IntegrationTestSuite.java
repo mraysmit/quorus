@@ -17,8 +17,6 @@
 package dev.mars.quorus.examples;
 
 import dev.mars.quorus.core.TransferRequest;
-import dev.mars.quorus.core.TransferResult;
-import dev.mars.quorus.core.TransferStatus;
 import dev.mars.quorus.protocol.ProtocolFactory;
 import dev.mars.quorus.protocol.TransferProtocol;
 import dev.mars.quorus.tenant.model.Tenant;
@@ -103,7 +101,7 @@ class IntegrationTestSuite {
                 .name("Integration Test Organization")
                 .description("Test organization for integration")
                 .build();
-        Tenant organization = tenantService.createTenant(organizationToCreate);
+        tenantService.createTenant(organizationToCreate);
 
         Tenant departmentToCreate = Tenant.builder()
                 .tenantId("integration-dept")
@@ -111,7 +109,7 @@ class IntegrationTestSuite {
                 .description("Test department")
                 .parentTenantId("integration-org")
                 .build();
-        Tenant department = tenantService.createTenant(departmentToCreate);
+        tenantService.createTenant(departmentToCreate);
         
         // Configure tenant with specific protocols
         TenantConfiguration.ResourceLimits resourceLimits = TenantConfiguration.ResourceLimits.builder()

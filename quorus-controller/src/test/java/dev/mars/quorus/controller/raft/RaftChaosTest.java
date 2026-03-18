@@ -21,8 +21,6 @@ import dev.mars.quorus.controller.state.QuorusStateStore;
 import dev.mars.quorus.controller.state.TransferJobCommand;
 import dev.mars.quorus.core.TransferJob;
 import dev.mars.quorus.core.TransferRequest;
-import dev.mars.quorus.core.TransferStatus;
-import io.vertx.core.CompositeFuture;
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
 import io.vertx.junit5.VertxExtension;
@@ -70,7 +68,6 @@ public class RaftChaosTest {
     
     private List<RaftNode> cluster;
     private Map<String, InMemoryTransportSimulator> transports;
-    private Vertx vertx;
     private static final int CLUSTER_SIZE = 5;
     private static final String[] NODE_IDS = {"node1", "node2", "node3", "node4", "node5"};
 
@@ -81,7 +78,6 @@ public class RaftChaosTest {
         // Clear any static state in InMemoryTransportSimulator
         InMemoryTransportSimulator.clearAllTransports();
         
-        this.vertx = vertx;
         cluster = new ArrayList<>();
         transports = new HashMap<>();
         

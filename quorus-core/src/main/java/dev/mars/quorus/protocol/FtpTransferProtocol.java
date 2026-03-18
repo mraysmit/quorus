@@ -19,7 +19,6 @@ package dev.mars.quorus.protocol;
 import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferResult;
 import dev.mars.quorus.core.TransferStatus;
-import dev.mars.quorus.core.exceptions.QuorusErrorCode;
 import dev.mars.quorus.core.exceptions.TransferException;
 import dev.mars.quorus.storage.ChecksumCalculator;
 import dev.mars.quorus.transfer.TransferContext;
@@ -35,16 +34,12 @@ import org.slf4j.LoggerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
-import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
-import javax.net.ssl.X509TrustManager;
 import java.io.*;
 import java.net.*;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.security.KeyStore;
-import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.time.Instant;
 /**
@@ -73,7 +68,6 @@ public class FtpTransferProtocol implements TransferProtocol {
     private static final int DEFAULT_FTP_PORT = 21;
     private static final int DEFAULT_FTPS_IMPLICIT_PORT = 990;
     private static final int DEFAULT_BUFFER_SIZE = 32 * 1024; // 32KB buffer for FTP
-    private static final Duration DEFAULT_TIMEOUT = Duration.ofMinutes(30);
     private static final Duration CONNECTION_TIMEOUT = Duration.ofSeconds(30);
     
     /**
@@ -443,10 +437,6 @@ public class FtpTransferProtocol implements TransferProtocol {
         private BufferedReader controlReader;
         private PrintWriter controlWriter;
         private SSLSocketFactory sslSocketFactory;
-        
-        FtpClient(FtpConnectionInfo connectionInfo) {
-            this(connectionInfo, null);
-        }
         
         FtpClient(FtpConnectionInfo connectionInfo, SSLSocketFactory customSslSocketFactory) {
             this.connectionInfo = connectionInfo;
@@ -904,13 +894,6 @@ public class FtpTransferProtocol implements TransferProtocol {
             this.username = username;
             this.password = password;
             this.ftpsMode = ftpsMode;
-        }
-        
-        /**
-         * Convenience constructor for plain FTP (no TLS).
-         */
-        FtpConnectionInfo(String host, int port, String path, String username, String password) {
-            this(host, port, path, username, password, FtpsMode.NONE);
         }
         
         @Override

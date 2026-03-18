@@ -266,6 +266,15 @@ public class InMemoryControllerClientSimulator {
     }
 
     /**
+     * Gets the current base URL.
+     *
+     * @return base URL used by the simulator
+     */
+    public String getBaseUrl() {
+        return baseUrl;
+    }
+
+    /**
      * Sets the default response latency.
      *
      * @param latencyMs latency in milliseconds

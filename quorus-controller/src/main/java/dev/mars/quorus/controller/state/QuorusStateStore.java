@@ -35,7 +35,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -226,8 +225,9 @@ public class QuorusStateStore implements RaftLogApplicator {
                     jobId, oldBytes, cmd.bytesTransferred(), progressJob.getTotalBytes());
                 yield new CommandResult.Success<>(updatedJob);
             }
-            case TransferJobCommand.Delete ignored -> {
+            case TransferJobCommand.Delete delete -> {
                 logger.debug("Deleting transfer job: jobId={}", jobId);
+                logger.trace("Transfer delete command timestamp={}", delete.timestamp());
                 TransferJobSnapshot removedJob = transferJobs.remove(jobId);
                 if (removedJob == null) {
                     logger.warn("Transfer job not found for deletion: id={}", jobId);
@@ -254,8 +254,9 @@ public class QuorusStateStore implements RaftLogApplicator {
                     agentId, agentInfo.getEndpoint(), agents.size());
                 yield new CommandResult.Success<>(agentInfo);
             }
-            case AgentCommand.Deregister ignored -> {
+            case AgentCommand.Deregister deregister -> {
                 logger.debug("Deregistering agent: agentId={}", agentId);
+                logger.trace("Agent deregister command timestamp={}", deregister.timestamp());
                 AgentInfo removedAgent = agents.remove(agentId);
                 if (removedAgent == null) {
                     logger.warn("Agent not found for deregistration: id={}", agentId);
@@ -334,7 +335,8 @@ public class QuorusStateStore implements RaftLogApplicator {
                     key, cmd.value(), oldValue);
                 yield new CommandResult.Success<>(oldValue);
             }
-            case SystemMetadataCommand.Delete ignored -> {
+            case SystemMetadataCommand.Delete delete -> {
+                logger.trace("System metadata delete command={}", delete);
                 String removedValue = systemMetadata.remove(key);
                 if (removedValue == null) {
                     logger.warn("System metadata not found for deletion: key={}", key);
@@ -439,8 +441,9 @@ public class QuorusStateStore implements RaftLogApplicator {
                     assignmentId, cancelAssignment.getJobId(), cmd.reason());
                 yield new CommandResult.Success<>(updated);
             }
-            case JobAssignmentCommand.Remove ignored -> {
+            case JobAssignmentCommand.Remove remove -> {
                 logger.debug("Removing job assignment: assignmentId={}", assignmentId);
+                logger.trace("Job assignment remove command={}", remove);
                 JobAssignment removed = jobAssignments.remove(assignmentId);
                 if (removed == null) {
                     logger.warn("Job assignment not found for removal: id={}", assignmentId);
@@ -466,8 +469,9 @@ public class QuorusStateStore implements RaftLogApplicator {
                     jobId, queuedJob.getPriority(), jobQueue.size());
                 yield new CommandResult.Success<>(queuedJob);
             }
-            case JobQueueCommand.Dequeue ignored -> {
+            case JobQueueCommand.Dequeue dequeue -> {
                 logger.debug("Dequeueing job: jobId={}", jobId);
+                logger.trace("Job dequeue command timestamp={}", dequeue.timestamp());
                 QueuedJob dequeuedJob = jobQueue.remove(jobId);
                 if (dequeuedJob == null) {
                     logger.warn("Job not found for dequeue: id={}", jobId);
@@ -551,8 +555,9 @@ public class QuorusStateStore implements RaftLogApplicator {
                 logger.info("Updated route: routeId={}, name={}", routeId, updatedRoute.getName());
                 yield new CommandResult.Success<>(updatedRoute);
             }
-            case RouteCommand.Delete ignored -> {
+            case RouteCommand.Delete delete -> {
                 logger.debug("Deleting route: routeId={}", routeId);
+                logger.trace("Route delete command timestamp={}", delete.timestamp());
                 RouteConfiguration removedRoute = routes.remove(routeId);
                 if (removedRoute == null) {
                     logger.warn("Route not found for deletion: id={}", routeId);
@@ -575,8 +580,9 @@ public class QuorusStateStore implements RaftLogApplicator {
                     routeId, oldStatus, cmd.reason());
                 yield new CommandResult.Success<>(suspended);
             }
-            case RouteCommand.Resume ignored -> {
+            case RouteCommand.Resume resume -> {
                 logger.debug("Resuming route: routeId={}", routeId);
+                logger.trace("Route resume command={}", resume);
                 RouteConfiguration resumeRoute = routes.get(routeId);
                 if (resumeRoute == null) {
                     logger.warn("Route not found for resume: id={}", routeId);

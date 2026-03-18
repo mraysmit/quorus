@@ -39,7 +39,7 @@ class TransferEngineHealthCheckTest {
         TransferEngineHealthCheck check = TransferEngineHealthCheck.builder()
                 .build();
 
-        assertEquals(TransferEngineHealthCheck.Status.UP, check.getStatus());
+        assertEquals(HealthStatus.UP, check.getHealthStatus());
         assertNotNull(check.getTimestamp());
         assertTrue(check.getProtocolHealthChecks().isEmpty());
         assertTrue(check.getSystemMetrics().isEmpty());
@@ -64,7 +64,7 @@ class TransferEngineHealthCheckTest {
         sysMetrics.put("memory", 75.2);
 
         TransferEngineHealthCheck check = TransferEngineHealthCheck.builder()
-                .status(TransferEngineHealthCheck.Status.DEGRADED)
+                .status(HealthStatus.DEGRADED)
                 .timestamp(now)
                 .message("Some protocols degraded")
                 .addProtocolHealthCheck(httpCheck)
@@ -72,7 +72,7 @@ class TransferEngineHealthCheckTest {
                 .systemMetrics(sysMetrics)
                 .build();
 
-        assertEquals(TransferEngineHealthCheck.Status.DEGRADED, check.getStatus());
+        assertEquals(HealthStatus.DEGRADED, check.getHealthStatus());
         assertEquals(now, check.getTimestamp());
         assertEquals("Some protocols degraded", check.getMessage());
         assertEquals(2, check.getProtocolHealthChecks().size());
@@ -86,7 +86,7 @@ class TransferEngineHealthCheckTest {
                 .up()
                 .build();
 
-        assertEquals(TransferEngineHealthCheck.Status.UP, check.getStatus());
+        assertEquals(HealthStatus.UP, check.getHealthStatus());
         assertTrue(check.isHealthy());
     }
 
@@ -97,7 +97,7 @@ class TransferEngineHealthCheckTest {
                 .message("System offline")
                 .build();
 
-        assertEquals(TransferEngineHealthCheck.Status.DOWN, check.getStatus());
+        assertEquals(HealthStatus.DOWN, check.getHealthStatus());
         assertFalse(check.isHealthy());
     }
 
@@ -108,7 +108,7 @@ class TransferEngineHealthCheckTest {
                 .message("Performance issues")
                 .build();
 
-        assertEquals(TransferEngineHealthCheck.Status.DEGRADED, check.getStatus());
+        assertEquals(HealthStatus.DEGRADED, check.getHealthStatus());
         assertFalse(check.isHealthy());
     }
 
@@ -156,7 +156,7 @@ class TransferEngineHealthCheckTest {
     }
 
     @Test
-    void testToMap() {
+        void testToHealthDetailMap() {
         Instant timestamp = Instant.parse("2025-01-20T10:00:00Z");
         
         ProtocolHealthCheck httpCheck = ProtocolHealthCheck.builder("http")
@@ -168,7 +168,7 @@ class TransferEngineHealthCheckTest {
                 .build();
 
         TransferEngineHealthCheck check = TransferEngineHealthCheck.builder()
-                .status(TransferEngineHealthCheck.Status.DEGRADED)
+                .status(HealthStatus.DEGRADED)
                 .timestamp(timestamp)
                 .message("One protocol down")
                 .addProtocolHealthCheck(httpCheck)
@@ -176,55 +176,48 @@ class TransferEngineHealthCheckTest {
                 .systemMetric("cpu", 50.0)
                 .build();
 
-        Map<String, Object> map = check.toMap();
+                Map<String, Object> map = check.toHealthDetail().toMap();
 
+                assertEquals("transfer-engine", map.get("component"));
         assertEquals("DEGRADED", map.get("status"));
         assertEquals("2025-01-20T10:00:00Z", map.get("timestamp"));
         assertEquals("One protocol down", map.get("message"));
-        
+
+                assertEquals(2, check.getProtocolHealthDetails().size());
+
         @SuppressWarnings("unchecked")
-        List<Map<String, Object>> protocols = (List<Map<String, Object>>) map.get("protocols");
-        assertEquals(2, protocols.size());
-        
-        @SuppressWarnings("unchecked")
-        Map<String, Object> system = (Map<String, Object>) map.get("system");
-        assertEquals(50.0, system.get("cpu"));
-        
-        @SuppressWarnings("unchecked")
-        Map<String, Object> summary = (Map<String, Object>) map.get("summary");
-        assertEquals(2L, summary.get("totalProtocols"));
-        assertEquals(1L, summary.get("healthyProtocols"));
-        assertEquals(1L, summary.get("unhealthyProtocols"));
+                Map<String, Object> metadata = (Map<String, Object>) map.get("metadata");
+                assertEquals("50.0", metadata.get("cpu"));
+                assertEquals("2", metadata.get("totalProtocols"));
+                assertEquals("1", metadata.get("healthyProtocols"));
+                assertEquals("1", metadata.get("unhealthyProtocols"));
     }
 
     @Test
-    void testToMapWithMinimalData() {
+        void testToHealthDetailMapWithMinimalData() {
         TransferEngineHealthCheck check = TransferEngineHealthCheck.builder()
                 .build();
 
-        Map<String, Object> map = check.toMap();
+                Map<String, Object> map = check.toHealthDetail().toMap();
 
+                assertEquals("transfer-engine", map.get("component"));
         assertEquals("UP", map.get("status"));
         assertNotNull(map.get("timestamp"));
         assertNull(map.get("message"));
-        
+
+                assertTrue(check.getProtocolHealthDetails().isEmpty());
+
         @SuppressWarnings("unchecked")
-        List<Map<String, Object>> protocols = (List<Map<String, Object>>) map.get("protocols");
-        assertTrue(protocols.isEmpty());
-        
-        assertNull(map.get("system"));
-        
-        @SuppressWarnings("unchecked")
-        Map<String, Object> summary = (Map<String, Object>) map.get("summary");
-        assertEquals(0L, summary.get("totalProtocols"));
-        assertEquals(0L, summary.get("healthyProtocols"));
-        assertEquals(0L, summary.get("unhealthyProtocols"));
+                Map<String, Object> metadata = (Map<String, Object>) map.get("metadata");
+                assertEquals("0", metadata.get("totalProtocols"));
+                assertEquals("0", metadata.get("healthyProtocols"));
+                assertEquals("0", metadata.get("unhealthyProtocols"));
     }
 
     @Test
     void testIsHealthyForUpStatus() {
         TransferEngineHealthCheck check = TransferEngineHealthCheck.builder()
-                .status(TransferEngineHealthCheck.Status.UP)
+                .status(HealthStatus.UP)
                 .build();
 
         assertTrue(check.isHealthy());
@@ -233,7 +226,7 @@ class TransferEngineHealthCheckTest {
     @Test
     void testIsHealthyForDownStatus() {
         TransferEngineHealthCheck check = TransferEngineHealthCheck.builder()
-                .status(TransferEngineHealthCheck.Status.DOWN)
+                .status(HealthStatus.DOWN)
                 .build();
 
         assertFalse(check.isHealthy());
@@ -242,7 +235,7 @@ class TransferEngineHealthCheckTest {
     @Test
     void testIsHealthyForDegradedStatus() {
         TransferEngineHealthCheck check = TransferEngineHealthCheck.builder()
-                .status(TransferEngineHealthCheck.Status.DEGRADED)
+                .status(HealthStatus.DEGRADED)
                 .build();
 
         assertFalse(check.isHealthy());
@@ -333,13 +326,13 @@ class TransferEngineHealthCheckTest {
                 .addProtocolHealthCheck(sftp)
                 .build();
 
-        Map<String, Object> map = check.toMap();
+        Map<String, Object> map = check.toHealthDetail().toMap();
         
         @SuppressWarnings("unchecked")
-        Map<String, Object> summary = (Map<String, Object>) map.get("summary");
-        assertEquals(3L, summary.get("totalProtocols"));
-        assertEquals(3L, summary.get("healthyProtocols"));
-        assertEquals(0L, summary.get("unhealthyProtocols"));
+        Map<String, Object> metadata = (Map<String, Object>) map.get("metadata");
+        assertEquals("3", metadata.get("totalProtocols"));
+        assertEquals("3", metadata.get("healthyProtocols"));
+        assertEquals("0", metadata.get("unhealthyProtocols"));
     }
 
     @Test
@@ -352,13 +345,13 @@ class TransferEngineHealthCheckTest {
                 .addProtocolHealthCheck(ftp)
                 .build();
 
-        Map<String, Object> map = check.toMap();
+        Map<String, Object> map = check.toHealthDetail().toMap();
         
         @SuppressWarnings("unchecked")
-        Map<String, Object> summary = (Map<String, Object>) map.get("summary");
-        assertEquals(2L, summary.get("totalProtocols"));
-        assertEquals(0L, summary.get("healthyProtocols"));
-        assertEquals(2L, summary.get("unhealthyProtocols"));
+        Map<String, Object> metadata = (Map<String, Object>) map.get("metadata");
+        assertEquals("2", metadata.get("totalProtocols"));
+        assertEquals("0", metadata.get("healthyProtocols"));
+        assertEquals("2", metadata.get("unhealthyProtocols"));
     }
 
     @Test
@@ -375,13 +368,13 @@ class TransferEngineHealthCheckTest {
                 .addProtocolHealthCheck(smb)
                 .build();
 
-        Map<String, Object> map = check.toMap();
+        Map<String, Object> map = check.toHealthDetail().toMap();
         
         @SuppressWarnings("unchecked")
-        Map<String, Object> summary = (Map<String, Object>) map.get("summary");
-        assertEquals(4L, summary.get("totalProtocols"));
-        assertEquals(2L, summary.get("healthyProtocols"));
-        assertEquals(2L, summary.get("unhealthyProtocols"));
+        Map<String, Object> metadata = (Map<String, Object>) map.get("metadata");
+        assertEquals("4", metadata.get("totalProtocols"));
+        assertEquals("2", metadata.get("healthyProtocols"));
+        assertEquals("2", metadata.get("unhealthyProtocols"));
     }
 
     @Test
@@ -394,15 +387,15 @@ class TransferEngineHealthCheckTest {
                 .build();
 
         assertNotNull(check);
-        assertEquals(TransferEngineHealthCheck.Status.UP, check.getStatus());
+        assertEquals(HealthStatus.UP, check.getHealthStatus());
     }
 
     @Test
     void testStatusEnumValues() {
-        assertEquals(3, TransferEngineHealthCheck.Status.values().length);
-        assertEquals(TransferEngineHealthCheck.Status.UP, TransferEngineHealthCheck.Status.valueOf("UP"));
-        assertEquals(TransferEngineHealthCheck.Status.DOWN, TransferEngineHealthCheck.Status.valueOf("DOWN"));
-        assertEquals(TransferEngineHealthCheck.Status.DEGRADED, TransferEngineHealthCheck.Status.valueOf("DEGRADED"));
+        assertEquals(3, HealthStatus.values().length);
+        assertEquals(HealthStatus.UP, HealthStatus.valueOf("UP"));
+        assertEquals(HealthStatus.DOWN, HealthStatus.valueOf("DOWN"));
+        assertEquals(HealthStatus.DEGRADED, HealthStatus.valueOf("DEGRADED"));
     }
 
     @Test
@@ -412,9 +405,12 @@ class TransferEngineHealthCheckTest {
                 .build();
 
         assertTrue(check.getSystemMetrics().isEmpty());
-        
-        Map<String, Object> map = check.toMap();
-        assertNull(map.get("system"));
+
+        Map<String, Object> map = check.toHealthDetail().toMap();
+        @SuppressWarnings("unchecked")
+        Map<String, Object> metadata = (Map<String, Object>) map.get("metadata");
+        assertFalse(metadata.containsKey("cpu"));
+        assertFalse(metadata.containsKey("memory"));
     }
 
     @Test
@@ -442,7 +438,7 @@ class TransferEngineHealthCheckTest {
                 .up()  // Should overwrite DOWN with UP
                 .build();
 
-        assertEquals(TransferEngineHealthCheck.Status.UP, check.getStatus());
+        assertEquals(HealthStatus.UP, check.getHealthStatus());
     }
 
     @Test
@@ -501,3 +497,4 @@ class TransferEngineHealthCheckTest {
         assertEquals(nestedMap, metrics.get("map"));
     }
 }
+

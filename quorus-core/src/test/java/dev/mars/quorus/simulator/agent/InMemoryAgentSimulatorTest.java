@@ -169,7 +169,7 @@ class InMemoryAgentSimulatorTest {
         @DisplayName("Should set hostname")
         void testWithHostname() {
             log.info("Testing hostname builder method");
-            var customAgent = new InMemoryAgentSimulator("custom")
+            new InMemoryAgentSimulator("custom")
                 .withHostname("custom-host");
             log.info("Custom agent created with hostname: custom-host");
             // Just verify no exception
@@ -538,7 +538,6 @@ class InMemoryAgentSimulatorTest {
         void testNetworkPartition() throws Exception {
             log.info("Testing NETWORK_PARTITION chaos mode");
             agent.start();
-            int initialHeartbeats = controller.getHeartbeatCount();
 
             agent.setFailureMode(InMemoryAgentSimulator.AgentFailureMode.NETWORK_PARTITION);
 

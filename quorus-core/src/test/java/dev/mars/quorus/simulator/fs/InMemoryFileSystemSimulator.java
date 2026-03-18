@@ -24,7 +24,6 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.stream.Collectors;
 
 /**
  * In-memory file system simulator for testing file transfer operations.
@@ -112,7 +111,7 @@ public class InMemoryFileSystemSimulator {
      */
     public InMemoryFileSystemSimulator() {
         // Create root directory
-        directories.put("/", new VirtualDirectory("/", Instant.now()));
+        directories.put("/", new VirtualDirectory(Instant.now()));
     }
 
     // ==================== File Operations ====================
@@ -145,7 +144,7 @@ public class InMemoryFileSystemSimulator {
         simulateWriteDelay(content.length);
         
         // Create file
-        VirtualFile file = new VirtualFile(normalizedPath, content);
+        VirtualFile file = new VirtualFile(content);
         files.put(normalizedPath, file);
         usedSpace.addAndGet(content.length);
         
@@ -221,7 +220,7 @@ public class InMemoryFileSystemSimulator {
             usedSpace.addAndGet(-existingFile.content.length);
         }
         
-        VirtualFile file = new VirtualFile(normalizedPath, content);
+        VirtualFile file = new VirtualFile(content);
         files.put(normalizedPath, file);
         usedSpace.addAndGet(content.length);
         
@@ -371,7 +370,7 @@ public class InMemoryFileSystemSimulator {
         }
         
         createParentDirectories(normalizedPath);
-        directories.put(normalizedPath, new VirtualDirectory(normalizedPath, Instant.now()));
+        directories.put(normalizedPath, new VirtualDirectory(Instant.now()));
     }
 
     /**
@@ -386,7 +385,7 @@ public class InMemoryFileSystemSimulator {
         checkWriteAccess();
         createParentDirectories(normalizedPath);
         if (!directories.containsKey(normalizedPath)) {
-            directories.put(normalizedPath, new VirtualDirectory(normalizedPath, Instant.now()));
+            directories.put(normalizedPath, new VirtualDirectory(Instant.now()));
         }
     }
 
@@ -762,7 +761,7 @@ public class InMemoryFileSystemSimulator {
         directories.clear();
         lockedFiles.clear();
         usedSpace.set(0);
-        directories.put("/", new VirtualDirectory("/", Instant.now()));
+        directories.put("/", new VirtualDirectory(Instant.now()));
     }
 
     /**
@@ -810,7 +809,7 @@ public class InMemoryFileSystemSimulator {
             current.append("/").append(parts[i]);
             String dirPath = current.toString();
             if (!directories.containsKey(dirPath)) {
-                directories.put(dirPath, new VirtualDirectory(dirPath, Instant.now()));
+                directories.put(dirPath, new VirtualDirectory(Instant.now()));
             }
         }
     }
@@ -901,7 +900,6 @@ public class InMemoryFileSystemSimulator {
      * Represents a virtual file in the simulator.
      */
     private static class VirtualFile {
-        final String path;
         byte[] content;
         final Instant created;
         Instant modified;
@@ -909,8 +907,7 @@ public class InMemoryFileSystemSimulator {
         Set<FilePermission> permissions;
         String owner;
 
-        VirtualFile(String path, byte[] content) {
-            this.path = path;
+        VirtualFile(byte[] content) {
             this.content = content.clone();
             this.created = Instant.now();
             this.modified = this.created;
@@ -924,11 +921,9 @@ public class InMemoryFileSystemSimulator {
      * Represents a virtual directory in the simulator.
      */
     private static class VirtualDirectory {
-        final String path;
         final Instant created;
 
-        VirtualDirectory(String path, Instant created) {
-            this.path = path;
+        VirtualDirectory(Instant created) {
             this.created = created;
         }
     }

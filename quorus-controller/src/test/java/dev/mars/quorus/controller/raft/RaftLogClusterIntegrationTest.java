@@ -178,7 +178,6 @@ class RaftLogClusterIntegrationTest {
     @DisplayName("Vote metadata persists to WAL during election")
     void testVoteMetadataPersistence(VertxTestContext ctx) throws Exception {
         LOG.info("=== TEST: Vote Metadata Persistence ===");
-        long testStartTime = System.currentTimeMillis();
         
         startClusterWithStorage();
         
@@ -252,7 +251,6 @@ class RaftLogClusterIntegrationTest {
     @DisplayName("Log entries persist and replay after restart")
     void testLogEntryPersistenceAndReplay(VertxTestContext ctx) throws Exception {
         LOG.info("=== TEST: Log Entry Persistence and Replay ===");
-        long testStartTime = System.currentTimeMillis();
         
         startClusterWithStorage();
         
@@ -308,9 +306,6 @@ class RaftLogClusterIntegrationTest {
         }
         LOG.info("[OK] All jobs exist in state machine before restart");
         
-        // Remember which node was leader
-        String leaderId = leader.getNodeId();
-        
         // Stop all nodes
         LOG.info("Stopping all nodes to test recovery...");
         for (RaftNode node : cluster) {
@@ -359,7 +354,6 @@ class RaftLogClusterIntegrationTest {
     @DisplayName("Single node restart recovers from WAL")
     void testSingleNodeRecovery(VertxTestContext ctx) throws Exception {
         LOG.info("=== TEST: Single Node Recovery ===");
-        long testStartTime = System.currentTimeMillis();
         
         startClusterWithStorage();
         

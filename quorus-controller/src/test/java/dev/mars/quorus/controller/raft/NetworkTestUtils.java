@@ -384,9 +384,7 @@ public class NetworkTestUtils {
      */
     private static boolean disconnectFromNetwork(String containerName, String networkName) {
         try {
-            String command = String.format("docker network disconnect %s %s", networkName, containerName);
-            Process process = Runtime.getRuntime().exec(command);
-            int exitCode = process.waitFor();
+            int exitCode = runDockerCommand("network", "disconnect", networkName, containerName);
 
             if (exitCode == 0) {
                 logger.info("Disconnected " + containerName + " from network " + networkName);
@@ -408,9 +406,7 @@ public class NetworkTestUtils {
      */
     private static void disconnectFromNetworkQuietly(String containerName, String networkName) {
         try {
-            String command = String.format("docker network disconnect %s %s", networkName, containerName);
-            Process process = Runtime.getRuntime().exec(command);
-            int exitCode = process.waitFor();
+            int exitCode = runDockerCommand("network", "disconnect", networkName, containerName);
 
             if (exitCode == 0) {
                 logger.info("Disconnected " + containerName + " from network " + networkName);
@@ -432,10 +428,7 @@ public class NetworkTestUtils {
      */
     private static boolean connectToNetwork(String containerName, String networkName, String ipAddress) {
         try {
-            String command = String.format("docker network connect --ip %s %s %s",
-                                         ipAddress, networkName, containerName);
-            Process process = Runtime.getRuntime().exec(command);
-            int exitCode = process.waitFor();
+            int exitCode = runDockerCommand("network", "connect", "--ip", ipAddress, networkName, containerName);
 
             if (exitCode == 0) {
                 logger.info("Connected " + containerName + " to network " + networkName + " with IP " + ipAddress);
@@ -457,10 +450,7 @@ public class NetworkTestUtils {
      */
     private static void connectToNetworkQuietly(String containerName, String networkName, String ipAddress) {
         try {
-            String command = String.format("docker network connect --ip %s %s %s",
-                                         ipAddress, networkName, containerName);
-            Process process = Runtime.getRuntime().exec(command);
-            int exitCode = process.waitFor();
+            int exitCode = runDockerCommand("network", "connect", "--ip", ipAddress, networkName, containerName);
 
             if (exitCode == 0) {
                 logger.info("Connected " + containerName + " to network " + networkName + " with IP " + ipAddress);
@@ -499,6 +489,22 @@ public class NetworkTestUtils {
             case "controller5": return "172.20.0.14";
             default: throw new IllegalArgumentException("Unknown node: " + nodeName);
         }
+    }
+
+    private static int runDockerCommand(String... args) throws Exception {
+        Process process = new ProcessBuilder("docker")
+                .command(buildDockerCommand(args))
+                .redirectErrorStream(true)
+                .start();
+        process.getInputStream().readAllBytes();
+        return process.waitFor();
+    }
+
+    private static List<String> buildDockerCommand(String... args) {
+        List<String> command = new java.util.ArrayList<>(args.length + 1);
+        command.add("docker");
+        command.addAll(java.util.List.of(args));
+        return command;
     }
 
     /**

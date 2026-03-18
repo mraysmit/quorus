@@ -60,9 +60,6 @@ class JobAssignmentHandlerTest {
     private static HttpApiServer httpServer;
     private static WebClient webClient;
 
-    /** Populated after the first assignment is created */
-    private static String assignmentId;
-
     @BeforeAll
     static void setUp() throws Exception {
         vertx = Vertx.vertx();
@@ -116,8 +113,6 @@ class JobAssignmentHandlerTest {
                         JsonObject json = response.bodyAsJsonObject();
                         assertTrue(json.getBoolean("success"));
                         assertNotNull(json.getString("assignmentId"));
-                        // Save for subsequent tests
-                        assignmentId = json.getString("assignmentId");
                         ctx.completeNow();
                     })));
         }

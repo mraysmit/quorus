@@ -16,7 +16,6 @@
 
 package dev.mars.quorus.examples;
 
-import dev.mars.quorus.config.QuorusConfiguration;
 import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferResult;
 import dev.mars.quorus.examples.util.ExampleLogger;
@@ -185,6 +184,8 @@ public class EnterpriseProtocolExample {
                     .sourceUri(smbUri)
                     .destinationPath(destination)
                     .build();
+
+                log.subDetail("Request ID: " + request.getRequestId());
             
             // Note: This will fail in the demo since we don't have an actual SMB server
             // but it demonstrates the protocol support

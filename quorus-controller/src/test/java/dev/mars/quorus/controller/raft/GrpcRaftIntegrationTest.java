@@ -16,7 +16,6 @@
 
 package dev.mars.quorus.controller.raft;
 
-import dev.mars.quorus.controller.raft.grpc.*;
 import dev.mars.quorus.controller.state.QuorusStateStore;
 import io.vertx.core.Vertx;
 import io.vertx.junit5.VertxExtension;
@@ -31,7 +30,6 @@ import java.net.ServerSocket;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -59,15 +57,11 @@ class GrpcRaftIntegrationTest {
     private List<TestNode> nodes = new ArrayList<>();
 
     private static class TestNode {
-        final String id;
-        final int port;
         final RaftNode raftNode;
         final GrpcRaftServer grpcServer;
         final GrpcRaftTransport transport;
 
-        TestNode(String id, int port, RaftNode raftNode, GrpcRaftServer grpcServer, GrpcRaftTransport transport) {
-            this.id = id;
-            this.port = port;
+        TestNode(RaftNode raftNode, GrpcRaftServer grpcServer, GrpcRaftTransport transport) {
             this.raftNode = raftNode;
             this.grpcServer = grpcServer;
             this.transport = transport;
@@ -142,7 +136,7 @@ class GrpcRaftIntegrationTest {
         
         GrpcRaftServer grpcServer = new GrpcRaftServer(vertx, port, raftNode);
         
-        return new TestNode(nodeId, port, raftNode, grpcServer, transport);
+        return new TestNode(raftNode, grpcServer, transport);
     }
 
     private void startNode(TestNode node) {

@@ -62,7 +62,6 @@ import static org.junit.jupiter.api.Assertions.*;
 class RaftNodeTest {
 
     private static final Duration SHORT_TIMEOUT = Duration.ofSeconds(5);
-    private static final Duration MEDIUM_TIMEOUT = Duration.ofSeconds(10);
 
     @TempDir
     Path tempDir;

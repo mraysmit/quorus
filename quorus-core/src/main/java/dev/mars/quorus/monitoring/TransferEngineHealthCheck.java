@@ -31,40 +31,8 @@ import java.util.Map;
  * @version 1.0
  */
 public class TransferEngineHealthCheck {
-    
-    /**
-     * @deprecated Use {@link HealthStatus} instead. This inner enum will be removed in a future release.
-     */
-    @Deprecated(forRemoval = true)
-    public enum Status {
-        UP,      // All systems operational
-        DOWN,    // Transfer engine is not operational
-        DEGRADED; // Some protocols are experiencing issues
-        
-        /**
-         * Converts this deprecated Status to the new HealthStatus enum.
-         */
-        public HealthStatus toHealthStatus() {
-            return switch (this) {
-                case UP -> HealthStatus.UP;
-                case DOWN -> HealthStatus.DOWN;
-                case DEGRADED -> HealthStatus.DEGRADED;
-            };
-        }
-        
-        /**
-         * Converts from the new HealthStatus enum.
-         */
-        public static Status fromHealthStatus(HealthStatus healthStatus) {
-            return switch (healthStatus) {
-                case UP -> UP;
-                case DOWN -> DOWN;
-                case DEGRADED -> DEGRADED;
-            };
-        }
-    }
-    
-    private final Status status;
+
+    private final HealthStatus status;
     private final Instant timestamp;
     private final List<ProtocolHealthCheck> protocolHealthChecks;
     private final Map<String, Object> systemMetrics;
@@ -78,20 +46,8 @@ public class TransferEngineHealthCheck {
         this.message = builder.message;
     }
     
-    /**
-     * @deprecated Use {@link #getHealthStatus()} instead.
-     */
-    @Deprecated(forRemoval = true)
-    public Status getStatus() {
-        return status;
-    }
-    
-    /**
-     * Returns the health status using the unified HealthStatus enum.
-     * @return the health status
-     */
     public HealthStatus getHealthStatus() {
-        return status.toHealthStatus();
+        return status;
     }
     
     public Instant getTimestamp() {
@@ -111,7 +67,7 @@ public class TransferEngineHealthCheck {
     }
     
     public boolean isHealthy() {
-        return status == Status.UP;
+        return status.isHealthy();
     }
     
     /**
@@ -153,86 +109,34 @@ public class TransferEngineHealthCheck {
             .toList();
     }
     
-    /**
-     * @deprecated Use {@link #toHealthDetail()} and then {@link HealthDetail#toMap()} if needed.
-     */
-    @Deprecated(forRemoval = true)
-    public Map<String, Object> toMap() {
-        Map<String, Object> map = new HashMap<>();
-        map.put("status", status.name());
-        map.put("timestamp", timestamp.toString());
-        
-        if (message != null) {
-            map.put("message", message);
-        }
-        
-        // Protocol health checks
-        List<Map<String, Object>> protocols = new ArrayList<>();
-        for (ProtocolHealthCheck check : protocolHealthChecks) {
-            protocols.add(check.toMap());
-        }
-        map.put("protocols", protocols);
-        
-        // System metrics
-        if (!systemMetrics.isEmpty()) {
-            map.put("system", new HashMap<>(systemMetrics));
-        }
-        
-        // Summary statistics
-        long totalProtocols = protocolHealthChecks.size();
-        long healthyProtocols = protocolHealthChecks.stream()
-                .filter(ProtocolHealthCheck::isHealthy)
-                .count();
-        
-        Map<String, Object> summary = new HashMap<>();
-        summary.put("totalProtocols", totalProtocols);
-        summary.put("healthyProtocols", healthyProtocols);
-        summary.put("unhealthyProtocols", totalProtocols - healthyProtocols);
-        map.put("summary", summary);
-        
-        return map;
-    }
-    
     public static Builder builder() {
         return new Builder();
     }
     
     public static class Builder {
-        private Status status = Status.UP;
+        private HealthStatus status = HealthStatus.UP;
         private Instant timestamp;
         private final List<ProtocolHealthCheck> protocolHealthChecks = new ArrayList<>();
         private final Map<String, Object> systemMetrics = new HashMap<>();
         private String message;
-        
-        /**
-         * @deprecated Use {@link #healthStatus(HealthStatus)} instead.
-         */
-        @Deprecated(forRemoval = true)
-        public Builder status(Status status) {
+
+        public Builder status(HealthStatus status) {
             this.status = status;
             return this;
         }
         
-        /**
-         * Sets the status using the unified HealthStatus enum.
-         */
-        public Builder healthStatus(HealthStatus healthStatus) {
-            this.status = Status.fromHealthStatus(healthStatus);
-            return this;
-        }
-        
         public Builder up() {
-            this.status = Status.UP;
+            this.status = HealthStatus.UP;
             return this;
         }
         
         public Builder down() {
-            this.status = Status.DOWN;
+            this.status = HealthStatus.DOWN;
             return this;
         }
         
         public Builder degraded() {
-            this.status = Status.DEGRADED;
+            this.status = HealthStatus.DEGRADED;
             return this;
         }
         

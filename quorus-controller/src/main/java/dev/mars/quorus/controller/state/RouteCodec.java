@@ -57,15 +57,17 @@ final class RouteCodec {
                 builder.setType(RouteCommandType.ROUTE_CMD_UPDATE);
                 builder.setRouteConfiguration(toProto(u.routeConfiguration()));
             }
-            case RouteCommand.Delete ignored -> {
+            case RouteCommand.Delete d -> {
                 builder.setType(RouteCommandType.ROUTE_CMD_DELETE);
+                builder.setTimestampEpochMs(d.timestamp().toEpochMilli());
             }
             case RouteCommand.Suspend s -> {
                 builder.setType(RouteCommandType.ROUTE_CMD_SUSPEND);
                 if (s.reason() != null) builder.setReason(s.reason());
             }
-            case RouteCommand.Resume ignored -> {
+            case RouteCommand.Resume r -> {
                 builder.setType(RouteCommandType.ROUTE_CMD_RESUME);
+                builder.setTimestampEpochMs(r.timestamp().toEpochMilli());
             }
             case RouteCommand.UpdateStatus us -> {
                 builder.setType(RouteCommandType.ROUTE_CMD_UPDATE_STATUS);

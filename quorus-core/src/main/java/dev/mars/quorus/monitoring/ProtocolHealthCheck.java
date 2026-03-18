@@ -30,48 +30,16 @@ import java.util.Objects;
  * @version 1.0
  */
 public class ProtocolHealthCheck {
-    
-    /**
-     * @deprecated Use {@link HealthStatus} instead. This inner enum will be removed in a future release.
-     */
-    @Deprecated(forRemoval = true)
-    public enum Status {
-        UP,      // Protocol is healthy and operational
-        DOWN,    // Protocol is not operational
-        DEGRADED; // Protocol is operational but experiencing issues
-        
-        /**
-         * Converts this deprecated Status to the new HealthStatus enum.
-         */
-        public HealthStatus toHealthStatus() {
-            return switch (this) {
-                case UP -> HealthStatus.UP;
-                case DOWN -> HealthStatus.DOWN;
-                case DEGRADED -> HealthStatus.DEGRADED;
-            };
-        }
-        
-        /**
-         * Converts from the new HealthStatus enum.
-         */
-        public static Status fromHealthStatus(HealthStatus healthStatus) {
-            return switch (healthStatus) {
-                case UP -> UP;
-                case DOWN -> DOWN;
-                case DEGRADED -> DEGRADED;
-            };
-        }
-    }
-    
+
     private final String protocolName;
-    private final Status status;
+    private final HealthStatus status;
     private final Instant timestamp;
     private final Map<String, Object> details;
     private final String message;
     
     private ProtocolHealthCheck(Builder builder) {
         this.protocolName = Objects.requireNonNull(builder.protocolName, "Protocol name cannot be null");
-        this.status = Objects.requireNonNull(builder.status, "Status cannot be null");
+        this.status = Objects.requireNonNull(builder.status, "Health status cannot be null");
         this.timestamp = builder.timestamp != null ? builder.timestamp : Instant.now();
         this.details = new HashMap<>(builder.details);
         this.message = builder.message;
@@ -81,20 +49,8 @@ public class ProtocolHealthCheck {
         return protocolName;
     }
     
-    /**
-     * @deprecated Use {@link #getHealthStatus()} instead.
-     */
-    @Deprecated(forRemoval = true)
-    public Status getStatus() {
-        return status;
-    }
-    
-    /**
-     * Returns the health status using the unified HealthStatus enum.
-     * @return the health status
-     */
     public HealthStatus getHealthStatus() {
-        return status.toHealthStatus();
+        return status;
     }
     
     public Instant getTimestamp() {
@@ -110,7 +66,7 @@ public class ProtocolHealthCheck {
     }
     
     public boolean isHealthy() {
-        return status == Status.UP;
+        return status.isHealthy();
     }
     
     /**
@@ -134,31 +90,13 @@ public class ProtocolHealthCheck {
         return builder.build();
     }
     
-    /**
-     * @deprecated Use {@link #toHealthDetail()} and then {@link HealthDetail#toMap()} if needed.
-     */
-    @Deprecated(forRemoval = true)
-    public Map<String, Object> toMap() {
-        Map<String, Object> map = new HashMap<>();
-        map.put("protocol", protocolName);
-        map.put("status", status.name());
-        map.put("timestamp", timestamp.toString());
-        if (message != null) {
-            map.put("message", message);
-        }
-        if (!details.isEmpty()) {
-            map.put("details", new HashMap<>(details));
-        }
-        return map;
-    }
-    
     public static Builder builder(String protocolName) {
         return new Builder(protocolName);
     }
     
     public static class Builder {
         private final String protocolName;
-        private Status status = Status.UP;
+        private HealthStatus status = HealthStatus.UP;
         private Instant timestamp;
         private final Map<String, Object> details = new HashMap<>();
         private String message;
@@ -167,35 +105,23 @@ public class ProtocolHealthCheck {
             this.protocolName = protocolName;
         }
         
-        /**
-         * @deprecated Use {@link #healthStatus(HealthStatus)} instead.
-         */
-        @Deprecated(forRemoval = true)
-        public Builder status(Status status) {
+        public Builder status(HealthStatus status) {
             this.status = status;
             return this;
         }
         
-        /**
-         * Sets the status using the unified HealthStatus enum.
-         */
-        public Builder healthStatus(HealthStatus healthStatus) {
-            this.status = Status.fromHealthStatus(healthStatus);
-            return this;
-        }
-        
         public Builder up() {
-            this.status = Status.UP;
+            this.status = HealthStatus.UP;
             return this;
         }
         
         public Builder down() {
-            this.status = Status.DOWN;
+            this.status = HealthStatus.DOWN;
             return this;
         }
         
         public Builder degraded() {
-            this.status = Status.DEGRADED;
+            this.status = HealthStatus.DEGRADED;
             return this;
         }
         

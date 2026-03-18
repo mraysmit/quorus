@@ -85,7 +85,6 @@ public class TransferTelemetryMetrics {
     // Attribute keys
     private static final AttributeKey<String> PROTOCOL_KEY = AttributeKey.stringKey("protocol");
     private static final AttributeKey<String> DIRECTION_KEY = AttributeKey.stringKey("direction");
-    private static final AttributeKey<String> STATUS_KEY = AttributeKey.stringKey("status");
     private static final AttributeKey<String> ERROR_TYPE_KEY = AttributeKey.stringKey("error.type");
 
     private TransferTelemetryMetrics() {

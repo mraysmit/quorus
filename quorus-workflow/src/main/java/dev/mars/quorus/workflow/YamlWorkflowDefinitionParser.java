@@ -316,12 +316,10 @@ public class YamlWorkflowDefinitionParser implements WorkflowDefinitionParser {
     }
     
     // Utility methods for safe type conversion
-    @SuppressWarnings("unchecked")
     private String getStringValue(Map<String, Object> data, String key) {
         return getStringValue(data, key, null);
     }
     
-    @SuppressWarnings("unchecked")
     private String getStringValue(Map<String, Object> data, String key, String defaultValue) {
         if (data == null) return defaultValue;
         Object value = data.get(key);

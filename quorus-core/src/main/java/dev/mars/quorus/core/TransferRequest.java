@@ -57,6 +57,7 @@ public final class TransferRequest implements Serializable {
 
     private final URI sourceUri;
 
+    @SuppressWarnings("unused")
     private final String destinationPath;
 
     private final URI destinationUri;

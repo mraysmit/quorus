@@ -199,6 +199,7 @@ public class DockerRaftClusterTest {
 
     // Helper methods
 
+    @SuppressWarnings("unused")
     private boolean allNodesHealthy() {
         for (String endpoint : nodeEndpoints) {
             try {
