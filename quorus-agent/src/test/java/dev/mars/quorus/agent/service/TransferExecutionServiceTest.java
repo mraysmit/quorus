@@ -60,6 +60,7 @@ class TransferExecutionServiceTest {
     private static AgentConfiguration createConfig() {
         return new AgentConfiguration.Builder()
                 .agentId("test-agent")
+                .tenantId("test-tenant")
                 .controllerUrl("http://localhost:8080/api/v1")
                 .maxConcurrentTransfers(2)
                 .heartbeatInterval(1000L)

@@ -18,6 +18,8 @@ package dev.mars.quorus.agent;
 
 import dev.mars.quorus.agent.config.AgentConfiguration;
 import dev.mars.quorus.agent.service.JobPollingService;
+import dev.mars.quorus.core.TransferResult;
+import dev.mars.quorus.core.TransferStatus;
 import io.vertx.core.Vertx;
 import io.vertx.core.http.HttpServer;
 import io.vertx.core.json.JsonObject;
@@ -29,10 +31,13 @@ import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.lang.reflect.Field;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.awaitility.Awaitility.await;
 
 /**
  * Integration tests for QuorusAgent.
@@ -112,13 +117,14 @@ class QuorusAgentTest {
         vertx.createHttpServer()
                 .requestHandler(router)
                 .listen(0) // Random port
-                .onSuccess(server -> {
+                .onComplete(testContext.succeeding(server -> {
                     mockControllerServer = server;
                     controllerPort = server.actualPort();
 
                     // Create agent configuration pointing to our real test server
                     config = new AgentConfiguration.Builder()
                             .agentId("test-agent-001")
+                            .tenantId("test-tenant")
                             .controllerUrl("http://localhost:" + controllerPort + "/api/v1")
                             .region("test-region")
                             .datacenter("test-dc")
@@ -129,8 +135,14 @@ class QuorusAgentTest {
                             .build();
 
                     testContext.completeNow();
-                })
-                .onFailure(testContext::failNow);
+                }));
+    }
+
+    @BeforeEach
+    void resetRequestCounts() {
+        registrationCount.set(0);
+        heartbeatCount.set(0);
+        statusReportCount.set(0);
     }
 
     @AfterAll
@@ -260,11 +272,18 @@ class QuorusAgentTest {
     void testVertxTimersUsed(Vertx vertx, VertxTestContext testContext) throws Exception {
         QuorusAgent agent = new QuorusAgent(vertx, config);
 
-        // Start agent - should use Vert.x timers, not ScheduledExecutorService
         agent.start();
 
-        // Verify agent started successfully (timers are set up)
-        // The logs should show "Vert.x timer ID" messages
+        await().atMost(Duration.ofSeconds(5))
+                .until(() -> extractLongField(agent, "heartbeatTimerId") != 0L);
+
+        assertTrue(agent.isRunning(), "Agent should be running after registration");
+        assertNotEquals(0L, extractLongField(agent, "heartbeatTimerId"),
+                "Background startup should install the heartbeat timer");
+
+        agent.shutdown();
+        assertDoesNotThrow(agent::awaitShutdown, "Started agent should shut down cleanly");
+        assertFalse(agent.isRunning(), "Agent should no longer be running after shutdown");
         testContext.completeNow();
     }
 
@@ -358,6 +377,56 @@ class QuorusAgentTest {
         testContext.completeNow();
     }
 
+    @Test
+    @DisplayName("Should shut down when controller registration fails")
+    void testShutdownOnRegistrationFailure(Vertx vertx) throws Exception {
+        AgentConfiguration unreachableControllerConfig = new AgentConfiguration.Builder()
+                .agentId("test-agent-unreachable")
+                .tenantId("test-tenant")
+                .controllerUrl("http://localhost:1/api/v1")
+                .region("test-region")
+                .datacenter("test-dc")
+                .agentPort(9091)
+                .httpConnectionTimeout(250)
+                .build();
+        QuorusAgent agent = new QuorusAgent(vertx, unreachableControllerConfig);
+
+        agent.start();
+        assertDoesNotThrow(agent::awaitShutdown,
+                "A registration failure should trigger a clean fail-fast shutdown");
+        assertFalse(agent.isRunning(), "Agent should stop after registration fails");
+    }
+
+    @Test
+    @DisplayName("Should report successful, failed, and exceptional transfer outcomes")
+    void testTransferOutcomeReporting(Vertx vertx) {
+        QuorusAgent agent = new QuorusAgent(vertx, config);
+        Instant start = Instant.now().minusSeconds(2);
+        Instant end = Instant.now();
+
+        TransferResult successful = TransferResult.builder()
+                .requestId("job-success")
+                .finalStatus(TransferStatus.COMPLETED)
+                .bytesTransferred(1024L)
+                .startTime(start)
+                .endTime(end)
+                .build();
+        TransferResult failed = TransferResult.builder()
+                .requestId("job-failed")
+                .finalStatus(TransferStatus.FAILED)
+                .errorMessage("simulated transfer failure")
+                .startTime(start)
+                .endTime(end)
+                .build();
+
+        invokeHandleTransferComplete(agent, "job-success", successful);
+        invokeHandleTransferComplete(agent, "job-failed", failed);
+        invokeHandleTransferError(agent, "job-error", new IllegalStateException("simulated error"));
+
+        await().atMost(Duration.ofSeconds(5)).until(() -> statusReportCount.get() == 3);
+        assertEquals(3, statusReportCount.get(), "Every terminal outcome should be reported");
+    }
+
     private static Vertx extractVertx(QuorusAgent agent) {
         try {
             Field vertxField = QuorusAgent.class.getDeclaredField("vertx");
@@ -368,6 +437,16 @@ class QuorusAgentTest {
         }
     }
 
+    private static long extractLongField(QuorusAgent agent, String fieldName) {
+        try {
+            Field field = QuorusAgent.class.getDeclaredField(fieldName);
+            field.setAccessible(true);
+            return field.getLong(agent);
+        } catch (ReflectiveOperationException e) {
+            throw new AssertionError("Failed to extract " + fieldName + " from QuorusAgent", e);
+        }
+    }
+
     private static void invokeProcessJob(QuorusAgent agent, JobPollingService.PendingJob pendingJob) {
         try {
             var method = QuorusAgent.class.getDeclaredMethod("processJob", JobPollingService.PendingJob.class);
@@ -375,6 +454,27 @@ class QuorusAgentTest {
             method.invoke(agent, pendingJob);
         } catch (ReflectiveOperationException e) {
             throw new AssertionError("Failed to invoke processJob on QuorusAgent", e);
+        }
+    }
+
+    private static void invokeHandleTransferComplete(QuorusAgent agent, String jobId, TransferResult result) {
+        invokePrivate(agent, "handleTransferComplete",
+                new Class<?>[]{String.class, TransferResult.class}, jobId, result);
+    }
+
+    private static void invokeHandleTransferError(QuorusAgent agent, String jobId, Throwable throwable) {
+        invokePrivate(agent, "handleTransferError",
+                new Class<?>[]{String.class, Throwable.class}, jobId, throwable);
+    }
+
+    private static void invokePrivate(QuorusAgent agent, String methodName, Class<?>[] parameterTypes,
+            Object... arguments) {
+        try {
+            var method = QuorusAgent.class.getDeclaredMethod(methodName, parameterTypes);
+            method.setAccessible(true);
+            method.invoke(agent, arguments);
+        } catch (ReflectiveOperationException e) {
+            throw new AssertionError("Failed to invoke " + methodName + " on QuorusAgent", e);
         }
     }
 }

@@ -179,7 +179,7 @@ class AgentTelemetryIntegrationTest {
 
         await().atMost(Duration.ofSeconds(10))
             .pollInterval(Duration.ofMillis(200))
-            .failMessage("Collector logs did not contain expected span name: " + spanName)
+            .alias("Collector logs did not contain expected span name: " + spanName)
             .until(() -> otelCollector.getLogs().contains(spanName));
     }
 

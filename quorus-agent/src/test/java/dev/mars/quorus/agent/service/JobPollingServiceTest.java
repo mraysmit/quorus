@@ -87,6 +87,7 @@ class JobPollingServiceTest {
                 
                 config = new AgentConfiguration.Builder()
                     .agentId("test-agent-poll")
+                    .tenantId("test-tenant")
                     .controllerUrl("http://localhost:" + serverPort)
                     .region("test-region")
                     .datacenter("test-dc")
@@ -280,6 +281,7 @@ class JobPollingServiceTest {
     void testPollConnectionError(Vertx vertx, VertxTestContext testContext) {
         AgentConfiguration badConfig = new AgentConfiguration.Builder()
             .agentId("test-agent-bad")
+            .tenantId("test-tenant")
             .controllerUrl("http://localhost:59999") // Non-existent port
             .region("test-region")
             .datacenter("test-dc")

@@ -97,6 +97,7 @@ class HeartbeatServiceTest {
                 
                 config = new AgentConfiguration.Builder()
                     .agentId("test-agent-hb")
+                    .tenantId("test-tenant")
                     .controllerUrl("http://localhost:" + serverPort)
                     .region("test-region")
                     .datacenter("test-dc")
@@ -217,6 +218,7 @@ class HeartbeatServiceTest {
         // Configure to connect to non-existent server
         AgentConfiguration badConfig = new AgentConfiguration.Builder()
             .agentId("test-agent-bad")
+            .tenantId("test-tenant")
             .controllerUrl("http://localhost:59999") // Non-existent port
             .region("test-region")
             .datacenter("test-dc")
