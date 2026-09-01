@@ -29,10 +29,13 @@ import dev.mars.quorus.controller.raft.RaftNodeMode;
 import dev.mars.quorus.controller.raft.RaftTransport;
 import dev.mars.quorus.controller.raft.GrpcRaftTransport;
 import dev.mars.quorus.controller.raft.GrpcRaftServer;
+import dev.mars.quorus.controller.raft.RaftTlsConfig;
 import dev.mars.quorus.controller.raft.storage.RaftStorage;
 import dev.mars.quorus.controller.raft.storage.RaftStorageFactory;
 import dev.mars.quorus.controller.state.QuorusStateStore;
 import dev.mars.quorus.controller.http.HttpApiServer;
+import dev.mars.quorus.controller.security.SecurityConfig;
+import dev.mars.quorus.controller.security.CertificateTrustState;
 
 import java.nio.file.Path;
 import java.util.HashMap;
@@ -67,6 +70,11 @@ public class QuorusControllerVerticle extends AbstractVerticle {
         try {
             // 1. Load configuration
             AppConfig config = AppConfig.get();
+            SecurityConfig securityConfig = SecurityConfig.from(config);
+            RaftTlsConfig raftTlsConfig = RaftTlsConfig.from(config);
+            CertificateTrustState trustState = CertificateTrustState.from(securityConfig);
+            securityConfig.validate();
+            raftTlsConfig.validate();
             String nodeId = config.getNodeId();
 
             // Set process-lifetime MDC context for all controller logs
@@ -95,7 +103,8 @@ public class QuorusControllerVerticle extends AbstractVerticle {
             // 3. Setup Raft Transport (gRPC)
             int raftPoolSize = config.getRaftIoPoolSize();
             int raftQueueSize = config.getRaftIoQueueSize();
-            this.transport = new GrpcRaftTransport(vertx, nodeId, peerAddresses, raftPoolSize, raftQueueSize);
+            this.transport = new GrpcRaftTransport(vertx, nodeId, peerAddresses,
+                    raftPoolSize, raftQueueSize, raftTlsConfig);
 
             // 4. Create Raft Storage (WAL)
             String storageType = config.getRaftStorageType();
@@ -109,7 +118,8 @@ public class QuorusControllerVerticle extends AbstractVerticle {
             RaftStorageFactory.create(vertx, storageType, storagePath, fsyncEnabled)
                 .onSuccess(storage -> {
                     this.raftStorage = storage;
-                    continueStartup(startPromise, config, nodeId, port, raftPort, clusterNodeIds);
+                    continueStartup(startPromise, config, securityConfig, raftTlsConfig, trustState,
+                            nodeId, port, raftPort, clusterNodeIds);
                 })
                 .onFailure(err -> {
                     logger.error("Failed to initialize Raft storage: {}", err.getMessage());
@@ -125,7 +135,9 @@ public class QuorusControllerVerticle extends AbstractVerticle {
     /**
      * Continues the startup sequence after storage is initialized.
      */
-    private void continueStartup(Promise<Void> startPromise, AppConfig config, 
+    private void continueStartup(Promise<Void> startPromise, AppConfig config,
+                                 SecurityConfig securityConfig, RaftTlsConfig raftTlsConfig,
+                                 CertificateTrustState trustState,
                                  String nodeId, int port, int raftPort, 
                                  Set<String> clusterNodeIds) {
         try {
@@ -155,7 +167,7 @@ public class QuorusControllerVerticle extends AbstractVerticle {
             transport.setRaftNode(node);
 
             // 6. Create and start gRPC server for inter-node communication
-            GrpcRaftServer grpc = new GrpcRaftServer(vertx, raftPort, node);
+            GrpcRaftServer grpc = new GrpcRaftServer(vertx, raftPort, node, raftTlsConfig, trustState);
             this.grpcServer = Optional.of(grpc);
 
             grpc.start().onSuccess(v1 -> {
@@ -165,7 +177,7 @@ public class QuorusControllerVerticle extends AbstractVerticle {
                 node.start().onSuccess(v2 -> {
                     // 8. Start HTTP API
                     HttpApiServer api = new HttpApiServer(
-                            vertx, config.getHttpHost(), port, node, stateMachine, -1);
+                            vertx, config.getHttpHost(), port, node, stateMachine, -1, securityConfig, trustState);
                     this.apiServer = Optional.of(api);
 
                     api.start()

@@ -2,11 +2,11 @@
 
 # Quorus Enterprise Implementation Plan
 
-**Version:** 1.0  
+**Version:** 1.5  
 **Date:** 2026-09-01  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
-**Status:** Proposed phased delivery plan  
+**Status:** Active — M0 and Phase 1 code-side work complete; initial process-deviation approval open and all subsequent work subject to the mandatory TDD gate  
 **Scope:** Enterprise control plane, transfer operations, security, governance, deployment, and user interfaces
 
 ## 1. Purpose and Authority
@@ -41,6 +41,7 @@ Every phase follows these rules:
 8. **Backward compatibility is explicit.** Raft entries, snapshots, APIs, configuration, workflow definitions, and agent protocols have version and migration rules.
 9. **No phase is complete on code alone.** Tests, audit, telemetry, runbooks, threat-model updates, migration, and operator evidence are part of the exit gate.
 10. **The user interface uses public contracts.** It receives no private database, filesystem, Raft, or controller-internal access.
+11. **Test-driven delivery is mandatory.** Every behavior-changing slice starts with an externally meaningful failing test, advances through the smallest implementation that makes it pass, and is refactored only while the focused and regression suites remain green. Tests added after implementation are characterization or regression tests and MUST NOT be represented as TDD evidence.
 
 ## 3. Current Baseline
 
@@ -60,7 +61,7 @@ The baseline does not yet justify protected enterprise production use. The criti
 
 | Milestone | Completed phases | Release meaning |
 |---|---|---|
-| **M0 — Reproducible Alpha Baseline** | Phase 0 | Clean, repeatable baseline with corrected current lifecycle and durability defects |
+| **M0 — Reproducible Alpha Baseline** | Phase 0 — **functional baseline; code-side remediation complete; deviation approval open** | Clean, repeatable functional baseline with corrected lifecycle and durability defects. The existing [Phase 0 release manifest](../evidence/phase0-release-evidence.json) proves green verification, not test-first sequencing. The [TDD assessment and remediation record](../evidence/tdd-remediation-2026-09-01.json) records the retrospective characterization; formal closure still requires approval of the process deviation. |
 | **M1 — Secure Transfer Core** | Phases 1–2 | Authenticated control plane and explainable, fenced transfer attempts |
 | **M2 — Operational Beta** | Phases 3–5 | Critical transfers are observable; services and agents have governed trust lifecycles |
 | **M3 — Enterprise Control Plane** | Phases 6–8 | Complete API, automated route/workflow operation, and evidenced recovery behavior |
@@ -121,10 +122,36 @@ A capability is complete only when all applicable items are satisfied:
 - current documentation distinguishes implemented behavior from the remaining target state;
 - measurable exit evidence is retained with build, configuration, environment, and artifact digests.
 
+### 6.1 Mandatory TDD delivery protocol
+
+Every implementation slice MUST use and retain the following sequence:
+
+1. **Specify:** identify one externally observable behavior, its security and tenant context, failure behavior, and acceptance boundary.
+2. **Red:** add the smallest unit, component, or external-path behavioral test that expresses the behavior; execute it before production implementation and retain output proving it failed for the intended missing behavior rather than environment or fixture failure.
+3. **Green:** implement the smallest coherent end-to-end change that makes the new test pass; retain the focused green output.
+4. **Refactor:** remove duplication and align architecture without changing behavior; rerun the focused test and affected module suite.
+5. **Regress:** run the applicable unit, integration, protocol, multi-node, security, contract, and documentation lanes. A phase cannot close with an unresolved failure or a green result inferred from an isolated retry.
+
+The mandatory evidence record for each slice contains:
+
+- stable slice identifier and linked requirement or gap;
+- acceptance statement written before implementation;
+- test file and external entry point exercised;
+- red command, timestamp, revision or patch identity, expected failure, and captured output;
+- green command, timestamp, revision or patch identity, and captured output;
+- refactor summary and focused plus affected-suite results;
+- test classification: unit, component, external-path behavioral, integration, protocol, multi-node, security, contract, or failure injection;
+- confirmation that request bodies, credentials, keys, and sensitive payloads were not captured in evidence.
+
+For asynchronous behavior, tests MUST use the project-standard Vert.x test facilities. Awaitility, Java executor/latch orchestration, sleeps used as synchronization, and equivalent non-Vert.x polling are not permitted in new or remediated tests. External-path tests MUST enter through the same HTTP, agent, protocol, or cluster boundary used by a real caller. Direct method tests remain useful but cannot independently satisfy the behavioral-test gate.
+
+Existing implementation for which no preserved red stage exists can only receive **retrospective characterization**. It requires an explicit process-deviation record and cannot be relabelled as historical TDD. All subsequent changes to that behavior return to the mandatory red-green-refactor protocol.
+
 ## 7. Phase 0 — Baseline, Conformance, and Delivery Controls
 
 **Size:** L  
 **Milestone:** M0  
+**Status:** Functional verification complete at commit `07195f6eaf33599d39aa0759cbe1d628b8a288d2`; code-side TDD remediation complete; process-deviation approval open  
 **Primary gaps:** `ARCH-01`, `ARCH-05`, `ARCH-06`, `ARCH-07`, `API-01`, `API-12`
 
 ### Objective
@@ -165,17 +192,73 @@ Create one reproducible, durable, end-to-end distributed transfer path and the e
 
 ### Exit gate
 
-M0 is achieved when the reference transfer path is repeatable, durable, state-machine invariant tests pass, and the current API is machine-described. No external untrusted exposure is permitted yet.
+M0 functional behavior is achieved when the reference transfer path is repeatable, durable, state-machine invariant tests pass, and the current API is machine-described. Vert.x-native retrospective behavioral coverage and the characterization record now exist. Formal phase closure still requires approval of the unavoidable process deviation for the original unrecorded red-green sequence. No external untrusted exposure is permitted yet.
 
 ## 8. Phase 1 — Enterprise Identity, Authorization, and Transport Trust
 
 **Size:** XL  
 **Milestone:** contributes to M1  
+**Status:** Code-side complete — technical exit evidence passed; approval of the initial historical TDD process deviation remains open  
 **Primary gaps:** `ARCH-03`, `ARCH-08`, `ARCH-13`, `API-02`
 
 ### Objective
 
 Establish authenticated and encrypted trust boundaries for human callers, service integrations, controllers, and agents.
+
+### Implementation checkpoint — 2026-09-01
+
+> **TDD compliance notice:** The initial security foundation was implemented before a preserved failing external-path test suite existed. Its retrospective tests cannot be relabelled as historical TDD evidence. Every subsequent Phase 1 behavior-changing slice followed Section 6.1 and retained its red and green evidence. Formal acceptance of the initial process deviation remains an approval item, not a code defect that can be rewritten after the event.
+
+Implemented in the current Phase 1 workstream:
+
+- trusted-gateway plus protected-hop assertion boundary selected and ADR-0003 updated;
+- fail-closed production security configuration and explicit warned development compatibility mode;
+- TLS 1.3 client-certificate authentication for controller HTTP;
+- TLS 1.3 mutual authentication for Raft server and peer clients;
+- certificate-authenticated agent controller clients with hostname verification;
+- human, service-integration, controller, agent, deployment, operator, administrator, security, and auditor identity/role vocabulary;
+- deterministic scope and tenant/environment policy decisions with stable denial codes;
+- uniform HTTP authentication and authorization middleware;
+- authenticated tenant derivation and item/collection isolation for transfers, agents, assignments, jobs, and routes;
+- agent identity self-binding for registration, heartbeat, polling, and status reporting;
+- `security/me` plus query and request-body authorization-explanation resources;
+- runtime trust-policy version and certificate-expiry observation through REST and OpenTelemetry;
+- atomic certificate-serial revocation updates shared by HTTP and Raft and re-evaluated on every request or RPC, including established TLS connections;
+- controlled old/new certificate overlap coverage for controller HTTP, Raft peers, and agent clients, followed by explicit old-certificate revocation;
+- redacted append-only, fsync'd, SHA-256 hash-chained authentication, authorization, mutation-completion, privileged-read, certificate-lifecycle, and security-configuration audit;
+- fail-closed audit-chain verification at startup and separate operational plus retained evidence chains;
+- security deployment guidance and certificate incident runbook.
+
+External validation and governance items retained after the code-side Phase 1 gate:
+
+- architecture, quality-engineering, and security-engineering approval of the initial Phase 0/Phase 1 TDD process deviation;
+- deployment-specific validation with the selected corporate PKI, enterprise gateway, secrets platform, controller topology, agent estate, and evidence collector, scheduled for the enterprise validation phase;
+- enterprise searchable audit service, WORM retention, SIEM integration, and signed export, which remain Phase 9 capabilities rather than claims about the local Phase 1 evidence files.
+
+Checkpoint verification on 2026-09-01:
+
+- remediation-focused run: 2 shared Vert.x test-facility tests, 3 live controller HTTP security tests, 1 live Raft mTLS test, and 2 live agent TLS tests passed;
+- a full-reactor run exposed that cross-module TLS fixtures were incorrectly assumed to be ordinary filesystem resources; the fixture loader was changed to materialize classpath resources safely from either directories or packaged test JARs, and the 6 external security-boundary tests then passed;
+- the first two clean regression attempts exposed Docker-health false negatives for the FTP and FTPS containers after the services were already accepting protocol connections; this was remediated test-first by retaining the failed runs as the red stage, replacing redundant container-health gating with three consecutive mapped-port FTP `220` readiness responses, and passing all 14 FTP/FTPS integration tests as the focused green stage;
+- the runtime trust and revocation slice retained a failing 6-test run before implementation, then passed 10 focused HTTP, Raft, and agent boundary tests after the shared runtime trust state, REST resources, enforcement, audit, and telemetry were implemented;
+- the retained audit-evidence slice first failed on modified-chain acceptance and missing dual-sink behavior, then passed all 3 focused audit-chain tests after startup verification and retained-evidence fan-out were implemented;
+- the expanded Phase 1 security and contract run passed 22 tests: 17 controller tests and 5 agent tests, with zero failures or errors;
+- definitive `mvn -o clean verify`: 2,237 tests passed with zero failures, errors, or skips across all seven reactor modules (core 1,491; workflow 134; tenant 64; controller 462; agent 86; integration examples 0).
+
+Completed retrospective remediation for the implemented checkpoint:
+
+- real HTTP TLS/mTLS acceptance and rejection through `HttpApiServer`;
+- trusted-gateway assertion acceptance, missing/forged assertion rejection, and direct certificate binding;
+- authenticated tenant derivation and cross-tenant rejection through live HTTP resources;
+- effective-identity resource through live HTTP requests;
+- successful and failed privileged-read records through the configured audit sink;
+- agent-to-controller trust and client-certificate behavior through a real TLS server;
+- Raft peer trust and unknown-certificate rejection through a live gRPC boundary;
+- replacement of Phase 0 Awaitility polling introduced by the baseline work with Vert.x futures and test contexts;
+- shared test-only TLS material, packaged-resource-safe fixture loading, and Vert.x-native asynchronous test utilities available to controller and agent modules;
+- protocol-level FTP and FTPS readiness detection proven by a retained red-green regression slice rather than Docker health-state timing.
+
+The remaining governance action is approval or explicit rejection of the Phase 0 and initial Phase 1 process deviation recorded in the TDD assessment. Authorization explanation, live decision and completion audit, agent hostname mismatch, plaintext-production rejection, HTTP/Raft/agent certificate overlap, active-connection revocation, and retained audit integrity now have executable regression evidence. This closes the Phase 1 technical gate but does not convert the initial retrospective checkpoint into TDD-compliant history.
 
 ### Scope
 
@@ -213,6 +296,8 @@ Establish authenticated and encrypted trust boundaries for human callers, servic
 ### Exit gate
 
 Every production trust-boundary connection is authenticated, encrypted, peer-verified, authorized, and audited. Tenant identity is no longer derived solely from request content.
+
+**Gate result — 2026-09-01:** Passed for the repository implementation and representative live-boundary fixtures. Corporate-environment accreditation and the recorded historical process-deviation approval remain external governance evidence and do not expand this result into a production-readiness claim.
 
 ## 9. Phase 2 — Transfer Attempts, Fencing, Integrity, and Reconciliation
 

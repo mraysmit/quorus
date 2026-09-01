@@ -17,6 +17,8 @@ The controlling documents are:
 2. [Quorus REST API Specification](../docs/QUORUS_REST_API_SPECIFICATION.md) for the complete normative control and operations API.
 3. [Quorus HTTP API Reference](../docs/QUORUS_API_REFERENCE.md) for endpoints registered by the current controller.
 4. [Quorus YAML Syntax Guide](../docs/QUORUS_YAML_SYNTAX_GUIDE.md) for fields accepted by the current workflow parser.
+5. [Quorus Security Deployment Guide](../docs/QUORUS_SECURITY_DEPLOYMENT_GUIDE.md) for the implemented Phase 1 trust configuration.
+6. [Quorus Certificate and Trust Incident Runbook](../docs/QUORUS_CERTIFICATE_INCIDENT_RUNBOOK.md) for containment and controlled recovery.
 
 The current phased delivery roadmap is [Quorus Enterprise Implementation Plan](task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md). It sequences the canonical requirements but does not override them.
 

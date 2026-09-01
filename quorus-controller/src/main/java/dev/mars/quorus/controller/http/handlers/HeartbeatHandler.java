@@ -21,6 +21,9 @@ import dev.mars.quorus.agent.AgentStatus;
 import dev.mars.quorus.controller.http.ErrorCode;
 import dev.mars.quorus.controller.http.QuorusApiException;
 import dev.mars.quorus.controller.raft.RaftNode;
+import dev.mars.quorus.controller.security.IdentityType;
+import dev.mars.quorus.controller.security.SecurityContext;
+import dev.mars.quorus.controller.security.SecurityIdentity;
 import dev.mars.quorus.controller.state.AgentCommand;
 import dev.mars.quorus.controller.state.CommandResult;
 import dev.mars.quorus.controller.state.QuorusStateStore;
@@ -76,6 +79,14 @@ public class HeartbeatHandler implements Handler<RoutingContext> {
             // Verify agent exists (throws HTTP 404 if not found)
             AgentInfo registeredAgent = stateStore.findAgent(agentId)
                     .orElseThrow(() -> QuorusApiException.notFound(ErrorCode.AGENT_NOT_FOUND, agentId));
+            SecurityContext.trustedTenant(ctx, registeredAgent.getTenantId());
+            SecurityIdentity identity = SecurityContext.identity(ctx);
+            if (identity != null && identity.type() == IdentityType.AGENT
+                    && !identity.principalId().equals(agentId)) {
+                ctx.fail(new QuorusApiException(ErrorCode.FORBIDDEN,
+                        "An agent identity may send heartbeats only for its own agentId"));
+                return;
+            }
 
             // Tenant isolation: if heartbeat carries tenantId, verify it matches the registered agent's tenant
             String heartbeatTenantId = body.getString("tenantId");

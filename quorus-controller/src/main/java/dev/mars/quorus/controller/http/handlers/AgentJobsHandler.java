@@ -18,6 +18,9 @@ package dev.mars.quorus.controller.http.handlers;
 
 import dev.mars.quorus.agent.AgentInfo;
 import dev.mars.quorus.controller.state.QuorusStateStore;
+import dev.mars.quorus.controller.security.IdentityType;
+import dev.mars.quorus.controller.security.SecurityContext;
+import dev.mars.quorus.controller.security.SecurityIdentity;
 import dev.mars.quorus.controller.state.TransferJobSnapshot;
 import dev.mars.quorus.core.JobAssignment;
 import io.vertx.core.Handler;
@@ -62,6 +65,15 @@ public class AgentJobsHandler implements Handler<RoutingContext> {
             return;
         }
         String agentTenantId = agent.getTenantId();
+        SecurityContext.trustedTenant(ctx, agentTenantId);
+        SecurityIdentity identity = SecurityContext.identity(ctx);
+        if (identity != null && identity.type() == IdentityType.AGENT
+                && !identity.principalId().equals(agentId)) {
+            ctx.fail(new dev.mars.quorus.controller.http.QuorusApiException(
+                    dev.mars.quorus.controller.http.ErrorCode.FORBIDDEN,
+                    "An agent identity may poll jobs only for its own agentId"));
+            return;
+        }
 
         Map<String, JobAssignment> allAssignments = stateMachine.getJobAssignments();
         JsonArray pendingJobs = new JsonArray();

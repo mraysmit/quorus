@@ -19,6 +19,8 @@ package dev.mars.quorus.controller.http.handlers;
 import dev.mars.quorus.controller.http.ErrorCode;
 import dev.mars.quorus.controller.http.QuorusApiException;
 import dev.mars.quorus.controller.raft.RaftNode;
+import dev.mars.quorus.controller.security.SecurityContext;
+import dev.mars.quorus.controller.security.SecurityIdentity;
 import dev.mars.quorus.controller.state.CommandResult;
 import dev.mars.quorus.controller.state.JobAssignmentCommand;
 import dev.mars.quorus.controller.state.QuorusStateStore;
@@ -89,6 +91,10 @@ public class JobAssignmentHandler {
                                     ErrorCode.TRANSFER_NOT_FOUND, jobId));
                     assignment = new JobAssignment.Builder(assignment).tenantId(tenantId).build();
                 }
+                String trustedTenant = SecurityContext.trustedTenant(ctx, assignment.getTenantId());
+                if (trustedTenant != null && !trustedTenant.equals(assignment.getTenantId())) {
+                    assignment = new JobAssignment.Builder(assignment).tenantId(trustedTenant).build();
+                }
                 logger.info("Assigning job: jobId={}, agentId={}",
                         assignment.getJobId(), assignment.getAgentId());
                 JobAssignmentCommand command = JobAssignmentCommand.assign(assignment);
@@ -127,13 +133,17 @@ public class JobAssignmentHandler {
             Map<String, JobAssignment> assignments = stateMachine.getJobAssignments();
 
             JsonArray array = new JsonArray();
+            SecurityIdentity identity = SecurityContext.identity(ctx);
             for (Map.Entry<String, JobAssignment> entry : assignments.entrySet()) {
+                if (identity != null && !identity.tenantId().equals(entry.getValue().getTenantId())) {
+                    continue;
+                }
                 array.add(toJson(entry.getKey(), entry.getValue()));
             }
 
             ctx.json(new JsonObject()
                     .put("assignments", array)
-                    .put("total", assignments.size()));
+                    .put("total", array.size()));
         };
     }
 
@@ -146,6 +156,7 @@ public class JobAssignmentHandler {
 
             JobAssignment assignment = stateStore.findJobAssignment(assignmentId)
                     .orElseThrow(() -> QuorusApiException.notFound(ErrorCode.ASSIGNMENT_NOT_FOUND, assignmentId));
+            SecurityContext.trustedTenant(ctx, assignment.getTenantId());
 
             ctx.json(toJson(assignmentId, assignment));
         };
@@ -159,6 +170,7 @@ public class JobAssignmentHandler {
             String assignmentId = ctx.pathParam("assignmentId");
             logger.info("Accepting assignment: assignmentId={}", assignmentId);
             JobAssignment existing = lookupAssignment(assignmentId);
+            SecurityContext.trustedTenant(ctx, existing.getTenantId());
             validateTransition(existing, JobAssignmentStatus.ACCEPTED, assignmentId, "accept");
 
             JobAssignmentCommand command = JobAssignmentCommand.accept(assignmentId);
@@ -192,6 +204,7 @@ public class JobAssignmentHandler {
             String assignmentId = ctx.pathParam("assignmentId");
             logger.info("Rejecting assignment: assignmentId={}", assignmentId);
             JobAssignment existing = lookupAssignment(assignmentId);
+            SecurityContext.trustedTenant(ctx, existing.getTenantId());
             validateTransition(existing, JobAssignmentStatus.REJECTED, assignmentId, "reject");
 
             JsonObject body = ctx.body().asJsonObject();
@@ -233,6 +246,7 @@ public class JobAssignmentHandler {
                 String assignmentId = ctx.pathParam("assignmentId");
                 logger.info("Updating assignment status: assignmentId={}", assignmentId);
                 JobAssignment existing = lookupAssignment(assignmentId);
+                SecurityContext.trustedTenant(ctx, existing.getTenantId());
 
                 JsonObject body = ctx.body().asJsonObject();
                 if (body == null || !body.containsKey("status")) {
@@ -288,6 +302,7 @@ public class JobAssignmentHandler {
             String assignmentId = ctx.pathParam("assignmentId");
             logger.info("Cancelling assignment: assignmentId={}", assignmentId);
             JobAssignment existing = lookupAssignment(assignmentId);
+            SecurityContext.trustedTenant(ctx, existing.getTenantId());
             validateTransition(existing, JobAssignmentStatus.CANCELLED, assignmentId, "cancel");
 
             JsonObject body = ctx.body().asJsonObject();
@@ -323,7 +338,8 @@ public class JobAssignmentHandler {
         return ctx -> {
             String assignmentId = ctx.pathParam("assignmentId");
             logger.info("Removing assignment: assignmentId={}", assignmentId);
-            lookupAssignment(assignmentId); // verify exists
+            JobAssignment existing = lookupAssignment(assignmentId); // verify exists
+            SecurityContext.trustedTenant(ctx, existing.getTenantId());
 
             JobAssignmentCommand command = JobAssignmentCommand.remove(assignmentId);
             raftNode.submitCommand(command)

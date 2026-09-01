@@ -55,6 +55,14 @@
             <artifactId>quorus-core</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- Shared Vert.x-native test utilities from quorus-core. -->
+        <dependency>
+            <groupId>dev.mars</groupId>
+            <artifactId>quorus-core</artifactId>
+            <version>${project.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
 
         <!-- Quorus Workflow -->
         <dependency>

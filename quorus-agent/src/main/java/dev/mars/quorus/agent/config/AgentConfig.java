@@ -99,7 +99,7 @@ public final class AgentConfig {
     // ==================== Controller Connection ====================
 
     public String getControllerUrl() {
-        return getString("quorus.agent.controller.url", "http://localhost:8080/api/v1");
+        return getString("quorus.agent.controller.url", "https://localhost:8080/api/v1");
     }
 
     // ==================== Network Configuration ====================

@@ -25,6 +25,8 @@ import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 /**
  * Configuration for the Quorus Agent.
@@ -50,6 +52,12 @@ public class AgentConfiguration {
     private final int httpIdleTimeout;
     private final String version;
     private final String tenantId;
+    private final String securityProfile;
+    private final boolean allowInsecure;
+    private final boolean controllerTlsEnabled;
+    private final String tlsCertificatePath;
+    private final String tlsPrivateKeyPath;
+    private final String tlsTrustBundlePath;
     
     private AgentConfiguration(Builder builder) {
         this.agentId = builder.agentId;
@@ -66,6 +74,12 @@ public class AgentConfiguration {
         this.httpIdleTimeout = builder.httpIdleTimeout;
         this.version = builder.version;
         this.tenantId = builder.tenantId;
+        this.securityProfile = builder.securityProfile;
+        this.allowInsecure = builder.allowInsecure;
+        this.controllerTlsEnabled = builder.controllerTlsEnabled;
+        this.tlsCertificatePath = builder.tlsCertificatePath;
+        this.tlsPrivateKeyPath = builder.tlsPrivateKeyPath;
+        this.tlsTrustBundlePath = builder.tlsTrustBundlePath;
     }
     
     public static AgentConfiguration fromEnvironment() {
@@ -74,7 +88,7 @@ public class AgentConfiguration {
         // Required configuration
         builder.agentId(getEnvOrThrow("AGENT_ID"));
         builder.tenantId(getEnvOrThrow("AGENT_TENANT_ID"));
-        builder.controllerUrl(getEnvOrDefault("CONTROLLER_URL", "http://localhost:8080/api/v1"));
+        builder.controllerUrl(getEnvOrDefault("CONTROLLER_URL", "https://localhost:8080/api/v1"));
         
         // Optional configuration with defaults
         builder.region(getEnvOrDefault("AGENT_REGION", "default"));
@@ -85,6 +99,14 @@ public class AgentConfiguration {
         builder.httpConnectionTimeout(Integer.parseInt(getEnvOrDefault("HTTP_CONNECTION_TIMEOUT_MS", "5000")));
         builder.httpIdleTimeout(Integer.parseInt(getEnvOrDefault("HTTP_IDLE_TIMEOUT_MS", "10000")));
         builder.version(getEnvOrDefault("AGENT_VERSION", "1.0.0"));
+        builder.securityProfile(getEnvOrDefault("QUORUS_AGENT_SECURITY_PROFILE", "production"));
+        builder.allowInsecure(Boolean.parseBoolean(getEnvOrDefault(
+                "QUORUS_AGENT_SECURITY_ALLOW_INSECURE", "false")));
+        builder.controllerTlsEnabled(Boolean.parseBoolean(getEnvOrDefault(
+                "QUORUS_AGENT_TLS_ENABLED", "true")));
+        builder.tlsCertificatePath(getEnvOrDefault("QUORUS_AGENT_TLS_CERTIFICATE", ""));
+        builder.tlsPrivateKeyPath(getEnvOrDefault("QUORUS_AGENT_TLS_PRIVATE_KEY", ""));
+        builder.tlsTrustBundlePath(getEnvOrDefault("QUORUS_AGENT_TLS_TRUST_BUNDLE", ""));
         
         // Parse supported protocols
         String protocolsStr = getEnvOrDefault("SUPPORTED_PROTOCOLS", "HTTP,HTTPS");
@@ -158,6 +180,12 @@ public class AgentConfiguration {
     public int getHttpConnectionTimeout() { return httpConnectionTimeout; }
     public int getHttpIdleTimeout() { return httpIdleTimeout; }
     public String getVersion() { return version; }
+    public String getSecurityProfile() { return securityProfile; }
+    public boolean isAllowInsecure() { return allowInsecure; }
+    public boolean isControllerTlsEnabled() { return controllerTlsEnabled; }
+    public String getTlsCertificatePath() { return tlsCertificatePath; }
+    public String getTlsPrivateKeyPath() { return tlsPrivateKeyPath; }
+    public String getTlsTrustBundlePath() { return tlsTrustBundlePath; }
     
     public static class Builder {
         private String agentId;
@@ -174,6 +202,12 @@ public class AgentConfiguration {
         private int httpConnectionTimeout = 5000;
         private int httpIdleTimeout = 10000;
         private String version = "1.0.0";
+        private String securityProfile = "development";
+        private boolean allowInsecure = true;
+        private boolean controllerTlsEnabled = false;
+        private String tlsCertificatePath;
+        private String tlsPrivateKeyPath;
+        private String tlsTrustBundlePath;
         
         public Builder agentId(String agentId) { this.agentId = agentId; return this; }
         public Builder tenantId(String tenantId) { this.tenantId = tenantId; return this; }
@@ -189,12 +223,40 @@ public class AgentConfiguration {
         public Builder httpConnectionTimeout(int httpConnectionTimeout) { this.httpConnectionTimeout = httpConnectionTimeout; return this; }
         public Builder httpIdleTimeout(int httpIdleTimeout) { this.httpIdleTimeout = httpIdleTimeout; return this; }
         public Builder version(String version) { this.version = version; return this; }
+        public Builder securityProfile(String securityProfile) { this.securityProfile = securityProfile; return this; }
+        public Builder allowInsecure(boolean allowInsecure) { this.allowInsecure = allowInsecure; return this; }
+        public Builder controllerTlsEnabled(boolean enabled) { this.controllerTlsEnabled = enabled; return this; }
+        public Builder tlsCertificatePath(String path) { this.tlsCertificatePath = path; return this; }
+        public Builder tlsPrivateKeyPath(String path) { this.tlsPrivateKeyPath = path; return this; }
+        public Builder tlsTrustBundlePath(String path) { this.tlsTrustBundlePath = path; return this; }
         
         public AgentConfiguration build() {
             if (agentId == null) throw new IllegalArgumentException("agentId is required");
             if (tenantId == null) throw new IllegalArgumentException("tenantId is required (AGENT_TENANT_ID)");
             if (controllerUrl == null) throw new IllegalArgumentException("controllerUrl is required");
+            boolean production = "production".equalsIgnoreCase(securityProfile);
+            if (!production && !"development".equalsIgnoreCase(securityProfile)) {
+                throw new IllegalArgumentException("securityProfile must be development or production");
+            }
+            if (production) {
+                if (allowInsecure || !controllerTlsEnabled || !controllerUrl.startsWith("https://")) {
+                    throw new IllegalArgumentException(
+                            "Production agents require HTTPS mutual TLS and forbid insecure transport");
+                }
+                requireReadable(tlsCertificatePath, "agent TLS certificate");
+                requireReadable(tlsPrivateKeyPath, "agent TLS private key");
+                requireReadable(tlsTrustBundlePath, "controller trust bundle");
+            } else if (!controllerTlsEnabled && !allowInsecure) {
+                throw new IllegalArgumentException(
+                        "Plaintext development connections require allowInsecure=true");
+            }
             return new AgentConfiguration(this);
+        }
+
+        private static void requireReadable(String value, String description) {
+            if (value == null || value.isBlank() || !Files.isReadable(Path.of(value))) {
+                throw new IllegalArgumentException(description + " must reference a readable file");
+            }
         }
     }
 }

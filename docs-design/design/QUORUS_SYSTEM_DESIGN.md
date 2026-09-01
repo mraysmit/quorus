@@ -2,7 +2,7 @@
 
 # Quorus Comprehensive System Design
 
-**Version:** 2.4  
+**Version:** 2.6  
 **Date:** 2025-08-26  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
@@ -12,6 +12,9 @@
 
 > [!IMPORTANT]
 > This document contains implemented features, historical design material, and future concepts. It is not the current runtime contract and its performance, security, compliance, scaling, and delivery statements are not guarantees. The canonical architecture and release requirements are defined in [Quorus Architecture Specification](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md), and the complete normative API contract is defined in [Quorus REST API Specification](../../docs/QUORUS_REST_API_SPECIFICATION.md). Endpoint examples below are target-state illustrations unless explicitly identified as current. Where the documents conflict, the canonical specifications take precedence.
+
+> [!NOTE]
+> Phase 1 now includes a fail-closed production security foundation: TLS 1.3 mutual authentication for controller HTTP and Raft, certificate-authenticated agent HTTP clients, trusted gateway and direct-workload identity resolution, tenant-aware policy middleware, effective-identity and authorization-explanation REST resources, runtime revocation shared by HTTP and Raft, certificate-expiry and trust-version telemetry, controlled certificate-overlap tests, and separately persisted tamper-evident operational and retained audit chains. The repository technical gate is complete. Corporate PKI accreditation, agent enrollment, service-connection security, searchable/WORM evidence services, and full enterprise release validation remain later-phase or deployment responsibilities.
 
 ## Technology Stack
 

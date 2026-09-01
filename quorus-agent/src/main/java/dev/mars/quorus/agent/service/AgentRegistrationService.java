@@ -23,7 +23,6 @@ import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.client.WebClient;
-import io.vertx.ext.web.client.WebClientOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,10 +45,7 @@ public class AgentRegistrationService {
     
     public AgentRegistrationService(Vertx vertx, AgentConfiguration config) {
         this.config = config;
-        this.webClient = WebClient.create(vertx, new WebClientOptions()
-            .setConnectTimeout(config.getHttpConnectionTimeout())
-            .setIdleTimeout(config.getHttpIdleTimeout())
-            .setUserAgent("Quorus-Agent/1.0"));
+        this.webClient = ControllerWebClientFactory.create(vertx, config);
         logger.debug("AgentRegistrationService initialized with Vert.x WebClient (connectTimeout={}ms, idleTimeout={}ms)",
             config.getHttpConnectionTimeout(), config.getHttpIdleTimeout());
     }

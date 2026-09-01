@@ -2,10 +2,10 @@
   "schemaVersion": 1,
   "phase": 0,
   "milestone": "M0 — Reproducible Alpha Baseline",
-  "generatedAt": "2026-09-01T06:06:11.0918143Z",
+  "generatedAt": "2026-09-01T07:51:19.5086342Z",
   "source": {
-    "revision": "1c24495a720b782712dca628e5e99f033ebfcb97",
-    "worktreeClean": false
+    "revision": "07195f6eaf33599d39aa0759cbe1d628b8a288d2",
+    "worktreeClean": true
   },
   "environment": {
     "os": "Microsoft Windows 10.0.26340",
@@ -52,38 +52,38 @@
   "artifacts": [
     {
       "path": "quorus-agent/target/quorus-agent-1.0-SNAPSHOT.jar",
-      "sha256": "71b8cbfa34b224fbacf1d9c087aa489c85155dc2f894ce1300fa508f9a244e62",
-      "bytes": 52156
+      "sha256": "991ebda8bc8debe80a93e95a5a7ae46bfa2aece9d737c03268b9284eafc6e4c9",
+      "bytes": 52155
     },
     {
       "path": "quorus-controller/target/quorus-controller-1.0-SNAPSHOT.jar",
-      "sha256": "b4edcfdc36dd855c9e004df5a2e5a3534ea4a640b4b99418c5ba85f52dc93006",
-      "bytes": 102675654
+      "sha256": "da275d17baacd809d6db9eae7f9d36fe5fec9300374be85932e90f994aec6a03",
+      "bytes": 102671914
     },
     {
       "path": "quorus-core/target/quorus-core-1.0-SNAPSHOT-tests.jar",
-      "sha256": "1c649a8f3f31b073d5bf861fd77923b13559c2a2a5c2fa028660ed70f14d6a47",
+      "sha256": "6b3513e145b81e7a30366a4bd5ccf07bf02ba6b03443a3712e5b3ad28617b3ec",
       "bytes": 678120
     },
     {
       "path": "quorus-core/target/quorus-core-1.0-SNAPSHOT.jar",
-      "sha256": "758e45afdbddcd4e1758f4f5eb7230311f89ac2fceb83284227c9db8d49ae4dc",
+      "sha256": "cb293b94ebffa9a1de77d33ab113429b281bbb4fa27cc852bcd147fa72516126",
       "bytes": 219179
     },
     {
       "path": "quorus-integration-examples/target/quorus-integration-examples-1.0-SNAPSHOT.jar",
-      "sha256": "6b028b4179b6ece6359bc342cb90d78c842d74dca1c0ff23b9914c70fe9568a7",
-      "bytes": 130757
+      "sha256": "109de3d4bb0c2064ccbc10d5e2233aa2ba1bf459d7c19e9654c23f9d87ce670d",
+      "bytes": 130760
     },
     {
       "path": "quorus-tenant/target/quorus-tenant-1.0-SNAPSHOT.jar",
-      "sha256": "f8b8dae8102672e36ac00015379a10260301b24c93e938d97cff837da59d0196",
-      "bytes": 49357
+      "sha256": "afebc9a233fb0cd4ef68934e781ac8d7329c23f2a5e5d6573edc4fe9856e5fdf",
+      "bytes": 49360
     },
     {
       "path": "quorus-workflow/target/quorus-workflow-1.0-SNAPSHOT.jar",
-      "sha256": "2de29e61a167afdc9320200bcbcb230ceb863b93dbf816451f295e2d98082fce",
-      "bytes": 68352
+      "sha256": "7894afbb22bd583b395187182f0a0ec06efd0664f715e4bb5700907d490e0db6",
+      "bytes": 68355
     }
   ]
 }

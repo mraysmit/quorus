@@ -19,6 +19,7 @@ package dev.mars.quorus.controller.http.handlers;
 import dev.mars.quorus.controller.http.ErrorCode;
 import dev.mars.quorus.controller.http.QuorusApiException;
 import dev.mars.quorus.controller.raft.RaftNode;
+import dev.mars.quorus.controller.security.SecurityContext;
 import dev.mars.quorus.controller.state.CommandResult;
 import dev.mars.quorus.controller.state.QuorusStateStore;
 import dev.mars.quorus.controller.state.TransferJobCommand;
@@ -74,9 +75,10 @@ public class TransferHandler {
 
                 // Extract tenantId BEFORE mapTo — TransferJob has no tenantId field and
                 // Jackson would throw "Unrecognized field" if we leave it in the body.
-                String tenantId = body.getString("tenantId");
+                String tenantId = SecurityContext.trustedTenant(ctx, body.getString("tenantId"));
                 if (tenantId == null || tenantId.isBlank()) {
-                    ctx.fail(400, new IllegalArgumentException("Missing required field: tenantId"));
+                    ctx.fail(400, new IllegalArgumentException(
+                            "Missing required field: tenantId (or authenticated tenant identity)"));
                     return;
                 }
 
@@ -120,6 +122,7 @@ public class TransferHandler {
 
             TransferJobSnapshot job = stateStore.findTransferJob(jobId)
                     .orElseThrow(() -> QuorusApiException.notFound(ErrorCode.TRANSFER_NOT_FOUND, jobId));
+            SecurityContext.trustedTenant(ctx, job.getTenantId());
 
                 // Get the latest assignment status for this job
             JobAssignment latestAssignment = stateStore.getJobAssignments().values().stream()
@@ -187,6 +190,7 @@ public class TransferHandler {
                 if (!stateMachine.hasTransferJob(jobId)) {
                     throw QuorusApiException.notFound(ErrorCode.TRANSFER_NOT_FOUND, jobId);
                 }
+                SecurityContext.trustedTenant(ctx, stateMachine.getTransferJob(jobId).getTenantId());
 
                 TransferJobCommand command = TransferJobCommand.delete(jobId);
                 raftNode.submitCommand(command)

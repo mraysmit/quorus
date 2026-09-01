@@ -21,7 +21,6 @@ import io.vertx.core.Future;
 import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.client.WebClient;
-import io.vertx.ext.web.client.WebClientOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,10 +47,7 @@ public class HeartbeatService {
     public HeartbeatService(Vertx vertx, AgentConfiguration config, AgentRegistrationService registrationService) {
         this.config = config;
         this.registrationService = registrationService;
-        this.webClient = WebClient.create(vertx, new WebClientOptions()
-            .setConnectTimeout(config.getHttpConnectionTimeout())
-            .setIdleTimeout(config.getHttpIdleTimeout())
-            .setUserAgent("Quorus-Agent/1.0"));
+        this.webClient = ControllerWebClientFactory.create(vertx, config);
         logger.debug("HeartbeatService initialized with Vert.x WebClient (connectTimeout={}ms, idleTimeout={}ms)",
             config.getHttpConnectionTimeout(), config.getHttpIdleTimeout());
     }
