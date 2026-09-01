@@ -25,6 +25,7 @@ import dev.mars.quorus.controller.raft.RaftLogApplicator;
 import dev.mars.quorus.core.JobPriority;
 import dev.mars.quorus.core.TransferJob;
 import dev.mars.quorus.core.TransferStatus;
+import dev.mars.quorus.util.SensitiveDataRedactor;
 import dev.mars.quorus.core.JobAssignment;
 import dev.mars.quorus.core.QueuedJob;
 import dev.mars.quorus.core.RouteConfiguration;
@@ -160,8 +161,15 @@ public class QuorusStateStore implements RaftLogApplicator {
         return switch (command) {
             case TransferJobCommand.Create cmd -> {
                 TransferJob job = cmd.transferJob();
+                if (!jobId.equals(job.getJobId())) {
+                    yield rejected("IDENTIFIER_MISMATCH", "Transfer command ID does not match the transfer job ID");
+                }
+                if (transferJobs.containsKey(jobId)) {
+                    yield rejected("DUPLICATE_ENTITY", "Transfer job already exists: " + jobId);
+                }
                 logger.debug("Creating transfer job: jobId={}, sourceUri={}, destPath={}", 
-                    jobId, job.getRequest().getSourceUri(), job.getRequest().getDestinationPath());
+                    jobId, SensitiveDataRedactor.redactUri(job.getRequest().getSourceUri()),
+                    job.getRequest().getDestinationPath());
                 TransferJobSnapshot snapshot = TransferJobSnapshot.fromTransferJob(job, cmd.tenantId());
                 transferJobs.put(jobId, snapshot);
                 logger.info("Created transfer job: jobId={}, protocol={}, totalJobs={}", 
@@ -180,6 +188,10 @@ public class QuorusStateStore implements RaftLogApplicator {
                     logger.debug("CAS mismatch for transfer job: jobId={}, expected={}, actual={}",
                         jobId, cmd.expectedStatus(), existingJob.getStatus());
                     yield new CommandResult.CasMismatch<>(existingJob);
+                }
+                if (!existingJob.getStatus().canTransitionTo(cmd.newStatus())) {
+                    yield rejected("INVALID_STATE_TRANSITION", "Transfer job " + jobId + " cannot transition from "
+                            + existingJob.getStatus() + " to " + cmd.newStatus());
                 }
                 TransferStatus oldStatus = existingJob.getStatus();
                 TransferJobSnapshot updatedJob = new TransferJobSnapshot(
@@ -207,6 +219,16 @@ public class QuorusStateStore implements RaftLogApplicator {
                     logger.warn("Transfer job not found for progress update: id={}", jobId);
                     yield new CommandResult.NotFound<>(jobId, "TransferJob");
                 }
+                if (cmd.bytesTransferred() < progressJob.getBytesTransferred()) {
+                    yield rejected("INVALID_PROGRESS", "Transfer progress cannot move backwards for job " + jobId);
+                }
+                if (cmd.bytesTransferred() < 0
+                        || (progressJob.getTotalBytes() > 0 && cmd.bytesTransferred() > progressJob.getTotalBytes())) {
+                    yield rejected("INVALID_PROGRESS", "Transfer progress is outside the valid byte range for job " + jobId);
+                }
+                if (progressJob.getStatus().isTerminal()) {
+                    yield rejected("INVALID_STATE_TRANSITION", "Transfer progress cannot change after terminal status for job " + jobId);
+                }
                 long oldBytes = progressJob.getBytesTransferred();
                 TransferJobSnapshot updatedJob = new TransferJobSnapshot(
                         progressJob.getJobId(),
@@ -228,6 +250,9 @@ public class QuorusStateStore implements RaftLogApplicator {
             case TransferJobCommand.Delete delete -> {
                 logger.debug("Deleting transfer job: jobId={}", jobId);
                 logger.trace("Transfer delete command timestamp={}", delete.timestamp());
+                if (jobAssignments.values().stream().anyMatch(a -> jobId.equals(a.getJobId()))) {
+                    yield rejected("DEPENDENT_ENTITY_EXISTS", "Transfer job is still referenced by an assignment: " + jobId);
+                }
                 TransferJobSnapshot removedJob = transferJobs.remove(jobId);
                 if (removedJob == null) {
                     logger.warn("Transfer job not found for deletion: id={}", jobId);
@@ -247,6 +272,9 @@ public class QuorusStateStore implements RaftLogApplicator {
         return switch (command) {
             case AgentCommand.Register cmd -> {
                 AgentInfo agentInfo = cmd.agentInfo();
+                if (!agentId.equals(agentInfo.getAgentId())) {
+                    yield rejected("IDENTIFIER_MISMATCH", "Agent command ID does not match the agent payload ID");
+                }
                 logger.debug("Registering agent: agentId={}, endpoint={}, status={}", 
                     agentId, agentInfo.getEndpoint(), agentInfo.getStatus());
                 agents.put(agentId, agentInfo);
@@ -257,6 +285,9 @@ public class QuorusStateStore implements RaftLogApplicator {
             case AgentCommand.Deregister deregister -> {
                 logger.debug("Deregistering agent: agentId={}", agentId);
                 logger.trace("Agent deregister command timestamp={}", deregister.timestamp());
+                if (jobAssignments.values().stream().anyMatch(a -> agentId.equals(a.getAgentId()))) {
+                    yield rejected("DEPENDENT_ENTITY_EXISTS", "Agent is still referenced by an assignment: " + agentId);
+                }
                 AgentInfo removedAgent = agents.remove(agentId);
                 if (removedAgent == null) {
                     logger.warn("Agent not found for deregistration: id={}", agentId);
@@ -278,6 +309,10 @@ public class QuorusStateStore implements RaftLogApplicator {
                     logger.debug("CAS mismatch for agent: agentId={}, expected={}, actual={}",
                         agentId, cmd.expectedStatus(), existingAgent.getStatus());
                     yield new CommandResult.CasMismatch<>(existingAgent);
+                }
+                if (!existingAgent.getStatus().canTransitionTo(cmd.newStatus())) {
+                    yield rejected("INVALID_STATE_TRANSITION", "Agent " + agentId + " cannot transition from "
+                            + existingAgent.getStatus() + " to " + cmd.newStatus());
                 }
                 AgentStatus oldStatus = existingAgent.getStatus();
                 AgentInfo updated = AgentInfo.copyOf(existingAgent);
@@ -355,6 +390,20 @@ public class QuorusStateStore implements RaftLogApplicator {
         return switch (command) {
             case JobAssignmentCommand.Assign cmd -> {
                 JobAssignment assignment = cmd.jobAssignment();
+                String canonicalAssignmentId = assignment.getJobId() + ":" + assignment.getAgentId();
+                if (!assignmentId.equals(canonicalAssignmentId)) {
+                    yield rejected("IDENTIFIER_MISMATCH", "Assignment ID does not match its job and agent IDs");
+                }
+                if (jobAssignments.containsKey(assignmentId)) {
+                    yield rejected("DUPLICATE_ENTITY", "Job assignment already exists: " + assignmentId);
+                }
+                if (assignment.getStatus() != dev.mars.quorus.core.JobAssignmentStatus.ASSIGNED) {
+                    yield rejected("INVALID_INITIAL_STATE", "New job assignments must start in ASSIGNED state");
+                }
+                CommandResult<?> referenceValidation = validateAssignmentReferences(assignment);
+                if (referenceValidation != null) {
+                    yield referenceValidation;
+                }
                 logger.debug("Creating job assignment: assignmentId={}, jobId={}, agentId={}", 
                     assignmentId, assignment.getJobId(), assignment.getAgentId());
                 jobAssignments.put(assignmentId, assignment);
@@ -368,6 +417,10 @@ public class QuorusStateStore implements RaftLogApplicator {
                 if (existing == null) {
                     logger.warn("Job assignment not found for accept: id={}", assignmentId);
                     yield new CommandResult.NotFound<>(assignmentId, "JobAssignment");
+                }
+                CommandResult<?> transitionValidation = validateAssignmentTransition(existing, cmd.newStatus());
+                if (transitionValidation != null) {
+                    yield transitionValidation;
                 }
                 JobAssignment updated = existing.withStatusAndTimestamp(cmd.newStatus(),
                         cmd.timestamp());
@@ -383,6 +436,10 @@ public class QuorusStateStore implements RaftLogApplicator {
                 if (rejectedAssignment == null) {
                     logger.warn("Job assignment not found for reject: id={}", assignmentId);
                     yield new CommandResult.NotFound<>(assignmentId, "JobAssignment");
+                }
+                CommandResult<?> transitionValidation = validateAssignmentTransition(rejectedAssignment, cmd.newStatus());
+                if (transitionValidation != null) {
+                    yield transitionValidation;
                 }
                 JobAssignment updated = rejectedAssignment.withStatusAndTimestamp(cmd.newStatus(),
                         cmd.timestamp());
@@ -405,6 +462,10 @@ public class QuorusStateStore implements RaftLogApplicator {
                         assignmentId, cmd.expectedStatus(), statusAssignment.getStatus());
                     yield new CommandResult.CasMismatch<>(statusAssignment);
                 }
+                CommandResult<?> transitionValidation = validateAssignmentTransition(statusAssignment, cmd.newStatus());
+                if (transitionValidation != null) {
+                    yield transitionValidation;
+                }
                 JobAssignment updated = statusAssignment.withStatusAndTimestamp(cmd.newStatus(),
                         cmd.timestamp());
                 jobAssignments.put(assignmentId, updated);
@@ -418,6 +479,10 @@ public class QuorusStateStore implements RaftLogApplicator {
                 if (timeoutAssignment == null) {
                     logger.warn("Job assignment not found for timeout: id={}", assignmentId);
                     yield new CommandResult.NotFound<>(assignmentId, "JobAssignment");
+                }
+                CommandResult<?> transitionValidation = validateAssignmentTransition(timeoutAssignment, cmd.newStatus());
+                if (transitionValidation != null) {
+                    yield transitionValidation;
                 }
                 JobAssignment updated = timeoutAssignment.withStatusAndTimestamp(cmd.newStatus(),
                         cmd.timestamp());
@@ -434,6 +499,10 @@ public class QuorusStateStore implements RaftLogApplicator {
                     logger.warn("Job assignment not found for cancel: id={}", assignmentId);
                     yield new CommandResult.NotFound<>(assignmentId, "JobAssignment");
                 }
+                CommandResult<?> transitionValidation = validateAssignmentTransition(cancelAssignment, cmd.newStatus());
+                if (transitionValidation != null) {
+                    yield transitionValidation;
+                }
                 JobAssignment updated = cancelAssignment.withStatusAndTimestamp(cmd.newStatus(),
                         cmd.timestamp());
                 jobAssignments.put(assignmentId, updated);
@@ -444,11 +513,15 @@ public class QuorusStateStore implements RaftLogApplicator {
             case JobAssignmentCommand.Remove remove -> {
                 logger.debug("Removing job assignment: assignmentId={}", assignmentId);
                 logger.trace("Job assignment remove command={}", remove);
-                JobAssignment removed = jobAssignments.remove(assignmentId);
+                JobAssignment removed = jobAssignments.get(assignmentId);
                 if (removed == null) {
                     logger.warn("Job assignment not found for removal: id={}", assignmentId);
                     yield new CommandResult.NotFound<>(assignmentId, "JobAssignment");
                 }
+                if (!removed.getStatus().isTerminal()) {
+                    yield rejected("INVALID_STATE_TRANSITION", "Active job assignment cannot be removed: " + assignmentId);
+                }
+                jobAssignments.remove(assignmentId);
                 logger.info("Removed job assignment: assignmentId={}, totalAssignments={}", 
                     assignmentId, jobAssignments.size());
                 yield new CommandResult.Success<>(removed);
@@ -535,6 +608,12 @@ public class QuorusStateStore implements RaftLogApplicator {
         return switch (command) {
             case RouteCommand.Create cmd -> {
                 RouteConfiguration routeConfig = cmd.routeConfiguration();
+                if (!routeId.equals(routeConfig.getRouteId())) {
+                    yield rejected("IDENTIFIER_MISMATCH", "Route command ID does not match the route payload ID");
+                }
+                if (routes.containsKey(routeId)) {
+                    yield rejected("DUPLICATE_ENTITY", "Route already exists: " + routeId);
+                }
                 logger.debug("Creating route: routeId={}, name={}", routeId, routeConfig.getName());
                 routes.put(routeId, routeConfig);
                 logger.info("Created route: routeId={}, name={}, triggerType={}, totalRoutes={}",
@@ -549,6 +628,9 @@ public class QuorusStateStore implements RaftLogApplicator {
                 if (existingRoute == null) {
                     logger.warn("Route not found for update: id={}", routeId);
                     yield new CommandResult.NotFound<>(routeId, "Route");
+                }
+                if (!routeId.equals(cmd.routeConfiguration().getRouteId())) {
+                    yield rejected("IDENTIFIER_MISMATCH", "Route update ID does not match the route payload ID");
                 }
                 RouteConfiguration updatedRoute = existingRoute.withUpdate(cmd.routeConfiguration());
                 routes.put(routeId, updatedRoute);
@@ -573,6 +655,10 @@ public class QuorusStateStore implements RaftLogApplicator {
                     logger.warn("Route not found for suspend: id={}", routeId);
                     yield new CommandResult.NotFound<>(routeId, "Route");
                 }
+                if (!suspendRoute.getStatus().canTransitionTo(RouteStatus.SUSPENDED)) {
+                    yield rejected("INVALID_STATE_TRANSITION", "Route " + routeId + " cannot be suspended from "
+                            + suspendRoute.getStatus());
+                }
                 RouteStatus oldStatus = suspendRoute.getStatus();
                 RouteConfiguration suspended = suspendRoute.withStatus(RouteStatus.SUSPENDED);
                 routes.put(routeId, suspended);
@@ -587,6 +673,10 @@ public class QuorusStateStore implements RaftLogApplicator {
                 if (resumeRoute == null) {
                     logger.warn("Route not found for resume: id={}", routeId);
                     yield new CommandResult.NotFound<>(routeId, "Route");
+                }
+                if (resumeRoute.getStatus() != RouteStatus.SUSPENDED) {
+                    yield rejected("INVALID_STATE_TRANSITION", "Route " + routeId + " cannot be resumed from "
+                            + resumeRoute.getStatus());
                 }
                 RouteStatus oldStatus = resumeRoute.getStatus();
                 RouteConfiguration resumed = resumeRoute.withStatus(RouteStatus.ACTIVE);
@@ -607,6 +697,10 @@ public class QuorusStateStore implements RaftLogApplicator {
                         routeId, cmd.expectedStatus(), statusRoute.getStatus());
                     yield new CommandResult.CasMismatch<>(statusRoute);
                 }
+                if (!statusRoute.getStatus().canTransitionTo(cmd.newStatus())) {
+                    yield rejected("INVALID_STATE_TRANSITION", "Route " + routeId + " cannot transition from "
+                            + statusRoute.getStatus() + " to " + cmd.newStatus());
+                }
                 RouteStatus oldStatus = statusRoute.getStatus();
                 RouteConfiguration updated = statusRoute.withStatus(cmd.newStatus());
                 routes.put(routeId, updated);
@@ -615,6 +709,49 @@ public class QuorusStateStore implements RaftLogApplicator {
                 yield new CommandResult.Success<>(updated);
             }
         };
+    }
+
+    private CommandResult<?> validateAssignmentReferences(JobAssignment assignment) {
+        TransferJobSnapshot job = transferJobs.get(assignment.getJobId());
+        if (job == null) {
+            return new CommandResult.NotFound<>(assignment.getJobId(), "TransferJob");
+        }
+        AgentInfo agent = agents.get(assignment.getAgentId());
+        if (agent == null) {
+            return new CommandResult.NotFound<>(assignment.getAgentId(), "Agent");
+        }
+        String assignmentTenant = assignment.getTenantId();
+        String jobTenant = job.getTenantId();
+        String agentTenant = agent.getTenantId();
+        if (isBlank(assignmentTenant) || isBlank(jobTenant) || isBlank(agentTenant)) {
+            return rejected("TENANT_REQUIRED", "Job, agent, and assignment must all have a tenant ID");
+        }
+        if (!assignmentTenant.equals(jobTenant) || !assignmentTenant.equals(agentTenant)) {
+            return rejected("TENANT_MISMATCH", "Job, agent, and assignment tenant IDs must match");
+        }
+        return null;
+    }
+
+    private CommandResult<?> validateAssignmentTransition(
+            JobAssignment assignment, dev.mars.quorus.core.JobAssignmentStatus newStatus) {
+        CommandResult<?> referenceValidation = validateAssignmentReferences(assignment);
+        if (referenceValidation != null) {
+            return referenceValidation;
+        }
+        if (!assignment.getStatus().canTransitionTo(newStatus)) {
+            return rejected("INVALID_STATE_TRANSITION", "Assignment "
+                    + assignment.getJobId() + ":" + assignment.getAgentId() + " cannot transition from "
+                    + assignment.getStatus() + " to " + newStatus);
+        }
+        return null;
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
+    }
+
+    private static <T> CommandResult.Rejected<T> rejected(String code, String message) {
+        return new CommandResult.Rejected<>(code, message);
     }
 
     @Override
@@ -647,6 +784,9 @@ public class QuorusStateStore implements RaftLogApplicator {
         logger.debug("Restoring state machine snapshot: snapshotSize={}bytes", snapshot.length);
         try {
             QuorusSnapshot restoredSnapshot = objectMapper.readValue(snapshot, QuorusSnapshot.class);
+            SchemaVersionRegistry.requireReadable(
+                    SchemaVersionRegistry.Contract.STATE_SNAPSHOT,
+                    restoredSnapshot.getSchemaVersion());
 
             transferJobs.clear();
             Optional.ofNullable(restoredSnapshot.getTransferJobs()).ifPresent(transferJobs::putAll);

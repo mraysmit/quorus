@@ -81,22 +81,23 @@ RUN mkdir -p /app/logs /app/data && \
 # Switch to non-root user
 USER quorus
 
-# Expose the Raft communication port
-EXPOSE 8080
+# Expose the HTTP API and Raft communication ports
+EXPOSE 8080 9080
 
 # Environment variables for Quorus Controller
 ENV JAVA_OPTS="-Xmx512m -Xms256m" \
-    NODE_ID="" \
-    CLUSTER_NODES="" \
-    RAFT_PORT=8080 \
-    RAFT_HOST=0.0.0.0 \
-    HTTP_PORT=8080 \
-    ELECTION_TIMEOUT_MS=5000 \
-    HEARTBEAT_INTERVAL_MS=1000
+    QUORUS_NODE_ID="" \
+    QUORUS_CLUSTER_NODES="" \
+    QUORUS_RAFT_PORT=9080 \
+    QUORUS_HTTP_HOST=0.0.0.0 \
+    QUORUS_HTTP_PORT=8080 \
+    QUORUS_RAFT_ELECTION_TIMEOUT_MS=5000 \
+    QUORUS_RAFT_HEARTBEAT_INTERVAL_MS=1000 \
+    QUORUS_RAFT_STORAGE_PATH=/app/data/raft
 
 # Health check using controller's health endpoint
 HEALTHCHECK --interval=10s --timeout=5s --start-period=15s --retries=3 \
-    CMD curl -f http://localhost:${HTTP_PORT}/health || exit 1
+    CMD curl -f http://localhost:${QUORUS_HTTP_PORT}/health || exit 1
 
 # Run the Quorus Controller application
 CMD ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

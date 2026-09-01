@@ -21,6 +21,7 @@ import dev.mars.quorus.controller.raft.RaftNode;
 import dev.mars.quorus.controller.raft.RaftNodeMode;
 import dev.mars.quorus.controller.raft.RaftTransport;
 import dev.mars.quorus.controller.state.QuorusStateStore;
+import io.vertx.core.buffer.Buffer;
 import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
@@ -304,12 +305,12 @@ class HttpApiServerHealthTest {
                         // Error JSON body should contain the same requestId
                         JsonObject body = response.bodyAsJsonObject();
                         assertNotNull(body, "Error response body should be JSON");
-                        JsonObject error = body.getJsonObject("error");
-                        assertNotNull(error, "Error body should contain 'error' object");
-                        assertEquals(clientRequestId, error.getString("requestId"),
+                        assertEquals("application/problem+json", response.getHeader("Content-Type"));
+                        assertEquals(clientRequestId, body.getString("requestId"),
                                 "Error JSON requestId must match client X-Request-ID");
-                        assertEquals("TRANSFER_NOT_FOUND", error.getString("code"),
+                        assertEquals("TRANSFER_NOT_FOUND", body.getString("code"),
                                 "Error code should be TRANSFER_NOT_FOUND");
+                        assertEquals(404, body.getInteger("status"));
 
                         ctx.completeNow();
                     })));
@@ -323,9 +324,8 @@ class HttpApiServerHealthTest {
                     .onComplete(ctx.succeeding(response -> ctx.verify(() -> {
                         assertEquals(404, response.statusCode());
 
-                        JsonObject error = response.bodyAsJsonObject().getJsonObject("error");
-                        assertNotNull(error, "Error body should contain 'error' object");
-                        String requestId = error.getString("requestId");
+                        JsonObject problem = response.bodyAsJsonObject();
+                        String requestId = problem.getString("requestId");
                         assertNotNull(requestId, "Auto-generated requestId should be present");
                         assertTrue(requestId.startsWith("req-"),
                                 "Auto-generated requestId should start with 'req-'");
@@ -334,6 +334,40 @@ class HttpApiServerHealthTest {
                         assertEquals(requestId, response.getHeader("X-Request-ID"),
                                 "Header and JSON requestId must match");
 
+                        ctx.completeNow();
+                    })));
+        }
+
+        @Test
+        @DisplayName("Should reject unsafe client correlation IDs")
+        void shouldReplaceUnsafeClientRequestId(VertxTestContext ctx) {
+            String unsafe = "unsafe request id/with spaces";
+            webClient.get(HTTP_PORT, "localhost", "/api/v1/transfers/nonexistent-job-xyz")
+                    .putHeader("X-Request-ID", unsafe)
+                    .send()
+                    .onComplete(ctx.succeeding(response -> ctx.verify(() -> {
+                        String actual = response.getHeader("X-Request-ID");
+                        assertNotNull(actual);
+                        assertTrue(actual.startsWith("req-"));
+                        assertNotEquals(unsafe, actual);
+                        assertEquals(actual, response.bodyAsJsonObject().getString("requestId"));
+                        ctx.completeNow();
+                    })));
+        }
+
+        @Test
+        @DisplayName("Should return a correlated problem when request body exceeds the configured limit")
+        void shouldRejectOversizedRequestBody(VertxTestContext ctx) {
+            Buffer oversized = Buffer.buffer("x".repeat(1_048_577));
+            webClient.post(HTTP_PORT, "localhost", "/api/v1/transfers")
+                    .putHeader("Content-Type", "application/json")
+                    .sendBuffer(oversized)
+                    .onComplete(ctx.succeeding(response -> ctx.verify(() -> {
+                        assertEquals(413, response.statusCode());
+                        assertEquals("application/problem+json", response.getHeader("Content-Type"));
+                        JsonObject problem = response.bodyAsJsonObject();
+                        assertEquals("PAYLOAD_TOO_LARGE", problem.getString("code"));
+                        assertEquals(response.getHeader("X-Request-ID"), problem.getString("requestId"));
                         ctx.completeNow();
                     })));
         }

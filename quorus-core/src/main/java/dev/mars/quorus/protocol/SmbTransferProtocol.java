@@ -25,6 +25,7 @@ import dev.mars.quorus.core.exceptions.TransferException;
 import dev.mars.quorus.storage.ChecksumCalculator;
 import dev.mars.quorus.transfer.TransferContext;
 import dev.mars.quorus.transfer.ProgressTracker;
+import dev.mars.quorus.util.SensitiveDataRedactor;
 
 import static dev.mars.quorus.core.exceptions.QuorusErrorCode.*;
 import io.vertx.core.Context;
@@ -106,7 +107,8 @@ public class SmbTransferProtocol implements TransferProtocol {
         logger.info("Starting SMB transfer: jobId={}, isUpload={}", context.getJobId(), request.isUpload());
         // Use destinationUri for logging to support both uploads and downloads
         logger.debug("Transfer details: sourceUri={}, destinationUri={}", 
-            request.getSourceUri(), request.getDestinationUri());
+            SensitiveDataRedactor.redactUri(request.getSourceUri()),
+            SensitiveDataRedactor.redactUri(request.getDestinationUri()));
 
         ProgressTracker progressTracker = new ProgressTracker(context.getJobId());
         progressTracker.start();
@@ -170,7 +172,8 @@ public class SmbTransferProtocol implements TransferProtocol {
         logger.debug("performSmbDownload: starting for requestId={}", requestId);
         
         try {
-            logger.info("Starting SMB download: {} -> {}", request.getSourceUri(), request.getDestinationPath());
+            logger.info("Starting SMB download: {} -> {}",
+                    SensitiveDataRedactor.redactUri(request.getSourceUri()), request.getDestinationPath());
             
             // Parse SMB URI and extract connection details
             SmbConnectionInfo connectionInfo = parseSmbUri(request.getSourceUri());
@@ -239,7 +242,8 @@ public class SmbTransferProtocol implements TransferProtocol {
                 throw new IOException("Source file does not exist: " + sourcePath);
             }
             
-            logger.info("Starting SMB upload: {} -> {}", sourcePath, destinationUri);
+            logger.info("Starting SMB upload: {} -> {}", sourcePath,
+                    SensitiveDataRedactor.redactUri(destinationUri));
             
             // Parse SMB URI and extract connection details
             SmbConnectionInfo connectionInfo = parseSmbUri(destinationUri);
@@ -351,7 +355,7 @@ public class SmbTransferProtocol implements TransferProtocol {
     }
     
     private SmbConnectionInfo parseSmbUri(URI sourceUri) throws TransferException {
-        logger.debug("parseSmbUri: parsing URI={}", sourceUri);
+        logger.debug("parseSmbUri: parsing URI={}", SensitiveDataRedactor.redactUri(sourceUri));
         
         String scheme = sourceUri.getScheme();
         if (!"smb".equalsIgnoreCase(scheme) && !"cifs".equalsIgnoreCase(scheme)) {

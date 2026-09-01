@@ -38,6 +38,8 @@ public class QuorusSnapshot implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
+    private int schemaVersion;
+
     private Map<String, TransferJobSnapshot> transferJobs;
     private Map<String, AgentInfo> agents;
     private Map<String, String> systemMetadata;
@@ -48,11 +50,13 @@ public class QuorusSnapshot implements Serializable {
     private Instant timestamp;
 
     public QuorusSnapshot() {
+        this.schemaVersion = SchemaVersionRegistry.current(SchemaVersionRegistry.Contract.STATE_SNAPSHOT);
         this.timestamp = Instant.now();
     }
 
     @JsonCreator
-    public QuorusSnapshot(@JsonProperty("transferJobs") Map<String, TransferJobSnapshot> transferJobs,
+    public QuorusSnapshot(@JsonProperty("schemaVersion") Integer schemaVersion,
+                         @JsonProperty("transferJobs") Map<String, TransferJobSnapshot> transferJobs,
                          @JsonProperty("agents") Map<String, AgentInfo> agents,
                          @JsonProperty("systemMetadata") Map<String, String> systemMetadata,
                          @JsonProperty("jobAssignments") Map<String, JobAssignment> jobAssignments,
@@ -60,6 +64,7 @@ public class QuorusSnapshot implements Serializable {
                          @JsonProperty("routes") Map<String, RouteConfiguration> routes,
                          @JsonProperty("lastAppliedIndex") long lastAppliedIndex,
                          @JsonProperty("timestamp") Instant timestamp) {
+        this.schemaVersion = schemaVersion == null ? 0 : schemaVersion;
         this.transferJobs = transferJobs;
         this.agents = agents;
         this.systemMetadata = systemMetadata;
@@ -68,6 +73,14 @@ public class QuorusSnapshot implements Serializable {
         this.routes = routes;
         this.lastAppliedIndex = lastAppliedIndex;
         this.timestamp = timestamp != null ? timestamp : Instant.now();
+    }
+
+    public int getSchemaVersion() {
+        return schemaVersion;
+    }
+
+    public void setSchemaVersion(int schemaVersion) {
+        this.schemaVersion = schemaVersion;
     }
 
     public Map<String, TransferJobSnapshot> getTransferJobs() {
@@ -140,6 +153,8 @@ public class QuorusSnapshot implements Serializable {
     @Override
     public String toString() {
         return "QuorusSnapshot{" +
+                "schemaVersion=" + schemaVersion +
+                ", " +
                 "transferJobs=" + (transferJobs != null ? transferJobs.size() : 0) + " jobs" +
                 ", agents=" + (agents != null ? agents.size() : 0) + " agents" +
                 ", systemMetadata=" + (systemMetadata != null ? systemMetadata.size() : 0) + " entries" +

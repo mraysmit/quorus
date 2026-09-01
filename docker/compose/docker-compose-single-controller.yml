@@ -11,18 +11,21 @@ services:
         m2cache: ${M2_REPO}/dev/mars
     container_name: quorus-controller-dev
     environment:
-      - NODE_ID=controller-dev
-      - RAFT_HOST=0.0.0.0
-      - RAFT_PORT=8080
-      - HTTP_PORT=8080
-      - CLUSTER_NODES=controller-dev=controller:8080
-      - ELECTION_TIMEOUT_MS=3000
-      - HEARTBEAT_INTERVAL_MS=500
+      - QUORUS_NODE_ID=controller-dev
+      - QUORUS_RAFT_HOST=0.0.0.0
+      - QUORUS_RAFT_PORT=9080
+      - QUORUS_HTTP_PORT=8080
+      - QUORUS_RAFT_STORAGE_PATH=/app/data/raft
+      - QUORUS_CLUSTER_NODES=controller-dev=controller:9080
+      - QUORUS_RAFT_ELECTION_TIMEOUT_MS=3000
+      - QUORUS_RAFT_HEARTBEAT_INTERVAL_MS=500
       - JAVA_OPTS=-Xmx512m -Xms256m
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     networks:
       - quorus-dev
+    volumes:
+      - controller-data:/app/data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 10s
@@ -30,3 +33,6 @@ services:
       retries: 3
       start_period: 30s
     restart: unless-stopped
+
+volumes:
+  controller-data:

@@ -123,6 +123,7 @@ final class JobAssignmentCodec {
         Optional.ofNullable(assignment.getStatus()).ifPresent(s -> builder.setStatus(toProto(s)));
         Optional.ofNullable(assignment.getFailureReason()).ifPresent(builder::setFailureReason);
         Optional.ofNullable(assignment.getAssignmentStrategy()).ifPresent(builder::setAssignmentStrategy);
+        Optional.ofNullable(assignment.getTenantId()).ifPresent(builder::setTenantId);
         return builder.build();
     }
 
@@ -152,6 +153,9 @@ final class JobAssignmentCodec {
         }
         if (!proto.getAssignmentStrategy().isEmpty()) {
             builder.assignmentStrategy(proto.getAssignmentStrategy());
+        }
+        if (!proto.getTenantId().isEmpty()) {
+            builder.tenantId(proto.getTenantId());
         }
         return builder.build();
     }

@@ -22,6 +22,7 @@ import io.vertx.ext.web.RoutingContext;
 import org.slf4j.MDC;
 
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 /**
  * HTTP request handler that assigns and propagates a correlation ID (request ID)
@@ -43,6 +44,8 @@ import java.util.UUID;
  */
 public class CorrelationIdHandler implements io.vertx.core.Handler<RoutingContext> {
 
+    private static final Pattern SAFE_REQUEST_ID = Pattern.compile("[A-Za-z0-9._:-]{1,128}");
+
     /** HTTP header name for correlation ID */
     public static final String REQUEST_ID_HEADER = "X-Request-ID";
 
@@ -62,7 +65,7 @@ public class CorrelationIdHandler implements io.vertx.core.Handler<RoutingContex
     public void handle(RoutingContext ctx) {
         // Use client-provided ID or generate a new one
         String requestId = ctx.request().getHeader(REQUEST_ID_HEADER);
-        if (requestId == null || requestId.isBlank()) {
+        if (requestId == null || !SAFE_REQUEST_ID.matcher(requestId).matches()) {
             requestId = generateRequestId();
         }
 

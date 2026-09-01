@@ -1,4 +1,12 @@
+<img src="../../docs/quorus-logo.png" alt="Quorus" width="120"/>
+
 # Minimal Write-Ahead Log (WAL) for Raft
+
+**Version:** 1.0  
+**Date:** 2025-08-20  
+**Author:** Mark Ray-Smith — Cityline Ltd  
+**License:** Apache 2.0
+
 **Design, Requirements, and Integration Strategy**
 
 ## Status

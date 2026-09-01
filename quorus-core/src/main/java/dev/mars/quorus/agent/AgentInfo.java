@@ -16,6 +16,7 @@
 
 package dev.mars.quorus.agent;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.time.Instant;
@@ -32,6 +33,7 @@ import java.util.Objects;
  * @since 2025-08-26
  * @version 1.0
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class AgentInfo {
 
     @JsonProperty("agentId")

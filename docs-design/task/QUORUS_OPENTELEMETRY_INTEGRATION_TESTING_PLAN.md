@@ -1,8 +1,11 @@
+<img src="../../docs/quorus-logo.png" alt="Quorus" width="120"/>
+
 # OpenTelemetry Integration & Testing Plan
 
 **Version:** 2.4  
-**Author:** Mark Andrew Ray-Smith Cityline Ltd  
 **Date:** 2026-03-15  
+**Author:** Mark Ray-Smith — Cityline Ltd  
+**License:** Apache 2.0
 
 > [!IMPORTANT]
 > This plan covers telemetry infrastructure and instrumentation work. Quorus operational observability is transfer-process centered: per-transfer attempts, continuous progress and freshness, deadlines, risk, stalls, integrity, publication, alerts, and operator timelines are the controlling production outcomes. See [QUORUS_ARCHITECTURE_SPECIFICATION.md](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md) and [QUORUS_REST_API_SPECIFICATION.md](../../docs/QUORUS_REST_API_SPECIFICATION.md).

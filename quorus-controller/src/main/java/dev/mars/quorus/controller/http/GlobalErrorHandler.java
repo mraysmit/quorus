@@ -16,6 +16,8 @@
 
 package dev.mars.quorus.controller.http;
 
+import dev.mars.quorus.util.SensitiveDataRedactor;
+
 import io.vertx.core.Handler;
 import io.vertx.core.json.DecodeException;
 import io.vertx.ext.web.RoutingContext;
@@ -82,7 +84,7 @@ public class GlobalErrorHandler implements Handler<RoutingContext> {
         } else {
             // Generic server error - don't expose internal details
             errorResponse = ErrorResponse.withMessage(ErrorCode.INTERNAL_ERROR, path, "An unexpected error occurred", requestId);
-            logger.error("Unhandled exception at path {}: {}", path, failure.getMessage());
+            logger.error("Unhandled exception at path {}: {}", path, SensitiveDataRedactor.redact(failure.getMessage()));
             logger.debug("Stack trace for unhandled exception at path {}", path, failure);
         }
 
@@ -100,6 +102,7 @@ public class GlobalErrorHandler implements Handler<RoutingContext> {
             case 404 -> ErrorResponse.withMessage(ErrorCode.NOT_FOUND, path, String.format(ErrorCode.NOT_FOUND.messageTemplate(), path), requestId);
             case 405 -> ErrorResponse.withMessage(ErrorCode.METHOD_NOT_ALLOWED, path, String.format(ErrorCode.METHOD_NOT_ALLOWED.messageTemplate(), "unknown"), requestId);
             case 409 -> ErrorResponse.withMessage(ErrorCode.CONFLICT, path, "Resource conflict", requestId);
+            case 413 -> ErrorResponse.withMessage(ErrorCode.PAYLOAD_TOO_LARGE, path, ErrorCode.PAYLOAD_TOO_LARGE.messageTemplate(), requestId);
             case 429 -> ErrorResponse.withMessage(ErrorCode.TENANT_QUOTA_EXCEEDED, path, String.format(ErrorCode.TENANT_QUOTA_EXCEEDED.messageTemplate(), "unknown", "rate limit"), requestId);
             case 500 -> ErrorResponse.withMessage(ErrorCode.INTERNAL_ERROR, path, "Internal server error", requestId);
             case 503 -> ErrorResponse.withMessage(ErrorCode.SERVICE_UNAVAILABLE, path, "Service unavailable", requestId);
@@ -114,7 +117,7 @@ public class GlobalErrorHandler implements Handler<RoutingContext> {
     private void sendErrorResponse(RoutingContext ctx, ErrorResponse errorResponse) {
         ctx.response()
             .setStatusCode(errorResponse.httpStatus())
-            .putHeader("Content-Type", "application/json")
+            .putHeader("Content-Type", "application/problem+json")
             .end(errorResponse.toJson().encode());
     }
 
@@ -124,12 +127,12 @@ public class GlobalErrorHandler implements Handler<RoutingContext> {
      */
     private void logError(ErrorCode code, Throwable failure, String path) {
         if (code.httpStatus() >= 500) {
-            logger.error("Server error [{}] at {}: {}", code.code(), path, failure.getMessage());
+            logger.error("Server error [{}] at {}: {}", code.code(), path, SensitiveDataRedactor.redact(failure.getMessage()));
             logger.debug("Stack trace for server error [{}] at {}", code.code(), path, failure);
         } else if (code.httpStatus() >= 400) {
-            logger.warn("Client error [{}] at {}: {}", code.code(), path, failure.getMessage());
+            logger.warn("Client error [{}] at {}: {}", code.code(), path, SensitiveDataRedactor.redact(failure.getMessage()));
         } else {
-            logger.debug("Error [{}] at {}: {}", code.code(), path, failure.getMessage());
+            logger.debug("Error [{}] at {}: {}", code.code(), path, SensitiveDataRedactor.redact(failure.getMessage()));
         }
     }
 }

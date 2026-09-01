@@ -89,6 +89,7 @@ public class TransferHandler {
 
                 raftNode.submitCommand(command)
                         .onSuccess(result -> {
+                            if (CommandResultHandler.failIfRejected(ctx, result)) return;
                             if (result instanceof CommandResult.NotFound<?> nf) {
                                 logger.warn("Transfer job disappeared during creation (race condition): jobId={}", nf.id());
                                 ctx.fail(QuorusApiException.notFound(ErrorCode.TRANSFER_NOT_FOUND, nf.id()));
@@ -190,6 +191,7 @@ public class TransferHandler {
                 TransferJobCommand command = TransferJobCommand.delete(jobId);
                 raftNode.submitCommand(command)
                         .onSuccess(result -> {
+                            if (CommandResultHandler.failIfRejected(ctx, result)) return;
                             if (result instanceof CommandResult.NotFound<?> nf) {
                                 logger.warn("Transfer job disappeared during deletion (race condition): jobId={}", nf.id());
                                 ctx.fail(QuorusApiException.notFound(ErrorCode.TRANSFER_NOT_FOUND, nf.id()));

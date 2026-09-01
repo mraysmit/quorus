@@ -81,15 +81,26 @@ public class JobAssignmentHandler {
                     throw QuorusApiException.badRequest(ErrorCode.BAD_REQUEST, "Request body is required");
                 }
                 JobAssignment assignment = body.mapTo(JobAssignment.class);
+                if (assignment.getTenantId() == null || assignment.getTenantId().isBlank()) {
+                    String jobId = assignment.getJobId();
+                    String tenantId = stateStore.findTransferJob(jobId)
+                            .map(job -> job.getTenantId())
+                            .orElseThrow(() -> QuorusApiException.notFound(
+                                    ErrorCode.TRANSFER_NOT_FOUND, jobId));
+                    assignment = new JobAssignment.Builder(assignment).tenantId(tenantId).build();
+                }
                 logger.info("Assigning job: jobId={}, agentId={}",
                         assignment.getJobId(), assignment.getAgentId());
                 JobAssignmentCommand command = JobAssignmentCommand.assign(assignment);
 
                 raftNode.submitCommand(command)
                         .onSuccess(result -> {
+                            if (CommandResultHandler.failIfRejected(ctx, result)) return;
                             if (result instanceof CommandResult.NotFound<?> nf) {
-                                logger.warn("Assignment disappeared during creation (race condition): assignmentId={}", nf.id());
-                                ctx.fail(QuorusApiException.notFound(ErrorCode.ASSIGNMENT_NOT_FOUND, nf.id()));
+                                logger.warn("Assignment reference missing during creation: type={}, id={}", nf.entityType(), nf.id());
+                                ErrorCode code = "Agent".equals(nf.entityType())
+                                        ? ErrorCode.AGENT_NOT_FOUND : ErrorCode.TRANSFER_NOT_FOUND;
+                                ctx.fail(QuorusApiException.notFound(code, nf.id()));
                             } else {
                                 logger.info("Job assigned: assignmentId={}", command.assignmentId());
                                 ctx.response().setStatusCode(201);
@@ -153,6 +164,7 @@ public class JobAssignmentHandler {
             JobAssignmentCommand command = JobAssignmentCommand.accept(assignmentId);
             raftNode.submitCommand(command)
                     .onSuccess(result -> {
+                            if (CommandResultHandler.failIfRejected(ctx, result)) return;
                         if (result instanceof CommandResult.NotFound<?> nf) {
                             logger.warn("Assignment disappeared during accept (race condition): assignmentId={}", nf.id());
                             ctx.fail(QuorusApiException.notFound(ErrorCode.ASSIGNMENT_NOT_FOUND, nf.id()));
@@ -188,6 +200,7 @@ public class JobAssignmentHandler {
             JobAssignmentCommand command = JobAssignmentCommand.reject(assignmentId, reason);
             raftNode.submitCommand(command)
                     .onSuccess(result -> {
+                            if (CommandResultHandler.failIfRejected(ctx, result)) return;
                         if (result instanceof CommandResult.NotFound<?> nf) {
                             logger.warn("Assignment disappeared during reject (race condition): assignmentId={}", nf.id());
                             ctx.fail(QuorusApiException.notFound(ErrorCode.ASSIGNMENT_NOT_FOUND, nf.id()));
@@ -243,6 +256,7 @@ public class JobAssignmentHandler {
                         assignmentId, currentStatus, newStatus);
                 raftNode.submitCommand(command)
                         .onSuccess(result -> {
+                            if (CommandResultHandler.failIfRejected(ctx, result)) return;
                             if (result instanceof CommandResult.CasMismatch<?>) {
                                 logger.warn("Assignment state conflict during status update: assignmentId={}, expected={}, target={}",
                                         assignmentId, currentStatus, newStatus);
@@ -282,6 +296,7 @@ public class JobAssignmentHandler {
             JobAssignmentCommand command = JobAssignmentCommand.cancel(assignmentId, reason);
             raftNode.submitCommand(command)
                     .onSuccess(result -> {
+                            if (CommandResultHandler.failIfRejected(ctx, result)) return;
                         if (result instanceof CommandResult.NotFound<?> nf) {
                             logger.warn("Assignment disappeared during cancel (race condition): assignmentId={}", nf.id());
                             ctx.fail(QuorusApiException.notFound(ErrorCode.ASSIGNMENT_NOT_FOUND, nf.id()));
@@ -313,6 +328,7 @@ public class JobAssignmentHandler {
             JobAssignmentCommand command = JobAssignmentCommand.remove(assignmentId);
             raftNode.submitCommand(command)
                     .onSuccess(result -> {
+                            if (CommandResultHandler.failIfRejected(ctx, result)) return;
                         if (result instanceof CommandResult.NotFound<?> nf) {
                             logger.warn("Assignment disappeared during removal (race condition): assignmentId={}", nf.id());
                             ctx.fail(QuorusApiException.notFound(ErrorCode.ASSIGNMENT_NOT_FOUND, nf.id()));

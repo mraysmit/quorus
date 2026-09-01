@@ -247,8 +247,8 @@ public class InMemoryWorkflowEngineSimulator {
             execution.notifyAll();
         }
         
-        execution.completionFuture.complete(execution);
         fireEvent(execution, WorkflowEvent.cancelled(executionId));
+        execution.completionFuture.complete(execution);
         return true;
     }
 
@@ -499,6 +499,7 @@ public class InMemoryWorkflowEngineSimulator {
             execution.error = "Workflow validation failed (simulated)";
             execution.endTime = Instant.now();
             failedExecutions.incrementAndGet();
+            fireEvent(execution, WorkflowEvent.failed(execution.executionId, execution.error));
             execution.completionFuture.complete(execution);
             return;
         }
@@ -511,6 +512,7 @@ public class InMemoryWorkflowEngineSimulator {
             execution.error = "Validation error: " + e.getMessage();
             execution.endTime = Instant.now();
             failedExecutions.incrementAndGet();
+            fireEvent(execution, WorkflowEvent.failed(execution.executionId, execution.error));
             execution.completionFuture.complete(execution);
             return;
         }
@@ -520,8 +522,8 @@ public class InMemoryWorkflowEngineSimulator {
             execution.status = WorkflowStatus.COMPLETED;
             execution.endTime = Instant.now();
             completedExecutions.incrementAndGet();
-            execution.completionFuture.complete(execution);
             fireEvent(execution, WorkflowEvent.completed(execution.executionId));
+            execution.completionFuture.complete(execution);
             return;
         }
         
@@ -563,9 +565,9 @@ public class InMemoryWorkflowEngineSimulator {
                     execution.error = "Required step failed: " + step.name();
                     execution.endTime = Instant.now();
                     failedExecutions.incrementAndGet();
-                    execution.completionFuture.complete(execution);
                     fireEvent(execution, WorkflowEvent.failed(execution.executionId, 
                         execution.error));
+                    execution.completionFuture.complete(execution);
                     return;
                 }
             }
@@ -581,8 +583,8 @@ public class InMemoryWorkflowEngineSimulator {
         execution.status = WorkflowStatus.COMPLETED;
         execution.endTime = Instant.now();
         completedExecutions.incrementAndGet();
-        execution.completionFuture.complete(execution);
         fireEvent(execution, WorkflowEvent.completed(execution.executionId));
+        execution.completionFuture.complete(execution);
     }
 
     private StepExecution executeStep(WorkflowExecution execution, WorkflowStep step) {

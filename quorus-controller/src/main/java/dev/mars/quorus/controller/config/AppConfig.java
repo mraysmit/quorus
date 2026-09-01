@@ -110,13 +110,25 @@ public final class AppConfig {
     }
 
     public String getHttpHost() {
-        return getString("quorus.http.host", "0.0.0.0");
+        return getString("quorus.http.host", "127.0.0.1");
+    }
+
+    public long getHttpMaxBodyBytes() {
+        return getLong("quorus.http.max-body-bytes", 1_048_576);
     }
 
     // ==================== Raft Configuration ====================
 
     public int getRaftPort() {
         return getInt("quorus.raft.port", 9080);
+    }
+
+    public long getElectionTimeoutMs() {
+        return getLong("quorus.raft.election-timeout-ms", 5000);
+    }
+
+    public long getHeartbeatIntervalMs() {
+        return getLong("quorus.raft.heartbeat-interval-ms", 1000);
     }
 
     public String getClusterNodes() {
@@ -289,8 +301,10 @@ public final class AppConfig {
             return sysValue;
         }
 
-        // 3. Check properties file
-        return properties.getProperty(key, defaultValue);
+        // 3. Check properties file. A blank packaged value means "not configured"
+        // and must not suppress a safe default (notably the durable Raft path).
+        String propertyValue = properties.getProperty(key);
+        return propertyValue == null || propertyValue.isBlank() ? defaultValue : propertyValue;
     }
 
     public int getInt(String key, int defaultValue) {

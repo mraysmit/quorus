@@ -1,0 +1,777 @@
+openapi: 3.1.0
+jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
+info:
+  title: Quorus Controller REST API
+  version: 1.0.0-alpha
+  summary: Current Phase 0 controller API contract
+  description: >-
+    Machine-readable contract for every HTTP route registered by the current Quorus
+    controller. Phase 0 permits trusted local and test-network access only; external
+    exposure is prohibited until authenticated identity and transport trust are delivered.
+  license:
+    name: Apache 2.0
+    identifier: Apache-2.0
+servers:
+  - url: http://127.0.0.1:8080
+    description: Trusted local development endpoint
+security: []
+tags:
+  - name: Operations
+  - name: Cluster
+  - name: Agents
+  - name: Transfers
+  - name: Assignments
+  - name: Routes
+x-assignment-mutation-responses: &AssignmentMutationResponses
+  '200':
+    description: Assignment state changed
+    content:
+      application/json:
+        schema: {$ref: '#/components/schemas/AssignmentMutation'}
+  '400': {$ref: '#/components/responses/Problem'}
+  '404': {$ref: '#/components/responses/Problem'}
+  '409': {$ref: '#/components/responses/Problem'}
+  '503': {$ref: '#/components/responses/Problem'}
+  default: {$ref: '#/components/responses/Problem'}
+x-route-mutation-responses: &RouteMutationResponses
+  '200':
+    description: Route mutation accepted
+    content:
+      application/json:
+        schema: {$ref: '#/components/schemas/RouteMutation'}
+  '400': {$ref: '#/components/responses/Problem'}
+  '404': {$ref: '#/components/responses/Problem'}
+  '409': {$ref: '#/components/responses/Problem'}
+  '503': {$ref: '#/components/responses/Problem'}
+  default: {$ref: '#/components/responses/Problem'}
+paths:
+  /metrics:
+    get:
+      tags: [Operations]
+      operationId: getMetrics
+      summary: Export controller metrics
+      responses:
+        '200':
+          description: Prometheus text exposition
+          content:
+            text/plain:
+              schema: {type: string}
+        default: {$ref: '#/components/responses/Problem'}
+  /health/live:
+    get:
+      tags: [Operations]
+      operationId: getLiveness
+      summary: Report process liveness
+      responses:
+        '200':
+          description: Process is alive
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Liveness'}
+        default: {$ref: '#/components/responses/Problem'}
+  /health/ready:
+    get:
+      tags: [Operations]
+      operationId: getReadiness
+      summary: Report Raft and leader readiness
+      responses:
+        '200':
+          description: Readiness state; status may be UP or DOWN
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Readiness'}
+        '503': {$ref: '#/components/responses/Problem'}
+        default: {$ref: '#/components/responses/Problem'}
+  /health:
+    get:
+      tags: [Operations]
+      operationId: getHealth
+      summary: Report detailed controller health
+      responses:
+        '200':
+          description: Controller health and resource checks
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Health'}
+        '503': {$ref: '#/components/responses/Problem'}
+        default: {$ref: '#/components/responses/Problem'}
+  /status:
+    get:
+      tags: [Operations]
+      operationId: getStatus
+      summary: Report basic controller status
+      responses:
+        '200':
+          description: Basic status
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, nodeId]
+                properties:
+                  status: {type: string}
+                  nodeId: {type: string}
+        default: {$ref: '#/components/responses/Problem'}
+  /raft/status:
+    get:
+      tags: [Cluster]
+      operationId: getRaftStatus
+      summary: Report local Raft state
+      responses:
+        '200':
+          description: Local cluster state
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RaftStatus'}
+        default: {$ref: '#/components/responses/Problem'}
+  /api/v1/info:
+    get:
+      tags: [Operations]
+      operationId: getApiInfo
+      summary: Discover API capabilities and endpoint inventory
+      responses:
+        '200':
+          description: API and controller information
+          content:
+            application/json:
+              schema: {type: object, additionalProperties: true}
+        default: {$ref: '#/components/responses/Problem'}
+  /api/v1/openapi.yaml:
+    get:
+      tags: [Operations]
+      operationId: getOpenApiContract
+      summary: Download the bundled OpenAPI 3.1 contract
+      responses:
+        '200':
+          description: OpenAPI YAML document
+          content:
+            application/vnd.oai.openapi;version=3.1.0:
+              schema: {type: string}
+        default: {$ref: '#/components/responses/Problem'}
+  /api/v1/agents/register:
+    post:
+      tags: [Agents]
+      operationId: registerAgent
+      summary: Register an agent in authoritative state
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/AgentRegistration'}
+      responses:
+        '201':
+          description: Agent registered
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CreatedAgent'}
+        '400': {$ref: '#/components/responses/Problem'}
+        '409': {$ref: '#/components/responses/Problem'}
+        '503': {$ref: '#/components/responses/Problem'}
+        default: {$ref: '#/components/responses/Problem'}
+  /api/v1/agents/heartbeat:
+    post:
+      tags: [Agents]
+      operationId: recordAgentHeartbeat
+      summary: Record agent health and optional sequence acknowledgement
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/AgentHeartbeat'}
+      responses:
+        '200':
+          description: Heartbeat accepted
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/HeartbeatAcknowledgement'}
+        '400': {$ref: '#/components/responses/Problem'}
+        '403': {$ref: '#/components/responses/Problem'}
+        '404': {$ref: '#/components/responses/Problem'}
+        '503': {$ref: '#/components/responses/Problem'}
+        default: {$ref: '#/components/responses/Problem'}
+  /api/v1/agents:
+    get:
+      tags: [Agents]
+      operationId: listAgents
+      summary: List registered agents
+      responses:
+        '200':
+          description: Registered agents
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [agents, count]
+                properties:
+                  agents: {type: array, items: {$ref: '#/components/schemas/Agent'}}
+                  count: {type: integer, minimum: 0}
+        default: {$ref: '#/components/responses/Problem'}
+  /api/v1/agents/{agentId}/jobs:
+    parameters:
+      - {$ref: '#/components/parameters/AgentId'}
+    get:
+      tags: [Agents, Assignments]
+      operationId: listAgentJobs
+      summary: Poll assignments awaiting processing by an agent
+      responses:
+        '200':
+          description: Pending assignments
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [pendingJobs, total]
+                properties:
+                  pendingJobs: {type: array, items: {$ref: '#/components/schemas/AgentJob'}}
+                  total: {type: integer, minimum: 0}
+        '404': {$ref: '#/components/responses/Problem'}
+        default: {$ref: '#/components/responses/Problem'}
+  /api/v1/transfers:
+    post:
+      tags: [Transfers]
+      operationId: createTransfer
+      summary: Submit a tenant-scoped transfer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CreateTransfer'}
+      responses:
+        '201':
+          description: Transfer created
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CreatedTransfer'}
+        '400': {$ref: '#/components/responses/Problem'}
+        '409': {$ref: '#/components/responses/Problem'}
+        '503': {$ref: '#/components/responses/Problem'}
+        default: {$ref: '#/components/responses/Problem'}
+  /api/v1/transfers/{jobId}:
+    parameters:
+      - {$ref: '#/components/parameters/JobId'}
+    get:
+      tags: [Transfers]
+      operationId: getTransfer
+      summary: Query transfer lifecycle and progress
+      responses:
+        '200':
+          description: Transfer status
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Transfer'}
+        '404': {$ref: '#/components/responses/Problem'}
+        default: {$ref: '#/components/responses/Problem'}
+    delete:
+      tags: [Transfers]
+      operationId: deleteTransfer
+      summary: Delete a transfer without dependent assignments
+      responses:
+        '200':
+          description: Transfer deleted
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Deletion'}
+        '404': {$ref: '#/components/responses/Problem'}
+        '409': {$ref: '#/components/responses/Problem'}
+        '503': {$ref: '#/components/responses/Problem'}
+        default: {$ref: '#/components/responses/Problem'}
+  /api/v1/jobs/{jobId}/status:
+    parameters:
+      - {$ref: '#/components/parameters/JobId'}
+    post:
+      tags: [Transfers, Assignments]
+      operationId: updateJobStatus
+      summary: Record agent assignment state and transfer progress
+      description: >-
+        Enforces assignment lifecycle, tenant ownership, monotonic byte progress,
+        and mirrors IN_PROGRESS/COMPLETED/FAILED/CANCELLED into transfer state.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/JobStatusUpdate'}
+      responses:
+        '200':
+          description: Status accepted
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Success'}
+        '400': {$ref: '#/components/responses/Problem'}
+        '403': {$ref: '#/components/responses/Problem'}
+        '404': {$ref: '#/components/responses/Problem'}
+        '409': {$ref: '#/components/responses/Problem'}
+        '503': {$ref: '#/components/responses/Problem'}
+        default: {$ref: '#/components/responses/Problem'}
+  /api/v1/assignments:
+    get:
+      tags: [Assignments]
+      operationId: listAssignments
+      summary: List assignments
+      responses:
+        '200':
+          description: Assignment collection
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [assignments, total]
+                properties:
+                  assignments: {type: array, items: {$ref: '#/components/schemas/Assignment'}}
+                  total: {type: integer, minimum: 0}
+        default: {$ref: '#/components/responses/Problem'}
+    post:
+      tags: [Assignments]
+      operationId: createAssignment
+      summary: Assign an existing transfer to an existing same-tenant agent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CreateAssignment'}
+      responses:
+        '201':
+          description: Assignment created
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CreatedAssignment'}
+        '400': {$ref: '#/components/responses/Problem'}
+        '404': {$ref: '#/components/responses/Problem'}
+        '409': {$ref: '#/components/responses/Problem'}
+        '503': {$ref: '#/components/responses/Problem'}
+        default: {$ref: '#/components/responses/Problem'}
+  /api/v1/assignments/{assignmentId}:
+    parameters:
+      - {$ref: '#/components/parameters/AssignmentId'}
+    get:
+      tags: [Assignments]
+      operationId: getAssignment
+      summary: Query one assignment
+      responses:
+        '200':
+          description: Assignment
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Assignment'}
+        '404': {$ref: '#/components/responses/Problem'}
+        default: {$ref: '#/components/responses/Problem'}
+    delete:
+      tags: [Assignments]
+      operationId: deleteAssignment
+      summary: Remove a terminal assignment
+      responses:
+        '200':
+          description: Assignment removed
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Deletion'}
+        '404': {$ref: '#/components/responses/Problem'}
+        '409': {$ref: '#/components/responses/Problem'}
+        '503': {$ref: '#/components/responses/Problem'}
+        default: {$ref: '#/components/responses/Problem'}
+  /api/v1/assignments/{assignmentId}/accept:
+    parameters: [{$ref: '#/components/parameters/AssignmentId'}]
+    put:
+      tags: [Assignments]
+      operationId: acceptAssignment
+      summary: Move ASSIGNED to ACCEPTED
+      responses: *AssignmentMutationResponses
+  /api/v1/assignments/{assignmentId}/reject:
+    parameters: [{$ref: '#/components/parameters/AssignmentId'}]
+    put:
+      tags: [Assignments]
+      operationId: rejectAssignment
+      summary: Move ASSIGNED to REJECTED
+      responses: *AssignmentMutationResponses
+  /api/v1/assignments/{assignmentId}/status:
+    parameters: [{$ref: '#/components/parameters/AssignmentId'}]
+    put:
+      tags: [Assignments]
+      operationId: updateAssignmentStatus
+      summary: Apply a legal assignment transition
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: {$ref: '#/components/schemas/AssignmentStatus'}
+      responses: *AssignmentMutationResponses
+  /api/v1/assignments/{assignmentId}/cancel:
+    parameters: [{$ref: '#/components/parameters/AssignmentId'}]
+    put:
+      tags: [Assignments]
+      operationId: cancelAssignment
+      summary: Cancel a non-terminal assignment
+      responses: *AssignmentMutationResponses
+  /api/v1/routes:
+    get:
+      tags: [Routes]
+      operationId: listRoutes
+      summary: List routes
+      responses:
+        '200':
+          description: Route collection
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [routes, total]
+                properties:
+                  routes: {type: array, items: {$ref: '#/components/schemas/Route'}}
+                  total: {type: integer, minimum: 0}
+        default: {$ref: '#/components/responses/Problem'}
+    post:
+      tags: [Routes]
+      operationId: createRoute
+      summary: Create a route in CONFIGURED state
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/Route'}
+      responses:
+        '201':
+          description: Route created
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RouteMutation'}
+        '400': {$ref: '#/components/responses/Problem'}
+        '409': {$ref: '#/components/responses/Problem'}
+        '503': {$ref: '#/components/responses/Problem'}
+        default: {$ref: '#/components/responses/Problem'}
+  /api/v1/routes/{routeId}:
+    parameters: [{$ref: '#/components/parameters/RouteId'}]
+    get:
+      tags: [Routes]
+      operationId: getRoute
+      summary: Query one route
+      responses:
+        '200':
+          description: Route
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Route'}
+        '404': {$ref: '#/components/responses/Problem'}
+        default: {$ref: '#/components/responses/Problem'}
+    put:
+      tags: [Routes]
+      operationId: updateRoute
+      summary: Update route fields while preserving identifier and state
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/Route'}
+      responses: *RouteMutationResponses
+    delete:
+      tags: [Routes]
+      operationId: deleteRoute
+      summary: Delete a route
+      responses: *RouteMutationResponses
+  /api/v1/routes/{routeId}/suspend:
+    parameters: [{$ref: '#/components/parameters/RouteId'}]
+    put:
+      tags: [Routes]
+      operationId: suspendRoute
+      summary: Suspend a configured or active route
+      responses: *RouteMutationResponses
+  /api/v1/routes/{routeId}/resume:
+    parameters: [{$ref: '#/components/parameters/RouteId'}]
+    put:
+      tags: [Routes]
+      operationId: resumeRoute
+      summary: Resume a suspended route
+      responses: *RouteMutationResponses
+components:
+  parameters:
+    AgentId:
+      name: agentId
+      in: path
+      required: true
+      schema: {type: string, minLength: 1}
+    JobId:
+      name: jobId
+      in: path
+      required: true
+      schema: {type: string, minLength: 1}
+    AssignmentId:
+      name: assignmentId
+      in: path
+      required: true
+      description: Canonical jobId:agentId identifier
+      schema: {type: string, minLength: 3}
+    RouteId:
+      name: routeId
+      in: path
+      required: true
+      schema: {type: string, minLength: 1}
+  responses:
+    Problem:
+      description: RFC 9457 problem details with Quorus extensions
+      headers:
+        X-Request-ID:
+          schema: {type: string, maxLength: 128}
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+  schemas:
+    Problem:
+      type: object
+      required: [type, title, status, detail, instance, shortCode, code, timestamp, requestId]
+      properties:
+        type: {type: string, format: uri}
+        title: {type: string}
+        status: {type: integer, minimum: 400, maximum: 599}
+        detail: {type: string}
+        instance: {type: string}
+        shortCode: {type: string, pattern: '^Q-[0-9]{4}$'}
+        code: {type: string}
+        timestamp: {type: string, format: date-time}
+        requestId: {type: string, maxLength: 128}
+        traceId: {type: string}
+      additionalProperties: false
+    Success:
+      type: object
+      required: [success]
+      properties: {success: {type: boolean, const: true}}
+      additionalProperties: false
+    Liveness:
+      type: object
+      required: [status, timestamp]
+      properties:
+        status: {type: string, const: UP}
+        timestamp: {type: string, format: date-time}
+      additionalProperties: false
+    Readiness:
+      type: object
+      required: [status, timestamp, checks]
+      properties:
+        status: {type: string, enum: [UP, DOWN]}
+        timestamp: {type: string, format: date-time}
+        checks:
+          type: object
+          required: [raftRunning, clusterHasLeader]
+          properties:
+            raftRunning: {type: string, enum: [UP, DOWN]}
+            clusterHasLeader: {type: string, enum: [UP, DOWN]}
+    Health:
+      type: object
+      required: [status, version, timestamp, nodeId, raft, checks]
+      properties:
+        status: {type: string, enum: [UP, DEGRADED]}
+        version: {type: string}
+        timestamp: {type: string, format: date-time}
+        nodeId: {type: string}
+        raft: {$ref: '#/components/schemas/RaftStatus'}
+        checks: {type: object, additionalProperties: {type: string}}
+    RaftStatus:
+      type: object
+      required: [nodeId, state, currentTerm, isLeader]
+      properties:
+        nodeId: {type: string}
+        state: {type: string, enum: [FOLLOWER, CANDIDATE, LEADER]}
+        currentTerm: {type: integer, format: int64, minimum: 0}
+        isLeader: {type: boolean}
+        isRunning: {type: boolean}
+        leaderId: {type: [string, 'null']}
+        term: {type: integer, format: int64}
+        commitIndex: {type: integer, format: int64}
+    AgentRegistration:
+      type: object
+      required: [agentId, hostname, address, tenantId]
+      properties:
+        agentId: {type: string, minLength: 1}
+        hostname: {type: string, minLength: 1}
+        address: {type: string, minLength: 1}
+        port: {type: integer, minimum: 1, maximum: 65535}
+        tenantId: {type: string, minLength: 1}
+        status: {$ref: '#/components/schemas/AgentStatus'}
+        version: {type: string}
+        region: {type: string}
+        datacenter: {type: string}
+        capabilities: {type: object, additionalProperties: true}
+    Agent:
+      allOf:
+        - {$ref: '#/components/schemas/AgentRegistration'}
+        - type: object
+          properties:
+            registrationTime: {type: string, format: date-time}
+            lastHeartbeat: {type: string, format: date-time}
+            healthy: {type: boolean}
+            available: {type: boolean}
+    AgentStatus:
+      type: string
+      enum: [REGISTERED, ONLINE, BUSY, OFFLINE, UNHEALTHY, DRAINING, DEREGISTERED]
+    AgentHeartbeat:
+      type: object
+      required: [agentId]
+      properties:
+        agentId: {type: string, minLength: 1}
+        tenantId: {type: string}
+        status: {$ref: '#/components/schemas/AgentStatus'}
+        sequenceNumber: {type: integer, minimum: 0}
+    CreatedAgent:
+      type: object
+      required: [success, agentId]
+      properties:
+        success: {type: boolean, const: true}
+        agentId: {type: string}
+    HeartbeatAcknowledgement:
+      type: object
+      required: [success, agentId, message]
+      properties:
+        success: {type: boolean, const: true}
+        agentId: {type: string}
+        message: {type: string}
+        status: {type: string}
+        lastHeartbeat: {type: string, format: date-time}
+        acknowledgedSequenceNumber: {type: integer}
+    CreateTransfer:
+      type: object
+      required: [jobId, tenantId, sourceUri, destinationPath]
+      properties:
+        jobId: {type: string, minLength: 1}
+        tenantId: {type: string, minLength: 1}
+        sourceUri: {type: string, format: uri}
+        destinationPath: {type: string, minLength: 1}
+        totalBytes: {type: integer, format: int64, minimum: 0}
+        description: {type: string}
+      additionalProperties: false
+    CreatedTransfer:
+      type: object
+      required: [success, jobId]
+      properties:
+        success: {type: boolean, const: true}
+        jobId: {type: string}
+    Transfer:
+      type: object
+      required: [jobId, sourceUri, destinationPath, status, totalBytes, bytesTransferred]
+      properties:
+        jobId: {type: string}
+        sourceUri: {type: string, format: uri}
+        destinationPath: {type: string}
+        status: {$ref: '#/components/schemas/TransferStatus'}
+        totalBytes: {type: integer, format: int64, minimum: 0}
+        bytesTransferred: {type: integer, format: int64, minimum: 0}
+        progressPercentage: {type: number, minimum: 0, maximum: 100}
+        startTime: {type: string, format: date-time}
+        lastUpdateTime: {type: string, format: date-time}
+        errorMessage: {type: string}
+        description: {type: string}
+    TransferStatus:
+      type: string
+      enum: [PENDING, IN_PROGRESS, COMPLETED, FAILED, CANCELLED, PAUSED]
+    AgentJob:
+      type: object
+      required: [assignmentId, jobId, agentId, status, assignedAt]
+      properties:
+        assignmentId: {type: string}
+        jobId: {type: string}
+        agentId: {type: string}
+        status: {$ref: '#/components/schemas/AssignmentStatus'}
+        assignedAt: {type: string, format: date-time}
+        sourceUri: {type: string, format: uri}
+        destinationPath: {type: string}
+        totalBytes: {type: integer, format: int64}
+        description: {type: string}
+    CreateAssignment:
+      type: object
+      required: [jobId, agentId]
+      properties:
+        jobId: {type: string, minLength: 1}
+        agentId: {type: string, minLength: 1}
+        assignedAt: {type: string, format: date-time}
+        status: {type: string, const: ASSIGNED}
+        tenantId: {type: string, minLength: 1}
+        retryCount: {type: integer, minimum: 0}
+        estimatedDurationMs: {type: integer, format: int64, minimum: 0}
+        assignmentStrategy: {type: string}
+    Assignment:
+      allOf:
+        - {$ref: '#/components/schemas/CreateAssignment'}
+        - type: object
+          required: [assignmentId]
+          properties:
+            assignmentId: {type: string}
+            status: {$ref: '#/components/schemas/AssignmentStatus'}
+            acceptedAt: {type: string, format: date-time}
+            startedAt: {type: string, format: date-time}
+            completedAt: {type: string, format: date-time}
+            failureReason: {type: string}
+            active: {type: boolean}
+            terminal: {type: boolean}
+    AssignmentStatus:
+      type: string
+      enum: [ASSIGNED, ACCEPTED, IN_PROGRESS, COMPLETED, FAILED, REJECTED, TIMEOUT, CANCELLED]
+    CreatedAssignment:
+      type: object
+      required: [success, assignmentId]
+      properties:
+        success: {type: boolean, const: true}
+        assignmentId: {type: string}
+    AssignmentMutation:
+      type: object
+      required: [assignmentId, message]
+      properties:
+        assignmentId: {type: string}
+        status: {$ref: '#/components/schemas/AssignmentStatus'}
+        message: {type: string}
+    JobStatusUpdate:
+      type: object
+      required: [agentId, status]
+      properties:
+        agentId: {type: string, minLength: 1}
+        status:
+          type: string
+          enum: [ACCEPTED, IN_PROGRESS, COMPLETED, FAILED, CANCELLED]
+        bytesTransferred: {type: integer, format: int64, minimum: 0}
+    Route:
+      type: object
+      required: [routeId, name, sourceAgentId, sourceLocation, destinationAgentId, destinationLocation, trigger]
+      properties:
+        routeId: {type: string, minLength: 1}
+        name: {type: string, minLength: 1}
+        description: {type: string}
+        sourceAgentId: {type: string, minLength: 1}
+        sourceLocation: {type: string, minLength: 1}
+        destinationAgentId: {type: string, minLength: 1}
+        destinationLocation: {type: string, minLength: 1}
+        trigger: {$ref: '#/components/schemas/Trigger'}
+        status: {type: string, enum: [CONFIGURED, ACTIVE, SUSPENDED, DEGRADED, ERROR]}
+        options: {type: object, additionalProperties: {type: string}}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+    Trigger:
+      type: object
+      required: [type]
+      properties:
+        type: {type: string, enum: [EVENT, TIME, INTERVAL, BATCH, SIZE, COMPOSITE]}
+        eventPatterns: {type: array, items: {type: string}}
+        excludePatterns: {type: array, items: {type: string}}
+        debounceMs: {type: integer, format: int64, minimum: 0}
+        cronExpression: {type: string}
+        timezone: {type: string}
+        intervalMinutes: {type: integer, minimum: 0}
+        fileCountThreshold: {type: integer, minimum: 0}
+        sizeThresholdMb: {type: integer, format: int64, minimum: 0}
+        maxWaitMinutes: {type: integer, minimum: 0}
+        compositeOperator: {type: string, enum: [AND, OR]}
+        childTriggers: {type: array, items: {$ref: '#/components/schemas/Trigger'}}
+    RouteMutation:
+      type: object
+      required: [routeId]
+      properties:
+        success: {type: boolean}
+        routeId: {type: string}
+        status: {type: string}
+        message: {type: string}
+    Deletion:
+      type: object
+      required: [message]
+      properties:
+        jobId: {type: string}
+        assignmentId: {type: string}
+        routeId: {type: string}
+        message: {type: string}

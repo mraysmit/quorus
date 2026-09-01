@@ -22,7 +22,7 @@ import java.util.Objects;
  * Algebraic data type for the result of applying a {@link RaftCommand} to the state machine.
  *
  * <p>Replaces the previous {@code Object} return (which used {@code null} to signal
- * "entity not found") with an explicit sum type. Callers pattern-match on the three
+ * "entity not found") with an explicit sum type. Callers pattern-match on the
  * permitted subtypes instead of null-checking or {@code instanceof}-casting.
  *
  * <h3>Permitted subtypes</h3>
@@ -41,7 +41,8 @@ public sealed interface CommandResult<T>
         permits CommandResult.Success,
                 CommandResult.NotFound,
                 CommandResult.NoOp,
-                CommandResult.CasMismatch {
+                CommandResult.CasMismatch,
+                CommandResult.Rejected {
 
     /**
      * The command was applied successfully.
@@ -88,6 +89,22 @@ public sealed interface CommandResult<T>
     record CasMismatch<T>(T entity) implements CommandResult<T> {
         public CasMismatch {
             Objects.requireNonNull(entity, "entity");
+        }
+    }
+
+    /**
+     * The command was deterministically rejected because applying it would violate
+     * an authoritative state-machine invariant. The stable code is suitable for
+     * API and audit mapping; the message is diagnostic and contains no secrets.
+     *
+     * @param code stable machine-readable rejection code
+     * @param message redacted human-readable reason
+     * @param <T> entity type (phantom — state was not changed)
+     */
+    record Rejected<T>(String code, String message) implements CommandResult<T> {
+        public Rejected {
+            Objects.requireNonNull(code, "code");
+            Objects.requireNonNull(message, "message");
         }
     }
 }

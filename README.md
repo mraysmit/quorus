@@ -16,6 +16,10 @@ Quorus is a Java 25 and Vert.x 5 based file transfer platform with two practical
 
 The current implementation centers on a controller-first architecture with embedded HTTP, Raft-backed replicated state, reactive transfer execution, and YAML workflow parsing and execution.
 
+The machine-readable contract for every currently registered controller endpoint is bundled at
+`quorus-controller/src/main/resources/openapi/quorus-controller-v1.yaml` and is served by a running
+controller from `GET /api/v1/openapi.yaml`.
+
 ## Current Capabilities
 
 ### Transfer Execution

@@ -336,12 +336,18 @@ class QuorusStateStoreTest {
                 .destinationPath(Paths.get("/dest/data.csv"))
                 .build();
         TransferJob transferJob = new TransferJob(request);
-        stateMachine.apply(TransferJobCommand.create(transferJob));
+        stateMachine.apply(TransferJobCommand.create(transferJob, "tenant-a"));
+
+        dev.mars.quorus.agent.AgentInfo agent = new dev.mars.quorus.agent.AgentInfo(
+                "agent-001", "agent-host", "127.0.0.1", 8080);
+        agent.setTenantId("tenant-a");
+        stateMachine.apply(AgentCommand.register(agent));
 
         // Add a job assignment via command
         JobAssignment assignment = new JobAssignment.Builder()
                 .jobId(transferJob.getJobId())
                 .agentId("agent-001")
+                .tenantId("tenant-a")
                 .build();
         stateMachine.apply(JobAssignmentCommand.assign(assignment));
 

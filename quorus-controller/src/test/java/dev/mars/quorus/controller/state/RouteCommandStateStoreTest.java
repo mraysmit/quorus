@@ -121,18 +121,17 @@ class RouteCommandStateStoreTest {
         }
 
         @Test
-        @DisplayName("Create duplicate route overwrites existing")
-        void createDuplicateRouteOverwrites() {
+        @DisplayName("Create duplicate route is rejected without overwriting existing state")
+        void createDuplicateRouteIsRejected() {
             RouteConfiguration route = createRoute("route-dup", "dup-route");
             stateMachine.apply(RouteCommand.create(route));
 
             RouteConfiguration duplicate = createRoute("route-dup", "dup-route-v2");
             CommandResult<?> result = stateMachine.apply(RouteCommand.create(duplicate));
 
-            assertInstanceOf(CommandResult.Success.class, result);
+            assertInstanceOf(CommandResult.Rejected.class, result);
             assertEquals(1, stateMachine.getRouteCount());
-            // Verify new version replaces old
-            assertEquals("dup-route-v2", stateMachine.getRoute("route-dup").getName());
+            assertEquals("dup-route", stateMachine.getRoute("route-dup").getName());
         }
 
         @Test
@@ -274,29 +273,26 @@ class RouteCommandStateStoreTest {
         }
 
         @Test
-        @DisplayName("Suspend already-suspended route overwrites status (idempotent)")
-        void suspendAlreadySuspendedRouteIsIdempotent() {
+        @DisplayName("Suspend already-suspended route is rejected")
+        void suspendAlreadySuspendedRouteIsRejected() {
             stateMachine.apply(RouteCommand.create(createRoute("route-double-sus", "double-suspend")));
             stateMachine.apply(RouteCommand.suspend("route-double-sus", "first suspension"));
             assertEquals(RouteStatus.SUSPENDED, stateMachine.getRoute("route-double-sus").getStatus());
 
-            // Suspend again -- state store doesn't validate, should still succeed
             CommandResult<?> result = stateMachine.apply(RouteCommand.suspend("route-double-sus", "second suspension"));
-            assertInstanceOf(CommandResult.Success.class, result);
+            assertInstanceOf(CommandResult.Rejected.class, result);
             assertEquals(RouteStatus.SUSPENDED, stateMachine.getRoute("route-double-sus").getStatus());
         }
 
         @Test
-        @DisplayName("Resume non-suspended route sets ACTIVE regardless")
-        void resumeNonSuspendedRouteSetsActive() {
-            // Route starts CONFIGURED -- resume sets to ACTIVE without transition validation
+        @DisplayName("Resume non-suspended route is rejected")
+        void resumeNonSuspendedRouteIsRejected() {
             stateMachine.apply(RouteCommand.create(createRoute("route-resume-cfg", "resume-configured")));
             assertEquals(RouteStatus.CONFIGURED, stateMachine.getRoute("route-resume-cfg").getStatus());
 
             CommandResult<?> result = stateMachine.apply(RouteCommand.resume("route-resume-cfg"));
-            assertInstanceOf(CommandResult.Success.class, result);
-            // State store does not validate transitions for suspend/resume commands
-            assertEquals(RouteStatus.ACTIVE, stateMachine.getRoute("route-resume-cfg").getStatus());
+            assertInstanceOf(CommandResult.Rejected.class, result);
+            assertEquals(RouteStatus.CONFIGURED, stateMachine.getRoute("route-resume-cfg").getStatus());
         }
     }
 

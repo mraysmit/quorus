@@ -1,8 +1,11 @@
+<img src="../../docs/quorus-logo.png" alt="Quorus" width="120"/>
+
 # Quorus In-Memory Simulators Design Document
 
 **Version:** 2.0  
-**Author:** Mark Andrew Ray-Smith Cityline Ltd  
 **Date:** 2026-01-28  
+**Author:** Mark Ray-Smith — Cityline Ltd  
+**License:** Apache 2.0
 
 > [!IMPORTANT]
 > This is a non-normative simulator design and validation record. “Production ready” entries in simulator comparison tables describe test-double maturity, not Quorus product readiness. Current product requirements and gaps are defined in [QUORUS_ARCHITECTURE_SPECIFICATION.md](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md).

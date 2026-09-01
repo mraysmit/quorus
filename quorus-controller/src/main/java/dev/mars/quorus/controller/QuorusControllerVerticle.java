@@ -143,8 +143,8 @@ public class QuorusControllerVerticle extends AbstractVerticle {
                     .transport(transport)
                     .stateMachine(stateMachine)
                     .mode(RaftNodeMode.durable(raftStorage))
-                    .electionTimeout(5000)
-                    .heartbeatInterval(1000)
+                    .electionTimeout(config.getElectionTimeoutMs())
+                    .heartbeatInterval(config.getHeartbeatIntervalMs())
                     .snapshotEnabled(config.isSnapshotEnabled())
                     .snapshotThreshold(config.getSnapshotThreshold())
                     .snapshotCheckInterval(config.getSnapshotCheckIntervalMs())
@@ -164,7 +164,8 @@ public class QuorusControllerVerticle extends AbstractVerticle {
                 // 7. Start Raft (includes recovery from WAL)
                 node.start().onSuccess(v2 -> {
                     // 8. Start HTTP API
-                    HttpApiServer api = new HttpApiServer(vertx, port, node, stateMachine);
+                    HttpApiServer api = new HttpApiServer(
+                            vertx, config.getHttpHost(), port, node, stateMachine, -1);
                     this.apiServer = Optional.of(api);
 
                     api.start()

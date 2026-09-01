@@ -31,9 +31,13 @@ import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.lang.reflect.Field;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -61,12 +65,14 @@ class QuorusAgentTest {
     private AtomicInteger registrationCount;
     private AtomicInteger heartbeatCount;
     private AtomicInteger statusReportCount;
+    private List<String> reportedStatuses;
 
     @BeforeAll
     void setUp(Vertx vertx, VertxTestContext testContext) {
         registrationCount = new AtomicInteger(0);
         heartbeatCount = new AtomicInteger(0);
         statusReportCount = new AtomicInteger(0);
+        reportedStatuses = new CopyOnWriteArrayList<>();
 
         // Create a real HTTP server to simulate the controller (no mocking!)
         Router router = Router.router(vertx);
@@ -107,11 +113,16 @@ class QuorusAgentTest {
         // Job status endpoint
         router.post("/api/v1/jobs/:jobId/status").handler(ctx -> {
             statusReportCount.incrementAndGet();
+            reportedStatuses.add(ctx.body().asJsonObject().getString("status"));
             ctx.response()
                 .setStatusCode(200)
                 .putHeader("content-type", "application/json")
                 .end(new JsonObject().put("status", "ok").encode());
         });
+
+        router.get("/files/lifecycle-test.txt").handler(ctx -> ctx.response()
+                .putHeader("content-type", "text/plain")
+                .end("phase-0-lifecycle"));
 
         // Start the mock controller server
         vertx.createHttpServer()
@@ -143,6 +154,7 @@ class QuorusAgentTest {
         registrationCount.set(0);
         heartbeatCount.set(0);
         statusReportCount.set(0);
+        reportedStatuses.clear();
     }
 
     @AfterAll
@@ -395,6 +407,41 @@ class QuorusAgentTest {
         assertDoesNotThrow(agent::awaitShutdown,
                 "A registration failure should trigger a clean fail-fast shutdown");
         assertFalse(agent.isRunning(), "Agent should stop after registration fails");
+    }
+
+    @Test
+    @DisplayName("Should acknowledge ACCEPTED and IN_PROGRESS before completing a transfer")
+    void testDistributedTransferLifecycle(Vertx vertx) throws Exception {
+        QuorusAgent agent = new QuorusAgent(vertx, config);
+        Path destination = Files.createTempFile("quorus-phase-0-", ".txt");
+        Files.delete(destination);
+
+        try {
+            agent.start();
+            await().atMost(Duration.ofSeconds(5)).until(agent::isRunning);
+
+            JobPollingService.PendingJob pendingJob = new JobPollingService.PendingJob(
+                    "assign-lifecycle",
+                    "job-lifecycle",
+                    config.getAgentId(),
+                    "http://localhost:" + controllerPort + "/files/lifecycle-test.txt",
+                    destination.toString(),
+                    17L,
+                    "phase 0 lifecycle"
+            );
+
+            invokeProcessJob(agent, pendingJob);
+
+            await().atMost(Duration.ofSeconds(10))
+                    .until(() -> reportedStatuses.contains("COMPLETED"));
+            assertEquals(List.of("ACCEPTED", "IN_PROGRESS", "COMPLETED"), reportedStatuses,
+                    "The controller must observe the legal lifecycle in order");
+            assertEquals("phase-0-lifecycle", Files.readString(destination));
+        } finally {
+            agent.shutdown();
+            assertDoesNotThrow(agent::awaitShutdown);
+            Files.deleteIfExists(destination);
+        }
     }
 
     @Test

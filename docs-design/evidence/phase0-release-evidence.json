@@ -1,0 +1,89 @@
+{
+  "schemaVersion": 1,
+  "phase": 0,
+  "milestone": "M0 — Reproducible Alpha Baseline",
+  "generatedAt": "2026-09-01T06:06:11.0918143Z",
+  "source": {
+    "revision": "1c24495a720b782712dca628e5e99f033ebfcb97",
+    "worktreeClean": false
+  },
+  "environment": {
+    "os": "Microsoft Windows 10.0.26340",
+    "architecture": "X64",
+    "java": "openjdk version \"25\" 2025-09-16 OpenJDK Runtime Environment (build 25+36-3489) OpenJDK 64-Bit Server VM (build 25+36-3489, mixed mode, sharing)",
+    "maven": "Apache Maven 3.9.16 (2bdd9fddda4b155ebf8000e807eb73fd829a51d5) | Maven home: C:\\Users\\markr\\scoop\\apps\\maven\\current"
+  },
+  "verification": {
+    "requiredCleanBuilds": 2,
+    "completedCleanBuilds": 2,
+    "cleanBuildCommand": "mvn -o clean verify",
+    "outcome": "passed",
+    "testReports": {
+      "suites": 321,
+      "tests": 2212,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "documentationChecks": "scripts/verify-phase0-docs.ps1"
+  },
+  "configuration": [
+    {
+      "path": "pom.xml",
+      "sha256": "2021f8be947c364dc53f3fe0eb37c3c55a5c9eab94b9adc094cd509032fcfd03"
+    },
+    {
+      "path": ".java-version",
+      "sha256": "64aeb9975f234becd55bb4635e6e2f2da7a6b7bf0a896f0c07763bdfbfb31420"
+    },
+    {
+      "path": "quorus-controller/src/main/resources/quorus-controller.properties",
+      "sha256": "ce697fc08a6a4576537633d71278c75170a9147d057da74d24645c17af6ba791"
+    },
+    {
+      "path": "quorus-agent/src/main/resources/quorus-agent.properties",
+      "sha256": "66c9b2d42fa6dfe4f296b51dd1d66223dc0b48de33873d65b969f1851852f116"
+    },
+    {
+      "path": "quorus-controller/src/main/resources/openapi/quorus-controller-v1.yaml",
+      "sha256": "251541a2af87acb4571e7f375f363cf5d103987704467a3a8dd26c7c452783f0"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "quorus-agent/target/quorus-agent-1.0-SNAPSHOT.jar",
+      "sha256": "71b8cbfa34b224fbacf1d9c087aa489c85155dc2f894ce1300fa508f9a244e62",
+      "bytes": 52156
+    },
+    {
+      "path": "quorus-controller/target/quorus-controller-1.0-SNAPSHOT.jar",
+      "sha256": "b4edcfdc36dd855c9e004df5a2e5a3534ea4a640b4b99418c5ba85f52dc93006",
+      "bytes": 102675654
+    },
+    {
+      "path": "quorus-core/target/quorus-core-1.0-SNAPSHOT-tests.jar",
+      "sha256": "1c649a8f3f31b073d5bf861fd77923b13559c2a2a5c2fa028660ed70f14d6a47",
+      "bytes": 678120
+    },
+    {
+      "path": "quorus-core/target/quorus-core-1.0-SNAPSHOT.jar",
+      "sha256": "758e45afdbddcd4e1758f4f5eb7230311f89ac2fceb83284227c9db8d49ae4dc",
+      "bytes": 219179
+    },
+    {
+      "path": "quorus-integration-examples/target/quorus-integration-examples-1.0-SNAPSHOT.jar",
+      "sha256": "6b028b4179b6ece6359bc342cb90d78c842d74dca1c0ff23b9914c70fe9568a7",
+      "bytes": 130757
+    },
+    {
+      "path": "quorus-tenant/target/quorus-tenant-1.0-SNAPSHOT.jar",
+      "sha256": "f8b8dae8102672e36ac00015379a10260301b24c93e938d97cff837da59d0196",
+      "bytes": 49357
+    },
+    {
+      "path": "quorus-workflow/target/quorus-workflow-1.0-SNAPSHOT.jar",
+      "sha256": "2de29e61a167afdc9320200bcbcb230ceb863b93dbf816451f295e2d98082fce",
+      "bytes": 68352
+    }
+  ]
+}

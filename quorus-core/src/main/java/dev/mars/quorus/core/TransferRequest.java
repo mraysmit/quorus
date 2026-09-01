@@ -1,5 +1,7 @@
 package dev.mars.quorus.core;
 
+import dev.mars.quorus.util.SensitiveDataRedactor;
+
 /*
  * Copyright 2025 Mark Andrew Ray-Smith Cityline Ltd
  *
@@ -396,8 +398,8 @@ public final class TransferRequest implements Serializable {
     public String toString() {
         return "TransferRequest{" +
                 "requestId='" + requestId + '\'' +
-                ", sourceUri=" + sourceUri +
-                ", destinationUri=" + destinationUri +
+                ", sourceUri=" + SensitiveDataRedactor.redactUri(sourceUri) +
+                ", destinationUri=" + SensitiveDataRedactor.redactUri(destinationUri) +
                 ", direction=" + getDirection() +
                 ", protocol='" + protocol + '\'' +
                 ", expectedSize=" + expectedSize +

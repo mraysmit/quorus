@@ -16,11 +16,17 @@
 
 package dev.mars.quorus.controller.http;
 
+import dev.mars.quorus.agent.AgentInfo;
+import dev.mars.quorus.agent.AgentStatus;
 import dev.mars.quorus.controller.raft.InMemoryTransportSimulator;
 import dev.mars.quorus.controller.raft.RaftNode;
 import dev.mars.quorus.controller.raft.RaftNodeMode;
 import dev.mars.quorus.controller.raft.RaftTransport;
+import dev.mars.quorus.controller.state.AgentCommand;
 import dev.mars.quorus.controller.state.QuorusStateStore;
+import dev.mars.quorus.controller.state.TransferJobCommand;
+import dev.mars.quorus.core.TransferJob;
+import dev.mars.quorus.core.TransferRequest;
 import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.client.WebClient;
@@ -30,6 +36,9 @@ import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.time.Duration;
+import java.time.Instant;
+import java.net.URI;
+import java.nio.file.Path;
 import java.util.Set;
 
 import static dev.mars.quorus.testing.TestFutureUtils.awaitSuccess;
@@ -114,6 +123,20 @@ class LeaderGuardHandlerTest {
         assertNotNull(leaderNode, "Cluster should have a leader");
         assertNotNull(followerNode, "Cluster should have a follower");
 
+        String tenantId = "guard-tenant";
+        TransferRequest transferRequest = TransferRequest.builder()
+                .requestId("guard-leader-job")
+                .sourceUri(URI.create("https://files.example.test/guard.dat"))
+                .destinationPath(Path.of("target", "guard.dat"))
+                .build();
+        AgentInfo agent = new AgentInfo("guard-leader-agent", "guard-host", "127.0.0.1", 8081);
+        agent.setTenantId(tenantId);
+        agent.setStatus(AgentStatus.HEALTHY);
+        awaitSuccess(leaderNode.submitCommand(
+                TransferJobCommand.create(new TransferJob(transferRequest), tenantId)), Duration.ofSeconds(5));
+        awaitSuccess(leaderNode.submitCommand(
+                new AgentCommand.Register(agent.getAgentId(), agent, Instant.now())), Duration.ofSeconds(5));
+
         // Start HTTP servers on leader and follower
         leaderServer = new HttpApiServer(vertx, LEADER_PORT, leaderNode, leaderStateStore);
         awaitSuccess(leaderServer.start(), Duration.ofSeconds(5));
@@ -175,7 +198,7 @@ class LeaderGuardHandlerTest {
                         assertEquals(503, response.statusCode(),
                                 "Write on follower should be rejected");
                         JsonObject json = response.bodyAsJsonObject();
-                        JsonObject error = json.getJsonObject("error");
+                        JsonObject error = json;
                         assertNotNull(error, "Error envelope expected");
                         String code = error.getString("code");
                         assertTrue("NOT_LEADER".equals(code) || "NO_LEADER".equals(code),

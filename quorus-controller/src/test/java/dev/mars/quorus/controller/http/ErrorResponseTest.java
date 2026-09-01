@@ -177,15 +177,15 @@ class ErrorResponseTest {
 
             JsonObject json = response.toJson();
             
-            assertTrue(json.containsKey("error"));
-            JsonObject error = json.getJsonObject("error");
-            
-            assertEquals("Q-3001", error.getString("shortCode"));
-            assertEquals("AGENT_NOT_FOUND", error.getString("code"));
-            assertEquals("Agent 'agent-1' not found", error.getString("message"));
-            assertEquals("/api/v1/agents/agent-1", error.getString("path"));
-            assertNotNull(error.getString("timestamp"));
-            assertNotNull(error.getString("requestId"));
+            assertEquals("urn:quorus:problem:agent-not-found", json.getString("type"));
+            assertEquals("Agent not found", json.getString("title"));
+            assertEquals(404, json.getInteger("status"));
+            assertEquals("Agent 'agent-1' not found", json.getString("detail"));
+            assertEquals("/api/v1/agents/agent-1", json.getString("instance"));
+            assertEquals("Q-3001", json.getString("shortCode"));
+            assertEquals("AGENT_NOT_FOUND", json.getString("code"));
+            assertNotNull(json.getString("timestamp"));
+            assertNotNull(json.getString("requestId"));
         }
 
         @Test

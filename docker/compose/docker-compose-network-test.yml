@@ -11,15 +11,16 @@ services:
     container_name: quorus-controller1
     hostname: controller1
     environment:
-      - NODE_ID=controller1
-      - RAFT_HOST=0.0.0.0
-      - RAFT_PORT=8080
-      - CLUSTER_NODES=controller1=172.20.0.10:8080,controller2=172.20.0.11:8080,controller3=172.20.0.12:8080,controller4=172.20.0.13:8080,controller5=172.20.0.14:8080
-      - ELECTION_TIMEOUT_MS=5000
-      - HEARTBEAT_INTERVAL_MS=1000
+      - QUORUS_NODE_ID=controller1
+      - QUORUS_RAFT_HOST=0.0.0.0
+      - QUORUS_RAFT_PORT=9080
+      - QUORUS_RAFT_STORAGE_PATH=/app/data/raft
+      - QUORUS_CLUSTER_NODES=controller1=172.20.0.10:9080,controller2=172.20.0.11:9080,controller3=172.20.0.12:9080,controller4=172.20.0.13:9080,controller5=172.20.0.14:9080
+      - QUORUS_RAFT_ELECTION_TIMEOUT_MS=5000
+      - QUORUS_RAFT_HEARTBEAT_INTERVAL_MS=1000
       - JAVA_OPTS=-Xmx256m -Xms128m
     ports:
-      - "8081:8080"
+      - "127.0.0.1:8081:8080"
     networks:
       raft-cluster:
         ipv4_address: 172.20.0.10
@@ -45,15 +46,16 @@ services:
     container_name: quorus-controller2
     hostname: controller2
     environment:
-      - NODE_ID=controller2
-      - RAFT_HOST=0.0.0.0
-      - RAFT_PORT=8080
-      - CLUSTER_NODES=controller1=172.20.0.10:8080,controller2=172.20.0.11:8080,controller3=172.20.0.12:8080,controller4=172.20.0.13:8080,controller5=172.20.0.14:8080
-      - ELECTION_TIMEOUT_MS=5000
-      - HEARTBEAT_INTERVAL_MS=1000
+      - QUORUS_NODE_ID=controller2
+      - QUORUS_RAFT_HOST=0.0.0.0
+      - QUORUS_RAFT_PORT=9080
+      - QUORUS_RAFT_STORAGE_PATH=/app/data/raft
+      - QUORUS_CLUSTER_NODES=controller1=172.20.0.10:9080,controller2=172.20.0.11:9080,controller3=172.20.0.12:9080,controller4=172.20.0.13:9080,controller5=172.20.0.14:9080
+      - QUORUS_RAFT_ELECTION_TIMEOUT_MS=5000
+      - QUORUS_RAFT_HEARTBEAT_INTERVAL_MS=1000
       - JAVA_OPTS=-Xmx256m -Xms128m
     ports:
-      - "8082:8080"
+      - "127.0.0.1:8082:8080"
     networks:
       raft-cluster:
         ipv4_address: 172.20.0.11
@@ -79,15 +81,16 @@ services:
     container_name: quorus-controller3
     hostname: controller3
     environment:
-      - NODE_ID=controller3
-      - RAFT_HOST=0.0.0.0
-      - RAFT_PORT=8080
-      - CLUSTER_NODES=controller1=172.20.0.10:8080,controller2=172.20.0.11:8080,controller3=172.20.0.12:8080,controller4=172.20.0.13:8080,controller5=172.20.0.14:8080
-      - ELECTION_TIMEOUT_MS=5000
-      - HEARTBEAT_INTERVAL_MS=1000
+      - QUORUS_NODE_ID=controller3
+      - QUORUS_RAFT_HOST=0.0.0.0
+      - QUORUS_RAFT_PORT=9080
+      - QUORUS_RAFT_STORAGE_PATH=/app/data/raft
+      - QUORUS_CLUSTER_NODES=controller1=172.20.0.10:9080,controller2=172.20.0.11:9080,controller3=172.20.0.12:9080,controller4=172.20.0.13:9080,controller5=172.20.0.14:9080
+      - QUORUS_RAFT_ELECTION_TIMEOUT_MS=5000
+      - QUORUS_RAFT_HEARTBEAT_INTERVAL_MS=1000
       - JAVA_OPTS=-Xmx256m -Xms128m
     ports:
-      - "8083:8080"
+      - "127.0.0.1:8083:8080"
     networks:
       raft-cluster:
         ipv4_address: 172.20.0.12
@@ -113,15 +116,16 @@ services:
     container_name: quorus-controller4
     hostname: controller4
     environment:
-      - NODE_ID=controller4
-      - RAFT_HOST=0.0.0.0
-      - RAFT_PORT=8080
-      - CLUSTER_NODES=controller1=172.20.0.10:8080,controller2=172.20.0.11:8080,controller3=172.20.0.12:8080,controller4=172.20.0.13:8080,controller5=172.20.0.14:8080
-      - ELECTION_TIMEOUT_MS=5000
-      - HEARTBEAT_INTERVAL_MS=1000
+      - QUORUS_NODE_ID=controller4
+      - QUORUS_RAFT_HOST=0.0.0.0
+      - QUORUS_RAFT_PORT=9080
+      - QUORUS_RAFT_STORAGE_PATH=/app/data/raft
+      - QUORUS_CLUSTER_NODES=controller1=172.20.0.10:9080,controller2=172.20.0.11:9080,controller3=172.20.0.12:9080,controller4=172.20.0.13:9080,controller5=172.20.0.14:9080
+      - QUORUS_RAFT_ELECTION_TIMEOUT_MS=5000
+      - QUORUS_RAFT_HEARTBEAT_INTERVAL_MS=1000
       - JAVA_OPTS=-Xmx256m -Xms128m
     ports:
-      - "8084:8080"
+      - "127.0.0.1:8084:8080"
     networks:
       raft-cluster:
         ipv4_address: 172.20.0.13
@@ -147,15 +151,16 @@ services:
     container_name: quorus-controller5
     hostname: controller5
     environment:
-      - NODE_ID=controller5
-      - RAFT_HOST=0.0.0.0
-      - RAFT_PORT=8080
-      - CLUSTER_NODES=controller1=172.20.0.10:8080,controller2=172.20.0.11:8080,controller3=172.20.0.12:8080,controller4=172.20.0.13:8080,controller5=172.20.0.14:8080
-      - ELECTION_TIMEOUT_MS=5000
-      - HEARTBEAT_INTERVAL_MS=1000
+      - QUORUS_NODE_ID=controller5
+      - QUORUS_RAFT_HOST=0.0.0.0
+      - QUORUS_RAFT_PORT=9080
+      - QUORUS_RAFT_STORAGE_PATH=/app/data/raft
+      - QUORUS_CLUSTER_NODES=controller1=172.20.0.10:9080,controller2=172.20.0.11:9080,controller3=172.20.0.12:9080,controller4=172.20.0.13:9080,controller5=172.20.0.14:9080
+      - QUORUS_RAFT_ELECTION_TIMEOUT_MS=5000
+      - QUORUS_RAFT_HEARTBEAT_INTERVAL_MS=1000
       - JAVA_OPTS=-Xmx256m -Xms128m
     ports:
-      - "8085:8080"
+      - "127.0.0.1:8085:8080"
     networks:
       raft-cluster:
         ipv4_address: 172.20.0.14

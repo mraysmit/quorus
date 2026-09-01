@@ -119,4 +119,29 @@ class AppConfigNodeIdentityTest {
         assertNotNull(nodeId, "Node ID should never be null");
         assertFalse(nodeId.isEmpty(), "Node ID should never be empty");
     }
+
+    @Test
+    @DisplayName("Blank packaged Raft path should use the node-specific durable default")
+    void blankRaftStoragePathUsesDefault() {
+        AppConfig config = AppConfig.get();
+
+        assertEquals("./data/raft/test-node", config.getRaftStoragePath());
+    }
+
+    @Test
+    @DisplayName("Explicit Raft path should override the packaged default")
+    void explicitRaftStoragePathIsRespected() {
+        String key = "quorus.raft.storage.path";
+        String previous = System.getProperty(key);
+        try {
+            System.setProperty(key, "/var/lib/quorus/controller-a");
+            assertEquals("/var/lib/quorus/controller-a", AppConfig.get().getRaftStoragePath());
+        } finally {
+            if (previous == null) {
+                System.clearProperty(key);
+            } else {
+                System.setProperty(key, previous);
+            }
+        }
+    }
 }

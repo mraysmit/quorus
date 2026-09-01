@@ -1,0 +1,56 @@
+name: Quorus CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  java-checks:
+    name: ${{ matrix.lane }}
+    runs-on: ubuntu-latest
+    container: maven:3.9.11-eclipse-temurin-25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - lane: unit
+            command: mvn -B -DskipITs test
+          - lane: integration
+            command: mvn -B -Dtest=*IntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test
+          - lane: protocol
+            command: mvn -B -pl quorus-core -am -Dtest=*ProtocolTest -Dsurefire.failIfNoSpecifiedTests=false test
+          - lane: multi-node
+            command: mvn -B -pl quorus-controller -am -Dtest=*ClusterTest,*RestartTest -Dsurefire.failIfNoSpecifiedTests=false test
+          - lane: security
+            command: mvn -B -pl quorus-controller -am -Dtest=SensitiveDataRedactorTest,ErrorResponseTest,AuthoritativeStateInvariantTest -Dsurefire.failIfNoSpecifiedTests=false test
+          - lane: contract
+            command: mvn -B -pl quorus-controller -am -Dtest=OpenApiContractTest,SchemaCompatibilityTest -Dsurefire.failIfNoSpecifiedTests=false test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Java 25 toolchain
+        run: java -version
+      - name: Run ${{ matrix.lane }} lane
+        run: ${{ matrix.command }}
+
+  documentation:
+    name: documentation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check headers, links, fences, endpoints and contract status
+        shell: pwsh
+        run: ./scripts/verify-phase0-docs.ps1
+
+  clean-build:
+    name: clean reproducible build
+    runs-on: ubuntu-latest
+    container: maven:3.9.11-eclipse-temurin-25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Clean build one
+        run: mvn -B clean verify
+      - name: Clean build two
+        run: mvn -B clean verify

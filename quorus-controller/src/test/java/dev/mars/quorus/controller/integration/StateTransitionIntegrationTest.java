@@ -144,7 +144,7 @@ class StateTransitionIntegrationTest {
                     .onComplete(ctx.succeeding(response -> ctx.verify(() -> {
                         assertEquals(409, response.statusCode(),
                                 "Accepting a REJECTED assignment should return 409 Conflict");
-                        JsonObject error = response.bodyAsJsonObject().getJsonObject("error");
+                        JsonObject error = response.bodyAsJsonObject();
                         assertNotNull(error, "Response should contain an error object");
                         assertEquals("ASSIGNMENT_STATE_CONFLICT", error.getString("code"));
                         ctx.completeNow();
@@ -172,7 +172,7 @@ class StateTransitionIntegrationTest {
                     .onComplete(ctx.succeeding(response -> ctx.verify(() -> {
                         assertEquals(409, response.statusCode(),
                                 "Cancelling a CANCELLED assignment should return 409");
-                        JsonObject error = response.bodyAsJsonObject().getJsonObject("error");
+                        JsonObject error = response.bodyAsJsonObject();
                         assertNotNull(error);
                         assertEquals("ASSIGNMENT_STATE_CONFLICT", error.getString("code"));
                         ctx.completeNow();
@@ -211,7 +211,7 @@ class StateTransitionIntegrationTest {
                     .onComplete(ctx.succeeding(response -> ctx.verify(() -> {
                         assertEquals(409, response.statusCode(),
                                 "Transitioning COMPLETED assignment to ASSIGNED should return 409");
-                        JsonObject error = response.bodyAsJsonObject().getJsonObject("error");
+                        JsonObject error = response.bodyAsJsonObject();
                         assertNotNull(error);
                         assertEquals("ASSIGNMENT_STATE_CONFLICT", error.getString("code"));
                         ctx.completeNow();
@@ -239,7 +239,7 @@ class StateTransitionIntegrationTest {
                     .onComplete(ctx.succeeding(response -> ctx.verify(() -> {
                         assertEquals(409, response.statusCode(),
                                 "Accepting a TIMED-OUT assignment should return 409");
-                        JsonObject error = response.bodyAsJsonObject().getJsonObject("error");
+                        JsonObject error = response.bodyAsJsonObject();
                         assertNotNull(error);
                         assertEquals("ASSIGNMENT_STATE_CONFLICT", error.getString("code"));
                         ctx.completeNow();
@@ -449,7 +449,7 @@ class StateTransitionIntegrationTest {
                     .onComplete(ctx.succeeding(response -> ctx.verify(() -> {
                         assertEquals(409, response.statusCode(),
                                 "Resuming a non-SUSPENDED route should return 409");
-                        JsonObject error = response.bodyAsJsonObject().getJsonObject("error");
+                        JsonObject error = response.bodyAsJsonObject();
                         assertNotNull(error);
                         assertEquals("ROUTE_STATE_CONFLICT", error.getString("code"));
                         ctx.completeNow();
@@ -476,7 +476,7 @@ class StateTransitionIntegrationTest {
                     .onComplete(ctx.succeeding(response -> ctx.verify(() -> {
                         assertEquals(409, response.statusCode(),
                                 "Suspending an already-SUSPENDED route should return 409");
-                        JsonObject error = response.bodyAsJsonObject().getJsonObject("error");
+                        JsonObject error = response.bodyAsJsonObject();
                         assertNotNull(error);
                         assertEquals("ROUTE_STATE_CONFLICT", error.getString("code"));
                         ctx.completeNow();
@@ -623,7 +623,7 @@ class StateTransitionIntegrationTest {
                     .send()
                     .onComplete(ctx.succeeding(response -> ctx.verify(() -> {
                         assertEquals(404, response.statusCode());
-                        JsonObject error = response.bodyAsJsonObject().getJsonObject("error");
+                        JsonObject error = response.bodyAsJsonObject();
                         assertNotNull(error);
                         assertEquals("ASSIGNMENT_NOT_FOUND", error.getString("code"));
                         ctx.completeNow();
@@ -637,7 +637,7 @@ class StateTransitionIntegrationTest {
                     .sendJsonObject(new JsonObject().put("reason", "just checking"))
                     .onComplete(ctx.succeeding(response -> ctx.verify(() -> {
                         assertEquals(404, response.statusCode());
-                        JsonObject error = response.bodyAsJsonObject().getJsonObject("error");
+                        JsonObject error = response.bodyAsJsonObject();
                         assertNotNull(error);
                         assertEquals("ROUTE_NOT_FOUND", error.getString("code"));
                         ctx.completeNow();
@@ -662,12 +662,33 @@ class StateTransitionIntegrationTest {
      * Creates a job assignment via HTTP and returns a Future containing the assignmentId.
      */
     private io.vertx.core.Future<String> createAssignment(String jobId, String agentId) {
-        JsonObject body = new JsonObject()
+        String tenantId = "transition-test-tenant";
+        JsonObject registerBody = new JsonObject()
+                .put("agentId", agentId)
+                .put("hostname", agentId + ".example.test")
+                .put("address", "127.0.0.1:9000")
+                .put("tenantId", tenantId);
+        JsonObject transferBody = new JsonObject()
+                .put("jobId", jobId)
+                .put("sourceUri", "https://files.example.test/" + jobId + ".dat")
+                .put("destinationPath", "target/transition-test/" + jobId + ".dat")
+                .put("tenantId", tenantId);
+        JsonObject assignmentBody = new JsonObject()
                 .put("jobId", jobId)
                 .put("agentId", agentId);
 
-        return webClient.post(HTTP_PORT, "localhost", "/api/v1/assignments")
-                .sendJsonObject(body)
+        return webClient.post(HTTP_PORT, "localhost", "/api/v1/agents/register")
+                .sendJsonObject(registerBody)
+                .compose(response -> {
+                    assertEquals(201, response.statusCode(), "Agent registration should return 201");
+                    return webClient.post(HTTP_PORT, "localhost", "/api/v1/transfers")
+                            .sendJsonObject(transferBody);
+                })
+                .compose(response -> {
+                    assertEquals(201, response.statusCode(), "Transfer creation should return 201");
+                    return webClient.post(HTTP_PORT, "localhost", "/api/v1/assignments")
+                            .sendJsonObject(assignmentBody);
+                })
                 .map(response -> {
                     assertEquals(201, response.statusCode(),
                             "Assignment creation should return 201");

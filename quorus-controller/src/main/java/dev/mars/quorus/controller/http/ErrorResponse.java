@@ -16,6 +16,8 @@
 
 package dev.mars.quorus.controller.http;
 
+import dev.mars.quorus.util.SensitiveDataRedactor;
+
 import io.vertx.core.json.JsonObject;
 import org.slf4j.MDC;
 
@@ -148,17 +150,25 @@ public record ErrorResponse(
      * Converts this error response to a JSON object suitable for HTTP response body.
      */
     public JsonObject toJson() {
-        JsonObject error = new JsonObject()
+        JsonObject problem = new JsonObject()
+            .put("type", "urn:quorus:problem:" + code.toLowerCase().replace('_', '-'))
+            .put("title", title(code))
+            .put("status", httpStatus)
+            .put("detail", SensitiveDataRedactor.redact(message))
+            .put("instance", path)
             .put("shortCode", shortCode)
             .put("code", code)
-            .put("message", message)
             .put("timestamp", timestamp.toString())
-            .put("path", path)
             .put("requestId", requestId);
         if (traceId != null) {
-            error.put("traceId", traceId);
+            problem.put("traceId", traceId);
         }
-        return new JsonObject().put("error", error);
+        return problem;
+    }
+
+    private static String title(String code) {
+        String normalized = code.toLowerCase().replace('_', ' ');
+        return Character.toUpperCase(normalized.charAt(0)) + normalized.substring(1);
     }
 
     private static String currentTraceId() {
