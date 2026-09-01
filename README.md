@@ -139,6 +139,8 @@ The architecture and REST API specifications are normative. The HTTP API referen
 
 - [Canonical architecture specification](docs/QUORUS_ARCHITECTURE_SPECIFICATION.md)
 - [Canonical REST API specification](docs/QUORUS_REST_API_SPECIFICATION.md)
+- [Security deployment guide](docs/QUORUS_SECURITY_DEPLOYMENT_GUIDE.md)
+- [Certificate and trust incident runbook](docs/QUORUS_CERTIFICATE_INCIDENT_RUNBOOK.md)
 - [Enterprise implementation plan](docs-design/task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md)
 - [docs/QUORUS_ARCHITECTURE_QUICKSTART.md](docs/QUORUS_ARCHITECTURE_QUICKSTART.md)
 - [Current HTTP API reference](docs/QUORUS_API_REFERENCE.md)

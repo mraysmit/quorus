@@ -18,6 +18,8 @@ package dev.mars.quorus.controller;
 
 import dev.mars.quorus.controller.config.AppConfig;
 import dev.mars.quorus.controller.observability.TelemetryConfig;
+import dev.mars.quorus.controller.raft.RaftTlsConfig;
+import dev.mars.quorus.controller.security.SecurityConfig;
 import io.vertx.core.Vertx;
 import io.vertx.core.VertxOptions;
 import org.slf4j.Logger;
@@ -58,6 +60,8 @@ public class QuorusControllerApplication {
         // Load and validate configuration (fail fast on misconfiguration)
         AppConfig config = AppConfig.get();
         config.validate();
+        SecurityConfig.from(config).validate();
+        RaftTlsConfig.from(config).validate();
 
         // Create Vert.x instance with OpenTelemetry tracing enabled
         VertxOptions options = new VertxOptions();

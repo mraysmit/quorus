@@ -29,6 +29,8 @@ import dev.mars.quorus.controller.raft.grpc.VoteResponse;
 import dev.mars.quorus.controller.observability.RaftMetrics;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+import io.grpc.netty.GrpcSslContexts;
+import io.grpc.netty.NettyChannelBuilder;
 import io.opentelemetry.api.GlobalOpenTelemetry;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanKind;
@@ -70,6 +72,7 @@ public class GrpcRaftTransport implements RaftTransport {
     private final ExecutorService executor;
     private final int poolSize;
     private final int queueSize;
+    private final RaftTlsConfig tlsConfig;
 
     private RaftNode raftNode; // Circular dependency injection
 
@@ -95,11 +98,17 @@ public class GrpcRaftTransport implements RaftTransport {
      */
     public GrpcRaftTransport(Vertx vertx, String selfId, Map<String, String> clusterNodes,
                               int poolSize, int queueSize) {
+        this(vertx, selfId, clusterNodes, poolSize, queueSize, RaftTlsConfig.developmentDisabled());
+    }
+
+    public GrpcRaftTransport(Vertx vertx, String selfId, Map<String, String> clusterNodes,
+                             int poolSize, int queueSize, RaftTlsConfig tlsConfig) {
         this.vertx = vertx;
         this.selfId = selfId;
         this.clusterNodes = clusterNodes;
         this.poolSize = poolSize;
         this.queueSize = queueSize;
+        this.tlsConfig = tlsConfig;
         
         // Create a bounded thread pool with named threads for gRPC callbacks
         AtomicInteger threadCounter = new AtomicInteger(0);
@@ -278,9 +287,22 @@ public class GrpcRaftTransport implements RaftTransport {
             String host = parts[0];
             int port = Integer.parseInt(parts[1]);
 
-            ManagedChannel channel = ManagedChannelBuilder.forAddress(host, port)
-                    .usePlaintext()
-                    .build();
+            ManagedChannel channel;
+            if (tlsConfig.enabled()) {
+                try {
+                    channel = NettyChannelBuilder.forAddress(host, port)
+                            .sslContext(GrpcSslContexts.forClient()
+                                    .keyManager(tlsConfig.certificate().toFile(), tlsConfig.privateKey().toFile())
+                                    .trustManager(tlsConfig.trustBundle().toFile())
+                                    .protocols("TLSv1.3")
+                                    .build())
+                            .build();
+                } catch (javax.net.ssl.SSLException exception) {
+                    throw new IllegalStateException("Cannot configure mutual TLS for Raft peer " + id, exception);
+                }
+            } else {
+                channel = ManagedChannelBuilder.forAddress(host, port).usePlaintext().build();
+            }
             channels.put(id, channel);
             return RaftServiceGrpc.newFutureStub(channel);
         });

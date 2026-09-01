@@ -35,13 +35,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static dev.mars.quorus.testing.TestFutureUtils.awaitSuccess;
+import static dev.mars.quorus.testing.TestFutureUtils.eventually;
 import static org.junit.jupiter.api.Assertions.*;
-import static org.awaitility.Awaitility.await;
 
 /**
  * Integration tests for QuorusAgent.
@@ -72,7 +73,7 @@ class QuorusAgentTest {
         registrationCount = new AtomicInteger(0);
         heartbeatCount = new AtomicInteger(0);
         statusReportCount = new AtomicInteger(0);
-        reportedStatuses = new CopyOnWriteArrayList<>();
+        reportedStatuses = new ArrayList<>();
 
         // Create a real HTTP server to simulate the controller (no mocking!)
         Router router = Router.router(vertx);
@@ -286,8 +287,8 @@ class QuorusAgentTest {
 
         agent.start();
 
-        await().atMost(Duration.ofSeconds(5))
-                .until(() -> extractLongField(agent, "heartbeatTimerId") != 0L);
+        awaitSuccess(eventually(vertx, () -> extractLongField(agent, "heartbeatTimerId") != 0L,
+                Duration.ofSeconds(5)), Duration.ofSeconds(6));
 
         assertTrue(agent.isRunning(), "Agent should be running after registration");
         assertNotEquals(0L, extractLongField(agent, "heartbeatTimerId"),
@@ -418,7 +419,7 @@ class QuorusAgentTest {
 
         try {
             agent.start();
-            await().atMost(Duration.ofSeconds(5)).until(agent::isRunning);
+            awaitSuccess(eventually(vertx, agent::isRunning, Duration.ofSeconds(5)), Duration.ofSeconds(6));
 
             JobPollingService.PendingJob pendingJob = new JobPollingService.PendingJob(
                     "assign-lifecycle",
@@ -432,8 +433,8 @@ class QuorusAgentTest {
 
             invokeProcessJob(agent, pendingJob);
 
-            await().atMost(Duration.ofSeconds(10))
-                    .until(() -> reportedStatuses.contains("COMPLETED"));
+            awaitSuccess(eventually(vertx, () -> reportedStatuses.contains("COMPLETED"), Duration.ofSeconds(10)),
+                    Duration.ofSeconds(11));
             assertEquals(List.of("ACCEPTED", "IN_PROGRESS", "COMPLETED"), reportedStatuses,
                     "The controller must observe the legal lifecycle in order");
             assertEquals("phase-0-lifecycle", Files.readString(destination));
@@ -470,7 +471,8 @@ class QuorusAgentTest {
         invokeHandleTransferComplete(agent, "job-failed", failed);
         invokeHandleTransferError(agent, "job-error", new IllegalStateException("simulated error"));
 
-        await().atMost(Duration.ofSeconds(5)).until(() -> statusReportCount.get() == 3);
+        awaitSuccess(eventually(vertx, () -> statusReportCount.get() == 3, Duration.ofSeconds(5)),
+                Duration.ofSeconds(6));
         assertEquals(3, statusReportCount.get(), "Every terminal outcome should be reported");
     }
 

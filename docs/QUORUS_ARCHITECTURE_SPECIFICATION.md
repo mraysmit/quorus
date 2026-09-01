@@ -2,7 +2,7 @@
 
 # Quorus Architecture Specification
 
-**Version:** 1.0  
+**Version:** 1.2  
 **Date:** 2026-09-01  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
@@ -68,21 +68,21 @@ The status values in this table are normative:
 | Core transfer engine | Implemented | Reactive execution through `SimpleTransferEngine` |
 | HTTP/HTTPS, FTP/FTPS, SFTP, SMB/CIFS, NFS adapters | Implemented | Adapter features differ; resume is not generally available |
 | YAML workflow parsing and dependency execution | Implemented | Conditions are carried as resolved strings; there is no general condition engine |
-| Controller HTTP API | Implemented | Live transfer, assignment, agent, route, health, and Raft endpoints; no built-in authentication; writes are leader-only |
+| Controller HTTP API | Implemented | Production profile requires TLS 1.3 client certificates, trusted identity resolution, policy middleware, and audit decisions; writes remain leader-only |
 | Complete REST control and operations interface | Partial | The live API covers a subset of the canonical transfer, workflow, tenant, service-connectivity, agent-lifecycle, security, audit, and administration contract |
 | Raft log, snapshots, and replicated controller state | Implemented | Membership is static and every node needs durable local storage |
-| Agent registration, heartbeat, polling, and reporting | Implemented | The successful assignment lifecycle has a known conformance gap |
+| Agent registration, heartbeat, polling, and reporting | Implemented | Agent control clients support certificate-authenticated HTTPS with hostname verification; enrollment and rotation lifecycle remains incomplete |
 | Transfer, assignment, and route CRUD | Implemented | CRUD does not imply autonomous route execution |
 | Transfer-process metrics | Partial | Aggregate job counts, bytes, and duration exist; continuous progress, deadline risk, stall detection, and an end-to-end operational timeline are incomplete |
 | Per-transfer operational telemetry and alerting | Planned | Required for critical and time-sensitive production transfers |
 | Enterprise service connectivity controls | Planned | Endpoint policy, secret references, service identity verification, and egress enforcement are incomplete |
 | Secure agent provisioning and deployment lifecycle | Planned | Unique identity enrollment, image signing, attestation, rotation, revocation, and controlled upgrade are required |
-| Tenant fields and selected tenant checks | Partial | Tenant IDs are not authenticated identities; all state-machine invariants are not yet uniformly enforced |
+| Authenticated tenant derivation and tenant checks | Partial | HTTP transfer, agent, assignment, and route access is constrained by the verified identity; uniform state-machine enforcement remains incomplete |
 | Distributed assignment lifecycle | Partial | The production agent omits the required `IN_PROGRESS` acknowledgement |
 | Automatic route trigger evaluation | Planned | Route configuration and lifecycle state exist; no trigger service is wired into controller startup |
 | Agent-to-agent file streaming | Planned | No protocol or endpoints are defined in the active runtime |
 | Automatic job fencing and idempotent destination publication | Planned | Required before automatic failover/reassignment can claim duplicate-safe behavior |
-| Built-in authentication and authorization | Planned | An external trusted gateway is required for protected deployments |
+| Authentication and authorization foundation | Partial | Mutual TLS, trusted gateway assertions, direct certificate bindings, stable policy decisions, effective-identity APIs, and hash-chained decision and HTTP completion audit are implemented; rotation automation and complete enterprise evidence services remain open |
 | Dynamic controller membership | Planned | Live 3-to-5 or 5-to-3 membership changes are unsupported |
 | PostgreSQL, Redis, or etcd controller state | Planned | These systems are not part of the canonical architecture |
 | S3, Azure Blob, and Google Cloud Storage adapters | Planned | Not registered by the current protocol factory |
@@ -330,17 +330,27 @@ Idempotency keys and a complete leader discovery route are current conformance g
 
 ### 10.1 Current security statement
 
-The current alpha runtime does not provide a complete production security boundary:
+Phase 1 now provides the active security foundation:
 
-- the embedded controller API does not authenticate callers;
-- a caller-supplied `tenantId` is a routing and validation field, not proof of identity;
-- controller HTTP and controller-to-controller Raft TLS are not part of the active runtime contract;
-- agents do not have a complete certificate enrollment, rotation, revocation, and attestation lifecycle;
+- the production controller profile requires TLS 1.3 mutual authentication and refuses to start without readable certificate, private-key, trust-bundle, identity-source, and audit-path configuration;
+- human and service identities may be asserted only by an explicitly allowlisted gateway certificate over the mutually authenticated hop;
+- agents and other direct workloads are resolved from exact certificate-subject bindings;
+- controller-to-controller Raft uses TLS 1.3 mutual authentication, and agent clients use certificate-authenticated HTTPS with hostname verification;
+- authorization middleware applies stable scope and tenant/environment decisions to every protected controller route;
+- transfer, agent, assignment, and route handlers derive or validate tenant ownership against the verified identity, including collection filtering and agent self-binding;
+- a shared runtime trust state re-evaluates certificate serial revocation on every controller HTTP request and Raft RPC, including established TLS connections;
+- certificate lifetime and trust-policy version are observable through REST and OpenTelemetry, and controlled old/new certificate overlap is covered for HTTP, Raft, and agent clients;
+- authentication, authorization, protected completion, certificate-lifecycle, and security-configuration events are written to separate operational and retained append-only, fsync'd, SHA-256 hash chains whose existing records are verified at startup;
+- `/api/v1/security/me`, `/api/v1/security/authorization/explain`, `/api/v1/security/authorization/check`, `/api/v1/security/trust`, and `/api/v1/security/trust/revocations` expose the implemented identity, policy, and runtime trust controls.
+
+The Phase 1 repository technical gate is complete against representative live HTTP, Raft, and agent TLS boundaries. This is not corporate-environment accreditation. The selected corporate PKI, gateway, secrets platform, evidence collector, production controller topology, and agent estate still require deployment-specific validation. In addition:
+
+- agents do not yet have a complete certificate enrollment, rotation, revocation, and attestation lifecycle;
 - protocol credentials can be represented in connection URIs;
 - SFTP disables strict host-key checking in production code;
 - route and transfer inputs do not yet constitute a centrally enforced destination and egress policy.
 
-Quorus therefore MUST NOT be exposed to untrusted networks or used for sensitive enterprise transfers without compensating controls that satisfy this section. TLS, OAuth/OIDC, SAML, LDAP, RBAC, ABAC, MFA, corporate PKI, Vault integration, encryption at rest, and regulatory compliance are target-state capabilities unless a deployed external control provides them and that deployment is independently verified.
+Quorus therefore MUST NOT yet be represented as enterprise production-ready merely because the Phase 1 code gate passed. Corporate PKI issuance, external identity validation and MFA at the trusted gateway, secrets management, encryption at rest, production rotation operations, WORM/SIEM evidence services, and regulatory controls remain deployment or later-phase responsibilities and require independent evidence.
 
 ### 10.2 Trust zones and connection flows
 
@@ -349,9 +359,9 @@ Every connection crossing a process, host, cluster, tenant, or network-zone boun
 | Connection | Current alpha behavior | Production requirement |
 |---|---|---|
 | User/application → gateway | External to Quorus | Enterprise authentication, TLS, authorization, request limits, audit, and tenant derivation |
-| Gateway/load balancer → controller HTTP | Controller accepts unauthenticated HTTP | Authenticated encrypted connection; forwarded identity must be integrity-protected and trusted only from approved gateways |
-| Controller → controller Raft gRPC | Cluster identity comes from static configuration | Mutual TLS with a dedicated cluster CA, node identity validation, network allowlist, and certificate rotation |
-| Agent → controller | Agent registers and polls over controller HTTP with declared agent and tenant IDs | Unique agent workload identity, mTLS or equivalent, authorization bound to agent and tenant, replay protection, and revocation |
+| Gateway/load balancer → controller HTTP | TLS 1.3 mTLS; assertion headers accepted only from exact trusted gateway subjects; runtime serial revocation and overlap tests | Validate the selected gateway, PKI, rotation process, and assertion policy in the deployment environment |
+| Controller → controller Raft gRPC | TLS 1.3 mTLS with hostname verification, configured controller trust bundle, per-RPC runtime revocation, and overlap tests | Validate no-quorum-loss rotation and revocation against the deployed topology and cluster PKI |
+| Agent → controller | HTTPS mTLS client support, exact certificate-subject identity binding, agent/tenant self-authorization, controller-side runtime serial revocation, and overlap/hostname tests | Add constrained enrollment, short-lived identity, replay controls, managed renewal, and posture lifecycle |
 | Controller → agent | No production job-push or data-plane connection | No inbound agent control path is assumed; any future push protocol requires a separate authenticated specification |
 | Agent → source/destination service | Protocol adapter connects using the supplied endpoint and credentials | Policy-approved endpoint, least-privilege service identity, encrypted protocol where supported, remote identity verification, and auditable secret retrieval |
 | Controller/agent → secret manager | Not integrated as a canonical runtime dependency | Workload-identity-authenticated retrieval of short-lived or rotated secrets; no secret values in control-plane state |

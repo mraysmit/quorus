@@ -2,7 +2,7 @@
 
 # Quorus REST API Specification
 
-**Version:** 1.0  
+**Version:** 1.2  
 **Date:** 2026-09-01  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
@@ -169,6 +169,8 @@ The response reports the applied consistency and commit index. The default for s
 ### 4.1 Identity
 
 Production deployments MUST authenticate human and workload callers through enterprise identity. Agent-only endpoints require the enrolled agent identity and mutual TLS. A gateway MAY validate external credentials, but Quorus MUST receive cryptographically protected identity, tenant, role, and correlation claims from a trusted boundary.
+
+The Phase 1 controller implements this boundary with TLS 1.3 mutual authentication. Exact trusted gateway certificate subjects may supply `X-Quorus-*` assertions; direct workloads are resolved from exact certificate-subject bindings. The production profile cannot disable authentication or TLS and refuses incomplete trust configuration. Legacy plaintext constructors exist only for explicitly insecure development and existing test fixtures.
 
 The API MUST distinguish:
 
@@ -460,8 +462,11 @@ Alerts MUST be actionable. Each alert includes policy, severity, first and last 
 
 | Method | Path | State | Purpose |
 |---|---|---|---|
-| `GET` | `/api/v1/security/me` | Required | Effective identity, tenant, roles, scopes, and policy boundaries |
-| `POST` | `/api/v1/security/authorization:check` | Required | Explain an authorization decision without performing the action |
+| `GET` | `/api/v1/security/me` | Current | Effective identity, tenant, environment, roles, scopes, and elevation expiry |
+| `GET` | `/api/v1/security/authorization/explain` | Current | Query-form compatibility endpoint for an explainable decision |
+| `POST` | `/api/v1/security/authorization/check` | Current | Explain an authorization decision without performing the action |
+| `GET` | `/api/v1/security/trust` | Current | Active runtime trust-policy version, revoked count, and caller-certificate expiry posture |
+| `PUT` | `/api/v1/security/trust/revocations` | Current | Elevated atomic replacement of runtime certificate serial revocations |
 | `GET` | `/api/v1/security/trust-bundles` | Required | Metadata and versions for controller, agent, and service trust bundles |
 | `GET` | `/api/v1/security/certificates` | Required | Certificate metadata, expiry, owner, and rotation state; never private material |
 | `GET` | `/api/v1/security/revocations` | Required | Revoked agent, certificate, enrollment, and token identifiers |
@@ -470,7 +475,7 @@ Alerts MUST be actionable. Each alert includes policy, severity, first and last 
 | `POST` | `/api/v1/audit-exports` | Required | Asynchronous signed evidence export |
 | `GET` | `/api/v1/audit-exports/{exportId}` | Required | Export status, digest, retention, and authorized retrieval link |
 
-Authorization checks MUST use the same policy engine as real requests. Audit exports MUST be integrity-protected, access-controlled, time-limited, and themselves audited.
+Authorization checks MUST use the same policy engine as real requests. A runtime revocation replacement MUST be re-evaluated on subsequent authenticated HTTP requests and Raft RPCs, including existing TLS connections; it does not itself reload certificate, private-key, CRL, or PEM trust-anchor files. Audit exports MUST be integrity-protected, access-controlled, time-limited, and themselves audited.
 
 ## 15. Controller Cluster and Configuration
 

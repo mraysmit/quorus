@@ -1,0 +1,150 @@
+{
+  "schemaVersion": 1,
+  "assessmentDate": "2026-09-01",
+  "scope": [
+    "Phase 0 — Baseline, Conformance, and Delivery Controls",
+    "Phase 1 — Identity, Authorization, and Trust Boundaries"
+  ],
+  "finding": {
+    "tddCompliant": false,
+    "reason": "The implementation history does not retain a failing behavioral test executed before production implementation.",
+    "classification": "process deviation",
+    "disposition": "New tests are retrospective characterization and regression coverage only; they are not represented as historical TDD evidence."
+  },
+  "remediation": {
+    "deliveryGate": "Section 6.1 of QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md",
+    "testSynchronization": "Phase 0-touched asynchronous tests use shared Vert.x futures, timers, and VertxTestContext facilities instead of Awaitility polling.",
+    "externalBoundaries": [
+      "controller HTTPS and mutual TLS",
+      "trusted-gateway and direct-certificate authentication",
+      "tenant isolation and privileged-read audit completion",
+      "agent-to-controller mutual TLS and server trust",
+      "controller-to-controller Raft mutual TLS and unknown-certificate rejection",
+      "runtime HTTP and Raft revocation on established TLS connections",
+      "HTTP, Raft, and agent old/new certificate overlap",
+      "operational and retained audit-chain integrity"
+    ],
+    "focusedVerification": {
+      "command": "mvn -o -pl quorus-agent,quorus-controller -am -Dtest=SecurityBoundaryIntegrationTest,RaftMtlsBoundaryIntegrationTest,ControllerWebClientFactoryTlsTest,HashChainedAuditLogTest,OpenApiContractTest,SecurityConfigTest,AuthorizationPolicyEngineTest,AgentTransportSecurityTest -Dsurefire.failIfNoSpecifiedTests=false test",
+      "tests": 22,
+      "failures": 0,
+      "errors": 0,
+      "outcome": "passed"
+    },
+    "retainedTddSlices": [
+      {
+        "behavior": "FTP and FTPS integration services are ready only after the mapped control port returns three consecutive FTP 220 responses.",
+        "red": "Two clean reactor runs failed when Docker health status timed out even though the mapped FTP or FTPS control port was accepting protocol connections.",
+        "green": {
+          "command": "mvn -o -pl quorus-core -Dtest=FtpUploadIntegrationTest,FtpsUploadIntegrationTest test",
+          "tests": 14,
+          "failures": 0,
+          "errors": 0,
+          "outcome": "passed"
+        },
+        "refactor": "Removed redundant Docker health gating while retaining the stronger protocol-level readiness check and its diagnostic logging."
+      },
+      {
+        "behavior": "Shared TLS test fixtures load from both module directories and the packaged core test JAR used by a full reactor build.",
+        "red": "The full reactor verification produced four FileSystemNotFoundException errors when controller security tests resolved jar: resources as filesystem paths.",
+        "green": {
+          "command": "mvn -o -pl quorus-agent,quorus-controller -am -Dtest=SecurityBoundaryIntegrationTest,RaftMtlsBoundaryIntegrationTest,ControllerWebClientFactoryTlsTest -Dsurefire.failIfNoSpecifiedTests=false test",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "outcome": "passed"
+        },
+        "refactor": "Centralized classpath-to-temporary-file materialization in TestResourceUtils."
+      },
+      {
+        "behavior": "Runtime certificate revocation and trust-version updates apply to subsequent controller HTTP requests and Raft RPCs on existing TLS connections, with live authorization explanation, negative-boundary, expiry-observation, and configuration-change audit behavior.",
+        "red": {
+          "log": "temp/phase1-completion-red.txt",
+          "tests": 6,
+          "failures": 2,
+          "errors": 1,
+          "observedFailures": [
+            "PUT /api/v1/security/trust/revocations returned 404 before the route and handler existed.",
+            "RaftMtlsBoundaryIntegrationTest could not compile because CertificateTrustState did not exist.",
+            "The first wrong-role assertion targeted /api/v1/info, which legitimately allowed the SECURITY role; the test was corrected to the protected /api/v1/agents resource before the green run."
+          ],
+          "outcome": "failed as expected before production implementation"
+        },
+        "green": {
+          "log": "temp/phase1-completion-green-1.txt",
+          "command": "mvn -o -pl quorus-agent,quorus-controller -am -Dtest=SecurityBoundaryIntegrationTest,RaftMtlsBoundaryIntegrationTest,ControllerWebClientFactoryTlsTest -Dsurefire.failIfNoSpecifiedTests=false test",
+          "tests": 10,
+          "failures": 0,
+          "errors": 0,
+          "outcome": "passed"
+        },
+        "refactor": "One atomic CertificateTrustState is shared by controller HTTP and Raft enforcement, with transport validation left at the TLS layer and lifecycle policy evaluated at each request or RPC."
+      },
+      {
+        "behavior": "Existing security audit chains are verified before append, modified evidence causes startup refusal, and each event is durably written to distinct retained and operational chains.",
+        "red": {
+          "logs": [
+            "temp/phase1-audit-integrity-red.txt",
+            "temp/phase1-audit-evidence-red.txt"
+          ],
+          "observedFailures": [
+            "Reopening a modified chain did not throw IllegalStateException.",
+            "AuditSink.composite(HashChainedAuditLog, HashChainedAuditLog) was undefined."
+          ],
+          "outcome": "modified-chain acceptance failed the assertion and dual-sink behavior was absent before production implementation"
+        },
+        "green": {
+          "log": "temp/phase1-audit-integrity-green.txt",
+          "command": "mvn -o -pl quorus-controller -am -Dtest=HashChainedAuditLogTest -Dsurefire.failIfNoSpecifiedTests=false test",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "outcome": "passed"
+        },
+        "refactor": "Audit fan-out retains one event schema and writes the retained chain first; HashChainedAuditLog owns full-chain startup verification."
+      }
+    ],
+    "regressionVerification": {
+      "command": "mvn -o clean verify",
+      "log": "temp/phase1-final-clean-verify.txt",
+      "tests": 2237,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "modules": 7,
+      "outcome": "passed",
+      "moduleTests": {
+        "quorus-core": 1491,
+        "quorus-workflow": 134,
+        "quorus-tenant": 64,
+        "quorus-controller": 462,
+        "quorus-agent": 86,
+        "quorus-integration-examples": 0
+      }
+    }
+  },
+  "phase1Gate": {
+    "repositoryTechnicalStatus": "passed",
+    "basis": "Representative live HTTP, Raft, and agent TLS boundaries plus the full clean seven-module regression build passed.",
+    "notClaimed": "Corporate-environment accreditation or enterprise production readiness",
+    "externalValidation": [
+      "selected corporate PKI and enterprise gateway",
+      "production controller topology and agent estate",
+      "secrets platform and retained evidence collector",
+      "regulatory and operational approval"
+    ]
+  },
+  "approval": {
+    "required": true,
+    "status": "pending",
+    "approvers": [
+      "architecture",
+      "quality engineering",
+      "security engineering"
+    ]
+  },
+  "remainingGates": [
+    "Formal approval or rejection of the initial Phase 0 and Phase 1 historical TDD process deviation",
+    "retained red-green-refactor evidence for every subsequent behavior-changing slice"
+  ]
+}

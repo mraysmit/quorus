@@ -34,7 +34,7 @@ import java.util.List;
 import java.util.Set;
 
 import static dev.mars.quorus.testing.TestFutureUtils.awaitSuccess;
-import static org.awaitility.Awaitility.await;
+import static dev.mars.quorus.testing.TestFutureUtils.eventually;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
@@ -61,8 +61,8 @@ class ThreeControllerDurableRestartTest {
         Cluster first = startCluster(vertx, "first");
         Cluster recovered = null;
         try {
-            RaftNode leader = awaitLeader(first.nodes());
-            await().atMost(TIMEOUT).until(() -> leader.getCommitIndex() >= 1);
+            RaftNode leader = awaitLeader(vertx, first.nodes());
+            awaitSuccess(eventually(vertx, () -> leader.getCommitIndex() >= 1, TIMEOUT), TIMEOUT.plusSeconds(1));
 
             TransferRequest request = TransferRequest.builder()
                     .requestId(JOB_ID)
@@ -75,24 +75,25 @@ class ThreeControllerDurableRestartTest {
                             TransferJobCommand.create(new TransferJob(request), TENANT_ID)), TIMEOUT));
 
             Cluster initialCluster = first;
-            await().atMost(TIMEOUT).until(() -> initialCluster.states().stream().allMatch(state ->
+            awaitSuccess(eventually(vertx, () -> initialCluster.states().stream().allMatch(state ->
                     state.findTransferJob(JOB_ID)
                             .map(job -> TENANT_ID.equals(job.getTenantId()) && job.getStatus() == TransferStatus.PENDING)
-                            .orElse(false)));
+                            .orElse(false)), TIMEOUT), TIMEOUT.plusSeconds(1));
             long committedIndex = leader.getCommitIndex();
             int durableLogSize = leader.getLogSize();
-            await().atMost(TIMEOUT).until(() -> initialCluster.nodes().stream().allMatch(node ->
-                    node.getCommitIndex() >= committedIndex && node.getLogSize() == durableLogSize));
+            awaitSuccess(eventually(vertx, () -> initialCluster.nodes().stream().allMatch(node ->
+                    node.getCommitIndex() >= committedIndex && node.getLogSize() == durableLogSize), TIMEOUT),
+                    TIMEOUT.plusSeconds(1));
 
             stopCluster(first);
             first = null;
             InMemoryTransportSimulator.clearAllTransports();
 
             recovered = startCluster(vertx, "recovered");
-            awaitLeader(recovered.nodes());
+            awaitLeader(vertx, recovered.nodes());
             Cluster recoveredCluster = recovered;
-            await().atMost(TIMEOUT).until(() -> recoveredCluster.states().stream().allMatch(state ->
-                    state.findTransferJob(JOB_ID).isPresent()));
+            awaitSuccess(eventually(vertx, () -> recoveredCluster.states().stream().allMatch(state ->
+                    state.findTransferJob(JOB_ID).isPresent()), TIMEOUT), TIMEOUT.plusSeconds(1));
 
             for (QuorusStateStore state : recovered.states()) {
                 var transfer = state.findTransferJob(JOB_ID).orElseThrow();
@@ -144,8 +145,9 @@ class ThreeControllerDurableRestartTest {
         return new Cluster(nodes, states, executors);
     }
 
-    private static RaftNode awaitLeader(List<RaftNode> nodes) {
-        await().atMost(TIMEOUT).until(() -> nodes.stream().filter(RaftNode::isLeader).count() == 1);
+    private static RaftNode awaitLeader(Vertx vertx, List<RaftNode> nodes) {
+        awaitSuccess(eventually(vertx, () -> nodes.stream().filter(RaftNode::isLeader).count() == 1, TIMEOUT),
+                TIMEOUT.plusSeconds(1));
         return nodes.stream().filter(RaftNode::isLeader).findFirst().orElseThrow();
     }
 

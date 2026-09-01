@@ -16,21 +16,21 @@
 
 package dev.mars.quorus.testing;
 
-import io.vertx.core.AsyncResult;
 import io.vertx.core.Future;
+import io.vertx.core.Promise;
+import io.vertx.core.Vertx;
+import io.vertx.junit5.VertxTestContext;
 
 import java.time.Duration;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BooleanSupplier;
 
-import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Shared test utilities for blocking on Vert.x {@link Future} results
- * without using {@code toCompletionStage().toCompletableFuture().get/join()}.
- *
- * <p>Uses Awaitility to poll for completion, which is safe from both
- * event-loop and worker threads.
+ * Shared test utilities for observing Vert.x {@link Future} results using
+ * Vert.x JUnit facilities rather than Java concurrency or polling libraries.
  */
 public final class TestFutureUtils {
 
@@ -46,19 +46,18 @@ public final class TestFutureUtils {
      * @throws AssertionError if the future fails or times out
      */
     public static <T> T awaitSuccess(Future<T> future, Duration timeout) {
-        AtomicReference<AsyncResult<T>> outcomeRef = new AtomicReference<>();
-
-        future.onComplete(outcomeRef::set);
-
-        await().atMost(timeout)
-                .pollInterval(Duration.ofMillis(10))
-                .until(() -> outcomeRef.get() != null);
-
-        AsyncResult<T> outcome = outcomeRef.get();
-        if (outcome.failed()) {
-            throw new AssertionError("Future failed", outcome.cause());
-        }
-        return outcome.result();
+        VertxTestContext context = new VertxTestContext();
+        AtomicReference<T> result = new AtomicReference<>();
+        future.onComplete(outcome -> {
+            if (outcome.succeeded()) {
+                result.set(outcome.result());
+                context.completeNow();
+            } else {
+                context.failNow(outcome.cause());
+            }
+        });
+        awaitContext(context, timeout);
+        return result.get();
     }
 
     /**
@@ -70,16 +69,60 @@ public final class TestFutureUtils {
      * @throws AssertionError if the future succeeds or times out
      */
     public static Throwable awaitFailure(Future<?> future, Duration timeout) {
-        AtomicReference<AsyncResult<?>> outcomeRef = new AtomicReference<>();
+        VertxTestContext context = new VertxTestContext();
+        AtomicReference<Throwable> failure = new AtomicReference<>();
+        future.onComplete(outcome -> {
+            if (outcome.failed()) {
+                failure.set(outcome.cause());
+                context.completeNow();
+            } else {
+                context.failNow(new AssertionError("Expected future to fail"));
+            }
+        });
+        awaitContext(context, timeout);
+        assertTrue(failure.get() != null, "Expected future to fail");
+        return failure.get();
+    }
 
-        future.onComplete(outcomeRef::set);
+    /**
+     * Returns a future that completes when a condition becomes true, using only
+     * a Vert.x periodic timer for asynchronous coordination.
+     */
+    public static Future<Void> eventually(Vertx vertx, BooleanSupplier condition, Duration timeout) {
+        Promise<Void> promise = Promise.promise();
+        long deadline = System.nanoTime() + timeout.toNanos();
+        if (condition.getAsBoolean()) {
+            return Future.succeededFuture();
+        }
+        long timerId = vertx.setPeriodic(10, id -> {
+            try {
+                if (condition.getAsBoolean()) {
+                    vertx.cancelTimer(id);
+                    promise.tryComplete();
+                } else if (System.nanoTime() >= deadline) {
+                    vertx.cancelTimer(id);
+                    promise.tryFail(new AssertionError("Condition was not satisfied within " + timeout));
+                }
+            } catch (Throwable failure) {
+                vertx.cancelTimer(id);
+                promise.tryFail(failure);
+            }
+        });
+        promise.future().onComplete(ignored -> vertx.cancelTimer(timerId));
+        return promise.future();
+    }
 
-        await().atMost(timeout)
-                .pollInterval(Duration.ofMillis(10))
-                .until(() -> outcomeRef.get() != null);
-
-        AsyncResult<?> outcome = outcomeRef.get();
-        assertTrue(outcome.failed(), "Expected future to fail");
-        return outcome.cause();
+    private static void awaitContext(VertxTestContext context, Duration timeout) {
+        try {
+            if (!context.awaitCompletion(timeout.toMillis(), TimeUnit.MILLISECONDS)) {
+                throw new AssertionError("Vert.x future did not complete within " + timeout);
+            }
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new AssertionError("Interrupted while awaiting Vert.x future", exception);
+        }
+        if (context.failed()) {
+            throw new AssertionError("Future failed", context.causeOfFailure());
+        }
     }
 }

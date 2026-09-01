@@ -2,10 +2,12 @@
 
 # Quorus HTTP API Reference
 
-**Version:** 2.2  
+**Version:** 2.4  
 **Date:** 2026-09-01  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
+**Status:** Current implementation reference  
+**Scope:** Active controller HTTP surface  
 **Implementation:** `quorus-controller/src/main/java/dev/mars/quorus/controller/http/HttpApiServer.java`
 
 This document reflects the endpoints currently registered by the embedded controller HTTP server.
@@ -14,26 +16,57 @@ The complete production REST contract is defined in [QUORUS_REST_API_SPECIFICATI
 
 ## Base URL
 
-`http://{controller-host}:8080`
+`https://{controller-host}:8080`
+
+Plaintext is available only to legacy development/test constructors. The packaged production profile requires TLS 1.3 mutual authentication.
 
 ## Request Model
 
 - Content type: `application/json` for JSON request bodies
 - All write requests are subject to leader guarding
 - A follower rejects a write with `503 NOT_LEADER`; the implementation does not issue an HTTP redirect
-- The API currently does **not** enforce built-in authentication
+- All endpoints except liveness, readiness, and the OpenAPI document require a verified identity
+- Human and integration assertions are accepted only from configured trusted-gateway certificate subjects
+- Direct agents and workloads are resolved from exact client-certificate subject bindings
+- Production configuration cannot disable authentication, HTTP TLS, or Raft mutual TLS
 
 ## Tenant Isolation
 
-Every agent belongs to exactly one declared tenant. `tenantId` is required in agent registration and transfer creation, and selected agent/job paths validate matching tenant fields:
+Every authenticated identity has one tenant and environment. Agent registration and transfer creation derive tenant from that identity. A supplied `tenantId` is optional narrowing input and must match:
 
-- Agent registration without `tenantId` → `400 Bad Request`
-- Transfer creation without `tenantId` → `400 Bad Request`
+- An authenticated registration or transfer may omit `tenantId`; Quorus supplies the authenticated tenant
+- A supplied tenant that differs from the authenticated tenant → `403 Forbidden`
 - Heartbeat carrying a `tenantId` that does not match the registered agent's tenant → `403 Forbidden`
 - Job status update from an agent for a job belonging to a different tenant → `403 Forbidden`
-- `GET /api/v1/agents/:agentId/jobs` silently filters out jobs whose tenant does not match the agent's registered tenant
+- Agent, assignment, and route collections are filtered to the authenticated tenant
+- Transfer, assignment, route, heartbeat, polling, and status items enforce tenant ownership
+- An agent certificate may register, heartbeat, poll, or report only its bound `agentId`
 
-These checks do not authenticate the caller or prove that a supplied `tenantId` is trustworthy. Direct assignment creation does not yet uniformly enforce referenced job/agent existence and tenant equality inside state-machine application. Protected multi-tenant deployment therefore remains subject to `ARCH-03` and `ARCH-06` in the architecture specification.
+Uniform state-machine enforcement remains subject to `ARCH-06`; the HTTP boundary must not be treated as the only invariant layer. See [Quorus Security Deployment Guide](QUORUS_SECURITY_DEPLOYMENT_GUIDE.md).
+
+## Security Endpoints
+
+### `GET /api/v1/security/me`
+
+Returns the effective principal, identity type, tenant, environment, roles, scopes, assertion expiry, and privileged-elevation expiry.
+
+### `GET /api/v1/security/authorization/explain`
+
+Evaluates query parameters `method`, `path`, `tenantId`, `environment`, and `classification` without performing the proposed operation.
+
+### `POST /api/v1/security/authorization/check`
+
+Evaluates the same fields in a JSON request body through the active policy engine. The result contains `allowed`, a stable `decisionCode`, `reason`, `requiredScope`, and the effective identity.
+
+### `GET /api/v1/security/trust`
+
+Returns the active runtime trust-policy version and load time, revoked-certificate count, and the authenticated caller certificate's subject, expiry, seconds remaining, warning threshold, and `OK`, `WARNING`, or `EXPIRED` alert state. It exposes metadata only, never certificates, trust anchors, private material, or the revoked serial set.
+
+### `PUT /api/v1/security/trust/revocations`
+
+Atomically replaces the runtime revoked-certificate serial set and advances its version. The JSON body requires `trustBundleVersion` and the complete `revokedCertificateSerials` array. This route requires the `security:trust:write` scope and an active privileged elevation. The change applies to subsequent controller HTTP requests and Raft RPCs, including established TLS connections, and emits a `SECURITY_CONFIGURATION_CHANGE` audit event.
+
+Authentication, authorization, certificate-lifecycle, configuration-change, and protected completion events are written to the separately configured operational and retained hash-chained audit files. Certificate and assertion configuration is documented in the [Security Deployment Guide](QUORUS_SECURITY_DEPLOYMENT_GUIDE.md).
 
 ## Infrastructure Endpoints
 
@@ -78,7 +111,7 @@ Registers an agent through a Raft-replicated write. Returns `201 Created` on suc
 | `agentId` | string | Unique agent identifier |
 | `hostname` | string | Agent hostname |
 | `address` | string | Agent IP address |
-| `tenantId` | string | Tenant this agent belongs to |
+| `tenantId` | string | Optional narrowing value; must match the authenticated tenant |
 
 **Optional fields:**
 
@@ -99,7 +132,7 @@ Registers an agent through a Raft-replicated write. Returns `201 Created` on suc
   "hostname": "agent-nyc-01.example.com",
   "address": "10.0.1.5",
   "port": 0,
-  "tenantId": "acme-corp",
+  "tenantId": "payments-operations",
   "region": "us-east",
   "datacenter": "nyc3"
 }
@@ -137,7 +170,7 @@ Updates agent health and capacity state. Returns `200` on success.
 ```json
 {
   "agentId": "agent-nyc-01",
-  "tenantId": "acme-corp",
+  "tenantId": "payments-operations",
   "status": "ACTIVE",
   "sequenceNumber": 42
 }
@@ -173,7 +206,7 @@ Creates a transfer job. Returns `201 Created` on success.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `tenantId` | string | Tenant that owns this job — must match the agent that will execute it |
+| `tenantId` | string | Optional narrowing value; must match the authenticated tenant and executing agent |
 | `jobId` | string | Unique job identifier |
 | `sourceUri` | string | Source URI |
 | `destinationPath` | string | Destination path |
@@ -189,7 +222,7 @@ Creates a transfer job. Returns `201 Created` on success.
 
 ```json
 {
-  "tenantId": "acme-corp",
+  "tenantId": "payments-operations",
   "jobId": "job-2026-03-17-001",
   "sourceUri": "https://files.example.com/report.csv",
   "destinationPath": "/data/reports/report.csv",

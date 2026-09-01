@@ -18,6 +18,9 @@ package dev.mars.quorus.controller.http.handlers;
 
 import dev.mars.quorus.agent.AgentInfo;
 import dev.mars.quorus.controller.raft.RaftNode;
+import dev.mars.quorus.controller.security.SecurityContext;
+import dev.mars.quorus.controller.security.SecurityIdentity;
+import dev.mars.quorus.controller.security.IdentityType;
 import dev.mars.quorus.controller.state.AgentCommand;
 import dev.mars.quorus.controller.state.CommandResult;
 import io.vertx.core.Handler;
@@ -55,6 +58,10 @@ public class AgentRegistrationHandler implements Handler<RoutingContext> {
                 return;
             }
             AgentInfo agentInfo = body.mapTo(AgentInfo.class);
+            String trustedTenant = SecurityContext.trustedTenant(ctx, agentInfo.getTenantId());
+            if (trustedTenant != null) {
+                agentInfo.setTenantId(trustedTenant);
+            }
 
             if (agentInfo.getAgentId() == null || agentInfo.getAgentId().isEmpty()) {
                 ctx.fail(400, new IllegalArgumentException("Missing required field: agentId"));
@@ -69,7 +76,16 @@ public class AgentRegistrationHandler implements Handler<RoutingContext> {
                 return;
             }
             if (agentInfo.getTenantId() == null || agentInfo.getTenantId().isEmpty()) {
-                ctx.fail(400, new IllegalArgumentException("Missing required field: tenantId"));
+                ctx.fail(400, new IllegalArgumentException(
+                        "Missing required field: tenantId (or authenticated tenant identity)"));
+                return;
+            }
+            SecurityIdentity identity = SecurityContext.identity(ctx);
+            if (identity != null && identity.type() == IdentityType.AGENT
+                    && !identity.principalId().equals(agentInfo.getAgentId())) {
+                ctx.fail(new dev.mars.quorus.controller.http.QuorusApiException(
+                        dev.mars.quorus.controller.http.ErrorCode.FORBIDDEN,
+                        "An agent identity may register only its own agentId"));
                 return;
             }
 

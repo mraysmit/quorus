@@ -42,7 +42,7 @@ import java.nio.file.Path;
 import java.util.Set;
 
 import static dev.mars.quorus.testing.TestFutureUtils.awaitSuccess;
-import static org.awaitility.Awaitility.await;
+import static dev.mars.quorus.testing.TestFutureUtils.eventually;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -101,9 +101,8 @@ class LeaderGuardHandlerTest {
         node3.start();
 
         // Wait for leader election 
-        await().atMost(Duration.ofSeconds(15))
-                .pollInterval(Duration.ofMillis(100))
-                .until(() -> node1.isLeader() || node2.isLeader() || node3.isLeader());
+        awaitSuccess(eventually(vertx, () -> node1.isLeader() || node2.isLeader() || node3.isLeader(),
+                Duration.ofSeconds(15)), Duration.ofSeconds(16));
 
         // Identify leader and a follower with their state stores
         RaftNode[] allNodes = {node1, node2, node3};

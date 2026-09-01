@@ -2,19 +2,22 @@ openapi: 3.1.0
 jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
 info:
   title: Quorus Controller REST API
-  version: 1.0.0-alpha
-  summary: Current Phase 0 controller API contract
+  version: 1.1.0-alpha
+  summary: Phase 1 authenticated controller API contract
   description: >-
     Machine-readable contract for every HTTP route registered by the current Quorus
-    controller. Phase 0 permits trusted local and test-network access only; external
-    exposure is prohibited until authenticated identity and transport trust are delivered.
+    controller. Production access uses mutual TLS. Human and integration identities
+    are asserted by an explicitly trusted gateway over that authenticated hop; agent
+    identities are bound directly to their client certificates. Tenant and environment
+    are derived from the verified identity, never established by request content.
   license:
     name: Apache 2.0
     identifier: Apache-2.0
 servers:
-  - url: http://127.0.0.1:8080
-    description: Trusted local development endpoint
-security: []
+  - url: https://127.0.0.1:8080
+    description: Mutually authenticated controller endpoint
+security:
+  - mutualTls: []
 tags:
   - name: Operations
   - name: Cluster
@@ -22,6 +25,7 @@ tags:
   - name: Transfers
   - name: Assignments
   - name: Routes
+  - name: Security
 x-assignment-mutation-responses: &AssignmentMutationResponses
   '200':
     description: Assignment state changed
@@ -59,6 +63,7 @@ paths:
         default: {$ref: '#/components/responses/Problem'}
   /health/live:
     get:
+      security: []
       tags: [Operations]
       operationId: getLiveness
       summary: Report process liveness
@@ -71,6 +76,7 @@ paths:
         default: {$ref: '#/components/responses/Problem'}
   /health/ready:
     get:
+      security: []
       tags: [Operations]
       operationId: getReadiness
       summary: Report Raft and leader readiness
@@ -138,6 +144,7 @@ paths:
         default: {$ref: '#/components/responses/Problem'}
   /api/v1/openapi.yaml:
     get:
+      security: []
       tags: [Operations]
       operationId: getOpenApiContract
       summary: Download the bundled OpenAPI 3.1 contract
@@ -147,6 +154,94 @@ paths:
           content:
             application/vnd.oai.openapi;version=3.1.0:
               schema: {type: string}
+        default: {$ref: '#/components/responses/Problem'}
+  /api/v1/security/me:
+    get:
+      tags: [Security]
+      operationId: getEffectiveSecurityIdentity
+      summary: Return the verified effective identity and policy attributes
+      responses:
+        '200':
+          description: Effective authenticated identity
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SecurityIdentity'}
+        '401': {$ref: '#/components/responses/Problem'}
+        '403': {$ref: '#/components/responses/Problem'}
+        default: {$ref: '#/components/responses/Problem'}
+  /api/v1/security/authorization/explain:
+    get:
+      tags: [Security]
+      operationId: explainAuthorization
+      summary: Explain whether the caller may perform a proposed API operation
+      parameters:
+        - {name: method, in: query, schema: {type: string, default: GET}}
+        - {name: path, in: query, schema: {type: string, default: /api/v1/info}}
+        - {name: tenantId, in: query, schema: {type: string}}
+        - {name: environment, in: query, schema: {type: string}}
+        - {name: classification, in: query, schema: {type: string}}
+      responses:
+        '200':
+          description: Stable policy decision and its effective inputs
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AuthorizationExplanation'}
+        '401': {$ref: '#/components/responses/Problem'}
+        '403': {$ref: '#/components/responses/Problem'}
+        default: {$ref: '#/components/responses/Problem'}
+  /api/v1/security/authorization/check:
+    post:
+      tags: [Security]
+      operationId: checkAuthorization
+      summary: Evaluate the effective policy without performing the proposed operation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/AuthorizationCheck'}
+      responses:
+        '200':
+          description: Stable policy decision and its effective inputs
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AuthorizationExplanation'}
+        '401': {$ref: '#/components/responses/Problem'}
+        '403': {$ref: '#/components/responses/Problem'}
+        default: {$ref: '#/components/responses/Problem'}
+  /api/v1/security/trust:
+    get:
+      tags: [Security]
+      operationId: getSecurityTrustStatus
+      summary: Observe the active trust-bundle version and caller certificate expiry posture
+      responses:
+        '200':
+          description: Active trust and certificate-lifecycle observation
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SecurityTrustStatus'}
+        '401': {$ref: '#/components/responses/Problem'}
+        '403': {$ref: '#/components/responses/Problem'}
+        default: {$ref: '#/components/responses/Problem'}
+  /api/v1/security/trust/revocations:
+    put:
+      tags: [Security]
+      operationId: replaceCertificateRevocations
+      summary: Atomically replace runtime certificate revocations and advance the trust version
+      description: Requires an actively elevated security identity. The update applies to subsequent HTTP requests and Raft RPCs, including established TLS connections.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CertificateRevocationUpdate'}
+      responses:
+        '200':
+          description: Runtime revocation state replaced and audited
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CertificateRevocationUpdateResult'}
+        '400': {$ref: '#/components/responses/Problem'}
+        '401': {$ref: '#/components/responses/Problem'}
+        '403': {$ref: '#/components/responses/Problem'}
         default: {$ref: '#/components/responses/Problem'}
   /api/v1/agents/register:
     post:
@@ -485,6 +580,13 @@ paths:
       summary: Resume a suspended route
       responses: *RouteMutationResponses
 components:
+  securitySchemes:
+    mutualTls:
+      type: mutualTLS
+      description: >-
+        Client certificate authentication. Trusted gateway certificates may carry
+        protected X-Quorus-* identity assertions; direct agent certificates are
+        resolved through configured subject-to-identity bindings.
   parameters:
     AgentId:
       name: agentId
@@ -517,6 +619,69 @@ components:
         application/problem+json:
           schema: {$ref: '#/components/schemas/Problem'}
   schemas:
+    SecurityIdentity:
+      type: object
+      required: [principalId, identityType, tenantId, environment, roles, scopes, authenticatedAt]
+      properties:
+        principalId: {type: string}
+        identityType: {type: string, enum: [HUMAN, SERVICE_INTEGRATION, CONTROLLER, AGENT, DEPLOYMENT]}
+        tenantId: {type: string}
+        environment: {type: string}
+        roles: {type: array, items: {type: string}}
+        scopes: {type: array, items: {type: string}}
+        authenticatedAt: {type: string, format: date-time}
+        expiresAt: {type: [string, 'null'], format: date-time}
+        elevationExpiresAt: {type: [string, 'null'], format: date-time}
+    AuthorizationExplanation:
+      type: object
+      required: [allowed, decisionCode, reason, requiredScope, effectiveIdentity]
+      properties:
+        allowed: {type: boolean}
+        decisionCode: {type: string}
+        reason: {type: string}
+        requiredScope: {type: string}
+        effectiveIdentity: {$ref: '#/components/schemas/SecurityIdentity'}
+    AuthorizationCheck:
+      type: object
+      required: [method, path]
+      properties:
+        method: {type: string}
+        path: {type: string}
+        tenantId: {type: string}
+        environment: {type: string}
+        classification: {type: string}
+    SecurityTrustStatus:
+      type: object
+      required: [trustBundleVersion, trustBundleLoadedAt, revokedCertificateCount, certificateSubject,
+        certificateExpiresAt, certificateSecondsRemaining, expiryWarningThresholdSeconds, expiryAlertState]
+      properties:
+        trustBundleVersion: {type: string, minLength: 1}
+        trustBundleLoadedAt: {type: string, format: date-time}
+        revokedCertificateCount: {type: integer, minimum: 0}
+        certificateSubject: {type: string}
+        certificateExpiresAt: {type: string, format: date-time}
+        certificateSecondsRemaining: {type: integer, format: int64}
+        expiryWarningThresholdSeconds: {type: integer, format: int64, minimum: 1}
+        expiryAlertState: {type: string, enum: [OK, WARNING, EXPIRED]}
+      additionalProperties: false
+    CertificateRevocationUpdate:
+      type: object
+      required: [trustBundleVersion, revokedCertificateSerials]
+      properties:
+        trustBundleVersion: {type: string, minLength: 1}
+        revokedCertificateSerials:
+          type: array
+          uniqueItems: true
+          items: {type: string, minLength: 1}
+      additionalProperties: false
+    CertificateRevocationUpdateResult:
+      type: object
+      required: [trustBundleVersion, loadedAt, revokedCertificateCount]
+      properties:
+        trustBundleVersion: {type: string, minLength: 1}
+        loadedAt: {type: string, format: date-time}
+        revokedCertificateCount: {type: integer, minimum: 0}
+      additionalProperties: false
     Problem:
       type: object
       required: [type, title, status, detail, instance, shortCode, code, timestamp, requestId]
@@ -580,13 +745,16 @@ components:
         commitIndex: {type: integer, format: int64}
     AgentRegistration:
       type: object
-      required: [agentId, hostname, address, tenantId]
+      required: [agentId, hostname, address]
       properties:
         agentId: {type: string, minLength: 1}
         hostname: {type: string, minLength: 1}
         address: {type: string, minLength: 1}
         port: {type: integer, minimum: 1, maximum: 65535}
-        tenantId: {type: string, minLength: 1}
+        tenantId:
+          type: string
+          minLength: 1
+          description: Optional narrowing value; it must match the authenticated tenant.
         status: {$ref: '#/components/schemas/AgentStatus'}
         version: {type: string}
         region: {type: string}
@@ -630,10 +798,13 @@ components:
         acknowledgedSequenceNumber: {type: integer}
     CreateTransfer:
       type: object
-      required: [jobId, tenantId, sourceUri, destinationPath]
+      required: [jobId, sourceUri, destinationPath]
       properties:
         jobId: {type: string, minLength: 1}
-        tenantId: {type: string, minLength: 1}
+        tenantId:
+          type: string
+          minLength: 1
+          description: Optional narrowing value; it must match the authenticated tenant.
         sourceUri: {type: string, format: uri}
         destinationPath: {type: string, minLength: 1}
         totalBytes: {type: integer, format: int64, minimum: 0}

@@ -159,11 +159,11 @@ public final class SharedTestContainers {
                             new File("src/test/resources/docker-compose-ftp-test.yml"))
                             .withEnv("FTP_CONTROL_PORT", Integer.toString(ftpControlPort))
                             .withEnv("FTP_DATA_PORT", Integer.toString(ftpDataPort))
-                            .waitingFor("ftp", Wait.forHealthcheck())
                             .withStartupTimeout(Duration.ofMinutes(2));
                     try {
                         container.start();
-                        // Wait for vsftpd to be fully ready (accept connections)
+                        // The FTP 220 handshake is the authoritative readiness boundary. Docker
+                        // health can lag or report unhealthy even when the mapped protocol is ready.
                         waitForFtpReady("localhost", ftpControlPort, Duration.ofMinutes(1));
                         ftpContainer = container;
                     } catch (RuntimeException e) {
@@ -235,11 +235,10 @@ public final class SharedTestContainers {
                             .withBuild(true)
                             .withEnv("FTPS_CONTROL_PORT", Integer.toString(ftpsControlPort))
                             .withEnv("FTPS_DATA_PORT", Integer.toString(ftpsDataPort))
-                            .waitingFor("ftps", Wait.forHealthcheck())
                             .withStartupTimeout(Duration.ofMinutes(3));
                     try {
                         container.start();
-                        // Wait for the FTP service to fully initialise (DH params, TLS cert, etc.)
+                        // Use the real FTP protocol boundary rather than Docker health metadata.
                         waitForFtpReady("localhost", ftpsControlPort, Duration.ofMinutes(2));
                         ftpsContainer = container;
                     } catch (RuntimeException e) {

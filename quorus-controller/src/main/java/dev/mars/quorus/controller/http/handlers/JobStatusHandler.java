@@ -20,6 +20,9 @@ import dev.mars.quorus.agent.AgentInfo;
 import dev.mars.quorus.controller.http.ErrorCode;
 import dev.mars.quorus.controller.http.QuorusApiException;
 import dev.mars.quorus.controller.raft.RaftNode;
+import dev.mars.quorus.controller.security.IdentityType;
+import dev.mars.quorus.controller.security.SecurityContext;
+import dev.mars.quorus.controller.security.SecurityIdentity;
 import dev.mars.quorus.controller.state.CommandResult;
 import dev.mars.quorus.controller.state.JobAssignmentCommand;
 import dev.mars.quorus.controller.state.QuorusStateStore;
@@ -88,6 +91,14 @@ public class JobStatusHandler implements Handler<RoutingContext> {
             }
             TransferJobSnapshot transferJobSnapshot = stateStore.findTransferJob(jobId)
                     .orElseThrow(() -> QuorusApiException.notFound(ErrorCode.TRANSFER_NOT_FOUND, jobId));
+            SecurityContext.trustedTenant(ctx, transferJobSnapshot.getTenantId());
+            SecurityIdentity identity = SecurityContext.identity(ctx);
+            if (identity != null && identity.type() == IdentityType.AGENT
+                    && !identity.principalId().equals(agentId)) {
+                ctx.fail(new QuorusApiException(ErrorCode.FORBIDDEN,
+                        "An agent identity may report status only for its own agentId"));
+                return;
+            }
             if (agent.getTenantId() != null
                     && transferJobSnapshot.getTenantId() != null
                     && !agent.getTenantId().equals(transferJobSnapshot.getTenantId())) {

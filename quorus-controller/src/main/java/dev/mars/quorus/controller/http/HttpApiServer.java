@@ -19,10 +19,23 @@ package dev.mars.quorus.controller.http;
 import dev.mars.quorus.controller.http.handlers.*;
 import dev.mars.quorus.controller.config.AppConfig;
 import dev.mars.quorus.controller.raft.RaftNode;
+import dev.mars.quorus.controller.security.AuthenticationHandler;
+import dev.mars.quorus.controller.security.AuthorizationHandler;
+import dev.mars.quorus.controller.security.AuthorizationPolicyEngine;
+import dev.mars.quorus.controller.security.SecurityConfig;
+import dev.mars.quorus.controller.security.CertificateTrustState;
+import dev.mars.quorus.controller.security.SecurityProfile;
+import dev.mars.quorus.controller.security.audit.AuditCompletionHandler;
+import dev.mars.quorus.controller.security.audit.AuditSink;
+import dev.mars.quorus.controller.security.audit.HashChainedAuditLog;
 import dev.mars.quorus.controller.state.QuorusStateStore;
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
+import io.vertx.core.http.ClientAuth;
 import io.vertx.core.http.HttpServer;
+import io.vertx.core.http.HttpServerOptions;
+import io.vertx.core.net.PemKeyCertOptions;
+import io.vertx.core.net.PemTrustOptions;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.handler.BodyHandler;
 import org.slf4j.Logger;
@@ -60,6 +73,10 @@ public class HttpApiServer {
     private final QuorusStateStore stateStore;
     private final int prometheusPort;
     private final DrainModeHandler drainModeHandler;
+    private final SecurityConfig securityConfig;
+    private final AuthorizationPolicyEngine policyEngine;
+    private final AuditSink auditSink;
+    private final CertificateTrustState trustState;
     private HealthHandler healthHandler;
     private HttpServer httpServer;
 
@@ -81,6 +98,33 @@ public class HttpApiServer {
 
     public HttpApiServer(Vertx vertx, String host, int port, RaftNode raftNode,
                          QuorusStateStore stateStore, int prometheusPort) {
+        this(vertx, host, port, raftNode, stateStore, prometheusPort,
+                SecurityConfig.developmentDisabled(), AuditSink.noOp());
+    }
+
+    public HttpApiServer(Vertx vertx, String host, int port, RaftNode raftNode,
+                         QuorusStateStore stateStore, int prometheusPort, SecurityConfig securityConfig) {
+        this(vertx, host, port, raftNode, stateStore, prometheusPort, securityConfig,
+                CertificateTrustState.from(securityConfig));
+    }
+
+    public HttpApiServer(Vertx vertx, String host, int port, RaftNode raftNode,
+                         QuorusStateStore stateStore, int prometheusPort, SecurityConfig securityConfig,
+                         CertificateTrustState trustState) {
+        this(vertx, host, port, raftNode, stateStore, prometheusPort, securityConfig,
+                createAuditSink(securityConfig), trustState);
+    }
+
+    HttpApiServer(Vertx vertx, String host, int port, RaftNode raftNode,
+                  QuorusStateStore stateStore, int prometheusPort, SecurityConfig securityConfig,
+                  AuditSink auditSink) {
+        this(vertx, host, port, raftNode, stateStore, prometheusPort, securityConfig, auditSink,
+                CertificateTrustState.from(securityConfig));
+    }
+
+    HttpApiServer(Vertx vertx, String host, int port, RaftNode raftNode,
+                  QuorusStateStore stateStore, int prometheusPort, SecurityConfig securityConfig,
+                  AuditSink auditSink, CertificateTrustState trustState) {
         this.vertx = vertx;
         this.host = host;
         this.port = port;
@@ -88,6 +132,10 @@ public class HttpApiServer {
         this.stateStore = stateStore;
         this.prometheusPort = prometheusPort;
         this.drainModeHandler = new DrainModeHandler();
+        this.securityConfig = securityConfig;
+        this.policyEngine = new AuthorizationPolicyEngine();
+        this.auditSink = auditSink;
+        this.trustState = trustState;
     }
 
     public Future<Void> start() {
@@ -95,6 +143,9 @@ public class HttpApiServer {
 
         // ==================== Middleware Pipeline ====================
         router.route().handler(new CorrelationIdHandler());
+        router.route().handler(new AuthenticationHandler(securityConfig, auditSink, trustState));
+        router.route().handler(new AuthorizationHandler(securityConfig, policyEngine, auditSink));
+        router.route().handler(new AuditCompletionHandler(securityConfig, policyEngine, auditSink));
         router.route().handler(BodyHandler.create()
                 .setBodyLimit(AppConfig.get().getHttpMaxBodyBytes()));
         router.route().handler(drainModeHandler);
@@ -120,6 +171,14 @@ public class HttpApiServer {
         router.get("/raft/status").handler(new ClusterHandler(raftNode));
         router.get("/api/v1/info").handler(new InfoHandler(raftNode, VERSION));
         router.get("/api/v1/openapi.yaml").handler(new OpenApiHandler());
+
+        // ==================== Security Endpoints ====================
+        SecurityHandler securityHandler = new SecurityHandler(policyEngine, trustState, auditSink);
+        router.get("/api/v1/security/me").handler(securityHandler.handleMe());
+        router.get("/api/v1/security/authorization/explain").handler(securityHandler.handleExplain());
+        router.post("/api/v1/security/authorization/check").handler(securityHandler.handleCheck());
+        router.get("/api/v1/security/trust").handler(securityHandler.handleTrustStatus());
+        router.put("/api/v1/security/trust/revocations").handler(securityHandler.handleRevocationUpdate());
 
         // ==================== Agent Endpoints ====================
         router.post("/api/v1/agents/register").handler(new AgentRegistrationHandler(raftNode));
@@ -157,7 +216,24 @@ public class HttpApiServer {
         router.put("/api/v1/routes/:routeId/suspend").handler(routeHandler.handleSuspend());
         router.put("/api/v1/routes/:routeId/resume").handler(routeHandler.handleResume());
 
-        httpServer = vertx.createHttpServer()
+        HttpServerOptions serverOptions = new HttpServerOptions();
+        if (securityConfig.httpTlsEnabled()) {
+            serverOptions.setSsl(true)
+                    .setClientAuth(ClientAuth.REQUIRED)
+                    .setKeyCertOptions(new PemKeyCertOptions()
+                            .setCertPath(securityConfig.httpCertificate().toString())
+                            .setKeyPath(securityConfig.httpPrivateKey().toString()))
+                    .setTrustOptions(new PemTrustOptions()
+                            .addCertPath(securityConfig.httpTrustBundle().toString()))
+                    .setEnabledSecureTransportProtocols(java.util.Set.of("TLSv1.3"));
+            if (securityConfig.httpCrl() != null) {
+                serverOptions.addCrlPath(securityConfig.httpCrl().toString());
+            }
+        } else if (securityConfig.profile() == SecurityProfile.DEVELOPMENT) {
+            logger.warn("INSECURE DEVELOPMENT MODE: HTTP TLS and request authentication are not production-ready");
+        }
+
+        httpServer = vertx.createHttpServer(serverOptions)
                 .requestHandler(router);
 
         return httpServer.listen(port, host)
@@ -175,9 +251,21 @@ public class HttpApiServer {
         }
         if (httpServer != null) {
             return httpServer.close()
-                    .onSuccess(v -> logger.info("HTTP API Server stopped"));
+                    .onSuccess(v -> {
+                        auditSink.close();
+                        logger.info("HTTP API Server stopped");
+                    });
         }
+        auditSink.close();
         return Future.succeededFuture();
+    }
+
+    private static AuditSink createAuditSink(SecurityConfig config) {
+        if (config.auditLogPath() == null) return AuditSink.noOp();
+        HashChainedAuditLog operational = new HashChainedAuditLog(config.auditLogPath());
+        if (config.auditEvidencePath() == null) return operational;
+        // Retained evidence is first so an operational-log failure cannot lose the security event.
+        return AuditSink.composite(new HashChainedAuditLog(config.auditEvidencePath()), operational);
     }
 
     /**

@@ -34,4 +34,6 @@ The Phase 0 focused gates are:
 
 Run `scripts/generate-phase0-evidence.ps1 -CompletedCleanBuilds 2` after both clean builds pass. It records the completed build count, Git revision and worktree state, Java and Maven versions, operating environment, test report totals, configuration digests and built artifact SHA-256 digests in `docs-design/evidence/phase0-release-evidence.json`.
 
+M0 was verified and committed at revision `07195f6eaf33599d39aa0759cbe1d628b8a288d2`. The committed evidence records two clean Java 25 builds, 2,212 tests with no failures or errors, and SHA-256 digests for the seven primary build artifacts.
+
 An evidence manifest is immutable once attached to a release candidate. A changed code revision, configuration, dependency lock or artifact requires regeneration and re-approval.

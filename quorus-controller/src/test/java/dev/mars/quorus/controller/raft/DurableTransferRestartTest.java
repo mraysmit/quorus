@@ -51,7 +51,7 @@ import java.time.Instant;
 import java.util.Set;
 
 import static dev.mars.quorus.testing.TestFutureUtils.awaitSuccess;
-import static org.awaitility.Awaitility.await;
+import static dev.mars.quorus.testing.TestFutureUtils.eventually;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
@@ -85,9 +85,10 @@ class DurableTransferRestartTest {
             RaftStorage firstStorage = openStorage(vertx, firstExecutor, storagePath);
             firstNode = node(vertx, firstState, firstStorage);
             awaitSuccess(firstNode.start(), TIMEOUT);
-            await().atMost(TIMEOUT).until(firstNode::isLeader);
+            awaitSuccess(eventually(vertx, firstNode::isLeader, TIMEOUT), TIMEOUT.plusSeconds(1));
             RaftNode electedNode = firstNode;
-            await().atMost(TIMEOUT).until(() -> electedNode.getCommitIndex() >= 1);
+            awaitSuccess(eventually(vertx, () -> electedNode.getCommitIndex() >= 1, TIMEOUT),
+                    TIMEOUT.plusSeconds(1));
 
             TransferRequest request = TransferRequest.builder()
                     .requestId(JOB_ID)

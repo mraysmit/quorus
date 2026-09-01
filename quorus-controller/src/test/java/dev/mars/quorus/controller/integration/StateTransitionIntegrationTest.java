@@ -37,7 +37,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static dev.mars.quorus.testing.TestFutureUtils.awaitSuccess;
-import static org.awaitility.Awaitility.await;
+import static dev.mars.quorus.testing.TestFutureUtils.eventually;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -92,9 +92,7 @@ class StateTransitionIntegrationTest {
                 .build();
         raftNode.start();
 
-        await().atMost(Duration.ofSeconds(10))
-                .pollInterval(Duration.ofMillis(50))
-                .until(() -> raftNode.isLeader());
+        awaitSuccess(eventually(vertx, raftNode::isLeader, Duration.ofSeconds(10)), Duration.ofSeconds(11));
 
         httpServer = new HttpApiServer(vertx, HTTP_PORT, raftNode, stateMachine);
         awaitSuccess(httpServer.start(), Duration.ofSeconds(5));

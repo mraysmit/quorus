@@ -23,8 +23,12 @@ import dev.mars.quorus.controller.raft.grpc.InstallSnapshotResponse;
 import dev.mars.quorus.controller.raft.grpc.RaftServiceGrpc;
 import dev.mars.quorus.controller.raft.grpc.VoteRequest;
 import dev.mars.quorus.controller.raft.grpc.VoteResponse;
+import dev.mars.quorus.controller.security.CertificateTrustState;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
+import io.grpc.netty.GrpcSslContexts;
+import io.grpc.netty.NettyServerBuilder;
+import io.netty.handler.ssl.ClientAuth;
 import io.grpc.stub.StreamObserver;
 import io.opentelemetry.api.GlobalOpenTelemetry;
 import io.opentelemetry.api.trace.Span;
@@ -57,12 +61,26 @@ public class GrpcRaftServer {
     private final Vertx vertx;
     private final int port;
     private final RaftNode raftNode;
+    private final RaftTlsConfig tlsConfig;
+    private final CertificateTrustState trustState;
     private Server server;
 
     public GrpcRaftServer(Vertx vertx, int port, RaftNode raftNode) {
+        this(vertx, port, raftNode, RaftTlsConfig.developmentDisabled());
+    }
+
+    public GrpcRaftServer(Vertx vertx, int port, RaftNode raftNode, RaftTlsConfig tlsConfig) {
+        this(vertx, port, raftNode, tlsConfig,
+                new CertificateTrustState("configuration", java.util.Set.of(), java.time.Duration.ofDays(30)));
+    }
+
+    public GrpcRaftServer(Vertx vertx, int port, RaftNode raftNode, RaftTlsConfig tlsConfig,
+                          CertificateTrustState trustState) {
         this.vertx = vertx;
         this.port = port;
         this.raftNode = raftNode;
+        this.tlsConfig = tlsConfig;
+        this.trustState = trustState;
     }
 
     /**
@@ -75,10 +93,23 @@ public class GrpcRaftServer {
 
         vertx.executeBlocking(() -> {
             try {
-                server = ServerBuilder.forPort(port)
-                        .addService(new RaftServiceImpl())
-                        .build()
-                        .start();
+                ServerBuilder<?> builder;
+                if (tlsConfig.enabled()) {
+                    builder = NettyServerBuilder.forPort(port)
+                            .sslContext(GrpcSslContexts.forServer(
+                                            tlsConfig.certificate().toFile(), tlsConfig.privateKey().toFile())
+                                    .trustManager(tlsConfig.trustBundle().toFile())
+                                    .clientAuth(ClientAuth.REQUIRE)
+                                    .protocols("TLSv1.3")
+                                    .build());
+                } else {
+                    logger.warn("INSECURE DEVELOPMENT MODE: Raft gRPC is using plaintext");
+                    builder = ServerBuilder.forPort(port);
+                }
+                if (tlsConfig.enabled()) {
+                    builder.intercept(new RaftPeerAuthorizationInterceptor(trustState));
+                }
+                server = builder.addService(new RaftServiceImpl()).build().start();
                 logger.info("gRPC Raft server started on port {}", port);
                 return null;
             } catch (IOException e) {

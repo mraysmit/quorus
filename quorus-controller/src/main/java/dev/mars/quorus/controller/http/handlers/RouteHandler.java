@@ -16,9 +16,12 @@
 
 package dev.mars.quorus.controller.http.handlers;
 
+import dev.mars.quorus.agent.AgentInfo;
 import dev.mars.quorus.controller.http.ErrorCode;
 import dev.mars.quorus.controller.http.QuorusApiException;
 import dev.mars.quorus.controller.raft.RaftNode;
+import dev.mars.quorus.controller.security.SecurityContext;
+import dev.mars.quorus.controller.security.SecurityIdentity;
 import dev.mars.quorus.controller.state.CommandResult;
 import dev.mars.quorus.controller.state.QuorusStateStore;
 import dev.mars.quorus.controller.state.RouteCommand;
@@ -83,6 +86,7 @@ public class RouteHandler {
                 RouteConfiguration routeToStore = (route.getStatus() != RouteStatus.CONFIGURED)
                         ? route.withStatus(RouteStatus.CONFIGURED)
                         : route;
+                requireRouteTenant(ctx, routeToStore);
 
                 QuorusStateStore stateMachine = this.stateStore;
                 if (stateMachine.hasRoute(routeToStore.getRouteId())) {
@@ -128,8 +132,13 @@ public class RouteHandler {
             String statusFilter = ctx.request().getParam("status");
 
             JsonArray routeArray = new JsonArray();
+            SecurityIdentity identity = SecurityContext.identity(ctx);
             for (RouteConfiguration route : routes.values()) {
                 if (statusFilter != null && !route.getStatus().name().equalsIgnoreCase(statusFilter)) {
+                    continue;
+                }
+                String routeTenant = routeTenant(route);
+                if (identity != null && !identity.tenantId().equals(routeTenant)) {
                     continue;
                 }
                 routeArray.add(routeToJson(route));
@@ -150,6 +159,7 @@ public class RouteHandler {
 
             RouteConfiguration route = stateStore.findRoute(routeId)
                     .orElseThrow(() -> QuorusApiException.notFound(ErrorCode.ROUTE_NOT_FOUND, routeId));
+            requireRouteTenant(ctx, route);
 
             ctx.json(routeToJson(route));
         };
@@ -169,6 +179,7 @@ public class RouteHandler {
 
                 RouteConfiguration existing = stateStore.findRoute(routeId)
                         .orElseThrow(() -> QuorusApiException.notFound(ErrorCode.ROUTE_NOT_FOUND, routeId));
+                requireRouteTenant(ctx, existing);
 
                 // Cannot update routes that are actively transferring or deleted
                 if (existing.getStatus() == RouteStatus.TRANSFERRING || existing.getStatus() == RouteStatus.DELETED) {
@@ -177,6 +188,7 @@ public class RouteHandler {
                 }
 
                 RouteConfiguration update = body.mapTo(RouteConfiguration.class);
+                requireRouteTenant(ctx, update);
                 logger.info("Updating route: routeId={}", routeId);
                 RouteCommand command = RouteCommand.update(routeId, update);
                 raftNode.submitCommand(command)
@@ -215,6 +227,7 @@ public class RouteHandler {
 
             RouteConfiguration existing = stateStore.findRoute(routeId)
                     .orElseThrow(() -> QuorusApiException.notFound(ErrorCode.ROUTE_NOT_FOUND, routeId));
+            requireRouteTenant(ctx, existing);
 
             // Pre-commit transition validation: can we transition to DELETED?
             validateTransition(existing, RouteStatus.DELETED, routeId, "delete");
@@ -247,6 +260,7 @@ public class RouteHandler {
 
             RouteConfiguration existing = stateStore.findRoute(routeId)
                     .orElseThrow(() -> QuorusApiException.notFound(ErrorCode.ROUTE_NOT_FOUND, routeId));
+            requireRouteTenant(ctx, existing);
 
             // Pre-commit transition validation: can we transition to SUSPENDED?
             validateTransition(existing, RouteStatus.SUSPENDED, routeId, "suspend");
@@ -295,6 +309,7 @@ public class RouteHandler {
 
             RouteConfiguration existing = stateStore.findRoute(routeId)
                     .orElseThrow(() -> QuorusApiException.notFound(ErrorCode.ROUTE_NOT_FOUND, routeId));
+            requireRouteTenant(ctx, existing);
 
             // Resume operation requires SUSPENDED state specifically (not just canTransitionTo ACTIVE)
             if (existing.getStatus() != RouteStatus.SUSPENDED) {
@@ -329,6 +344,26 @@ public class RouteHandler {
     }
 
     // ==================== Validation ====================
+
+    private void requireRouteTenant(RoutingContext context, RouteConfiguration route) {
+        String tenant = routeTenant(route);
+        if (SecurityContext.identity(context) != null && tenant == null) {
+            throw new QuorusApiException(ErrorCode.FORBIDDEN,
+                    "Route tenant cannot be established from its registered agents");
+        }
+        SecurityContext.trustedTenant(context, tenant);
+    }
+
+    private String routeTenant(RouteConfiguration route) {
+        AgentInfo source = stateStore.getAgent(route.getSourceAgentId());
+        AgentInfo destination = stateStore.getAgent(route.getDestinationAgentId());
+        if (source == null || destination == null) return null;
+        if (source.getTenantId() == null || !source.getTenantId().equals(destination.getTenantId())) {
+            throw new QuorusApiException(ErrorCode.FORBIDDEN,
+                    "Source and destination agents must belong to the same tenant");
+        }
+        return source.getTenantId();
+    }
 
     /**
      * Validates that the route can transition from its current status to the target status.

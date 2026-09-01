@@ -18,6 +18,8 @@ package dev.mars.quorus.controller.http.handlers;
 
 import dev.mars.quorus.agent.AgentInfo;
 import dev.mars.quorus.controller.state.QuorusStateStore;
+import dev.mars.quorus.controller.security.SecurityContext;
+import dev.mars.quorus.controller.security.SecurityIdentity;
 import io.vertx.core.Handler;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
@@ -55,7 +57,11 @@ public class AgentListHandler implements Handler<RoutingContext> {
         Map<String, AgentInfo> agents = stateMachine.getAgents();
 
         JsonArray agentArray = new JsonArray();
+        SecurityIdentity identity = SecurityContext.identity(ctx);
         for (AgentInfo agent : agents.values()) {
+            if (identity != null && !identity.tenantId().equals(agent.getTenantId())) {
+                continue;
+            }
             agentArray.add(new JsonObject()
                     .put("agentId", agent.getAgentId())
                     .put("hostname", agent.getHostname())
@@ -71,9 +77,9 @@ public class AgentListHandler implements Handler<RoutingContext> {
                     .put("available", agent.isAvailable()));
         }
 
-        logger.debug("Returning {} agents", agents.size());
+        logger.debug("Returning {} tenant-scoped agents", agentArray.size());
         ctx.json(new JsonObject()
                 .put("agents", agentArray)
-                .put("count", agents.size()));
+                .put("count", agentArray.size()));
     }
 }
