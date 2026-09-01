@@ -101,7 +101,7 @@ class AgentRegistrationServiceTest {
         vertx.createHttpServer()
             .requestHandler(router)
             .listen(0)
-            .onSuccess(server -> {
+            .onComplete(testContext.succeeding(server -> {
                 testServer = server;
                 serverPort = server.actualPort();
                 
@@ -111,6 +111,7 @@ class AgentRegistrationServiceTest {
                 
                 config = new AgentConfiguration.Builder()
                     .agentId("test-agent-reg")
+                    .tenantId("test-tenant")
                     .controllerUrl("http://localhost:" + serverPort)
                     .region("test-region")
                     .datacenter("test-dc")
@@ -121,10 +122,9 @@ class AgentRegistrationServiceTest {
                     .maxConcurrentTransfers(10)
                     .supportedProtocols(protocols)
                     .build();
-                
+
                 testContext.completeNow();
-            })
-            .onFailure(testContext::failNow);
+            }));
     }
 
     @BeforeEach
@@ -222,6 +222,7 @@ class AgentRegistrationServiceTest {
     void testRegisterConnectionError(Vertx vertx, VertxTestContext testContext) {
         AgentConfiguration badConfig = new AgentConfiguration.Builder()
             .agentId("test-agent-bad")
+            .tenantId("test-tenant")
             .controllerUrl("http://localhost:59999") // Non-existent port
             .region("test-region")
             .datacenter("test-dc")

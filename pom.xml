@@ -23,13 +23,12 @@
 
     <properties>
         <java.version>25</java.version>
-        <maven.compiler.source>${java.version}</maven.compiler.source>
-        <maven.compiler.target>${java.version}</maven.compiler.target>
+        <maven.compiler.release>${java.version}</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <junit.version>5.14.3</junit.version>
         <vertx.version>5.0.8</vertx.version>
         <testcontainers.version>2.0.3</testcontainers.version>
-        <jacoco.version>0.8.13</jacoco.version>
+        <jacoco.version>0.8.15</jacoco.version>
         <raftlog.version>1.1.0</raftlog.version>
         <!-- Shared timestamp for consolidated test log file across all modules -->
         <maven.build.timestamp.format>yyyy-MM-dd_HH-mm-ss</maven.build.timestamp.format>

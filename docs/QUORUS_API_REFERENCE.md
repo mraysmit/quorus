@@ -4,7 +4,7 @@
 
 **Version:** 2.1  
 **Date:** 2026-03-17  
-**Author:** Mark Ray-Smith — Cityline Ltd  
+**Author:** Mark Ray-Smith Cityline Ltd  
 **License:** Apache 2.0  
 **Implementation:** `quorus-controller/src/main/java/dev/mars/quorus/controller/http/HttpApiServer.java`
 

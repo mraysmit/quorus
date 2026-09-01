@@ -536,7 +536,9 @@ class InMemorySimulatorTest {
                 InMemoryControllerClientSimulator.ClientFailureMode.CONNECTION_REFUSED);
 
             var future = client.get("/health");
-            assertThat(future).isCompletedExceptionally();
+            assertThatThrownBy(() -> future.get(5, TimeUnit.SECONDS))
+                .isInstanceOf(ExecutionException.class)
+                .hasCauseInstanceOf(InMemoryControllerClientSimulator.ClientException.class);
             log.info("CONNECTION_REFUSED correctly rejected request");
         }
 
