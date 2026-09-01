@@ -5,6 +5,9 @@
 **Status:** NOT STARTED  
 **Dependencies:** Core infrastructure complete
 
+> [!IMPORTANT]
+> This is a historical implementation plan, not the current security contract. Enterprise identity, TLS/mTLS, service trust and egress policy, secret references, audit, and secure agent lifecycle controls are production release requirements rather than optional post-stability enhancements. See [QUORUS_ARCHITECTURE_SPECIFICATION.md](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md) and [QUORUS_REST_API_SPECIFICATION.md](../../docs/QUORUS_REST_API_SPECIFICATION.md).
+
 ---
 
 ## Overview

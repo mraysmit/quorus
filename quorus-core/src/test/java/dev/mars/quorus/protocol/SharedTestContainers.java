@@ -23,7 +23,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.io.IOException;
+import java.net.ServerSocket;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Shared test containers that are reused across multiple integration test classes.
@@ -125,17 +129,18 @@ public final class SharedTestContainers {
         return sftpContainer != null;
     }
 
-    // Fixed ports for FTP — avoids Testcontainers socat proxy which changes
+    // Direct ports for FTP avoid the Testcontainers socat proxy which changes
     // source IP, triggering vsftpd's "425 Security: Bad IP connecting" error
     // when the passive data connection comes from a different IP than control.
-    private static final int FTP_CONTROL_PORT = 2100;
-    private static final int FTP_DATA_PORT = 21100;
+    // Allocate them per run so concurrent builds do not contend for fixed ports.
+    private static volatile int ftpControlPort;
+    private static volatile int ftpDataPort;
 
     /**
      * Gets the shared FTP container, starting it if necessary.
      * 
-     * <p>Uses <b>fixed port mappings</b> (2100:21 for control, 21100:21100 for
-     * passive data) to bypass Testcontainers' socat proxy. This is necessary
+     * <p>Uses <b>direct port mappings</b> for control and passive data to bypass
+     * Testcontainers' socat proxy. The host ports are selected per test run. This is necessary
      * because vsftpd verifies that data connections come from the same IP as
      * the control connection, and the socat proxy changes the source IP.
      * 
@@ -147,14 +152,27 @@ public final class SharedTestContainers {
                 if (ftpContainer == null) {
                     logger.info("Starting shared FTP container...");
 
-                    ftpContainer = new ComposeContainer(
+                    int[] ports = findAvailablePorts(2);
+                    ftpControlPort = ports[0];
+                    ftpDataPort = ports[1];
+                    ComposeContainer container = new ComposeContainer(
                             new File("src/test/resources/docker-compose-ftp-test.yml"))
+                            .withEnv("FTP_CONTROL_PORT", Integer.toString(ftpControlPort))
+                            .withEnv("FTP_DATA_PORT", Integer.toString(ftpDataPort))
+                            .waitingFor("ftp", Wait.forHealthcheck())
                             .withStartupTimeout(Duration.ofMinutes(2));
-                    ftpContainer.start();
+                    try {
+                        container.start();
+                        // Wait for vsftpd to be fully ready (accept connections)
+                        waitForFtpReady("localhost", ftpControlPort, Duration.ofMinutes(1));
+                        ftpContainer = container;
+                    } catch (RuntimeException e) {
+                        container.stop();
+                        throw e;
+                    }
                     registerShutdownHook();
-                    // Wait for vsftpd to be fully ready (accept connections)
-                    waitForFtpReady("localhost", FTP_CONTROL_PORT, Duration.ofMinutes(1));
-                    logger.info("Shared FTP container started at {}:{}", getFtpHost(), getFtpPort());
+                    logger.info("Shared FTP container started at localhost:{} (PASV data port {})",
+                            ftpControlPort, ftpDataPort);
                 }
             }
         }
@@ -162,7 +180,7 @@ public final class SharedTestContainers {
     }
 
     /**
-     * Gets the FTP host. Returns localhost since FTP uses fixed port mapping.
+     * Gets the FTP host. Returns localhost since FTP uses a direct port mapping.
      */
     public static String getFtpHost() {
         getFtpContainer(); // Ensure container is started
@@ -170,11 +188,11 @@ public final class SharedTestContainers {
     }
 
     /**
-     * Gets the FTP control port. Returns the fixed mapped port (2100).
+     * Gets the dynamically selected FTP control port.
      */
     public static int getFtpPort() {
         getFtpContainer(); // Ensure container is started
-        return FTP_CONTROL_PORT;
+        return ftpControlPort;
     }
 
     /**
@@ -184,19 +202,20 @@ public final class SharedTestContainers {
         return ftpContainer != null;
     }
 
-    // Fixed ports for FTPS — avoids Testcontainers socat proxy which breaks
+    // Direct ports for FTPS avoid the Testcontainers socat proxy which breaks
     // TLS session reuse between control and data channels in FTP passive mode.
-    private static final int FTPS_CONTROL_PORT = 2121;
-    private static final int FTPS_DATA_PORT = 30000;
+    // Allocate them per run so concurrent builds do not contend for fixed ports.
+    private static volatile int ftpsControlPort;
+    private static volatile int ftpsDataPort;
 
     /**
      * Gets the shared FTPS container, starting it if necessary.
      * Uses delfer/alpine-ftp-server with TLS enabled (explicit FTPS via AUTH TLS).
      * The container auto-generates a self-signed certificate.
      * 
-     * <p>Unlike FTP/SFTP containers, the FTPS container uses <b>fixed port mappings</b>
-     * (2121:21 for control, 30000:30000 for passive data) instead of Testcontainers'
-     * socat proxy. This is necessary because FTPS passive mode requires TLS session
+     * <p>Unlike SFTP containers, the FTPS container uses <b>direct port mappings</b>
+     * selected per test run instead of Testcontainers' socat proxy. This is necessary
+     * because FTPS passive mode requires TLS session
      * reuse between the control and data channels, and the socat proxy breaks this
      * by introducing a different endpoint for the control channel.
      * 
@@ -208,15 +227,28 @@ public final class SharedTestContainers {
                 if (ftpsContainer == null) {
                     logger.info("Starting shared FTPS container...");
 
-                    ftpsContainer = new ComposeContainer(
+                    int[] ports = findAvailablePorts(2);
+                    ftpsControlPort = ports[0];
+                    ftpsDataPort = ports[1];
+                    ComposeContainer container = new ComposeContainer(
                             new File("src/test/resources/docker-compose-ftps-test.yml"))
                             .withBuild(true)
+                            .withEnv("FTPS_CONTROL_PORT", Integer.toString(ftpsControlPort))
+                            .withEnv("FTPS_DATA_PORT", Integer.toString(ftpsDataPort))
+                            .waitingFor("ftps", Wait.forHealthcheck())
                             .withStartupTimeout(Duration.ofMinutes(3));
-                    ftpsContainer.start();
+                    try {
+                        container.start();
+                        // Wait for the FTP service to fully initialise (DH params, TLS cert, etc.)
+                        waitForFtpReady("localhost", ftpsControlPort, Duration.ofMinutes(2));
+                        ftpsContainer = container;
+                    } catch (RuntimeException e) {
+                        container.stop();
+                        throw e;
+                    }
                     registerShutdownHook();
-                    // Wait for the FTP service to fully initialise (DH params, TLS cert, etc.)
-                    waitForFtpReady("localhost", FTPS_CONTROL_PORT, Duration.ofMinutes(2));
-                    logger.info("Shared FTPS container started at {}:{}", getFtpsHost(), getFtpsPort());
+                    logger.info("Shared FTPS container started at localhost:{} (PASV data port {})",
+                            ftpsControlPort, ftpsDataPort);
                 }
             }
         }
@@ -224,7 +256,7 @@ public final class SharedTestContainers {
     }
 
     /**
-     * Gets the FTPS host. Returns localhost since FTPS uses fixed port mapping.
+     * Gets the FTPS host. Returns localhost since FTPS uses a direct port mapping.
      */
     public static String getFtpsHost() {
         getFtpsContainer(); // Ensure container is started
@@ -232,11 +264,11 @@ public final class SharedTestContainers {
     }
 
     /**
-     * Gets the FTPS control port. Returns the fixed mapped port (2121).
+     * Gets the dynamically selected FTPS control port.
      */
     public static int getFtpsPort() {
         getFtpsContainer(); // Ensure container is started
-        return FTPS_CONTROL_PORT;
+        return ftpsControlPort;
     }
 
     /**
@@ -297,6 +329,34 @@ public final class SharedTestContainers {
             }
         }
         throw new RuntimeException("Timed out waiting for FTP service at " + host + ":" + port + " after " + timeout);
+    }
+
+    /**
+     * Reserves distinct ephemeral ports long enough to collect their numbers, then
+     * releases them immediately before Docker Compose binds them.
+     */
+    private static int[] findAvailablePorts(int count) {
+        List<ServerSocket> sockets = new ArrayList<>(count);
+        try {
+            int[] ports = new int[count];
+            for (int index = 0; index < count; index++) {
+                ServerSocket socket = new ServerSocket(0);
+                socket.setReuseAddress(false);
+                sockets.add(socket);
+                ports[index] = socket.getLocalPort();
+            }
+            return ports;
+        } catch (IOException e) {
+            throw new IllegalStateException("Unable to allocate ports for an FTP test container", e);
+        } finally {
+            for (ServerSocket socket : sockets) {
+                try {
+                    socket.close();
+                } catch (IOException e) {
+                    logger.debug("Unable to close temporary port-allocation socket", e);
+                }
+            }
+        }
     }
 
     /**

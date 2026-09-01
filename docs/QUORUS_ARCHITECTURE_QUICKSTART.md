@@ -2,8 +2,8 @@
 
 # Quorus Architecture Quickstart
 
-**Version:** 2.1  
-**Date:** 2026-03-17  
+**Version:** 2.2  
+**Date:** 2026-09-01  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Scope:** Current implementation snapshot
@@ -156,7 +156,7 @@ Controller metrics are exposed through the embedded HTTP server, and transfer an
 
 ## Tenant-Agent Isolation
 
-From the controller's perspective, the agent fleet is partitioned by tenant. A single agent belongs to exactly one tenant and only sees jobs for that tenant.
+From the controller's perspective, the agent fleet carries tenant partitioning fields. A single agent declares exactly one tenant, and selected polling and status paths enforce matching tenant values.
 
 The enforcement path is:
 
@@ -166,7 +166,9 @@ The enforcement path is:
 4. `GET /api/v1/agents/:agentId/jobs` filters the assignment list to the agent's own tenant before returning
 5. `POST /api/v1/jobs/:jobId/status` verifies the submitting agent's tenant matches the job's tenant (`403` if not)
 
-All these checks run inside the Vert.x controller, routed through Raft-replicated state. The tenant model is stored as a field on `AgentInfo` and `TransferJobSnapshot` in `QuorusStateStore`.
+These checks run inside the Vert.x controller against Raft-replicated state. The tenant model is stored as a field on `AgentInfo` and `TransferJobSnapshot` in `QuorusStateStore`.
+
+This is not an authenticated tenant security boundary: the API has no built-in authentication, and direct assignment creation does not yet uniformly enforce referential and tenant invariants during state-machine application. See `ARCH-03` and `ARCH-06` in `docs/QUORUS_ARCHITECTURE_SPECIFICATION.md`.
 
 ## Java Baseline
 
@@ -179,7 +181,9 @@ Use JDK 25 for builds, tests, and IDE tooling in this repository.
 
 ## Recommended Reading
 
-- `docs/QUORUS_API_REFERENCE.md`
+- `docs/QUORUS_ARCHITECTURE_SPECIFICATION.md` — canonical architecture, guarantees, and release requirements
+- `docs/QUORUS_REST_API_SPECIFICATION.md` — complete normative REST control and operations contract
+- `docs/QUORUS_API_REFERENCE.md` — endpoints implemented by the current controller
 - `docs/QUORUS_USER_GUIDE.md`
 - `docs/QUORUS_WORKFLOWS_README.md`
 - `docs/QUORUS_YAML_SYNTAX_GUIDE.md`

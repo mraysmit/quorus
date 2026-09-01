@@ -2,10 +2,11 @@
 
 # Quorus Integration Examples
 
-**Version:** 2.0  
-**Date:** 2026-03-14  
+**Version:** 2.1  
+**Date:** 2026-09-01  
 **Author:** Mark Ray-Smith — Cityline Ltd  
-**License:** Apache 2.0
+**License:** Apache 2.0  
+**Scope:** Current direct-execution and model examples
 
 This document lists the example entry points that actually exist in `quorus-integration-examples` today.
 
@@ -18,6 +19,8 @@ The examples module depends on:
 - `quorus-tenant`
 
 It does not currently depend on `quorus-controller`, so examples in this module focus on direct engine usage, workflow usage, tenant usage, and model demonstrations rather than running a controller cluster in-process.
+
+The examples demonstrate APIs and parser behavior. They are not secure production connection or agent-deployment templates; production service connectivity, secret references, identity, authorization, and telemetry requirements are defined in the canonical architecture and REST API specifications.
 
 ## Current Example Classes
 

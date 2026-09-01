@@ -1,5 +1,8 @@
 # Vert.x 5.x Migration - Performance Validation Results
 
+> [!IMPORTANT]
+> This is a point-in-time migration benchmark, not evidence that the Quorus product is production ready. Results apply only to the recorded workloads and environment. Current measurable release gates and unresolved production gaps are defined in [QUORUS_ARCHITECTURE_SPECIFICATION.md](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md).
+
 ## Date: January 5, 2026
 
 ## Executive Summary
@@ -246,9 +249,9 @@ The Vert.x 5.x migration has been **successfully completed** with all phases fin
 - **Resource efficiency**: 70% fewer threads
 - **Memory**: Zero increase for 1K operations
 
-The system is **production-ready** with comprehensive test coverage (140+ tests passing) and proper shutdown handling. All migration goals have been achieved or exceeded.
+The recorded migration benchmark met its scoped performance and shutdown objectives with the stated test count. This does not establish Quorus product readiness or close the canonical security, durability, API, transfer-operations, and agent-lifecycle gaps.
 
-**Status**: ✅ **MIGRATION COMPLETE - PRODUCTION READY**
+**Status**: ✅ **MIGRATION PERFORMANCE VALIDATION COMPLETE FOR THE RECORDED SCOPE**
 
 ---
 

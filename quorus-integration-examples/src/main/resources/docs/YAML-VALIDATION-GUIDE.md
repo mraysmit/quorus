@@ -1,8 +1,18 @@
+<img src="../../../../../docs/quorus-logo.png" alt="Quorus" width="120"/>
+
 # Quorus YAML Schema Validation Guide
+
+**Version:** 1.1  
+**Date:** 2026-09-01  
+**Author:** Mark Ray-Smith — Cityline Ltd  
+**License:** Apache 2.0  
+**Scope:** Supporting validation guide for integration examples
 
 ## Overview
 
 Quorus now includes a comprehensive YAML schema validation system that ensures workflow definitions are consistent, complete, and follow best practices. This guide covers the new validation features, requirements, and migration from legacy formats.
+
+The canonical current parser vocabulary and execution limitations are documented in [QUORUS_YAML_SYNTAX_GUIDE.md](../../../../../docs/QUORUS_YAML_SYNTAX_GUIDE.md). Schema-valid example content can still name protocols or options that have no registered runtime adapter; validation success is not proof that a workflow is securely or operationally deployable.
 
 ## Table of Contents
 
@@ -255,10 +265,7 @@ if (fullResult.isValid()) {
 
 ## Examples
 
-### Complete Production Workflow
-See: `workflows/ecommerce-order-processing.yaml`
-
-### Financial Reporting Workflow  
+### Financial Reporting Workflow
 See: `workflows/financial-reporting.yaml`
 
 ### Schema Compliant Example

@@ -4,6 +4,8 @@
 ## Status
 **Proposed – Design Review**
 
+This proposal is non-normative. The current state-authority, durability, snapshot, and release requirements are defined in [QUORUS_ARCHITECTURE_SPECIFICATION.md](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md).
+
 ## Scope
 This document defines a **minimal, Raft-correct Write-Ahead Log (WAL)** design for a Java & Vert.x 5.x Raft implementation.
 
@@ -1968,7 +1970,7 @@ This completes the WAL design from theory through implementation to deployment c
 
 ## Appendix D: Linux Deployment & Bootstrap
 
-This section provides production-ready scripts and configurations for deploying the Quorus Controller on Linux servers and in containerized environments.
+This section provides illustrative scripts and configurations for evaluating the proposed WAL deployment. Production use remains subject to the canonical durability, security, backup, restore, and release requirements.
 
 ### D.1 Bootstrap Shell Script (`setup-quorus.sh`)
 
@@ -2056,7 +2058,7 @@ For containerized deployments, this Dockerfile bakes configuration defaults into
 # =============================================================================
 
 # Use Eclipse Temurin JRE 21 on Ubuntu Jammy
-FROM eclipse-temurin:21-jre-jammy
+FROM eclipse-temurin:25-jre
 
 LABEL maintainer="Quorus Team"
 LABEL description="Quorus Controller - Distributed Job Orchestration"

@@ -2,8 +2,8 @@
 
 # Quorus YAML Syntax Guide
 
-**Version:** 2.1  
-**Date:** 2026-03-17  
+**Version:** 2.2  
+**Date:** 2026-09-01  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0
 
@@ -84,23 +84,23 @@ All metadata fields are parsed as strings. Only `name` is required.
 | `tags` | No | `[]` | List of string tags for categorization. |
 | `labels` | No | `{}` | Key-value map of string labels. |
 
-**Example from `ecommerce-order-processing.yaml`:**
+**Example from `financial-reporting.yaml`:**
 
 ```yaml
 metadata:
-  name: "ecommerce-order-processing-pipeline"
-  version: "3.1.2"
-  description: "Complete order processing pipeline from payment verification to fulfillment"
-  type: "data-pipeline-workflow"
-  author: "ecommerce-team@company.com"
+  name: "monthly-financial-reporting-pipeline"
+  version: "2.0.1"
+  description: "Automated monthly financial report generation with regulatory compliance checks and multi-format output"
+  type: "etl-workflow"
+  author: "finance-automation@company.com"
   created: "2025-08-21"
-  tags: ["ecommerce", "orders", "payment", "fulfillment", "inventory", "production"]
+  tags: ["finance", "reporting", "compliance", "monthly", "automated", "regulatory"]
   labels:
     environment: "production"
-    team: "ecommerce"
-    sla: "15-minutes"
-    criticality: "high"
-    schedule: "continuous"
+    team: "finance"
+    schedule: "monthly"
+    compliance: "sox-required"
+    retention: "7-years"
 ```
 
 ---
@@ -251,47 +251,47 @@ transferGroups:
       - ...
 ```
 
-**Example — multi-stage pipeline from `ecommerce-order-processing.yaml`:**
+**Example — multi-stage financial reporting pipeline from `financial-reporting.yaml`:**
 
 ```yaml
 transferGroups:
-  - name: process-payments
-    description: Process pending payment verifications
+  - name: extract-financial-data
+    description: Extract monthly financial data from various sources
     continueOnError: false
     retryCount: 3
     transfers: [...]
 
-  - name: manage-inventory
+  - name: transform-and-validate
     dependsOn:
-      - process-payments
+      - extract-financial-data
     continueOnError: false
     retryCount: 2
     transfers: [...]
 
-  - name: fulfill-orders
+  - name: compliance-validation
     dependsOn:
-      - manage-inventory
-    continueOnError: true
+      - transform-and-validate
+    continueOnError: false
     retryCount: 2
     transfers: [...]
 
-  - name: notify-customers
+  - name: generate-reports
     dependsOn:
-      - fulfill-orders
+      - compliance-validation
+    continueOnError: false
+    retryCount: 1
+    transfers: [...]
+
+  - name: audit-and-archive
+    dependsOn:
+      - generate-reports
     continueOnError: true
     retryCount: 1
     transfers: [...]
 
-  - name: update-analytics
+  - name: distribute-reports
     dependsOn:
-      - notify-customers
-    continueOnError: true
-    retryCount: 1
-    transfers: [...]
-
-  - name: cleanup-and-archive
-    dependsOn:
-      - update-analytics
+      - audit-and-archive
     continueOnError: true
     retryCount: 1
     transfers: [...]
@@ -319,7 +319,7 @@ The following protocol values appear in the example workflows:
 | Value | Description | Source Example |
 |-------|-------------|----------------|
 | `http` | HTTP protocol adapter | `simple-download.yaml` |
-| `https` | HTTPS protocol adapter | `ecommerce-order-processing.yaml` |
+| `https` | HTTPS protocol adapter | `financial-reporting.yaml` |
 | `database` | Used in example YAML but not backed by a registered `ProtocolFactory` adapter | `financial-reporting.yaml` |
 | `file` | Used in example YAML but not backed by a registered `ProtocolFactory` adapter | `financial-reporting.yaml` |
 | `email` | Used in example YAML but not backed by a registered `ProtocolFactory` adapter | `financial-reporting.yaml` |
@@ -335,11 +335,9 @@ The `options` map is freeform — the parser does not validate option keys. Stri
 | `timeout` | `"30s"`, `"{{timeout}}"` | `simple-download.yaml`, `data-pipeline.yaml` |
 | `chunkSize` | `256`, `"{{chunkSize}}"` | `simple-download.yaml`, `data-pipeline.yaml` |
 | `maxRetries` | `5`, `"{{maxRetries}}"` | `simple-workflow.yaml`, `data-pipeline.yaml` |
-| `batchSize` | `"{{batchSize}}"` | `ecommerce-order-processing.yaml` |
+| `batchSize` | `"1000"` | `schema-compliant-example.yaml` |
 | `validateCertificate` | `true` | `schema-compliant-example.yaml` |
 | `executable` | `true` | `schema-compliant-example.yaml` |
-| `transactional` | `true` | `ecommerce-order-processing.yaml` |
-| `upsert` | `true` | `ecommerce-order-processing.yaml` |
 | `query` | SQL string | `financial-reporting.yaml` |
 | `format` | `"pdf"` | `financial-reporting.yaml` |
 | `template` | `"executive-summary"` | `financial-reporting.yaml` |
@@ -457,7 +455,7 @@ Condition patterns used in real YAML files:
 | Pattern | Example | Source File |
 |---------|---------|-------------|
 | `success(group-or-transfer-name)` | `"success(download-base-files)"` | `simple-workflow.yaml` |
-| `file_exists('path')` | `"file_exists('{{dataPath}}/pending-payments.json')"` | `ecommerce-order-processing.yaml` |
+| `file_exists('path')` | `"file_exists('{{configDir}}/postgresql.conf')"` | `schema-compliant-example.yaml` |
 
 These are conventions in the YAML files, not evaluated expressions. If condition evaluation is needed, it would require implementing a condition evaluator in the workflow engine.
 
@@ -559,7 +557,6 @@ Recommended validation order:
 | `simple-workflow.yaml` | Dependency chains | 3 | `dependsOn`, group variables, conditions, `maxRetries` |
 | `data-pipeline.yaml` | Multi-stage ETL | 5+ | Parallel strategy, group-scoped variables, `continueOnError` |
 | `schema-compliant-example.yaml` | Database config setup | 4 | HTTPS with `validateCertificate`, `condition` with `file_exists` |
-| `ecommerce-order-processing.yaml` | Order pipeline | 6 | Complex dependencies, multiple protocols, `transactional` option |
 | `financial-reporting.yaml` | Monthly reporting | 6 | Nested variable references, compliance options, multi-format output |
 
 These files are in `quorus-integration-examples/src/main/resources/workflows/` and `quorus-workflow/src/test/resources/`.

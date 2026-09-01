@@ -2,10 +2,11 @@
 
 # Quorus Docker Testing README
 
-**Version:** 2.0  
-**Date:** 2026-03-14  
+**Version:** 2.1  
+**Date:** 2026-09-01  
 **Author:** Mark Ray-Smith — Cityline Ltd  
-**License:** Apache 2.0
+**License:** Apache 2.0  
+**Scope:** Current development and verification assets
 
 This document summarizes the Docker assets that exist in the repository today and the testing scenarios they support.
 
@@ -21,6 +22,8 @@ Current Docker and compose assets in this repository support:
 - network partition and cluster test scenarios
 
 Relevant compose files are in `docker/compose`.
+
+These environments are development and test assets. They do not by themselves satisfy the production identity, TLS/mTLS, service-egress, secret-management, signed-agent, or critical-transfer telemetry requirements in the canonical architecture specification.
 
 ## Current Compose Inventory
 

@@ -4,6 +4,9 @@
 **Author:** Mark Andrew Ray-Smith Cityline Ltd  
 **Date:** 2026-01-28  
 
+> [!IMPORTANT]
+> This is a non-normative simulator design and validation record. “Production ready” entries in simulator comparison tables describe test-double maturity, not Quorus product readiness. Current product requirements and gaps are defined in [QUORUS_ARCHITECTURE_SPECIFICATION.md](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md).
+
 ---
 
 ## Table of Contents
@@ -1187,11 +1190,11 @@ quorus-controller/
 
 ### Related Components
 
-- [RaftTransport](../main/java/dev/mars/quorus/controller/raft/RaftTransport.java) - Transport interface
-- [RaftNode](../main/java/dev/mars/quorus/controller/raft/RaftNode.java) - Raft consensus implementation
-- [RaftChaosTest](RaftChaosTest.java) - Chaos testing suite using this transport
-- [RaftFailureTest](RaftFailureTest.java) - Failure scenario tests
-- [InfrastructureSmokeTest](../integration/InfrastructureSmokeTest.java) - Smoke tests using single-node transport
+- [RaftTransport](../../quorus-controller/src/main/java/dev/mars/quorus/controller/raft/RaftTransport.java) - Transport interface
+- [RaftNode](../../quorus-controller/src/main/java/dev/mars/quorus/controller/raft/RaftNode.java) - Raft consensus implementation
+- `RaftChaosTest` - Proposed chaos testing suite; no file with this name is currently present
+- `RaftFailureTest` - Proposed failure scenario tests; no file with this name is currently present
+- `InfrastructureSmokeTest` - Historical smoke-test reference; no file with this name is currently present
 
 ---
 
@@ -1971,9 +1974,9 @@ public class InMemoryControllerClientSimulator {
     // Simulated HTTP responses
     public CompletableFuture<HttpResponse> post(String path, Object body) {
         // Route to appropriate handler
-        if (path.startsWith("/agents/register")) {
+        if (path.startsWith("/api/v1/agents/register")) {
             return handleAgentRegistration(body);
-        } else if (path.startsWith("/agents/") && path.endsWith("/heartbeat")) {
+        } else if (path.equals("/api/v1/agents/heartbeat")) {
             return handleHeartbeat(body);
         }
         // ...

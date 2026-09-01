@@ -1,4 +1,12 @@
+<img src="../docs/quorus-logo.png" alt="Quorus" width="120"/>
+
 # Docker Build Optimization
+
+**Version:** 1.0  
+**Date:** 2026-09-01  
+**Author:** Mark Ray-Smith — Cityline Ltd  
+**License:** Apache 2.0  
+**Scope:** Controller image build performance
 
 ## Maven Dependency Caching
 

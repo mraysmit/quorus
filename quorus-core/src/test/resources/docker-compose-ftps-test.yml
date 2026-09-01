@@ -16,7 +16,6 @@
 
 networks:
   ftps-test:
-    name: quorus-ftps-test
     driver: bridge
 
 services:
@@ -29,21 +28,22 @@ services:
         aliases:
           - ftps-server
     ports:
-      - "2121:21"        # Control port - fixed mapping (avoids socat proxy for TLS compat)
-      - "30000:30000"    # Passive mode data port - fixed mapping (FTP PASV requires this)
+      - "${FTPS_CONTROL_PORT:-2121}:21" # Control port (default supports manual use)
+      # The host/container data port values must match the encrypted PASV response.
+      - "${FTPS_DATA_PORT:-30000}:${FTPS_DATA_PORT:-30000}"
     environment:
       # FTP credentials (delfer/alpine-ftp-server format: name|password)
       USERS: "testuser|testpass"
       # Passive mode: advertise localhost (tests run on Docker host)
       ADDRESS: "127.0.0.1"
-      MIN_PORT: "30000"
-      MAX_PORT: "30000"
+      MIN_PORT: "${FTPS_DATA_PORT:-30000}"
+      MAX_PORT: "${FTPS_DATA_PORT:-30000}"
       # Certificate subject (used by ftps-entrypoint.sh)
       TLS_CN: "localhost"
       TLS_ORG: "Quorus Test"
       TLS_C: "GB"
     healthcheck:
-      test: ["CMD-SHELL", "nc -z localhost 21 || exit 1"]
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 21 || exit 1"]
       interval: 5s
       timeout: 3s
       retries: 10
