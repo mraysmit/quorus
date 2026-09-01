@@ -131,15 +131,20 @@ For the currently supported YAML fields, use the YAML guide rather than relying 
 
 ## Key Documentation
 
+The architecture and REST API specifications are normative. The HTTP API reference and implementation guides describe current behavior. Material under `docs-design` is classified as target-state, working, point-in-time, or historical and does not override the canonical specifications.
+
+- [Canonical architecture specification](docs/QUORUS_ARCHITECTURE_SPECIFICATION.md)
+- [Canonical REST API specification](docs/QUORUS_REST_API_SPECIFICATION.md)
 - [docs/QUORUS_ARCHITECTURE_QUICKSTART.md](docs/QUORUS_ARCHITECTURE_QUICKSTART.md)
-- [docs/QUORUS_API_REFERENCE.md](docs/QUORUS_API_REFERENCE.md)
+- [Current HTTP API reference](docs/QUORUS_API_REFERENCE.md)
 - [docs/QUORUS_USER_GUIDE.md](docs/QUORUS_USER_GUIDE.md)
 - [docs/QUORUS_WORKFLOWS_README.md](docs/QUORUS_WORKFLOWS_README.md)
 - [docs/QUORUS_YAML_SYNTAX_GUIDE.md](docs/QUORUS_YAML_SYNTAX_GUIDE.md)
 - [docs/QUORUS_INTEGRATION_EXAMPLES_README.md](docs/QUORUS_INTEGRATION_EXAMPLES_README.md)
 - [docs/QUORUS_CLUSTER_STARTUP_GUIDE.md](docs/QUORUS_CLUSTER_STARTUP_GUIDE.md)
 - [docs/QUORUS-DOCKER-TESTING-README.md](docs/QUORUS-DOCKER-TESTING-README.md)
-- [docs/QUORUS_SYSTEM_DESIGN.md](docs/QUORUS_SYSTEM_DESIGN.md)
+- [Target-state system design (non-normative)](docs-design/design/QUORUS_SYSTEM_DESIGN.md)
+- [Design and engineering document status](docs-design/README.md)
 
 ## License
 

@@ -321,7 +321,7 @@ Since this architectural review was conducted, the following progress has been m
 
 ## System Design vs Implementation Gap Analysis (February 2026)
 
-A comprehensive gap analysis was conducted comparing the documented system design (`QUORUS_SYSTEM_DESIGN.md` v2.3) against the actual implemented codebase. The full analysis is available in [QUORUS_GAP_ANALYSIS.md](../../docs/QUORUS_GAP_ANALYSIS.md).
+A comprehensive gap analysis was conducted comparing the documented system design (`QUORUS_SYSTEM_DESIGN.md` v2.3) against the actual implemented codebase. The full historical analysis is available in [QUORUS_GAP_ANALYSIS.md](QUORUS_GAP_ANALYSIS.md).
 
 ### Summary Statistics
 
