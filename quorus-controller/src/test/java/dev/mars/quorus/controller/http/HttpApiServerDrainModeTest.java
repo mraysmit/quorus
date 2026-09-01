@@ -243,13 +243,13 @@ class HttpApiServerDrainModeTest {
                     .onComplete(ctx.succeeding(response -> ctx.verify(() -> {
                         assertEquals(503, response.statusCode());
                         JsonObject body = response.bodyAsJsonObject();
-                        assertNotNull(body.getJsonObject("error"),
+                        assertNotNull(body.getString("type"),
                                 "Response should contain error object");
                         assertEquals("SERVICE_SHUTTING_DOWN",
-                                body.getJsonObject("error").getString("code"),
+                                body.getString("code"),
                                 "Error code should be SERVICE_SHUTTING_DOWN");
                         assertEquals("Server is shutting down",
-                                body.getJsonObject("error").getString("message"));
+                                body.getString("detail"));
                         ctx.completeNow();
                     })));
         }

@@ -22,10 +22,10 @@ services:
     volumes:
       - ./otel-collector-cluster-config.yaml:/etc/otel-collector-config.yaml:ro
     ports:
-      - "4317:4317"
-      - "4318:4318"
-      - "8888:8888"
-      - "13133:13133"
+      - "127.0.0.1:4317:4317"
+      - "127.0.0.1:4318:4318"
+      - "127.0.0.1:8888:8888"
+      - "127.0.0.1:13133:13133"
     networks:
       - observability
     healthcheck:
@@ -46,8 +46,8 @@ services:
       - ./tempo-config.yaml:/etc/tempo/tempo.yaml:ro
       - tempo-data:/tmp/tempo
     ports:
-      - "3200:3200"
-      - "9095:9095"
+      - "127.0.0.1:3200:3200"
+      - "127.0.0.1:9095:9095"
     networks:
       - observability
     healthcheck:
@@ -72,7 +72,7 @@ services:
       - ./prometheus-cluster.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     networks:
       - observability
     healthcheck:
@@ -93,7 +93,7 @@ services:
       - ./loki-config.yaml:/etc/loki/loki.yaml:ro
       - loki-data:/loki
     ports:
-      - "3100:3100"
+      - "127.0.0.1:3100:3100"
     networks:
       - observability
     healthcheck:
@@ -120,7 +120,7 @@ services:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - grafana-data:/var/lib/grafana
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     depends_on:
       prometheus:
         condition: service_healthy
@@ -149,12 +149,13 @@ services:
     container_name: quorus-controller1
     hostname: controller1
     environment:
-      - NODE_ID=controller1
-      - HTTP_PORT=8080
-      - RAFT_PORT=9080
-      - CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080
-      - ELECTION_TIMEOUT_MS=3000
-      - HEARTBEAT_INTERVAL_MS=500
+      - QUORUS_NODE_ID=controller1
+      - QUORUS_HTTP_PORT=8080
+      - QUORUS_RAFT_STORAGE_PATH=/app/data/raft
+      - QUORUS_RAFT_PORT=9080
+      - QUORUS_CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080
+      - QUORUS_RAFT_ELECTION_TIMEOUT_MS=3000
+      - QUORUS_RAFT_HEARTBEAT_INTERVAL_MS=500
       - JAVA_OPTS=-Xmx512m -Xms256m
       # OpenTelemetry configuration
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
@@ -163,10 +164,12 @@ services:
       - OTEL_SERVICE_NAME=quorus-controller
       - OTEL_RESOURCE_ATTRIBUTES=service.instance.id=controller1
     ports:
-      - "8081:8080"
-      - "9464:9464"
+      - "127.0.0.1:8081:8080"
+      - "127.0.0.1:9464:9464"
     networks:
       - observability
+    volumes:
+      - controller1-data:/app/data
     depends_on:
       otel-collector:
         condition: service_healthy
@@ -190,12 +193,13 @@ services:
     container_name: quorus-controller2
     hostname: controller2
     environment:
-      - NODE_ID=controller2
-      - HTTP_PORT=8080
-      - RAFT_PORT=9080
-      - CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080
-      - ELECTION_TIMEOUT_MS=3000
-      - HEARTBEAT_INTERVAL_MS=500
+      - QUORUS_NODE_ID=controller2
+      - QUORUS_HTTP_PORT=8080
+      - QUORUS_RAFT_STORAGE_PATH=/app/data/raft
+      - QUORUS_RAFT_PORT=9080
+      - QUORUS_CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080
+      - QUORUS_RAFT_ELECTION_TIMEOUT_MS=3000
+      - QUORUS_RAFT_HEARTBEAT_INTERVAL_MS=500
       - JAVA_OPTS=-Xmx512m -Xms256m
       # OpenTelemetry configuration
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
@@ -204,10 +208,12 @@ services:
       - OTEL_SERVICE_NAME=quorus-controller
       - OTEL_RESOURCE_ATTRIBUTES=service.instance.id=controller2
     ports:
-      - "8082:8080"
-      - "9465:9464"
+      - "127.0.0.1:8082:8080"
+      - "127.0.0.1:9465:9464"
     networks:
       - observability
+    volumes:
+      - controller2-data:/app/data
     depends_on:
       otel-collector:
         condition: service_healthy
@@ -233,12 +239,13 @@ services:
     container_name: quorus-controller3
     hostname: controller3
     environment:
-      - NODE_ID=controller3
-      - HTTP_PORT=8080
-      - RAFT_PORT=9080
-      - CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080
-      - ELECTION_TIMEOUT_MS=3000
-      - HEARTBEAT_INTERVAL_MS=500
+      - QUORUS_NODE_ID=controller3
+      - QUORUS_HTTP_PORT=8080
+      - QUORUS_RAFT_STORAGE_PATH=/app/data/raft
+      - QUORUS_RAFT_PORT=9080
+      - QUORUS_CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080
+      - QUORUS_RAFT_ELECTION_TIMEOUT_MS=3000
+      - QUORUS_RAFT_HEARTBEAT_INTERVAL_MS=500
       - JAVA_OPTS=-Xmx512m -Xms256m
       # OpenTelemetry configuration
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
@@ -247,10 +254,12 @@ services:
       - OTEL_SERVICE_NAME=quorus-controller
       - OTEL_RESOURCE_ATTRIBUTES=service.instance.id=controller3
     ports:
-      - "8083:8080"
-      - "9466:9464"
+      - "127.0.0.1:8083:8080"
+      - "127.0.0.1:9466:9464"
     networks:
       - observability
+    volumes:
+      - controller3-data:/app/data
     depends_on:
       otel-collector:
         condition: service_healthy
@@ -276,3 +285,6 @@ volumes:
   tempo-data:
   loki-data:
   grafana-data:
+  controller1-data:
+  controller2-data:
+  controller3-data:

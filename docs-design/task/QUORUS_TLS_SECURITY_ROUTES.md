@@ -1,7 +1,11 @@
+<img src="../../docs/quorus-logo.png" alt="Quorus" width="120"/>
+
 # Quorus Stage 6: Security & Enterprise Features
 
 **Version:** 1.0  
-**Date:** March 2, 2026  
+**Date:** 2026-03-02  
+**Author:** Mark Ray-Smith — Cityline Ltd  
+**License:** Apache 2.0
 **Status:** NOT STARTED  
 **Dependencies:** Core infrastructure complete
 

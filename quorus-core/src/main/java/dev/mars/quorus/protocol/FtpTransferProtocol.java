@@ -23,6 +23,7 @@ import dev.mars.quorus.core.exceptions.TransferException;
 import dev.mars.quorus.storage.ChecksumCalculator;
 import dev.mars.quorus.transfer.TransferContext;
 import dev.mars.quorus.transfer.ProgressTracker;
+import dev.mars.quorus.util.SensitiveDataRedactor;
 
 import static dev.mars.quorus.core.exceptions.QuorusErrorCode.*;
 import io.vertx.core.Context;
@@ -150,7 +151,8 @@ public class FtpTransferProtocol implements TransferProtocol {
         logger.info("Starting FTP transfer: jobId={}, isUpload={}", context.getJobId(), request.isUpload());
         // Use destinationUri for logging to support both uploads and downloads
         logger.debug("Transfer details: sourceUri={}, destinationUri={}", 
-                    request.getSourceUri(), request.getDestinationUri());
+                    SensitiveDataRedactor.redactUri(request.getSourceUri()),
+                    SensitiveDataRedactor.redactUri(request.getDestinationUri()));
 
         ProgressTracker progressTracker = new ProgressTracker(context.getJobId());
         progressTracker.start();
@@ -211,7 +213,8 @@ public class FtpTransferProtocol implements TransferProtocol {
         String requestId = request.getRequestId();
         
         try {
-            logger.info("Starting FTP download: {} -> {}", request.getSourceUri(), request.getDestinationPath());
+            logger.info("Starting FTP download: {} -> {}",
+                    SensitiveDataRedactor.redactUri(request.getSourceUri()), request.getDestinationPath());
             
             // Parse FTP URI and extract connection details
             FtpConnectionInfo connectionInfo = parseFtpUri(request.getSourceUri());
@@ -293,7 +296,8 @@ public class FtpTransferProtocol implements TransferProtocol {
                 throw new IOException("Source file does not exist: " + sourcePath);
             }
             
-            logger.info("Starting FTP upload: {} -> {}", sourcePath, destinationUri);
+            logger.info("Starting FTP upload: {} -> {}", sourcePath,
+                    SensitiveDataRedactor.redactUri(destinationUri));
             
             // Parse FTP URI and extract connection details
             FtpConnectionInfo connectionInfo = parseFtpUri(destinationUri);

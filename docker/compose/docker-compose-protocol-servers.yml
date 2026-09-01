@@ -18,7 +18,7 @@ services:
           - ftp-server
     ports:
       # Control port
-      - "21:21"
+      - "127.0.0.1:21:21"
       # Passive mode data ports (10 ports for concurrent connections)
       - "30000-30009:30000-30009"
     environment:
@@ -46,7 +46,7 @@ services:
         aliases:
           - sftp-server
     ports:
-      - "2222:22"
+      - "127.0.0.1:2222:22"
     # Format: username:password:userid:groupid:directory
     command: testuser:testpass:1001:100:upload
     volumes:
@@ -68,7 +68,7 @@ services:
           - smb-server
     ports:
       # SMB/CIFS port (using 4445 to avoid conflict with Windows SMB on 445)
-      - "4445:445"
+      - "127.0.0.1:4445:445"
     environment:
       # Account setup (UID-based)
       ACCOUNT_testuser: "testpass"

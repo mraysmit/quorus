@@ -116,6 +116,7 @@ final class AgentCodec {
         Optional.ofNullable(info.getRegion()).ifPresent(builder::setRegion);
         Optional.ofNullable(info.getDatacenter()).ifPresent(builder::setDatacenter);
         Optional.ofNullable(info.getMetadata()).ifPresent(builder::putAllMetadata);
+        Optional.ofNullable(info.getTenantId()).ifPresent(builder::setTenantId);
         return builder.build();
     }
 
@@ -148,6 +149,9 @@ final class AgentCodec {
         }
         if (proto.getMetadataCount() > 0) {
             info.setMetadata(new HashMap<>(proto.getMetadataMap()));
+        }
+        if (!proto.getTenantId().isEmpty()) {
+            info.setTenantId(proto.getTenantId());
         }
         return info;
     }

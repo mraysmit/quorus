@@ -40,6 +40,9 @@ import dev.mars.quorus.controller.raft.grpc.*;
  */
 public final class ProtobufCommandCodec {
 
+    private static final int CURRENT_SCHEMA_VERSION = SchemaVersionRegistry.current(
+            SchemaVersionRegistry.Contract.RAFT_COMMAND_ENVELOPE);
+
     private ProtobufCommandCodec() {
         // Utility class — not instantiable
     }
@@ -53,7 +56,10 @@ public final class ProtobufCommandCodec {
     public static ByteString serialize(RaftCommand command) {
         if (command == null) {
             // No-op entry: encode as empty RaftCommandMessage (no oneof field set)
-            return RaftCommandMessage.getDefaultInstance().toByteString();
+            return RaftCommandMessage.newBuilder()
+                    .setSchemaVersion(CURRENT_SCHEMA_VERSION)
+                    .build()
+                    .toByteString();
         }
         RaftCommandMessage raftMessage = switch (command) {
             case TransferJobCommand cmd -> RaftCommandMessage.newBuilder()
@@ -69,7 +75,7 @@ public final class ProtobufCommandCodec {
             case RouteCommand cmd -> RaftCommandMessage.newBuilder()
                     .setRouteCommand(RouteCodec.toProto(cmd)).build();
         };
-        return raftMessage.toByteString();
+        return raftMessage.toBuilder().setSchemaVersion(CURRENT_SCHEMA_VERSION).build().toByteString();
     }
 
     /**
@@ -82,6 +88,9 @@ public final class ProtobufCommandCodec {
     public static RaftCommand deserialize(ByteString data) {
         try {
             RaftCommandMessage raftMessage = RaftCommandMessage.parseFrom(data);
+            SchemaVersionRegistry.requireReadable(
+                    SchemaVersionRegistry.Contract.RAFT_COMMAND_ENVELOPE,
+                    raftMessage.getSchemaVersion());
             return switch (raftMessage.getCommandCase()) {
                 case TRANSFER_JOB_COMMAND -> TransferCodec.fromProto(raftMessage.getTransferJobCommand());
                 case AGENT_COMMAND -> AgentCodec.fromProto(raftMessage.getAgentCommand());

@@ -148,21 +148,23 @@ class CasValidationTest {
         @DisplayName("CAS succeeds when expectedStatus matches current assignment status")
         void casSucceeds_whenExpectedStatusMatches() {
             JobAssignment assignment = createJobAssignment("job-1", "agent-1");
+            addAssignmentReferences("job-1", "agent-1");
             stateMachine.apply(JobAssignmentCommand.assign(assignment));
 
             String assignmentId = "job-1:agent-1";
             CommandResult<?> result = stateMachine.apply(
-                    JobAssignmentCommand.updateStatus(assignmentId, JobAssignmentStatus.ASSIGNED, JobAssignmentStatus.IN_PROGRESS));
+                    JobAssignmentCommand.updateStatus(assignmentId, JobAssignmentStatus.ASSIGNED, JobAssignmentStatus.ACCEPTED));
 
             assertInstanceOf(CommandResult.Success.class, result);
             JobAssignment updated = (JobAssignment) ((CommandResult.Success<?>) result).entity();
-            assertEquals(JobAssignmentStatus.IN_PROGRESS, updated.getStatus());
+            assertEquals(JobAssignmentStatus.ACCEPTED, updated.getStatus());
         }
 
         @Test
         @DisplayName("CAS returns CasMismatch when assignment status does not match expected")
         void casReturnsMismatch_whenStatusDoesNotMatch() {
             JobAssignment assignment = createJobAssignment("job-2", "agent-2");
+            addAssignmentReferences("job-2", "agent-2");
             stateMachine.apply(JobAssignmentCommand.assign(assignment));
 
             String assignmentId = "job-2:agent-2";
@@ -336,7 +338,15 @@ class CasValidationTest {
                 .agentId(agentId)
                 .status(JobAssignmentStatus.ASSIGNED)
                 .assignedAt(Instant.now())
+                .tenantId("tenant-a")
                 .build();
+    }
+
+    private void addAssignmentReferences(String jobId, String agentId) {
+        stateMachine.apply(TransferJobCommand.create(createTransferJob(jobId), "tenant-a"));
+        AgentInfo agent = createAgentInfo(agentId, AgentStatus.HEALTHY);
+        agent.setTenantId("tenant-a");
+        stateMachine.apply(AgentCommand.register(agent));
     }
 
     private RouteConfiguration createRoute(String routeId) {

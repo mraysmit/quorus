@@ -94,6 +94,7 @@ public class RouteHandler {
                         routeToStore.getRouteId(), routeToStore.getName());
                 raftNode.submitCommand(command)
                         .onSuccess(result -> {
+                            if (CommandResultHandler.failIfRejected(ctx, result)) return;
                             if (result instanceof CommandResult.NotFound<?> nf) {
                                 logger.warn("Route disappeared during creation (race condition): routeId={}", nf.id());
                                 ctx.fail(QuorusApiException.notFound(ErrorCode.ROUTE_NOT_FOUND, nf.id()));
@@ -180,6 +181,7 @@ public class RouteHandler {
                 RouteCommand command = RouteCommand.update(routeId, update);
                 raftNode.submitCommand(command)
                         .onSuccess(result -> {
+                            if (CommandResultHandler.failIfRejected(ctx, result)) return;
                             if (result instanceof CommandResult.NotFound<?> nf) {
                                 logger.warn("Route disappeared during update (race condition): routeId={}", nf.id());
                                 ctx.fail(QuorusApiException.notFound(ErrorCode.ROUTE_NOT_FOUND, nf.id()));
@@ -221,6 +223,7 @@ public class RouteHandler {
             logger.info("Deleting route: routeId={}", routeId);
             raftNode.submitCommand(command)
                     .onSuccess(result -> {
+                            if (CommandResultHandler.failIfRejected(ctx, result)) return;
                         if (result instanceof CommandResult.NotFound<?> nf) {
                             logger.warn("Route disappeared during deletion (race condition): routeId={}", nf.id());
                             ctx.fail(QuorusApiException.notFound(ErrorCode.ROUTE_NOT_FOUND, nf.id()));
@@ -259,6 +262,7 @@ public class RouteHandler {
             logger.info("Suspending route: routeId={}, reason={}", routeId, reason);
             raftNode.submitCommand(command)
                     .onSuccess(result -> {
+                            if (CommandResultHandler.failIfRejected(ctx, result)) return;
                         if (result instanceof CommandResult.NotFound<?> nf) {
                             logger.warn("Route disappeared during suspend (race condition): routeId={}", nf.id());
                             ctx.fail(QuorusApiException.notFound(ErrorCode.ROUTE_NOT_FOUND, nf.id()));
@@ -303,6 +307,7 @@ public class RouteHandler {
             logger.info("Resuming route: routeId={}", routeId);
             raftNode.submitCommand(command)
                     .onSuccess(result -> {
+                            if (CommandResultHandler.failIfRejected(ctx, result)) return;
                         if (result instanceof CommandResult.NotFound<?> nf) {
                             logger.warn("Route disappeared during resume (race condition): routeId={}", nf.id());
                             ctx.fail(QuorusApiException.notFound(ErrorCode.ROUTE_NOT_FOUND, nf.id()));

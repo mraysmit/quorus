@@ -23,6 +23,7 @@ import dev.mars.quorus.core.exceptions.TransferException;
 import dev.mars.quorus.storage.ChecksumCalculator;
 import dev.mars.quorus.transfer.TransferContext;
 import dev.mars.quorus.transfer.ProgressTracker;
+import dev.mars.quorus.util.SensitiveDataRedactor;
 
 import static dev.mars.quorus.core.exceptions.QuorusErrorCode.*;
 import io.vertx.core.Context;
@@ -103,7 +104,8 @@ public class SftpTransferProtocol implements TransferProtocol {
 
         logger.info("Starting SFTP transfer for job: {}", context.getJobId());
         logger.debug("transfer: request={}, sourceUri={}, destinationUri={}, isUpload={}", 
-            request.getRequestId(), request.getSourceUri(), request.getDestinationUri(), request.isUpload());
+            request.getRequestId(), SensitiveDataRedactor.redactUri(request.getSourceUri()),
+            SensitiveDataRedactor.redactUri(request.getDestinationUri()), request.isUpload());
 
         ProgressTracker progressTracker = new ProgressTracker(context.getJobId());
         progressTracker.start();
@@ -185,7 +187,8 @@ public class SftpTransferProtocol implements TransferProtocol {
         logger.debug("performSftpDownload: starting for requestId={}", requestId);
 
         try {
-            logger.info("Starting SFTP download: {} -> {}", request.getSourceUri(), request.getDestinationPath());
+            logger.info("Starting SFTP download: {} -> {}",
+                    SensitiveDataRedactor.redactUri(request.getSourceUri()), request.getDestinationPath());
 
             // Parse SFTP URI and extract connection details
             SftpConnectionInfo connectionInfo = parseSftpUri(request.getSourceUri());
@@ -264,7 +267,9 @@ public class SftpTransferProtocol implements TransferProtocol {
 
         try {
             URI destinationUri = request.getDestinationUri();
-            logger.info("Starting SFTP upload: {} -> {}", request.getSourceUri(), destinationUri);
+            logger.info("Starting SFTP upload: {} -> {}",
+                    SensitiveDataRedactor.redactUri(request.getSourceUri()),
+                    SensitiveDataRedactor.redactUri(destinationUri));
 
             // Parse destination SFTP URI and extract connection details
             SftpConnectionInfo connectionInfo = parseSftpUri(destinationUri);

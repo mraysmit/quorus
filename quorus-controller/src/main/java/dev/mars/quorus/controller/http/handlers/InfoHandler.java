@@ -117,7 +117,8 @@ public class InfoHandler implements Handler<RoutingContext> {
                 .put("metrics", new JsonArray()
                         .add(endpoint("GET", "/metrics", "Prometheus metrics")))
                 .put("info", new JsonArray()
-                        .add(endpoint("GET", "/api/v1/info", "API information and available endpoints")));
+                        .add(endpoint("GET", "/api/v1/info", "API information and available endpoints"))
+                        .add(endpoint("GET", "/api/v1/openapi.yaml", "OpenAPI 3.1 contract")));
     }
 
     private static JsonObject endpoint(String method, String path, String description) {

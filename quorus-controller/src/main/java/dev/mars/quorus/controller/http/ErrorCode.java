@@ -70,6 +70,9 @@ public enum ErrorCode {
     
     /** Resource state conflict */
     CONFLICT("Q-1008", "CONFLICT", 409, "Conflict: %s"),
+
+    /** Request body exceeds the configured controller limit */
+    PAYLOAD_TOO_LARGE("Q-1009", "PAYLOAD_TOO_LARGE", 413, "Request body exceeds the configured limit"),
     
     // ==================== Transfer Errors ====================
     

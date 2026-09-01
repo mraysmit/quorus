@@ -65,6 +65,7 @@ class ProtobufCommandCodecTest {
         info.setVersion("2.1.0");
         info.setRegion("us-east-1");
         info.setDatacenter("nyc-dc1");
+        info.setTenantId("tenant-acme");
         info.setRegistrationTime(Instant.parse("2025-01-10T08:00:00Z"));
         info.setLastHeartbeat(Instant.parse("2025-06-15T10:29:30Z"));
         info.setMetadata(new HashMap<>(Map.of("rack", "A3", "zone", "az-1")));
@@ -121,6 +122,7 @@ class ProtobufCommandCodecTest {
                 .retryCount(0)
                 .estimatedDurationMs(30000L)
                 .assignmentStrategy("WEIGHTED_SCORE")
+                .tenantId("tenant-acme")
                 .build();
     }
 
@@ -278,6 +280,7 @@ class ProtobufCommandCodecTest {
             assertInstanceOf(AgentCommand.Register.class, deserialized);
             AgentCommand.Register restored = (AgentCommand.Register) deserialized;
             assertEquals("agent-nyc-01", restored.agentId());
+            assertEquals("tenant-acme", restored.agentInfo().getTenantId());
 
             AgentInfo restoredInfo = restored.agentInfo();
             assertNotNull(restoredInfo);
@@ -456,6 +459,7 @@ class ProtobufCommandCodecTest {
             assertEquals(0, restored.jobAssignment().getRetryCount());
             assertEquals(30000L, restored.jobAssignment().getEstimatedDurationMs());
             assertEquals("WEIGHTED_SCORE", restored.jobAssignment().getAssignmentStrategy());
+            assertEquals("tenant-acme", restored.jobAssignment().getTenantId());
         }
 
         @Test

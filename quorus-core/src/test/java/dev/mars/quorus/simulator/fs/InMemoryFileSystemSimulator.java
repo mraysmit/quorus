@@ -888,8 +888,11 @@ public class InMemoryFileSystemSimulator {
         // Corrupt 1-5% of bytes
         int corruptCount = Math.max(1, data.length / 50);
         for (int i = 0; i < corruptCount; i++) {
-            int index = ThreadLocalRandom.current().nextInt(data.length);
-            data[index] = (byte) ThreadLocalRandom.current().nextInt(256);
+            // Flip a bit at deterministic, distinct positions. Assigning a random
+            // byte could select the original value and make the corruption mode a
+            // flaky no-op, which defeats both the simulator contract and its tests.
+            int index = (i * 31) % data.length;
+            data[index] ^= 0x01;
         }
         return data;
     }

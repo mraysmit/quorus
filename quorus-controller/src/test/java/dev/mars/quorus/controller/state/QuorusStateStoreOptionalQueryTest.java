@@ -61,7 +61,11 @@ class QuorusStateStoreOptionalQueryTest {
     @Test
     void findTransferJob_returnsPresent_whenExists() {
         TransferJob job = createTransferJob();
-        stateStore.apply(TransferJobCommand.create(job));
+        stateStore.apply(TransferJobCommand.create(job, "tenant-a"));
+
+        AgentInfo agent = new AgentInfo("agent-001", "agent.example.com", "10.0.0.1", 8080);
+        agent.setTenantId("tenant-a");
+        stateStore.apply(AgentCommand.register(agent));
 
         Optional<TransferJobSnapshot> result = stateStore.findTransferJob(job.getJobId());
 
@@ -115,11 +119,16 @@ class QuorusStateStoreOptionalQueryTest {
     @Test
     void findJobAssignment_returnsPresent_whenExists() {
         TransferJob job = createTransferJob();
-        stateStore.apply(TransferJobCommand.create(job));
+        stateStore.apply(TransferJobCommand.create(job, "tenant-a"));
+
+        AgentInfo agent = new AgentInfo("agent-001", "agent.example.com", "10.0.0.1", 8080);
+        agent.setTenantId("tenant-a");
+        stateStore.apply(AgentCommand.register(agent));
 
         JobAssignment assignment = new JobAssignment.Builder()
                 .jobId(job.getJobId())
                 .agentId("agent-001")
+                .tenantId("tenant-a")
                 .build();
         stateStore.apply(JobAssignmentCommand.assign(assignment));
 

@@ -28,6 +28,7 @@ import dev.mars.quorus.monitoring.TransferEngineHealthCheck;
 import dev.mars.quorus.protocol.ProtocolFactory;
 import dev.mars.quorus.protocol.TransferProtocol;
 import dev.mars.quorus.transfer.observability.TransferTelemetryMetrics;
+import dev.mars.quorus.util.SensitiveDataRedactor;
 import io.opentelemetry.api.GlobalOpenTelemetry;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanKind;
@@ -446,7 +447,9 @@ public class SimpleTransferEngine implements TransferEngine {
 
         logger.info("Starting {} transfer: {}", direction, job.getJobId());
         logger.debug("executeTransfer: starting for jobId={}, protocol={}, direction={}, sourceUri={}, destinationUri={}", 
-            job.getJobId(), request.getProtocol(), direction, request.getSourceUri(), request.getDestinationUri());
+            job.getJobId(), request.getProtocol(), direction,
+            SensitiveDataRedactor.redactUri(request.getSourceUri()),
+            SensitiveDataRedactor.redactUri(request.getDestinationUri()));
         job.start();
 
         String protocolName = request.getProtocol();

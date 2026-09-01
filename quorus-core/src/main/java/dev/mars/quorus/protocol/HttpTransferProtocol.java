@@ -24,6 +24,7 @@ import dev.mars.quorus.core.TransferStatus;
 import dev.mars.quorus.core.exceptions.TransferException;
 import dev.mars.quorus.storage.ChecksumCalculator;
 import dev.mars.quorus.transfer.ProgressTracker;
+import dev.mars.quorus.util.SensitiveDataRedactor;
 import dev.mars.quorus.transfer.TransferContext;
 
 import static dev.mars.quorus.core.exceptions.QuorusErrorCode.*;
@@ -174,7 +175,7 @@ public class HttpTransferProtocol implements TransferProtocol {
             }
 
             String url = request.getSourceUri().toString();
-            logger.info("Starting reactive HTTP download from {}", url);
+            logger.info("Starting reactive HTTP download from {}", SensitiveDataRedactor.redact(url));
 
             return webClient.getAbs(url)
                 .timeout(READ_TIMEOUT_MS)

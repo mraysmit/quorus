@@ -24,6 +24,7 @@ import dev.mars.quorus.core.exceptions.QuorusErrorCode;
 import dev.mars.quorus.core.exceptions.TransferException;
 import dev.mars.quorus.transfer.TransferContext;
 import dev.mars.quorus.transfer.ProgressTracker;
+import dev.mars.quorus.util.SensitiveDataRedactor;
 
 import static dev.mars.quorus.core.exceptions.QuorusErrorCode.*;
 import io.vertx.core.Context;
@@ -152,7 +153,8 @@ public class NfsTransferProtocol implements TransferProtocol {
 
         logger.info("Starting NFS transfer: jobId={}, isUpload={}", context.getJobId(), request.isUpload());
         logger.debug("Transfer details: sourceUri={}, destinationUri={}",
-                request.getSourceUri(), request.getDestinationUri());
+                SensitiveDataRedactor.redactUri(request.getSourceUri()),
+                SensitiveDataRedactor.redactUri(request.getDestinationUri()));
 
         ProgressTracker progressTracker = new ProgressTracker(context.getJobId());
         progressTracker.start();
@@ -212,7 +214,9 @@ public class NfsTransferProtocol implements TransferProtocol {
         logger.debug("performNfsDownload: starting for requestId={}", requestId);
 
         try {
-            logger.info("Starting NFS download: {} -> {}", request.getSourceUri(), request.getDestinationUri());
+            logger.info("Starting NFS download: {} -> {}",
+                    SensitiveDataRedactor.redactUri(request.getSourceUri()),
+                    SensitiveDataRedactor.redactUri(request.getDestinationUri()));
 
             NfsConnectionInfo connectionInfo = parseNfsUri(request.getSourceUri());
             logger.debug("performNfsDownload: parsed connection info - host={}, export={}, path={}",
@@ -285,7 +289,8 @@ public class NfsTransferProtocol implements TransferProtocol {
             }
 
             URI destinationUri = request.getDestinationUri();
-            logger.info("Starting NFS upload: {} -> {}", sourcePath, destinationUri);
+            logger.info("Starting NFS upload: {} -> {}", sourcePath,
+                    SensitiveDataRedactor.redactUri(destinationUri));
 
             NfsConnectionInfo connectionInfo = parseNfsUri(destinationUri);
 

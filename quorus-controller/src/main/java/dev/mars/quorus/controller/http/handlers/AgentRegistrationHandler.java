@@ -79,6 +79,7 @@ public class AgentRegistrationHandler implements Handler<RoutingContext> {
             AgentCommand command = AgentCommand.register(agentInfo);
             raftNode.submitCommand(command)
                     .onSuccess(result -> {
+                            if (CommandResultHandler.failIfRejected(ctx, result)) return;
                         if (result instanceof CommandResult.Success<?> success
                                 && success.entity() instanceof AgentInfo registered) {
                             logger.info("Agent registered via Raft: agentId={}, hostname={}",

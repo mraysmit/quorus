@@ -1,8 +1,11 @@
+<img src="../../docs/quorus-logo.png" alt="Quorus" width="120"/>
+
 # Quorus Alpha Implementation Plan
 
 **Version:** 1.9  
-**Date:** March 17, 2026  
-**Author:** Mark Andrew Ray-Smith Cityline Ltd
+**Date:** 2026-03-17  
+**Author:** Mark Ray-Smith — Cityline Ltd  
+**License:** Apache 2.0
 
 > [!IMPORTANT]
 > This is a point-in-time implementation plan. Completion markers do not establish current production conformance. In particular, tenant field checks are not authenticated tenant isolation, and current assignment, security, transfer-operations telemetry, service-connectivity, and agent-lifecycle gaps are governed by [QUORUS_ARCHITECTURE_SPECIFICATION.md](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md) and [QUORUS_REST_API_SPECIFICATION.md](../../docs/QUORUS_REST_API_SPECIFICATION.md).

@@ -409,8 +409,11 @@ public class QuorusAgent {
 
         logger.info("Processing job: {} ({})", jobId, pendingJob.getDescription());
 
-        // Strict contract: do not execute unless ACCEPTED status is acknowledged by controller
+        // Strict contract: do not execute unless both lifecycle acknowledgements are
+        // durably accepted by the controller. This keeps the authoritative assignment
+        // state aligned with the real transfer process before any bytes are moved.
         jobStatusReportingService.reportAccepted(jobId)
+            .compose(v -> jobStatusReportingService.reportInProgress(jobId, 0L))
             .onSuccess(v -> {
                 // Convert to transfer request
                 TransferRequest request = pendingJob.toTransferRequest();
@@ -424,7 +427,7 @@ public class QuorusAgent {
                     .onFailure(throwable -> handleTransferError(jobId, throwable));
             })
             .onFailure(err -> {
-                logger.error("Refusing to execute job {} because ACCEPTED status was not acknowledged: {}",
+                logger.error("Refusing to execute job {} because its start lifecycle was not acknowledged: {}",
                         jobId, err.getMessage());
             });
     }

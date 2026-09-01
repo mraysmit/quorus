@@ -16,11 +16,17 @@
 
 package dev.mars.quorus.controller.http;
 
+import dev.mars.quorus.agent.AgentInfo;
+import dev.mars.quorus.agent.AgentStatus;
 import dev.mars.quorus.controller.raft.InMemoryTransportSimulator;
 import dev.mars.quorus.controller.raft.RaftNode;
 import dev.mars.quorus.controller.raft.RaftNodeMode;
 import dev.mars.quorus.controller.raft.RaftTransport;
 import dev.mars.quorus.controller.state.QuorusStateStore;
+import dev.mars.quorus.controller.state.AgentCommand;
+import dev.mars.quorus.controller.state.TransferJobCommand;
+import dev.mars.quorus.core.TransferJob;
+import dev.mars.quorus.core.TransferRequest;
 import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
@@ -31,6 +37,9 @@ import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.time.Duration;
+import java.net.URI;
+import java.nio.file.Path;
+import java.util.List;
 import java.util.Set;
 
 import static dev.mars.quorus.testing.TestFutureUtils.awaitSuccess;
@@ -57,6 +66,7 @@ class JobAssignmentHandlerTest {
 
     private static Vertx vertx;
     private static RaftNode raftNode;
+    private static QuorusStateStore stateMachine;
     private static HttpApiServer httpServer;
     private static WebClient webClient;
 
@@ -64,7 +74,13 @@ class JobAssignmentHandlerTest {
     static void setUp() throws Exception {
         vertx = Vertx.vertx();
 
-        QuorusStateStore stateMachine = new QuorusStateStore();
+        stateMachine = new QuorusStateStore();
+        List.of(
+                "list-test", "get-test", "accept-test", "reject-test",
+                "status-test", "status-missing", "status-invalid", "cancel-test",
+                "remove-test", "cas-envelope")
+                .forEach(suffix -> seedReferences("job-" + suffix, "agent-" + suffix));
+        seedReferences("job-100", "agent-east-01");
         RaftTransport transport = new InMemoryTransportSimulator("assign-test-node");
         Set<String> clusterNodes = Set.of("assign-test-node");
 
@@ -213,8 +229,8 @@ class JobAssignmentHandlerTest {
                     .onComplete(ctx.succeeding(response -> ctx.verify(() -> {
                         assertEquals(404, response.statusCode());
                         JsonObject json = response.bodyAsJsonObject();
-                        assertNotNull(json.getJsonObject("error"));
-                        assertEquals("ASSIGNMENT_NOT_FOUND", json.getJsonObject("error").getString("code"));
+                        assertNotNull(json.getString("type"));
+                        assertEquals("ASSIGNMENT_NOT_FOUND", json.getString("code"));
                         ctx.completeNow();
                     })));
         }
@@ -411,8 +427,10 @@ class JobAssignmentHandlerTest {
                     .sendJsonObject(createBody)
                     .compose(createResp -> {
                         String id = createResp.bodyAsJsonObject().getString("assignmentId");
-                        return webClient.delete(HTTP_PORT, "localhost", "/api/v1/assignments/" + id)
-                                .send();
+                        return webClient.put(HTTP_PORT, "localhost", "/api/v1/assignments/" + id + "/cancel")
+                                .sendJsonObject(new JsonObject().put("reason", "test cleanup"))
+                                .compose(ignored -> webClient.delete(
+                                        HTTP_PORT, "localhost", "/api/v1/assignments/" + id).send());
                     })
                     .onComplete(ctx.succeeding(response -> ctx.verify(() -> {
                         assertEquals(200, response.statusCode());
@@ -457,12 +475,12 @@ class JobAssignmentHandlerTest {
                     })
                     .onComplete(ctx.succeeding(response -> ctx.verify(() -> {
                         assertEquals(409, response.statusCode());
-                        JsonObject error = response.bodyAsJsonObject().getJsonObject("error");
+                        JsonObject error = response.bodyAsJsonObject();
                         assertNotNull(error);
                         assertEquals("ASSIGNMENT_STATE_CONFLICT", error.getString("code"));
                         assertNotNull(error.getString("shortCode"));
                         assertNotNull(error.getString("timestamp"));
-                        assertNotNull(error.getString("path"));
+                        assertNotNull(error.getString("instance"));
                         ctx.completeNow();
                     })));
         }
@@ -483,8 +501,17 @@ class JobAssignmentHandlerTest {
                     .put("jobId", jobId)
                     .put("agentId", agentId);
 
+            JsonObject transferBody = new JsonObject()
+                    .put("jobId", jobId)
+                    .put("sourceUri", "https://example.com/separator.dat")
+                    .put("destinationPath", "/data/separator.dat")
+                    .put("tenantId", "test-tenant")
+                    .put("totalBytes", 100);
+
             webClient.post(HTTP_PORT, "localhost", "/api/v1/agents/register")
                     .sendJsonObject(registerBody)
+                    .compose(r -> webClient.post(HTTP_PORT, "localhost", "/api/v1/transfers")
+                            .sendJsonObject(transferBody))
                     .compose(r -> webClient.post(HTTP_PORT, "localhost", "/api/v1/assignments")
                             .sendJsonObject(createBody))
                     .compose(createResp -> webClient.get(HTTP_PORT, "localhost", "/api/v1/agents/" + agentId + "/jobs")
@@ -520,8 +547,17 @@ class JobAssignmentHandlerTest {
                     .put("jobId", jobId)
                     .put("agentId", agentId);
 
+            JsonObject transferBody = new JsonObject()
+                    .put("jobId", jobId)
+                    .put("sourceUri", "https://example.com/terminal.dat")
+                    .put("destinationPath", "/data/terminal.dat")
+                    .put("tenantId", "test-tenant")
+                    .put("totalBytes", 100);
+
             webClient.post(HTTP_PORT, "localhost", "/api/v1/agents/register")
                     .sendJsonObject(registerBody)
+                    .compose(r -> webClient.post(HTTP_PORT, "localhost", "/api/v1/transfers")
+                            .sendJsonObject(transferBody))
                     .compose(r -> webClient.post(HTTP_PORT, "localhost", "/api/v1/assignments")
                             .sendJsonObject(createBody))
                     .compose(createResp -> {
@@ -552,7 +588,7 @@ class JobAssignmentHandlerTest {
                     .send()
                     .onComplete(ctx.succeeding(response -> ctx.verify(() -> {
                         assertEquals(400, response.statusCode());
-                        JsonObject error = response.bodyAsJsonObject().getJsonObject("error");
+                        JsonObject error = response.bodyAsJsonObject();
                         assertNotNull(error);
                         assertEquals("VALIDATION_ERROR", error.getString("code"));
                         ctx.completeNow();
@@ -566,7 +602,7 @@ class JobAssignmentHandlerTest {
                     .send()
                     .onComplete(ctx.succeeding(response -> ctx.verify(() -> {
                         assertEquals(400, response.statusCode());
-                        JsonObject error = response.bodyAsJsonObject().getJsonObject("error");
+                        JsonObject error = response.bodyAsJsonObject();
                         assertNotNull(error);
                         assertEquals("VALIDATION_ERROR", error.getString("code"));
                         ctx.completeNow();
@@ -580,7 +616,7 @@ class JobAssignmentHandlerTest {
                     .send()
                     .onComplete(ctx.succeeding(response -> ctx.verify(() -> {
                         assertEquals(400, response.statusCode());
-                        JsonObject error = response.bodyAsJsonObject().getJsonObject("error");
+                        JsonObject error = response.bodyAsJsonObject();
                         assertNotNull(error);
                         assertEquals("VALIDATION_ERROR", error.getString("code"));
                         ctx.completeNow();
@@ -594,7 +630,7 @@ class JobAssignmentHandlerTest {
                     .send()
                     .onComplete(ctx.succeeding(response -> ctx.verify(() -> {
                         assertEquals(400, response.statusCode());
-                        JsonObject error = response.bodyAsJsonObject().getJsonObject("error");
+                        JsonObject error = response.bodyAsJsonObject();
                         assertNotNull(error);
                         assertEquals("VALIDATION_ERROR", error.getString("code"));
                         ctx.completeNow();
@@ -627,9 +663,9 @@ class JobAssignmentHandlerTest {
                             .sendJsonObject(statusBody))
                     .onComplete(ctx.succeeding(response -> ctx.verify(() -> {
                         assertEquals(404, response.statusCode());
-                        JsonObject error = response.bodyAsJsonObject().getJsonObject("error");
+                        JsonObject error = response.bodyAsJsonObject();
                         assertNotNull(error);
-                        assertEquals("ASSIGNMENT_NOT_FOUND", error.getString("code"));
+                        assertEquals("TRANSFER_NOT_FOUND", error.getString("code"));
                         ctx.completeNow();
                     })));
         }
@@ -666,7 +702,7 @@ class JobAssignmentHandlerTest {
                             .sendJsonObject(new JsonObject().put("agentId", agentId).put("status", "COMPLETED")))
                     .onComplete(ctx.succeeding(response -> ctx.verify(() -> {
                         assertEquals(409, response.statusCode());
-                        JsonObject error = response.bodyAsJsonObject().getJsonObject("error");
+                        JsonObject error = response.bodyAsJsonObject();
                         assertNotNull(error);
                         assertEquals("ASSIGNMENT_STATE_CONFLICT", error.getString("code"));
                         ctx.completeNow();
@@ -686,11 +722,24 @@ class JobAssignmentHandlerTest {
                     .put("destinationPath", "/data/latest.csv")
                     .put("tenantId", "test-tenant");
 
+            JsonObject registerA = new JsonObject()
+                    .put("agentId", agentA)
+                    .put("hostname", agentA + ".example.com")
+                    .put("address", "localhost:9001")
+                    .put("tenantId", "test-tenant");
+            JsonObject registerB = new JsonObject()
+                    .put("agentId", agentB)
+                    .put("hostname", agentB + ".example.com")
+                    .put("address", "localhost:9002")
+                    .put("tenantId", "test-tenant");
+
             JsonObject assignA = new JsonObject().put("jobId", jobId).put("agentId", agentA);
             JsonObject assignB = new JsonObject().put("jobId", jobId).put("agentId", agentB);
 
-            webClient.post(HTTP_PORT, "localhost", "/api/v1/transfers")
-                    .sendJsonObject(transferBody)
+            webClient.post(HTTP_PORT, "localhost", "/api/v1/agents/register")
+                    .sendJsonObject(registerA)
+                    .compose(r -> webClient.post(HTTP_PORT, "localhost", "/api/v1/agents/register").sendJsonObject(registerB))
+                    .compose(r -> webClient.post(HTTP_PORT, "localhost", "/api/v1/transfers").sendJsonObject(transferBody))
                     .compose(r -> webClient.post(HTTP_PORT, "localhost", "/api/v1/assignments").sendJsonObject(assignA))
                     .compose(r -> webClient.post(HTTP_PORT, "localhost", "/api/v1/assignments").sendJsonObject(assignB))
                     .compose(r -> webClient.put(HTTP_PORT, "localhost", "/api/v1/assignments/" + jobId + ":" + agentA + "/status")
@@ -702,5 +751,20 @@ class JobAssignmentHandlerTest {
                         ctx.completeNow();
                     })));
         }
+    }
+
+    private static void seedReferences(String jobId, String agentId) {
+        TransferRequest request = TransferRequest.builder()
+                .requestId(jobId)
+                .sourceUri(URI.create("https://files.example.test/" + jobId + ".dat"))
+                .destinationPath(Path.of("target", "test-data", jobId + ".dat"))
+                .expectedSize(100)
+                .build();
+        stateMachine.apply(TransferJobCommand.create(new TransferJob(request), "test-tenant"));
+
+        AgentInfo agent = new AgentInfo(agentId, agentId + ".example.test", "127.0.0.1", 8080);
+        agent.setTenantId("test-tenant");
+        agent.setStatus(AgentStatus.HEALTHY);
+        stateMachine.apply(AgentCommand.register(agent));
     }
 }

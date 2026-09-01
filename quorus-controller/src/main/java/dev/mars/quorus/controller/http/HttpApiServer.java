@@ -17,6 +17,7 @@
 package dev.mars.quorus.controller.http;
 
 import dev.mars.quorus.controller.http.handlers.*;
+import dev.mars.quorus.controller.config.AppConfig;
 import dev.mars.quorus.controller.raft.RaftNode;
 import dev.mars.quorus.controller.state.QuorusStateStore;
 import io.vertx.core.Future;
@@ -53,6 +54,7 @@ public class HttpApiServer {
     private static final String VERSION = "1.0.0-alpha";
 
     private final Vertx vertx;
+    private final String host;
     private final int port;
     private final RaftNode raftNode;
     private final QuorusStateStore stateStore;
@@ -65,7 +67,7 @@ public class HttpApiServer {
      * Creates an HttpApiServer with default Prometheus port from configuration.
      */
     public HttpApiServer(Vertx vertx, int port, RaftNode raftNode, QuorusStateStore stateStore) {
-        this(vertx, port, raftNode, stateStore, -1);
+        this(vertx, "127.0.0.1", port, raftNode, stateStore, -1);
     }
 
     /**
@@ -74,7 +76,13 @@ public class HttpApiServer {
      * @param prometheusPort the port where Prometheus metrics are exposed, or -1 to use config default
      */
     public HttpApiServer(Vertx vertx, int port, RaftNode raftNode, QuorusStateStore stateStore, int prometheusPort) {
+        this(vertx, "127.0.0.1", port, raftNode, stateStore, prometheusPort);
+    }
+
+    public HttpApiServer(Vertx vertx, String host, int port, RaftNode raftNode,
+                         QuorusStateStore stateStore, int prometheusPort) {
         this.vertx = vertx;
+        this.host = host;
         this.port = port;
         this.raftNode = raftNode;
         this.stateStore = stateStore;
@@ -86,8 +94,9 @@ public class HttpApiServer {
         Router router = Router.router(vertx);
 
         // ==================== Middleware Pipeline ====================
-        router.route().handler(BodyHandler.create());
         router.route().handler(new CorrelationIdHandler());
+        router.route().handler(BodyHandler.create()
+                .setBodyLimit(AppConfig.get().getHttpMaxBodyBytes()));
         router.route().handler(drainModeHandler);
         router.route().handler(new LeaderGuardHandler(raftNode));
         router.route().failureHandler(new GlobalErrorHandler());
@@ -110,6 +119,7 @@ public class HttpApiServer {
         // ==================== Cluster / Info Endpoints ====================
         router.get("/raft/status").handler(new ClusterHandler(raftNode));
         router.get("/api/v1/info").handler(new InfoHandler(raftNode, VERSION));
+        router.get("/api/v1/openapi.yaml").handler(new OpenApiHandler());
 
         // ==================== Agent Endpoints ====================
         router.post("/api/v1/agents/register").handler(new AgentRegistrationHandler(raftNode));
@@ -150,8 +160,8 @@ public class HttpApiServer {
         httpServer = vertx.createHttpServer()
                 .requestHandler(router);
 
-        return httpServer.listen(port)
-                .onSuccess(server -> logger.info("HTTP API Server listening on port {}", port))
+        return httpServer.listen(port, host)
+                .onSuccess(server -> logger.info("HTTP API Server listening on {}:{}", host, server.actualPort()))
                 .onFailure(err -> {
                     logger.error("Failed to start HTTP API Server: {}", err.getMessage());
                     logger.debug("Stack trace for HTTP API Server start failure", err);
@@ -168,6 +178,17 @@ public class HttpApiServer {
                     .onSuccess(v -> logger.info("HTTP API Server stopped"));
         }
         return Future.succeededFuture();
+    }
+
+    /**
+     * Returns the bound HTTP port. This is primarily useful when the server is
+     * started with port {@code 0} for an isolated integration test.
+     */
+    public int actualPort() {
+        if (httpServer == null || httpServer.actualPort() < 0) {
+            throw new IllegalStateException("HTTP API Server is not listening");
+        }
+        return httpServer.actualPort();
     }
 
     /**

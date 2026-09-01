@@ -4,7 +4,7 @@ services:
     image: grafana/loki:2.9.0
     container_name: quorus-loki
     ports:
-      - "3100:3100"
+      - "127.0.0.1:3100:3100"
     command: -config.file=/etc/loki/local-config.yaml
     volumes:
       - ../logging/loki/config.yml:/etc/loki/local-config.yaml
@@ -32,7 +32,7 @@ services:
     image: grafana/grafana:10.2.0
     container_name: quorus-grafana
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
     volumes:
@@ -48,7 +48,7 @@ services:
     image: prom/prometheus:v2.47.0
     container_name: quorus-prometheus
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     volumes:
       - ../logging/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus-data:/prometheus

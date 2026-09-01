@@ -106,6 +106,7 @@ public class HeartbeatHandler implements Handler<RoutingContext> {
 
             raftNode.submitCommand(command)
                     .onSuccess(result -> {
+                            if (CommandResultHandler.failIfRejected(ctx, result)) return;
                         if (result instanceof CommandResult.NotFound<?> nf) {
                             logger.warn("Agent disappeared during heartbeat (race condition): agentId={}", nf.id());
                             ctx.fail(QuorusApiException.notFound(ErrorCode.AGENT_NOT_FOUND, nf.id()));

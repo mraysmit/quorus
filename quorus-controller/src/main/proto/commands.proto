@@ -240,6 +240,7 @@ message AgentInfoProto {
   string region = 10;
   string datacenter = 11;
   map<string, string> metadata = 12;
+  string tenant_id = 13;
 }
 
 message JobRequirementsProto {
@@ -283,6 +284,7 @@ message JobAssignmentProto {
   int32 retry_count = 9;
   int64 estimated_duration_ms = 10;
   string assignment_strategy = 11;
+  string tenant_id = 12;
 }
 
 // ===== STATE MACHINE COMMAND MESSAGES =====
@@ -393,4 +395,5 @@ message RaftCommandMessage {
     JobQueueCommandProto job_queue_command = 5;
     RouteCommandProto route_command = 6;
   }
+  uint32 schema_version = 100;
 }

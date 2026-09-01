@@ -15,16 +15,17 @@ services:
         m2cache: ${M2_REPO}/dev/mars
     container_name: quorus-controller-corrected
     environment:
-      - NODE_ID=controller-corrected
-      - RAFT_HOST=0.0.0.0
-      - RAFT_PORT=8080
-      - HTTP_PORT=8080
-      - CLUSTER_NODES=controller-corrected=controller:8080
-      - ELECTION_TIMEOUT_MS=3000
-      - HEARTBEAT_INTERVAL_MS=500
+      - QUORUS_NODE_ID=controller-corrected
+      - QUORUS_RAFT_HOST=0.0.0.0
+      - QUORUS_RAFT_PORT=9080
+      - QUORUS_HTTP_PORT=8080
+      - QUORUS_RAFT_STORAGE_PATH=/app/data/raft
+      - QUORUS_CLUSTER_NODES=controller-corrected=controller:9080
+      - QUORUS_RAFT_ELECTION_TIMEOUT_MS=3000
+      - QUORUS_RAFT_HEARTBEAT_INTERVAL_MS=500
       - JAVA_OPTS=-Xmx512m -Xms256m
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     networks:
       - quorus-corrected
     volumes:
