@@ -2,10 +2,11 @@
 
 # Quorus Workflow README
 
-**Version:** 2.0  
-**Date:** 2026-03-14  
+**Version:** 2.1  
+**Date:** 2026-09-01  
 **Author:** Mark Ray-Smith — Cityline Ltd  
-**License:** Apache 2.0
+**License:** Apache 2.0  
+**Scope:** Current in-process workflow parser and execution behavior
 
 This document reflects the workflow functionality implemented in `quorus-workflow` today.
 
@@ -28,18 +29,18 @@ Recommended structure:
 ```yaml
 apiVersion: v1
 metadata:
-  name: "daily-sync"
+  name: "daily-settlement-report"
   version: "1.0.0"
-  description: "Download and stage a daily dataset"
-  type: "workflow"
-  author: "ops@example.com"
+  description: "Receive and stage a daily settlement position report"
+  type: "financial-reporting-workflow"
+  author: "settlement-operations@example.com"
   created: "2026-03-14"
-  tags: ["daily", "sync"]
+  tags: ["settlement", "reporting", "daily"]
 
 spec:
   variables:
-    sourceBase: "https://example.com"
-    outputDir: "/data/out"
+    sourceBase: "https://clearing.example.com/reports"
+    outputDir: "/data/settlement/incoming"
 
   execution:
     dryRun: false
@@ -49,16 +50,16 @@ spec:
     strategy: sequential
 
   transferGroups:
-    - name: fetch
-      description: "Download source files"
+    - name: receive-settlement-report
+      description: "Receive the clearing-house position report"
       dependsOn: []
       continueOnError: false
       retryCount: 2
       transfers:
-        - name: dataset
-          source: "{{sourceBase}}/dataset.csv"
-          destination: "{{outputDir}}/dataset.csv"
-          protocol: http
+        - name: settlement-positions
+          source: "{{sourceBase}}/settlement-positions.csv"
+          destination: "{{outputDir}}/settlement-positions.csv"
+          protocol: https
           options:
             timeout: 30s
 ```
@@ -133,6 +134,7 @@ The parser supports:
 - `condition` values are parsed and variable-resolved, but the current workflow engine does not expose a dedicated condition evaluator in execution flow.
 - Older documentation that described rich workflow notifications, cleanup policies, SLA sections, or advanced credential models does not match the current parser.
 - The current parser does not accept a broad workflow spec vocabulary beyond the fields listed above.
+- The YAML model accepts URI strings, but production distributed execution must use approved service aliases and opaque secret references when that canonical connectivity contract is implemented. Credentials must not be embedded in workflow URIs.
 
 ## Current Source of Truth
 

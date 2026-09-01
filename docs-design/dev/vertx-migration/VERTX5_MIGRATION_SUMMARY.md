@@ -1,5 +1,8 @@
 # Vert.x 5.x Migration - Executive Summary
 
+> [!IMPORTANT]
+> This summary records completion of a historical Vert.x migration. Its “production ready” language is scoped to that migration work and is not a current product-level security, reliability, operability, or release claim. See [QUORUS_ARCHITECTURE_SPECIFICATION.md](../../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md) for current release requirements.
+
 **Project**: Quorus Distributed File Transfer System  
 **Migration**: Vert.x 4.x → Vert.x 5.x  
 **Status**: ✅ **COMPLETE**  
@@ -130,7 +133,7 @@ The Quorus distributed file transfer system has been successfully migrated from 
 
 ## Conclusion
 
-The Vert.x 5.x migration has been completed successfully, delivering significant performance improvements and eliminating all critical anti-patterns. The system is now production-ready with comprehensive monitoring, health checks, and reactive patterns throughout.
+The recorded Vert.x 5.x migration work was completed, with the performance and pattern results described in this historical summary. That migration outcome does not establish current Quorus product readiness; security, transfer-operations telemetry, agent lifecycle, API coverage, durability, and delivery guarantees remain governed by the canonical architecture specification.
 
 **Next Steps**: Deploy to staging environment and conduct performance validation.
 

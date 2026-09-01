@@ -275,7 +275,7 @@ These timeouts are designed to allow graceful completion of in-flight operations
 
 ## See Also
 
-- [PeeGeeQ Architecture & API Reference](PeeGeeQ-Architecture-API-Reference.md)
-- [PeeGeeQ Coding Principles](devtest/pgq-coding-principles.md)
-- [Spring Boot Examples](../peegeeq-examples/src/main/java/dev/mars/peegeeq/examples/)
+- `PeeGeeQ-Architecture-API-Reference.md` in the source PeeGeeQ repository
+- `devtest/pgq-coding-principles.md` in the source PeeGeeQ repository
+- `peegeeq-examples/src/main/java/dev/mars/peegeeq/examples/` in the source PeeGeeQ repository
 

@@ -1,10 +1,21 @@
+<img src="quorus-logo.png" alt="Quorus" width="120"/>
+
 # Quorus Codebase and Documentation Review — 2026-08-31
+
+**Version:** 1.0  
+**Date:** 2026-08-31  
+**Author:** Mark Ray-Smith — Cityline Ltd  
+**License:** Apache 2.0  
+**Status:** Point-in-time technical review  
+**Scope:** Repository state inspected on 2026-08-31
 
 ## Document purpose
 
 This document records a point-in-time review of the Quorus source code, automated tests, runtime configuration, deployment assets, and user-facing documentation. The review focuses on correctness, durability, security, operability, maintainability, and consistency between documented behavior and the implementation.
 
 The review is based on the repository state inspected on 2026-08-31. It is a technical assessment rather than a certification, penetration test, or exhaustive line-by-line audit of every experimental and archived artifact.
+
+The current normative requirements are maintained in [QUORUS_ARCHITECTURE_SPECIFICATION.md](QUORUS_ARCHITECTURE_SPECIFICATION.md) and [QUORUS_REST_API_SPECIFICATION.md](QUORUS_REST_API_SPECIFICATION.md). Those specifications supersede this review when later implementation or architecture decisions differ.
 
 ## Executive summary
 

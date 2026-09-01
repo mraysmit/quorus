@@ -1,11 +1,17 @@
-<img src="quorus-logo.png" alt="Quorus Logo" width="200"/>
+<img src="../../docs/quorus-logo.png" alt="Quorus" width="120"/>
 
 # Quorus Comprehensive System Design
 
-**Version:** 2.3  
-**Date:** 26 August 2025  
-**Author:** Mark Andrew Ray-Smith Cityline Ltd  
-**Updated:** 2026-02-01  
+**Version:** 2.4  
+**Date:** 2025-08-26  
+**Author:** Mark Ray-Smith — Cityline Ltd  
+**License:** Apache 2.0  
+**Updated:** 2026-09-01  
+**Status:** Non-normative target-state vision  
+**Scope:** Historical design material, current concepts, and future architecture
+
+> [!IMPORTANT]
+> This document contains implemented features, historical design material, and future concepts. It is not the current runtime contract and its performance, security, compliance, scaling, and delivery statements are not guarantees. The canonical architecture and release requirements are defined in [Quorus Architecture Specification](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md), and the complete normative API contract is defined in [Quorus REST API Specification](../../docs/QUORUS_REST_API_SPECIFICATION.md). Endpoint examples below are target-state illustrations unless explicitly identified as current. Where the documents conflict, the canonical specifications take precedence.
 
 ## Technology Stack
 
@@ -22,13 +28,13 @@
 
 ## Overview
 
-Quorus is an enterprise-grade **route-based distributed file transfer system** designed for high reliability, scalability, and multi-tenant operation within corporate network environments. The system uses predefined transfer routes as the primary configuration method, where the central controller manages route definitions between agents (e.g., "Agent A → Agent B"). The system is optimized for internal corporate network transfers, providing both route-based configurations and declarative YAML-based workflow definitions for complex file transfer orchestration with comprehensive multi-tenancy support.
+This document describes a target-state enterprise file-transfer system designed for high reliability, scalability, and multi-tenant operation within corporate network environments. The current Quorus runtime has route configuration and lifecycle APIs, but autonomous route-trigger evaluation, complete tenant security, and agent-to-agent transfer semantics are not implemented. Current capabilities and release blockers are defined only by the canonical architecture specification.
 
 ## Executive Synopsis
 
 - **Mission & Scope**: Provide secure, controller-first orchestration for high-throughput, internal corporate transfers spanning data-center sync, departmental distribution, ETL staging, and compliance-driven backups. Transfers are orchestrated through predefined routes that define source and destination agents, with multiple trigger mechanisms (event-based, time-based, interval-based, batch-based). Reliability is anchored by Raft consensus, while extensibility comes from REST APIs plus declarative YAML workflows and route configurations.
-- **Platform Pillars**: (1) Workflow engine with dependency graphs, dry/virtual runs, and templating. (2) Multi-tenant governance with hierarchical quotas and policy inheritance. (3) Real-time observability through Prometheus/Grafana/Splunk hooks, predictive ETAs, and Loki-based log aggregation. (4) Zero-trust security posture using TLS 1.3, AES-256, OAuth2/JWT, MFA, PKI, and audit-ready telemetry that maps to SOX, GDPR, HIPAA, PCI, and ISO 27001 controls.
-- **Controller-First Architecture**: Every controller node embeds the HTTP API, Raft engine, scheduler, and state machine—removing the API-first bottleneck and enabling horizontal scale by simply adding nodes to the quorum. Leader failover timing is configuration-dependent and should not be treated as a fixed sub-second guarantee.
+- **Target-State Platform Pillars**: (1) Workflow engine with dependency graphs, dry/virtual runs, and templating. (2) Multi-tenant governance with hierarchical quotas and policy inheritance. (3) Transfer-process observability supported by metrics, traces, logs, predictive ETAs, deadline risk, stall detection, alerts, and operator timelines. (4) Explicit enterprise trust boundaries using authenticated identity, authorization, encryption, peer verification, secret references, and audit. These are requirements, not current compliance or implementation claims.
+- **Controller-First Architecture**: Every controller node embeds the HTTP API, Raft engine, scheduler, and state machine—removing the API-first bottleneck. The current Raft membership is static; adding or removing controllers live is not supported. Leader failover timing is configuration-dependent and should not be treated as a fixed sub-second guarantee.
 - **Module Snapshot**:
 
   | Module | Purpose | Key Classes |
@@ -53,20 +59,309 @@ Quorus is designed primarily for **internal corporate network file transfers**, 
 - **Multi-tenant SaaS** file operations within controlled network environments
 - **Hybrid cloud** transfers between on-premises and private cloud infrastructure
 
-The system is architected to leverage the **high bandwidth, low latency, and trusted security** characteristics of internal corporate networks while providing enterprise-grade reliability, monitoring, and governance.
+The target design assumes high-bandwidth, low-latency corporate networks while requiring explicit security at every trust boundary. Internal placement is not itself trusted and does not establish enterprise reliability, monitoring, governance, or compliance.
+
+## Enterprise Capability Requirements
+
+An administration or operations user interface is only a presentation and control client. It does not create enterprise capability by itself. The platform services beneath it MUST provide trustworthy identity, authorization, transfer state, telemetry, security controls, audit evidence, recovery behavior, and complete APIs. The canonical implementation status and release consequences remain defined by the [Quorus Architecture Specification](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md) and [Quorus REST API Specification](../../docs/QUORUS_REST_API_SPECIFICATION.md).
+
+### Enterprise Capability Summary
+
+| Capability | Target outcome | Current design position |
+|---|---|---|
+| Identity, access, and separation of duties | Authenticated human and workload identities with scoped authorization and controlled privileged actions | Required; current controller has no built-in authenticated identity boundary |
+| Agent trust and deployment lifecycle | Every agent is enrolled, identifiable, attestable, upgradeable, revocable, and auditable | Required; current alpha registration is incomplete |
+| Governed service connectivity | Agents connect only to approved services, paths, protocols, and network zones using verified peers and secret references | Required; current service and egress policy is incomplete |
+| Transfer correctness and recovery | Attempts, leases, fencing, integrity, atomic publication, retry, and reconciliation produce explainable outcomes | Required; duplicate-safe reassignment is not available |
+| Transfer operations telemetry | Operations teams can see progress, deadlines, risk, stalls, retries, integrity, publication, and alerts for every critical transfer | Required; aggregate metrics are insufficient |
+| Complete management API | Every supported control and observation is available through a versioned, secured, auditable API | Required; current HTTP surface covers only a subset |
+| Audit, evidence, and data governance | Immutable evidence with retention, integrity, export, classification, residency, and controlled deletion | Required; complete evidence services are not implemented |
+| Tenant and resource governance | Authenticated isolation, hierarchy, quotas, reservations, usage, and inherited policy | Partial; tenant fields are not identities |
+| High availability and disaster recovery | Proven durability, backup, restore, failover, compatibility, RPO, and RTO | Partial; important durability and recovery evidence remains required |
+| Route and workflow operations | Validated, versioned, schedulable, observable, controllable executions | Partial; route triggers and workflow REST resources remain incomplete |
+| Protocol and large-file readiness | Secure peer verification, bounded memory, capability discovery, and safe protocol-specific behavior | Partial; adapter limitations remain |
+| Configuration and release governance | Reproducible configuration, drift control, signed releases, safe rollout, and measurable release gates | Required |
+| Enterprise integrations | Events, alert delivery, ITSM, SIEM, schedulers, CMDB, secrets, PKI, KMS, and support tooling | Required for enterprise operations |
+| Administration and operations interface | Role-specific UI built entirely on the supported REST and event contracts | Required after the underlying capabilities are trustworthy |
+
+### Identity, Authentication, Authorization, and Separation of Duties
+
+The target platform MUST distinguish human operators, service integrations, controllers, agents, and deployment automation. A tenant identifier or agent identifier supplied in a JSON payload is not identity.
+
+Required capabilities are:
+
+- enterprise SSO through an approved OIDC, OAuth 2.0, or SAML identity boundary;
+- unique workload identities for controllers, agents, service integrations, and deployment automation;
+- mutual authentication for controller-to-controller and agent-to-controller communication;
+- tenant, environment, business-service, resource-owner, and action scopes derived from trusted claims and policy;
+- RBAC for standard duties and ABAC for tenant, classification, environment, service, path, time, and risk constraints;
+- least-privilege service accounts without interactive-user permissions;
+- time-bounded privileged elevation with reason, approver, and audit correlation;
+- separation of duties between platform administration, security administration, transfer operations, application ownership, audit, and deployment roles;
+- immediate revocation and session invalidation when an identity, certificate, agent, or role is withdrawn;
+- authorization re-evaluation for long-lived streams and operations.
+
+High-risk actions SHOULD require four-eyes approval. This includes production route activation, trust-policy changes, secret-reference changes, agent quarantine release, forced retry after an uncertain external outcome, overwrite publication, evidence deletion, and emergency configuration changes. Approval records MUST identify requester, approver, scope, reason, expiry, resulting version, and audit event.
+
+### Agent Trust, Build, Deployment, and Fleet Lifecycle
+
+Every production agent MUST have a controlled lifecycle:
+
+1. **Build:** produce a reproducible artifact with a pinned digest, software bill of materials, provenance, vulnerability result, and trusted signature.
+2. **Admission:** reject unsigned, unapproved, incompatible, critically vulnerable, or policy-noncompliant artifacts.
+3. **Enrollment:** use short-lived, single-purpose bootstrap authority to issue a unique workload identity bound to tenant, environment, agent pool, and permitted capabilities.
+4. **Attestation:** record artifact digest, runtime posture, configuration version, host or workload identity, and security-policy result.
+5. **Operation:** report health, capacity, version, capabilities, active attempts, effective policy, certificate expiry, and telemetry freshness.
+6. **Rotation:** renew identities and trust material before expiry without losing control of active work.
+7. **Drain:** stop new assignments, allow governed completion or cancellation of active attempts, and expose drain progress.
+8. **Upgrade:** use canary or staged rollout with compatibility checks, health gates, failure thresholds, pause, and resume.
+9. **Rollback:** return to an approved signed version while preserving assignment and audit evidence.
+10. **Quarantine and revocation:** immediately prevent new work, block service access, revoke credentials, and preserve incident evidence.
+11. **Decommission:** verify drain, revoke all authority, remove inventory eligibility, and retain the required lifecycle history.
+
+Agents SHOULD run as non-root workloads with a read-only filesystem where practical, restricted temporary storage, bounded resources, default-deny network policy, minimal image content, and no embedded credentials. Fleet operations MUST be available through the canonical API and must not depend on direct host access.
+
+### Service Connectivity, Trust, Egress, and Secret Management
+
+Production transfers MUST reference approved service connections rather than arbitrary credential-bearing URIs. A service connection defines:
+
+- tenant, environment, business owner, technical owner, criticality, and data classification;
+- protocol, hostname or service identity, port, and permitted network zone;
+- permitted source or destination paths, shares, buckets, prefixes, and operations;
+- allowed agent pools and transfer directions;
+- TLS certificate, CA, hostname, SSH host key, or pinned fingerprint policy;
+- approved protocol versions, algorithms, ciphers, redirect behavior, and authentication mechanism;
+- opaque secret reference and secrets-provider metadata, never the secret value;
+- timeouts, retry constraints, throughput limits, and maintenance windows;
+- DNS and resolved-address policy that prevents rebinding into forbidden networks;
+- validation, connection-test, last-success, last-failure, and rotation status.
+
+The agent and controller MUST independently enforce the authorized connection policy before secret retrieval and again before connection. Default-deny egress, service identity verification, path constraints, and audit MUST prevent an agent from becoming a generic route to enterprise services.
+
+Secrets SHOULD integrate with enterprise Vault, cloud secrets managers, KMS, or HSM-backed services. Quorus stores only opaque references and redacted metadata. Retrieval, use, failure, rotation, and revocation are audited. Secret values MUST NOT appear in controller state, URIs, workflow definitions, logs, traces, metrics, support bundles, container images, or API responses.
+
+### Transfer Correctness, Attempts, Publication, and Reconciliation
+
+Enterprise transfer reliability requires more than a final job status. Each execution MUST have an immutable `attemptId`, assigned agent identity, lease, fencing generation, start and end times, progress sequence, protocol observations, integrity outcome, publication outcome, and terminal reason.
+
+Required behavior includes:
+
+- explicit `SUBMITTED`, validation, queue, assignment, acceptance, running, pause, cancellation, success, failure, timeout, quarantine, and reconciliation states;
+- a required `IN_PROGRESS` acknowledgement before successful completion;
+- monotonic progress reports protected from replay and stale attempts;
+- attempt leases and fencing tokens that reject delayed or superseded agents;
+- idempotent transfer submission and state-changing client operations;
+- classified retry policy with maximum attempts, maximum elapsed time, backoff, jitter, and non-retriable failure categories;
+- destination staging followed by integrity verification and atomic or otherwise explicitly governed publication;
+- overwrite, versioning, duplicate, and partial-file policies;
+- source and destination checksum or digest evidence when required;
+- reconciliation for ambiguous timeouts, lost acknowledgements, expired leases, controller failover, and publication uncertainty;
+- immutable history for every attempt and operator intervention.
+
+Quorus MUST NOT claim exactly-once external execution. A transfer is successful only when the required bytes, integrity verification, and destination publication have completed. Automatic reassignment remains conservative until leases, fencing, idempotent publication, and reconciliation are implemented.
+
+### Transfer Operations Monitoring, Telemetry, and Alerting
+
+File-transfer process health is the primary operational observability outcome. JVM, container, Raft, network, and infrastructure signals are supporting evidence.
+
+For every critical or time-sensitive transfer, operations teams require:
+
+- tenant, business service, operational owner, criticality, processing date, environment, and runbook;
+- expected start, actual start, required completion time, current ETA, time remaining, and risk confidence;
+- source and destination service aliases without exposed credentials;
+- active attempt, assigned agent, queue duration, connection duration, bytes transferred, total bytes, percent complete, rolling throughput, and average throughput;
+- last-progress time, last-telemetry time, freshness state, and explicit unknown-size behavior;
+- retry count, failure classification, next action, and reconciliation state;
+- integrity verification and destination publication state;
+- an ordered end-to-end timeline covering submission through final publication;
+- operational conditions `ON_TRACK`, `AT_RISK`, `LATE`, `STALLED`, `DEGRADED`, and `UNKNOWN` independently of lifecycle state;
+- actionable alerts containing evidence, affected resources, deadline impact, owner, severity, runbook, acknowledgement, suppression, escalation, notification delivery, and resolution.
+
+The platform MUST provide durable event queries and a resumable filtered event stream. Stream consumers use cursor or event identifiers, bounded replay, gap notification, authorization re-evaluation, and backpressure protection. Loss of telemetry is itself an observable condition and MUST NOT be represented as zero progress.
+
+### Complete REST, Event, and Automation Contract
+
+Every remotely operable function MUST be available through the canonical versioned API. Operators, automation, integrations, and the future UI MUST NOT require direct database, Raft-log, filesystem, or undocumented endpoint access.
+
+The API contract includes:
+
+- OpenAPI 3.1 schemas and generated contract tests;
+- authentication and required scopes for every operation;
+- transfer, attempt, progress, event, timeline, integrity, publication, retry, pause, resume, cancellation, and reconciliation resources;
+- route definition, validation, activation, suspension, triggering, execution, and history;
+- versioned workflow definitions, plans, executions, steps, events, and lifecycle controls;
+- tenant, hierarchy, quota, reservation, usage, and policy resources;
+- agent inventory, posture, effective policy, enrollment, drain, upgrade, rollback, quarantine, revocation, and decommissioning;
+- service connections, trust policy, egress policy, secret-reference metadata, validation, and connection tests;
+- audit, evidence export, alerts, operational events, cluster state, snapshots, and redacted effective configuration;
+- idempotency keys, ETags and preconditions, asynchronous operation resources, cursor pagination, filtering, stable problem responses, versioning, deprecation, and retention behavior;
+- explicit leader and read-consistency behavior.
+
+REST controls file movement but never carries file bytes or secret values. Event delivery and webhooks complement durable resource queries; they do not become independent sources of truth.
+
+### Audit, Compliance Evidence, and Data Governance
+
+The audit service MUST produce immutable, tenant-aware evidence for authentication, authorization, denial, mutation, privileged read, secret-reference use, trust-policy decision, transfer control, agent lifecycle, deployment, configuration change, approval, notification, export, and administrative operation.
+
+Each audit event records actor, workload identity, action, decision, reason, resource, previous and resulting version, tenant, business service, environment, source, timestamp, correlation and trace identifiers, request fingerprint, and redacted outcome. Evidence exports are asynchronous, access-controlled, integrity-protected, time-limited, and themselves audited.
+
+Data-governance policy MUST address:
+
+- data classification and handling restrictions;
+- filename, path, label, and metadata masking where these reveal sensitive business information;
+- geographic and legal residency constraints;
+- retention, archive, legal hold, defensible deletion, and evidence preservation;
+- lineage between route, workflow, transfer, attempts, source, destination, integrity result, and publication;
+- tenant-isolated search and export;
+- external evidence storage and SIEM delivery;
+- regulatory control mapping supported by actual evidence.
+
+Quorus documentation MUST NOT claim SOX, GDPR, HIPAA, PCI-DSS, ISO 27001, or other certification solely from feature configuration. Compliance requires deployed controls, operating evidence, organizational procedures, and independent assessment.
+
+### Tenant, Quota, Policy, and Resource Governance
+
+Tenant scope MUST be derived from authenticated identity and enforced in the authoritative state machine. All referenced resources—agent, transfer, assignment, route, workflow, service connection, secret reference, alert, and audit event—must belong to an authorized compatible scope.
+
+Enterprise tenant governance includes:
+
+- hierarchical tenants with explicit inheritance and override rules;
+- lifecycle states including active, suspended, retiring, and retired;
+- quotas for active transfers, queued work, bytes, bandwidth, agents, storage, API requests, exports, and workflow concurrency;
+- atomic quota admission and reservations with release or expiry;
+- priority and fairness policy that prevents one tenant or service from starving others;
+- usage history, capacity consumption, forecasting, showback, and optional chargeback;
+- business-service ownership, environment, criticality, data classification, and cost allocation labels;
+- policy explanation showing the effective inherited rule and denial reason;
+- isolation tests for every list, item, event, export, and streaming path.
+
+### High Availability, Durability, Backup, and Disaster Recovery
+
+Enterprise availability requires proven operational recovery, not only Raft replication. The platform MUST define and test:
+
+- supported static controller topologies, quorum requirements, failure domains, and compatibility rules;
+- leader discovery and safe client retry without authenticated redirects;
+- durable local storage paths aligned with deployment volume mounts;
+- snapshot creation, integrity verification, retention, replication, and restore compatibility;
+- backup ownership, encryption, off-site or cross-zone storage, and access control;
+- recovery from one-node loss, quorum loss, corrupt log, corrupt snapshot, full-cluster loss, and accidental configuration loss;
+- declared RPO and RTO for controller metadata, audit evidence, telemetry, and configuration;
+- scheduled restore exercises and disaster-recovery evidence;
+- rolling upgrade and rollback behavior across compatible controller and agent versions;
+- reconciliation of active or uncertain transfers after control-plane recovery.
+
+Dynamic Raft membership is not assumed. Live node add/remove and multi-region consensus require a separate safe membership and latency design before being offered as enterprise functionality.
+
+### Route, Workflow, Scheduling, and Business Calendars
+
+Routes and workflows MUST be versioned, validated, policy-checked, and observable. Activation requires valid service connections, authorized agent pools, resolvable non-secret inputs, compatible capabilities, and a running evaluator.
+
+The target execution service provides:
+
+- manual, scheduled, event-driven, interval, and approved file-arrival triggers;
+- immutable execution records pinned to a route or workflow version;
+- dependency and step state, linked transfer resources, pause, cancellation, retry, and reconciliation;
+- idempotent trigger handling and duplicate-event suppression;
+- dry-run, virtual plan, and policy-validation modes without external side effects;
+- execution history, event timeline, input digest, and redacted resolved configuration;
+- calendar-aware cut-offs, market holidays, processing dates, daylight-saving behavior, blackout windows, maintenance windows, and exception calendars;
+- deadline escalation aligned to settlement, clearing, reporting, end-of-day, and regulatory submission windows;
+- controlled backfill and reprocessing with approval and duplicate-publication protection.
+
+Creating a route definition does not mean an autonomous route service is operating. The API and UI MUST display evaluator, validation, activation, and last-execution state separately.
+
+### Protocol Security, Capability, and Large-File Readiness
+
+Every protocol adapter MUST publish its verified capabilities and fail closed when a requested control is unsupported. Capability metadata includes upload, download, pause, resume, known-size behavior, checksums, atomic publication, overwrite modes, proxy support, authentication mechanisms, maximum tested object size, bounded-memory behavior, and retry safety.
+
+Required protocol controls include:
+
+- HTTPS hostname and certificate verification, approved roots, minimum TLS policy, restricted redirects, and bounded streaming;
+- SFTP strict host-key verification, managed known-hosts or pinned fingerprints, approved keys and algorithms;
+- FTPS peer verification, explicit mode policy, bounded data connections, and secure fallback behavior;
+- SMB/CIFS signing and encryption requirements, share and path constraints, and domain authentication policy;
+- NFS export and mount policy, path enforcement, identity mapping, and network-zone restrictions;
+- streaming transfer with bounded buffers and backpressure for large files;
+- protocol-specific interruption, partial-file, cleanup, and safe-resume semantics;
+- conformance and interoperability tests against supported server versions.
+
+Cloud-storage adapters such as S3, Azure Blob, and Google Cloud Storage require separate implementation, security, identity, multipart, integrity, retry, and publication contracts before being advertised as supported.
+
+### Configuration, Change, Release, and Environment Promotion
+
+Configuration MUST be schema-versioned, validated, attributable, reproducible, and safe to inspect. The platform exposes redacted effective configuration, source, version, reloadability, restart requirements, node-local versus cluster scope, compatibility, and drift state.
+
+Enterprise change management includes:
+
+- configuration-as-code with review, signature, approval, and immutable version history;
+- promotion through development, integration, pre-production, and production without copying secret values;
+- environment-specific policy overlays with explicit inheritance;
+- pre-deployment validation, compatibility checks, canary rollout, automated health gates, pause, rollback, and evidence;
+- maintenance windows and emergency-change paths with time-bounded authority;
+- database-free and shell-free supported administrative operations;
+- release artifacts with SBOM, provenance, signatures, vulnerability policy, and reproducible build evidence;
+- contract, isolation, upgrade, rollback, failure-injection, security, performance, and recovery test gates;
+- documented deprecation and migration periods for API, configuration, route, workflow, and agent-protocol versions.
+
+### Enterprise Integrations, Notification, and Incident Management
+
+Quorus SHOULD integrate through governed outbound events and adapters with:
+
+- ITSM platforms for incident, problem, and change records;
+- on-call platforms for escalation, acknowledgement, and resolution state;
+- SIEM and security-data platforms for immutable security and audit events;
+- enterprise schedulers and workload automation platforms;
+- CMDB and service catalogues for ownership, criticality, environment, and dependency metadata;
+- corporate PKI, identity providers, secrets managers, KMS, and HSM services;
+- email, approved messaging, and webhook destinations;
+- enterprise data catalogues and lineage systems.
+
+Notification policy MUST support routing, deduplication, throttling, escalation, acknowledgement, time-bounded suppression, maintenance windows, delivery retries, dead-letter handling, and proof of delivery. Notification failure is observable and does not silently resolve the underlying alert.
+
+### Supportability, Diagnostics, Capacity, and Service Management
+
+Enterprise support requires a safe diagnostic interface that can produce a time-bounded, redacted support bundle containing build versions, compatibility, cluster state, replication position, snapshot status, effective non-secret configuration, agent posture, relevant transfer timelines, event gaps, alert delivery, and recent classified failures.
+
+Supportability and service-management capabilities include:
+
+- correlation and trace identifiers across API, controller, agent, service connection, and notification delivery;
+- diagnostic health that distinguishes liveness, readiness, dependency degradation, capacity exhaustion, and quorum loss;
+- maintenance mode and controlled degraded operation;
+- runbook links and ownership for every critical service, route, workflow, connection, and transfer;
+- capacity forecasting for queue depth, agent pools, bandwidth, storage, controller resources, event retention, and evidence exports;
+- service-level reporting for success, timeliness, throughput, retry, integrity, publication, alert response, and telemetry completeness;
+- controlled remote diagnostics without exposing shell access or secrets;
+- support-bundle access, expiry, integrity, download, and audit controls.
+
+### Administration and Operations Interface Dependency
+
+The future administration and operations interface MUST be a client of the same supported REST and event contracts available to automation. It MUST NOT have privileged database, Raft, filesystem, or controller-internal access.
+
+The interface requires role-specific views for transfer operations, application owners, platform administrators, security administrators, auditors, and support personnel. It should provide critical-transfer boards, deadline and risk queues, end-to-end timelines, alert acknowledgement, route and workflow management, agent fleet posture, service connection health, tenant and quota administration, approval queues, audit search, evidence export, cluster state, configuration drift, deployment rollout, and disaster-recovery evidence.
+
+The interface is sequenced after the identity, transfer correctness, telemetry, security, audit, and API foundations because it cannot compensate for missing or untrustworthy backend state.
+
+### Recommended Delivery Order
+
+1. Establish authenticated identities, authorization, TLS/mTLS, service trust, secret references, and agent enrollment.
+2. Implement attempt identity, leases, fencing, monotonic progress, integrity, atomic publication, idempotency, and reconciliation.
+3. Deliver the transfer-process event, progress, deadline, risk, stall, alert, and timeline model.
+4. Complete the versioned REST, event, audit, tenant, workflow, service-connection, and fleet-management contracts.
+5. Prove durable storage, snapshot, backup, restore, disaster recovery, upgrade, rollback, and compatibility behavior.
+6. Add governed external integrations, four-eyes approvals, business calendars, data governance, supportability, and capacity management.
+7. Build administration and operations interfaces on the completed supported contracts.
 
 ## System Architecture
 
 ### Controller-First Architecture
 
-Quorus follows a **controller-first architecture** where each Quorus Controller (e.g., `quorus-controller1`, `quorus-controller2`, `quorus-controller3`) is a self-contained process with an embedded `HttpApiServer`. This design provides natural scaling, fault tolerance, and eliminates single points of failure.
+Quorus follows a **controller-first architecture** where each Quorus Controller is a self-contained process with an embedded `HttpApiServer`. A correctly configured static quorum is designed to tolerate the supported node failures. This does not provide live membership scaling or remove the need to prove storage, routing, quorum, and recovery behavior.
 
 #### Core Design Principles
 
 1. **Controller Ownership**: Each Quorus Controller owns its `HttpApiServer` as an embedded capability
 2. **Self-Contained Processes**: Each Quorus Controller container is independently deployable and scalable
 3. **Distributed Consensus**: Raft consensus (via `RaftNode` and `GrpcRaftTransport`) ensures data consistency across the 3-node Quorus Controller cluster
-4. **Natural Scaling**: Add/remove Quorus Controller containers without architectural changes
+4. **Static Membership Scaling**: Size controller membership before startup; live add/remove operations require a future dynamic-membership design
 5. **No Single Point of Failure**: Any single Quorus Controller can fail; the remaining 2 maintain quorum
 
 ### High-Level Distributed Architecture
@@ -85,11 +380,11 @@ The diagram below shows how Quorus organizes its distributed file transfer syste
 
 1. **Client Request**: A CLI command, REST API call, or YAML workflow submission arrives at the `nginx` load balancer (port 8080)
 2. **Load Balancer Routing**: `nginx` forwards the request to one of the three Quorus Controllers (`quorus-controller1:8080`, `quorus-controller2:8080`, or `quorus-controller3:8080`)
-3. **Leader Handling**: If the request reaches a FOLLOWER, its `HttpApiServer` returns HTTP 307 (redirect) to the LEADER. Only the LEADER's `RaftNode` can accept write operations.
+3. **Leader Handling**: If a current write request reaches a FOLLOWER, its `HttpApiServer` returns `503 NOT_LEADER`. The implementation does not issue an HTTP redirect. Only the LEADER's `RaftNode` can accept write operations.
 4. **State Replication**: The LEADER appends the operation to its Raft log and replicates it to `quorus-controller2` and `quorus-controller3` via `GrpcRaftTransport` (port 9080)
 5. **Commit & Apply**: Once 2 of 3 controllers acknowledge the entry, the LEADER commits it. `QuorusStateMachine.apply()` updates the replicated state stores.
 6. **Agent Assignment**: The Workflow Engine (`YamlWorkflowDefinitionParser`, `DependencyGraph`) assigns transfer jobs to Quorus Agents based on region, available capacity, and protocol support
-7. **Transfer Execution**: Quorus Agents poll for jobs via `GET /agents/{id}/jobs`, execute transfers using `SimpleTransferEngine`, and report status via `POST /agents/{id}/status`
+7. **Transfer Execution**: Quorus Agents poll for jobs via `GET /api/v1/agents/{agentId}/jobs`, execute transfers using `SimpleTransferEngine`, and report compatibility status via `POST /api/v1/jobs/{jobId}/status`
 
 #### Embedded Services (Inside Each Quorus Controller)
 
@@ -121,15 +416,15 @@ Quorus Agents are stateless workers deployed close to data sources/destinations.
 
 | Region | Example Agents | Purpose |
 |--------|----------------|---------|
-| APAC-East | `agent-east-01`, `agent-east-02` | Transfers involving AWS S3 (ap-east-1), Asia-Pacific East data centers |
-| APAC-West | `agent-west-01`, `agent-west-02` | Transfers involving GCP (asia-west1), Asia-Pacific West data centers |
-| EU | `agent-eu-01`, `agent-eu-N` | GDPR-compliant transfers, European data residency |
+| APAC-East | `agent-east-01`, `agent-east-02` | Target-state cloud and data-center placement example; S3 is not a current adapter |
+| APAC-West | `agent-west-01`, `agent-west-02` | Target-state cloud and data-center placement example; GCS is not a current adapter |
+| EU | `agent-eu-01`, `agent-eu-N` | European data-residency placement example; deployment alone does not establish GDPR compliance |
 
 Agents communicate with the Quorus Controller cluster via:
-- **Registration**: `POST /agents/register` (once at startup)
-- **Heartbeat**: `POST /agents/heartbeat` (every 30 seconds via `HeartbeatService`)
-- **Job Polling**: `GET /agents/{id}/jobs` (every 10 seconds via `JobPollingService`)
-- **Status Reporting**: `POST /agents/{id}/status` (per-job progress via `JobStatusReportingService`)
+- **Registration**: `POST /api/v1/agents/register` (alpha startup registration)
+- **Heartbeat**: `POST /api/v1/agents/heartbeat` (periodic via `HeartbeatService`)
+- **Job Polling**: `GET /api/v1/agents/{agentId}/jobs` (via `JobPollingService`)
+- **Status Reporting**: `POST /api/v1/jobs/{jobId}/status` (compatibility status via `JobStatusReportingService`)
 
 ##### Figure 1: Quorus System Overview
 
@@ -364,8 +659,8 @@ Each Quorus Controller (`quorus-controller1`, `quorus-controller2`, `quorus-cont
 
 ### Benefits of Controller-First Design
 
-1. **Natural Scaling**: Each Quorus Controller (`quorus-controller1`, etc.) is independently scalable
-2. **Fault Tolerance**: No single point of failure; 2 of 3 Quorus Controllers maintain quorum
+1. **Self-Contained Deployment**: Each Quorus Controller runs the same controller and API artifact
+2. **Quorum Fault Tolerance**: A healthy, durably configured 3-node cluster can continue metadata writes with 2 available nodes
 3. **Architectural Clarity**: Each Quorus Controller owns its `HttpApiServer` and `RaftNode`
 4. **Operational Simplicity**: Single Docker container per Quorus Controller
 5. **Interface Flexibility**: `HttpApiServer` can be extended with gRPC, WebSocket, etc.
@@ -722,7 +1017,7 @@ Quorus Agents are deployed close to data sources and destinations to minimize tr
 |--------|--------|---------------------|---------|
 | **APAC-East** | `agent-crm-001`, `agent-warehouse-001`, `agent-app-001` | `/crm/export/`, `/warehouse/import/`, `/app/data/` | Primary business applications — CRM exports, warehouse imports, application data |
 | **APAC-West** | `agent-backup-001`, `agent-logs-001` | `/backup/nightly/`, `/logs/collected/` | Disaster recovery and log aggregation site |
-| **EU-West** | `agent-archive-001`, `agent-reports-001`, `agent-dist-001` | `/archive/logs/`, `/reports/generated/`, `/distribution/` | GDPR-compliant archive storage and report distribution |
+| **EU-West** | `agent-archive-001`, `agent-reports-001`, `agent-dist-001` | `/archive/logs/`, `/reports/generated/`, `/distribution/` | European data-residency example; compliance requires separate control evidence |
 
 ##### Route-to-Agent Mapping
 
@@ -749,10 +1044,10 @@ Route: Reports→Dist
 ##### Communication Flow
 
 1. **Raft Consensus (gRPC, port 9080)**: `quorus-controller1` ↔ `quorus-controller2` ↔ `quorus-controller3` — Leader election, log replication, route configuration sync
-2. **Agent Heartbeats (HTTP, port 8080)**: Each Quorus Agent sends `POST /agents/heartbeat` to the controller cluster every 30 seconds via `HeartbeatService`
-3. **Job Assignment (HTTP, port 8080)**: When a route triggers, the LEADER creates a transfer job; the source agent fetches it via `GET /agents/{id}/jobs` (polled by `JobPollingService`)
+2. **Agent Heartbeats (HTTP, port 8080)**: Each Quorus Agent sends `POST /api/v1/agents/heartbeat` to the controller cluster via `HeartbeatService`
+3. **Job Assignment (HTTP, port 8080)**: The agent fetches assigned work via `GET /api/v1/agents/{agentId}/jobs`. Automatic route-trigger evaluation is target-state behavior and is not wired in the current controller startup path.
 4. **Transfer Execution**: Source agent reads file, transfers via `SimpleTransferEngine` using the appropriate protocol adapter (`SftpTransferProtocol`, `HttpTransferProtocol`, etc.)
-5. **Status Reporting (HTTP, port 8080)**: Source agent reports progress/completion via `POST /agents/{id}/status` (sent by `JobStatusReportingService`)
+5. **Status Reporting (HTTP, port 8080)**: The agent reports compatibility status via `POST /api/v1/jobs/{jobId}/status` (sent by `JobStatusReportingService`); the attempt-aware progress contract in the canonical REST specification is still required.
 
 ##### Figure 5: Controller-Agent-Route Architecture
 
@@ -1007,7 +1302,7 @@ private void handleMessage(RaftMessage message) {
 
 | Transport | Status | Class | Description |
 |-----------|--------|-------|-------------|
-| **gRPC** | ✅ Implemented | `GrpcRaftTransport` | Production-ready, high-performance |
+| **gRPC** | ✅ Implemented | `GrpcRaftTransport` | Active Raft transport; production security and durability gates remain open |
 | **In-Memory** | ✅ Implemented | `InMemoryTransportSimulator` | For unit testing (in test folder) |
 
 #### gRPC Transport Implementation (Production)
@@ -1274,7 +1569,7 @@ The Quorus Controller (`quorus-controller` module) serves as the **distributed c
 **5. `HttpApiServer`**
 - **Health Monitoring**: `/health` endpoint provides Quorus Controller cluster health and Raft state
 - **API Endpoints**: REST APIs for workflow submission, agent registration, job management
-- **Cluster Status**: `/api/v1/cluster/status` reports which Quorus Controller is LEADER, current term, all node states
+- **Cluster Status**: current deployments expose `/raft/status`; the richer `/api/v1/cluster` resource is required by the canonical REST specification but is not implemented today
 - **Metrics**: `/metrics` provides Prometheus metrics (`quorus_cluster_*`, `quorus_raft_*`)
 
 #### Quorus Controller Architecture Diagram
@@ -1447,14 +1742,14 @@ public byte[] takeSnapshot() {
 ```
 Before Failure: 3 Quorus Controllers have transfer job "TJ-123" status = "IN_PROGRESS"
 quorus-controller2 Fails: 2 Quorus Controllers still have transfer job "TJ-123" status = "IN_PROGRESS"
-Result:         NO DATA LOSS - Majority (2 of 3) still has the data
+Result:         No committed metadata loss, assuming durable correctly mounted storage on the majority
 ```
 
 **Scenario 2: Network Partition**
 ```
 Partition A: 2 Quorus Controllers (majority) - Can continue operations
 Partition B: 1 Quorus Controller (minority) - Becomes read-only
-Result:      NO DATA LOSS - Majority partition maintains consistency
+Result:      Majority partition can preserve committed metadata consistency under the stated storage assumptions
 ```
 
 **Scenario 3: LEADER Quorus Controller Failure During Write**
@@ -1463,7 +1758,7 @@ Result:      NO DATA LOSS - Majority partition maintains consistency
 2. LEADER replicates via AppendEntries to quorus-controller2 (majority: 2 of 3)
 3. LEADER fails before responding to client
 4. New LEADER elected (quorus-controller2 or quorus-controller3) with the committed change
-Result: NO DATA LOSS - Change was committed to majority via QuorusStateMachine
+Result: Committed metadata remains recoverable under the stated quorum and durable-storage assumptions
 ```
 
 #### What Data is NOT Protected
@@ -1496,7 +1791,7 @@ The Quorus Controllers do **NOT** store the actual file data being transferred. 
 - ❌ Lost progress information
 - ❌ Broken audit trails
 
-The Quorus Controller cluster ensures that the **"brain" of the system** (the coordination and tracking data) is never lost, providing enterprise-grade reliability for Quorus file transfer operations while maintaining strong consistency across `quorus-controller1`, `quorus-controller2`, and `quorus-controller3`.
+The Quorus Controller cluster is intended to preserve committed coordination metadata through quorum replication. This is not an unconditional no-loss guarantee: durable storage, correct volume mounting, snapshots, restore testing, quorum, and the release gates in the canonical architecture specification are required.
 
 ### HttpApiServer-RaftNode Relationship and Coupling
 
@@ -1558,20 +1853,20 @@ graph TB
 
 **1. Leader Discovery**
 
-When `HttpApiServer` receives a write request on a FOLLOWER, it must forward to the LEADER:
+When `HttpApiServer` receives a current write request on a FOLLOWER, it rejects the request and allows the client or trusted routing tier to retry against the leader:
 
 ```java
 /**
  * HttpApiServer checks if local RaftNode is LEADER before processing writes.
- * If not LEADER, returns HTTP 307 redirect to the current LEADER.
+ * If not LEADER, returns 503 NOT_LEADER. No authenticated redirect is issued.
  */
 private void handleWriteRequest(RoutingContext ctx) {
     if (raftNode.getState() != RaftNode.State.LEADER) {
-        String leaderUrl = raftNode.getLeaderHttpUrl();
         ctx.response()
-            .setStatusCode(307)
-            .putHeader("Location", leaderUrl + ctx.request().uri())
-            .end();
+            .setStatusCode(503)
+            .putHeader("Content-Type", "application/problem+json")
+            .putHeader("Retry-After", "1")
+            .end("{\"code\":\"NOT_LEADER\",\"retryable\":true}");
         return;
     }
     // Process write on LEADER
@@ -1614,7 +1909,7 @@ upstream quorus_controllers {
 - No separate API layer that could become a single point of failure
 
 **Scalability:**
-- Add more Quorus Controllers to the cluster for increased capacity
+- Size the static controller membership before startup; live add/remove operations require a future dynamic-membership design
 - `nginx` automatically routes to healthy controllers
 - Each controller handles both HTTP and Raft traffic
 
@@ -1636,15 +1931,15 @@ upstream quorus_controllers {
 - Handled by `GrpcRaftTransport` and `GrpcRaftServer`
 
 **Client-to-Controller (HTTP REST, port 8080):**
-- Workflow submissions, transfer requests, agent registration
+- Current transfer, assignment, agent, and route requests; workflow REST resources are required by the canonical REST specification but are not registered today
 - Handled by `HttpApiServer` inside each Quorus Controller
-- Write requests redirected to LEADER; reads can be served by any controller
+- Follower writes return `503 NOT_LEADER`; follower reads may be stale unless the required consistency contract is implemented
 
 **Agent-to-Controller (HTTP REST, port 8080):**
-- `POST /agents/register` — Agent registration at startup
-- `POST /agents/heartbeat` — Periodic heartbeats from `HeartbeatService`
-- `GET /agents/{id}/jobs` — Job polling by `JobPollingService`
-- `POST /agents/{id}/status` — Status reporting by `JobStatusReportingService`
+- `POST /api/v1/agents/register` — Alpha agent registration at startup
+- `POST /api/v1/agents/heartbeat` — Periodic heartbeats from `HeartbeatService`
+- `GET /api/v1/agents/{agentId}/jobs` — Job polling by `JobPollingService`
+- `POST /api/v1/jobs/{jobId}/status` — Compatibility status reporting by `JobStatusReportingService`
 
 ## Reliability and Health Monitoring
 
@@ -1941,7 +2236,7 @@ sequenceDiagram
     Note over A,AR: Failure Detection
     A--xLB: Heartbeat Timeout
     C1->>AR: Mark Agent Unhealthy
-    C1->>C1: Redistribute Jobs
+    C1->>C1: Mark work for reconciliation
 ```
 
 ### Failure Detection and Recovery
@@ -1953,13 +2248,13 @@ sequenceDiagram
 - **Health Checks**: Active health probes every 60 seconds
 
 **Failure Scenarios:**
-- **Agent Failure**: Jobs redistributed to healthy agents
+- **Agent Failure**: Active work requires reconciliation; duplicate-safe automatic redistribution is not implemented
 - **Network Partition**: Agents continue current jobs, new jobs queued
 - **Controller Failure**: Automatic leader election, minimal disruption
 - **Partial Failure**: Degraded mode operation with reduced capacity
 
 **Recovery Mechanisms:**
-- **Automatic Recovery**: Failed jobs automatically redistributed to healthy Quorus Agents
+- **Automatic Recovery**: Automatic duplicate-safe redistribution remains blocked until attempt leases, fencing, and reconciliation semantics are implemented
 - **Graceful Shutdown**: 30-second drain period for active transfers
 - **State Persistence**: Job state persisted in `QuorusStateMachine` for recovery after failures
 - **Backpressure**: Automatic throttling when Quorus Agents are overloaded
@@ -2059,6 +2354,8 @@ flowchart TB
 ### Performance Targets
 
 **Quorus Agent Fleet Capacity:**
+
+The figures below are target workloads that require reproducible benchmark and failure evidence; they are not current supported-scale guarantees.
 - **Agent Support**: 100+ Quorus Agents per Quorus Controller cluster
 - **Concurrent Transfers**: 10,000+ simultaneous transfers across fleet
 - **Heartbeat Processing**: 1,000+ heartbeats/second via `HeartbeatService`
@@ -2075,15 +2372,15 @@ flowchart TB
 ### Horizontal Scaling Strategies
 
 **Quorus Controller Scaling:**
-- **Quorum Expansion**: Add Quorus Controllers to increase availability (e.g., 3 → 5 nodes)
-- **Read Replicas**: Read-only replicas for query load distribution
-- **Sharding**: Partition Quorus Agents across multiple Quorus Controller clusters
-- **Federation**: Multiple Quorus Controller clusters for different regions/tenants
+- **Quorum Expansion**: Future capability requiring safe dynamic-membership semantics; current membership is static
+- **Read Replicas**: Target-state query scaling with an explicit read-consistency and staleness contract
+- **Sharding**: Target-state partitioning of agents across controller clusters with explicit ownership and transfer-routing semantics
+- **Federation**: Target-state multi-cluster design requiring identity, policy, consistency, recovery, and cross-cluster operational contracts
 
 **Quorus Agent Scaling:**
 - **Linear Scaling**: Add Quorus Agents to linearly increase transfer capacity
-- **Auto-Scaling**: Automatic Quorus Agent provisioning based on demand
-- **Elastic Scaling**: Dynamic scaling up/down based on workload
+- **Auto-Scaling**: Target-state provisioning based on demand, constrained by secure enrollment, signed artifacts, policy, drain, and revocation
+- **Elastic Scaling**: Target-state scale-down that preserves active-attempt and reconciliation safety
 - **Burst Capacity**: Temporary capacity increases for peak loads
 
 **Storage Scaling:**
@@ -2102,7 +2399,7 @@ flowchart TB
 
 **Security and Isolation:**
 - **Network Segmentation**: Isolated Docker networks for different tenants
-- **Encryption**: End-to-end TLS encryption for all communications
+- **Target-State Encryption**: TLS/mTLS with verified identities at every applicable communication boundary; this is not complete in the current runtime
 - **Authentication**: Mutual TLS authentication between Quorus Controllers and Quorus Agents
 - **Authorization**: Fine-grained access control and permissions
 
@@ -2130,7 +2427,7 @@ The `quorus-core` module provides the foundation for file transfer capabilities.
 
 ### 2. Multi-Tenant Management (quorus-tenant)
 
-Enterprise-grade multi-tenancy with isolation and resource management.
+Target-state enterprise multi-tenancy with authenticated isolation and resource management. Current tenant fields and selected checks do not yet establish this boundary.
 
 **Key Components:**
 - `TenantService`: Tenant lifecycle management
@@ -3132,6 +3429,8 @@ spec:
 
 ## Enterprise Features
 
+The snippets in this section are illustrative target-state policy concepts, not schemas accepted by the current workflow parser or proof of implemented controls. The complete capability requirements and delivery dependencies are defined in [Enterprise Capability Requirements](#enterprise-capability-requirements); canonical implementation status remains in the architecture and REST API specifications.
+
 ### 1. Governance & Compliance
 ```yaml
 governance:
@@ -3285,6 +3584,9 @@ variables:
 
 ## Deployment Architecture
 
+> [!CAUTION]
+> The database, Redis, and etcd topology retained in this target-state section is a superseded legacy alternative, not the canonical Quorus controller architecture. Current authoritative controller state is the Raft log and snapshots; PostgreSQL, Redis, and etcd are not controller state authorities. Static Raft membership, current security gaps, and measurable availability requirements are defined in the canonical architecture specification.
+
 ### Corporate Network Deployment with Controller Quorum
 
 ```mermaid
@@ -3420,31 +3722,17 @@ graph TD
     style AC1 fill:#fff3e0
     style AC2 fill:#fff3e0
     style AC3 fill:#fff3e0
-        INTERNAL[Internal Zone<br/>Data Sources]
-        SECURE[Secure Zone<br/>Sensitive Data]
-    end
-
-    %% Styling by Corporate Zone
     style CORP fill:#f0f0f0
     style LB fill:#f0f0f0
-    style ING fill:#f0f0f0
-
-    style QE fill:#e8f5e8
-    style WE fill:#fff3e0
-    style TS fill:#e3f2fd
-
     style PG fill:#f3e5f5
     style REDIS fill:#f3e5f5
-    style SAN fill:#f3e5f5
-
+    style ETCD fill:#f3e5f5
     style PROM fill:#fce4ec
     style SPLUNK fill:#fce4ec
     style GRAF fill:#fce4ec
     style ALERT fill:#fce4ec
-
     style VAULT fill:#f1f8e9
     style CA fill:#f1f8e9
-
     style AD fill:#fff8e1
     style NAS fill:#fff8e1
     style NFS fill:#fff8e1
@@ -3576,7 +3864,7 @@ graph TB
 - **Single Controller Failure**: Automatic leader election, <5s downtime
 - **Database Failure**: Automatic failover to replica, <30s downtime
 - **Network Partition**: Majority partition continues operation
-- **Agent Failure**: Jobs redistributed, no data loss
+- **Agent Failure**: Duplicate-safe redistribution is not a current guarantee; reconciliation, attempt leases, and fencing are required first
 
 ### Database Schema
 
@@ -3748,7 +4036,7 @@ CREATE TABLE audit_logs (
 - **Version-controlled** transfer configurations in corporate repositories
 - **Corporate approval workflows** for configuration changes
 
-### 5. Enterprise-Grade Security
+### 5. Target-State Enterprise Security
 - **Corporate directory integration** (Active Directory, LDAP)
 - **Certificate-based authentication** using corporate PKI
 - **Network-level security** through corporate firewalls and VLANs
@@ -3822,7 +4110,7 @@ graph TD
 
 #### Data Protection Layer
 - **Encryption at Rest** - Database and file encryption
-- **Encryption in Transit** - TLS/mTLS for all communications
+- **Encryption in Transit Requirement** - TLS/mTLS and verified peer identity for all applicable communications; not fully implemented today
 - **Key Management Service** - Centralized key management
 - **Hardware Security Module** - Secure key storage
 
@@ -4031,8 +4319,8 @@ source:
 
 **Docker Configuration:**
 ```dockerfile
-# Multi-stage build for optimized images
-FROM openjdk:17-jre-slim
+# Runtime image matching the repository's Java 25 bytecode baseline
+FROM eclipse-temurin:25-jre-alpine
 COPY target/quorus-controller-*.jar app.jar
 HEALTHCHECK CMD curl -f http://localhost:${HTTP_PORT}/health
 CMD ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
@@ -4299,35 +4587,37 @@ docs/                           # Documentation
 
 ## Related Documents
 
-- **[API Documentation](api-documentation.md)** - REST API specifications (future)
+- **[Canonical Architecture Specification](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md)** - Current guarantees, boundaries, and release requirements
+- **[Canonical REST API Specification](../../docs/QUORUS_REST_API_SPECIFICATION.md)** - Complete control, operations, security, and administration API contract
+- **[Enterprise Implementation Plan](../task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md)** - Phased delivery, dependencies, verification, and exit gates
+- **[HTTP API Reference](../../docs/QUORUS_API_REFERENCE.md)** - Endpoints registered by the active controller runtime
 
 ## Conclusion
 
-The Quorus comprehensive system design provides a robust foundation for enterprise-grade file transfer operations with:
+The Quorus comprehensive system design describes a target foundation for enterprise file-transfer operations with:
 
 ### Core Architectural Strengths
 
-- **Controller-First Architecture**: Natural scaling with self-contained nodes
+- **Controller-First Architecture**: Self-contained nodes with static membership in the current runtime
 - **Distributed Consensus**: Raft-based coordination for strong consistency
-- **High Availability**: Load-balanced deployment with automatic failover
-- **Multi-tenant Support**: Complex organizational structures and isolation
+- **High Availability Target**: Load-balanced deployment, leader election, proven durable storage, and recovery gates
+- **Multi-tenant Target**: Authenticated isolation, organizational hierarchy, quotas, and policy
 - **Declarative Workflows**: YAML-based infrastructure-as-code approach
 
 ### Operational Excellence
 
-- **Comprehensive Monitoring**: Multi-level health checks and observability
-- **Deployment Automation**: Multiple configurations for different environments
-- **Fault Tolerance**: No single points of failure with graceful degradation
-- **Performance Optimization**: Tuned for high-throughput operations
-- **Enterprise Security**: Authentication, authorization, and compliance frameworks
+- **Transfer Operations Monitoring**: Per-transfer progress, deadlines, risk, stalls, attempts, integrity, publication, alerts, and timelines
+- **Deployment Governance**: Signed artifacts, configuration promotion, controlled rollout, drain, rollback, and evidence
+- **Fault-Tolerance Target**: Tested quorum, storage, reconciliation, backup, restore, and degraded-operation behavior
+- **Performance Evidence**: Reproducible workload-specific validation against release gates
+- **Enterprise Security Target**: Identity, authorization, TLS/mTLS, service trust, secret references, agent lifecycle, and audit
 
 ### Scalability and Reliability
 
-- **Horizontal Scaling**: Add/remove Quorus Controllers without downtime (e.g., 3 → 5 nodes)
-- **Quorus Agent Fleet Management**: Support for 100+ Quorus Agents with intelligent scheduling
-- **Fault Recovery**: Automatic detection and recovery from Quorus Controller or Agent failures
+- **Controller Scaling**: Static membership sized before startup; live membership change remains future work
+- **Quorus Agent Fleet Management**: Target capacity must be supported by measured scheduling, telemetry, identity, and rollout evidence
+- **Fault Recovery**: Controller recovery plus conservative transfer reconciliation until duplicate-safe reassignment is implemented
 - **Load Distribution**: `nginx` load balancer routes to healthy Quorus Controllers
 - **Data Consistency**: Strong consistency guarantees via `RaftNode` and `QuorusStateMachine` across `quorus-controller1`, `quorus-controller2`, `quorus-controller3`
 
-The modular design ensures maintainability and extensibility while meeting the demanding requirements of enterprise environments. The Quorus system is designed to scale from simple single-tenant deployments to complex multi-tenant enterprise scenarios with thousands of users and petabytes of data transfer, providing a solid foundation for mission-critical file transfer operations.
-```
+The modular design is intended to scale from simple single-tenant deployments to complex multi-tenant enterprise scenarios. Current guarantees, supported scale, and production release gates are defined only by the canonical architecture specification and its verification evidence.

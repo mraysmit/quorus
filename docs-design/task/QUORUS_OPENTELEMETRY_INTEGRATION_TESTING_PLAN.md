@@ -4,6 +4,9 @@
 **Author:** Mark Andrew Ray-Smith Cityline Ltd  
 **Date:** 2026-03-15  
 
+> [!IMPORTANT]
+> This plan covers telemetry infrastructure and instrumentation work. Quorus operational observability is transfer-process centered: per-transfer attempts, continuous progress and freshness, deadlines, risk, stalls, integrity, publication, alerts, and operator timelines are the controlling production outcomes. See [QUORUS_ARCHITECTURE_SPECIFICATION.md](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md) and [QUORUS_REST_API_SPECIFICATION.md](../../docs/QUORUS_REST_API_SPECIFICATION.md).
+
 ## Table of Contents
 
 1. [Overview](#overview)
@@ -231,7 +234,7 @@ public void handle(RoutingContext ctx) {
 ```
 
 **Files Modified:**
-- [quorus-controller/src/main/java/dev/mars/quorus/controller/http/handler/MetricsHandler.java](../../quorus-controller/src/main/java/dev/mars/quorus/controller/http/handler/MetricsHandler.java)
+- [quorus-controller/src/main/java/dev/mars/quorus/controller/http/handlers/MetricsHandler.java](../../quorus-controller/src/main/java/dev/mars/quorus/controller/http/handlers/MetricsHandler.java)
 
 **Net Code Change:**
 - 421 deletions, 284 insertions = **-137 lines** (code simplification)
@@ -1094,7 +1097,7 @@ This section covers the **integration testing infrastructure** for validating th
 
 > **Updated: 2026-01-29** - Full Grafana observability stack implemented
 
-The standard observability stack provides a production-ready visualization layer for all telemetry data. This stack replaces the simpler Jaeger-only configuration for comprehensive observability.
+The standard observability stack provides a shared visualization layer for the telemetry exported in this plan. It replaces the simpler Jaeger-only configuration, but it is not complete production transfer-operations observability until the required per-transfer progress, freshness, attempts, deadlines, risk, stalls, integrity, publication, alerts, and timelines are implemented and verified.
 
 #### Stack Components
 
@@ -3514,7 +3517,7 @@ After implementing this testing plan:
 - [Prometheus Metric Types](https://prometheus.io/docs/concepts/metric_types/)
 - [Jaeger Architecture](https://www.jaegertracing.io/docs/latest/architecture/)
 - [TestContainers](https://www.testcontainers.org/)
-- [Quorus Docker Testing README](../docs/QUORUS-DOCKER-TESTING-README.md)
+- [Quorus Docker Testing README](../../docs/QUORUS-DOCKER-TESTING-README.md)
 
 ---
 

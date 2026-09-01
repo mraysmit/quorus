@@ -2,12 +2,15 @@
 
 # Quorus Cluster Startup Guide
 
-**Version:** 2.1  
-**Date:** 2026-03-17  
+**Version:** 2.2  
+**Date:** 2026-09-01  
 **Author:** Mark Ray-Smith — Cityline Ltd  
-**License:** Apache 2.0
+**License:** Apache 2.0  
+**Scope:** Current repository-local deployment guide
 
 This guide documents the current repository-local path for starting a controller cluster and observability stack with the compose files that exist today.
+
+The current controller API has no built-in authentication, and complete production TLS/mTLS identity boundaries are not implemented for controller HTTP, Raft, and agent control traffic. The examples in this guide are development and verification procedures, not a secure production deployment baseline. See [QUORUS_ARCHITECTURE_SPECIFICATION.md](QUORUS_ARCHITECTURE_SPECIFICATION.md) for the required security boundary and [QUORUS_REST_API_SPECIFICATION.md](QUORUS_REST_API_SPECIFICATION.md) for the complete operations interface.
 
 ## Prerequisites
 
@@ -109,7 +112,7 @@ Alternatively, set the property in `quorus-agent.properties`:
 quorus.agent.tenant.id=<your-tenant-id>
 ```
 
-An agent that registers without a `tenantId` is rejected by the controller with `400 Bad Request`. Transfer jobs without a `tenantId` are equally rejected. See `docs/QUORUS_USER_GUIDE.md` for the full tenant isolation model.
+An agent that registers without a `tenantId` is rejected by the controller with `400 Bad Request`. Transfer jobs without a `tenantId` are equally rejected. These field checks are not authenticated tenant identity or complete tenant isolation; see `docs/QUORUS_USER_GUIDE.md` for the current enforcement boundary.
 
 ## Current Source of Truth
 

@@ -3,12 +3,13 @@
 **Project**: Quorus Distributed File Transfer System  
 **Version**: 1.0-SNAPSHOT (Vert.x 5.x)  
 **Date**: December 17, 2025  
+**Status**: Historical Vert.x migration deployment artifact  
 
 ---
 
 ## Overview
 
-This guide provides step-by-step instructions for deploying the Vert.x 5.x version of Quorus to production environments.
+This guide records the deployment assumptions used during the Vert.x 5 migration. It is not the current Quorus production deployment baseline: the repository now requires Java 25, PostgreSQL is not an authoritative controller-state dependency, and the security and agent-lifecycle release requirements remain open. Use [QUORUS_CLUSTER_STARTUP_GUIDE.md](../../../docs/QUORUS_CLUSTER_STARTUP_GUIDE.md) for current repository startup and [QUORUS_ARCHITECTURE_SPECIFICATION.md](../../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md) for production requirements.
 
 ---
 

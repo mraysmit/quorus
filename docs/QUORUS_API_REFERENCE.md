@@ -2,13 +2,15 @@
 
 # Quorus HTTP API Reference
 
-**Version:** 2.1  
-**Date:** 2026-03-17  
-**Author:** Mark Ray-Smith Cityline Ltd  
+**Version:** 2.2  
+**Date:** 2026-09-01  
+**Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Implementation:** `quorus-controller/src/main/java/dev/mars/quorus/controller/http/HttpApiServer.java`
 
 This document reflects the endpoints currently registered by the embedded controller HTTP server.
+
+The complete production REST contract is defined in [QUORUS_REST_API_SPECIFICATION.md](QUORUS_REST_API_SPECIFICATION.md). The canonical security, consistency, and release requirements are defined in [QUORUS_ARCHITECTURE_SPECIFICATION.md](QUORUS_ARCHITECTURE_SPECIFICATION.md). This reference deliberately remains limited to the active HTTP surface: an endpoint described only in the REST API specification is required or planned, not implicitly implemented.
 
 ## Base URL
 
@@ -18,17 +20,20 @@ This document reflects the endpoints currently registered by the embedded contro
 
 - Content type: `application/json` for JSON request bodies
 - All write requests are subject to leader guarding
+- A follower rejects a write with `503 NOT_LEADER`; the implementation does not issue an HTTP redirect
 - The API currently does **not** enforce built-in authentication
 
 ## Tenant Isolation
 
-Every agent belongs to exactly one tenant and can only receive jobs from that tenant. `tenantId` is a required field in both agent registration and transfer job creation. The controller enforces this at every write path:
+Every agent belongs to exactly one declared tenant. `tenantId` is required in agent registration and transfer creation, and selected agent/job paths validate matching tenant fields:
 
 - Agent registration without `tenantId` → `400 Bad Request`
 - Transfer creation without `tenantId` → `400 Bad Request`
 - Heartbeat carrying a `tenantId` that does not match the registered agent's tenant → `403 Forbidden`
 - Job status update from an agent for a job belonging to a different tenant → `403 Forbidden`
 - `GET /api/v1/agents/:agentId/jobs` silently filters out jobs whose tenant does not match the agent's registered tenant
+
+These checks do not authenticate the caller or prove that a supplied `tenantId` is trustworthy. Direct assignment creation does not yet uniformly enforce referenced job/agent existence and tenant equality inside state-machine application. Protected multi-tenant deployment therefore remains subject to `ARCH-03` and `ARCH-06` in the architecture specification.
 
 ## Infrastructure Endpoints
 
@@ -244,6 +249,8 @@ Updates status for an existing transfer job. Only the agent that owns the assign
 ### `POST /api/v1/assignments`
 
 Creates a job assignment.
+
+**Current boundary:** this endpoint does not yet provide the complete referential and tenant invariant enforcement required by the canonical architecture specification. It must not be treated as a trusted cross-tenant authorization boundary.
 
 ### `GET /api/v1/assignments`
 

@@ -1,12 +1,17 @@
-<img src="../../docs/quorus-logo.png" alt="Quorus Logo" width="200"/>
+<img src="../../docs/quorus-logo.png" alt="Quorus" width="120"/>
 
 # Quorus Raft Cluster Testing Guide
 
 **Version:** 1.0  
 **Date:** 2026-02-01  
-**Author:** Mark Andrew Ray-Smith Cityline Ltd  
+**Author:** Mark Ray-Smith — Cityline Ltd  
+**License:** Apache 2.0  
+**Status:** Engineering testing reference  
+**Scope:** Static three-controller development cluster
 
-This guide explains how to run and test the 3-node Quorus Controller cluster defined in `docker/compose/docker-compose-controller-first.yml`. The cluster uses Raft consensus for leader election, workflow metadata replication, and fault-tolerant coordination.
+This guide explains how to run and test the 3-node Quorus Controller cluster defined in `docker/compose/docker-compose-controller-first.yml`. The cluster uses Raft consensus for leader election and replicated controller commands. Current authoritative state includes agents, transfers, assignments, and routes; the current HTTP server does not register workflow REST resources.
+
+This is a development test guide, not a secure production deployment baseline. The canonical runtime, security, consistency, and API contracts are [QUORUS_ARCHITECTURE_SPECIFICATION.md](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md) and [QUORUS_REST_API_SPECIFICATION.md](../../docs/QUORUS_REST_API_SPECIFICATION.md).
 
 ---
 
@@ -168,18 +173,18 @@ flowchart TB
 
 | Benefit | Quorus Use Case |
 |---------|----------------|
-| **Leader Election** | When a Quorus Controller fails, another is automatically elected to handle workflow submissions and agent coordination |
-| **State Replication** | Workflow definitions, agent registrations, and transfer job state are replicated across all three controllers |
+| **Leader Election** | When a Quorus Controller fails, another is automatically elected to handle supported writes and agent coordination |
+| **State Replication** | Agent, transfer, assignment, and route commands are replicated across the controllers |
 | **Fault Tolerance** | The cluster continues operating if one Quorus Controller crashes (2 of 3 controllers = quorum) |
-| **Consistency** | All controllers see the same workflow and agent state, preventing duplicate job assignments |
+| **Consistency** | Committed controller commands are applied in Raft order; this does not by itself provide duplicate-safe external transfer execution |
 
 ### Quorus Controller Raft States
 
 | State | Behavior in Quorus |
 |-------|--------------------|
-| `FOLLOWER` | Receives replicated workflow/agent data from the leader; redirects API requests to the leader; votes in elections |
+| `FOLLOWER` | Receives replicated commands, returns `503 NOT_LEADER` for writes, and votes in elections |
 | `CANDIDATE` | Requesting votes from other controllers to become the new leader (transient state during elections) |
-| `LEADER` | Accepts workflow submissions via `HttpApiServer`, replicates state to followers, coordinates agent job assignments |
+| `LEADER` | Accepts supported writes via `HttpApiServer`, replicates commands to followers, and coordinates agent assignments |
 
 ---
 
@@ -301,7 +306,7 @@ curl -s http://localhost:8081/health | ConvertFrom-Json
 | `state` | "LEADER" | This controller's Raft role: `LEADER` (accepts writes), `FOLLOWER` (replicates from leader), or `CANDIDATE` (election in progress). |
 | `nodeId` | "controller1" | This controller's identifier, matching the `QUORUS_NODE_ID` environment variable set in `docker-compose-controller-first.yml`. |
 | `term` | 1 | Raft election term. Increments when a new election occurs (e.g., after leader failure). All controllers in a healthy cluster report the same term. |
-| `commitIndex` | 42 | Highest Raft log index replicated to a majority of controllers (2 of 3). Committed entries (workflows, agent state) are durable. |
+| `commitIndex` | 42 | Highest Raft log index replicated to a majority of controllers (2 of 3). |
 | `lastApplied` | 42 | Highest Raft log index applied to the `QuorusStateMachine`. Should equal `commitIndex` when this controller is caught up. |
 
 **Interpreting the values:**
@@ -312,12 +317,12 @@ curl -s http://localhost:8081/health | ConvertFrom-Json
 - **Multiple Quorus Controllers report `LEADER`**: Split-brain condition (temporary); the Quorus Controller with the higher term will win.
 
 > **What are committed entries?**  
-> When a workflow is submitted via `curl` or the Quorus API, the LEADER Quorus Controller appends it to its Raft log and replicates it to the FOLLOWER Quorus Controllers. An entry becomes **committed** once the LEADER confirms it has been written to a majority (2 of 3 Quorus Controllers). Only committed entries are guaranteed to survive failures—they will never be lost or overwritten. The `commitIndex` tracks the highest such entry. Once committed, the entry is then **applied** to the `QuorusStateMachine` (the actual workflow/agent data store), which is tracked by `lastApplied`.
+> When a supported controller mutation is accepted, the LEADER appends its command to the Raft log and replicates it to the FOLLOWER controllers. An entry becomes **committed** once a majority acknowledges it. The `commitIndex` tracks the highest committed entry. Once committed, the entry is applied to `QuorusStateMachine`, which is tracked by `lastApplied`.
 >
-> **Example:** Submitting a Quorus workflow YAML to the 3-node Quorus Controller cluster:
-> 1. `curl -X POST http://localhost:8080/api/v1/workflows -d @daily-export.yaml` → the `nginx` container (port 8080) routes to the current Quorus Controller leader
+> **Example:** Submitting a tenant-scoped transfer to the 3-node Quorus Controller cluster:
+> 1. `POST /api/v1/transfers` reaches the current Quorus Controller leader
 > 2. The leader's `HttpApiServer` (running inside `quorus-controller1`, `quorus-controller2`, or `quorus-controller3`) receives the request
-> 3. The leader's `RaftNode` appends `{workflowId: "wf-123", name: "daily-export", transfers: [...]}` to its Raft log at index 43
+> 3. The leader's `RaftNode` appends the transfer creation command to its Raft log at index 43
 > 4. The leader's `GrpcRaftTransport` sends the entry to the other two Quorus Controllers via `AppendEntries` gRPC (port 9080)
 > 5. One follower's `RaftNode` writes to its log and acknowledges → majority reached (2 of 3 controllers)
 > 6. The leader updates `commitIndex` to 43 → entry is now **committed** and durable
@@ -327,7 +332,7 @@ curl -s http://localhost:8081/health | ConvertFrom-Json
 ### Cluster Status Endpoint
 
 ```powershell
-curl -s http://localhost:8081/api/v1/cluster/status | ConvertFrom-Json
+curl -s http://localhost:8081/raft/status | ConvertFrom-Json
 ```
 
 ### Metrics Endpoint
@@ -343,7 +348,7 @@ quorus_cluster_term          # Current Raft election term (same across healthy c
 quorus_cluster_is_leader     # 1 if this controller is leader, 0 otherwise
 quorus_cluster_commit_index  # Highest log index committed (replicated to 2+ controllers)
 quorus_cluster_last_applied  # Highest log index applied to QuorusStateMachine
-quorus_cluster_log_size      # Total Raft log entries (workflows, agent state, etc.)
+quorus_cluster_log_size      # Total Raft log entries
 quorus_raft_rpc_ratio_total  # gRPC calls between controllers (AppendEntries, RequestVote)
 ```
 
@@ -355,7 +360,7 @@ These endpoints are served by the `HttpApiServer` class running inside the `quor
 
 Each Quorus Controller container runs a single Java process (`QuorusControllerVerticle`) that starts two servers:
 
-1. **`HttpApiServer`** (port 8080 inside container) — A Vert.x HTTP server that handles REST API requests. It provides the `/health`, `/metrics`, and `/api/v1/*` endpoints. When a request arrives (e.g., `POST /api/v1/workflows`), the `HttpApiServer` forwards it to the local `RaftNode`. If this Quorus Controller is the LEADER, it processes the request; if it's a FOLLOWER, it can redirect or reject the write.
+1. **`HttpApiServer`** (port 8080 inside container) — A Vert.x HTTP server that handles REST API requests. It provides health, metrics, Raft status, and the currently registered `/api/v1/*` endpoints. When a supported write arrives, the leader proposes it to Raft; a follower returns `503 NOT_LEADER` and does not redirect it.
 
 2. **`GrpcRaftServer`** (port 9080 inside container) — A gRPC server that handles Raft protocol messages (`AppendEntries`, `RequestVote`) from the other two Quorus Controllers. This is how the 3-node cluster maintains consensus.
 
@@ -363,7 +368,7 @@ Each Quorus Controller container runs a single Java process (`QuorusControllerVe
 
 | Access Method | URL | Use Case |
 |---------------|-----|----------|
-| Via `nginx` load balancer | `http://localhost:8080/...` | Production usage; `nginx` routes to a healthy Quorus Controller |
+| Via `nginx` load balancer | `http://localhost:8080/...` | Development cluster testing through the repository load balancer |
 | Direct to `quorus-controller1` | `http://localhost:8081/...` | Testing/debugging a specific node |
 | Direct to `quorus-controller2` | `http://localhost:8082/...` | Testing/debugging a specific node |
 | Direct to `quorus-controller3` | `http://localhost:8083/...` | Testing/debugging a specific node |
@@ -374,9 +379,9 @@ Each Quorus Controller container runs a single Java process (`QuorusControllerVe
 |----------|--------|-------------|
 | `/health` | GET | Controller health including Raft state (as shown above) |
 | `/metrics` | GET | Prometheus metrics (prefixed with `quorus_`) |
-| `/api/v1/cluster/status` | GET | Raft cluster status: leader ID, term, all node states |
+| `/raft/status` | GET | Current Raft cluster status |
 | `/api/v1/agents` | GET | Quorus Agents currently registered with this cluster |
-| `/api/v1/workflows` | POST | Submit a Quorus workflow YAML for execution |
+| `/api/v1/transfers` | POST | Submit a tenant-scoped transfer request |
 
 ---
 
@@ -536,7 +541,7 @@ Write-Host "Leaders: $leaders (expected: 1)"
 
 1. Stop the current leader container (`docker stop quorus-controller1` if controller1 is leader)
 2. Expect: Remaining controllers detect missing heartbeats; new election within `ELECTION_TIMEOUT_MS` (3 seconds)
-3. Verify: One of controller2/controller3 becomes the new LEADER; workflow submissions continue via `nginx` load balancer
+3. Verify: One of controller2/controller3 becomes the new LEADER; supported writes resume after client retry against the new leader
 
 ```powershell
 # Stop leader (assume controller1)
@@ -568,7 +573,7 @@ Write-Host "controller1 state: $state (expected: FOLLOWER)"
 #### Scenario 4: Network Partition (minority isolation)
 
 1. Disconnect one controller from the Docker network: `docker network disconnect compose_quorus-cluster quorus-controller3`
-2. Expect: The remaining two controllers (controller1, controller2) maintain quorum; workflow submissions continue
+2. Expect: The remaining two controllers (controller1, controller2) maintain quorum; supported writes can continue through the leader
 3. Isolated controller3: Cannot become leader (cannot reach quorum); returns to FOLLOWER when reconnected
 
 ---
@@ -676,7 +681,7 @@ docker logs quorus-controller1 2>&1 | Select-String "LEADER|election|term|vote"
 | Leader Failover | ✅ | New LEADER elected when current LEADER container stops |
 | Controller Rejoin | ✅ | Restarted Quorus Controller syncs Raft log and becomes FOLLOWER |
 | Metrics Export | ✅ | All `quorus_cluster_*` metrics visible in Prometheus |
-| Log Replication | ✅ | Workflow and agent state replicated to all three Quorus Controllers |
+| Log Replication | ✅ | Supported controller commands replicated to all three Quorus Controllers |
 
 ### Key Files
 

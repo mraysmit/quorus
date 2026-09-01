@@ -1675,12 +1675,6 @@ The patterns and optimizations demonstrated here serve as a reference for any Ve
 - **PostgreSQL Performance Tuning**: Database-side optimization guides
 
 
----
-
-        .onComplete(ar -> started = false);
-}
-```
-
 ### 3. **Modern Future Composition**
 
 ```java

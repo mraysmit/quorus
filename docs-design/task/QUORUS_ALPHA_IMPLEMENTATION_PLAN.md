@@ -4,6 +4,11 @@
 **Date:** March 17, 2026  
 **Author:** Mark Andrew Ray-Smith Cityline Ltd
 
+> [!IMPORTANT]
+> This is a point-in-time implementation plan. Completion markers do not establish current production conformance. In particular, tenant field checks are not authenticated tenant isolation, and current assignment, security, transfer-operations telemetry, service-connectivity, and agent-lifecycle gaps are governed by [QUORUS_ARCHITECTURE_SPECIFICATION.md](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md) and [QUORUS_REST_API_SPECIFICATION.md](../../docs/QUORUS_REST_API_SPECIFICATION.md).
+>
+> The current delivery roadmap is [QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md](QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md). This alpha plan is retained as historical implementation evidence.
+
 ---
 
 ## Revision History
@@ -11,7 +16,7 @@
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.9 | 2026-03-17 | Added T4.3 Tenant-Agent Isolation (COMPLETE): 13-touchpoint enforcement across registration, job creation, selection, polling, status update, and heartbeat |
-| 1.8 | 2026-03-02 | Extracted Stage 6 details to [QUORUS_STAGE6_SECURITY_ROUTES.md](QUORUS_STAGE6_SECURITY_ROUTES.md); main document now contains summary only |
+| 1.8 | 2026-03-02 | Extracted Stage 6 details to [QUORUS_TLS_SECURITY_ROUTES.md](QUORUS_TLS_SECURITY_ROUTES.md); main document now contains summary only |
 | 1.7 | 2026-02-19 | Consistency fixes: updated Appendix A to match completed tasks (T4.1, T4.2, T5.2, T5.3, T5.4), corrected summary counts (14/22 completed), fixed version header, fixed 2025→2026 date in T3.1, expanded route risk mitigation |
 | 1.6 | 2026-02-13 | Consolidated: merged IMPLEMENTATION_STATUS, CHANGELOG, .env.example into appendices |
 | 1.5 | 2026-02-13 | Stage 1 & Stage 2 COMPLETE: All documentation, config, logging, health, error, and shutdown tasks |
@@ -509,7 +514,7 @@ Larger changes that improve system reliability.
 
 ## Stage 6: Security & Enterprise Features (2-4 weeks each)
 
-> **📄 Full details moved to:** [QUORUS_STAGE6_SECURITY_ROUTES.md](QUORUS_STAGE6_SECURITY_ROUTES.md)
+> **📄 Full details moved to:** [QUORUS_TLS_SECURITY_ROUTES.md](QUORUS_TLS_SECURITY_ROUTES.md)
 
 Security features implemented **after** core functionality is stable and well-tested.
 
@@ -531,7 +536,7 @@ Security features implemented **after** core functionality is stable and well-te
 **Total Estimated Effort:** 10-14 weeks
 
 > **Note:** Routes (T6.7) are **core** to Quorus architecture, not optional.
-> See [QUORUS_STAGE6_SECURITY_ROUTES.md](QUORUS_STAGE6_SECURITY_ROUTES.md) for full implementation details.
+> See [QUORUS_TLS_SECURITY_ROUTES.md](QUORUS_TLS_SECURITY_ROUTES.md) for full implementation details.
 
 ---
 

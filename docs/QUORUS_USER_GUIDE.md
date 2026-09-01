@@ -2,8 +2,8 @@
 
 # Quorus User Guide
 
-**Version:** 2.1  
-**Date:** 2026-03-17  
+**Version:** 2.2  
+**Date:** 2026-09-01  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Scope:** Current implementation guide
@@ -169,9 +169,13 @@ Current controller observability endpoints:
 
 Current core and workflow modules also emit OpenTelemetry-backed metrics through their observability components.
 
+These endpoints and aggregate metrics provide infrastructure evidence, but they do not yet constitute the complete transfer-operations capability required for critical and highly time-sensitive processing. Continuous per-transfer progress, telemetry freshness, attempt history, expected and required completion times, deadline risk, stall detection, actionable alerts, and an end-to-end operator timeline are required by the canonical architecture and REST API specifications and remain conformance gaps where not implemented.
+
 ## Tenant Isolation
 
-Quorus enforces strict tenant isolation between agents and transfer jobs. Every agent belongs to exactly one tenant and can only receive jobs from that tenant.
+Quorus currently enforces selected tenant checks between registered agents and transfer jobs. Every agent declares one tenant, and polling and selected status paths filter or reject mismatched tenant fields.
+
+This is not yet a strict authenticated tenant security boundary. The controller does not authenticate the caller, a supplied `tenantId` is not proof of identity, and direct assignment creation does not uniformly enforce every reference and tenant invariant inside state-machine application.
 
 ### Agent Configuration
 
@@ -191,9 +195,9 @@ quorus.agent.tenant.id=acme-corp
 
 If `tenantId` is absent from the agent registration payload, the controller returns `400 Bad Request`.
 
-### Transfer Job Ownership
+### Transfer Job Tenant Field
 
-Every transfer job must declare a `tenantId` at creation time (field in the `POST /api/v1/transfers` request body). The controller matches job tenant to agent tenant at assignment time — agents never see jobs belonging to other tenants.
+Every transfer job must declare a `tenantId` at creation time. The implemented polling path filters jobs to the registered agent's declared tenant, and selected update paths reject mismatches. Protected multi-tenant operation still requires authenticated identity, authorization, and uniform state-machine invariants.
 
 ### Enforcement Points
 
@@ -201,7 +205,7 @@ Every transfer job must declare a `tenantId` at creation time (field in the `POS
 |-----------|-------------|
 | Agent registration | `tenantId` required — `400` if absent |
 | Transfer creation | `tenantId` required — `400` if absent |
-| Job polling (`GET /agents/:id/jobs`) | Jobs filtered to agent's tenant only |
+| Job polling (`GET /api/v1/agents/:agentId/jobs`) | Jobs filtered to agent's tenant only |
 | Job status update | Cross-tenant update blocked — `403` |
 | Heartbeat | Cross-tenant `tenantId` in payload blocked — `403` |
 
@@ -215,8 +219,10 @@ When reading older Quorus material, keep these distinctions in mind:
 
 ## Recommended Next Documents
 
+- `docs/QUORUS_ARCHITECTURE_SPECIFICATION.md` — canonical architecture and production requirements
+- `docs/QUORUS_REST_API_SPECIFICATION.md` — complete required REST control and operations contract
 - `docs/QUORUS_ARCHITECTURE_QUICKSTART.md`
-- `docs/QUORUS_API_REFERENCE.md`
+- `docs/QUORUS_API_REFERENCE.md` — current implemented endpoints
 - `docs/QUORUS_WORKFLOWS_README.md`
 - `docs/QUORUS_YAML_SYNTAX_GUIDE.md`
 - `docs/QUORUS_CLUSTER_STARTUP_GUIDE.md`
