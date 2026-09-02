@@ -2,8 +2,8 @@
 
 # Quorus REST API Specification
 
-**Version:** 1.2  
-**Date:** 2026-09-01  
+**Version:** 1.8  
+**Date:** 2026-09-02  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Status:** Canonical and normative  
@@ -232,16 +232,16 @@ Health endpoints MUST distinguish process health from dependency readiness. A de
 | `GET` | `/api/v1/transfers` | Required | Search transfers by tenant, service, state, time, criticality, route, workflow, agent, and deadline risk |
 | `GET` | `/api/v1/transfers/{transferId}` | Current | Read authoritative transfer summary |
 | `DELETE` | `/api/v1/transfers/{transferId}` | Current | Compatibility cancellation; returns the resulting transfer or operation |
-| `POST` | `/api/v1/jobs/{jobId}/status` | Current | Compatibility agent status report; superseded by attempt-aware assignment actions |
+| `POST` | `/api/v1/jobs/{jobId}/status` | Current | Attempt-aware agent report with expected state, fence, lease, ordered sequence, atomic multi-entity application, and legacy-assignment compatibility |
 | `POST` | `/api/v1/transfers/{transferId}:cancel` | Required | Explicit conditional cancellation with reason |
 | `POST` | `/api/v1/transfers/{transferId}:pause` | Required | Pause when the active adapter supports safe pause |
 | `POST` | `/api/v1/transfers/{transferId}:resume` | Required | Resume a paused transfer when supported |
 | `POST` | `/api/v1/transfers/{transferId}:retry` | Required | Create a governed new attempt or replacement transfer |
 | `POST` | `/api/v1/transfers/{transferId}:reconcile` | Required | Reconcile uncertain execution or publication state |
-| `GET` | `/api/v1/transfers/{transferId}/attempts` | Required | Immutable execution-attempt history |
-| `GET` | `/api/v1/transfers/{transferId}/attempts/{attemptId}` | Required | One attempt, lease, agent, timings, and outcome |
-| `GET` | `/api/v1/transfers/{transferId}/progress` | Required | Current bytes, rate, ETA, deadline risk, and stall evidence |
-| `GET` | `/api/v1/transfers/{transferId}/events` | Required | Ordered domain and operational event history |
+| `GET` | `/api/v1/transfers/{transferId}/attempts` | Current | Immutable execution-attempt history and active fence |
+| `GET` | `/api/v1/transfers/{transferId}/attempts/{attemptId}` | Current | One attempt, lease, fence, sequence, agent, timings, and outcome |
+| `GET` | `/api/v1/transfers/{transferId}/progress` | Current | Tenant-checked ownership, bytes, size semantics, missing/stale telemetry, configured policy windows, attempt, deadline, condition, low-confidence rate, and ETA view; historical evidence and calibrated prediction remain required |
+| `GET` | `/api/v1/transfers/{transferId}/events` | Current | Initial ordered submission-event ledger; complete lifecycle vocabulary, pagination, replay, and retention remain required |
 | `GET` | `/api/v1/transfers/{transferId}/timeline` | Required | Operator-oriented end-to-end timeline |
 | `GET` | `/api/v1/transfers/{transferId}/integrity` | Required | Configured and observed integrity evidence |
 | `GET` | `/api/v1/transfers/{transferId}/publication` | Required | Destination staging, commit, and publication state |
@@ -283,7 +283,7 @@ Each attempt has its own state and identity. Reassignment MUST create a new atte
 
 ### 6.4 Progress and deadline risk
 
-Progress MUST include `observedAt`, `bytesTransferred`, `totalBytes`, `percentComplete`, rolling and average throughput, last-progress time, estimated completion, required completion, time remaining, risk state, risk reason, active attempt, agent, source and destination service aliases, retry count, and confidence.
+Progress MUST include `observedAt`, `bytesTransferred`, `totalBytes`, `percentComplete`, rolling and average throughput, last-progress time, estimated completion, required completion, time remaining, risk state, risk reason, condition onset and duration where applicable, active attempt, agent, source and destination service aliases, retry count, and confidence.
 
 The API MUST distinguish “no bytes expected yet,” “source size unknown,” “telemetry stale,” and “transfer stalled.” Absence of telemetry MUST NOT be represented as zero progress.
 
@@ -292,6 +292,8 @@ The API MUST distinguish “no bytes expected yet,” “source size unknown,”
 Every event contains `eventId`, `sequence`, `eventType`, `occurredAt`, `recordedAt`, `transferId`, `attemptId`, actor, agent, tenant, business service, correlation and trace identifiers, previous and current state, reason code, and redacted details.
 
 At minimum, the event vocabulary covers submission, validation, queueing, assignment, acceptance, rejection, start, progress, pause, resume, retry scheduling, lease expiry, reassignment, cancellation, source connection, destination connection, integrity verification, staging, publication, completion, failure, deadline-risk change, stall detection, reconciliation, and operator acknowledgement.
+
+**Current implementation boundary:** the controller currently emits the canonical submission, assignment, acceptance, start, and progress events from replicated state-machine commands. It exposes them through the tenant-checked per-transfer event resource and persists them in controller snapshots. This partial implementation does not reduce the complete required vocabulary or the pagination, replay, retention, and streaming requirements.
 
 ## 7. Assignment Resources and Agent Protocol
 
@@ -311,7 +313,7 @@ At minimum, the event vocabulary covers submission, validation, queueing, assign
 | `POST` | `/api/v1/assignments/{assignmentId}:fail` | Required | Report classified failure and retry evidence |
 | `POST` | `/api/v1/assignments/{assignmentId}/lease:renew` | Required | Renew the active attempt lease |
 
-Agent transitions require the authenticated agent ID, assignment ID, transfer ID, attempt ID, expected state, monotonically increasing report sequence, and current lease/fencing token. Duplicate reports are idempotent; stale or cross-tenant reports return `409` or `403` without changing state.
+Agent transitions require the authenticated agent ID, assignment ID, transfer ID, attempt ID, expected state, monotonically increasing report sequence, and current lease/fencing token. The current attempt-aware status resource applies attempt, assignment, transfer status, and progress atomically. Duplicate reports, including terminal retries after a lost response, are idempotent; stale or cross-tenant reports return `409` or `403` without changing state.
 
 ## 8. Agent and Deployment Resources
 
@@ -558,11 +560,11 @@ Release documentation MUST publish a generated endpoint coverage report with `Cu
 |---|---|---|---|
 | API-01 | Critical | No canonical OpenAPI 3.1 contract and automated registered-path coverage | Integrations cannot rely on a complete machine-verifiable contract |
 | API-02 | Critical | No built-in authenticated identity, tenant derivation, or scope enforcement | Caller and tenant claims cannot be trusted at the controller boundary |
-| API-03 | Critical | Transfer API lacks collection search, attempts, progress, timeline, integrity, publication, retry, pause, resume, and reconciliation resources | Technology operations cannot fully run or investigate critical transfers through the API |
-| API-04 | Critical | No deadline-risk, late, stalled, degraded, alert, or durable operational-event API | Time-sensitive transfer failures may not be detected or actioned in time |
+| API-03 | Critical | Transfer API exposes attempt history and an initial dedicated progress view but lacks collection search, timeline, integrity, publication, retry, pause, resume, and reconciliation resources | Technology operations cannot fully run or investigate critical transfers through the API |
+| API-04 | Critical | Per-transfer progress applies configured freshness/stall windows and distinguishes missing and stale telemetry, but the active stall boundary, configurable deadline-risk policy, operational queries, alerts, durable events, timelines, and streaming are incomplete | Time-sensitive transfer failures cannot yet be detected, distributed, and actioned reliably at fleet scale |
 | API-05 | Critical | Agent registration is not a complete enrollment, rotation, quarantine, revocation, and decommissioning API | Enterprise agent trust lifecycle is incomplete |
 | API-06 | Critical | No service-connection, trust-policy, egress-policy, or secret-reference API | Service connectivity cannot be governed as an enterprise control |
-| API-07 | High | Assignment reports lack the full attempt, lease, fencing, monotonic progress, and completion-evidence contract | Retry and reassignment can create ambiguous or unsafe outcomes |
+| API-07 | High | The attempt-aware status resource enforces attempt, lease, fencing, expected-state, sequence, monotonic progress, and atomic lifecycle rules, but specialized assignment actions, lease renewal, and integrity/publication completion evidence remain incomplete | Retry and reassignment remain unsafe until every mutation and destination commit uses the full contract |
 | API-08 | High | Workflow functionality has no controller REST resources | Workflow definitions and executions cannot be governed or observed consistently |
 | API-09 | High | Tenant, hierarchy, quota, usage, and policy services have no controller REST resources | Administrative behavior requires internal integration rather than a supported contract |
 | API-10 | High | Route API exposes configuration without validation, trigger execution, or execution history | Route CRUD can be mistaken for an operating route service |

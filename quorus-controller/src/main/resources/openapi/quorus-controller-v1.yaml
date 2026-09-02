@@ -2,8 +2,8 @@ openapi: 3.1.0
 jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
 info:
   title: Quorus Controller REST API
-  version: 1.1.0-alpha
-  summary: Phase 1 authenticated controller API contract
+  version: 1.3.0-alpha
+  summary: Phase 2 authenticated controller API contract with fenced agent reports
   description: >-
     Machine-readable contract for every HTTP route registered by the current Quorus
     controller. Production access uses mutual TLS. Human and integration identities
@@ -370,6 +370,42 @@ paths:
         '409': {$ref: '#/components/responses/Problem'}
         '503': {$ref: '#/components/responses/Problem'}
         default: {$ref: '#/components/responses/Problem'}
+  /api/v1/transfers/{jobId}/progress:
+    parameters:
+      - {$ref: '#/components/parameters/JobId'}
+    get:
+      tags: [Transfers, Operations]
+      operationId: getTransferProgress
+      summary: Query operational progress, telemetry freshness, and deadline condition
+      description: >-
+        Returns tenant-checked transfer progress with ownership, attempt, telemetry freshness,
+        source-size semantics, and deadline condition. Missing telemetry is never represented
+        as zero progress.
+      responses:
+        '200':
+          description: Current operational progress view
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/TransferProgress'}
+        '403': {$ref: '#/components/responses/Problem'}
+        '404': {$ref: '#/components/responses/Problem'}
+        default: {$ref: '#/components/responses/Problem'}
+  /api/v1/transfers/{jobId}/events:
+    parameters:
+      - {$ref: '#/components/parameters/JobId'}
+    get:
+      tags: [Transfers, Operations]
+      operationId: listTransferEvents
+      summary: List durable ordered transfer events
+      responses:
+        '200':
+          description: Ordered transfer event history
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/TransferEventList'}
+        '403': {$ref: '#/components/responses/Problem'}
+        '404': {$ref: '#/components/responses/Problem'}
+        default: {$ref: '#/components/responses/Problem'}
   /api/v1/jobs/{jobId}/status:
     parameters:
       - {$ref: '#/components/parameters/JobId'}
@@ -378,8 +414,9 @@ paths:
       operationId: updateJobStatus
       summary: Record agent assignment state and transfer progress
       description: >-
-        Enforces assignment lifecycle, tenant ownership, monotonic byte progress,
-        and mirrors IN_PROGRESS/COMPLETED/FAILED/CANCELLED into transfer state.
+        Enforces assignment lifecycle, tenant ownership, active attempt identity,
+        expected state, lease, fencing generation, ordered reports, monotonic byte
+        progress, and mirrors IN_PROGRESS/COMPLETED/FAILED/CANCELLED into transfer state.
       requestBody:
         required: true
         content:
@@ -396,6 +433,40 @@ paths:
         '404': {$ref: '#/components/responses/Problem'}
         '409': {$ref: '#/components/responses/Problem'}
         '503': {$ref: '#/components/responses/Problem'}
+        default: {$ref: '#/components/responses/Problem'}
+  /api/v1/transfers/{jobId}/attempts:
+    parameters:
+      - {$ref: '#/components/parameters/JobId'}
+    get:
+      tags: [Transfers]
+      operationId: listTransferAttempts
+      summary: List immutable execution attempts and identify the active fencing generation
+      responses:
+        '200':
+          description: Ordered attempt history and current active attempt, when present
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/TransferAttemptList'}
+        '404': {$ref: '#/components/responses/Problem'}
+        default: {$ref: '#/components/responses/Problem'}
+  /api/v1/transfers/{jobId}/attempts/{attemptId}:
+    parameters:
+      - {$ref: '#/components/parameters/JobId'}
+      - name: attemptId
+        in: path
+        required: true
+        schema: {type: string, minLength: 1}
+    get:
+      tags: [Transfers]
+      operationId: getTransferAttempt
+      summary: Get immutable execution-attempt, lease, ordering, and fencing evidence
+      responses:
+        '200':
+          description: Transfer attempt evidence
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/TransferAttempt'}
+        '404': {$ref: '#/components/responses/Problem'}
         default: {$ref: '#/components/responses/Problem'}
   /api/v1/assignments:
     get:
@@ -809,6 +880,25 @@ components:
         destinationPath: {type: string, minLength: 1}
         totalBytes: {type: integer, format: int64, minimum: 0}
         description: {type: string}
+        metadata:
+          type: object
+          additionalProperties: {type: string}
+        businessService: {type: string, minLength: 1}
+        owner: {type: string, minLength: 1}
+        criticality: {type: string, enum: [LOW, STANDARD, HIGH, CRITICAL]}
+        environment: {type: string, minLength: 1}
+        processingDate: {type: string, format: date}
+        expectedStartAt: {type: string, format: date-time}
+        requiredCompletionAt: {type: string, format: date-time}
+        runbookUrl: {type: string, format: uri}
+        runbook:
+          type: object
+          properties:
+            url: {type: string, format: uri}
+          additionalProperties: false
+        labels:
+          type: object
+          additionalProperties: {type: string}
       additionalProperties: false
     CreatedTransfer:
       type: object
@@ -834,15 +924,116 @@ components:
     TransferStatus:
       type: string
       enum: [PENDING, IN_PROGRESS, COMPLETED, FAILED, CANCELLED, PAUSED]
+    TransferProgress:
+      type: object
+      required: [jobId, observedAt, bytesTransferred, totalBytes, sourceSizeState, telemetryState, freshnessWindowSeconds, stallWindowSeconds, telemetryPolicySource, condition, conditionReason, confidence, retryCount]
+      properties:
+        jobId: {type: string}
+        observedAt: {type: string, format: date-time}
+        lastProgressAt: {type: string, format: date-time}
+        bytesTransferred: {type: integer, format: int64, minimum: 0}
+        totalBytes: {type: integer, format: int64}
+        percentComplete: {type: number, minimum: 0, maximum: 100}
+        sourceSizeState: {type: string, enum: [KNOWN, UNKNOWN]}
+        telemetryState: {type: string, enum: [FRESH, STALE, UNKNOWN]}
+        telemetryAgeSeconds: {type: integer, format: int64, minimum: 0}
+        freshnessWindowSeconds: {type: integer, format: int64, minimum: 0}
+        stallWindowSeconds: {type: integer, format: int64, minimum: 0}
+        telemetryPolicySource: {type: string, enum: [CONTROLLER_CONFIGURATION]}
+        condition: {type: string, enum: [ON_TRACK, AT_RISK, LATE, STALLED, DEGRADED, UNKNOWN]}
+        conditionReason: {type: string}
+        conditionSince: {type: string, format: date-time}
+        stallDurationSeconds: {type: integer, format: int64, minimum: 0}
+        confidence: {type: string, enum: [INSUFFICIENT_DATA, LOW, MEDIUM, HIGH]}
+        businessService: {type: string}
+        owner: {type: string}
+        criticality: {type: string}
+        environment: {type: string}
+        processingDate: {type: string, format: date}
+        expectedStartAt: {type: string, format: date-time}
+        requiredCompletionAt: {type: string, format: date-time}
+        timeRemainingSeconds: {type: integer, format: int64}
+        runbookUrl: {type: string, format: uri}
+        activeAttemptId: {type: string}
+        agentId: {type: string}
+        attemptNumber: {type: integer, minimum: 1}
+    TransferEventList:
+      type: object
+      required: [jobId, events]
+      properties:
+        jobId: {type: string}
+        events:
+          type: array
+          items: {$ref: '#/components/schemas/TransferEvent'}
+    TransferEvent:
+      type: object
+      required: [eventId, sequence, eventType, occurredAt, recordedAt, jobId, tenantId, currentState]
+      properties:
+        eventId: {type: string}
+        sequence: {type: integer, format: int64, minimum: 1}
+        eventType: {type: string}
+        occurredAt: {type: string, format: date-time}
+        recordedAt: {type: string, format: date-time}
+        jobId: {type: string}
+        tenantId: {type: string}
+        businessService: {type: string}
+        attemptId: {type: string}
+        agentId: {type: string}
+        bytesTransferred: {type: integer, format: int64, minimum: 0}
+        totalBytes: {type: integer, format: int64, minimum: 0}
+        reportSequence: {type: integer, format: int64, minimum: 0}
+        previousState: {type: string}
+        currentState: {type: string}
+        retryCount: {type: integer, minimum: 0}
+        averageBytesPerSecond: {type: number, minimum: 0}
+        estimatedCompletionAt: {type: string, format: date-time}
+        estimatedDeadlineMarginSeconds: {type: integer, format: int64}
+    TransferAttemptList:
+      type: object
+      required: [jobId, items, count]
+      properties:
+        jobId: {type: string}
+        activeAttemptId: {type: string}
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/TransferAttempt'}
+        count: {type: integer, minimum: 0}
+    TransferAttempt:
+      type: object
+      required: [attemptId, jobId, agentId, tenantId, attemptNumber, fencingGeneration, leaseExpiresAt, status, outcome, lastReportSequence, bytesTransferred, createdAt, updatedAt]
+      properties:
+        attemptId: {type: string}
+        jobId: {type: string}
+        agentId: {type: string}
+        tenantId: {type: string}
+        attemptNumber: {type: integer, minimum: 1}
+        fencingGeneration: {type: integer, format: int64, minimum: 1}
+        leaseExpiresAt: {type: string, format: date-time}
+        status:
+          type: string
+          enum: [OFFERED, ACCEPTED, IN_PROGRESS, COMPLETED, FAILED, REJECTED, CANCELLED, EXPIRED, FENCED, RECONCILIATION_REQUIRED]
+        outcome:
+          type: string
+          enum: [NONE, SUCCEEDED, RETRYABLE_FAILURE, TERMINAL_FAILURE, REJECTED, CANCELLED, LEASE_EXPIRED, SUPERSEDED, RECONCILIATION_REQUIRED]
+        lastReportSequence: {type: integer, format: int64, minimum: 0}
+        bytesTransferred: {type: integer, format: int64, minimum: 0}
+        outcomeReason: {type: string}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+        completedAt: {type: string, format: date-time}
     AgentJob:
       type: object
-      required: [assignmentId, jobId, agentId, status, assignedAt]
+      required: [assignmentId, jobId, agentId, status, assignedAt, attemptId, fencingGeneration, leaseExpiresAt, lastReportSequence]
       properties:
         assignmentId: {type: string}
         jobId: {type: string}
         agentId: {type: string}
         status: {$ref: '#/components/schemas/AssignmentStatus'}
         assignedAt: {type: string, format: date-time}
+        attemptId: {type: string, minLength: 1}
+        fencingGeneration: {type: integer, format: int64, minimum: 1}
+        leaseExpiresAt: {type: string, format: date-time}
+        lastReportSequence: {type: integer, format: int64, minimum: 0}
         sourceUri: {type: string, format: uri}
         destinationPath: {type: string}
         totalBytes: {type: integer, format: int64}
@@ -878,10 +1069,11 @@ components:
       enum: [ASSIGNED, ACCEPTED, IN_PROGRESS, COMPLETED, FAILED, REJECTED, TIMEOUT, CANCELLED]
     CreatedAssignment:
       type: object
-      required: [success, assignmentId]
+      required: [success, assignmentId, attemptId]
       properties:
         success: {type: boolean, const: true}
         assignmentId: {type: string}
+        attemptId: {type: string, minLength: 1}
     AssignmentMutation:
       type: object
       required: [assignmentId, message]
@@ -891,13 +1083,18 @@ components:
         message: {type: string}
     JobStatusUpdate:
       type: object
-      required: [agentId, status]
+      required: [agentId, status, attemptId, expectedState, fencingGeneration, reportSequence]
       properties:
         agentId: {type: string, minLength: 1}
         status:
           type: string
           enum: [ACCEPTED, IN_PROGRESS, COMPLETED, FAILED, CANCELLED]
+        attemptId: {type: string, minLength: 1}
+        expectedState: {$ref: '#/components/schemas/TransferAttemptStatus'}
+        fencingGeneration: {type: integer, format: int64, minimum: 1}
+        reportSequence: {type: integer, format: int64, minimum: 1}
         bytesTransferred: {type: integer, format: int64, minimum: 0}
+        errorMessage: {type: string}
     Route:
       type: object
       required: [routeId, name, sourceAgentId, sourceLocation, destinationAgentId, destinationLocation, trigger]

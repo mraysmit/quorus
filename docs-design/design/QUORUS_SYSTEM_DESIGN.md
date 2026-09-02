@@ -2,11 +2,11 @@
 
 # Quorus Comprehensive System Design
 
-**Version:** 2.6  
+**Version:** 3.2  
 **Date:** 2025-08-26  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
-**Updated:** 2026-09-01  
+**Updated:** 2026-09-02  
 **Status:** Non-normative target-state vision  
 **Scope:** Historical design material, current concepts, and future architecture
 
@@ -15,6 +15,12 @@
 
 > [!NOTE]
 > Phase 1 now includes a fail-closed production security foundation: TLS 1.3 mutual authentication for controller HTTP and Raft, certificate-authenticated agent HTTP clients, trusted gateway and direct-workload identity resolution, tenant-aware policy middleware, effective-identity and authorization-explanation REST resources, runtime revocation shared by HTTP and Raft, certificate-expiry and trust-version telemetry, controlled certificate-overlap tests, and separately persisted tamper-evident operational and retained audit chains. The repository technical gate is complete. Corporate PKI accreditation, agent enrollment, service-connection security, searchable/WORM evidence services, and full enterprise release validation remain later-phase or deployment responsibilities.
+
+> [!NOTE]
+> The current Phase 2 checkpoint includes immutable authoritative transfer attempts, monotonically increasing fencing generations and report sequences, leases, atomic assignment and first-attempt creation, attempt-aware polling and reporting, tenant-checked attempt-history APIs, and one replicated lifecycle command that atomically updates attempt, assignment, transfer status, and progress. Exact terminal report retries are idempotent through the HTTP boundary. Phase 2 remains open for automatic lease expiry and reassignment, external lease renewal, submission idempotency, retry policy, integrity verification, governed publication, and reconciliation.
+
+> [!NOTE]
+> The current Phase 3 TDD checkpoint persists business service, owner, criticality, environment, processing date, expected start, required completion, and runbook context through Raft and exposes a tenant-checked per-transfer progress API with real last-progress time, explicit missing/stale telemetry, governed freshness/stall windows, stable stall-onset and duration semantics, known/unknown size semantics, active attempt and agent, deadline condition, and explicitly qualified rate/ETA output. The ordered event resource now covers the canonical submission, assignment, acceptance, start, and progress prefix, carries attempt/agent/progress correlation, and has explicit snapshot reset/restore proof. This is still an initial operator read model: durable stall event detection, remaining lifecycle events, configurable deadline-risk prediction, queries, timelines, streaming, alert lifecycle, retention, and service reporting remain open.
 
 ## Technology Stack
 
@@ -1050,7 +1056,7 @@ Route: Reports→Dist
 2. **Agent Heartbeats (HTTP, port 8080)**: Each Quorus Agent sends `POST /api/v1/agents/heartbeat` to the controller cluster via `HeartbeatService`
 3. **Job Assignment (HTTP, port 8080)**: The agent fetches assigned work via `GET /api/v1/agents/{agentId}/jobs`. Automatic route-trigger evaluation is target-state behavior and is not wired in the current controller startup path.
 4. **Transfer Execution**: Source agent reads file, transfers via `SimpleTransferEngine` using the appropriate protocol adapter (`SftpTransferProtocol`, `HttpTransferProtocol`, etc.)
-5. **Status Reporting (HTTP, port 8080)**: The agent reports compatibility status via `POST /api/v1/jobs/{jobId}/status` (sent by `JobStatusReportingService`); the attempt-aware progress contract in the canonical REST specification is still required.
+5. **Status Reporting (HTTP, port 8080)**: The agent reports `ACCEPTED`, `IN_PROGRESS`, and terminal state through `POST /api/v1/jobs/{jobId}/status` using attempt identity, expected state, fencing generation, and ordered report sequence. The controller applies attempt, assignment, transfer status, and progress atomically; legacy assignments retain a compatibility path.
 
 ##### Figure 5: Controller-Agent-Route Architecture
 
@@ -2257,7 +2263,7 @@ sequenceDiagram
 - **Partial Failure**: Degraded mode operation with reduced capacity
 
 **Recovery Mechanisms:**
-- **Automatic Recovery**: Automatic duplicate-safe redistribution remains blocked until attempt leases, fencing, and reconciliation semantics are implemented
+- **Automatic Recovery**: Attempt leases and fencing are implemented, but automatic duplicate-safe redistribution remains blocked until expiry scheduling, safe reassignment, destination enforcement, and reconciliation are implemented
 - **Graceful Shutdown**: 30-second drain period for active transfers
 - **State Persistence**: Job state persisted in `QuorusStateMachine` for recovery after failures
 - **Backpressure**: Automatic throttling when Quorus Agents are overloaded
@@ -3867,7 +3873,7 @@ graph TB
 - **Single Controller Failure**: Automatic leader election, <5s downtime
 - **Database Failure**: Automatic failover to replica, <30s downtime
 - **Network Partition**: Majority partition continues operation
-- **Agent Failure**: Duplicate-safe redistribution is not a current guarantee; reconciliation, attempt leases, and fencing are required first
+- **Agent Failure**: Duplicate-safe redistribution is not a current guarantee; leases and fencing exist, but automatic expiry/reassignment, destination enforcement, and reconciliation are still required
 
 ### Database Schema
 

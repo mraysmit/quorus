@@ -44,9 +44,28 @@ public class TransferJobSnapshot implements Serializable {
     private final long totalBytes;
     private final Instant startTime;
     private final Instant lastUpdateTime;
+    private final Instant lastProgressAt;
     private final String errorMessage;
     private final String description;
     private final String tenantId;
+    private final TransferOperationalContext operationalContext;
+
+    public TransferJobSnapshot(
+            String jobId, String sourceUri, String destinationPath, TransferStatus status,
+            long bytesTransferred, long totalBytes, Instant startTime, Instant lastUpdateTime,
+            String errorMessage, String description, String tenantId) {
+        this(jobId, sourceUri, destinationPath, status, bytesTransferred, totalBytes, startTime,
+                lastUpdateTime, errorMessage, description, tenantId, null, null);
+    }
+
+    public TransferJobSnapshot(
+            String jobId, String sourceUri, String destinationPath, TransferStatus status,
+            long bytesTransferred, long totalBytes, Instant startTime, Instant lastUpdateTime,
+            String errorMessage, String description, String tenantId,
+            TransferOperationalContext operationalContext) {
+        this(jobId, sourceUri, destinationPath, status, bytesTransferred, totalBytes, startTime,
+                lastUpdateTime, errorMessage, description, tenantId, operationalContext, null);
+    }
 
     @JsonCreator
     public TransferJobSnapshot(
@@ -60,7 +79,9 @@ public class TransferJobSnapshot implements Serializable {
             @JsonProperty("lastUpdateTime") Instant lastUpdateTime,
             @JsonProperty("errorMessage") String errorMessage,
             @JsonProperty("description") String description,
-            @JsonProperty("tenantId") String tenantId) {
+            @JsonProperty("tenantId") String tenantId,
+            @JsonProperty("operationalContext") TransferOperationalContext operationalContext,
+            @JsonProperty("lastProgressAt") Instant lastProgressAt) {
         this.jobId = jobId;
         this.sourceUri = sourceUri;
         this.destinationPath = destinationPath;
@@ -69,9 +90,11 @@ public class TransferJobSnapshot implements Serializable {
         this.totalBytes = totalBytes;
         this.startTime = startTime;
         this.lastUpdateTime = lastUpdateTime;
+        this.lastProgressAt = lastProgressAt;
         this.errorMessage = errorMessage;
         this.description = description;
         this.tenantId = tenantId;
+        this.operationalContext = operationalContext;
     }
 
     public static TransferJobSnapshot fromTransferJob(TransferJob job) {
@@ -91,7 +114,9 @@ public class TransferJobSnapshot implements Serializable {
                 job.getLastUpdateTime(),
                 job.getErrorMessage(),
                 job.getRequest().getMetadata().get("description"),
-                tenantId);
+                tenantId,
+                TransferOperationalContext.fromMetadata(job.getRequest().getMetadata()),
+                job.getBytesTransferred() > 0 ? job.getLastUpdateTime() : null);
     }
 
     /**
@@ -110,8 +135,24 @@ public class TransferJobSnapshot implements Serializable {
         if (description != null) {
             builder.metadata("description", description);
         }
+        if (operationalContext != null) {
+            putMetadata(builder, "businessService", operationalContext.businessService());
+            putMetadata(builder, "owner", operationalContext.owner());
+            putMetadata(builder, "criticality", operationalContext.criticality());
+            putMetadata(builder, "environment", operationalContext.environment());
+            putMetadata(builder, "processingDate", operationalContext.processingDate());
+            putMetadata(builder, "expectedStartAt", operationalContext.expectedStartAt() == null
+                    ? null : operationalContext.expectedStartAt().toString());
+            putMetadata(builder, "requiredCompletionAt", operationalContext.requiredCompletionAt() == null
+                    ? null : operationalContext.requiredCompletionAt().toString());
+            putMetadata(builder, "runbookUrl", operationalContext.runbookUrl());
+        }
 
         return new TransferJob(builder.build());
+    }
+
+    private static void putMetadata(TransferRequest.Builder builder, String key, String value) {
+        if (value != null) builder.metadata(key, value);
     }
 
     // Getters
@@ -123,9 +164,11 @@ public class TransferJobSnapshot implements Serializable {
     public long getTotalBytes() { return totalBytes; }
     public Instant getStartTime() { return startTime; }
     public Instant getLastUpdateTime() { return lastUpdateTime; }
+    public Instant getLastProgressAt() { return lastProgressAt; }
     public String getErrorMessage() { return errorMessage; }
     public String getDescription() { return description; }
     public String getTenantId() { return tenantId; }
+    public TransferOperationalContext getOperationalContext() { return operationalContext; }
 
     @Override
     public String toString() {

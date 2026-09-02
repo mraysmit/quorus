@@ -25,8 +25,12 @@ import dev.mars.quorus.controller.raft.RaftLogApplicator;
 import dev.mars.quorus.core.JobPriority;
 import dev.mars.quorus.core.TransferJob;
 import dev.mars.quorus.core.TransferStatus;
+import dev.mars.quorus.core.TransferAttempt;
+import dev.mars.quorus.core.TransferAttemptOutcome;
+import dev.mars.quorus.core.TransferAttemptStatus;
 import dev.mars.quorus.util.SensitiveDataRedactor;
 import dev.mars.quorus.core.JobAssignment;
+import dev.mars.quorus.core.JobAssignmentStatus;
 import dev.mars.quorus.core.QueuedJob;
 import dev.mars.quorus.core.RouteConfiguration;
 import dev.mars.quorus.core.RouteStatus;
@@ -36,7 +40,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Map;
+import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -60,6 +68,9 @@ public class QuorusStateStore implements RaftLogApplicator {
     private final Map<String, JobAssignment> jobAssignments = new ConcurrentHashMap<>();
     private final Map<String, QueuedJob> jobQueue = new ConcurrentHashMap<>();
     private final Map<String, RouteConfiguration> routes = new ConcurrentHashMap<>();
+    private final Map<String, TransferAttempt> transferAttempts = new ConcurrentHashMap<>();
+    private final Map<String, String> activeAttemptByJob = new ConcurrentHashMap<>();
+    private final Map<String, List<TransferEvent>> transferEvents = new ConcurrentHashMap<>();
     private final AtomicLong lastAppliedIndex = new AtomicLong(0);
 
     // JSON serialization
@@ -144,6 +155,7 @@ public class QuorusStateStore implements RaftLogApplicator {
                 case JobAssignmentCommand cmd -> applyJobAssignmentCommand(cmd);
                 case JobQueueCommand cmd -> applyJobQueueCommand(cmd);
                 case RouteCommand cmd -> applyRouteCommand(cmd);
+                case TransferAttemptCommand cmd -> applyTransferAttemptCommand(cmd);
             };
             logger.debug("Command applied successfully: type={}, result={}", 
                 command.getClass().getSimpleName(), result.getClass().getSimpleName());
@@ -172,6 +184,8 @@ public class QuorusStateStore implements RaftLogApplicator {
                     job.getRequest().getDestinationPath());
                 TransferJobSnapshot snapshot = TransferJobSnapshot.fromTransferJob(job, cmd.tenantId());
                 transferJobs.put(jobId, snapshot);
+                appendTransferEvent(jobId, "TRANSFER_SUBMITTED", cmd.timestamp(), null, null,
+                        null, snapshot.getStatus().name(), null, null, null);
                 logger.info("Created transfer job: jobId={}, protocol={}, totalJobs={}", 
                     jobId, job.getRequest().getProtocol(), transferJobs.size());
                 yield new CommandResult.Success<>(job);
@@ -205,7 +219,9 @@ public class QuorusStateStore implements RaftLogApplicator {
                         cmd.timestamp(),
                         existingJob.getErrorMessage(),
                         existingJob.getDescription(),
-                        existingJob.getTenantId());
+                        existingJob.getTenantId(),
+                        existingJob.getOperationalContext(),
+                        existingJob.getLastProgressAt());
                 transferJobs.put(jobId, updatedJob);
                 logger.info("Updated transfer job status: jobId={}, oldStatus={}, newStatus={}", 
                     jobId, oldStatus, cmd.newStatus());
@@ -241,7 +257,9 @@ public class QuorusStateStore implements RaftLogApplicator {
                         cmd.timestamp(),
                         progressJob.getErrorMessage(),
                         progressJob.getDescription(),
-                        progressJob.getTenantId());
+                        progressJob.getTenantId(),
+                        progressJob.getOperationalContext(),
+                        cmd.bytesTransferred() > oldBytes ? cmd.timestamp() : progressJob.getLastProgressAt());
                 transferJobs.put(jobId, updatedJob);
                 logger.debug("Updated transfer job progress: jobId={}, oldBytes={}, newBytes={}, totalBytes={}", 
                     jobId, oldBytes, cmd.bytesTransferred(), progressJob.getTotalBytes());
@@ -250,7 +268,8 @@ public class QuorusStateStore implements RaftLogApplicator {
             case TransferJobCommand.Delete delete -> {
                 logger.debug("Deleting transfer job: jobId={}", jobId);
                 logger.trace("Transfer delete command timestamp={}", delete.timestamp());
-                if (jobAssignments.values().stream().anyMatch(a -> jobId.equals(a.getJobId()))) {
+                if (jobAssignments.values().stream().anyMatch(a -> jobId.equals(a.getJobId()))
+                        || transferAttempts.values().stream().anyMatch(a -> jobId.equals(a.getJobId()))) {
                     yield rejected("DEPENDENT_ENTITY_EXISTS", "Transfer job is still referenced by an assignment: " + jobId);
                 }
                 TransferJobSnapshot removedJob = transferJobs.remove(jobId);
@@ -285,7 +304,8 @@ public class QuorusStateStore implements RaftLogApplicator {
             case AgentCommand.Deregister deregister -> {
                 logger.debug("Deregistering agent: agentId={}", agentId);
                 logger.trace("Agent deregister command timestamp={}", deregister.timestamp());
-                if (jobAssignments.values().stream().anyMatch(a -> agentId.equals(a.getAgentId()))) {
+                if (jobAssignments.values().stream().anyMatch(a -> agentId.equals(a.getAgentId()))
+                        || transferAttempts.values().stream().anyMatch(a -> agentId.equals(a.getAgentId()))) {
                     yield rejected("DEPENDENT_ENTITY_EXISTS", "Agent is still referenced by an assignment: " + agentId);
                 }
                 AgentInfo removedAgent = agents.remove(agentId);
@@ -404,9 +424,56 @@ public class QuorusStateStore implements RaftLogApplicator {
                 if (referenceValidation != null) {
                     yield referenceValidation;
                 }
+                TransferAttempt initialAttempt = null;
+                if ((cmd.attemptId() == null) != (cmd.leaseExpiresAt() == null)) {
+                    yield rejected("INVALID_ATTEMPT", "Attempt ID and lease expiry must be supplied together");
+                }
+                if (cmd.attemptId() != null) {
+                    if (cmd.attemptId().isBlank()) {
+                        yield rejected("INVALID_ATTEMPT", "Attempt ID cannot be blank");
+                    }
+                    if (transferAttempts.containsKey(cmd.attemptId())) {
+                        yield rejected("DUPLICATE_ENTITY", "Transfer attempt already exists: " + cmd.attemptId());
+                    }
+                    if (activeAttemptByJob.containsKey(assignment.getJobId())) {
+                        yield rejected("ACTIVE_ATTEMPT_MISMATCH",
+                                "A transfer cannot receive a new assignment while an attempt is active");
+                    }
+                    if (!cmd.leaseExpiresAt().isAfter(cmd.timestamp())) {
+                        yield rejected("INVALID_LEASE", "Attempt lease must expire after assignment creation");
+                    }
+                    long highestGeneration = transferAttempts.values().stream()
+                            .filter(existing -> assignment.getJobId().equals(existing.getJobId()))
+                            .mapToLong(TransferAttempt::getFencingGeneration)
+                            .max().orElse(0);
+                    int highestAttemptNumber = transferAttempts.values().stream()
+                            .filter(existing -> assignment.getJobId().equals(existing.getJobId()))
+                            .mapToInt(TransferAttempt::getAttemptNumber)
+                            .max().orElse(0);
+                    initialAttempt = new TransferAttempt.Builder()
+                            .attemptId(cmd.attemptId())
+                            .jobId(assignment.getJobId())
+                            .agentId(assignment.getAgentId())
+                            .tenantId(assignment.getTenantId())
+                            .attemptNumber(highestAttemptNumber + 1)
+                            .fencingGeneration(highestGeneration + 1)
+                            .leaseExpiresAt(cmd.leaseExpiresAt())
+                            .status(TransferAttemptStatus.OFFERED)
+                            .outcome(TransferAttemptOutcome.NONE)
+                            .createdAt(cmd.timestamp())
+                            .updatedAt(cmd.timestamp())
+                            .build();
+                }
                 logger.debug("Creating job assignment: assignmentId={}, jobId={}, agentId={}", 
                     assignmentId, assignment.getJobId(), assignment.getAgentId());
                 jobAssignments.put(assignmentId, assignment);
+                if (initialAttempt != null) {
+                    transferAttempts.put(initialAttempt.getAttemptId(), initialAttempt);
+                    activeAttemptByJob.put(initialAttempt.getJobId(), initialAttempt.getAttemptId());
+                    appendTransferEvent(initialAttempt.getJobId(), "TRANSFER_ASSIGNED", cmd.timestamp(),
+                            initialAttempt.getAttemptId(), initialAttempt.getAgentId(), null,
+                            initialAttempt.getStatus().name(), null, null, null);
+                }
                 logger.info("Created job assignment: assignmentId={}, jobId={}, agentId={}, totalAssignments={}", 
                     assignmentId, assignment.getJobId(), assignment.getAgentId(), jobAssignments.size());
                 yield new CommandResult.Success<>(assignment);
@@ -711,6 +778,298 @@ public class QuorusStateStore implements RaftLogApplicator {
         };
     }
 
+    private CommandResult<?> applyTransferAttemptCommand(TransferAttemptCommand command) {
+        return switch (command) {
+            case TransferAttemptCommand.Offer offer -> applyAttemptOffer(offer);
+            case TransferAttemptCommand.Report report -> applyAttemptReport(report);
+            case TransferAttemptCommand.LifecycleReport report -> applyAttemptLifecycleReport(report);
+            case TransferAttemptCommand.RenewLease renew -> applyAttemptLeaseRenewal(renew);
+        };
+    }
+
+    private CommandResult<?> applyAttemptOffer(TransferAttemptCommand.Offer command) {
+        TransferAttempt attempt = command.attempt();
+        if (!command.attemptId().equals(attempt.getAttemptId())) {
+            return rejected("IDENTIFIER_MISMATCH", "Attempt command ID does not match attempt ID");
+        }
+        if (transferAttempts.containsKey(command.attemptId())) {
+            return rejected("DUPLICATE_ENTITY", "Transfer attempt already exists: " + command.attemptId());
+        }
+        if (attempt.getStatus() != TransferAttemptStatus.OFFERED
+                || attempt.getOutcome() != TransferAttemptOutcome.NONE
+                || attempt.getLastReportSequence() != 0) {
+            return rejected("INVALID_INITIAL_STATE",
+                    "New transfer attempts must start in OFFERED with no outcome or reports");
+        }
+        TransferJobSnapshot job = transferJobs.get(attempt.getJobId());
+        if (job == null) {
+            return new CommandResult.NotFound<>(attempt.getJobId(), "TransferJob");
+        }
+        AgentInfo agent = agents.get(attempt.getAgentId());
+        if (agent == null) {
+            return new CommandResult.NotFound<>(attempt.getAgentId(), "Agent");
+        }
+        if (isBlank(attempt.getTenantId()) || !attempt.getTenantId().equals(job.getTenantId())
+                || !attempt.getTenantId().equals(agent.getTenantId())) {
+            return rejected("TENANT_MISMATCH", "Job, agent, and attempt tenant IDs must match");
+        }
+        if (!attempt.getLeaseExpiresAt().isAfter(command.timestamp())) {
+            return rejected("INVALID_LEASE", "Attempt lease must expire after the offer timestamp");
+        }
+
+        String currentId = activeAttemptByJob.get(attempt.getJobId());
+        if (!Objects.equals(currentId, command.expectedActiveAttemptId())) {
+            return rejected("ACTIVE_ATTEMPT_MISMATCH", "Active attempt changed before offer application");
+        }
+        TransferAttempt current = currentId == null ? null : transferAttempts.get(currentId);
+        long highestGeneration = transferAttempts.values().stream()
+                .filter(existing -> attempt.getJobId().equals(existing.getJobId()))
+                .mapToLong(TransferAttempt::getFencingGeneration)
+                .max().orElse(0);
+        int highestAttemptNumber = transferAttempts.values().stream()
+                .filter(existing -> attempt.getJobId().equals(existing.getJobId()))
+                .mapToInt(TransferAttempt::getAttemptNumber)
+                .max().orElse(0);
+        if (attempt.getFencingGeneration() != highestGeneration + 1
+                || attempt.getAttemptNumber() != highestAttemptNumber + 1) {
+            return rejected("INVALID_ATTEMPT_SEQUENCE",
+                    "Attempt number and fencing generation must advance exactly once");
+        }
+
+        if (current != null) {
+            transferAttempts.put(current.getAttemptId(), current.fenced(command.timestamp()));
+        }
+        transferAttempts.put(attempt.getAttemptId(), attempt);
+        activeAttemptByJob.put(attempt.getJobId(), attempt.getAttemptId());
+        return new CommandResult.Success<>(attempt);
+    }
+
+    private CommandResult<?> applyAttemptReport(TransferAttemptCommand.Report command) {
+        TransferAttempt attempt = transferAttempts.get(command.attemptId());
+        if (attempt == null) {
+            return new CommandResult.NotFound<>(command.attemptId(), "TransferAttempt");
+        }
+        if (command.fencingGeneration() == attempt.getFencingGeneration()
+                && command.reportSequence() == attempt.getLastReportSequence()
+                && command.newStatus() == attempt.getStatus()
+                && command.bytesTransferred() == attempt.getBytesTransferred()
+                && command.outcome() == attempt.getOutcome()
+                && Objects.equals(command.reason(), attempt.getOutcomeReason())) {
+            return new CommandResult.Success<>(attempt);
+        }
+        CommandResult<?> fenceValidation = validateCurrentAttemptFence(attempt, command.fencingGeneration());
+        if (fenceValidation != null) {
+            return fenceValidation;
+        }
+        if (!command.timestamp().isBefore(attempt.getLeaseExpiresAt())) {
+            return rejected("LEASE_EXPIRED", "Attempt lease expired before the report was received");
+        }
+        CommandResult<?> sequenceValidation = validateNextReportSequence(attempt, command.reportSequence());
+        if (sequenceValidation != null) {
+            return sequenceValidation;
+        }
+        if (attempt.getStatus() != command.expectedStatus()) {
+            return new CommandResult.CasMismatch<>(attempt);
+        }
+        if (!attempt.getStatus().canTransitionTo(command.newStatus())) {
+            return rejected("INVALID_STATE_TRANSITION", "Attempt cannot transition from "
+                    + attempt.getStatus() + " to " + command.newStatus());
+        }
+        if (command.bytesTransferred() < attempt.getBytesTransferred()) {
+            return rejected("PROGRESS_REGRESSION", "Attempt progress cannot decrease");
+        }
+        if (!validOutcome(command.newStatus(), command.outcome())) {
+            return rejected("INVALID_ATTEMPT_OUTCOME", "Attempt outcome does not match target status");
+        }
+
+        TransferAttempt updated = attempt.withReport(command.reportSequence(), command.newStatus(),
+                command.bytesTransferred(), command.outcome(), command.reason(), command.timestamp());
+        transferAttempts.put(updated.getAttemptId(), updated);
+        if (updated.getStatus().isTerminal()) {
+            activeAttemptByJob.remove(updated.getJobId(), updated.getAttemptId());
+        }
+        return new CommandResult.Success<>(updated);
+    }
+
+    private CommandResult<?> applyAttemptLifecycleReport(TransferAttemptCommand.LifecycleReport command) {
+        TransferAttempt attempt = transferAttempts.get(command.attemptId());
+        if (attempt == null) {
+            return new CommandResult.NotFound<>(command.attemptId(), "TransferAttempt");
+        }
+        JobAssignment assignment = jobAssignments.get(command.assignmentId());
+        if (assignment == null) {
+            return new CommandResult.NotFound<>(command.assignmentId(), "JobAssignment");
+        }
+        TransferJobSnapshot job = transferJobs.get(command.jobId());
+        if (job == null) {
+            return new CommandResult.NotFound<>(command.jobId(), "TransferJob");
+        }
+        if (!command.jobId().equals(attempt.getJobId())
+                || !command.jobId().equals(assignment.getJobId())
+                || !attempt.getAgentId().equals(assignment.getAgentId())
+                || !attempt.getTenantId().equals(assignment.getTenantId())
+                || !attempt.getTenantId().equals(job.getTenantId())) {
+            return rejected("LIFECYCLE_REFERENCE_MISMATCH",
+                    "Attempt, assignment, transfer, agent, and tenant references must match");
+        }
+
+        boolean exactAttemptRetry = command.fencingGeneration() == attempt.getFencingGeneration()
+                && command.reportSequence() == attempt.getLastReportSequence()
+                && command.newStatus() == attempt.getStatus()
+                && command.bytesTransferred() == attempt.getBytesTransferred()
+                && command.outcome() == attempt.getOutcome()
+                && Objects.equals(command.reason(), attempt.getOutcomeReason());
+        if (exactAttemptRetry) {
+            boolean assignmentMatches = assignment.getStatus() == command.newAssignmentStatus();
+            boolean transferMatches = command.newTransferStatus() == null
+                    || job.getStatus() == command.newTransferStatus();
+            boolean progressMatches = command.bytesTransferred() == 0
+                    || job.getBytesTransferred() == command.bytesTransferred();
+            if (assignmentMatches && transferMatches && progressMatches) {
+                return new CommandResult.Success<>(attempt);
+            }
+            return rejected("INCONSISTENT_LIFECYCLE_RETRY",
+                    "Attempt report was applied without the matching assignment and transfer state");
+        }
+
+        CommandResult<?> fenceValidation = validateCurrentAttemptFence(attempt, command.fencingGeneration());
+        if (fenceValidation != null) {
+            return fenceValidation;
+        }
+        if (!command.timestamp().isBefore(attempt.getLeaseExpiresAt())) {
+            return rejected("LEASE_EXPIRED", "Attempt lease expired before the report was received");
+        }
+        CommandResult<?> sequenceValidation = validateNextReportSequence(attempt, command.reportSequence());
+        if (sequenceValidation != null) {
+            return sequenceValidation;
+        }
+        if (attempt.getStatus() != command.expectedStatus()
+                || assignment.getStatus() != command.expectedAssignmentStatus()
+                || (command.expectedTransferStatus() != null
+                    && job.getStatus() != command.expectedTransferStatus())) {
+            return new CommandResult.CasMismatch<>(attempt);
+        }
+        if (!attempt.getStatus().canTransitionTo(command.newStatus())
+                || !assignment.getStatus().canTransitionTo(command.newAssignmentStatus())
+                || (command.newTransferStatus() != null
+                    && !job.getStatus().canTransitionTo(command.newTransferStatus()))) {
+            return rejected("INVALID_STATE_TRANSITION",
+                    "Attempt, assignment, and transfer lifecycle transition must all be valid");
+        }
+        if (command.bytesTransferred() < attempt.getBytesTransferred()
+                || command.bytesTransferred() < job.getBytesTransferred()
+                || command.bytesTransferred() < 0
+                || (job.getTotalBytes() > 0 && command.bytesTransferred() > job.getTotalBytes())) {
+            return rejected("PROGRESS_REGRESSION", "Lifecycle progress is outside the valid byte range");
+        }
+        if (!validOutcome(command.newStatus(), command.outcome())) {
+            return rejected("INVALID_ATTEMPT_OUTCOME", "Attempt outcome does not match target status");
+        }
+
+        TransferAttempt updatedAttempt = attempt.withReport(command.reportSequence(), command.newStatus(),
+                command.bytesTransferred(), command.outcome(), command.reason(), command.timestamp());
+        JobAssignment updatedAssignment = assignment.withStatusAndTimestamp(
+                command.newAssignmentStatus(), command.timestamp());
+        TransferStatus updatedTransferStatus = command.newTransferStatus() == null
+                ? job.getStatus() : command.newTransferStatus();
+        TransferJobSnapshot updatedJob = new TransferJobSnapshot(
+                job.getJobId(), job.getSourceUri(), job.getDestinationPath(), updatedTransferStatus,
+                command.bytesTransferred(), job.getTotalBytes(), job.getStartTime(), command.timestamp(),
+                command.reason(), job.getDescription(), job.getTenantId(), job.getOperationalContext(),
+                command.bytesTransferred() > job.getBytesTransferred()
+                        ? command.timestamp() : job.getLastProgressAt());
+
+        transferAttempts.put(updatedAttempt.getAttemptId(), updatedAttempt);
+        jobAssignments.put(command.assignmentId(), updatedAssignment);
+        transferJobs.put(command.jobId(), updatedJob);
+        if (updatedAttempt.getStatus() == TransferAttemptStatus.ACCEPTED) {
+            appendTransferEvent(command.jobId(), "TRANSFER_ACCEPTED", command.timestamp(),
+                    updatedAttempt.getAttemptId(), updatedAttempt.getAgentId(),
+                    attempt.getStatus().name(), updatedAttempt.getStatus().name(),
+                    command.bytesTransferred(), job.getTotalBytes(), command.reportSequence());
+        }
+        if (updatedAttempt.getStatus() == TransferAttemptStatus.IN_PROGRESS) {
+            if (attempt.getStatus() != TransferAttemptStatus.IN_PROGRESS) {
+                appendTransferEvent(command.jobId(), "TRANSFER_STARTED", command.timestamp(),
+                        updatedAttempt.getAttemptId(), updatedAttempt.getAgentId(),
+                        job.getStatus().name(), updatedJob.getStatus().name(),
+                        command.bytesTransferred(), job.getTotalBytes(), command.reportSequence());
+            }
+            appendTransferEvent(command.jobId(), "TRANSFER_PROGRESS", command.timestamp(),
+                    updatedAttempt.getAttemptId(), updatedAttempt.getAgentId(),
+                    updatedAttempt.getStatus().name(), updatedAttempt.getStatus().name(),
+                    command.bytesTransferred(), job.getTotalBytes(), command.reportSequence());
+        }
+        if (updatedAttempt.getStatus().isTerminal()) {
+            activeAttemptByJob.remove(updatedAttempt.getJobId(), updatedAttempt.getAttemptId());
+        }
+        return new CommandResult.Success<>(updatedAttempt);
+    }
+
+    private CommandResult<?> applyAttemptLeaseRenewal(TransferAttemptCommand.RenewLease command) {
+        TransferAttempt attempt = transferAttempts.get(command.attemptId());
+        if (attempt == null) {
+            return new CommandResult.NotFound<>(command.attemptId(), "TransferAttempt");
+        }
+        CommandResult<?> fenceValidation = validateCurrentAttemptFence(attempt, command.fencingGeneration());
+        if (fenceValidation != null) {
+            return fenceValidation;
+        }
+        if (!command.timestamp().isBefore(attempt.getLeaseExpiresAt())) {
+            return rejected("LEASE_EXPIRED", "An expired attempt lease cannot be renewed");
+        }
+        if (command.reportSequence() == attempt.getLastReportSequence()
+                && command.leaseExpiresAt().equals(attempt.getLeaseExpiresAt())) {
+            return new CommandResult.Success<>(attempt);
+        }
+        CommandResult<?> sequenceValidation = validateNextReportSequence(attempt, command.reportSequence());
+        if (sequenceValidation != null) {
+            return sequenceValidation;
+        }
+        if (!command.leaseExpiresAt().isAfter(command.timestamp())
+                || !command.leaseExpiresAt().isAfter(attempt.getLeaseExpiresAt())) {
+            return rejected("LEASE_NOT_EXTENDED", "Renewed lease must extend the current future expiry");
+        }
+        TransferAttempt updated = attempt.withLease(command.reportSequence(), command.leaseExpiresAt(),
+                command.timestamp());
+        transferAttempts.put(updated.getAttemptId(), updated);
+        return new CommandResult.Success<>(updated);
+    }
+
+    private CommandResult<?> validateCurrentAttemptFence(TransferAttempt attempt, long fencingGeneration) {
+        String activeId = activeAttemptByJob.get(attempt.getJobId());
+        if (!attempt.getAttemptId().equals(activeId)
+                || attempt.getFencingGeneration() != fencingGeneration) {
+            return rejected("STALE_FENCE", "Attempt is no longer the active fencing generation");
+        }
+        return null;
+    }
+
+    private CommandResult<?> validateNextReportSequence(TransferAttempt attempt, long reportSequence) {
+        if (reportSequence <= attempt.getLastReportSequence()) {
+            return rejected("STALE_REPORT_SEQUENCE", "Attempt report sequence has already been applied");
+        }
+        if (reportSequence != attempt.getLastReportSequence() + 1) {
+            return rejected("REPORT_SEQUENCE_GAP", "Attempt report sequence must advance exactly once");
+        }
+        return null;
+    }
+
+    private static boolean validOutcome(TransferAttemptStatus status, TransferAttemptOutcome outcome) {
+        return switch (status) {
+            case OFFERED, ACCEPTED, IN_PROGRESS -> outcome == TransferAttemptOutcome.NONE;
+            case COMPLETED -> outcome == TransferAttemptOutcome.SUCCEEDED;
+            case FAILED -> outcome == TransferAttemptOutcome.RETRYABLE_FAILURE
+                    || outcome == TransferAttemptOutcome.TERMINAL_FAILURE;
+            case REJECTED -> outcome == TransferAttemptOutcome.REJECTED;
+            case CANCELLED -> outcome == TransferAttemptOutcome.CANCELLED;
+            case EXPIRED -> outcome == TransferAttemptOutcome.LEASE_EXPIRED;
+            case FENCED -> outcome == TransferAttemptOutcome.SUPERSEDED;
+            case RECONCILIATION_REQUIRED ->
+                    outcome == TransferAttemptOutcome.RECONCILIATION_REQUIRED;
+        };
+    }
+
     private CommandResult<?> validateAssignmentReferences(JobAssignment assignment) {
         TransferJobSnapshot job = transferJobs.get(assignment.getJobId());
         if (job == null) {
@@ -766,6 +1125,9 @@ public class QuorusStateStore implements RaftLogApplicator {
             snapshot.setJobAssignments(new ConcurrentHashMap<>(jobAssignments));
             snapshot.setJobQueue(new ConcurrentHashMap<>(jobQueue));
             snapshot.setRoutes(new ConcurrentHashMap<>(routes));
+            snapshot.setTransferAttempts(new ConcurrentHashMap<>(transferAttempts));
+            snapshot.setActiveAttemptByJob(new ConcurrentHashMap<>(activeAttemptByJob));
+            snapshot.setTransferEvents(new ConcurrentHashMap<>(transferEvents));
             snapshot.setLastAppliedIndex(lastAppliedIndex.get());
 
             byte[] data = objectMapper.writeValueAsBytes(snapshot);
@@ -806,6 +1168,15 @@ public class QuorusStateStore implements RaftLogApplicator {
             routes.clear();
             Optional.ofNullable(restoredSnapshot.getRoutes()).ifPresent(routes::putAll);
 
+            transferAttempts.clear();
+            Optional.ofNullable(restoredSnapshot.getTransferAttempts()).ifPresent(transferAttempts::putAll);
+
+            activeAttemptByJob.clear();
+            Optional.ofNullable(restoredSnapshot.getActiveAttemptByJob()).ifPresent(activeAttemptByJob::putAll);
+
+            transferEvents.clear();
+            Optional.ofNullable(restoredSnapshot.getTransferEvents()).ifPresent(transferEvents::putAll);
+
             lastAppliedIndex.set(restoredSnapshot.getLastAppliedIndex());
 
             logger.info("Restored snapshot: jobs={}, agents={}, metadata={}, assignments={}, queue={}, routes={}, lastAppliedIndex={}", 
@@ -833,6 +1204,9 @@ public class QuorusStateStore implements RaftLogApplicator {
         jobAssignments.clear();
         jobQueue.clear();
         routes.clear();
+        transferAttempts.clear();
+        activeAttemptByJob.clear();
+        transferEvents.clear();
         lastAppliedIndex.set(0);
         
         // Restore default metadata after clearing
@@ -943,6 +1317,18 @@ public class QuorusStateStore implements RaftLogApplicator {
         return routes.size();
     }
 
+    public Map<String, TransferAttempt> getTransferAttempts() {
+        return Map.copyOf(transferAttempts);
+    }
+
+    public Optional<TransferAttempt> findTransferAttempt(String attemptId) {
+        return Optional.ofNullable(transferAttempts.get(attemptId));
+    }
+
+    public Optional<TransferAttempt> findActiveTransferAttempt(String jobId) {
+        return Optional.ofNullable(activeAttemptByJob.get(jobId)).map(transferAttempts::get);
+    }
+
     // ── Optional query methods ─────────────────────────────────────────────
 
     /**
@@ -953,6 +1339,27 @@ public class QuorusStateStore implements RaftLogApplicator {
      */
     public Optional<TransferJobSnapshot> findTransferJob(String jobId) {
         return Optional.ofNullable(transferJobs.get(jobId));
+    }
+
+    public List<TransferEvent> findTransferEvents(String jobId) {
+        return List.copyOf(transferEvents.getOrDefault(jobId, List.of()));
+    }
+
+    private void appendTransferEvent(String jobId, String eventType, Instant occurredAt,
+                                     String attemptId, String agentId,
+                                     String previousState, String currentState,
+                                     Long bytesTransferred, Long totalBytes, Long reportSequence) {
+        TransferJobSnapshot job = transferJobs.get(jobId);
+        List<TransferEvent> existing = transferEvents.getOrDefault(jobId, List.of());
+        long sequence = existing.isEmpty() ? 1 : existing.getLast().sequence() + 1;
+        String businessService = job == null || job.getOperationalContext() == null
+                ? null : job.getOperationalContext().businessService();
+        String tenantId = job == null ? null : job.getTenantId();
+        List<TransferEvent> updated = new ArrayList<>(existing);
+        updated.add(new TransferEvent(jobId + ":" + sequence, sequence, eventType,
+                occurredAt, occurredAt, jobId, tenantId, businessService, attemptId, agentId,
+                bytesTransferred, totalBytes, reportSequence, previousState, currentState));
+        transferEvents.put(jobId, List.copyOf(updated));
     }
 
     /**

@@ -41,6 +41,8 @@ import io.vertx.ext.web.handler.BodyHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Duration;
+
 /**
  * Reactive HTTP API Server using Vert.x Web.
  *
@@ -190,7 +192,15 @@ public class HttpApiServer {
         TransferHandler transferHandler = new TransferHandler(raftNode, stateStore);
         router.post("/api/v1/transfers").handler(transferHandler.handleCreate());
         router.get("/api/v1/transfers/:jobId").handler(transferHandler.handleGet());
+        router.get("/api/v1/transfers/:jobId/progress").handler(new TransferProgressHandler(
+                stateStore,
+                Duration.ofMillis(AppConfig.get().getTransferFreshWindowMs()),
+                Duration.ofMillis(AppConfig.get().getTransferStallWindowMs())));
+        router.get("/api/v1/transfers/:jobId/events").handler(new TransferEventHandler(stateStore));
         router.delete("/api/v1/transfers/:jobId").handler(transferHandler.handleDelete());
+        TransferAttemptHandler attemptHandler = new TransferAttemptHandler(stateStore);
+        router.get("/api/v1/transfers/:jobId/attempts").handler(attemptHandler.handleListForTransfer());
+        router.get("/api/v1/transfers/:jobId/attempts/:attemptId").handler(attemptHandler.handleGet());
 
         // ==================== Job Status Endpoint ====================
         router.post("/api/v1/jobs/:jobId/status").handler(new JobStatusHandler(raftNode, stateStore));

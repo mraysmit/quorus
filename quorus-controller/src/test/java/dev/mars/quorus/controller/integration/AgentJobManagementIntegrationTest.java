@@ -71,6 +71,8 @@ class AgentJobManagementIntegrationTest {
     private String testAgentId;
     private String testJobId;
     private String testAssignmentId;
+    private String testAttemptId;
+    private long testFencingGeneration;
 
     @BeforeAll
     void setUp(VertxTestContext testContext) throws Exception {
@@ -240,6 +242,8 @@ class AgentJobManagementIntegrationTest {
 
         JsonNode responseJson = objectMapper.readTree(response.body());
         assertTrue(responseJson.get("success").asBoolean(), "Response should indicate success");
+        testAttemptId = responseJson.get("attemptId").asText();
+        assertFalse(testAttemptId.isBlank(), "Assignment should return its authoritative attempt ID");
 
         logger.info("[PASS] Job assigned to agent: " + testAssignmentId);
     }
@@ -270,6 +274,9 @@ class AgentJobManagementIntegrationTest {
         JsonNode firstJob = pendingJobs.get(0);
         assertEquals(testJobId, firstJob.get("jobId").asText(), "Job ID should match");
         assertEquals(testAgentId, firstJob.get("agentId").asText(), "Agent ID should match");
+        assertEquals(testAttemptId, firstJob.get("attemptId").asText(), "Attempt ID should match");
+        testFencingGeneration = firstJob.get("fencingGeneration").asLong();
+        assertTrue(testFencingGeneration > 0, "Fencing generation should be positive");
 
         logger.info("[PASS] Agent polled and found " + pendingJobs.size() + " pending job(s)");
     }
@@ -282,9 +289,13 @@ class AgentJobManagementIntegrationTest {
         String requestBody = """
             {
                 "agentId": "%s",
-                "status": "ACCEPTED"
+                "status": "ACCEPTED",
+                "attemptId": "%s",
+                "expectedState": "OFFERED",
+                "fencingGeneration": %d,
+                "reportSequence": 1
             }
-            """.formatted(testAgentId);
+            """.formatted(testAgentId, testAttemptId, testFencingGeneration);
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(BASE_URL + "/api/v1/jobs/" + testJobId + "/status"))
@@ -311,9 +322,13 @@ class AgentJobManagementIntegrationTest {
             {
                 "agentId": "%s",
                 "status": "IN_PROGRESS",
+                "attemptId": "%s",
+                "expectedState": "ACCEPTED",
+                "fencingGeneration": %d,
+                "reportSequence": 2,
                 "bytesTransferred": 524288
             }
-            """.formatted(testAgentId);
+            """.formatted(testAgentId, testAttemptId, testFencingGeneration);
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(BASE_URL + "/api/v1/jobs/" + testJobId + "/status"))
@@ -341,9 +356,13 @@ class AgentJobManagementIntegrationTest {
             {
                 "agentId": "%s",
                 "status": "COMPLETED",
+                "attemptId": "%s",
+                "expectedState": "IN_PROGRESS",
+                "fencingGeneration": %d,
+                "reportSequence": 3,
                 "bytesTransferred": 1048576
             }
-            """.formatted(testAgentId);
+            """.formatted(testAgentId, testAttemptId, testFencingGeneration);
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(BASE_URL + "/api/v1/jobs/" + testJobId + "/status"))
@@ -363,6 +382,36 @@ class AgentJobManagementIntegrationTest {
 
     @Test
     @Order(8)
+    void testLostCompletionResponseCanBeRetriedExactly() throws Exception {
+        logger.info("TEST 8: Retry Completed Report After Simulated Lost Response");
+
+        String requestBody = """
+            {
+                "agentId": "%s",
+                "status": "COMPLETED",
+                "attemptId": "%s",
+                "expectedState": "IN_PROGRESS",
+                "fencingGeneration": %d,
+                "reportSequence": 3,
+                "bytesTransferred": 1048576
+            }
+            """.formatted(testAgentId, testAttemptId, testFencingGeneration);
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(BASE_URL + "/api/v1/jobs/" + testJobId + "/status"))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                .build();
+
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+        assertEquals(200, response.statusCode(),
+                "An exact terminal report retry must return the original success");
+        assertEquals(3L, stateMachine.findTransferAttempt(testAttemptId).orElseThrow().getLastReportSequence());
+    }
+
+    @Test
+    @Order(9)
     void testVerifyJobCompletion() throws Exception {
         logger.info("TEST 8: Verify Job Completion");
 
@@ -383,7 +432,7 @@ class AgentJobManagementIntegrationTest {
     }
 
     @Test
-    @Order(9)
+    @Order(10)
     void testAgentPollsForJobsAfterCompletion() throws Exception {
         logger.info("TEST 9: Agent Polls for Jobs After Completion");
 
@@ -407,7 +456,7 @@ class AgentJobManagementIntegrationTest {
     }
 
     @Test
-    @Order(10)
+    @Order(11)
     void testCompleteFlowSummary() {
         logger.info("\n" + "=".repeat(60));
         logger.info("[DONE] AGENT JOB MANAGEMENT INTEGRATION TEST COMPLETE!");

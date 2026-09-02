@@ -26,7 +26,10 @@ final class CommandResultHandler {
 
     static QuorusApiException rejectionException(CommandResult.Rejected<?> rejected) {
         ErrorCode errorCode = switch (rejected.code()) {
-            case "DUPLICATE_ENTITY", "DEPENDENT_ENTITY_EXISTS", "INVALID_STATE_TRANSITION" -> ErrorCode.CONFLICT;
+            case "DUPLICATE_ENTITY", "DEPENDENT_ENTITY_EXISTS", "INVALID_STATE_TRANSITION",
+                    "STALE_FENCE", "STALE_REPORT_SEQUENCE", "REPORT_SEQUENCE_GAP",
+                    "LEASE_EXPIRED", "LEASE_NOT_EXTENDED", "ACTIVE_ATTEMPT_MISMATCH",
+                    "INVALID_ATTEMPT_SEQUENCE" -> ErrorCode.CONFLICT;
             default -> ErrorCode.VALIDATION_ERROR;
         };
         return new QuorusApiException(errorCode, rejected.message());

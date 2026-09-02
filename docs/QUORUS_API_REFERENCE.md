@@ -2,8 +2,8 @@
 
 # Quorus HTTP API Reference
 
-**Version:** 2.4  
-**Date:** 2026-09-01  
+**Version:** 3.2  
+**Date:** 2026-09-02  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Status:** Current implementation reference  
@@ -194,7 +194,7 @@ Lists agents from controller state.
 
 ### `GET /api/v1/agents/:agentId/jobs`
 
-Returns jobs assigned to a specific agent. Only returns jobs whose `tenantId` matches the agent's registered tenant.
+Returns jobs assigned to a specific agent. Only returns jobs whose `tenantId` matches the agent's registered tenant. An active assignment includes the authoritative `attemptId`, `fencingGeneration`, `leaseExpiresAt`, and `lastReportSequence`; the agent must use these values when reporting lifecycle changes.
 
 ## Transfer Endpoints
 
@@ -217,6 +217,14 @@ Creates a transfer job. Returns `201 Created` on success.
 |-------|------|-------------|
 | `totalBytes` | long | Expected transfer size in bytes |
 | `description` | string | Human-readable description |
+| `businessService` | string | Business service responsible for the transfer |
+| `owner` | string | Operational owner responsible for intervention |
+| `criticality` | string | `LOW`, `STANDARD`, `HIGH`, or `CRITICAL` |
+| `environment` | string | Runtime environment, such as `PRODUCTION` |
+| `processingDate` | date | Business processing date |
+| `expectedStartAt` | timestamp | Expected transfer start |
+| `requiredCompletionAt` | timestamp | Operational completion deadline |
+| `runbookUrl` | URI | Operator runbook for this transfer |
 
 **Example:**
 
@@ -244,6 +252,24 @@ Creates a transfer job. Returns `201 Created` on success.
 
 Returns transfer job details.
 
+### `GET /api/v1/transfers/:jobId/progress`
+
+Returns the current tenant-checked operator progress view. The response includes observation and actual last-progress times, bytes and known-size percentage semantics, telemetry freshness, active attempt and agent, retry count, operational ownership and deadline context, time remaining, and `ON_TRACK`, `AT_RISK`, `LATE`, `STALLED`, `DEGRADED`, or `UNKNOWN` condition independently of transfer lifecycle state. A transfer with no increasing-byte report returns `UNKNOWN` telemetry without an invented last-progress timestamp. A stalled active transfer includes stable `conditionSince` and `stallDurationSeconds` values derived from its last real progress and the governed threshold. The response discloses `freshnessWindowSeconds`, `stallWindowSeconds`, and `telemetryPolicySource`; controller properties `quorus.telemetry.transfer.fresh-window-ms` and `quorus.telemetry.transfer.stall-window-ms` govern the effective windows. Average throughput and estimated completion are returned only when an active attempt has enough elapsed observation time; confidence remains explicit.
+
+**Current boundary:** the windows are configurable and the missing, stale, and active-transfer stalled cases are externally verified. Durable sample history, calibrated rolling throughput and ETA, deadline-risk policy, collection queries, timelines, alerts, and streaming remain Phase 3 work.
+
+### `GET /api/v1/transfers/:jobId/events`
+
+Returns the tenant-checked ordered transfer event ledger. The current implementation records `TRANSFER_SUBMITTED`, `TRANSFER_ASSIGNED`, `TRANSFER_ACCEPTED`, `TRANSFER_STARTED`, and `TRANSFER_PROGRESS` with deterministic per-transfer sequence and event identity. Assignment and lifecycle events include attempt and agent identity; progress events also include bytes, total size, and agent report sequence. The ledger is part of controller snapshots, and assignment ordering has been verified across snapshot reset and restore. Remaining terminal and exceptional lifecycle events, pagination, replay, retention gaps, and streaming remain Phase 3 work.
+
+### `GET /api/v1/transfers/:jobId/attempts`
+
+Returns immutable execution-attempt history for the transfer, ordered by `attemptNumber`. The response includes `activeAttemptId` while an authoritative attempt fence is active. The authenticated caller must have `transfers:read` and belong to the transfer tenant.
+
+### `GET /api/v1/transfers/:jobId/attempts/:attemptId`
+
+Returns one immutable execution-attempt record, including its agent, lifecycle status, classified outcome, lease expiry, fencing generation, report sequence, progress, and timestamps. An attempt ID belonging to another transfer is treated as not found. The authenticated caller must have `transfers:read` and belong to the attempt tenant.
+
 ### `DELETE /api/v1/transfers/:jobId`
 
 Deletes a transfer job.
@@ -252,7 +278,7 @@ Deletes a transfer job.
 
 ### `POST /api/v1/jobs/:jobId/status`
 
-Updates status for an existing transfer job. Only the agent that owns the assignment — and belongs to the same tenant as the job — may update status.
+Updates status for an existing transfer job. Only the agent that owns the assignment — and belongs to the same tenant as the job — may update status. When an active attempt exists, the report is guarded by the attempt identity, expected state, fencing generation, lease, and report sequence.
 
 **Required fields:**
 
@@ -260,6 +286,10 @@ Updates status for an existing transfer job. Only the agent that owns the assign
 |-------|------|-------------|
 | `agentId` | string | ID of the agent submitting the update |
 | `status` | string | New assignment status (e.g., `IN_PROGRESS`, `COMPLETED`, `FAILED`) |
+| `attemptId` | string | Active attempt ID supplied by the polling response |
+| `expectedState` | string | Attempt state the agent expects before this report is applied |
+| `fencingGeneration` | long | Active fencing generation supplied by the polling response |
+| `reportSequence` | long | Next monotonically increasing sequence for this attempt |
 
 **Optional fields:**
 
@@ -273,17 +303,23 @@ Updates status for an existing transfer job. Only the agent that owns the assign
 {
   "agentId": "agent-nyc-01",
   "status": "COMPLETED",
+  "attemptId": "9d1e2c1a-6f47-4f31-b125-2ab816fe8237",
+  "expectedState": "IN_PROGRESS",
+  "fencingGeneration": 1,
+  "reportSequence": 3,
   "bytesTransferred": 102400
 }
 ```
+
+The controller returns `409 Conflict` for a stale fence, stale or gapped sequence, expired lease, expected-state mismatch, or illegal lifecycle transition. For attempt-aware reports, it validates and applies the attempt, assignment, transfer status, and transfer progress as one atomic replicated lifecycle command; rejection leaves every view unchanged. An exact retry of an already accepted report is idempotent and returns `200 OK`, including a terminal retry after the original response was lost, without advancing the report sequence or reopening the active fence.
 
 ## Assignment Endpoints
 
 ### `POST /api/v1/assignments`
 
-Creates a job assignment.
+Creates a job assignment and its first authoritative transfer attempt atomically in one replicated command. A successful `201 Created` response contains `assignmentId` and `attemptId`; the attempt receives the configured initial lease and fencing generation.
 
-**Current boundary:** this endpoint does not yet provide the complete referential and tenant invariant enforcement required by the canonical architecture specification. It must not be treated as a trusted cross-tenant authorization boundary.
+**Current boundary:** creation is atomic, but the specialized accept, reject, status, cancel, and remove assignment endpoints do not yet apply corresponding attempt and transfer lifecycle changes atomically. Uniform referential and tenant invariant enforcement in state application also remains subject to `ARCH-06`.
 
 ### `GET /api/v1/assignments`
 

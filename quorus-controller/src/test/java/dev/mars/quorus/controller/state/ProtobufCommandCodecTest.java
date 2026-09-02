@@ -59,6 +59,21 @@ class ProtobufCommandCodecTest {
         return new TransferJob(createTransferRequest());
     }
 
+    private TransferAttempt createTransferAttempt() {
+        Instant createdAt = Instant.parse("2025-06-15T10:30:00Z");
+        return new TransferAttempt.Builder()
+                .attemptId("attempt-001")
+                .jobId("job-001")
+                .agentId("agent-nyc-01")
+                .tenantId("tenant-acme")
+                .attemptNumber(1)
+                .fencingGeneration(1)
+                .leaseExpiresAt(createdAt.plusSeconds(60))
+                .createdAt(createdAt)
+                .updatedAt(createdAt)
+                .build();
+    }
+
     private AgentInfo createAgentInfo() {
         AgentInfo info = new AgentInfo("agent-nyc-01", "nyc-host-1", "10.0.1.50", 8080);
         info.setStatus(AgentStatus.ACTIVE);
@@ -463,6 +478,20 @@ class ProtobufCommandCodecTest {
         }
 
         @Test
+        @DisplayName("ASSIGN preserves atomic attempt identity and lease")
+        void assignWithAttemptRoundtrip() {
+            Instant leaseExpiresAt = Instant.parse("2026-09-02T05:00:00Z");
+            JobAssignmentCommand original = JobAssignmentCommand.assignWithAttempt(
+                    createJobAssignment(), "attempt-atomic-001", leaseExpiresAt);
+
+            JobAssignmentCommand.Assign restored = assertInstanceOf(JobAssignmentCommand.Assign.class,
+                    ProtobufCommandCodec.deserialize(ProtobufCommandCodec.serialize(original)));
+
+            assertEquals("attempt-atomic-001", restored.attemptId());
+            assertEquals(leaseExpiresAt, restored.leaseExpiresAt());
+        }
+
+        @Test
         @DisplayName("ACCEPT preserves assignmentId and timestamp")
         void acceptRoundtrip() {
             JobAssignmentCommand original = JobAssignmentCommand.accept("assign-001");
@@ -678,7 +707,8 @@ class ProtobufCommandCodecTest {
                     AgentCommand.register(createAgentInfo()),
                     SystemMetadataCommand.set("key", "value"),
                     JobAssignmentCommand.assign(createJobAssignment()),
-                    JobQueueCommand.dequeue("job-001"));
+                    JobQueueCommand.dequeue("job-001"),
+                    TransferAttemptCommand.offer(createTransferAttempt(), null));
 
             for (RaftCommand original : commands) {
                 ByteString bytes = ProtobufCommandCodec.serialize(original);
@@ -709,6 +739,10 @@ class ProtobufCommandCodecTest {
                     case RouteCommand routeCommand -> {
                         assertNotNull(routeCommand);
                         assertInstanceOf(RouteCommand.class, restored);
+                    }
+                    case TransferAttemptCommand transferAttemptCommand -> {
+                        assertNotNull(transferAttemptCommand);
+                        assertInstanceOf(TransferAttemptCommand.class, restored);
                     }
                 }
             }

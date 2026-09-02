@@ -23,6 +23,7 @@ import dev.mars.quorus.controller.security.SecurityContext;
 import dev.mars.quorus.controller.security.SecurityIdentity;
 import dev.mars.quorus.controller.state.TransferJobSnapshot;
 import dev.mars.quorus.core.JobAssignment;
+import dev.mars.quorus.core.TransferAttempt;
 import io.vertx.core.Handler;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
@@ -101,6 +102,16 @@ public class AgentJobsHandler implements Handler<RoutingContext> {
                     .put("agentId", assignment.getAgentId())
                     .put("status", assignment.getStatus().toString())
                     .put("assignedAt", assignment.getAssignedAt().toString());
+
+            TransferAttempt activeAttempt = stateMachine.findActiveTransferAttempt(assignment.getJobId())
+                    .filter(attempt -> assignment.getAgentId().equals(attempt.getAgentId()))
+                    .orElse(null);
+            if (activeAttempt != null) {
+                jobInfo.put("attemptId", activeAttempt.getAttemptId())
+                        .put("fencingGeneration", activeAttempt.getFencingGeneration())
+                        .put("leaseExpiresAt", activeAttempt.getLeaseExpiresAt().toString())
+                        .put("lastReportSequence", activeAttempt.getLastReportSequence());
+            }
 
             if (transferJob != null) {
                 jobInfo.put("sourceUri", transferJob.getSourceUri())

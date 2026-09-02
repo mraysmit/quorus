@@ -1,0 +1,311 @@
+{
+  "schemaVersion": 1,
+  "assessmentDate": "2026-09-02",
+  "implementationIdentity": "uncommitted Phase 2 working tree as assessed on 2026-09-02; no revision assigned",
+  "phase": "Phase 2 — Transfer Attempts, Fencing, Integrity, and Reconciliation",
+  "phaseStatus": "in_progress",
+  "checkpoint": "authoritative attempts, atomic assignment, fenced agent protocol, and atomic multi-entity lifecycle reporting",
+  "tddCompliance": {
+    "status": "compliant",
+    "method": "Each behavior was first expressed by a failing component or real HTTP-boundary test and its red output was retained. Production changes were then limited to making that behavior pass, followed by focused regression, external-path, clean affected-module, and JaCoCo verification.",
+    "acceptanceStatement": "A committed transfer attempt has immutable ordered evidence; assignment and its first attempt are created atomically; polling supplies attempt, lease, fence, and sequence context; reports require expected state, fence, and sequence; stale or expired agents are rejected; report acceptance is atomic across attempt, assignment, transfer status, and progress; exact terminal retries are safe through HTTP; and authorized callers can inspect attempt evidence through the real controller boundary.",
+    "testFile": "quorus-controller/src/test/java/dev/mars/quorus/controller/http/TransferAttemptLifecycleAtomicityIntegrationTest.java",
+    "externalEntryPoints": [
+      "GET /api/v1/transfers/{jobId}/attempts",
+      "GET /api/v1/transfers/{jobId}/attempts/{attemptId}",
+      "POST /api/v1/assignments",
+      "GET /api/v1/agents/{agentId}/jobs",
+      "POST /api/v1/jobs/{jobId}/status"
+    ],
+    "red": [
+      {
+        "behavior": "Authoritative attempt creation, lifecycle, report ordering, replacement fencing, lease renewal, snapshot recovery, and protobuf round-trip",
+        "log": "temp/phase2-attempt-fencing-red.txt",
+        "observedFailure": "Test compilation failed because TransferAttempt, attempt lifecycle and outcome types, commands, state-store queries, and protobuf codec support did not exist.",
+        "outcome": "failed as expected before production implementation"
+      },
+      {
+        "behavior": "An exact terminal report retry returns the existing success after the active fence is released",
+        "log": "temp/phase2-terminal-retry-red.txt",
+        "tests": 6,
+        "failures": 1,
+        "errors": 0,
+        "observedFailure": "The completion retry was rejected as STALE_FENCE after the first completion removed the active-attempt pointer.",
+        "outcome": "failed as expected before the idempotency ordering change"
+      },
+      {
+        "behavior": "Each terminal attempt state accepts only its canonical classified outcome",
+        "log": "temp/phase2-terminal-outcome-red.txt",
+        "tests": 6,
+        "failures": 1,
+        "errors": 0,
+        "observedFailure": "CANCELLED with SUPERSEDED was accepted because terminal outcomes were only checked as generic non-success values.",
+        "outcome": "failed as expected before exact state-to-outcome mapping"
+      },
+      {
+        "behavior": "A real HTTP caller can read committed attempt history and the active fence after commands pass through a real single-node Raft boundary",
+        "log": "temp/phase2-attempt-http-red.txt",
+        "tests": 1,
+        "failures": 1,
+        "errors": 0,
+        "observedFailure": "GET /api/v1/transfers/{jobId}/attempts returned 404 before the attempt read handler and routes existed.",
+        "outcome": "failed as expected before external-path implementation"
+      },
+      {
+        "behavior": "Agent polling returns attempt identity, lease, fence, and last report sequence",
+        "log": "temp/phase2-agent-protocol-red.txt",
+        "tests": 1,
+        "failures": 1,
+        "errors": 0,
+        "observedFailure": "The real polling response omitted attemptId before attempt context was added to the agent job resource.",
+        "outcome": "failed as expected before external-path implementation"
+      },
+      {
+        "behavior": "The agent client preserves attempt context and sends expected state, fencing generation, and report sequence",
+        "log": "temp/phase2-agent-client-red.txt",
+        "observedFailure": "Five tests failed to compile because the polling and reporting client API did not expose the required attempt fields.",
+        "outcome": "failed as expected before agent client implementation"
+      },
+      {
+        "behavior": "Reports and renewals are rejected after the authoritative lease expires",
+        "log": "temp/phase2-expired-lease-red.txt",
+        "tests": 7,
+        "failures": 1,
+        "errors": 0,
+        "observedFailure": "An expired report was accepted before lease validation was enforced during state application.",
+        "outcome": "failed as expected before lease validation"
+      },
+      {
+        "behavior": "Assignment and first attempt are represented by one replicated command",
+        "log": "temp/phase2-atomic-assignment-red.txt",
+        "observedFailure": "Tests failed to compile because assignWithAttempt and its persisted attempt and lease fields did not exist.",
+        "outcome": "failed as expected before command implementation"
+      },
+      {
+        "behavior": "A stale fencing generation is reported as an HTTP conflict without mutating the attempt",
+        "log": "temp/phase2-stale-fence-http-red.txt",
+        "observedFailure": "The real status endpoint returned 400 instead of 409 before command rejection translation was implemented.",
+        "outcome": "failed as expected before conflict translation"
+      },
+      {
+        "behavior": "An active-attempt report must include expectedState",
+        "log": "temp/phase2-expected-state-http-red.txt",
+        "observedFailure": "The real status endpoint accepted the report with 200 before expectedState became mandatory.",
+        "outcome": "failed as expected before request validation"
+      },
+      {
+        "behavior": "REST assignment creation exposes an active attempt immediately",
+        "log": "temp/phase2-rest-atomic-assignment-red.txt",
+        "observedFailure": "POST /api/v1/assignments returned 201 but the nested attempt resource had no active attempt.",
+        "outcome": "failed as expected before the REST path used atomic assignment"
+      },
+      {
+        "behavior": "A rejected report cannot partially mutate attempt state when the corresponding transfer transition is invalid",
+        "log": "temp/phase2-lifecycle-atomicity-red.txt",
+        "tests": 1,
+        "failures": 1,
+        "errors": 0,
+        "observedFailure": "The real HTTP request returned 409 but the attempt had already advanced from ACCEPTED to IN_PROGRESS because the three entities were updated by separate replicated commands.",
+        "outcome": "failed as expected before atomic lifecycle application"
+      },
+      {
+        "behavior": "An exact terminal report can be retried through HTTP after the original successful response is lost",
+        "log": "temp/phase2-terminal-http-retry-red.txt",
+        "tests": 11,
+        "failures": 1,
+        "errors": 0,
+        "observedFailure": "The retry returned 409 ASSIGNMENT_STATE_CONFLICT because the HTTP handler rejected COMPLETED to COMPLETED before authoritative idempotency evaluation.",
+        "outcome": "failed as expected before the HTTP retry path reached the authoritative lifecycle command"
+      }
+    ],
+    "green": {
+      "command": "mvn -o -pl quorus-controller -am -Dtest=TransferAttemptTest,TransferAttemptStateStoreTest,TransferAttemptCommandCodecTest,TransferAttemptHttpIntegrationTest,OpenApiContractTest,AuthorizationPolicyEngineTest -Dsurefire.failIfNoSpecifiedTests=false test",
+      "log": "temp/phase2-foundation-external-green-final.txt",
+      "tests": 17,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "moduleTests": {
+        "quorus-core": 4,
+        "quorus-controller": 13
+      },
+      "outcome": "passed"
+    },
+    "subsequentGreen": [
+      {
+        "log": "temp/phase2-agent-protocol-controller-green.txt",
+        "tests": 9,
+        "outcome": "passed"
+      },
+      {
+        "log": "temp/phase2-agent-client-green.txt",
+        "tests": 21,
+        "outcome": "passed"
+      },
+      {
+        "log": "temp/phase2-atomic-assignment-green.txt",
+        "tests": 53,
+        "outcome": "passed"
+      },
+      {
+        "log": "temp/phase2-attempt-assignment-green-final.txt",
+        "tests": 57,
+        "outcome": "passed"
+      },
+      {
+        "log": "temp/phase2-agent-protocol-green-final.txt",
+        "tests": 38,
+        "outcome": "passed"
+      },
+      {
+        "log": "temp/phase2-rest-atomic-assignment-green.txt",
+        "tests": 27,
+        "outcome": "passed"
+      },
+      {
+        "log": "temp/phase2-assignment-agent-flow-green.txt",
+        "tests": 35,
+        "outcome": "passed"
+      },
+      {
+        "log": "temp/phase2-lifecycle-atomicity-green.txt",
+        "tests": 5,
+        "outcome": "passed"
+      },
+      {
+        "log": "temp/phase2-lifecycle-atomicity-regression.txt",
+        "tests": 94,
+        "outcome": "passed"
+      },
+      {
+        "log": "temp/phase2-terminal-http-retry-green.txt",
+        "tests": 13,
+        "outcome": "passed"
+      },
+      {
+        "log": "temp/phase2-terminal-retry-regression-green.txt",
+        "tests": 37,
+        "outcome": "passed after preserving the legacy invalid-transition conflict contract"
+      }
+    ],
+    "refactor": [
+      "Added the new sealed command subtype to the existing exhaustive serialization-dispatch assertion without introducing a default branch.",
+      "Recognized exact report retries before active-fence validation while still requiring the persisted fencing generation and exact authoritative result fields.",
+      "Replaced the generic terminal-outcome predicate with an exhaustive state-to-outcome mapping.",
+      "Exposed the immutable read model through two tenant-checked nested HTTP resources and synchronized OpenAPI plus endpoint discovery; both inherit the established transfers:read authorization scope.",
+      "Added focused core model characterization after the behavioral slice was green so the module-local JaCoCo report measures the immutable model directly.",
+      "Extended the assignment command rather than creating a second write so the assignment and first attempt share one deterministic Raft entry.",
+      "Carried one attempt context object through polling and reporting so the agent increments report sequences in one place.",
+      "Translated authoritative stale-fence, sequence, lease, and state rejections into stable HTTP conflicts.",
+      "Stabilized the leader-guard test fixture by separating the intended leader election timeout from follower timeouts; the isolated seven-test suite then passed.",
+      "Replaced the attempt-aware sequence of independent writes with one lifecycle report command that validates every referenced entity and transition before mutating any state.",
+      "Allowed a terminal retry to resolve its inactive historical attempt by request identity and delegated exact-retry recognition to the authoritative state application."
+    ]
+  },
+  "implemented": [
+    "immutable transfer attempt model and canonical lifecycle",
+    "replicated offer, report, and lease-renewal commands",
+    "monotonic attempt and fencing generations",
+    "ordered and idempotent report application",
+    "stale-agent fencing after replacement",
+    "attempt history and active fence in snapshots",
+    "protobuf command encoding and decoding",
+    "schema version 2 with legacy version 0 and 1 readability",
+    "tenant-checked REST reads for attempt history, active fence, and individual attempt evidence",
+    "atomic assignment and first-attempt creation in service and REST paths",
+    "configurable initial attempt lease",
+    "attempt-aware agent polling with lease, fence, and report-sequence context",
+    "expected-state, fencing-generation, and report-sequence validation on agent reports",
+    "expired report and renewal rejection",
+    "stable HTTP conflict translation for authoritative attempt rejections",
+    "atomic attempt, assignment, transfer-status, and transfer-progress lifecycle application",
+    "idempotent terminal-report retry through the live HTTP boundary after a lost response"
+  ],
+  "notYetImplemented": [
+    "lease expiry scheduler and automatic reassignment",
+    "lease-renewal HTTP resource and agent client behavior",
+    "attempt-aware behavior for specialized assignment mutation resources",
+    "submission idempotency store",
+    "retry classification, limits, backoff, and jitter",
+    "integrity verification and staged publication",
+    "ambiguous-publication reconciliation and operator actions",
+    "protocol capability and resume-safety enforcement",
+    "migration and rollback tooling"
+  ],
+  "verification": {
+    "authoritativeReactor": {
+      "command": "mvn -o clean verify",
+      "log": "temp/phase2-clean-verify-1.txt",
+      "tests": 2257,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "modules": 7,
+      "duration": "7m 27s",
+      "moduleTests": {
+        "quorus-core": 1491,
+        "quorus-workflow": 134,
+        "quorus-tenant": 64,
+        "quorus-controller": 482,
+        "quorus-agent": 86,
+        "quorus-integration-examples": 0
+      },
+      "outcome": "passed"
+    },
+    "supplementalCoreModel": {
+      "command": "mvn -o -pl quorus-core -Dtest=TransferAttemptTest test",
+      "log": "temp/phase2-transfer-attempt-model-green-final.txt",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "outcome": "passed"
+    },
+    "affectedControllerSuite": {
+      "command": "mvn -o -pl quorus-controller clean verify",
+      "log": "temp/phase2-controller-clean-verify-final.txt",
+      "tests": 490,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "duration": "3m 39s",
+      "outcome": "passed with all coverage checks met"
+    },
+    "affectedAgentSuite": {
+      "command": "mvn -o -pl quorus-agent clean verify",
+      "log": "temp/phase2-agent-clean-verify-final.txt",
+      "tests": 87,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "duration": "33.192s",
+      "outcome": "passed with all coverage checks met"
+    },
+    "coverageAfterSupplementalModelTests": {
+      "quorus-core": {
+        "linePercentage": 82.6,
+        "branchPercentage": 61.3
+      },
+      "quorus-controller": {
+        "linePercentage": 79.6,
+        "branchPercentage": 59.8
+      },
+      "quorus-agent": {
+        "linePercentage": 76.7,
+        "branchPercentage": 52.8
+      },
+      "gateLinePercentage": 60.0,
+      "outcome": "all enforced package checks passed in the clean reactor"
+    }
+  },
+  "sensitiveEvidenceConfirmation": "No request bodies, credentials, keys, secrets, or production payloads were captured in retained evidence.",
+  "testClassifications": [
+    "unit",
+    "component",
+    "external-path behavioral",
+    "integration",
+    "contract",
+    "failure behavior"
+  ],
+  "nextTddSlice": "Implement automatic lease expiry and safe reassignment plus lease renewal through the external agent protocol, beginning with failing time-controlled and real HTTP-boundary tests."
+}

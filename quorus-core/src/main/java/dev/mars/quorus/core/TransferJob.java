@@ -20,6 +20,8 @@ package dev.mars.quorus.core;
 import java.io.Serializable;
 import java.net.URI;
 import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -73,7 +75,18 @@ public class TransferJob implements Serializable {
             @JsonProperty("sourceUri") URI sourceUri,
             @JsonProperty("destinationPath") String destinationPath,
             @JsonProperty("totalBytes") long totalBytes,
-            @JsonProperty("description") String description) {
+            @JsonProperty("description") String description,
+            @JsonProperty("metadata") Map<String, String> metadata,
+            @JsonProperty("businessService") String businessService,
+            @JsonProperty("owner") String owner,
+            @JsonProperty("criticality") String criticality,
+            @JsonProperty("environment") String environment,
+            @JsonProperty("processingDate") String processingDate,
+            @JsonProperty("expectedStartAt") String expectedStartAt,
+            @JsonProperty("requiredCompletionAt") String requiredCompletionAt,
+            @JsonProperty("runbookUrl") String runbookUrl,
+            @JsonProperty("runbook") Map<String, String> runbook,
+            @JsonProperty("labels") Map<String, String> labels) {
         
         TransferRequest.Builder builder = TransferRequest.builder()
                 .requestId(jobId)
@@ -81,11 +94,26 @@ public class TransferJob implements Serializable {
                 .destinationPath(destinationPath)
                 .expectedSize(totalBytes);
                 
-        if (description != null) {
-            builder.metadata("description", description);
-        }
+        Map<String, String> effectiveMetadata = new HashMap<>();
+        if (metadata != null) effectiveMetadata.putAll(metadata);
+        putIfPresent(effectiveMetadata, "description", description);
+        putIfPresent(effectiveMetadata, "businessService", businessService);
+        putIfPresent(effectiveMetadata, "owner", owner);
+        putIfPresent(effectiveMetadata, "criticality", criticality);
+        putIfPresent(effectiveMetadata, "environment", environment);
+        putIfPresent(effectiveMetadata, "processingDate", processingDate);
+        putIfPresent(effectiveMetadata, "expectedStartAt", expectedStartAt);
+        putIfPresent(effectiveMetadata, "requiredCompletionAt", requiredCompletionAt);
+        putIfPresent(effectiveMetadata, "runbookUrl", runbookUrl);
+        if (runbook != null) putIfPresent(effectiveMetadata, "runbookUrl", runbook.get("url"));
+        if (labels != null) putIfPresent(effectiveMetadata, "processingDate", labels.get("processingDate"));
+        if (!effectiveMetadata.isEmpty()) builder.metadata(effectiveMetadata);
         
         return new TransferJob(builder.build());
+    }
+
+    private static void putIfPresent(Map<String, String> metadata, String key, String value) {
+        if (value != null && !value.isBlank()) metadata.put(key, value);
     }
 
     // ========== GETTER METHODS ==========

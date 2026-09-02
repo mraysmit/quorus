@@ -122,11 +122,23 @@ class JobAssignmentHandlerTest {
 
             webClient.post(HTTP_PORT, "localhost", "/api/v1/assignments")
                     .sendJsonObject(body)
+                    .compose(response -> {
+                        ctx.verify(() -> {
+                            assertEquals(201, response.statusCode());
+                            JsonObject json = response.bodyAsJsonObject();
+                            assertTrue(json.getBoolean("success"));
+                            assertNotNull(json.getString("assignmentId"));
+                            assertNotNull(json.getString("attemptId"));
+                        });
+                        return webClient.get(HTTP_PORT, "localhost", "/api/v1/transfers/job-100/attempts")
+                                .send();
+                    })
                     .onComplete(ctx.succeeding(response -> ctx.verify(() -> {
-                        assertEquals(201, response.statusCode());
-                        JsonObject json = response.bodyAsJsonObject();
-                        assertTrue(json.getBoolean("success"));
-                        assertNotNull(json.getString("assignmentId"));
+                        assertEquals(200, response.statusCode());
+                        JsonObject bodyJson = response.bodyAsJsonObject();
+                        assertNotNull(bodyJson.getString("activeAttemptId"));
+                        assertEquals("agent-east-01",
+                                bodyJson.getJsonArray("items").getJsonObject(0).getString("agentId"));
                         ctx.completeNow();
                     })));
         }

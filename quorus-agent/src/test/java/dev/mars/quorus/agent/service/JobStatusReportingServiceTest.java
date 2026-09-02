@@ -135,6 +135,26 @@ class JobStatusReportingServiceTest {
     }
 
     @Test
+    @DisplayName("Should report authoritative attempt identity, fence, and sequence")
+    void testReportAcceptedWithAttemptFence(Vertx vertx, VertxTestContext testContext) {
+        JobStatusReportingService service = new JobStatusReportingService(vertx, config);
+
+        service.reportAccepted("job-fenced", "attempt-007", 7L, 4L)
+            .onComplete(testContext.succeeding(v -> {
+                testContext.verify(() -> {
+                    JsonObject request = lastRequest.get();
+                    assertEquals("test-agent-status", request.getString("agentId"));
+                    assertEquals("ACCEPTED", request.getString("status"));
+                    assertEquals("attempt-007", request.getString("attemptId"));
+                    assertEquals("OFFERED", request.getString("expectedState"));
+                    assertEquals(7L, request.getLong("fencingGeneration"));
+                    assertEquals(4L, request.getLong("reportSequence"));
+                });
+                testContext.completeNow();
+            }));
+    }
+
+    @Test
     @DisplayName("Should report IN_PROGRESS status with bytes transferred")
     void testReportInProgress(Vertx vertx, VertxTestContext testContext) {
         JobStatusReportingService service = new JobStatusReportingService(vertx, config);

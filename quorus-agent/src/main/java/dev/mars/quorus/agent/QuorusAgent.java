@@ -28,6 +28,7 @@ import dev.mars.quorus.agent.service.JobPollingService;
 import dev.mars.quorus.agent.service.JobStatusReportingService;
 import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferResult;
+import io.vertx.core.Future;
 import io.vertx.core.Vertx;
 import io.vertx.core.VertxOptions;
 import org.slf4j.Logger;
@@ -412,8 +413,8 @@ public class QuorusAgent {
         // Strict contract: do not execute unless both lifecycle acknowledgements are
         // durably accepted by the controller. This keeps the authoritative assignment
         // state aligned with the real transfer process before any bytes are moved.
-        jobStatusReportingService.reportAccepted(jobId)
-            .compose(v -> jobStatusReportingService.reportInProgress(jobId, 0L))
+        reportAccepted(pendingJob)
+            .compose(v -> reportInProgress(pendingJob, 0L))
             .onSuccess(v -> {
                 // Convert to transfer request
                 TransferRequest request = pendingJob.toTransferRequest();
@@ -423,8 +424,8 @@ public class QuorusAgent {
 
                 // Execute the transfer
                 transferService.executeTransfer(request)
-                    .onSuccess(result -> handleTransferComplete(jobId, result))
-                    .onFailure(throwable -> handleTransferError(jobId, throwable));
+                    .onSuccess(result -> handleTransferComplete(pendingJob, result))
+                    .onFailure(throwable -> handleTransferError(pendingJob, throwable));
             })
             .onFailure(err -> {
                 logger.error("Refusing to execute job {} because its start lifecycle was not acknowledged: {}",
@@ -432,7 +433,8 @@ public class QuorusAgent {
             });
     }
 
-    private void handleTransferComplete(String jobId, TransferResult result) {
+    private void handleTransferComplete(JobPollingService.PendingJob pendingJob, TransferResult result) {
+        String jobId = pendingJob.getJobId();
         long durationSeconds = result.getDuration().map(d -> d.toSeconds()).orElse(0L);
         // Protocol and direction not available on TransferResult, use defaults for metrics
         String protocol = "unknown";
@@ -446,24 +448,70 @@ public class QuorusAgent {
                        jobId,
                        result.getBytesTransferred(),
                        durationStr);
-            jobStatusReportingService.reportCompleted(jobId, result.getBytesTransferred())
+            reportCompleted(pendingJob, result.getBytesTransferred())
                     .onFailure(err -> logger.error("Failed to report COMPLETED for job {}: {}", jobId, err.getMessage()));
             metrics.recordJobCompleted(true, protocol, direction, result.getBytesTransferred(), durationSeconds);
         } else {
             String errorMessage = result.getErrorMessage().orElse("Unknown error");
             logger.warn("Transfer failed: {} - {}", jobId, errorMessage);
-            jobStatusReportingService.reportFailed(jobId, errorMessage)
+            reportFailed(pendingJob, errorMessage)
                     .onFailure(err -> logger.error("Failed to report FAILED for job {}: {}", jobId, err.getMessage()));
             metrics.recordJobCompleted(false, protocol, direction, 0, durationSeconds);
         }
     }
 
-    private void handleTransferError(String jobId, Throwable throwable) {
+    private void handleTransferComplete(String jobId, TransferResult result) {
+        handleTransferComplete(legacyPendingJob(jobId), result);
+    }
+
+    private void handleTransferError(JobPollingService.PendingJob pendingJob, Throwable throwable) {
+        String jobId = pendingJob.getJobId();
         logger.error("Transfer error: {}: {}", jobId, throwable.getMessage());
         logger.debug("Stack trace for transfer error: jobId={}", jobId, throwable);
-        jobStatusReportingService.reportFailed(jobId, throwable.getMessage())
+        reportFailed(pendingJob, throwable.getMessage())
                 .onFailure(err -> logger.error("Failed to report FAILED for job {}: {}", jobId, err.getMessage()));
         metrics.recordJobCompleted(false, "unknown", "DOWNLOAD", 0, 0);
+    }
+
+    private void handleTransferError(String jobId, Throwable throwable) {
+        handleTransferError(legacyPendingJob(jobId), throwable);
+    }
+
+    private JobPollingService.PendingJob legacyPendingJob(String jobId) {
+        return new JobPollingService.PendingJob(null, jobId, config.getAgentId(),
+                null, null, 0, null);
+    }
+
+    private Future<Void> reportAccepted(JobPollingService.PendingJob job) {
+        if (!job.hasAttemptContext()) {
+            return jobStatusReportingService.reportAccepted(job.getJobId());
+        }
+        return jobStatusReportingService.reportAccepted(job.getJobId(), job.getAttemptId(),
+                job.getFencingGeneration(), job.nextReportSequence());
+    }
+
+    private Future<Void> reportInProgress(JobPollingService.PendingJob job, long bytesTransferred) {
+        if (!job.hasAttemptContext()) {
+            return jobStatusReportingService.reportInProgress(job.getJobId(), bytesTransferred);
+        }
+        return jobStatusReportingService.reportInProgress(job.getJobId(), bytesTransferred,
+                job.getAttemptId(), job.getFencingGeneration(), job.nextReportSequence());
+    }
+
+    private Future<Void> reportCompleted(JobPollingService.PendingJob job, long bytesTransferred) {
+        if (!job.hasAttemptContext()) {
+            return jobStatusReportingService.reportCompleted(job.getJobId(), bytesTransferred);
+        }
+        return jobStatusReportingService.reportCompleted(job.getJobId(), bytesTransferred,
+                job.getAttemptId(), job.getFencingGeneration(), job.nextReportSequence());
+    }
+
+    private Future<Void> reportFailed(JobPollingService.PendingJob job, String reason) {
+        if (!job.hasAttemptContext()) {
+            return jobStatusReportingService.reportFailed(job.getJobId(), reason);
+        }
+        return jobStatusReportingService.reportFailed(job.getJobId(), reason, job.getAttemptId(),
+                job.getFencingGeneration(), job.nextReportSequence());
     }
     
     public boolean isRunning() {

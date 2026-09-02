@@ -26,10 +26,14 @@ import dev.mars.quorus.controller.security.SecurityIdentity;
 import dev.mars.quorus.controller.state.CommandResult;
 import dev.mars.quorus.controller.state.JobAssignmentCommand;
 import dev.mars.quorus.controller.state.QuorusStateStore;
+import dev.mars.quorus.controller.state.TransferAttemptCommand;
 import dev.mars.quorus.controller.state.TransferJobCommand;
 import dev.mars.quorus.controller.state.TransferJobSnapshot;
 import dev.mars.quorus.core.JobAssignment;
 import dev.mars.quorus.core.JobAssignmentStatus;
+import dev.mars.quorus.core.TransferAttempt;
+import dev.mars.quorus.core.TransferAttemptOutcome;
+import dev.mars.quorus.core.TransferAttemptStatus;
 import dev.mars.quorus.core.TransferStatus;
 import io.vertx.core.Future;
 import io.vertx.core.Handler;
@@ -37,6 +41,8 @@ import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.RoutingContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.time.Instant;
 
 /**
  * HTTP handler for job status updates from agents.
@@ -118,52 +124,61 @@ public class JobStatusHandler implements Handler<RoutingContext> {
             JobAssignment existing = stateStore.findJobAssignment(assignmentId)
                     .orElseThrow(() -> QuorusApiException.notFound(ErrorCode.ASSIGNMENT_NOT_FOUND, assignmentId));
 
-            // Pre-commit transition validation
-            if (!existing.getStatus().canTransitionTo(status)) {
+            TransferStatus targetTransferStatus = transferStatus(status);
+            TransferAttempt activeAttempt = stateStore.findActiveTransferAttempt(jobId)
+                    .filter(attempt -> agentId.equals(attempt.getAgentId()))
+                    .orElse(null);
+            String requestedAttemptId = body.getString("attemptId");
+            if (requestedAttemptId == null && !existing.getStatus().canTransitionTo(status)) {
                 ctx.fail(QuorusApiException.conflict(ErrorCode.ASSIGNMENT_STATE_CONFLICT,
                         assignmentId, existing.getStatus().name(), "transition to " + status));
                 return;
             }
-
-            // Update job assignment status with CAS
-            JobAssignmentCommand assignmentCommand = JobAssignmentCommand.updateStatus(
-                    assignmentId, existing.getStatus(), status);
-            Future<CommandResult<?>> assignmentFuture = raftNode.submitCommand(assignmentCommand)
-                    .compose(assignmentResult -> {
-                        if (assignmentResult instanceof CommandResult.Rejected<?> rejected) {
-                            return Future.failedFuture(CommandResultHandler.rejectionException(rejected));
-                        }
-                        if (assignmentResult instanceof CommandResult.CasMismatch<?>) {
-                            logger.warn("Assignment state conflict during job status update: assignmentId={}, expected={}",
-                                    assignmentId, existing.getStatus());
-                            return Future.failedFuture(QuorusApiException.conflict(
-                                    ErrorCode.ASSIGNMENT_STATE_CONFLICT,
-                                    assignmentId, existing.getStatus().name(), "update (concurrent modification)"));
-                        }
-                        if (assignmentResult instanceof CommandResult.NotFound<?> nf) {
-                            logger.warn("Assignment disappeared during job status update (race condition): assignmentId={}", nf.id());
-                            return Future.failedFuture(QuorusApiException.notFound(
-                                    ErrorCode.ASSIGNMENT_NOT_FOUND, nf.id()));
-                        }
-                        return Future.succeededFuture(assignmentResult);
-                    });
-
-            TransferStatus targetTransferStatus = transferStatus(status);
-            Future<CommandResult<?>> lifecycle = assignmentFuture;
-
-            // Enter IN_PROGRESS before accepting progress. For terminal reports,
-            // persist the final checkpoint before closing the transfer lifecycle.
-            if (targetTransferStatus == TransferStatus.IN_PROGRESS) {
-                lifecycle = lifecycle.compose(ignored -> submitTransferStatus(
-                        jobId, transferJobSnapshot.getStatus(), targetTransferStatus));
+            if (activeAttempt == null && requestedAttemptId != null) {
+                activeAttempt = stateStore.findTransferAttempt(requestedAttemptId)
+                        .filter(attempt -> jobId.equals(attempt.getJobId()))
+                        .filter(attempt -> agentId.equals(attempt.getAgentId()))
+                        .orElse(null);
             }
-            if (bytesTransferred > 0) {
-                lifecycle = lifecycle.compose(ignored -> acceptedTransferResult(
-                        raftNode.submitCommand(TransferJobCommand.updateProgress(jobId, bytesTransferred)), jobId));
-            }
-            if (targetTransferStatus != null && targetTransferStatus != TransferStatus.IN_PROGRESS) {
-                lifecycle = lifecycle.compose(ignored -> submitTransferStatus(
-                        jobId, transferJobSnapshot.getStatus(), targetTransferStatus));
+            Future<CommandResult<?>> lifecycle;
+            if (activeAttempt != null) {
+                String attemptId = requestedAttemptId;
+                Long fencingGeneration = body.getLong("fencingGeneration");
+                Long reportSequence = body.getLong("reportSequence");
+                String expectedState = body.getString("expectedState");
+                if (attemptId == null || fencingGeneration == null || reportSequence == null
+                        || expectedState == null) {
+                    ctx.fail(400, new IllegalArgumentException(
+                            "Missing required attempt fields: attemptId, expectedState, fencingGeneration, reportSequence"));
+                    return;
+                }
+                TransferAttemptStatus attemptStatus = attemptStatus(status);
+                TransferAttemptOutcome outcome = attemptOutcome(status);
+                TransferAttemptCommand report = TransferAttemptCommand.lifecycleReport(
+                        attemptId, fencingGeneration, reportSequence,
+                        TransferAttemptStatus.valueOf(expectedState), attemptStatus,
+                        bytesTransferred, outcome, body.getString("errorMessage"),
+                        assignmentId, existing.getStatus(), status, jobId,
+                        targetTransferStatus == null ? null : transferJobSnapshot.getStatus(),
+                        targetTransferStatus, Instant.now());
+                lifecycle = acceptedAttemptResult(raftNode.submitCommand(report), attemptId);
+            } else {
+                JobAssignmentCommand assignmentCommand = JobAssignmentCommand.updateStatus(
+                        assignmentId, existing.getStatus(), status);
+                lifecycle = submitAssignmentStatus(assignmentCommand, existing);
+                // Legacy assignments without an attempt retain the compatibility path.
+                if (targetTransferStatus == TransferStatus.IN_PROGRESS) {
+                    lifecycle = lifecycle.compose(ignored -> submitTransferStatus(
+                            jobId, transferJobSnapshot.getStatus(), targetTransferStatus));
+                }
+                if (bytesTransferred > 0) {
+                    lifecycle = lifecycle.compose(ignored -> acceptedTransferResult(
+                            raftNode.submitCommand(TransferJobCommand.updateProgress(jobId, bytesTransferred)), jobId));
+                }
+                if (targetTransferStatus != null && targetTransferStatus != TransferStatus.IN_PROGRESS) {
+                    lifecycle = lifecycle.compose(ignored -> submitTransferStatus(
+                            jobId, transferJobSnapshot.getStatus(), targetTransferStatus));
+                }
             }
 
             lifecycle
@@ -193,6 +208,45 @@ public class JobStatusHandler implements Handler<RoutingContext> {
                 raftNode.submitCommand(TransferJobCommand.updateStatus(jobId, expected, target)), jobId);
     }
 
+    private Future<CommandResult<?>> submitAssignmentStatus(
+            JobAssignmentCommand command, JobAssignment existing) {
+        return raftNode.submitCommand(command).compose(result -> {
+            if (result instanceof CommandResult.Rejected<?> rejected) {
+                return Future.failedFuture(CommandResultHandler.rejectionException(rejected));
+            }
+            if (result instanceof CommandResult.CasMismatch<?>) {
+                logger.warn("Assignment state conflict during job status update: jobId={}, expected={}",
+                        existing.getJobId(), existing.getStatus());
+                return Future.failedFuture(QuorusApiException.conflict(
+                        ErrorCode.ASSIGNMENT_STATE_CONFLICT, existing.getJobId(),
+                        existing.getStatus().name(), "update (concurrent modification)"));
+            }
+            if (result instanceof CommandResult.NotFound<?> notFound) {
+                return Future.failedFuture(QuorusApiException.notFound(
+                        ErrorCode.ASSIGNMENT_NOT_FOUND, notFound.id()));
+            }
+            return Future.succeededFuture(result);
+        });
+    }
+
+    private static Future<CommandResult<?>> acceptedAttemptResult(
+            Future<CommandResult<?>> command, String attemptId) {
+        return command.compose(result -> {
+            if (result instanceof CommandResult.Rejected<?> rejected) {
+                return Future.failedFuture(CommandResultHandler.rejectionException(rejected));
+            }
+            if (result instanceof CommandResult.CasMismatch<?>) {
+                return Future.failedFuture(QuorusApiException.conflict(
+                        ErrorCode.ATTEMPT_STATE_CONFLICT, attemptId, "changed", "report"));
+            }
+            if (result instanceof CommandResult.NotFound<?> notFound) {
+                return Future.failedFuture(QuorusApiException.notFound(
+                        ErrorCode.ATTEMPT_NOT_FOUND, notFound.id()));
+            }
+            return Future.succeededFuture(result);
+        });
+    }
+
     private static Future<CommandResult<?>> acceptedTransferResult(
             Future<CommandResult<?>> command, String jobId) {
         return command.compose(result -> {
@@ -218,6 +272,31 @@ public class JobStatusHandler implements Handler<RoutingContext> {
             case FAILED -> TransferStatus.FAILED;
             case CANCELLED -> TransferStatus.CANCELLED;
             case ASSIGNED, ACCEPTED, REJECTED, TIMEOUT -> null;
+        };
+    }
+
+    private static TransferAttemptStatus attemptStatus(JobAssignmentStatus status) {
+        return switch (status) {
+            case ACCEPTED -> TransferAttemptStatus.ACCEPTED;
+            case IN_PROGRESS -> TransferAttemptStatus.IN_PROGRESS;
+            case COMPLETED -> TransferAttemptStatus.COMPLETED;
+            case FAILED -> TransferAttemptStatus.FAILED;
+            case REJECTED -> TransferAttemptStatus.REJECTED;
+            case TIMEOUT -> TransferAttemptStatus.EXPIRED;
+            case CANCELLED -> TransferAttemptStatus.CANCELLED;
+            case ASSIGNED -> throw new IllegalArgumentException("ASSIGNED is not an agent report state");
+        };
+    }
+
+    private static TransferAttemptOutcome attemptOutcome(JobAssignmentStatus status) {
+        return switch (status) {
+            case ACCEPTED, IN_PROGRESS -> TransferAttemptOutcome.NONE;
+            case COMPLETED -> TransferAttemptOutcome.SUCCEEDED;
+            case FAILED -> TransferAttemptOutcome.TERMINAL_FAILURE;
+            case REJECTED -> TransferAttemptOutcome.REJECTED;
+            case TIMEOUT -> TransferAttemptOutcome.LEASE_EXPIRED;
+            case CANCELLED -> TransferAttemptOutcome.CANCELLED;
+            case ASSIGNED -> throw new IllegalArgumentException("ASSIGNED is not an agent report state");
         };
     }
 }

@@ -25,7 +25,7 @@ import dev.mars.quorus.controller.raft.grpc.*;
  * Replaces Java serialization (ObjectOutputStream/ObjectInputStream) with
  * version-safe Protobuf encoding for Raft log entry command payloads.
  *
- * <p>Delegates to domain-specific codecs for the six {@link RaftCommand} sealed subtypes:
+ * <p>Delegates to domain-specific codecs for the seven {@link RaftCommand} sealed subtypes:
  * <ul>
  *   <li>{@link TransferCodec} — {@link TransferJobCommand}, TransferJob, TransferRequest, TransferStatus</li>
  *   <li>{@link AgentCodec} — {@link AgentCommand}, AgentInfo, AgentCapabilities, AgentStatus</li>
@@ -33,6 +33,7 @@ import dev.mars.quorus.controller.raft.grpc.*;
  *   <li>{@link JobAssignmentCodec} — {@link JobAssignmentCommand}, JobAssignment, JobAssignmentStatus</li>
  *   <li>{@link JobQueueCodec} — {@link JobQueueCommand}, QueuedJob, JobRequirements, JobPriority</li>
  *   <li>{@link RouteCodec} — {@link RouteCommand}, RouteConfiguration, TriggerConfiguration, RouteStatus</li>
+ *   <li>{@link TransferAttemptCodec} — {@link TransferAttemptCommand} and immutable attempt evidence</li>
  * </ul>
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
@@ -50,7 +51,7 @@ public final class ProtobufCommandCodec {
     /**
      * Serialize a state machine command to Protobuf-encoded bytes.
      *
-     * @param command the command object (one of the six sealed command types, or null for no-op)
+     * @param command the command object (one of the seven sealed command types, or null for no-op)
      * @return Protobuf-encoded bytes as ByteString
      */
     public static ByteString serialize(RaftCommand command) {
@@ -74,6 +75,8 @@ public final class ProtobufCommandCodec {
                     .setJobQueueCommand(JobQueueCodec.toProto(cmd)).build();
             case RouteCommand cmd -> RaftCommandMessage.newBuilder()
                     .setRouteCommand(RouteCodec.toProto(cmd)).build();
+            case TransferAttemptCommand cmd -> RaftCommandMessage.newBuilder()
+                    .setTransferAttemptCommand(TransferAttemptCodec.toProto(cmd)).build();
         };
         return raftMessage.toBuilder().setSchemaVersion(CURRENT_SCHEMA_VERSION).build().toByteString();
     }
@@ -98,6 +101,8 @@ public final class ProtobufCommandCodec {
                 case JOB_ASSIGNMENT_COMMAND -> JobAssignmentCodec.fromProto(raftMessage.getJobAssignmentCommand());
                 case JOB_QUEUE_COMMAND -> JobQueueCodec.fromProto(raftMessage.getJobQueueCommand());
                 case ROUTE_COMMAND -> RouteCodec.fromProto(raftMessage.getRouteCommand());
+                case TRANSFER_ATTEMPT_COMMAND -> TransferAttemptCodec.fromProto(
+                        raftMessage.getTransferAttemptCommand());
                 case COMMAND_NOT_SET -> null; // No-op entry
             };
         } catch (InvalidProtocolBufferException e) {
