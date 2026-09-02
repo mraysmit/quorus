@@ -55,6 +55,12 @@ public class JobStatusReportingService {
         return reportStatus(jobId, "ACCEPTED", null, null);
     }
 
+    public Future<Void> reportAccepted(String jobId, String attemptId,
+                                       long fencingGeneration, long reportSequence) {
+        return reportStatus(jobId, "ACCEPTED", null, null,
+                attemptId, fencingGeneration, reportSequence);
+    }
+
     /**
      * Report that a job is in progress.
      * 
@@ -62,6 +68,12 @@ public class JobStatusReportingService {
      */
     public Future<Void> reportInProgress(String jobId, long bytesTransferred) {
         return reportStatus(jobId, "IN_PROGRESS", bytesTransferred, null);
+    }
+
+    public Future<Void> reportInProgress(String jobId, long bytesTransferred, String attemptId,
+                                         long fencingGeneration, long reportSequence) {
+        return reportStatus(jobId, "IN_PROGRESS", bytesTransferred, null,
+                attemptId, fencingGeneration, reportSequence);
     }
 
     /**
@@ -73,6 +85,12 @@ public class JobStatusReportingService {
         return reportStatus(jobId, "COMPLETED", bytesTransferred, null);
     }
 
+    public Future<Void> reportCompleted(String jobId, long bytesTransferred, String attemptId,
+                                        long fencingGeneration, long reportSequence) {
+        return reportStatus(jobId, "COMPLETED", bytesTransferred, null,
+                attemptId, fencingGeneration, reportSequence);
+    }
+
     /**
      * Report that a job has failed.
      * 
@@ -82,12 +100,23 @@ public class JobStatusReportingService {
         return reportStatus(jobId, "FAILED", null, errorMessage);
     }
 
+    public Future<Void> reportFailed(String jobId, String errorMessage, String attemptId,
+                                     long fencingGeneration, long reportSequence) {
+        return reportStatus(jobId, "FAILED", null, errorMessage,
+                attemptId, fencingGeneration, reportSequence);
+    }
+
     /**
      * Report job status to the controller.
      * 
      * @return Future that completes when the report is sent
      */
     private Future<Void> reportStatus(String jobId, String status, Long bytesTransferred, String errorMessage) {
+        return reportStatus(jobId, status, bytesTransferred, errorMessage, null, 0, 0);
+    }
+
+    private Future<Void> reportStatus(String jobId, String status, Long bytesTransferred, String errorMessage,
+                                      String attemptId, long fencingGeneration, long reportSequence) {
         JsonObject request = new JsonObject()
             .put("agentId", config.getAgentId())
             .put("status", status);
@@ -97,6 +126,12 @@ public class JobStatusReportingService {
         }
         if (errorMessage != null) {
             request.put("errorMessage", errorMessage);
+        }
+        if (attemptId != null) {
+            request.put("attemptId", attemptId)
+                    .put("expectedState", expectedAttemptState(status))
+                    .put("fencingGeneration", fencingGeneration)
+                    .put("reportSequence", reportSequence);
         }
         
         String url = config.getControllerUrl() + "/jobs/" + jobId + "/status";
@@ -118,6 +153,15 @@ public class JobStatusReportingService {
             .onFailure(err -> {
                 logger.error("Error reporting job status: {} -> {}: {}", jobId, status, err.getMessage());
             });
+    }
+
+    private static String expectedAttemptState(String status) {
+        return switch (status) {
+            case "ACCEPTED" -> "OFFERED";
+            case "IN_PROGRESS" -> "ACCEPTED";
+            case "COMPLETED", "FAILED", "CANCELLED" -> "IN_PROGRESS";
+            default -> throw new IllegalArgumentException("Unsupported attempt-aware status: " + status);
+        };
     }
 
     /**

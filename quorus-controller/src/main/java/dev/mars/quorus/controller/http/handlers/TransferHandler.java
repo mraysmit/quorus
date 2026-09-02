@@ -24,6 +24,7 @@ import dev.mars.quorus.controller.state.CommandResult;
 import dev.mars.quorus.controller.state.QuorusStateStore;
 import dev.mars.quorus.controller.state.TransferJobCommand;
 import dev.mars.quorus.controller.state.TransferJobSnapshot;
+import dev.mars.quorus.controller.state.TransferOperationalContext;
 import dev.mars.quorus.core.JobAssignment;
 import dev.mars.quorus.core.TransferJob;
 import io.vertx.core.Handler;
@@ -85,6 +86,7 @@ public class TransferHandler {
                 JsonObject jobBody = body.copy();
                 jobBody.remove("tenantId");
                 TransferJob job = jobBody.mapTo(TransferJob.class);
+                TransferOperationalContext.fromMetadata(job.getRequest().getMetadata());
 
                 logger.info("Creating transfer job: jobId={}, tenantId={}", job.getJobId(), tenantId);
                 TransferJobCommand command = TransferJobCommand.create(job, tenantId);

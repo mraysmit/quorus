@@ -30,6 +30,7 @@ import io.vertx.core.Vertx;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
@@ -191,7 +192,11 @@ public class JobAssignmentService {
 
         // Submit assignment command to Raft (reactive)
         logger.debug("Submitting assignment to Raft: jobId={}, agentId={}", jobId, selectedAgentId);
-        JobAssignmentCommand assignCommand = JobAssignmentCommand.assign(assignment);
+        String attemptId = UUID.randomUUID().toString();
+        Instant leaseExpiresAt = assignment.getAssignedAt()
+                .plusMillis(AppConfig.get().getAttemptLeaseDurationMs());
+        JobAssignmentCommand assignCommand = JobAssignmentCommand.assignWithAttempt(
+                assignment, attemptId, leaseExpiresAt);
 
         return raftNode.submitCommand(assignCommand)
             .compose(result -> {

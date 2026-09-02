@@ -65,13 +65,18 @@ public sealed interface JobAssignmentCommand extends RaftCommand
      * @param jobAssignment the full job assignment
      * @param timestamp     the command timestamp
      */
-    record Assign(String assignmentId, JobAssignment jobAssignment, Instant timestamp) implements JobAssignmentCommand {
+    record Assign(String assignmentId, JobAssignment jobAssignment, String attemptId,
+                  Instant leaseExpiresAt, Instant timestamp) implements JobAssignmentCommand {
         private static final long serialVersionUID = 1L;
 
         public Assign {
             Objects.requireNonNull(assignmentId, "assignmentId");
             Objects.requireNonNull(jobAssignment, "jobAssignment");
             Objects.requireNonNull(timestamp, "timestamp");
+        }
+
+        public Assign(String assignmentId, JobAssignment jobAssignment, Instant timestamp) {
+            this(assignmentId, jobAssignment, null, null, timestamp);
         }
     }
 
@@ -196,6 +201,18 @@ public sealed interface JobAssignmentCommand extends RaftCommand
         Objects.requireNonNull(jobAssignment, "Job assignment cannot be null");
         String assignmentId = generateAssignmentId(jobAssignment.getJobId(), jobAssignment.getAgentId());
         return new Assign(assignmentId, jobAssignment, Instant.now());
+    }
+
+    /**
+     * Atomically create an assignment and its first authoritative execution attempt.
+     */
+    static Assign assignWithAttempt(JobAssignment jobAssignment, String attemptId,
+                                    Instant leaseExpiresAt) {
+        Objects.requireNonNull(jobAssignment, "Job assignment cannot be null");
+        Objects.requireNonNull(attemptId, "Attempt ID cannot be null");
+        Objects.requireNonNull(leaseExpiresAt, "Lease expiry cannot be null");
+        String assignmentId = generateAssignmentId(jobAssignment.getJobId(), jobAssignment.getAgentId());
+        return new Assign(assignmentId, jobAssignment, attemptId, leaseExpiresAt, jobAssignment.getAssignedAt());
     }
 
     /**

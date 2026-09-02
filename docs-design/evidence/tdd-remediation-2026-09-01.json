@@ -1,6 +1,7 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "assessmentDate": "2026-09-01",
+  "lastUpdated": "2026-09-02",
   "scope": [
     "Phase 0 — Baseline, Conformance, and Delivery Controls",
     "Phase 1 — Identity, Authorization, and Trust Boundaries"
@@ -121,10 +122,70 @@
         "quorus-agent": 86,
         "quorus-integration-examples": 0
       }
+    },
+    "coverageGateRemediation": {
+      "classification": "build-gate repair plus retrospective behavioral characterization; no production behavior was changed and the added tests are not represented as historical TDD evidence",
+      "rootCause": "The controller Surefire argLine replaced the JaCoCo prepare-agent value, so controller tests ran without the JaCoCo agent and the report/check goals skipped because jacoco.exec was absent.",
+      "repair": "Surefire now expands @{argLine} before the required Java modules. The existing 60 percent line-coverage minimum remains unchanged and is enforced for every authored controller package.",
+      "generatedCodePolicy": "Only protoc-generated Java and gRPC bindings under dev/mars/quorus/controller/raft/grpc are excluded from controller coverage accounting; their transport behavior remains exercised through the live gRPC tests.",
+      "retrospectiveBehavioralCoverage": [
+        "controller entry-point deployment and graceful undeployment",
+        "packaged configuration defaults and malformed numeric fallbacks",
+        "enabled and disabled OpenTelemetry bootstrap with global-state isolation",
+        "assignment lifecycle through a real single-node Raft boundary, including fail-closed validation and cancellation",
+        "file-backed snapshot and prefix-truncation behavior",
+        "RocksDB metadata, log truncation, replay, and snapshot behavior"
+      ],
+      "focusedVerification": {
+        "remediationTests": 29,
+        "telemetryOrderingTests": 15,
+        "timingReliabilityTests": 17,
+        "failures": 0,
+        "errors": 0,
+        "outcome": "passed"
+      },
+      "authoritativeVerification": {
+        "command": "mvn -o -pl quorus-controller -am clean verify",
+        "log": "temp/jacoco-controller-clean-verify-authoritative.txt",
+        "tests": 2163,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "modules": 5,
+        "outcome": "passed",
+        "moduleTests": {
+          "quorus-core": 1491,
+          "quorus-workflow": 134,
+          "quorus-tenant": 64,
+          "quorus-controller": 474
+        }
+      },
+      "controllerCoverage": {
+        "analyzedAuthoredClasses": 143,
+        "line": {
+          "covered": 5343,
+          "missed": 1419,
+          "percentage": 79.0
+        },
+        "branch": {
+          "covered": 1378,
+          "missed": 911,
+          "percentage": 60.2
+        },
+        "lowestAuthoredPackageLinePercentage": 60.1,
+        "coverageGateLinePercentage": 60.0,
+        "outcome": "All coverage checks have been met."
+      },
+      "retainedRedEvidence": [
+        "temp/jacoco-controller-clean-verify.txt",
+        "temp/jacoco-controller-clean-verify-retry.txt"
+      ]
     }
   },
   "phase1Gate": {
-    "repositoryTechnicalStatus": "passed",
+    "repositoryTechnicalStatus": "complete",
+    "phaseStatus": "complete",
+    "completedDate": "2026-09-02",
     "basis": "Representative live HTTP, Raft, and agent TLS boundaries plus the full clean seven-module regression build passed.",
     "notClaimed": "Corporate-environment accreditation or enterprise production readiness",
     "externalValidation": [
@@ -136,15 +197,17 @@
   },
   "approval": {
     "required": true,
-    "status": "pending",
-    "approvers": [
+    "status": "approved",
+    "approvedDate": "2026-09-02",
+    "approvedBy": "project authority",
+    "decision": "Accept the Phase 0 and initial Phase 1 historical TDD process deviation as a recorded risk without representing retrospective tests as historical TDD evidence.",
+    "originalApprovalFunctions": [
       "architecture",
       "quality engineering",
       "security engineering"
     ]
   },
   "remainingGates": [
-    "Formal approval or rejection of the initial Phase 0 and Phase 1 historical TDD process deviation",
     "retained red-green-refactor evidence for every subsequent behavior-changing slice"
   ]
 }

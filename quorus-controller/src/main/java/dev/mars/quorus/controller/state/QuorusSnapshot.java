@@ -22,10 +22,12 @@ import dev.mars.quorus.agent.AgentInfo;
 import dev.mars.quorus.core.JobAssignment;
 import dev.mars.quorus.core.QueuedJob;
 import dev.mars.quorus.core.RouteConfiguration;
+import dev.mars.quorus.core.TransferAttempt;
 
 import java.io.Serializable;
 import java.time.Instant;
 import java.util.Map;
+import java.util.List;
 /**
  * Description for QuorusSnapshot
  *
@@ -46,6 +48,9 @@ public class QuorusSnapshot implements Serializable {
     private Map<String, JobAssignment> jobAssignments;
     private Map<String, QueuedJob> jobQueue;
     private Map<String, RouteConfiguration> routes;
+    private Map<String, TransferAttempt> transferAttempts;
+    private Map<String, String> activeAttemptByJob;
+    private Map<String, List<TransferEvent>> transferEvents;
     private long lastAppliedIndex;
     private Instant timestamp;
 
@@ -62,6 +67,9 @@ public class QuorusSnapshot implements Serializable {
                          @JsonProperty("jobAssignments") Map<String, JobAssignment> jobAssignments,
                          @JsonProperty("jobQueue") Map<String, QueuedJob> jobQueue,
                          @JsonProperty("routes") Map<String, RouteConfiguration> routes,
+                         @JsonProperty("transferAttempts") Map<String, TransferAttempt> transferAttempts,
+                         @JsonProperty("activeAttemptByJob") Map<String, String> activeAttemptByJob,
+                         @JsonProperty("transferEvents") Map<String, List<TransferEvent>> transferEvents,
                          @JsonProperty("lastAppliedIndex") long lastAppliedIndex,
                          @JsonProperty("timestamp") Instant timestamp) {
         this.schemaVersion = schemaVersion == null ? 0 : schemaVersion;
@@ -71,6 +79,9 @@ public class QuorusSnapshot implements Serializable {
         this.jobAssignments = jobAssignments;
         this.jobQueue = jobQueue;
         this.routes = routes;
+        this.transferAttempts = transferAttempts;
+        this.activeAttemptByJob = activeAttemptByJob;
+        this.transferEvents = transferEvents;
         this.lastAppliedIndex = lastAppliedIndex;
         this.timestamp = timestamp != null ? timestamp : Instant.now();
     }
@@ -131,6 +142,28 @@ public class QuorusSnapshot implements Serializable {
         this.routes = routes;
     }
 
+    public Map<String, TransferAttempt> getTransferAttempts() {
+        return transferAttempts;
+    }
+
+    public void setTransferAttempts(Map<String, TransferAttempt> transferAttempts) {
+        this.transferAttempts = transferAttempts;
+    }
+
+    public Map<String, String> getActiveAttemptByJob() {
+        return activeAttemptByJob;
+    }
+
+    public void setActiveAttemptByJob(Map<String, String> activeAttemptByJob) {
+        this.activeAttemptByJob = activeAttemptByJob;
+    }
+
+    public Map<String, List<TransferEvent>> getTransferEvents() { return transferEvents; }
+
+    public void setTransferEvents(Map<String, List<TransferEvent>> transferEvents) {
+        this.transferEvents = transferEvents;
+    }
+
     public long getLastAppliedIndex() {
         return lastAppliedIndex;
     }
@@ -161,6 +194,7 @@ public class QuorusSnapshot implements Serializable {
                 ", jobAssignments=" + (jobAssignments != null ? jobAssignments.size() : 0) + " assignments" +
                 ", jobQueue=" + (jobQueue != null ? jobQueue.size() : 0) + " queued" +
                 ", routes=" + (routes != null ? routes.size() : 0) + " routes" +
+                ", transferAttempts=" + (transferAttempts != null ? transferAttempts.size() : 0) + " attempts" +
                 ", lastAppliedIndex=" + lastAppliedIndex +
                 ", timestamp=" + timestamp +
                 '}';

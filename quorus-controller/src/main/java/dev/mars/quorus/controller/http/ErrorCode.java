@@ -87,6 +87,13 @@ public enum ErrorCode {
     
     /** Transfer is in a state that doesn't allow this operation */
     TRANSFER_STATE_CONFLICT("Q-2004", "TRANSFER_STATE_CONFLICT", 409, "Transfer '%s' is in state '%s', cannot %s"),
+
+    /** Transfer attempt not found */
+    ATTEMPT_NOT_FOUND("Q-2005", "ATTEMPT_NOT_FOUND", 404, "Transfer attempt '%s' not found"),
+
+    /** Transfer attempt is in a state that does not allow the report */
+    ATTEMPT_STATE_CONFLICT("Q-2006", "ATTEMPT_STATE_CONFLICT", 409,
+            "Transfer attempt '%s' is in state '%s', cannot %s"),
     
     // ==================== Agent Errors ====================
     

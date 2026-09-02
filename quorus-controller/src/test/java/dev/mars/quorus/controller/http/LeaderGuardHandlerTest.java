@@ -67,6 +67,7 @@ class LeaderGuardHandlerTest {
 
     private static final int LEADER_PORT = 18098;
     private static final int FOLLOWER_PORT = 18099;
+    private static final Duration ASYNC_SETUP_TIMEOUT = Duration.ofSeconds(15);
 
     private static Vertx vertx;
     private static RaftNode leaderNode;
@@ -90,11 +91,11 @@ class LeaderGuardHandlerTest {
         QuorusStateStore sm3 = new QuorusStateStore();
 
         RaftNode node1 = RaftNode.builder().vertx(vertx).nodeId("guard-node-1").clusterNodes(clusterNodes).transport(transport1).stateMachine(sm1).mode(RaftNodeMode.volatileMode())
-                .electionTimeout(500).heartbeatInterval(100).build();
+                .electionTimeout(400).heartbeatInterval(100).build();
         RaftNode node2 = RaftNode.builder().vertx(vertx).nodeId("guard-node-2").clusterNodes(clusterNodes).transport(transport2).stateMachine(sm2).mode(RaftNodeMode.volatileMode())
-                .electionTimeout(500).heartbeatInterval(100).build();
+                .electionTimeout(30000).heartbeatInterval(100).build();
         RaftNode node3 = RaftNode.builder().vertx(vertx).nodeId("guard-node-3").clusterNodes(clusterNodes).transport(transport3).stateMachine(sm3).mode(RaftNodeMode.volatileMode())
-                .electionTimeout(500).heartbeatInterval(100).build();
+                .electionTimeout(45000).heartbeatInterval(100).build();
 
         node1.start();
         node2.start();
@@ -132,16 +133,16 @@ class LeaderGuardHandlerTest {
         agent.setTenantId(tenantId);
         agent.setStatus(AgentStatus.HEALTHY);
         awaitSuccess(leaderNode.submitCommand(
-                TransferJobCommand.create(new TransferJob(transferRequest), tenantId)), Duration.ofSeconds(5));
+                TransferJobCommand.create(new TransferJob(transferRequest), tenantId)), ASYNC_SETUP_TIMEOUT);
         awaitSuccess(leaderNode.submitCommand(
-                new AgentCommand.Register(agent.getAgentId(), agent, Instant.now())), Duration.ofSeconds(5));
+                new AgentCommand.Register(agent.getAgentId(), agent, Instant.now())), ASYNC_SETUP_TIMEOUT);
 
         // Start HTTP servers on leader and follower
         leaderServer = new HttpApiServer(vertx, LEADER_PORT, leaderNode, leaderStateStore);
-        awaitSuccess(leaderServer.start(), Duration.ofSeconds(5));
+        awaitSuccess(leaderServer.start(), ASYNC_SETUP_TIMEOUT);
 
         followerServer = new HttpApiServer(vertx, FOLLOWER_PORT, followerNode, followerStateStore);
-        awaitSuccess(followerServer.start(), Duration.ofSeconds(5));
+        awaitSuccess(followerServer.start(), ASYNC_SETUP_TIMEOUT);
 
         webClient = WebClient.create(vertx);
     }

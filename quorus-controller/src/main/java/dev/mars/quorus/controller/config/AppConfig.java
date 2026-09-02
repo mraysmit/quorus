@@ -220,6 +220,14 @@ public final class AppConfig {
         return getInt("quorus.telemetry.prometheus.port", 9464);
     }
 
+    public long getTransferFreshWindowMs() {
+        return getLong("quorus.telemetry.transfer.fresh-window-ms", 60000);
+    }
+
+    public long getTransferStallWindowMs() {
+        return getLong("quorus.telemetry.transfer.stall-window-ms", 120000);
+    }
+
     public String getServiceName() {
         return getString("quorus.telemetry.service.name", "quorus-controller");
     }
@@ -262,6 +270,10 @@ public final class AppConfig {
 
     public long getTimeoutIntervalMs() {
         return getLong("quorus.jobs.timeout.interval-ms", 30000);
+    }
+
+    public long getAttemptLeaseDurationMs() {
+        return getLong("quorus.jobs.attempt.lease-duration-ms", 300000);
     }
 
     // ==================== Application Info ====================
@@ -392,6 +404,14 @@ public final class AppConfig {
                     "Timeout interval must be positive, got: " + getTimeoutIntervalMs());
         }
 
+        if (getTransferFreshWindowMs() <= 0) {
+            throw new IllegalStateException("Transfer telemetry freshness window must be positive, got: "
+                    + getTransferFreshWindowMs());
+        }
+        if (getTransferStallWindowMs() <= getTransferFreshWindowMs()) {
+            throw new IllegalStateException("Transfer telemetry stall window must be greater than freshness window");
+        }
+
         // Validate snapshot threshold
         if (getSnapshotThreshold() < 1) {
             throw new IllegalStateException(
@@ -451,6 +471,8 @@ public final class AppConfig {
         logger.info("  Enabled:              {}", isTelemetryEnabled());
         logger.info("  OTLP Endpoint:        {}", getOtlpEndpoint());
         logger.info("  Prometheus Port:      {}", getPrometheusPort());
+        logger.info("  Transfer Freshness:   {}ms", getTransferFreshWindowMs());
+        logger.info("  Transfer Stall:       {}ms", getTransferStallWindowMs());
         logger.info("========================================");
     }
 }

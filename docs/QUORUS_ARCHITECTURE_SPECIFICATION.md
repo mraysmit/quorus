@@ -2,8 +2,8 @@
 
 # Quorus Architecture Specification
 
-**Version:** 1.2  
-**Date:** 2026-09-01  
+**Version:** 2.0  
+**Date:** 2026-09-02  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Status:** Canonical and normative  
@@ -73,15 +73,15 @@ The status values in this table are normative:
 | Raft log, snapshots, and replicated controller state | Implemented | Membership is static and every node needs durable local storage |
 | Agent registration, heartbeat, polling, and reporting | Implemented | Agent control clients support certificate-authenticated HTTPS with hostname verification; enrollment and rotation lifecycle remains incomplete |
 | Transfer, assignment, and route CRUD | Implemented | CRUD does not imply autonomous route execution |
-| Transfer-process metrics | Partial | Aggregate job counts, bytes, and duration exist; continuous progress, deadline risk, stall detection, and an end-to-end operational timeline are incomplete |
-| Per-transfer operational telemetry and alerting | Planned | Required for critical and time-sensitive production transfers |
+| Transfer-process metrics | Partial | Aggregate metrics plus a tenant-checked per-transfer progress view now expose byte progress, real last-progress time, missing/stale telemetry, configured policy windows, active attempt, ownership, and deadline condition; continuous samples, calibrated prediction, and timelines remain incomplete |
+| Per-transfer operational telemetry and alerting | Partial | Submission persists operational ownership and deadline context; progress is governed and the first ordered submission event is queryable; the remaining lifecycle vocabulary, active stall boundary, queries, streaming, alert lifecycle, retention, and service reporting remain required |
 | Enterprise service connectivity controls | Planned | Endpoint policy, secret references, service identity verification, and egress enforcement are incomplete |
 | Secure agent provisioning and deployment lifecycle | Planned | Unique identity enrollment, image signing, attestation, rotation, revocation, and controlled upgrade are required |
 | Authenticated tenant derivation and tenant checks | Partial | HTTP transfer, agent, assignment, and route access is constrained by the verified identity; uniform state-machine enforcement remains incomplete |
-| Distributed assignment lifecycle | Partial | The production agent omits the required `IN_PROGRESS` acknowledgement |
+| Distributed assignment lifecycle | Partial | The agent obtains acknowledged `ACCEPTED` and `IN_PROGRESS` transitions before completion; each attempt-aware report atomically updates attempt, assignment, transfer status, and progress in one replicated transition; lease automation and specialized assignment actions remain incomplete |
 | Automatic route trigger evaluation | Planned | Route configuration and lifecycle state exist; no trigger service is wired into controller startup |
 | Agent-to-agent file streaming | Planned | No protocol or endpoints are defined in the active runtime |
-| Automatic job fencing and idempotent destination publication | Planned | Required before automatic failover/reassignment can claim duplicate-safe behavior |
+| Transfer-attempt evidence and fencing | Partial | Immutable attempts, atomic assignment/first-attempt creation, atomic multi-entity reporting, attempt-aware agent polling/reporting, ordering, leases, active fences, snapshots, and tenant-checked REST reads are implemented; automatic expiry/reassignment, lease renewal over the agent API, and destination enforcement remain incomplete |
 | Authentication and authorization foundation | Partial | Mutual TLS, trusted gateway assertions, direct certificate bindings, stable policy decisions, effective-identity APIs, and hash-chained decision and HTTP completion audit are implemented; rotation automation and complete enterprise evidence services remain open |
 | Dynamic controller membership | Planned | Live 3-to-5 or 5-to-3 membership changes are unsupported |
 | PostgreSQL, Redis, or etcd controller state | Planned | These systems are not part of the canonical architecture |
@@ -154,6 +154,7 @@ PostgreSQL, Redis, etcd, metrics stores, log stores, and dashboards MUST NOT be 
 | State | Authority | Durability | Consistency | Notes |
 |---|---|---|---|---|
 | Transfer jobs | Raft | Log and snapshot | Strong for committed writes | Does not include file bytes |
+| Transfer attempts and active fencing generations | Raft | Log and snapshot | Strong for committed writes | Immutable ordered attempt history is authoritative; assignment creates the first attempt atomically, the agent protocol carries attempt and fence context, and lifecycle reports atomically update attempt, assignment, transfer status, and progress |
 | Job assignments | Raft | Log and snapshot | Strong for committed writes | State transitions MUST be validated during command application |
 | Job queue | Raft | Log and snapshot | Strong for committed writes | In-memory service caches are non-authoritative |
 | Agent registrations | Raft | Log and snapshot | Strong for committed writes | Tenant and capabilities are durable metadata |
@@ -221,7 +222,7 @@ stateDiagram-v2
 
 The executing agent MUST receive acknowledgement of `ACCEPTED`, then acknowledgement of `IN_PROGRESS`, before it performs an externally visible destination commit. `COMPLETED` is valid only from `IN_PROGRESS`.
 
-The current production agent reports `ACCEPTED` and then `COMPLETED` without reporting `IN_PROGRESS`. This is a release-blocking conformance gap.
+The production agent obtains acknowledged `ACCEPTED` and `IN_PROGRESS` reports before executing the completion path. External protocol tests verify this ordering and the controller rejects invalid expected state, stale fencing generations, and stale or gapped report sequences. The controller validates and applies each attempt-aware report atomically across attempt, assignment, transfer status, and progress in one replicated lifecycle transition; a rejected transition leaves all four views unchanged.
 
 ### 6.2 Delivery semantics
 
@@ -237,7 +238,7 @@ The production target is **at-least-once execution with idempotent publication**
 - completion reporting is idempotent for the same job and attempt;
 - reconciliation decides the outcome when the destination commit succeeds but the completion acknowledgement is lost.
 
-The `attemptId`, lease, and fencing generation are not present in the complete current runtime path. Automatic reassignment MUST remain conservative until they are implemented.
+The controller persists immutable attempt history, lease expiry, report ordering, and monotonically increasing fencing generations through Raft and snapshots. Assignment and first-attempt creation are atomic; polling carries the attempt identity, lease, fence, and last report sequence; status reporting requires expected state, fence, and sequence; attempt-aware lifecycle reports update attempt, assignment, transfer status, and progress atomically; exact terminal retries return the committed result; and tenant-checked read resources expose the evidence. Fencing is not yet enforced during destination publication. Automatic reassignment MUST therefore remain conservative until expiry, reassignment, publication, and reconciliation are implemented end to end.
 
 ### 6.3 Destination publication
 
@@ -603,6 +604,8 @@ Every event MUST contain event time, observed time, identifiers from Section 12.
 
 The committed controller state remains authoritative. Telemetry events describe and explain that state; they do not replace it.
 
+The current Phase 3 checkpoint implements the canonical `TRANSFER_SUBMITTED`, `TRANSFER_ASSIGNED`, `TRANSFER_ACCEPTED`, `TRANSFER_STARTED`, and `TRANSFER_PROGRESS` prefix of this timeline. These events are derived inside the replicated command application that mutates authoritative state, use deterministic per-transfer sequences, carry attempt and agent correlation where applicable, and survive controller snapshot reset and restore. The remaining vocabulary and durable replay/retention services are not yet implemented.
+
 ### 12.4 Progress, throughput, ETA, and deadline risk
 
 An active transfer MUST report progress at a configurable cadence appropriate to its criticality and expected duration. Progress MUST include:
@@ -617,6 +620,8 @@ An active transfer MUST report progress at a configurable cadence appropriate to
 - retry count and current attempt number.
 
 Progress values MUST be monotonic within an attempt. A heartbeat from an agent does not count as transfer progress. A transfer is stalled when bytes, records, or another protocol-specific progress unit has not advanced within its configured stall threshold.
+
+The current progress resource externally verifies the configured active-transfer stall boundary and exposes the stable time at which the threshold was crossed plus the elapsed stalled duration. Durable detection, event emission, alerting, and acknowledgement remain required work; reading the progress resource does not itself mutate authoritative state or manufacture an event.
 
 ETA calculation SHOULD use recent observed throughput and SHOULD avoid presenting a precise estimate until enough samples exist. Deadline-risk evaluation MUST distinguish:
 
@@ -698,10 +703,10 @@ These are acceptance gates, not claims about the current alpha. A gate must have
 | Stall detection | 100% of injected transfer stalls raise an operational event and alert within `stall threshold + one alert evaluation interval` | Not implemented |
 | Deadline monitoring | 100% of configured deadline breaches alert no later than one alert evaluation interval after breach; predictive risk alerts are measured separately | Not implemented |
 | Terminal-state visibility | 99.9% of committed terminal states appear in the operations view within one configured telemetry publication interval | Not yet evidenced |
-| Timeline correlation | 100% of retries and failovers retain one `jobId` and distinct `attemptId` values across events, logs, and traces | Blocked by missing attempt model |
+| Timeline correlation | 100% of retries and failovers retain one `jobId` and distinct `attemptId` values across events, logs, and traces | Authoritative attempt identity exists; end-to-end event, log, and trace propagation is not yet implemented |
 | Single-controller durability | Zero committed control-state loss across 100 controller container recreation tests using the documented volume | Not yet evidenced |
 | Leader failover | Write service resumes within `2 × configured election timeout + client retry interval` in 99% of 100 induced leader failures | Not yet evidenced |
-| Duplicate-safe publication | Zero duplicate final publications across 1,000 induced agent/controller failure windows | Blocked by missing lease/fencing protocol |
+| Duplicate-safe publication | Zero duplicate final publications across 1,000 induced agent/controller failure windows | Blocked by incomplete agent lease/fencing and destination-publication enforcement |
 | Tenant isolation | 100% of cross-tenant registration, assignment, polling, status, route, and transfer mutation tests are rejected | Partial |
 | Authentication boundary | 100% of protected API and agent requests without valid identity are rejected | Blocked by external/built-in authentication integration |
 | Encrypted trust flows | 100% of production gateway, controller, Raft, agent, service, secret-manager, and telemetry connections satisfy their configured encryption and peer-verification policy | Not implemented end to end |
@@ -730,8 +735,7 @@ Capacity figures such as requests per second, heartbeats per second, concurrent 
 
 | ID | Priority | Gap | Release consequence |
 |---|---|---|---|
-| ARCH-01 | Critical | Agent omits `IN_PROGRESS` before reporting `COMPLETED` | Blocks distributed success lifecycle |
-| ARCH-02 | Critical | No attempt lease or fencing generation | Blocks duplicate-safe automatic reassignment |
+| ARCH-02 | Critical | Attempt leases, fencing, and atomic multi-entity lifecycle application exist, but automatic expiry/reassignment, destination enforcement, and reconciliation are incomplete | Blocks duplicate-safe automatic reassignment and publication |
 | ARCH-03 | Critical | No authenticated API/agent identity boundary | Blocks untrusted or production multi-tenant exposure |
 | ARCH-11 | Critical | No complete per-transfer operational event, progress, deadline, stall, and alerting model | Blocks use for critical, highly time-sensitive production transfers |
 | ARCH-13 | Critical | Controller HTTP, Raft, and agent control connections lack a complete production TLS/mTLS identity boundary | Blocks secure enterprise deployment |

@@ -18,6 +18,7 @@ package dev.mars.quorus.controller.http.handlers;
 
 import dev.mars.quorus.controller.http.ErrorCode;
 import dev.mars.quorus.controller.http.QuorusApiException;
+import dev.mars.quorus.controller.config.AppConfig;
 import dev.mars.quorus.controller.raft.RaftNode;
 import dev.mars.quorus.controller.security.SecurityContext;
 import dev.mars.quorus.controller.security.SecurityIdentity;
@@ -34,6 +35,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * HTTP handler for job assignment operations.
@@ -97,7 +99,10 @@ public class JobAssignmentHandler {
                 }
                 logger.info("Assigning job: jobId={}, agentId={}",
                         assignment.getJobId(), assignment.getAgentId());
-                JobAssignmentCommand command = JobAssignmentCommand.assign(assignment);
+                String attemptId = UUID.randomUUID().toString();
+                JobAssignmentCommand.Assign command = JobAssignmentCommand.assignWithAttempt(
+                        assignment, attemptId, assignment.getAssignedAt()
+                                .plusMillis(AppConfig.get().getAttemptLeaseDurationMs()));
 
                 raftNode.submitCommand(command)
                         .onSuccess(result -> {
@@ -112,7 +117,8 @@ public class JobAssignmentHandler {
                                 ctx.response().setStatusCode(201);
                                 ctx.json(new JsonObject()
                                         .put("success", true)
-                                        .put("assignmentId", command.assignmentId()));
+                                        .put("assignmentId", command.assignmentId())
+                                        .put("attemptId", command.attemptId()));
                             }
                         })
                         .onFailure(ctx::fail);

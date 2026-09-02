@@ -47,6 +47,10 @@ final class JobAssignmentCodec {
             case JobAssignmentCommand.Assign c -> {
                 builder.setType(JobAssignmentCommandType.JOB_ASSIGNMENT_CMD_ASSIGN);
                 builder.setJobAssignment(toProto(c.jobAssignment()));
+                if (c.attemptId() != null) builder.setAttemptId(c.attemptId());
+                if (c.leaseExpiresAt() != null) {
+                    builder.setLeaseExpiresAtEpochMs(c.leaseExpiresAt().toEpochMilli());
+                }
             }
             case JobAssignmentCommand.Accept c -> {
                 builder.setType(JobAssignmentCommandType.JOB_ASSIGNMENT_CMD_ACCEPT);
@@ -89,8 +93,13 @@ final class JobAssignmentCodec {
         String reason = proto.getReason().isEmpty() ? null : proto.getReason();
 
         return switch (proto.getType()) {
-            case JOB_ASSIGNMENT_CMD_ASSIGN ->
-                new JobAssignmentCommand.Assign(assignmentId, fromProto(proto.getJobAssignment()), timestamp);
+            case JOB_ASSIGNMENT_CMD_ASSIGN -> {
+                String attemptId = proto.getAttemptId().isEmpty() ? null : proto.getAttemptId();
+                Instant leaseExpiresAt = proto.getLeaseExpiresAtEpochMs() > 0
+                        ? Instant.ofEpochMilli(proto.getLeaseExpiresAtEpochMs()) : null;
+                yield new JobAssignmentCommand.Assign(assignmentId, fromProto(proto.getJobAssignment()),
+                        attemptId, leaseExpiresAt, timestamp);
+            }
             case JOB_ASSIGNMENT_CMD_ACCEPT ->
                 new JobAssignmentCommand.Accept(assignmentId, newStatus, timestamp);
             case JOB_ASSIGNMENT_CMD_REJECT ->

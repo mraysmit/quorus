@@ -2,11 +2,11 @@
 
 # Quorus Enterprise Implementation Plan
 
-**Version:** 1.5  
-**Date:** 2026-09-01  
+**Version:** 1.14  
+**Date:** 2026-09-02  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
-**Status:** Active — M0 and Phase 1 code-side work complete; initial process-deviation approval open and all subsequent work subject to the mandatory TDD gate  
+**Status:** Active — M0 and Phase 1 complete; Phases 2 and 3 are in progress under the mandatory TDD gate  
 **Scope:** Enterprise control plane, transfer operations, security, governance, deployment, and user interfaces
 
 ## 1. Purpose and Authority
@@ -55,13 +55,13 @@ The current baseline provides:
 - health, Raft status, aggregate metrics, and selected OpenTelemetry instrumentation;
 - tenant models, quota services, route models, and supporting examples.
 
-The baseline does not yet justify protected enterprise production use. The critical blockers include unauthenticated identities, incomplete TLS/mTLS boundaries, incomplete assignment lifecycle, no attempt fencing, incomplete transfer operations telemetry, uncontrolled service connectivity, incomplete agent trust lifecycle, and incomplete REST coverage.
+The baseline does not yet justify protected enterprise production use. Phase 1 established the authenticated identity and TLS/mTLS foundation, and the completed Phase 2 slices established authoritative attempt fencing and atomic report application. Critical blockers still include certificate lifecycle automation, automatic lease expiry and safe reassignment, destination-side fencing and reconciliation, incomplete transfer operations telemetry, uncontrolled service connectivity, incomplete agent trust lifecycle, and incomplete REST coverage.
 
 ## 4. Target Release Milestones
 
 | Milestone | Completed phases | Release meaning |
 |---|---|---|
-| **M0 — Reproducible Alpha Baseline** | Phase 0 — **functional baseline; code-side remediation complete; deviation approval open** | Clean, repeatable functional baseline with corrected lifecycle and durability defects. The existing [Phase 0 release manifest](../evidence/phase0-release-evidence.json) proves green verification, not test-first sequencing. The [TDD assessment and remediation record](../evidence/tdd-remediation-2026-09-01.json) records the retrospective characterization; formal closure still requires approval of the process deviation. |
+| **M0 — Reproducible Alpha Baseline** | Phase 0 — **complete** | Clean, repeatable functional baseline with corrected lifecycle and durability defects. The existing [Phase 0 release manifest](../evidence/phase0-release-evidence.json) proves green verification, not test-first sequencing. The [TDD assessment and remediation record](../evidence/tdd-remediation-2026-09-01.json) retains the retrospective characterization and the approved historical process deviation. |
 | **M1 — Secure Transfer Core** | Phases 1–2 | Authenticated control plane and explainable, fenced transfer attempts |
 | **M2 — Operational Beta** | Phases 3–5 | Critical transfers are observable; services and agents have governed trust lifecycles |
 | **M3 — Enterprise Control Plane** | Phases 6–8 | Complete API, automated route/workflow operation, and evidenced recovery behavior |
@@ -151,7 +151,7 @@ Existing implementation for which no preserved red stage exists can only receive
 
 **Size:** L  
 **Milestone:** M0  
-**Status:** Functional verification complete at commit `07195f6eaf33599d39aa0759cbe1d628b8a288d2`; code-side TDD remediation complete; process-deviation approval open  
+**Status:** Complete — functional verification and code-side TDD remediation passed; historical process deviation approved on 2026-09-02  
 **Primary gaps:** `ARCH-01`, `ARCH-05`, `ARCH-06`, `ARCH-07`, `API-01`, `API-12`
 
 ### Objective
@@ -192,13 +192,13 @@ Create one reproducible, durable, end-to-end distributed transfer path and the e
 
 ### Exit gate
 
-M0 functional behavior is achieved when the reference transfer path is repeatable, durable, state-machine invariant tests pass, and the current API is machine-described. Vert.x-native retrospective behavioral coverage and the characterization record now exist. Formal phase closure still requires approval of the unavoidable process deviation for the original unrecorded red-green sequence. No external untrusted exposure is permitted yet.
+M0 functional behavior is achieved when the reference transfer path is repeatable, durable, state-machine invariant tests pass, and the current API is machine-described. Vert.x-native retrospective behavioral coverage and the characterization record now exist. The unavoidable process deviation for the original unrecorded red-green sequence was approved as a historical risk on 2026-09-02 without relabelling the work as TDD-compliant. No external untrusted exposure is permitted at the M0 boundary.
 
 ## 8. Phase 1 — Enterprise Identity, Authorization, and Transport Trust
 
 **Size:** XL  
 **Milestone:** contributes to M1  
-**Status:** Code-side complete — technical exit evidence passed; approval of the initial historical TDD process deviation remains open  
+**Status:** Complete — repository implementation and technical exit gate passed; historical TDD process deviation approved on 2026-09-02  
 **Primary gaps:** `ARCH-03`, `ARCH-08`, `ARCH-13`, `API-02`
 
 ### Objective
@@ -207,7 +207,7 @@ Establish authenticated and encrypted trust boundaries for human callers, servic
 
 ### Implementation checkpoint — 2026-09-01
 
-> **TDD compliance notice:** The initial security foundation was implemented before a preserved failing external-path test suite existed. Its retrospective tests cannot be relabelled as historical TDD evidence. Every subsequent Phase 1 behavior-changing slice followed Section 6.1 and retained its red and green evidence. Formal acceptance of the initial process deviation remains an approval item, not a code defect that can be rewritten after the event.
+> **TDD compliance notice:** The initial security foundation was implemented before a preserved failing external-path test suite existed. Its retrospective tests cannot be relabelled as historical TDD evidence. Every subsequent Phase 1 behavior-changing slice followed Section 6.1 and retained its red and green evidence. The initial process deviation was approved as a historical risk on 2026-09-02; that approval closes the governance item but does not rewrite the implementation history.
 
 Implemented in the current Phase 1 workstream:
 
@@ -231,7 +231,7 @@ Implemented in the current Phase 1 workstream:
 
 External validation and governance items retained after the code-side Phase 1 gate:
 
-- architecture, quality-engineering, and security-engineering approval of the initial Phase 0/Phase 1 TDD process deviation;
+- the initial Phase 0/Phase 1 TDD process deviation was approved by project authority on 2026-09-02 and remains recorded in the evidence rather than being relabelled as compliant history;
 - deployment-specific validation with the selected corporate PKI, enterprise gateway, secrets platform, controller topology, agent estate, and evidence collector, scheduled for the enterprise validation phase;
 - enterprise searchable audit service, WORM retention, SIEM integration, and signed export, which remain Phase 9 capabilities rather than claims about the local Phase 1 evidence files.
 
@@ -244,6 +244,16 @@ Checkpoint verification on 2026-09-01:
 - the retained audit-evidence slice first failed on modified-chain acceptance and missing dual-sink behavior, then passed all 3 focused audit-chain tests after startup verification and retained-evidence fan-out were implemented;
 - the expanded Phase 1 security and contract run passed 22 tests: 17 controller tests and 5 agent tests, with zero failures or errors;
 - definitive `mvn -o clean verify`: 2,237 tests passed with zero failures, errors, or skips across all seven reactor modules (core 1,491; workflow 134; tenant 64; controller 462; agent 86; integration examples 0).
+
+Coverage-gate remediation completed on 2026-09-02:
+
+- controller Surefire now preserves the JaCoCo agent argument while adding the required Java modules; the prior configuration silently replaced the agent argument and therefore produced no controller execution data;
+- the existing 60% line-coverage minimum remains unchanged and applies to every authored controller package;
+- only protoc-generated Java and gRPC bindings are excluded from coverage accounting, while live gRPC transport tests continue to exercise that boundary;
+- retrospective Vert.x behavioral coverage now exercises controller deployment, packaged configuration, telemetry bootstrap, assignment lifecycle through Raft, file storage, and RocksDB storage; these tests characterize existing production behavior and are not presented as historical TDD evidence;
+- the authoritative five-module clean verification passed 2,163 tests with zero failures, errors, or skips (core 1,491; workflow 134; tenant 64; controller 474);
+- JaCoCo analyzed 143 authored controller classes and reported 79.0% line coverage and 60.2% branch coverage; the lowest authored package is 60.1%, above the unchanged 60.0% package gate;
+- two existing asynchronous tests exposed instrumented-suite timing assumptions; their assertions and production behavior were retained while their setup/convergence deadlines were aligned to the established 15-second integration-test window, followed by a 17-test focused green run and the clean reactor pass.
 
 Completed retrospective remediation for the implemented checkpoint:
 
@@ -258,7 +268,7 @@ Completed retrospective remediation for the implemented checkpoint:
 - shared test-only TLS material, packaged-resource-safe fixture loading, and Vert.x-native asynchronous test utilities available to controller and agent modules;
 - protocol-level FTP and FTPS readiness detection proven by a retained red-green regression slice rather than Docker health-state timing.
 
-The remaining governance action is approval or explicit rejection of the Phase 0 and initial Phase 1 process deviation recorded in the TDD assessment. Authorization explanation, live decision and completion audit, agent hostname mismatch, plaintext-production rejection, HTTP/Raft/agent certificate overlap, active-connection revocation, and retained audit integrity now have executable regression evidence. This closes the Phase 1 technical gate but does not convert the initial retrospective checkpoint into TDD-compliant history.
+The Phase 0 and initial Phase 1 process deviation recorded in the TDD assessment was approved as a historical risk on 2026-09-02. Authorization explanation, live decision and completion audit, agent hostname mismatch, plaintext-production rejection, HTTP/Raft/agent certificate overlap, active-connection revocation, and retained audit integrity have executable regression evidence. Phase 1 is complete, but the approved deviation does not convert the initial retrospective checkpoint into TDD-compliant history.
 
 ### Scope
 
@@ -297,17 +307,43 @@ The remaining governance action is approval or explicit rejection of the Phase 0
 
 Every production trust-boundary connection is authenticated, encrypted, peer-verified, authorized, and audited. Tenant identity is no longer derived solely from request content.
 
-**Gate result — 2026-09-01:** Passed for the repository implementation and representative live-boundary fixtures. Corporate-environment accreditation and the recorded historical process-deviation approval remain external governance evidence and do not expand this result into a production-readiness claim.
+**Gate result — 2026-09-02:** Complete for the repository implementation and representative live-boundary fixtures. The historical process deviation is approved and retained in the evidence. Corporate-environment accreditation remains deferred to Phase 12, so this result is not a production-readiness claim.
 
 ## 9. Phase 2 — Transfer Attempts, Fencing, Integrity, and Reconciliation
 
 **Size:** XL  
 **Milestone:** M1  
-**Primary gaps:** `ARCH-01`, `ARCH-02`, `ARCH-05`, `ARCH-06`, `ARCH-17`, `API-03`, `API-07`, `API-12`
+**Primary gaps:** `ARCH-02`, `ARCH-05`, `ARCH-06`, `ARCH-17`, `API-03`, `API-07`, `API-12`
+**Status:** In progress — authoritative attempts, atomic assignment, the fenced agent poll/report protocol, and atomic multi-entity lifecycle reporting implemented on 2026-09-02; lease automation, integrity, publication, idempotent submission, retry policy, and reconciliation remain open  
 
 ### Objective
 
 Make distributed transfer outcomes explainable and safe under retries, failover, delayed agents, lost acknowledgements, and uncertain publication.
+
+### Implementation checkpoint — 2026-09-02
+
+Four Phase 2 vertical slices were delivered with retained red-green evidence before production implementation:
+
+- immutable attempt identity, attempt number, agent, tenant, lease, fencing generation, report sequence, lifecycle state, progress, outcome, and timestamps;
+- authoritative offer, ordered report, exact-retry, lease-renewal, and replacement-fencing commands in replicated state;
+- stale-fence, stale-sequence, sequence-gap, invalid-transition, progress-regression, tenant-mismatch, and invalid-outcome rejection;
+- terminal-report retry after a lost response, without reopening the released active fence;
+- immutable attempt history and active-fence recovery in state snapshots;
+- version 2 protobuf command and snapshot contracts while retaining readers for legacy version 0 and version 1 data;
+- exhaustive sealed-command dispatch and protobuf round-trip coverage;
+- tenant-checked `GET /api/v1/transfers/{jobId}/attempts` and `GET /api/v1/transfers/{jobId}/attempts/{attemptId}` read resources, governed by `transfers:read` and synchronized with OpenAPI and endpoint discovery.
+- atomic creation of an assignment and its first authoritative attempt in one replicated command, including a configured initial lease and deterministic attempt identity in the command payload;
+- agent polling responses that carry `attemptId`, `fencingGeneration`, `leaseExpiresAt`, and the last accepted report sequence;
+- agent status reports that require `attemptId`, `expectedState`, `fencingGeneration`, and a monotonically increasing `reportSequence`;
+- agent execution that obtains acknowledged `ACCEPTED` and `IN_PROGRESS` transitions before reporting `COMPLETED` or `FAILED`;
+- rejection of missing expected state, stale fencing generations, stale or gapped report sequences, invalid transitions, and reports or renewals after lease expiry;
+- conflict translation through the live HTTP boundary and OpenAPI synchronization for the implemented assignment and agent protocol.
+- atomic application of each attempt-aware lifecycle report across attempt, assignment, transfer status, and transfer progress in one replicated command, with all validation completed before any state is mutated;
+- exact retry of a terminal report through the live HTTP boundary after a lost response, returning the committed success without advancing the sequence or reopening the active fence.
+
+This checkpoint does not close Phase 2. Automatic lease expiry and reassignment, lease renewal through the external agent protocol, mutation coverage for the specialized assignment actions, submission idempotency, retry classification, integrity verification, staged publication, reconciliation, protocol capability enforcement, and migration tooling remain required by the exit gate.
+
+Evidence is recorded in [Phase 2 TDD evidence](../evidence/phase2-tdd-evidence-2026-09-02.json). The pre-slice clean seven-module verification passed 2,257 tests with no failures. Clean affected-module verification after the delivered slices passed 490 controller tests and 87 agent tests with all JaCoCo checks met; four supplemental core model tests also passed. The next full clean gate must include at least 2,270 tests, subject to intentional test-suite changes.
 
 ### Scope
 
@@ -353,10 +389,25 @@ Quorus can safely explain what ran, where it ran, which attempt is authoritative
 **Size:** XL  
 **Milestone:** contributes to M2  
 **Primary gaps:** `ARCH-11`, `ARCH-12`, `API-03`, `API-04`
+**Status:** In progress — started on 2026-09-02 by explicit direction while the remaining Phase 2 lease automation, publication, integrity, retry-policy, and reconciliation work stays open; Phase 3 work MUST NOT claim or depend on those unfinished guarantees  
 
 ### Objective
 
 Give technology operations teams a current, end-to-end operational view of every critical and time-sensitive transfer.
+
+### Implementation checkpoint — 2026-09-02
+
+The initial vertical slices were delivered test-first through the real controller HTTP boundary and are recorded in the [Phase 3 TDD evidence manifest](../evidence/phase3-tdd-evidence-2026-09-02.json). The first retained red test proved that submission rejected required operational context before implementation (`temp/phase3-progress-http-red-final.txt`); the green path now commits business service, owner, criticality, environment, processing date, expected start, required completion, and runbook context through Raft and exposes tenant-checked `GET /api/v1/transfers/{jobId}/progress` with source-size semantics, percent complete, active attempt and agent, retry count, deadline state, and qualified rate/ETA output (`temp/phase3-progress-http-green.txt`). The second red/green cycle proved and corrected the false use of generic lifecycle update time as progress telemetry, so a transfer with no increasing-byte report is now explicitly `UNKNOWN` and has no invented last-progress time (`temp/phase3-missing-telemetry-red-final.txt`, `temp/phase3-missing-telemetry-green.txt`). The third cycle replaced fixed freshness/stall constants with validated controller policy, used that policy to classify stale telemetry, and discloses the effective windows and source to operators (`temp/phase3-progress-policy-red.txt`, `temp/phase3-progress-policy-green.txt`). The first-slice focused cross-module regression passed 50 core tests and 84 controller tests (`temp/phase3-progress-regression.txt`). The earlier clean checkpoint passed all 493 tests and all JaCoCo gates with 79.3% line and 59.6% branch coverage (`temp/phase3-controller-clean-verify-final.txt`).
+
+The fourth cycle added the first deterministic, tenant-checked `TRANSFER_SUBMITTED` event through `GET /api/v1/transfers/{jobId}/events`, with the ledger included in controller snapshots (`temp/phase3-event-ledger-red.txt`, `temp/phase3-event-ledger-green.txt`; 32 focused tests passed). The fifth cycle added `TRANSFER_ASSIGNED` with attempt and agent identity and proved ordered event recovery across a real snapshot reset/restore boundary. Its first red exposed and corrected an unintended serialized helper property before the retained behavioral red demonstrated the missing assignment event (`temp/phase3-event-offer-restore-red.txt`, `temp/phase3-event-offer-red-final.txt`, `temp/phase3-event-offer-restore-green.txt`). A separate red/green vocabulary cycle aligned the event name with the project’s established canonical standard (`temp/phase3-event-vocabulary-red.txt`, `temp/phase3-event-vocabulary-green.txt`). The sixth cycle added atomic `TRANSFER_ACCEPTED`, `TRANSFER_STARTED`, and `TRANSFER_PROGRESS` events, including authoritative attempt, agent, byte, total-size, and report-sequence context (`temp/phase3-lifecycle-events-red.txt`, `temp/phase3-lifecycle-events-green.txt`; 34 focused tests passed).
+
+The final clean controller retry passed 495 tests with no failures, errors, or skips; JaCoCo reported 79.5% line and 59.7% branch coverage and all configured gates passed (`temp/phase3-controller-clean-verify-events-retry.txt`). The immediately preceding clean attempt reached 489 tests before the three-node `LeaderGuardHandlerTest` fixture exceeded its 15-second startup wait; the same fixture passed on the clean retry, so the non-reproducing timeout is retained rather than hidden (`temp/phase3-controller-clean-verify-events.txt`).
+
+The seventh red/green cycle proved the configured active-transfer stall boundary through the tenant-checked progress API. A stalled transfer now exposes a stable `conditionSince` derived from its last real byte advancement plus the governed stall window, together with `stallDurationSeconds` for operator triage (`temp/phase3-active-stall-red.txt`, `temp/phase3-active-stall-green.txt`; 7 focused tests passed).
+
+The clean controller gate after the stall slice passed all 496 tests with no failures, errors, or skips. JaCoCo reported 79.8% line and 60.2% branch coverage, and every configured coverage check passed (`temp/phase3-controller-clean-verify-stall.txt`).
+
+This checkpoint does not close Phase 3. The remaining lifecycle event vocabulary, durable stall detection/event emission, throughput windows, calibrated ETA confidence, configurable deadline-risk prediction, operational query collections, timelines, resumable streaming, alerts, retention, archival, and service-level reporting remain open.
 
 ### Scope
 

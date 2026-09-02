@@ -138,6 +138,10 @@ class JobPollingServiceTest {
                 .put("assignmentId", "assign-001")
                 .put("jobId", "job-001")
                 .put("agentId", "test-agent-poll")
+                .put("attemptId", "attempt-001")
+                .put("fencingGeneration", 7L)
+                .put("leaseExpiresAt", "2026-09-02T04:00:00Z")
+                .put("lastReportSequence", 3L)
                 .put("sourceUri", "https://example.com/file.txt")
                 .put("destinationPath", "/data/file.txt")
                 .put("totalBytes", 1024L)
@@ -156,6 +160,10 @@ class JobPollingServiceTest {
                     assertEquals("assign-001", job.getAssignmentId());
                     assertEquals("job-001", job.getJobId());
                     assertEquals("test-agent-poll", job.getAgentId());
+                    assertEquals("attempt-001", job.getAttemptId());
+                    assertEquals(7L, job.getFencingGeneration());
+                    assertEquals("2026-09-02T04:00:00Z", job.getLeaseExpiresAt().toString());
+                    assertEquals(4L, job.nextReportSequence());
                     assertEquals("https://example.com/file.txt", job.getSourceUri());
                     assertEquals("/data/file.txt", job.getDestinationPath());
                     assertEquals(1024L, job.getTotalBytes());

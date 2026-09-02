@@ -75,6 +75,33 @@ enum JobAssignmentStatusProto {
   JOB_ASSIGNMENT_STATUS_CANCELLED = 8;
 }
 
+enum TransferAttemptStatusProto {
+  TRANSFER_ATTEMPT_STATUS_UNSPECIFIED = 0;
+  TRANSFER_ATTEMPT_STATUS_OFFERED = 1;
+  TRANSFER_ATTEMPT_STATUS_ACCEPTED = 2;
+  TRANSFER_ATTEMPT_STATUS_IN_PROGRESS = 3;
+  TRANSFER_ATTEMPT_STATUS_COMPLETED = 4;
+  TRANSFER_ATTEMPT_STATUS_FAILED = 5;
+  TRANSFER_ATTEMPT_STATUS_REJECTED = 6;
+  TRANSFER_ATTEMPT_STATUS_CANCELLED = 7;
+  TRANSFER_ATTEMPT_STATUS_EXPIRED = 8;
+  TRANSFER_ATTEMPT_STATUS_FENCED = 9;
+  TRANSFER_ATTEMPT_STATUS_RECONCILIATION_REQUIRED = 10;
+}
+
+enum TransferAttemptOutcomeProto {
+  TRANSFER_ATTEMPT_OUTCOME_UNSPECIFIED = 0;
+  TRANSFER_ATTEMPT_OUTCOME_NONE = 1;
+  TRANSFER_ATTEMPT_OUTCOME_SUCCEEDED = 2;
+  TRANSFER_ATTEMPT_OUTCOME_RETRYABLE_FAILURE = 3;
+  TRANSFER_ATTEMPT_OUTCOME_TERMINAL_FAILURE = 4;
+  TRANSFER_ATTEMPT_OUTCOME_REJECTED = 5;
+  TRANSFER_ATTEMPT_OUTCOME_CANCELLED = 6;
+  TRANSFER_ATTEMPT_OUTCOME_LEASE_EXPIRED = 7;
+  TRANSFER_ATTEMPT_OUTCOME_SUPERSEDED = 8;
+  TRANSFER_ATTEMPT_OUTCOME_RECONCILIATION_REQUIRED = 9;
+}
+
 enum SelectionStrategyProto {
   SELECTION_STRATEGY_UNSPECIFIED = 0;
   SELECTION_STRATEGY_ROUND_ROBIN = 1;
@@ -119,6 +146,14 @@ enum JobAssignmentCommandType {
   JOB_ASSIGNMENT_CMD_TIMEOUT = 5;
   JOB_ASSIGNMENT_CMD_CANCEL = 6;
   JOB_ASSIGNMENT_CMD_REMOVE = 7;
+}
+
+enum TransferAttemptCommandType {
+  TRANSFER_ATTEMPT_CMD_UNSPECIFIED = 0;
+  TRANSFER_ATTEMPT_CMD_OFFER = 1;
+  TRANSFER_ATTEMPT_CMD_REPORT = 2;
+  TRANSFER_ATTEMPT_CMD_RENEW_LEASE = 3;
+  TRANSFER_ATTEMPT_CMD_LIFECYCLE_REPORT = 4;
 }
 
 enum JobQueueCommandType {
@@ -287,6 +322,24 @@ message JobAssignmentProto {
   string tenant_id = 12;
 }
 
+message TransferAttemptProto {
+  string attempt_id = 1;
+  string job_id = 2;
+  string agent_id = 3;
+  string tenant_id = 4;
+  int32 attempt_number = 5;
+  int64 fencing_generation = 6;
+  int64 lease_expires_at_epoch_ms = 7;
+  TransferAttemptStatusProto status = 8;
+  TransferAttemptOutcomeProto outcome = 9;
+  int64 last_report_sequence = 10;
+  int64 bytes_transferred = 11;
+  string outcome_reason = 12;
+  int64 created_at_epoch_ms = 13;
+  int64 updated_at_epoch_ms = 14;
+  int64 completed_at_epoch_ms = 15;
+}
+
 // ===== STATE MACHINE COMMAND MESSAGES =====
 
 message TriggerConfigurationProto {
@@ -361,6 +414,31 @@ message JobAssignmentCommandProto {
   string reason = 5;
   int64 timestamp_epoch_ms = 6;
   JobAssignmentStatusProto expected_status = 7;  // CAS: expected current status (must match for command to apply)
+  string attempt_id = 8;                         // Optional atomic first-attempt identity
+  int64 lease_expires_at_epoch_ms = 9;           // Required when attempt_id is present
+}
+
+message TransferAttemptCommandProto {
+  TransferAttemptCommandType type = 1;
+  string attempt_id = 2;
+  TransferAttemptProto attempt = 3;
+  string expected_active_attempt_id = 4;
+  int64 fencing_generation = 5;
+  int64 report_sequence = 6;
+  TransferAttemptStatusProto expected_status = 7;
+  TransferAttemptStatusProto new_status = 8;
+  int64 bytes_transferred = 9;
+  TransferAttemptOutcomeProto outcome = 10;
+  string reason = 11;
+  int64 lease_expires_at_epoch_ms = 12;
+  int64 timestamp_epoch_ms = 13;
+  string assignment_id = 14;
+  JobAssignmentStatusProto expected_assignment_status = 15;
+  JobAssignmentStatusProto new_assignment_status = 16;
+  string job_id = 17;
+  bool has_transfer_status = 18;
+  TransferStatusProto expected_transfer_status = 19;
+  TransferStatusProto new_transfer_status = 20;
 }
 
 message JobQueueCommandProto {
@@ -394,6 +472,7 @@ message RaftCommandMessage {
     JobAssignmentCommandProto job_assignment_command = 4;
     JobQueueCommandProto job_queue_command = 5;
     RouteCommandProto route_command = 6;
+    TransferAttemptCommandProto transfer_attempt_command = 7;
   }
   uint32 schema_version = 100;
 }

@@ -47,6 +47,8 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class RaftFailureTest {
 
+    private static final Duration CLUSTER_CONVERGENCE_TIMEOUT = Duration.ofSeconds(15);
+
     private RaftNode node1;
     private RaftNode node2;
     private RaftNode node3;
@@ -173,7 +175,7 @@ class RaftFailureTest {
         
         // Wait for initial leader
         Awaitility.await()
-                .atMost(Duration.ofSeconds(3))
+                .atMost(CLUSTER_CONVERGENCE_TIMEOUT)
                 .until(() -> Set.of(node1, node2, node3).stream()
                         .anyMatch(RaftNode::isLeader));
         
@@ -182,7 +184,7 @@ class RaftFailureTest {
         
         // Remaining nodes should still have a leader (majority)
         Awaitility.await()
-                .atMost(Duration.ofSeconds(3))
+                .atMost(CLUSTER_CONVERGENCE_TIMEOUT)
                 .until(() -> Set.of(node1, node2).stream()
                         .anyMatch(RaftNode::isLeader));
         

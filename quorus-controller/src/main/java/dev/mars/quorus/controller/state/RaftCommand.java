@@ -43,5 +43,5 @@ import java.io.Serializable;
  */
 public sealed interface RaftCommand extends Serializable
         permits TransferJobCommand, AgentCommand, SystemMetadataCommand,
-                JobAssignmentCommand, JobQueueCommand, RouteCommand {
+                JobAssignmentCommand, JobQueueCommand, RouteCommand, TransferAttemptCommand {
 }

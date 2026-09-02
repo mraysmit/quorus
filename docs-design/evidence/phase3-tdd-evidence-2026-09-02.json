@@ -1,0 +1,255 @@
+{
+  "schemaVersion": 1,
+  "phase": 3,
+  "recordedAt": "2026-09-02T14:57:02+08:00",
+  "baseRevision": "d522f900e65f4f5718f2b03641d19a89c89fb0e5",
+  "workingState": "uncommitted implementation patch based on baseRevision",
+  "slices": [
+    {
+      "sliceId": "P3-TRANSFER-PROGRESS-001",
+      "requirements": [
+        "ARCH-11",
+        "ARCH-12",
+        "API-03",
+        "API-04"
+      ],
+      "acceptanceStatement": "An authorized tenant caller can submit critical-transfer operational context, report attempt-aware progress through the real agent HTTP and Raft path, and read a tenant-isolated transfer progress resource that distinguishes lifecycle state from operational condition and exposes source-size, freshness, ownership, deadline, active-attempt, and retry context.",
+      "failureBoundary": "Before implementation, the real transfer-submission boundary must reject the unsupported operational context; after implementation, the same end-to-end path must return committed context and a late REQUIRED_COMPLETION_MISSED condition without bypassing HTTP, tenant authorization, attempt fencing, or Raft.",
+      "testFile": "quorus-controller/src/test/java/dev/mars/quorus/controller/http/TransferProgressHttpIntegrationTest.java",
+      "externalEntryPoints": [
+        "POST /api/v1/agents",
+        "POST /api/v1/transfers",
+        "POST /api/v1/assignments",
+        "GET /api/v1/agents/{agentId}/jobs",
+        "POST /api/v1/jobs/{jobId}/status",
+        "GET /api/v1/transfers/{jobId}/progress"
+      ],
+      "classification": [
+        "external-path behavioral",
+        "integration",
+        "protocol",
+        "contract"
+      ],
+      "red": {
+        "command": "mvn -o -pl quorus-controller -am -Dtest=TransferProgressHttpIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test",
+        "timestamp": "2026-09-02T12:55:17+08:00",
+        "patchIdentity": "base revision plus failing test only",
+        "log": "temp/phase3-progress-http-red-final.txt",
+        "tests": 1,
+        "failures": 1,
+        "errors": 0,
+        "expectedFailure": "POST /api/v1/transfers returned 400 instead of 201 because the operational context was not accepted or persisted.",
+        "outcome": "failed as expected before production implementation"
+      },
+      "green": {
+        "command": "mvn -o -pl quorus-controller -am -Dtest=TransferProgressHttpIntegrationTest,OpenApiContractTest -Dsurefire.failIfNoSpecifiedTests=false test",
+        "timestamp": "2026-09-02T13:00:12+08:00",
+        "patchIdentity": "working implementation patch based on baseRevision",
+        "log": "temp/phase3-progress-http-green.txt",
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "outcome": "passed"
+      },
+      "refactorSummary": [
+        "Kept operational context in the existing transfer metadata model and added a typed snapshot projection so Raft persistence and legacy snapshot construction remain compatible.",
+        "Derived the progress read model from authoritative transfer, assignment, and attempt state instead of creating a second mutable source of truth.",
+        "Registered the resource in the existing HTTP, discovery, authorization, and OpenAPI conventions."
+      ],
+      "regression": {
+        "command": "mvn -o -pl quorus-controller -am -Dtest=TransferJobTest,TransferRequestTest,TransferRequestBidirectionalTest,TransferProgressHttpIntegrationTest,TransferAttemptLifecycleAtomicityIntegrationTest,AgentJobManagementIntegrationTest,QuorusStateStoreTest,ProtobufCommandCodecTest,OpenApiContractTest,HttpApiServerHealthTest -Dsurefire.failIfNoSpecifiedTests=false test",
+        "timestamp": "2026-09-02T13:01:20+08:00",
+        "log": "temp/phase3-progress-regression.txt",
+        "moduleTests": {
+          "quorus-core": 50,
+          "quorus-controller": 84
+        },
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "outcome": "passed"
+      },
+      "cleanVerification": {
+        "command": "mvn -o -pl quorus-controller clean verify",
+        "timestamp": "2026-09-02T13:05:36+08:00",
+        "log": "temp/phase3-controller-clean-verify.txt",
+        "tests": 491,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "lineCoveragePercent": 79.3,
+        "branchCoveragePercent": 59.1,
+        "coverageGates": "passed",
+        "outcome": "passed"
+      },
+      "sensitiveEvidenceCaptured": false,
+      "sensitiveEvidenceStatement": "Evidence contains build output and synthetic tenant, service, transfer, agent, and runbook identifiers only; it contains no credentials, keys, request bodies, or production payloads."
+    },
+    {
+      "sliceId": "P3-TELEMETRY-ABSENCE-002",
+      "requirements": ["ARCH-11", "API-03", "API-04"],
+      "acceptanceStatement": "A submitted transfer with no advancing byte report exposes telemetry as UNKNOWN, does not invent a last-progress time or telemetry age, and does not represent the absence of telemetry as fresh zero-byte progress.",
+      "failureBoundary": "The real tenant-checked progress endpoint must distinguish transfer creation and lifecycle updates from an actual increase in transferred bytes.",
+      "testFile": "quorus-controller/src/test/java/dev/mars/quorus/controller/http/TransferProgressHttpIntegrationTest.java",
+      "externalEntryPoints": ["POST /api/v1/transfers", "GET /api/v1/transfers/{jobId}/progress"],
+      "classification": ["external-path behavioral", "integration", "persistence"],
+      "red": {
+        "command": "mvn -o -pl quorus-controller -am -Dtest=TransferProgressHttpIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test",
+        "timestamp": "2026-09-02T13:10:13+08:00",
+        "patchIdentity": "preceding Phase 3 patch plus failing test only",
+        "log": "temp/phase3-missing-telemetry-red-final.txt",
+        "tests": 2,
+        "failures": 1,
+        "errors": 0,
+        "expectedFailure": "The endpoint returned FRESH because transfer last-update time was incorrectly treated as last-progress time.",
+        "outcome": "failed as expected before production implementation"
+      },
+      "green": {
+        "command": "mvn -o -pl quorus-controller -am -Dtest=TransferProgressHttpIntegrationTest,QuorusStateStoreTest -Dsurefire.failIfNoSpecifiedTests=false test",
+        "timestamp": "2026-09-02T13:11:42+08:00",
+        "log": "temp/phase3-missing-telemetry-green.txt",
+        "tests": 14,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "outcome": "passed"
+      },
+      "refactorSummary": [
+        "Added a backward-compatible lastProgressAt snapshot field distinct from generic lifecycle lastUpdateTime.",
+        "Only an increase in authoritative transferred bytes advances lastProgressAt; status-only and repeated same-byte reports do not hide a stall."
+      ],
+      "sensitiveEvidenceCaptured": false
+    },
+    {
+      "sliceId": "P3-TELEMETRY-POLICY-003",
+      "requirements": ["ARCH-11", "API-04"],
+      "acceptanceStatement": "Controller-governed freshness and stall windows drive the tenant-checked progress condition and the effective windows and policy source are disclosed to an operator caller.",
+      "failureBoundary": "A progress observation ten seconds old is STALE and DEGRADED under a configured five-second freshness window but is not STALLED before the configured fifteen-second stall window.",
+      "testFile": "quorus-controller/src/test/java/dev/mars/quorus/controller/http/TransferProgressPolicyHttpIntegrationTest.java",
+      "externalEntryPoints": ["GET /api/v1/transfers/{jobId}/progress"],
+      "classification": ["external-path behavioral", "integration", "configuration", "contract"],
+      "red": {
+        "command": "mvn -o -pl quorus-controller -am -Dtest=TransferProgressPolicyHttpIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test",
+        "timestamp": "2026-09-02T13:13:50+08:00",
+        "patchIdentity": "preceding Phase 3 patch plus failing test only",
+        "log": "temp/phase3-progress-policy-red.txt",
+        "tests": 1,
+        "failures": 1,
+        "errors": 0,
+        "expectedFailure": "The endpoint returned FRESH because it used a fixed sixty-second implementation constant and did not disclose effective policy.",
+        "outcome": "failed as expected before production implementation"
+      },
+      "green": {
+        "command": "mvn -o -pl quorus-controller -am -Dtest=TransferProgressPolicyHttpIntegrationTest,TransferProgressHttpIntegrationTest,AppConfigNodeIdentityTest,OpenApiContractTest,QuorusStateStoreTest -Dsurefire.failIfNoSpecifiedTests=false test",
+        "timestamp": "2026-09-02T13:15:29+08:00",
+        "log": "temp/phase3-progress-policy-green.txt",
+        "tests": 25,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "outcome": "passed"
+      },
+      "refactorSummary": [
+        "Moved freshness and stall windows into validated controller configuration while retaining established defaults.",
+        "Injected immutable durations into the handler at route construction and exposed their effective values and source in the progress contract."
+      ],
+      "sensitiveEvidenceCaptured": false
+    },
+    {
+      "sliceId": "P3-TRANSFER-EVENTS-004",
+      "requirements": ["ARCH-11", "API-03", "API-04"],
+      "acceptanceStatement": "A tenant caller can submit a transfer and retrieve its first ordered TRANSFER_SUBMITTED event with deterministic identity, sequence, time, tenant, business-service, and state context.",
+      "testFile": "quorus-controller/src/test/java/dev/mars/quorus/controller/http/TransferProgressHttpIntegrationTest.java",
+      "externalEntryPoints": ["POST /api/v1/transfers", "GET /api/v1/transfers/{jobId}/events"],
+      "classification": ["external-path behavioral", "integration", "contract"],
+      "red": {"log": "temp/phase3-event-ledger-red.txt", "timestamp": "2026-09-02T14:11:55+08:00", "tests": 3, "failures": 1, "expectedFailure": "The event resource returned 404 before the route and ledger existed."},
+      "green": {"log": "temp/phase3-event-ledger-green.txt", "timestamp": "2026-09-02T14:15:16+08:00", "tests": 32, "failures": 0, "errors": 0, "outcome": "passed"},
+      "refactorSummary": ["Used command timestamps and per-transfer sequence values so Raft replicas derive identical records.", "Included the ledger in snapshots and exposed it only after tenant verification."],
+      "sensitiveEvidenceCaptured": false
+    },
+    {
+      "sliceId": "P3-TRANSFER-ASSIGNMENT-EVENT-005",
+      "requirements": ["ARCH-11", "API-03", "API-04"],
+      "acceptanceStatement": "A tenant caller can retrieve a canonically named TRANSFER_ASSIGNED event, correlated to the authoritative attempt and agent, immediately after TRANSFER_SUBMITTED, and the ordered ledger remains intact across controller snapshot reset and restore.",
+      "testFile": "quorus-controller/src/test/java/dev/mars/quorus/controller/http/TransferProgressHttpIntegrationTest.java",
+      "externalEntryPoints": ["POST /api/v1/transfers", "POST /api/v1/assignments", "GET /api/v1/transfers/{jobId}/events"],
+      "classification": ["external-path behavioral", "integration", "persistence", "restart", "contract"],
+      "red": [
+        {"log": "temp/phase3-event-offer-restore-red.txt", "timestamp": "2026-09-02T14:22:28+08:00", "tests": 4, "errors": 1, "expectedFailure": "Snapshot restore rejected an unintended Jackson empty property exposed by the operational-context helper."},
+        {"log": "temp/phase3-event-offer-red-final.txt", "timestamp": "2026-09-02T14:25:25+08:00", "tests": 4, "failures": 1, "expectedFailure": "After the restart-boundary defect was corrected, the restored ledger contained only TRANSFER_SUBMITTED and lacked the assignment event."},
+        {"log": "temp/phase3-event-vocabulary-red.txt", "timestamp": "2026-09-02T14:29:56+08:00", "tests": 1, "failures": 1, "expectedFailure": "The event used ATTEMPT_OFFERED rather than the established canonical TRANSFER_ASSIGNED vocabulary."}
+      ],
+      "green": [
+        {"log": "temp/phase3-event-offer-restore-green.txt", "timestamp": "2026-09-02T14:27:42+08:00", "tests": 33, "failures": 0, "errors": 0, "outcome": "passed"},
+        {"log": "temp/phase3-event-vocabulary-green.txt", "timestamp": "2026-09-02T14:31:28+08:00", "tests": 1, "failures": 0, "errors": 0, "outcome": "passed"}
+      ],
+      "refactorSummary": [
+        "Excluded the internal isEmpty helper from the persisted JSON contract without changing operational-context data.",
+        "Appended assignment events in the same replicated command that creates the assignment and first fenced attempt.",
+        "Retained attempt-level detail while using the canonical transfer-level event vocabulary already defined by the architecture specification."
+      ],
+      "sensitiveEvidenceCaptured": false
+    },
+    {
+      "sliceId": "P3-ACTIVE-LIFECYCLE-EVENTS-006",
+      "requirements": ["ARCH-11", "ARCH-12", "API-03", "API-04"],
+      "acceptanceStatement": "A critical financial-services transfer exposes an ordered canonical timeline from submission through assignment, acceptance, start, and progress, with attempt, agent, byte, total-size, and report-sequence correlation.",
+      "testFile": "quorus-controller/src/test/java/dev/mars/quorus/controller/http/TransferProgressHttpIntegrationTest.java",
+      "externalEntryPoints": ["POST /api/v1/jobs/{jobId}/status", "GET /api/v1/transfers/{jobId}/progress", "GET /api/v1/transfers/{jobId}/events"],
+      "classification": ["external-path behavioral", "integration", "atomicity", "contract"],
+      "red": {"log": "temp/phase3-lifecycle-events-red.txt", "timestamp": "2026-09-02T14:33:14+08:00", "tests": 1, "failures": 1, "expectedFailure": "The timeline contained two events instead of the required five because acceptance, start, and progress events were absent."},
+      "green": {"log": "temp/phase3-lifecycle-events-green.txt", "timestamp": "2026-09-02T14:35:26+08:00", "tests": 34, "failures": 0, "errors": 0, "outcome": "passed"},
+      "refactorSummary": [
+        "Generated lifecycle events inside the existing atomic replicated lifecycle command after all transition validations pass.",
+        "Preserved exact-retry idempotency because duplicate reports return before event append.",
+        "Extended the event schema with optional byte, total-size, and report-sequence evidence required to explain operational progress."
+      ],
+      "sensitiveEvidenceCaptured": false
+    },
+    {
+      "sliceId": "P3-ACTIVE-STALL-CONDITION-007",
+      "requirements": ["ARCH-11", "ARCH-12", "API-03", "API-04"],
+      "acceptanceStatement": "An active transfer with no byte advancement beyond the configured stall window is reported as STALLED and discloses the stable condition onset and elapsed stall duration needed for operator triage.",
+      "testFile": "quorus-controller/src/test/java/dev/mars/quorus/controller/http/TransferProgressPolicyHttpIntegrationTest.java",
+      "externalEntryPoints": ["GET /api/v1/transfers/{jobId}/progress"],
+      "classification": ["external-path behavioral", "integration", "configuration", "contract"],
+      "red": {"log": "temp/phase3-active-stall-red.txt", "timestamp": "2026-09-02T14:50:09+08:00", "tests": 1, "failures": 1, "expectedFailure": "The response classified the active transfer as STALLED but omitted conditionSince and stallDurationSeconds."},
+      "green": {"log": "temp/phase3-active-stall-green.txt", "timestamp": "2026-09-02T14:52:32+08:00", "tests": 7, "failures": 0, "errors": 0, "outcome": "passed"},
+      "refactorSummary": [
+        "Derived condition onset from the authoritative last-progress time plus the effective controller stall window.",
+        "Kept condition evaluation read-only; the progress query does not mutate state or manufacture durable events.",
+        "Added optional timing fields to the OpenAPI progress schema without weakening missing-telemetry semantics."
+      ],
+      "sensitiveEvidenceCaptured": false
+    }
+  ],
+  "latestCleanVerification": {
+    "command": "mvn -o -pl quorus-controller clean verify",
+    "timestamp": "2026-09-02T14:57:02+08:00",
+    "log": "temp/phase3-controller-clean-verify-stall.txt",
+    "precedingFailedAttempt": {
+      "log": "temp/phase3-controller-clean-verify-events.txt",
+      "tests": 489,
+      "failures": 1,
+      "failure": "LeaderGuardHandlerTest fixture setup exceeded its 15-second election/startup wait; the failure did not reproduce on the immediate clean retry."
+    },
+    "tests": 496,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "lineCoveragePercent": 79.8,
+    "branchCoveragePercent": 60.2,
+    "coverageGates": "passed",
+    "outcome": "passed"
+  },
+  "phaseStatus": "in progress",
+  "notYetVerified": [
+    "durable stall detection and TRANSFER_STALLED event emission independent of reads",
+    "remaining lifecycle event vocabulary, pagination, replay, retention, and timelines",
+    "windowed throughput and calibrated ETA confidence",
+    "configurable deadline-risk prediction",
+    "operational query collections and resumable streaming",
+    "alert lifecycle, routing, retention, archival, and service-level reporting"
+  ]
+}

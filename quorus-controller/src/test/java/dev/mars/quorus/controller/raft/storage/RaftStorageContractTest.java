@@ -319,4 +319,43 @@ class RaftStorageContractTest {
                     }
                 }));
     }
+
+    @Test
+    @DisplayName("snapshot persists state and Raft coordinates")
+    void snapshot_roundTripsStateAndCoordinates(VertxTestContext ctx) {
+        byte[] snapshot = "financial-transfer-state".getBytes(StandardCharsets.UTF_8);
+
+        storage.loadSnapshot()
+                .compose(empty -> {
+                    ctx.verify(() -> assertTrue(empty.isEmpty()));
+                    return storage.saveSnapshot(snapshot, 12, 4);
+                })
+                .compose(v -> storage.loadSnapshot())
+                .onComplete(ctx.succeeding(loaded -> ctx.verify(() -> {
+                    assertTrue(loaded.isPresent());
+                    assertArrayEquals(snapshot, loaded.orElseThrow().data());
+                    assertEquals(12, loaded.orElseThrow().lastIncludedIndex());
+                    assertEquals(4, loaded.orElseThrow().lastIncludedTerm());
+                    ctx.completeNow();
+                })));
+    }
+
+    @Test
+    @DisplayName("prefix truncation preserves entries after the snapshot boundary")
+    void truncatePrefix_preservesLaterEntries(VertxTestContext ctx) {
+        List<LogEntryData> entries = List.of(
+                new LogEntryData(1, 1, "snapshotted-1".getBytes(StandardCharsets.UTF_8)),
+                new LogEntryData(2, 1, "snapshotted-2".getBytes(StandardCharsets.UTF_8)),
+                new LogEntryData(3, 2, "retained-3".getBytes(StandardCharsets.UTF_8)),
+                new LogEntryData(4, 2, "retained-4".getBytes(StandardCharsets.UTF_8)));
+
+        storage.appendEntries(entries)
+                .compose(v -> storage.sync())
+                .compose(v -> storage.truncatePrefix(2))
+                .compose(v -> storage.replayLog())
+                .onComplete(ctx.succeeding(replayed -> ctx.verify(() -> {
+                    assertEquals(List.of(3L, 4L), replayed.stream().map(LogEntryData::index).toList());
+                    ctx.completeNow();
+                })));
+    }
 }

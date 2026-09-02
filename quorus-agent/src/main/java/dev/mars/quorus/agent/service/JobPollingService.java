@@ -28,9 +28,11 @@ import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 import java.nio.file.Paths;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Service for polling the controller for new job assignments.
@@ -101,12 +103,19 @@ public class JobPollingService {
         String assignmentId = jobData.getString("assignmentId");
         String jobId = jobData.getString("jobId");
         String agentId = jobData.getString("agentId");
+        String attemptId = jobData.getString("attemptId");
+        Long fencingGeneration = jobData.getLong("fencingGeneration");
+        String leaseExpiresAt = jobData.getString("leaseExpiresAt");
+        Long lastReportSequence = jobData.getLong("lastReportSequence");
         String sourceUri = jobData.getString("sourceUri");
         String destinationPath = jobData.getString("destinationPath");
         Long totalBytes = jobData.getLong("totalBytes", 0L);
         String description = jobData.getString("description");
         
-        return new PendingJob(assignmentId, jobId, agentId, sourceUri, destinationPath, totalBytes, description);
+        return new PendingJob(assignmentId, jobId, agentId, sourceUri, destinationPath, totalBytes, description,
+                attemptId, fencingGeneration == null ? 0 : fencingGeneration,
+                leaseExpiresAt == null ? null : Instant.parse(leaseExpiresAt),
+                lastReportSequence == null ? 0 : lastReportSequence);
     }
 
     /**
@@ -131,9 +140,21 @@ public class JobPollingService {
         private final String destinationPath;
         private final long totalBytes;
         private final String description;
+        private final String attemptId;
+        private final long fencingGeneration;
+        private final Instant leaseExpiresAt;
+        private final AtomicLong reportSequence;
 
         public PendingJob(String assignmentId, String jobId, String agentId, String sourceUri, 
                          String destinationPath, long totalBytes, String description) {
+            this(assignmentId, jobId, agentId, sourceUri, destinationPath, totalBytes, description,
+                    null, 0, null, 0);
+        }
+
+        public PendingJob(String assignmentId, String jobId, String agentId, String sourceUri,
+                          String destinationPath, long totalBytes, String description,
+                          String attemptId, long fencingGeneration, Instant leaseExpiresAt,
+                          long lastReportSequence) {
             this.assignmentId = assignmentId;
             this.jobId = jobId;
             this.agentId = agentId;
@@ -141,6 +162,10 @@ public class JobPollingService {
             this.destinationPath = destinationPath;
             this.totalBytes = totalBytes;
             this.description = description;
+            this.attemptId = attemptId;
+            this.fencingGeneration = fencingGeneration;
+            this.leaseExpiresAt = leaseExpiresAt;
+            this.reportSequence = new AtomicLong(lastReportSequence);
         }
 
         public String getAssignmentId() { return assignmentId; }
@@ -150,6 +175,13 @@ public class JobPollingService {
         public String getDestinationPath() { return destinationPath; }
         public long getTotalBytes() { return totalBytes; }
         public String getDescription() { return description; }
+        public String getAttemptId() { return attemptId; }
+        public long getFencingGeneration() { return fencingGeneration; }
+        public Instant getLeaseExpiresAt() { return leaseExpiresAt; }
+        public boolean hasAttemptContext() {
+            return attemptId != null && !attemptId.isBlank() && fencingGeneration > 0 && leaseExpiresAt != null;
+        }
+        public long nextReportSequence() { return reportSequence.incrementAndGet(); }
 
         public TransferRequest toTransferRequest() {
             return TransferRequest.builder()

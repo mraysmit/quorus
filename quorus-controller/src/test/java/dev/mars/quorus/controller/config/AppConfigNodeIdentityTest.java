@@ -144,4 +144,37 @@ class AppConfigNodeIdentityTest {
             }
         }
     }
+
+    @Test
+    @DisplayName("Packaged controller configuration satisfies startup validation")
+    void packagedConfigurationIsValidAndTypedAccessorsUseSafeDefaults() {
+        AppConfig config = AppConfig.get();
+
+        assertDoesNotThrow(config::validate);
+        assertEquals(8080, config.getHttpPort());
+        assertEquals(9080, config.getRaftPort());
+        assertEquals(1_048_576L, config.getHttpMaxBodyBytes());
+        assertEquals("memory", config.getRaftStorageType());
+        assertFalse(config.getRaftStorageFsync());
+        assertTrue(config.isSnapshotEnabled());
+        assertEquals(100_000L, config.getLogHardLimit());
+    }
+
+    @Test
+    @DisplayName("Malformed numeric overrides fall back instead of destabilizing startup")
+    void malformedNumericOverridesUseDeclaredFallbacks() {
+        String key = "quorus.test.invalid-number";
+        String previous = System.getProperty(key);
+        try {
+            System.setProperty(key, "not-a-number");
+            assertEquals(17, AppConfig.get().getInt(key, 17));
+            assertEquals(23L, AppConfig.get().getLong(key, 23L));
+        } finally {
+            if (previous == null) {
+                System.clearProperty(key);
+            } else {
+                System.setProperty(key, previous);
+            }
+        }
+    }
 }
