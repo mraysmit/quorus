@@ -23,14 +23,17 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Properties;
 
 /**
  * Centralized configuration for Quorus Controller.
  * 
- * <p>Loads configuration from application.properties with environment variable override support.
- * Environment variables take precedence and use uppercase with underscores
- * (e.g., quorus.http.port -> QUORUS_HTTP_PORT).
+ * <p>Each instance loads the packaged defaults, an optional profile resource,
+ * environment overrides, and finally caller-supplied overrides. JVM system
+ * properties are deliberately not a configuration source: callers that need
+ * an override must supply it explicitly through {@link Properties}.
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @since 2026-01-28
@@ -39,21 +42,30 @@ public final class AppConfig {
 
     private static final Logger logger = LoggerFactory.getLogger(AppConfig.class);
     private static final String CONFIG_FILE = "quorus-controller.properties";
-    private static final AppConfig INSTANCE = new AppConfig();
 
+    private final String profile;
     private final Properties properties;
 
-    private AppConfig() {
+    public AppConfig(String profile, Properties overrides) {
+        this(profile, overrides, System.getenv());
+    }
+
+    AppConfig(String profile, Properties overrides, Map<String, String> environment) {
+        this.profile = Objects.requireNonNull(profile, "profile must not be null");
+        Objects.requireNonNull(overrides, "overrides must not be null");
+        Objects.requireNonNull(environment, "environment must not be null");
         this.properties = new Properties();
-        loadProperties();
+        loadResource(CONFIG_FILE, true);
+        if (!"default".equals(profile)) {
+            loadResource("quorus-controller-" + profile + ".properties", false);
+        }
+        applyEnvironmentOverrides(environment);
+        this.properties.putAll(overrides);
         logConfiguration();
     }
 
-    /**
-     * Gets the singleton configuration instance.
-     */
-    public static AppConfig get() {
-        return INSTANCE;
+    public String getProfile() {
+        return profile;
     }
 
     // ==================== Node Configuration ====================
@@ -73,8 +85,8 @@ public final class AppConfig {
             if (isMultiNodeCluster()) {
                 throw new IllegalStateException(
                     "quorus.node.id must be set for multi-node clusters to prevent split-brain. " +
-                    "Set via environment variable QUORUS_NODE_ID, system property -Dquorus.node.id, " +
-                    "or in quorus-controller.properties.");
+                    "Set via environment variable QUORUS_NODE_ID, an explicit Properties override, " +
+                    "or a Quorus configuration resource.");
             }
             // Single-node is safe to use hostname (local dev)
             nodeId = deriveNodeIdFromHostname();
@@ -285,13 +297,14 @@ public final class AppConfig {
     // ==================== Core Property Accessors ====================
 
     /**
-     * Gets a string property with environment variable and system property override.
-     * 
-     * <p>Resolution order (highest to lowest priority):
+     * Gets a string property from this configuration instance.
+     *
+     * <p>Construction precedence (highest to lowest priority):
      * <ol>
+     *   <li>Explicit caller-supplied properties</li>
      *   <li>Environment variable (e.g., QUORUS_HTTP_PORT)</li>
-     *   <li>System property (e.g., -Dquorus.http.port=8080)</li>
-     *   <li>Properties file (quorus-controller.properties)</li>
+     *   <li>Profile resource (e.g., quorus-controller-production.properties)</li>
+     *   <li>Packaged defaults (quorus-controller.properties)</li>
      *   <li>Default value</li>
      * </ol>
      * 
@@ -300,20 +313,7 @@ public final class AppConfig {
      * @return the resolved property value
      */
     public String getString(String key, String defaultValue) {
-        // 1. Check environment variable (QUORUS_HTTP_PORT format)
-        String envKey = key.toUpperCase().replace('.', '_').replace('-', '_');
-        String envValue = System.getenv(envKey);
-        if (envValue != null && !envValue.isEmpty()) {
-            return envValue;
-        }
-
-        // 2. Check system property (-Dquorus.http.port format)
-        String sysValue = System.getProperty(key);
-        if (sysValue != null && !sysValue.isEmpty()) {
-            return sysValue;
-        }
-
-        // 3. Check properties file. A blank packaged value means "not configured"
+        // A blank configured value means "not configured"
         // and must not suppress a safe default (notably the durable Raft path).
         String propertyValue = properties.getProperty(key);
         return propertyValue == null || propertyValue.isBlank() ? defaultValue : propertyValue;
@@ -432,18 +432,42 @@ public final class AppConfig {
         logger.info("Controller configuration validated successfully");
     }
 
-    private void loadProperties() {
-        try (InputStream input = getClass().getClassLoader().getResourceAsStream(CONFIG_FILE)) {
+    private void loadResource(String resourceName, boolean required) {
+        try (InputStream input = getClass().getClassLoader().getResourceAsStream(resourceName)) {
             if (input != null) {
                 properties.load(input);
-                logger.info("Loaded configuration from {}", CONFIG_FILE);
+                logger.info("Loaded configuration from {}", resourceName);
+            } else if (required) {
+                logger.warn("Configuration file {} not found, using accessor defaults", resourceName);
             } else {
-                logger.warn("Configuration file {} not found, using defaults", CONFIG_FILE);
+                logger.debug("Optional configuration profile {} not found", resourceName);
             }
         } catch (IOException e) {
-            logger.error("Error loading configuration file: {}", e.getMessage());
-            logger.debug("Stack trace for configuration load error", e);
+            throw new IllegalStateException("Unable to load configuration resource " + resourceName, e);
         }
+    }
+
+    private void applyEnvironmentOverrides(Map<String, String> environment) {
+        environment.forEach((environmentKey, environmentValue) -> {
+            if (environmentKey.startsWith("QUORUS_")
+                    && environmentValue != null
+                    && !environmentValue.isBlank()) {
+                properties.setProperty(resolveEnvironmentKey(environmentKey), environmentValue.trim());
+            }
+        });
+    }
+
+    private String resolveEnvironmentKey(String environmentKey) {
+        String directConversion = environmentKey.toLowerCase().replace('_', '.');
+        if (properties.containsKey(directConversion)) {
+            return directConversion;
+        }
+        for (String knownKey : properties.stringPropertyNames()) {
+            if (knownKey.replace('-', '.').equals(directConversion)) {
+                return knownKey;
+            }
+        }
+        return directConversion;
     }
 
     private void logConfiguration() {

@@ -19,19 +19,12 @@ import org.slf4j.LoggerFactory;
 public class TelemetryConfig {
 
     private static final Logger logger = LoggerFactory.getLogger(TelemetryConfig.class);
-    private static int configuredPrometheusPort;
-    private static String configuredOtlpEndpoint;
-
-    public static VertxOptions configure(VertxOptions options) {
-        AppConfig config = AppConfig.get();
-        
+    public static VertxOptions configure(VertxOptions options, AppConfig config) {
         if (!config.isTelemetryEnabled()) {
             logger.info("Telemetry is disabled");
             return options;
         }
 
-        configuredPrometheusPort = config.getPrometheusPort();
-        configuredOtlpEndpoint = config.getOtlpEndpoint();
         String serviceName = config.getServiceName();
 
         // 1. Configure Resource
@@ -41,7 +34,7 @@ public class TelemetryConfig {
 
         // 2. Configure Tracing (OTLP Exporter)
         OtlpGrpcSpanExporter spanExporter = OtlpGrpcSpanExporter.builder()
-                .setEndpoint(configuredOtlpEndpoint)
+                .setEndpoint(config.getOtlpEndpoint())
                 .build();
 
         SdkTracerProvider tracerProvider = SdkTracerProvider.builder()
@@ -51,7 +44,7 @@ public class TelemetryConfig {
 
         // 3. Configure Metrics (Prometheus)
         PrometheusHttpServer prometheusReader = PrometheusHttpServer.builder()
-                .setPort(configuredPrometheusPort)
+                .setPort(config.getPrometheusPort())
                 .build();
 
         SdkMeterProvider meterProvider = SdkMeterProvider.builder()
@@ -66,23 +59,10 @@ public class TelemetryConfig {
                 .buildAndRegisterGlobal();
 
         logger.info("OpenTelemetry configured: service={}, otlp={}, prometheus={}",
-                serviceName, configuredOtlpEndpoint, configuredPrometheusPort);
+                serviceName, config.getOtlpEndpoint(), config.getPrometheusPort());
 
         // 5. Configure Vert.x Options (picks up globally registered SDK)
         return options.setTracingOptions(new OpenTelemetryOptions());
     }
 
-    /**
-     * Gets the configured Prometheus metrics port.
-     */
-    public static int getPrometheusPort() {
-        return configuredPrometheusPort;
-    }
-
-    /**
-     * Gets the configured OTLP endpoint.
-     */
-    public static String getOtlpEndpoint() {
-        return configuredOtlpEndpoint;
-    }
 }

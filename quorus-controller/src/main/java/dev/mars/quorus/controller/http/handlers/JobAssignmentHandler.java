@@ -18,7 +18,6 @@ package dev.mars.quorus.controller.http.handlers;
 
 import dev.mars.quorus.controller.http.ErrorCode;
 import dev.mars.quorus.controller.http.QuorusApiException;
-import dev.mars.quorus.controller.config.AppConfig;
 import dev.mars.quorus.controller.raft.RaftNode;
 import dev.mars.quorus.controller.security.SecurityContext;
 import dev.mars.quorus.controller.security.SecurityIdentity;
@@ -68,10 +67,16 @@ public class JobAssignmentHandler {
 
     private final RaftNode raftNode;
     private final QuorusStateStore stateStore;
+    private final long attemptLeaseDurationMs;
 
-    public JobAssignmentHandler(RaftNode raftNode, QuorusStateStore stateStore) {
+    public JobAssignmentHandler(RaftNode raftNode, QuorusStateStore stateStore,
+                                long attemptLeaseDurationMs) {
         this.raftNode = raftNode;
         this.stateStore = stateStore;
+        if (attemptLeaseDurationMs <= 0) {
+            throw new IllegalArgumentException("attemptLeaseDurationMs must be positive");
+        }
+        this.attemptLeaseDurationMs = attemptLeaseDurationMs;
     }
 
     /**
@@ -102,7 +107,7 @@ public class JobAssignmentHandler {
                 String attemptId = UUID.randomUUID().toString();
                 JobAssignmentCommand.Assign command = JobAssignmentCommand.assignWithAttempt(
                         assignment, attemptId, assignment.getAssignedAt()
-                                .plusMillis(AppConfig.get().getAttemptLeaseDurationMs()));
+                                .plusMillis(attemptLeaseDurationMs));
 
                 raftNode.submitCommand(command)
                         .onSuccess(result -> {

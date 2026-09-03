@@ -41,13 +41,34 @@ public class ProtocolFactory {
 
     private final Map<String, TransferProtocol> protocols;
     private final Vertx vertx;
+    private final String nfsMountRoot;
+    private final boolean smbMountSecurityVerified;
+    private final boolean nfsMountSecurityVerified;
 
     /**
      * Constructor with Vert.x dependency injection (recommended).
      * @param vertx Vert.x instance for reactive HTTP protocol
      */
     public ProtocolFactory(Vertx vertx) {
+        this(vertx, null, false, false);
+    }
+
+    /**
+     * Creates a protocol factory with an explicitly injected NFS mount root.
+     *
+     * @param vertx Vert.x instance for reactive HTTP protocol
+     * @param nfsMountRoot NFS mount root, or {@code null}/blank for the platform default
+     */
+    public ProtocolFactory(Vertx vertx, String nfsMountRoot) {
+        this(vertx, nfsMountRoot, false, false);
+    }
+
+    public ProtocolFactory(Vertx vertx, String nfsMountRoot,
+                           boolean smbMountSecurityVerified, boolean nfsMountSecurityVerified) {
         this.vertx = java.util.Objects.requireNonNull(vertx, "Vertx instance cannot be null");
+        this.nfsMountRoot = nfsMountRoot;
+        this.smbMountSecurityVerified = smbMountSecurityVerified;
+        this.nfsMountSecurityVerified = nfsMountSecurityVerified;
         this.protocols = new HashMap<>();
         logger.debug("Initializing ProtocolFactory with Vert.x instance");
         registerDefaultProtocols();
@@ -64,7 +85,7 @@ public class ProtocolFactory {
 
         // Register SMB protocol for both smb and cifs schemes
         logger.debug("Creating SmbTransferProtocol instance");
-        SmbTransferProtocol smbProtocol = new SmbTransferProtocol();
+        SmbTransferProtocol smbProtocol = new SmbTransferProtocol(smbMountSecurityVerified);
         registerProtocol(smbProtocol);
         registerProtocolAlias("cifs", smbProtocol);
 
@@ -80,12 +101,14 @@ public class ProtocolFactory {
 
         // Register NFS protocol
         logger.debug("Creating NfsTransferProtocol instance");
-        registerProtocol(new NfsTransferProtocol());
+        registerProtocol(nfsMountRoot == null || nfsMountRoot.isBlank()
+                ? new NfsTransferProtocol(nfsMountSecurityVerified)
+                : new NfsTransferProtocol(nfsMountRoot, nfsMountSecurityVerified));
 
         logger.info("Registered default transfer protocols: count={}, schemes={}", 
                    protocols.size(), String.join(", ", protocols.keySet()));
     }
-    
+
     public void registerProtocol(TransferProtocol protocol) {
         String protocolName = protocol.getProtocolName().toLowerCase();
         protocols.put(protocolName, protocol);

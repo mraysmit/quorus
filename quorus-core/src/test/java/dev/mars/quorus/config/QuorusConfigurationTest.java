@@ -18,7 +18,6 @@ package dev.mars.quorus.config;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.AfterEach;
 
 import java.util.Properties;
 
@@ -35,27 +34,10 @@ import static org.junit.jupiter.api.Assertions.*;
 class QuorusConfigurationTest {
 
     private QuorusConfiguration config;
-    private String originalSystemProperty;
 
     @BeforeEach
     void setUp() {
-        config = new QuorusConfiguration();
-        // Save original system property to restore later
-        originalSystemProperty = System.getProperty("quorus.test.property");
-    }
-
-    @AfterEach
-    void tearDown() {
-        // Restore original system property
-        if (originalSystemProperty != null) {
-            System.setProperty("quorus.test.property", originalSystemProperty);
-        } else {
-            System.clearProperty("quorus.test.property");
-        }
-        // Clean up any test system properties
-        System.clearProperty("quorus.transfer.max.concurrent");
-        System.clearProperty("quorus.transfer.max.retries");
-        System.clearProperty("quorus.monitoring.metrics.enabled");
+        config = new QuorusConfiguration("test", new Properties());
     }
 
     // ========== Default Configuration Tests ==========
@@ -134,7 +116,7 @@ class QuorusConfigurationTest {
         props.setProperty("quorus.transfer.max.retries", "5");
         props.setProperty("quorus.file.checksum.algorithm", "MD5");
 
-        QuorusConfiguration customConfig = new QuorusConfiguration(props);
+        QuorusConfiguration customConfig = new QuorusConfiguration("test", props);
 
         assertEquals(20, customConfig.getMaxConcurrentTransfers());
         assertEquals(5, customConfig.getMaxRetryAttempts());
@@ -142,18 +124,14 @@ class QuorusConfigurationTest {
     }
 
     @Test
-    void testConstructorWithNullProperties() {
-        QuorusConfiguration customConfig = new QuorusConfiguration(null);
-
-        // Should fall back to defaults
-        assertEquals(10, customConfig.getMaxConcurrentTransfers());
-        assertEquals(3, customConfig.getMaxRetryAttempts());
+    void testConstructorRejectsNullProperties() {
+        assertThrows(NullPointerException.class, () -> new QuorusConfiguration("test", null));
     }
 
     @Test
     void testConstructorWithEmptyProperties() {
         Properties props = new Properties();
-        QuorusConfiguration customConfig = new QuorusConfiguration(props);
+        QuorusConfiguration customConfig = new QuorusConfiguration("test", props);
 
         // Should use defaults
         assertEquals(10, customConfig.getMaxConcurrentTransfers());
@@ -164,8 +142,8 @@ class QuorusConfigurationTest {
 
     @Test
     void testSetAndGetProperty() {
-        config.setProperty("custom.property", "custom-value");
-        assertEquals("custom-value", config.getProperty("custom.property"));
+        assertEquals("custom-value", configWith("custom.property", "custom-value")
+                .getProperty("custom.property"));
     }
 
     @Test
@@ -176,132 +154,111 @@ class QuorusConfigurationTest {
 
     @Test
     void testOverrideMaxConcurrentTransfers() {
-        config.setProperty("quorus.transfer.max.concurrent", "25");
-        assertEquals(25, config.getMaxConcurrentTransfers());
+        assertEquals(25, configWith("quorus.transfer.max.concurrent", "25").getMaxConcurrentTransfers());
     }
 
     @Test
     void testOverrideRetryDelayMs() {
-        config.setProperty("quorus.transfer.retry.delay.ms", "2500");
-        assertEquals(2500, config.getRetryDelayMs());
+        assertEquals(2500, configWith("quorus.transfer.retry.delay.ms", "2500").getRetryDelayMs());
     }
 
     @Test
     void testOverrideMaxFileSize() {
-        config.setProperty("quorus.file.max.size", "5368709120"); // 5GB
-        assertEquals(5368709120L, config.getMaxFileSize());
+        assertEquals(5368709120L, configWith("quorus.file.max.size", "5368709120").getMaxFileSize());
     }
 
     @Test
     void testOverrideChecksumAlgorithm() {
-        config.setProperty("quorus.file.checksum.algorithm", "SHA-512");
-        assertEquals("SHA-512", config.getChecksumAlgorithm());
+        assertEquals("SHA-512", configWith("quorus.file.checksum.algorithm", "SHA-512")
+                .getChecksumAlgorithm());
     }
 
     @Test
     void testOverrideTempDirectory() {
-        config.setProperty("quorus.file.temp.dir", "/custom/temp");
-        assertEquals("/custom/temp", config.getTempDirectory());
+        assertEquals("/custom/temp", configWith("quorus.file.temp.dir", "/custom/temp").getTempDirectory());
     }
 
     @Test
     void testOverrideMetricsEnabled() {
-        config.setProperty("quorus.monitoring.metrics.enabled", "false");
-        assertFalse(config.isMetricsEnabled());
+        assertFalse(configWith("quorus.monitoring.metrics.enabled", "false").isMetricsEnabled());
     }
 
     @Test
     void testOverrideHealthCheckEnabled() {
-        config.setProperty("quorus.monitoring.health.enabled", "false");
-        assertFalse(config.isHealthCheckEnabled());
+        assertFalse(configWith("quorus.monitoring.health.enabled", "false").isHealthCheckEnabled());
     }
 
     // ========== Type Conversion Tests ==========
 
     @Test
     void testInvalidIntegerPropertyUsesDefault() {
-        config.setProperty("quorus.transfer.max.concurrent", "not-a-number");
-        assertEquals(10, config.getMaxConcurrentTransfers()); // Falls back to default
+        assertEquals(10, configWith("quorus.transfer.max.concurrent", "not-a-number")
+                .getMaxConcurrentTransfers());
     }
 
     @Test
     void testInvalidLongPropertyUsesDefault() {
-        config.setProperty("quorus.file.max.size", "invalid-long");
-        assertEquals(10L * 1024 * 1024 * 1024, config.getMaxFileSize()); // Falls back to default
+        assertEquals(10L * 1024 * 1024 * 1024,
+                configWith("quorus.file.max.size", "invalid-long").getMaxFileSize());
     }
 
     @Test
     void testBooleanPropertyTrueVariations() {
-        config.setProperty("quorus.monitoring.metrics.enabled", "true");
-        assertTrue(config.isMetricsEnabled());
-
-        config.setProperty("quorus.monitoring.metrics.enabled", "TRUE");
-        assertTrue(config.isMetricsEnabled());
-
-        config.setProperty("quorus.monitoring.metrics.enabled", "True");
-        assertTrue(config.isMetricsEnabled());
+        assertTrue(configWith("quorus.monitoring.metrics.enabled", "true").isMetricsEnabled());
+        assertTrue(configWith("quorus.monitoring.metrics.enabled", "TRUE").isMetricsEnabled());
+        assertTrue(configWith("quorus.monitoring.metrics.enabled", "True").isMetricsEnabled());
     }
 
     @Test
     void testBooleanPropertyFalseVariations() {
-        config.setProperty("quorus.monitoring.metrics.enabled", "false");
-        assertFalse(config.isMetricsEnabled());
-
-        config.setProperty("quorus.monitoring.metrics.enabled", "FALSE");
-        assertFalse(config.isMetricsEnabled());
-
-        config.setProperty("quorus.monitoring.metrics.enabled", "anything-else");
-        assertFalse(config.isMetricsEnabled()); // Non-true values are false
+        assertFalse(configWith("quorus.monitoring.metrics.enabled", "false").isMetricsEnabled());
+        assertFalse(configWith("quorus.monitoring.metrics.enabled", "FALSE").isMetricsEnabled());
+        assertFalse(configWith("quorus.monitoring.metrics.enabled", "anything-else").isMetricsEnabled());
     }
 
     @Test
     void testIntegerPropertyWithWhitespace() {
-        config.setProperty("quorus.transfer.max.concurrent", "  15  ");
-        assertEquals(15, config.getMaxConcurrentTransfers());
+        assertEquals(15, configWith("quorus.transfer.max.concurrent", "  15  ").getMaxConcurrentTransfers());
     }
 
     @Test
     void testLongPropertyWithWhitespace() {
-        config.setProperty("quorus.transfer.retry.delay.ms", "  3000  ");
-        assertEquals(3000, config.getRetryDelayMs());
+        assertEquals(3000, configWith("quorus.transfer.retry.delay.ms", "  3000  ").getRetryDelayMs());
     }
 
     @Test
     void testBooleanPropertyWithWhitespace() {
-        config.setProperty("quorus.monitoring.metrics.enabled", "  true  ");
-        assertTrue(config.isMetricsEnabled());
+        assertTrue(configWith("quorus.monitoring.metrics.enabled", "  true  ").isMetricsEnabled());
     }
 
     // ========== Boundary Value Tests ==========
 
     @Test
     void testMaximumIntValue() {
-        config.setProperty("quorus.transfer.max.concurrent", String.valueOf(Integer.MAX_VALUE));
-        assertEquals(Integer.MAX_VALUE, config.getMaxConcurrentTransfers());
+        assertEquals(Integer.MAX_VALUE,
+                configWith("quorus.transfer.max.concurrent", String.valueOf(Integer.MAX_VALUE))
+                        .getMaxConcurrentTransfers());
     }
 
     @Test
     void testMinimumIntValue() {
-        config.setProperty("quorus.transfer.max.retries", String.valueOf(0));
-        assertEquals(0, config.getMaxRetryAttempts());
+        assertEquals(0, configWith("quorus.transfer.max.retries", "0").getMaxRetryAttempts());
     }
 
     @Test
     void testNegativeIntValue() {
-        config.setProperty("quorus.transfer.max.concurrent", "-5");
-        assertEquals(-5, config.getMaxConcurrentTransfers());
+        assertEquals(-5, configWith("quorus.transfer.max.concurrent", "-5").getMaxConcurrentTransfers());
     }
 
     @Test
     void testMaximumLongValue() {
-        config.setProperty("quorus.file.max.size", String.valueOf(Long.MAX_VALUE));
-        assertEquals(Long.MAX_VALUE, config.getMaxFileSize());
+        assertEquals(Long.MAX_VALUE, configWith("quorus.file.max.size", String.valueOf(Long.MAX_VALUE))
+                .getMaxFileSize());
     }
 
     @Test
     void testZeroLongValue() {
-        config.setProperty("quorus.transfer.retry.delay.ms", "0");
-        assertEquals(0, config.getRetryDelayMs());
+        assertEquals(0, configWith("quorus.transfer.retry.delay.ms", "0").getRetryDelayMs());
     }
 
     // ========== toString() Tests ==========
@@ -319,46 +276,45 @@ class QuorusConfigurationTest {
 
     @Test
     void testToStringWithCustomValues() {
-        config.setProperty("quorus.transfer.max.concurrent", "50");
-        config.setProperty("quorus.transfer.max.retries", "7");
-        config.setProperty("quorus.monitoring.metrics.enabled", "false");
-
-        String configStr = config.toString();
+        Properties overrides = new Properties();
+        overrides.setProperty("quorus.transfer.max.concurrent", "50");
+        overrides.setProperty("quorus.transfer.max.retries", "7");
+        overrides.setProperty("quorus.monitoring.metrics.enabled", "false");
+        String configStr = new QuorusConfiguration("test", overrides).toString();
 
         assertTrue(configStr.contains("maxConcurrentTransfers=50"));
         assertTrue(configStr.contains("maxRetryAttempts=7"));
         assertTrue(configStr.contains("metricsEnabled=false"));
     }
 
-    // ========== System Property Override Tests ==========
+    // ========== Configuration isolation tests ==========
 
     @Test
-    void testSystemPropertyOverride() {
-        // Set system property before creating config
-        System.setProperty("quorus.transfer.max.concurrent", "100");
-
-        QuorusConfiguration sysConfig = new QuorusConfiguration();
-        assertEquals(100, sysConfig.getMaxConcurrentTransfers());
+    void testSystemPropertyIsNotAConfigurationChannel() {
+        String key = "quorus.transfer.max.concurrent";
+        String previous = System.getProperty(key);
+        try {
+            System.setProperty(key, "100");
+            assertEquals(10, new QuorusConfiguration("test", new Properties()).getMaxConcurrentTransfers());
+        } finally {
+            if (previous == null) System.clearProperty(key);
+            else System.setProperty(key, previous);
+        }
     }
 
     @Test
-    void testMultipleSystemPropertyOverrides() {
-        System.setProperty("quorus.transfer.max.concurrent", "99");
-        System.setProperty("quorus.transfer.max.retries", "8");
-        System.setProperty("quorus.monitoring.metrics.enabled", "false");
-
-        QuorusConfiguration sysConfig = new QuorusConfiguration();
-        assertEquals(99, sysConfig.getMaxConcurrentTransfers());
-        assertEquals(8, sysConfig.getMaxRetryAttempts());
-        assertFalse(sysConfig.isMetricsEnabled());
+    void testConfigurationInstancesRemainIsolated() {
+        QuorusConfiguration first = configWith("quorus.transfer.max.concurrent", "99");
+        QuorusConfiguration second = configWith("quorus.transfer.max.concurrent", "7");
+        assertEquals(99, first.getMaxConcurrentTransfers());
+        assertEquals(7, second.getMaxConcurrentTransfers());
     }
 
     // ========== Edge Cases ==========
 
     @Test
     void testEmptyStringProperty() {
-        config.setProperty("quorus.file.checksum.algorithm", "");
-        assertEquals("", config.getChecksumAlgorithm());
+        assertEquals("", configWith("quorus.file.checksum.algorithm", "").getChecksumAlgorithm());
     }
 
     @Test
@@ -387,17 +343,17 @@ class QuorusConfigurationTest {
     }
 
     @Test
-    void testConfigurationIsImmutableAfterCreation() {
-        // Test that original defaults are preserved
-        QuorusConfiguration config1 = new QuorusConfiguration();
-        int original = config1.getMaxConcurrentTransfers();
+    void testConfigurationDefensivelyCopiesOverrides() {
+        Properties overrides = new Properties();
+        overrides.setProperty("quorus.transfer.max.concurrent", "9");
+        QuorusConfiguration isolated = new QuorusConfiguration("test", overrides);
+        overrides.setProperty("quorus.transfer.max.concurrent", "999");
+        assertEquals(9, isolated.getMaxConcurrentTransfers());
+    }
 
-        // Modify instance
-        config1.setProperty("quorus.transfer.max.concurrent", "999");
-        assertEquals(999, config1.getMaxConcurrentTransfers());
-
-        // New instance should have original defaults
-        QuorusConfiguration config2 = new QuorusConfiguration();
-        assertEquals(original, config2.getMaxConcurrentTransfers());
+    private static QuorusConfiguration configWith(String key, String value) {
+        Properties overrides = new Properties();
+        overrides.setProperty(key, value);
+        return new QuorusConfiguration("test", overrides);
     }
 }

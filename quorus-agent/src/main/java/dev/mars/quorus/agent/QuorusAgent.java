@@ -36,6 +36,7 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
 import java.util.Objects;
+import java.util.Properties;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -94,7 +95,7 @@ public class QuorusAgent {
         this.vertx = Objects.requireNonNull(vertx, "Vertx instance cannot be null");
         this.closeVertxOnShutdown = closeVertxOnShutdown;
         this.config = Objects.requireNonNull(config, "AgentConfiguration cannot be null");
-        this.foreignAssignmentMismatchThreshold = AgentConfig.get().getForeignAssignmentMismatchThreshold();
+        this.foreignAssignmentMismatchThreshold = config.getForeignAssignmentMismatchThreshold();
 
         logger.info("Creating QuorusAgent with Vert.x instance: {} (using Vert.x timers, no ScheduledExecutorService)",
                     System.identityHashCode(vertx));
@@ -143,16 +144,16 @@ public class QuorusAgent {
 
         try {
             // Load and validate configuration (fail fast on misconfiguration)
-            AgentConfiguration config = AgentConfiguration.fromEnvironment();
-            AgentConfig.get().validate();
+            AgentConfig sourceConfig = new AgentConfig("default", new Properties());
+            AgentConfiguration config = AgentConfiguration.from(sourceConfig);
 
             // Create shared Vert.x instance with OpenTelemetry tracing
             VertxOptions options = new VertxOptions();
-            options = AgentTelemetryConfig.configure(options, config.getAgentId());
+            options = AgentTelemetryConfig.configure(options, config);
             Vertx vertx = Vertx.vertx(options);
             
             logger.info("Created Vert.x instance with OpenTelemetry: {} (Prometheus on port {})", 
-                    System.identityHashCode(vertx), AgentTelemetryConfig.getPrometheusPort());
+                    System.identityHashCode(vertx), config.getPrometheusPort());
 
             // Create and start agent with Vert.x instance
             QuorusAgent agent = new QuorusAgent(vertx, config);
@@ -264,9 +265,8 @@ public class QuorusAgent {
 
         // Start job polling using Vert.x timer (no ScheduledExecutorService!)
         // Configurable initial delay and polling interval
-        final AgentConfig agentConfig = AgentConfig.get();
-        final long initialDelay = agentConfig.getJobPollingInitialDelayMs();
-        final long pollingInterval = agentConfig.getJobPollingIntervalMs();
+        final long initialDelay = config.getJobPollingInitialDelayMs();
+        final long pollingInterval = config.getJobPollingIntervalMs();
         
         vertx.setTimer(initialDelay, initialId -> {
             if (!closed.get() && running) {

@@ -285,7 +285,7 @@ Extend capabilities with new protocols and services.
 | Create NfsTransferProtocol interface impl | quorus-core | 8 hours | ✅ Complete |
 | Add NFS client library dependency | pom.xml | 1 hour | ✅ N/A (uses java.nio mount paths) |
 | Register NFS in ProtocolFactory | quorus-core | 1 hour | ✅ Complete |
-| Add NFS configuration properties | quorus.properties | 1 hour | ✅ Complete (quorus.nfs.mount.root) |
+| Add NFS configuration properties | quorus-agent.properties | 1 hour | ✅ Complete (`quorus.agent.nfs.mount-root`) |
 | Create NFS Testcontainer setup | quorus-core/test | 4 hours | ✅ Complete (simulation mode + @TempDir) |
 | Add NFS integration tests | quorus-core/test | 8 hours | ✅ Complete (44 tests) |
 | Document NFS usage | docs/ | 2 hours | ✅ Inline Javadoc |
@@ -293,7 +293,7 @@ Extend capabilities with new protocols and services.
 **Implementation Notes:**
 - `NfsTransferProtocol` (~420 lines): mount-path-based adapter mapping `nfs://host/export/path` to local mount points
 - URI parsing: `NfsConnectionInfo` extracts host, port, exportPath, filePath from NFS URIs
-- Mount resolution: configurable via `quorus.nfs.mount.root` system property (default `/mnt/nfs`)
+- Mount resolution: injected per agent through `quorus.agent.nfs.mount-root`; a blank value selects the platform default (`/mnt` on Unix-like systems, `C:\\nfs` on Windows)
 - Simulation mode: detected via hostname patterns (testserver, localhost.test, simulated-nfs-server)
 - Checksum: SHA-256 verification on all transfers
 - Tests: 44 total (36 in NfsTransferProtocolTest + 8 in NfsTransferProtocolUploadTest)
@@ -776,7 +776,7 @@ Each task is complete when:
 | `HealthService` (JDK HttpServer) | ✅ | `/health` + `/status` |
 | Graceful shutdown (idempotent) | ✅ | Cancel timers, stop services, deregister |
 | `AgentMetrics` (OpenTelemetry) | ✅ | Registration, heartbeat, status gauges |
-| Agent configuration (`AgentConfig`) | ✅ | Properties + env var + system property resolution |
+| Agent configuration (`AgentConfig`) | ✅ | Isolated resource/profile/environment/explicit-`Properties` resolution; no JVM-global configuration |
 
 ### quorus-tenant (Multi-Tenancy)
 
@@ -876,10 +876,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## Appendix C: Configuration Reference
 
 Configuration resolution order (highest to lowest priority):
-1. Environment variable (e.g., `QUORUS_HTTP_PORT=8080`)
-2. System property (e.g., `-Dquorus.http.port=8080`)
-3. Properties file (`quorus-controller.properties` / `quorus-agent.properties`)
-4. Default value
+
+1. Explicit `Properties` supplied to the configuration constructor
+2. Environment variable (for example, `QUORUS_HTTP_PORT=8080`)
+3. Profile resource (`quorus-controller-{profile}.properties` / `quorus-agent-{profile}.properties`)
+4. Packaged defaults (`quorus-controller.properties` / `quorus-agent.properties`) and accessor fallbacks
+
+The profile and explicit overrides are supplied at the application boundary and retained by that configuration instance. JVM system properties are deliberately excluded so concurrently deployed controllers and agents cannot contaminate one another.
 
 Environment variable naming: replace dots with underscores, uppercase (`quorus.http.port` → `QUORUS_HTTP_PORT`).
 
@@ -889,7 +892,7 @@ Environment variable naming: replace dots with underscores, uppercase (`quorus.h
 |----------|-------------|---------|
 | `QUORUS_NODE_ID` | Unique node identifier | hostname |
 | `QUORUS_HTTP_PORT` | HTTP API port | `8080` |
-| `QUORUS_HTTP_HOST` | HTTP API bind address | `0.0.0.0` |
+| `QUORUS_HTTP_HOST` | HTTP API bind address | `127.0.0.1` (container deployment sets `0.0.0.0`) |
 | `QUORUS_RAFT_PORT` | Raft gRPC port | `9080` |
 | `QUORUS_CLUSTER_NODES` | Cluster node list (`nodeId=host:port,...`) | `{nodeId}=localhost:{raftPort}` |
 | `QUORUS_RAFT_STORAGE_TYPE` | Storage backend: `raftlog`, `file`, `memory` | `file` |

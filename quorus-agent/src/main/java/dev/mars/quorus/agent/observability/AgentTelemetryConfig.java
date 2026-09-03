@@ -16,7 +16,7 @@
 
 package dev.mars.quorus.agent.observability;
 
-import dev.mars.quorus.agent.config.AgentConfig;
+import dev.mars.quorus.agent.config.AgentConfiguration;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
 import io.opentelemetry.sdk.metrics.SdkMeterProvider;
 import io.opentelemetry.sdk.resources.Resource;
@@ -42,20 +42,21 @@ import io.vertx.tracing.opentelemetry.OpenTelemetryOptions;
  */
 public class AgentTelemetryConfig {
 
-    private static final AgentConfig config = AgentConfig.get();
-
     /**
      * Configure Vert.x options with OpenTelemetry tracing.
      *
      * @param options the VertxOptions to configure
-     * @param agentId the agent ID for service identification
+     * @param config the isolated agent configuration
      * @return configured VertxOptions
      */
-    public static VertxOptions configure(VertxOptions options, String agentId) {
+    public static VertxOptions configure(VertxOptions options, AgentConfiguration config) {
+        if (!config.isTelemetryEnabled()) {
+            return options;
+        }
         // 1. Configure Resource with agent-specific attributes
         Resource resource = Resource.getDefault().toBuilder()
                 .put("service.name", "quorus-agent")
-                .put("service.instance.id", agentId)
+                .put("service.instance.id", config.getAgentId())
                 .build();
 
         // 2. Configure Tracing (OTLP Exporter)
@@ -88,10 +89,4 @@ public class AgentTelemetryConfig {
         return options.setTracingOptions(new OpenTelemetryOptions());
     }
 
-    /**
-     * Get the Prometheus metrics port.
-     */
-    public static int getPrometheusPort() {
-        return config.getPrometheusPort();
-    }
 }

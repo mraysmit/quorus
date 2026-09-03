@@ -16,6 +16,7 @@
 
 package dev.mars.quorus.controller.raft;
 
+import dev.mars.quorus.controller.config.ControllerTestConfig;
 import dev.mars.quorus.agent.AgentInfo;
 import dev.mars.quorus.agent.AgentStatus;
 import dev.mars.quorus.controller.http.HttpApiServer;
@@ -158,7 +159,8 @@ class DurableTransferRestartTest {
                     recoveredState.findJobAssignment(ASSIGNMENT_ID).orElseThrow().getStatus());
             assertEquals(TENANT_ID, recoveredState.findAgent(AGENT_ID).orElseThrow().getTenantId());
 
-            apiServer = new HttpApiServer(vertx, 0, recoveredNode, recoveredState);
+        apiServer = new HttpApiServer(
+                vertx, 0, recoveredNode, recoveredState, ControllerTestConfig.create());
             awaitSuccess(apiServer.start(), TIMEOUT);
             client = WebClient.create(vertx);
             HttpResponse<Buffer> response = awaitSuccess(client

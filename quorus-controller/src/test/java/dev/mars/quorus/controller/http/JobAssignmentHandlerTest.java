@@ -16,6 +16,7 @@
 
 package dev.mars.quorus.controller.http;
 
+import dev.mars.quorus.controller.config.ControllerTestConfig;
 import dev.mars.quorus.agent.AgentInfo;
 import dev.mars.quorus.agent.AgentStatus;
 import dev.mars.quorus.controller.raft.InMemoryTransportSimulator;
@@ -90,7 +91,7 @@ class JobAssignmentHandlerTest {
 
         awaitSuccess(eventually(vertx, raftNode::isLeader, Duration.ofSeconds(10)), Duration.ofSeconds(11));
 
-        httpServer = new HttpApiServer(vertx, HTTP_PORT, raftNode, stateMachine);
+        httpServer = new HttpApiServer(vertx, HTTP_PORT, raftNode, stateMachine, ControllerTestConfig.create());
         awaitSuccess(httpServer.start(), Duration.ofSeconds(5));
 
         webClient = WebClient.create(vertx);

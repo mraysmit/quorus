@@ -43,12 +43,8 @@ import java.util.concurrent.CompletableFuture;
  *   <li>This adapter performs the conversion transparently</li>
  * </ul>
  *
- * <p><b>Configuration:</b> The underlying {@code FileRaftStorage} can be configured via:</p>
- * <ul>
- *   <li>System properties: {@code -Draftlog.syncEnabled=true}</li>
- *   <li>Environment variables: {@code RAFTLOG_SYNC_ENABLED=true}</li>
- *   <li>Programmatic: Pass {@link RaftStorageConfig} to constructor</li>
- * </ul>
+ * <p><b>Configuration:</b> Callers pass a fully assembled
+ * {@link RaftStorageConfig} to the constructor.</p>
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @version 1.0
@@ -66,18 +62,6 @@ public final class RaftLogStorageAdapter implements RaftStorage {
     // =========================================================================
     // Constructors
     // =========================================================================
-
-    /**
-     * Creates an adapter with default configuration.
-     *
-     * <p>Configuration is loaded from system properties, environment variables,
-     * or defaults as defined by {@link RaftStorageConfig#load()}.</p>
-     *
-     * @param vertx the Vert.x instance for Future conversion
-     */
-    public RaftLogStorageAdapter(Vertx vertx) {
-        this(vertx, new FileRaftStorage());
-    }
 
     /**
      * Creates an adapter with custom configuration.

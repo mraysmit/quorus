@@ -26,6 +26,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.bridge.SLF4JBridgeHandler;
 
+import java.util.Properties;
+
 /**
  * Main application class for Quorus Controller.
  *
@@ -58,23 +60,23 @@ public class QuorusControllerApplication {
         logger.info("Initializing Quorus Controller with OpenTelemetry (Vert.x 5)...");
 
         // Load and validate configuration (fail fast on misconfiguration)
-        AppConfig config = AppConfig.get();
+        AppConfig config = new AppConfig("default", new Properties());
         config.validate();
         SecurityConfig.from(config).validate();
         RaftTlsConfig.from(config).validate();
 
         // Create Vert.x instance with OpenTelemetry tracing enabled
         VertxOptions options = new VertxOptions();
-        options = TelemetryConfig.configure(options);
+        options = TelemetryConfig.configure(options, config);
         Vertx vertx = Vertx.vertx(options);
         
         if (config.isTelemetryEnabled()) {
             logger.info("OpenTelemetry tracing enabled - OTLP endpoint: {}, Prometheus metrics port: {}",
-                    TelemetryConfig.getOtlpEndpoint(), TelemetryConfig.getPrometheusPort());
+                    config.getOtlpEndpoint(), config.getPrometheusPort());
         }
 
         // Deploy the main verticle
-        vertx.deployVerticle(new QuorusControllerVerticle())
+        vertx.deployVerticle(new QuorusControllerVerticle(config))
                 .onSuccess(id -> {
                     logger.info("QuorusControllerVerticle deployed successfully (Deployment ID: {})", id);
                 })

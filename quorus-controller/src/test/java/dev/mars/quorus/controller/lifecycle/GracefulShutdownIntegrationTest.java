@@ -16,6 +16,7 @@
 
 package dev.mars.quorus.controller.lifecycle;
 
+import dev.mars.quorus.controller.config.ControllerTestConfig;
 import dev.mars.quorus.controller.http.HttpApiServer;
 import dev.mars.quorus.controller.raft.InMemoryTransportSimulator;
 import dev.mars.quorus.controller.raft.RaftNode;
@@ -79,7 +80,8 @@ class GracefulShutdownIntegrationTest {
                     .pollInterval(Duration.ofMillis(50))
                     .until(raftNode::isLeader);
 
-            HttpApiServer apiServer = new HttpApiServer(vertx, HTTP_PORT, raftNode, stateMachine);
+        HttpApiServer apiServer = new HttpApiServer(
+                vertx, HTTP_PORT, raftNode, stateMachine, ControllerTestConfig.create());
                 awaitSuccess(apiServer.start(), Duration.ofSeconds(5));
 
             // Configure shutdown coordinator with real services
@@ -130,7 +132,8 @@ class GracefulShutdownIntegrationTest {
                     .pollInterval(Duration.ofMillis(50))
                     .until(raftNode::isLeader);
 
-            HttpApiServer apiServer = new HttpApiServer(vertx, port, raftNode, stateMachine);
+        HttpApiServer apiServer = new HttpApiServer(
+                vertx, port, raftNode, stateMachine, ControllerTestConfig.create());
                 awaitSuccess(apiServer.start(), Duration.ofSeconds(5));
 
             WebClient webClient = WebClient.create(vertx);

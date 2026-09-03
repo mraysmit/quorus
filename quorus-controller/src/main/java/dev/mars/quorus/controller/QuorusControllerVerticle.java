@@ -43,6 +43,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.Objects;
 
 /**
  * Main Verticle for the Quorus Controller.
@@ -56,6 +57,7 @@ public class QuorusControllerVerticle extends AbstractVerticle {
 
     private static final Logger logger = LoggerFactory.getLogger(QuorusControllerVerticle.class);
 
+    private final AppConfig config;
     private RaftTransport transport;
     private Optional<RaftNode> raftNode = Optional.empty();
     private RaftStorage raftStorage;
@@ -63,13 +65,16 @@ public class QuorusControllerVerticle extends AbstractVerticle {
     private Optional<GrpcRaftServer> grpcServer = Optional.empty();
     private Optional<ShutdownCoordinator> shutdownCoordinator = Optional.empty();
 
+    public QuorusControllerVerticle(AppConfig config) {
+        this.config = Objects.requireNonNull(config, "config must not be null");
+    }
+
     @Override
     public void start(Promise<Void> startPromise) throws Exception {
         logger.info("Starting QuorusControllerVerticle...");
 
         try {
-            // 1. Load configuration
-            AppConfig config = AppConfig.get();
+            // 1. Use the configuration assembled by the application boundary
             SecurityConfig securityConfig = SecurityConfig.from(config);
             RaftTlsConfig raftTlsConfig = RaftTlsConfig.from(config);
             CertificateTrustState trustState = CertificateTrustState.from(securityConfig);
@@ -177,7 +182,8 @@ public class QuorusControllerVerticle extends AbstractVerticle {
                 node.start().onSuccess(v2 -> {
                     // 8. Start HTTP API
                     HttpApiServer api = new HttpApiServer(
-                            vertx, config.getHttpHost(), port, node, stateMachine, -1, securityConfig, trustState);
+                            vertx, config.getHttpHost(), port, node, stateMachine, -1,
+                            config, securityConfig, trustState);
                     this.apiServer = Optional.of(api);
 
                     api.start()
@@ -209,7 +215,6 @@ public class QuorusControllerVerticle extends AbstractVerticle {
      * </ol>
      */
     private void setupShutdownCoordinator() {
-        AppConfig config = AppConfig.get();
         long drainTimeoutMs = config.getLong("quorus.shutdown.drain.timeout.ms", 5000L);
         long shutdownTimeoutMs = config.getLong("quorus.shutdown.timeout.ms", 30000L);
         

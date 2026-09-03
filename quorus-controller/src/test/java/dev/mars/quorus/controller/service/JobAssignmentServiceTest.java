@@ -4,6 +4,7 @@
  */
 package dev.mars.quorus.controller.service;
 
+import dev.mars.quorus.controller.config.ControllerTestConfig;
 import dev.mars.quorus.agent.AgentInfo;
 import dev.mars.quorus.agent.AgentStatus;
 import dev.mars.quorus.controller.raft.InMemoryTransportSimulator;
@@ -63,7 +64,8 @@ class JobAssignmentServiceTest {
         raftNode.start()
                 .compose(ignored -> awaitLeadership(vertx))
                 .onComplete(context.succeeding(ignored -> {
-                    service = new JobAssignmentService(vertx, raftNode, new AgentSelectionService());
+        service = new JobAssignmentService(
+                vertx, raftNode, new AgentSelectionService(), ControllerTestConfig.create());
                     context.completeNow();
                 }));
     }

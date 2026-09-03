@@ -16,6 +16,7 @@
 
 package dev.mars.quorus.controller.integration;
 
+import dev.mars.quorus.controller.config.ControllerTestConfig;
 import dev.mars.quorus.controller.http.HttpApiServer;
 import dev.mars.quorus.controller.raft.InMemoryTransportSimulator;
 import dev.mars.quorus.controller.raft.RaftNode;
@@ -94,7 +95,7 @@ class StateTransitionIntegrationTest {
 
         awaitSuccess(eventually(vertx, raftNode::isLeader, Duration.ofSeconds(10)), Duration.ofSeconds(11));
 
-        httpServer = new HttpApiServer(vertx, HTTP_PORT, raftNode, stateMachine);
+        httpServer = new HttpApiServer(vertx, HTTP_PORT, raftNode, stateMachine, ControllerTestConfig.create());
         awaitSuccess(httpServer.start(), Duration.ofSeconds(5));
 
         webClient = WebClient.create(vertx);

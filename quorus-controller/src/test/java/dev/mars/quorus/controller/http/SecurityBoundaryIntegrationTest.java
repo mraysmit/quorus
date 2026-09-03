@@ -4,6 +4,7 @@
  */
 package dev.mars.quorus.controller.http;
 
+import dev.mars.quorus.controller.config.ControllerTestConfig;
 import dev.mars.quorus.controller.raft.InMemoryTransportSimulator;
 import dev.mars.quorus.controller.raft.RaftNode;
 import dev.mars.quorus.controller.raft.RaftNodeMode;
@@ -329,7 +330,8 @@ class SecurityBoundaryIntegrationTest {
                 .build();
         awaitSuccess(node.start(), TIMEOUT);
         awaitSuccess(eventually(vertx, node::isLeader, TIMEOUT), TIMEOUT.plusSeconds(1));
-        HttpApiServer server = new HttpApiServer(vertx, "127.0.0.1", 0, node, state, -1, config, auditSink);
+        HttpApiServer server = new HttpApiServer(vertx, "127.0.0.1", 0, node, state, -1,
+                ControllerTestConfig.create(), config, auditSink);
         awaitSuccess(server.start(), TIMEOUT);
         return new RunningServer(server, node, state);
     }

@@ -54,6 +54,19 @@ public class SmbTransferProtocol implements TransferProtocol {
     private static final Logger logger = LoggerFactory.getLogger(SmbTransferProtocol.class);
     private static final int DEFAULT_BUFFER_SIZE = 64 * 1024; // 64KB buffer for SMB
     private static final Duration DEFAULT_TIMEOUT = Duration.ofMinutes(30);
+    private final boolean mountSecurityVerified;
+
+    public SmbTransferProtocol() {
+        this(false);
+    }
+
+    public SmbTransferProtocol(boolean mountSecurityVerified) {
+        this.mountSecurityVerified = mountSecurityVerified;
+    }
+
+    public boolean isMountSecurityVerified() {
+        return mountSecurityVerified;
+    }
     
     @Override
     public String getProtocolName() {
@@ -107,7 +120,7 @@ public class SmbTransferProtocol implements TransferProtocol {
 
         logger.info("Starting SMB transfer: jobId={}, isUpload={}", context.getJobId(), request.isUpload());
         if (request.getRuntimeCredential() != null) {
-            try { MountedFileSystemSecurity.requireVerified("SMB", MountedFileSystemSecurity.configured("SMB")); }
+            try { MountedFileSystemSecurity.requireVerified("SMB", mountSecurityVerified); }
             catch (Exception denied) { throw new TransferException(context.getJobId(), denied.getMessage(), denied); }
         }
         // Use destinationUri for logging to support both uploads and downloads

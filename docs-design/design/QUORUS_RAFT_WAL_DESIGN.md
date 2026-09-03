@@ -1827,10 +1827,10 @@ public final class FileRaftWAL implements RaftStorage {
     private FileChannel logCh;
     private FileChannel metaCh;
 
-    public FileRaftWAL(Vertx vertx, WorkerExecutor walExecutor) {
+    public FileRaftWAL(Vertx vertx, WorkerExecutor walExecutor, AppConfig config) {
         this.vertx = vertx;
         this.walExecutor = walExecutor;
-        this.config = AppConfig.get();
+        this.config = Objects.requireNonNull(config, "config");
         
         // Resolve path from externalized config
         this.dataPath = Paths.get(config.getDataDir());
@@ -1926,11 +1926,15 @@ Add validation in the controller's startup sequence:
 
 ```java
 public class QuorusControllerVerticle extends AbstractVerticle {
-    
+
+    private final AppConfig config;
+
+    public QuorusControllerVerticle(AppConfig config) {
+        this.config = Objects.requireNonNull(config, "config");
+    }
+
     @Override
     public void start(Promise<Void> startPromise) {
-        AppConfig config = AppConfig.get();
-        
         // Validate storage configuration
         Path dataPath = Paths.get(config.getDataDir());
         
@@ -2209,7 +2213,6 @@ ExecStart=/usr/bin/java \
     -XX:+UseG1GC \
     -XX:MaxRAMPercentage=75.0 \
     -XX:+ExitOnOutOfMemoryError \
-    -Dquorus.config.file=/etc/quorus/quorus-controller.properties \
     -jar /opt/quorus/quorus-controller.jar
 
 # Graceful shutdown
@@ -3449,19 +3452,19 @@ public final class RaftStorageFactory {
      * Creates a RaftStorage instance based on configuration.
      * 
      * @param vertx    the Vert.x instance
-     * @param executor the worker executor for blocking I/O
+     * @param storageType the explicitly configured backend
+     * @param storagePath the explicitly configured data path
+     * @param fsync whether durable writes are required
      * @return the configured RaftStorage implementation
      */
-    public static RaftStorage create(Vertx vertx, WorkerExecutor executor) {
-        AppConfig config = AppConfig.get();
-        String storageType = config.getString("quorus.raft.storage.type", "file");
-
+    public static Future<RaftStorage> create(Vertx vertx, String storageType,
+                                              Path storagePath, boolean fsync) {
         return switch (storageType.toLowerCase()) {
             case "rocksdb" -> {
                 validateRocksDbAvailable();
-                yield new RocksDbRaftStorage(vertx, executor);
+                yield openRocksDb(vertx, storagePath, fsync);
             }
-            case "file" -> new FileRaftStorage(vertx, executor);
+            case "file" -> openFileStorage(vertx, storagePath, fsync);
             default -> throw new IllegalArgumentException(
                 "Unknown storage type: " + storageType + ". Valid options: file, rocksdb");
         };

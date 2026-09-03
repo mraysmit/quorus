@@ -30,7 +30,7 @@ import java.nio.file.Path;
 
 /**
  * Configuration for the Quorus Agent.
- * Loads configuration from environment variables and system properties.
+ * Typed, immutable runtime configuration assembled at the application boundary.
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @since 2025-09-04
@@ -60,8 +60,19 @@ public class AgentConfiguration {
     private final String tlsTrustBundlePath;
     private final Path uploadRoot;
     private final Path downloadRoot;
+    private final String nfsMountRoot;
+    private final boolean nfsMountSecurityVerified;
+    private final boolean smbMountSecurityVerified;
     private final String agentPool;
     private final String networkZone;
+    private final long jobPollingInitialDelayMs;
+    private final long jobPollingIntervalMs;
+    private final int foreignAssignmentMismatchThreshold;
+    private final boolean telemetryEnabled;
+    private final int prometheusPort;
+    private final String otlpEndpoint;
+    private final String vaultAddress;
+    private final String vaultToken;
     
     private AgentConfiguration(Builder builder) {
         this.agentId = builder.agentId;
@@ -86,42 +97,58 @@ public class AgentConfiguration {
         this.tlsTrustBundlePath = builder.tlsTrustBundlePath;
         this.uploadRoot = builder.uploadRoot;
         this.downloadRoot = builder.downloadRoot;
+        this.nfsMountRoot = builder.nfsMountRoot;
+        this.nfsMountSecurityVerified = builder.nfsMountSecurityVerified;
+        this.smbMountSecurityVerified = builder.smbMountSecurityVerified;
         this.agentPool = builder.agentPool;
         this.networkZone = builder.networkZone;
+        this.jobPollingInitialDelayMs = builder.jobPollingInitialDelayMs;
+        this.jobPollingIntervalMs = builder.jobPollingIntervalMs;
+        this.foreignAssignmentMismatchThreshold = builder.foreignAssignmentMismatchThreshold;
+        this.telemetryEnabled = builder.telemetryEnabled;
+        this.prometheusPort = builder.prometheusPort;
+        this.otlpEndpoint = builder.otlpEndpoint;
+        this.vaultAddress = builder.vaultAddress;
+        this.vaultToken = builder.vaultToken;
     }
     
-    public static AgentConfiguration fromEnvironment() {
+    public static AgentConfiguration from(AgentConfig config) {
+        config.validate();
         Builder builder = new Builder();
-        
-        // Required configuration
-        builder.agentId(getEnvOrThrow("AGENT_ID"));
-        builder.tenantId(getEnvOrThrow("AGENT_TENANT_ID"));
-        builder.controllerUrl(getEnvOrDefault("CONTROLLER_URL", "https://localhost:8080/api/v1"));
-        
-        // Optional configuration with defaults
-        builder.region(getEnvOrDefault("AGENT_REGION", "default"));
-        builder.datacenter(getEnvOrDefault("AGENT_DATACENTER", "default"));
-        builder.agentPort(Integer.parseInt(getEnvOrDefault("AGENT_PORT", "8080")));
-        builder.maxConcurrentTransfers(Integer.parseInt(getEnvOrDefault("MAX_CONCURRENT_TRANSFERS", "5")));
-        builder.heartbeatInterval(Long.parseLong(getEnvOrDefault("HEARTBEAT_INTERVAL", "30000")));
-        builder.httpConnectionTimeout(Integer.parseInt(getEnvOrDefault("HTTP_CONNECTION_TIMEOUT_MS", "5000")));
-        builder.httpIdleTimeout(Integer.parseInt(getEnvOrDefault("HTTP_IDLE_TIMEOUT_MS", "10000")));
-        builder.version(getEnvOrDefault("AGENT_VERSION", "1.0.0"));
-        builder.securityProfile(getEnvOrDefault("QUORUS_AGENT_SECURITY_PROFILE", "production"));
-        builder.allowInsecure(Boolean.parseBoolean(getEnvOrDefault(
-                "QUORUS_AGENT_SECURITY_ALLOW_INSECURE", "false")));
-        builder.controllerTlsEnabled(Boolean.parseBoolean(getEnvOrDefault(
-                "QUORUS_AGENT_TLS_ENABLED", "true")));
-        builder.tlsCertificatePath(getEnvOrDefault("QUORUS_AGENT_TLS_CERTIFICATE", ""));
-        builder.tlsPrivateKeyPath(getEnvOrDefault("QUORUS_AGENT_TLS_PRIVATE_KEY", ""));
-        builder.tlsTrustBundlePath(getEnvOrDefault("QUORUS_AGENT_TLS_TRUST_BUNDLE", ""));
-        builder.uploadRoot(Path.of(getEnvOrDefault("QUORUS_AGENT_UPLOAD_ROOT", "data/uploads")));
-        builder.downloadRoot(Path.of(getEnvOrDefault("QUORUS_AGENT_DOWNLOAD_ROOT", "data/downloads")));
-        builder.agentPool(getEnvOrDefault("QUORUS_AGENT_POOL", "default"));
-        builder.networkZone(getEnvOrDefault("QUORUS_AGENT_NETWORK_ZONE", "default"));
-        
-        // Parse supported protocols
-        String protocolsStr = getEnvOrDefault("SUPPORTED_PROTOCOLS", "HTTP,HTTPS");
+        builder.agentId(config.getAgentId());
+        builder.tenantId(config.getTenantId());
+        builder.controllerUrl(config.getControllerUrl());
+        builder.region(config.getRegion());
+        builder.datacenter(config.getDatacenter());
+        builder.agentPort(config.getAgentPort());
+        builder.maxConcurrentTransfers(config.getMaxConcurrentTransfers());
+        builder.heartbeatInterval(config.getHeartbeatIntervalMs());
+        builder.httpConnectionTimeout(config.getHttpConnectionTimeoutMs());
+        builder.httpIdleTimeout(config.getHttpIdleTimeoutMs());
+        builder.version(config.getVersion());
+        builder.securityProfile(config.getSecurityProfile());
+        builder.allowInsecure(config.isAllowInsecure());
+        builder.controllerTlsEnabled(config.isControllerTlsEnabled());
+        builder.tlsCertificatePath(config.getTlsCertificatePath());
+        builder.tlsPrivateKeyPath(config.getTlsPrivateKeyPath());
+        builder.tlsTrustBundlePath(config.getTlsTrustBundlePath());
+        builder.uploadRoot(Path.of(config.getUploadRoot()));
+        builder.downloadRoot(Path.of(config.getDownloadRoot()));
+        builder.nfsMountRoot(config.getNfsMountRoot());
+        builder.nfsMountSecurityVerified(config.isNfsMountSecurityVerified());
+        builder.smbMountSecurityVerified(config.isSmbMountSecurityVerified());
+        builder.agentPool(config.getAgentPool());
+        builder.networkZone(config.getNetworkZone());
+        builder.jobPollingInitialDelayMs(config.getJobPollingInitialDelayMs());
+        builder.jobPollingIntervalMs(config.getJobPollingIntervalMs());
+        builder.foreignAssignmentMismatchThreshold(config.getForeignAssignmentMismatchThreshold());
+        builder.telemetryEnabled(config.isTelemetryEnabled());
+        builder.prometheusPort(config.getPrometheusPort());
+        builder.otlpEndpoint(config.getOtlpEndpoint());
+        builder.vaultAddress(config.getVaultAddress());
+        builder.vaultToken(config.getVaultToken());
+
+        String protocolsStr = config.getSupportedProtocols();
         Set<String> protocols = new HashSet<>(Arrays.asList(protocolsStr.split(",")));
         builder.supportedProtocols(protocols);
         
@@ -136,19 +163,6 @@ public class AgentConfiguration {
         }
         
         return builder.build();
-    }
-    
-    private static String getEnvOrThrow(String name) {
-        String value = System.getenv(name);
-        if (value == null || value.trim().isEmpty()) {
-            throw new IllegalArgumentException("Required environment variable not set: " + name);
-        }
-        return value.trim();
-    }
-    
-    private static String getEnvOrDefault(String name, String defaultValue) {
-        String value = System.getenv(name);
-        return (value != null && !value.trim().isEmpty()) ? value.trim() : defaultValue;
     }
     
     public AgentCapabilities createCapabilities() {
@@ -200,8 +214,19 @@ public class AgentConfiguration {
     public String getTlsTrustBundlePath() { return tlsTrustBundlePath; }
     public Path getUploadRoot() { return uploadRoot; }
     public Path getDownloadRoot() { return downloadRoot; }
+    public String getNfsMountRoot() { return nfsMountRoot; }
+    public boolean isNfsMountSecurityVerified() { return nfsMountSecurityVerified; }
+    public boolean isSmbMountSecurityVerified() { return smbMountSecurityVerified; }
     public String getAgentPool() { return agentPool; }
     public String getNetworkZone() { return networkZone; }
+    public long getJobPollingInitialDelayMs() { return jobPollingInitialDelayMs; }
+    public long getJobPollingIntervalMs() { return jobPollingIntervalMs; }
+    public int getForeignAssignmentMismatchThreshold() { return foreignAssignmentMismatchThreshold; }
+    public boolean isTelemetryEnabled() { return telemetryEnabled; }
+    public int getPrometheusPort() { return prometheusPort; }
+    public String getOtlpEndpoint() { return otlpEndpoint; }
+    public String getVaultAddress() { return vaultAddress; }
+    public String getVaultToken() { return vaultToken; }
     
     public static class Builder {
         private String agentId;
@@ -226,8 +251,19 @@ public class AgentConfiguration {
         private String tlsTrustBundlePath;
         private Path uploadRoot = Path.of("data/uploads");
         private Path downloadRoot = Path.of("data/downloads");
+        private String nfsMountRoot = "";
+        private boolean nfsMountSecurityVerified;
+        private boolean smbMountSecurityVerified;
         private String agentPool = "default";
         private String networkZone = "default";
+        private long jobPollingInitialDelayMs = 5000;
+        private long jobPollingIntervalMs = 10000;
+        private int foreignAssignmentMismatchThreshold = 3;
+        private boolean telemetryEnabled = true;
+        private int prometheusPort = 9465;
+        private String otlpEndpoint = "http://localhost:4317";
+        private String vaultAddress;
+        private String vaultToken;
         
         public Builder agentId(String agentId) { this.agentId = agentId; return this; }
         public Builder tenantId(String tenantId) { this.tenantId = tenantId; return this; }
@@ -251,8 +287,19 @@ public class AgentConfiguration {
         public Builder tlsTrustBundlePath(String path) { this.tlsTrustBundlePath = path; return this; }
         public Builder uploadRoot(Path path) { this.uploadRoot = path; return this; }
         public Builder downloadRoot(Path path) { this.downloadRoot = path; return this; }
+        public Builder nfsMountRoot(String value) { this.nfsMountRoot = value; return this; }
+        public Builder nfsMountSecurityVerified(boolean value) { this.nfsMountSecurityVerified = value; return this; }
+        public Builder smbMountSecurityVerified(boolean value) { this.smbMountSecurityVerified = value; return this; }
         public Builder agentPool(String value) { this.agentPool = value; return this; }
         public Builder networkZone(String value) { this.networkZone = value; return this; }
+        public Builder jobPollingInitialDelayMs(long value) { this.jobPollingInitialDelayMs = value; return this; }
+        public Builder jobPollingIntervalMs(long value) { this.jobPollingIntervalMs = value; return this; }
+        public Builder foreignAssignmentMismatchThreshold(int value) { this.foreignAssignmentMismatchThreshold = value; return this; }
+        public Builder telemetryEnabled(boolean value) { this.telemetryEnabled = value; return this; }
+        public Builder prometheusPort(int value) { this.prometheusPort = value; return this; }
+        public Builder otlpEndpoint(String value) { this.otlpEndpoint = value; return this; }
+        public Builder vaultAddress(String value) { this.vaultAddress = value; return this; }
+        public Builder vaultToken(String value) { this.vaultToken = value; return this; }
         
         public AgentConfiguration build() {
             if (agentId == null) throw new IllegalArgumentException("agentId is required");
@@ -260,8 +307,20 @@ public class AgentConfiguration {
             if (controllerUrl == null) throw new IllegalArgumentException("controllerUrl is required");
             if (uploadRoot == null) throw new IllegalArgumentException("uploadRoot is required");
             if (downloadRoot == null) throw new IllegalArgumentException("downloadRoot is required");
+            if (nfsMountRoot == null) throw new IllegalArgumentException("nfsMountRoot is required");
             if (agentPool == null || agentPool.isBlank()) throw new IllegalArgumentException("agentPool is required");
             if (networkZone == null || networkZone.isBlank()) throw new IllegalArgumentException("networkZone is required");
+            if (jobPollingInitialDelayMs < 0) throw new IllegalArgumentException("jobPollingInitialDelayMs must not be negative");
+            if (jobPollingIntervalMs <= 0) throw new IllegalArgumentException("jobPollingIntervalMs must be positive");
+            if (foreignAssignmentMismatchThreshold <= 0) {
+                throw new IllegalArgumentException("foreignAssignmentMismatchThreshold must be positive");
+            }
+            if (prometheusPort < 1 || prometheusPort > 65535) {
+                throw new IllegalArgumentException("prometheusPort must be between 1 and 65535");
+            }
+            if (otlpEndpoint == null || otlpEndpoint.isBlank()) {
+                throw new IllegalArgumentException("otlpEndpoint is required");
+            }
             boolean production = "production".equalsIgnoreCase(securityProfile);
             if (!production && !"development".equalsIgnoreCase(securityProfile)) {
                 throw new IllegalArgumentException("securityProfile must be development or production");

@@ -22,14 +22,16 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.util.Objects;
 import java.util.Properties;
 
 /**
  * Configuration management for Quorus system.
- * Handles loading and providing access to system configuration parameters.
+ * Handles loading and providing access to Quorus configuration parameters.
+ * Every instance is isolated and follows the PeeGeeQ precedence contract:
+ * packaged defaults, optional profile, environment, explicit overrides.
+ * JVM system properties and implicit filesystem searches are not configuration
+ * channels.
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @since 2025-08-17
@@ -50,26 +52,27 @@ public class QuorusConfiguration {
     private static final String DEFAULT_TEMP_DIR = System.getProperty("java.io.tmpdir");
     
     private final Properties properties;
-    
-    public QuorusConfiguration() {
-        logger.debug("Initializing QuorusConfiguration with default settings");
+    private final String profile;
+
+    public QuorusConfiguration(String profile, Properties overrides) {
+        this.profile = Objects.requireNonNull(profile, "profile must not be null");
+        Objects.requireNonNull(overrides, "overrides must not be null");
+        logger.debug("Initializing QuorusConfiguration: profile={}, overrideCount={}",
+                profile, overrides.size());
         this.properties = new Properties();
         loadDefaultConfiguration();
-        loadConfigurationFromFile();
-        loadConfigurationFromSystemProperties();
-        logger.debug("QuorusConfiguration initialized: maxConcurrentTransfers={}, maxRetryAttempts={}", 
-                     getMaxConcurrentTransfers(), getMaxRetryAttempts());
-    }
-    
-    public QuorusConfiguration(Properties properties) {
-        logger.debug("Initializing QuorusConfiguration with custom properties: count={}", 
-                     properties != null ? properties.size() : 0);
-        this.properties = new Properties();
-        loadDefaultConfiguration();
-        if (properties != null) {
-            this.properties.putAll(properties);
-            logger.debug("Applied {} custom properties", properties.size());
+        loadResource("quorus.properties", true);
+        if (!"default".equals(profile)) {
+            loadResource("quorus-" + profile + ".properties", false);
         }
+        applyEnvironmentOverrides();
+        this.properties.putAll(overrides);
+        logger.debug("QuorusConfiguration initialized: maxConcurrentTransfers={}, maxRetryAttempts={}",
+                getMaxConcurrentTransfers(), getMaxRetryAttempts());
+    }
+
+    public String getProfile() {
+        return profile;
     }
     
     // Transfer Engine Configuration
@@ -137,10 +140,6 @@ public class QuorusConfiguration {
         return properties.getProperty(key, defaultValue);
     }
     
-    public void setProperty(String key, String value) {
-        properties.setProperty(key, value);
-    }
-    
     // Utility methods for type conversion
     private String getStringProperty(String key, String defaultValue) {
         return properties.getProperty(key, defaultValue);
@@ -202,56 +201,29 @@ public class QuorusConfiguration {
         properties.setProperty("quorus.monitoring.health.enabled", "true");
     }
     
-    private void loadConfigurationFromFile() {
-        // Try to load from various locations
-        String[] configFiles = {
-                "quorus.properties",
-                "config/quorus.properties",
-                System.getProperty("user.home") + "/.quorus/quorus.properties",
-                "/etc/quorus/quorus.properties"
-        };
-        
-        for (String configFile : configFiles) {
-            Path configPath = Paths.get(configFile);
-            if (Files.exists(configPath) && Files.isReadable(configPath)) {
-                logger.debug("Found configuration file: {}", configPath);
-                try (InputStream input = Files.newInputStream(configPath)) {
-                    properties.load(input);
-                    logger.info("Loaded configuration from: {}", configPath);
-                    return;
-                } catch (IOException e) {
-                    logger.warn("Failed to load configuration from {}: {}", configPath, e.getMessage());
-                }
-            } else {
-                logger.debug("Configuration file not found or not readable: {}", configPath);
-            }
-        }
-        
-        // Try to load from classpath
-        logger.debug("Attempting to load configuration from classpath");
-        try (InputStream input = getClass().getClassLoader().getResourceAsStream("quorus.properties")) {
+    private void loadResource(String resourceName, boolean required) {
+        try (InputStream input = getClass().getClassLoader().getResourceAsStream(resourceName)) {
             if (input != null) {
                 properties.load(input);
-                logger.info("Loaded configuration from classpath");
+                logger.info("Loaded configuration from {}", resourceName);
+            } else if (required) {
+                logger.warn("Configuration resource {} not found; using built-in defaults", resourceName);
             } else {
-                logger.debug("No configuration file found on classpath");
+                logger.debug("Optional configuration profile {} not found", resourceName);
             }
         } catch (IOException e) {
-            logger.warn("Failed to load configuration from classpath: {}", e.getMessage());
+            throw new IllegalStateException("Unable to load configuration resource " + resourceName, e);
         }
     }
-    
-    private void loadConfigurationFromSystemProperties() {
-        logger.debug("Loading configuration overrides from system properties");
-        // Override with system properties that start with "quorus."
-        long count = System.getProperties().entrySet().stream()
-                .filter(entry -> entry.getKey().toString().startsWith("quorus."))
-                .peek(entry -> {
-                    properties.setProperty(entry.getKey().toString(), entry.getValue().toString());
-                    logger.debug("Override from system property: {}={}", entry.getKey(), entry.getValue());
-                })
-                .count();
-        logger.debug("Applied {} system property overrides", count);
+
+    private void applyEnvironmentOverrides() {
+        for (String key : properties.stringPropertyNames()) {
+            String environmentKey = key.toUpperCase().replace('.', '_').replace('-', '_');
+            String environmentValue = System.getenv(environmentKey);
+            if (environmentValue != null && !environmentValue.isBlank()) {
+                properties.setProperty(key, environmentValue);
+            }
+        }
     }
     
     @Override
