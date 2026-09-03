@@ -185,7 +185,7 @@ class ProtocolServersLifecycleIT {
             
             System.out.println("\n[PASS] FTP Protocol Validation Complete");
             System.out.println("   Total operations: 4 (connect, auth, pasv, list)");
-            System.out.println("   Container network URL: ftp://testuser:testpass@ftp:21/path");
+            System.out.println("   Container network URL: ftp://ftp:21/path (credentials injected separately)");
             
         } finally {
             if (ftp.isConnected()) {
@@ -269,7 +269,7 @@ class ProtocolServersLifecycleIT {
             System.out.println("   SSH handshake: " + connectTime + "ms");
             System.out.println("   SFTP channel: " + channelTime + "ms");
             System.out.println("   Directory ops: " + listTime + "ms");
-            System.out.println("   Container network URL: sftp://testuser:testpass@sftp:22/upload/path");
+            System.out.println("   Container network URL: sftp://sftp:22/upload/path (credentials injected separately)");
             
         } finally {
             if (channel != null && channel.isConnected()) {
@@ -349,7 +349,7 @@ class ProtocolServersLifecycleIT {
             System.out.println("   Connection + auth: " + connectTime + "ms");
             System.out.println("   Share verification: " + existsTime + "ms");
             System.out.println("   Directory enum: " + listTime + "ms");
-            System.out.println("   Container network URL: smb://testuser:testpass@smb:445/testshare/path");
+            System.out.println("   Container network URL: smb://smb:445/testshare/path (credentials injected separately)");
         }
         
         System.out.println("   SMB connection closed\n");
@@ -387,14 +387,14 @@ class ProtocolServersLifecycleIT {
         System.out.println("VALIDATED CONNECTION URLS FOR INTEGRATION TESTS");
         System.out.println("-".repeat(80));
         System.out.println("From container network (use these in TransferProtocol tests):");
-        System.out.println("  FTP:  ftp://testuser:testpass@ftp:21/<path>");
-        System.out.println("  SFTP: sftp://testuser:testpass@sftp:22/upload/<path>");
-        System.out.println("  SMB:  smb://testuser:testpass@smb:445/testshare/<path>");
+        System.out.println("  FTP:  ftp://ftp:21/<path> (credentials injected separately)");
+        System.out.println("  SFTP: sftp://sftp:22/upload/<path> (credentials injected separately)");
+        System.out.println("  SMB:  smb://smb:445/testshare/<path> (credentials injected separately)");
         System.out.println();
         System.out.println("From host machine (for manual verification):");
-        System.out.println("  FTP:  ftp://testuser:testpass@localhost:21/<path>");
-        System.out.println("  SFTP: sftp://testuser:testpass@localhost:2222/upload/<path>");
-        System.out.println("  SMB:  smb://testuser:testpass@localhost:4445/testshare/<path>");
+        System.out.println("  FTP:  ftp://localhost:21/<path> (credentials injected separately)");
+        System.out.println("  SFTP: sftp://localhost:2222/upload/<path> (credentials injected separately)");
+        System.out.println("  SMB:  smb://localhost:4445/testshare/<path> (credentials injected separately)");
         System.out.println("=".repeat(80));
         System.out.println("\n[PASS] Infrastructure validation complete - Ready for full transfer testing\n");
         

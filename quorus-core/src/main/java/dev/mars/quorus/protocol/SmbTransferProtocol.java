@@ -26,6 +26,7 @@ import dev.mars.quorus.storage.ChecksumCalculator;
 import dev.mars.quorus.transfer.TransferContext;
 import dev.mars.quorus.transfer.ProgressTracker;
 import dev.mars.quorus.util.SensitiveDataRedactor;
+import dev.mars.quorus.connection.MountedFileSystemSecurity;
 
 import static dev.mars.quorus.core.exceptions.QuorusErrorCode.*;
 import io.vertx.core.Context;
@@ -105,6 +106,10 @@ public class SmbTransferProtocol implements TransferProtocol {
         }
 
         logger.info("Starting SMB transfer: jobId={}, isUpload={}", context.getJobId(), request.isUpload());
+        if (request.getRuntimeCredential() != null) {
+            try { MountedFileSystemSecurity.requireVerified("SMB", MountedFileSystemSecurity.configured("SMB")); }
+            catch (Exception denied) { throw new TransferException(context.getJobId(), denied.getMessage(), denied); }
+        }
         // Use destinationUri for logging to support both uploads and downloads
         logger.debug("Transfer details: sourceUri={}, destinationUri={}", 
             SensitiveDataRedactor.redactUri(request.getSourceUri()),

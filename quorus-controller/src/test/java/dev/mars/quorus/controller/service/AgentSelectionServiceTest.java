@@ -228,6 +228,32 @@ class AgentSelectionServiceTest {
         
         assertNull(selected, "Should return null when no agents available");
     }
+
+    @Test
+    void governedJobSelectsOnlyAgentInRequiredPoolAndNetworkZone() {
+        availableAgents.get("agent-001").setAgentPool("payments-agents");
+        availableAgents.get("agent-001").setNetworkZone("payments-dmz");
+        availableAgents.get("agent-002").setAgentPool("payments-agents");
+        availableAgents.get("agent-002").setNetworkZone("corporate-lan");
+        availableAgents.get("agent-003").setAgentPool("general-agents");
+        availableAgents.get("agent-003").setNetworkZone("payments-dmz");
+        JobRequirements requirements = new JobRequirements.Builder()
+                .tenantId("tenant-1")
+                .selectionStrategy(JobRequirements.SelectionStrategy.LEAST_LOADED)
+                .build();
+        TransferRequest request = TransferRequest.builder()
+                .sourceUri(URI.create("https://payments.example.com/statement.dat"))
+                .destinationPath(Paths.get("/dest/statement.dat"))
+                .metadata("agentPool", "payments-agents")
+                .metadata("networkZone", "payments-dmz")
+                .build();
+        QueuedJob job = new QueuedJob.Builder()
+                .transferJob(new TransferJob(request))
+                .requirements(requirements)
+                .build();
+
+        assertEquals("agent-001", selectionService.selectAgent(job, availableAgents, agentLoads));
+    }
     
     // Helper methods
     

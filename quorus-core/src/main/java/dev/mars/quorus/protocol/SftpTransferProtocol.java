@@ -24,6 +24,9 @@ import dev.mars.quorus.storage.ChecksumCalculator;
 import dev.mars.quorus.transfer.TransferContext;
 import dev.mars.quorus.transfer.ProgressTracker;
 import dev.mars.quorus.util.SensitiveDataRedactor;
+import dev.mars.quorus.connection.RuntimeCredential;
+import dev.mars.quorus.connection.ServiceConnection;
+import dev.mars.quorus.connection.SftpHostKeyPolicy;
 
 import static dev.mars.quorus.core.exceptions.QuorusErrorCode.*;
 import io.vertx.core.Context;
@@ -36,10 +39,17 @@ import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.net.URI;
+import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.StandardOpenOption;
+import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Set;
+import java.util.List;
 /**
  * Description for SftpTransferProtocol
  *
@@ -191,7 +201,7 @@ public class SftpTransferProtocol implements TransferProtocol {
                     SensitiveDataRedactor.redactUri(request.getSourceUri()), request.getDestinationPath());
 
             // Parse SFTP URI and extract connection details
-            SftpConnectionInfo connectionInfo = parseSftpUri(request.getSourceUri());
+            SftpConnectionInfo connectionInfo = parseSftpUri(request.getSourceUri(), request.getRuntimeCredential());
             logger.debug("performSftpDownload: parsed connection info - host={}, port={}, path={}", 
                 connectionInfo.host, connectionInfo.port, connectionInfo.path);
 
@@ -272,7 +282,7 @@ public class SftpTransferProtocol implements TransferProtocol {
                     SensitiveDataRedactor.redactUri(destinationUri));
 
             // Parse destination SFTP URI and extract connection details
-            SftpConnectionInfo connectionInfo = parseSftpUri(destinationUri);
+            SftpConnectionInfo connectionInfo = parseSftpUri(destinationUri, request.getRuntimeCredential());
             logger.debug("performSftpUpload: parsed connection info - host={}, port={}, path={}", 
                 connectionInfo.host, connectionInfo.port, connectionInfo.path);
 
@@ -369,20 +379,38 @@ public class SftpTransferProtocol implements TransferProtocol {
 
         void connect() throws JSchException {
             logger.debug("Connecting to SFTP server: {}:{}", connectionInfo.host, connectionInfo.port);
-            logger.debug("SftpClient.connect: username={}, hasPassword={}", 
-                connectionInfo.username, connectionInfo.password != null);
+            logger.debug("SftpClient.connect: username={}, authenticationType={}",
+                connectionInfo.username, connectionInfo.authenticationType);
 
             // Create session
             logger.debug("SftpClient.connect: creating JSch session");
             session = jsch.getSession(connectionInfo.username, connectionInfo.host, connectionInfo.port);
+            if (!connectionInfo.approvedResolvedAddresses.isEmpty()) {
+                session.setSocketFactory(new PinnedSocketFactory(
+                        connectionInfo.approvedResolvedAddresses.getFirst()));
+            }
 
-            if (connectionInfo.password != null) {
+            if (connectionInfo.authenticationType == ServiceConnection.AuthenticationType.SSH_PRIVATE_KEY) {
+                byte[] privateKey = connectionInfo.consumePrivateKey();
+                try {
+                    jsch.addIdentity("quorus-runtime", privateKey, null, null);
+                    logger.debug("SftpClient.connect: ephemeral private-key authentication configured");
+                } finally {
+                    java.util.Arrays.fill(privateKey, (byte) 0);
+                }
+            } else if (connectionInfo.password != null) {
                 session.setPassword(connectionInfo.password);
                 logger.debug("SftpClient.connect: password authentication configured");
             }
 
             // Configure session properties
-            session.setConfig("StrictHostKeyChecking", "no"); // For demo purposes
+            if (connectionInfo.approvedHostKeyFingerprints.isEmpty()) {
+                // Legacy direct-URI compatibility is confined to non-production submission paths.
+                session.setConfig("StrictHostKeyChecking", "no");
+            } else {
+                jsch.setHostKeyRepository(new PinnedHostKeyRepository(connectionInfo.approvedHostKeyFingerprints));
+                session.setConfig("StrictHostKeyChecking", "yes");
+            }
             session.setTimeout((int) CONNECTION_TIMEOUT.toMillis());
             logger.debug("SftpClient.connect: session configured with timeout={}ms", CONNECTION_TIMEOUT.toMillis());
 
@@ -562,6 +590,7 @@ public class SftpTransferProtocol implements TransferProtocol {
             } catch (Exception e) {
                 logger.warn("Error disconnecting SFTP session: {}", e.getMessage());
             }
+            clearIdentities();
         }
         
         /**
@@ -589,10 +618,20 @@ public class SftpTransferProtocol implements TransferProtocol {
             } catch (Exception e) {
                 logger.warn("Error during SFTP session force disconnect: {}", e.getMessage());
             }
+            clearIdentities();
+        }
+
+        private void clearIdentities() {
+            try {
+                jsch.removeAllIdentity();
+            } catch (JSchException e) {
+                logger.warn("Error clearing ephemeral SFTP identity: {}", e.getMessage());
+            }
         }
     }
     
-    private SftpConnectionInfo parseSftpUri(URI sourceUri) throws TransferException {
+    private SftpConnectionInfo parseSftpUri(URI sourceUri, RuntimeCredential runtimeCredential)
+            throws TransferException {
         String scheme = sourceUri.getScheme();
         if (!"sftp".equalsIgnoreCase(scheme)) {
             throw new TransferException("unknown", "Invalid SFTP URI scheme: " + scheme);
@@ -617,6 +656,8 @@ public class SftpTransferProtocol implements TransferProtocol {
         String userInfo = sourceUri.getUserInfo();
         String username = null;
         String password = null;
+        byte[] privateKey = null;
+        ServiceConnection.AuthenticationType authenticationType = ServiceConnection.AuthenticationType.PASSWORD;
         
         if (userInfo != null) {
             String[] parts = userInfo.split(":", 2);
@@ -625,8 +666,29 @@ public class SftpTransferProtocol implements TransferProtocol {
                 password = parts[1];
             }
         }
+        Set<String> pins = Set.of();
+        if (runtimeCredential != null) {
+            username = runtimeCredential.identity();
+            authenticationType = runtimeCredential.authenticationType();
+            char[] secret = runtimeCredential.copySecret();
+            try {
+                if (authenticationType == ServiceConnection.AuthenticationType.SSH_PRIVATE_KEY) {
+                    ByteBuffer encoded = StandardCharsets.UTF_8.encode(CharBuffer.wrap(secret));
+                    privateKey = new byte[encoded.remaining()];
+                    encoded.get(privateKey);
+                    if (encoded.hasArray()) java.util.Arrays.fill(encoded.array(), (byte) 0);
+                } else {
+                    password = new String(secret);
+                }
+            } finally {
+                java.util.Arrays.fill(secret, '\0');
+            }
+            pins = runtimeCredential.sshHostKeyFingerprints();
+        }
         
-        return new SftpConnectionInfo(host, port, path, username, password);
+        return new SftpConnectionInfo(host, port, path, username, password, privateKey,
+                authenticationType, pins,
+                runtimeCredential == null ? List.of() : runtimeCredential.approvedResolvedAddresses());
     }
 
     /**
@@ -638,13 +700,33 @@ public class SftpTransferProtocol implements TransferProtocol {
         final String path;
         final String username;
         final String password;
+        private byte[] privateKey;
+        final ServiceConnection.AuthenticationType authenticationType;
+        final Set<String> approvedHostKeyFingerprints;
+        final List<String> approvedResolvedAddresses;
         
-        SftpConnectionInfo(String host, int port, String path, String username, String password) {
+        SftpConnectionInfo(String host, int port, String path, String username, String password, byte[] privateKey,
+                           ServiceConnection.AuthenticationType authenticationType,
+                           Set<String> approvedHostKeyFingerprints,
+                           List<String> approvedResolvedAddresses) {
             this.host = host;
             this.port = port;
             this.path = path;
             this.username = username;
             this.password = password;
+            this.privateKey = privateKey;
+            this.authenticationType = authenticationType;
+            this.approvedHostKeyFingerprints = Set.copyOf(approvedHostKeyFingerprints);
+            this.approvedResolvedAddresses = List.copyOf(approvedResolvedAddresses);
+        }
+
+        byte[] consumePrivateKey() throws JSchException {
+            if (privateKey == null || privateKey.length == 0) {
+                throw new JSchException("SFTP private-key secret is empty");
+            }
+            byte[] material = privateKey;
+            privateKey = null;
+            return material;
         }
         
         boolean hasAuthentication() {
@@ -661,5 +743,36 @@ public class SftpTransferProtocol implements TransferProtocol {
                     ", hasAuth=" + hasAuthentication() +
                     '}';
         }
+    }
+
+    private static final class PinnedSocketFactory implements com.jcraft.jsch.SocketFactory {
+        private final String address;
+        private PinnedSocketFactory(String address) { this.address = address; }
+        @Override public Socket createSocket(String ignoredHost, int port) throws IOException {
+            Socket socket = new Socket();
+            socket.connect(new InetSocketAddress(address, port), (int) CONNECTION_TIMEOUT.toMillis());
+            if (!address.equals(socket.getInetAddress().getHostAddress())) {
+                socket.close();
+                throw new IOException("Q-EGRESS-SOCKET-BIND: connected SFTP address was not approved");
+            }
+            return socket;
+        }
+        @Override public InputStream getInputStream(Socket socket) throws IOException { return socket.getInputStream(); }
+        @Override public OutputStream getOutputStream(Socket socket) throws IOException { return socket.getOutputStream(); }
+    }
+
+    private static final class PinnedHostKeyRepository implements HostKeyRepository {
+        private final Set<String> pins;
+        private PinnedHostKeyRepository(Set<String> pins) { this.pins = Set.copyOf(pins); }
+        @Override public int check(String host, byte[] key) {
+            try { SftpHostKeyPolicy.requireApproved(key, pins); return OK; }
+            catch (Exception denied) { return CHANGED; }
+        }
+        @Override public void add(HostKey hostkey, UserInfo ui) { throw new UnsupportedOperationException(); }
+        @Override public void remove(String host, String type) { }
+        @Override public void remove(String host, String type, byte[] key) { }
+        @Override public String getKnownHostsRepositoryID() { return "quorus-managed-host-key-pins"; }
+        @Override public HostKey[] getHostKey() { return new HostKey[0]; }
+        @Override public HostKey[] getHostKey(String host, String type) { return new HostKey[0]; }
     }
 }

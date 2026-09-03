@@ -129,6 +129,15 @@ public class AgentSelectionService {
             return false;
         }
 
+        String requiredPool = request.getMetadata().get("agentPool");
+        if (requiredPool != null && !requiredPool.equals(agent.getAgentPool())) {
+            return false;
+        }
+        String requiredZone = request.getMetadata().get("networkZone");
+        if (requiredZone != null && !requiredZone.equals(agent.getNetworkZone())) {
+            return false;
+        }
+
         // Check agent status - must be available for work
         if (!agent.getStatus().isAvailableForWork()) {
             return false;
@@ -146,7 +155,7 @@ public class AgentSelectionService {
         
         // Check protocol compatibility
         String sourceProtocol = extractProtocol(request.getSourceUri());
-        String destProtocol = extractProtocolFromPath(request.getDestinationPath());
+        String destProtocol = extractProtocol(request.getDestinationUri());
 
         // Check source protocol support
         if (!agent.getCapabilities().supportsProtocol(sourceProtocol)) {

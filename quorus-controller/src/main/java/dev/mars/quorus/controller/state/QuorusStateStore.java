@@ -181,7 +181,7 @@ public class QuorusStateStore implements RaftLogApplicator {
                 }
                 logger.debug("Creating transfer job: jobId={}, sourceUri={}, destPath={}", 
                     jobId, SensitiveDataRedactor.redactUri(job.getRequest().getSourceUri()),
-                    job.getRequest().getDestinationPath());
+                    SensitiveDataRedactor.redactUri(job.getRequest().getDestinationUri()));
                 TransferJobSnapshot snapshot = TransferJobSnapshot.fromTransferJob(job, cmd.tenantId());
                 transferJobs.put(jobId, snapshot);
                 appendTransferEvent(jobId, "TRANSFER_SUBMITTED", cmd.timestamp(), null, null,
@@ -221,7 +221,11 @@ public class QuorusStateStore implements RaftLogApplicator {
                         existingJob.getDescription(),
                         existingJob.getTenantId(),
                         existingJob.getOperationalContext(),
-                        existingJob.getLastProgressAt());
+                        existingJob.getLastProgressAt(),
+                        existingJob.getServiceConnectionId(), existingJob.getRemotePath(),
+                        existingJob.getConnectionPolicyVersion(), existingJob.getConnectionPolicyDigest(),
+                        existingJob.getAgentPool(),
+                        existingJob.getControllerResolvedAddresses());
                 transferJobs.put(jobId, updatedJob);
                 logger.info("Updated transfer job status: jobId={}, oldStatus={}, newStatus={}", 
                     jobId, oldStatus, cmd.newStatus());
@@ -259,7 +263,11 @@ public class QuorusStateStore implements RaftLogApplicator {
                         progressJob.getDescription(),
                         progressJob.getTenantId(),
                         progressJob.getOperationalContext(),
-                        cmd.bytesTransferred() > oldBytes ? cmd.timestamp() : progressJob.getLastProgressAt());
+                        cmd.bytesTransferred() > oldBytes ? cmd.timestamp() : progressJob.getLastProgressAt(),
+                        progressJob.getServiceConnectionId(), progressJob.getRemotePath(),
+                        progressJob.getConnectionPolicyVersion(), progressJob.getConnectionPolicyDigest(),
+                        progressJob.getAgentPool(),
+                        progressJob.getControllerResolvedAddresses());
                 transferJobs.put(jobId, updatedJob);
                 logger.debug("Updated transfer job progress: jobId={}, oldBytes={}, newBytes={}, totalBytes={}", 
                     jobId, oldBytes, cmd.bytesTransferred(), progressJob.getTotalBytes());
@@ -386,8 +394,7 @@ public class QuorusStateStore implements RaftLogApplicator {
         return switch (command) {
             case SystemMetadataCommand.Set cmd -> {
                 String oldValue = systemMetadata.put(key, cmd.value());
-                logger.info("Set system metadata: key={}, value={}, previousValue={}", 
-                    key, cmd.value(), oldValue);
+                logger.info("Set system metadata: key={}, valuePresent=true, replaced={}", key, oldValue != null);
                 yield new CommandResult.Success<>(oldValue);
             }
             case SystemMetadataCommand.Delete delete -> {
@@ -397,7 +404,7 @@ public class QuorusStateStore implements RaftLogApplicator {
                     logger.warn("System metadata not found for deletion: key={}", key);
                     yield new CommandResult.NotFound<>(key, "SystemMetadata");
                 }
-                logger.info("Deleted system metadata: key={}, removedValue={}", key, removedValue);
+                    logger.info("Deleted system metadata: key={}, valueRemoved=true", key);
                 yield new CommandResult.Success<>(removedValue);
             }
         };
@@ -977,7 +984,9 @@ public class QuorusStateStore implements RaftLogApplicator {
                 command.bytesTransferred(), job.getTotalBytes(), job.getStartTime(), command.timestamp(),
                 command.reason(), job.getDescription(), job.getTenantId(), job.getOperationalContext(),
                 command.bytesTransferred() > job.getBytesTransferred()
-                        ? command.timestamp() : job.getLastProgressAt());
+                        ? command.timestamp() : job.getLastProgressAt(),
+                job.getServiceConnectionId(), job.getRemotePath(), job.getConnectionPolicyVersion(),
+                job.getConnectionPolicyDigest(), job.getAgentPool(), job.getControllerResolvedAddresses());
 
         transferAttempts.put(updatedAttempt.getAttemptId(), updatedAttempt);
         jobAssignments.put(command.assignmentId(), updatedAssignment);

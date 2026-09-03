@@ -167,19 +167,16 @@ class SmbTransferProtocolUploadTest {
         }
 
         @Test
-        @DisplayName("Upload handles authenticated destination URI")
-        void uploadHandlesAuthenticatedUri() throws IOException {
+        @DisplayName("Upload rejects authenticated destination URI")
+        void uploadRejectsAuthenticatedUri() throws IOException {
             Path localFile = tempDir.resolve("auth-upload.txt");
             Files.writeString(localFile, "Authenticated upload content");
 
-            TransferRequest request = TransferRequest.builder()
+            assertThrows(IllegalArgumentException.class, () -> TransferRequest.builder()
                     .requestId("upload-auth-test")
                     .sourceUri(localFile.toUri())
                     .destinationUri(URI.create("smb://domain;user:pass@server/share/uploads/file.txt"))
-                    .build();
-
-            assertTrue(protocol.canHandle(request));
-            assertEquals(TransferDirection.UPLOAD, request.getDirection());
+                    .build());
         }
 
         @Test

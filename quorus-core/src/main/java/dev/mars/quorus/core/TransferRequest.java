@@ -32,6 +32,9 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import dev.mars.quorus.connection.RuntimeCredential;
+import dev.mars.quorus.security.CredentialBearingUriDetector;
 
 /**
  * Represents a file transfer request with bidirectional support.
@@ -74,6 +77,9 @@ public final class TransferRequest implements Serializable {
 
     private final String expectedChecksum;
 
+    /** Agent-memory-only. Deliberately excluded from Java and JSON serialization. */
+    private final transient RuntimeCredential runtimeCredential;
+
     private TransferRequest(Builder builder) {
         // Generate unique request ID if not provided
         this.requestId = builder.requestId != null ? builder.requestId : UUID.randomUUID().toString();
@@ -95,6 +101,8 @@ public final class TransferRequest implements Serializable {
         
         // Validate URI combinations
         validateUriCombination(this.sourceUri, this.destinationUri);
+        CredentialBearingUriDetector.requireCredentialFree(this.sourceUri, "Source");
+        CredentialBearingUriDetector.requireCredentialFree(this.destinationUri, "Destination");
 
         // Set optional fields with defaults
         this.protocol = builder.protocol != null ? builder.protocol : "http";
@@ -102,6 +110,7 @@ public final class TransferRequest implements Serializable {
         this.createdAt = builder.createdAt != null ? builder.createdAt : Instant.now();
         this.expectedSize = builder.expectedSize;
         this.expectedChecksum = builder.expectedChecksum;
+        this.runtimeCredential = builder.runtimeCredential;
     }
     
     /**
@@ -167,6 +176,9 @@ public final class TransferRequest implements Serializable {
     public long getExpectedSize() { return expectedSize; }
 
     public String getExpectedChecksum() { return expectedChecksum; }
+
+    @JsonIgnore
+    public RuntimeCredential getRuntimeCredential() { return runtimeCredential; }
     
     /**
      * Returns the transfer direction (DOWNLOAD, UPLOAD, or REMOTE_TO_REMOTE).
@@ -263,6 +275,7 @@ public final class TransferRequest implements Serializable {
 
         /** Expected checksum for integrity verification (optional) */
         private String expectedChecksum;
+        private RuntimeCredential runtimeCredential;
 
         public Builder requestId(String requestId) {
             this.requestId = requestId;
@@ -364,6 +377,13 @@ public final class TransferRequest implements Serializable {
 
         public Builder expectedChecksum(String expectedChecksum) {
             this.expectedChecksum = expectedChecksum;
+            return this;
+        }
+
+        /** Agent-only injection point; runtime credentials must never enter request metadata. */
+        @JsonIgnore
+        public Builder runtimeCredential(RuntimeCredential runtimeCredential) {
+            this.runtimeCredential = runtimeCredential;
             return this;
         }
 

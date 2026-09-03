@@ -21,6 +21,11 @@ import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferResult;
 import dev.mars.quorus.transfer.SimpleTransferEngine;
 import dev.mars.quorus.transfer.TransferEngine;
+import dev.mars.quorus.connection.ConnectionAccessRequest;
+import dev.mars.quorus.connection.HostResolver;
+import dev.mars.quorus.connection.SecretProvider;
+import dev.mars.quorus.connection.ServiceConnection;
+import dev.mars.quorus.connection.VaultKvV2SecretProvider;
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
 import org.slf4j.Logger;
@@ -28,6 +33,10 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.net.URI;
+import java.time.Duration;
+import java.util.List;
+import java.util.function.Supplier;
 
 /**
  * Service for executing file transfer operations.
@@ -45,6 +54,8 @@ public class TransferExecutionService {
     private final boolean closeVertxOnShutdown;
     private final AgentConfiguration config;
     private final TransferEngine transferEngine;
+    private final AgentConnectionPolicyService connectionPolicyService;
+    private final AgentLocalPathPolicy localPathPolicy;
 
     private final AtomicBoolean closed = new AtomicBoolean(false);
     private volatile boolean running = false;
@@ -69,6 +80,8 @@ public class TransferExecutionService {
                 3,      // maxRetryAttempts
                 1000    // retryDelayMs
         );
+        this.connectionPolicyService = createConnectionPolicyService(config);
+        this.localPathPolicy = new AgentLocalPathPolicy(config.getUploadRoot(), config.getDownloadRoot());
 
         logger.info("TransferExecutionService initialized (Vert.x reactive mode)");
     }
@@ -100,7 +113,7 @@ public class TransferExecutionService {
         }
 
         logger.info("Executing transfer: {} -> {}",
-                   request.getSourceUri(), request.getDestinationPath());
+                   request.getSourceUri(), request.getDestinationUri());
 
         try {
             return transferEngine.submitTransfer(request)
@@ -130,6 +143,51 @@ public class TransferExecutionService {
             logger.debug("Stack trace for transfer submission failure: requestId={}", request.getRequestId(), e);
             return Future.failedFuture(e);
         }
+    }
+
+    /** Resolves and authorizes a governed assignment on the executing agent. */
+    public Future<TransferResult> executeTransfer(JobPollingService.PendingJob pendingJob) {
+        return executeTransfer(pendingJob, () -> Future.succeededFuture());
+    }
+
+    /** Invokes the acknowledgement only after governed policy and secret resolution succeed. */
+    public Future<TransferResult> executeTransfer(JobPollingService.PendingJob pendingJob,
+                                                   Supplier<Future<Void>> onAuthorized) {
+        if (!pendingJob.isGoverned()) {
+            if ("production".equalsIgnoreCase(config.getSecurityProfile())) {
+                return Future.failedFuture(new SecurityException(
+                        "Production agents reject assignments without a governed service connection"));
+            }
+            return onAuthorized.get().compose(ignored -> executeTransfer(pendingJob.toTransferRequest()));
+        }
+        return vertx.executeBlocking(() -> {
+            var direction = pendingJob.direction();
+            URI source = URI.create(pendingJob.getSourceUri());
+            URI destination = URI.create(pendingJob.getDestinationPath());
+            localPathPolicy.authorize("file".equalsIgnoreCase(source.getScheme()) ? source : destination, direction);
+            var connection = AgentConnectionPolicyService.parseConnection(pendingJob.getServiceConnection());
+            var reference = AgentConnectionPolicyService.parseSecret(pendingJob.getSecretReference());
+            var access = new ConnectionAccessRequest(pendingJob.getTenantId(), pendingJob.getRemotePath(),
+                    direction == dev.mars.quorus.core.TransferDirection.DOWNLOAD
+                            ? ServiceConnection.Direction.DOWNLOAD : ServiceConnection.Direction.UPLOAD,
+                    config.getAgentPool(), config.getNetworkZone(), pendingJob.getControllerResolvedAddresses());
+            return connectionPolicyService.authorize(connection, reference, access,
+                    pendingJob.getConnectionPolicyVersion(), pendingJob.getConnectionPolicyDigest());
+        }, false).compose(authorized -> onAuthorized.get().compose(ignored -> executeTransfer(
+                        pendingJob.toAuthorizedTransferRequest(authorized.resolved().authorization().endpoint(),
+                                authorized.runtimeCredential(), localPathPolicy)))
+                .onComplete(ignored -> authorized.close()));
+    }
+
+    private static AgentConnectionPolicyService createConnectionPolicyService(AgentConfiguration config) {
+        String address = System.getenv("QUORUS_VAULT_ADDR");
+        String token = System.getenv("QUORUS_VAULT_TOKEN");
+        List<SecretProvider> providers = List.of();
+        if (address != null && !address.isBlank() && token != null && !token.isBlank()) {
+            providers = List.of(VaultKvV2SecretProvider.usingHttpClient(URI.create(address),
+                    () -> token.toCharArray(), Duration.ofMillis(config.getHttpConnectionTimeout())));
+        }
+        return new AgentConnectionPolicyService(HostResolver.system(), providers);
     }
     
     public boolean canAcceptTransfer() {

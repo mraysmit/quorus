@@ -18,6 +18,7 @@ package dev.mars.quorus.agent.service;
 
 import dev.mars.quorus.agent.config.AgentConfiguration;
 import dev.mars.quorus.core.TransferRequest;
+import dev.mars.quorus.connection.RuntimeCredential;
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonArray;
@@ -27,11 +28,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.URI;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -108,14 +111,20 @@ public class JobPollingService {
         String leaseExpiresAt = jobData.getString("leaseExpiresAt");
         Long lastReportSequence = jobData.getLong("lastReportSequence");
         String sourceUri = jobData.getString("sourceUri");
-        String destinationPath = jobData.getString("destinationPath");
+        String destinationPath = jobData.getString("destinationUri", jobData.getString("destinationPath"));
         Long totalBytes = jobData.getLong("totalBytes", 0L);
         String description = jobData.getString("description");
+        JsonObject serviceConnection = jobData.getJsonObject("serviceConnection");
+        JsonObject secretReference = jobData.getJsonObject("secretReference");
         
         return new PendingJob(assignmentId, jobId, agentId, sourceUri, destinationPath, totalBytes, description,
                 attemptId, fencingGeneration == null ? 0 : fencingGeneration,
                 leaseExpiresAt == null ? null : Instant.parse(leaseExpiresAt),
-                lastReportSequence == null ? 0 : lastReportSequence);
+                lastReportSequence == null ? 0 : lastReportSequence,
+                jobData.getString("tenantId"), jobData.getString("remotePath"), jobData.getString("agentPool"),
+                jobData.getJsonArray("controllerResolvedAddresses", new JsonArray()).stream()
+                        .map(String::valueOf).toList(), serviceConnection, secretReference,
+                jobData.getInteger("connectionPolicyVersion"), jobData.getString("connectionPolicyDigest"));
     }
 
     /**
@@ -144,17 +153,37 @@ public class JobPollingService {
         private final long fencingGeneration;
         private final Instant leaseExpiresAt;
         private final AtomicLong reportSequence;
+        private final String tenantId;
+        private final String remotePath;
+        private final String agentPool;
+        private final List<String> controllerResolvedAddresses;
+        private final JsonObject serviceConnection;
+        private final JsonObject secretReference;
+        private final Integer connectionPolicyVersion;
+        private final String connectionPolicyDigest;
 
         public PendingJob(String assignmentId, String jobId, String agentId, String sourceUri, 
                          String destinationPath, long totalBytes, String description) {
             this(assignmentId, jobId, agentId, sourceUri, destinationPath, totalBytes, description,
-                    null, 0, null, 0);
+                    null, 0, null, 0, null, null, null, List.of(), null, null, null, null);
         }
 
         public PendingJob(String assignmentId, String jobId, String agentId, String sourceUri,
                           String destinationPath, long totalBytes, String description,
                           String attemptId, long fencingGeneration, Instant leaseExpiresAt,
                           long lastReportSequence) {
+            this(assignmentId, jobId, agentId, sourceUri, destinationPath, totalBytes, description,
+                    attemptId, fencingGeneration, leaseExpiresAt, lastReportSequence,
+                    null, null, null, List.of(), null, null, null, null);
+        }
+
+        public PendingJob(String assignmentId, String jobId, String agentId, String sourceUri,
+                          String destinationPath, long totalBytes, String description,
+                          String attemptId, long fencingGeneration, Instant leaseExpiresAt,
+                          long lastReportSequence, String tenantId, String remotePath, String agentPool,
+                          List<String> controllerResolvedAddresses, JsonObject serviceConnection,
+                          JsonObject secretReference, Integer connectionPolicyVersion,
+                          String connectionPolicyDigest) {
             this.assignmentId = assignmentId;
             this.jobId = jobId;
             this.agentId = agentId;
@@ -166,6 +195,14 @@ public class JobPollingService {
             this.fencingGeneration = fencingGeneration;
             this.leaseExpiresAt = leaseExpiresAt;
             this.reportSequence = new AtomicLong(lastReportSequence);
+            this.tenantId = tenantId;
+            this.remotePath = remotePath;
+            this.agentPool = agentPool;
+            this.controllerResolvedAddresses = List.copyOf(controllerResolvedAddresses);
+            this.serviceConnection = serviceConnection == null ? null : serviceConnection.copy();
+            this.secretReference = secretReference == null ? null : secretReference.copy();
+            this.connectionPolicyVersion = connectionPolicyVersion;
+            this.connectionPolicyDigest = connectionPolicyDigest;
         }
 
         public String getAssignmentId() { return assignmentId; }
@@ -182,14 +219,78 @@ public class JobPollingService {
             return attemptId != null && !attemptId.isBlank() && fencingGeneration > 0 && leaseExpiresAt != null;
         }
         public long nextReportSequence() { return reportSequence.incrementAndGet(); }
+        public boolean isGoverned() { return serviceConnection != null && secretReference != null; }
+        public String getTenantId() { return tenantId; }
+        public String getRemotePath() { return remotePath; }
+        public String getAgentPool() { return agentPool; }
+        public List<String> getControllerResolvedAddresses() { return controllerResolvedAddresses; }
+        public JsonObject getServiceConnection() { return serviceConnection == null ? null : serviceConnection.copy(); }
+        public JsonObject getSecretReference() { return secretReference == null ? null : secretReference.copy(); }
+        public Integer getConnectionPolicyVersion() { return connectionPolicyVersion; }
+        public String getConnectionPolicyDigest() { return connectionPolicyDigest; }
 
         public TransferRequest toTransferRequest() {
+            return toTransferRequest(null);
+        }
+
+        public TransferRequest toTransferRequest(RuntimeCredential runtimeCredential) {
             return TransferRequest.builder()
                     .requestId(jobId)
                     .sourceUri(URI.create(sourceUri))
-                    .destinationPath(Paths.get(destinationPath))
+                    .destinationUri(destinationUri(destinationPath))
                     .expectedSize(totalBytes)
+                    .runtimeCredential(runtimeCredential)
                     .build();
+        }
+
+        /** Builds the executable request from the agent authorization, never from a queued remote URI. */
+        public TransferRequest toAuthorizedTransferRequest(URI authorizedRemoteEndpoint,
+                                                            RuntimeCredential runtimeCredential,
+                                                            AgentLocalPathPolicy localPathPolicy) {
+            Objects.requireNonNull(authorizedRemoteEndpoint, "authorizedRemoteEndpoint");
+            Objects.requireNonNull(localPathPolicy, "localPathPolicy");
+            URI source = URI.create(sourceUri);
+            URI destination = destinationUri(destinationPath);
+            boolean sourceLocal = "file".equalsIgnoreCase(source.getScheme());
+            boolean destinationLocal = "file".equalsIgnoreCase(destination.getScheme());
+            if (sourceLocal == destinationLocal) {
+                throw new SecurityException(
+                        "Q-ASSIGNMENT-ENDPOINTS: governed assignment must have exactly one local endpoint");
+            }
+            dev.mars.quorus.core.TransferDirection direction = sourceLocal
+                    ? dev.mars.quorus.core.TransferDirection.UPLOAD
+                    : dev.mars.quorus.core.TransferDirection.DOWNLOAD;
+            Path authorizedLocal = localPathPolicy.authorize(sourceLocal ? source : destination, direction);
+            return TransferRequest.builder()
+                    .requestId(jobId)
+                    .sourceUri(sourceLocal ? authorizedLocal.toUri() : authorizedRemoteEndpoint)
+                    .destinationUri(destinationLocal ? authorizedLocal.toUri() : authorizedRemoteEndpoint)
+                    .expectedSize(totalBytes)
+                    .runtimeCredential(runtimeCredential)
+                    .build();
+        }
+
+        public dev.mars.quorus.core.TransferDirection direction() {
+            URI source = URI.create(sourceUri);
+            URI destination = destinationUri(destinationPath);
+            boolean sourceLocal = "file".equalsIgnoreCase(source.getScheme());
+            boolean destinationLocal = "file".equalsIgnoreCase(destination.getScheme());
+            if (sourceLocal == destinationLocal) {
+                throw new SecurityException(
+                        "Q-ASSIGNMENT-ENDPOINTS: governed assignment must have exactly one local endpoint");
+            }
+            return sourceLocal ? dev.mars.quorus.core.TransferDirection.UPLOAD
+                    : dev.mars.quorus.core.TransferDirection.DOWNLOAD;
+        }
+
+        private static URI destinationUri(String value) {
+            try {
+                URI uri = URI.create(value);
+                if (uri.getScheme() != null && uri.getScheme().length() > 1) return uri;
+            } catch (IllegalArgumentException ignored) {
+                // Compatibility with controller snapshots created before destination URIs were canonical.
+            }
+            return Paths.get(value).toUri();
         }
     }
 }

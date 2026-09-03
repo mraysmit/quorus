@@ -414,16 +414,13 @@ public class QuorusAgent {
         // durably accepted by the controller. This keeps the authoritative assignment
         // state aligned with the real transfer process before any bytes are moved.
         reportAccepted(pendingJob)
-            .compose(v -> reportInProgress(pendingJob, 0L))
             .onSuccess(v -> {
-                // Convert to transfer request
-                TransferRequest request = pendingJob.toTransferRequest();
-
                 // Record job started
                 metrics.recordJobStarted();
 
-                // Execute the transfer
-                transferService.executeTransfer(request)
+                // Resolve policy and credentials first; IN_PROGRESS is the durable
+                // evidence that the governed connection was actually used.
+                transferService.executeTransfer(pendingJob, () -> reportInProgress(pendingJob, 0L))
                     .onSuccess(result -> handleTransferComplete(pendingJob, result))
                     .onFailure(throwable -> handleTransferError(pendingJob, throwable));
             })

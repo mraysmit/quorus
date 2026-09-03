@@ -7,7 +7,7 @@
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0
 
-**Status:** Accepted direction; implementation begins in Phase 4
+**Status:** Accepted and implemented in Phase 4
 
 ## Context
 
@@ -18,6 +18,8 @@ Transfer agents connect to financial-services endpoints whose credentials requir
 Quorus stores opaque credential references and non-sensitive connection policy only. A provider interface resolves short-lived credentials at the executing agent using its workload identity. Returned secrets remain in memory for the minimum operation lifetime, are never persisted or returned by REST, and are covered by centralized redaction. Provider access, denial and rotation events are audited without secret values.
 
 Phase 0 adds shared redaction and tests. It does not make URI-embedded credentials an approved configuration mechanism.
+
+Phase 4 implements the provider SPI and HashiCorp Vault KV v2 provider at the executing-agent boundary. Production transfers use a Raft-backed service connection and opaque reference; controller and agent policy checks precede provider access, and the closeable runtime lease is wiped after transfer completion. Vault origin configuration requires a credential-free HTTPS origin and workload token injection; no Vault response, token, or resolved value is persisted or returned.
 
 ## Consequences
 

@@ -2,8 +2,8 @@
 
 # Quorus HTTP API Reference
 
-**Version:** 3.2  
-**Date:** 2026-09-02  
+**Version:** 3.5  
+**Date:** 2026-09-03  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Status:** Current implementation reference  
@@ -208,13 +208,17 @@ Creates a transfer job. Returns `201 Created` on success.
 |-------|------|-------------|
 | `tenantId` | string | Optional narrowing value; must match the authenticated tenant and executing agent |
 | `jobId` | string | Unique job identifier |
-| `sourceUri` | string | Source URI |
-| `destinationPath` | string | Destination path |
+| `serviceConnectionId` | string | Production service alias |
+| `remotePath` | string | Absolute remote path within the alias policy |
+| `agentPool` | string | Approved executing agent pool |
+
+Governed downloads additionally require `destinationPath`. Governed uploads require `direction: "UPLOAD"` and a local `file:` `sourceUri`. Development-profile direct transfers require a credential-free `sourceUri` and `destinationPath`.
 
 **Optional fields:**
 
 | Field | Type | Description |
 |-------|------|-------------|
+| `direction` | string | `DOWNLOAD` (default) or `UPLOAD` |
 | `totalBytes` | long | Expected transfer size in bytes |
 | `description` | string | Human-readable description |
 | `businessService` | string | Business service responsible for the transfer |
@@ -231,11 +235,13 @@ Creates a transfer job. Returns `201 Created` on success.
 ```json
 {
   "tenantId": "payments-operations",
-  "jobId": "job-2026-03-17-001",
-  "sourceUri": "https://files.example.com/report.csv",
-  "destinationPath": "/data/reports/report.csv",
+  "jobId": "settlement-2026-09-03-001",
+  "serviceConnectionId": "clearing-sftp",
+  "remotePath": "/outbound/settlement-2026-09-03.dat",
+  "agentPool": "payments-agents",
+  "destinationPath": "C:/quorus/settlement/settlement-2026-09-03.dat",
   "totalBytes": 102400,
-  "description": "Daily report"
+  "description": "Time-critical settlement file"
 }
 ```
 
@@ -244,9 +250,23 @@ Creates a transfer job. Returns `201 Created` on success.
 ```json
 {
   "success": true,
-  "jobId": "job-2026-03-17-001"
+  "jobId": "settlement-2026-09-03-001"
 }
 ```
+
+**Current security boundary:** production submissions require `serviceConnectionId`, `remotePath`, and `agentPool`; the controller resolves a credential-free endpoint only after tenant, path, direction, pool, host, CIDR, port, DNS, trust, secret-reference, and status checks. The governed model preserves direction: downloads bind the alias to the remote source, while uploads bind it to the remote destination and require a local `file:` source. Credential-free direct transfer remains a development-profile compatibility input. URI user-info always returns `400 VALIDATION_ERROR` before request mapping or Raft submission.
+
+## Governed Service Connectivity Endpoints
+
+The active API provides full tenant-scoped CRUD at `/api/v1/service-connections` and `/api/v1/service-connections/:serviceConnectionId`, full opaque-reference CRUD at `/api/v1/secret-references` and `/api/v1/secret-references/:secretReferenceId`, policy validation at `POST /api/v1/service-connections/:serviceConnectionId/validate`, and redacted lifecycle history at `GET /api/v1/security-events`.
+
+Service connections expose protocol, credential-free endpoint, service identity and authentication type, owner, environment, classification, network zone, path/direction/pool constraints, trust rules, egress allowlists, status, version, and timestamps. Authentication is constrained by protocol: SFTP accepts `PASSWORD` or `SSH_PRIVATE_KEY`, HTTPS accepts `BASIC` or `BEARER`, FTPS accepts `PASSWORD`, and governed SMB/NFS accepts `KERBEROS`. TLS `approvedCaIds` are SHA-256 certificate fingerprints in `SHA256:<base64>` form; they restrict a normally valid PKIX chain, while `tlsPeerFingerprints` optionally pin the leaf certificate. Secret-reference requests accept only provider/path/key/version and lifecycle metadata. Fields such as `secretValue`, `password`, `token`, `privateKey`, and nested equivalents are rejected and never enter Raft state.
+
+The executing agent receives the exact policy version and digest, controller-resolved address pins, redacted service connection, and opaque reference. It repeats authorization, including its deployment-configured pool and network zone, before contacting Vault KV v2. Upload sources and download destinations must remain under the agent's configured local roots after canonical and symbolic-link resolution. HTTPS, FTPS, and SFTP sockets bind to an approved resolved address while retaining the original service hostname for TLS or SSH identity verification. Runtime credentials are memory-only and wiped after completion.
+
+`POST /api/v1/service-connections/:serviceConnectionId/validate` is policy-only by default. With `probeNetwork: true`, it additionally performs a bounded TCP route probe to a controller-approved address and returns `ROUTE_VERIFIED`; it does not retrieve a secret, authenticate to the service, or claim application-level readiness. Submission emits `SERVICE_CONNECTION_AUTHORIZED`. `SERVICE_CONNECTION_LAST_USED` is emitted only after the executing agent has passed its policy checks and resolved secret authority. If an active secret reference is past `expiresAt`, transfer authorization durably marks it `EXPIRED`, records the expiry event, and returns `409`.
+
+See [Quorus Service Connection Operations Runbook](QUORUS_SERVICE_CONNECTION_OPERATIONS_RUNBOOK.md).
 
 ### `GET /api/v1/transfers/:jobId`
 
@@ -419,7 +439,7 @@ The current `HttpApiServer` does **not** register a generic `/api/v1/commands` s
 
 - Route CRUD and route lifecycle endpoints are live.
 - This API surface does not by itself prove that a background route trigger evaluator is running. The controller startup path currently wires route persistence and route HTTP operations, but not a separate trigger execution service.
-- Authentication is still an external deployment concern.
+- Corporate identity issuance remains deployment-specific, but the production controller enforces the Phase 1 mTLS identity, tenant, scope, elevation, and audit boundary.
 
 ## Source of Truth
 

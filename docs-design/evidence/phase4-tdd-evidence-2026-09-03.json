@@ -1,0 +1,459 @@
+{
+  "schemaVersion": 1,
+  "phase": 4,
+  "recordedAt": "2026-09-03T14:44:02+08:00",
+  "baseRevision": "ca82d23d157446d8e025bd74ef2e9d22fd864872",
+  "workingState": "uncommitted implementation patch based on baseRevision",
+  "slices": [
+    {
+      "sliceId": "P4-CREDENTIAL-FREE-URI-001",
+      "requirements": ["ARCH-17"],
+      "acceptanceStatement": "A reusable detector identifies source and destination endpoint URI user-info, and the real controller HTTP boundary rejects a credential-bearing transfer source before it can enter authoritative state.",
+      "failureBoundary": "Before implementation, the core request model accepted credential-bearing endpoints and POST /api/v1/transfers returned 201 after replicating the request.",
+      "testFiles": [
+        "quorus-core/src/test/java/dev/mars/quorus/core/TransferRequestTest.java",
+        "quorus-core/src/test/java/dev/mars/quorus/security/CredentialBearingUriDetectorTest.java",
+        "quorus-controller/src/test/java/dev/mars/quorus/controller/http/CredentialBearingUriHttpIntegrationTest.java"
+      ],
+      "externalEntryPoints": ["POST /api/v1/transfers"],
+      "classification": ["external-path behavioral", "integration", "security", "persistence boundary"],
+      "red": [
+        {
+          "command": "mvn -o -pl quorus-controller -am -Dtest=TransferRequestTest,CredentialBearingUriHttpIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test",
+          "timestamp": "2026-09-03T10:19:23+08:00",
+          "patchIdentity": "base revision plus failing tests only",
+          "log": "temp/phase4-credential-uri-red.txt",
+          "tests": 7,
+          "failures": 1,
+          "errors": 0,
+          "expectedFailure": "The core request model accepted a source URI containing username/password user-info.",
+          "outcome": "failed as expected before production implementation"
+        },
+        {
+          "command": "mvn -o -pl quorus-controller -am -Dtest=CredentialBearingUriHttpIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test",
+          "timestamp": "2026-09-03T10:20:14+08:00",
+          "patchIdentity": "base revision plus failing tests only",
+          "log": "temp/phase4-credential-uri-http-red.txt",
+          "tests": 1,
+          "failures": 1,
+          "errors": 0,
+          "expectedFailure": "POST /api/v1/transfers returned 201 and the credential-bearing URI entered authoritative state.",
+          "outcome": "failed as expected before production implementation"
+        }
+      ],
+      "green": {
+        "command": "mvn -o -pl quorus-controller -am -Dtest=CredentialBearingUriDetectorTest,CredentialBearingUriHttpIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test",
+        "timestamp": "2026-09-03T10:29:31+08:00",
+        "patchIdentity": "working implementation patch based on baseRevision",
+        "log": "temp/phase4-credential-uri-green.txt",
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "outcome": "passed"
+      },
+      "refactorSummary": [
+        "Placed a reusable detector in core and enforced it at controller ingress before JSON mapping and Raft command construction.",
+        "Used URI raw user-info detection so both username-only and username/password forms are detected without parsing or exposing credential contents.",
+        "Kept existing protocol-adapter and credential-free direct URI behavior explicitly transitional; governed service aliases and opaque secret references remain required Phase 4 work."
+      ],
+      "sensitiveEvidenceCaptured": false,
+      "sensitiveEvidenceStatement": "Evidence contains only an explicitly synthetic credential marker and test-only financial-services identifiers; it contains no production credentials, keys, endpoints, request bodies, or payloads."
+    },
+    {
+      "sliceId": "P4-GOVERNED-CONNECTION-002",
+      "requirements": ["ARCH-08", "ARCH-14", "ARCH-17", "API-06"],
+      "acceptanceStatement": "Production transfers use authoritative tenant service aliases and opaque secret references; controller and agent enforce the same versioned default-deny policy before a short-lived secret is resolved; protocol peers fail closed and lifecycle evidence remains redacted.",
+      "failureBoundary": "Before these slices, the REST resources, shared policy authority, Vault provider, staged validation, agent re-enforcement, hardened runtime credential, Phase 4 scopes, lifecycle events, and governed adapter checks did not exist.",
+      "testFiles": [
+        "quorus-core/src/test/java/dev/mars/quorus/connection/GovernedConnectionSecurityTest.java",
+        "quorus-core/src/test/java/dev/mars/quorus/connection/VaultAndValidationTest.java",
+        "quorus-core/src/test/java/dev/mars/quorus/connection/RuntimeProtocolSecurityTest.java",
+        "quorus-agent/src/test/java/dev/mars/quorus/agent/service/AgentGovernedConnectionTest.java",
+        "quorus-controller/src/test/java/dev/mars/quorus/controller/http/ServiceConnectionHttpIntegrationTest.java",
+        "quorus-controller/src/test/java/dev/mars/quorus/controller/http/Phase4OpenApiContractTest.java",
+        "quorus-controller/src/test/java/dev/mars/quorus/controller/security/AuthorizationPolicyEngineTest.java"
+      ],
+      "externalEntryPoints": [
+        "POST/GET/PUT/DELETE /api/v1/service-connections",
+        "POST/GET/PUT/DELETE /api/v1/secret-references",
+        "POST /api/v1/service-connections/{id}/validate",
+        "GET /api/v1/security-events",
+        "POST /api/v1/transfers",
+        "GET /api/v1/agents/{agentId}/jobs"
+      ],
+      "classification": ["external-path behavioral", "integration", "security", "persistence", "agent boundary", "protocol hardening"],
+      "red": [
+        {
+          "timestamp": "2026-09-03T11:32:14+08:00",
+          "log": "temp/phase4-service-connection-http-red.txt",
+          "expectedFailure": "The tenant service-connection and secret-reference REST authority was absent.",
+          "outcome": "failed as expected before production implementation"
+        },
+        {
+          "timestamp": "2026-09-03T11:33:27+08:00",
+          "log": "temp/phase4-policy-secret-red.txt",
+          "expectedFailure": "Shared default-deny authorization and fail-before-secret resolution types were absent.",
+          "outcome": "failed compilation as expected before production implementation"
+        },
+        {
+          "timestamp": "2026-09-03T11:45:12+08:00",
+          "log": "temp/phase4-vault-validation-red.txt",
+          "expectedFailure": "Vault KV v2 resolution and seven-stage redacted validation were absent.",
+          "outcome": "failed compilation as expected before production implementation"
+        },
+        {
+          "timestamp": "2026-09-03T11:49:50+08:00",
+          "log": "temp/phase4-agent-runtime-red.txt",
+          "expectedFailure": "Agent policy re-enforcement, closeable runtime credentials, host-key pins, and mounted-filesystem attestation were absent.",
+          "outcome": "failed compilation as expected before production implementation"
+        },
+        {
+          "timestamp": "2026-09-03T12:03:23+08:00",
+          "log": "temp/phase4-openapi-authz-red.txt",
+          "tests": 5,
+          "failures": 2,
+          "expectedFailure": "Phase 4 OpenAPI paths/schemas and authorization scopes were absent.",
+          "outcome": "failed as expected before production implementation"
+        },
+        {
+          "timestamp": "2026-09-03T12:08:44+08:00",
+          "log": "temp/phase4-lifecycle-events-red.txt",
+          "tests": 1,
+          "failures": 1,
+          "expectedFailure": "The service-connection last-use event was absent from authoritative security history.",
+          "outcome": "failed as expected before production implementation"
+        },
+        {
+          "timestamp": "2026-09-03T12:09:41+08:00",
+          "log": "temp/phase4-mounted-filesystem-red.txt",
+          "expectedFailure": "Governed SMB and NFS encrypted-authenticated mount attestation was absent.",
+          "outcome": "failed compilation as expected before production implementation"
+        }
+      ],
+      "green": [
+        {
+          "timestamp": "2026-09-03T11:43:56+08:00",
+          "log": "temp/phase4-service-connection-green.txt",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "outcome": "passed"
+        },
+        {
+          "timestamp": "2026-09-03T11:47:39+08:00",
+          "log": "temp/phase4-vault-validation-green.txt",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "outcome": "passed"
+        },
+        {
+          "timestamp": "2026-09-03T12:02:15+08:00",
+          "log": "temp/phase4-agent-runtime-green.txt",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "outcome": "passed"
+        },
+        {
+          "timestamp": "2026-09-03T12:05:47+08:00",
+          "log": "temp/phase4-openapi-authz-green.txt",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "outcome": "passed"
+        },
+        {
+          "timestamp": "2026-09-03T12:11:50+08:00",
+          "log": "temp/phase4-lifecycle-protocol-green.txt",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "outcome": "passed"
+        }
+      ],
+      "refactorSummary": [
+        "Kept service and secret metadata tenant-scoped, redacted, and Raft replicated while resolving secret values only on the executing agent.",
+        "Shared the authorization model across controller and agent and bound dispatch to the controller-approved policy version, digest, and DNS pins.",
+        "Moved runtime credentials outside serializable metadata and wiped their in-memory character buffers when transfer execution completes.",
+        "Applied protocol-specific fail-closed behavior for SSH host keys, TLS, redirects, passive FTP addressing, and mounted SMB/NFS transports.",
+        "Exposed the complete Phase 4 REST surface and explicit least-privilege scopes in the canonical OpenAPI document."
+      ],
+      "sensitiveEvidenceCaptured": false,
+      "sensitiveEvidenceStatement": "All fixtures use documentation-only addresses and synthetic markers. Red and green evidence contains no production secret, token, key, payload, or credential-bearing response."
+    },
+    {
+      "sliceId": "P4-DIRECTION-AND-TRUST-003",
+      "requirements": ["ARCH-08", "ARCH-14", "ARCH-17", "API-06"],
+      "acceptanceStatement": "Governed uploads preserve the agent-local source and bind the authorized remote alias to the destination; HTTPS and FTPS enforce PKIX, hostname, approved-CA, optional leaf-pin, and minimum-TLS policy; protocol/authentication combinations fail closed.",
+      "failureBoundary": "The initial governed path represented every alias as a source and could not create an upload. TLS peer pins and approved CA identifiers were metadata without adapter enforcement, TLSv1.2 was treated as an exact version rather than a floor, and unsupported authentication types could be configured.",
+      "testFiles": [
+        "quorus-controller/src/test/java/dev/mars/quorus/controller/http/ServiceConnectionHttpIntegrationTest.java",
+        "quorus-core/src/test/java/dev/mars/quorus/connection/RuntimeProtocolSecurityTest.java",
+        "quorus-core/src/test/java/dev/mars/quorus/core/TransferJobTest.java",
+        "quorus-agent/src/test/java/dev/mars/quorus/agent/service/JobPollingServiceTest.java",
+        "quorus-agent/src/test/java/dev/mars/quorus/agent/service/TransferExecutionServiceTest.java"
+      ],
+      "externalEntryPoints": [
+        "POST /api/v1/transfers",
+        "GET /api/v1/transfers/{jobId}",
+        "GET /api/v1/agents/{agentId}/jobs"
+      ],
+      "classification": ["external-path behavioral", "integration", "security", "agent boundary", "protocol hardening"],
+      "red": [
+        {
+          "timestamp": "2026-09-03T12:30:20+08:00",
+          "log": "temp/phase4-governed-upload-red.txt",
+          "expectedFailure": "A valid governed upload returned 400 because the controller discarded the remote destination and required a local destination path.",
+          "outcome": "failed as expected before production implementation"
+        },
+        {
+          "timestamp": "2026-09-03T12:40:00+08:00",
+          "log": "temp/phase4-tls-peer-pin-red.txt",
+          "expectedFailure": "No shared TLS certificate-pin policy existed for HTTPS and FTPS adapters.",
+          "outcome": "failed compilation as expected before production implementation"
+        },
+        {
+          "timestamp": "2026-09-03T12:44:18+08:00",
+          "log": "temp/phase4-approved-ca-red.txt",
+          "expectedFailure": "Approved CA identifiers did not restrict an otherwise valid TLS certificate chain.",
+          "outcome": "failed compilation as expected before production implementation"
+        },
+        {
+          "timestamp": "2026-09-03T12:47:13+08:00",
+          "log": "temp/phase4-auth-mode-red.txt",
+          "tests": 6,
+          "failures": 1,
+          "errors": 0,
+          "expectedFailure": "An unsupported SFTP Bearer authentication policy was accepted.",
+          "outcome": "failed as expected before production implementation"
+        },
+        {
+          "timestamp": "2026-09-03T12:48:00+08:00",
+          "log": "temp/phase4-tls-floor-red.txt",
+          "expectedFailure": "TLS floor expansion was absent, so TLSv1.2 could not express acceptance of TLSv1.2 and newer TLSv1.3.",
+          "outcome": "failed compilation as expected before production implementation"
+        }
+      ],
+      "green": [
+        {
+          "timestamp": "2026-09-03T12:35:45+08:00",
+          "log": "temp/phase4-governed-upload-final-green.txt",
+          "tests": 39,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "outcome": "passed"
+        },
+        {
+          "timestamp": "2026-09-03T12:49:47+08:00",
+          "log": "temp/phase4-auth-tls-green.txt",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "outcome": "passed"
+        },
+        {
+          "timestamp": "2026-09-03T13:04:51+08:00",
+          "log": "temp/phase4-openapi-final-green.txt",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "outcome": "passed after final approved-CA and authentication schema clarification"
+        }
+      ],
+      "refactorSummary": [
+        "Preserved canonical source and destination URI semantics through snapshots, assignment polling, execution, status reads, and logging for both governed directions.",
+        "Added one default-PKIX trust manager that restricts accepted TLS chains to approved SHA-256 CA fingerprints and optionally pins the leaf certificate.",
+        "Applied TLS trust and floor policy to HTTPS and both FTPS channels, retaining hostname verification, redirect denial, and passive-host substitution protection.",
+        "Rejected unsupported protocol/authentication combinations and loaded SFTP private keys only into a transfer-scoped SSH client with transient input buffers wiped after use."
+      ],
+      "sensitiveEvidenceCaptured": false,
+      "sensitiveEvidenceStatement": "All new trust fixtures use synthetic certificate bytes or documentation-only endpoints; no production CA, peer certificate, private key, credential, or payload was captured."
+    },
+    {
+      "sliceId": "P4-SECURITY-REMEDIATION-004",
+      "requirements": ["ARCH-08", "ARCH-14", "ARCH-17", "API-06"],
+      "acceptanceStatement": "The executing agent accepts only controller-authorized remote endpoints and deployment-configured placement, confines local paths to configured roots, binds protocol sockets to authorized resolved addresses, validates optional active reachability, augments trust only with the selected approved CA, records actual connection use separately from authorization, and durably expires secret references.",
+      "failureBoundary": "The Phase 4 review proved that local paths could escape configured roots, a queued URI could substitute an unapproved endpoint, source and destination URI handling was asymmetric, agent pool and zone were advisory, DNS pins were not bound to the actual socket, validation did not probe reachability, approved CA selection did not add its trust anchor, authorization was recorded as use, and expiry was calculated but not persisted.",
+      "testFiles": [
+        "quorus-agent/src/test/java/dev/mars/quorus/agent/service/AgentLocalPathPolicyTest.java",
+        "quorus-agent/src/test/java/dev/mars/quorus/agent/service/AgentGovernedConnectionTest.java",
+        "quorus-agent/src/test/java/dev/mars/quorus/agent/service/JobPollingServiceTest.java",
+        "quorus-agent/src/test/java/dev/mars/quorus/agent/service/TransferExecutionServiceTest.java",
+        "quorus-controller/src/test/java/dev/mars/quorus/controller/http/ServiceConnectionHttpIntegrationTest.java",
+        "quorus-controller/src/test/java/dev/mars/quorus/controller/http/ServiceConnectionRouteProbeTest.java",
+        "quorus-controller/src/test/java/dev/mars/quorus/controller/service/AgentSelectionServiceTest.java",
+        "quorus-core/src/test/java/dev/mars/quorus/connection/RuntimeProtocolSecurityTest.java",
+        "quorus-core/src/test/java/dev/mars/quorus/connection/TlsTrustAnchorPolicyTest.java"
+      ],
+      "externalEntryPoints": [
+        "POST /api/v1/transfers",
+        "POST /api/v1/service-connections/{id}/validate",
+        "GET /api/v1/agents/{agentId}/jobs",
+        "HTTP, SFTP, FTPS, SMB, and NFS execution adapters"
+      ],
+      "classification": ["external-path behavioral", "integration", "security", "durability", "scheduler boundary", "agent boundary", "protocol socket binding"],
+      "red": [
+        {
+          "timestamp": "2026-09-03T13:44:35+08:00",
+          "log": "temp/phase4-remediation-boundaries-red.txt",
+          "expectedFailure": "Local-root confinement, queued-endpoint integrity, and symmetric source/destination URI rejection were absent.",
+          "outcome": "failed as expected before production implementation"
+        },
+        {
+          "timestamp": "2026-09-03T13:50:04+08:00",
+          "log": "temp/phase4-remediation-agent-placement-red.txt",
+          "expectedFailure": "Scheduler and executing agent did not enforce the authorized pool and network zone.",
+          "outcome": "failed as expected before production implementation"
+        },
+        {
+          "timestamp": "2026-09-03T13:54:45+08:00",
+          "log": "temp/phase4-remediation-socket-binding-red.txt",
+          "expectedFailure": "Authorized DNS pins were policy metadata but did not select the actual protocol socket address.",
+          "outcome": "failed as expected before production implementation"
+        },
+        {
+          "timestamp": "2026-09-03T13:59:55+08:00",
+          "log": "temp/phase4-remediation-validation-probe-red.txt",
+          "expectedFailure": "Validation could report success without an active bounded route probe.",
+          "outcome": "failed as expected before production implementation"
+        },
+        {
+          "timestamp": "2026-09-03T14:01:56+08:00",
+          "log": "temp/phase4-remediation-connection-use-red.txt",
+          "expectedFailure": "Transfer authorization incorrectly advanced last-used state before any socket was opened.",
+          "outcome": "failed as expected before production implementation"
+        },
+        {
+          "timestamp": "2026-09-03T14:03:51+08:00",
+          "log": "temp/phase4-remediation-secret-expiry-red.txt",
+          "expectedFailure": "Time-based secret expiry was returned transiently but not durably replicated or emitted as an event.",
+          "outcome": "failed as expected before production implementation"
+        },
+        {
+          "timestamp": "2026-09-03T14:05:42+08:00",
+          "log": "temp/phase4-remediation-ca-anchor-red.txt",
+          "expectedFailure": "Selecting an approved root CA restricted fingerprints but did not add that root to the runtime trust anchors.",
+          "outcome": "failed as expected before production implementation"
+        }
+      ],
+      "green": [
+        {
+          "timestamp": "2026-09-03T13:48:14+08:00",
+          "log": "temp/phase4-remediation-boundaries-green.txt",
+          "tests": 20,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 1,
+          "outcome": "passed; Windows symbolic-link creation was unavailable, while canonical existing-parent escape coverage passed"
+        },
+        {
+          "timestamp": "2026-09-03T13:53:14+08:00",
+          "log": "temp/phase4-remediation-agent-placement-green.txt",
+          "tests": 15,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "outcome": "passed"
+        },
+        {
+          "timestamp": "2026-09-03T13:57:55+08:00",
+          "log": "temp/phase4-remediation-socket-binding-green.txt",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "outcome": "passed"
+        },
+        {
+          "timestamp": "2026-09-03T14:00:58+08:00",
+          "log": "temp/phase4-remediation-validation-probe-green.txt",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "outcome": "passed"
+        },
+        {
+          "timestamp": "2026-09-03T14:04:53+08:00",
+          "log": "temp/phase4-remediation-lifecycle-green.txt",
+          "tests": 14,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "outcome": "passed"
+        },
+        {
+          "timestamp": "2026-09-03T14:06:31+08:00",
+          "log": "temp/phase4-remediation-ca-anchor-green.txt",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "outcome": "passed"
+        }
+      ],
+      "refactorSummary": [
+        "Applied canonical configured-root confinement to every agent-local path and rejected credential-bearing URI user-info for both transfer directions.",
+        "Bound the queued remote endpoint, policy digest/version, agent pool, and network zone to controller authorization and rechecked all attributes at the agent boundary.",
+        "Connected HTTP, SFTP, and FTPS sockets to policy-authorized resolved addresses while preserving the authorized hostname for HTTP Host headers, TLS SNI, and hostname verification.",
+        "Made active route probing explicit, bounded, and opt-in, with stage-by-stage redacted results suitable for operations diagnostics.",
+        "Loaded only the selected approved CA certificate into an augmented PKIX trust store and retained hostname and optional leaf-pin verification.",
+        "Separated authorization events from actual connection-use events and made time-based secret expiry a replicated state transition with an auditable event.",
+        "Updated real FTP, FTPS, and SFTP integration fixtures to exercise credential-free endpoint URIs and transfer-scoped runtime credentials."
+      ],
+      "sensitiveEvidenceCaptured": false,
+      "sensitiveEvidenceStatement": "Evidence uses synthetic credentials, documentation-only addresses, and ephemeral test certificates. It contains no production secret, key, endpoint, payload, or credential-bearing response."
+    }
+  ],
+  "focusedRegression": {
+    "command": "mvn -o -pl quorus-controller,quorus-agent -am -Dtest=CredentialBearingUriDetectorTest,GovernedConnectionSecurityTest,VaultAndValidationTest,RuntimeProtocolSecurityTest,SftpTransferProtocolTest,SftpTransferProtocolUploadTest,FtpTransferProtocolTest,FtpTransferProtocolUploadTest,FtpsTransferProtocolTest,HttpTransferProtocolTest,HttpTransferProtocolUploadTest,SmbTransferProtocolTest,SmbTransferProtocolUploadTest,NfsTransferProtocolTest,NfsTransferProtocolUploadTest,TransferJobTest,ServiceConnectionHttpIntegrationTest,CredentialBearingUriHttpIntegrationTest,Phase4OpenApiContractTest,AuthorizationPolicyEngineTest,AgentSelectionServiceTest,AgentGovernedConnectionTest,JobPollingServiceTest,TransferExecutionServiceTest -Dsurefire.failIfNoSpecifiedTests=false test -Djacoco.skip=true",
+    "timestamp": "2026-09-03T12:50:39+08:00",
+    "log": "temp/phase4-final-focused-regression.txt",
+    "moduleTests": {
+      "quorus-core": 204,
+      "quorus-controller": 17,
+      "quorus-agent": 13
+    },
+    "tests": 234,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "outcome": "passed"
+  },
+  "cleanVerification": {
+    "command": "mvn -o clean verify",
+    "timestamp": "2026-09-03T14:44:02+08:00",
+    "evidence": "Surefire XML and JaCoCo XML reports generated by the clean reactor; the detached runner did not retain its console banner.",
+    "moduleTests": {
+      "quorus-core": 1512,
+      "quorus-workflow": 134,
+      "quorus-tenant": 64,
+      "quorus-controller": 502,
+      "quorus-agent": 91,
+      "quorus-integration-examples": 0
+    },
+    "tests": 2303,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 1,
+    "jacoco": "Every configured module coverage check passed",
+    "dockerFixtures": "FTP and FTPS integration fixtures passed with foreground server processes and credential-free endpoint URIs",
+    "reactorModules": 7,
+    "duration": "08:36",
+    "outcome": "passed"
+  },
+  "phaseStatus": "complete",
+  "notYetVerified": [
+    "The direct symbolic-link escape test was skipped because this Windows host does not grant symbolic-link creation privilege; canonical existing-parent escape and configured-root boundary cases passed."
+  ]
+}

@@ -2,8 +2,8 @@
 
 # Quorus Architecture Specification
 
-**Version:** 2.0  
-**Date:** 2026-09-02  
+**Version:** 2.3  
+**Date:** 2026-09-03  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Status:** Canonical and normative  
@@ -75,7 +75,7 @@ The status values in this table are normative:
 | Transfer, assignment, and route CRUD | Implemented | CRUD does not imply autonomous route execution |
 | Transfer-process metrics | Partial | Aggregate metrics plus a tenant-checked per-transfer progress view now expose byte progress, real last-progress time, missing/stale telemetry, configured policy windows, active attempt, ownership, and deadline condition; continuous samples, calibrated prediction, and timelines remain incomplete |
 | Per-transfer operational telemetry and alerting | Partial | Submission persists operational ownership and deadline context; progress is governed and the first ordered submission event is queryable; the remaining lifecycle vocabulary, active stall boundary, queries, streaming, alert lifecycle, retention, and service reporting remain required |
-| Enterprise service connectivity controls | Planned | Endpoint policy, secret references, service identity verification, and egress enforcement are incomplete |
+| Enterprise service connectivity controls | Implemented for production transfer submission | Tenant aliases, opaque Vault references, controller/agent default-deny enforcement, peer verification, and protocol-specific controls are active; later route/workflow activation must adopt the same authority |
 | Secure agent provisioning and deployment lifecycle | Planned | Unique identity enrollment, image signing, attestation, rotation, revocation, and controlled upgrade are required |
 | Authenticated tenant derivation and tenant checks | Partial | HTTP transfer, agent, assignment, and route access is constrained by the verified identity; uniform state-machine enforcement remains incomplete |
 | Distributed assignment lifecycle | Partial | The agent obtains acknowledged `ACCEPTED` and `IN_PROGRESS` transitions before completion; each attempt-aware report atomically updates attempt, assignment, transfer status, and progress in one replicated transition; lease automation and specialized assignment actions remain incomplete |
@@ -347,9 +347,9 @@ Phase 1 now provides the active security foundation:
 The Phase 1 repository technical gate is complete against representative live HTTP, Raft, and agent TLS boundaries. This is not corporate-environment accreditation. The selected corporate PKI, gateway, secrets platform, evidence collector, production controller topology, and agent estate still require deployment-specific validation. In addition:
 
 - agents do not yet have a complete certificate enrollment, rotation, revocation, and attestation lifecycle;
-- protocol credentials can be represented in connection URIs;
-- SFTP disables strict host-key checking in production code;
-- route and transfer inputs do not yet constitute a centrally enforced destination and egress policy.
+- production transfer submission requires a governed tenant alias, remote path, and agent pool; credential-free direct URI compatibility is development-only and later route/workflow activation must adopt the same authority;
+- governed SFTP uses strict SHA-256 host-key pins and accepts password or ephemeral private-key authentication;
+- controller and agent enforce the same versioned destination, DNS/CIDR, port, direction, path, pool, and trust policy before secret retrieval and connection.
 
 Quorus therefore MUST NOT yet be represented as enterprise production-ready merely because the Phase 1 code gate passed. Corporate PKI issuance, external identity validation and MFA at the trusted gateway, secrets management, encryption at rest, production rotation operations, WORM/SIEM evidence services, and regulatory controls remain deployment or later-phase responsibilities and require independent evidence.
 
@@ -364,8 +364,8 @@ Every connection crossing a process, host, cluster, tenant, or network-zone boun
 | Controller → controller Raft gRPC | TLS 1.3 mTLS with hostname verification, configured controller trust bundle, per-RPC runtime revocation, and overlap tests | Validate no-quorum-loss rotation and revocation against the deployed topology and cluster PKI |
 | Agent → controller | HTTPS mTLS client support, exact certificate-subject identity binding, agent/tenant self-authorization, controller-side runtime serial revocation, and overlap/hostname tests | Add constrained enrollment, short-lived identity, replay controls, managed renewal, and posture lifecycle |
 | Controller → agent | No production job-push or data-plane connection | No inbound agent control path is assumed; any future push protocol requires a separate authenticated specification |
-| Agent → source/destination service | Protocol adapter connects using the supplied endpoint and credentials | Policy-approved endpoint, least-privilege service identity, encrypted protocol where supported, remote identity verification, and auditable secret retrieval |
-| Controller/agent → secret manager | Not integrated as a canonical runtime dependency | Workload-identity-authenticated retrieval of short-lived or rotated secrets; no secret values in control-plane state |
+| Agent → source/destination service | Production transfers require a Raft-backed tenant alias; controller and agent independently enforce path, direction, pool, endpoint, port, DNS/CIDR pins, policy version/digest, trust, and opaque Vault reference before connection. Direct credential-free URIs are development-only; URI user-info is rejected. | Policy-approved endpoint, least-privilege service identity, encrypted protocol, remote identity verification, and auditable short-lived secret retrieval |
+| Agent → secret manager | Vault KV v2 provider resolves opaque versioned references only after agent authorization; values are memory-only and wiped after use | Deploy with workload-injected Vault token, least-privilege policy, rotation, availability, and audit integration |
 | Controller/agent → telemetry backend | Backend-specific | Encrypted authenticated export with tenant, confidentiality, retention, and redaction controls |
 | Deployment platform → agent | Compose or platform-specific | Approved signed artifact, pinned digest, workload identity, immutable configuration, deployment audit, and controlled rollout |
 
@@ -392,6 +392,8 @@ Production transfer requests SHOULD reference an approved service alias and secr
 Agents SHOULD use outbound-initiated connections to controllers and enterprise services. Agent health endpoints MUST be limited to the local orchestrator or approved monitoring network and MUST NOT expose a public control or data-plane surface.
 
 Default-deny egress is the production baseline. A transfer to an unapproved endpoint, port, path, protocol, or network zone MUST fail before any service credential is retrieved or connection is opened. Denials MUST produce a security audit event without disclosing secret material.
+
+**Current Phase 4 boundary:** governed transfers are authorized twice: first by the controller and again by the executing agent against the committed policy version and digest. Agent selection and execution require the configured pool and network zone; local upload and download paths are confined to deployment-configured roots after canonical and symbolic-link checks. HTTPS, FTPS, and SFTP sockets connect to an agent-approved resolved address rather than re-resolving the service name; TLS retains the original hostname for SNI and hostname verification, and SFTP retains it for host-key verification. The optional validation route probe opens a bounded TCP connection to an approved address but deliberately does not retrieve a secret or claim service authentication. Submission records authorization; last-use evidence is recorded only after the agent has repeated policy checks and resolved secret authority. Time-expired secret references are durably transitioned to `EXPIRED` and audited before transfer denial.
 
 ### 10.4 Protocol security requirements
 
@@ -711,13 +713,13 @@ These are acceptance gates, not claims about the current alpha. A gate must have
 | Authentication boundary | 100% of protected API and agent requests without valid identity are rejected | Blocked by external/built-in authentication integration |
 | Encrypted trust flows | 100% of production gateway, controller, Raft, agent, service, secret-manager, and telemetry connections satisfy their configured encryption and peer-verification policy | Not implemented end to end |
 | Agent identity lifecycle | 100% of production agents use a unique approved identity; expired, revoked, cloned, or incorrectly bound identities receive no assignments | Not implemented |
-| Service egress policy | 100% of unapproved service aliases, DNS/IP targets, ports, protocols, paths, redirects, and network zones are denied before secret retrieval | Not implemented |
-| Secret containment | Automated scans find zero secret values in request bodies, Raft state, logs, metrics, traces, images, and diagnostic bundles across the security test suite | Not achieved while URI credentials are supported |
+| Service egress policy | 100% of unapproved service aliases, DNS/IP targets, ports, protocols, paths, redirects, and network zones are denied before secret retrieval | Achieved for governed Phase 4 transfers; fleet identity enrollment and broader end-to-end environment evidence remain Phase 5 and Phase 12 work |
+| Secret containment | Automated scans find zero secret values in request bodies, Raft state, logs, metrics, traces, images, and diagnostic bundles across the security test suite | Raw secret fields and URI credentials are rejected and governed state contains only opaque references; repository-wide release evidence remains required |
 | Agent artifact admission | 100% of production agents run an approved signed digest with verified provenance, SBOM, and vulnerability-policy result | Deployment-platform integration not implemented |
 | Secure readiness | 100% of agents missing mandatory identity, trust, policy, secret-manager, or audit-export controls remain ineligible for assignments | Not implemented |
 | Agent drain and upgrade | In 100 induced upgrades, draining agents accept zero new jobs and publish zero unauthorized partial final files | Not yet evidenced |
 | Revocation | 100% of revoked agents are rejected within the configured revocation propagation limit and cannot publish a newly fenced attempt | Not implemented |
-| SFTP identity | Unknown and changed host keys fail in 100% of protocol tests | Not achieved while host-key checking is disabled |
+| SFTP identity | Unknown and changed host keys fail in 100% of governed protocol tests | Achieved for governed production transfers with SHA-256 host-key pins; development-only direct URI compatibility remains explicitly outside the production authority |
 | Large HTTP transfer memory | Ten concurrent files larger than the agent heap complete with bounded streaming memory and no full-file buffering | Not achieved by the current HTTP adapter |
 | Static three-node formation | 100 consecutive clean starts elect exactly one leader and agree on membership | Test evidence required |
 | Snapshot recovery | Restored state hash equals committed pre-restart state in 100 consecutive snapshot/replay tests | Test evidence required |
@@ -739,17 +741,17 @@ Capacity figures such as requests per second, heartbeats per second, concurrent 
 | ARCH-03 | Critical | No authenticated API/agent identity boundary | Blocks untrusted or production multi-tenant exposure |
 | ARCH-11 | Critical | No complete per-transfer operational event, progress, deadline, stall, and alerting model | Blocks use for critical, highly time-sensitive production transfers |
 | ARCH-13 | Critical | Controller HTTP, Raft, and agent control connections lack a complete production TLS/mTLS identity boundary | Blocks secure enterprise deployment |
-| ARCH-14 | Critical | No centrally enforced service alias, egress, endpoint-verification, and secret-reference policy | Allows agents to become an uncontrolled path to enterprise services |
+| ARCH-14 | Closed in Phase 4 | Tenant service aliases, default-deny egress, endpoint trust, opaque references, and controller/agent enforcement are implemented | Production transfers fail closed outside the approved service policy |
 | ARCH-15 | Critical | No complete agent enrollment, identity rotation, revocation, attestation, and quarantine lifecycle | Blocks trusted fleet operation and incident response |
 | ARCH-18 | Critical | The live REST API covers only a subset of the canonical control, transfer-operations, security, connectivity, agent-lifecycle, and administration contract | Blocks supported enterprise operation and complete external integration |
 | ARCH-04 | High | Route trigger evaluator is not wired | Route trigger types remain planned |
 | ARCH-05 | High | Retriable writes lack idempotency keys and leader discovery | Blocks transparent HA write routing |
 | ARCH-06 | High | Assignment referential/tenant invariants are not uniformly enforced in state application | Blocks strong tenant-isolation claim |
 | ARCH-07 | High | Persistent controller path and deployment volume must be proven aligned | Blocks durability claim for container recreation |
-| ARCH-08 | High | SFTP host-key verification is disabled | Blocks secure SFTP deployment |
+| ARCH-08 | Closed in Phase 4 | Governed SFTP uses managed SHA-256 host-key pins with strict checking | Unknown or changed host keys fail closed |
 | ARCH-12 | High | Job model lacks business service, operational owner, expected start, required completion time, and runbook context | Blocks actionable operations monitoring and escalation |
 | ARCH-16 | High | No canonical signed-artifact admission, hardened runtime, controlled drain, upgrade, rollback, and decommissioning process | Blocks governed enterprise agent deployment |
-| ARCH-17 | High | Protocol credentials may be carried in URI user-info rather than opaque secret references | Risks secret replication, logging, disclosure, and weak rotation |
+| ARCH-17 | Closed for production transfer paths in Phase 4 | Production requires aliases and opaque references; direct URI compatibility is development-only and the redacted scanner inventories migration findings | Route/workflow adoption remains gated by their later activation phases rather than an active bypass |
 | ARCH-09 | Medium | HTTP adapter buffers complete payloads | Blocks bounded-memory large-file claim |
 | ARCH-10 | Medium | Dynamic Raft membership is absent | Blocks live controller scale-out claims |
 

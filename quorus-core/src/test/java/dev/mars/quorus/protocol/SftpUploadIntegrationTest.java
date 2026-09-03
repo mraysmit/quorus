@@ -16,6 +16,9 @@
 
 package dev.mars.quorus.protocol;
 
+import dev.mars.quorus.connection.RuntimeCredential;
+import dev.mars.quorus.connection.ServiceConnection;
+import dev.mars.quorus.connection.SftpHostKeyPolicy;
 import dev.mars.quorus.core.TransferDirection;
 import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferResult;
@@ -35,6 +38,8 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Base64;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -67,6 +72,7 @@ class SftpUploadIntegrationTest {
     private TransferContext context;
     private String sftpHost;
     private int sftpPort;
+    private String sftpHostKeyFingerprint;
 
     @TempDir
     Path tempDir;
@@ -86,6 +92,7 @@ class SftpUploadIntegrationTest {
         // Get SFTP container connection details from shared container
         sftpHost = SharedTestContainers.getSftpHost();
         sftpPort = SharedTestContainers.getSftpPort();
+        sftpHostKeyFingerprint = readHostKeyFingerprint();
 
         logger.info("SFTP server available at {}:{}", sftpHost, sftpPort);
 
@@ -111,6 +118,7 @@ class SftpUploadIntegrationTest {
                 .requestId("integration-upload-small")
                 .sourceUri(localFile.toUri())
                 .destinationUri(buildSftpUri("/upload/small-upload.txt"))
+                .runtimeCredential(testCredential())
                 .build();
 
         // Verify direction detection
@@ -147,6 +155,7 @@ class SftpUploadIntegrationTest {
                 .requestId("integration-upload-1kb")
                 .sourceUri(localFile.toUri())
                 .destinationUri(buildSftpUri("/upload/1kb-upload.txt"))
+                .runtimeCredential(testCredential())
                 .build();
 
         // Execute upload
@@ -173,6 +182,7 @@ class SftpUploadIntegrationTest {
                 .requestId("integration-upload-nested")
                 .sourceUri(localFile.toUri())
                 .destinationUri(buildSftpUri("/upload/deep/nested/path/nested-upload.txt"))
+                .runtimeCredential(testCredential())
                 .build();
 
         // Execute upload
@@ -200,6 +210,7 @@ class SftpUploadIntegrationTest {
                 .requestId("integration-roundtrip-upload")
                 .sourceUri(localFile.toUri())
                 .destinationUri(buildSftpUri("/upload/roundtrip.txt"))
+                .runtimeCredential(testCredential())
                 .build();
 
         TransferResult uploadResult = protocol.transfer(uploadRequest, context);
@@ -211,6 +222,7 @@ class SftpUploadIntegrationTest {
                 .requestId("integration-roundtrip-download")
                 .sourceUri(buildSftpUri("/upload/roundtrip.txt"))
                 .destinationPath(downloadedFile)
+                .runtimeCredential(testCredential())
                 .build();
 
         TransferResult downloadResult = protocol.transfer(downloadRequest, context);
@@ -237,6 +249,7 @@ class SftpUploadIntegrationTest {
                 .requestId("integration-upload-binary")
                 .sourceUri(localFile.toUri())
                 .destinationUri(buildSftpUri("/upload/binary-upload.bin"))
+                .runtimeCredential(testCredential())
                 .build();
 
         // Execute upload
@@ -256,7 +269,30 @@ class SftpUploadIntegrationTest {
      * Builds an SFTP URI for the test server.
      */
     private URI buildSftpUri(String path) {
-        return URI.create("sftp://testuser:testpass@" + sftpHost + ":" + sftpPort + path);
+        return URI.create("sftp://" + sftpHost + ":" + sftpPort + path);
+    }
+
+    private RuntimeCredential testCredential() {
+        return new RuntimeCredential("testuser", ServiceConnection.AuthenticationType.PASSWORD,
+                "testpass".toCharArray(), Set.of(sftpHostKeyFingerprint), Set.of(), "TLSv1.3");
+    }
+
+    private String readHostKeyFingerprint() {
+        try {
+            com.jcraft.jsch.JSch jsch = new com.jcraft.jsch.JSch();
+            com.jcraft.jsch.Session session = jsch.getSession("testuser", sftpHost, sftpPort);
+            session.setPassword("testpass");
+            session.setConfig("StrictHostKeyChecking", "no");
+            session.connect(10000);
+            try {
+                byte[] encoded = Base64.getDecoder().decode(session.getHostKey().getKey());
+                return SftpHostKeyPolicy.sha256Fingerprint(encoded);
+            } finally {
+                session.disconnect();
+            }
+        } catch (Exception e) {
+            throw new IllegalStateException("Unable to read the integration server host key", e);
+        }
     }
 
     /**

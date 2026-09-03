@@ -195,7 +195,7 @@ class SimpleTransferEngineTest {
         TransferRequest request = TransferRequest.builder()
             .requestId("retry-backoff-test")
             .sourceUri(localFile.toUri())
-            .destinationUri(URI.create("ftp://user:pass@127.0.0.1:1/unreachable.txt"))
+            .destinationUri(URI.create("ftp://127.0.0.1:1/unreachable.txt"))
             .protocol("ftp")
             .build();
 

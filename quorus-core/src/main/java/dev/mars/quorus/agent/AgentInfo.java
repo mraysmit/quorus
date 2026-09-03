@@ -75,6 +75,12 @@ public class AgentInfo {
     @JsonProperty("tenantId")
     private String tenantId;
 
+    @JsonProperty("agentPool")
+    private String agentPool;
+
+    @JsonProperty("networkZone")
+    private String networkZone;
+
     /**
      * Default constructor for JSON deserialization.
      */
@@ -121,6 +127,8 @@ public class AgentInfo {
             copy.metadata = new HashMap<>(source.metadata);
         }
         copy.tenantId = source.tenantId;
+        copy.agentPool = source.agentPool;
+        copy.networkZone = source.networkZone;
         return copy;
     }
 
@@ -358,6 +366,14 @@ public class AgentInfo {
         this.tenantId = tenantId;
     }
 
+    public String getAgentPool() { return agentPool; }
+
+    public void setAgentPool(String agentPool) { this.agentPool = agentPool; }
+
+    public String getNetworkZone() { return networkZone; }
+
+    public void setNetworkZone(String networkZone) { this.networkZone = networkZone; }
+
     /**
      * Add a metadata entry.
      * 
@@ -424,6 +440,8 @@ public class AgentInfo {
                 ", version='" + version + '\'' +
                 ", region='" + region + '\'' +
                 ", datacenter='" + datacenter + '\'' +
+                ", agentPool='" + agentPool + '\'' +
+                ", networkZone='" + networkZone + '\'' +
                 '}';
     }
 }

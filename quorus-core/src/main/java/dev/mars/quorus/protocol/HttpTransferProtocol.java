@@ -29,10 +29,16 @@ import dev.mars.quorus.transfer.TransferContext;
 
 import static dev.mars.quorus.core.exceptions.QuorusErrorCode.*;
 import io.vertx.core.Context;
+import io.vertx.core.Future;
 import io.vertx.core.Vertx;
 import io.vertx.core.buffer.Buffer;
+import io.vertx.core.net.TrustOptions;
 import io.vertx.ext.web.client.WebClient;
 import io.vertx.ext.web.client.WebClientOptions;
+import io.vertx.ext.web.client.HttpRequest;
+import dev.mars.quorus.connection.RuntimeCredential;
+import dev.mars.quorus.connection.TlsPeerPolicy;
+import dev.mars.quorus.connection.PinnedEndpoint;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,6 +48,10 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.Base64;
+import java.util.Set;
 
 /**
  * HTTP/HTTPS transfer protocol implementation.
@@ -68,13 +78,20 @@ public class HttpTransferProtocol implements TransferProtocol {
      */
     public HttpTransferProtocol(Vertx vertx) {
         this.vertx = java.util.Objects.requireNonNull(vertx, "Vertx instance cannot be null");
-        this.webClient = WebClient.create(vertx, new WebClientOptions()
-            .setConnectTimeout(CONNECTION_TIMEOUT_MS)
-            .setIdleTimeout(READ_TIMEOUT_MS)
-            .setUserAgent("Quorus/1.0"));
+        this.webClient = WebClient.create(vertx, secureClientOptions());
         logger.info("HttpTransferProtocol initialized: connectTimeout={}ms, readTimeout={}ms, maxFileSize={} bytes",
                    CONNECTION_TIMEOUT_MS, READ_TIMEOUT_MS, MAX_FILE_SIZE);
         logger.debug("HttpTransferProtocol created with Vert.x Web Client (reactive mode)");
+    }
+
+    private static WebClientOptions secureClientOptions() {
+        return new WebClientOptions()
+            .setConnectTimeout(CONNECTION_TIMEOUT_MS)
+            .setIdleTimeout(READ_TIMEOUT_MS)
+            .setFollowRedirects(false)
+            .setTrustAll(false)
+            .setVerifyHost(true)
+            .setUserAgent("Quorus/1.0");
     }
 
     @Override
@@ -174,11 +191,15 @@ public class HttpTransferProtocol implements TransferProtocol {
                 return io.vertx.core.Future.failedFuture(new TransferException(context.getJobId(), "Failed to create directory", e));
             }
 
-            String url = request.getSourceUri().toString();
+            URI authority = request.getSourceUri();
+            String url = PinnedEndpoint.connectUri(authority, request.getRuntimeCredential()).toString();
             logger.info("Starting reactive HTTP download from {}", SensitiveDataRedactor.redact(url));
 
-            return webClient.getAbs(url)
-                .timeout(READ_TIMEOUT_MS)
+            WebClient transferClient = clientFor(request.getRuntimeCredential());
+            HttpRequest<Buffer> httpRequest = transferClient.getAbs(url);
+            applyVirtualHost(httpRequest, authority, request.getRuntimeCredential());
+            applyRuntimeAuthorization(httpRequest, request.getRuntimeCredential());
+            Future<TransferResult> result = httpRequest.timeout(READ_TIMEOUT_MS)
                 .send()
                 .compose(response -> {
                     logger.debug("HTTP response received: statusCode={}, statusMessage={}", 
@@ -251,6 +272,7 @@ public class HttpTransferProtocol implements TransferProtocol {
                     logger.debug("HTTP download exception details for job: {}", context.getJobId(), err);
                     return io.vertx.core.Future.failedFuture(err);
                 });
+            return closeAfter(result, transferClient);
         } catch (Exception e) {
             logger.error("[{}] HTTP download setup failed: error={}", QUORUS_1207.code(), e.getMessage());
             return io.vertx.core.Future.failedFuture(e);
@@ -278,12 +300,13 @@ public class HttpTransferProtocol implements TransferProtocol {
             }
 
             URI destinationUri = request.getDestinationUri();
-            String url = destinationUri.toString();
+            String url = PinnedEndpoint.connectUri(destinationUri, request.getRuntimeCredential()).toString();
             logger.info("Starting reactive HTTP upload to {}", url);
 
             // Read file content
             logger.debug("Reading source file: {}", sourcePath);
-            return vertx.fileSystem().readFile(sourcePath.toString())
+            WebClient transferClient = clientFor(request.getRuntimeCredential());
+            Future<TransferResult> result = vertx.fileSystem().readFile(sourcePath.toString())
                 .compose(fileContent -> {
                     long bytesTransferred = fileContent.length();
                     logger.debug("Source file loaded: {} bytes", bytesTransferred);
@@ -312,8 +335,10 @@ public class HttpTransferProtocol implements TransferProtocol {
 
                     // Perform PUT request
                     logger.debug("Sending HTTP PUT request: {} bytes to {}", bytesTransferred, url);
-                    return webClient.putAbs(url)
-                        .timeout(READ_TIMEOUT_MS)
+                    HttpRequest<Buffer> httpRequest = transferClient.putAbs(url);
+                    applyVirtualHost(httpRequest, destinationUri, request.getRuntimeCredential());
+                    applyRuntimeAuthorization(httpRequest, request.getRuntimeCredential());
+                    return httpRequest.timeout(READ_TIMEOUT_MS)
                         .sendBuffer(fileContent)
                         .map(response -> {
                             int statusCode = response.statusCode();
@@ -354,6 +379,7 @@ public class HttpTransferProtocol implements TransferProtocol {
                     }
                     return io.vertx.core.Future.failedFuture(err);
                 });
+            return closeAfter(result, transferClient);
         } catch (Exception e) {
             logger.error("[{}] HTTP upload setup failed: error={}", QUORUS_1212.code(), e.getMessage());
             return io.vertx.core.Future.failedFuture(e);
@@ -410,5 +436,58 @@ public class HttpTransferProtocol implements TransferProtocol {
         }
         
         logger.debug("Request validation passed");
+    }
+
+    private static void applyRuntimeAuthorization(HttpRequest<Buffer> request, RuntimeCredential credential) {
+        if (credential == null) return;
+        char[] secret = credential.copySecret();
+        try {
+            if (credential.authenticationType() == dev.mars.quorus.connection.ServiceConnection.AuthenticationType.BEARER) {
+                request.putHeader("Authorization", "Bearer " + new String(secret));
+            } else if (credential.authenticationType() == dev.mars.quorus.connection.ServiceConnection.AuthenticationType.BASIC
+                    || credential.authenticationType() == dev.mars.quorus.connection.ServiceConnection.AuthenticationType.PASSWORD) {
+                String material = credential.identity() + ":" + new String(secret);
+                request.putHeader("Authorization", "Basic " + Base64.getEncoder()
+                        .encodeToString(material.getBytes(StandardCharsets.UTF_8)));
+            }
+        } finally {
+            Arrays.fill(secret, '\0');
+        }
+    }
+
+    private static void applyVirtualHost(HttpRequest<Buffer> request, URI authority,
+                                         RuntimeCredential credential) {
+        if (credential != null && !credential.approvedResolvedAddresses().isEmpty()) {
+            request.virtualHost(PinnedEndpoint.virtualHost(authority));
+        }
+    }
+
+    /**
+     * Creates a transfer-scoped client for governed HTTPS connections. Its trust
+     * manager first performs normal CA validation and then enforces any approved
+     * leaf-certificate pins carried in the immutable runtime authority.
+     */
+    private WebClient clientFor(RuntimeCredential credential) {
+        if (credential == null) return webClient;
+
+        WebClientOptions options = secureClientOptions()
+                .setEnabledSecureTransportProtocols(Set.of(
+                        TlsPeerPolicy.enabledProtocols(credential.minimumTlsVersion())));
+        if (!credential.tlsPeerFingerprints().isEmpty()) {
+            options.setTrustOptions(TrustOptions.wrap(
+                    TlsPeerPolicy.defaultTrustManager(credential.approvedCaIds(),
+                            credential.tlsPeerFingerprints())));
+        } else if (!credential.approvedCaIds().isEmpty()) {
+            options.setTrustOptions(TrustOptions.wrap(
+                    TlsPeerPolicy.defaultTrustManager(credential.approvedCaIds(), Set.of())));
+        }
+        return WebClient.create(vertx, options);
+    }
+
+    private Future<TransferResult> closeAfter(Future<TransferResult> result, WebClient transferClient) {
+        if (transferClient != webClient) {
+            result.onComplete(ignored -> transferClient.close());
+        }
+        return result;
     }
 }

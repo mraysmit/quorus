@@ -2,11 +2,11 @@
 
 # Quorus Enterprise Implementation Plan
 
-**Version:** 1.14  
-**Date:** 2026-09-02  
+**Version:** 1.17  
+**Date:** 2026-09-03  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
-**Status:** Active — M0 and Phase 1 complete; Phases 2 and 3 are in progress under the mandatory TDD gate  
+**Status:** Active — M0, Phase 1, and Phase 4 complete; Phases 2 and 3 are in progress under the mandatory TDD gate  
 **Scope:** Enterprise control plane, transfer operations, security, governance, deployment, and user interfaces
 
 ## 1. Purpose and Authority
@@ -451,7 +451,18 @@ Operations can detect, understand, own, and act on a critical transfer before it
 
 **Size:** XL  
 **Milestone:** contributes to M2  
-**Primary gaps:** `ARCH-08`, `ARCH-14`, `ARCH-17`, `API-06`
+**Primary gaps:** `ARCH-08`, `ARCH-14`, `ARCH-17`, `API-06`  
+**Status:** Complete — delivered on 2026-09-03 under the mandatory TDD gate  
+
+### Implementation checkpoint — 2026-09-03
+
+Phase 4 was delivered and then security-remediated as test-first vertical slices spanning the public API, authoritative state, scheduler, shared policy engine, agent execution boundary, local filesystem boundary, external secret resolution, and protocol adapters. Tenant-scoped service aliases hold redacted ownership, service identity, protocol, endpoint, network zone, path, direction, agent-pool, environment, classification, egress, and trust policy. Secret references are opaque Raft-backed metadata; the first production provider is Vault KV v2. Policy is enforced before dispatch and repeated by the executing agent, including deployment-configured pool and network-zone checks, policy version and digest checks, DNS pin comparison, resolved-address/CIDR validation, port, remote path, direction, tenant, and agent-local root checks before the secret provider is contacted. The controller binds those attributes to the authenticated agent's registered record for scheduling and job access; secure enrollment and deployment-authority binding of that record remains Phase 5.
+
+Production transfer submission requires a service alias, remote path, and agent pool. Direct URIs remain an explicitly development-only compatibility mode, and URI user-info is rejected before request mapping or Raft submission. A redacted migration scanner inventories legacy credential-bearing values without echoing credentials. Runtime credentials exist only in agent memory, are excluded from serialization, are wiped on close, and are never returned by the API. The controller exposes service-connection, secret-reference, validation, and security-event resources with explicit scopes and step-up enforcement for mutations.
+
+Trust and protocol behavior fail closed: SFTP uses managed SHA-256 host-key pins and strict checking with password or ephemeral private-key authentication; HTTPS disables redirects and supports only Basic or Bearer authentication; FTPS protects control and data channels and supports password authentication. Governed HTTPS, FTPS, and SFTP connect their actual sockets to an address approved by the agent's repeated DNS policy. TLS adapters retain the original hostname for SNI and verification, perform normal PKIX, match approved CA identifiers against the validated chain including the selected trust anchor normally omitted by the server, apply optional leaf pins, and enforce the TLS floor. The staged validation model distinguishes policy-only validation from an optional bounded active route probe. Submission emits authorization evidence; last-use is emitted only after agent policy and secret resolution; time-based secret expiry is durably transitioned and audited before denial.
+
+Retained red evidence covers the original delivery plus remediation of local filesystem escape, queued-endpoint substitution, destination URI credentials, pool/zone placement, socket-address binding, active route probing, omitted-root CA approval, authorization/use event semantics, and durable time-based secret expiry. The final clean seven-module reactor reported 2,303 tests with 2,302 passed, zero failures or errors, and one environment-limited skip (core 1,512; workflow 134; tenant 64; controller 502; agent 91; integration examples 0), generated every configured JaCoCo report, and passed every coverage gate. The skipped Windows symbolic-link escape case requires link-creation privilege unavailable on this host; canonical existing-parent escape and configured-root boundary coverage passed. Exact red/green commands, results, and the environment limitation are recorded in [Phase 4 TDD evidence](../evidence/phase4-tdd-evidence-2026-09-03.json).
 
 ### Objective
 
@@ -933,23 +944,23 @@ Architecture, security, operations, quality, and product/domain owners participa
 | `ARCH-05` Retriable writes lack idempotency and leader discovery | Phases 0, 2, and 6 |
 | `ARCH-06` Assignment reference and tenant invariants incomplete | Phases 0 and 1 |
 | `ARCH-07` Persistent controller path and volume not proven | Phases 0 and 8 |
-| `ARCH-08` SFTP host-key verification disabled | Phase 4, supported by Phase 1 trust foundations |
+| `ARCH-08` SFTP host-key verification disabled | Closed in Phase 4, supported by Phase 1 trust foundations |
 | `ARCH-09` HTTP adapter buffers full payload | Phase 4 protocol hardening and Phase 12 scale validation |
 | `ARCH-10` Dynamic membership absent | Phase 8 decision or optional Phase 8B |
 | `ARCH-11` Transfer operations telemetry incomplete | Phase 3 |
 | `ARCH-12` Operational business context absent | Phase 3 |
 | `ARCH-13` TLS/mTLS boundary incomplete | Phase 1 |
-| `ARCH-14` Service alias, egress, verification, and secret policy absent | Phase 4 |
+| `ARCH-14` Service alias, egress, verification, and secret policy absent | Closed in Phase 4 |
 | `ARCH-15` Agent identity lifecycle incomplete | Phase 5 |
 | `ARCH-16` Governed agent deployment absent | Phase 5 |
-| `ARCH-17` Credentials may appear in URI user-info | Phase 4 |
+| `ARCH-17` Credential-bearing production transfer paths | Closed for active production transfer paths in Phase 4; later route/workflow activation must use the same governed model |
 | `ARCH-18` REST coverage incomplete | Phase 6, with incremental delivery in Phases 1–5 |
 | `API-01` OpenAPI and path coverage absent | Phases 0 and 6 |
 | `API-02` Authenticated scope enforcement absent | Phase 1 |
 | `API-03` Transfer lifecycle and evidence resources absent | Phases 2, 3, and 6 |
 | `API-04` Operational risk and alert APIs absent | Phase 3 |
 | `API-05` Secure agent lifecycle API absent | Phase 5 |
-| `API-06` Service connection and secret-reference API absent | Phase 4 |
+| `API-06` Service connection and secret-reference API absent | Closed in Phase 4 |
 | `API-07` Assignment lease and fencing contract absent | Phase 2 |
 | `API-08` Workflow REST resources absent | Phases 6 and 7 |
 | `API-09` Tenant and quota REST resources absent | Phase 6 |

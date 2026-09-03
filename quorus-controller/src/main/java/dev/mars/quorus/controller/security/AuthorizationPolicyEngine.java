@@ -50,6 +50,9 @@ public final class AuthorizationPolicyEngine {
         if (path.startsWith("/api/v1/security/trust")) return "security:trust:read";
         if (path.startsWith("/api/v1/security/authorization")) return "security:explain";
         if (path.startsWith("/api/v1/security/me")) return "security:self:read";
+        if (path.startsWith("/api/v1/security-events")) return "security-events:read";
+        if (path.startsWith("/api/v1/service-connections")) return scope("service-connections", verb);
+        if (path.startsWith("/api/v1/secret-references")) return scope("secret-references", verb);
         if (path.startsWith("/api/v1/agents/register")) return "agents:register";
         if (path.startsWith("/api/v1/agents/heartbeat")) return "agents:heartbeat";
         if (path.matches("/api/v1/agents/[^/]+/jobs.*")) return "agents:jobs:read";
@@ -75,7 +78,9 @@ public final class AuthorizationPolicyEngine {
     private static boolean roleAllows(SecurityIdentity identity, String scope) {
         if (identity.roles().contains(SecurityRole.ADMINISTRATOR)) return true;
         if (identity.roles().contains(SecurityRole.SECURITY)) {
-            return scope.startsWith("security:") || scope.equals("system:read") || scope.equals("telemetry:read");
+            return scope.startsWith("security:") || scope.startsWith("security-events:")
+                    || scope.startsWith("service-connections:") || scope.startsWith("secret-references:")
+                    || scope.equals("system:read") || scope.equals("telemetry:read");
         }
         if (identity.roles().contains(SecurityRole.AUDITOR)) {
             return scope.endsWith(":read") || scope.equals("telemetry:read") || scope.equals("security:explain");
@@ -83,6 +88,7 @@ public final class AuthorizationPolicyEngine {
         if (identity.roles().contains(SecurityRole.OPERATOR)) {
             return scope.startsWith("transfers:") || scope.startsWith("assignments:")
                     || scope.startsWith("routes:") || scope.startsWith("agents:read")
+                    || scope.equals("service-connections:read") || scope.equals("security-events:read")
                     || scope.equals("telemetry:read") || scope.equals("system:read")
                     || scope.equals("security:self:read");
         }
@@ -93,6 +99,7 @@ public final class AuthorizationPolicyEngine {
         }
         if (identity.roles().contains(SecurityRole.SERVICE_INTEGRATION)) {
             return scope.startsWith("transfers:") || scope.startsWith("routes:")
+                    || scope.equals("service-connections:read")
                     || scope.equals("security:self:read");
         }
         return false;
@@ -101,6 +108,8 @@ public final class AuthorizationPolicyEngine {
     private static boolean requiresElevation(String scope) {
         return "security:policy:write".equals(scope) || "security:trust:write".equals(scope)
                 || "cluster:membership:write".equals(scope)
-                || "audit:purge".equals(scope);
+                || "audit:purge".equals(scope)
+                || scope.startsWith("secret-references:") && !scope.endsWith(":read")
+                || scope.startsWith("service-connections:") && !scope.endsWith(":read");
     }
 }

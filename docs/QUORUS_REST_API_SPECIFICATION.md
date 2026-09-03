@@ -2,8 +2,8 @@
 
 # Quorus REST API Specification
 
-**Version:** 1.8  
-**Date:** 2026-09-02  
+**Version:** 2.0  
+**Date:** 2026-09-03  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Status:** Canonical and normative  
@@ -271,6 +271,8 @@ A production transfer submission MUST support:
 
 Raw credentials and credential-bearing URIs are rejected. `serviceConnectionId` resolves an authorized endpoint, trust policy, network policy, and secret reference without exposing the secret.
 
+**Current implementation boundary:** production transfer submission uses a tenant-scoped service connection alias, remote path, and agent pool. The controller resolves and authorizes the alias without retrieving credentials, and the executing agent repeats the committed policy version and digest, pool, network zone, path, direction, host, port, CIDR, DNS, trust, and local-root checks before resolving the opaque secret reference. The governed endpoint is constructed from that authorization, and HTTPS, FTPS, and SFTP sockets connect to an approved resolved address while preserving the original hostname for peer verification. Direct URI submission is development-only; URI user-info is rejected before request mapping or Raft command submission. A redacted scanner supports legacy migration without returning credential contents.
+
 ### 6.3 Transfer states
 
 The canonical summary state is one of:
@@ -356,21 +358,28 @@ Deployment representations MUST include artifact digest, signature verification,
 
 | Method | Path | State | Purpose |
 |---|---|---|---|
-| `POST` | `/api/v1/service-connections` | Required | Create a tenant-scoped service alias |
-| `GET` | `/api/v1/service-connections` | Required | Search authorized aliases and posture |
-| `GET` | `/api/v1/service-connections/{connectionId}` | Required | Redacted endpoint, protocol, ownership, trust, and policy |
-| `PUT` | `/api/v1/service-connections/{connectionId}` | Required | Conditional update |
-| `DELETE` | `/api/v1/service-connections/{connectionId}` | Required | Retire only when reference policy permits |
-| `POST` | `/api/v1/service-connections/{connectionId}:validate` | Required | Validate schema, policy, and references without network access |
+| `POST` | `/api/v1/service-connections` | Current | Create a tenant-scoped service alias |
+| `GET` | `/api/v1/service-connections` | Current | List authorized aliases and posture |
+| `GET` | `/api/v1/service-connections/{serviceConnectionId}` | Current | Redacted endpoint, protocol, ownership, trust, and policy |
+| `PUT` | `/api/v1/service-connections/{serviceConnectionId}` | Current | Update and increment the policy version |
+| `DELETE` | `/api/v1/service-connections/{serviceConnectionId}` | Current | Retire an alias |
+| `POST` | `/api/v1/service-connections/{serviceConnectionId}/validate` | Current | Validate schema, policy, DNS, and references; optionally perform a bounded route probe without secret retrieval |
 | `POST` | `/api/v1/service-connections/{connectionId}:test` | Required | Authorized asynchronous connectivity and trust test |
 | `GET` | `/api/v1/service-connections/{connectionId}/trust` | Required | Host keys, CA references, pinning policy, and verification status |
 | `GET` | `/api/v1/service-connections/{connectionId}/events` | Required | Changes, tests, denials, and use history |
-| `GET` | `/api/v1/secret-references` | Required | Authorized metadata only: provider, owner, status, and rotation due date |
+| `GET` | `/api/v1/secret-references` | Current | Authorized metadata only: provider, status, expiry, and rotation time |
+| `POST` | `/api/v1/secret-references` | Current | Register an opaque external-provider reference; values are forbidden |
+| `GET` | `/api/v1/secret-references/{secretReferenceId}` | Current | Read redacted reference metadata |
+| `PUT` | `/api/v1/secret-references/{secretReferenceId}` | Current | Rotate, expire, or revoke a reference |
+| `DELETE` | `/api/v1/secret-references/{secretReferenceId}` | Current | Delete only when no alias references it |
+| `GET` | `/api/v1/security-events` | Current | Tenant-scoped connection and secret lifecycle evidence |
 | `POST` | `/api/v1/secret-references:validate` | Required | Validate reference existence and access without returning a value |
 
-Service connections MUST define protocol, endpoint, permitted path or bucket scope, tenant, business owner, allowed agent pools, environment, service identity verification, encryption minimum, egress rule, timeout, and a secret reference where needed. SFTP host-key verification and TLS certificate verification are mandatory and cannot be silently disabled in production.
+Service connections MUST define protocol, endpoint, permitted path or bucket scope, tenant, business owner, allowed agent pools, environment, service identity verification, encryption minimum, egress rule, timeout, and a secret reference where needed. SFTP host-key verification and TLS certificate verification are mandatory and cannot be silently disabled in production. Authentication types are protocol constrained. TLS approved-CA identifiers are SHA-256 certificate fingerprints that restrict an otherwise valid PKIX chain; optional peer fingerprints pin the leaf certificate.
 
 Connection tests MUST return redacted stage results for DNS, route/egress policy, network connection, TLS or SSH negotiation, peer identity, authentication, authorization, and optional read/write capability. They MUST NOT upload production-like data unless an explicitly approved test path and operation are configured.
+
+The current validation resource is policy-only unless `probeNetwork` is true. An active probe connects only to a controller-approved address within the bounded `probeTimeoutMillis` and may return `ROUTE_VERIFIED`; negotiation, peer identity, authentication, authorization, and read/write capability remain unexecuted and MUST NOT be inferred from a successful TCP route. Submission records `SERVICE_CONNECTION_AUTHORIZED`, while `SERVICE_CONNECTION_LAST_USED` is recorded only after agent-side policy enforcement and secret-authority resolution. A reference past `expiresAt` is durably transitioned to `EXPIRED` and audited before transfer denial.
 
 ## 10. Route Resources
 
@@ -563,7 +572,7 @@ Release documentation MUST publish a generated endpoint coverage report with `Cu
 | API-03 | Critical | Transfer API exposes attempt history and an initial dedicated progress view but lacks collection search, timeline, integrity, publication, retry, pause, resume, and reconciliation resources | Technology operations cannot fully run or investigate critical transfers through the API |
 | API-04 | Critical | Per-transfer progress applies configured freshness/stall windows and distinguishes missing and stale telemetry, but the active stall boundary, configurable deadline-risk policy, operational queries, alerts, durable events, timelines, and streaming are incomplete | Time-sensitive transfer failures cannot yet be detected, distributed, and actioned reliably at fleet scale |
 | API-05 | Critical | Agent registration is not a complete enrollment, rotation, quarantine, revocation, and decommissioning API | Enterprise agent trust lifecycle is incomplete |
-| API-06 | Critical | No service-connection, trust-policy, egress-policy, or secret-reference API | Service connectivity cannot be governed as an enterprise control |
+| API-06 | Closed in Phase 4 | Service-connection, trust, egress, opaque-secret-reference, validation, and security-event APIs are active and represented in OpenAPI | Remaining asynchronous active test and per-resource projections are additive API work, not a production-transfer bypass |
 | API-07 | High | The attempt-aware status resource enforces attempt, lease, fencing, expected-state, sequence, monotonic progress, and atomic lifecycle rules, but specialized assignment actions, lease renewal, and integrity/publication completion evidence remain incomplete | Retry and reassignment remain unsafe until every mutation and destination commit uses the full contract |
 | API-08 | High | Workflow functionality has no controller REST resources | Workflow definitions and executions cannot be governed or observed consistently |
 | API-09 | High | Tenant, hierarchy, quota, usage, and policy services have no controller REST resources | Administrative behavior requires internal integration rather than a supported contract |
