@@ -16,6 +16,7 @@
 
 package dev.mars.quorus.controller.integration;
 
+import dev.mars.quorus.controller.config.ControllerTestConfig;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -109,7 +110,7 @@ class AgentJobManagementIntegrationTest {
         assertTrue(raftNode.isLeader(), "Node should become leader");
 
         // Start HTTP API server and wait for it to be ready
-        httpServer = new HttpApiServer(vertx, HTTP_PORT, raftNode, stateMachine);
+        httpServer = new HttpApiServer(vertx, HTTP_PORT, raftNode, stateMachine, ControllerTestConfig.create());
         httpServer.start().onComplete(testContext.succeeding(v -> {
             logger.info("Test environment ready");
             testContext.completeNow();

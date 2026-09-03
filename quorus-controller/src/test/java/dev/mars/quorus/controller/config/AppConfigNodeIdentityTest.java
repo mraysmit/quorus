@@ -19,6 +19,9 @@ package dev.mars.quorus.controller.config;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.util.Map;
+import java.util.Properties;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -31,9 +34,6 @@ import static org.junit.jupiter.api.Assertions.*;
  *   <li>Explicit node ID is always used when provided</li>
  * </ul>
  * 
- * <p>Note: AppConfig is a singleton, so we test the underlying logic
- * rather than trying to reset the singleton state.
- * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @since 2026-02-04
  */
@@ -42,52 +42,67 @@ class AppConfigNodeIdentityTest {
     @Test
     @DisplayName("AppConfig should load node ID from test properties")
     void configLoadsNodeIdFromProperties() {
-        // The test properties file sets quorus.node.id=test-node
-        AppConfig config = AppConfig.get();
-        assertEquals("test-node", config.getNodeId());
+        Properties overrides = properties("quorus.node.id", "configured-node");
+
+        AppConfig config = new AppConfig("test", overrides);
+
+        assertEquals("configured-node", config.getNodeId());
     }
 
     @Test
-    @DisplayName("System property should override properties file")
-    void systemPropertyOverridesPropertiesFile() {
-        // System properties have higher priority than properties file
-        // Set via -Dquorus.node.id=override-node on JVM
-        String sysProp = System.getProperty("quorus.node.id");
-        String propFile = "test-node"; // From quorus-controller.properties
-        
-        AppConfig config = AppConfig.get();
-        String nodeId = config.getNodeId();
-        
-        if (sysProp != null && !sysProp.isEmpty()) {
-            assertEquals(sysProp, nodeId, "System property should take precedence");
-        } else {
-            assertEquals(propFile, nodeId, "Properties file value should be used");
+    @DisplayName("System properties must not contaminate an AppConfig instance")
+    void systemPropertyIsNotAConfigurationChannel() {
+        String key = "quorus.node.id";
+        String previous = System.getProperty(key);
+        try {
+            System.setProperty(key, "ambient-node");
+
+            AppConfig config = new AppConfig("test", properties(key, "explicit-node"));
+
+            assertEquals("explicit-node", config.getNodeId());
+        } finally {
+            if (previous == null) {
+                System.clearProperty(key);
+            } else {
+                System.setProperty(key, previous);
+            }
         }
     }
 
     @Test
-    @DisplayName("getString should check environment, system property, then properties file")
-    void getStringPrecedenceOrder() {
-        AppConfig config = AppConfig.get();
-        
-        // Test a property that's unlikely to be set in env or system props
-        String testKey = "quorus.test.precedence.check";
-        String defaultValue = "default-value";
-        
-        // Should return default when nothing is set
-        String result = config.getString(testKey, defaultValue);
-        
-        // Environment variable would be QUORUS_TEST_PRECEDENCE_CHECK
-        String envValue = System.getenv("QUORUS_TEST_PRECEDENCE_CHECK");
-        String sysValue = System.getProperty(testKey);
-        
-        if (envValue != null && !envValue.isEmpty()) {
-            assertEquals(envValue, result);
-        } else if (sysValue != null && !sysValue.isEmpty()) {
-            assertEquals(sysValue, result);
-        } else {
-            assertEquals(defaultValue, result);
-        }
+    @DisplayName("Explicit properties should override packaged configuration")
+    void explicitPropertiesOverridePackagedConfiguration() {
+        AppConfig config = new AppConfig("test", properties("quorus.http.port", "18080"));
+
+        assertEquals(18080, config.getHttpPort());
+    }
+
+    @Test
+    @DisplayName("Configuration sources follow defaults, profile, environment, explicit precedence")
+    void configurationSourcesHavePeeGeeQPrecedence() {
+        AppConfig defaults = new AppConfig("default", new Properties(), Map.of());
+        AppConfig profile = new AppConfig("precedence", new Properties(), Map.of());
+        AppConfig environment = new AppConfig(
+                "precedence", new Properties(), Map.of("QUORUS_HTTP_PORT", "18082"));
+        AppConfig explicit = new AppConfig(
+                "precedence",
+                properties("quorus.http.port", "18083"),
+                Map.of("QUORUS_HTTP_PORT", "18082"));
+
+        assertEquals(8080, defaults.getHttpPort());
+        assertEquals(18081, profile.getHttpPort());
+        assertEquals(18082, environment.getHttpPort());
+        assertEquals(18083, explicit.getHttpPort());
+    }
+
+    @Test
+    @DisplayName("Configuration instances should remain isolated")
+    void configurationInstancesRemainIsolated() {
+        AppConfig first = new AppConfig("test", properties("quorus.node.id", "node-a"));
+        AppConfig second = new AppConfig("test", properties("quorus.node.id", "node-b"));
+
+        assertEquals("node-a", first.getNodeId());
+        assertEquals("node-b", second.getNodeId());
     }
 
     @Test
@@ -113,7 +128,7 @@ class AppConfigNodeIdentityTest {
     @Test
     @DisplayName("Node ID should not be empty or null")
     void nodeIdIsNeverEmpty() {
-        AppConfig config = AppConfig.get();
+        AppConfig config = new AppConfig("test", new Properties());
         String nodeId = config.getNodeId();
         
         assertNotNull(nodeId, "Node ID should never be null");
@@ -123,7 +138,7 @@ class AppConfigNodeIdentityTest {
     @Test
     @DisplayName("Blank packaged Raft path should use the node-specific durable default")
     void blankRaftStoragePathUsesDefault() {
-        AppConfig config = AppConfig.get();
+        AppConfig config = new AppConfig("test", new Properties());
 
         assertEquals("./data/raft/test-node", config.getRaftStoragePath());
     }
@@ -131,24 +146,16 @@ class AppConfigNodeIdentityTest {
     @Test
     @DisplayName("Explicit Raft path should override the packaged default")
     void explicitRaftStoragePathIsRespected() {
-        String key = "quorus.raft.storage.path";
-        String previous = System.getProperty(key);
-        try {
-            System.setProperty(key, "/var/lib/quorus/controller-a");
-            assertEquals("/var/lib/quorus/controller-a", AppConfig.get().getRaftStoragePath());
-        } finally {
-            if (previous == null) {
-                System.clearProperty(key);
-            } else {
-                System.setProperty(key, previous);
-            }
-        }
+        AppConfig config = new AppConfig("test",
+                properties("quorus.raft.storage.path", "/var/lib/quorus/controller-a"));
+
+        assertEquals("/var/lib/quorus/controller-a", config.getRaftStoragePath());
     }
 
     @Test
     @DisplayName("Packaged controller configuration satisfies startup validation")
     void packagedConfigurationIsValidAndTypedAccessorsUseSafeDefaults() {
-        AppConfig config = AppConfig.get();
+        AppConfig config = new AppConfig("test", new Properties());
 
         assertDoesNotThrow(config::validate);
         assertEquals(8080, config.getHttpPort());
@@ -164,17 +171,15 @@ class AppConfigNodeIdentityTest {
     @DisplayName("Malformed numeric overrides fall back instead of destabilizing startup")
     void malformedNumericOverridesUseDeclaredFallbacks() {
         String key = "quorus.test.invalid-number";
-        String previous = System.getProperty(key);
-        try {
-            System.setProperty(key, "not-a-number");
-            assertEquals(17, AppConfig.get().getInt(key, 17));
-            assertEquals(23L, AppConfig.get().getLong(key, 23L));
-        } finally {
-            if (previous == null) {
-                System.clearProperty(key);
-            } else {
-                System.setProperty(key, previous);
-            }
-        }
+        AppConfig config = new AppConfig("test", properties(key, "not-a-number"));
+
+        assertEquals(17, config.getInt(key, 17));
+        assertEquals(23L, config.getLong(key, 23L));
+    }
+
+    private static Properties properties(String key, String value) {
+        Properties properties = new Properties();
+        properties.setProperty(key, value);
+        return properties;
     }
 }

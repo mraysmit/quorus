@@ -14,9 +14,4 @@ public final class MountedFileSystemSecurity {
                     protocol + " mount lacks an agent attestation for encrypted authenticated transport");
         }
     }
-
-    public static boolean configured(String protocol) {
-        return Boolean.getBoolean("quorus." + protocol.toLowerCase(java.util.Locale.ROOT)
-                + ".encrypted-authenticated-mount");
-    }
 }

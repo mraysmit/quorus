@@ -32,6 +32,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
+import java.util.Properties;
 import java.util.logging.Logger;
 
 /**
@@ -64,7 +65,7 @@ public class BasicTransferExample {
         logger.info("");
 
         // Initialize configuration with default settings
-        QuorusConfiguration config = new QuorusConfiguration();
+        QuorusConfiguration config = new QuorusConfiguration("default", new Properties());
         logger.info("Configuration loaded: " + config);
 
         // Create Vert.x instance for reactive operations

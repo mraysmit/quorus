@@ -77,21 +77,19 @@ public class NfsTransferProtocol implements TransferProtocol {
     private static final int DEFAULT_BUFFER_SIZE = 64 * 1024; // 64KB buffer
     private static final Duration DEFAULT_TIMEOUT = Duration.ofMinutes(30);
 
-    /**
-     * System property to configure the NFS mount root directory.
-     * Default: {@code /mnt} on Linux/Mac, or the value of this property on Windows.
-     */
-    static final String MOUNT_ROOT_PROPERTY = "quorus.nfs.mount.root";
-
     private final String mountRoot;
+    private final boolean mountSecurityVerified;
 
     /**
-     * Creates an NFS protocol adapter with the default mount root.
-     * The mount root is resolved from the system property {@code quorus.nfs.mount.root},
-     * falling back to {@code /mnt} if not set.
+     * Creates an NFS protocol adapter with the platform default mount root.
+     * Applications that configure another root must use the explicit constructor.
      */
     public NfsTransferProtocol() {
-        this(System.getProperty(MOUNT_ROOT_PROPERTY, getDefaultMountRoot()));
+        this(getDefaultMountRoot(), false);
+    }
+
+    public NfsTransferProtocol(boolean mountSecurityVerified) {
+        this(getDefaultMountRoot(), mountSecurityVerified);
     }
 
     /**
@@ -100,8 +98,17 @@ public class NfsTransferProtocol implements TransferProtocol {
      * @param mountRoot the root directory where NFS exports are mounted
      */
     public NfsTransferProtocol(String mountRoot) {
+        this(mountRoot, false);
+    }
+
+    public NfsTransferProtocol(String mountRoot, boolean mountSecurityVerified) {
         this.mountRoot = mountRoot;
+        this.mountSecurityVerified = mountSecurityVerified;
         logger.debug("NfsTransferProtocol initialized with mountRoot={}", this.mountRoot);
+    }
+
+    public boolean isMountSecurityVerified() {
+        return mountSecurityVerified;
     }
 
     @Override
@@ -154,7 +161,7 @@ public class NfsTransferProtocol implements TransferProtocol {
 
         logger.info("Starting NFS transfer: jobId={}, isUpload={}", context.getJobId(), request.isUpload());
         if (request.getRuntimeCredential() != null) {
-            try { MountedFileSystemSecurity.requireVerified("NFS", MountedFileSystemSecurity.configured("NFS")); }
+            try { MountedFileSystemSecurity.requireVerified("NFS", mountSecurityVerified); }
             catch (Exception denied) { throw new TransferException(context.getJobId(), denied.getMessage(), denied); }
         }
         logger.debug("Transfer details: sourceUri={}, destinationUri={}",

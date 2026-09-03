@@ -16,6 +16,7 @@
 
 package dev.mars.quorus.controller.http;
 
+import dev.mars.quorus.controller.config.ControllerTestConfig;
 import dev.mars.quorus.controller.raft.InMemoryTransportSimulator;
 import dev.mars.quorus.controller.raft.RaftNode;
 import dev.mars.quorus.controller.raft.RaftNodeMode;
@@ -74,7 +75,7 @@ class HttpApiServerDrainModeTest {
         // Wait for single-node cluster to elect itself as leader
         awaitSuccess(eventually(vertx, raftNode::isLeader, Duration.ofSeconds(10)), Duration.ofSeconds(11));
 
-        httpServer = new HttpApiServer(vertx, HTTP_PORT, raftNode, stateMachine);
+        httpServer = new HttpApiServer(vertx, HTTP_PORT, raftNode, stateMachine, ControllerTestConfig.create());
         awaitSuccess(httpServer.start(), Duration.ofSeconds(5));
 
         webClient = WebClient.create(vertx);

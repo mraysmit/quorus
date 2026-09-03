@@ -78,7 +78,10 @@ public class TransferExecutionService {
                 vertx,  // Pass Vertx to SimpleTransferEngine
                 config.getMaxConcurrentTransfers(),
                 3,      // maxRetryAttempts
-                1000    // retryDelayMs
+                1000,   // retryDelayMs
+                config.getNfsMountRoot(),
+                config.isSmbMountSecurityVerified(),
+                config.isNfsMountSecurityVerified()
         );
         this.connectionPolicyService = createConnectionPolicyService(config);
         this.localPathPolicy = new AgentLocalPathPolicy(config.getUploadRoot(), config.getDownloadRoot());
@@ -180,8 +183,8 @@ public class TransferExecutionService {
     }
 
     private static AgentConnectionPolicyService createConnectionPolicyService(AgentConfiguration config) {
-        String address = System.getenv("QUORUS_VAULT_ADDR");
-        String token = System.getenv("QUORUS_VAULT_TOKEN");
+        String address = config.getVaultAddress();
+        String token = config.getVaultToken();
         List<SecretProvider> providers = List.of();
         if (address != null && !address.isBlank() && token != null && !token.isBlank()) {
             providers = List.of(VaultKvV2SecretProvider.usingHttpClient(URI.create(address),

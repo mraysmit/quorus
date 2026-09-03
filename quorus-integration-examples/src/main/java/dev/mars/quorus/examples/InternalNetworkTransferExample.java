@@ -37,6 +37,7 @@ import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -165,12 +166,11 @@ public class InternalNetworkTransferExample {
     }
     
     private static QuorusConfiguration createCorporateNetworkConfiguration() {
-        QuorusConfiguration config = new QuorusConfiguration();
-
-        // Corporate network optimizations using property-based configuration
-        config.setProperty("quorus.transfer.max.concurrent", "20");  // Higher concurrency for corporate bandwidth
-        config.setProperty("quorus.transfer.max.retries", "5");      // More retries for corporate reliability
-        config.setProperty("quorus.transfer.retry.delay.ms", "500"); // Faster retry for internal networks
+        Properties overrides = new Properties();
+        overrides.setProperty("quorus.transfer.max.concurrent", "20");
+        overrides.setProperty("quorus.transfer.max.retries", "5");
+        overrides.setProperty("quorus.transfer.retry.delay.ms", "500");
+        QuorusConfiguration config = new QuorusConfiguration("default", overrides);
 
         log.section("Corporate network optimizations applied");
         log.indentedKeyValue("Increased concurrent transfers for high bandwidth", 

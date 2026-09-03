@@ -6,6 +6,7 @@
  */
 package dev.mars.quorus.controller.http;
 
+import dev.mars.quorus.controller.config.ControllerTestConfig;
 import dev.mars.quorus.controller.raft.InMemoryTransportSimulator;
 import dev.mars.quorus.controller.raft.RaftNode;
 import dev.mars.quorus.controller.raft.RaftNodeMode;
@@ -62,7 +63,7 @@ class TransferProgressHttpIntegrationTest {
         awaitSuccess(raftNode.start(), Duration.ofSeconds(5));
         awaitSuccess(eventually(vertx, raftNode::isLeader, Duration.ofSeconds(5)), Duration.ofSeconds(6));
 
-        httpServer = new HttpApiServer(vertx, 0, raftNode, stateStore);
+        httpServer = new HttpApiServer(vertx, 0, raftNode, stateStore, ControllerTestConfig.create());
         awaitSuccess(httpServer.start(), Duration.ofSeconds(5));
         webClient = WebClient.create(vertx);
     }

@@ -9,6 +9,8 @@ package dev.mars.quorus.controller.http;
 import dev.mars.quorus.agent.AgentInfo;
 import dev.mars.quorus.agent.AgentStatus;
 import dev.mars.quorus.controller.raft.InMemoryTransportSimulator;
+import dev.mars.quorus.controller.config.AppConfig;
+import dev.mars.quorus.controller.config.ControllerTestConfig;
 import dev.mars.quorus.controller.raft.RaftNode;
 import dev.mars.quorus.controller.raft.RaftNodeMode;
 import dev.mars.quorus.controller.state.QuorusStateStore;
@@ -36,6 +38,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Set;
+import java.util.Properties;
 
 import static dev.mars.quorus.testing.TestFutureUtils.awaitSuccess;
 import static dev.mars.quorus.testing.TestFutureUtils.eventually;
@@ -62,9 +65,11 @@ class TransferProgressPolicyHttpIntegrationTest {
 
     @BeforeAll
     static void setUp() throws Exception {
-        System.setProperty(FRESH_PROPERTY, "5000");
-        System.setProperty(STALL_PROPERTY, "15000");
-        try {
+        Properties overrides = new Properties();
+        overrides.setProperty(FRESH_PROPERTY, "5000");
+        overrides.setProperty(STALL_PROPERTY, "15000");
+        AppConfig config = ControllerTestConfig.create(overrides);
+        {
             vertx = Vertx.vertx();
             QuorusStateStore stateStore = new QuorusStateStore();
             raftNode = RaftNode.builder()
@@ -129,12 +134,9 @@ class TransferProgressPolicyHttpIntegrationTest {
             awaitSuccess(raftNode.submitCommand(TransferAttemptCommand.offer(stalledAttempt, null)),
                     Duration.ofSeconds(5));
 
-            httpServer = new HttpApiServer(vertx, 0, raftNode, stateStore);
+            httpServer = new HttpApiServer(vertx, 0, raftNode, stateStore, config);
             awaitSuccess(httpServer.start(), Duration.ofSeconds(5));
             webClient = WebClient.create(vertx);
-        } finally {
-            System.clearProperty(FRESH_PROPERTY);
-            System.clearProperty(STALL_PROPERTY);
         }
     }
 

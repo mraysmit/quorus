@@ -93,18 +93,10 @@ class NfsTransferProtocolTest {
         }
 
         @Test
-        void defaultMountRootUsedWhenNoProperty() {
-            String previous = System.getProperty(NfsTransferProtocol.MOUNT_ROOT_PROPERTY);
-            try {
-                System.clearProperty(NfsTransferProtocol.MOUNT_ROOT_PROPERTY);
-                NfsTransferProtocol defaultProtocol = new NfsTransferProtocol();
-                assertNotNull(defaultProtocol.getMountRoot());
-                assertFalse(defaultProtocol.getMountRoot().isEmpty());
-            } finally {
-                if (previous != null) {
-                    System.setProperty(NfsTransferProtocol.MOUNT_ROOT_PROPERTY, previous);
-                }
-            }
+        void defaultMountRootDoesNotDependOnMutableConfiguration() {
+            NfsTransferProtocol defaultProtocol = new NfsTransferProtocol();
+            assertNotNull(defaultProtocol.getMountRoot());
+            assertFalse(defaultProtocol.getMountRoot().isEmpty());
         }
     }
 
@@ -455,6 +447,24 @@ class NfsTransferProtocolTest {
                 TransferProtocol nfs = factory.getProtocol("nfs");
                 assertNotNull(nfs);
                 assertInstanceOf(NfsTransferProtocol.class, nfs);
+            } finally {
+                vertx.close();
+            }
+        }
+
+        @Test
+        void factoryInjectsExplicitNfsMountRoot() {
+            io.vertx.core.Vertx vertx = io.vertx.core.Vertx.vertx();
+            try {
+                ProtocolFactory factory = new ProtocolFactory(vertx, tempDir.toString(), true, true);
+
+                NfsTransferProtocol nfs = assertInstanceOf(
+                        NfsTransferProtocol.class, factory.getProtocol("nfs"));
+                SmbTransferProtocol smb = assertInstanceOf(
+                        SmbTransferProtocol.class, factory.getProtocol("smb"));
+                assertEquals(tempDir.toString(), nfs.getMountRoot());
+                assertTrue(nfs.isMountSecurityVerified());
+                assertTrue(smb.isMountSecurityVerified());
             } finally {
                 vertx.close();
             }

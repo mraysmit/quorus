@@ -16,6 +16,7 @@
 
 package dev.mars.quorus.controller.integration;
 
+import dev.mars.quorus.controller.config.ControllerTestConfig;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -197,7 +198,8 @@ class InfrastructureWithTelemetryTest {
         logger.info("  -> Prometheus port for MetricsHandler: " + PROMETHEUS_PORT);
 
         // Start HTTP server with the correct Prometheus port for metrics proxy
-        httpServer = new HttpApiServer(vertx, HTTP_PORT, raftNode, stateMachine, PROMETHEUS_PORT);
+        httpServer = new HttpApiServer(vertx, HTTP_PORT, raftNode, stateMachine,
+                PROMETHEUS_PORT, ControllerTestConfig.create());
         httpServer.start().onComplete(testContext.succeeding(v -> {
             logger.info("  [OK] HTTP Server deployed and listening");
 

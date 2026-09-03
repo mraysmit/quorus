@@ -16,6 +16,7 @@
 
 package dev.mars.quorus.agent.integration;
 
+import dev.mars.quorus.agent.config.AgentConfiguration;
 import dev.mars.quorus.agent.observability.AgentMetrics;
 import dev.mars.quorus.agent.observability.AgentTelemetryConfig;
 import io.opentelemetry.api.GlobalOpenTelemetry;
@@ -64,9 +65,6 @@ import static org.junit.jupiter.api.Assertions.*;
 @DisplayName("Agent Telemetry Integration")
 class AgentTelemetryIntegrationTest {
 
-    private static final String PROMETHEUS_PORT_PROPERTY = "quorus.agent.telemetry.prometheus.port";
-    private static final String OTLP_ENDPOINT_PROPERTY = "quorus.agent.telemetry.otlp.endpoint";
-
     @SuppressWarnings("resource")
     @Container
     static GenericContainer<?> otelCollector = new GenericContainer<>(
@@ -92,10 +90,15 @@ class AgentTelemetryIntegrationTest {
         prometheusPort = findAvailablePort();
         String otlpEndpoint = "http://localhost:" + otelCollector.getMappedPort(4317);
 
-        System.setProperty(PROMETHEUS_PORT_PROPERTY, String.valueOf(prometheusPort));
-        System.setProperty(OTLP_ENDPOINT_PROPERTY, otlpEndpoint);
-
-        VertxOptions options = AgentTelemetryConfig.configure(new VertxOptions(), "agent-telemetry-test");
+        AgentConfiguration config = new AgentConfiguration.Builder()
+                .agentId("agent-telemetry-test")
+                .tenantId("telemetry-test")
+                .controllerUrl("http://127.0.0.1:8080/api/v1")
+                .allowInsecure(true)
+                .prometheusPort(prometheusPort)
+                .otlpEndpoint(otlpEndpoint)
+                .build();
+        VertxOptions options = AgentTelemetryConfig.configure(new VertxOptions(), config);
         vertx = Vertx.vertx(options);
         httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
 
@@ -132,8 +135,6 @@ class AgentTelemetryIntegrationTest {
         }
         GlobalOpenTelemetry.resetForTest();
 
-        System.clearProperty(PROMETHEUS_PORT_PROPERTY);
-        System.clearProperty(OTLP_ENDPOINT_PROPERTY);
     }
 
     @Test

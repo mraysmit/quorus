@@ -36,8 +36,8 @@ import java.nio.file.Path;
  *   <li><b>memory</b> - In-memory storage for testing (not durable)</li>
  * </ul>
  *
- * <p><b>Configuration:</b> The storage type is determined by the system property
- * or environment variable {@code quorus.raft.storage.type}.</p>
+ * <p><b>Configuration:</b> Callers provide the storage type, path, and durability
+ * setting explicitly from their validated configuration instance.</p>
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @version 1.0
@@ -119,75 +119,6 @@ public final class RaftStorageFactory {
     }
 
     /**
-     * Creates a {@link RaftStorage} instance based on configuration.
-     *
-     * <p>The storage type is determined by:</p>
-     * <ol>
-     *   <li>System property {@code quorus.raft.storage.type}</li>
-     *   <li>Environment variable {@code QUORUS_RAFT_STORAGE_TYPE}</li>
-     *   <li>Default: {@code file}</li>
-     * </ol>
-     *
-     * @param vertx    the Vert.x instance
-     * @param executor the worker executor for blocking I/O operations
-     * @return the configured RaftStorage implementation
-     * @throws IllegalArgumentException if the storage type is unknown
-     * @throws IllegalStateException if RocksDB is requested but not on classpath
-     */
-    public static RaftStorage create(Vertx vertx, WorkerExecutor executor) {
-        String storageType = getConfiguredStorageType();
-        return create(vertx, executor, storageType);
-    }
-
-    /**
-     * Creates a {@link RaftStorage} instance of the specified type.
-     *
-     * @param vertx       the Vert.x instance
-     * @param executor    the worker executor for blocking I/O operations
-     * @param storageType the storage type ("file", "rocksdb", or "memory")
-     * @return the requested RaftStorage implementation
-     * @throws IllegalArgumentException if the storage type is unknown
-     * @throws IllegalStateException if RocksDB is requested but not on classpath
-     */
-    public static RaftStorage create(Vertx vertx, WorkerExecutor executor, String storageType) {
-        StorageType type = parseStorageType(storageType);
-        return create(vertx, executor, type);
-    }
-
-    /**
-     * Creates a {@link RaftStorage} instance of the specified type.
-     *
-     * @param vertx    the Vert.x instance
-     * @param executor the worker executor for blocking I/O operations
-     * @param type     the storage type enum
-     * @return the requested RaftStorage implementation
-     * @throws IllegalStateException if RocksDB is requested but not on classpath
-     */
-    public static RaftStorage create(Vertx vertx, WorkerExecutor executor, StorageType type) {
-        logger.info("Creating RaftStorage: type={}", type);
-
-        return switch (type) {
-            case RAFTLOG -> {
-                logger.info("Using RaftLogStorageAdapter (raftlog-core library)");
-                yield new RaftLogStorageAdapter(vertx);
-            }
-            case FILE -> {
-                logger.info("Using FileRaftStorage (custom WAL, zero dependencies)");
-                yield new FileRaftStorage(vertx, executor);
-            }
-            case ROCKSDB -> {
-                validateRocksDbAvailable();
-                logger.info("Using RocksDbRaftStorage (high-performance key-value store)");
-                yield createRocksDbStorage(vertx, executor);
-            }
-            case MEMORY -> {
-                logger.warn("Using InMemoryRaftStorage - DATA WILL NOT SURVIVE RESTART!");
-                yield new InMemoryRaftStorage();
-            }
-        };
-    }
-
-    /**
      * Creates an in-memory storage for testing.
      *
      * <p>This is a convenience method that doesn't require Vert.x or an executor.</p>
@@ -201,23 +132,6 @@ public final class RaftStorageFactory {
     // =========================================================================
     // Private Helpers
     // =========================================================================
-
-    private static String getConfiguredStorageType() {
-        // Check system property first
-        String type = System.getProperty("quorus.raft.storage.type");
-        if (type != null && !type.isBlank()) {
-            return type.trim();
-        }
-
-        // Check environment variable
-        type = System.getenv("QUORUS_RAFT_STORAGE_TYPE");
-        if (type != null && !type.isBlank()) {
-            return type.trim();
-        }
-
-        // Default to file (raftlog-core requires local build)
-        return "file";
-    }
 
     private static StorageType parseStorageType(String type) {
         if (type == null || type.isBlank()) {

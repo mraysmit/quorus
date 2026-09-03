@@ -16,6 +16,7 @@
 
 package dev.mars.quorus.controller.http;
 
+import dev.mars.quorus.controller.config.ControllerTestConfig;
 import dev.mars.quorus.agent.AgentInfo;
 import dev.mars.quorus.agent.AgentStatus;
 import dev.mars.quorus.controller.raft.InMemoryTransportSimulator;
@@ -138,10 +139,10 @@ class LeaderGuardHandlerTest {
                 new AgentCommand.Register(agent.getAgentId(), agent, Instant.now())), ASYNC_SETUP_TIMEOUT);
 
         // Start HTTP servers on leader and follower
-        leaderServer = new HttpApiServer(vertx, LEADER_PORT, leaderNode, leaderStateStore);
+        leaderServer = new HttpApiServer(vertx, LEADER_PORT, leaderNode, leaderStateStore, ControllerTestConfig.create());
         awaitSuccess(leaderServer.start(), ASYNC_SETUP_TIMEOUT);
 
-        followerServer = new HttpApiServer(vertx, FOLLOWER_PORT, followerNode, followerStateStore);
+        followerServer = new HttpApiServer(vertx, FOLLOWER_PORT, followerNode, followerStateStore, ControllerTestConfig.create());
         awaitSuccess(followerServer.start(), ASYNC_SETUP_TIMEOUT);
 
         webClient = WebClient.create(vertx);

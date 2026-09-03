@@ -93,11 +93,28 @@ public class SimpleTransferEngine implements TransferEngine {
      * @param retryDelayMs Base delay between retries in milliseconds
      */
     public SimpleTransferEngine(Vertx vertx, int maxConcurrentTransfers, int maxRetryAttempts, long retryDelayMs) {
-        this(vertx, maxConcurrentTransfers, maxRetryAttempts, retryDelayMs, false);
+        this(vertx, maxConcurrentTransfers, maxRetryAttempts, retryDelayMs,
+                null, false, false, false);
+    }
+
+    /** Creates an engine with an explicitly injected NFS mount root. */
+    public SimpleTransferEngine(Vertx vertx, int maxConcurrentTransfers, int maxRetryAttempts,
+                                long retryDelayMs, String nfsMountRoot) {
+        this(vertx, maxConcurrentTransfers, maxRetryAttempts, retryDelayMs,
+                nfsMountRoot, false, false, false);
+    }
+
+    /** Creates an engine with explicit mounted-filesystem security attestations. */
+    public SimpleTransferEngine(Vertx vertx, int maxConcurrentTransfers, int maxRetryAttempts,
+                                long retryDelayMs, String nfsMountRoot,
+                                boolean smbMountSecurityVerified, boolean nfsMountSecurityVerified) {
+        this(vertx, maxConcurrentTransfers, maxRetryAttempts, retryDelayMs,
+                nfsMountRoot, smbMountSecurityVerified, nfsMountSecurityVerified, false);
     }
 
     private SimpleTransferEngine(Vertx vertx, int maxConcurrentTransfers, int maxRetryAttempts, long retryDelayMs,
-                                 boolean closeVertxOnShutdown) {
+                                 String nfsMountRoot, boolean smbMountSecurityVerified,
+                                 boolean nfsMountSecurityVerified, boolean closeVertxOnShutdown) {
         logger.debug("Initializing SimpleTransferEngine: maxConcurrent={}, maxRetries={}, retryDelay={}ms",
             maxConcurrentTransfers, maxRetryAttempts, retryDelayMs);
         
@@ -110,7 +127,8 @@ public class SimpleTransferEngine implements TransferEngine {
         this.activeJobs = new ConcurrentHashMap<>();
         this.activeContexts = new ConcurrentHashMap<>();
         this.activeFutures = new ConcurrentHashMap<>();
-        this.protocolFactory = new ProtocolFactory(vertx);  // Pass Vertx to ProtocolFactory
+        this.protocolFactory = new ProtocolFactory(
+                vertx, nfsMountRoot, smbMountSecurityVerified, nfsMountSecurityVerified);
         this.shutdown = new AtomicBoolean(false);
 
         // Initialize monitoring

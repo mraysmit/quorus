@@ -6,6 +6,7 @@
  */
 package dev.mars.quorus.controller.http;
 
+import dev.mars.quorus.controller.config.ControllerTestConfig;
 import dev.mars.quorus.agent.AgentInfo;
 import dev.mars.quorus.agent.AgentStatus;
 import dev.mars.quorus.controller.raft.InMemoryTransportSimulator;
@@ -126,7 +127,7 @@ class TransferAttemptLifecycleAtomicityIntegrationTest {
         awaitSuccess(raftNode.submitCommand(TransferJobCommand.updateStatus(
                 jobId, TransferStatus.PENDING, TransferStatus.CANCELLED)), Duration.ofSeconds(5));
 
-        httpServer = new HttpApiServer(vertx, 0, raftNode, stateStore);
+        httpServer = new HttpApiServer(vertx, 0, raftNode, stateStore, ControllerTestConfig.create());
         awaitSuccess(httpServer.start(), Duration.ofSeconds(5));
         webClient = WebClient.create(vertx);
 

@@ -23,14 +23,16 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Properties;
 
 /**
  * Centralized configuration loader for Quorus Agent.
  * 
- * <p>Loads configuration from application.properties with environment variable override support.
- * Environment variables take precedence using legacy naming convention (AGENT_ID, CONTROLLER_URL, etc.)
- * and new convention (QUORUS_AGENT_ID, QUORUS_AGENT_CONTROLLER_URL, etc.).
+ * <p>Each instance loads packaged defaults, an optional profile resource,
+ * environment values and explicit overrides, in that order. JVM system
+ * properties are deliberately excluded.
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @since 2026-01-28
@@ -39,21 +41,25 @@ public final class AgentConfig {
 
     private static final Logger logger = LoggerFactory.getLogger(AgentConfig.class);
     private static final String CONFIG_FILE = "quorus-agent.properties";
-    private static final AgentConfig INSTANCE = new AgentConfig();
 
+    private final String profile;
     private final Properties properties;
 
-    private AgentConfig() {
+    public AgentConfig(String profile, Properties overrides) {
+        this.profile = Objects.requireNonNull(profile, "profile must not be null");
+        Objects.requireNonNull(overrides, "overrides must not be null");
         this.properties = new Properties();
-        loadProperties();
+        loadResource(CONFIG_FILE, true);
+        if (!"default".equals(profile)) {
+            loadResource("quorus-agent-" + profile + ".properties", false);
+        }
+        applyEnvironmentOverrides();
+        this.properties.putAll(overrides);
         logConfiguration();
     }
 
-    /**
-     * Gets the singleton configuration instance.
-     */
-    public static AgentConfig get() {
-        return INSTANCE;
+    public String getProfile() {
+        return profile;
     }
 
     // ==================== Agent Identity ====================
@@ -65,10 +71,6 @@ public final class AgentConfig {
     public String getAgentId() {
         String agentId = getString("quorus.agent.id", "");
         if (agentId.isEmpty()) {
-            // Try legacy env var
-            agentId = System.getenv("AGENT_ID");
-        }
-        if (agentId == null || agentId.isEmpty()) {
             // Derive from hostname as fallback
             agentId = deriveAgentIdFromHostname();
             logger.warn("Agent ID not configured, derived from hostname: {}", agentId);
@@ -83,9 +85,6 @@ public final class AgentConfig {
     public String getTenantId() {
         String tenantId = getString("quorus.agent.tenant.id", "");
         if (tenantId.isEmpty()) {
-            tenantId = System.getenv("AGENT_TENANT_ID");
-        }
-        if (tenantId == null || tenantId.isEmpty()) {
             throw new IllegalStateException(
                     "Tenant ID not configured. Set quorus.agent.tenant.id or AGENT_TENANT_ID env var.");
         }
@@ -164,35 +163,82 @@ public final class AgentConfig {
         return getString("quorus.agent.telemetry.otlp.endpoint", "http://localhost:4317");
     }
 
+    public int getHttpConnectionTimeoutMs() {
+        return getInt("quorus.agent.http.connection-timeout-ms", 5000);
+    }
+
+    public int getHttpIdleTimeoutMs() {
+        return getInt("quorus.agent.http.idle-timeout-ms", 10000);
+    }
+
+    public String getSecurityProfile() {
+        return getString("quorus.agent.security.profile", "production");
+    }
+
+    public boolean isAllowInsecure() {
+        return getBoolean("quorus.agent.security.allow-insecure", false);
+    }
+
+    public boolean isControllerTlsEnabled() {
+        return getBoolean("quorus.agent.tls.enabled", true);
+    }
+
+    public String getTlsCertificatePath() {
+        return getString("quorus.agent.tls.certificate", "");
+    }
+
+    public String getTlsPrivateKeyPath() {
+        return getString("quorus.agent.tls.private-key", "");
+    }
+
+    public String getTlsTrustBundlePath() {
+        return getString("quorus.agent.tls.trust-bundle", "");
+    }
+
+    public String getUploadRoot() {
+        return getString("quorus.agent.upload-root", "data/uploads");
+    }
+
+    public String getDownloadRoot() {
+        return getString("quorus.agent.download-root", "data/downloads");
+    }
+
+    public String getNfsMountRoot() {
+        return getString("quorus.agent.nfs.mount-root", "");
+    }
+
+    public boolean isNfsMountSecurityVerified() {
+        return getBoolean("quorus.agent.nfs.encrypted-authenticated-mount", false);
+    }
+
+    public boolean isSmbMountSecurityVerified() {
+        return getBoolean("quorus.agent.smb.encrypted-authenticated-mount", false);
+    }
+
+    public String getAgentPool() {
+        return getString("quorus.agent.pool", "default");
+    }
+
+    public String getNetworkZone() {
+        return getString("quorus.agent.network-zone", "default");
+    }
+
+    public String getVaultAddress() {
+        return getString("quorus.vault.addr", "");
+    }
+
+    public String getVaultToken() {
+        return getString("quorus.vault.token", "");
+    }
+
     // ==================== Core Property Accessors ====================
 
     /**
-     * Gets a string property with layered resolution.
-     * 
-     * <p>Resolution order (highest to lowest priority):
-     * <ol>
-     *   <li>Environment variable (e.g., QUORUS_AGENT_CONTROLLER_URL)</li>
-     *   <li>System property (e.g., -Dquorus.agent.controller.url=...)</li>
-     *   <li>Properties file (quorus-agent.properties)</li>
-     *   <li>Default value</li>
-     * </ol>
+     * Gets a value from this isolated configuration instance.
      */
     public String getString(String key, String defaultValue) {
-        // 1. Check environment variable (QUORUS_AGENT_XXX format)
-        String envKey = key.toUpperCase().replace('.', '_').replace('-', '_');
-        String envValue = System.getenv(envKey);
-        if (envValue != null && !envValue.isEmpty()) {
-            return envValue;
-        }
-
-        // 2. Check system property (e.g., -Dquorus.agent.port=8090)
-        String sysProp = System.getProperty(key);
-        if (sysProp != null && !sysProp.isEmpty()) {
-            return sysProp;
-        }
-
-        // 3. Check properties file
-        return properties.getProperty(key, defaultValue);
+        String value = properties.getProperty(key);
+        return value == null || value.isBlank() ? defaultValue : value;
     }
 
     /**
@@ -273,17 +319,48 @@ public final class AgentConfig {
 
     // ==================== Private Helpers ====================
 
-    private void loadProperties() {
-        try (InputStream input = getClass().getClassLoader().getResourceAsStream(CONFIG_FILE)) {
+    private void loadResource(String resourceName, boolean required) {
+        try (InputStream input = getClass().getClassLoader().getResourceAsStream(resourceName)) {
             if (input != null) {
                 properties.load(input);
-                logger.info("Loaded configuration from {}", CONFIG_FILE);
+                logger.info("Loaded configuration from {}", resourceName);
+            } else if (required) {
+                logger.warn("Configuration resource {} not found, using accessor defaults", resourceName);
             } else {
-                logger.warn("Configuration file {} not found, using defaults and environment variables", CONFIG_FILE);
+                logger.debug("Optional configuration profile {} not found", resourceName);
             }
         } catch (IOException e) {
-            logger.error("Error loading configuration file: {}", e.getMessage());
-            logger.debug("Stack trace", e);
+            throw new IllegalStateException("Unable to load configuration resource " + resourceName, e);
+        }
+    }
+
+    private void applyEnvironmentOverrides() {
+        for (String key : properties.stringPropertyNames()) {
+            applyEnvironmentValue(key, key.toUpperCase().replace('.', '_').replace('-', '_'));
+        }
+
+        Map.ofEntries(
+                Map.entry("quorus.agent.id", "AGENT_ID"),
+                Map.entry("quorus.agent.tenant.id", "AGENT_TENANT_ID"),
+                Map.entry("quorus.agent.controller.url", "CONTROLLER_URL"),
+                Map.entry("quorus.agent.region", "AGENT_REGION"),
+                Map.entry("quorus.agent.datacenter", "AGENT_DATACENTER"),
+                Map.entry("quorus.agent.port", "AGENT_PORT"),
+                Map.entry("quorus.agent.transfers.max-concurrent", "MAX_CONCURRENT_TRANSFERS"),
+                Map.entry("quorus.agent.heartbeat.interval-ms", "HEARTBEAT_INTERVAL"),
+                Map.entry("quorus.agent.http.connection-timeout-ms", "HTTP_CONNECTION_TIMEOUT_MS"),
+                Map.entry("quorus.agent.http.idle-timeout-ms", "HTTP_IDLE_TIMEOUT_MS"),
+                Map.entry("quorus.agent.version", "AGENT_VERSION"),
+                Map.entry("quorus.agent.protocols", "SUPPORTED_PROTOCOLS"),
+                Map.entry("quorus.vault.addr", "QUORUS_VAULT_ADDR"),
+                Map.entry("quorus.vault.token", "QUORUS_VAULT_TOKEN")
+        ).forEach(this::applyEnvironmentValue);
+    }
+
+    private void applyEnvironmentValue(String propertyKey, String environmentKey) {
+        String value = System.getenv(environmentKey);
+        if (value != null && !value.isBlank()) {
+            properties.setProperty(propertyKey, value.trim());
         }
     }
 

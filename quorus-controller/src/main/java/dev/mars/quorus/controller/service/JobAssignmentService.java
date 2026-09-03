@@ -55,6 +55,7 @@ public class JobAssignmentService {
     private final Vertx vertx;
     private final RaftNode raftNode;
     private final AgentSelectionService agentSelectionService;
+    private final AppConfig config;
     private final AtomicBoolean closed = new AtomicBoolean(false);
 
     // Vert.x timer IDs (replacing ScheduledExecutorService)
@@ -74,10 +75,12 @@ public class JobAssignmentService {
      * @param raftNode the Raft node for distributed consensus
      * @param agentSelectionService the agent selection service
      */
-    public JobAssignmentService(Vertx vertx, RaftNode raftNode, AgentSelectionService agentSelectionService) {
+    public JobAssignmentService(Vertx vertx, RaftNode raftNode,
+                                AgentSelectionService agentSelectionService, AppConfig config) {
         this.vertx = Objects.requireNonNull(vertx, "Vertx cannot be null");
         this.raftNode = Objects.requireNonNull(raftNode, "RaftNode cannot be null");
         this.agentSelectionService = Objects.requireNonNull(agentSelectionService, "AgentSelectionService cannot be null");
+        this.config = Objects.requireNonNull(config, "AppConfig cannot be null");
 
         logger.info("Creating JobAssignmentService: vertxId={} (using Vert.x timers)", 
             System.identityHashCode(vertx));
@@ -194,7 +197,7 @@ public class JobAssignmentService {
         logger.debug("Submitting assignment to Raft: jobId={}, agentId={}", jobId, selectedAgentId);
         String attemptId = UUID.randomUUID().toString();
         Instant leaseExpiresAt = assignment.getAssignedAt()
-                .plusMillis(AppConfig.get().getAttemptLeaseDurationMs());
+                .plusMillis(config.getAttemptLeaseDurationMs());
         JobAssignmentCommand assignCommand = JobAssignmentCommand.assignWithAttempt(
                 assignment, attemptId, leaseExpiresAt);
 
@@ -344,7 +347,6 @@ public class JobAssignmentService {
      * Uses Vert.x periodic timer instead of ScheduledExecutorService.
      */
     private void startAssignmentProcessor() {
-        AppConfig config = AppConfig.get();
         long initialDelay = config.getAssignmentInitialDelayMs();
         long interval = config.getAssignmentIntervalMs();
         
@@ -370,7 +372,6 @@ public class JobAssignmentService {
      * Uses Vert.x periodic timer instead of ScheduledExecutorService.
      */
     private void startTimeoutMonitor() {
-        AppConfig config = AppConfig.get();
         long initialDelay = config.getTimeoutInitialDelayMs();
         long interval = config.getTimeoutIntervalMs();
         

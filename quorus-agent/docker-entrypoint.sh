@@ -31,11 +31,9 @@ export HEARTBEAT_INTERVAL=${HEARTBEAT_INTERVAL:-30000}
 export AGENT_PORT=${AGENT_PORT:-8080}
 export AGENT_VERSION=${AGENT_VERSION:-1.0.0}
 
-# Configure Java options
-JAVA_OPTS="${JAVA_OPTS:-} -Dquorus.agent.id=$AGENT_ID"
-JAVA_OPTS="$JAVA_OPTS -Dquorus.agent.region=$AGENT_REGION"
-JAVA_OPTS="$JAVA_OPTS -Dquorus.agent.datacenter=$AGENT_DATACENTER"
-JAVA_OPTS="$JAVA_OPTS -Dquorus.controller.url=$CONTROLLER_URL"
+# Agent configuration is supplied through exported environment values. JVM
+# system properties are reserved for JVM and logging concerns only.
+JAVA_OPTS="${JAVA_OPTS:-}"
 
 # JVM tuning for containers
 JAVA_OPTS="$JAVA_OPTS -XX:+UseContainerSupport"

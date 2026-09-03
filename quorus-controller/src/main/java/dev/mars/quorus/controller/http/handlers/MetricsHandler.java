@@ -16,7 +16,6 @@
 
 package dev.mars.quorus.controller.http.handlers;
 
-import dev.mars.quorus.controller.config.AppConfig;
 import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
 import io.vertx.ext.web.RoutingContext;
@@ -28,8 +27,7 @@ import org.slf4j.LoggerFactory;
  * HTTP handler for system metrics.
  * Proxies the OpenTelemetry Prometheus exporter.
  * 
- * The Prometheus port is read from configuration (quorus.telemetry.prometheus.port),
- * defaulting to 9464.
+ * The Prometheus port is supplied by the application configuration boundary.
  *
  * Endpoint: GET /metrics
  *
@@ -43,13 +41,6 @@ public class MetricsHandler implements Handler<RoutingContext> {
     
     private final WebClient webClient;
     private final int prometheusPort;
-
-    /**
-     * Creates a MetricsHandler with the default Prometheus port from configuration.
-     */
-    public MetricsHandler(Vertx vertx) {
-        this(vertx, AppConfig.get().getPrometheusPort());
-    }
 
     /**
      * Creates a MetricsHandler with a specific Prometheus port.

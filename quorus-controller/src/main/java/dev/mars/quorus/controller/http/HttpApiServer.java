@@ -42,6 +42,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
+import java.util.Objects;
 
 /**
  * Reactive HTTP API Server using Vert.x Web.
@@ -74,6 +75,7 @@ public class HttpApiServer {
     private final RaftNode raftNode;
     private final QuorusStateStore stateStore;
     private final int prometheusPort;
+    private final AppConfig appConfig;
     private final DrainModeHandler drainModeHandler;
     private final SecurityConfig securityConfig;
     private final AuthorizationPolicyEngine policyEngine;
@@ -85,8 +87,9 @@ public class HttpApiServer {
     /**
      * Creates an HttpApiServer with default Prometheus port from configuration.
      */
-    public HttpApiServer(Vertx vertx, int port, RaftNode raftNode, QuorusStateStore stateStore) {
-        this(vertx, "127.0.0.1", port, raftNode, stateStore, -1);
+    public HttpApiServer(Vertx vertx, int port, RaftNode raftNode, QuorusStateStore stateStore,
+                         AppConfig appConfig) {
+        this(vertx, "127.0.0.1", port, raftNode, stateStore, -1, appConfig);
     }
 
     /**
@@ -94,38 +97,43 @@ public class HttpApiServer {
      *
      * @param prometheusPort the port where Prometheus metrics are exposed, or -1 to use config default
      */
-    public HttpApiServer(Vertx vertx, int port, RaftNode raftNode, QuorusStateStore stateStore, int prometheusPort) {
-        this(vertx, "127.0.0.1", port, raftNode, stateStore, prometheusPort);
+    public HttpApiServer(Vertx vertx, int port, RaftNode raftNode, QuorusStateStore stateStore,
+                         int prometheusPort, AppConfig appConfig) {
+        this(vertx, "127.0.0.1", port, raftNode, stateStore, prometheusPort, appConfig);
     }
 
     public HttpApiServer(Vertx vertx, String host, int port, RaftNode raftNode,
-                         QuorusStateStore stateStore, int prometheusPort) {
-        this(vertx, host, port, raftNode, stateStore, prometheusPort,
+                         QuorusStateStore stateStore, int prometheusPort, AppConfig appConfig) {
+        this(vertx, host, port, raftNode, stateStore, prometheusPort, appConfig,
                 SecurityConfig.developmentDisabled(), AuditSink.noOp());
     }
 
     public HttpApiServer(Vertx vertx, String host, int port, RaftNode raftNode,
-                         QuorusStateStore stateStore, int prometheusPort, SecurityConfig securityConfig) {
-        this(vertx, host, port, raftNode, stateStore, prometheusPort, securityConfig,
+                         QuorusStateStore stateStore, int prometheusPort, AppConfig appConfig,
+                         SecurityConfig securityConfig) {
+        this(vertx, host, port, raftNode, stateStore, prometheusPort, appConfig, securityConfig,
                 CertificateTrustState.from(securityConfig));
     }
 
     public HttpApiServer(Vertx vertx, String host, int port, RaftNode raftNode,
-                         QuorusStateStore stateStore, int prometheusPort, SecurityConfig securityConfig,
+                         QuorusStateStore stateStore, int prometheusPort, AppConfig appConfig,
+                         SecurityConfig securityConfig,
                          CertificateTrustState trustState) {
-        this(vertx, host, port, raftNode, stateStore, prometheusPort, securityConfig,
+        this(vertx, host, port, raftNode, stateStore, prometheusPort, appConfig, securityConfig,
                 createAuditSink(securityConfig), trustState);
     }
 
     HttpApiServer(Vertx vertx, String host, int port, RaftNode raftNode,
-                  QuorusStateStore stateStore, int prometheusPort, SecurityConfig securityConfig,
+                  QuorusStateStore stateStore, int prometheusPort, AppConfig appConfig,
+                  SecurityConfig securityConfig,
                   AuditSink auditSink) {
-        this(vertx, host, port, raftNode, stateStore, prometheusPort, securityConfig, auditSink,
+        this(vertx, host, port, raftNode, stateStore, prometheusPort, appConfig, securityConfig, auditSink,
                 CertificateTrustState.from(securityConfig));
     }
 
     HttpApiServer(Vertx vertx, String host, int port, RaftNode raftNode,
-                  QuorusStateStore stateStore, int prometheusPort, SecurityConfig securityConfig,
+                  QuorusStateStore stateStore, int prometheusPort, AppConfig appConfig,
+                  SecurityConfig securityConfig,
                   AuditSink auditSink, CertificateTrustState trustState) {
         this.vertx = vertx;
         this.host = host;
@@ -133,6 +141,7 @@ public class HttpApiServer {
         this.raftNode = raftNode;
         this.stateStore = stateStore;
         this.prometheusPort = prometheusPort;
+        this.appConfig = Objects.requireNonNull(appConfig, "appConfig must not be null");
         this.drainModeHandler = new DrainModeHandler();
         this.securityConfig = securityConfig;
         this.policyEngine = new AuthorizationPolicyEngine();
@@ -149,17 +158,14 @@ public class HttpApiServer {
         router.route().handler(new AuthorizationHandler(securityConfig, policyEngine, auditSink));
         router.route().handler(new AuditCompletionHandler(securityConfig, policyEngine, auditSink));
         router.route().handler(BodyHandler.create()
-                .setBodyLimit(AppConfig.get().getHttpMaxBodyBytes()));
+                .setBodyLimit(appConfig.getHttpMaxBodyBytes()));
         router.route().handler(drainModeHandler);
         router.route().handler(new LeaderGuardHandler(raftNode));
         router.route().failureHandler(new GlobalErrorHandler());
 
         // ==================== Infrastructure Endpoints ====================
-        if (prometheusPort > 0) {
-            router.get("/metrics").handler(new MetricsHandler(vertx, prometheusPort));
-        } else {
-            router.get("/metrics").handler(new MetricsHandler(vertx));
-        }
+        int metricsPort = prometheusPort > 0 ? prometheusPort : appConfig.getPrometheusPort();
+        router.get("/metrics").handler(new MetricsHandler(vertx, metricsPort));
 
         // ==================== Health Endpoints ====================
         this.healthHandler = new HealthHandler(raftNode, VERSION);
@@ -210,8 +216,8 @@ public class HttpApiServer {
         router.get("/api/v1/transfers/:jobId").handler(transferHandler.handleGet());
         router.get("/api/v1/transfers/:jobId/progress").handler(new TransferProgressHandler(
                 stateStore,
-                Duration.ofMillis(AppConfig.get().getTransferFreshWindowMs()),
-                Duration.ofMillis(AppConfig.get().getTransferStallWindowMs())));
+                Duration.ofMillis(appConfig.getTransferFreshWindowMs()),
+                Duration.ofMillis(appConfig.getTransferStallWindowMs())));
         router.get("/api/v1/transfers/:jobId/events").handler(new TransferEventHandler(stateStore));
         router.delete("/api/v1/transfers/:jobId").handler(transferHandler.handleDelete());
         TransferAttemptHandler attemptHandler = new TransferAttemptHandler(stateStore);
@@ -222,7 +228,8 @@ public class HttpApiServer {
         router.post("/api/v1/jobs/:jobId/status").handler(new JobStatusHandler(raftNode, stateStore));
 
         // ==================== Job Assignment Endpoints ====================
-        JobAssignmentHandler assignmentHandler = new JobAssignmentHandler(raftNode, stateStore);
+        JobAssignmentHandler assignmentHandler = new JobAssignmentHandler(
+                raftNode, stateStore, appConfig.getAttemptLeaseDurationMs());
         router.post("/api/v1/assignments").handler(assignmentHandler.handleAssign());
         router.get("/api/v1/assignments").handler(assignmentHandler.handleList());
         router.get("/api/v1/assignments/:assignmentId").handler(assignmentHandler.handleGet());

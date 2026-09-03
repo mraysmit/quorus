@@ -7,7 +7,7 @@ set -e
 
 # Default values
 DEFAULT_NODE_ID="controller1"
-DEFAULT_RAFT_PORT=8080
+DEFAULT_RAFT_PORT=9080
 DEFAULT_RAFT_HOST="0.0.0.0"
 DEFAULT_ELECTION_TIMEOUT_MS=5000
 DEFAULT_HEARTBEAT_INTERVAL_MS=1000
@@ -39,13 +39,12 @@ echo "Cluster Nodes: $CLUSTER_NODES"
 # startup waiting for other nodes. This avoids 30–60s of unnecessary delay
 # when the cluster starts simultaneously on the same Docker network.
 
-# Set Java system properties
-JAVA_OPTS="$JAVA_OPTS -Dquorus.raft.nodeId=$NODE_ID"
-JAVA_OPTS="$JAVA_OPTS -Dquorus.raft.host=$RAFT_HOST"
-JAVA_OPTS="$JAVA_OPTS -Dquorus.raft.port=$RAFT_PORT"
-JAVA_OPTS="$JAVA_OPTS -Dquorus.raft.clusterNodes=$CLUSTER_NODES"
-JAVA_OPTS="$JAVA_OPTS -Dquorus.raft.electionTimeoutMs=$ELECTION_TIMEOUT_MS"
-JAVA_OPTS="$JAVA_OPTS -Dquorus.raft.heartbeatIntervalMs=$HEARTBEAT_INTERVAL_MS"
+# Export application configuration through the supported environment channel.
+export QUORUS_NODE_ID="$NODE_ID"
+export QUORUS_RAFT_PORT="$RAFT_PORT"
+export QUORUS_CLUSTER_NODES="$CLUSTER_NODES"
+export QUORUS_RAFT_ELECTION_TIMEOUT_MS="$ELECTION_TIMEOUT_MS"
+export QUORUS_RAFT_HEARTBEAT_INTERVAL_MS="$HEARTBEAT_INTERVAL_MS"
 
 # JUL logs are bridged to SLF4J/Logback in application startup.
 
