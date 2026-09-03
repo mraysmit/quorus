@@ -106,7 +106,7 @@ public class JobAssignmentService {
         // Create transfer job
         TransferJob transferJob = new TransferJob(transferRequest);
         logger.debug("Created transfer job: jobId={}, source={}, dest={}", 
-            transferJob.getJobId(), transferRequest.getSourceUri(), transferRequest.getDestinationPath());
+            transferJob.getJobId(), transferRequest.getSourceUri(), transferRequest.getDestinationUri());
 
         // Create queued job
         QueuedJob queuedJob = new QueuedJob.Builder()

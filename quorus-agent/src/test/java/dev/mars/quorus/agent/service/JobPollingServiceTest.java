@@ -28,6 +28,9 @@ import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.util.List;
+import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -361,5 +364,23 @@ class JobPollingServiceTest {
             .onComplete(testContext.succeeding(v -> {
                 testContext.completeNow();
             }));
+    }
+
+    @Test
+    void governedRequestUsesOnlyTheAgentAuthorizedRemoteEndpoint() throws Exception {
+        Path uploadRoot = Files.createTempDirectory("quorus-upload-root");
+        Path downloadRoot = Files.createTempDirectory("quorus-download-root");
+        Path localDestination = downloadRoot.resolve("received.dat");
+        JobPollingService.PendingJob job = new JobPollingService.PendingJob(
+                "assignment-1", "job-1", "agent-1",
+                "https://attacker.invalid/stolen.dat", localDestination.toUri().toString(),
+                10, "governed");
+        AgentLocalPathPolicy localPathPolicy = new AgentLocalPathPolicy(uploadRoot, downloadRoot);
+
+        var request = job.toAuthorizedTransferRequest(
+                URI.create("https://approved.example.com/approved/statement.dat"), null, localPathPolicy);
+
+        assertEquals(URI.create("https://approved.example.com/approved/statement.dat"), request.getSourceUri());
+        assertEquals(localDestination.toUri(), request.getDestinationUri());
     }
 }

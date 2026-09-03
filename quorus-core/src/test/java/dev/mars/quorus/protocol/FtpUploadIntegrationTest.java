@@ -247,6 +247,6 @@ class FtpUploadIntegrationTest {
      * Builds an FTP URI for the test server.
      */
     private URI buildFtpUri(String path) {
-        return URI.create("ftp://testuser:testpass@" + ftpHost + ":" + ftpPort + path);
+        return URI.create("ftp://" + ftpHost + ":" + ftpPort + path);
     }
 }

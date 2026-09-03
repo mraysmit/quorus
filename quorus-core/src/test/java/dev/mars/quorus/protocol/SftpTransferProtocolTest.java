@@ -118,14 +118,11 @@ class SftpTransferProtocolTest {
     
     @Test
     void testSftpUriAuthenticationEdgeCase() {
-        // Test SFTP URI with username and password
-        TransferRequest request = TransferRequest.builder()
+        assertThrows(IllegalArgumentException.class, () -> TransferRequest.builder()
                 .requestId("test-auth-edge")
                 .sourceUri(URI.create("sftp://user:pass@server.com:22/path/file.txt"))
                 .destinationPath(tempDir.resolve("file.txt"))
-                .build();
-        
-        assertTrue(protocol.canHandle(request));
+                .build());
     }
     
     @Test
@@ -143,13 +140,11 @@ class SftpTransferProtocolTest {
     @Test
     void testSftpUriUsernameOnlyEdgeCase() {
         // Test SFTP URI with username but no password
-        TransferRequest request = TransferRequest.builder()
+        assertThrows(IllegalArgumentException.class, () -> TransferRequest.builder()
                 .requestId("test-username-edge")
                 .sourceUri(URI.create("sftp://user@server.com/path/file.txt"))
                 .destinationPath(tempDir.resolve("file.txt"))
-                .build();
-        
-        assertTrue(protocol.canHandle(request));
+                .build());
     }
     
     // Additional edge case error tests moved to dev.mars.quorus.protocol.errorhandling.SftpTransferProtocolErrorHandlingTest

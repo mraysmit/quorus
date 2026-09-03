@@ -22,6 +22,9 @@ import dev.mars.quorus.controller.security.IdentityType;
 import dev.mars.quorus.controller.security.SecurityContext;
 import dev.mars.quorus.controller.security.SecurityIdentity;
 import dev.mars.quorus.controller.state.TransferJobSnapshot;
+import dev.mars.quorus.controller.state.ServiceConnectionRegistry;
+import dev.mars.quorus.connection.ServiceConnection;
+import dev.mars.quorus.connection.SecretReference;
 import dev.mars.quorus.core.JobAssignment;
 import dev.mars.quorus.core.TransferAttempt;
 import io.vertx.core.Handler;
@@ -49,9 +52,11 @@ public class AgentJobsHandler implements Handler<RoutingContext> {
 
     private static final Logger logger = LoggerFactory.getLogger(AgentJobsHandler.class);
     private final QuorusStateStore stateStore;
+    private final ServiceConnectionRegistry connectionRegistry;
 
     public AgentJobsHandler(QuorusStateStore stateStore) {
         this.stateStore = stateStore;
+        this.connectionRegistry = new ServiceConnectionRegistry(stateStore);
     }
 
     @Override
@@ -115,10 +120,33 @@ public class AgentJobsHandler implements Handler<RoutingContext> {
 
             if (transferJob != null) {
                 jobInfo.put("sourceUri", transferJob.getSourceUri())
-                        .put("destinationPath", transferJob.getDestinationPath())
+                        .put("destinationUri", transferJob.getDestinationUri())
                         .put("totalBytes", transferJob.getTotalBytes());
+                if (transferJob.getLocalDestinationPath() != null) {
+                    jobInfo.put("destinationPath", transferJob.getLocalDestinationPath());
+                }
                 if (transferJob.getDescription() != null) {
                     jobInfo.put("description", transferJob.getDescription());
+                }
+                if (transferJob.getServiceConnectionId() != null) {
+                    ServiceConnection connection = connectionRegistry.findConnection(
+                            agentTenantId, transferJob.getServiceConnectionId());
+                    SecretReference reference = connection == null ? null : connectionRegistry.findSecret(
+                            agentTenantId, connection.secretReferenceId());
+                    if (connection == null || reference == null) {
+                        logger.error("Governed job withheld because its connection authority is unavailable: jobId={}",
+                                transferJob.getJobId());
+                        continue;
+                    }
+                    jobInfo.put("tenantId", agentTenantId)
+                            .put("serviceConnection", ServiceConnectionRegistry.connectionToJson(connection))
+                            .put("secretReference", ServiceConnectionRegistry.secretToJson(reference))
+                            .put("remotePath", transferJob.getRemotePath())
+                            .put("agentPool", transferJob.getAgentPool())
+                            .put("connectionPolicyVersion", transferJob.getConnectionPolicyVersion())
+                            .put("connectionPolicyDigest", transferJob.getConnectionPolicyDigest())
+                            .put("controllerResolvedAddresses",
+                                    new JsonArray(transferJob.getControllerResolvedAddresses()));
                 }
             }
 

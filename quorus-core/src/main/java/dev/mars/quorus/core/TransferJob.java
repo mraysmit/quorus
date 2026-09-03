@@ -74,6 +74,7 @@ public class TransferJob implements Serializable {
             @JsonProperty("jobId") String jobId,
             @JsonProperty("sourceUri") URI sourceUri,
             @JsonProperty("destinationPath") String destinationPath,
+            @JsonProperty("destinationUri") URI destinationUri,
             @JsonProperty("totalBytes") long totalBytes,
             @JsonProperty("description") String description,
             @JsonProperty("metadata") Map<String, String> metadata,
@@ -91,8 +92,12 @@ public class TransferJob implements Serializable {
         TransferRequest.Builder builder = TransferRequest.builder()
                 .requestId(jobId)
                 .sourceUri(sourceUri)
-                .destinationPath(destinationPath)
                 .expectedSize(totalBytes);
+        if (destinationUri != null) {
+            builder.destinationUri(destinationUri);
+        } else {
+            builder.destinationPath(destinationPath);
+        }
                 
         Map<String, String> effectiveMetadata = new HashMap<>();
         if (metadata != null) effectiveMetadata.putAll(metadata);

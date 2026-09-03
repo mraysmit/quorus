@@ -650,6 +650,107 @@ paths:
       operationId: resumeRoute
       summary: Resume a suspended route
       responses: *RouteMutationResponses
+  /api/v1/service-connections:
+    get:
+      tags: [Service Connections]
+      operationId: listServiceConnections
+      summary: List tenant-scoped governed service connections
+      parameters: [{$ref: '#/components/parameters/TenantIdQuery'}]
+      responses:
+        '200': {description: Service connections, content: {application/json: {schema: {$ref: '#/components/schemas/ServiceConnectionList'}}}}
+        default: {$ref: '#/components/responses/Problem'}
+    post:
+      tags: [Service Connections]
+      operationId: createServiceConnection
+      summary: Create a governed service connection
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ServiceConnectionWrite'}}}}
+      responses:
+        '201': {description: Created, content: {application/json: {schema: {$ref: '#/components/schemas/ServiceConnection'}}}}
+        '400': {$ref: '#/components/responses/Problem'}
+        '409': {$ref: '#/components/responses/Problem'}
+        default: {$ref: '#/components/responses/Problem'}
+  /api/v1/service-connections/{serviceConnectionId}:
+    parameters: [{$ref: '#/components/parameters/ServiceConnectionId'}]
+    get:
+      tags: [Service Connections]
+      operationId: getServiceConnection
+      parameters: [{$ref: '#/components/parameters/TenantIdQuery'}]
+      responses:
+        '200': {description: Service connection, content: {application/json: {schema: {$ref: '#/components/schemas/ServiceConnection'}}}}
+        '404': {$ref: '#/components/responses/Problem'}
+        default: {$ref: '#/components/responses/Problem'}
+    put:
+      tags: [Service Connections]
+      operationId: updateServiceConnection
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ServiceConnectionWrite'}}}}
+      responses:
+        '200': {description: Updated, content: {application/json: {schema: {$ref: '#/components/schemas/ServiceConnection'}}}}
+        default: {$ref: '#/components/responses/Problem'}
+    delete:
+      tags: [Service Connections]
+      operationId: deleteServiceConnection
+      parameters: [{$ref: '#/components/parameters/TenantIdQuery'}]
+      responses:
+        '200': {description: Deleted, content: {application/json: {schema: {$ref: '#/components/schemas/Deletion'}}}}
+        default: {$ref: '#/components/responses/Problem'}
+  /api/v1/service-connections/{serviceConnectionId}/validate:
+    parameters: [{$ref: '#/components/parameters/ServiceConnectionId'}]
+    post:
+      tags: [Service Connections]
+      operationId: validateServiceConnection
+      summary: Perform a redacted staged policy validation
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ConnectionValidationRequest'}}}}
+      responses:
+        '200': {description: Validation result, content: {application/json: {schema: {$ref: '#/components/schemas/ConnectionValidation'}}}}
+        default: {$ref: '#/components/responses/Problem'}
+  /api/v1/secret-references:
+    get:
+      tags: [Secret References]
+      operationId: listSecretReferences
+      parameters: [{$ref: '#/components/parameters/TenantIdQuery'}]
+      responses:
+        '200': {description: Opaque references, content: {application/json: {schema: {$ref: '#/components/schemas/SecretReferenceList'}}}}
+        default: {$ref: '#/components/responses/Problem'}
+    post:
+      tags: [Secret References]
+      operationId: createSecretReference
+      summary: Register an opaque reference; secret values are forbidden
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/SecretReferenceWrite'}}}}
+      responses:
+        '201': {description: Created, content: {application/json: {schema: {$ref: '#/components/schemas/SecretReference'}}}}
+        default: {$ref: '#/components/responses/Problem'}
+  /api/v1/secret-references/{secretReferenceId}:
+    parameters: [{$ref: '#/components/parameters/SecretReferenceId'}]
+    get:
+      tags: [Secret References]
+      operationId: getSecretReference
+      parameters: [{$ref: '#/components/parameters/TenantIdQuery'}]
+      responses:
+        '200': {description: Opaque reference, content: {application/json: {schema: {$ref: '#/components/schemas/SecretReference'}}}}
+        default: {$ref: '#/components/responses/Problem'}
+    put:
+      tags: [Secret References]
+      operationId: updateSecretReference
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/SecretReferenceWrite'}}}}
+      responses:
+        '200': {description: Updated, content: {application/json: {schema: {$ref: '#/components/schemas/SecretReference'}}}}
+        default: {$ref: '#/components/responses/Problem'}
+    delete:
+      tags: [Secret References]
+      operationId: deleteSecretReference
+      parameters: [{$ref: '#/components/parameters/TenantIdQuery'}]
+      responses:
+        '200': {description: Deleted, content: {application/json: {schema: {$ref: '#/components/schemas/Deletion'}}}}
+        '409': {$ref: '#/components/responses/Problem'}
+        default: {$ref: '#/components/responses/Problem'}
+  /api/v1/security-events:
+    get:
+      tags: [Security Events]
+      operationId: listSecurityEvents
+      parameters: [{$ref: '#/components/parameters/TenantIdQuery'}]
+      responses:
+        '200': {description: Redacted security events, content: {application/json: {schema: {$ref: '#/components/schemas/SecurityEventList'}}}}
+        default: {$ref: '#/components/responses/Problem'}
 components:
   securitySchemes:
     mutualTls:
@@ -679,6 +780,22 @@ components:
       name: routeId
       in: path
       required: true
+      schema: {type: string, minLength: 1}
+    ServiceConnectionId:
+      name: serviceConnectionId
+      in: path
+      required: true
+      schema: {type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$'}
+    SecretReferenceId:
+      name: secretReferenceId
+      in: path
+      required: true
+      schema: {type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$'}
+    TenantIdQuery:
+      name: tenantId
+      in: query
+      required: false
+      description: Optional narrowing value; authenticated tenant remains authoritative.
       schema: {type: string, minLength: 1}
   responses:
     Problem:
@@ -773,6 +890,158 @@ components:
       required: [success]
       properties: {success: {type: boolean, const: true}}
       additionalProperties: false
+    TrustPolicy:
+      type: object
+      required: [tlsRequired, hostnameVerification, approvedCaIds, sshHostKeyFingerprints,
+        minimumTlsVersion, tlsPeerFingerprints, transportEncryptionRequired]
+      properties:
+        tlsRequired: {type: boolean}
+        hostnameVerification: {type: boolean}
+        approvedCaIds:
+          type: array
+          uniqueItems: true
+          description: SHA-256 fingerprints of CA certificates allowed within an otherwise valid PKIX chain.
+          items: {type: string, pattern: '^SHA256:.+'}
+        sshHostKeyFingerprints: {type: array, uniqueItems: true, items: {type: string, pattern: '^SHA256:.+'}}
+        minimumTlsVersion: {type: string, enum: [TLSv1.2, TLSv1.3]}
+        tlsPeerFingerprints: {type: array, uniqueItems: true, items: {type: string, minLength: 1}}
+        transportEncryptionRequired: {type: boolean}
+      additionalProperties: false
+    EgressPolicy:
+      type: object
+      required: [allowedHostnames, allowedCidrs, allowedPorts, allowRedirects, pinResolvedAddresses]
+      properties:
+        allowedHostnames: {type: array, minItems: 1, uniqueItems: true, items: {type: string, minLength: 1}}
+        allowedCidrs: {type: array, minItems: 1, uniqueItems: true, items: {type: string, minLength: 1}}
+        allowedPorts: {type: array, minItems: 1, uniqueItems: true, items: {type: integer, minimum: 1, maximum: 65535}}
+        allowRedirects: {type: boolean, const: false}
+        pinResolvedAddresses: {type: boolean, const: true}
+      additionalProperties: false
+    ServiceConnectionWrite:
+      type: object
+      required: [tenantId, protocol, endpoint, networkZone, allowedPaths, allowedDirections,
+        allowedAgentPools, owner, environment, classification, secretReferenceId, serviceIdentity,
+        authenticationType, trustPolicy, egressPolicy]
+      properties:
+        serviceConnectionId: {type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$'}
+        tenantId: {type: string, minLength: 1}
+        protocol: {type: string, enum: [SFTP, HTTPS, FTPS, SMB, NFS]}
+        endpoint: {type: string, format: uri, description: Credential-free service endpoint origin.}
+        networkZone: {type: string, minLength: 1}
+        allowedPaths: {type: array, minItems: 1, uniqueItems: true, items: {type: string, pattern: '^/'}}
+        allowedDirections: {type: array, minItems: 1, uniqueItems: true, items: {type: string, enum: [DOWNLOAD, UPLOAD]}}
+        allowedAgentPools: {type: array, minItems: 1, uniqueItems: true, items: {type: string, minLength: 1}}
+        owner: {type: string, minLength: 1}
+        environment: {type: string, minLength: 1}
+        classification: {type: string, minLength: 1}
+        secretReferenceId: {type: string, minLength: 1}
+        serviceIdentity: {type: string, minLength: 1}
+        authenticationType:
+          type: string
+          description: Protocol constrained — SFTP PASSWORD/SSH_PRIVATE_KEY, HTTPS BASIC/BEARER, FTPS PASSWORD, SMB/NFS KERBEROS.
+          enum: [PASSWORD, BASIC, BEARER, SSH_PRIVATE_KEY, KERBEROS]
+        trustPolicy: {$ref: '#/components/schemas/TrustPolicy'}
+        egressPolicy: {$ref: '#/components/schemas/EgressPolicy'}
+        status: {type: string, enum: [ACTIVE, SUSPENDED, REVOKED]}
+      additionalProperties: false
+    ServiceConnection:
+      allOf:
+        - {$ref: '#/components/schemas/ServiceConnectionWrite'}
+        - type: object
+          required: [serviceConnectionId, policyVersion, status, createdAt, updatedAt]
+          properties:
+            serviceConnectionId: {type: string}
+            policyVersion: {type: integer, minimum: 1}
+            status: {type: string, enum: [ACTIVE, SUSPENDED, REVOKED]}
+            createdAt: {type: string, format: date-time}
+            updatedAt: {type: string, format: date-time}
+    ServiceConnectionList:
+      type: object
+      required: [serviceConnections, total]
+      properties:
+        serviceConnections: {type: array, items: {$ref: '#/components/schemas/ServiceConnection'}}
+        total: {type: integer, minimum: 0}
+    SecretReferenceWrite:
+      type: object
+      required: [tenantId, provider, path, key, version]
+      properties:
+        secretReferenceId: {type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$'}
+        tenantId: {type: string, minLength: 1}
+        provider: {type: string, enum: [VAULT_KV_V2]}
+        path: {type: string, minLength: 1}
+        key: {type: string, minLength: 1}
+        version: {type: string, minLength: 1}
+        status: {type: string, enum: [ACTIVE, REVOKED, EXPIRED]}
+        expiresAt: {type: [string, 'null'], format: date-time}
+        lastRotatedAt: {type: [string, 'null'], format: date-time}
+      additionalProperties: false
+    SecretReference:
+      allOf:
+        - {$ref: '#/components/schemas/SecretReferenceWrite'}
+        - type: object
+          required: [secretReferenceId, status]
+          properties:
+            secretReferenceId: {type: string}
+            status: {type: string, enum: [ACTIVE, REVOKED, EXPIRED]}
+    SecretReferenceList:
+      type: object
+      required: [secretReferences, total]
+      properties:
+        secretReferences: {type: array, items: {$ref: '#/components/schemas/SecretReference'}}
+        total: {type: integer, minimum: 0}
+    ConnectionValidationRequest:
+      type: object
+      required: [tenantId, remotePath, direction, agentPool]
+      properties:
+        tenantId: {type: string, minLength: 1}
+        remotePath: {type: string, pattern: '^/'}
+        direction: {type: string, enum: [DOWNLOAD, UPLOAD]}
+        agentPool: {type: string, minLength: 1}
+        probeNetwork:
+          type: boolean
+          default: false
+          description: When true, open a bounded TCP route probe to a controller-approved resolved address.
+        probeTimeoutMillis: {type: integer, minimum: 100, maximum: 10000, default: 3000}
+      additionalProperties: false
+    ConnectionValidationStage:
+      type: object
+      required: [stage, status, detail]
+      properties:
+        stage: {type: string, enum: [POLICY, DNS, ROUTE, NEGOTIATION, IDENTITY, AUTHENTICATION, AUTHORIZATION]}
+        status: {type: string}
+        detail: {type: string}
+        addressCount: {type: integer, minimum: 0}
+        latencyMillis: {type: integer, format: int64, minimum: 0}
+      additionalProperties: false
+    ConnectionValidation:
+      type: object
+      required: [status, serviceConnectionId, policyVersion, policyDigest, stages]
+      properties:
+        status: {type: string, enum: [POLICY_APPROVED, ROUTE_VERIFIED, VALID, INVALID]}
+        serviceConnectionId: {type: string}
+        policyVersion: {type: integer, minimum: 1}
+        policyDigest: {type: string}
+        stages: {type: array, items: {$ref: '#/components/schemas/ConnectionValidationStage'}}
+    SecurityEvent:
+      type: object
+      required: [eventId, tenantId, eventType, resourceType, resourceId, outcome, reasonCode, timestamp]
+      properties:
+        eventId: {type: string, format: uuid}
+        tenantId: {type: string}
+        eventType: {type: string}
+        resourceType: {type: string}
+        resourceId: {type: string}
+        outcome: {type: string, enum: [SUCCESS, DENIED, FAILED]}
+        reasonCode: {type: string}
+        policyVersion: {type: integer, minimum: 1}
+        timestamp: {type: string, format: date-time}
+      additionalProperties: false
+    SecurityEventList:
+      type: object
+      required: [events, total]
+      properties:
+        events: {type: array, items: {$ref: '#/components/schemas/SecurityEvent'}}
+        total: {type: integer, minimum: 0}
     Liveness:
       type: object
       required: [status, timestamp]
@@ -830,6 +1099,12 @@ components:
         version: {type: string}
         region: {type: string}
         datacenter: {type: string}
+        agentPool:
+          type: string
+          description: Deployment-bound pool used for governed scheduling and agent-side re-authorization.
+        networkZone:
+          type: string
+          description: Deployment-bound network zone used for governed scheduling and agent-side re-authorization.
         capabilities: {type: object, additionalProperties: true}
     Agent:
       allOf:
@@ -869,14 +1144,27 @@ components:
         acknowledgedSequenceNumber: {type: integer}
     CreateTransfer:
       type: object
-      required: [jobId, sourceUri, destinationPath]
+      required: [jobId]
+      oneOf:
+        - required: [sourceUri, destinationPath]
+        - required: [serviceConnectionId, remotePath, agentPool, destinationPath]
+        - required: [serviceConnectionId, remotePath, agentPool, direction, sourceUri]
+          properties:
+            direction: {const: UPLOAD}
       properties:
         jobId: {type: string, minLength: 1}
         tenantId:
           type: string
           minLength: 1
           description: Optional narrowing value; it must match the authenticated tenant.
-        sourceUri: {type: string, format: uri}
+        sourceUri:
+          type: string
+          format: uri
+          description: Local file URI for a governed upload, or a credential-free development-only direct source.
+        serviceConnectionId: {type: string, minLength: 1}
+        remotePath: {type: string, pattern: '^/'}
+        agentPool: {type: string, minLength: 1}
+        direction: {type: string, enum: [DOWNLOAD, UPLOAD], default: DOWNLOAD}
         destinationPath: {type: string, minLength: 1}
         totalBytes: {type: integer, format: int64, minimum: 0}
         description: {type: string}
@@ -912,6 +1200,7 @@ components:
       properties:
         jobId: {type: string}
         sourceUri: {type: string, format: uri}
+        destinationUri: {type: string, format: uri}
         destinationPath: {type: string}
         status: {$ref: '#/components/schemas/TransferStatus'}
         totalBytes: {type: integer, format: int64, minimum: 0}
@@ -1038,6 +1327,14 @@ components:
         destinationPath: {type: string}
         totalBytes: {type: integer, format: int64}
         description: {type: string}
+        tenantId: {type: string}
+        remotePath: {type: string}
+        agentPool: {type: string}
+        connectionPolicyVersion: {type: integer, minimum: 1}
+        connectionPolicyDigest: {type: string}
+        controllerResolvedAddresses: {type: array, items: {type: string}}
+        serviceConnection: {$ref: '#/components/schemas/ServiceConnection'}
+        secretReference: {$ref: '#/components/schemas/SecretReference'}
     CreateAssignment:
       type: object
       required: [jobId, agentId]

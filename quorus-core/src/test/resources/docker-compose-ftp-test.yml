@@ -22,7 +22,9 @@ services:
       - "${FTP_DATA_PORT:-21100}:${FTP_DATA_PORT:-21100}"
     environment:
       # FTP credentials (delfer format: name|password)
-      USERS: "testuser|testpass"
+      # Match the adapter's credential-free development-mode fallback. Production
+      # service connections prohibit clear FTP and use agent runtime credentials.
+      USERS: "anonymous|anonymous@example.com"
       # Passive mode configuration
       ADDRESS: "127.0.0.1"
       MIN_PORT: "${FTP_DATA_PORT:-21100}"

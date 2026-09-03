@@ -16,6 +16,9 @@
 
 package dev.mars.quorus.protocol;
 
+import dev.mars.quorus.connection.RuntimeCredential;
+import dev.mars.quorus.connection.ServiceConnection;
+import dev.mars.quorus.connection.SftpHostKeyPolicy;
 import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferResult;
 import dev.mars.quorus.transfer.SimpleTransferEngine;
@@ -34,6 +37,8 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.Base64;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -72,6 +77,7 @@ class SftpAbortIntegrationTest {
     private SimpleTransferEngine engine;
     private String sftpHost;
     private int sftpPort;
+    private String sftpHostKeyFingerprint;
 
     @TempDir
     Path tempDir;
@@ -132,6 +138,8 @@ class SftpAbortIntegrationTest {
             session.setPassword("testpass");
             session.setConfig("StrictHostKeyChecking", "no");
             session.connect(10000);
+            sftpHostKeyFingerprint = SftpHostKeyPolicy.sha256Fingerprint(
+                    Base64.getDecoder().decode(session.getHostKey().getKey()));
             
             com.jcraft.jsch.ChannelSftp channel = (com.jcraft.jsch.ChannelSftp) session.openChannel("sftp");
             channel.connect(5000);
@@ -157,7 +165,7 @@ class SftpAbortIntegrationTest {
     @Test
     void testAbortInterruptsActiveTransfer() throws Exception {
         // URI for the large file we created in setUp()
-        URI sourceUri = URI.create(String.format("sftp://testuser:testpass@%s:%d/upload/large-file.bin",
+        URI sourceUri = URI.create(String.format("sftp://%s:%d/upload/large-file.bin",
                 sftpHost, sftpPort));
         Path destination = tempDir.resolve("downloaded-file.bin");
 
@@ -165,6 +173,7 @@ class SftpAbortIntegrationTest {
                 .requestId("test-abort-download")
                 .sourceUri(sourceUri)
                 .destinationPath(destination)
+                .runtimeCredential(testCredential())
                 .build();
 
         TransferContext context = new TransferContext(new dev.mars.quorus.core.TransferJob(request));
@@ -219,7 +228,7 @@ class SftpAbortIntegrationTest {
 
     @Test
     void testAbortFromDifferentThread() throws Exception {
-        URI sourceUri = URI.create(String.format("sftp://testuser:testpass@%s:%d/upload/large-file.bin",
+        URI sourceUri = URI.create(String.format("sftp://%s:%d/upload/large-file.bin",
                 sftpHost, sftpPort));
         Path destination = tempDir.resolve("downloaded-file2.bin");
 
@@ -227,6 +236,7 @@ class SftpAbortIntegrationTest {
                 .requestId("test-cross-thread-abort")
                 .sourceUri(sourceUri)
                 .destinationPath(destination)
+                .runtimeCredential(testCredential())
                 .build();
 
         TransferContext context = new TransferContext(new dev.mars.quorus.core.TransferJob(request));
@@ -280,5 +290,10 @@ class SftpAbortIntegrationTest {
             protocol.abort();
             protocol.abort();
         });
+    }
+
+    private RuntimeCredential testCredential() {
+        return new RuntimeCredential("testuser", ServiceConnection.AuthenticationType.PASSWORD,
+                "testpass".toCharArray(), Set.of(sftpHostKeyFingerprint), Set.of(), "TLSv1.3");
     }
 }

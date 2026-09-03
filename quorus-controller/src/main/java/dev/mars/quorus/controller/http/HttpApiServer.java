@@ -182,6 +182,22 @@ public class HttpApiServer {
         router.get("/api/v1/security/trust").handler(securityHandler.handleTrustStatus());
         router.put("/api/v1/security/trust/revocations").handler(securityHandler.handleRevocationUpdate());
 
+        // ==================== Governed Service Connection Endpoints ====================
+        ServiceConnectionHandler serviceConnectionHandler = new ServiceConnectionHandler(raftNode, stateStore);
+        router.post("/api/v1/secret-references").handler(serviceConnectionHandler.createSecret());
+        router.get("/api/v1/secret-references").handler(serviceConnectionHandler.listSecrets());
+        router.get("/api/v1/secret-references/:secretReferenceId").handler(serviceConnectionHandler.getSecret());
+        router.put("/api/v1/secret-references/:secretReferenceId").handler(serviceConnectionHandler.updateSecret());
+        router.delete("/api/v1/secret-references/:secretReferenceId").handler(serviceConnectionHandler.deleteSecret());
+        router.post("/api/v1/service-connections").handler(serviceConnectionHandler.createConnection());
+        router.get("/api/v1/service-connections").handler(serviceConnectionHandler.listConnections());
+        router.get("/api/v1/service-connections/:serviceConnectionId").handler(serviceConnectionHandler.getConnection());
+        router.put("/api/v1/service-connections/:serviceConnectionId").handler(serviceConnectionHandler.updateConnection());
+        router.delete("/api/v1/service-connections/:serviceConnectionId").handler(serviceConnectionHandler.deleteConnection());
+        router.post("/api/v1/service-connections/:serviceConnectionId/validate")
+                .handler(serviceConnectionHandler.validateConnection());
+        router.get("/api/v1/security-events").handler(serviceConnectionHandler.listEvents());
+
         // ==================== Agent Endpoints ====================
         router.post("/api/v1/agents/register").handler(new AgentRegistrationHandler(raftNode));
         router.post("/api/v1/agents/heartbeat").handler(new HeartbeatHandler(raftNode, stateStore));
@@ -189,7 +205,7 @@ public class HttpApiServer {
         router.get("/api/v1/agents/:agentId/jobs").handler(new AgentJobsHandler(stateStore));
 
         // ==================== Transfer Endpoints ====================
-        TransferHandler transferHandler = new TransferHandler(raftNode, stateStore);
+        TransferHandler transferHandler = new TransferHandler(raftNode, stateStore, securityConfig.profile());
         router.post("/api/v1/transfers").handler(transferHandler.handleCreate());
         router.get("/api/v1/transfers/:jobId").handler(transferHandler.handleGet());
         router.get("/api/v1/transfers/:jobId/progress").handler(new TransferProgressHandler(

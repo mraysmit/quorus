@@ -117,6 +117,8 @@ final class AgentCodec {
         Optional.ofNullable(info.getDatacenter()).ifPresent(builder::setDatacenter);
         Optional.ofNullable(info.getMetadata()).ifPresent(builder::putAllMetadata);
         Optional.ofNullable(info.getTenantId()).ifPresent(builder::setTenantId);
+        Optional.ofNullable(info.getAgentPool()).ifPresent(builder::setAgentPool);
+        Optional.ofNullable(info.getNetworkZone()).ifPresent(builder::setNetworkZone);
         return builder.build();
     }
 
@@ -152,6 +154,12 @@ final class AgentCodec {
         }
         if (!proto.getTenantId().isEmpty()) {
             info.setTenantId(proto.getTenantId());
+        }
+        if (!proto.getAgentPool().isEmpty()) {
+            info.setAgentPool(proto.getAgentPool());
+        }
+        if (!proto.getNetworkZone().isEmpty()) {
+            info.setNetworkZone(proto.getNetworkZone());
         }
         return info;
     }

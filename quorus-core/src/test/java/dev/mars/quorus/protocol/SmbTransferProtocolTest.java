@@ -140,42 +140,30 @@ class SmbTransferProtocolTest {
     // Error handling tests moved to dev.mars.quorus.protocol.errorhandling.SmbTransferProtocolErrorHandlingTest
     
     @Test
-    @ExpectsError("UNC path with auth -- no SMB server")
     void testSmbUriWithAuthentication() {
-        TransferRequest request = TransferRequest.builder()
+        assertThrows(IllegalArgumentException.class, () -> TransferRequest.builder()
                 .requestId("test-auth")
                 .sourceUri(URI.create("smb://domain;username:password@127.0.0.1/share/file.txt"))
                 .destinationPath(tempDir.resolve("testfile.txt"))
-                .build();
-        
-        assertTrue(protocol.canHandle(request));
-        
-        // Should throw exception when trying to transfer (no real SMB server)
-        assertThrows(TransferException.class, () -> {
-            protocol.transfer(request, context);
-        });
+                .build());
     }
     
     @Test
     void testSmbUriWithUsernameOnly() {
-        TransferRequest request = TransferRequest.builder()
+        assertThrows(IllegalArgumentException.class, () -> TransferRequest.builder()
                 .requestId("test-username-only")
                 .sourceUri(URI.create("smb://username@server/share/file.txt"))
                 .destinationPath(tempDir.resolve("testfile.txt"))
-                .build();
-        
-        assertTrue(protocol.canHandle(request));
+                .build());
     }
     
     @Test
     void testSmbUriWithDomainAndUsername() {
-        TransferRequest request = TransferRequest.builder()
+        assertThrows(IllegalArgumentException.class, () -> TransferRequest.builder()
                 .requestId("test-domain-username")
                 .sourceUri(URI.create("smb://domain;username@server/share/file.txt"))
                 .destinationPath(tempDir.resolve("testfile.txt"))
-                .build();
-        
-        assertTrue(protocol.canHandle(request));
+                .build());
     }
     
     @Test
@@ -244,26 +232,20 @@ class SmbTransferProtocolTest {
     
     @Test
     void testSmbUriAuthenticationEdgeCase() {
-        // Test SMB URI with username and password
-        TransferRequest request = TransferRequest.builder()
+        assertThrows(IllegalArgumentException.class, () -> TransferRequest.builder()
                 .requestId("test-auth-edge")
                 .sourceUri(URI.create("smb://domain;user:pass@server/share/file.txt"))
                 .destinationPath(tempDir.resolve("file.txt"))
-                .build();
-        
-        assertTrue(protocol.canHandle(request));
+                .build());
     }
     
     @Test
     void testSmbUriWithDomain() {
-        // Test SMB URI with domain in username
-        TransferRequest request = TransferRequest.builder()
+        assertThrows(IllegalArgumentException.class, () -> TransferRequest.builder()
                 .requestId("test-domain")
                 .sourceUri(URI.create("smb://DOMAIN;user@server/share/file.txt"))
                 .destinationPath(tempDir.resolve("file.txt"))
-                .build();
-        
-        assertTrue(protocol.canHandle(request));
+                .build());
     }
     
     @Test

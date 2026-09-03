@@ -16,6 +16,8 @@
 
 package dev.mars.quorus.protocol;
 
+import dev.mars.quorus.connection.RuntimeCredential;
+import dev.mars.quorus.connection.ServiceConnection;
 import dev.mars.quorus.core.TransferDirection;
 import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferResult;
@@ -44,6 +46,7 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.cert.X509Certificate;
+import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -238,6 +241,7 @@ class FtpsUploadIntegrationTest {
                     .requestId("integration-ftps-upload-small")
                     .sourceUri(localFile.toUri())
                     .destinationUri(buildFtpsUri("/small-ftps-upload.txt"))
+                    .runtimeCredential(testCredential())
                     .build();
 
             // Verify direction detection
@@ -273,6 +277,7 @@ class FtpsUploadIntegrationTest {
                     .requestId("integration-ftps-upload-1kb")
                     .sourceUri(localFile.toUri())
                     .destinationUri(buildFtpsUri("/1kb-ftps-upload.txt"))
+                    .runtimeCredential(testCredential())
                     .build();
 
             // Execute upload
@@ -305,6 +310,7 @@ class FtpsUploadIntegrationTest {
                     .requestId("integration-ftps-upload-binary")
                     .sourceUri(localFile.toUri())
                     .destinationUri(buildFtpsUri("/binary-ftps-upload.bin"))
+                    .runtimeCredential(testCredential())
                     .build();
 
             // Execute upload
@@ -332,6 +338,7 @@ class FtpsUploadIntegrationTest {
                     .requestId("integration-ftps-roundtrip-upload")
                     .sourceUri(localFile.toUri())
                     .destinationUri(buildFtpsUri("/ftps-roundtrip.txt"))
+                    .runtimeCredential(testCredential())
                     .build();
 
             TransferResult uploadResult = protocol.transfer(uploadRequest, context);
@@ -344,6 +351,7 @@ class FtpsUploadIntegrationTest {
                     .requestId("integration-ftps-roundtrip-download")
                     .sourceUri(buildFtpsUri("/ftps-roundtrip.txt"))
                     .destinationPath(downloadedFile)
+                    .runtimeCredential(testCredential())
                     .build();
 
             TransferResult downloadResult = protocol.transfer(downloadRequest, context);
@@ -372,6 +380,7 @@ class FtpsUploadIntegrationTest {
                     .requestId("integration-ftps-timing")
                     .sourceUri(localFile.toUri())
                     .destinationUri(buildFtpsUri("/ftps-timing-test.txt"))
+                    .runtimeCredential(testCredential())
                     .build();
 
             // Execute upload
@@ -412,6 +421,7 @@ class FtpsUploadIntegrationTest {
                     .requestId("seed-" + remotePath.replace("/", ""))
                     .sourceUri(tempFile.toUri())
                     .destinationUri(buildFtpsUri(remotePath))
+                    .runtimeCredential(testCredential())
                     .build();
             
             TransferResult result = protocol.transfer(uploadRequest, context);
@@ -435,6 +445,7 @@ class FtpsUploadIntegrationTest {
                     .requestId("integration-ftps-download")
                     .sourceUri(buildFtpsUri("/ftps-download-test.txt"))
                     .destinationPath(downloadDest)
+                    .runtimeCredential(testCredential())
                     .build();
 
             TransferResult result = protocol.transfer(downloadRequest, context);
@@ -467,6 +478,7 @@ class FtpsUploadIntegrationTest {
                     .requestId("integration-ftps-download-binary")
                     .sourceUri(buildFtpsUri("/ftps-binary-download.bin"))
                     .destinationPath(downloadDest)
+                    .runtimeCredential(testCredential())
                     .build();
 
             TransferResult result = protocol.transfer(downloadRequest, context);
@@ -499,6 +511,7 @@ class FtpsUploadIntegrationTest {
                     .requestId("integration-ftps-upload-missing")
                     .sourceUri(nonExistent.toUri())
                     .destinationUri(buildFtpsUri("/should-not-arrive.txt"))
+                    .runtimeCredential(testCredential())
                     .build();
 
             assertThrows(TransferException.class, () ->
@@ -512,7 +525,12 @@ class FtpsUploadIntegrationTest {
      * Uses ftps:// scheme to trigger explicit FTPS (AUTH TLS).
      */
     private URI buildFtpsUri(String path) {
-        return URI.create("ftps://" + TEST_USERNAME + ":" + TEST_PASSWORD + "@" + ftpsHost + ":" + ftpsPort + path);
+        return URI.create("ftps://" + ftpsHost + ":" + ftpsPort + path);
+    }
+
+    private RuntimeCredential testCredential() {
+        return new RuntimeCredential(TEST_USERNAME, ServiceConnection.AuthenticationType.PASSWORD,
+                TEST_PASSWORD.toCharArray(), Set.of(), Set.of(), "TLSv1.2");
     }
 
     // ========================================================================

@@ -276,6 +276,8 @@ message AgentInfoProto {
   string datacenter = 11;
   map<string, string> metadata = 12;
   string tenant_id = 13;
+  string agent_pool = 14;
+  string network_zone = 15;
 }
 
 message JobRequirementsProto {

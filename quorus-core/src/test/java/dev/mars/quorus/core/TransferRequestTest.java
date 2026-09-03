@@ -152,4 +152,17 @@ class TransferRequestTest {
         assertThrows(UnsupportedOperationException.class, () ->
                 retrievedMetadata.put("key2", "value2"));  // Should fail - metadata is immutable
     }
+
+    @Test
+    void rejectsCredentialsEmbeddedInEitherEndpointUri() {
+        assertThrows(IllegalArgumentException.class, () -> TransferRequest.builder()
+                .sourceUri(URI.create("https://user:secret@example.com/input.dat"))
+                .destinationPath(Paths.get("/tmp/input.dat"))
+                .build());
+
+        assertThrows(IllegalArgumentException.class, () -> TransferRequest.builder()
+                .sourceUri(Paths.get("/tmp/output.dat").toUri())
+                .destinationUri(URI.create("sftp://user:secret@example.com/output.dat"))
+                .build());
+    }
 }

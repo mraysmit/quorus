@@ -16,6 +16,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class AuthorizationPolicyEngineTest {
     private final AuthorizationPolicyEngine policy = new AuthorizationPolicyEngine();
 
+    @org.junit.jupiter.api.Test
+    void serviceConnectionSecretAndSecurityEventRoutesHaveExplicitScopes() {
+        org.junit.jupiter.api.Assertions.assertEquals("service-connections:read",
+                policy.requiredScope("GET", "/api/v1/service-connections"));
+        org.junit.jupiter.api.Assertions.assertEquals("service-connections:write",
+                policy.requiredScope("POST", "/api/v1/service-connections/payments/validate"));
+        org.junit.jupiter.api.Assertions.assertEquals("secret-references:delete",
+                policy.requiredScope("DELETE", "/api/v1/secret-references/payments"));
+        org.junit.jupiter.api.Assertions.assertEquals("security-events:read",
+                policy.requiredScope("GET", "/api/v1/security-events"));
+    }
+
     @Test
     void operatorMayControlTransfersWithinAuthenticatedTenant() {
         SecurityIdentity identity = identity(Set.of(SecurityRole.OPERATOR), Set.of());

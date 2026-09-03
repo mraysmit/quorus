@@ -128,6 +128,8 @@ public class AgentRegistrationService {
             .put("version", config.getVersion())
             .put("region", config.getRegion())
             .put("datacenter", config.getDatacenter())
+            .put("agentPool", config.getAgentPool())
+            .put("networkZone", config.getNetworkZone())
             .put("capabilities", capabilitiesToJson(capabilities));
         
         return request;

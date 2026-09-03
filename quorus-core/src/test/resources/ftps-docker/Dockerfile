@@ -30,7 +30,10 @@ ssl_ciphers=HIGH\n\
 # Allow writing into chroot directory (required for upload tests)\n\
 allow_writeable_chroot=YES\n\
 # Enable chroot so user is jailed to home dir (safe for testing)\n\
-chroot_local_user=YES\n' >> /etc/vsftpd/vsftpd.conf
+chroot_local_user=YES\n\
+# Keep vsftpd in the foreground so the container lifetime is the daemon lifetime.\n\
+# This avoids the upstream background/pidproxy race during readiness probes.\n\
+background=NO\n' >> /etc/vsftpd/vsftpd.conf
 
 # Custom entrypoint: generate cert then delegate to original start script
 COPY ftps-entrypoint.sh /bin/ftps-entrypoint.sh

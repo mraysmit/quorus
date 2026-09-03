@@ -28,6 +28,8 @@ import dev.mars.quorus.controller.state.JobAssignmentCommand;
 import dev.mars.quorus.controller.state.QuorusStateStore;
 import dev.mars.quorus.controller.state.TransferAttemptCommand;
 import dev.mars.quorus.controller.state.TransferJobCommand;
+import dev.mars.quorus.controller.state.ServiceConnectionRegistry;
+import dev.mars.quorus.controller.state.SystemMetadataCommand;
 import dev.mars.quorus.controller.state.TransferJobSnapshot;
 import dev.mars.quorus.core.JobAssignment;
 import dev.mars.quorus.core.JobAssignmentStatus;
@@ -43,6 +45,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
+import java.util.UUID;
 
 /**
  * HTTP handler for job status updates from agents.
@@ -61,10 +64,12 @@ public class JobStatusHandler implements Handler<RoutingContext> {
     private static final Logger logger = LoggerFactory.getLogger(JobStatusHandler.class);
     private final RaftNode raftNode;
     private final QuorusStateStore stateStore;
+    private final ServiceConnectionRegistry connectionRegistry;
 
     public JobStatusHandler(RaftNode raftNode, QuorusStateStore stateStore) {
         this.raftNode = raftNode;
         this.stateStore = stateStore;
+        this.connectionRegistry = new ServiceConnectionRegistry(stateStore);
     }
 
     @Override
@@ -181,6 +186,13 @@ public class JobStatusHandler implements Handler<RoutingContext> {
                 }
             }
 
+            if (status == JobAssignmentStatus.IN_PROGRESS
+                    && transferJobSnapshot.getServiceConnectionId() != null) {
+                Future<CommandResult<?>> completedLifecycle = lifecycle;
+                lifecycle = completedLifecycle.compose(result -> recordConnectionUse(
+                        transferJobSnapshot, jobId).map(result));
+            }
+
             lifecycle
                     .onSuccess(ignored -> {
                         logger.info("Job status updated: jobId={}, agentId={}, status={}, bytesTransferred={}",
@@ -193,6 +205,16 @@ public class JobStatusHandler implements Handler<RoutingContext> {
             logger.debug("Stack trace for status update failure", e);
             ctx.fail(e);
         }
+    }
+
+    private Future<CommandResult<?>> recordConnectionUse(TransferJobSnapshot job, String jobId) {
+        Instant now = Instant.now();
+        ServiceConnectionRegistry.SecurityEvent event = new ServiceConnectionRegistry.SecurityEvent(
+                UUID.randomUUID().toString(), job.getTenantId(), "SERVICE_CONNECTION_LAST_USED",
+                "TRANSFER", jobId, "SUCCESS", "Q-CONNECTION-AGENT-USE",
+                job.getConnectionPolicyVersion(), now);
+        return raftNode.submitCommand(new SystemMetadataCommand.Set(
+                connectionRegistry.eventKey(job.getTenantId(), now), ServiceConnectionRegistry.encode(event)));
     }
 
     private Future<CommandResult<?>> submitTransferStatus(

@@ -200,31 +200,24 @@ class FtpsTransferProtocolTest {
     // ========================================================================
 
     @Test
-    @ExpectsError("Connection refused with credentials — verifies TransferException")
     void testFtpsUriWithAuthentication() {
-        // Uses 127.0.0.1 for instant connection-refused instead of DNS timeout
-        TransferRequest request = TransferRequest.builder()
+        assertThrows(IllegalArgumentException.class, () -> TransferRequest.builder()
                 .requestId("test-ftps-auth")
                 .sourceUri(URI.create("ftps://user:secret@127.0.0.1/exports/data.zip"))
                 .destinationPath(tempDir.resolve("data.zip"))
-                .build();
-
-        assertTrue(protocol.canHandle(request));
-        assertThrows(TransferException.class, () -> protocol.transfer(request, context));
-        log("testFtpsUriWithAuthentication", "[PASS] ftps:// with credentials parsed correctly");
+                .build());
+        log("testFtpsUriWithAuthentication", "[PASS] credential-bearing ftps:// URI rejected");
     }
 
     @Test
     void testFtpsUriWithUsernameOnly() {
         log("testFtpsUriWithUsernameOnly", "Testing ftps:// URI with username only (no password)");
-        TransferRequest request = TransferRequest.builder()
+        assertThrows(IllegalArgumentException.class, () -> TransferRequest.builder()
                 .requestId("test-ftps-user-only")
                 .sourceUri(URI.create("ftps://admin@server.com/path/file.txt"))
                 .destinationPath(tempDir.resolve("file.txt"))
-                .build();
-
-        assertTrue(protocol.canHandle(request));
-        log("testFtpsUriWithUsernameOnly", "[PASS] username-only URI accepted");
+                .build());
+        log("testFtpsUriWithUsernameOnly", "[PASS] username-only URI rejected");
     }
 
     @Test

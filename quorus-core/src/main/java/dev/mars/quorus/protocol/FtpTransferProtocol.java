@@ -24,6 +24,8 @@ import dev.mars.quorus.storage.ChecksumCalculator;
 import dev.mars.quorus.transfer.TransferContext;
 import dev.mars.quorus.transfer.ProgressTracker;
 import dev.mars.quorus.util.SensitiveDataRedactor;
+import dev.mars.quorus.connection.RuntimeCredential;
+import dev.mars.quorus.connection.TlsPeerPolicy;
 
 import static dev.mars.quorus.core.exceptions.QuorusErrorCode.*;
 import io.vertx.core.Context;
@@ -217,7 +219,7 @@ public class FtpTransferProtocol implements TransferProtocol {
                     SensitiveDataRedactor.redactUri(request.getSourceUri()), request.getDestinationPath());
             
             // Parse FTP URI and extract connection details
-            FtpConnectionInfo connectionInfo = parseFtpUri(request.getSourceUri());
+            FtpConnectionInfo connectionInfo = parseFtpUri(request.getSourceUri(), request.getRuntimeCredential());
             logger.debug("Connection info parsed: host={}, port={}, path={}", 
                         connectionInfo.host, connectionInfo.port, connectionInfo.path);
             
@@ -300,7 +302,7 @@ public class FtpTransferProtocol implements TransferProtocol {
                     SensitiveDataRedactor.redactUri(destinationUri));
             
             // Parse FTP URI and extract connection details
-            FtpConnectionInfo connectionInfo = parseFtpUri(destinationUri);
+            FtpConnectionInfo connectionInfo = parseFtpUri(destinationUri, request.getRuntimeCredential());
             logger.debug("Connection info parsed: host={}, port={}, path={}", 
                         connectionInfo.host, connectionInfo.port, connectionInfo.path);
             
@@ -382,13 +384,17 @@ public class FtpTransferProtocol implements TransferProtocol {
         return remotePath.substring(0, lastSlash);
     }
     
-    private FtpConnectionInfo parseFtpUri(URI sourceUri) throws TransferException {
+    private FtpConnectionInfo parseFtpUri(URI sourceUri, RuntimeCredential runtimeCredential)
+            throws TransferException {
         String scheme = sourceUri.getScheme();
         if (!isFtpScheme(scheme)) {
             throw new TransferException("unknown", "Invalid FTP/FTPS URI scheme: " + scheme);
         }
         
         boolean isFtps = "ftps".equalsIgnoreCase(scheme);
+        if (runtimeCredential != null && !isFtps) {
+            throw new TransferException("unknown", "Governed FTP transfers require FTPS");
+        }
         
         String host = sourceUri.getHost();
         if (host == null || host.isEmpty()) {
@@ -429,9 +435,20 @@ public class FtpTransferProtocol implements TransferProtocol {
                 password = parts[1];
             }
         }
+        String minimumTlsVersion = "TLSv1.3";
+        if (runtimeCredential != null) {
+            username = runtimeCredential.identity();
+            char[] secret = runtimeCredential.copySecret();
+            try { password = new String(secret); } finally { java.util.Arrays.fill(secret, '\0'); }
+            minimumTlsVersion = runtimeCredential.minimumTlsVersion();
+        }
         
         logger.debug("Parsed URI: scheme={}, host={}, port={}, ftpsMode={}", scheme, host, port, ftpsMode);
-        return new FtpConnectionInfo(host, port, path, username, password, ftpsMode);
+        return new FtpConnectionInfo(host, port, path, username, password, ftpsMode,
+                runtimeCredential != null, minimumTlsVersion,
+                runtimeCredential == null ? java.util.Set.of() : runtimeCredential.approvedCaIds(),
+                runtimeCredential == null ? java.util.Set.of() : runtimeCredential.tlsPeerFingerprints(),
+                runtimeCredential == null ? java.util.List.of() : runtimeCredential.approvedResolvedAddresses());
     }
 
     private static class FtpClient {
@@ -470,14 +487,19 @@ public class FtpTransferProtocol implements TransferProtocol {
             if (connectionInfo.ftpsMode == FtpsMode.IMPLICIT) {
                 logger.debug("Implicit FTPS: establishing TLS connection to {}:{}", 
                             connectionInfo.host, connectionInfo.port);
+                Socket pinnedSocket = new Socket();
+                pinnedSocket.connect(new InetSocketAddress(connectionInfo.socketHost(), connectionInfo.port),
+                        (int) CONNECTION_TIMEOUT.toMillis());
                 controlSocket = sslSocketFactory.createSocket(
-                        connectionInfo.host, connectionInfo.port);
+                        pinnedSocket, connectionInfo.host, connectionInfo.port, true);
+                configureTlsSocket((SSLSocket) controlSocket);
                 ((SSLSocket) controlSocket).startHandshake();
+                verifyPinnedPeer((SSLSocket) controlSocket);
                 logger.debug("Implicit FTPS: TLS handshake completed");
             } else {
                 // Plain FTP or Explicit FTPS: connect with a plain socket first
                 controlSocket = new Socket();
-                controlSocket.connect(new InetSocketAddress(connectionInfo.host, connectionInfo.port), 
+                controlSocket.connect(new InetSocketAddress(connectionInfo.socketHost(), connectionInfo.port),
                         (int) CONNECTION_TIMEOUT.toMillis());
             }
             logger.debug("TCP connection established to {}:{}", connectionInfo.host, connectionInfo.port);
@@ -546,7 +568,9 @@ public class FtpTransferProtocol implements TransferProtocol {
             SSLSocket sslSocket = (SSLSocket) sslSocketFactory.createSocket(
                     controlSocket, connectionInfo.host, connectionInfo.port, true);
             sslSocket.setUseClientMode(true);
+            configureTlsSocket(sslSocket);
             sslSocket.startHandshake();
+            verifyPinnedPeer(sslSocket);
             
             // Replace control streams with encrypted ones
             controlSocket = sslSocket;
@@ -584,7 +608,14 @@ public class FtpTransferProtocol implements TransferProtocol {
          * Creates an SSLSocketFactory for FTPS connections.
          * Uses the default trust store from the JVM.
          */
-        private static SSLSocketFactory createSslSocketFactory() throws Exception {
+        private SSLSocketFactory createSslSocketFactory() throws Exception {
+            if (connectionInfo.strictPeerVerification) {
+                SSLContext sslContext = SSLContext.getInstance("TLS");
+                sslContext.init(null, new javax.net.ssl.TrustManager[]{
+                        TlsPeerPolicy.defaultTrustManager(connectionInfo.approvedCaIds,
+                                connectionInfo.tlsPeerFingerprints)}, null);
+                return sslContext.getSocketFactory();
+            }
             TrustManagerFactory tmf = TrustManagerFactory.getInstance(
                     TrustManagerFactory.getDefaultAlgorithm());
             tmf.init((KeyStore) null); // Uses default cacerts trust store
@@ -835,7 +866,7 @@ public class FtpTransferProtocol implements TransferProtocol {
          */
         private Socket createPlainDataSocket(DataConnectionInfo dataInfo) throws IOException {
             Socket plainSocket = new Socket();
-            plainSocket.connect(new InetSocketAddress(dataInfo.host, dataInfo.port), 
+            plainSocket.connect(new InetSocketAddress(connectionInfo.socketHost(), dataInfo.port),
                     (int) CONNECTION_TIMEOUT.toMillis());
             plainSocket.setSoTimeout((int) CONNECTION_TIMEOUT.toMillis());
             return plainSocket;
@@ -853,9 +884,11 @@ public class FtpTransferProtocol implements TransferProtocol {
             if (connectionInfo.ftpsMode != FtpsMode.NONE && sslSocketFactory != null) {
                 logger.debug("FTPS: wrapping data connection in TLS to {}:{}", dataInfo.host, dataInfo.port);
                 SSLSocket sslDataSocket = (SSLSocket) sslSocketFactory.createSocket(
-                        dataSocket, dataInfo.host, dataInfo.port, true);
+                        dataSocket, connectionInfo.host, dataInfo.port, true);
                 sslDataSocket.setUseClientMode(true);
+                configureTlsSocket(sslDataSocket);
                 sslDataSocket.startHandshake();
+                verifyPinnedPeer(sslDataSocket);
                 logger.debug("FTPS: data channel TLS handshake completed (protocol={})",
                         sslDataSocket.getSession().getProtocol());
                 return sslDataSocket;
@@ -879,7 +912,27 @@ public class FtpTransferProtocol implements TransferProtocol {
             String host = parts[0] + "." + parts[1] + "." + parts[2] + "." + parts[3];
             int port = Integer.parseInt(parts[4]) * 256 + Integer.parseInt(parts[5]);
             
-            return new DataConnectionInfo(host, port);
+            // Ignore the server-supplied PASV host to prevent FTP bounce/SSRF; use the
+            // already-authorized control endpoint and only accept the ephemeral port.
+            return new DataConnectionInfo(connectionInfo.host, port);
+        }
+
+        private void configureTlsSocket(SSLSocket socket) {
+            if (!connectionInfo.strictPeerVerification) return;
+            javax.net.ssl.SSLParameters parameters = socket.getSSLParameters();
+            parameters.setEndpointIdentificationAlgorithm("HTTPS");
+            parameters.setProtocols(TlsPeerPolicy.enabledProtocols(connectionInfo.minimumTlsVersion));
+            socket.setSSLParameters(parameters);
+        }
+
+        private void verifyPinnedPeer(SSLSocket socket) throws IOException {
+            if (connectionInfo.tlsPeerFingerprints.isEmpty()) return;
+            try {
+                TlsPeerPolicy.requireApproved(socket.getSession().getPeerCertificates()[0].getEncoded(),
+                        connectionInfo.tlsPeerFingerprints);
+            } catch (Exception denied) {
+                throw new IOException("FTPS peer certificate pin verification failed", denied);
+            }
         }
     }
     
@@ -890,14 +943,32 @@ public class FtpTransferProtocol implements TransferProtocol {
         final String username;
         final String password;
         final FtpsMode ftpsMode;
-        
-        FtpConnectionInfo(String host, int port, String path, String username, String password, FtpsMode ftpsMode) {
+        final boolean strictPeerVerification;
+        final String minimumTlsVersion;
+        final java.util.Set<String> approvedCaIds;
+        final java.util.Set<String> tlsPeerFingerprints;
+        final java.util.List<String> approvedResolvedAddresses;
+
+        FtpConnectionInfo(String host, int port, String path, String username, String password, FtpsMode ftpsMode,
+                          boolean strictPeerVerification, String minimumTlsVersion,
+                          java.util.Set<String> approvedCaIds,
+                          java.util.Set<String> tlsPeerFingerprints,
+                          java.util.List<String> approvedResolvedAddresses) {
             this.host = host;
             this.port = port;
             this.path = path;
             this.username = username;
             this.password = password;
             this.ftpsMode = ftpsMode;
+            this.strictPeerVerification = strictPeerVerification;
+            this.minimumTlsVersion = minimumTlsVersion;
+            this.approvedCaIds = java.util.Set.copyOf(approvedCaIds);
+            this.tlsPeerFingerprints = java.util.Set.copyOf(tlsPeerFingerprints);
+            this.approvedResolvedAddresses = java.util.List.copyOf(approvedResolvedAddresses);
+        }
+
+        String socketHost() {
+            return approvedResolvedAddresses.isEmpty() ? host : approvedResolvedAddresses.getFirst();
         }
         
         @Override

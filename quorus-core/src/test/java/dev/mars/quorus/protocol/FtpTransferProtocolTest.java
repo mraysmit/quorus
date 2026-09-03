@@ -140,31 +140,21 @@ class FtpTransferProtocolTest {
     // Error handling tests moved to dev.mars.quorus.protocol.errorhandling.FtpTransferProtocolErrorHandlingTest
     
     @Test
-    @ExpectsError("Connection refused with auth credentials -- no FTP server")
     void testFtpUriWithAuthentication() {
-        TransferRequest request = TransferRequest.builder()
+        assertThrows(IllegalArgumentException.class, () -> TransferRequest.builder()
                 .requestId("test-auth")
                 .sourceUri(URI.create("ftp://username:password@127.0.0.1/path/file.txt"))
                 .destinationPath(tempDir.resolve("testfile.txt"))
-                .build();
-        
-        assertTrue(protocol.canHandle(request));
-        
-        // Should throw exception when trying to transfer (no real FTP server)
-        assertThrows(TransferException.class, () -> {
-            protocol.transfer(request, context);
-        });
+                .build());
     }
     
     @Test
     void testFtpUriWithUsernameOnly() {
-        TransferRequest request = TransferRequest.builder()
+        assertThrows(IllegalArgumentException.class, () -> TransferRequest.builder()
                 .requestId("test-username-only")
                 .sourceUri(URI.create("ftp://username@server/path/file.txt"))
                 .destinationPath(tempDir.resolve("testfile.txt"))
-                .build();
-        
-        assertTrue(protocol.canHandle(request));
+                .build());
     }
     
     @Test
@@ -270,21 +260,12 @@ class FtpTransferProtocolTest {
     }
     
     @Test
-    @ExpectsError("Connection refused with auth edge case URI -- no FTP server")
     void testFtpUriAuthenticationEdgeCase() {
-        // Test FTP URI with username and password
-        TransferRequest request = TransferRequest.builder()
+        assertThrows(IllegalArgumentException.class, () -> TransferRequest.builder()
                 .requestId("test-auth-edge")
                 .sourceUri(URI.create("ftp://user:pass@127.0.0.1:21/path/file.txt"))
                 .destinationPath(tempDir.resolve("file.txt"))
-                .build();
-        
-        assertTrue(protocol.canHandle(request));
-        
-        // Will fail due to no real server, but tests URI parsing with auth
-        assertThrows(TransferException.class, () -> {
-            protocol.transfer(request, context);
-        });
+                .build());
     }
     
     @Test

@@ -25,6 +25,7 @@ import dev.mars.quorus.core.exceptions.TransferException;
 import dev.mars.quorus.transfer.TransferContext;
 import dev.mars.quorus.transfer.ProgressTracker;
 import dev.mars.quorus.util.SensitiveDataRedactor;
+import dev.mars.quorus.connection.MountedFileSystemSecurity;
 
 import static dev.mars.quorus.core.exceptions.QuorusErrorCode.*;
 import io.vertx.core.Context;
@@ -152,6 +153,10 @@ public class NfsTransferProtocol implements TransferProtocol {
         }
 
         logger.info("Starting NFS transfer: jobId={}, isUpload={}", context.getJobId(), request.isUpload());
+        if (request.getRuntimeCredential() != null) {
+            try { MountedFileSystemSecurity.requireVerified("NFS", MountedFileSystemSecurity.configured("NFS")); }
+            catch (Exception denied) { throw new TransferException(context.getJobId(), denied.getMessage(), denied); }
+        }
         logger.debug("Transfer details: sourceUri={}, destinationUri={}",
                 SensitiveDataRedactor.redactUri(request.getSourceUri()),
                 SensitiveDataRedactor.redactUri(request.getDestinationUri()));

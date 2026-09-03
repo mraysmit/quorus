@@ -58,6 +58,10 @@ public class AgentConfiguration {
     private final String tlsCertificatePath;
     private final String tlsPrivateKeyPath;
     private final String tlsTrustBundlePath;
+    private final Path uploadRoot;
+    private final Path downloadRoot;
+    private final String agentPool;
+    private final String networkZone;
     
     private AgentConfiguration(Builder builder) {
         this.agentId = builder.agentId;
@@ -80,6 +84,10 @@ public class AgentConfiguration {
         this.tlsCertificatePath = builder.tlsCertificatePath;
         this.tlsPrivateKeyPath = builder.tlsPrivateKeyPath;
         this.tlsTrustBundlePath = builder.tlsTrustBundlePath;
+        this.uploadRoot = builder.uploadRoot;
+        this.downloadRoot = builder.downloadRoot;
+        this.agentPool = builder.agentPool;
+        this.networkZone = builder.networkZone;
     }
     
     public static AgentConfiguration fromEnvironment() {
@@ -107,6 +115,10 @@ public class AgentConfiguration {
         builder.tlsCertificatePath(getEnvOrDefault("QUORUS_AGENT_TLS_CERTIFICATE", ""));
         builder.tlsPrivateKeyPath(getEnvOrDefault("QUORUS_AGENT_TLS_PRIVATE_KEY", ""));
         builder.tlsTrustBundlePath(getEnvOrDefault("QUORUS_AGENT_TLS_TRUST_BUNDLE", ""));
+        builder.uploadRoot(Path.of(getEnvOrDefault("QUORUS_AGENT_UPLOAD_ROOT", "data/uploads")));
+        builder.downloadRoot(Path.of(getEnvOrDefault("QUORUS_AGENT_DOWNLOAD_ROOT", "data/downloads")));
+        builder.agentPool(getEnvOrDefault("QUORUS_AGENT_POOL", "default"));
+        builder.networkZone(getEnvOrDefault("QUORUS_AGENT_NETWORK_ZONE", "default"));
         
         // Parse supported protocols
         String protocolsStr = getEnvOrDefault("SUPPORTED_PROTOCOLS", "HTTP,HTTPS");
@@ -186,6 +198,10 @@ public class AgentConfiguration {
     public String getTlsCertificatePath() { return tlsCertificatePath; }
     public String getTlsPrivateKeyPath() { return tlsPrivateKeyPath; }
     public String getTlsTrustBundlePath() { return tlsTrustBundlePath; }
+    public Path getUploadRoot() { return uploadRoot; }
+    public Path getDownloadRoot() { return downloadRoot; }
+    public String getAgentPool() { return agentPool; }
+    public String getNetworkZone() { return networkZone; }
     
     public static class Builder {
         private String agentId;
@@ -208,6 +224,10 @@ public class AgentConfiguration {
         private String tlsCertificatePath;
         private String tlsPrivateKeyPath;
         private String tlsTrustBundlePath;
+        private Path uploadRoot = Path.of("data/uploads");
+        private Path downloadRoot = Path.of("data/downloads");
+        private String agentPool = "default";
+        private String networkZone = "default";
         
         public Builder agentId(String agentId) { this.agentId = agentId; return this; }
         public Builder tenantId(String tenantId) { this.tenantId = tenantId; return this; }
@@ -229,11 +249,19 @@ public class AgentConfiguration {
         public Builder tlsCertificatePath(String path) { this.tlsCertificatePath = path; return this; }
         public Builder tlsPrivateKeyPath(String path) { this.tlsPrivateKeyPath = path; return this; }
         public Builder tlsTrustBundlePath(String path) { this.tlsTrustBundlePath = path; return this; }
+        public Builder uploadRoot(Path path) { this.uploadRoot = path; return this; }
+        public Builder downloadRoot(Path path) { this.downloadRoot = path; return this; }
+        public Builder agentPool(String value) { this.agentPool = value; return this; }
+        public Builder networkZone(String value) { this.networkZone = value; return this; }
         
         public AgentConfiguration build() {
             if (agentId == null) throw new IllegalArgumentException("agentId is required");
             if (tenantId == null) throw new IllegalArgumentException("tenantId is required (AGENT_TENANT_ID)");
             if (controllerUrl == null) throw new IllegalArgumentException("controllerUrl is required");
+            if (uploadRoot == null) throw new IllegalArgumentException("uploadRoot is required");
+            if (downloadRoot == null) throw new IllegalArgumentException("downloadRoot is required");
+            if (agentPool == null || agentPool.isBlank()) throw new IllegalArgumentException("agentPool is required");
+            if (networkZone == null || networkZone.isBlank()) throw new IllegalArgumentException("networkZone is required");
             boolean production = "production".equalsIgnoreCase(securityProfile);
             if (!production && !"development".equalsIgnoreCase(securityProfile)) {
                 throw new IllegalArgumentException("securityProfile must be development or production");
