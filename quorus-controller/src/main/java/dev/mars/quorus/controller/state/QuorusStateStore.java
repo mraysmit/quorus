@@ -64,7 +64,7 @@ public class QuorusStateStore implements RaftLogApplicator {
     // State data
     private final Map<String, TransferJobSnapshot> transferJobs = new ConcurrentHashMap<>();
     private final Map<String, AgentInfo> agents = new ConcurrentHashMap<>();
-    private final Map<String, String> systemMetadata = new ConcurrentHashMap<>();
+    private volatile Map<String, String> systemMetadata = new ConcurrentHashMap<>();
     private final Map<String, JobAssignment> jobAssignments = new ConcurrentHashMap<>();
     private final Map<String, QueuedJob> jobQueue = new ConcurrentHashMap<>();
     private final Map<String, RouteConfiguration> routes = new ConcurrentHashMap<>();
@@ -389,21 +389,35 @@ public class QuorusStateStore implements RaftLogApplicator {
 
     private CommandResult<?> applySystemMetadataCommand(SystemMetadataCommand command) {
         String key = command.key();
+        if (ServiceConnectionRegistry.forbiddenLegacyMutation(systemMetadata, key)) {
+            return rejected("REGISTRY_SCHEMA_CONFLICT", "Legacy registry mutation is not permitted after migration");
+        }
+        Map<String, String> target = systemMetadata;
+        if (ServiceConnectionRegistry.versioned(key)) {
+            try {
+                target = ServiceConnectionRegistry.prepareMutation(systemMetadata, command);
+            } catch (IllegalArgumentException error) {
+                return rejected("REGISTRY_OWNERSHIP_CONFLICT",
+                        "Registry ownership or migration conflict; operator review required");
+            }
+        }
         logger.debug("Processing system metadata command: key={}, type={}", key, command.getClass().getSimpleName());
 
         return switch (command) {
             case SystemMetadataCommand.Set cmd -> {
-                String oldValue = systemMetadata.put(key, cmd.value());
+                String oldValue = target.put(key, cmd.value());
+                systemMetadata = target;
                 logger.info("Set system metadata: key={}, valuePresent=true, replaced={}", key, oldValue != null);
                 yield new CommandResult.Success<>(oldValue);
             }
             case SystemMetadataCommand.Delete delete -> {
                 logger.trace("System metadata delete command={}", delete);
-                String removedValue = systemMetadata.remove(key);
+                String removedValue = target.remove(key);
                 if (removedValue == null) {
                     logger.warn("System metadata not found for deletion: key={}", key);
                     yield new CommandResult.NotFound<>(key, "SystemMetadata");
                 }
+                systemMetadata = target;
                     logger.info("Deleted system metadata: key={}, valueRemoved=true", key);
                 yield new CommandResult.Success<>(removedValue);
             }
@@ -1246,6 +1260,11 @@ public class QuorusStateStore implements RaftLogApplicator {
 
     public Map<String, String> getSystemMetadata() {
         return new ConcurrentHashMap<>(systemMetadata);
+    }
+
+    /** Read-only view pinned to one migration generation, without copying the full event registry. */
+    Map<String, String> registryMetadataView() {
+        return java.util.Collections.unmodifiableMap(systemMetadata);
     }
 
     public String getMetadata(String key) {

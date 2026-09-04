@@ -2,8 +2,8 @@
 
 # Quorus REST API Specification
 
-**Version:** 2.0  
-**Date:** 2026-09-03  
+**Version:** 2.2  
+**Date:** 2026-09-04  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Status:** Canonical and normative  
@@ -145,6 +145,21 @@ The default and maximum limits MUST be documented in OpenAPI. Collections SHOULD
 - Reuse with the same fingerprint returns the original result. Reuse with a different fingerprint returns `409 IDEMPOTENCY_KEY_REUSED`.
 - Mutable resources MUST return an `ETag`. Mutation without the required `If-Match` returns `428`; a stale value returns `412`.
 - Agent assignment transitions additionally require `expectedState`, `attemptId`, and the active lease or fencing token.
+
+The implemented agent status contract permits `ACCEPTED → FAILED` for preparation
+rejections (authorization, secret resolution, or local-path validation). The same
+committed lifecycle command sets the assignment and transfer to `FAILED`; a transfer
+can therefore move directly from `PENDING` to `FAILED`, without an `IN_PROGRESS` report
+or a transfer-start event. Cancellation, lease, fencing and sequence checks still apply.
+
+For attempt-aware status reports, the agent retries transport failures, HTTP 408/429
+and 5xx responses using the **identical payload and report sequence** (three sends
+maximum, with 100 ms then 200 ms delays). Each send uses the configured
+`quorus.agent.http.idle-timeout-ms` as its response deadline. Other non-2xx responses,
+including 403 and 409, are not retried. An unresolved start acknowledgement never
+authorizes file I/O or a guessed terminal transition. Legacy reports without attempt
+identity are not automatically replayed. See the security/deployment guide for
+operator reconciliation after the bounded retry budget is exhausted.
 
 ### 3.7 Asynchronous operations
 
@@ -355,6 +370,18 @@ Agent transitions require the authenticated agent ID, assignment ID, transfer ID
 Deployment representations MUST include artifact digest, signature verification, SBOM and provenance references, target selector, approved version, rollout strategy, drain policy, health gates, failure threshold, initiator, and audit correlation. The API MUST reject unsigned or unapproved artifacts.
 
 ## 9. Service Connectivity and Secret References
+
+The current registry isolates complete tenant/resource pairs, including identifiers that
+contain dots. HTTP CRUD, validation and collection reads use the authenticated tenant;
+secret-reference and security-event lists obey the same boundary. A colliding identifier
+owned by another tenant is not an existing resource in the caller's namespace: item
+reads/updates/deletes return `404`, and independent creates may coexist. Conflicting
+caller-supplied tenant claims remain forbidden.
+
+Ownership is checked again during replicated state application. Malformed ownership or
+ambiguous legacy migration is rejected with a redacted problem response; records are not
+silently reassigned or partially migrated. This correction does not add linearizable
+follower reads, pagination or the later-phase API features below.
 
 | Method | Path | State | Purpose |
 |---|---|---|---|

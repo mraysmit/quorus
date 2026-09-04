@@ -17,7 +17,9 @@
 package dev.mars.quorus.agent.service;
 
 import dev.mars.quorus.agent.config.AgentConfiguration;
+import dev.mars.quorus.core.TransferAttemptStatus;
 import io.vertx.core.Future;
+import io.vertx.core.Promise;
 import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.client.WebClient;
@@ -38,9 +40,14 @@ public class JobStatusReportingService {
     
     private final AgentConfiguration config;
     private final WebClient webClient;
+    private final Vertx vertx;
+    private volatile boolean closed;
+    private static final int MAX_REPORT_SENDS = 3;
+    private static final long RETRY_DELAY_MS = 100;
 
     public JobStatusReportingService(Vertx vertx, AgentConfiguration config) {
         this.config = config;
+        this.vertx = vertx;
         this.webClient = ControllerWebClientFactory.create(vertx, config);
         logger.debug("JobStatusReportingService initialized with Vert.x WebClient (connectTimeout={}ms, idleTimeout={}ms)",
             config.getHttpConnectionTimeout(), config.getHttpIdleTimeout());
@@ -101,9 +108,12 @@ public class JobStatusReportingService {
     }
 
     public Future<Void> reportFailed(String jobId, String errorMessage, String attemptId,
-                                     long fencingGeneration, long reportSequence) {
+                                     long fencingGeneration, long reportSequence, TransferAttemptStatus expectedState) {
+        if (expectedState != TransferAttemptStatus.ACCEPTED && expectedState != TransferAttemptStatus.IN_PROGRESS) {
+            return Future.failedFuture("FAILED reports require an acknowledged ACCEPTED or IN_PROGRESS state");
+        }
         return reportStatus(jobId, "FAILED", null, errorMessage,
-                attemptId, fencingGeneration, reportSequence);
+                attemptId, fencingGeneration, reportSequence, expectedState.name());
     }
 
     /**
@@ -117,6 +127,12 @@ public class JobStatusReportingService {
 
     private Future<Void> reportStatus(String jobId, String status, Long bytesTransferred, String errorMessage,
                                       String attemptId, long fencingGeneration, long reportSequence) {
+        return reportStatus(jobId, status, bytesTransferred, errorMessage, attemptId,
+                fencingGeneration, reportSequence, attemptId == null ? null : expectedAttemptState(status));
+    }
+
+    private Future<Void> reportStatus(String jobId, String status, Long bytesTransferred, String errorMessage,
+                                      String attemptId, long fencingGeneration, long reportSequence, String expectedState) {
         JsonObject request = new JsonObject()
             .put("agentId", config.getAgentId())
             .put("status", status);
@@ -129,30 +145,55 @@ public class JobStatusReportingService {
         }
         if (attemptId != null) {
             request.put("attemptId", attemptId)
-                    .put("expectedState", expectedAttemptState(status))
+                    .put("expectedState", expectedState)
                     .put("fencingGeneration", fencingGeneration)
                     .put("reportSequence", reportSequence);
         }
         
         String url = config.getControllerUrl() + "/jobs/" + jobId + "/status";
         
+        // Reconciliation by exact replay: retries retain the original fence, sequence,
+        // expected state and payload. Only attempt-aware reports are idempotent.
+        return sendReport(url, request, attemptId == null ? 1 : MAX_REPORT_SENDS)
+                .onSuccess(ignored -> logger.debug("Job status reported: {} -> {}", jobId, status))
+                .onFailure(err -> logger.error("Status report unresolved or rejected: jobId={}, status={}, attemptId={}, sequence={}: {}",
+                        jobId, status, attemptId, reportSequence, err.getMessage()));
+    }
+
+    private Future<Void> sendReport(String url, JsonObject request, int sendsRemaining) {
+        if (closed) return Future.failedFuture(new StatusReportException("Q-REPORT-CLOSED", false));
         return webClient.postAbs(url)
+            .timeout(config.getHttpIdleTimeout())
             .putHeader("Content-Type", "application/json")
-            .sendJsonObject(request)
+            .sendJsonObject(request.copy())
             .compose(response -> {
                 int statusCode = response.statusCode();
                 if (statusCode >= 200 && statusCode < 300) {
-                    logger.debug("Job status reported: {} -> {}", jobId, status);
                     return Future.<Void>succeededFuture();
                 } else {
-                    String message = "Failed to report job status: " + jobId + " -> " + status + " (HTTP " + statusCode + ")";
-                    logger.error(message);
-                    return Future.<Void>failedFuture(message);
+                    boolean retryable = statusCode >= 500 || statusCode == 408 || statusCode == 429;
+                    return Future.<Void>failedFuture(new StatusReportException(
+                            "Q-REPORT-" + (retryable ? "UNRESOLVED" : "REJECTED") + ": HTTP " + statusCode, retryable));
                 }
             })
-            .onFailure(err -> {
-                logger.error("Error reporting job status: {} -> {}: {}", jobId, status, err.getMessage());
+            .recover(err -> {
+                StatusReportException failure = err instanceof StatusReportException reportFailure
+                        ? reportFailure : new StatusReportException("Q-REPORT-UNRESOLVED: transport acknowledgement unavailable", true);
+                if (!failure.retryable || sendsRemaining <= 1 || closed) return Future.failedFuture(failure);
+                Promise<Void> delay = Promise.promise();
+                vertx.setTimer(RETRY_DELAY_MS * (MAX_REPORT_SENDS - sendsRemaining + 1), id -> delay.complete());
+                return delay.future().compose(ignored -> sendReport(url, request, sendsRemaining - 1));
             });
+    }
+
+    /** Reporting failure, not evidence of a transfer failure. No response body or credential is retained. */
+    public static final class StatusReportException extends RuntimeException {
+        private final boolean retryable;
+
+        private StatusReportException(String message, boolean retryable) {
+            super(message);
+            this.retryable = retryable;
+        }
     }
 
     private static String expectedAttemptState(String status) {
@@ -170,6 +211,7 @@ public class JobStatusReportingService {
      * @return Future that completes when shutdown is done
      */
     public Future<Void> shutdown() {
+        closed = true;
         logger.debug("Shutting down JobStatusReportingService WebClient");
         webClient.close();
         return Future.succeededFuture();

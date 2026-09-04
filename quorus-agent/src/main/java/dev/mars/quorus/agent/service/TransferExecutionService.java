@@ -161,7 +161,12 @@ public class TransferExecutionService {
                 return Future.failedFuture(new SecurityException(
                         "Production agents reject assignments without a governed service connection"));
             }
-            return onAuthorized.get().compose(ignored -> executeTransfer(pendingJob.toTransferRequest()));
+            try {
+                TransferRequest request = pendingJob.toTransferRequest();
+                return onAuthorized.get().compose(ignored -> executeTransfer(request));
+            } catch (Exception failure) {
+                return Future.failedFuture(failure);
+            }
         }
         return vertx.executeBlocking(() -> {
             var direction = pendingJob.direction();
@@ -174,13 +179,24 @@ public class TransferExecutionService {
                     direction == dev.mars.quorus.core.TransferDirection.DOWNLOAD
                             ? ServiceConnection.Direction.DOWNLOAD : ServiceConnection.Direction.UPLOAD,
                     config.getAgentPool(), config.getNetworkZone(), pendingJob.getControllerResolvedAddresses());
-            return connectionPolicyService.authorize(connection, reference, access,
+            var authorized = connectionPolicyService.authorize(connection, reference, access,
                     pendingJob.getConnectionPolicyVersion(), pendingJob.getConnectionPolicyDigest());
-        }, false).compose(authorized -> onAuthorized.get().compose(ignored -> executeTransfer(
-                        pendingJob.toAuthorizedTransferRequest(authorized.resolved().authorization().endpoint(),
-                                authorized.runtimeCredential(), localPathPolicy)))
-                .onComplete(ignored -> authorized.close()));
+            try {
+                TransferRequest request = pendingJob.toAuthorizedTransferRequest(
+                        authorized.resolved().authorization().endpoint(), authorized.runtimeCredential(), localPathPolicy);
+                return new PreparedTransfer(request, authorized);
+            } catch (Exception failure) {
+                authorized.close();
+                throw failure;
+            }
+        }, false).compose(prepared -> Future.<Void>succeededFuture()
+                .compose(ignored -> onAuthorized.get())
+                .compose(ignored -> executeTransfer(prepared.request()))
+                .onComplete(ignored -> prepared.authorization().close()));
     }
+
+    private record PreparedTransfer(TransferRequest request,
+                                    AgentConnectionPolicyService.AuthorizedConnection authorization) { }
 
     private static AgentConnectionPolicyService createConnectionPolicyService(AgentConfiguration config) {
         String address = config.getVaultAddress();

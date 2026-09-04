@@ -2,7 +2,7 @@ openapi: 3.1.0
 jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
 info:
   title: Quorus Controller REST API
-  version: 1.3.0-alpha
+  version: 1.3.1-alpha
   summary: Phase 2 authenticated controller API contract with fenced agent reports
   description: >-
     Machine-readable contract for every HTTP route registered by the current Quorus
@@ -10,6 +10,10 @@ info:
     are asserted by an explicitly trusted gateway over that authenticated hop; agent
     identities are bound directly to their client certificates. Tenant and environment
     are derived from the verified identity, never established by request content.
+    Service connections, secret references and security events isolate complete tenant
+    identifiers, including dots. Foreign item identifiers return 404 within the caller's
+    namespace; collection reads filter exact ownership. Ambiguous legacy registry
+    ownership fails closed with a redacted problem response and no partial migration.
   license:
     name: Apache 2.0
     identifier: Apache-2.0
@@ -1380,6 +1384,12 @@ components:
         message: {type: string}
     JobStatusUpdate:
       type: object
+      description: >-
+        An attempt-aware lifecycle report. Preparation failures use status FAILED
+        and expectedState ACCEPTED, atomically failing the pending transfer and
+        assignment without a synthetic IN_PROGRESS report. Retries must preserve
+        the complete payload, attempt identity, fencing generation and reportSequence.
+        A missing acknowledgement does not authorize execution or a new sequence.
       required: [agentId, status, attemptId, expectedState, fencingGeneration, reportSequence]
       properties:
         agentId: {type: string, minLength: 1}
