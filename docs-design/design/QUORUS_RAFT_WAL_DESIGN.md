@@ -840,6 +840,8 @@ To maintain Raft safety, a follower must never acknowledge an entry until it is 
    - Update `commitIndex` based on `leaderCommit`.
    - Trigger the **Application Loop** (Section 16.4).
 
+**One mutation at a time.** The Prepare step decides what is new by reading the in-memory log, and the in-memory log only reflects an entry after step 4. A second `AppendEntries` that arrives while step 3 is still in flight would therefore plan the same entries again and persist them twice; the same applies to two leader submits reserving the same index. `RaftNode` queues every log mutation behind the previous one (`serializeLogMutation`), and `FileRaftStorage` runs all I/O on its single-thread executor in submission order. Replay additionally keys records by index: a repeated record with the same term is ignored, a record with a different term supersedes the tail from that index, and a gap fails recovery.
+
 **Implementation (Vert.x):**
 
 ```java
@@ -1009,6 +1011,9 @@ Before considering the WAL "done":
 - ✅ **Application Order:** Entries are applied to the State Machine strictly in-order
 - ✅ **Leader Consistency:** Leader only advances `commitIndex` after a majority `sync()` is confirmed
 - ✅ **Replay Safety:** Replay truncates corrupt/partial tail safely
+- ✅ **Overlap Safety:** Two mutations that overlap an in-flight WAL write never persist or reserve the same index twice
+- ✅ **Replay Idempotence:** A repeated record for an index is ignored; a gap fails recovery instead of misplacing later entries
+- ✅ **Election Liveness:** A rejected `RequestVote` does not reset the election timer of a follower
 - ✅ **Crash Test (Append):** Kill during append → restart yields prefix-safe log
 - ✅ **Crash Test (Truncate+Append):** Kill during truncate+append sequence → replay yields last durable state
 
