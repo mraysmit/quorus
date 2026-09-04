@@ -177,6 +177,40 @@ class AppConfigNodeIdentityTest {
         assertEquals(23L, config.getLong(key, 23L));
     }
 
+    @Test
+    @DisplayName("Environment variables reach hyphenated keys that no properties resource declares")
+    void environmentReachesHyphenatedKeysAbsentFromResources() {
+        AppConfig config = new AppConfig("test", new Properties(), Map.of(
+                "QUORUS_JOBS_ATTEMPT_LEASE_DURATION_MS", "45000",
+                "QUORUS_RAFT_IO_QUEUE_SIZE", "250",
+                "QUORUS_RAFT_SNAPSHOT_CHECK_INTERVAL_MS", "7500"));
+
+        assertEquals(45_000L, config.getAttemptLeaseDurationMs());
+        assertEquals(250, config.getRaftIoQueueSize());
+        assertEquals(7_500L, config.getSnapshotCheckIntervalMs());
+    }
+
+    @Test
+    @DisplayName("Explicit overrides beat environment values for hyphenated keys")
+    void explicitOverrideBeatsEnvironmentForHyphenatedKey() {
+        AppConfig config = new AppConfig("test",
+                properties("quorus.jobs.attempt.lease-duration-ms", "60000"),
+                Map.of("QUORUS_JOBS_ATTEMPT_LEASE_DURATION_MS", "45000"));
+
+        assertEquals(60_000L, config.getAttemptLeaseDurationMs());
+    }
+
+    @Test
+    @DisplayName("Validation rejects a non-positive attempt lease duration")
+    void validateRejectsNonPositiveAttemptLeaseDuration() {
+        AppConfig zero = new AppConfig("test", properties("quorus.jobs.attempt.lease-duration-ms", "0"));
+        AppConfig negative = new AppConfig("test", properties("quorus.jobs.attempt.lease-duration-ms", "-1"));
+
+        IllegalStateException error = assertThrows(IllegalStateException.class, zero::validate);
+        assertTrue(error.getMessage().contains("Attempt lease duration"));
+        assertThrows(IllegalStateException.class, negative::validate);
+    }
+
     private static Properties properties(String key, String value) {
         Properties properties = new Properties();
         properties.setProperty(key, value);

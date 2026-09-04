@@ -9,6 +9,7 @@ package dev.mars.quorus.agent.config;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.util.Map;
 import java.util.Properties;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -105,6 +106,55 @@ class AgentConfigTest {
         AgentConfig source = new AgentConfig("test", overrides);
 
         assertThrows(IllegalStateException.class, () -> AgentConfiguration.from(source));
+    }
+
+    @Test
+    @DisplayName("Documented QUORUS_AGENT_* names win over legacy unprefixed names")
+    void documentedEnvironmentNamesWinOverLegacyNames() {
+        AgentConfig config = new AgentConfig("test", new Properties(), Map.of(
+                "AGENT_ID", "legacy-agent",
+                "QUORUS_AGENT_ID", "documented-agent",
+                "AGENT_REGION", "legacy-region",
+                "QUORUS_AGENT_REGION", "documented-region",
+                "MAX_CONCURRENT_TRANSFERS", "2",
+                "QUORUS_AGENT_TRANSFERS_MAX_CONCURRENT", "7"));
+
+        assertEquals("documented-agent", config.getAgentId());
+        assertEquals("documented-region", config.getRegion());
+        assertEquals(7, config.getMaxConcurrentTransfers());
+    }
+
+    @Test
+    @DisplayName("Legacy unprefixed names still apply when no documented name is set")
+    void legacyEnvironmentNamesRemainAFallback() {
+        AgentConfig config = new AgentConfig("test", new Properties(), Map.of(
+                "AGENT_ID", "legacy-agent",
+                "AGENT_TENANT_ID", "legacy-tenant",
+                "HEARTBEAT_INTERVAL", "15000"));
+
+        assertEquals("legacy-agent", config.getAgentId());
+        assertEquals("legacy-tenant", config.getTenantId());
+        assertEquals(15_000L, config.getHeartbeatIntervalMs());
+    }
+
+    @Test
+    @DisplayName("Explicit overrides beat both environment names")
+    void explicitOverridesBeatEnvironmentNames() {
+        Properties overrides = new Properties();
+        overrides.setProperty("quorus.agent.id", "explicit-agent");
+        AgentConfig config = new AgentConfig("test", overrides,
+                Map.of("AGENT_ID", "legacy-agent", "QUORUS_AGENT_ID", "documented-agent"));
+
+        assertEquals("explicit-agent", config.getAgentId());
+    }
+
+    @Test
+    @DisplayName("Environment variables reach keys that no properties resource declares")
+    void environmentReachesKeysAbsentFromResources() {
+        AgentConfig config = new AgentConfig("test", new Properties(),
+                Map.of("QUORUS_AGENT_UNDECLARED_SETTING_MS", "1234"));
+
+        assertEquals(1234L, config.getLong("quorus.agent.undeclared.setting-ms", 0L));
     }
 
     private static AgentConfig testConfig() {
