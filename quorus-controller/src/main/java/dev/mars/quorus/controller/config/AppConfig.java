@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
@@ -45,6 +46,7 @@ public final class AppConfig {
 
     private final String profile;
     private final Properties properties;
+    private final Map<String, String> environment;
 
     public AppConfig(String profile, Properties overrides) {
         this(profile, overrides, System.getenv());
@@ -53,7 +55,7 @@ public final class AppConfig {
     AppConfig(String profile, Properties overrides, Map<String, String> environment) {
         this.profile = Objects.requireNonNull(profile, "profile must not be null");
         Objects.requireNonNull(overrides, "overrides must not be null");
-        Objects.requireNonNull(environment, "environment must not be null");
+        this.environment = Map.copyOf(Objects.requireNonNull(environment, "environment must not be null"));
         this.properties = new Properties();
         loadResource(CONFIG_FILE, true);
         if (!"default".equals(profile)) {
@@ -302,20 +304,28 @@ public final class AppConfig {
      * <p>Construction precedence (highest to lowest priority):
      * <ol>
      *   <li>Explicit caller-supplied properties</li>
-     *   <li>Environment variable (e.g., QUORUS_HTTP_PORT)</li>
+     *   <li>Environment variable named from the key, upper-cased with {@code .} and {@code -}
+     *       replaced by {@code _} (e.g., QUORUS_RAFT_ELECTION_TIMEOUT_MS)</li>
      *   <li>Profile resource (e.g., quorus-controller-production.properties)</li>
      *   <li>Packaged defaults (quorus-controller.properties)</li>
      *   <li>Default value</li>
      * </ol>
+     *
+     * <p>Environment variables are folded into the loaded properties during construction. A variable
+     * name cannot distinguish {@code -} from {@code .}, so a hyphenated key that no properties
+     * resource declares is resolved here, from the key, instead of during that pass.
      * 
      * @param key the property key (e.g., "quorus.http.port")
      * @param defaultValue the default value if not found
      * @return the resolved property value
      */
     public String getString(String key, String defaultValue) {
+        String propertyValue = properties.getProperty(key);
+        if (propertyValue == null) {
+            propertyValue = environment.get(environmentKey(key));
+        }
         // A blank configured value means "not configured"
         // and must not suppress a safe default (notably the durable Raft path).
-        String propertyValue = properties.getProperty(key);
         return propertyValue == null || propertyValue.isBlank() ? defaultValue : propertyValue;
     }
 
@@ -403,6 +413,10 @@ public final class AppConfig {
             throw new IllegalStateException(
                     "Timeout interval must be positive, got: " + getTimeoutIntervalMs());
         }
+        if (getAttemptLeaseDurationMs() <= 0) {
+            throw new IllegalStateException(
+                    "Attempt lease duration must be positive, got: " + getAttemptLeaseDurationMs());
+        }
 
         if (getTransferFreshWindowMs() <= 0) {
             throw new IllegalStateException("Transfer telemetry freshness window must be positive, got: "
@@ -468,6 +482,10 @@ public final class AppConfig {
             }
         }
         return directConversion;
+    }
+
+    static String environmentKey(String propertyKey) {
+        return propertyKey.toUpperCase(Locale.ROOT).replace('.', '_').replace('-', '_');
     }
 
     private void logConfiguration() {

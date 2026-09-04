@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
@@ -42,12 +43,37 @@ public final class AgentConfig {
     private static final Logger logger = LoggerFactory.getLogger(AgentConfig.class);
     private static final String CONFIG_FILE = "quorus-agent.properties";
 
+    /**
+     * Legacy unprefixed variable names that {@code docker-entrypoint.sh} and the compose files still
+     * export. They are applied before the documented {@code QUORUS_AGENT_*} names so that the
+     * documented name wins whenever both are present.
+     */
+    private static final Map<String, String> LEGACY_ENVIRONMENT_NAMES = Map.ofEntries(
+            Map.entry("quorus.agent.id", "AGENT_ID"),
+            Map.entry("quorus.agent.tenant.id", "AGENT_TENANT_ID"),
+            Map.entry("quorus.agent.controller.url", "CONTROLLER_URL"),
+            Map.entry("quorus.agent.region", "AGENT_REGION"),
+            Map.entry("quorus.agent.datacenter", "AGENT_DATACENTER"),
+            Map.entry("quorus.agent.port", "AGENT_PORT"),
+            Map.entry("quorus.agent.transfers.max-concurrent", "MAX_CONCURRENT_TRANSFERS"),
+            Map.entry("quorus.agent.heartbeat.interval-ms", "HEARTBEAT_INTERVAL"),
+            Map.entry("quorus.agent.http.connection-timeout-ms", "HTTP_CONNECTION_TIMEOUT_MS"),
+            Map.entry("quorus.agent.http.idle-timeout-ms", "HTTP_IDLE_TIMEOUT_MS"),
+            Map.entry("quorus.agent.version", "AGENT_VERSION"),
+            Map.entry("quorus.agent.protocols", "SUPPORTED_PROTOCOLS"));
+
     private final String profile;
     private final Properties properties;
+    private final Map<String, String> environment;
 
     public AgentConfig(String profile, Properties overrides) {
+        this(profile, overrides, System.getenv());
+    }
+
+    AgentConfig(String profile, Properties overrides, Map<String, String> environment) {
         this.profile = Objects.requireNonNull(profile, "profile must not be null");
         Objects.requireNonNull(overrides, "overrides must not be null");
+        this.environment = Map.copyOf(Objects.requireNonNull(environment, "environment must not be null"));
         this.properties = new Properties();
         loadResource(CONFIG_FILE, true);
         if (!"default".equals(profile)) {
@@ -235,9 +261,16 @@ public final class AgentConfig {
 
     /**
      * Gets a value from this isolated configuration instance.
+     *
+     * <p>Environment variables are folded into the loaded properties during construction, driven by
+     * the keys the properties resources declare. A key that no resource declares is resolved here,
+     * from the key, so that it stays reachable through its {@code QUORUS_*} variable.
      */
     public String getString(String key, String defaultValue) {
         String value = properties.getProperty(key);
+        if (value == null) {
+            value = environment.get(environmentKey(key));
+        }
         return value == null || value.isBlank() ? defaultValue : value;
     }
 
@@ -335,33 +368,22 @@ public final class AgentConfig {
     }
 
     private void applyEnvironmentOverrides() {
+        // Legacy names first, as a fallback; the documented QUORUS_AGENT_* names then take precedence.
+        LEGACY_ENVIRONMENT_NAMES.forEach(this::applyEnvironmentValue);
         for (String key : properties.stringPropertyNames()) {
-            applyEnvironmentValue(key, key.toUpperCase().replace('.', '_').replace('-', '_'));
+            applyEnvironmentValue(key, environmentKey(key));
         }
-
-        Map.ofEntries(
-                Map.entry("quorus.agent.id", "AGENT_ID"),
-                Map.entry("quorus.agent.tenant.id", "AGENT_TENANT_ID"),
-                Map.entry("quorus.agent.controller.url", "CONTROLLER_URL"),
-                Map.entry("quorus.agent.region", "AGENT_REGION"),
-                Map.entry("quorus.agent.datacenter", "AGENT_DATACENTER"),
-                Map.entry("quorus.agent.port", "AGENT_PORT"),
-                Map.entry("quorus.agent.transfers.max-concurrent", "MAX_CONCURRENT_TRANSFERS"),
-                Map.entry("quorus.agent.heartbeat.interval-ms", "HEARTBEAT_INTERVAL"),
-                Map.entry("quorus.agent.http.connection-timeout-ms", "HTTP_CONNECTION_TIMEOUT_MS"),
-                Map.entry("quorus.agent.http.idle-timeout-ms", "HTTP_IDLE_TIMEOUT_MS"),
-                Map.entry("quorus.agent.version", "AGENT_VERSION"),
-                Map.entry("quorus.agent.protocols", "SUPPORTED_PROTOCOLS"),
-                Map.entry("quorus.vault.addr", "QUORUS_VAULT_ADDR"),
-                Map.entry("quorus.vault.token", "QUORUS_VAULT_TOKEN")
-        ).forEach(this::applyEnvironmentValue);
     }
 
     private void applyEnvironmentValue(String propertyKey, String environmentKey) {
-        String value = System.getenv(environmentKey);
+        String value = environment.get(environmentKey);
         if (value != null && !value.isBlank()) {
             properties.setProperty(propertyKey, value.trim());
         }
+    }
+
+    static String environmentKey(String propertyKey) {
+        return propertyKey.toUpperCase(Locale.ROOT).replace('.', '_').replace('-', '_');
     }
 
     private String deriveAgentIdFromHostname() {
