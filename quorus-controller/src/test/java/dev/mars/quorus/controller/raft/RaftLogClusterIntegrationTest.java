@@ -63,7 +63,7 @@ import org.junit.jupiter.api.Tag;
  * <p>These tests are timing-sensitive because they rely on Awaitility
  * polling to observe asynchronous leader election and WAL replication.
  * Excluded from the default {@code mvn test} cycle; run explicitly with
- * {@code mvn test -Dgroups=slow}.</p>
+ * {@code mvn test -Dgroups=slow -Dtest.excludedGroups=}.</p>
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @since 2026-01-29
@@ -108,17 +108,8 @@ class RaftLogClusterIntegrationTest {
         }
         
         Future.all(stopFutures)
-            .onComplete(ar -> {
-                // Close storages
-                for (RaftStorage storage : storages.values()) {
-                    try {
-                        storage.close();
-                    } catch (Exception e) {
-                        LOG.warn("Error closing storage", e);
-                    }
-                }
-                ctx.completeNow();
-            });
+            .compose(v -> Future.all(storages.values().stream().map(RaftStorage::close).toList()))
+            .onComplete(ctx.succeedingThenComplete());
     }
 
     // =========================================================================
@@ -232,7 +223,7 @@ class RaftLogClusterIntegrationTest {
                 nodesWithValidTerm++;
             }
             
-            storage.close();
+            awaitSuccess(storage.close(), SHORT_TIMEOUT);
         }
         
         // At least majority should have valid term persisted (the voters)

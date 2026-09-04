@@ -15,6 +15,7 @@ import dev.mars.quorus.controller.state.ProtobufCommandCodec;
 import dev.mars.quorus.controller.state.QuorusStateStore;
 import dev.mars.quorus.controller.state.SystemMetadataCommand;
 import io.vertx.core.Future;
+import io.vertx.core.Promise;
 import io.vertx.core.Vertx;
 import io.vertx.junit5.VertxExtension;
 import org.junit.jupiter.api.AfterEach;
@@ -208,6 +209,172 @@ class FollowerRestartConsistencyTest {
                 .electionTimeout(electionTimeoutMs)
                 .heartbeatInterval(100)
                 .build();
+    }
+
+    @Test
+    @DisplayName("Snapshot waits for an already accepted leader append before capturing its boundary")
+    void snapshotQueuesBehindInflightAppend(Vertx vertx) {
+        RaftStorage disk = openStorage(vertx, tempDir.resolve("snapshot-queue"));
+        Promise<Void> entered = Promise.promise();
+        Promise<Void> release = Promise.promise();
+        java.util.concurrent.atomic.AtomicBoolean armed = new java.util.concurrent.atomic.AtomicBoolean();
+        RaftStorage delayed = (RaftStorage) java.lang.reflect.Proxy.newProxyInstance(
+                RaftStorage.class.getClassLoader(), new Class<?>[]{RaftStorage.class}, (proxy, method, args) -> {
+                    if (method.getName().equals("appendEntries") && armed.compareAndSet(true, false)) {
+                        entered.complete();
+                        @SuppressWarnings("unchecked")
+                        List<LogEntryData> entries = (List<LogEntryData>) args[0];
+                        return release.future().compose(v -> disk.appendEntries(entries));
+                    }
+                    return method.invoke(disk, args);
+                });
+        QuorusStateStore state = new QuorusStateStore();
+        RaftNode node = RaftNode.builder().vertx(vertx).nodeId("snapshot-queue")
+                .clusterNodes(Set.of("snapshot-queue"))
+                .transport(new InMemoryTransportSimulator("snapshot-queue"))
+                .stateMachine(state).mode(RaftNodeMode.durable(delayed))
+                .electionTimeout(200).heartbeatInterval(50).build();
+        try {
+            awaitSuccess(node.start(), TIMEOUT);
+            awaitSuccess(eventually(vertx, () -> node.isLeader() && node.getCommitIndex() >= 1, TIMEOUT), TIMEOUT);
+            armed.set(true);
+            Future<CommandResult<?>> append = node.submitCommand(SystemMetadataCommand.set("payment", "settled"));
+            awaitSuccess(entered.future(), TIMEOUT);
+            Future<Void> snapshot = node.takeSnapshot();
+            release.complete();
+            awaitSuccess(append, TIMEOUT);
+            awaitSuccess(snapshot, TIMEOUT);
+            var saved = awaitSuccess(disk.loadSnapshot(), TIMEOUT).orElseThrow();
+            assertEquals(node.getCommitIndex(), saved.lastIncludedIndex(), "Snapshot must follow the queued append");
+            QuorusStateStore restored = new QuorusStateStore();
+            restored.restoreSnapshot(saved.data());
+            assertEquals("settled", restored.getMetadata("payment"));
+        } finally {
+            release.tryComplete();
+            awaitSuccess(node.stop(), TIMEOUT);
+        }
+    }
+
+    @Test
+    @DisplayName("AppendEntries waits for an in-flight InstallSnapshot before checking the log boundary")
+    void appendQueuesBehindSnapshotInstallation(Vertx vertx) {
+        RaftStorage disk = openStorage(vertx, tempDir.resolve("install-queue"));
+        Promise<Void> entered = Promise.promise();
+        Promise<Void> release = Promise.promise();
+        RaftStorage delayed = (RaftStorage) java.lang.reflect.Proxy.newProxyInstance(
+                RaftStorage.class.getClassLoader(), new Class<?>[]{RaftStorage.class}, (proxy, method, args) -> {
+                    if (method.getName().equals("saveSnapshot")) {
+                        entered.complete();
+                        return release.future().compose(v -> disk.saveSnapshot((byte[]) args[0],
+                                (long) args[1], (long) args[2]));
+                    }
+                    return method.invoke(disk, args);
+                });
+        RaftNode node = follower(vertx, delayed, 10_000);
+        try {
+            awaitSuccess(node.start(), TIMEOUT);
+            QuorusStateStore snapshotState = new QuorusStateStore();
+            var install = node.handleInstallSnapshot(
+                    dev.mars.quorus.controller.raft.grpc.InstallSnapshotRequest.newBuilder()
+                            .setLeaderId("leader").setTerm(1).setLastIncludedIndex(10).setLastIncludedTerm(1)
+                            .setChunkIndex(0).setTotalChunks(1).setDone(true)
+                            .setData(com.google.protobuf.ByteString.copyFrom(snapshotState.takeSnapshot())).build());
+            awaitSuccess(entered.future(), TIMEOUT);
+            Promise<AppendEntriesResponse> appended = Promise.promise();
+            io.vertx.core.Context context = vertx.getOrCreateContext();
+            context.runOnContext(v -> {
+                node.handleAppendEntriesRequest(appendEntries(1, 10, 1, entry(11, 1, "after-snapshot")))
+                        .onComplete(appended);
+                // FIFO context barrier: submit the append before releasing snapshot persistence.
+                context.runOnContext(ignored -> release.complete());
+            });
+            assertTrue(awaitSuccess(install, TIMEOUT).getSuccess());
+            assertTrue(awaitSuccess(appended.future(), TIMEOUT).getSuccess(),
+                    "Append must check consistency against the completed snapshot, not the old log");
+            assertEquals(11, node.getLastLogIndex());
+        } finally {
+            release.tryComplete();
+            awaitSuccess(node.stop(), TIMEOUT);
+        }
+    }
+
+    @Test
+    void installedSnapshotRetainsMatchingSuffixAcrossRestart(Vertx vertx) {
+        verifyInstalledSuffix(vertx, 1, 3);
+    }
+
+    @Test
+    void installedSnapshotDiscardsConflictingSuffixAcrossRestart(Vertx vertx) {
+        verifyInstalledSuffix(vertx, 2, 2);
+    }
+
+    @Test
+    @DisplayName("Recovery rejects the old suffix if snapshot installation stopped before suffix deletion")
+    void interruptedSnapshotInstallationDoesNotResurrectConflictingSuffix(Vertx vertx) {
+        Path path = tempDir.resolve("interrupted-install");
+        RaftStorage disk = openStorage(vertx, path);
+        RaftStorage interrupted = (RaftStorage) java.lang.reflect.Proxy.newProxyInstance(
+                RaftStorage.class.getClassLoader(), new Class<?>[]{RaftStorage.class}, (proxy, method, args) -> {
+                    if (method.getName().equals("truncateSuffix")) {
+                        return Future.failedFuture("Injected interruption after snapshot publication");
+                    }
+                    return method.invoke(disk, args);
+                });
+        RaftNode node = follower(vertx, interrupted, 10_000);
+        RaftNode recovered = null;
+        try {
+            awaitSuccess(node.start(), TIMEOUT);
+            assertTrue(awaitSuccess(node.handleAppendEntriesRequest(appendEntries(1, 0, 0,
+                    entry(1, 1, "one"), entry(2, 1, "two"), entry(3, 1, "three"))), TIMEOUT).getSuccess());
+            var response = awaitSuccess(node.handleInstallSnapshot(
+                    dev.mars.quorus.controller.raft.grpc.InstallSnapshotRequest.newBuilder()
+                            .setLeaderId("leader").setTerm(2).setLastIncludedIndex(2).setLastIncludedTerm(2)
+                            .setChunkIndex(0).setTotalChunks(1).setDone(true)
+                            .setData(com.google.protobuf.ByteString.copyFrom(new QuorusStateStore().takeSnapshot())).build()), TIMEOUT);
+            assertFalse(response.getSuccess());
+            assertEquals(2, awaitSuccess(disk.loadSnapshot(), TIMEOUT).orElseThrow().lastIncludedTerm());
+            assertEquals(List.of(1L, 2L, 3L), awaitSuccess(disk.replayLog(), TIMEOUT).stream()
+                    .map(LogEntryData::index).toList(), "Failure must leave the conflicting WAL physically present");
+            awaitSuccess(node.stop(), TIMEOUT);
+            recovered = follower(vertx, openStorage(vertx, path), 10_000);
+            awaitSuccess(recovered.start(), TIMEOUT);
+            assertEquals(2, recovered.getLastLogIndex(), "Published snapshot must fence the conflicting tail on recovery");
+            assertTrue(awaitSuccess(recovered.handleAppendEntriesRequest(
+                    appendEntries(2, 2, 2, entry(3, 2, "valid-after-recovery"))), TIMEOUT).getSuccess());
+            awaitSuccess(recovered.stop(), TIMEOUT);
+            recovered = follower(vertx, openStorage(vertx, path), 10_000);
+            awaitSuccess(recovered.start(), TIMEOUT);
+            assertEquals(3, recovered.getLastLogIndex(), "A second recovery must retain newly acknowledged entries");
+        } finally {
+            if (recovered != null) awaitSuccess(recovered.stop(), TIMEOUT);
+            awaitSuccess(node.stop(), TIMEOUT);
+        }
+    }
+
+    private void verifyInstalledSuffix(Vertx vertx, long snapshotTerm, long expectedLastIndex) {
+        Path path = tempDir.resolve("install-suffix");
+        RaftNode node = follower(vertx, openStorage(vertx, path), 10_000);
+        RaftNode recovered = null;
+        try {
+            awaitSuccess(node.start(), TIMEOUT);
+            assertTrue(awaitSuccess(node.handleAppendEntriesRequest(appendEntries(1, 0, 0,
+                    entry(1, 1, "one"), entry(2, 1, "two"), entry(3, 1, "three"))), TIMEOUT).getSuccess());
+            var response = awaitSuccess(node.handleInstallSnapshot(
+                    dev.mars.quorus.controller.raft.grpc.InstallSnapshotRequest.newBuilder()
+                            .setLeaderId("leader").setTerm(2).setLastIncludedIndex(2).setLastIncludedTerm(snapshotTerm)
+                            .setChunkIndex(0).setTotalChunks(1).setDone(true)
+                            .setData(com.google.protobuf.ByteString.copyFrom(new QuorusStateStore().takeSnapshot())).build()), TIMEOUT);
+            assertTrue(response.getSuccess());
+            long liveIndex = node.getLastLogIndex();
+            awaitSuccess(node.stop(), TIMEOUT);
+            recovered = follower(vertx, openStorage(vertx, path), 10_000);
+            awaitSuccess(recovered.start(), TIMEOUT);
+            assertEquals(expectedLastIndex, recovered.getLastLogIndex(), "Recovery must not resurrect a conflicting suffix");
+            assertEquals(expectedLastIndex, liveIndex, "Live log must retain exactly the matching suffix");
+        } finally {
+            if (recovered != null) awaitSuccess(recovered.stop(), TIMEOUT);
+            awaitSuccess(node.stop(), TIMEOUT);
+        }
     }
 
     /** Obtains the production storage type through the same factory call the controller makes. */

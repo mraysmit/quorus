@@ -64,10 +64,9 @@ class RaftStorageContractTest {
     }
 
     @AfterEach
-    void tearDown() {
-        if (storage != null) {
-            storage.close();
-        }
+    void tearDown(VertxTestContext ctx) {
+        if (storage != null) storage.close().onComplete(ctx.succeedingThenComplete());
+        else ctx.completeNow();
     }
 
     // =========================================================================
@@ -116,8 +115,10 @@ class RaftStorageContractTest {
         storage.updateMetadata(10L, Optional.of("leader-node"))
                 .compose(v -> storage.close())
                 .compose(v -> RaftStorageFactory.create(vertx, "raftlog", tempDir, true))
-                .compose(newStorage -> newStorage.loadMetadata()
-                        .onComplete(ar -> newStorage.close()))
+                .compose(newStorage -> {
+                    storage = newStorage;
+                    return storage.loadMetadata();
+                })
                 .onComplete(ctx.succeeding(meta -> {
                     assertEquals(10L, meta.currentTerm());
                     assertEquals(Optional.of("leader-node"), meta.votedFor());
@@ -178,8 +179,10 @@ class RaftStorageContractTest {
                 .compose(v -> storage.sync())
                 .compose(v -> storage.close())
                 .compose(v -> RaftStorageFactory.create(vertx, "raftlog", tempDir, true))
-                .compose(newStorage -> newStorage.replayLog()
-                        .onComplete(ar -> newStorage.close()))
+                .compose(newStorage -> {
+                    storage = newStorage;
+                    return storage.replayLog();
+                })
                 .onComplete(ctx.succeeding(replayed -> {
                     assertEquals(1, replayed.size());
                     assertEquals(1, replayed.get(0).index());
@@ -271,39 +274,34 @@ class RaftStorageContractTest {
 
         storage.appendEntries(entries)
                 .compose(v -> storage.sync())
-                .onComplete(ctx.succeeding(v -> {
-                    try {
-                        // Step 2: Close storage and corrupt the file
-                        storage.close();
+                .compose(v -> storage.close())
+                .compose(v -> vertx.executeBlocking(() -> {
+                    Path logPath = tempDir.resolve("raft.log");
 
-                        Path logPath = tempDir.resolve("raft.log");
-                        
-                        // Append partial/corrupt data (incomplete record)
-                        try (FileChannel fc = FileChannel.open(logPath,
-                                StandardOpenOption.WRITE, StandardOpenOption.APPEND)) {
-                            ByteBuffer garbage = ByteBuffer.allocate(10);
-                            garbage.putInt(0x52414654); // Valid magic
-                            garbage.putShort((short) 1); // Valid version
-                            garbage.put((byte) 2);      // Type APPEND
-                            // Missing: index, term, payload, CRC
-                            garbage.flip();
-                            fc.write(garbage);
-                        }
-
-                        // Step 3: Reopen and replay - should recover only valid entries
-                        RaftStorageFactory.create(vertx, "raftlog", tempDir, true)
-                                .compose(newStorage -> newStorage.replayLog()
-                                        .onComplete(ar -> newStorage.close()))
-                                .onComplete(ctx.succeeding(replayed -> {
-                                    assertEquals(2, replayed.size(),
-                                            "Should recover only the 2 valid entries");
-                                    assertEquals(1, replayed.get(0).index());
-                                    assertEquals(2, replayed.get(1).index());
-                                    ctx.completeNow();
-                                }));
-                    } catch (Exception e) {
-                        ctx.failNow(e);
+                    // Append partial/corrupt data (incomplete record)
+                    try (FileChannel fc = FileChannel.open(logPath,
+                            StandardOpenOption.WRITE, StandardOpenOption.APPEND)) {
+                        ByteBuffer garbage = ByteBuffer.allocate(10);
+                        garbage.putInt(0x52414654); // Valid magic
+                        garbage.putShort((short) 1); // Valid version
+                        garbage.put((byte) 2);      // Type APPEND
+                        // Missing: index, term, payload, CRC
+                        garbage.flip();
+                        fc.write(garbage);
                     }
+
+                    return (Void) null;
+                }))
+                .compose(v -> RaftStorageFactory.create(vertx, "raftlog", tempDir, true))
+                .compose(newStorage -> {
+                    storage = newStorage;
+                    return storage.replayLog();
+                })
+                .onComplete(ctx.succeeding(replayed -> {
+                    assertEquals(2, replayed.size(), "Should recover only the 2 valid entries");
+                    assertEquals(1, replayed.get(0).index());
+                    assertEquals(2, replayed.get(1).index());
+                    ctx.completeNow();
                 }));
     }
 
@@ -328,6 +326,39 @@ class RaftStorageContractTest {
     }
 
     @Test
+    @DisplayName("Snapshot and retained WAL tail survive compaction and fresh-instance restart")
+    void snapshotAndTail_surviveCompactionAndFreshInstance(VertxTestContext ctx) {
+        byte[] snapshot = "bank-a-committed-payment-state".getBytes(StandardCharsets.UTF_8);
+        storage.appendEntries(List.of(
+                        new LogEntryData(1, 4, "payment-1".getBytes(StandardCharsets.UTF_8)),
+                        new LogEntryData(2, 4, "payment-2".getBytes(StandardCharsets.UTF_8)),
+                        new LogEntryData(3, 5, "payment-3".getBytes(StandardCharsets.UTF_8))))
+                .compose(v -> storage.sync())
+                .compose(v -> storage.saveSnapshot(snapshot, 2, 4))
+                .compose(v -> storage.truncatePrefix(2))
+                .compose(v -> storage.close())
+                .compose(v -> RaftStorageFactory.create(vertx, "raftlog", tempDir, true))
+                .compose(reopened -> {
+                    storage = reopened;
+                    return storage.loadSnapshot();
+                })
+                .compose(loaded -> {
+                    ctx.verify(() -> {
+                        assertTrue(loaded.isPresent(), "Compaction must not delete the only durable copy of committed state");
+                        assertArrayEquals(snapshot, loaded.orElseThrow().data());
+                        assertEquals(2, loaded.orElseThrow().lastIncludedIndex());
+                        assertEquals(4, loaded.orElseThrow().lastIncludedTerm());
+                    });
+                    return storage.replayLog();
+                })
+                .onComplete(ctx.succeeding(tail -> ctx.verify(() -> {
+                    assertEquals(List.of(3L), tail.stream().map(LogEntryData::index).toList());
+                    assertArrayEquals("payment-3".getBytes(StandardCharsets.UTF_8), tail.getFirst().payload());
+                    ctx.completeNow();
+                })));
+    }
+
+    @Test
     @DisplayName("prefix truncation preserves entries after the snapshot boundary")
     void truncatePrefix_preservesLaterEntries(VertxTestContext ctx) {
         List<LogEntryData> entries = List.of(
@@ -338,6 +369,7 @@ class RaftStorageContractTest {
 
         storage.appendEntries(entries)
                 .compose(v -> storage.sync())
+                .compose(v -> storage.saveSnapshot("covered-state".getBytes(StandardCharsets.UTF_8), 2, 1))
                 .compose(v -> storage.truncatePrefix(2))
                 .compose(v -> storage.replayLog())
                 .onComplete(ctx.succeeding(replayed -> ctx.verify(() -> {
