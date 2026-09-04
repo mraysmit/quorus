@@ -3637,10 +3637,15 @@ public class RaftNode {
     // RaftNode never knows if it's using File or RocksDB
 }
 
-// Usage in QuorusControllerVerticle:
-WorkerExecutor walExecutor = vertx.createSharedWorkerExecutor("wal", 1);
-RaftStorage storage = RaftStorageFactory.create(vertx, walExecutor);
-RaftNode raftNode = new RaftNode(storage, stateMachine);
+// Usage in QuorusControllerVerticle. The factory is asynchronous: it creates the
+// serialized I/O worker itself and opens the storage (WAL replay) off the event loop.
+RaftStorageFactory.create(vertx, config.getRaftStorageType(),
+        Path.of(config.getRaftStoragePath()), config.getRaftStorageFsync())
+    .onSuccess(storage -> {
+        RaftNode raftNode = new RaftNode(storage, stateMachine);
+        // ...
+    })
+    .onFailure(startPromise::fail);
 ```
 
 ### F.11 Migration Path
