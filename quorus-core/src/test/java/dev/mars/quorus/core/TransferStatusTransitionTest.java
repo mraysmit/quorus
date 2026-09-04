@@ -39,7 +39,7 @@ class TransferStatusTransitionTest {
     // --- Valid transition map ---
 
     private static final EnumSet<TransferStatus> FROM_PENDING =
-            EnumSet.of(TransferStatus.IN_PROGRESS, TransferStatus.CANCELLED);
+            EnumSet.of(TransferStatus.IN_PROGRESS, TransferStatus.CANCELLED, TransferStatus.FAILED);
 
     private static final EnumSet<TransferStatus> FROM_IN_PROGRESS =
             EnumSet.of(TransferStatus.COMPLETED, TransferStatus.FAILED,

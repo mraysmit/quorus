@@ -36,8 +36,9 @@ public final class SchemaVersionRegistry {
     static {
         EnumMap<Contract, VersionRange> versions = new EnumMap<>(Contract.class);
         // Version zero represents the unversioned alpha encoding and remains readable in Phase 0.
-        versions.put(Contract.RAFT_COMMAND_ENVELOPE, new VersionRange(0, 2));
-        versions.put(Contract.STATE_SNAPSHOT, new VersionRange(0, 2));
+        // Version 3 fences older readers from R2 registry key/migration semantics.
+        versions.put(Contract.RAFT_COMMAND_ENVELOPE, new VersionRange(0, 3));
+        versions.put(Contract.STATE_SNAPSHOT, new VersionRange(0, 3));
         versions.put(Contract.REST_API, new VersionRange(1, 1));
         versions.put(Contract.CONFIGURATION, new VersionRange(1, 1));
         versions.put(Contract.WORKFLOW_DEFINITION, new VersionRange(1, 1));

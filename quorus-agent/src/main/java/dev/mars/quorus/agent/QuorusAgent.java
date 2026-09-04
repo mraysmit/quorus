@@ -26,8 +26,8 @@ import dev.mars.quorus.agent.service.TransferExecutionService;
 import dev.mars.quorus.agent.service.HealthService;
 import dev.mars.quorus.agent.service.JobPollingService;
 import dev.mars.quorus.agent.service.JobStatusReportingService;
-import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferResult;
+import dev.mars.quorus.core.TransferAttemptStatus;
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
 import io.vertx.core.VertxOptions;
@@ -37,6 +37,9 @@ import org.slf4j.MDC;
 
 import java.util.Objects;
 import java.util.Properties;
+import java.time.Instant;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -79,6 +82,11 @@ public class QuorusAgent {
     private final io.vertx.core.Promise<Void> shutdownPromise = io.vertx.core.Promise.promise();
     private final AtomicInteger foreignAssignmentMismatchCount = new AtomicInteger(0);
     private final int foreignAssignmentMismatchThreshold;
+    // Keep completed/unresolved claims until their lease ends: a stale poll must not
+    // start the same fenced attempt again. This is process-local, not a durable outbox.
+    private final ConcurrentMap<AttemptIdentity, Instant> claimedAttempts = new ConcurrentHashMap<>();
+
+    private record AttemptIdentity(String jobId, String attemptId, long generation) { }
 
     /**
      * Creates a QuorusAgent with Vert.x dependency injection.
@@ -389,6 +397,7 @@ public class QuorusAgent {
     }
 
     private void processJob(JobPollingService.PendingJob pendingJob) {
+        if (closed.get()) return;
         String jobId = pendingJob.getJobId();
         String assignedAgentId = pendingJob.getAgentId();
 
@@ -408,6 +417,14 @@ public class QuorusAgent {
             return;
         }
 
+        if (pendingJob.hasAttemptContext()) {
+            Instant now = Instant.now();
+            claimedAttempts.entrySet().removeIf(entry -> !now.isBefore(entry.getValue()));
+            if (!now.isBefore(pendingJob.getLeaseExpiresAt())) return;
+            AttemptIdentity identity = new AttemptIdentity(jobId, pendingJob.getAttemptId(), pendingJob.getFencingGeneration());
+            if (claimedAttempts.putIfAbsent(identity, pendingJob.getLeaseExpiresAt()) != null) return;
+        }
+
         logger.info("Processing job: {} ({})", jobId, pendingJob.getDescription());
 
         // Strict contract: do not execute unless both lifecycle acknowledgements are
@@ -420,9 +437,11 @@ public class QuorusAgent {
 
                 // Resolve policy and credentials first; IN_PROGRESS is the durable
                 // evidence that the governed connection was actually used.
-                transferService.executeTransfer(pendingJob, () -> reportInProgress(pendingJob, 0L))
+                AtomicBoolean started = new AtomicBoolean();
+                transferService.executeTransfer(pendingJob, () -> reportInProgress(pendingJob, 0L)
+                                .onSuccess(ignored -> started.set(true)))
                     .onSuccess(result -> handleTransferComplete(pendingJob, result))
-                    .onFailure(throwable -> handleTransferError(pendingJob, throwable));
+                    .onFailure(throwable -> handleTransferError(pendingJob, throwable, started.get()));
             })
             .onFailure(err -> {
                 logger.error("Refusing to execute job {} because its start lifecycle was not acknowledged: {}",
@@ -462,10 +481,22 @@ public class QuorusAgent {
     }
 
     private void handleTransferError(JobPollingService.PendingJob pendingJob, Throwable throwable) {
+        handleTransferError(pendingJob, throwable, true);
+    }
+
+    private void handleTransferError(JobPollingService.PendingJob pendingJob, Throwable throwable, boolean started) {
         String jobId = pendingJob.getJobId();
+        if (throwable instanceof JobStatusReportingService.StatusReportException) {
+            // The controller may have committed the report even though its reply was lost.
+            // Never advance the sequence or guess a FAILED transition after an unresolved start.
+            logger.error("Job {} was not executed because its start report was rejected or unresolved: {}",
+                    jobId, throwable.getMessage());
+            return;
+        }
         logger.error("Transfer error: {}: {}", jobId, throwable.getMessage());
         logger.debug("Stack trace for transfer error: jobId={}", jobId, throwable);
-        reportFailed(pendingJob, throwable.getMessage())
+        reportFailed(pendingJob, throwable.getMessage(), started
+                ? TransferAttemptStatus.IN_PROGRESS : TransferAttemptStatus.ACCEPTED)
                 .onFailure(err -> logger.error("Failed to report FAILED for job {}: {}", jobId, err.getMessage()));
         metrics.recordJobCompleted(false, "unknown", "DOWNLOAD", 0, 0);
     }
@@ -504,11 +535,15 @@ public class QuorusAgent {
     }
 
     private Future<Void> reportFailed(JobPollingService.PendingJob job, String reason) {
+        return reportFailed(job, reason, TransferAttemptStatus.IN_PROGRESS);
+    }
+
+    private Future<Void> reportFailed(JobPollingService.PendingJob job, String reason, TransferAttemptStatus expectedState) {
         if (!job.hasAttemptContext()) {
             return jobStatusReportingService.reportFailed(job.getJobId(), reason);
         }
         return jobStatusReportingService.reportFailed(job.getJobId(), reason, job.getAttemptId(),
-                job.getFencingGeneration(), job.nextReportSequence());
+                job.getFencingGeneration(), job.nextReportSequence(), expectedState);
     }
     
     public boolean isRunning() {
