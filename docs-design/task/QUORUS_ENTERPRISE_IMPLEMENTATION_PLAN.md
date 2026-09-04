@@ -2,7 +2,7 @@
 
 # Quorus Enterprise Implementation Plan
 
-**Version:** 1.19  
+**Version:** 1.21  
 **Date:** 2026-09-04  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
@@ -70,15 +70,48 @@ Execute the following slices in order under Section 6.1, retaining intended beha
 | Slice | Scope and acceptance gate | Status |
 |---|---|---|
 | R1 — Durable snapshots | Snapshot, compact, close, construct fresh storage, and recover state and coordinates; three-controller restart; interrupted publication, corruption, retained tails, and concurrent log mutations. Keep raftlog-core as the only WAL. | Code remediation verified on Windows; container-recreation, production-filesystem and power-loss acceptance remain open |
-| R2 — Tenant isolation | Collision-free versioned registry keys, ownership validation, HTTP CRUD/list boundaries, replicated migration and restart; ambiguous legacy ownership fails closed. | Pending |
-| R3 — Pre-execution failures | Authorization/secret/path rejection reaches the correct terminal attempt state without artificial IN_PROGRESS; preserve sequencing/fencing and reconcile uncertain acknowledgements. | Pending |
+| R2 — Tenant isolation | Collision-free versioned registry keys, ownership validation, HTTP CRUD/list boundaries, replicated migration and restart; ambiguous legacy ownership fails closed. | Implementation complete — 546 tests pass in final clean controller verify, no failures/errors/skips; JaCoCo gate passed; deployment acceptance remains under R1/R6 |
+| R3 — Pre-execution failures | Authorization/secret/path rejection reaches the correct terminal attempt state without artificial IN_PROGRESS; preserve sequencing/fencing and reconcile uncertain acknowledgements. | Implementation complete — clean affected-reactor verify and JaCoCo gates pass; Windows symlink skip covered by passing Linux path-policy tests |
 | R4 — Non-blocking DNS | Slow DNS cannot block unrelated HTTP requests; bounded resolution, overload/timeout handling, default-deny egress and address pinning remain enforced. | Pending |
 | R5 — Handover closure | Confirm and disposition every remaining handover item, including entrypoints, defaults, path/port/TLS behavior, trust updates, codecs, compatibility, and retention. | Pending |
 | R6 — Final acceptance | Clean isolated-worktree reactor verify at the final revision, configured JaCoCo gates, protocol/security/restart tests, migration/runbook/specification alignment and retained evidence. | Pending |
 
-**R1 implementation evidence:** 14 new tests: 11 exposed missing behavior before their fixes, and three are explicitly recorded as characterization. Seven red/green stages cover recovery and mutation ordering, including interrupted installation followed by a second restart. The final clean controller run passes 530 tests with no failures, errors or skips and meets its JaCoCo gate; the separately enabled slow cluster suite passes four tests. An earlier seven-module clean reactor passed before the last interruption-recovery fixes; it is not represented as a final-revision reactor result. Commands, failure excerpts, timestamps, log hashes, source hashes and limitations are retained in [Raft TDD evidence](../evidence/raft-log-tdd-evidence-2026-09-04.json). R2 is the next implementation slice; no remaining slice or production acceptance gate is closed by this result.
+**R1 implementation evidence:** 14 new tests: 11 exposed missing behavior before their fixes, and three are explicitly recorded as characterization. Seven red/green stages cover recovery and mutation ordering, including interrupted installation followed by a second restart. The final clean controller run passes 530 tests with no failures, errors or skips and meets its JaCoCo gate; the separately enabled slow cluster suite passes four tests. An earlier seven-module clean reactor passed before the last interruption-recovery fixes; it is not represented as a final-revision reactor result. Commands, failure excerpts, timestamps, log hashes, source hashes and limitations are retained in [Raft TDD evidence](../evidence/raft-log-tdd-evidence-2026-09-04.json). R2 progress is recorded below; no remaining slice or production acceptance gate is closed by the R1 result.
 
 The two Raft regression cases without preserved red evidence remain historical process deviations requiring explicit disposition, not historical TDD. The earlier raftlog prefix API's compile-only red also does not satisfy the behavioral-red mandate; its historical record is preserved, not retroactively relabelled. No waiver is inferred from earlier Phase 0/1 approvals. The later full-reactor result recorded by `ffc3e64` corrects the earlier review's verification chronology, but does not cover the missing snapshot/restart behavior. Completion of this checkpoint requires all applicable gates, not a green build alone.
+
+**R2 implementation evidence:** versioned tenant/resource keys, exact-owner reads and
+authoritative writes replace the ambiguous legacy namespace. The first successful v2
+registry mutation migrates validated legacy records atomically through Raft. Conflicts
+and incomplete ownership fail closed; command/snapshot schema 3 fences older binaries.
+Twenty-two cases retain intended behavioral red before fixes; one HTTP outcome, two
+three-controller restart variants and one schema-2 snapshot compatibility case are
+separately identified as characterization/regression.
+The corrected focused suite passes 37 tests. Final clean controller verification passes
+546 tests with no failures, errors or skips and meets the JaCoCo gate. Commands, hashes, the failed cluster-test
+sequencing run and final verification are retained in the existing
+[Phase 4 evidence](../evidence/phase4-tdd-evidence-2026-09-03.json).
+Follow the [coordinated upgrade procedure](../../docs/QUORUS_SECURITY_DEPLOYMENT_GUIDE.md#11-registry-isolation-upgrade-and-recovery);
+no deployed data has been changed. R3 progress is recorded below.
+
+**R3 implementation evidence:** preparation failure reports now use the acknowledged
+attempt state. The controller atomically fails the accepted attempt, assignment and
+pending transfer without a synthetic start transition. Transient acknowledgement
+failures replay the identical report, bounded to three sends; definitive rejection or
+unresolved start acknowledgement does not authorize execution or a guessed next report.
+Repeated polls are suppressed per fenced attempt, and executable request construction
+precedes the start report. Sixteen new cases retain intended behavioral red; one new
+cancellation case is characterization. The first focused run passes 98 tests; the
+extended agent regression passes 44. Clean affected-reactor verification passes 2,357
+tests with no failures/errors and one existing Windows symlink-permission skip; all
+five module JaCoCo gates pass. Both unchanged path-policy tests then pass against the
+verified artifacts in a pinned Java 25 Linux container, with no skips or aborts.
+Commands, initial assertion corrections, hashes and limitations are retained under
+`remediationR3` in the existing [Phase 4 evidence](../evidence/phase4-tdd-evidence-2026-09-03.json).
+The [reconciliation procedure](../../docs/QUORUS_SECURITY_DEPLOYMENT_GUIDE.md#12-pre-execution-failure-and-acknowledgement-reconciliation)
+distinguishes bounded replay from outstanding durable outbox, automatic lease recovery
+and destination reconciliation work in Phase 2. R4 is the next remediation slice; the
+remaining release gates are not waived.
 
 | Milestone | Completed phases | Release meaning |
 |---|---|---|

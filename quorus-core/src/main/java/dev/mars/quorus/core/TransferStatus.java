@@ -84,7 +84,7 @@ public enum TransferStatus {
      *
      * <p><strong>Valid transitions:</strong></p>
      * <pre>
-     *   PENDING     → IN_PROGRESS, CANCELLED
+     *   PENDING     → IN_PROGRESS, CANCELLED, FAILED (pre-execution rejection)
      *   IN_PROGRESS → COMPLETED, FAILED, CANCELLED, PAUSED
      *   PAUSED      → IN_PROGRESS, CANCELLED
      *   FAILED      → PENDING (retry)
@@ -97,7 +97,7 @@ public enum TransferStatus {
      */
     public boolean canTransitionTo(TransferStatus target) {
         return switch (this) {
-            case PENDING -> target == IN_PROGRESS || target == CANCELLED;
+            case PENDING -> target == IN_PROGRESS || target == CANCELLED || target == FAILED;
             case IN_PROGRESS -> target == COMPLETED || target == FAILED
                              || target == CANCELLED || target == PAUSED;
             case PAUSED -> target == IN_PROGRESS || target == CANCELLED;
@@ -113,7 +113,7 @@ public enum TransferStatus {
      */
     public TransferStatus[] getValidTransitions() {
         return switch (this) {
-            case PENDING -> new TransferStatus[]{IN_PROGRESS, CANCELLED};
+            case PENDING -> new TransferStatus[]{IN_PROGRESS, CANCELLED, FAILED};
             case IN_PROGRESS -> new TransferStatus[]{COMPLETED, FAILED, CANCELLED, PAUSED};
             case PAUSED -> new TransferStatus[]{IN_PROGRESS, CANCELLED};
             case FAILED -> new TransferStatus[]{PENDING};

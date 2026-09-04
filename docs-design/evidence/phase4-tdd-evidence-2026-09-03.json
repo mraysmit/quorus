@@ -452,8 +452,353 @@
     "duration": "08:36",
     "outcome": "passed"
   },
-  "phaseStatus": "complete",
+  "phaseStatus": "Historical Phase 4 completion retained; remediation checkpoint and release acceptance reopened on 2026-09-04",
+  "remediationR2": {
+    "sliceId": "R2-TENANT-REGISTRY-ISOLATION",
+    "baseRevision": "2d8ed83",
+    "status": "R2 implementation complete; final clean controller verify and JaCoCo passed; R1 deployment gates and R3-R6 remain open",
+    "guidelinesReviewed": [
+      ".github/copilot-instructions.md",
+      "QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md sections 2, 4 and 6.1",
+      "QUORUS_ARCHITECTURE_SPECIFICATION.md authoritative state/tenant invariants",
+      "QUORUS_REST_API_SPECIFICATION.md tenant and service-registry contract",
+      "QUORUS_CONFIGURATION_ISOLATION_HANDOVER_2026-09-03.md"
+    ],
+    "acceptance": "Exact tenant ownership across service connections, secret references and security events, collision-free versioned keys, authoritative payload/key validation, deterministic atomic replicated migration, fail-closed ambiguity, and recovery after WAL replay or snapshot compaction.",
+    "flow": "mTLS trusted-gateway identity -> SecurityContext -> HTTP registry handlers -> Raft metadata command -> QuorusStateStore ownership/migration -> exact-tenant registry projection -> HTTP and agent consumers; command/snapshot serialization retains versioned state.",
+    "entryPoints": [
+      "Authenticated HTTP CRUD/list /api/v1/service-connections",
+      "Authenticated HTTP CRUD/list /api/v1/secret-references",
+      "Authenticated HTTP GET /api/v1/security-events",
+      "RaftNode.submitCommand",
+      "ProtobufCommandCodec",
+      "RaftNode.takeSnapshot/start"
+    ],
+    "classification": [
+      "external-path behavioral",
+      "security",
+      "state-machine contract",
+      "real-filesystem",
+      "multi-node",
+      "restart",
+      "snapshot-compaction"
+    ],
+    "red": [
+      {
+        "stage": "authenticated-http-boundaries",
+        "command": "mvn.cmd -q clean test -pl quorus-controller '-Dtest=SecurityBoundaryIntegrationTest#registryBoundariesSeparateDottedTenantAndResourceIds' -f ../quorus-r2-tests-20260904/pom.xml 2>&1 | Tee-Object -FilePath temp/r2-http-red.log; exit $LASTEXITCODE",
+        "log": "temp/r2-http-red.log",
+        "sha256": "9923FA391DDD819044EA53749E0A5CD5E6E16E363E6C6537BC386C81E6DD3FA3",
+        "completedAt": "2026-09-04T16:16:01.7717491+08:00",
+        "patchIdentity": "2d8ed83 plus test-only changes, before production implementation",
+        "tests": 11,
+        "failures": 10,
+        "errors": 0,
+        "skipped": 0,
+        "exitCode": 1,
+        "expectedFailure": "Foreign item reads/deletes/secret updates returned 200, distinct creates returned 409, and lists exposed child-tenant records. Connection-update already returned 404 due to the missing caller-tenant secret; it is characterization, not a red case."
+      },
+      {
+        "stage": "authoritative-ownership-and-migration",
+        "command": "mvn.cmd -q test -pl quorus-controller '-Dtest=ServiceConnectionRegistryIsolationTest' -f ../quorus-r2-tests-20260904/pom.xml 2>&1 | Tee-Object -FilePath temp/r2-state-red.log; exit $LASTEXITCODE",
+        "log": "temp/r2-state-red.log",
+        "sha256": "85F0598F4E743060E5B0F501E02429BB34C14F7EEBCDA943A4B3A9BE1938737E",
+        "completedAt": "2026-09-04T16:16:48.1340041+08:00",
+        "patchIdentity": "2d8ed83 plus test-only changes, before production implementation",
+        "tests": 7,
+        "failures": 7,
+        "errors": 0,
+        "skipped": 0,
+        "exitCode": 1,
+        "expectedFailure": "State accepted mismatched tenant/ID payloads and legacy writes after the intended migration, returned foreign legacy records, and neither migrated keys nor rejected ambiguous ownership atomically."
+      },
+      {
+        "stage": "old-reader-fencing",
+        "command": "mvn.cmd -q test -pl quorus-controller '-Dtest=ServiceConnectionRegistryIsolationTest#versionedRegistryCommandsFenceOutOldReaders+migratedSnapshotsFenceOutOldReaders' -f ../quorus-r2-tests-20260904/pom.xml 2>&1 | Tee-Object -FilePath temp/r2-schema-red.log; exit $LASTEXITCODE",
+        "log": "temp/r2-schema-red.log",
+        "sha256": "6E8325843848A8C676B729309D97C2BF7EAED3A4786A6496E1CC0C6F5969A761",
+        "completedAt": "2026-09-04T16:17:24.3737910+08:00",
+        "patchIdentity": "2d8ed83 plus test-only changes, before production implementation",
+        "tests": 2,
+        "failures": 2,
+        "errors": 0,
+        "skipped": 0,
+        "exitCode": 1,
+        "expectedFailure": "Command and snapshot schema were 2 rather than 3, so older readers could not be fenced from the new migration semantics."
+      },
+      {
+        "stage": "migration-conflict-boundaries",
+        "command": "mvn.cmd -q test -pl quorus-controller '-Dtest=ServiceConnectionRegistryIsolationTest#conflictingLegacyAndVersionedOwnershipFailsClosedOnRead+missingDeleteDoesNotPartiallyCommitMigration+migrationRejectsMalformedExistingVersionedRecordAtomically' -f ../quorus-r2-tests-20260904/pom.xml 2>&1 | Tee-Object -FilePath temp/r2-migration-boundary-red.log; exit $LASTEXITCODE",
+        "log": "temp/r2-migration-boundary-red.log",
+        "sha256": "6F3FABBAD5D27E03B8F770F41101F1B86CAB5AC5EF26CAF440FA94FF20A59E8C",
+        "completedAt": "2026-09-04T16:19:47.0822400+08:00",
+        "patchIdentity": "Initial R2 green implementation plus three new boundary tests, before their fixes",
+        "tests": 3,
+        "failures": 3,
+        "errors": 0,
+        "skipped": 0,
+        "exitCode": 1,
+        "expectedFailure": "Conflicting old/new read returned data, a missing delete published migration, and malformed existing v2 ownership did not reject migration."
+      }
+    ],
+    "initialGreen": {
+      "command": "mvn.cmd -q test -pl quorus-controller '-Dtest=ServiceConnectionRegistryIsolationTest,SecurityBoundaryIntegrationTest#registryBoundariesSeparateDottedTenantAndResourceIds' -f ../quorus-r2-tests-20260904/pom.xml 2>&1 | Tee-Object -FilePath temp/r2-initial-green.log; exit $LASTEXITCODE",
+      "log": "temp/r2-initial-green.log",
+      "sha256": "36BA3C43F082F50CEBEE570A0CD0A99E557EE6268A10BD04FFC0AF5917833CC2",
+      "completedAt": "2026-09-04T16:19:04.7773496+08:00",
+      "tests": 20,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "exitCode": 0
+    },
+    "intermediateRegression": {
+      "command": "mvn.cmd -q test -pl quorus-controller '-Dtest=ServiceConnectionRegistryIsolationTest,SecurityBoundaryIntegrationTest,ServiceConnectionHttpIntegrationTest,ThreeControllerDurableRestartTest,SchemaCompatibilityTest' -f ../quorus-r2-tests-20260904/pom.xml 2>&1 | Tee-Object -FilePath temp/r2-regression-green.log; exit $LASTEXITCODE",
+      "log": "temp/r2-regression-green.log",
+      "sha256": "65F944335895377C1D1F616EE54FA27D5294846707DAADE04E9D409E00D9F039",
+      "completedAt": "2026-09-04T16:21:10.7667210+08:00",
+      "tests": 37,
+      "failures": 2,
+      "errors": 0,
+      "skipped": 0,
+      "exitCode": 1,
+      "outcome": "Failed despite the filename: both newly added cluster regression cases waited for migration but asserted equality before followers applied the separately committed audit event. No production change was needed; test sequencing was corrected to await the complete committed state using Vert.x facilities. This is not behavioral-red evidence."
+    },
+    "focusedRegression": {
+      "command": "mvn.cmd -q test -pl quorus-controller '-Dtest=ServiceConnectionRegistryIsolationTest,SecurityBoundaryIntegrationTest,ServiceConnectionHttpIntegrationTest,ThreeControllerDurableRestartTest,SchemaCompatibilityTest' -f ../quorus-r2-tests-20260904/pom.xml 2>&1 | Tee-Object -FilePath temp/r2-regression-corrected-green.log; exit $LASTEXITCODE",
+      "log": "temp/r2-regression-corrected-green.log",
+      "sha256": "91309F3DCC22709C403B92C715FD004D9550EAD863ABE1B68B8A05B84E0CED75",
+      "completedAt": "2026-09-04T16:22:35.1385134+08:00",
+      "tests": 37,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "exitCode": 0
+    },
+    "finalControllerVerification": {
+      "artifact": "../quorus-r2-tests-20260904/quorus-controller/target/quorus-controller-1.0-SNAPSHOT.jar",
+      "artifactSha256": "DCF2960D9C285AF9F62DD0A055945E0FF7F83EE59A131AF4F03E46526799E443",
+      "command": "mvn.cmd clean verify -pl quorus-controller -f ../quorus-r2-tests-20260904/pom.xml 2>&1 | Tee-Object -FilePath temp/r2-final-controller-verify.log; exit $LASTEXITCODE",
+      "log": "temp/r2-final-controller-verify.log",
+      "sha256": "9BC2C6D5E0954C68DB6A85A391EE57556C79F4FBDD6EC1BFFF2CF4794B0F5B6B",
+      "completedAt": "2026-09-04T16:32:10.1472750+08:00",
+      "tests": 546,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "exitCode": 0,
+      "duration": "03:18 min",
+      "summary": [
+        "[INFO] Tests run: 546, Failures: 0, Errors: 0, Skipped: 0",
+        "[INFO] All coverage checks have been met.",
+        "[INFO] BUILD SUCCESS"
+      ],
+      "scope": "Final changed controller sources and OpenAPI resource matched the isolated build by SHA-256. Includes all 26 added cases; default group exclusions remain. No full-reactor or production deployment acceptance is claimed."
+    },
+    "intermediateControllerVerification": {
+      "command": "mvn.cmd clean verify -pl quorus-controller -f ../quorus-r2-tests-20260904/pom.xml 2>&1 | Tee-Object -FilePath temp/r2-controller-clean-verify.log; exit $LASTEXITCODE",
+      "log": "temp/r2-controller-clean-verify.log",
+      "sha256": "ED6180AEB0666654CD3E44B48431076D082E94874B3E3AA9EE5C0013904901D7",
+      "completedAt": "2026-09-04T16:28:12.7558628+08:00",
+      "tests": 545,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "exitCode": 0,
+      "duration": "04:56 min",
+      "outcome": "BUILD SUCCESS; JaCoCo gate passed",
+      "scope": "Before the final constant-size lookup refactor and the added schema-2 snapshot compatibility regression"
+    },
+    "finalSourceSha256": [
+      {
+        "path": "quorus-controller/src/main/java/dev/mars/quorus/controller/state/QuorusStateStore.java",
+        "sha256": "4F060FC59BC7006EC38D7ADBE353F7AE6AB68639735B2176D677CCDECAF8AFD0"
+      },
+      {
+        "path": "quorus-controller/src/main/java/dev/mars/quorus/controller/state/SchemaVersionRegistry.java",
+        "sha256": "65E678FC42761E71F77F26BA668DB886AFDA70FE2D6CF0CABF13FAAD2A975BD4"
+      },
+      {
+        "path": "quorus-controller/src/main/java/dev/mars/quorus/controller/state/ServiceConnectionRegistry.java",
+        "sha256": "4C9622DFBD728311385E9A24B6877EF9410A31F49274EB4F8B0BC29C1782AE09"
+      },
+      {
+        "path": "quorus-controller/src/main/resources/openapi/quorus-controller-v1.yaml",
+        "sha256": "26DC7FD3A4C4E4C249FA8F9B8A5AA8EE0F9E55B41F8DFE5D02F15C9819262DBC"
+      },
+      {
+        "path": "quorus-controller/src/test/java/dev/mars/quorus/controller/http/SecurityBoundaryIntegrationTest.java",
+        "sha256": "01456B966005999AADD2B8616FF9DCD731DFF1DC33DCE98B337719980648A57E"
+      },
+      {
+        "path": "quorus-controller/src/test/java/dev/mars/quorus/controller/raft/ThreeControllerDurableRestartTest.java",
+        "sha256": "CF0D9041D309F6CD1DCA1C56D597584A94F830CDDEEE6F11355FACEAEEA8D7D0"
+      },
+      {
+        "path": "quorus-controller/src/test/java/dev/mars/quorus/controller/state/ServiceConnectionRegistryIsolationTest.java",
+        "sha256": "E2170C87ADB0158EF87E49FD67340EDD76F3C6E5E80D981291B758161455C5FE"
+      }
+    ],
+    "testAccounting": {
+      "added": 26,
+      "behavioralRedBeforeFix": 22,
+      "characterizationOrRegression": 4,
+      "note": "One existing-safe HTTP connection-update outcome, two new three-controller restart variants, and the added schema-2 snapshot compatibility case are not claimed as TDD. Twelve state/schema cases and ten HTTP cases retained intended red before their respective fixes."
+    },
+    "refactorSummary": [
+      "Versioned delimiter-separated keys preserve the existing allowed identifier alphabet, including dots; collection reads validate exact payload ownership and deduplicate matching old/new rows.",
+      "First successful v2 registry mutation validates and migrates legacy state with the triggering command; a volatile map publication prevents partial migration views. Ambiguity is rejected with a redacted stable state-machine reason.",
+      "Writes validate ownership at authoritative state application; the replicated schema marker rejects subsequent legacy mutations.",
+      "Command and snapshot writable schemas advance to 3 (readable 0-3) to fence out older binaries. Upgrade/runbook and public API descriptions updated without inventing a new document format.",
+      "Tests use real HTTP/mTLS, Vert.x coordination and external raftlog-core storage in temporary directories; production imports normalized only after initial green.",
+      "After the first clean controller run, individual lookups were refactored to use a read-only metadata view pinned to one migration generation instead of copying the entire event registry. Final clean verification includes this refactor and schema-2 snapshot compatibility coverage for all three resource kinds."
+    ],
+    "limitations": [
+      "No deployed data was inventoried or changed; legacy rows already overwritten by collisions cannot be reconstructed.",
+      "Coordinated schema-3 controller upgrade required; no mixed-version rolling upgrade or lossless binary-only rollback is claimed.",
+      "Ambiguous legacy records require explicitly reviewed operator recovery; no automatic ambiguity-repair tool is provided.",
+      "Final-revision full-reactor verification belongs to R6; R1 container-recreation/production-filesystem/power-loss gates and R3-R6 remain open.",
+      "Default controller verification excludes configured docker/slow groups; the R2 restart regression uses real local filesystem storage and simulated transport, not container recreation."
+    ],
+    "sensitiveEvidenceCaptured": false,
+    "sensitiveEvidenceStatement": "Synthetic bank identifiers, documentation-only IP addresses, temporary test certificates and opaque test Vault references only; no production secret values or transfer contents."
+  },
+  "remediationR3": {
+    "sliceId": "R3-PRE-EXECUTION-FAILURES",
+    "status": "implementation complete; clean affected-reactor verification and Linux path-policy follow-up passed",
+    "baseRevision": "2d8ed83",
+    "workingState": "Uncommitted R3 on top of the uncommitted R2 patch; neither patch is deployed.",
+    "testWorktree": "../quorus-r2-tests-20260904",
+    "acceptanceStatement": "The real agent startup/polling path reports preparation rejection from acknowledged ACCEPTED, never synthesizes IN_PROGRESS, and the controller HTTP lifecycle command atomically fails attempt/assignment/pending transfer. Uncertain acknowledgements replay the exact fenced, sequenced payload; rejected or unresolved starts do not execute or invent a terminal transition. Repeated polls do not execute one fenced attempt twice, and request construction precedes the start report.",
+    "finalSourceSha256": {
+      "quorus-core/src/main/java/dev/mars/quorus/core/TransferStatus.java": "8C95A4FB581B429AE40AD2C9B671A79881611322EF91613D65C4F511284EADFE",
+      "quorus-core/src/test/java/dev/mars/quorus/core/TransferStatusTest.java": "E042F5DB3C255548D526240F4D18DD76A41A477DA14F2F1C8A01D155E7860725",
+      "quorus-core/src/test/java/dev/mars/quorus/core/TransferStatusTransitionTest.java": "20A5670B6CED643B33AEF316BCBF4F920F3848261996F81CCBEB79014A7939F7",
+      "quorus-agent/src/main/java/dev/mars/quorus/agent/QuorusAgent.java": "C24ED3D7F96741FC0D8B4688E2A252E83B31F9BBE7A94C749F6946753FE2B1DF",
+      "quorus-agent/src/main/java/dev/mars/quorus/agent/service/JobStatusReportingService.java": "DEF8E33F9623CCDF1324FA1157AE4902AAB07DD67F1900B2C761681FD4C6914E",
+      "quorus-agent/src/main/java/dev/mars/quorus/agent/service/TransferExecutionService.java": "E5FE1D8D8347DD9F5FEF92C3E226BCC7CA9ED1B6EFB02ED3B280B71A0FDDA96F",
+      "quorus-agent/src/test/java/dev/mars/quorus/agent/PreExecutionFailureIntegrationTest.java": "2288E1253B4D70B91A890F0D532F3F6B880D04B45E6B01E63DD836CBD332D2C4",
+      "quorus-controller/src/test/java/dev/mars/quorus/controller/http/TransferAttemptLifecycleAtomicityIntegrationTest.java": "1EE29A566748C7E655EED27ECD4DB4DF4254BC3F86191A7F5914D0FD1F5C6B8E",
+      "quorus-controller/src/main/resources/openapi/quorus-controller-v1.yaml": "B650F709EC921BBA329578702859C95C5533F2C9938BF1510053BB30451DF0B8"
+    },
+    "sourceIsolation": "All nine R3 production/test/resource file hashes match the isolated test worktree. Prior R2 production/test sources are retained; R2 hashes above are historical evidence, not rewritten as R3 results.",
+    "flow": "Agent startup -> HTTP polling -> ACCEPTED acknowledgement -> path/policy/secret/request preparation -> IN_PROGRESS acknowledgement -> execution -> terminal HTTP report -> Raft lifecycle application",
+    "testFiles": [
+      "quorus-agent/src/test/java/dev/mars/quorus/agent/PreExecutionFailureIntegrationTest.java",
+      "quorus-controller/src/test/java/dev/mars/quorus/controller/http/TransferAttemptLifecycleAtomicityIntegrationTest.java",
+      "quorus-core/src/test/java/dev/mars/quorus/core/TransferStatusTest.java",
+      "quorus-core/src/test/java/dev/mars/quorus/core/TransferStatusTransitionTest.java"
+    ],
+    "classification": ["external-path behavioral", "HTTP integration", "failure injection", "state-transition contract"],
+    "newCaseAccounting": {
+      "netNewCases": 17,
+      "intendedBehavioralRed": 16,
+      "characterization": 1,
+      "explanation": "14 agent cases, one new core case, two additional controller parameter cases. The controller cancellation/FAILED case characterizes an existing rejection; the prior cancellation/IN_PROGRESS test remains covered. Revised existing transition-map expectations are not counted as new cases. Later sequence/fence/no-start-event/snapshot assertions supplement the HTTP case as regression coverage, not separately claimed TDD."
+    },
+    "stages": [
+      {
+        "stage": "core-red",
+        "command": "mvn.cmd test -pl quorus-core,quorus-agent,quorus-controller -am -f ../quorus-r2-tests-20260904/pom.xml -Dtest=TransferStatusTest,PreExecutionFailureIntegrationTest,TransferAttemptLifecycleAtomicityIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false --fail-at-end 2>&1 | Tee-Object -FilePath temp/r3-pre-execution-red.log",
+        "completedAt": "2026-09-04T17:34:46+08:00",
+        "result": "4 core tests: 1 intended failure, PENDING.canTransitionTo(FAILED) was false. Dependent modules were skipped by Maven after that failure and run separately below.",
+        "logSha256": "E9228A3309998FC53ACAD85A237D6646A85F696DD39FF614F4F07251D2AB22FC"
+      },
+      {
+        "stage": "http-red-and-initial-agent-assertions",
+        "command": "mvn.cmd test -pl quorus-agent,quorus-controller -f ../quorus-r2-tests-20260904/pom.xml -Dtest=PreExecutionFailureIntegrationTest,TransferAttemptLifecycleAtomicityIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false --fail-at-end 2>&1 | Tee-Object -FilePath temp/r3-boundaries-red.log",
+        "completedAt": "2026-09-04T17:35:56+08:00",
+        "result": "Controller: 2 tests, 1 intended failure (HTTP 409 instead of 200). Agent: 4 failures; path case reached expectedState mismatch, but three assertions incorrectly expected policy codes inside existing exception messages. Those assertions were corrected to the existing redacted messages and all agent cases rerun before agent production changes. The three mistaken assertions are not counted as behavioral red evidence.",
+        "logSha256": "DD7F9C54B125420E14EA9B9021FAE40056B5C137CA988B1900B42A67DA7910CE"
+      },
+      {
+        "stage": "agent-contract-red",
+        "command": "mvn.cmd test -pl quorus-agent -f ../quorus-r2-tests-20260904/pom.xml -Dtest=PreExecutionFailureIntegrationTest 2>&1 | Tee-Object -FilePath temp/r3-agent-contracts-red.log",
+        "completedAt": "2026-09-04T17:37:37+08:00",
+        "result": "12 tests, 12 intended failures: four wrong expected states; lost FAILED/ACCEPTED/IN_PROGRESS/COMPLETED acknowledgement cases fail to reach the replayed terminal report; 403/409 and exhausted-503 cases instead send an artificial FAILED report. All relevant agent production sources were unchanged for this run.",
+        "logSha256": "0CA3747432760E668746F89E611CC4317891C7D9CB401BDE03B79365DE2CA757"
+      },
+      {
+        "stage": "first-green",
+        "command": "mvn.cmd test -pl quorus-core,quorus-controller,quorus-agent -am -f ../quorus-r2-tests-20260904/pom.xml -Dtest=TransferStatusTest,TransferStatusTransitionTest,PreExecutionFailureIntegrationTest,TransferAttemptLifecycleAtomicityIntegrationTest,JobStatusReportingServiceTest,QuorusAgentTest -Dsurefire.failIfNoSpecifiedTests=false 2>&1 | Tee-Object -FilePath temp/r3-focused-green.log",
+        "completedAt": "2026-09-04T17:40:41+08:00",
+        "result": "98 passed: core 55, controller 3, agent 40; no failures/errors/skips; BUILD SUCCESS.",
+        "logSha256": "A2960F6C23442E5937BD7A12B063A3473ACF2B938003655A2C53DEF6832FDC35"
+      },
+      {
+        "stage": "preparation-and-duplicate-poll-red",
+        "command": "mvn.cmd test -pl quorus-agent -f ../quorus-r2-tests-20260904/pom.xml -Dtest=PreExecutionFailureIntegrationTest 2>&1 | Tee-Object -FilePath temp/r3-preparation-dedup-red.log",
+        "completedAt": "2026-09-04T17:41:20+08:00",
+        "result": "14 tests: prior 12 pass, 2 new intended failures. Repeated polling produced 26 reports instead of 3; malformed request construction produced ACCEPTED, IN_PROGRESS, FAILED instead of ACCEPTED, FAILED.",
+        "logSha256": "910F9D8532649D52255CA57CDC2F17DB3373DBBB28888EF7384D24FD8CB5F482"
+      },
+      {
+        "stage": "preparation-and-duplicate-poll-green",
+        "command": "mvn.cmd test -pl quorus-agent -f ../quorus-r2-tests-20260904/pom.xml -Dtest=PreExecutionFailureIntegrationTest,JobStatusReportingServiceTest,QuorusAgentTest,TransferExecutionServiceTest 2>&1 | Tee-Object -FilePath temp/r3-preparation-dedup-green.log",
+        "completedAt": "2026-09-04T17:42:34+08:00",
+        "result": "44 passed; no failures/errors/skips; BUILD SUCCESS.",
+        "logSha256": "2D5E31D544D60465560FAF1F5558CE9353D61A9B8C3E5A0D8519490C20DDE4F4"
+      }
+    ],
+    "finalVerification": {
+      "command": "mvn.cmd clean verify -pl quorus-core,quorus-controller,quorus-agent -am -f ../quorus-r2-tests-20260904/pom.xml 2>&1 | Tee-Object -FilePath temp/r3-clean-verify.log",
+      "completedAt": "2026-09-04T17:51:53+08:00",
+      "result": "BUILD SUCCESS",
+      "tests": 2358,
+      "passed": 2357,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 1,
+      "modules": {
+        "quorus-core": {"tests": 1514, "passed": 1514},
+        "quorus-workflow": {"tests": 134, "passed": 134},
+        "quorus-tenant": {"tests": 64, "passed": 64},
+        "quorus-controller": {"tests": 548, "passed": 548},
+        "quorus-agent": {"tests": 98, "passed": 97, "skipped": 1}
+      },
+      "coverage": "All five configured module JaCoCo gates passed.",
+      "skip": "Existing AgentLocalPathPolicyTest.rejectsSymlinkEscapesFromAnApprovedRoot aborts when Windows symbolic-link creation permission is unavailable.",
+      "scope": "Clean core/controller/agent and reactor dependencies, not the examples module or R6 final full-reactor release. Controller docker/slow groups remain excluded by the existing default configuration; explicitly enabled extra IT/benchmark lanes were not requested in this run.",
+      "logSha256": "4BD7B6FC8F91275CB698452AB27470807AA44A8AD316DBD969DF176BD16F0870",
+      "artifactSha256": {
+        "../quorus-r2-tests-20260904/quorus-core/target/quorus-core-1.0-SNAPSHOT.jar": "82FBF770D640A5545817375289E234AD5734D38DDEC17A44F358B287811572B3",
+        "../quorus-r2-tests-20260904/quorus-controller/target/quorus-controller-1.0-SNAPSHOT.jar": "8965FA500B50732BDD73ABCDFF66D34E0097B58164B8695716810402641FE5FE",
+        "../quorus-r2-tests-20260904/quorus-agent/target/quorus-agent-1.0-SNAPSHOT.jar": "1062B31B9FF6A7045E934C66E2458C068111B4C04CAE192234F33F0F9BBF7C3F"
+      }
+    },
+    "linuxPathPolicyVerification": {
+      "classification": "Regression follow-up of unchanged existing tests, not new TDD",
+      "completedAt": "2026-09-04T17:56:24.5604859+08:00",
+      "command": "docker run --rm --network none --mount type=bind,source=C:/Users/markr/dev/java/corejava/quorus-r2-tests-20260904/quorus-agent/target,target=/agent,readonly --mount type=bind,source=C:/Users/markr/.m2/repository/org/junit/platform/junit-platform-launcher/1.14.3/junit-platform-launcher-1.14.3.jar,target=/launcher.jar,readonly --mount type=bind,source=C:/Users/markr/dev/java/corejava/quorus/temp/R3LinuxPathTests.java,target=/runner/R3LinuxPathTests.java,readonly eclipse-temurin@sha256:e787e08ef76f4c16866108cd7f9fcd96a68eef3ac6cc76866897d4d02d5a2262 java --class-path '/agent/classes:/agent/test-classes:/agent/lib/*:/launcher.jar' /runner/R3LinuxPathTests.java 2>&1 | Tee-Object -FilePath temp/r3-linux-path-policy-green.log",
+      "runtime": "Linux, Temurin JDK 25.0.4+7; pinned image; network disabled; verified classes and dependencies mounted read-only; test fixtures use the container filesystem.",
+      "testClass": "dev.mars.quorus.agent.service.AgentLocalPathPolicyTest",
+      "result": "2 tests passed; no failures, skips or aborts. This covers the existing symbolic-link case skipped by Windows without changing host permissions or the test.",
+      "logSha256": "DDA851433C884A7A7C479B083B45D3D512A739DE8D65BF448DC1B3F99C724E13",
+      "launcher": "temp/R3LinuxPathTests.java",
+      "launcherSha256": "BA3EF892B1A8295B1F93F9B134FCFAB05FE98EA5CDBC31E45A63D461F1751FCD",
+      "testSourceSha256": "A3B3C1BA690F4F5AE2775CB8A25AE287A812A37A2EA9A591FD689981CE9B5C6B",
+      "initialEnvironmentAttempt": {
+        "log": "temp/r3-linux-path-policy.log",
+        "logSha256": "E1CB64CDB7D42D58A3F69294D54534556FFAC203795DC8052E722A1728B6CA6B",
+        "result": "The initially available image was a Java 21 JRE without jdk.compiler, so source-file launching failed before tests ran. A Java 25 JDK image was then pulled; this prerequisite failure is not behavioral TDD evidence."
+      }
+    },
+    "implementation": [
+      "Allow PENDING -> FAILED in the core transfer lifecycle; existing atomic controller validation still enforces all attempt/assignment/job references, CAS, lease, progress, outcome, fencing and sequence invariants.",
+      "Track acknowledgement of IN_PROGRESS in each agent execution and explicitly pass ACCEPTED or IN_PROGRESS as the FAILED report's expected state.",
+      "Replay attempt-aware transient reports unchanged, at most three sends with 100/200ms delays and a per-send response deadline; do not replay legacy non-attempt reports or definitive 4xx rejections.",
+      "Distinguish a rejected/unresolved status acknowledgement from an execution failure and do not manufacture a later report or execute after an unacknowledged start.",
+      "Suppress repeated local claims for one job/attempt/fencing generation until lease expiry. Build the executable request before start acknowledgement; governed final path validation stays on a worker and closes credentials on preparation failure."
+    ],
+    "limitations": [
+      "Agent boundary tests use real HTTP against a controlled protocol fixture; complementary controller tests use the real HTTP handler and Raft application in explicit volatile node mode. The snapshot assertion is a codec round trip, not a WAL/disk restart. No internal storage backend is introduced. This is not a single agent-to-production-controller cross-module deployment test.",
+      "Exact-payload bounded replay reconciles transient lost acknowledgements. Prolonged outages, durable agent report-outbox recovery, automatic lease expiry/reassignment and destination reconciliation remain Phase 2 work; operator guidance is in deployment guide section 12.",
+      "No deployed data was changed. R1 production durability and R6 final release gates remain open; this record does not close Phase 2 or Phase 4 overall."
+    ],
+    "sensitiveEvidenceCaptured": false,
+    "sensitiveEvidenceStatement": "Only synthetic bank identifiers, opaque test Vault references, temporary paths and a synthetic payment payload; no production credentials or customer data. Status retry errors retain no response body or underlying exception payload."
+  },
   "notYetVerified": [
-    "The direct symbolic-link escape test was skipped because this Windows host does not grant symbolic-link creation privilege; canonical existing-parent escape and configured-root boundary cases passed."
+    "Windows still cannot run the direct symlink-creation case without additional host permissions. Its implementation behavior is now verified by the R3 Linux follow-up above: both unchanged path-policy tests passed with no skips. This does not close production-filesystem, container-recreation or power-loss acceptance under R1/R6."
   ]
 }

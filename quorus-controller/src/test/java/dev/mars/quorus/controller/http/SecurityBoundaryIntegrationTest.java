@@ -22,10 +22,12 @@ import dev.mars.quorus.core.TransferJob;
 import dev.mars.quorus.core.TransferRequest;
 import io.vertx.core.Vertx;
 import io.vertx.core.buffer.Buffer;
+import io.vertx.core.http.HttpMethod;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.net.PemKeyCertOptions;
 import io.vertx.core.net.PemTrustOptions;
+import io.vertx.ext.web.client.HttpRequest;
 import io.vertx.ext.web.client.HttpResponse;
 import io.vertx.ext.web.client.WebClient;
 import io.vertx.ext.web.client.WebClientOptions;
@@ -33,6 +35,8 @@ import io.vertx.junit5.VertxExtension;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.InputStream;
 import java.net.URI;
@@ -55,7 +59,7 @@ import static dev.mars.quorus.testing.TestResourceUtils.copyResource;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Retrospective external-path characterization of the Phase 1 HTTP trust boundary. */
+/** Phase 1 trust-boundary characterization and test-first R2 tenant registry isolation. */
 @ExtendWith(VertxExtension.class)
 class SecurityBoundaryIntegrationTest {
     private static final Duration TIMEOUT = Duration.ofSeconds(10);
@@ -314,6 +318,99 @@ class SecurityBoundaryIntegrationTest {
         }
     }
 
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "secret-read", "secret-create", "secret-list", "secret-update", "secret-delete",
+            "connection-read", "connection-create", "connection-list", "connection-update",
+            "connection-delete", "events"})
+    void registryBoundariesSeparateDottedTenantAndResourceIds(String operation, Vertx vertx) throws Exception {
+        TlsMaterial tls = TlsMaterial.create(tempDir.resolve("r2-tls"));
+        SecurityConfig config = tls.config(Set.of(tls.clientSubject()), Set.of(), Map.of(),
+                tempDir.resolve("r2-audit.jsonl"));
+        RunningServer running = startServer(vertx, config, AuditSink.noOp());
+        WebClient client = tls.authenticatedClient(vertx);
+        try {
+            String foreignTenant = "bank.branch";
+            String tenant = "bank";
+            assertEquals(201, awaitSuccess(registryRequest(client, running, "POST", "/secret-references",
+                    foreignTenant).sendJsonObject(registrySecret("ledger")), TIMEOUT).statusCode());
+            boolean connection = operation.startsWith("connection");
+            if (connection) {
+                assertEquals(201, awaitSuccess(registryRequest(client, running, "POST", "/service-connections",
+                        foreignTenant).sendJsonObject(registryConnection("ledger", "ledger")), TIMEOUT).statusCode());
+                assertEquals(201, awaitSuccess(registryRequest(client, running, "POST", "/secret-references",
+                        tenant).sendJsonObject(registrySecret("own-secret")), TIMEOUT).statusCode());
+            }
+            String resource = connection ? "/service-connections" : "/secret-references";
+            String id = "branch.ledger";
+            if (operation.endsWith("read")) {
+                assertEquals(404, awaitSuccess(registryRequest(client, running, "GET", resource + "/" + id,
+                        tenant).send(), TIMEOUT).statusCode(), "Foreign resource must not be readable");
+            } else if (operation.endsWith("create")) {
+                JsonObject body = connection ? registryConnection(id, "own-secret") : registrySecret(id);
+                assertEquals(201, awaitSuccess(registryRequest(client, running, "POST", resource, tenant)
+                        .sendJsonObject(body), TIMEOUT).statusCode(), "Distinct tenant/resource pairs must coexist");
+                assertEquals(foreignTenant, awaitSuccess(registryRequest(client, running, "GET",
+                        resource + "/ledger", foreignTenant).send(), TIMEOUT).bodyAsJsonObject().getString("tenantId"));
+            } else if (operation.endsWith("list") || operation.equals("events")) {
+                String path = operation.equals("events") ? "/security-events" : resource;
+                String field = operation.equals("events") ? "events" : connection ? "serviceConnections" : "secretReferences";
+                HttpResponse<Buffer> response = awaitSuccess(registryRequest(client, running, "GET", path, tenant)
+                        .send(), TIMEOUT);
+                assertEquals(200, response.statusCode());
+                assertTrue(response.bodyAsJsonObject().getJsonArray(field).stream()
+                        .map(JsonObject.class::cast).allMatch(value -> tenant.equals(value.getString("tenantId"))),
+                        "Collection must not include a dotted child tenant");
+            } else if (operation.endsWith("update")) {
+                assertEquals(404, awaitSuccess(registryRequest(client, running, "PUT", resource + "/" + id, tenant)
+                        .sendJsonObject(connection ? new JsonObject().put("owner", "changed")
+                                : new JsonObject().put("version", "2")), TIMEOUT).statusCode(),
+                        "Foreign resource must not be mutable");
+            } else {
+                assertEquals(404, awaitSuccess(registryRequest(client, running, "DELETE", resource + "/" + id, tenant)
+                        .send(), TIMEOUT).statusCode(), "Foreign resource must not be deletable");
+            }
+        } finally {
+            client.close();
+            running.close();
+        }
+    }
+
+    private static HttpRequest<Buffer> registryRequest(WebClient client,
+            RunningServer running, String method, String path, String tenant) {
+        return client.request(HttpMethod.valueOf(method), running.server().actualPort(),
+                "localhost", "/api/v1" + path)
+                .putHeader(AuthenticationHandler.PRINCIPAL, "r2-security-admin")
+                .putHeader(AuthenticationHandler.IDENTITY_TYPE, "HUMAN")
+                .putHeader(AuthenticationHandler.TENANT, tenant)
+                .putHeader(AuthenticationHandler.ENVIRONMENT, "production")
+                .putHeader(AuthenticationHandler.ROLES, "SECURITY")
+                .putHeader(AuthenticationHandler.SCOPES, "*")
+                .putHeader(AuthenticationHandler.EXPIRES_AT, Instant.now().plusSeconds(120).toString())
+                .putHeader(AuthenticationHandler.ELEVATION_EXPIRES_AT, Instant.now().plusSeconds(120).toString());
+    }
+
+    private static JsonObject registrySecret(String id) {
+        return new JsonObject().put("secretReferenceId", id).put("provider", "VAULT_KV_V2")
+                .put("path", "quorus/data/payments").put("key", "password").put("version", "1").put("status", "ACTIVE");
+    }
+
+    private static JsonObject registryConnection(String id, String secretId) {
+        return new JsonObject().put("serviceConnectionId", id).put("protocol", "SFTP")
+                .put("endpoint", "sftp://192.0.2.10:22").put("networkZone", "payments-dmz")
+                .put("allowedPaths", new JsonArray().add("/outbound"))
+                .put("allowedDirections", new JsonArray().add("DOWNLOAD"))
+                .put("allowedAgentPools", new JsonArray().add("payments-agents"))
+                .put("owner", "payments-platform").put("environment", "PRODUCTION")
+                .put("classification", "CONFIDENTIAL").put("secretReferenceId", secretId)
+                .put("serviceIdentity", "payments-batch").put("authenticationType", "PASSWORD")
+                .put("trustPolicy", new JsonObject().put("sshHostKeyFingerprints",
+                        new JsonArray().add("SHA256:synthetic-host-key-pin")))
+                .put("egressPolicy", new JsonObject().put("allowedHostnames", new JsonArray().add("192.0.2.10"))
+                        .put("allowedCidrs", new JsonArray().add("192.0.2.0/24"))
+                        .put("allowedPorts", new JsonArray().add(22)).put("pinResolvedAddresses", true));
+    }
     private static RunningServer startServer(Vertx vertx, SecurityConfig config, AuditSink auditSink) {
         config.validate();
         String nodeId = "security-boundary-" + System.nanoTime();

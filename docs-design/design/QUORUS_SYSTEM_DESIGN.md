@@ -2,11 +2,11 @@
 
 # Quorus Comprehensive System Design
 
-**Version:** 3.5  
+**Version:** 3.6  
 **Date:** 2025-08-26  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
-**Updated:** 2026-09-03  
+**Updated:** 2026-09-04  
 **Status:** Non-normative target-state vision  
 **Scope:** Historical design material, current concepts, and future architecture
 
@@ -1066,6 +1066,16 @@ Route: Reports→Dist
 3. **Job Assignment (HTTP, port 8080)**: The agent fetches assigned work via `GET /api/v1/agents/{agentId}/jobs`. Automatic route-trigger evaluation is target-state behavior and is not wired in the current controller startup path.
 4. **Transfer Execution**: Source agent reads file, transfers via `SimpleTransferEngine` using the appropriate protocol adapter (`SftpTransferProtocol`, `HttpTransferProtocol`, etc.)
 5. **Status Reporting (HTTP, port 8080)**: The agent reports `ACCEPTED`, `IN_PROGRESS`, and terminal state through `POST /api/v1/jobs/{jobId}/status` using attempt identity, expected state, fencing generation, and ordered report sequence. The controller applies attempt, assignment, transfer status, and progress atomically; legacy assignments retain a compatibility path.
+
+In the current R3 remediation, authorization, secret, local-path and request-preparation
+rejections report `FAILED` directly from acknowledged `ACCEPTED`; the pending transfer
+also becomes `FAILED` atomically, without synthetic start/use evidence. Transient lost
+acknowledgements are reconciled by bounded exact-report replay, and an unresolved start
+does not authorize transfer execution. Repeated polls for the same fenced attempt are
+suppressed within the running agent. Durable agent report-outbox recovery and destination
+reconciliation remain Phase 2 work; consult the current
+[implementation checkpoint](../task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md#remediation-checkpoint--2026-09-04)
+and [operator procedure](../../docs/QUORUS_SECURITY_DEPLOYMENT_GUIDE.md#12-pre-execution-failure-and-acknowledgement-reconciliation).
 
 ##### Figure 5: Controller-Agent-Route Architecture
 

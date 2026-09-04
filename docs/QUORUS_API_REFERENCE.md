@@ -2,8 +2,8 @@
 
 # Quorus HTTP API Reference
 
-**Version:** 3.5  
-**Date:** 2026-09-03  
+**Version:** 3.6  
+**Date:** 2026-09-04  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Status:** Current implementation reference  
@@ -316,6 +316,7 @@ Updates status for an existing transfer job. Only the agent that owns the assign
 | Field | Type | Description |
 |-------|------|-------------|
 | `bytesTransferred` | long | Running byte count for progress tracking |
+| `errorMessage` | string | Redacted failure reason; never include credentials or secret-provider payloads |
 
 **Example:**
 
@@ -332,6 +333,14 @@ Updates status for an existing transfer job. Only the agent that owns the assign
 ```
 
 The controller returns `409 Conflict` for a stale fence, stale or gapped sequence, expired lease, expected-state mismatch, or illegal lifecycle transition. For attempt-aware reports, it validates and applies the attempt, assignment, transfer status, and transfer progress as one atomic replicated lifecycle command; rejection leaves every view unchanged. An exact retry of an already accepted report is idempotent and returns `200 OK`, including a terminal retry after the original response was lost, without advancing the report sequence or reopening the active fence.
+
+Preparation rejection uses `status: FAILED`, `expectedState: ACCEPTED`, zero bytes,
+and the next sequence (normally 2 after acceptance). It atomically fails the pending
+transfer and accepted assignment/attempt without reporting `IN_PROGRESS` first.
+After a lost response, resend the identical report rather than advancing its sequence.
+The agent implements three-send bounded replay for transient errors; unresolved start
+reports do not authorize file I/O. See [reconciliation guidance](QUORUS_SECURITY_DEPLOYMENT_GUIDE.md#12-pre-execution-failure-and-acknowledgement-reconciliation)
+for exhausted retries and terminal acknowledgements.
 
 ## Assignment Endpoints
 
