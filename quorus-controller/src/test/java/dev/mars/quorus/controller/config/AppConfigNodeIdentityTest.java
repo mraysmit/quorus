@@ -161,7 +161,7 @@ class AppConfigNodeIdentityTest {
         assertEquals(8080, config.getHttpPort());
         assertEquals(9080, config.getRaftPort());
         assertEquals(1_048_576L, config.getHttpMaxBodyBytes());
-        assertEquals("memory", config.getRaftStorageType());
+        assertEquals("raftlog", config.getRaftStorageType());
         assertFalse(config.getRaftStorageFsync());
         assertTrue(config.isSnapshotEnabled());
         assertEquals(100_000L, config.getLogHardLimit());
@@ -216,6 +216,13 @@ class AppConfigNodeIdentityTest {
     void validateRejectsFileStorageType() {
         AppConfig config = new AppConfig("test", properties("quorus.raft.storage.type", "file"));
 
+        IllegalStateException error = assertThrows(IllegalStateException.class, config::validate);
+        assertTrue(error.getMessage().contains("raftlog"));
+    }
+
+    @Test
+    void validationRejectsInternalMemoryStorage() {
+        AppConfig config = new AppConfig("test", properties("quorus.raft.storage.type", "memory"));
         IllegalStateException error = assertThrows(IllegalStateException.class, config::validate);
         assertTrue(error.getMessage().contains("raftlog"));
     }

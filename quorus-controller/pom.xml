@@ -69,18 +69,10 @@
             <artifactId>vertx-grpc-client</artifactId>
         </dependency>
 
-        <!-- RaftLog WAL - default storage implementation -->
+        <!-- RaftLog WAL - the only supported storage implementation -->
         <dependency>
             <groupId>io.github.mraysmit</groupId>
             <artifactId>raftlog-core</artifactId>
-        </dependency>
-
-        <!-- Optional: High-performance storage backend -->
-        <dependency>
-            <groupId>org.rocksdb</groupId>
-            <artifactId>rocksdbjni</artifactId>
-            <version>9.11.2</version>
-            <optional>true</optional>
         </dependency>
 
         <!-- OpenTelemetry Dependencies -->
