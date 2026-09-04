@@ -219,10 +219,8 @@ public final class RaftLogStorageAdapter implements RaftStorage {
 
     @Override
     public Future<Void> truncatePrefix(long toIndex) {
-        logger.info("Prefix truncation requested for index <= {} (no-op for RaftLogStorageAdapter)", toIndex);
-        // The raftlog-core library doesn't support prefix truncation.
-        // Log entries will accumulate but snapshots still work for state machine recovery.
-        return Future.succeededFuture();
+        logger.info("Compacting log prefix up to index {}", toIndex);
+        return toVertxFuture(delegate.truncatePrefix(toIndex));
     }
 
     // =========================================================================
