@@ -2,18 +2,56 @@
 
 # Quorus Configuration Isolation Handover — 2026-09-03
 
-**Version:** 1.1  
+**Version:** 1.3  
 **Date:** 2026-09-04  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Status:** Superseded — see the post-handover status below  
-**Scope:** Original configuration handover at `fab72a6`, with remediation updates through `038da9f` and the uncommitted external-library-only removal
+**Scope:** Original configuration handover at `fab72a6`, with remediation updates through `2d8ed83` and the uncommitted R2/R3 changes
 
 ## Post-handover status — 2026-09-04
 
+**R3 pre-execution follow-up:** preparation rejection now reports `FAILED` from the
+acknowledged `ACCEPTED` state; the transfer model permits `PENDING → FAILED`, so the
+existing atomic lifecycle command can fail attempt, assignment and transfer together.
+There is no artificial `IN_PROGRESS` or transfer-start event. Exact fenced/sequence
+replay reconciles transient lost acknowledgements (three sends maximum); an unresolved
+or rejected start does not execute or manufacture a later failure report. Repeated
+polls are suppressed per attempt/fence, and request construction precedes start reporting.
+
+Sixteen new cases retain intended behavioral red; one new cancellation case is explicitly
+characterization. Focused verification passes 98 tests and the extended agent lane passes
+44. Clean affected-reactor verification passes 2,357 tests, with no failures/errors,
+one existing Windows symlink-permission skip, and all five JaCoCo gates met. Both
+unchanged path-policy tests pass in a pinned Java 25 Linux container against the verified
+artifacts, with no skips or aborts. R3 implementation is complete. See `remediationR3` in the existing
+[Phase 4 evidence](../docs-design/evidence/phase4-tdd-evidence-2026-09-03.json) and the
+[operator reconciliation procedure](QUORUS_SECURITY_DEPLOYMENT_GUIDE.md#12-pre-execution-failure-and-acknowledgement-reconciliation).
+Durable report-outbox recovery and destination reconciliation remain Phase 2 work.
+R4 (non-blocking DNS) is next; R1/R6 release gates remain open.
+
+**R2 tenant-isolation follow-up:** the external-library-only removal was committed as
+`2d8ed83`. The current uncommitted R2 change replaces ambiguous registry addresses with
+versioned collision-free tenant/resource keys, checks stored ownership in projections
+and replicated state application, and atomically migrates validated legacy rows with
+the first successful v2 registry mutation. Ambiguous records fail closed without partial
+writes. Command and snapshot schema 3 prevents older binaries from reading the new state.
+See the [upgrade and recovery procedure](QUORUS_SECURITY_DEPLOYMENT_GUIDE.md#11-registry-isolation-upgrade-and-recovery)
+before any deployment.
+
+Twenty-two new cases retain intended behavioral red before their fixes. One HTTP case,
+two three-controller restart cases and one schema-2 snapshot compatibility case are
+explicitly classified as characterization or regression. The corrected focused suite passes 37 tests; the initial cluster-test
+sequencing failures are retained, not hidden by the rerun. Final clean controller verification
+passes 546 tests with no failures, errors or skips and meets the JaCoCo gate. R2's implementation
+is complete; commands, hashes and limitations are recorded under `remediationR2` in the existing
+[Phase 4 evidence](../docs-design/evidence/phase4-tdd-evidence-2026-09-03.json).
+R3 progress is recorded above; production acceptance gates
+remain open. No deployed data was inspected, migrated or deleted.
+
 **External-library-only follow-up:** the internal file WAL was already removed, but RocksDB and memory backends remained. Those implementations, their factory branches, `createInMemory()`, backend-specific tests and RocksDB JNI dependency are now removed. Storage-dependent controller, election and snapshot tests use the external adapter. Seven behavioral rejection cases retain red/green evidence; production code contains only `RaftLogStorageAdapter` as a `RaftStorage` implementation. Quorus retains its Vert.x interface and application-snapshot sidecar, neither of which implements a WAL.
 
-**Current commit boundary:** `038da9f` (`fix(raft): persist snapshots and recover safely after compaction`) contains the R1 snapshot recovery remediation. The external-library-only removal described above is the subsequent uncommitted change. No commit was created as part of this handover update. The snapshot sidecar must remain while `raftlog-core` 1.2.0 has no snapshot API; removing it would reintroduce the snapshot-compaction recovery defect.
+**Prior commit boundaries:** `038da9f` (`fix(raft): persist snapshots and recover safely after compaction`) contains the R1 snapshot recovery remediation; `2d8ed83` contains the subsequent external-library-only removal. The snapshot sidecar must remain while `raftlog-core` 1.2.0 has no snapshot API; removing it would reintroduce the snapshot-compaction recovery defect.
 
 **Verification of the removal:** tests ran in the isolated `../quorus-core-tests-20260904` worktree to avoid editor-generated class-file interference. Changed controller sources, resources and POM matched the working tree by file hash.
 
@@ -37,7 +75,7 @@ The working tree described here was committed as `b35fb25` (`refactor(config): i
 - Finding 3: `AppConfig.validate()` rejects a non-positive attempt lease, and `QuorusControllerVerticle` chains its asynchronous start steps with `compose`, so an exception in any step fails the deployment after stopping the components that already started.
 - Finding 8: the Copilot instructions and the Raft WAL design snippet were updated.
 
-Finding 5's dead `createRocksDbStorage` helper is resolved by deleting the entire RocksDB factory path. Its other cleanup items, findings 4, 6 and 7, and every item in section 7 remain open. The rest of this document is preserved as historical evidence from 2026-09-03; its uncommitted-state statements and recommended next steps describe that original handover, not the current checkout. Follow the enterprise implementation plan's remediation checkpoint for current next steps.
+Finding 5's dead `createRocksDbStorage` helper is resolved by deleting the entire RocksDB factory path. Its other cleanup items and findings 4, 6 and 7 remain open. Section 7's registry tenant-key collision/list-isolation finding is addressed by R2; its pre-execution failure finding is addressed by R3 above. The other findings remain open. The rest of this document is preserved as historical evidence from 2026-09-03; its uncommitted-state statements and recommended next steps describe that original handover, not the current checkout. Follow the enterprise implementation plan's remediation checkpoint for current next steps.
 
 ## Document purpose
 

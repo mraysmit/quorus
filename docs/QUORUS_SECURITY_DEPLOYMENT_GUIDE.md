@@ -2,8 +2,8 @@
 
 # Quorus Security Deployment Guide
 
-**Version:** 1.1  
-**Date:** 2026-09-01  
+**Version:** 1.3  
+**Date:** 2026-09-04  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Status:** Phase 1 implementation guide  
@@ -187,3 +187,65 @@ The release evidence must show rejection of:
 Certificate files and PEM trust bundles are loaded at process start; Quorus does not hot-reload their key or CA material. The validated overlap process therefore deploys trust overlap first and uses a controlled rolling restart while preserving Raft quorum and active control. Runtime serial revocations are the exception: the REST update takes effect without restart for subsequent HTTP requests and Raft RPCs, including established TLS connections. Follow the [Certificate Incident Runbook](QUORUS_CERTIFICATE_INCIDENT_RUNBOOK.md), drain affected agents when required, and preserve the change evidence.
 
 The built-in audit provides complete Phase 1 security-boundary evidence and a second retained local chain. Searchable enterprise audit queries, WORM storage, evidence-collector delivery state, signed export, and broader resource-version detail remain part of the complete enterprise audit target.
+
+## 11. Registry isolation upgrade and recovery
+
+R2 changes the persisted service-connection, secret-reference and security-event key
+format. Raft commands and snapshots write schema 3, which older schema-2 binaries reject.
+This is a coordinated upgrade, not a mixed-version rolling upgrade.
+
+1. Quiesce control-plane mutations and agent polling/reporting under the approved
+   maintenance procedure; stop all controllers cleanly.
+2. Preserve every controller's complete WAL, snapshot and compaction-marker files together.
+   Retain the previous binaries and configuration. Never clear a data directory to migrate.
+3. Start all controllers on the schema-3-capable release and verify quorum, authenticated
+   identities and the expected recovered state before resuming requests.
+4. The first successful registry mutation migrates legacy records and its own change in
+   one replicated state application. Exact stored ownership and complete legacy addresses
+   must agree. Reads before that point enforce ownership without changing state.
+5. Verify tenant-scoped connection, secret-reference and security-event collections,
+   policy versions and opaque references, including dotted identifiers. Retain redacted
+   evidence of the operation and resulting registry schema marker.
+6. If ownership is missing/mismatched or old/new records conflict, the mutation fails
+   closed. Keep traffic quiesced, preserve evidence and escalate for an explicitly reviewed
+   recovery procedure. Do not infer ownership by splitting keys or edit one follower.
+   This release does not supply an automatic ambiguity-repair tool.
+7. After schema-3 writes, reverting only the binaries is unsupported. Restoring the
+   preserved pre-upgrade cluster requires an approved recovery decision and reconciliation
+   of every subsequent operation; it is not a lossless rollback. A record already
+   overwritten by a legacy key collision cannot be reconstructed from its surviving row.
+
+The local test results do not accredit a production deployment. R1 production-filesystem,
+container-recreation and power-loss gates and the R6 release acceptance remain required.
+
+## 12. Pre-execution failure and acknowledgement reconciliation
+
+R3 preparation rejections fail the accepted attempt, assignment and pending transfer
+atomically. They must not create `IN_PROGRESS`, `TRANSFER_STARTED`, or connection-use
+evidence. Request construction and local-path checks precede the start acknowledgement.
+Repeated polls for the same attempt/fencing generation are suppressed in the running
+agent until the original lease expires; this claim cache is not durable recovery state.
+
+The agent sends an attempt-aware report at most three times, retaining the exact payload
+and sequence, with 100 ms and 200 ms retry delays. Transport failures, HTTP 408/429 and
+5xx responses are retryable; a 403/409 rejection is not. Each send has the configured
+agent HTTP idle-timeout in milliseconds as its response deadline. A legacy status
+without attempt identity is sent once.
+
+On `Q-REPORT-UNRESOLVED` after those retries:
+
+1. Preserve the job/attempt identifiers, fencing generation, sequence and redacted
+   diagnostic. A timeout is not evidence that the controller rejected the command.
+2. Query the authoritative leader's transfer, attempt and assignment resources. Compare
+   the last sequence and outcome before deciding on recovery; do not infer authority
+   from a stale follower response.
+3. For an unresolved start, the agent does not execute the transfer or manufacture a
+   `FAILED` report with the next sequence. Verify the committed state and preserve the
+   lease/fence boundary before any reassignment.
+4. For an unresolved terminal report, do not rerun a possibly completed transfer.
+   Reconcile the controller outcome and destination evidence under an approved recovery
+   procedure. Never edit state on one controller or bypass a stale-fence rejection.
+
+Durable agent report-outbox recovery, automatic lease-expiry/reassignment and
+destination reconciliation remain open Phase 2 deliverables. Bounded replay is not
+a claim of automatic recovery across agent restarts or prolonged controller outages.

@@ -9,21 +9,28 @@
  */
 package dev.mars.quorus.controller.raft;
 
+import dev.mars.quorus.controller.config.ControllerTestConfig;
+import dev.mars.quorus.controller.http.HttpApiServer;
 import dev.mars.quorus.controller.raft.storage.RaftStorage;
 import dev.mars.quorus.controller.raft.storage.RaftStorageFactory;
 import dev.mars.quorus.controller.state.CommandResult;
 import dev.mars.quorus.controller.state.QuorusStateStore;
+import dev.mars.quorus.controller.state.SystemMetadataCommand;
 import dev.mars.quorus.controller.state.TransferJobCommand;
 import dev.mars.quorus.core.TransferJob;
 import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferStatus;
 import io.vertx.core.Vertx;
+import io.vertx.core.json.JsonObject;
+import io.vertx.ext.web.client.WebClient;
 import io.vertx.junit5.VertxExtension;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.net.URI;
 import java.nio.file.Path;
@@ -36,6 +43,7 @@ import static dev.mars.quorus.testing.TestFutureUtils.awaitSuccess;
 import static dev.mars.quorus.testing.TestFutureUtils.eventually;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 @ExtendWith(VertxExtension.class)
 @DisplayName("Three-controller durable restart")
@@ -123,6 +131,76 @@ class ThreeControllerDurableRestartTest {
             if (first != null) {
                 stopCluster(first);
             }
+        }
+    }
+
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void registryMigrationSurvivesReplicatedRestartAndHttpQueries(boolean compact, Vertx vertx) {
+        Cluster first = startCluster(vertx, "registry-first");
+        Cluster recovered = null;
+        HttpApiServer api = null;
+        WebClient client = WebClient.create(vertx);
+        try {
+            RaftNode leader = awaitLeader(vertx, first.nodes());
+            QuorusStateStore leaderState = first.states().get(first.nodes().indexOf(leader));
+            String oldKey = "phase4.secret-reference.bank.branch.ledger";
+            JsonObject legacy = new JsonObject()
+                    .put("tenantId", "bank.branch").put("secretReferenceId", "ledger")
+                    .put("provider", "VAULT_KV_V2").put("path", "quorus/data/payments")
+                    .put("key", "password").put("version", "1").put("status", "ACTIVE");
+            assertInstanceOf(CommandResult.Success.class, awaitSuccess(leader.submitCommand(
+                    new SystemMetadataCommand.Set(oldKey, legacy.encode())), TIMEOUT));
+            api = new HttpApiServer(vertx, 0, leader, leaderState,
+                    ControllerTestConfig.create());
+            awaitSuccess(api.start(), TIMEOUT);
+            var created = awaitSuccess(client.post(api.actualPort(), "localhost", "/api/v1/secret-references")
+                    .sendJsonObject(legacy.copy().put("tenantId", "bank").put("secretReferenceId", "branch.ledger")), TIMEOUT);
+            assertEquals(201, created.statusCode());
+            Cluster initial = first;
+            var expected = leaderState.getSystemMetadata();
+            awaitSuccess(eventually(vertx, () -> initial.states().stream().allMatch(state ->
+                    expected.equals(state.getSystemMetadata())),
+                    TIMEOUT), TIMEOUT.plusSeconds(1));
+            assertEquals("2", expected.get("phase4.registry.schema"));
+            assertNull(expected.get(oldKey));
+            for (QuorusStateStore state : first.states()) assertEquals(expected, state.getSystemMetadata());
+            awaitSuccess(api.stop(), TIMEOUT);
+            api = null;
+            if (compact) {
+                for (RaftNode node : first.nodes()) awaitSuccess(node.takeSnapshot(), TIMEOUT);
+            }
+            stopCluster(first);
+            first = null;
+            InMemoryTransportSimulator.clearAllTransports();
+            recovered = startCluster(vertx, "registry-recovered");
+            awaitLeader(vertx, recovered.nodes());
+            Cluster restarted = recovered;
+            awaitSuccess(eventually(vertx, () -> restarted.states().stream().allMatch(state ->
+                    expected.equals(state.getSystemMetadata())), TIMEOUT), TIMEOUT.plusSeconds(1));
+            for (int i = 0; i < recovered.nodes().size(); i++) {
+                QuorusStateStore state = recovered.states().get(i);
+                assertEquals(expected, state.getSystemMetadata());
+                api = new HttpApiServer(vertx, 0, recovered.nodes().get(i), state,
+                        ControllerTestConfig.create());
+                awaitSuccess(api.start(), TIMEOUT);
+                for (String tenant : List.of("bank", "bank.branch")) {
+                    var response = awaitSuccess(client.get(api.actualPort(), "localhost", "/api/v1/secret-references")
+                            .addQueryParam("tenantId", tenant).send(), TIMEOUT);
+                    assertEquals(200, response.statusCode());
+                    var rows = response.bodyAsJsonObject().getJsonArray("secretReferences");
+                    assertEquals(1, rows.size());
+                    assertEquals(tenant, rows.getJsonObject(0).getString("tenantId"));
+                }
+                awaitSuccess(api.stop(), TIMEOUT);
+                api = null;
+            }
+        } finally {
+            client.close();
+            if (api != null) awaitSuccess(api.stop(), TIMEOUT);
+            if (recovered != null) stopCluster(recovered);
+            if (first != null) stopCluster(first);
         }
     }
 

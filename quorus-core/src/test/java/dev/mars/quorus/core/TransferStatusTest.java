@@ -28,6 +28,12 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 
 class TransferStatusTest {
+    @Test
+    void preparationCanFailWithoutPretendingTransferStarted() {
+        assertTrue(TransferStatus.PENDING.canTransitionTo(TransferStatus.FAILED));
+        assertTrue(java.util.List.of(TransferStatus.PENDING.getValidTransitions()).contains(TransferStatus.FAILED));
+        assertFalse(TransferStatus.PENDING.canTransitionTo(TransferStatus.COMPLETED));
+    }
     
     @Test
     void testIsTerminal() {

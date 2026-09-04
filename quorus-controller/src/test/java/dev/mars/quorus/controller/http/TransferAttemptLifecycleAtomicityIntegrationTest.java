@@ -29,9 +29,9 @@ import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.client.WebClient;
 import io.vertx.junit5.VertxExtension;
-import io.vertx.junit5.VertxTestContext;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.net.URI;
@@ -43,6 +43,7 @@ import java.util.Set;
 import static dev.mars.quorus.testing.TestFutureUtils.awaitSuccess;
 import static dev.mars.quorus.testing.TestFutureUtils.eventually;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** External proof that a rejected lifecycle report cannot leave partial authoritative state. */
 @ExtendWith(VertxExtension.class)
@@ -61,8 +62,10 @@ class TransferAttemptLifecycleAtomicityIntegrationTest {
         if (vertx != null) awaitSuccess(vertx.close(), Duration.ofSeconds(5));
     }
 
-    @Test
-    void rejectedTransferTransitionLeavesAttemptAndAssignmentUnchanged(VertxTestContext context) throws Exception {
+    @ParameterizedTest
+    @CsvSource({"true,IN_PROGRESS,256", "true,FAILED,0", "false,FAILED,0"})
+    void preExecutionFailureIsAtomicAndCannotOverwriteCancellation(boolean cancelled, String status, long bytes)
+            throws Exception {
         String nodeId = "attempt-lifecycle-atomicity-node";
         String tenantId = "payments-operations";
         String agentId = "agent-payments-atomicity";
@@ -124,8 +127,10 @@ class TransferAttemptLifecycleAtomicityIntegrationTest {
                 attemptId, 1, 1, TransferAttemptStatus.OFFERED, TransferAttemptStatus.ACCEPTED,
                 0, TransferAttemptOutcome.NONE, null, created.plusSeconds(1))), Duration.ofSeconds(5));
         awaitSuccess(raftNode.submitCommand(JobAssignmentCommand.accept(jobId + ":" + agentId)), Duration.ofSeconds(5));
-        awaitSuccess(raftNode.submitCommand(TransferJobCommand.updateStatus(
-                jobId, TransferStatus.PENDING, TransferStatus.CANCELLED)), Duration.ofSeconds(5));
+        if (cancelled) {
+            awaitSuccess(raftNode.submitCommand(TransferJobCommand.updateStatus(
+                    jobId, TransferStatus.PENDING, TransferStatus.CANCELLED)), Duration.ofSeconds(5));
+        }
 
         httpServer = new HttpApiServer(vertx, 0, raftNode, stateStore, ControllerTestConfig.create());
         awaitSuccess(httpServer.start(), Duration.ofSeconds(5));
@@ -133,25 +138,59 @@ class TransferAttemptLifecycleAtomicityIntegrationTest {
 
         JsonObject report = new JsonObject()
                 .put("agentId", agentId)
-                .put("status", "IN_PROGRESS")
+                .put("status", status)
                 .put("attemptId", attemptId)
                 .put("expectedState", "ACCEPTED")
                 .put("fencingGeneration", 1L)
                 .put("reportSequence", 2L)
-                .put("bytesTransferred", 256L);
+                .put("bytesTransferred", bytes)
+                .put("errorMessage", "Q-SECRET-UNAVAILABLE");
 
-        webClient.post(httpServer.actualPort(), "localhost", "/api/v1/jobs/" + jobId + "/status")
-                .sendJsonObject(report)
-                .onComplete(context.succeeding(response -> context.verify(() -> {
-                    assertEquals(409, response.statusCode());
-                    TransferAttempt unchangedAttempt = stateStore.findTransferAttempt(attemptId).orElseThrow();
-                    assertEquals(TransferAttemptStatus.ACCEPTED, unchangedAttempt.getStatus());
-                    assertEquals(1L, unchangedAttempt.getLastReportSequence());
-                    assertEquals(0L, unchangedAttempt.getBytesTransferred());
-                    assertEquals(JobAssignmentStatus.ACCEPTED,
-                            stateStore.findJobAssignment(jobId + ":" + agentId).orElseThrow().getStatus());
-                    assertEquals(TransferStatus.CANCELLED, stateStore.findTransferJob(jobId).orElseThrow().getStatus());
-                    context.completeNow();
-                })));
+        if (!cancelled) {
+            for (JsonObject invalid : java.util.List.of(
+                    report.copy().put("reportSequence", 1L),
+                    report.copy().put("reportSequence", 3L),
+                    report.copy().put("fencingGeneration", 2L),
+                    report.copy().put("expectedState", "IN_PROGRESS"))) {
+                var rejected = awaitSuccess(webClient.post(httpServer.actualPort(), "localhost",
+                        "/api/v1/jobs/" + jobId + "/status").sendJsonObject(invalid), Duration.ofSeconds(5));
+                assertEquals(409, rejected.statusCode());
+                assertEquals(1L, stateStore.findTransferAttempt(attemptId).orElseThrow().getLastReportSequence());
+                assertEquals(TransferStatus.PENDING, stateStore.findTransferJob(jobId).orElseThrow().getStatus());
+                assertEquals(JobAssignmentStatus.ACCEPTED,
+                        stateStore.findJobAssignment(jobId + ":" + agentId).orElseThrow().getStatus());
+            }
+        }
+        var response = awaitSuccess(webClient.post(httpServer.actualPort(), "localhost",
+                "/api/v1/jobs/" + jobId + "/status").sendJsonObject(report), Duration.ofSeconds(5));
+        assertEquals(cancelled ? 409 : 200, response.statusCode());
+        TransferAttempt unchangedAttempt = stateStore.findTransferAttempt(attemptId).orElseThrow();
+        assertEquals(cancelled ? TransferAttemptStatus.ACCEPTED : TransferAttemptStatus.FAILED, unchangedAttempt.getStatus());
+        assertEquals(cancelled ? 1L : 2L, unchangedAttempt.getLastReportSequence());
+        assertEquals(0L, unchangedAttempt.getBytesTransferred());
+        assertEquals(cancelled ? JobAssignmentStatus.ACCEPTED : JobAssignmentStatus.FAILED,
+                stateStore.findJobAssignment(jobId + ":" + agentId).orElseThrow().getStatus());
+        assertEquals(cancelled ? TransferStatus.CANCELLED : TransferStatus.FAILED,
+                stateStore.findTransferJob(jobId).orElseThrow().getStatus());
+        if (!cancelled) {
+            assertEquals(TransferAttemptOutcome.TERMINAL_FAILURE, unchangedAttempt.getOutcome());
+            assertTrue(stateStore.findActiveTransferAttempt(jobId).isEmpty());
+            var retry = awaitSuccess(webClient.post(httpServer.actualPort(), "localhost",
+                    "/api/v1/jobs/" + jobId + "/status").sendJsonObject(report), Duration.ofSeconds(5));
+            assertEquals(200, retry.statusCode(), "Lost terminal acknowledgement must be replayable");
+            var stale = awaitSuccess(webClient.post(httpServer.actualPort(), "localhost",
+                    "/api/v1/jobs/" + jobId + "/status")
+                    .sendJsonObject(report.copy().put("fencingGeneration", 2L)), Duration.ofSeconds(5));
+            assertEquals(409, stale.statusCode());
+            assertTrue(stateStore.findTransferEvents(jobId).stream()
+                    .noneMatch(event -> "TRANSFER_STARTED".equals(event.eventType())));
+            QuorusStateStore restored = new QuorusStateStore();
+            restored.restoreSnapshot(stateStore.takeSnapshot());
+            assertEquals(TransferAttemptStatus.FAILED, restored.findTransferAttempt(attemptId).orElseThrow().getStatus());
+            assertEquals(TransferStatus.FAILED, restored.findTransferJob(jobId).orElseThrow().getStatus());
+            assertEquals(JobAssignmentStatus.FAILED,
+                    restored.findJobAssignment(jobId + ":" + agentId).orElseThrow().getStatus());
+            assertTrue(restored.findActiveTransferAttempt(jobId).isEmpty());
+        }
     }
 }

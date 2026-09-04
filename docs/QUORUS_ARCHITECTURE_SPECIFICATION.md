@@ -2,7 +2,7 @@
 
 # Quorus Architecture Specification
 
-**Version:** 2.5  
+**Version:** 2.7  
 **Date:** 2026-09-04  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
@@ -178,6 +178,26 @@ Every replicated command MUST be deterministic and MUST enforce invariants at st
 
 ### 5.4 Read consistency
 
+Service connections, opaque secret references and security events use registry key schema 2:
+`phase4.v2.<kind>.<tenant>:<resource>`. The separator is forbidden in both validated
+identifier components, so dotted tenant/resource IDs cannot collide. Projections validate
+stored ownership and collection filtering uses exact tenant equality. Replicated v2
+mutations validate key/payload ownership in `QuorusStateStore`; HTTP checks alone are
+not the authority.
+
+The first successful v2 registry mutation atomically migrates all validated legacy registry
+records and publishes the mutation together. Migration derives ownership from the stored
+payload and verifies its complete legacy address; it never guesses a split at a dot.
+Missing/mismatched ownership or conflicting old/new records fail closed without partial
+writes. Reads do not migrate. The replicated `phase4.registry.schema=2` marker prevents
+later legacy-key mutations. Already overwritten legacy records cannot be reconstructed.
+
+Raft command envelopes and state snapshots now write schema 3 and retain readers for
+versions 0–3. Schema-2 binaries cannot read the new state. A coordinated upgrade is
+required; mixed-version operation and binary-only rollback after new writes are not
+supported. Preserve all controller WALs and snapshots before upgrading; see the
+[Security Deployment Guide](QUORUS_SECURITY_DEPLOYMENT_GUIDE.md#11-registry-isolation-upgrade-and-recovery).
+
 Committed Raft writes are strongly ordered. This does not make every HTTP read linearizable.
 
 - A read served from a follower is a **stale-tolerant read** and may lag the leader.
@@ -260,12 +280,19 @@ Where atomic publication or fencing is unavailable, the adapter MUST declare wea
 | Controller leader failure before commit | Client receives failure/timeout and may retry with the same idempotency key |
 | Leader failure after commit but before response | Retry returns the committed result rather than creating a duplicate |
 | Agent disappears before `IN_PROGRESS` | Assignment may expire and be reassigned |
+| Agent rejects preparation after acceptance | Atomically fail the accepted attempt, assignment and pending transfer; do not synthesize `IN_PROGRESS` or transfer-start evidence |
+| Status acknowledgement is lost | Replay the exact attempt/fence/sequence/payload; never allocate the next sequence to repair uncertainty |
 | Agent disappears during transfer | Controller waits for lease expiry; a new attempt uses a higher fencing generation |
 | Agent completes destination write but loses acknowledgement | Reconciliation inspects the attempt and destination evidence before retrying |
 | Minority controller partition | Minority rejects writes; stale reads must be identified as such |
 | Destination cannot support atomic publish | Adapter reports weaker semantics and cleanup requirements |
 
 ## 7. Canonical Data Plane
+
+The current agent performs bounded status replay (three sends) for transient failures.
+If acknowledgement remains unresolved, it logs `Q-REPORT-UNRESOLVED` and does not start
+file I/O. Automatic durable report-outbox recovery and destination reconciliation
+remain Phase 2 work; operators must not equate a reporting timeout with a failed transfer.
 
 The current distributed data plane is single-agent execution:
 
