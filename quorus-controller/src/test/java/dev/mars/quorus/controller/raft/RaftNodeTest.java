@@ -19,7 +19,7 @@ package dev.mars.quorus.controller.raft;
 import dev.mars.quorus.controller.raft.storage.InMemoryRaftStorage;
 import dev.mars.quorus.controller.raft.storage.RaftStorage;
 import dev.mars.quorus.controller.raft.storage.RaftStorage.LogEntryData;
-import dev.mars.quorus.controller.raft.storage.file.FileRaftStorage;
+import dev.mars.quorus.controller.raft.storage.RaftStorageFactory;
 import dev.mars.quorus.controller.raft.grpc.AppendEntriesRequest;
 import dev.mars.quorus.controller.raft.grpc.AppendEntriesResponse;
 import dev.mars.quorus.controller.raft.grpc.InstallSnapshotRequest;
@@ -28,7 +28,6 @@ import dev.mars.quorus.controller.raft.grpc.VoteRequest;
 import dev.mars.quorus.controller.raft.grpc.VoteResponse;
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
-import io.vertx.core.WorkerExecutor;
 import io.vertx.junit5.VertxExtension;
 import dev.mars.quorus.controller.state.CommandResult;
 import dev.mars.quorus.controller.state.ProtobufCommandCodec;
@@ -445,11 +444,10 @@ class RaftNodeTest {
 
     @Test
     void testRejectHigherTermVoteWithStaleCandidateLogPersistsTermAcrossRestart() {
-        WorkerExecutor executor = vertx.createSharedWorkerExecutor("vote-persist-test", 1);
         Path storageDir = tempDir.resolve("vote-reject-higher-term");
 
-        RaftStorage storage = new FileRaftStorage(vertx, executor);
-        awaitSuccess(storage.open(storageDir), SHORT_TIMEOUT);
+        RaftStorage storage = awaitSuccess(
+                RaftStorageFactory.create(vertx, "raftlog", storageDir, true), SHORT_TIMEOUT);
 
         Set<String> singleNodeCluster = Set.of("node1");
         RaftNode durableNode = RaftNode.builder().vertx(vertx).nodeId("node1").clusterNodes(singleNodeCluster)
@@ -479,9 +477,8 @@ class RaftNodeTest {
 
         awaitSuccess(durableNode.stop(), SHORT_TIMEOUT);
 
-        WorkerExecutor recoveryExecutor = vertx.createSharedWorkerExecutor("vote-persist-recovery-test", 1);
-        RaftStorage recoveryStorage = new FileRaftStorage(vertx, recoveryExecutor);
-        awaitSuccess(recoveryStorage.open(storageDir), SHORT_TIMEOUT);
+        RaftStorage recoveryStorage = awaitSuccess(
+                RaftStorageFactory.create(vertx, "raftlog", storageDir, true), SHORT_TIMEOUT);
 
         RaftNode recovered = RaftNode.builder().vertx(vertx).nodeId("node1")
             .clusterNodes(singleNodeCluster)
@@ -498,17 +495,14 @@ class RaftNodeTest {
             "Higher observed term must be durable after rejecting stale candidate to prevent term regression");
 
         awaitSuccess(recovered.stop(), SHORT_TIMEOUT);
-        executor.close();
-        recoveryExecutor.close();
     }
 
     @Test
     void testRejectHigherTermVoteWithStaleCandidateLogPersistsEmptyVoteAcrossRestart() {
-        WorkerExecutor executor = vertx.createSharedWorkerExecutor("vote-persist-vote-state-test", 1);
         Path storageDir = tempDir.resolve("vote-reject-higher-term-empty-vote");
 
-        RaftStorage storage = new FileRaftStorage(vertx, executor);
-        awaitSuccess(storage.open(storageDir), SHORT_TIMEOUT);
+        RaftStorage storage = awaitSuccess(
+                RaftStorageFactory.create(vertx, "raftlog", storageDir, true), SHORT_TIMEOUT);
 
         Set<String> singleNodeCluster = Set.of("node1");
         RaftNode durableNode = RaftNode.builder().vertx(vertx).nodeId("node1").clusterNodes(singleNodeCluster)
@@ -538,9 +532,8 @@ class RaftNodeTest {
 
         awaitSuccess(durableNode.stop(), SHORT_TIMEOUT);
 
-        WorkerExecutor recoveryExecutor = vertx.createSharedWorkerExecutor("vote-persist-vote-state-recovery-test", 1);
-        RaftStorage recoveryStorage = new FileRaftStorage(vertx, recoveryExecutor);
-        awaitSuccess(recoveryStorage.open(storageDir), SHORT_TIMEOUT);
+        RaftStorage recoveryStorage = awaitSuccess(
+                RaftStorageFactory.create(vertx, "raftlog", storageDir, true), SHORT_TIMEOUT);
 
         RaftStorage.PersistentMeta persistedMeta = awaitSuccess(recoveryStorage.loadMetadata(), SHORT_TIMEOUT);
 
@@ -550,8 +543,6 @@ class RaftNodeTest {
             "No candidate should be persisted when vote is rejected");
 
         awaitSuccess(recoveryStorage.close(), SHORT_TIMEOUT);
-        executor.close();
-        recoveryExecutor.close();
     }
 
     @Test

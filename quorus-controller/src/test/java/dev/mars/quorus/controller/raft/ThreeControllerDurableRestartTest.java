@@ -10,7 +10,7 @@
 package dev.mars.quorus.controller.raft;
 
 import dev.mars.quorus.controller.raft.storage.RaftStorage;
-import dev.mars.quorus.controller.raft.storage.file.FileRaftStorage;
+import dev.mars.quorus.controller.raft.storage.RaftStorageFactory;
 import dev.mars.quorus.controller.state.CommandResult;
 import dev.mars.quorus.controller.state.QuorusStateStore;
 import dev.mars.quorus.controller.state.TransferJobCommand;
@@ -18,7 +18,6 @@ import dev.mars.quorus.core.TransferJob;
 import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferStatus;
 import io.vertx.core.Vertx;
-import io.vertx.core.WorkerExecutor;
 import io.vertx.junit5.VertxExtension;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -114,14 +113,11 @@ class ThreeControllerDurableRestartTest {
     private Cluster startCluster(Vertx vertx, String generation) {
         List<RaftNode> nodes = new ArrayList<>();
         List<QuorusStateStore> states = new ArrayList<>();
-        List<WorkerExecutor> executors = new ArrayList<>();
         int nodePosition = 0;
         for (String nodeId : NODE_IDS.stream().sorted().toList()) {
-            WorkerExecutor executor = vertx.createSharedWorkerExecutor(
-                    "phase0-three-controller-" + generation + "-" + nodeId, 1);
-            executors.add(executor);
-            RaftStorage storage = new FileRaftStorage(vertx, executor);
-            awaitSuccess(storage.open(tempDir.resolve(nodeId).resolve("raft")), TIMEOUT);
+            RaftStorage storage = awaitSuccess(
+                    RaftStorageFactory.create(vertx, "raftlog", tempDir.resolve(nodeId).resolve("raft"), true),
+                    TIMEOUT);
             QuorusStateStore state = new QuorusStateStore();
             states.add(state);
             RaftNode node = RaftNode.builder()
@@ -142,7 +138,7 @@ class ThreeControllerDurableRestartTest {
             nodePosition++;
         }
         nodes.forEach(node -> awaitSuccess(node.start(), TIMEOUT));
-        return new Cluster(nodes, states, executors);
+        return new Cluster(nodes, states);
     }
 
     private static RaftNode awaitLeader(Vertx vertx, List<RaftNode> nodes) {
@@ -153,11 +149,9 @@ class ThreeControllerDurableRestartTest {
 
     private static void stopCluster(Cluster cluster) {
         cluster.nodes().forEach(node -> awaitSuccess(node.stop(), TIMEOUT));
-        cluster.executors().forEach(executor -> awaitSuccess(executor.close(), TIMEOUT));
     }
 
     private record Cluster(List<RaftNode> nodes,
-                           List<QuorusStateStore> states,
-                           List<WorkerExecutor> executors) {
+                           List<QuorusStateStore> states) {
     }
 }
