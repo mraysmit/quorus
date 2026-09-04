@@ -2,7 +2,7 @@
 
 # Quorus Architecture Specification
 
-**Version:** 2.4  
+**Version:** 2.5  
 **Date:** 2026-09-04  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
@@ -189,7 +189,7 @@ Committed Raft writes are strongly ordered. This does not make every HTTP read l
 
 - Every production controller MUST use a durable storage backend and an explicitly mounted storage path.
 - A blank storage path MUST be treated as invalid or replaced with the documented durable default.
-- Memory storage is test-only.
+- The external `raftlog-core` library is the only WAL and Raft metadata storage implementation. Internal file, RocksDB and memory storage backends are not supported, including in storage-dependent tests; tests use the external adapter with isolated temporary directories.
 - A controller MUST recover its term, vote, log, snapshot, and applied state after container recreation.
 - WAL prefix deletion MUST follow durable publication of a covering snapshot. Recovery MUST reject a missing or invalid snapshot when durable compaction evidence requires it. Snapshot installation MUST preserve only a matching log suffix, including after restart. The R1 remediation implements these storage boundaries; release remains subject to the reopened enterprise remediation checkpoint and deployment-specific durability validation.
 - Backups MUST be validated by restore tests; copying a live directory without a storage-specific consistency procedure is not sufficient.

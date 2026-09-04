@@ -204,6 +204,7 @@ spec:
 Variable substitution uses `{{variable}}` syntax. Parser: `YamlWorkflowDefinitionParser` (uses static singleton for performance).
 
 ## Raft Consensus (quorus-controller)
+- Storage uses only the external `raftlog-core` library through `RaftLogStorageAdapter`. Do not add internal WAL, RocksDB or memory storage backends. Storage-dependent tests use the real adapter and per-test temporary directories; fault injection wraps real I/O. Quorus's snapshot sidecar is not a WAL.
 - `RaftNode` manages state: FOLLOWER → CANDIDATE → LEADER
 - `GrpcRaftTransport` handles inter-node communication
 - `QuorusStateMachine` applies committed log entries

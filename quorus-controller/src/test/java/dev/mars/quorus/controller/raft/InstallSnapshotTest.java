@@ -17,7 +17,8 @@
 package dev.mars.quorus.controller.raft;
 
 import dev.mars.quorus.controller.raft.grpc.InstallSnapshotRequest;
-import dev.mars.quorus.controller.raft.storage.InMemoryRaftStorage;
+import dev.mars.quorus.controller.raft.storage.RaftLogStorageAdapter;
+import dev.mars.quorus.controller.raft.storage.RaftStorage;
 import dev.mars.quorus.controller.state.QuorusStateStore;
 import dev.mars.quorus.controller.state.SystemMetadataCommand;
 import io.vertx.core.Future;
@@ -52,9 +53,13 @@ import static org.junit.jupiter.api.Assertions.*;
 @ExtendWith(VertxExtension.class)
 class InstallSnapshotTest {
 
+    @org.junit.jupiter.api.io.TempDir
+    Path tempDir;
+    private final java.util.List<RaftNode> nodes = new java.util.ArrayList<>();
+
     private Vertx vertx;
-    private InMemoryRaftStorage leaderStorage;
-    private InMemoryRaftStorage followerStorage;
+    private RaftStorage leaderStorage;
+    private RaftStorage followerStorage;
 
     @BeforeEach
     void setUp(Vertx vertx) {
@@ -64,6 +69,7 @@ class InstallSnapshotTest {
 
     @AfterEach
     void tearDown() {
+        awaitSuccess(Future.all(nodes.stream().map(RaftNode::stop).toList()), Duration.ofSeconds(10));
         InMemoryTransportSimulator.clearAllTransports();
     }
 
@@ -77,9 +83,9 @@ class InstallSnapshotTest {
      */
     @Test
     void testLeaderSendsSnapshotToLaggingFollower(VertxTestContext ctx) throws Throwable {
-        leaderStorage = new InMemoryRaftStorage();
-        followerStorage = new InMemoryRaftStorage();
-        InMemoryRaftStorage node2Storage = new InMemoryRaftStorage();
+        leaderStorage = new RaftLogStorageAdapter(vertx, true);
+        followerStorage = new RaftLogStorageAdapter(vertx, true);
+        RaftStorage node2Storage = new RaftLogStorageAdapter(vertx, true);
 
         Set<String> cluster = Set.of("node1", "node2", "node3");
 
@@ -94,21 +100,24 @@ class InstallSnapshotTest {
         RaftNode node1 = RaftNode.builder().vertx(vertx).nodeId("node1").clusterNodes(cluster).transport(t1).stateMachine(sm1).mode(RaftNodeMode.durable(leaderStorage))
                 .electionTimeout(1000).heartbeatInterval(200)
                 .snapshotEnabled(true).snapshotThreshold(5).snapshotCheckInterval(300).build();
+        nodes.add(node1);
         RaftNode node2 = RaftNode.builder().vertx(vertx).nodeId("node2").clusterNodes(cluster).transport(t2).stateMachine(sm2).mode(RaftNodeMode.durable(node2Storage))
                 .electionTimeout(1500).heartbeatInterval(200)
                 .snapshotEnabled(true).snapshotThreshold(5).snapshotCheckInterval(300).build();
+        nodes.add(node2);
         RaftNode node3 = RaftNode.builder().vertx(vertx).nodeId("node3").clusterNodes(cluster).transport(t3).stateMachine(sm3).mode(RaftNodeMode.durable(followerStorage))
                 .electionTimeout(15000).heartbeatInterval(200)
                 .snapshotEnabled(true).snapshotThreshold(5).snapshotCheckInterval(300).build();
+        nodes.add(node3);
 
         AtomicReference<RaftNode> leaderRef = new AtomicReference<>();
 
         // Partition node3, then start all nodes and submit commands (fire-and-forget)
         InMemoryTransportSimulator.createPartition(Set.of("node1", "node2"), Set.of("node3"));
 
-        leaderStorage.open(Path.of("/tmp/t1-1"))
-                .compose(v -> node2Storage.open(Path.of("/tmp/t1-2")))
-                .compose(v -> followerStorage.open(Path.of("/tmp/t1-3")))
+        leaderStorage.open(tempDir.resolve("t1-1"))
+                .compose(v -> node2Storage.open(tempDir.resolve("t1-2")))
+                .compose(v -> followerStorage.open(tempDir.resolve("t1-3")))
                 .compose(v -> node1.start())
                 .compose(v -> node2.start())
                 .compose(v -> node3.start());
@@ -149,7 +158,7 @@ class InstallSnapshotTest {
                     }
                 });
 
-        node1.stop(); node2.stop(); node3.stop();
+        // Nodes are stopped and disk storage closed by tearDown.
         ctx.completeNow();
 
         assertTrue(ctx.awaitCompletion(5, TimeUnit.SECONDS), "Test timed out");
@@ -162,9 +171,9 @@ class InstallSnapshotTest {
      */
     @Test
     void testFollowerStateMachineRestoredBySnapshot(VertxTestContext ctx) throws Throwable {
-        leaderStorage = new InMemoryRaftStorage();
-        followerStorage = new InMemoryRaftStorage();
-        InMemoryRaftStorage node2Storage = new InMemoryRaftStorage();
+        leaderStorage = new RaftLogStorageAdapter(vertx, true);
+        followerStorage = new RaftLogStorageAdapter(vertx, true);
+        RaftStorage node2Storage = new RaftLogStorageAdapter(vertx, true);
 
         Set<String> cluster = Set.of("node1", "node2", "node3");
 
@@ -179,19 +188,22 @@ class InstallSnapshotTest {
         RaftNode node1 = RaftNode.builder().vertx(vertx).nodeId("node1").clusterNodes(cluster).transport(t1).stateMachine(sm1).mode(RaftNodeMode.durable(leaderStorage))
                 .electionTimeout(1000).heartbeatInterval(200)
                 .snapshotEnabled(true).snapshotThreshold(5).snapshotCheckInterval(300).build();
+        nodes.add(node1);
         RaftNode node2 = RaftNode.builder().vertx(vertx).nodeId("node2").clusterNodes(cluster).transport(t2).stateMachine(sm2).mode(RaftNodeMode.durable(node2Storage))
                 .electionTimeout(1500).heartbeatInterval(200)
                 .snapshotEnabled(true).snapshotThreshold(5).snapshotCheckInterval(300).build();
+        nodes.add(node2);
         RaftNode node3 = RaftNode.builder().vertx(vertx).nodeId("node3").clusterNodes(cluster).transport(t3).stateMachine(sm3).mode(RaftNodeMode.durable(followerStorage))
                 .electionTimeout(15000).heartbeatInterval(200)
                 .snapshotEnabled(true).snapshotThreshold(5).snapshotCheckInterval(300).build();
+        nodes.add(node3);
 
         // Partition node3
         InMemoryTransportSimulator.createPartition(Set.of("node1", "node2"), Set.of("node3"));
 
-        leaderStorage.open(Path.of("/tmp/t2-1"))
-                .compose(v -> node2Storage.open(Path.of("/tmp/t2-2")))
-                .compose(v -> followerStorage.open(Path.of("/tmp/t2-3")))
+        leaderStorage.open(tempDir.resolve("t2-1"))
+                .compose(v -> node2Storage.open(tempDir.resolve("t2-2")))
+                .compose(v -> followerStorage.open(tempDir.resolve("t2-3")))
                 .compose(v -> node1.start())
                 .compose(v -> node2.start())
                 .compose(v -> node3.start());
@@ -240,7 +252,7 @@ class InstallSnapshotTest {
                     assertEquals("value8", sm3.getMetadata("key8"), "Post-snapshot replicated data");
                 });
 
-        node1.stop(); node2.stop(); node3.stop();
+        // Nodes are stopped and disk storage closed by tearDown.
         ctx.completeNow();
 
         assertTrue(ctx.awaitCompletion(5, TimeUnit.SECONDS), "Test timed out");
@@ -252,9 +264,9 @@ class InstallSnapshotTest {
      */
     @Test
     void testLeaderUpdatesIndicesAfterSnapshotInstall(VertxTestContext ctx) throws Throwable {
-        leaderStorage = new InMemoryRaftStorage();
-        followerStorage = new InMemoryRaftStorage();
-        InMemoryRaftStorage node2Storage = new InMemoryRaftStorage();
+        leaderStorage = new RaftLogStorageAdapter(vertx, true);
+        followerStorage = new RaftLogStorageAdapter(vertx, true);
+        RaftStorage node2Storage = new RaftLogStorageAdapter(vertx, true);
 
         Set<String> cluster = Set.of("node1", "node2", "node3");
 
@@ -269,18 +281,21 @@ class InstallSnapshotTest {
         RaftNode node1 = RaftNode.builder().vertx(vertx).nodeId("node1").clusterNodes(cluster).transport(t1).stateMachine(sm1).mode(RaftNodeMode.durable(leaderStorage))
                 .electionTimeout(1000).heartbeatInterval(200)
                 .snapshotEnabled(true).snapshotThreshold(5).snapshotCheckInterval(300).build();
+        nodes.add(node1);
         RaftNode node2 = RaftNode.builder().vertx(vertx).nodeId("node2").clusterNodes(cluster).transport(t2).stateMachine(sm2).mode(RaftNodeMode.durable(node2Storage))
                 .electionTimeout(1500).heartbeatInterval(200)
                 .snapshotEnabled(true).snapshotThreshold(5).snapshotCheckInterval(300).build();
+        nodes.add(node2);
         RaftNode node3 = RaftNode.builder().vertx(vertx).nodeId("node3").clusterNodes(cluster).transport(t3).stateMachine(sm3).mode(RaftNodeMode.durable(followerStorage))
                 .electionTimeout(15000).heartbeatInterval(200)
                 .snapshotEnabled(true).snapshotThreshold(5).snapshotCheckInterval(300).build();
+        nodes.add(node3);
 
         InMemoryTransportSimulator.createPartition(Set.of("node1", "node2"), Set.of("node3"));
 
-        leaderStorage.open(Path.of("/tmp/t3-1"))
-                .compose(v -> node2Storage.open(Path.of("/tmp/t3-2")))
-                .compose(v -> followerStorage.open(Path.of("/tmp/t3-3")))
+        leaderStorage.open(tempDir.resolve("t3-1"))
+                .compose(v -> node2Storage.open(tempDir.resolve("t3-2")))
+                .compose(v -> followerStorage.open(tempDir.resolve("t3-3")))
                 .compose(v -> node1.start())
                 .compose(v -> node2.start())
                 .compose(v -> node3.start());
@@ -318,7 +333,7 @@ class InstallSnapshotTest {
                                     "nextIdx=" + nextIdx + ", snapIdx=" + leaderSnapIdx);
                 });
 
-        node1.stop(); node2.stop(); node3.stop();
+        // Nodes are stopped and disk storage closed by tearDown.
         ctx.completeNow();
 
         assertTrue(ctx.awaitCompletion(5, TimeUnit.SECONDS), "Test timed out");
@@ -333,7 +348,7 @@ class InstallSnapshotTest {
      */
     @Test
     void testFollowerRejectsStaleTermSnapshot(VertxTestContext ctx) throws Throwable {
-        InMemoryRaftStorage storage = new InMemoryRaftStorage();
+        RaftStorage storage = new RaftLogStorageAdapter(vertx, true);
         InMemoryTransportSimulator transport = new InMemoryTransportSimulator("node1");
         QuorusStateStore sm = new QuorusStateStore();
         Set<String> cluster = Set.of("node1");
@@ -341,8 +356,9 @@ class InstallSnapshotTest {
         RaftNode node = RaftNode.builder().vertx(vertx).nodeId("node1").clusterNodes(cluster).transport(transport).stateMachine(sm).mode(RaftNodeMode.durable(storage))
                 .electionTimeout(1000).heartbeatInterval(200)
                 .snapshotEnabled(false).snapshotThreshold(100).snapshotCheckInterval(5000).build();
+        nodes.add(node);
 
-        storage.open(Path.of("/tmp/stale-test")).onComplete(ctx.succeeding(v -> {
+        storage.open(tempDir.resolve("stale-test")).onComplete(ctx.succeeding(v -> {
             node.start().onComplete(ctx.succeeding(v2 -> {
                 node.awaitState(RaftNode.State.LEADER, 5000).onComplete(ctx.succeeding(state -> {
 
@@ -366,7 +382,7 @@ class InstallSnapshotTest {
                             assertTrue(response.getTerm() > 0,
                                     "Response should include current term");
                         });
-                        node.stop();
+                        // Nodes are stopped and disk storage closed by tearDown.
                         ctx.completeNow();
                     }));
                 }));
@@ -430,7 +446,7 @@ class InstallSnapshotTest {
      */
     @Test
     void testFollowerPersistsInstalledSnapshot(VertxTestContext ctx) throws Throwable {
-        InMemoryRaftStorage storage = new InMemoryRaftStorage();
+        RaftStorage storage = new RaftLogStorageAdapter(vertx, true);
         InMemoryTransportSimulator transport = new InMemoryTransportSimulator("follower-persist");
         QuorusStateStore sm = new QuorusStateStore();
         Set<String> cluster = Set.of("follower-persist");
@@ -438,8 +454,9 @@ class InstallSnapshotTest {
         RaftNode node = RaftNode.builder().vertx(vertx).nodeId("follower-persist").clusterNodes(cluster).transport(transport).stateMachine(sm).mode(RaftNodeMode.durable(storage))
                 .electionTimeout(15000).heartbeatInterval(200)
                 .snapshotEnabled(false).snapshotThreshold(100).snapshotCheckInterval(5000).build();
+        nodes.add(node);
 
-        storage.open(Path.of("/tmp/persist-test")).onComplete(ctx.succeeding(v -> {
+        storage.open(tempDir.resolve("persist-test")).onComplete(ctx.succeeding(v -> {
             node.start().onComplete(ctx.succeeding(v2 -> {
 
                 // Build a realistic snapshot: serialize some state machine data
@@ -482,7 +499,7 @@ class InstallSnapshotTest {
                             assertEquals(10, node.getSnapshotLastIndex());
                             assertEquals(1, node.getSnapshotLastTerm());
                         });
-                        node.stop();
+                        // Nodes are stopped and disk storage closed by tearDown.
                         ctx.completeNow();
                     }));
                 }));

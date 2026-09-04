@@ -2,8 +2,8 @@
 
 # Quorus Architecture Quickstart
 
-**Version:** 2.2  
-**Date:** 2026-09-01  
+**Version:** 2.3  
+**Date:** 2026-09-04  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Scope:** Current implementation snapshot
@@ -41,7 +41,7 @@ Current controller defaults come from `AppConfig`:
 
 - HTTP port: `8080`
 - Raft port: `9080`
-- Raft storage type: `file`
+- Raft storage type: `raftlog` (external library only)
 - Snapshot enabled: `true`
 - Snapshot threshold: `10000` entries
 - Snapshot eligibility check interval: `60000` ms

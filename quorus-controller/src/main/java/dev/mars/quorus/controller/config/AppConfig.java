@@ -438,9 +438,9 @@ public final class AppConfig {
 
         // Validate storage type
         String storageType = getRaftStorageType();
-        if (!storageType.equals("raftlog") && !storageType.equals("memory")) {
+        if (!storageType.equals("raftlog")) {
             throw new IllegalStateException(
-                    "Raft storage type must be 'raftlog' or 'memory', got: " + storageType);
+                    "Raft storage type must be 'raftlog', got: " + storageType);
         }
 
         logger.info("Controller configuration validated successfully");

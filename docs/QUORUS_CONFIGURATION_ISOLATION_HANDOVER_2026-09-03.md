@@ -2,14 +2,31 @@
 
 # Quorus Configuration Isolation Handover — 2026-09-03
 
-**Version:** 1.0  
-**Date:** 2026-09-03  
+**Version:** 1.1  
+**Date:** 2026-09-04  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Status:** Superseded — see the post-handover status below  
-**Scope:** Working tree on `master` at commit `fab72a6` as inspected on 2026-09-03
+**Scope:** Original configuration handover at `fab72a6`, with remediation updates through `038da9f` and the uncommitted external-library-only removal
 
 ## Post-handover status — 2026-09-04
+
+**External-library-only follow-up:** the internal file WAL was already removed, but RocksDB and memory backends remained. Those implementations, their factory branches, `createInMemory()`, backend-specific tests and RocksDB JNI dependency are now removed. Storage-dependent controller, election and snapshot tests use the external adapter. Seven behavioral rejection cases retain red/green evidence; production code contains only `RaftLogStorageAdapter` as a `RaftStorage` implementation. Quorus retains its Vert.x interface and application-snapshot sidecar, neither of which implements a WAL.
+
+**Current commit boundary:** `038da9f` (`fix(raft): persist snapshots and recover safely after compaction`) contains the R1 snapshot recovery remediation. The external-library-only removal described above is the subsequent uncommitted change. No commit was created as part of this handover update. The snapshot sidecar must remain while `raftlog-core` 1.2.0 has no snapshot API; removing it would reintroduce the snapshot-compaction recovery defect.
+
+**Verification of the removal:** tests ran in the isolated `../quorus-core-tests-20260904` worktree to avoid editor-generated class-file interference. Changed controller sources, resources and POM matched the working tree by file hash.
+
+| Check | Result |
+|---|---|
+| Behavioral red before production changes | Seven rejection cases failed as intended: six removed factory backend names and controller memory configuration |
+| Focused regression after removal | 93 tests passed; no failures, errors or skips |
+| Clean controller `verify` | 520 tests passed; no failures, errors or skips; JaCoCo gate passed; BUILD SUCCESS |
+| Shaded JAR audit | External `dev/mars/raftlog/storage/FileRaftStorage.class` present; internal WAL implementations and RocksDB JNI absent |
+
+The controller count changed from 530 to 520 because 17 obsolete implementation-specific tests were removed and seven rejection cases were added. Existing node, snapshot and controller tests were migrated to real library storage with per-test temporary directories and awaited shutdown; these migrations are regression coverage, not new TDD evidence. Commands, timestamps, log hashes and the artifact hash are retained under `externalLibraryOnly` in the [Raft evidence record](../docs-design/evidence/raft-log-tdd-evidence-2026-09-04.json). This removal slice did not rerun the full reactor or the configured Docker/slow groups excluded by default controller verification.
+
+**Operational boundary:** controller configuration accepts only `raftlog`; removed backend names fail explicitly. No deployed storage was inspected, migrated or deleted. Preserve any legacy storage before recovery work; switching a property is not an on-disk migration. The remaining R1 production-filesystem/power-loss acceptance gates and R2–R6 remain open; green tests do not close those gates.
 
 **Remediation checkpoint:** the approved review follow-up is tracked in the existing [enterprise implementation plan](../docs-design/task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md#remediation-checkpoint--2026-09-04). M0 durability and Phase 4 acceptance are reopened. Real WAL prefix deletion in `43cdd20` exposed the adapter's memory-only snapshots. R1 adds a durable snapshot sidecar, compaction dependency checks, serialized snapshot mutations and interrupted-install recovery; its behavioral red/green evidence is retained in the [Raft evidence record](../docs-design/evidence/raft-log-tdd-evidence-2026-09-04.json). Release remains blocked by the checkpoint's outstanding gates. `ffc3e64` records a full clean reactor against the 1.2.0 adoption patch, but that historical green result did not exercise snapshot-plus-compaction restart. No deployed storage has been changed or assessed by this remediation.
 
@@ -20,7 +37,7 @@ The working tree described here was committed as `b35fb25` (`refactor(config): i
 - Finding 3: `AppConfig.validate()` rejects a non-positive attempt lease, and `QuorusControllerVerticle` chains its asynchronous start steps with `compose`, so an exception in any step fails the deployment after stopping the components that already started.
 - Finding 8: the Copilot instructions and the Raft WAL design snippet were updated.
 
-Findings 4 to 7 and every item in section 7 remain open. The rest of this document is preserved as written on 2026-09-03.
+Finding 5's dead `createRocksDbStorage` helper is resolved by deleting the entire RocksDB factory path. Its other cleanup items, findings 4, 6 and 7, and every item in section 7 remain open. The rest of this document is preserved as historical evidence from 2026-09-03; its uncommitted-state statements and recommended next steps describe that original handover, not the current checkout. Follow the enterprise implementation plan's remediation checkpoint for current next steps.
 
 ## Document purpose
 
