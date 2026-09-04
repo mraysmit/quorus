@@ -328,8 +328,6 @@ class RaftStorageContractTest {
     }
 
     @Test
-    @Disabled("Gap RAFT-STORAGE-PREFIX-TRUNCATION-001: raftlog-core has no prefix truncation, so "
-            + "RaftLogStorageAdapter.truncatePrefix is a no-op and the WAL is never compacted on disk.")
     @DisplayName("prefix truncation preserves entries after the snapshot boundary")
     void truncatePrefix_preservesLaterEntries(VertxTestContext ctx) {
         List<LogEntryData> entries = List.of(

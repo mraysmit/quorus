@@ -1011,7 +1011,7 @@ Before considering the WAL "done":
 - ✅ **Application Order:** Entries are applied to the State Machine strictly in-order
 - ✅ **Leader Consistency:** Leader only advances `commitIndex` after a majority `sync()` is confirmed
 - ✅ **Replay Safety:** Replay truncates corrupt/partial tail safely
-- ⚠️ **Prefix Compaction (gap RAFT-STORAGE-PREFIX-TRUNCATION-001):** `RaftLogStorageAdapter.truncatePrefix` is a no-op because raftlog-core has no prefix truncation, so the on-disk WAL is never compacted after a snapshot; recovery skips entries at or below the snapshot boundary, so correctness holds but disk use and replay time grow without bound
+- ✅ **Prefix Compaction:** `RaftLogStorageAdapter.truncatePrefix` delegates to raftlog-core 1.2.0, which rewrites the journal atomically without the entries at or below the snapshot index; gap RAFT-STORAGE-PREFIX-TRUNCATION-001 closed 2026-09-04
 - ✅ **Overlap Safety:** Two mutations that overlap an in-flight WAL write never persist or reserve the same index twice
 - ✅ **Replay Idempotence:** A repeated record for an index is ignored; a gap fails recovery instead of misplacing later entries
 - ✅ **Election Liveness:** A rejected `RequestVote` does not reset the election timer of a follower
