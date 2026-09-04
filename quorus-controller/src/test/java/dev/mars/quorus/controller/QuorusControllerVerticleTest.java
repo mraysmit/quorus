@@ -20,6 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Exercises the real controller bootstrap and graceful shutdown boundary. */
 @ExtendWith(VertxExtension.class)
@@ -79,7 +80,31 @@ class QuorusControllerVerticleTest {
                 .onFailure(context::failNow);
     }
 
+    @Test
+    void failureInsideAsynchronousStartupFailsDeploymentInsteadOfHanging(Vertx vertx, VertxTestContext context)
+            throws IOException {
+        int[] ports = availablePorts(2);
+        Properties properties = controllerProperties("failing-node", ports[0], ports[1], 1_024L);
+        // Rejected by JobAssignmentHandler, which is only built after the Raft node has started asynchronously.
+        properties.setProperty("quorus.jobs.attempt.lease-duration-ms", "0");
+        AppConfig config = new AppConfig("test", properties);
+
+        vertx.deployVerticle(new QuorusControllerVerticle(config))
+                .onSuccess(deploymentId -> context.failNow(
+                        new AssertionError("deployment must fail for a non-positive attempt lease")))
+                .onFailure(cause -> {
+                    context.verify(() -> assertTrue(
+                            String.valueOf(cause.getMessage()).contains("attemptLeaseDurationMs"),
+                            "unexpected startup failure: " + cause));
+                    context.completeNow();
+                });
+    }
+
     private static AppConfig controllerConfig(String nodeId, int httpPort, int raftPort, long maxBodyBytes) {
+        return new AppConfig("test", controllerProperties(nodeId, httpPort, raftPort, maxBodyBytes));
+    }
+
+    private static Properties controllerProperties(String nodeId, int httpPort, int raftPort, long maxBodyBytes) {
         Properties properties = new Properties();
         properties.setProperty("quorus.node.id", nodeId);
         properties.setProperty("quorus.security.profile", "development");
@@ -94,7 +119,7 @@ class QuorusControllerVerticleTest {
         properties.setProperty("quorus.cluster.nodes", nodeId + "=localhost:" + raftPort);
         properties.setProperty("quorus.raft.election-timeout-ms", "50");
         properties.setProperty("quorus.raft.heartbeat-interval-ms", "20");
-        return new AppConfig("test", properties);
+        return properties;
     }
 
     private static int[] availablePorts(int count) throws IOException {
