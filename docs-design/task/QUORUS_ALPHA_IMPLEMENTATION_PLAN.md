@@ -895,7 +895,7 @@ Environment variable naming: replace dots with underscores, uppercase (`quorus.h
 | `QUORUS_HTTP_HOST` | HTTP API bind address | `127.0.0.1` (container deployment sets `0.0.0.0`) |
 | `QUORUS_RAFT_PORT` | Raft gRPC port | `9080` |
 | `QUORUS_CLUSTER_NODES` | Cluster node list (`nodeId=host:port,...`) | `{nodeId}=localhost:{raftPort}` |
-| `QUORUS_RAFT_STORAGE_TYPE` | Storage backend: `raftlog`, `file`, `memory` | `file` |
+| `QUORUS_RAFT_STORAGE_TYPE` | Storage backend: `raftlog`, `memory` | `raftlog` |
 | `QUORUS_RAFT_STORAGE_PATH` | Raft log/metadata directory | `./data/raft/{nodeId}` |
 | `QUORUS_RAFT_STORAGE_FSYNC` | Enable fsync for durability | `true` |
 | `QUORUS_RAFT_IO_POOL_SIZE` | I/O thread pool size | `10` |

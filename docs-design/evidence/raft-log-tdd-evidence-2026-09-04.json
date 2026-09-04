@@ -1,0 +1,149 @@
+{
+  "schemaVersion": 1,
+  "phase": "M0 durability remediation",
+  "recordedAt": "2026-09-04T13:10:00+08:00",
+  "baseRevision": "219e307",
+  "workingState": "two sequential slices; slice 1 committed as 176dbee, slice 2 committed on top of it",
+  "slices": [
+    {
+      "sliceId": "RAFT-LOG-CONSISTENCY-001",
+      "requirements": [
+        "Restart Safety and Durability Barrier acceptance criteria, QUORUS_RAFT_WAL_DESIGN.md section 18"
+      ],
+      "acceptanceStatement": "After a full-cluster restart every controller recovers the same committed log and elects a leader. A follower that receives overlapping AppendEntries for the same index persists it once, a leader that receives overlapping submits reserves distinct indices, recovery keys journal records by index, and a follower keeps its election timer when it rejects a vote request.",
+      "failureBoundary": "ThreeControllerDurableRestartTest failed under full-suite load: followers replayed four log entries where the leader replayed three, rejected the leader as not up to date, and the leader started 40 elections in 15 s while the followers never timed out.",
+      "testFiles": [
+        "quorus-controller/src/test/java/dev/mars/quorus/controller/raft/FollowerRestartConsistencyTest.java",
+        "quorus-controller/src/test/java/dev/mars/quorus/controller/raft/ThreeControllerDurableRestartTest.java"
+      ],
+      "externalEntryPoints": [
+        "RaftNode.handleAppendEntriesRequest",
+        "RaftNode.submitCommand",
+        "RaftNode.handleVoteRequest",
+        "RaftNode.start recovery"
+      ],
+      "classification": [
+        "component",
+        "multi-node",
+        "failure injection",
+        "persistence boundary"
+      ],
+      "red": [
+        {
+          "command": "mvn -q clean test -pl quorus-controller -Dtest=FollowerRestartConsistencyTest -Dsurefire.failIfNoSpecifiedTests=false",
+          "timestamp": "2026-09-04T12:03:44+08:00",
+          "patchIdentity": "base revision 219e307 plus the two failing tests only, run in an isolated worktree",
+          "log": "temp/raft-log-consistency-red.txt",
+          "tests": 2,
+          "failures": 2,
+          "errors": 0,
+          "expectedFailure": "WAL must hold each index exactly once ==> expected [1, 2] but was [1, 2, 1]; follower never started its own election while rejecting a stale candidate for 3 s",
+          "outcome": "failed as expected before production implementation"
+        }
+      ],
+      "green": {
+        "command": "mvn -q clean test -pl quorus-controller -Dtest=FollowerRestartConsistencyTest,ThreeControllerDurableRestartTest,RaftNodeTest,DurableTransferRestartTest,MetadataPersistenceTest,FileRaftStorage*Test,RaftStorage*Test,*Snapshot*Test -Dsurefire.failIfNoSpecifiedTests=false",
+        "timestamp": "2026-09-04T12:33:57+08:00",
+        "patchIdentity": "working implementation patch based on 219e307, committed as 176dbee",
+        "log": "temp/raft-log-consistency-green.txt",
+        "tests": 52,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "outcome": "passed"
+      },
+      "refactorSummary": [
+        "RaftNode serializes every log mutation behind the previous one (serializeLogMutation) on both the follower AppendEntries path and the leader submit path.",
+        "Recovery keys replayed records by index: a same-term repeat is ignored, a different-term record supersedes the tail from that index, and a gap fails recovery.",
+        "stepDown keeps a running follower election timer; only leaving the leader or candidate role arms a fresh one.",
+        "Module suite after the change: 513 tests, 0 failures (temp/raft-log-consistency-regress.txt, 2026-09-04T12:36:30+08:00); ThreeControllerDurableRestartTest passed six consecutive runs."
+      ],
+      "processNotes": [
+        "Two of the four tests in FollowerRestartConsistencyTest (overlapping leader submits, recovery keyed by index) were written together with the implementation and have no preserved red stage; they are regression tests, not TDD evidence.",
+        "The original election-timer test synchronized with a sleep loop; it was remediated to a Vert.x periodic timer in slice 2."
+      ],
+      "sensitiveEvidenceCaptured": false,
+      "sensitiveEvidenceStatement": "Logs contain synthetic node identifiers, test tenant names, and temporary paths only."
+    },
+    {
+      "sliceId": "RAFT-STORAGE-SINGLE-IMPL-001",
+      "requirements": [
+        "Project decision 2026-09-04: Quorus uses only the raftlog-core library for the durable Raft log"
+      ],
+      "acceptanceStatement": "The controller obtains its durable Raft log only from the raftlog-core library. RaftStorageFactory and AppConfig.validate reject storage type file, a blank type resolves to raftlog, and every restart, recovery, contract, and node test obtains storage through RaftStorageFactory with the production type.",
+      "failureBoundary": "Before implementation the controller carried a stale in-repo fork of the library WAL under storage type file, accepted by validation and by the factory, defaulted to for a blank type, and used by every durable restart test while production ran the library.",
+      "testFiles": [
+        "quorus-controller/src/test/java/dev/mars/quorus/controller/raft/storage/RaftStorageFactoryTest.java",
+        "quorus-controller/src/test/java/dev/mars/quorus/controller/config/AppConfigNodeIdentityTest.java",
+        "quorus-controller/src/test/java/dev/mars/quorus/controller/raft/storage/RaftStorageContractTest.java",
+        "quorus-controller/src/test/java/dev/mars/quorus/controller/raft/RaftNodeTest.java",
+        "quorus-controller/src/test/java/dev/mars/quorus/controller/raft/DurableTransferRestartTest.java",
+        "quorus-controller/src/test/java/dev/mars/quorus/controller/raft/ThreeControllerDurableRestartTest.java",
+        "quorus-controller/src/test/java/dev/mars/quorus/controller/raft/FollowerRestartConsistencyTest.java"
+      ],
+      "externalEntryPoints": [
+        "RaftStorageFactory.create",
+        "AppConfig.validate"
+      ],
+      "classification": [
+        "unit",
+        "contract",
+        "component",
+        "multi-node",
+        "persistence boundary"
+      ],
+      "red": [
+        {
+          "command": "mvn -q clean test -pl quorus-controller -Dtest=RaftStorageFactoryTest,AppConfigNodeIdentityTest,FollowerRestartConsistencyTest,RaftStorageContractTest,RaftNodeTest,DurableTransferRestartTest,ThreeControllerDurableRestartTest -Dsurefire.failIfNoSpecifiedTests=false",
+          "timestamp": "2026-09-04T12:57:57+08:00",
+          "patchIdentity": "base revision 176dbee plus the new and repointed tests only, run in an isolated worktree",
+          "log": "temp/raft-storage-removal-red.txt",
+          "tests": 56,
+          "failures": 4,
+          "errors": 0,
+          "expectedFailure": "AppConfigNodeIdentityTest.validateRejectsFileStorageType, RaftStorageFactoryTest.fileTypeIsRejected and RaftStorageFactoryTest.blankTypeDefaultsToLibraryBackedStorage failed because the in-repo type was still accepted. The fourth failure, RaftStorageContractTest.truncatePrefix_preservesLaterEntries, was not part of the intended red: it exposed that the library-backed adapter does not compact the WAL (expected [3, 4] but was [1, 2, 3, 4]).",
+          "outcome": "failed as expected before production implementation; one additional failure recorded as gap RAFT-STORAGE-PREFIX-TRUNCATION-001"
+        }
+      ],
+      "green": {
+        "command": "mvn -q clean test -pl quorus-controller -Dtest=RaftStorageFactoryTest,AppConfigNodeIdentityTest,FollowerRestartConsistencyTest,RaftStorageContractTest,RaftNodeTest,DurableTransferRestartTest,ThreeControllerDurableRestartTest,RaftLogStorageAdapterTest -Dsurefire.failIfNoSpecifiedTests=false",
+        "timestamp": "2026-09-04T13:02:56+08:00",
+        "patchIdentity": "working implementation patch based on 176dbee",
+        "log": "temp/raft-storage-removal-green.txt",
+        "tests": 64,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 1,
+        "outcome": "passed; the one skip is the prefix-truncation contract case disabled under gap RAFT-STORAGE-PREFIX-TRUNCATION-001"
+      },
+      "refactorSummary": [
+        "Deleted quorus-controller raft/storage/file/FileRaftStorage.java and the file storage type from RaftStorageFactory and AppConfig.validate; a blank type defaults to raftlog.",
+        "Removed the adapter unit test that asserted the old blank-type default; the factory test now owns that behavior.",
+        "Removed the per-test worker executors the deleted class needed; the library owns its own writer thread.",
+        "Updated the packaged properties comment, the WAL design document, and the alpha implementation plan to describe raftlog and memory only."
+      ],
+      "sensitiveEvidenceCaptured": false,
+      "sensitiveEvidenceStatement": "Logs contain synthetic node identifiers, test tenant names, and temporary paths only."
+    }
+  ],
+  "focusedRegression": {
+    "command": "mvn -q verify -pl quorus-controller",
+    "timestamp": "2026-09-04T13:04:23+08:00",
+    "log": "temp/raft-storage-removal-regress.txt",
+    "moduleTests": {
+      "quorus-controller": 516
+    },
+    "tests": 516,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 1,
+    "outcome": "passed in an isolated worktree; the skip is gap RAFT-STORAGE-PREFIX-TRUNCATION-001"
+  },
+  "phaseStatus": "slices complete; one gap open",
+  "notYetVerified": [
+    "Gap RAFT-STORAGE-PREFIX-TRUNCATION-001: RaftLogStorageAdapter.truncatePrefix is a no-op because raftlog-core has no prefix truncation, so the on-disk WAL is never compacted after a snapshot. Recovery skips entries at or below the snapshot boundary, so correctness holds, but disk use and replay time grow without bound. Resolution belongs in raftlog-core.",
+    "raftlog-core replayLog is positional and does not de-duplicate records by index; RaftNode recovery compensates. A library-level fix would let the library be correct on its own.",
+    "The full reactor mvn clean verify was not rerun for these two slices; only the quorus-controller module suite was run. No other module changed.",
+    "Workspace builds are unreliable on this host because the VS Code Java extension writes into target/classes; every run above was executed in a git worktree outside the workspace."
+  ]
+}

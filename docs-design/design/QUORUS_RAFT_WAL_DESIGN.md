@@ -1011,6 +1011,7 @@ Before considering the WAL "done":
 - ✅ **Application Order:** Entries are applied to the State Machine strictly in-order
 - ✅ **Leader Consistency:** Leader only advances `commitIndex` after a majority `sync()` is confirmed
 - ✅ **Replay Safety:** Replay truncates corrupt/partial tail safely
+- ⚠️ **Prefix Compaction (gap RAFT-STORAGE-PREFIX-TRUNCATION-001):** `RaftLogStorageAdapter.truncatePrefix` is a no-op because raftlog-core has no prefix truncation, so the on-disk WAL is never compacted after a snapshot; recovery skips entries at or below the snapshot boundary, so correctness holds but disk use and replay time grow without bound
 - ✅ **Overlap Safety:** Two mutations that overlap an in-flight WAL write never persist or reserve the same index twice
 - ✅ **Replay Idempotence:** A repeated record for an index is ignored; a gap fails recovery instead of misplacing later entries
 - ✅ **Election Liveness:** A rejected `RequestVote` does not reset the election timer of a follower
@@ -2825,7 +2826,7 @@ RaftNode Integration:
 
 ## Appendix F: Pluggable Storage Architecture
 
-This appendix defines the **Storage Provider Interface (SPI)** pattern that allows the Raft implementation to use either the custom `FileRaftStorage` (our minimal WAL) or a high-performance key-value store like **RocksDB** as a drop-in replacement.
+This appendix defines the **Storage Provider Interface (SPI)** pattern that allows the Raft implementation to use either the WAL from the `raftlog-core` library, reached through `RaftLogStorageAdapter`, or a high-performance key-value store like **RocksDB** as a drop-in replacement.
 
 ### F.1 Design Goals
 
@@ -3481,7 +3482,7 @@ public final class RaftStorageFactory {
         } catch (ClassNotFoundException e) {
             throw new IllegalStateException(
                 "RocksDB storage requested but org.rocksdb:rocksdbjni is not on classpath. " +
-                "Add the dependency or use storage.type=file");
+                "Add the dependency or use storage.type=raftlog");
         }
     }
 }
@@ -3496,10 +3497,10 @@ Add to `quorus-controller.properties`:
 # Raft Storage Configuration
 # =============================================================================
 
-# Storage backend type: "file" (default) or "rocksdb"
-# - file:    Custom WAL, zero dependencies, simpler, lower throughput
-# - rocksdb: High-performance LSM-tree, requires rocksdbjni dependency
-quorus.raft.storage.type=file
+# Storage backend type: "raftlog" (default) or "memory" (testing only)
+# - raftlog: WAL from the raftlog-core library
+# - memory:  In-memory storage for testing, not durable
+quorus.raft.storage.type=raftlog
 
 # Base directory for storage files
 quorus.raft.storage.path=/var/lib/quorus/data

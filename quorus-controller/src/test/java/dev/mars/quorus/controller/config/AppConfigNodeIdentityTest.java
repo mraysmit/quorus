@@ -211,6 +211,15 @@ class AppConfigNodeIdentityTest {
         assertThrows(IllegalStateException.class, negative::validate);
     }
 
+    @Test
+    @DisplayName("Validation rejects the removed in-repo file storage type")
+    void validateRejectsFileStorageType() {
+        AppConfig config = new AppConfig("test", properties("quorus.raft.storage.type", "file"));
+
+        IllegalStateException error = assertThrows(IllegalStateException.class, config::validate);
+        assertTrue(error.getMessage().contains("raftlog"));
+    }
+
     private static Properties properties(String key, String value) {
         Properties properties = new Properties();
         properties.setProperty(key, value);
