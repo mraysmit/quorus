@@ -16,7 +16,7 @@
 
 package dev.mars.quorus.controller.raft;
 
-import dev.mars.quorus.controller.raft.storage.InMemoryRaftStorage;
+import dev.mars.quorus.controller.raft.storage.RaftLogStorageAdapter;
 import dev.mars.quorus.controller.raft.storage.RaftStorage;
 import dev.mars.quorus.controller.raft.storage.RaftStorage.LogEntryData;
 import dev.mars.quorus.controller.raft.storage.RaftStorageFactory;
@@ -309,8 +309,8 @@ class RaftNodeTest {
 
         @Test
         void testDurableElectionPersistsTermAndVote() {
-        InMemoryRaftStorage storage = new InMemoryRaftStorage();
-        awaitSuccess(storage.open(null), SHORT_TIMEOUT);
+        RaftStorage storage = new RaftLogStorageAdapter(vertx, true);
+        awaitSuccess(storage.open(tempDir.resolve("raft")), SHORT_TIMEOUT);
 
         Set<String> singleNodeCluster = Set.of("node1");
         RaftNode singleNode = RaftNode.builder().vertx(vertx).nodeId("node1").clusterNodes(singleNodeCluster)
@@ -322,8 +322,8 @@ class RaftNodeTest {
         Awaitility.await()
             .atMost(Duration.ofSeconds(3))
             .untilAsserted(() -> {
-                assertTrue(storage.getCurrentTerm() > 0, "Election term should be persisted");
-                assertEquals(Optional.of("node1"), storage.getVotedFor(), "Self vote should be persisted");
+                assertTrue(awaitSuccess(storage.loadMetadata(), SHORT_TIMEOUT).currentTerm() > 0, "Election term should be persisted");
+                assertEquals(Optional.of("node1"), awaitSuccess(storage.loadMetadata(), SHORT_TIMEOUT).votedFor(), "Self vote should be persisted");
             });
 
         awaitSuccess(singleNode.stop(), SHORT_TIMEOUT);
@@ -331,8 +331,8 @@ class RaftNodeTest {
 
         @Test
         void testMultiNodeRecoveryDoesNotApplyUncommittedTail() {
-        InMemoryRaftStorage storage = new InMemoryRaftStorage();
-        awaitSuccess(storage.open(null), SHORT_TIMEOUT);
+        RaftStorage storage = new RaftLogStorageAdapter(vertx, true);
+        awaitSuccess(storage.open(tempDir.resolve("raft")), SHORT_TIMEOUT);
 
         SystemMetadataCommand command = SystemMetadataCommand.set("recovery-key", "tail-value");
         byte[] payload = ProtobufCommandCodec.serialize(command).toByteArray();
@@ -356,8 +356,8 @@ class RaftNodeTest {
 
         @Test
         void testSingleNodeRecoveryReappliesLocalLog() {
-        InMemoryRaftStorage storage = new InMemoryRaftStorage();
-        awaitSuccess(storage.open(null), SHORT_TIMEOUT);
+        RaftStorage storage = new RaftLogStorageAdapter(vertx, true);
+        awaitSuccess(storage.open(tempDir.resolve("raft")), SHORT_TIMEOUT);
 
         SystemMetadataCommand command = SystemMetadataCommand.set("single-recovery-key", "single-value");
         byte[] payload = ProtobufCommandCodec.serialize(command).toByteArray();
@@ -410,10 +410,10 @@ class RaftNodeTest {
 
         @Test
         void testHigherTermIsPersistedWhenVotePersistenceFails() {
-        InMemoryRaftStorage delegate = new InMemoryRaftStorage();
+        RaftStorage delegate = new RaftLogStorageAdapter(vertx, true);
         RaftStorage flakyMetadataStorage = oneShotMetadataFailureStorage(delegate);
 
-        awaitSuccess(flakyMetadataStorage.open(null), SHORT_TIMEOUT);
+        awaitSuccess(flakyMetadataStorage.open(tempDir.resolve("raft")), SHORT_TIMEOUT);
 
         Set<String> singleNodeCluster = Set.of("node1");
         RaftNode durableNode = RaftNode.builder().vertx(vertx).nodeId("node1").clusterNodes(singleNodeCluster)
@@ -547,7 +547,7 @@ class RaftNodeTest {
 
     @Test
     void testRejectHigherTermVoteWithStaleCandidateLogFailsWhenTermPersistenceFails() {
-        InMemoryRaftStorage delegate = new InMemoryRaftStorage();
+        RaftStorage delegate = new RaftLogStorageAdapter(vertx, true);
         final long higherTerm = 5;
         final boolean[] failedOnRejectWrite = new boolean[] { false };
         RaftStorage flakyMetadataStorage = new RaftStorage() {
@@ -610,7 +610,7 @@ class RaftNodeTest {
                 return delegate.truncatePrefix(toIndex);
             }
         };
-        awaitSuccess(flakyMetadataStorage.open(null), SHORT_TIMEOUT);
+        awaitSuccess(flakyMetadataStorage.open(tempDir.resolve("raft")), SHORT_TIMEOUT);
 
         RaftNode durableNode = RaftNode.builder().vertx(vertx).nodeId("node1").clusterNodes(Set.of("node1"))
             .transport(new InMemoryTransportSimulator("node1"))
@@ -647,9 +647,9 @@ class RaftNodeTest {
 
         @Test
         void testAppendEntriesRejectsWhenHigherTermMetadataPersistFails() {
-        InMemoryRaftStorage delegate = new InMemoryRaftStorage();
+        RaftStorage delegate = new RaftLogStorageAdapter(vertx, true);
         RaftStorage flakyMetadataStorage = oneShotMetadataFailureStorage(delegate);
-        awaitSuccess(flakyMetadataStorage.open(null), SHORT_TIMEOUT);
+        awaitSuccess(flakyMetadataStorage.open(tempDir.resolve("raft")), SHORT_TIMEOUT);
 
         RaftNode durableNode = RaftNode.builder().vertx(vertx).nodeId("node1").clusterNodes(Set.of("node1"))
             .transport(new InMemoryTransportSimulator("node1"))
@@ -676,9 +676,9 @@ class RaftNodeTest {
 
         @Test
         void testInstallSnapshotRejectsWhenHigherTermMetadataPersistFails() {
-        InMemoryRaftStorage delegate = new InMemoryRaftStorage();
+        RaftStorage delegate = new RaftLogStorageAdapter(vertx, true);
         RaftStorage flakyMetadataStorage = oneShotMetadataFailureStorage(delegate);
-        awaitSuccess(flakyMetadataStorage.open(null), SHORT_TIMEOUT);
+        awaitSuccess(flakyMetadataStorage.open(tempDir.resolve("raft")), SHORT_TIMEOUT);
 
         RaftNode durableNode = RaftNode.builder().vertx(vertx).nodeId("node1").clusterNodes(Set.of("node1"))
             .transport(new InMemoryTransportSimulator("node1"))
@@ -710,7 +710,7 @@ class RaftNodeTest {
         System.out.println("[EXPECTED-TEST-FAILURE] Scenario=" + scenario + " message=" + failure.getMessage());
         }
 
-        private static RaftStorage oneShotMetadataFailureStorage(InMemoryRaftStorage delegate) {
+        private static RaftStorage oneShotMetadataFailureStorage(RaftStorage delegate) {
         return new RaftStorage() {
             private int metadataUpdateCalls = 0;
 

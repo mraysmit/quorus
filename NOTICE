@@ -52,15 +52,10 @@ Google Guava (com.google.guava:guava:33.5.0-jre)
   Copyright (C) 2010 The Guava Authors
   https://github.com/google/guava
 
-RaftLog (io.github.mraysmit:raftlog-core:1.1.0)
+RaftLog (io.github.mraysmit:raftlog-core:1.2.0)
   License: Apache License 2.0
   Copyright 2025 Mark Andrew Ray-Smith
   https://github.com/mraysmit/raftlog
-
-RocksDB JNI (org.rocksdb:rocksdbjni:9.11.2)
-  License: Apache License 2.0
-  Copyright (c) 2011-present, Facebook, Inc.
-  https://github.com/facebook/rocksdb
 
 JSch (com.github.mwiede:jsch:0.2.26)
   License: BSD 2-Clause License
