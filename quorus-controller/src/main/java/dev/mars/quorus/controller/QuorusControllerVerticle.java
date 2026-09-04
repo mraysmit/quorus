@@ -175,32 +175,54 @@ public class QuorusControllerVerticle extends AbstractVerticle {
             GrpcRaftServer grpc = new GrpcRaftServer(vertx, raftPort, node, raftTlsConfig, trustState);
             this.grpcServer = Optional.of(grpc);
 
-            grpc.start().onSuccess(v1 -> {
-                logger.info("gRPC server started on port {}", raftPort);
-
-                // 7. Start Raft (includes recovery from WAL)
-                node.start().onSuccess(v2 -> {
-                    // 8. Start HTTP API
-                    HttpApiServer api = new HttpApiServer(
-                            vertx, config.getHttpHost(), port, node, stateMachine, -1,
-                            config, securityConfig, trustState);
-                    this.apiServer = Optional.of(api);
-
-                    api.start()
-                            .onSuccess(server -> {
-                                // 9. Setup shutdown coordinator for graceful shutdown
-                                setupShutdownCoordinator();
-                                
-                                logger.info("QuorusControllerVerticle started successfully");
-                                startPromise.complete();
-                            })
-                            .onFailure(startPromise::fail);
-                }).onFailure(startPromise::fail);
-            }).onFailure(startPromise::fail);
+            grpc.start()
+                    .compose(v -> {
+                        logger.info("gRPC server started on port {}", raftPort);
+                        // 7. Start Raft (includes recovery from WAL)
+                        return node.start();
+                    })
+                    .compose(v -> {
+                        // 8. Start HTTP API. compose() turns an exception thrown here into a failed
+                        // future; a plain onSuccess callback would only log it and leave the
+                        // deployment pending forever.
+                        HttpApiServer api = new HttpApiServer(
+                                vertx, config.getHttpHost(), port, node, stateMachine, -1,
+                                config, securityConfig, trustState);
+                        this.apiServer = Optional.of(api);
+                        return api.start();
+                    })
+                    .compose(v -> {
+                        // 9. Setup shutdown coordinator for graceful shutdown
+                        setupShutdownCoordinator();
+                        return Future.<Void>succeededFuture();
+                    })
+                    .onSuccess(v -> {
+                        logger.info("QuorusControllerVerticle started successfully");
+                        startPromise.complete();
+                    })
+                    .onFailure(cause -> failStartup(startPromise, cause));
 
         } catch (Exception e) {
-            startPromise.fail(e);
+            failStartup(startPromise, e);
         }
+    }
+
+    /**
+     * Fails the deployment with {@code cause} after stopping the components that already started,
+     * so a failed start neither hangs the deployment nor leaves a Raft node or gRPC server running.
+     */
+    private void failStartup(Promise<Void> startPromise, Throwable cause) {
+        logger.error("QuorusControllerVerticle failed to start: {}", cause.getMessage());
+        logger.debug("Stack trace for controller startup failure", cause);
+        stopComponents().onComplete(ignored -> startPromise.fail(cause));
+    }
+
+    /** Stops the HTTP API, Raft node, and gRPC server, tolerating components that never started. */
+    private Future<Void> stopComponents() {
+        Future<Void> apiStop = apiServer.map(HttpApiServer::stop).orElseGet(Future::succeededFuture);
+        Future<Void> raftStop = raftNode.map(RaftNode::stop).orElseGet(Future::succeededFuture);
+        Future<Void> grpcStop = grpcServer.map(GrpcRaftServer::stop).orElseGet(Future::succeededFuture);
+        return Future.all(apiStop, raftStop, grpcStop).mapEmpty();
     }
 
     /**
@@ -267,11 +289,7 @@ public class QuorusControllerVerticle extends AbstractVerticle {
             () -> {
                 // Fallback to immediate shutdown if coordinator wasn't initialized
                 try {
-                    Future<Void> apiStop = apiServer.map(HttpApiServer::stop).orElseGet(Future::succeededFuture);
-                    Future<Void> raftStop = raftNode.map(RaftNode::stop).orElseGet(Future::succeededFuture);
-                    Future<Void> grpcStop = grpcServer.map(GrpcRaftServer::stop).orElseGet(Future::succeededFuture);
-
-                    Future.all(apiStop, raftStop, grpcStop)
+                    stopComponents()
                             .onSuccess(v -> {
                                 logger.info("QuorusControllerVerticle stopped successfully (immediate)");
                                 stopPromise.complete();
