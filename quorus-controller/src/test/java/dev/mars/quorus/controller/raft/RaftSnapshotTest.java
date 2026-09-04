@@ -16,7 +16,8 @@
 
 package dev.mars.quorus.controller.raft;
 
-import dev.mars.quorus.controller.raft.storage.InMemoryRaftStorage;
+import dev.mars.quorus.controller.raft.storage.RaftLogStorageAdapter;
+import dev.mars.quorus.controller.raft.storage.RaftStorage;
 import dev.mars.quorus.controller.state.QuorusStateStore;
 import dev.mars.quorus.controller.state.SystemMetadataCommand;
 import io.vertx.core.Vertx;
@@ -45,10 +46,14 @@ import static org.junit.jupiter.api.Assertions.*;
 @ExtendWith(VertxExtension.class)
 class RaftSnapshotTest {
 
+    @org.junit.jupiter.api.io.TempDir
+    Path tempDir;
+    private final java.util.List<RaftNode> nodes = new java.util.ArrayList<>();
+
     private Vertx vertx;
     private RaftNode leaderNode;
     private QuorusStateStore stateMachine;
-    private InMemoryRaftStorage storage;
+    private RaftStorage storage;
     private InMemoryTransportSimulator transport;
 
     @BeforeEach
@@ -57,7 +62,7 @@ class RaftSnapshotTest {
         InMemoryTransportSimulator.clearAllTransports();
 
         stateMachine = new QuorusStateStore();
-        storage = new InMemoryRaftStorage();
+        storage = new RaftLogStorageAdapter(vertx, true);
         transport = new InMemoryTransportSimulator("node1");
 
         // Single-node cluster with snapshot enabled, threshold=5, check every 500ms
@@ -75,18 +80,20 @@ class RaftSnapshotTest {
                 .snapshotThreshold(5)
                 .snapshotCheckInterval(500)
                 .build();
+        nodes.add(leaderNode);
     }
 
     @AfterEach
     void tearDown() {
-        if (leaderNode != null) leaderNode.stop();
+        dev.mars.quorus.testing.TestFutureUtils.awaitSuccess(
+                io.vertx.core.Future.all(nodes.stream().map(RaftNode::stop).toList()), java.time.Duration.ofSeconds(10));
         InMemoryTransportSimulator.clearAllTransports();
     }
 
     @Test
     void testSnapshotTriggeredByThreshold(VertxTestContext ctx) throws Throwable {
         // Open storage, start node, wait for leader
-        storage.open(Path.of("/tmp/test")).onComplete(ctx.succeeding(v -> {
+        storage.open(tempDir.resolve("test")).onComplete(ctx.succeeding(v -> {
             leaderNode.start().onComplete(ctx.succeeding(v2 -> {
                 leaderNode.awaitState(RaftNode.State.LEADER, 5000).onComplete(ctx.succeeding(state -> {
 
@@ -119,7 +126,7 @@ class RaftSnapshotTest {
 
     @Test
     void testManualSnapshotCompactsLog(VertxTestContext ctx) throws Throwable {
-        storage.open(Path.of("/tmp/test")).onComplete(ctx.succeeding(v -> {
+        storage.open(tempDir.resolve("test")).onComplete(ctx.succeeding(v -> {
             leaderNode.start().onComplete(ctx.succeeding(v2 -> {
                 leaderNode.awaitState(RaftNode.State.LEADER, 5000).onComplete(ctx.succeeding(state -> {
 
@@ -146,7 +153,7 @@ class RaftSnapshotTest {
                                 assertEquals("value9", stateMachine.getMetadata("key9"));
 
                                 // Snapshot data saved in storage
-                                assertNotNull(storage.getLog(), "Storage should still be accessible");
+                                assertTrue(leaderNode.getLogSize() >= 1, "Compaction retains the snapshot boundary");
                             });
                             ctx.completeNow();
                         }));
@@ -161,7 +168,7 @@ class RaftSnapshotTest {
 
     @Test
     void testCommandsWorkAfterSnapshot(VertxTestContext ctx) throws Throwable {
-        storage.open(Path.of("/tmp/test")).onComplete(ctx.succeeding(v -> {
+        storage.open(tempDir.resolve("test")).onComplete(ctx.succeeding(v -> {
             leaderNode.start().onComplete(ctx.succeeding(v2 -> {
                 leaderNode.awaitState(RaftNode.State.LEADER, 5000).onComplete(ctx.succeeding(state -> {
 
@@ -196,7 +203,7 @@ class RaftSnapshotTest {
 
     @Test
     void testSnapshotPreservesJobAssignmentsAndQueue(VertxTestContext ctx) throws Throwable {
-        storage.open(Path.of("/tmp/test")).onComplete(ctx.succeeding(v -> {
+        storage.open(tempDir.resolve("test")).onComplete(ctx.succeeding(v -> {
             leaderNode.start().onComplete(ctx.succeeding(v2 -> {
                 leaderNode.awaitState(RaftNode.State.LEADER, 5000).onComplete(ctx.succeeding(state -> {
 
@@ -229,7 +236,7 @@ class RaftSnapshotTest {
     @Test
     void testSnapshotDisabledDoesNotTrigger(VertxTestContext ctx) throws Throwable {
         // Create a second node with snapshots disabled
-        InMemoryRaftStorage storage2 = new InMemoryRaftStorage();
+        RaftStorage storage2 = new RaftLogStorageAdapter(vertx, true);
         InMemoryTransportSimulator transport2 = new InMemoryTransportSimulator("node-no-snap");
         Set<String> cluster = Set.of("node-no-snap");
         RaftNode noSnapNode = RaftNode.builder()
@@ -245,8 +252,9 @@ class RaftSnapshotTest {
                 .snapshotThreshold(5)
                 .snapshotCheckInterval(500)
                 .build();
+        nodes.add(noSnapNode);
 
-        storage2.open(Path.of("/tmp/test2")).onComplete(ctx.succeeding(v -> {
+        storage2.open(tempDir.resolve("test2")).onComplete(ctx.succeeding(v -> {
             noSnapNode.start().onComplete(ctx.succeeding(v2 -> {
                 noSnapNode.awaitState(RaftNode.State.LEADER, 5000).onComplete(ctx.succeeding(state -> {
 
@@ -259,7 +267,7 @@ class RaftSnapshotTest {
                                         "Snapshot should not be taken when disabled");
                                 assertFalse(noSnapNode.isSnapshotEnabled());
                             });
-                            noSnapNode.stop();
+                            // Nodes are stopped and disk storage closed by tearDown.
                             InMemoryTransportSimulator.clearAllTransports();
                             ctx.completeNow();
                         });
@@ -274,7 +282,7 @@ class RaftSnapshotTest {
 
     @Test
     void testSnapshotSavesAndLoadsFromStorage(VertxTestContext ctx) throws Throwable {
-        storage.open(Path.of("/tmp/test")).onComplete(ctx.succeeding(v -> {
+        storage.open(tempDir.resolve("test")).onComplete(ctx.succeeding(v -> {
             leaderNode.start().onComplete(ctx.succeeding(v2 -> {
                 leaderNode.awaitState(RaftNode.State.LEADER, 5000).onComplete(ctx.succeeding(state -> {
 

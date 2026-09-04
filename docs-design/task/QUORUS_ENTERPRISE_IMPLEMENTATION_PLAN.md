@@ -2,7 +2,7 @@
 
 # Quorus Enterprise Implementation Plan
 
-**Version:** 1.18  
+**Version:** 1.19  
 **Date:** 2026-09-04  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
@@ -60,6 +60,8 @@ The baseline does not yet justify protected enterprise production use. Phase 1 e
 ## 4. Target Release Milestones
 
 ### Remediation checkpoint — 2026-09-04
+
+**External-library-only correction:** the remaining internal RocksDB and memory storage implementations, backend factory branches, convenience API and RocksDB JNI dependency have been removed. Configuration now accepts only `raftlog`; storage-dependent tests use the external adapter and isolated temporary paths. Seven behavioral tests first proved that the old factory/configuration still admitted internal backends, then passed after removal. The 93-test focused regression and final clean controller verification (520 tests, no failures/errors/skips, JaCoCo gate passed) are green. The shaded JAR contains the external library WAL and no removed internal storage classes or RocksDB JNI. Commands, hashes and test-count accounting are recorded in the existing [Raft evidence record](../evidence/raft-log-tdd-evidence-2026-09-04.json). This corrects the incomplete earlier removal without closing R2–R6 or the outstanding R1 production durability gates.
 
 The historical results below are retained, but do not authorize release of the snapshot-compaction behavior at `ffc3e64`: WAL prefix deletion is durable while adapter snapshots are only in memory at that revision. R1 replaces that behavior with durable snapshots and recovery checks; implementation evidence and outstanding deployment gates are recorded below. Existing persistent environments have not been inventoried; preserve their storage before recovery or rollback. Code rollback cannot recover already deleted WAL records.
 

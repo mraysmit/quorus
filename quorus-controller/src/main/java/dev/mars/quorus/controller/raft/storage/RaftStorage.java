@@ -25,9 +25,8 @@ import java.util.Optional;
 /**
  * Storage Provider Interface (SPI) for Raft persistence.
  *
- * <p>This interface defines the contract for all Raft storage backends.
- * Implementations can range from a simple file-based WAL to high-performance
- * key-value stores like RocksDB.</p>
+ * <p>Vert.x boundary around the external raftlog-core WAL and Quorus snapshot sidecar.
+ * The only production implementation is {@link RaftLogStorageAdapter}.</p>
  *
  * <p><b>Durability Contract:</b> All implementations MUST guarantee:</p>
  * <ul>
@@ -36,12 +35,7 @@ import java.util.Optional;
  *   <li><b>Ordering:</b> Log entries maintain strict index ordering</li>
  * </ul>
  *
- * <p><b>Implementations:</b></p>
- * <ul>
- *   <li>{@code FileRaftStorage} - Custom WAL (zero dependencies, default)</li>
- *   <li>{@code RocksDbRaftStorage} - RocksDB adapter (high performance)</li>
- *   <li>{@code InMemoryRaftStorage} - In-memory storage (testing only)</li>
- * </ul>
+ * <p>The adapter bridges the library futures; it does not implement a second WAL.</p>
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @version 1.0
@@ -171,8 +165,7 @@ public interface RaftStorage {
      * Replays the entire log from storage on startup.
      *
      * <p>Returns entries in index order. For file-based storage, this involves
-     * scanning the WAL and handling any truncation markers. For key-value stores,
-     * this is a range scan.</p>
+     * scanning the external library WAL and resolving its truncation markers.</p>
      *
      * <p>Any corrupt or incomplete records at the tail are silently discarded
      * (this handles "torn writes" from crashes during append).</p>

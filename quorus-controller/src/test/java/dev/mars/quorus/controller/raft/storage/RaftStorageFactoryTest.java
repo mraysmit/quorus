@@ -8,6 +8,8 @@ import io.vertx.core.Vertx;
 import io.vertx.junit5.VertxExtension;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -27,6 +29,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class RaftStorageFactoryTest {
 
     private static final Duration TIMEOUT = Duration.ofSeconds(5);
+
+    @ParameterizedTest
+    @ValueSource(strings = {"memory", "inmemory", "in-memory", "test", "rocksdb", "rocks"})
+    void internalBackendsAreRejectedBeforeOpeningStorage(String type, Vertx vertx) {
+        IllegalArgumentException error = assertThrows(IllegalArgumentException.class, () -> {
+            // Close any incorrectly accepted backend before failing the assertion.
+            RaftStorage accepted = awaitSuccess(RaftStorageFactory.create(vertx, type, tempDir, true), TIMEOUT);
+            awaitSuccess(accepted.close(), TIMEOUT);
+        });
+        assertTrue(error.getMessage().contains("raftlog"));
+    }
 
     @TempDir
     Path tempDir;

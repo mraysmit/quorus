@@ -573,6 +573,96 @@
       }
     }
   },
+  "externalLibraryOnly": {
+    "sliceId": "RAFT-STORAGE-EXTERNAL-ONLY-002",
+    "baseRevision": "038da9f",
+    "status": "Implemented; focused and clean controller verification passed; packaged artifact confirms external-library-only WAL",
+    "acceptance": "RaftLogStorageAdapter is the only production RaftStorage implementation. Removed internal memory/RocksDB backend names fail explicitly, controller configuration accepts only raftlog, and storage-dependent tests use the external library with per-test temporary directories.",
+    "scope": "Remove remaining internal storage alternatives and RocksDB JNI dependency. Retain the Vert.x RaftStorage boundary and durable FileSnapshotStore sidecar: raftlog-core 1.2.0 has no snapshot API; the sidecar is not a second WAL.",
+    "red": {
+      "patchIdentity": "038da9f plus only the two test-file changes, before production removal, in an isolated worktree",
+      "command": "mvn.cmd -q test -pl quorus-controller '-Dtest=RaftStorageFactoryTest#internalBackendsAreRejectedBeforeOpeningStorage,AppConfigNodeIdentityTest#validationRejectsInternalMemoryStorage' -f ../quorus-core-tests-20260904/pom.xml 2>&1 | Tee-Object -FilePath temp/raftlog-only-red.log; exit $LASTEXITCODE",
+      "log": "temp/raftlog-only-red.log",
+      "sha256": "3DAA835AF4B80E0B473E65BA7D63348529D5F2F1081F6E2122BD1D2A4486EF5F",
+      "completedAt": "2026-09-04T15:07:06.1395705+08:00",
+      "tests": 7,
+      "failures": 7,
+      "errors": 0,
+      "skipped": 0,
+      "exitCode": 1,
+      "expectedFailure": "All six factory cases (memory, inmemory, in-memory, test, rocksdb, rocks) and the AppConfig memory validation case accepted removed backends.",
+      "retainedFailureExcerpt": [
+        "Expected java.lang.IllegalArgumentException to be thrown, but nothing was thrown.",
+        "Expected java.lang.IllegalStateException to be thrown, but nothing was thrown.",
+        "[ERROR] Tests run: 7, Failures: 7, Errors: 0, Skipped: 0"
+      ]
+    },
+    "focusedGreen": {
+      "command": "mvn.cmd -q clean test -pl quorus-controller '-Dtest=RaftStorageFactoryTest,AppConfigNodeIdentityTest,RaftNodeTest,RaftSnapshotTest,InstallSnapshotTest,QuorusControllerVerticleTest,RaftStorageContractTest,SnapshotRecoveryBoundaryTest,FollowerRestartConsistencyTest,ThreeControllerDurableRestartTest' -f ../quorus-core-tests-20260904/pom.xml 2>&1 | Tee-Object -FilePath temp/raftlog-only-green.log; exit $LASTEXITCODE",
+      "log": "temp/raftlog-only-green.log",
+      "sha256": "67396AE7228747B11A5EC333A6C4261A9CC465B5C48E24BFCD59B6E335E1437E",
+      "completedAt": "2026-09-04T15:10:04.0187992+08:00",
+      "tests": 93,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "exitCode": 0
+    },
+    "finalControllerVerification": {
+      "command": "mvn.cmd clean verify -pl quorus-controller -f ../quorus-core-tests-20260904/pom.xml 2>&1 | Tee-Object -FilePath temp/raftlog-only-controller-verify.log; exit $LASTEXITCODE",
+      "log": "temp/raftlog-only-controller-verify.log",
+      "sha256": "E13C3956A5C050F890AB0EABA13A9B4BE6BB7DEFB14450AF713F800684835716",
+      "completedAt": "2026-09-04T15:14:34.5474457+08:00",
+      "tests": 520,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "exitCode": 0,
+      "duration": "03:56 min",
+      "summary": [
+        "[INFO] Tests run: 520, Failures: 0, Errors: 0, Skipped: 0",
+        "[INFO] All coverage checks have been met.",
+        "[INFO] BUILD SUCCESS"
+      ],
+      "patchIdentity": "038da9f plus this removal patch; all changed controller sources, resources and POM byte-hash matched the isolated build"
+    },
+    "artifactAudit": {
+      "artifact": "../quorus-core-tests-20260904/quorus-controller/target/quorus-controller-1.0-SNAPSHOT.jar",
+      "sha256": "F9FD3307020BA637B5D7EC1A5603AEC674D1A19FD35B417CBF5FB3059D3212A5",
+      "method": "Enumerated the completed shaded JAR using System.IO.Compression.ZipFile.OpenRead; asserted the external WAL entry exists and all forbidden entries are absent.",
+      "present": "dev/mars/raftlog/storage/FileRaftStorage.class",
+      "absent": [
+        "org/rocksdb/",
+        "rocksdbjni",
+        "dev/mars/quorus/controller/raft/storage/InMemoryRaftStorage",
+        "dev/mars/quorus/controller/raft/storage/rocksdb/",
+        "dev/mars/quorus/controller/raft/storage/file/FileRaftStorage"
+      ],
+      "outcome": "passed"
+    },
+    "testAccounting": {
+      "newBehavioralRedBeforeFix": 7,
+      "removedObsoleteImplementationSpecificTests": 17,
+      "removedBreakdown": {
+        "InMemoryRaftStorageTest": 14,
+        "RocksDbRaftStorageTest": 3
+      },
+      "controllerSuiteDelta": "530 previous tests - 17 obsolete implementation-specific tests + 7 new rejection cases = 520",
+      "note": "Migrated Raft node, snapshot, install-snapshot and controller tests retain their existing behaviors against real library storage; these are regression migrations, not new TDD evidence. Generic storage and snapshot recovery contracts remain in the external-library suite."
+    },
+    "changes": [
+      "Deleted InMemoryRaftStorage and RocksDbRaftStorage and their implementation-specific tests; removed factory enum, alternate branches, reflection helpers and createInMemory.",
+      "Removed org.rocksdb:rocksdbjni and its NOTICE entry; retained only raftlog-core 1.2.0.",
+      "Changed test resource defaults and per-instance controller overrides to raftlog with isolated storage paths; snapshot tests await node shutdown before temporary directory cleanup.",
+      "Aligned current architecture, WAL design, implementation plans, handover and contributor instructions. Historical test records remain historical; obsolete Appendix F implementation and destructive migration advice were removed."
+    ],
+    "limitations": [
+      "No deployed data was changed or deleted; no automatic legacy on-disk format migration is supplied.",
+      "R1 production-filesystem/power-loss acceptance and R2-R6 remain open.",
+      "No final-revision full-reactor run is claimed by this removal slice; default controller verification excludes configured docker/slow groups."
+    ],
+    "sensitiveEvidenceCaptured": false
+  },
   "notYetVerified": [
     "Workspace builds are unreliable on this host because the VS Code Java extension writes into target/classes; every run above was executed in a git worktree outside the workspace."
   ],

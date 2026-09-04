@@ -26,6 +26,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @ExtendWith(VertxExtension.class)
 class QuorusControllerVerticleTest {
 
+    @org.junit.jupiter.api.io.TempDir
+    java.nio.file.Path tempDir;
+
     @Test
     void deploysCompleteControllerStackAndUndeploysGracefully(Vertx vertx, VertxTestContext context) {
         Properties properties = new Properties();
@@ -34,7 +37,8 @@ class QuorusControllerVerticleTest {
         properties.setProperty("quorus.security.allow-insecure", "true");
         properties.setProperty("quorus.security.http.tls.enabled", "false");
         properties.setProperty("quorus.security.raft.tls.enabled", "false");
-        properties.setProperty("quorus.raft.storage.type", "memory");
+        properties.setProperty("quorus.raft.storage.type", "raftlog");
+        properties.setProperty("quorus.raft.storage.path", tempDir.resolve("controller").toString());
         properties.setProperty("quorus.http.port", "0");
         properties.setProperty("quorus.raft.port", "0");
         properties.setProperty("quorus.cluster.nodes", "test-node=localhost:0");
@@ -100,11 +104,11 @@ class QuorusControllerVerticleTest {
                 });
     }
 
-    private static AppConfig controllerConfig(String nodeId, int httpPort, int raftPort, long maxBodyBytes) {
+    private AppConfig controllerConfig(String nodeId, int httpPort, int raftPort, long maxBodyBytes) {
         return new AppConfig("test", controllerProperties(nodeId, httpPort, raftPort, maxBodyBytes));
     }
 
-    private static Properties controllerProperties(String nodeId, int httpPort, int raftPort, long maxBodyBytes) {
+    private Properties controllerProperties(String nodeId, int httpPort, int raftPort, long maxBodyBytes) {
         Properties properties = new Properties();
         properties.setProperty("quorus.node.id", nodeId);
         properties.setProperty("quorus.security.profile", "development");
@@ -112,7 +116,8 @@ class QuorusControllerVerticleTest {
         properties.setProperty("quorus.security.allow-insecure", "true");
         properties.setProperty("quorus.security.http.tls.enabled", "false");
         properties.setProperty("quorus.security.raft.tls.enabled", "false");
-        properties.setProperty("quorus.raft.storage.type", "memory");
+        properties.setProperty("quorus.raft.storage.type", "raftlog");
+        properties.setProperty("quorus.raft.storage.path", tempDir.resolve(nodeId).toString());
         properties.setProperty("quorus.http.port", Integer.toString(httpPort));
         properties.setProperty("quorus.http.max-body-bytes", Long.toString(maxBodyBytes));
         properties.setProperty("quorus.raft.port", Integer.toString(raftPort));
