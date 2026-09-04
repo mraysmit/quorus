@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "phase": "M0 durability remediation",
-  "recordedAt": "2026-09-04T13:10:00+08:00",
+  "recordedAt": "2026-09-04T13:30:00+08:00",
   "baseRevision": "219e307",
-  "workingState": "two sequential slices; slice 1 committed as 176dbee, slice 2 committed on top of it",
+  "workingState": "three sequential slices; slice 1 committed as 176dbee, slice 2 as 849538f, slice 3 committed on top with raftlog-core 1.2.0 (raftlog commit db59859)",
   "slices": [
     {
       "sliceId": "RAFT-LOG-CONSISTENCY-001",
@@ -124,26 +124,107 @@
       ],
       "sensitiveEvidenceCaptured": false,
       "sensitiveEvidenceStatement": "Logs contain synthetic node identifiers, test tenant names, and temporary paths only."
+    },
+    {
+      "sliceId": "RAFT-STORAGE-PREFIX-TRUNCATION-001",
+      "requirements": [
+        "Gap opened by slice RAFT-STORAGE-SINGLE-IMPL-001: the production log was never compacted on disk"
+      ],
+      "acceptanceStatement": "raftlog-core compacts its journal on truncatePrefix and resolves repeated APPEND records by index, and the Quorus adapter delegates truncatePrefix so the prefix-truncation contract case passes against the production storage.",
+      "failureBoundary": "raftlog-core 1.1.0 had no truncatePrefix and replayed records positionally; RaftLogStorageAdapter.truncatePrefix was a no-op, so the on-disk WAL grew without bound after snapshots.",
+      "testFiles": [
+        "raftlog: raftlog-core/src/test/java/dev/mars/raftlog/storage/FileRaftStorageReplayIdempotenceTest.java",
+        "raftlog: raftlog-core/src/test/java/dev/mars/raftlog/storage/FileRaftStoragePrefixTruncationTest.java",
+        "quorus-controller/src/test/java/dev/mars/quorus/controller/raft/storage/RaftStorageContractTest.java"
+      ],
+      "externalEntryPoints": [
+        "RaftStorage.truncatePrefix (raftlog-core)",
+        "RaftStorage.replayLog (raftlog-core)",
+        "RaftStorageFactory.create (quorus)"
+      ],
+      "classification": [
+        "unit",
+        "contract",
+        "persistence boundary",
+        "failure injection"
+      ],
+      "red": [
+        {
+          "command": "mvn -q test -pl raftlog-core -Dtest=FileRaftStorageReplayIdempotenceTest (raftlog repository)",
+          "timestamp": "2026-09-04T13:14:34+08:00",
+          "patchIdentity": "raftlog 7a3bd3a plus the failing tests only",
+          "log": "temp/raft-log-library-replay-red.txt",
+          "tests": 3,
+          "failures": 3,
+          "errors": 0,
+          "expectedFailure": "replay returned [1, 2, 1] and [1, 2, 3, 2]: records were appended positionally",
+          "outcome": "failed as expected before production implementation"
+        },
+        {
+          "command": "mvn -q test -pl raftlog-core -Dtest=FileRaftStoragePrefixTruncationTest (raftlog repository)",
+          "timestamp": "2026-09-04T13:16:38+08:00",
+          "patchIdentity": "raftlog 7a3bd3a plus the failing tests only",
+          "log": "temp/raft-log-library-prefix-red.txt",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "expectedFailure": "compilation failed: cannot find symbol method truncatePrefix",
+          "outcome": "failed as expected before production implementation (compile failure on the missing method)"
+        }
+      ],
+      "green": {
+        "command": "mvn clean install -pl raftlog-core -am (raftlog repository), then mvn -q clean test -pl quorus-controller -Dtest=RaftStorageContractTest,RaftStorageFactoryTest,RaftLogStorageAdapterTest,FollowerRestartConsistencyTest,ThreeControllerDurableRestartTest,RaftNodeTest,DurableTransferRestartTest,RaftSnapshotTest,InstallSnapshotTest",
+        "timestamp": "2026-09-04T13:22:22+08:00",
+        "patchIdentity": "raftlog db59859 installed as 1.2.0; quorus 849538f plus adoption patch",
+        "log": "temp/raft-log-library-install.txt and temp/raft-log-adopt-120-green.txt",
+        "tests": 63,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "outcome": "passed; raftlog-core suite 282 tests, 0 failures, 3 platform skips; the previously disabled contract case passes"
+      },
+      "refactorSummary": [
+        "raftlog-core 1.2.0: RaftStorage.truncatePrefix rewrites the journal to raft.log.tmp, syncs, and swaps it in by atomic rename; a stale tmp file is discarded on open; replayLog resolves APPEND records by index; the record encoder is shared with the rewrite path.",
+        "Two raftlog adversarial tests that asserted accumulating duplicates now assert the resolved log.",
+        "Quorus: raftlog.version 1.2.0, RaftLogStorageAdapter.truncatePrefix delegates, the contract case is re-enabled.",
+        "Quorus controller suite after adoption: 516 tests, 0 failures, 0 skipped (temp/raft-log-adopt-120-regress.txt, 2026-09-04T13:23:29+08:00)."
+      ],
+      "sensitiveEvidenceCaptured": false,
+      "sensitiveEvidenceStatement": "Logs contain synthetic node identifiers, test tenant names, and temporary paths only."
     }
   ],
   "focusedRegression": {
     "command": "mvn -q verify -pl quorus-controller",
-    "timestamp": "2026-09-04T13:04:23+08:00",
-    "log": "temp/raft-storage-removal-regress.txt",
+    "timestamp": "2026-09-04T13:23:29+08:00",
+    "log": "temp/raft-log-adopt-120-regress.txt",
     "moduleTests": {
       "quorus-controller": 516
     },
     "tests": 516,
     "failures": 0,
     "errors": 0,
-    "skipped": 1,
-    "outcome": "passed in an isolated worktree; the skip is gap RAFT-STORAGE-PREFIX-TRUNCATION-001"
+    "skipped": 0,
+    "outcome": "passed in an isolated worktree against raftlog-core 1.2.0"
   },
-  "phaseStatus": "slices complete; one gap open",
+  "phaseStatus": "slices complete; no open gaps",
   "notYetVerified": [
-    "Gap RAFT-STORAGE-PREFIX-TRUNCATION-001: RaftLogStorageAdapter.truncatePrefix is a no-op because raftlog-core has no prefix truncation, so the on-disk WAL is never compacted after a snapshot. Recovery skips entries at or below the snapshot boundary, so correctness holds, but disk use and replay time grow without bound. Resolution belongs in raftlog-core.",
-    "raftlog-core replayLog is positional and does not de-duplicate records by index; RaftNode recovery compensates. A library-level fix would let the library be correct on its own.",
-    "The full reactor mvn clean verify was not rerun for these two slices; only the quorus-controller module suite was run. No other module changed.",
+    "The full reactor clean verify recorded above ran at 849538f; after the 1.2.0 adoption only the quorus-controller module suite was rerun, and no other module consumes raftlog-core.",
     "Workspace builds are unreliable on this host because the VS Code Java extension writes into target/classes; every run above was executed in a git worktree outside the workspace."
-  ]
+  ],
+  "cleanVerification": {
+    "command": "mvn clean verify (full reactor, isolated worktree at 849538f, before the 1.2.0 adoption)",
+    "timestamp": "2026-09-04T13:12:02+08:00",
+    "log": "temp/raft-storage-removal-clean-verify.txt",
+    "moduleTests": {
+      "quorus-core": 1513,
+      "quorus-workflow": 134,
+      "quorus-tenant": 64,
+      "quorus-controller": 516,
+      "quorus-agent": 84
+    },
+    "failures": 0,
+    "errors": 0,
+    "skipped": 2,
+    "outcome": "BUILD SUCCESS; the controller skip was the gap case closed by slice 3, the agent skip is pre-existing"
+  }
 }
