@@ -46,6 +46,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Supplier;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -113,6 +114,15 @@ public class RaftNode {
     private volatile boolean running = false;
     private long electionTimerId = -1;
     private long heartbeatTimerId = -1;
+
+    /**
+     * Serializes log mutations. Both the leader append path and the follower AppendEntries
+     * path decide what to write by looking at the in-memory log, which only reflects an entry
+     * once its storage write has completed, so two overlapping mutations would reserve or
+     * persist the same index twice. See {@link #serializeLogMutation(Supplier)}.
+     */
+    private final Object logWriteLock = new Object();
+    private Future<Void> logWriteChain = Future.succeededFuture();
 
     // ========== STATE CHANGE LISTENERS ==========
     private final List<io.vertx.core.Handler<State>> stateChangeListeners = new CopyOnWriteArrayList<>();
@@ -459,13 +469,11 @@ public class RaftNode {
                     // Snapshot recovery: only replay entries AFTER the snapshot
                     int replayedCount = 0;
                     for (LogEntryData entry : entries) {
-                        if (entry.index() > snapshotLastIndex) {
-                            RaftCommand command = deserialize(ByteString.copyFrom(entry.payload()));
-                            log.add(new LogEntry(entry.term(), entry.index(), command));
+                        if (restoreRecoveredEntry(entry)) {
                             replayedCount++;
                         }
                     }
-                    logger.info("Replayed {} post-snapshot entries (skipped {} compacted entries)",
+                    logger.info("Replayed {} post-snapshot entries (skipped {} compacted or duplicate records)",
                             replayedCount, entries.size() - replayedCount);
 
                     // Safety first: on multi-node recovery, do not assume replayed
@@ -482,10 +490,9 @@ public class RaftNode {
                     log.clear();
                     log.add(new LogEntry(0, 0, null));
                     for (LogEntryData entry : entries) {
-                        RaftCommand command = deserialize(ByteString.copyFrom(entry.payload()));
-                        log.add(new LogEntry(entry.term(), entry.index(), command));
+                        restoreRecoveredEntry(entry);
                     }
-                    logger.info("Recovered {} log entries from storage", entries.size());
+                    logger.info("Recovered {} log entries from {} storage records", log.size() - 1, entries.size());
                     return rebuildStateMachine();
                 }
 
@@ -497,6 +504,39 @@ public class RaftNode {
                 logger.error("Recovery failed: {}", err.getMessage());
                 logger.debug("Stack trace for recovery failure", err);
             });
+    }
+
+    /**
+     * Places one replayed record at its own index and reports whether it changed the log.
+     * Storage journals are append-only, so a record for an index that is already present is
+     * either an idempotent duplicate (same term, therefore the same entry) or a later write
+     * that supersedes the tail from that index. Records at or below the snapshot boundary are
+     * compacted and skipped. A gap means the journal lost a record; recovery must not continue
+     * past it, because every later index would be misplaced.
+     */
+    private boolean restoreRecoveredEntry(LogEntryData entry) {
+        if (entry.index() <= snapshotLastIndex) {
+            return false;
+        }
+        long expectedIndex = lastLogIndex() + 1;
+        if (entry.index() > expectedIndex) {
+            throw new IllegalStateException("Raft log replay gap: expected index " + expectedIndex
+                    + " but storage returned index " + entry.index());
+        }
+        if (entry.index() < expectedIndex) {
+            int position = toArrayIndex(entry.index());
+            LogEntry existing = log.get(position);
+            if (existing.getTerm() == entry.term()) {
+                logger.warn("Ignoring duplicate storage record for index {} (term {})", entry.index(), entry.term());
+                return false;
+            }
+            logger.warn("Storage record for index {} (term {}) supersedes {} recovered entries from term {}",
+                    entry.index(), entry.term(), log.size() - position, existing.getTerm());
+            log.subList(position, log.size()).clear();
+        }
+        RaftCommand command = deserialize(ByteString.copyFrom(entry.payload()));
+        log.add(new LogEntry(entry.term(), entry.index(), command));
+        return true;
     }
 
     /**
@@ -560,35 +600,43 @@ public class RaftNode {
     }
 
     public Future<CommandResult<?>> submitCommand(RaftCommand command) {
-        Promise<CommandResult<?>> promise = Promise.promise();
+        Promise<CommandResult<?>> completion = Promise.promise();
+        serializeLogMutation(() -> appendAsLeader(command, completion))
+                .onFailure(completion::tryFail);
+        return completion.future();
+    }
 
-        vertx.runOnContext(v -> {
-            if (state != State.LEADER) {
-                promise.fail(
-                        new IllegalStateException("Not the leader. Current state: " + state));
-                return;
-            }
+    /**
+     * Persists one leader entry and appends it to the in-memory log. The returned future
+     * completes once the entry is in the in-memory log, so the next queued mutation sees the
+     * reserved index; {@code completion} completes later, when the entry commits.
+     */
+    private Future<Void> appendAsLeader(RaftCommand command, Promise<CommandResult<?>> completion) {
+        if (state != State.LEADER) {
+            completion.tryFail(new IllegalStateException("Not the leader. Current state: " + state));
+            return Future.succeededFuture();
+        }
 
-            // Hard limit check - reject if log is at capacity to prevent OOM
-            if (log.size() >= logHardLimit) {
-                logger.warn("Raft log at capacity ({}/{}), rejecting command", log.size(), logHardLimit);
-                promise.fail(new IllegalStateException(
-                        "Raft log at capacity (" + log.size() + "/" + logHardLimit + "). Wait for snapshot."));
-                return;
-            }
+        // Hard limit check - reject if log is at capacity to prevent OOM
+        if (log.size() >= logHardLimit) {
+            logger.warn("Raft log at capacity ({}/{}), rejecting command", log.size(), logHardLimit);
+            completion.tryFail(new IllegalStateException(
+                    "Raft log at capacity (" + log.size() + "/" + logHardLimit + "). Wait for snapshot."));
+            return Future.succeededFuture();
+        }
 
-            // Create log entry
-            long entryIndex = lastLogIndex() + 1;
-            LogEntry entry = new LogEntry(currentTerm, entryIndex, command);
+        // Create log entry
+        long entryIndex = lastLogIndex() + 1;
+        LogEntry entry = new LogEntry(currentTerm, entryIndex, command);
 
-            // Persist to WAL before adding to in-memory log
-            persistLogEntry(entry)
-                .onSuccess(v2 -> {
+        // Persist to WAL before adding to in-memory log
+        return persistLogEntry(entry)
+                .compose(v -> {
                     // Add to in-memory log AFTER durability confirmed
                     log.add(entry);
 
                     // Register promise for completion when committed
-                    pendingCommands.put(entry.getIndex(), promise);
+                    pendingCommands.put(entry.getIndex(), completion);
 
                     logger.info("Command submitted at index {} term {}", entry.getIndex(), entry.getTerm());
 
@@ -601,15 +649,36 @@ public class RaftNode {
 
                     // Try to commit immediately (crucial for single-node clusters)
                     updateCommitIndex();
+                    return Future.<Void>succeededFuture();
                 })
                 .onFailure(err -> {
                     logger.error("Failed to persist command to WAL: {}", err.getMessage());
                     logger.debug("Stack trace for WAL persist failure", err);
-                    promise.fail(err);
+                    completion.tryFail(err);
                 });
-        });
+    }
 
-        return promise.future();
+    /**
+     * Runs {@code operation} on the Vert.x context after every previously queued log mutation
+     * has completed. The returned future carries the outcome of {@code operation}; a failed
+     * operation never blocks the ones queued behind it.
+     */
+    private <T> Future<T> serializeLogMutation(Supplier<Future<T>> operation) {
+        synchronized (logWriteLock) {
+            Future<T> result = logWriteChain.transform(previous -> {
+                Promise<T> promise = Promise.promise();
+                vertx.runOnContext(v -> {
+                    try {
+                        operation.get().onComplete(promise);
+                    } catch (Exception e) {
+                        promise.fail(e);
+                    }
+                });
+                return promise.future();
+            });
+            logWriteChain = result.<Void>mapEmpty().otherwiseEmpty();
+            return result;
+        }
     }
 
     /**
@@ -856,6 +925,17 @@ public class RaftNode {
             vertx.cancelTimer(snapshotTimerId);
     }
 
+    private void cancelLeaderTimers() {
+        if (heartbeatTimerId != -1) {
+            vertx.cancelTimer(heartbeatTimerId);
+            heartbeatTimerId = -1;
+        }
+        if (snapshotTimerId != -1) {
+            vertx.cancelTimer(snapshotTimerId);
+            snapshotTimerId = -1;
+        }
+    }
+
     private void resetElectionTimer() {
         if (electionTimerId != -1) {
             vertx.cancelTimer(electionTimerId);
@@ -1018,6 +1098,7 @@ public class RaftNode {
 
     private Future<Void> stepDown(long newTerm, boolean persistMetadataRequired) {
         if (newTerm > currentTerm) {
+            State previousState = state;
             currentTerm = newTerm;
             votedFor = null;
             state = State.FOLLOWER;
@@ -1025,8 +1106,15 @@ public class RaftNode {
             MDC.put("raftTerm", String.valueOf(currentTerm));
             notifyStateChangeListeners(State.FOLLOWER);
 
-            cancelTimers();
-            resetElectionTimer();
+            cancelLeaderTimers();
+            if (previousState != State.FOLLOWER || electionTimerId == -1) {
+                // Leaving the leader or candidate role: arm a fresh follower election timer.
+                resetElectionTimer();
+            }
+            // A follower that merely observed a higher term keeps its running timer. Only an
+            // AppendEntries from the current leader or a vote it grants may reset the timer;
+            // otherwise a candidate that can never win, such as one with a stale log and the
+            // shortest timeout, keeps every follower from ever timing out.
             logger.info("Stepped down to FOLLOWER. Term: {}", currentTerm);
 
             if (persistMetadataRequired) {
@@ -1218,43 +1306,49 @@ public class RaftNode {
      * </ol>
      */
     public Future<AppendEntriesResponse> handleAppendEntriesRequest(AppendEntriesRequest request) {
+        // Requests are processed one at a time. The duplicate check in
+        // continueAppendEntriesAfterTermCheck consults the in-memory log, which only reflects
+        // an entry once its WAL write has completed, so two overlapping requests carrying the
+        // same index would otherwise both persist it.
+        return serializeLogMutation(() -> processAppendEntriesRequest(request));
+    }
+
+    private Future<AppendEntriesResponse> processAppendEntriesRequest(AppendEntriesRequest request) {
         Promise<AppendEntriesResponse> promise = Promise.promise();
-        vertx.runOnContext(v -> {
-            try {
-                // Step 1: Term check
-                if (request.getTerm() < currentTerm) {
-                    logger.debug("Rejecting AppendEntries: stale term {} < {}", request.getTerm(), currentTerm);
-                    promise.complete(AppendEntriesResponse.newBuilder()
-                            .setTerm(currentTerm)
-                            .setSuccess(false)
-                            .build());
-                    return;
-                }
-
-                // Step 2: Step down if higher term
-                if (request.getTerm() > currentTerm) {
-                    stepDown(request.getTerm(), true)
-                            .onSuccess(v2 -> continueAppendEntriesAfterTermCheck(request, promise))
-                            .onFailure(err -> {
-                                logger.error("Failed to persist higher term {} before AppendEntries response: {}",
-                                        request.getTerm(), err.getMessage());
-                                logger.debug("Stack trace for AppendEntries higher-term persistence failure", err);
-                                promise.complete(AppendEntriesResponse.newBuilder()
-                                        .setTerm(currentTerm)
-                                        .setSuccess(false)
-                                        .build());
-                            });
-                    return;
-                }
-
-                continueAppendEntriesAfterTermCheck(request, promise);
-
-            } catch (Exception e) {
-                logger.error("Error handling append entries request: {}", e.getMessage());
-                logger.debug("Stack trace for append entries handling error", e);
-                promise.fail(e);
+        try {
+            // Step 1: Term check
+            if (request.getTerm() < currentTerm) {
+                logger.debug("Rejecting AppendEntries: stale term {} < {}", request.getTerm(), currentTerm);
+                promise.complete(AppendEntriesResponse.newBuilder()
+                        .setTerm(currentTerm)
+                        .setSuccess(false)
+                        .build());
+                return promise.future();
             }
-        });
+
+            // Step 2: Step down if higher term
+            if (request.getTerm() > currentTerm) {
+                stepDown(request.getTerm(), true)
+                        .onSuccess(v2 -> continueAppendEntriesAfterTermCheck(request, promise))
+                        .onFailure(err -> {
+                            logger.error("Failed to persist higher term {} before AppendEntries response: {}",
+                                    request.getTerm(), err.getMessage());
+                            logger.debug("Stack trace for AppendEntries higher-term persistence failure", err);
+                            promise.complete(AppendEntriesResponse.newBuilder()
+                                    .setTerm(currentTerm)
+                                    .setSuccess(false)
+                                    .build());
+                        });
+                return promise.future();
+            }
+
+            continueAppendEntriesAfterTermCheck(request, promise);
+
+        } catch (Exception e) {
+            logger.error("Error handling append entries request: {}", e.getMessage());
+            logger.debug("Stack trace for append entries handling error", e);
+            promise.fail(e);
+        }
         return promise.future();
     }
 
