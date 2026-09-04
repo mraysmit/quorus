@@ -11,6 +11,8 @@
 
 ## Post-handover status — 2026-09-04
 
+**Remediation checkpoint:** the approved review follow-up is tracked in the existing [enterprise implementation plan](../docs-design/task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md#remediation-checkpoint--2026-09-04). M0 durability and Phase 4 acceptance are reopened. Real WAL prefix deletion in `43cdd20` exposed the adapter's memory-only snapshots. R1 adds a durable snapshot sidecar, compaction dependency checks, serialized snapshot mutations and interrupted-install recovery; its behavioral red/green evidence is retained in the [Raft evidence record](../docs-design/evidence/raft-log-tdd-evidence-2026-09-04.json). Release remains blocked by the checkpoint's outstanding gates. `ffc3e64` records a full clean reactor against the 1.2.0 adoption patch, but that historical green result did not exercise snapshot-plus-compaction restart. No deployed storage has been changed or assessed by this remediation.
+
 The working tree described here was committed as `b35fb25` (`refactor(config): isolate layered config; drop singletons and -D flags`). A follow-up on 2026-09-04 then addressed the blocking findings:
 
 - Finding 1: `AppConfig.getString` and `AgentConfig.getString` derive the variable name from the key when no properties resource declares it, so hyphenated keys such as `quorus.raft.io.queue-size` are reachable from the environment again.

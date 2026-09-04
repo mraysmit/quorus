@@ -465,6 +465,24 @@ public class RaftNode {
                 return store.replayLog();
             })
             .compose(entries -> {
+                // Publication may have completed before InstallSnapshot could delete an old
+                // conflicting tail. If the boundary is still in the WAL, validate its term
+                // before replay. Once prefix deletion completes the boundary is absent, and
+                // installation has already durably removed any incompatible suffix.
+                boolean conflictingBoundary = snapshotLastIndex > 0 && entries.stream().anyMatch(
+                        entry -> entry.index() == snapshotLastIndex && entry.term() != snapshotLastTerm);
+                if (conflictingBoundary) {
+                    logger.warn("Discarding conflicting WAL suffix after interrupted snapshot installation at index {}",
+                            snapshotLastIndex);
+                    return store.truncateSuffix(snapshotLastIndex + 1)
+                            // Finish compaction before accepting new appends. Otherwise a later
+                            // restart would see the old boundary again and delete the new tail.
+                            .compose(v -> store.truncatePrefix(snapshotLastIndex))
+                            .map(v -> List.<LogEntryData>of());
+                }
+                return Future.succeededFuture(entries);
+            })
+            .compose(entries -> {
                 if (snapshotLastIndex > 0) {
                     // Snapshot recovery: only replay entries AFTER the snapshot
                     int replayedCount = 0;
@@ -1634,6 +1652,10 @@ public class RaftNode {
      * @return a Future that completes when the snapshot is saved and log is compacted
      */
     public Future<Void> takeSnapshot() {
+        return serializeLogMutation(this::takeSnapshotAfterPendingWrites);
+    }
+
+    private Future<Void> takeSnapshotAfterPendingWrites() {
         if (storage.isEmpty()) {
             return Future.failedFuture(new IllegalStateException("Cannot take snapshot in volatile mode"));
         }
@@ -1853,6 +1875,10 @@ public class RaftNode {
      * @return Future containing the response
      */
     public Future<InstallSnapshotResponse> handleInstallSnapshot(InstallSnapshotRequest request) {
+        return serializeLogMutation(() -> processInstallSnapshot(request));
+    }
+
+    private Future<InstallSnapshotResponse> processInstallSnapshot(InstallSnapshotRequest request) {
         Promise<InstallSnapshotResponse> promise = Promise.promise();
         vertx.runOnContext(v -> {
             try {
@@ -1954,12 +1980,26 @@ public class RaftNode {
                 logger.info("InstallSnapshot complete: assembling {} bytes at index={}, term={}",
                         snapshotData.length, lastIncludedIndex, lastIncludedTerm);
 
+                boolean matchingBoundary = hasLogEntry(lastIncludedIndex)
+                        && log.get(toArrayIndex(lastIncludedIndex)).getTerm() == lastIncludedTerm;
+                List<LogEntry> retainedSuffix = matchingBoundary
+                        ? new ArrayList<>(log.subList(toArrayIndex(lastIncludedIndex) + 1, log.size()))
+                        : List.of();
+
                 // Step 7: Persist snapshot and restore state
                 Future<Void> saveFuture = storage
                         .map(s -> s.saveSnapshot(snapshotData, lastIncludedIndex, lastIncludedTerm))
                         .orElseGet(Future::succeededFuture);
 
                 saveFuture
+                    .compose(v2 -> {
+                        // A suffix is reusable only if the snapshot boundary matches our log.
+                        // Delete a conflicting suffix durably as well as from memory, or restart
+                        // would resurrect commands from the superseded leader.
+                        return matchingBoundary ? Future.<Void>succeededFuture()
+                                : storage.map(s -> s.truncateSuffix(lastIncludedIndex + 1))
+                                        .orElseGet(Future::succeededFuture);
+                    })
                     .compose(v2 -> {
                         // Truncate old log entries from storage
                         return storage.map(s -> s.truncatePrefix(lastIncludedIndex))
@@ -1972,6 +2012,7 @@ public class RaftNode {
                         // Step 9: Reset in-memory log to snapshot boundary
                         log.clear();
                         log.add(new LogEntry(lastIncludedTerm, lastIncludedIndex, null));
+                        log.addAll(retainedSuffix);
 
                         // Step 10: Update snapshot and index tracking
                         snapshotLastIndex = lastIncludedIndex;

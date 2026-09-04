@@ -206,7 +206,373 @@
     "skipped": 0,
     "outcome": "passed in an isolated worktree against raftlog-core 1.2.0"
   },
-  "phaseStatus": "slices complete; no open gaps",
+  "phaseStatus": "Historical slices retained; durable snapshot remediation and release checkpoint reopened on 2026-09-04",
+  "remediationR1": {
+    "sliceId": "R1-DURABLE-SNAPSHOT-RECOVERY",
+    "baseRevision": "ffc3e64",
+    "status": "R1 code remediation implemented; final clean controller verification and explicit slow-cluster regression pass; deployment acceptance and R2-R6 remain open",
+    "acceptance": "Durable snapshot publication precedes prefix deletion; fresh-instance and three-controller recovery preserve committed state, coordinates and valid tails. Corrupt/missing required snapshots fail closed; append/snapshot/install mutations are serialized.",
+    "entryPoints": [
+      "RaftStorageFactory.create",
+      "RaftNode.takeSnapshot",
+      "RaftNode.handleInstallSnapshot",
+      "RaftNode.handleAppendEntriesRequest",
+      "RaftNode.submitCommand",
+      "RaftNode.start"
+    ],
+    "classification": [
+      "storage contract",
+      "real filesystem",
+      "failure injection",
+      "multi-node",
+      "cluster entry-point"
+    ],
+    "stages": [
+      {
+        "stage": "restart",
+        "red": {
+          "patchIdentity": "ffc3e64 plus test-only changes",
+          "command": "mvn.cmd -q clean test -pl quorus-controller '-Dtest=RaftStorageContractTest#snapshotAndTail_surviveCompactionAndFreshInstance,ThreeControllerDurableRestartTest#fullClusterRestartAfterSnapshotCompaction' '-Dsurefire.failIfNoSpecifiedTests=false' -f ../quorus-remediation-20260904/pom.xml 2>&1 | Tee-Object -FilePath temp/remediation-r1-red.log; exit $LASTEXITCODE",
+          "name": "remediation-r1-red.log",
+          "sha256": "FE8BA7843251D0DC68D9F5D41D2BDB994338C926F3078C37D08742472C8E5C2F",
+          "completedAt": "2026-09-04T13:46:57.2824670+08:00",
+          "tests": 2,
+          "failures": 2,
+          "errors": 0,
+          "expectedFailure": "Fresh storage returned no snapshot; full-cluster restart lost the committed transfer.",
+          "log": "temp/remediation-r1-red.log",
+          "retainedFailureExcerpt": [
+            "[ERROR]   ThreeControllerDurableRestartTest.fullClusterRestartAfterSnapshotCompaction:66->verifyFullClusterRestart:110 Future failed",
+            "[ERROR]   RaftStorageContractTest.snapshotAndTail_surviveCompactionAndFreshInstance(VertxTestContext) org.opentest4j.AssertionFailedError: Compaction must not delete the only durable copy of committed state ==> expected: <true> but was: <false>",
+            "[ERROR] Tests run: 2, Failures: 2, Errors: 0, Skipped: 0"
+          ]
+        },
+        "green": {
+          "name": "remediation-r1-green.log",
+          "sha256": "7443150762840CB08307A6F3C8A51E3C7DA7CB2D1C4913A15F184950F9A9BDC5",
+          "completedAt": "2026-09-04T13:48:00.3667402+08:00",
+          "log": "temp/remediation-r1-green.log",
+          "exitCode": 0,
+          "reproductionCommand": "mvn.cmd -q test -pl quorus-controller '-Dtest=RaftStorageContractTest#snapshotAndTail_surviveCompactionAndFreshInstance,ThreeControllerDurableRestartTest#fullClusterRestartAfterSnapshotCompaction' '-Dsurefire.failIfNoSpecifiedTests=false' -f ../quorus-remediation-20260904/pom.xml 2>&1 | Tee-Object -FilePath temp/remediation-r1-green.log; exit $LASTEXITCODE"
+        }
+      },
+      {
+        "stage": "boundaries",
+        "red": {
+          "patchIdentity": "R1 durable sidecar implementation before dependency marker, monotonicity, and legacy decoding",
+          "command": "mvn.cmd -q test -pl quorus-controller '-Dtest=SnapshotRecoveryBoundaryTest' -f ../quorus-remediation-20260904/pom.xml 2>&1 | Tee-Object -FilePath temp/remediation-r1-boundary-red.log; exit $LASTEXITCODE",
+          "name": "remediation-r1-boundary-red.log",
+          "sha256": "39C722ECF71091FDF273A0B6795ABF698A86C602C61EC2708199807A80A5B447",
+          "completedAt": "2026-09-04T13:48:59.7493769+08:00",
+          "tests": 7,
+          "failures": 3,
+          "errors": 1,
+          "expectedFailure": "Compaction accepted no covering snapshot; missing snapshot returned empty; older snapshot replaced newer; legacy format rejected.",
+          "log": "temp/remediation-r1-boundary-red.log",
+          "retainedFailureExcerpt": [
+            "[ERROR]   SnapshotRecoveryBoundaryTest.compactionWithoutSnapshotMustNotRemoveWal(VertxTestContext) org.opentest4j.AssertionFailedError: Compaction requires a durable covering snapshot ==> expected: <true> but was: <false>",
+            "[ERROR]   SnapshotRecoveryBoundaryTest.missingSnapshotAfterCompleteCompactionFailsClosed(VertxTestContext) java.lang.AssertionError: The asynchronous result was expected to have failed",
+            "[ERROR]   SnapshotRecoveryBoundaryTest.olderSnapshotCannotReplaceRecoveryBaseline(VertxTestContext) org.opentest4j.AssertionFailedError: Snapshot coordinates must never regress ==> expected: <true> but was: <false>",
+            "[ERROR]   SnapshotRecoveryBoundaryTest.legacySnapshotFromRemovedStorageRemainsReadable(VertxTestContext) � IO Invalid snapshot: unsupported format/version",
+            "[ERROR] Tests run: 7, Failures: 3, Errors: 1, Skipped: 0"
+          ]
+        },
+        "green": {
+          "name": "remediation-r1-boundary-green.log",
+          "sha256": "D30BCA73C6B476042E2FECBE86865C0DB1FC323F658AD01A0A68C62860822ACE",
+          "completedAt": "2026-09-04T13:49:54.7429357+08:00",
+          "log": "temp/remediation-r1-boundary-green.log",
+          "exitCode": 0,
+          "reproductionCommand": "mvn.cmd -q test -pl quorus-controller '-Dtest=FollowerRestartConsistencyTest,SnapshotRecoveryBoundaryTest,RaftStorageContractTest,ThreeControllerDurableRestartTest,RaftLogStorageAdapterTest,RaftSnapshotTest,InstallSnapshotTest' -f ../quorus-remediation-20260904/pom.xml 2>&1 | Tee-Object -FilePath temp/remediation-r1-boundary-green.log; exit $LASTEXITCODE"
+        }
+      },
+      {
+        "stage": "snapshot-ordering",
+        "red": {
+          "patchIdentity": "R1 boundary implementation before RaftNode snapshot serialization",
+          "command": "mvn.cmd -q test -pl quorus-controller '-Dtest=FollowerRestartConsistencyTest#snapshotQueuesBehindInflightAppend' -f ../quorus-remediation-20260904/pom.xml 2>&1 | Tee-Object -FilePath temp/remediation-r1-ordering-red.log; exit $LASTEXITCODE",
+          "name": "remediation-r1-ordering-red.log",
+          "sha256": "74DFA0D93F755AADA7733D614EF7B733EC4847EF9F2C7E216D946223123C44FC",
+          "completedAt": "2026-09-04T13:50:34.9052193+08:00",
+          "tests": 1,
+          "failures": 1,
+          "errors": 0,
+          "expectedFailure": "Snapshot boundary was 1 instead of 2: snapshot overtook an in-flight append.",
+          "log": "temp/remediation-r1-ordering-red.log",
+          "retainedFailureExcerpt": [
+            "[ERROR]   FollowerRestartConsistencyTest.snapshotQueuesBehindInflightAppend:248 Snapshot must follow the queued append ==> expected: <2> but was: <1>",
+            "[ERROR] Tests run: 1, Failures: 1, Errors: 0, Skipped: 0"
+          ]
+        },
+        "green": {
+          "name": "remediation-r1-ordering-green.log",
+          "sha256": "CD9F8A64C0094038AC6C1AF9C27AE797EB28DBE49E6BE8A1773676715F47A869",
+          "completedAt": "2026-09-04T13:51:39.9767089+08:00",
+          "log": "temp/remediation-r1-ordering-green.log",
+          "exitCode": 0,
+          "reproductionCommand": "mvn.cmd -q test -pl quorus-controller '-Dtest=FollowerRestartConsistencyTest,SnapshotRecoveryBoundaryTest,RaftStorageContractTest,ThreeControllerDurableRestartTest,RaftLogStorageAdapterTest,RaftSnapshotTest,InstallSnapshotTest' -f ../quorus-remediation-20260904/pom.xml 2>&1 | Tee-Object -FilePath temp/remediation-r1-ordering-green.log; exit $LASTEXITCODE"
+        }
+      },
+      {
+        "stage": "install-ordering",
+        "red": {
+          "patchIdentity": "R1 snapshot serialization before InstallSnapshot serialization",
+          "command": "mvn.cmd -q test -pl quorus-controller '-Dtest=FollowerRestartConsistencyTest#appendQueuesBehindSnapshotInstallation' -f ../quorus-remediation-20260904/pom.xml 2>&1 | Tee-Object -FilePath temp/remediation-r1-install-red.log; exit $LASTEXITCODE",
+          "name": "remediation-r1-install-red.log",
+          "sha256": "E8C70B50BECA825F49620EB47B8BE8E0F8E2F27CA958D6D4C8678B7044277BB2",
+          "completedAt": "2026-09-04T13:52:08.0336976+08:00",
+          "tests": 1,
+          "failures": 1,
+          "errors": 0,
+          "expectedFailure": "AppendEntries rejected the pending snapshot boundary instead of waiting for installation.",
+          "log": "temp/remediation-r1-install-red.log",
+          "retainedFailureExcerpt": [
+            "[ERROR]   FollowerRestartConsistencyTest.appendQueuesBehindSnapshotInstallation:292 Append must check consistency against the completed snapshot, not the old log ==> expected: <true> but was: <false>",
+            "[ERROR] Tests run: 1, Failures: 1, Errors: 0, Skipped: 0"
+          ]
+        },
+        "green": {
+          "name": "remediation-r1-install-green.log",
+          "sha256": "7BD4201460926F41FC6006D38C5645DC974E3C6D7A6E621DFB279956684E3DBE",
+          "completedAt": "2026-09-04T13:53:13.0208758+08:00",
+          "log": "temp/remediation-r1-install-green.log",
+          "exitCode": 0,
+          "reproductionCommand": "mvn.cmd -q test -pl quorus-controller '-Dtest=FollowerRestartConsistencyTest,SnapshotRecoveryBoundaryTest,RaftStorageContractTest,ThreeControllerDurableRestartTest,RaftLogStorageAdapterTest,RaftSnapshotTest,InstallSnapshotTest' -f ../quorus-remediation-20260904/pom.xml 2>&1 | Tee-Object -FilePath temp/remediation-r1-install-green.log; exit $LASTEXITCODE"
+        }
+      },
+      {
+        "stage": "installed-suffix",
+        "red": {
+          "patchIdentity": "R1 serialization before InstallSnapshot suffix preservation/rejection",
+          "command": "mvn.cmd -q test -pl quorus-controller '-Dtest=FollowerRestartConsistencyTest#installedSnapshotRetainsMatchingSuffixAcrossRestart+installedSnapshotDiscardsConflictingSuffixAcrossRestart' -f ../quorus-remediation-20260904/pom.xml 2>&1 | Tee-Object -FilePath temp/remediation-r1-suffix-red.log; exit $LASTEXITCODE",
+          "name": "remediation-r1-suffix-red.log",
+          "sha256": "0592C3DEA55110AF4832373D157CA2CED0454C671AD8C32F3E780C8307C12173",
+          "completedAt": "2026-09-04T13:53:28.2877432+08:00",
+          "tests": 2,
+          "failures": 2,
+          "errors": 0,
+          "expectedFailure": "Live matching suffix lost (expected 3, actual 2); conflicting suffix resurrected on recovery (expected 2, actual 3).",
+          "log": "temp/remediation-r1-suffix-red.log",
+          "retainedFailureExcerpt": [
+            "[ERROR]   FollowerRestartConsistencyTest.installedSnapshotDiscardsConflictingSuffixAcrossRestart:308->verifyInstalledSuffix:329 Recovery must not resurrect a conflicting suffix ==> expected: <2> but was: <3>",
+            "[ERROR]   FollowerRestartConsistencyTest.installedSnapshotRetainsMatchingSuffixAcrossRestart:303->verifyInstalledSuffix:330 Live log must retain exactly the matching suffix ==> expected: <3> but was: <2>",
+            "[ERROR] Tests run: 2, Failures: 2, Errors: 0, Skipped: 0"
+          ]
+        },
+        "green": {
+          "name": "remediation-r1-suffix-green.log",
+          "sha256": "A79C598CBB124C4B7BB4879CDE45982E10701626B730DA226DD5E5E79EA00540",
+          "completedAt": "2026-09-04T13:54:32.1389434+08:00",
+          "log": "temp/remediation-r1-suffix-green.log",
+          "exitCode": 0,
+          "reproductionCommand": "mvn.cmd -q test -pl quorus-controller '-Dtest=FollowerRestartConsistencyTest,SnapshotRecoveryBoundaryTest,RaftStorageContractTest,ThreeControllerDurableRestartTest,RaftLogStorageAdapterTest,RaftSnapshotTest,InstallSnapshotTest' -f ../quorus-remediation-20260904/pom.xml 2>&1 | Tee-Object -FilePath temp/remediation-r1-suffix-green.log; exit $LASTEXITCODE"
+        }
+      },
+      {
+        "stage": "interrupted-installation",
+        "red": {
+          "patchIdentity": "R1 suffix handling before startup reconciliation of a published snapshot with a conflicting WAL boundary",
+          "command": "mvn.cmd -q test -pl quorus-controller '-Dtest=FollowerRestartConsistencyTest#interruptedSnapshotInstallationDoesNotResurrectConflictingSuffix' -f ../quorus-remediation-20260904/pom.xml 2>&1 | Tee-Object -FilePath temp/remediation-r1-interruption-red.log; exit $LASTEXITCODE",
+          "name": "remediation-r1-interruption-red.log",
+          "sha256": "F7A679D21454CC7BB6D20E790DEBC704E1A37C23C1307BA1821328DEEE565E32",
+          "completedAt": "2026-09-04T14:02:23.5356127+08:00",
+          "log": "temp/remediation-r1-interruption-red.log",
+          "exitCode": 1,
+          "tests": 1,
+          "failures": 1,
+          "errors": 0,
+          "expectedFailure": "Published snapshot must fence the conflicting tail on recovery ==> expected: <2> but was: <3>",
+          "retainedFailureExcerpt": [
+            "[ERROR]   FollowerRestartConsistencyTest.interruptedSnapshotInstallationDoesNotResurrectConflictingSuffix:341 Published snapshot must fence the conflicting tail on recovery ==> expected: <2> but was: <3>",
+            "[ERROR] Tests run: 1, Failures: 1, Errors: 0, Skipped: 0"
+          ]
+        },
+        "green": {
+          "name": "remediation-r1-interruption-green.log",
+          "sha256": "57B2B763455EB4FD99A7FC0491C5015BECFE5EEBDFD16364085E843EB6F92887",
+          "completedAt": "2026-09-04T14:03:33.4046143+08:00",
+          "command": "mvn.cmd -q test -pl quorus-controller '-Dtest=FollowerRestartConsistencyTest,SnapshotRecoveryBoundaryTest,RaftStorageContractTest,ThreeControllerDurableRestartTest,RaftLogStorageAdapterTest,RaftSnapshotTest,InstallSnapshotTest' -f ../quorus-remediation-20260904/pom.xml 2>&1 | Tee-Object -FilePath temp/remediation-r1-interruption-green.log; exit $LASTEXITCODE",
+          "log": "temp/remediation-r1-interruption-green.log",
+          "exitCode": 0
+        }
+      },
+      {
+        "stage": "repeat-recovery",
+        "red": {
+          "patchIdentity": "R1 startup suffix rejection before completing prefix compaction; the interruption test is extended with a new append and a second restart",
+          "command": "mvn.cmd -q test -pl quorus-controller '-Dtest=FollowerRestartConsistencyTest#interruptedSnapshotInstallationDoesNotResurrectConflictingSuffix' -f ../quorus-remediation-20260904/pom.xml 2>&1 | Tee-Object -FilePath temp/remediation-r1-repeat-recovery-red.log; exit $LASTEXITCODE",
+          "name": "remediation-r1-repeat-recovery-red.log",
+          "sha256": "3A14BF69B2A779D12A474225559D076F24D6112475A94DE79364E08D35319BA6",
+          "completedAt": "2026-09-04T14:04:17.5471419+08:00",
+          "log": "temp/remediation-r1-repeat-recovery-red.log",
+          "exitCode": 1,
+          "tests": 1,
+          "failures": 1,
+          "errors": 0,
+          "expectedFailure": "A second recovery must retain newly acknowledged entries ==> expected: <3> but was: <2>",
+          "retainedFailureExcerpt": [
+            "[ERROR]   FollowerRestartConsistencyTest.interruptedSnapshotInstallationDoesNotResurrectConflictingSuffix:347 A second recovery must retain newly acknowledged entries ==> expected: <3> but was: <2>",
+            "[ERROR] Tests run: 1, Failures: 1, Errors: 0, Skipped: 0"
+          ]
+        },
+        "green": {
+          "name": "remediation-r1-repeat-recovery-green.log",
+          "sha256": "A6D8256E517EB068265A910DB82E9A88C35665E122B3C5C3251DD29C7947CBE1",
+          "completedAt": "2026-09-04T14:05:01.2949015+08:00",
+          "command": "mvn.cmd -q test -pl quorus-controller '-Dtest=FollowerRestartConsistencyTest#interruptedSnapshotInstallationDoesNotResurrectConflictingSuffix' -f ../quorus-remediation-20260904/pom.xml 2>&1 | Tee-Object -FilePath temp/remediation-r1-repeat-recovery-green.log; exit $LASTEXITCODE",
+          "log": "temp/remediation-r1-repeat-recovery-green.log",
+          "exitCode": 0
+        }
+      }
+    ],
+    "focusedRegression": {
+      "log": "temp/remediation-r1-interruption-green.log",
+      "tests": 53,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "command": "mvn.cmd -q test -pl quorus-controller '-Dtest=FollowerRestartConsistencyTest,SnapshotRecoveryBoundaryTest,RaftStorageContractTest,ThreeControllerDurableRestartTest,RaftLogStorageAdapterTest,RaftSnapshotTest,InstallSnapshotTest' -f ../quorus-remediation-20260904/pom.xml 2>&1 | Tee-Object -FilePath temp/remediation-r1-interruption-green.log; exit $LASTEXITCODE",
+      "patchIdentity": "Before final repeated-recovery cleanup; final controller verification supersedes this focused run"
+    },
+    "limitations": [
+      "Interrupted temporary-write, publication-failure and corrupt-file tests passed when first introduced after the basic sidecar implementation; they are regression characterization, not claimed as red-green evidence.",
+      "Windows file-force and atomic-rename exercised; Linux directory-fsync and power-loss validation remain required before deployment accreditation.",
+      "No deployed storage was inventoried or mutated. Prior compaction without a durable snapshot cannot be repaired by software rollback.",
+      "The original two Raft regression cases without historical red evidence remain a process deviation; no approval is inferred.",
+      "R2 tenant isolation, R3 terminal failure reporting, R4 DNS, R5 remaining handover findings and R6 final acceptance remain open.",
+      "The first slow-test selector used -Dgroups=slow without clearing test.excludedGroups, selected no tests and is not counted as verification; the enabled run explicitly cleared exclusions and passed all four tests.",
+      "Default controller builds exclude docker and slow groups. The separately enabled RaftLogClusterIntegrationTest passed; no Docker-tagged controller cluster or container-recreation/power-loss snapshot test is claimed.",
+      "The historical raftlog prefix-API compile-only red is not behavioral TDD evidence. Its original record is retained; explicit process disposition remains required."
+    ],
+    "sensitiveEvidenceCaptured": false,
+    "sensitiveEvidenceStatement": "Synthetic node identifiers, test payment state and temporary paths only; no credentials or real transfer payloads.",
+    "intermediateCleanVerification": {
+      "name": "remediation-r1-clean-verify.log",
+      "sha256": "36EA560B609130A09E033F96F3E1F660D658B5894CBDFBE3E40F200C83867AB1",
+      "completedAt": "2026-09-04T14:01:57.2875798+08:00",
+      "command": "mvn.cmd clean verify -f ../quorus-remediation-20260904/pom.xml 2>&1 | Tee-Object -FilePath temp/remediation-r1-clean-verify.log; exit $LASTEXITCODE",
+      "patchIdentity": "R1 sidecar, mutation ordering and installed suffix handling; before interruption-recovery changes",
+      "exitCode": 0,
+      "moduleTests": {
+        "quorus-core": 1513,
+        "quorus-workflow": 134,
+        "quorus-tenant": 64,
+        "quorus-controller": 529,
+        "quorus-agent": 84
+      },
+      "failures": 0,
+      "errors": 0,
+      "skipped": 1,
+      "outcome": "Seven-module BUILD SUCCESS; executed JaCoCo checks pass; integration-examples has no test execution data; pre-existing agent local-path test skipped on Windows",
+      "duration": "06:57 min"
+    },
+    "newTestAccounting": {
+      "added": 14,
+      "behavioralRedBeforeFix": 11,
+      "characterization": 3,
+      "redGreenStages": 7,
+      "note": "The interruption test was extended in the seventh stage to cover a second restart; counted once, not twice."
+    },
+    "finalSourceSha256": [
+      {
+        "path": "quorus-controller/src/main/java/dev/mars/quorus/controller/raft/RaftNode.java",
+        "sha256": "6165768549AC90D60CC79895244C0E2FDB47E01F0EF504E97018A7E279DAB727"
+      },
+      {
+        "path": "quorus-controller/src/main/java/dev/mars/quorus/controller/raft/storage/RaftLogStorageAdapter.java",
+        "sha256": "4127C2C79067583C725BD7633F544ACE3BFE05BFFE1C1D31544100042D5B698C"
+      },
+      {
+        "path": "quorus-controller/src/test/java/dev/mars/quorus/controller/raft/FollowerRestartConsistencyTest.java",
+        "sha256": "BD5D19C122674914449159D3CB8C75C577BDACAC9CB10AD656D3A511AE03476F"
+      },
+      {
+        "path": "quorus-controller/src/test/java/dev/mars/quorus/controller/raft/RaftLogClusterIntegrationTest.java",
+        "sha256": "AA7DE695352F97828356E00ABC1D2BEA007B4F9772673606BBEF5D1C72ABC9E1"
+      },
+      {
+        "path": "quorus-controller/src/test/java/dev/mars/quorus/controller/raft/ThreeControllerDurableRestartTest.java",
+        "sha256": "AD57821D0EA8EDB1B607249DD5E4D77FBC81931A2A05BC6BF90D2C50C3C3373A"
+      },
+      {
+        "path": "quorus-controller/src/test/java/dev/mars/quorus/controller/raft/storage/RaftStorageContractTest.java",
+        "sha256": "3F816E147BB71E1051CAB8BEB6C1C13DBDE75FACDE2C689458F2A2DD5D36522B"
+      },
+      {
+        "path": "quorus-controller/src/main/java/dev/mars/quorus/controller/raft/storage/FileSnapshotStore.java",
+        "sha256": "9DB02DC42F1B7015AEFFC4F51E51B8F3219BFED96288D2C92638131B35EC4450"
+      },
+      {
+        "path": "quorus-controller/src/test/java/dev/mars/quorus/controller/raft/storage/SnapshotRecoveryBoundaryTest.java",
+        "sha256": "E3E0C96D72130C983DAD567D36FC2F496BD170D41D4E938EE3C63B4E031F6379"
+      }
+    ],
+    "slowClusterRegression": {
+      "command": "mvn.cmd test -pl quorus-controller '-Dtest=RaftLogClusterIntegrationTest' '-Dgroups=slow' '-Dtest.excludedGroups=' -f ../quorus-remediation-20260904/pom.xml 2>&1 | Tee-Object -FilePath temp/remediation-r1-slow-cluster-enabled.log; exit $LASTEXITCODE",
+      "log": "temp/remediation-r1-slow-cluster-enabled.log",
+      "sha256": "63E63747D10D01A98903EFD2731C1712BB95085698840DAAE7C9D76514F0BC6C",
+      "completedAt": "2026-09-04T14:06:21.3738076+08:00",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "exitCode": 0
+    },
+    "finalControllerVerification": {
+      "sha256": "C4807D88BD85ACD049BAA42D568DE196BC1DB7C8591A1946255CA0E20015C38B",
+      "completedAt": "2026-09-04T14:10:08.6641171+08:00",
+      "summary": [
+        "[INFO] Tests run: 530, Failures: 0, Errors: 0, Skipped: 0",
+        "[INFO] All coverage checks have been met.",
+        "[INFO] BUILD SUCCESS"
+      ],
+      "command": "mvn.cmd clean verify -pl quorus-controller -f ../quorus-remediation-20260904/pom.xml 2>&1 | Tee-Object -FilePath temp/remediation-r1-final-controller-verify.log; exit $LASTEXITCODE",
+      "log": "temp/remediation-r1-final-controller-verify.log",
+      "tests": 530,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "exitCode": 0,
+      "duration": "03:34 min",
+      "patchIdentity": "ffc3e64 plus final R1 source files identified by finalSourceSha256",
+      "scope": "Final controller source verified clean against installed unchanged sibling dependencies; the intermediate full reactor predates the last interruption-recovery fixes and is not claimed as a final-revision reactor run."
+    },
+    "coverage": {
+      "scope": "Final clean controller run; counts are JaCoCo covered/missed, not proof of behavior or TDD",
+      "classes": {
+        "FileSnapshotStore": {
+          "line": {
+            "covered": 75,
+            "missed": 7
+          },
+          "branch": {
+            "covered": 30,
+            "missed": 14
+          }
+        },
+        "RaftLogStorageAdapter": {
+          "line": {
+            "covered": 49,
+            "missed": 2
+          },
+          "branch": {
+            "covered": 4,
+            "missed": 2
+          }
+        },
+        "RaftNode": {
+          "line": {
+            "covered": 846,
+            "missed": 169
+          },
+          "branch": {
+            "covered": 222,
+            "missed": 78
+          }
+        }
+      }
+    }
+  },
   "notYetVerified": [
     "Workspace builds are unreliable on this host because the VS Code Java extension writes into target/classes; every run above was executed in a git worktree outside the workspace."
   ],
