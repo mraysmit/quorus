@@ -175,7 +175,7 @@ public final class FileRaftStorage implements RaftStorage {
     }
 
     private Future<Void> doOpen() {
-        return vertx.executeBlocking(() -> {
+        return executor.executeBlocking(() -> {
             Files.createDirectories(dataDir);
 
             Path logPath = dataDir.resolve("raft.log");
@@ -191,12 +191,12 @@ public final class FileRaftStorage implements RaftStorage {
             opened = true;
             logger.info("FileRaftStorage opened: {} (log size: {} bytes)", dataDir, logChannel.size());
             return null;
-        }, false);
+        }, true);
     }
 
     @Override
     public Future<Void> close() {
-        return vertx.executeBlocking(() -> {
+        Future<Void> closed = executor.executeBlocking(() -> {
             opened = false;
             if (logChannel != null) {
                 try {
@@ -207,13 +207,15 @@ public final class FileRaftStorage implements RaftStorage {
                     logger.debug("Stack trace for log channel close failure", e);
                 }
             }
-
-            if (closeExecutorOnClose) {
-                executor.close();
-                logger.debug("Closed owned WorkerExecutor for FileRaftStorage");
-            }
             return null;
-        }, false);
+        }, true);
+
+        if (!closeExecutorOnClose) {
+            return closed;
+        }
+        // The executor cannot shut itself down from inside one of its own tasks.
+        return closed.eventually(() -> executor.close()
+                .onSuccess(v -> logger.debug("Closed owned WorkerExecutor for FileRaftStorage")));
     }
 
     // =========================================================================
@@ -222,7 +224,7 @@ public final class FileRaftStorage implements RaftStorage {
 
     @Override
     public Future<Void> updateMetadata(long currentTerm, Optional<String> votedFor) {
-        return vertx.executeBlocking(() -> {
+        return executor.executeBlocking(() -> {
             Path tmp = dataDir.resolve("meta.dat.tmp");
             Path dst = dataDir.resolve("meta.dat");
 
@@ -268,12 +270,12 @@ public final class FileRaftStorage implements RaftStorage {
 
             logger.debug("Metadata updated: term={}, votedFor={}", currentTerm, votedFor.orElse("(none)"));
             return null;
-        }, false);
+        }, true);
     }
 
     @Override
     public Future<PersistentMeta> loadMetadata() {
-        return vertx.executeBlocking(() -> {
+        return executor.executeBlocking(() -> {
             Path metaPath = dataDir.resolve("meta.dat");
 
             if (!Files.exists(metaPath)) {
@@ -319,7 +321,7 @@ public final class FileRaftStorage implements RaftStorage {
 
             logger.debug("Metadata loaded: term={}, votedFor={}", term, votedFor.orElse("(none)"));
             return new PersistentMeta(term, votedFor);
-        }, false);
+        }, true);
     }
 
     // =========================================================================
@@ -332,27 +334,27 @@ public final class FileRaftStorage implements RaftStorage {
             return Future.succeededFuture();
         }
 
-        return vertx.executeBlocking(() -> {
+        return executor.executeBlocking(() -> {
             for (LogEntryData entry : entries) {
                 writeRecord(TYPE_APPEND, entry.index(), entry.term(), entry.payload());
             }
             logger.debug("Appended {} entries to WAL", entries.size());
             return null;
-        }, false);
+        }, true);
     }
 
     @Override
     public Future<Void> truncateSuffix(long fromIndex) {
-        return vertx.executeBlocking(() -> {
+        return executor.executeBlocking(() -> {
             writeRecord(TYPE_TRUNCATE, fromIndex, 0L, new byte[0]);
             logger.debug("Recorded truncation from index {}", fromIndex);
             return null;
-        }, false);
+        }, true);
     }
 
     @Override
     public Future<Void> sync() {
-        return vertx.executeBlocking(() -> {
+        return executor.executeBlocking(() -> {
             if (fsyncEnabled) {
                 logChannel.force(true);
                 logger.trace("WAL synced to disk");
@@ -360,12 +362,12 @@ public final class FileRaftStorage implements RaftStorage {
                 logger.trace("WAL sync skipped (fsync disabled)");
             }
             return null;
-        }, false);
+        }, true);
     }
 
     @Override
     public Future<List<LogEntryData>> replayLog() {
-        return vertx.executeBlocking(() -> {
+        return executor.executeBlocking(() -> {
             Path logPath = dataDir.resolve("raft.log");
 
             if (!Files.exists(logPath)) {
@@ -456,8 +458,7 @@ public final class FileRaftStorage implements RaftStorage {
                     } else if (type == TYPE_APPEND) {
                         byte[] payload = new byte[payloadLen];
                         payloadBuf.get(payload);
-                        result.add(new LogEntryData(index, term, payload));
-                        logger.trace("Replay: appended entry at index {}, term {}", index, term);
+                        restoreAppendRecord(result, new LogEntryData(index, term, payload));
                     } else {
                         logger.warn("Unknown record type at position {}: {}", pos, type);
                         break;
@@ -478,7 +479,32 @@ public final class FileRaftStorage implements RaftStorage {
 
             logger.info("WAL replay complete: {} entries recovered", result.size());
             return result;
-        }, false);
+        }, true);
+    }
+
+    /**
+     * Applies an APPEND record to the replay result. The journal is append-only, so a record
+     * for an index that is already present is either an idempotent duplicate (same term,
+     * therefore the same entry under the Raft log matching property) or a later write that
+     * supersedes the tail from that index. The result stays contiguous and ordered, so the
+     * entry for an index, when present, sits at a fixed offset from the first entry.
+     */
+    private static void restoreAppendRecord(List<LogEntryData> result, LogEntryData record) {
+        if (!result.isEmpty() && record.index() <= result.get(result.size() - 1).index()) {
+            int position = (int) (record.index() - result.get(0).index());
+            if (position >= 0 && position < result.size() && result.get(position).index() == record.index()) {
+                LogEntryData existing = result.get(position);
+                if (existing.term() == record.term()) {
+                    logger.debug("Replay: ignoring duplicate record at index {}, term {}", record.index(), record.term());
+                    return;
+                }
+                logger.debug("Replay: record at index {} (term {}) supersedes {} entries from term {}",
+                        record.index(), record.term(), result.size() - position, existing.term());
+                result.subList(position, result.size()).clear();
+            }
+        }
+        result.add(record);
+        logger.trace("Replay: appended entry at index {}, term {}", record.index(), record.term());
     }
 
     // =========================================================================
@@ -487,7 +513,7 @@ public final class FileRaftStorage implements RaftStorage {
 
     @Override
     public Future<Void> saveSnapshot(byte[] data, long lastIncludedIndex, long lastIncludedTerm) {
-        return vertx.executeBlocking(() -> {
+        return executor.executeBlocking(() -> {
             Path snapshotPath = dataDir.resolve("snapshot.dat");
             Path tmpPath = dataDir.resolve("snapshot.dat.tmp");
 
@@ -529,12 +555,12 @@ public final class FileRaftStorage implements RaftStorage {
             logger.info("Snapshot saved: lastIncludedIndex={}, lastIncludedTerm={}, size={}bytes",
                     lastIncludedIndex, lastIncludedTerm, data.length);
             return null;
-        }, false);
+        }, true);
     }
 
     @Override
     public Future<Optional<SnapshotData>> loadSnapshot() {
-        return vertx.executeBlocking(() -> {
+        return executor.executeBlocking(() -> {
             Path snapshotPath = dataDir.resolve("snapshot.dat");
 
             if (!Files.exists(snapshotPath)) {
@@ -578,12 +604,12 @@ public final class FileRaftStorage implements RaftStorage {
             logger.info("Snapshot loaded: lastIncludedIndex={}, lastIncludedTerm={}, size={}bytes",
                     lastIncludedIndex, lastIncludedTerm, dataLen);
             return Optional.of(new SnapshotData(data, lastIncludedIndex, lastIncludedTerm));
-        }, false);
+        }, true);
     }
 
     @Override
     public Future<Void> truncatePrefix(long toIndex) {
-        return vertx.executeBlocking(() -> {
+        return executor.executeBlocking(() -> {
             // Prefix truncation in a WAL is achieved by rewriting the log file
             // excluding entries with index <= toIndex.
             // For efficiency, we replay the current log, filter, and rewrite.
@@ -638,7 +664,7 @@ public final class FileRaftStorage implements RaftStorage {
             logger.info("WAL prefix truncation complete: removed {} entries, {} remaining",
                     originalSize - entries.size(), entries.size());
             return null;
-        }, false);
+        }, true);
     }
 
     /**
