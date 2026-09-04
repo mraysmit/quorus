@@ -58,6 +58,7 @@ public final class RaftLogStorageAdapter implements RaftStorage {
 
     private final Vertx vertx;
     private final dev.mars.raftlog.storage.RaftStorage delegate;
+    private FileSnapshotStore snapshots;
 
     // =========================================================================
     // Constructors
@@ -105,21 +106,19 @@ public final class RaftLogStorageAdapter implements RaftStorage {
     @Override
     public Future<Void> open(Path dataDir) {
         logger.info("Opening RaftLog storage at: {}", dataDir);
-        return toVertxFuture(delegate.open(dataDir));
+        return toVertxFuture(delegate.open(dataDir))
+                .onSuccess(v -> snapshots = new FileSnapshotStore(vertx, dataDir));
     }
 
     @Override
     public Future<Void> close() {
         logger.info("Closing RaftLog storage");
-        // The raftlog library's close() is synchronous
-        try {
+        // The library close may wait for disk writes: never block the event loop.
+        Future<Void> drained = snapshots == null ? Future.succeededFuture() : snapshots.drain();
+        return drained.compose(v -> vertx.executeBlocking(() -> {
             delegate.close();
-            return Future.succeededFuture();
-        } catch (Exception e) {
-            logger.error("Error closing RaftLog storage: {}", e.getMessage());
-            logger.debug("Stack trace for RaftLog storage close failure", e);
-            return Future.failedFuture(e);
-        }
+            return (Void) null;
+        }));
     }
 
     // =========================================================================
@@ -188,39 +187,23 @@ public final class RaftLogStorageAdapter implements RaftStorage {
     // Snapshot Operations (delegated to file-based storage)
     // =========================================================================
 
-    /**
-     * Snapshot data stored in-memory for the adapter layer.
-     * The raftlog-core library does not natively support snapshots,
-     * so we implement snapshot persistence directly using the data directory.
-     */
-    private byte[] snapshotData;
-    private long snapshotLastIncludedIndex = -1;
-    private long snapshotLastIncludedTerm = -1;
-
     @Override
     public Future<Void> saveSnapshot(byte[] data, long lastIncludedIndex, long lastIncludedTerm) {
         logger.info("Saving snapshot: lastIncludedIndex={}, lastIncludedTerm={}, size={}bytes",
                 lastIncludedIndex, lastIncludedTerm, data.length);
-        // Store in memory - the raftlog-core library doesn't have snapshot support
-        this.snapshotData = data.clone();
-        this.snapshotLastIncludedIndex = lastIncludedIndex;
-        this.snapshotLastIncludedTerm = lastIncludedTerm;
-        return Future.succeededFuture();
+        return snapshots.save(data, lastIncludedIndex, lastIncludedTerm);
     }
 
     @Override
     public Future<Optional<SnapshotData>> loadSnapshot() {
-        if (snapshotData == null) {
-            return Future.succeededFuture(Optional.empty());
-        }
-        return Future.succeededFuture(Optional.of(
-                new SnapshotData(snapshotData.clone(), snapshotLastIncludedIndex, snapshotLastIncludedTerm)));
+        return snapshots.load();
     }
 
     @Override
     public Future<Void> truncatePrefix(long toIndex) {
         logger.info("Compacting log prefix up to index {}", toIndex);
-        return toVertxFuture(delegate.truncatePrefix(toIndex));
+        return snapshots.requireSnapshot(toIndex)
+                .compose(v -> toVertxFuture(delegate.truncatePrefix(toIndex)));
     }
 
     // =========================================================================

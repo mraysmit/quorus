@@ -1011,7 +1011,7 @@ Before considering the WAL "done":
 - ✅ **Application Order:** Entries are applied to the State Machine strictly in-order
 - ✅ **Leader Consistency:** Leader only advances `commitIndex` after a majority `sync()` is confirmed
 - ✅ **Replay Safety:** Replay truncates corrupt/partial tail safely
-- ✅ **Prefix Compaction:** `RaftLogStorageAdapter.truncatePrefix` delegates to raftlog-core 1.2.0, which rewrites the journal atomically without the entries at or below the snapshot index; gap RAFT-STORAGE-PREFIX-TRUNCATION-001 closed 2026-09-04
+- **Prefix Compaction and Snapshot Recovery — R1 remediation:** `RaftLogStorageAdapter.truncatePrefix` delegates to raftlog-core 1.2.0 only after a durable covering snapshot and recovery-dependency marker have been published. The earlier closure of RAFT-STORAGE-PREFIX-TRUNCATION-001 proved deletion, not restart safety; R1 retains the failing fresh-instance/three-controller restart evidence and the subsequent fixes.
 - ✅ **Overlap Safety:** Two mutations that overlap an in-flight WAL write never persist or reserve the same index twice
 - ✅ **Replay Idempotence:** A repeated record for an index is ignored; a gap fails recovery instead of misplacing later entries
 - ✅ **Election Liveness:** A rejected `RequestVote` does not reset the election timer of a follower
@@ -1020,6 +1020,19 @@ Before considering the WAL "done":
 
 ---
 ## 19. Design Review Feedback
+
+### Snapshot recovery implementation checkpoint — 2026-09-04
+
+The current adapter uses `FileSnapshotStore` for a snapshot sidecar; raftlog-core remains the only WAL. Snapshot I/O runs on Vert.x workers and completes only after file force, atomic replacement and directory force on supported production filesystems. Windows development follows Appendix A.1; it is not evidence of Linux power-loss durability.
+
+- `snapshot.dat`: QSNP magic, format version 1, last-included index and term, exact payload length, payload, CRC32C covering header and payload. The previous unversioned index/term/length/payload/CRC32C format remains readable.
+- `snapshot.required`: checksummed minimum recovery index, atomically published before prefix deletion. If this dependency exists, a missing, corrupt or older snapshot fails recovery instead of appearing to be a fresh node. This cannot detect or reconstruct state already lost by older releases that wrote no marker.
+- `snapshot.dat.tmp` and `snapshot.required.tmp`: unpublished files; never recovery authorities. A failed temporary write does not replace the published snapshot. Older snapshot coordinates are rejected.
+- Snapshot capture and InstallSnapshot share the Raft log-mutation queue with appends. Installation retains a suffix only when the index/term boundary matches; a conflicting suffix is removed from disk as well as memory. If installation stops after snapshot publication but before suffix deletion, startup checks the remaining WAL boundary, discards a conflicting suffix and completes prefix compaction before accepting new appends. A second restart must retain newly acknowledged entries.
+
+**Operator recovery requirements:** preserve the whole stopped-node data directory, including snapshot, dependency marker and raftlog files. Do not back up or restore these files independently, delete the marker to bypass recovery validation, or treat an empty WAL from a previously compacted release as proof of an empty application state. On recovery failure preserve the evidence and restore from a verified backup/healthy authoritative replica under the existing recovery procedure. Rolling back the binary does not restore deleted WAL entries; pre-R1 adapters do not understand the new snapshot recovery contract. Keep release blocked until the remediation checkpoint's acceptance gates pass.
+
+Focused red/green results and limitations are retained in [Raft TDD evidence](../evidence/raft-log-tdd-evidence-2026-09-04.json). The fresh-instance and three-controller tests exercise process-local object replacement, not an OS power interruption.
 
 **Review Date:** 2026-01-28
 
