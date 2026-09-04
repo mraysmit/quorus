@@ -50,7 +50,7 @@ import java.util.Optional;
  * </ul>
  *
  * <p><b>Requirements:</b> This class requires {@code org.rocksdb:rocksdbjni} on the classpath.
- * If not present, use {@link dev.mars.quorus.controller.raft.storage.file.FileRaftStorage} instead.</p>
+ * If not present, use the raftlog-backed {@link dev.mars.quorus.controller.raft.storage.RaftLogStorageAdapter} instead.</p>
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @version 1.0

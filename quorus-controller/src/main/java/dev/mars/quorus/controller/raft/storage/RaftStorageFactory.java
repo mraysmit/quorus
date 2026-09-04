@@ -16,7 +16,6 @@
 
 package dev.mars.quorus.controller.raft.storage;
 
-import dev.mars.quorus.controller.raft.storage.file.FileRaftStorage;
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
 import io.vertx.core.WorkerExecutor;
@@ -53,8 +52,6 @@ public final class RaftStorageFactory {
     public enum StorageType {
         /** Production WAL from raftlog-core library (default) */
         RAFTLOG,
-        /** Custom WAL implementation (Quorus-internal) */
-        FILE,
         /** RocksDB key-value store (high performance) */
         ROCKSDB,
         /** In-memory storage (testing only, not durable) */
@@ -76,7 +73,7 @@ public final class RaftStorageFactory {
      * </ul>
      *
      * @param vertx       the Vert.x instance
-     * @param storageType the storage type ("file", "rocksdb", or "memory")
+     * @param storageType the storage type ("raftlog", "rocksdb", or "memory")
      * @param storagePath the path for persistent storage (ignored for memory)
      * @param fsync       whether to fsync after writes (ignored for memory)
      * @return a Future completing with the opened RaftStorage
@@ -95,13 +92,6 @@ public final class RaftStorageFactory {
                         .syncEnabled(fsync)
                         .build();
                 RaftLogStorageAdapter storage = new RaftLogStorageAdapter(vertx, config);
-                yield storage.open(storagePath).map(v -> (RaftStorage) storage);
-            }
-            case FILE -> {
-                // Create a dedicated single-threaded executor for serialized WAL I/O
-                WorkerExecutor executor = vertx.createSharedWorkerExecutor(
-                        "raft-wal-executor", 1, 60_000_000_000L); // 60s max exec time
-                FileRaftStorage storage = new FileRaftStorage(vertx, executor, storagePath, fsync, true);
                 yield storage.open(storagePath).map(v -> (RaftStorage) storage);
             }
             case ROCKSDB -> {
@@ -135,16 +125,15 @@ public final class RaftStorageFactory {
 
     private static StorageType parseStorageType(String type) {
         if (type == null || type.isBlank()) {
-            return StorageType.FILE;
+            return StorageType.RAFTLOG;
         }
 
         return switch (type.toLowerCase().trim()) {
             case "raftlog", "wal" -> StorageType.RAFTLOG;
-            case "file" -> StorageType.FILE;
             case "rocksdb", "rocks" -> StorageType.ROCKSDB;
             case "memory", "inmemory", "in-memory", "test" -> StorageType.MEMORY;
             default -> throw new IllegalArgumentException(
-                    "Unknown storage type: '" + type + "'. Valid options: raftlog, file, rocksdb, memory");
+                    "Unknown storage type: '" + type + "'. Valid options: raftlog, rocksdb, memory");
         };
     }
 
@@ -154,7 +143,7 @@ public final class RaftStorageFactory {
         } catch (ClassNotFoundException e) {
             throw new IllegalStateException(
                     "RocksDB storage requested but org.rocksdb:rocksdbjni is not on classpath. " +
-                    "Add the dependency to your pom.xml or use storage.type=file instead.\n" +
+                    "Add the dependency to your pom.xml or use storage.type=raftlog instead.\n" +
                     "Maven dependency:\n" +
                     "  <dependency>\n" +
                     "    <groupId>org.rocksdb</groupId>\n" +
