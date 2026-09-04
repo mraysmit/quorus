@@ -257,7 +257,7 @@ Agents communicate with the controller via REST API at `{controller}/api/v1`:
 
 ## OpenTelemetry Integration
 
-All modules use OpenTelemetry for metrics/tracing. Initialize via `TelemetryConfig.configure(vertxOptions)`.
+All modules use OpenTelemetry for metrics/tracing. The controller initializes via `TelemetryConfig.configure(vertxOptions, appConfig)` using its injected configuration instance.
 
 ### Metrics Pattern
 ```java
@@ -386,7 +386,7 @@ Before writing any code, **identify the data flow end-to-end**: entry point → 
 Every feature must have at least one test that **exercises the full path a real request would take**. Unit tests of individual methods are not sufficient on their own. The test must prove the feature works from the perspective of the external caller (HTTP client, agent, etc.). Example: to test correlation ID propagation, send an HTTP request with `X-Request-ID`, trigger an error, and assert the JSON response `requestId` matches.
 
 ### 4. No Document Proliferation
-Do not create new standalone documents (markdown files, changelog files, example files) unless explicitly requested. Consolidate into existing working documents. The single source of truth for implementation planning is `docs-design/task/QUORUS_ALPHA_IMPLEMENTATION_PLAN.md`.
+Do not create new standalone documents (markdown files, changelog files, example files) unless explicitly requested. Consolidate into existing working documents. The current delivery roadmap is `docs-design/task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md`; `QUORUS_ALPHA_IMPLEMENTATION_PLAN.md` is retained as historical evidence.
 
 ## Process Rules: Preventing Incomplete Work (MANDATORY)
 

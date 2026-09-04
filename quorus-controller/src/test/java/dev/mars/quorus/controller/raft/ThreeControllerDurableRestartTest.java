@@ -57,6 +57,16 @@ class ThreeControllerDurableRestartTest {
     @Test
     @DisplayName("All controllers recover the same committed transfer after a full-cluster restart")
     void fullClusterRestartRecoversCommittedAuthoritativeState(Vertx vertx) {
+        verifyFullClusterRestart(vertx, false);
+    }
+
+    @Test
+    @DisplayName("All controllers recover committed state after snapshots compact the entire WAL")
+    void fullClusterRestartAfterSnapshotCompaction(Vertx vertx) {
+        verifyFullClusterRestart(vertx, true);
+    }
+
+    private void verifyFullClusterRestart(Vertx vertx, boolean compact) {
         Cluster first = startCluster(vertx, "first");
         Cluster recovered = null;
         try {
@@ -83,6 +93,12 @@ class ThreeControllerDurableRestartTest {
             awaitSuccess(eventually(vertx, () -> initialCluster.nodes().stream().allMatch(node ->
                     node.getCommitIndex() >= committedIndex && node.getLogSize() == durableLogSize), TIMEOUT),
                     TIMEOUT.plusSeconds(1));
+
+            if (compact) {
+                for (RaftNode node : first.nodes()) {
+                    awaitSuccess(node.takeSnapshot(), TIMEOUT);
+                }
+            }
 
             stopCluster(first);
             first = null;
