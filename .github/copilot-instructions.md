@@ -45,12 +45,13 @@ All exceptions extend `QuorusException`:
 Each module has `src/main/resources/<module>.properties` with override support.
 
 **Resolution order (highest to lowest priority):**
-1. Environment variable: `QUORUS_HTTP_PORT=8080`
-2. System property: `-Dquorus.http.port=8080`
-3. Properties file: `quorus.http.port=8080`
-4. Default value
+1. Explicit `Properties` passed to the configuration constructor
+2. Environment variable: `QUORUS_HTTP_PORT=8080` (key upper-cased, `.` and `-` become `_`)
+3. Profile resource: `quorus-controller-<profile>.properties` (profile `default` loads none)
+4. Packaged defaults: `quorus.http.port=8080` in `quorus-controller.properties`
+5. Accessor default value
 
-Config classes use singleton pattern: `AppConfig.get()`, `AgentConfig.get()`
+JVM system properties (`-Dquorus.*`) are **not** a configuration source. Config classes are per-instance, not singletons: `new AppConfig(profile, overrides)`, `new AgentConfig(profile, overrides)`, `new QuorusConfiguration(profile, overrides)`. Build one at the application boundary and pass it explicitly; controller tests use `ControllerTestConfig.create()`.
 
 ## Build & Test Commands
 

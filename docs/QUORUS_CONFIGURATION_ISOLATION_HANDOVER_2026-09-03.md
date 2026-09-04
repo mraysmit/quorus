@@ -6,8 +6,19 @@
 **Date:** 2026-09-03  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
-**Status:** Handover of uncommitted work in progress  
+**Status:** Superseded — see the post-handover status below  
 **Scope:** Working tree on `master` at commit `fab72a6` as inspected on 2026-09-03
+
+## Post-handover status — 2026-09-04
+
+The working tree described here was committed as `b35fb25` (`refactor(config): isolate layered config; drop singletons and -D flags`). A follow-up on 2026-09-04 then addressed the blocking findings:
+
+- Finding 1: `AppConfig.getString` and `AgentConfig.getString` derive the variable name from the key when no properties resource declares it, so hyphenated keys such as `quorus.raft.io.queue-size` are reachable from the environment again.
+- Finding 2: `AgentConfig` applies the legacy unprefixed names first and the documented `QUORUS_AGENT_*` names second, so the documented name wins. The `QUORUS_VAULT_ADDR` and `QUORUS_VAULT_TOKEN` entries left the legacy map because they are the documented names and the generic pass already reaches them. `AgentConfig` also gained a package-private constructor that accepts an environment map for tests.
+- Finding 3: `AppConfig.validate()` rejects a non-positive attempt lease, and `QuorusControllerVerticle` chains its asynchronous start steps with `compose`, so an exception in any step fails the deployment after stopping the components that already started.
+- Finding 8: the Copilot instructions and the Raft WAL design snippet were updated.
+
+Findings 4 to 7 and every item in section 7 remain open. The rest of this document is preserved as written on 2026-09-03.
 
 ## Document purpose
 
