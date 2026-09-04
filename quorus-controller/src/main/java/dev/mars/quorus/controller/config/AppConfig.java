@@ -158,10 +158,10 @@ public final class AppConfig {
 
     /**
      * Gets the Raft storage backend type.
-     * Supported values: "file" (default), "rocksdb", "memory" (testing only).
+     * Supported values: "raftlog" (default, the raftlog-core library) and "memory" (testing only).
      */
     public String getRaftStorageType() {
-        return getString("quorus.raft.storage.type", "file");
+        return getString("quorus.raft.storage.type", "raftlog");
     }
 
     /**
@@ -438,9 +438,9 @@ public final class AppConfig {
 
         // Validate storage type
         String storageType = getRaftStorageType();
-        if (!storageType.equals("raftlog") && !storageType.equals("file") && !storageType.equals("memory")) {
+        if (!storageType.equals("raftlog") && !storageType.equals("memory")) {
             throw new IllegalStateException(
-                    "Raft storage type must be 'raftlog', 'file', or 'memory', got: " + storageType);
+                    "Raft storage type must be 'raftlog' or 'memory', got: " + storageType);
         }
 
         logger.info("Controller configuration validated successfully");

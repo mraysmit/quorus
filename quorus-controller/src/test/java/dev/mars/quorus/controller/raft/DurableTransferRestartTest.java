@@ -21,7 +21,7 @@ import dev.mars.quorus.agent.AgentInfo;
 import dev.mars.quorus.agent.AgentStatus;
 import dev.mars.quorus.controller.http.HttpApiServer;
 import dev.mars.quorus.controller.raft.storage.RaftStorage;
-import dev.mars.quorus.controller.raft.storage.file.FileRaftStorage;
+import dev.mars.quorus.controller.raft.storage.RaftStorageFactory;
 import dev.mars.quorus.controller.state.AgentCommand;
 import dev.mars.quorus.controller.state.CommandResult;
 import dev.mars.quorus.controller.state.JobAssignmentCommand;
@@ -34,7 +34,6 @@ import dev.mars.quorus.core.JobAssignmentStatus;
 import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferStatus;
 import io.vertx.core.Vertx;
-import io.vertx.core.WorkerExecutor;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.client.WebClient;
 import io.vertx.ext.web.client.HttpResponse;
@@ -74,8 +73,6 @@ class DurableTransferRestartTest {
     @DisplayName("Committed transfer lifecycle survives restart and remains available through REST")
     void committedTransferSurvivesRestartAndApiQuery(Vertx vertx) {
         Path storagePath = tempDir.resolve("mounted-data").resolve("raft");
-        WorkerExecutor firstExecutor = vertx.createSharedWorkerExecutor("phase0-storage-first", 1);
-        WorkerExecutor recoveredExecutor = vertx.createSharedWorkerExecutor("phase0-storage-recovered", 1);
         RaftNode firstNode = null;
         RaftNode recoveredNode = null;
         HttpApiServer apiServer = null;
@@ -83,7 +80,7 @@ class DurableTransferRestartTest {
 
         try {
             QuorusStateStore firstState = new QuorusStateStore();
-            RaftStorage firstStorage = openStorage(vertx, firstExecutor, storagePath);
+            RaftStorage firstStorage = openStorage(vertx, storagePath);
             firstNode = node(vertx, firstState, firstStorage);
             awaitSuccess(firstNode.start(), TIMEOUT);
             awaitSuccess(eventually(vertx, firstNode::isLeader, TIMEOUT), TIMEOUT.plusSeconds(1));
@@ -147,7 +144,7 @@ class DurableTransferRestartTest {
             firstNode = null;
 
             QuorusStateStore recoveredState = new QuorusStateStore();
-            RaftStorage recoveredStorage = openStorage(vertx, recoveredExecutor, storagePath);
+            RaftStorage recoveredStorage = openStorage(vertx, storagePath);
             recoveredNode = node(vertx, recoveredState, recoveredStorage);
             awaitSuccess(recoveredNode.start(), TIMEOUT);
 
@@ -185,15 +182,11 @@ class DurableTransferRestartTest {
             if (firstNode != null) {
                 awaitSuccess(firstNode.stop(), TIMEOUT);
             }
-            awaitSuccess(firstExecutor.close(), TIMEOUT);
-            awaitSuccess(recoveredExecutor.close(), TIMEOUT);
         }
     }
 
-    private static RaftStorage openStorage(Vertx vertx, WorkerExecutor executor, Path path) {
-        RaftStorage storage = new FileRaftStorage(vertx, executor);
-        awaitSuccess(storage.open(path), TIMEOUT);
-        return storage;
+    private static RaftStorage openStorage(Vertx vertx, Path path) {
+        return awaitSuccess(RaftStorageFactory.create(vertx, "raftlog", path, true), TIMEOUT);
     }
 
     private static RaftNode node(Vertx vertx, QuorusStateStore state, RaftStorage storage) {

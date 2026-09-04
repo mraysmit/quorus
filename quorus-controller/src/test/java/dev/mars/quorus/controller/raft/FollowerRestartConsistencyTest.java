@@ -7,17 +7,15 @@ package dev.mars.quorus.controller.raft;
 import dev.mars.quorus.controller.raft.grpc.AppendEntriesRequest;
 import dev.mars.quorus.controller.raft.grpc.AppendEntriesResponse;
 import dev.mars.quorus.controller.raft.grpc.VoteRequest;
-import dev.mars.quorus.controller.raft.grpc.VoteResponse;
 import dev.mars.quorus.controller.raft.storage.RaftStorage;
 import dev.mars.quorus.controller.raft.storage.RaftStorage.LogEntryData;
-import dev.mars.quorus.controller.raft.storage.file.FileRaftStorage;
+import dev.mars.quorus.controller.raft.storage.RaftStorageFactory;
 import dev.mars.quorus.controller.state.CommandResult;
 import dev.mars.quorus.controller.state.ProtobufCommandCodec;
 import dev.mars.quorus.controller.state.QuorusStateStore;
 import dev.mars.quorus.controller.state.SystemMetadataCommand;
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
-import io.vertx.core.WorkerExecutor;
 import io.vertx.junit5.VertxExtension;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -30,19 +28,23 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static dev.mars.quorus.testing.TestFutureUtils.awaitSuccess;
 import static dev.mars.quorus.testing.TestFutureUtils.eventually;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Regression tests for the defects behind the intermittent {@link ThreeControllerDurableRestartTest}
  * failure: log mutations that overlapped an in-flight storage write reserved or persisted the same
- * index twice, replay reproduced such duplicates positionally, and the election timer of a follower
- * was reset by vote requests it rejected.
+ * index twice, recovery reproduced such duplicates positionally, and the election timer of a follower
+ * was reset by vote requests it rejected. Storage is obtained through {@link RaftStorageFactory}, the
+ * same boundary the controller uses, so every test runs against the production log implementation.
  */
 @ExtendWith(VertxExtension.class)
 class FollowerRestartConsistencyTest {
@@ -62,9 +64,7 @@ class FollowerRestartConsistencyTest {
     @DisplayName("Overlapping AppendEntries for the same index must not duplicate WAL records")
     void overlappingAppendEntriesDoNotDuplicateWalRecords(Vertx vertx) {
         Path dataDir = tempDir.resolve("follower-raft");
-        RaftStorage storage = openStorage(vertx, dataDir, "follower-wal");
-
-        RaftNode follower = follower(vertx, storage, 10_000);
+        RaftNode follower = follower(vertx, openStorage(vertx, dataDir), 10_000);
         awaitSuccess(follower.start(), TIMEOUT);
 
         var first = entry(1, 1, "first");
@@ -87,7 +87,7 @@ class FollowerRestartConsistencyTest {
 
         assertEquals(List.of(1L, 2L), replayedIndices(vertx, dataDir), "WAL must hold each index exactly once");
 
-        RaftNode recovered = follower(vertx, openStorage(vertx, dataDir, "follower-wal-recovered"), 10_000);
+        RaftNode recovered = follower(vertx, openStorage(vertx, dataDir), 10_000);
         awaitSuccess(recovered.start(), TIMEOUT);
         assertEquals(2, recovered.getLastLogIndex(), "recovered log must end at the last replicated index");
         awaitSuccess(recovered.stop(), TIMEOUT);
@@ -97,15 +97,13 @@ class FollowerRestartConsistencyTest {
     @DisplayName("Overlapping leader submits must reserve distinct indices")
     void overlappingLeaderSubmitsReserveDistinctIndices(Vertx vertx) {
         Path dataDir = tempDir.resolve("leader-raft");
-        RaftStorage storage = openStorage(vertx, dataDir, "leader-wal");
-
         RaftNode leader = RaftNode.builder()
                 .vertx(vertx)
                 .nodeId("leader")
                 .clusterNodes(Set.of("leader"))
                 .transport(new InMemoryTransportSimulator("leader"))
                 .stateMachine(new QuorusStateStore())
-                .mode(RaftNodeMode.durable(storage))
+                .mode(RaftNodeMode.durable(openStorage(vertx, dataDir)))
                 .electionTimeout(200)
                 .heartbeatInterval(50)
                 .build();
@@ -126,33 +124,34 @@ class FollowerRestartConsistencyTest {
     }
 
     @Test
-    @DisplayName("Replay keys repeated APPEND records by index instead of position")
-    void replayKeysRepeatedAppendRecordsByIndex(Vertx vertx) {
+    @DisplayName("Recovery keys repeated storage records by index instead of position")
+    void recoveryKeysRepeatedRecordsByIndex(Vertx vertx) {
         Path dataDir = tempDir.resolve("journal");
-        RaftStorage storage = openStorage(vertx, dataDir, "journal-wal");
-
+        RaftStorage storage = openStorage(vertx, dataDir);
         awaitSuccess(storage.appendEntries(List.of(record(1, 1))), TIMEOUT);
         awaitSuccess(storage.appendEntries(List.of(record(2, 1))), TIMEOUT);
         // A duplicate written by an older release: same index, same term, therefore the same entry.
         awaitSuccess(storage.appendEntries(List.of(record(1, 1))), TIMEOUT);
-        assertEquals(List.of(1L, 2L), replayedIndices(vertx, dataDir), "same-term duplicate is ignored");
-
         // A genuine overwrite from a newer leader supersedes the tail from that index.
         awaitSuccess(storage.appendEntries(List.of(record(2, 2))), TIMEOUT);
-        List<LogEntryData> replayed = awaitSuccess(openStorage(vertx, dataDir, "journal-replay").replayLog(), TIMEOUT);
-        assertEquals(List.of(1L, 2L), replayed.stream().map(LogEntryData::index).toList());
-        assertEquals(List.of(1L, 2L), replayed.stream().map(LogEntryData::term).toList(), "index 2 now carries term 2");
+        awaitSuccess(storage.sync(), TIMEOUT);
         awaitSuccess(storage.close(), TIMEOUT);
 
-        RaftNode recovered = follower(vertx, openStorage(vertx, dataDir, "journal-recovered"), 10_000);
+        RaftNode recovered = follower(vertx, openStorage(vertx, dataDir), 10_000);
         awaitSuccess(recovered.start(), TIMEOUT);
-        assertEquals(2, recovered.getLastLogIndex());
+        assertEquals(2, recovered.getLastLogIndex(), "the duplicate is ignored and index 2 is replaced in place");
+        assertEquals(3, recovered.getLogSize(), "sentinel plus indices 1 and 2");
+
+        // Index 2 must now carry term 2: a candidate whose last entry is (index 2, term 1) is
+        // behind this log and is refused, one whose last entry is (index 2, term 2) is granted.
+        assertFalse(awaitSuccess(recovered.handleVoteRequest(voteRequest(5, 2, 1)), TIMEOUT).getVoteGranted());
+        assertTrue(awaitSuccess(recovered.handleVoteRequest(voteRequest(6, 2, 2)), TIMEOUT).getVoteGranted());
         awaitSuccess(recovered.stop(), TIMEOUT);
     }
 
     @Test
     @DisplayName("Rejected vote requests must not keep resetting the election timer of a follower")
-    void rejectedVoteRequestsDoNotSuppressElectionTimeout(Vertx vertx) throws InterruptedException {
+    void rejectedVoteRequestsDoNotSuppressElectionTimeout(Vertx vertx) {
         RaftNode follower = follower(vertx, null, 300);
         awaitSuccess(follower.start(), TIMEOUT);
 
@@ -171,20 +170,28 @@ class FollowerRestartConsistencyTest {
 
         // A stale peer with a shorter timeout asks for votes every 100 ms with a higher term.
         // Each request is rejected. The own 300 to 600 ms timeout of the follower must still fire.
-        long deadline = System.nanoTime() + Duration.ofSeconds(3).toNanos();
-        long term = follower.getCurrentTerm();
-        while (System.nanoTime() < deadline && candidacies.get() == 0) {
-            term = Math.max(term, follower.getCurrentTerm()) + 1;
-            VoteResponse response = awaitSuccess(follower.handleVoteRequest(VoteRequest.newBuilder()
-                    .setTerm(term)
-                    .setCandidateId("third")
-                    .setLastLogTerm(0)
-                    .setLastLogIndex(0)
-                    .build()), TIMEOUT);
-            assertFalse(response.getVoteGranted(), "a candidate with an empty log must be rejected");
-            Thread.sleep(100);
+        AtomicLong term = new AtomicLong(follower.getCurrentTerm());
+        AtomicReference<Throwable> unexpected = new AtomicReference<>();
+        long pestering = vertx.setPeriodic(100, id -> {
+            long nextTerm = Math.max(term.get(), follower.getCurrentTerm()) + 1;
+            term.set(nextTerm);
+            follower.handleVoteRequest(voteRequest(nextTerm, 0, 0))
+                    .onSuccess(response -> {
+                        if (response.getVoteGranted()) {
+                            unexpected.compareAndSet(null,
+                                    new AssertionError("a candidate with an empty log must be rejected"));
+                        }
+                    })
+                    .onFailure(err -> unexpected.compareAndSet(null, err));
+        });
+        try {
+            awaitSuccess(eventually(vertx, () -> candidacies.get() > 0 || unexpected.get() != null,
+                    Duration.ofSeconds(3)).recover(timedOut -> Future.succeededFuture()), Duration.ofSeconds(4));
+        } finally {
+            vertx.cancelTimer(pestering);
         }
 
+        assertNull(unexpected.get(), "every vote request from the stale candidate must be rejected");
         assertTrue(candidacies.get() > 0,
                 "follower never started its own election while rejecting a stale candidate for 3 s");
         awaitSuccess(follower.stop(), TIMEOUT);
@@ -203,20 +210,27 @@ class FollowerRestartConsistencyTest {
                 .build();
     }
 
-    private static RaftStorage openStorage(Vertx vertx, Path dataDir, String executorName) {
-        WorkerExecutor executor = vertx.createSharedWorkerExecutor(executorName, 1);
-        RaftStorage storage = new FileRaftStorage(vertx, executor);
-        awaitSuccess(storage.open(dataDir), TIMEOUT);
-        return storage;
+    /** Obtains the production storage type through the same factory call the controller makes. */
+    private static RaftStorage openStorage(Vertx vertx, Path dataDir) {
+        return awaitSuccess(RaftStorageFactory.create(vertx, "raftlog", dataDir, true), TIMEOUT);
     }
 
     private static List<Long> replayedIndices(Vertx vertx, Path dataDir) {
-        RaftStorage storage = openStorage(vertx, dataDir, "replay-" + System.nanoTime());
+        RaftStorage storage = openStorage(vertx, dataDir);
         List<Long> indices = awaitSuccess(storage.replayLog(), TIMEOUT).stream()
                 .map(LogEntryData::index)
                 .toList();
         awaitSuccess(storage.close(), TIMEOUT);
         return indices;
+    }
+
+    private static VoteRequest voteRequest(long term, long lastLogIndex, long lastLogTerm) {
+        return VoteRequest.newBuilder()
+                .setTerm(term)
+                .setCandidateId("third")
+                .setLastLogIndex(lastLogIndex)
+                .setLastLogTerm(lastLogTerm)
+                .build();
     }
 
     private static AppendEntriesRequest appendEntries(long term, long prevLogIndex, long prevLogTerm,
