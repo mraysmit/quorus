@@ -2,6 +2,7 @@ package dev.mars.quorus.controller.raft;
 
 import dev.mars.quorus.controller.raft.grpc.VoteRequest;
 import dev.mars.quorus.controller.raft.grpc.VoteResponse;
+import dev.mars.quorus.controller.raft.storage.RaftStorage;
 import dev.mars.quorus.controller.raft.storage.RaftStorageFactory;
 import dev.mars.quorus.controller.state.QuorusStateStore;
 import io.vertx.core.Context;
@@ -16,7 +17,10 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static dev.mars.quorus.testing.TestFutureUtils.awaitSuccess;
 import static org.junit.jupiter.api.Assertions.*;
@@ -35,11 +39,14 @@ class ConcurrentVoteBoundaryTest {
 
     @Test
     void incomingVotesUseTheNodeContext(Vertx vertx) {
-        node = builder(vertx).mode(RaftNodeMode.volatileMode()).build();
+        RaftStorage delegate = awaitSuccess(RaftStorageFactory.create(vertx, "raftlog", directory, true), TIMEOUT);
+        AtomicReference<Context> metadataContext = new AtomicReference<>();
+        RaftStorage observingStorage = observingMetadataContext(delegate, metadataContext);
+        node = builder(vertx).mode(RaftNodeMode.durable(observingStorage)).build();
         Context startedOn = awaitSuccess(node.start().map(v -> Vertx.currentContext()), TIMEOUT);
-        Context votedOn = awaitSuccess(node.handleVoteRequest(vote("candidate-a"))
-                .map(v -> Vertx.currentContext()), TIMEOUT);
-        assertSame(startedOn, votedOn, "External RPC callers must enter the node's owning context");
+        awaitSuccess(node.handleVoteRequest(vote("candidate-a")), TIMEOUT);
+        assertSame(startedOn, metadataContext.get(),
+                "External RPC callers must mutate durable vote state on the node's owning context");
     }
 
     @Test
@@ -74,5 +81,29 @@ class ConcurrentVoteBoundaryTest {
 
     private VoteRequest vote(String candidate) {
         return VoteRequest.newBuilder().setTerm(1).setCandidateId(candidate).build();
+    }
+
+    private static RaftStorage observingMetadataContext(RaftStorage delegate,
+                                                         AtomicReference<Context> observed) {
+        return new RaftStorage() {
+            @Override public Future<Void> open(Path path) { return delegate.open(path); }
+            @Override public Future<Void> close() { return delegate.close(); }
+            @Override public Future<Void> updateMetadata(long term, Optional<String> votedFor) {
+                observed.set(Vertx.currentContext());
+                return delegate.updateMetadata(term, votedFor);
+            }
+            @Override public Future<PersistentMeta> loadMetadata() { return delegate.loadMetadata(); }
+            @Override public Future<Void> appendEntries(List<LogEntryData> entries) {
+                return delegate.appendEntries(entries);
+            }
+            @Override public Future<Void> truncateSuffix(long index) { return delegate.truncateSuffix(index); }
+            @Override public Future<Void> sync() { return delegate.sync(); }
+            @Override public Future<List<LogEntryData>> replayLog() { return delegate.replayLog(); }
+            @Override public Future<Void> saveSnapshot(byte[] data, long index, long term) {
+                return delegate.saveSnapshot(data, index, term);
+            }
+            @Override public Future<Optional<SnapshotData>> loadSnapshot() { return delegate.loadSnapshot(); }
+            @Override public Future<Void> truncatePrefix(long index) { return delegate.truncatePrefix(index); }
+        };
     }
 }

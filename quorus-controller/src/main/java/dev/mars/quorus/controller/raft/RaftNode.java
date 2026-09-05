@@ -598,8 +598,12 @@ public class RaftNode {
 
                 cancelTimers();
                 
-                // Stop transport and then close storage
+                // Storage owns an exclusive file lock and must close even if transport shutdown fails.
                 transport.stop()
+                    .recover(error -> {
+                        logger.warn("Transport shutdown failed for {}: {}", nodeId, error.getMessage());
+                        return Future.succeededFuture();
+                    })
                     .compose(v2 -> storage.map(RaftStorage::close)
                         .orElseGet(Future::succeededFuture))
                     .onSuccess(v2 -> {
