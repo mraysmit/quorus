@@ -20,6 +20,7 @@ import dev.mars.quorus.connection.ConnectionAccessRequest;
 import dev.mars.quorus.connection.ConnectionPolicyEnforcer;
 import dev.mars.quorus.connection.ConnectionPolicyException;
 import dev.mars.quorus.connection.HostResolver;
+import dev.mars.quorus.controller.http.ControllerConnectionAuthorizer;
 import dev.mars.quorus.connection.SecretReference;
 import dev.mars.quorus.connection.ServiceConnection;
 import dev.mars.quorus.controller.http.ErrorCode;
@@ -71,19 +72,31 @@ public class TransferHandler {
     private final RaftNode raftNode;
     private final QuorusStateStore stateStore;
     private final ServiceConnectionRegistry connectionRegistry;
-    private final ConnectionPolicyEnforcer connectionPolicyEnforcer;
+
     private final SecurityProfile securityProfile;
+    private final ControllerConnectionAuthorizer authorizer;
 
     public TransferHandler(RaftNode raftNode, QuorusStateStore stateStore) {
         this(raftNode, stateStore, SecurityProfile.DEVELOPMENT);
     }
 
     public TransferHandler(RaftNode raftNode, QuorusStateStore stateStore, SecurityProfile securityProfile) {
+        this(raftNode, stateStore, securityProfile, HostResolver.system());
+    }
+
+    public TransferHandler(RaftNode raftNode, QuorusStateStore stateStore, SecurityProfile securityProfile,
+                           HostResolver hostResolver) {
+        this(raftNode, stateStore, securityProfile, new ControllerConnectionAuthorizer(hostResolver));
+    }
+
+    public TransferHandler(RaftNode raftNode, QuorusStateStore stateStore, SecurityProfile securityProfile,
+                           ControllerConnectionAuthorizer authorizer) {
         this.raftNode = raftNode;
         this.stateStore = stateStore;
         this.connectionRegistry = new ServiceConnectionRegistry(stateStore);
-        this.connectionPolicyEnforcer = new ConnectionPolicyEnforcer();
+
         this.securityProfile = securityProfile;
+        this.authorizer = java.util.Objects.requireNonNull(authorizer);
     }
 
     /**
@@ -108,7 +121,7 @@ public class TransferHandler {
                 }
 
                 String serviceConnectionId = body.getString("serviceConnectionId");
-                ConnectionPolicyEnforcer.ConnectionAuthorization connectionAuthorization = null;
+
                 JsonObject jobBody = body.copy();
                 if (serviceConnectionId != null && !serviceConnectionId.isBlank()) {
                     ServiceConnection connection = connectionRegistry.findConnection(tenantId, serviceConnectionId);
@@ -139,41 +152,71 @@ public class TransferHandler {
                     }
                     ServiceConnection.Direction direction = ServiceConnection.Direction.valueOf(
                             body.getString("direction", "DOWNLOAD").toUpperCase(Locale.ROOT));
-                    connectionAuthorization = connectionPolicyEnforcer.authorizeController(connection,
-                            new ConnectionAccessRequest(tenantId, remotePath, direction,
-                                    agentPool, List.of()), HostResolver.system());
-                    JsonObject metadata = jobBody.getJsonObject("metadata", new JsonObject());
-                    metadata.put("serviceConnectionId", serviceConnectionId)
-                            .put("remotePath", remotePath)
-                            .put("connectionPolicyVersion", Integer.toString(connection.policyVersion()))
-                            .put("connectionPolicyDigest", connectionAuthorization.policyDigest())
-                            .put("agentPool", agentPool)
-                            .put("networkZone", connection.networkZone())
-                            .put("controllerResolvedAddresses",
-                                    String.join(",", connectionAuthorization.resolvedAddresses()));
-                    if (direction == ServiceConnection.Direction.DOWNLOAD) {
-                        if (body.getString("destinationPath") == null) {
-                            throw new QuorusApiException(ErrorCode.VALIDATION_ERROR,
-                                    "Governed downloads require destinationPath");
-                        }
-                        jobBody.put("sourceUri", connectionAuthorization.endpoint().toString())
-                                .remove("destinationUri");
-                    } else {
-                        String localSource = body.getString("sourceUri");
-                        if (localSource == null || !"file".equalsIgnoreCase(URI.create(localSource).getScheme())) {
-                            throw new QuorusApiException(ErrorCode.VALIDATION_ERROR,
-                                    "Governed uploads require a local file sourceUri");
-                        }
-                        CredentialBearingUriDetector.requireCredentialFree(URI.create(localSource), "Source");
-                        jobBody.put("sourceUri", localSource)
-                                .put("destinationUri", connectionAuthorization.endpoint().toString())
-                                .remove("destinationPath");
-                    }
-                    jobBody.put("metadata", metadata);
-                    jobBody.remove("serviceConnectionId");
-                    jobBody.remove("remotePath");
-                    jobBody.remove("direction");
-                    jobBody.remove("agentPool");
+                    authorizer.authorize(ctx.vertx(), connection,
+                            new ConnectionAccessRequest(tenantId, remotePath, direction, agentPool, List.of()))
+                            .onSuccess(connectionAuthorization -> {
+                                try {
+                                    if (!connection.equals(connectionRegistry.findConnection(tenantId, serviceConnectionId))) {
+                                        throw new QuorusApiException(ErrorCode.CONFLICT,
+                                                "Service connection changed during DNS authorization; retry");
+                                    }
+                                    SecretReference currentSecret = connectionRegistry.findSecret(
+                                            tenantId, connection.secretReferenceId());
+                                    if (!secretReference.equals(currentSecret)) {
+                                        throw new QuorusApiException(ErrorCode.CONFLICT,
+                                                "Service connection secret changed during DNS authorization; retry");
+                                    }
+                                    Instant completedAt = Instant.now();
+                                    if (currentSecret.status() == SecretReference.Status.ACTIVE
+                                            && currentSecret.expiresAt() != null
+                                            && !completedAt.isBefore(currentSecret.expiresAt())) {
+                                        expireSecretReference(currentSecret).onComplete(ignored -> ctx.fail(
+                                                new QuorusApiException(ErrorCode.CONFLICT,
+                                                        "Service connection secret reference is unavailable")));
+                                        return;
+                                    }
+                                    if (!currentSecret.usableAt(completedAt)) {
+                                        throw new QuorusApiException(ErrorCode.CONFLICT,
+                                                "Service connection secret reference is unavailable");
+                                    }
+                                    JsonObject metadata = jobBody.getJsonObject("metadata", new JsonObject());
+                                    metadata.put("serviceConnectionId", serviceConnectionId)
+                                            .put("remotePath", remotePath)
+                                            .put("connectionPolicyVersion", Integer.toString(connection.policyVersion()))
+                                            .put("connectionPolicyDigest", connectionAuthorization.policyDigest())
+                                            .put("agentPool", agentPool)
+                                            .put("networkZone", connection.networkZone())
+                                            .put("controllerResolvedAddresses",
+                                                    String.join(",", connectionAuthorization.resolvedAddresses()));
+                                    if (direction == ServiceConnection.Direction.DOWNLOAD) {
+                                        if (body.getString("destinationPath") == null) {
+                                            throw new QuorusApiException(ErrorCode.VALIDATION_ERROR,
+                                                    "Governed downloads require destinationPath");
+                                        }
+                                        jobBody.put("sourceUri", connectionAuthorization.endpoint().toString())
+                                                .remove("destinationUri");
+                                    } else {
+                                        String localSource = body.getString("sourceUri");
+                                        if (localSource == null || !"file".equalsIgnoreCase(URI.create(localSource).getScheme())) {
+                                            throw new QuorusApiException(ErrorCode.VALIDATION_ERROR,
+                                                    "Governed uploads require a local file sourceUri");
+                                        }
+                                        CredentialBearingUriDetector.requireCredentialFree(URI.create(localSource), "Source");
+                                        jobBody.put("sourceUri", localSource)
+                                                .put("destinationUri", connectionAuthorization.endpoint().toString())
+                                                .remove("destinationPath");
+                                    }
+                                    jobBody.put("metadata", metadata);
+                                    jobBody.remove("serviceConnectionId");
+                                    jobBody.remove("remotePath");
+                                    jobBody.remove("direction");
+                                    jobBody.remove("agentPool");
+                                    submitTransfer(ctx, jobBody, tenantId, connectionAuthorization);
+                                } catch (Exception error) {
+                                    failCreate(ctx, error);
+                                }
+                            }).onFailure(error -> failCreate(ctx, error));
+                    return;
                 } else {
                     String sourceUri = body.getString("sourceUri");
                     if (securityProfile == SecurityProfile.PRODUCTION) {
@@ -185,41 +228,49 @@ public class TransferHandler {
                     }
                 }
 
-                jobBody.remove("tenantId");
-                TransferJob job = jobBody.mapTo(TransferJob.class);
-                TransferOperationalContext.fromMetadata(job.getRequest().getMetadata());
-
-                logger.info("Creating transfer job: jobId={}, tenantId={}", job.getJobId(), tenantId);
-                TransferJobCommand command = TransferJobCommand.create(job, tenantId);
-
-                ConnectionPolicyEnforcer.ConnectionAuthorization committedAuthorization = connectionAuthorization;
-                raftNode.submitCommand(command)
-                        .onSuccess(result -> {
-                            if (CommandResultHandler.failIfRejected(ctx, result)) return;
-                            if (result instanceof CommandResult.NotFound<?> nf) {
-                                logger.warn("Transfer job disappeared during creation (race condition): jobId={}", nf.id());
-                                ctx.fail(QuorusApiException.notFound(ErrorCode.TRANSFER_NOT_FOUND, nf.id()));
-                            } else {
-                                logger.info("Transfer job created: jobId={}", job.getJobId());
-                                if (committedAuthorization == null) {
-                                    respondCreated(ctx, job.getJobId());
-                                } else {
-                                    recordConnectionAuthorization(tenantId, job.getJobId(),
-                                            committedAuthorization).onSuccess(ignored ->
-                                            respondCreated(ctx, job.getJobId())).onFailure(ctx::fail);
-                                }
-                            }
-                        })
-                        .onFailure(ctx::fail);
-            } catch (ConnectionPolicyException e) {
-                logger.warn("Service connection policy denied transfer creation: decisionCode={}", e.decisionCode());
-                ctx.fail(new QuorusApiException(ErrorCode.VALIDATION_ERROR, e.getMessage()));
-            } catch (Exception e) {
-                logger.error("Failed to create transfer job: {}", e.getMessage());
-                logger.debug("Stack trace for transfer job creation failure", e);
-                ctx.fail(e);
+                submitTransfer(ctx, jobBody, tenantId, null);
+            } catch (Exception error) {
+                failCreate(ctx, error);
             }
         };
+    }
+
+    private void submitTransfer(RoutingContext ctx, JsonObject jobBody, String tenantId,
+                                ConnectionPolicyEnforcer.ConnectionAuthorization connectionAuthorization) {
+        jobBody.remove("tenantId");
+        TransferJob job = jobBody.mapTo(TransferJob.class);
+        TransferOperationalContext.fromMetadata(job.getRequest().getMetadata());
+
+        logger.info("Creating transfer job: jobId={}, tenantId={}", job.getJobId(), tenantId);
+        TransferJobCommand command = TransferJobCommand.create(job, tenantId);
+
+        ConnectionPolicyEnforcer.ConnectionAuthorization committedAuthorization = connectionAuthorization;
+        raftNode.submitCommand(command)
+                .onSuccess(result -> {
+                    if (CommandResultHandler.failIfRejected(ctx, result)) return;
+                    if (result instanceof CommandResult.NotFound<?> nf) {
+                        logger.warn("Transfer job disappeared during creation (race condition): jobId={}", nf.id());
+                        ctx.fail(QuorusApiException.notFound(ErrorCode.TRANSFER_NOT_FOUND, nf.id()));
+                    } else {
+                        logger.info("Transfer job created: jobId={}", job.getJobId());
+                        if (committedAuthorization == null) {
+                            respondCreated(ctx, job.getJobId());
+                        } else {
+                            recordConnectionAuthorization(tenantId, job.getJobId(),
+                                    committedAuthorization).onSuccess(ignored ->
+                                    respondCreated(ctx, job.getJobId())).onFailure(ctx::fail);
+                        }
+                    }
+                })
+                .onFailure(ctx::fail);
+    }
+
+    private void failCreate(RoutingContext ctx, Throwable error) {
+        if (error instanceof ConnectionPolicyException policyError) {
+            ctx.fail(new QuorusApiException(ErrorCode.VALIDATION_ERROR, policyError.getMessage()));
+        } else {
+            ctx.fail(error);
+        }
     }
 
     /**

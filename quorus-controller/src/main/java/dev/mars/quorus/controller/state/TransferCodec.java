@@ -105,9 +105,15 @@ final class TransferCodec {
     }
 
     static TransferJob fromProto(TransferJobProto proto) {
+        boolean legacyCredentials = hasUserInfo(proto.getRequest().getSourceUri())
+                || hasUserInfo(proto.getRequest().getDestinationUri())
+                || hasUserInfo(proto.getRequest().getDestinationPath());
         TransferRequest request = fromProto(proto.getRequest());
         TransferJob job = new TransferJob(request);
-        // The job starts in PENDING. For CREATE commands this is always correct.
+        if (legacyCredentials) {
+            job.fail("Legacy credential-bearing URI was redacted; resubmit through a governed service connection", null);
+        }
+        // Current CREATE commands start PENDING; unsafe legacy commands are terminal above.
         return job;
     }
 
@@ -130,13 +136,13 @@ final class TransferCodec {
     private static TransferRequest fromProto(TransferRequestProto proto) {
         TransferRequest.Builder builder = TransferRequest.builder()
                 .requestId(proto.getRequestId())
-                .sourceUri(URI.create(proto.getSourceUri()))
+                .sourceUri(withoutUserInfo(URI.create(proto.getSourceUri())))
                 .expectedSize(proto.getExpectedSize());
 
         if (!proto.getDestinationUri().isEmpty()) {
-            builder.destinationUri(URI.create(proto.getDestinationUri()));
+            builder.destinationUri(withoutUserInfo(URI.create(proto.getDestinationUri())));
         } else if (!proto.getDestinationPath().isEmpty()) {
-            builder.destinationUri(URI.create(proto.getDestinationPath()));
+            builder.destinationUri(withoutUserInfo(URI.create(proto.getDestinationPath())));
         }
 
         if (!proto.getProtocol().isEmpty()) {
@@ -152,6 +158,20 @@ final class TransferCodec {
             builder.expectedChecksum(proto.getExpectedChecksum());
         }
         return builder.build();
+    }
+
+    private static boolean hasUserInfo(String value) {
+        return value != null && !value.isEmpty() && URI.create(value).getUserInfo() != null;
+    }
+
+    private static URI withoutUserInfo(URI value) {
+        if (value.getUserInfo() == null) return value;
+        try {
+            return new URI(value.getScheme(), null, value.getHost(), value.getPort(), value.getPath(),
+                    value.getQuery(), value.getFragment());
+        } catch (java.net.URISyntaxException error) {
+            throw new IllegalArgumentException("Legacy transfer URI cannot be safely redacted", error);
+        }
     }
 
     // ── Enums ───────────────────────────────────────────────────

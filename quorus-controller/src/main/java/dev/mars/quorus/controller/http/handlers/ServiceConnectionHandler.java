@@ -8,6 +8,7 @@ import dev.mars.quorus.connection.ConnectionAccessRequest;
 import dev.mars.quorus.connection.ConnectionPolicyEnforcer;
 import dev.mars.quorus.connection.ConnectionPolicyException;
 import dev.mars.quorus.connection.HostResolver;
+import dev.mars.quorus.controller.http.ControllerConnectionAuthorizer;
 import dev.mars.quorus.connection.SecretReference;
 import dev.mars.quorus.connection.ServiceConnection;
 import dev.mars.quorus.controller.http.ErrorCode;
@@ -40,11 +41,21 @@ public final class ServiceConnectionHandler {
 
     private final RaftNode raftNode;
     private final ServiceConnectionRegistry registry;
-    private final ConnectionPolicyEnforcer policyEnforcer = new ConnectionPolicyEnforcer();
+
+    private final ControllerConnectionAuthorizer authorizer;
 
     public ServiceConnectionHandler(RaftNode raftNode, QuorusStateStore stateStore) {
+        this(raftNode, stateStore, HostResolver.system());
+    }
+
+    public ServiceConnectionHandler(RaftNode raftNode, QuorusStateStore stateStore, HostResolver hostResolver) {
+        this(raftNode, stateStore, new ControllerConnectionAuthorizer(hostResolver));
+    }
+
+    public ServiceConnectionHandler(RaftNode raftNode, QuorusStateStore stateStore, ControllerConnectionAuthorizer authorizer) {
         this.raftNode = raftNode;
         this.registry = new ServiceConnectionRegistry(stateStore);
+        this.authorizer = java.util.Objects.requireNonNull(authorizer);
     }
 
     public Handler<RoutingContext> createSecret() {
@@ -175,9 +186,11 @@ public final class ServiceConnectionHandler {
             ConnectionAccessRequest request = new ConnectionAccessRequest(tenant,
                     body.getString("remotePath"), ServiceConnection.Direction.valueOf(
                     body.getString("direction").toUpperCase(Locale.ROOT)), body.getString("agentPool"), null);
-            try {
-                ConnectionPolicyEnforcer.ConnectionAuthorization authorization = policyEnforcer
-                        .authorizeController(connection, request, HostResolver.system());
+            authorizer.authorize(ctx.vertx(), connection, request).onSuccess(authorization -> execute(ctx, () -> {
+                if (!connection.equals(registry.findConnection(tenant, connection.serviceConnectionId()))) {
+                    throw new QuorusApiException(ErrorCode.CONFLICT,
+                            "Service connection changed during DNS authorization; retry");
+                }
                 JsonArray stages = new JsonArray()
                         .add(stage("POLICY", "PASS", "Connection policy approved"))
                         .add(new JsonObject().put("stage", "DNS").put("status", "PASS")
@@ -208,11 +221,15 @@ public final class ServiceConnectionHandler {
                 appendNonRouteStages(stages, false);
                 respondValidation(ctx, tenant, connection, authorization, stages, "POLICY_APPROVED",
                         "Q-CONNECTION-POLICY-APPROVED");
-            } catch (ConnectionPolicyException e) {
-                recordEvent(ctx, tenant, "SERVICE_CONNECTION_VALIDATION_FAILED", "SERVICE_CONNECTION",
-                        connection.serviceConnectionId(), "DENIED", e.decisionCode(), connection.policyVersion())
-                        .onComplete(ignored -> ctx.fail(validation(e.getMessage())));
-            }
+            })).onFailure(error -> {
+                if (error instanceof ConnectionPolicyException e) {
+                    recordEvent(ctx, tenant, "SERVICE_CONNECTION_VALIDATION_FAILED", "SERVICE_CONNECTION",
+                            connection.serviceConnectionId(), "DENIED", e.decisionCode(), connection.policyVersion())
+                            .onComplete(ignored -> ctx.fail(validation(e.getMessage())));
+                } else {
+                    ctx.fail(error);
+                }
+            });
         });
     }
 
@@ -242,9 +259,23 @@ public final class ServiceConnectionHandler {
     public Handler<RoutingContext> listEvents() {
         return ctx -> execute(ctx, () -> {
             String tenant = tenant(ctx, null);
-            JsonArray events = new JsonArray(registry.listEvents(tenant).stream()
+            int limit;
+            try {
+                limit = Integer.parseInt(ctx.request().getParam("limit", "100"));
+            } catch (NumberFormatException error) {
+                throw validation("limit must be an integer");
+            }
+            if (limit < 1 || limit > 1_000) throw validation("limit must be between 1 and 1000");
+            ServiceConnectionRegistry.EventPage page;
+            try {
+                page = registry.listEvents(tenant, limit, ctx.request().getParam("cursor"));
+            } catch (IllegalArgumentException error) {
+                throw validation(error.getMessage());
+            }
+            JsonArray events = new JsonArray(page.events().stream()
                     .map(ServiceConnectionRegistry::eventToJson).toList());
-            ctx.json(new JsonObject().put("events", events).put("total", events.size()));
+            ctx.json(new JsonObject().put("events", events).put("total", events.size())
+                    .put("nextCursor", page.nextCursor()));
         });
     }
 
@@ -315,10 +346,14 @@ public final class ServiceConnectionHandler {
                 new ServiceConnection.TrustPolicy(
                         trust.getBoolean("tlsRequired", existing != null && existing.trustPolicy().tlsRequired()),
                         trust.getBoolean("hostnameVerification", existing != null && existing.trustPolicy().hostnameVerification()),
-                        strings(trust.getJsonArray("approvedCaIds"), Set.of()),
-                        strings(trust.getJsonArray("sshHostKeyFingerprints"), Set.of()),
-                        trust.getString("minimumTlsVersion", "TLSv1.3"),
-                        strings(trust.getJsonArray("tlsPeerFingerprints"), Set.of()),
+                        strings(trust.getJsonArray("approvedCaIds"), existing == null
+                                ? Set.of() : existing.trustPolicy().approvedCaIds()),
+                        strings(trust.getJsonArray("sshHostKeyFingerprints"), existing == null
+                                ? Set.of() : existing.trustPolicy().sshHostKeyFingerprints()),
+                        trust.getString("minimumTlsVersion", existing == null
+                                ? "TLSv1.3" : existing.trustPolicy().minimumTlsVersion()),
+                        strings(trust.getJsonArray("tlsPeerFingerprints"), existing == null
+                                ? Set.of() : existing.trustPolicy().tlsPeerFingerprints()),
                         trust.getBoolean("transportEncryptionRequired", existing != null
                                 && existing.trustPolicy().transportEncryptionRequired())),
                 new ServiceConnection.EgressPolicy(

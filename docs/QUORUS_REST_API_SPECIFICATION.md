@@ -2,8 +2,8 @@
 
 # Quorus REST API Specification
 
-**Version:** 2.2  
-**Date:** 2026-09-04  
+**Version:** 2.4  
+**Date:** 2026-09-05  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Status:** Canonical and normative  
@@ -381,7 +381,7 @@ caller-supplied tenant claims remain forbidden.
 Ownership is checked again during replicated state application. Malformed ownership or
 ambiguous legacy migration is rejected with a redacted problem response; records are not
 silently reassigned or partially migrated. This correction does not add linearizable
-follower reads, pagination or the later-phase API features below.
+follower reads or the later-phase API features below.
 
 | Method | Path | State | Purpose |
 |---|---|---|---|
@@ -399,7 +399,7 @@ follower reads, pagination or the later-phase API features below.
 | `GET` | `/api/v1/secret-references/{secretReferenceId}` | Current | Read redacted reference metadata |
 | `PUT` | `/api/v1/secret-references/{secretReferenceId}` | Current | Rotate, expire, or revoke a reference |
 | `DELETE` | `/api/v1/secret-references/{secretReferenceId}` | Current | Delete only when no alias references it |
-| `GET` | `/api/v1/security-events` | Current | Tenant-scoped connection and secret lifecycle evidence |
+| `GET` | `/api/v1/security-events` | Current | Tenant-scoped connection and secret lifecycle evidence, bounded by `limit` and opaque `cursor` |
 | `POST` | `/api/v1/secret-references:validate` | Required | Validate reference existence and access without returning a value |
 
 Service connections MUST define protocol, endpoint, permitted path or bucket scope, tenant, business owner, allowed agent pools, environment, service identity verification, encryption minimum, egress rule, timeout, and a secret reference where needed. SFTP host-key verification and TLS certificate verification are mandatory and cannot be silently disabled in production. Authentication types are protocol constrained. TLS approved-CA identifiers are SHA-256 certificate fingerprints that restrict an otherwise valid PKIX chain; optional peer fingerprints pin the leaf certificate.
@@ -407,6 +407,22 @@ Service connections MUST define protocol, endpoint, permitted path or bucket sco
 Connection tests MUST return redacted stage results for DNS, route/egress policy, network connection, TLS or SSH negotiation, peer identity, authentication, authorization, and optional read/write capability. They MUST NOT upload production-like data unless an explicitly approved test path and operation are configured.
 
 The current validation resource is policy-only unless `probeNetwork` is true. An active probe connects only to a controller-approved address within the bounded `probeTimeoutMillis` and may return `ROUTE_VERIFIED`; negotiation, peer identity, authentication, authorization, and read/write capability remain unexecuted and MUST NOT be inferred from a successful TCP route. Submission records `SERVICE_CONNECTION_AUTHORIZED`, while `SERVICE_CONNECTION_LAST_USED` is recorded only after agent-side policy enforcement and secret-authority resolution. A reference past `expiresAt` is durably transitioned to `EXPIRED` and audited before transfer denial.
+
+Route probes MUST apply the same protocol default-port contract as transfer policy when
+an endpoint omits its port. A partial connection update MUST retain every omitted trust
+field, including approved CA identifiers, SSH host-key pins, TLS peer pins and minimum
+TLS version. `GET /api/v1/security-events` accepts `limit` 1–1000 (default 100) and an
+opaque cursor, and returns `events`, the page-size `total`, and nullable `nextCursor`.
+This bounded query does not define automatic pruning: current authoritative events remain
+in snapshot state until Phase 9 supplies archive, retention and legal-hold policy.
+
+Controller DNS authorization for validation and transfer submission MUST run off the
+HTTP event loop with shared bounded admission and a deadline that includes worker
+queue time. Capacity exhaustion returns HTTP 503; deadline expiry returns HTTP 504.
+A timed-out native lookup retains its slot until completion, and its late result
+MUST NOT authorize a transfer or initiate a validation probe. Changed registry
+authority during resolution returns HTTP 409. Defaults and configuration are documented
+in the [deployment guide](QUORUS_SECURITY_DEPLOYMENT_GUIDE.md#14-bounded-controller-dns-authorization).
 
 The service-connection `remotePath` field is a literal absolute path, not a pre-encoded
 URI. Root scope `/` permits descendants. Filename punctuation (`#`, `?`, `%`, spaces)

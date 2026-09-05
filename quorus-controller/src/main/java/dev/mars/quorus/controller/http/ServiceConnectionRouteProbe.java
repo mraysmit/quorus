@@ -5,6 +5,7 @@
 package dev.mars.quorus.controller.http;
 
 import dev.mars.quorus.connection.ConnectionPolicyEnforcer;
+import dev.mars.quorus.connection.ServiceConnection;
 
 import java.net.InetSocketAddress;
 import java.net.Socket;
@@ -19,8 +20,9 @@ public final class ServiceConnectionRouteProbe {
         if (authorization.resolvedAddresses().isEmpty()) {
             throw new IllegalArgumentException("Authorization has no approved addresses");
         }
-        int port = authorization.endpoint().getPort();
-        if (port < 1) throw new IllegalArgumentException("Authorization endpoint has no port");
+        int port = ServiceConnection.effectivePort(
+                ServiceConnection.Protocol.fromScheme(authorization.endpoint().getScheme()),
+                authorization.endpoint());
         long started = System.nanoTime();
         try (Socket socket = new Socket()) {
             socket.connect(new InetSocketAddress(authorization.resolvedAddresses().getFirst(), port),

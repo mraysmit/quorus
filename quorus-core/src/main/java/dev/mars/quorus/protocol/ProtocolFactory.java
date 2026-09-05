@@ -53,16 +53,6 @@ public class ProtocolFactory {
         this(vertx, null, false, false);
     }
 
-    /**
-     * Creates a protocol factory with an explicitly injected NFS mount root.
-     *
-     * @param vertx Vert.x instance for reactive HTTP protocol
-     * @param nfsMountRoot NFS mount root, or {@code null}/blank for the platform default
-     */
-    public ProtocolFactory(Vertx vertx, String nfsMountRoot) {
-        this(vertx, nfsMountRoot, false, false);
-    }
-
     public ProtocolFactory(Vertx vertx, String nfsMountRoot,
                            boolean smbMountSecurityVerified, boolean nfsMountSecurityVerified) {
         this.vertx = java.util.Objects.requireNonNull(vertx, "Vertx instance cannot be null");
@@ -101,9 +91,7 @@ public class ProtocolFactory {
 
         // Register NFS protocol
         logger.debug("Creating NfsTransferProtocol instance");
-        registerProtocol(nfsMountRoot == null || nfsMountRoot.isBlank()
-                ? new NfsTransferProtocol(nfsMountSecurityVerified)
-                : new NfsTransferProtocol(nfsMountRoot, nfsMountSecurityVerified));
+        registerProtocol(new NfsTransferProtocol(nfsMountRoot, nfsMountSecurityVerified));
 
         logger.info("Registered default transfer protocols: count={}, schemes={}", 
                    protocols.size(), String.join(", ", protocols.keySet()));

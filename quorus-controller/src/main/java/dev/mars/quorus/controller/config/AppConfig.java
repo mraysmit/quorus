@@ -16,11 +16,10 @@
 
 package dev.mars.quorus.controller.config;
 
+import dev.mars.quorus.config.LayeredProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.Locale;
@@ -320,47 +319,19 @@ public final class AppConfig {
      * @return the resolved property value
      */
     public String getString(String key, String defaultValue) {
-        String propertyValue = properties.getProperty(key);
-        if (propertyValue == null) {
-            propertyValue = environment.get(environmentKey(key));
-        }
-        // A blank configured value means "not configured"
-        // and must not suppress a safe default (notably the durable Raft path).
-        return propertyValue == null || propertyValue.isBlank() ? defaultValue : propertyValue;
+        return LayeredProperties.getString(properties, environment, key, defaultValue);
     }
 
     public int getInt(String key, int defaultValue) {
-        String value = getString(key, null);
-        if (value == null) {
-            return defaultValue;
-        }
-        try {
-            return Integer.parseInt(value.trim());
-        } catch (NumberFormatException e) {
-            logger.warn("Invalid integer value for {}: '{}', using default {}", key, value, defaultValue);
-            return defaultValue;
-        }
+        return LayeredProperties.getInt(properties, environment, key, defaultValue, logger);
     }
 
     public long getLong(String key, long defaultValue) {
-        String value = getString(key, null);
-        if (value == null) {
-            return defaultValue;
-        }
-        try {
-            return Long.parseLong(value.trim());
-        } catch (NumberFormatException e) {
-            logger.warn("Invalid long value for {}: '{}', using default {}", key, value, defaultValue);
-            return defaultValue;
-        }
+        return LayeredProperties.getLong(properties, environment, key, defaultValue, logger);
     }
 
     public boolean getBoolean(String key, boolean defaultValue) {
-        String value = getString(key, null);
-        if (value == null) {
-            return defaultValue;
-        }
-        return Boolean.parseBoolean(value.trim());
+        return LayeredProperties.getBoolean(properties, environment, key, defaultValue);
     }
 
     // ==================== Private Helpers ====================
@@ -447,45 +418,18 @@ public final class AppConfig {
     }
 
     private void loadResource(String resourceName, boolean required) {
-        try (InputStream input = getClass().getClassLoader().getResourceAsStream(resourceName)) {
-            if (input != null) {
-                properties.load(input);
-                logger.info("Loaded configuration from {}", resourceName);
-            } else if (required) {
-                logger.warn("Configuration file {} not found, using accessor defaults", resourceName);
-            } else {
-                logger.debug("Optional configuration profile {} not found", resourceName);
-            }
-        } catch (IOException e) {
-            throw new IllegalStateException("Unable to load configuration resource " + resourceName, e);
-        }
+        if (LayeredProperties.loadResource(properties, getClass().getClassLoader(), resourceName))
+            logger.info("Loaded configuration from {}", resourceName);
+        else if (required) logger.warn("Configuration file {} not found, using accessor defaults", resourceName);
+        else logger.debug("Optional configuration profile {} not found", resourceName);
     }
 
     private void applyEnvironmentOverrides(Map<String, String> environment) {
-        environment.forEach((environmentKey, environmentValue) -> {
-            if (environmentKey.startsWith("QUORUS_")
-                    && environmentValue != null
-                    && !environmentValue.isBlank()) {
-                properties.setProperty(resolveEnvironmentKey(environmentKey), environmentValue.trim());
-            }
-        });
-    }
-
-    private String resolveEnvironmentKey(String environmentKey) {
-        String directConversion = environmentKey.toLowerCase().replace('_', '.');
-        if (properties.containsKey(directConversion)) {
-            return directConversion;
-        }
-        for (String knownKey : properties.stringPropertyNames()) {
-            if (knownKey.replace('-', '.').equals(directConversion)) {
-                return knownKey;
-            }
-        }
-        return directConversion;
+        LayeredProperties.applyEnvironment(properties, environment, Map.of());
     }
 
     static String environmentKey(String propertyKey) {
-        return propertyKey.toUpperCase(Locale.ROOT).replace('.', '_').replace('-', '_');
+        return LayeredProperties.environmentKey(propertyKey);
     }
 
     private void logConfiguration() {

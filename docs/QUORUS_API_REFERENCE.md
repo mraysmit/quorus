@@ -2,8 +2,8 @@
 
 # Quorus HTTP API Reference
 
-**Version:** 3.6  
-**Date:** 2026-09-04  
+**Version:** 3.8  
+**Date:** 2026-09-05  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Status:** Current implementation reference  
@@ -258,6 +258,18 @@ Governed downloads additionally require `destinationPath`. Governed uploads requ
 
 ## Governed Service Connectivity Endpoints
 
+Governed transfer creation and connection validation resolve DNS on Vert.x workers.
+They share an HTTP-server admission limit of eight outstanding authorizations and a
+5,000 ms deadline, configurable through `quorus.http.dns.max-concurrent` and
+`quorus.http.dns.timeout-ms` (positive values). Capacity exhaustion returns
+`503 SERVICE_UNAVAILABLE`; expiration returns `504 TIMEOUT`. The deadline includes
+worker queue time. A timed-out native lookup retains its slot until it finishes;
+late results cannot create transfers, record approval, or begin route probes.
+The controller returns `409 CONFLICT` if the connection changes during resolution,
+or if a transfer's secret reference changes or becomes unusable before submission.
+Tenant checks, default-deny egress policy and controller-approved address pins remain
+enforced. The optional TCP probe has its own timeout, separate from DNS authorization.
+
 The active API provides full tenant-scoped CRUD at `/api/v1/service-connections` and `/api/v1/service-connections/:serviceConnectionId`, full opaque-reference CRUD at `/api/v1/secret-references` and `/api/v1/secret-references/:secretReferenceId`, policy validation at `POST /api/v1/service-connections/:serviceConnectionId/validate`, and redacted lifecycle history at `GET /api/v1/security-events`.
 
 Service connections expose protocol, credential-free endpoint, service identity and authentication type, owner, environment, classification, network zone, path/direction/pool constraints, trust rules, egress allowlists, status, version, and timestamps. Authentication is constrained by protocol: SFTP accepts `PASSWORD` or `SSH_PRIVATE_KEY`, HTTPS accepts `BASIC` or `BEARER`, FTPS accepts `PASSWORD`, and governed SMB/NFS accepts `KERBEROS`. TLS `approvedCaIds` are SHA-256 certificate fingerprints in `SHA256:<base64>` form; they restrict a normally valid PKIX chain, while `tlsPeerFingerprints` optionally pin the leaf certificate. Secret-reference requests accept only provider/path/key/version and lifecycle metadata. Fields such as `secretValue`, `password`, `token`, `privateKey`, and nested equivalents are rejected and never enter Raft state.
@@ -265,6 +277,17 @@ Service connections expose protocol, credential-free endpoint, service identity 
 The executing agent receives the exact policy version and digest, controller-resolved address pins, redacted service connection, and opaque reference. It repeats authorization, including its deployment-configured pool and network zone, before contacting Vault KV v2. Upload sources and download destinations must remain under the agent's configured local roots after canonical and symbolic-link resolution. HTTPS, FTPS, and SFTP sockets bind to an approved resolved address while retaining the original service hostname for TLS or SSH identity verification. Runtime credentials are memory-only and wiped after completion.
 
 `POST /api/v1/service-connections/:serviceConnectionId/validate` is policy-only by default. With `probeNetwork: true`, it additionally performs a bounded TCP route probe to a controller-approved address and returns `ROUTE_VERIFIED`; it does not retrieve a secret, authenticate to the service, or claim application-level readiness. Submission emits `SERVICE_CONNECTION_AUTHORIZED`. `SERVICE_CONNECTION_LAST_USED` is emitted only after the executing agent has passed its policy checks and resolved secret authority. If an active secret reference is past `expiresAt`, transfer authorization durably marks it `EXPIRED`, records the expiry event, and returns `409`.
+
+Route probes use the protocol's effective default when the endpoint omits a port
+(`21` FTP/FTPS, `22` SFTP, `80` HTTP and `443` HTTPS). A partial `PUT` retains omitted
+CA identifiers, SSH host-key pins, TLS peer pins and minimum TLS version; supplying a
+field replaces that field and still increments the policy version.
+
+`GET /api/v1/security-events` accepts `limit` from 1 through 1000 (default 100) and an
+opaque `cursor`. The response contains the current page in `events`, its row count in
+`total`, and `nextCursor` when another page exists. Events are ordered by timestamp and
+event ID. They remain authoritative snapshot state and are not automatically pruned;
+enterprise archive, legal hold and retention controls remain Phase 9 work.
 
 Path scope `/` permits descendants. Filename characters such as spaces, `#`, `?`, `%`
 and Unicode are preserved and encoded when constructing the endpoint URI; `..` path
