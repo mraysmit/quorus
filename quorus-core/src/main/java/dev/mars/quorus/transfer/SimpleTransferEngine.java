@@ -97,13 +97,6 @@ public class SimpleTransferEngine implements TransferEngine {
                 null, false, false, false);
     }
 
-    /** Creates an engine with an explicitly injected NFS mount root. */
-    public SimpleTransferEngine(Vertx vertx, int maxConcurrentTransfers, int maxRetryAttempts,
-                                long retryDelayMs, String nfsMountRoot) {
-        this(vertx, maxConcurrentTransfers, maxRetryAttempts, retryDelayMs,
-                nfsMountRoot, false, false, false);
-    }
-
     /** Creates an engine with explicit mounted-filesystem security attestations. */
     public SimpleTransferEngine(Vertx vertx, int maxConcurrentTransfers, int maxRetryAttempts,
                                 long retryDelayMs, String nfsMountRoot,

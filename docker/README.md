@@ -85,6 +85,10 @@ docker-compose -f compose/docker-compose-full-network.yml logs -f
 docker-compose -f compose/docker-compose-full-network.yml down
 ```
 
+`test-transfers.ps1` submits credential-free HTTP fixtures through the current transfer
+request contract. FTP and SFTP tests require governed service connections with opaque
+external secret references; credentials must not be embedded in transfer URIs.
+
 ### Service Endpoints
 
 | Service | URL | Credentials |

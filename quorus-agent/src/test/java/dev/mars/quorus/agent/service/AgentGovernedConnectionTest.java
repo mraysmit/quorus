@@ -12,6 +12,8 @@ import dev.mars.quorus.connection.SecretProvider;
 import dev.mars.quorus.connection.SecretReference;
 import dev.mars.quorus.connection.ServiceConnection;
 import org.junit.jupiter.api.Test;
+import io.vertx.core.json.JsonArray;
+import io.vertx.core.json.JsonObject;
 
 import java.net.InetAddress;
 import java.net.URI;
@@ -23,6 +25,38 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.*;
 
 class AgentGovernedConnectionTest {
+
+    @Test
+    void agentDecoderAcceptsControllerContractCaseAndDefaults() {
+        Instant now = Instant.parse("2026-09-05T00:00:00Z");
+        JsonObject json = new JsonObject()
+                .put("serviceConnectionId", "codec-connection").put("tenantId", "bank-a")
+                .put("protocol", "sftp").put("endpoint", "sftp://192.0.2.10")
+                .put("networkZone", "restricted-egress")
+                .put("allowedPaths", new JsonArray().add("/in"))
+                .put("allowedDirections", new JsonArray().add("download"))
+                .put("allowedAgentPools", new JsonArray().add("payments"))
+                .put("owner", "payments-ops").put("environment", "production")
+                .put("classification", "confidential").put("secretReferenceId", "payments-key")
+                .put("serviceIdentity", "payments-batch").put("authenticationType", "password")
+                .put("trustPolicy", new JsonObject()
+                        .put("sshHostKeyFingerprints", new JsonArray().add("SHA256:known")))
+                .put("egressPolicy", new JsonObject()
+                        .put("allowedHostnames", new JsonArray().add("192.0.2.10"))
+                        .put("allowedCidrs", new JsonArray().add("192.0.2.0/24"))
+                        .put("allowedPorts", new JsonArray().add(22)))
+                .put("createdAt", now.toString()).put("updatedAt", now.toString());
+
+        ServiceConnection decoded = AgentConnectionPolicyService.parseConnection(json);
+
+        assertEquals(ServiceConnection.Protocol.SFTP, decoded.protocol());
+        assertEquals(Set.of(ServiceConnection.Direction.DOWNLOAD), decoded.allowedDirections());
+        assertEquals(ServiceConnection.AuthenticationType.PASSWORD, decoded.authenticationType());
+        assertEquals(ServiceConnection.Status.ACTIVE, decoded.status());
+        assertEquals(1, decoded.policyVersion());
+        assertTrue(decoded.egressPolicy().pinResolvedAddresses());
+        assertEquals("TLSv1.3", decoded.trustPolicy().minimumTlsVersion());
+    }
 
     @Test
     void agentRepeatsPolicyBeforeSecretResolutionAndReturnsCloseableRuntimeCredential() throws Exception {

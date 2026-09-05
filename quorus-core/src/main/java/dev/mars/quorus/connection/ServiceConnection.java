@@ -91,6 +91,10 @@ public record ServiceConnection(
     }
 
     public int effectivePort() {
+        return effectivePort(protocol, endpoint);
+    }
+
+    public static int effectivePort(Protocol protocol, URI endpoint) {
         return endpoint.getPort() > 0 ? endpoint.getPort() : protocol.defaultPort();
     }
 
@@ -137,6 +141,12 @@ public record ServiceConnection(
         Protocol(String scheme, int defaultPort) { this.scheme = scheme; this.defaultPort = defaultPort; }
         public String scheme() { return scheme; }
         public int defaultPort() { return defaultPort; }
+        public static Protocol fromScheme(String scheme) {
+            for (Protocol protocol : values()) {
+                if (protocol.scheme.equalsIgnoreCase(scheme)) return protocol;
+            }
+            throw new IllegalArgumentException("Unsupported service protocol scheme: " + scheme);
+        }
     }
 
     public enum Direction { DOWNLOAD, UPLOAD }

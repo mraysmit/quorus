@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-09-05",
+  "status": "R5 implementation complete; R6 and R1 gates separate",
+  "sisterProject": {
+    "name": "RaftLog",
+    "relativePath": "../raftlog",
+    "historicalDefectClaims": "unsubstantiated",
+    "subsequentRelease": {"version": "1.2.0", "revision": "1c5af80"}
+  },
+  "focusedRegression": {
+    "log": "temp/r5-closure-focused-regression.log",
+    "sha256": "027DA7DBC90B68B48A9022D2AE19EB66526A71666BDA9C93B4F76317C27E0C4E",
+    "finishedAt": "2026-09-05T19:45:33+08:00",
+    "tests": 254,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "behavioralStages": [
+    {"item":"route defaults and partial trust update","red":"temp/r5-closure-route-trust-red.log","green":"temp/r5-closure-route-trust-green.log"},
+    {"item":"shared service-connection JSON contract","red":"temp/r5-closure-codec-red.log","green":"temp/r5-closure-codec-green.log"},
+    {"item":"bounded security-event pagination","red":"temp/r5-closure-events-behavioral-red.log","green":"temp/r5-closure-events-green.log"},
+    {"item":"bounded trust-manager reuse","red":"temp/r5-closure-trust-cache-red.log","green":"temp/r5-closure-trust-cache-green.log"},
+    {"item":"legacy credential-bearing replay","red":"temp/r5-closure-legacy-replay-red.log","green":"temp/r5-closure-legacy-replay-green-2.log"}
+  ],
+  "nonBehavioralFailures": [
+    {"log":"temp/r5-closure-events-red.log","reason":"test compilation: missing static imports"},
+    {"log":"temp/r5-closure-legacy-replay-green.log","reason":"initial implementation and assertion compilation errors"}
+  ],
+  "retentionDisposition": "No automatic authoritative-event pruning; Phase 9 owns archive, legal hold and retention policy",
+  "openGates": ["R6 isolated final-tree acceptance", "R1 container recreation", "R1 selected production filesystem", "R1 machine power-loss"]
+}
