@@ -1,0 +1,88 @@
+{
+  "command": "mvn.cmd --fail-at-end clean verify '-Dtest.excludedGroups='",
+  "completed": "2026-09-05T15:46:52+08:00",
+  "result": "BUILD SUCCESS",
+  "coverage": "All five configured module gates passed",
+  "modules": [
+    {
+      "module": "quorus-core",
+      "tests": 1540,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "module": "quorus-workflow",
+      "tests": 134,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "module": "quorus-tenant",
+      "tests": 64,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "module": "quorus-controller",
+      "tests": 578,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 2
+    },
+    {
+      "module": "quorus-agent",
+      "tests": 100,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "module": "quorus-integration-examples",
+      "tests": 0,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ],
+  "files": [
+    {
+      "path": "temp/full-suite-20260905.log",
+      "sha256": "3178D907496D40D3F25AC25121C7F4610475DAD1C1DE00295F8DE4BD12303E3B"
+    },
+    {
+      "path": "temp/vote-boundary-red-20260905.log",
+      "sha256": "46CE1D940988EE8076C2128583F6BDB3A860DFE39E24FF4EAF52EF3C2E49857C"
+    },
+    {
+      "path": "temp/vote-boundary-green-20260905.log",
+      "sha256": "75DB4D4132A84C2198645595938F133C45F67589A67F779D38BDB93D5CC9DF33"
+    },
+    {
+      "path": "temp/docker-fixture-green-20260905.log",
+      "sha256": "1BEAA79A650D74F8596190913C624E0F6B3FA1815AF35A696D3D8EE986AB5263"
+    },
+    {
+      "path": "temp/full-suite-fixed-20260905.log",
+      "sha256": "117B552C5310DC56FFC970177BECB9B02039D644C03EFF2DF82C30B571E1AAA1"
+    },
+    {
+      "path": "quorus-controller/src/main/java/dev/mars/quorus/controller/raft/RaftNode.java",
+      "sha256": "662539BF91A997FD3C1ECE10101DBB5D069354ECA6E425E18D2AF0E71EEED05E"
+    },
+    {
+      "path": "quorus-controller/src/test/java/dev/mars/quorus/controller/raft/ConcurrentVoteBoundaryTest.java",
+      "sha256": "D44EB24A5047F0BB6FEC94C1284088DACB408C7B5DC2EDC04CB8A82D6EFA40FC"
+    },
+    {
+      "path": "quorus-controller/src/test/resources/docker-compose-3node-prebuilt.yml",
+      "sha256": "FB3B4801F4828218F072DD076C4537F829B6FFF34B7F253B2F42954EA25344A0"
+    },
+    {
+      "path": "quorus-controller/src/test/resources/docker-compose-5node-prebuilt.yml",
+      "sha256": "489C2FBEF1405F3E9517DEB22C81BD7E68CAEEF67DC6636F1BA7E7DC35A9D5DF"
+    }
+  ]
+}

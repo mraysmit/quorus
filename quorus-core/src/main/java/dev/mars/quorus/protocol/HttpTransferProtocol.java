@@ -78,7 +78,7 @@ public class HttpTransferProtocol implements TransferProtocol {
      */
     public HttpTransferProtocol(Vertx vertx) {
         this.vertx = java.util.Objects.requireNonNull(vertx, "Vertx instance cannot be null");
-        this.webClient = WebClient.create(vertx, secureClientOptions());
+        this.webClient = WebClient.create(vertx, secureClientOptions().setFollowRedirects(true));
         logger.info("HttpTransferProtocol initialized: connectTimeout={}ms, readTimeout={}ms, maxFileSize={} bytes",
                    CONNECTION_TIMEOUT_MS, READ_TIMEOUT_MS, MAX_FILE_SIZE);
         logger.debug("HttpTransferProtocol created with Vert.x Web Client (reactive mode)");

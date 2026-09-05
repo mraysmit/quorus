@@ -31,8 +31,8 @@ public final class PinnedEndpoint {
     }
 
     public static String virtualHost(URI authority) {
-        int port = authority.getPort();
-        return port < 0 ? authority.getHost() : authority.getHost() + ":" + port;
+        // Vert.x uses this value for TLS peer verification, then adds the socket port to Host.
+        return authority.getHost();
     }
 
     public static void requireApprovedAddress(InetAddress connectedAddress, RuntimeCredential credential)

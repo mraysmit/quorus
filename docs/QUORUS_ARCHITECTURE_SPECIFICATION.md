@@ -211,8 +211,10 @@ Committed Raft writes are strongly ordered. This does not make every HTTP read l
 - A blank storage path MUST be treated as invalid or replaced with the documented durable default.
 - The external `raftlog-core` library is the only WAL and Raft metadata storage implementation. Internal file, RocksDB and memory storage backends are not supported, including in storage-dependent tests; tests use the external adapter with isolated temporary directories.
 - A controller MUST recover its term, vote, log, snapshot, and applied state after container recreation.
-- WAL prefix deletion MUST follow durable publication of a covering snapshot. Recovery MUST reject a missing or invalid snapshot when durable compaction evidence requires it. Snapshot installation MUST preserve only a matching log suffix, including after restart. The R1 remediation implements these storage boundaries; release remains subject to the reopened enterprise remediation checkpoint and deployment-specific durability validation.
+- WAL prefix deletion MUST follow durable publication of a covering snapshot. Recovery MUST reject a missing or invalid snapshot when durable compaction evidence requires it. Snapshot installation MUST preserve only a matching log suffix, including after restart. The Quorus R1 sidecar implements snapshot coordination. RaftLog 1.2.0 from commit `1c5af80` now supplies verified prefix compaction; all 41 selected Quorus storage/snapshot/restart tests passed against it. Release remains subject to the reopened enterprise remediation checkpoint and deployment-specific durability validation, including actual power-loss behavior.
 - Backups MUST be validated by restore tests; copying a live directory without a storage-specific consistency procedure is not sufficient.
+
+The verified append semantics, snapshot ownership, and verified dependency are recorded in [External RaftLog Integration Contract, Appendix F.5](../docs-design/design/QUORUS_RAFT_WAL_DESIGN.md#f5-independently-verified-contract-and-dependency-requirements--2026-09-05). Quorus must not rely on automatic index deduplication during replay or treat a successful no-op as prefix compaction.
 
 ### 5.6 Membership
 
@@ -424,6 +426,17 @@ Default-deny egress is the production baseline. A transfer to an unapproved endp
 **Current Phase 4 boundary:** governed transfers are authorized twice: first by the controller and again by the executing agent against the committed policy version and digest. Agent selection and execution require the configured pool and network zone; local upload and download paths are confined to deployment-configured roots after canonical and symbolic-link checks. HTTPS, FTPS, and SFTP sockets connect to an agent-approved resolved address rather than re-resolving the service name; TLS retains the original hostname for SNI and hostname verification, and SFTP retains it for host-key verification. The optional validation route probe opens a bounded TCP connection to an approved address but deliberately does not retrieve a secret or claim service authentication. Submission records authorization; last-use evidence is recorded only after the agent has repeated policy checks and resolved secret authority. Time-expired secret references are durably transitioned to `EXPIRED` and audited before transfer denial.
 
 ### 10.4 Protocol security requirements
+
+Remote paths are literal absolute filename data, not URI strings. Root policy scope
+`/` includes descendants; filename punctuation and Unicode survive endpoint encoding,
+while traversal segments and backslashes are rejected. Portless FTPS uses explicit
+`AUTH TLS` on port 21; implicit TLS requires an explicit port 990. Policy approval and
+adapter socket selection MUST use the same effective port.
+
+Blocking adapters execute through Vert.x workers. Their direct blocking methods reject
+event-loop threads, not worker threads that retain an event-loop context. Agent builder
+defaults come from packaged configuration and preserve the production TLS baseline;
+development transport requires explicit opt-in.
 
 Protocol adapters MUST declare their security capabilities and fail closed when a route requires a control they cannot provide.
 

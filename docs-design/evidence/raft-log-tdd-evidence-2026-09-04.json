@@ -1,5 +1,12 @@
 {
+  "prefixCompactionRelease20260905": {"status":"New capability implemented and published; historical db59859 claims remain unsubstantiated","version":"1.2.0","revision":"1c5af80f13a149663926c01eb15f88c14c4f2d25","tag":"v1.2.0","coreJarSha256":"7BB73A0F588FC8C5534296D4F0860F890A7D15789145DB742C2A4E3C8D75C426","deploymentId":"5d8e4410-c07d-4bb4-bb7e-b3846bee91cd","behavioralRed":23,"behavioralGreen":23,"windowsTests":319,"windowsSkipped":3,"linuxTests":319,"linuxSkipped":0,"quorusFocusedTests":41,"handover":"docs-design/evidence/raftlog-validation-handover-2026-09-05.md#implemented-capability-and-release--2026-09-05"},
   "schemaVersion": 1,
+  "validationCorrection20260905": {
+    "status": "Historical assertions retained; external RaftLog 1.1.0 defect allegations and the claimed 1.2.0/db59859 validation are unsubstantiated",
+    "scope": "Do not use those claims as acceptance evidence for the independently externalised sister project. The earlier integrated implementation may be their source, but that provenance is unconfirmed.",
+    "confirmedMismatch": "Quorus requests 1.2.0 and invokes truncatePrefix; the inspected sister project declares 1.1.0 and its storage interface has no truncatePrefix method.",
+    "handover": "docs-design/evidence/raftlog-validation-handover-2026-09-05.md"
+  },
   "phase": "M0 durability remediation",
   "recordedAt": "2026-09-04T13:36:00+08:00",
   "baseRevision": "219e307",

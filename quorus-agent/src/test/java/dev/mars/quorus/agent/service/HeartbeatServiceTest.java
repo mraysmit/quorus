@@ -96,6 +96,7 @@ class HeartbeatServiceTest {
                 serverPort = server.actualPort();
                 
                 config = new AgentConfiguration.Builder()
+                .securityProfile("development").allowInsecure(true).controllerTlsEnabled(false)
                     .agentId("test-agent-hb")
                     .tenantId("test-tenant")
                     .controllerUrl("http://localhost:" + serverPort)
@@ -217,6 +218,7 @@ class HeartbeatServiceTest {
     void testHeartbeatConnectionError(Vertx vertx, VertxTestContext testContext) {
         // Configure to connect to non-existent server
         AgentConfiguration badConfig = new AgentConfiguration.Builder()
+                .securityProfile("development").allowInsecure(true).controllerTlsEnabled(false)
             .agentId("test-agent-bad")
             .tenantId("test-tenant")
             .controllerUrl("http://localhost:59999") // Non-existent port

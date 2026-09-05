@@ -1,0 +1,2 @@
+# Linux entrypoints and shell acceptance fixtures must survive Windows checkout.
+*.sh text eol=lf

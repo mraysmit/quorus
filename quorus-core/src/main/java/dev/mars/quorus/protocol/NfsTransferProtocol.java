@@ -153,8 +153,7 @@ public class NfsTransferProtocol implements TransferProtocol {
 
     @Override
     public TransferResult transfer(TransferRequest request, TransferContext context) throws TransferException {
-        Context vertxContext = Vertx.currentContext();
-        if (vertxContext != null && vertxContext.isEventLoopContext()) {
+        if (Context.isOnEventLoopThread()) {
             throw new TransferException(context.getJobId(),
                     "Blocking NFS transfer() invoked on event loop. Use transferReactive() instead.");
         }

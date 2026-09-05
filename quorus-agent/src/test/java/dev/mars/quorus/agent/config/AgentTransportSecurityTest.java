@@ -10,6 +10,14 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class AgentTransportSecurityTest {
     @Test
+    void defaultBuilderRejectsPlaintextController() {
+        AgentConfiguration.Builder builder = new AgentConfiguration.Builder()
+                .agentId("agent-1").tenantId("tenant-a")
+                .controllerUrl("http://controller:8080/api/v1");
+        assertThrows(IllegalArgumentException.class, builder::build);
+    }
+
+    @Test
     void productionAgentRejectsPlaintextController() {
         AgentConfiguration.Builder builder = new AgentConfiguration.Builder()
                 .agentId("agent-1")

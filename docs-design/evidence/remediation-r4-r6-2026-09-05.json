@@ -1,0 +1,1114 @@
+{
+  "subsequentRaftLogRelease20260905": {"status":"New capability implemented and published; historical db59859 claims remain unsubstantiated","version":"1.2.0","revision":"1c5af80f13a149663926c01eb15f88c14c4f2d25","tag":"v1.2.0","coreJarSha256":"7BB73A0F588FC8C5534296D4F0860F890A7D15789145DB742C2A4E3C8D75C426","deploymentId":"5d8e4410-c07d-4bb4-bb7e-b3846bee91cd","behavioralRed":23,"behavioralGreen":23,"windowsTests":319,"windowsSkipped":3,"linuxTests":319,"linuxSkipped":0,"quorusFocusedTests":41,"handover":"docs-design/evidence/raftlog-validation-handover-2026-09-05.md#implemented-capability-and-release--2026-09-05"},
+  "baseRevision": "28f053011670655c4938bf176667cde7b8b1f6e7",
+  "recordedAt": "2026-09-05T04:01:35.097083Z",
+  "status": "R5 partial; R4 and R6 blocked, no release acceptance",
+  "validationCorrection20260905": "The unresolved 1.2.0 dependency is a Quorus consumer mismatch, not proof that this release exists or is required. External 1.1.0 defect allegations and db59859 provenance remain unsubstantiated. See raftlog-validation-handover-2026-09-05.md. Existing logs, hashes and verification counts describe the previously recorded run and are unchanged.",
+  "finalVerification": {
+    "command": "mvn.cmd -o clean verify -pl quorus-agent -am -f temp/remediation-20260905/verify-worktree/pom.xml 2>&1 | Tee-Object -FilePath temp/remediation-20260905/isolated-core-agent-verify.log",
+    "tests": 1774,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "coverage": "All three configured module gates passed",
+    "modules": {
+      "agent": 100,
+      "core": 1540,
+      "workflow": 134
+    },
+    "scope": "Core, workflow, agent only. Controller/tenant/examples final reactor, cluster restart, deployed filesystem and power-loss acceptance not completed."
+  },
+  "controllerPreflight": {
+    "command": "mvn.cmd -o clean verify -pl quorus-controller -f temp/remediation-20260905/verify-worktree/pom.xml",
+    "result": "Dependency resolution failure before compilation: io.github.mraysmit:raftlog-core:1.2.0 unavailable",
+    "classification": "environment blocker, not behavioral red"
+  },
+  "verifiedSources": [
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/agent/AgentCapabilities.java",
+      "sha256": "F6664C7C2D23ECF0E28301180895F62BBE0792D9C9B6E6124E52CBD19F6CB871"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/agent/AgentInfo.java",
+      "sha256": "3374B7046C379BC2EE9AC84696AF2486353F32D80BE52097E91440C6B6D24B06"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/agent/AgentNetworkInfo.java",
+      "sha256": "1D1F9733A68D24A128B3D36A5285C7E5B11EACFDD500B576C1BEF93C8A426378"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/agent/AgentStatus.java",
+      "sha256": "3BC24EF10867EC34EB5781A2F91B7B4232C1F912622D626B1B617EB0D812A816"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/agent/AgentSystemInfo.java",
+      "sha256": "22694469DB2135CCA48D8CF10F9EDBC97C1C5CAB6E8F48907914455E2A9BA42F"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/config/QuorusConfiguration.java",
+      "sha256": "D6D083D284F71698176CD74CCB9E2EABB282054B5B6B6EE05DEAB86DDD4EC724"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/connection/ConnectionAccessRequest.java",
+      "sha256": "C10C6118ECD8AEF9BCE2561C10114E4ADC19D2953C58708F335C574A578ACBAF"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/connection/ConnectionPolicyEnforcer.java",
+      "sha256": "E2D281DD304EC1FC8CBC089C02FEDF81718F3869F86A29E546BDF3E8B72DB721"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/connection/ConnectionPolicyException.java",
+      "sha256": "889C38ADBD56C3F795B965BBCEA1E8CBE69038894C7E8643866115F044ECD550"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/connection/ConnectionValidationService.java",
+      "sha256": "4F7F554BB4EDAC15C376573E84410A2BDB3E2934877D615BCD0230F822FC92D0"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/connection/CredentialUriMigrationScanner.java",
+      "sha256": "906730DB8396A10E4DA96E449FD22BD288B09E6C21E4EE450478B0F6A8747968"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/connection/GovernedConnectionResolver.java",
+      "sha256": "CD9E0986C8A7753177D44D16FCEE1CA3A5249C3705B48BA98B17702ED3068E6F"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/connection/HostResolver.java",
+      "sha256": "5526D8BC8639552B34447D8B0B7831A4A4CFB71BF8284B9B94C5CE68164797BB"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/connection/MountedFileSystemSecurity.java",
+      "sha256": "9009814E879274366F191C97B15A0DC90FE1986C4355E6C5E2EFBA9F58FD07B8"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/connection/PinnedEndpoint.java",
+      "sha256": "B42110FA530CD7BE5EC8B58FBB3895D833CC7BF859D8F6797E5DBF7AA2893AC3"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/connection/ResolvedConnection.java",
+      "sha256": "A94ACDA9D7BF2B35C485A7BFB647F80F65C347908BF94B50AA687DDC41DCEBDE"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/connection/RuntimeCredential.java",
+      "sha256": "B6F71D438E2ECC4682B7903B15646E6875800D4EDC3EEC4AE6942B933771EF97"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/connection/SecretLease.java",
+      "sha256": "A8657D536714341A0883B7C0DDC95C8623571AC8B998E05C08673D9B9FDD3C09"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/connection/SecretProvider.java",
+      "sha256": "B0E6C2008394235507DCF1A1E3DC3DDCD307575E2AD2A946770A99014CBB47D2"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/connection/SecretReference.java",
+      "sha256": "07D99F854D4C1492EDE685B863AF7C3665962435E3A4608BFC2C46DD6AB2A945"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/connection/ServiceConnection.java",
+      "sha256": "1D827A4B85B15C99AC93E6C0430189A3CEA6997A5598375F58745214CADEE4B1"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/connection/SftpHostKeyPolicy.java",
+      "sha256": "04E30FE9913E13279033D93C6ED9F9418C902A17CE66E1328DC0207C50D0B50A"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/connection/TlsPeerPolicy.java",
+      "sha256": "BF79FA12B8E4CA0EE059DADF38C2EE6DF94C87468057CC388787662729D943CB"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/connection/VaultKvV2SecretProvider.java",
+      "sha256": "ACF1D90AD1E315D8DF9A032FC625DB58C90CF3F1B2921E81D8191705C3DB8D9C"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/core/AgentLoad.java",
+      "sha256": "4FD9CEF6B1304765CCCAA91F496895EDF2913526A2CFDD3AE3642A770EB66496"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/core/JobAssignment.java",
+      "sha256": "8A02333162E49DA034C19EDD1D8BAEFFC5426BB0107E2F4FA64332F8F4C7838B"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/core/JobAssignmentStatus.java",
+      "sha256": "307896AB54A7E74773D00AFF2AD8BAAB4C655E6E4B2DAB7C788A20C7C8DF149D"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/core/JobPriority.java",
+      "sha256": "DC7DEB12D250410206E3F5247EB197A7C9955C5712A4A5B2CD088FB88386DDD7"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/core/JobRequirements.java",
+      "sha256": "CED55C4166F1A7CED16BBAE10B7EBD6D4690C0B9DC94B881CF7912BD8BA06A7F"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/core/QueuedJob.java",
+      "sha256": "B27B6613867C479A5C0E2EA654D200BEA24D10C1830C4011BFC7E51D350667C0"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/core/RouteConfiguration.java",
+      "sha256": "DE38164C6E8598B90D60FE7868EEC9D76ECEA2509921ABABFF2D03F9637326A2"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/core/RouteStatus.java",
+      "sha256": "692D824580E554FE6E398502B8E0AD51E477DE1B3BF1104E4BAD5146C37D9B1F"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/core/TransferAttempt.java",
+      "sha256": "A839F33FD11F0867640585FF1C1C12133BA3534FB75EF10B9C07EC07C101A0A8"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/core/TransferAttemptOutcome.java",
+      "sha256": "DE4214174B32F3F8321976EE79511D5315D3A12AC9281DA0293628EDEA21274A"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/core/TransferAttemptStatus.java",
+      "sha256": "2DF073013EE7FCCD37B4E9644F64E11907B22C30F0F3694D3274973DC58A7817"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/core/TransferDirection.java",
+      "sha256": "D5945BF156FAA175DC371E5A547F80C1E323223E76B7B63F3B881263470C7DDE"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/core/TransferJob.java",
+      "sha256": "D964A776AB46D5602C92D9072063965230B0EE42A4E77EDA9581E7932067A767"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/core/TransferRequest.java",
+      "sha256": "163DD91AE16D2FF70103B36D96C88780DB4B3404D1C8D739EF26F04AC7BD5BC8"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/core/TransferResult.java",
+      "sha256": "49B5A85C2DF1698FEDAD6B8BDF4E8E50B5E868E2909BB9F50F89B97A3F9B7247"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/core/TransferStatus.java",
+      "sha256": "06ABAAD3C1BB36B44DF011E6658B4CA877B799C9866E45800AD90955AC146D24"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/core/TriggerConfiguration.java",
+      "sha256": "810657AE037B754DBE32C2811A58EB53C87D4DB122257010C130343E63614451"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/core/TriggerType.java",
+      "sha256": "AA8A9B742023590C8A14C97C2FE782B9E0EF860BA6F48F722C0ABF8B0A57CEB7"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/core/exceptions/ChecksumMismatchException.java",
+      "sha256": "2BB31592B2116563A403E75E54F123148B4BADD96E045F24E8DE8B1DA9FE7121"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/core/exceptions/InvalidTransitionException.java",
+      "sha256": "AE9D697470A5680FE04F636C2F6F76C4951BB3C8BBBDF72055FBD404AF5A87F8"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/core/exceptions/QuorusErrorCode.java",
+      "sha256": "F3F90A3FB961DDA01E31DAF2F44B7F8F4DC77AF53DD7DEB0C3E34D775D40CDE6"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/core/exceptions/QuorusException.java",
+      "sha256": "EB2BECCDAC4CF5F3075D5FE1F36787E09CDF2FD0D4A641044D7802A3FE5C6D2F"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/core/exceptions/TransferException.java",
+      "sha256": "241E24A628F413C10EA8363FF01AE1626B77D7F5CFECC03B59DA350071B004E3"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/monitoring/HealthDetail.java",
+      "sha256": "CF029ABF2A16B43DBC0C161A56039E28284792D7443DFD577B2123275B234029"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/monitoring/HealthStatus.java",
+      "sha256": "64CEEB521DDEB9524F17F8F7719CA0A5522290C1E9E7ABAC24DE38EDA094C9A5"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/monitoring/ProtocolHealthCheck.java",
+      "sha256": "4315E4BA55B31F4CDE5D88702EF7CD937415228362824044D202284480DA0383"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/monitoring/TransferEngineHealthCheck.java",
+      "sha256": "56EA7833AA31272FD8B8BF390527F521B3FD615D1968A6726965FDCFF254D80F"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/monitoring/TransferMetrics.java",
+      "sha256": "368A1B49740C72B3EB4F9944466B9C1E6BA72364A17AAB91EA754AA361946550"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/network/ConnectionPoolService.java",
+      "sha256": "EF42B0CE91E6E868E633C67A63AC7116C1032BACD45FB23672869D89287006C7"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/network/NetworkNode.java",
+      "sha256": "DF7E8D73CDE353388B0CE7652A3D9FA3F146478332D37453141D5C4058509D46"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/network/NetworkTopologyService.java",
+      "sha256": "F147E8B20F4B6708EB73EC69B72C8FDE1602E7678D21DAD14AD59E30B7F87903"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/protocol/FtpTransferProtocol.java",
+      "sha256": "EA2929D3DB2AF8A58608F27BF6F9937438868A4F6C3A19F47775BA728DDD5496"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/protocol/HttpTransferProtocol.java",
+      "sha256": "091216DEBC835A89876788881E6357B4B36EC077C73A86D5F3A9F217A193136B"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/protocol/NfsTransferProtocol.java",
+      "sha256": "F1624D6E3B60F769AEE75AB96714D7B8D00C24CA38C0502DEC6E2E71D89E0113"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/protocol/ProtocolFactory.java",
+      "sha256": "9F73C1113167506CE9C181E5A6C0986D885E54012730963103B9CB8AF1BFDC23"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/protocol/SftpTransferProtocol.java",
+      "sha256": "EA50823FEEB109F29BDFC48BEC6BCEC68DB45AB2CECAF43BBECEFBBE908553D4"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/protocol/SmbTransferProtocol.java",
+      "sha256": "6BA7FD80BEE3B9B758389A3FFFC0952BD7FA6DF3F43D085D05B2B2E8A79EF49A"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/protocol/TransferProtocol.java",
+      "sha256": "95DF0DED029C8589F1EE85B14D7982ADF2DB9D1A00DCF2EA16456C9D06991A05"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/security/CredentialBearingUriDetector.java",
+      "sha256": "B091F639E524B2DE85F9B103A7B05E21138B97D3C921C1468CB38654DA0F3A5A"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/storage/ChecksumCalculator.java",
+      "sha256": "4C91177C6EB3E2C49F89D14E89C106DE47A77CED6E07C24A7674883194CB41AD"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/storage/FileManager.java",
+      "sha256": "32215A962422CC6D58E86B6930FE9694FAC49554083F2C6E5AC5B47EBD0BB01F"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/storage/TransferStateRepository.java",
+      "sha256": "D92D4FAA86D820C0BED49A53B3B4A8F06DE00E8140F3C37E7FFE5E0B5B9A793F"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/transfer/ProgressTracker.java",
+      "sha256": "9FF590C26EAA88FEE9C65C75CE32E6DEA1FF9C4C33C8817910C51CFE59C20340"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/transfer/SimpleTransferEngine.java",
+      "sha256": "89943BCC15CF9B683D7479E427E6577C710ED6006A901A5D64B4B897EFBC888A"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/transfer/TransferContext.java",
+      "sha256": "66BD02D7FEFD032680E29E08DC876BBB763F507CEF293A4B17ADCF1325E41FF9"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/transfer/TransferEngine.java",
+      "sha256": "193F8BE8EDEAEF110CE3662441C598CF569C5F956C9FE52B2E286B444957014F"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/transfer/observability/TransferTelemetryMetrics.java",
+      "sha256": "3A9ABF6107B1BA36D28B331346ABFC61F30A646E7E5958E4F876AAE9EA2CA755"
+    },
+    {
+      "path": "quorus-core/src/main/java/dev/mars/quorus/util/SensitiveDataRedactor.java",
+      "sha256": "5AE6C7FB65D6F03BC3D5AFA7C0C2B688F81BF42C4FB1E628B520ED916050DE00"
+    },
+    {
+      "path": "quorus-core/src/main/resources/quorus.properties",
+      "sha256": "06AAE317913668A611246879BF27514A762C7EB4EF88B563369EA896BDDBC4EC"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/agent/AgentCapabilitiesTest.java",
+      "sha256": "EE95771F2593978F60668D7525F75DA32F949EF9844E7E79AAE65C48E6927CF0"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/agent/AgentInfoTest.java",
+      "sha256": "EF97B1ADAF0F0E14B944F44E8BC09193A0888770D1B54B6802AF9728A74F9BDD"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/agent/AgentNetworkInfoTest.java",
+      "sha256": "506F0EADCA4359AAA966DD6329D84762C02D8552A423EB16ED56B4A4DCA1F432"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/agent/AgentStatusTest.java",
+      "sha256": "50CAC9FBB9E26BAC40F971178A77B7E6E46234844841990BB64EF80E33CE72FD"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/agent/AgentStatusTransitionTest.java",
+      "sha256": "D2B9AA6C5F761CEB237A73F27E19B53C5FC4AEB7A3A1677E3DC8894DA4BDC3B5"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/agent/AgentSystemInfoTest.java",
+      "sha256": "E1D92D648DB3438F2058EC292326D543D51EE5A9844E8CF40EDEC4C805D870FD"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/config/QuorusConfigurationTest.java",
+      "sha256": "1EBCC053A92DF791A62062BD6D697FEEF078B832D937CE6838A196C2045D9276"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/connection/FtpsDefaultPortBoundaryTest.java",
+      "sha256": "E0686BD2307A4BD102E6BDE60FBD7EAFF1459B35072C2ECF39D6B489D0376C5E"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/connection/GovernedConnectionSecurityTest.java",
+      "sha256": "934A6A72B5EF1F3F612336EEB52E66C17F963033165951074B29026D4B97C60E"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/connection/RemotePathBoundaryTest.java",
+      "sha256": "55A90797B576790F5D5040DC9BAC866526FF9DB73945EEC1808B4AC7EAADE783"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/connection/RuntimeProtocolSecurityTest.java",
+      "sha256": "960A4ADF662455921119ADBC920EF76BEC68AEE2CE38D03EC158A84D87BBEC65"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/connection/TlsTrustAnchorPolicyTest.java",
+      "sha256": "3375B54DA5FCE6E891C8671A161EECB616C1C37BFA4F1F1D86C7CCAF1E923BB5"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/connection/VaultAndValidationTest.java",
+      "sha256": "4B265FCDBF331F50C5B81DA31614ED0C70931311886F25211D7C70B8C6D5140A"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/core/JobAssignmentModelsTest.java",
+      "sha256": "DB8940AA51C3B694F8873004D40652FA58CB68759619A9DCEF28322277291327"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/core/JobAssignmentStatusTransitionTest.java",
+      "sha256": "CC31C33B53323A5C1B81AAABD108B9D1EB209F50DE93BB744701FC8D614A6F8F"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/core/RouteConfigurationTest.java",
+      "sha256": "43A9EA565F1CA70E14E43D6C88C0484E22B2629E0842B3C05D29DE41A50EB5BD"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/core/RouteStatusTransitionTest.java",
+      "sha256": "B4463BA0CF6C65AB254373AB6C720979FA31C10A7F11D33128DFE8A62309C789"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/core/TransferAttemptTest.java",
+      "sha256": "71E407F1302542B60BEEAFC90D3E4DC2E5242008F951541C0A715640EF4A1F65"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/core/TransferJobTest.java",
+      "sha256": "716438545AAF9537B289EBAB9D7F25DB73CCC141682CF1299BBF00310EBFE565"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/core/TransferRequestBidirectionalTest.java",
+      "sha256": "DAD788BE21A77AA1FC198563B1AFA04F7AD9ABC45F20FC66ECA7DF68E8C433C7"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/core/TransferRequestTest.java",
+      "sha256": "00C95E41F7E21F68C0EA8B9E9C86351B43B00A8896F875CB37BCFE8133AF9BB5"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/core/TransferStatusTest.java",
+      "sha256": "FFA02B5DC5FEC9F314822F953A442DC7FD96CE778A631840F6053F183CD3D45C"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/core/TransferStatusTransitionTest.java",
+      "sha256": "8ECB95C95B259A66E871BE385FCD51E50FF3CB9F1EA74C3BF09095FC4C91E8FB"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/core/exceptions/InvalidTransitionExceptionTest.java",
+      "sha256": "C3C4758964CF472EB9A5E420CFFE49CBF32E87C629CFC676E887D8D540EC8076"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/integration/BasicTransferIntegrationTest.java",
+      "sha256": "BA2EDD42EFE08B45008EC6D201761CBC2308603C713679B50333661023D65428"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/integration/LocalHttpTestServer.java",
+      "sha256": "C212EC87F0328EDF2D50C825C65367D276528F2BF7120EE22489757492C9E5D3"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/monitoring/HealthDetailTest.java",
+      "sha256": "7234A5EB6A64370274DFC93826FF4E0DB89FCC83A0955B16B1C0D3D11ECB9331"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/monitoring/HealthStatusTest.java",
+      "sha256": "6E470AA3200119CC9FF78733E48325F453F3614D4CE244D7C5339F10CFDFE70E"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/monitoring/ProtocolHealthCheckTest.java",
+      "sha256": "A1E0ADB345B0B48C5194ED8837BEC4206D83F076A3502C4A50DF5B4FF2C90ECD"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/monitoring/TransferEngineHealthCheckTest.java",
+      "sha256": "DD361F226B994542F2DF331D25381349BE668912D2E58C68EB3B69E4885A5EFD"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/monitoring/TransferMetricsTest.java",
+      "sha256": "BD4855AB2062A4FB800ED4BFF1B2309F993CC715B55A538CB507C5539B9E4414"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/network/ConnectionPoolServiceTest.java",
+      "sha256": "44F9F4CDB2969F14DB62CF65590512FCD9C2899ECEB38D0547DCFFA36413DC1D"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/network/NetworkNodeTest.java",
+      "sha256": "D32FB394AB7F5C01765A270E63E77A94278988C1D8D39C9CFAD13497E6A40299"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/network/NetworkTopologyServiceTest.java",
+      "sha256": "E657C5E16C4E7EB11FB3036E8E2D7181ADE588B7F7C2402D28EEA5169DC71347"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/performance/VertxPerformanceBenchmark.java",
+      "sha256": "B994D3ABC263C7989FEF2A50805DB0C2F2E64A4580EA27E822EC89A9007FF39A"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/protocol/BlockingProtocolWorkerBoundaryTest.java",
+      "sha256": "E036FFAA35C88D67EBA37947C6FF05A23C55871DC3A5C362A66CAE6C4F30F43C"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/protocol/FtpsTransferProtocolTest.java",
+      "sha256": "D26CF7D44C1A97F295195465765FAF978F4B59818C3CDABEB6CE3A1CDC09BD3B"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/protocol/FtpsUploadIntegrationTest.java",
+      "sha256": "4A0A70DBD5DC74FC6E0DF4C4E6643C8E138B5374DC0FF17646C24A125B3673BD"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/protocol/FtpTransferProtocolTest.java",
+      "sha256": "8396252D004207B5BA230FD624E29C2367D6967D4AF71B0A91592A1D3967CDBE"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/protocol/FtpTransferProtocolUploadTest.java",
+      "sha256": "03B38AC60CF661B2ABA45F18B792DDDAC25DB0C38D425AAB2DA7613220A22814"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/protocol/FtpUploadIntegrationTest.java",
+      "sha256": "52202C0CB49FDA2380253E10D560E8FFDCE2B2967ED2A79B5104F125A5B7A2D5"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/protocol/HttpRedirectBoundaryTest.java",
+      "sha256": "FE881D65CA38A5A6B7BD633B3D07AF98A7B3C2D7708377C0F53B9E302499599E"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/protocol/HttpTransferProtocolTest.java",
+      "sha256": "EC4CD1C8B84A7B21D180CC672DF78B63D96B1847CAFC3B6DC1133F5CB3346071"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/protocol/HttpTransferProtocolUploadTest.java",
+      "sha256": "DC491BDDB088A0EC9EA7D24AABC8A4B26BC803CF222AA1EAFCB8DDE00BEE5135"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/protocol/NfsTransferProtocolTest.java",
+      "sha256": "AC5F6803B0F6150ECF3BFB7575922DCE9F70057F6B87F2639D5DDAA6EE87ACF0"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/protocol/NfsTransferProtocolUploadTest.java",
+      "sha256": "C11D052D10988139020CFFFCFB56F5A03F28DE33C66D3EAB07DA9ABC606B56FA"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/protocol/ProtocolFactoryBidirectionalTest.java",
+      "sha256": "C525337C409A82E22C82678BD679FF75BB021456AF71FAB8CA554625C0B704B2"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/protocol/ProtocolFactoryTest.java",
+      "sha256": "447ED7470D691B6E12A3376AACFBCD757FF33D15AE16CDBAA74E804ACDDF9F7E"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/protocol/SftpAbortIntegrationTest.java",
+      "sha256": "654BED0D255C2A2313080DF72F6B4626E57D2BD0F15F5A6F9F48321F65E0473F"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/protocol/SftpTransferProtocolTest.java",
+      "sha256": "A255D89D36D121731D80B5C9915AA11D1D8B38ED68411648BAFC07DDC572C197"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/protocol/SftpTransferProtocolUploadTest.java",
+      "sha256": "DBA495CE0C8E16643E18335429566102C9C4B2DCD00A77318E168913BA652814"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/protocol/SftpUploadIntegrationTest.java",
+      "sha256": "A18128C7C019F6A3D29C7E270D9E6444B98F800743EBB2AA322E5A636F4BBECF"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/protocol/SharedTestContainers.java",
+      "sha256": "AE4CA751FAD55D404FC00ED62B15357FA728EE4D8CC7A61729F5A30B6E296144"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/protocol/SmbTransferProtocolTest.java",
+      "sha256": "58456E81E8B5C5A86A03E9317B8D5EBA4C57B4E0C7CFB1C70CF424701850CB42"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/protocol/SmbTransferProtocolUploadTest.java",
+      "sha256": "5E90ACD8E7BDF8671F7D6C033821A0FBF109CCAA5CC643300BD8086D0943B028"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/protocol/errorhandling/FtpTransferProtocolErrorHandlingTest.java",
+      "sha256": "AC3A5E05C339B0708CBB97068BB168F0149E2A3A50C77E79F5669D4E40432956"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/protocol/errorhandling/ProtocolErrorHandlingTestBase.java",
+      "sha256": "D9884E997F387785C6BF20E7925339F6BDF0EBF613C3052B5487638BC9ED51BF"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/protocol/errorhandling/SftpTransferProtocolErrorHandlingTest.java",
+      "sha256": "9D6109BBB0CAC5D6C1596D003EEBE7813964731B9EBAC193396326A073CDD7F4"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/protocol/errorhandling/SmbTransferProtocolErrorHandlingTest.java",
+      "sha256": "D1FCA7B4805A8B1B1F09511EA70E5BFBE4A8F39C3A04556A0E2D43BE81B7C8C9"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/protocol/integration/ProtocolServersLifecycleIT.java",
+      "sha256": "969FEC253D23D4D2C9C7D93CA66E9D2A049C63AF00FF9457C0D3B46D6152F931"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/security/CredentialBearingUriDetectorTest.java",
+      "sha256": "2B7A8DF9B4C6ECB79439C4BD8C345498146BAE4013E0E2A839F5C54DBEA527DF"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/simulator/InMemorySimulatorTest.java",
+      "sha256": "47B2BEBFA7360FA52C8CAFD8B1B28E75B083FF50A9FDFA1796BE9BC5061BC243"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/simulator/SimulatorTestLoggingExtension.java",
+      "sha256": "C56106B52BE1D0E27F35EEA6F6769620BA30D7585116A2E3DB4EA1F17E5A08F9"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/simulator/agent/InMemoryAgentSimulator.java",
+      "sha256": "8E1D5813D23079A2D0C3F94EC49E0CD88EE9C2F3D3D0FD7305B05AA896FD7CF6"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/simulator/agent/InMemoryAgentSimulatorTest.java",
+      "sha256": "04E83677F3B29EFF326591A548DB8C725FF45AECF2BE28005A021F66F1F64D44"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/simulator/client/InMemoryControllerClientSimulator.java",
+      "sha256": "23515A7DA708C36A4DD297C99294D597F81D3B0084E8E4EEAE7D55A11AB2D4F2"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/simulator/client/InMemoryControllerClientSimulatorTest.java",
+      "sha256": "74DBC1B92CA96BD6128EFB7AAEA7BA470D486962E3E0BFD52D970771F5096E36"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/simulator/fs/InMemoryFileSystemSimulator.java",
+      "sha256": "DB325BF5387D1E5154CCAC70723EE8A204D6EDBC8FBDCE335B077F3DAE9CF545"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/simulator/fs/InMemoryFileSystemSimulatorTest.java",
+      "sha256": "5F9DD85933719442D1B0A35C8532F523D712793DF2CE576F15FBC16181236A73"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/simulator/protocol/InMemoryFtpsProtocolSimulatorTest.java",
+      "sha256": "69B7FE1500E7506539868AFB63D11DC876E6AEF0CC5091FF98C52D3CAF6BAC57"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/simulator/protocol/InMemoryTransferProtocolSimulator.java",
+      "sha256": "CD4CFF665D42DB7984BB57742A4149FF5EE21B0A314969421E66BDE819EF7B97"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/simulator/protocol/InMemoryTransferProtocolSimulatorTest.java",
+      "sha256": "B37E26F0CA81D531E578B8AC809487D5F7F94DA57B9A9CA1610E08E899C46020"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/simulator/transfer/InMemoryTransferEngineSimulator.java",
+      "sha256": "D4D0B8B7DB0F7BD7A83DBAD2F06ADDD2AC5655679F69E94DA3A81B0162EF2A51"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/simulator/transfer/InMemoryTransferEngineSimulatorTest.java",
+      "sha256": "9635AAB6D32251EF01068623F6183D4739FE3870460BF248EAE6EC38CE792AFD"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/simulator/workflow/InMemoryWorkflowEngineSimulator.java",
+      "sha256": "801ABF29D271F1F06E560B2F666005D65A1AA0AAF5563E71198CE42A7D997829"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/simulator/workflow/InMemoryWorkflowEngineSimulatorTest.java",
+      "sha256": "C2B41AB3059B45678CA4212E3682D0AAA9FFD8BBC178D18D075803D1D36D642B"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/storage/ChecksumCalculatorTest.java",
+      "sha256": "2AC06BC8B1241DA27A83E5D92D4FBAB511B496E34DF128B6D58F9DE2E6BCE52D"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/storage/FileManagerTest.java",
+      "sha256": "3B6799F6E6C941E1D3552E85EAECB83021BC8CB51B9CAD16493AE5F2A76B06BD"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/storage/TransferStateRepositoryTest.java",
+      "sha256": "8A126A35B14A5B7FC094D0A3381A034C8A0E8EEBE25A02DB6F32C01C67C3DB2E"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/testing/ExpectsError.java",
+      "sha256": "3EAC4023CB7DFAFDF75996597BA4A77BE75B542703AF8637C8E117B9B8172520"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/testing/ExpectsErrorExtension.java",
+      "sha256": "60F6086C9A39A85D87A98DAF1E1E56821171803357B5FDD2F46133F3846DD509"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/testing/TestFutureUtils.java",
+      "sha256": "89B3C702C8ED68964AB466DF00013A4238FA1AA2870162E6146FEA066B72CAE7"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/testing/TestFutureUtilsTest.java",
+      "sha256": "5602F1DF5A127FB3D1217C5B499409B024FC800CD1242E61EDCCD15B9B8A62DA"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/testing/TestResourceUtils.java",
+      "sha256": "1164795E603BABB3B2FE76D1C944A7C4EA68047AAE46FA3ADF940DBAD7672764"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/transfer/ProgressTrackerTest.java",
+      "sha256": "613B1865D131009B2F65BD35D48330AE3E6B756FF78C4E1198A5E9F03C55F8D6"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/transfer/SimpleTransferEngineBidirectionalTest.java",
+      "sha256": "56DB5E831BE8329033BA0FB1BBD4CB86C05280DB2F33D1BC3DF19C7CF804A107"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/transfer/SimpleTransferEngineTest.java",
+      "sha256": "D33829D20086201F7B8E66D0C0BE20B4AEE21F39183F44991FC468EE967C3893"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/transfer/TransferContextTest.java",
+      "sha256": "C559B68F4902C2569E09F6B1B4987947C9836EEC81BA0C645270F8115805E93B"
+    },
+    {
+      "path": "quorus-core/src/test/java/dev/mars/quorus/util/SensitiveDataRedactorTest.java",
+      "sha256": "2C92599D3BD226E3E2B09F03BE35B24B8E330899101B023714EF7DB522349EC4"
+    },
+    {
+      "path": "quorus-core/src/test/resources/docker-compose-ftp-test.yml",
+      "sha256": "6C83D917FD4A8C15AF11CEFE5DA017645AA44034B6283161E4C049D32E6587B5"
+    },
+    {
+      "path": "quorus-core/src/test/resources/docker-compose-ftps-test.yml",
+      "sha256": "A436E71DFF310376D866E9CAD4825093E40D2F4B7D6D5C764EEA7D7AFFECFD9F"
+    },
+    {
+      "path": "quorus-core/src/test/resources/docker-compose-sftp-abort-test.yml",
+      "sha256": "3095807E9652E5B702DECC244F856A09A20166CBE5CE9B54E5D759069FCE69A2"
+    },
+    {
+      "path": "quorus-core/src/test/resources/logback-test.xml",
+      "sha256": "B3684786E21FE2BDD1B0BF419937F7DFB984B856F6F9A6CECDB421223A3F705A"
+    },
+    {
+      "path": "quorus-core/src/test/resources/ftp-docker/Dockerfile",
+      "sha256": "FCB71D517DE0D5256D407A30EC1DC0D96BC49A0545EF7BB7114D04D49E4ECBFF"
+    },
+    {
+      "path": "quorus-core/src/test/resources/ftps-docker/Dockerfile",
+      "sha256": "9946BFEF4566248310F80D184FCBA13B6516C6951E401FED60C6E719EF666852"
+    },
+    {
+      "path": "quorus-core/src/test/resources/ftps-docker/ftps-entrypoint.sh",
+      "sha256": "B3EAAC82BB9CC77C95D5B01DA477C665092969F2E2698210243A5BBC6FE14356"
+    },
+    {
+      "path": "quorus-core/src/test/resources/security/client-cert.pem",
+      "sha256": "8D6BB4549F9D8B221917D35632AA445284CA6872089CB5F7E84FA2EA04FC20B2"
+    },
+    {
+      "path": "quorus-core/src/test/resources/security/client-key.pem",
+      "sha256": "507D250586035D6901CC6B50AF93E7C563BE5CF8F8487F19EE29FBB3F7DE780E"
+    },
+    {
+      "path": "quorus-core/src/test/resources/security/server-cert.pem",
+      "sha256": "87477B7D4B634A92148E5947A297CF5CCD3BE8A37A5D69B305511BE7EF0B505F"
+    },
+    {
+      "path": "quorus-core/src/test/resources/security/server-key.pem",
+      "sha256": "F91C61D5C4154BB406BC30E0CDF595B138B288711A87F8D8BF9363F0EE3D174A"
+    },
+    {
+      "path": "quorus-workflow/src/main/java/dev/mars/quorus/workflow/DependencyGraph.java",
+      "sha256": "D8FD41E0D3514D6DF7D1C8E9A22FCA0E3669EB2915BAFC3EB26AB1C9A35EC20D"
+    },
+    {
+      "path": "quorus-workflow/src/main/java/dev/mars/quorus/workflow/ExecutionContext.java",
+      "sha256": "B6BBE76CF32241F43705E672FCD70D074373FF38629DCB300248811229F27B3D"
+    },
+    {
+      "path": "quorus-workflow/src/main/java/dev/mars/quorus/workflow/SimpleWorkflowEngine.java",
+      "sha256": "512DB864717C2906D7B3D6C1E22E959AF9CE570FA08E1845F86187844B06B818"
+    },
+    {
+      "path": "quorus-workflow/src/main/java/dev/mars/quorus/workflow/TransferGroup.java",
+      "sha256": "DFBEFC8D43AB242A697DCB9FC9957ED7ECED3E070E9E6D14AE1D0FBC0AA44866"
+    },
+    {
+      "path": "quorus-workflow/src/main/java/dev/mars/quorus/workflow/ValidationResult.java",
+      "sha256": "B6A24E43FF719B4A8597C99CBDD13BF64BA51A3DC6487743D1BD0EEA9A57506C"
+    },
+    {
+      "path": "quorus-workflow/src/main/java/dev/mars/quorus/workflow/VariableResolver.java",
+      "sha256": "6FB821E7935E08876A99F965CE3C711F5FD010A267856E15E5186389A07AF5B7"
+    },
+    {
+      "path": "quorus-workflow/src/main/java/dev/mars/quorus/workflow/WorkflowDefinition.java",
+      "sha256": "62C665D4FE5CEF48B876866B347C0467958B0C9EF8A11E90A5FE71A6C7F640CE"
+    },
+    {
+      "path": "quorus-workflow/src/main/java/dev/mars/quorus/workflow/WorkflowDefinitionParser.java",
+      "sha256": "B1BC0985265CF4303A53FE63B6D730CE22FBAB87CA4BF83A407E393311EE8C0A"
+    },
+    {
+      "path": "quorus-workflow/src/main/java/dev/mars/quorus/workflow/WorkflowEngine.java",
+      "sha256": "48A099A8BE76FB53CFE2BB0F85D89A88E20A31293C57F6F8A64DBC7D09CFE3D9"
+    },
+    {
+      "path": "quorus-workflow/src/main/java/dev/mars/quorus/workflow/WorkflowExecution.java",
+      "sha256": "488CABC439AE6B6A2AEDB169442AD25F0EF567C8A0369E90751F3B8A4F0EB743"
+    },
+    {
+      "path": "quorus-workflow/src/main/java/dev/mars/quorus/workflow/WorkflowParseException.java",
+      "sha256": "A91DA52C1A9C69D40CD8889CE957889A85C0DC3029616B484DE017A659AAA678"
+    },
+    {
+      "path": "quorus-workflow/src/main/java/dev/mars/quorus/workflow/WorkflowSchemaValidator.java",
+      "sha256": "C7DB0B366839075EE3E7216D3FFB2029980DFF4B80D6C22706AB4FB587492091"
+    },
+    {
+      "path": "quorus-workflow/src/main/java/dev/mars/quorus/workflow/WorkflowStatus.java",
+      "sha256": "44A1EAC704D657BA05E4BEF51256A9980F10563BC0A5788FE1F484C2566B7A73"
+    },
+    {
+      "path": "quorus-workflow/src/main/java/dev/mars/quorus/workflow/YamlWorkflowDefinitionParser.java",
+      "sha256": "C337A3FD5998A0FFBB022AFF93D5468EC5843CE605D96F2CC56BE309640D6210"
+    },
+    {
+      "path": "quorus-workflow/src/main/java/dev/mars/quorus/workflow/observability/WorkflowMetrics.java",
+      "sha256": "3C2F80DA15B2DA5C7053B4D7491A10D8C59638BA16D547C2BBAA4B8ADE8062B9"
+    },
+    {
+      "path": "quorus-workflow/src/main/resources/schema/workflow-schema.json",
+      "sha256": "CD2CF456767A1C79C250F9CFE3D0F5CA80852C8D0B842CDB5B53D237F7A6BD8B"
+    },
+    {
+      "path": "quorus-workflow/src/test/java/dev/mars/quorus/workflow/ComprehensiveSchemaValidationTest.java",
+      "sha256": "7533002A9508625E736C29B2ADB417899B0ACB96F5E1EE8CF1C9DDD0FB9EC2B8"
+    },
+    {
+      "path": "quorus-workflow/src/test/java/dev/mars/quorus/workflow/DependencyGraphTest.java",
+      "sha256": "595D357F7931114A531456204F470406FCB31B8B304C13C4B4C4DC4732079FD8"
+    },
+    {
+      "path": "quorus-workflow/src/test/java/dev/mars/quorus/workflow/SchemaValidationIntegrationTest.java",
+      "sha256": "3C94272619F3BC944E890EAECE62FD87616AE0E77742083C434006DED7523D74"
+    },
+    {
+      "path": "quorus-workflow/src/test/java/dev/mars/quorus/workflow/SimpleWorkflowEngineTest.java",
+      "sha256": "A9EF92AEE830F8BF2B944AE6351AFE71D0523D532323CFB45A0B63CE1634260F"
+    },
+    {
+      "path": "quorus-workflow/src/test/java/dev/mars/quorus/workflow/TestTransferEngine.java",
+      "sha256": "F6AD2A11AA3B99716078FC6A8AB1AF65A189E432631CBE108D5D5AED1774BE72"
+    },
+    {
+      "path": "quorus-workflow/src/test/java/dev/mars/quorus/workflow/ValidationResultTest.java",
+      "sha256": "48B8383C9A48D0FBE76F42A52599C0F33E1C1AD1D80AF08378AB6B2B43FC759A"
+    },
+    {
+      "path": "quorus-workflow/src/test/java/dev/mars/quorus/workflow/VariableResolverTest.java",
+      "sha256": "64A2705F7ECA689E8E136017F6B90443DBFCB23EFDB2754FA8B3FA85FE04785F"
+    },
+    {
+      "path": "quorus-workflow/src/test/java/dev/mars/quorus/workflow/WorkflowDefinitionTest.java",
+      "sha256": "04390C9DD44771C4B684F78CD77744B574620B2CDFD6FAE55B3AD1CACBD072FF"
+    },
+    {
+      "path": "quorus-workflow/src/test/java/dev/mars/quorus/workflow/WorkflowParseExceptionTest.java",
+      "sha256": "749ED98F4D12A7823A2A6C25460BA05FC4761F62136A70510CD0FE0EF89BE3D3"
+    },
+    {
+      "path": "quorus-workflow/src/test/java/dev/mars/quorus/workflow/WorkflowSchemaValidatorTest.java",
+      "sha256": "631FBE527BAAA04D9E4377BFD1F7A2E3BB6EAD8332A7676A6230CA70F8F355C6"
+    },
+    {
+      "path": "quorus-workflow/src/test/java/dev/mars/quorus/workflow/YamlWorkflowDefinitionParserTest.java",
+      "sha256": "7889D19A6CE9700B0237FFA905F5A6DE0DDD7F625AB6E1D0364830FCCCF14CC1"
+    },
+    {
+      "path": "quorus-workflow/src/test/resources/logback-test.xml",
+      "sha256": "EB0F7250525C07CACA2025A8FDA00E6BA02431129850644AFB2F144781F1812D"
+    },
+    {
+      "path": "quorus-workflow/src/test/resources/simple-workflow.yaml",
+      "sha256": "7B6CB89073ADE86ED915EC63A306BAAC7407BE1D026817CA74A865F381708D8D"
+    },
+    {
+      "path": "quorus-agent/src/main/java/dev/mars/quorus/agent/QuorusAgent.java",
+      "sha256": "036495667039EC97B802E687B0C2DEEBB262C09AFC62654F7D7C84D5097E5C33"
+    },
+    {
+      "path": "quorus-agent/src/main/java/dev/mars/quorus/agent/config/AgentConfig.java",
+      "sha256": "1662B31BDA6B7A84BFA71267CFA0CBC1AEAA46804B90A03542EA1E58B85EE448"
+    },
+    {
+      "path": "quorus-agent/src/main/java/dev/mars/quorus/agent/config/AgentConfiguration.java",
+      "sha256": "6624233DEDA2000EFE5FC3B4851B2683CAE073FFD6D9EB5DB11D6ADA547A2B9E"
+    },
+    {
+      "path": "quorus-agent/src/main/java/dev/mars/quorus/agent/observability/AgentMetrics.java",
+      "sha256": "86CB7883AFB0D77D8474AD5615D1772D26D0A56C5C37844DC70E408D5B72F569"
+    },
+    {
+      "path": "quorus-agent/src/main/java/dev/mars/quorus/agent/observability/AgentTelemetryConfig.java",
+      "sha256": "A6E8553074EC80512D2F078EE528C39D7BDFB71749E826DB2812CE8C1FE136D3"
+    },
+    {
+      "path": "quorus-agent/src/main/java/dev/mars/quorus/agent/service/AgentConnectionPolicyService.java",
+      "sha256": "A34F25D0D78E0B82CCDA2852F4DF0A5B3E1F1E31524F639C11AE0338AA7D4F3B"
+    },
+    {
+      "path": "quorus-agent/src/main/java/dev/mars/quorus/agent/service/AgentLocalPathPolicy.java",
+      "sha256": "6C5826DDEDBF4F212AAB9E74813480FF8B245B90B709AE5A386784479426A7C1"
+    },
+    {
+      "path": "quorus-agent/src/main/java/dev/mars/quorus/agent/service/AgentRegistrationService.java",
+      "sha256": "010DC9BB6235D0F4DAF8DC268C2B56FFCC2D01771E4822CDC2FDD8D695742E2A"
+    },
+    {
+      "path": "quorus-agent/src/main/java/dev/mars/quorus/agent/service/ControllerWebClientFactory.java",
+      "sha256": "426E2A2B275B9F1CCF7DF4F7F1609ADD329656F48BE41BD51EF1090C10970103"
+    },
+    {
+      "path": "quorus-agent/src/main/java/dev/mars/quorus/agent/service/HealthService.java",
+      "sha256": "AF881E6E7643B3C356924DB911954CF53C97316210C083B13E2C82B9DF99AC36"
+    },
+    {
+      "path": "quorus-agent/src/main/java/dev/mars/quorus/agent/service/HeartbeatService.java",
+      "sha256": "256C016148F388B0F9B4D86F930ADD1DDCC4951832E378B1975BB3C3425E8AD3"
+    },
+    {
+      "path": "quorus-agent/src/main/java/dev/mars/quorus/agent/service/JobPollingService.java",
+      "sha256": "E079602CE91592215EC6B0216534936337D57A1D37152102B64E334ABE254E35"
+    },
+    {
+      "path": "quorus-agent/src/main/java/dev/mars/quorus/agent/service/JobStatusReportingService.java",
+      "sha256": "CF595A91379B16762BBE0BB549A14C1EDBCAFE860702219E746DD2789DA73C8F"
+    },
+    {
+      "path": "quorus-agent/src/main/java/dev/mars/quorus/agent/service/TransferExecutionService.java",
+      "sha256": "1833B62190BEC43486F1704B054F72BFDAE9E1404450749C4B021372923AAAED"
+    },
+    {
+      "path": "quorus-agent/src/main/resources/logback.xml",
+      "sha256": "1E18BA2D3770837195416157A4144F0AACEF19464B6ACF9ACB5563836A35BC4A"
+    },
+    {
+      "path": "quorus-agent/src/main/resources/quorus-agent.properties",
+      "sha256": "E315B3294773961F88C2C4F87850EB702FEB7C89A296338CD373E0D3FAB6FCEE"
+    },
+    {
+      "path": "quorus-agent/src/test/java/dev/mars/quorus/agent/AgentDefaultIsolationBoundaryTest.java",
+      "sha256": "6BEC7675DB60538E96D0F7F3A44D19267BD447855B2AE33212C5BBA49133E28A"
+    },
+    {
+      "path": "quorus-agent/src/test/java/dev/mars/quorus/agent/PreExecutionFailureIntegrationTest.java",
+      "sha256": "3EEBBC4F83493D8335787F3D06CD67CF81ADFD879D3585D772268D2134346D7B"
+    },
+    {
+      "path": "quorus-agent/src/test/java/dev/mars/quorus/agent/QuorusAgentTest.java",
+      "sha256": "F3AE5FBCB6CD4743DD6571B7DA38D787368CD743DDF4C63AFF2D7B6E08D9783D"
+    },
+    {
+      "path": "quorus-agent/src/test/java/dev/mars/quorus/agent/config/AgentConfigTest.java",
+      "sha256": "AAAA0DA0479D52160E7EE0A06223A3845514667049668B65E85E2A4554B77F05"
+    },
+    {
+      "path": "quorus-agent/src/test/java/dev/mars/quorus/agent/config/AgentTransportSecurityTest.java",
+      "sha256": "8A0F335B5CA752D889F7C900B05651228407FBD681CAE9023A92664519847C56"
+    },
+    {
+      "path": "quorus-agent/src/test/java/dev/mars/quorus/agent/integration/AgentTelemetryIntegrationTest.java",
+      "sha256": "C1B1ABA41CE2B30B6015BEDA74F880CF2A2F3B662046FA726C219A8314FBC330"
+    },
+    {
+      "path": "quorus-agent/src/test/java/dev/mars/quorus/agent/service/AgentGovernedConnectionTest.java",
+      "sha256": "27AD1115C48613ACEE590CB473A557D85B35663D4A9F9591186847D98823989C"
+    },
+    {
+      "path": "quorus-agent/src/test/java/dev/mars/quorus/agent/service/AgentLocalPathPolicyTest.java",
+      "sha256": "90812B640F6767C970429D94888359C101790B768D767942A7385EBFDACB9EBA"
+    },
+    {
+      "path": "quorus-agent/src/test/java/dev/mars/quorus/agent/service/AgentRegistrationServiceTest.java",
+      "sha256": "6A8C6F11C8BCF8D312A8E89D09145E9989ED7A97892C3839641D00770D3BBF0B"
+    },
+    {
+      "path": "quorus-agent/src/test/java/dev/mars/quorus/agent/service/ControllerWebClientFactoryTlsTest.java",
+      "sha256": "961E57CDC95CCDAF3CDA985AF453EFDE87EA295AFEEB7025B420CB7B7D8D575C"
+    },
+    {
+      "path": "quorus-agent/src/test/java/dev/mars/quorus/agent/service/HeartbeatServiceTest.java",
+      "sha256": "E730367A1962053582B6DD4C4AF13E08A66CC2A4BCECDC140F007BE13A9E4BC6"
+    },
+    {
+      "path": "quorus-agent/src/test/java/dev/mars/quorus/agent/service/JobPollingServiceTest.java",
+      "sha256": "19D6765CD9C1B22585F48E0F265F1763031BD7310E3A0C1870D0538B519EDB39"
+    },
+    {
+      "path": "quorus-agent/src/test/java/dev/mars/quorus/agent/service/JobStatusReportingServiceTest.java",
+      "sha256": "3CDB96901FD4C7741009A65640872528177167296F6A6B011D5D902265B92F7B"
+    },
+    {
+      "path": "quorus-agent/src/test/java/dev/mars/quorus/agent/service/TransferExecutionServiceTest.java",
+      "sha256": "07FC4BAA1C5D89C78583B413399E167355973A01642792DCA7FB5ADC0485AD41"
+    },
+    {
+      "path": "quorus-agent/src/test/resources/logback-test.xml",
+      "sha256": "EB0F7250525C07CACA2025A8FDA00E6BA02431129850644AFB2F144781F1812D"
+    },
+    {
+      "path": "quorus-agent/src/test/resources/otel-collector-config.yaml",
+      "sha256": "96DE2B2F41FCD75BC1A81A5817452873275586B78A370B3B88A44B65FE766538"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "temp/remediation-20260905/verify-worktree/quorus-core/target/quorus-core-1.0-SNAPSHOT-tests.jar",
+      "sha256": "37018DA9284EEE53D0FFC14097C1BD7945DF5FB14E8035B330771D285C1FB58D"
+    },
+    {
+      "path": "temp/remediation-20260905/verify-worktree/quorus-core/target/quorus-core-1.0-SNAPSHOT.jar",
+      "sha256": "7916E650A9618FB08555B689791B81FB572004809144C797484440D692358D64"
+    },
+    {
+      "path": "temp/remediation-20260905/verify-worktree/quorus-workflow/target/quorus-workflow-1.0-SNAPSHOT.jar",
+      "sha256": "9D22DB677A7F45BCA2C48753BC9BBF59FA16D07CCBD1E77D075A3CDA6010D963"
+    },
+    {
+      "path": "temp/remediation-20260905/verify-worktree/quorus-agent/target/quorus-agent-1.0-SNAPSHOT.jar",
+      "sha256": "5812796636C7735AF13EB289D9928B6559F9CD6616517F7C780910BB92EFC5FB"
+    }
+  ],
+  "logs": [
+    {
+      "path": "temp/remediation-20260905/isolated-core-agent-verify.log",
+      "sha256": "4241C07EA824B44282B2F6F96CBA86BD4017AAEF3A7B17E8441F67227EC19B71",
+      "finishedAt": "2026-09-05T12:00:33+08:00"
+    },
+    {
+      "path": "temp/remediation-20260905/r4-1-red-elevated.log",
+      "sha256": "AD3CFD9E72D1C0176AC96E8A3ABE58932A50A6A97D3D3A4AD5F04A57099AB386",
+      "finishedAt": "2026-09-05T11:39:53+08:00"
+    },
+    {
+      "path": "temp/remediation-20260905/r4-1-red-online.log",
+      "sha256": "271A5A2C80057F9781B0110162B2DBCD8BB49E95BE5DAC448EA3AC0E9DB3700E",
+      "finishedAt": "2026-09-05T11:40:24+08:00"
+    },
+    {
+      "path": "temp/remediation-20260905/r4-1-red.log",
+      "sha256": "6F7ED70E49CE632A27FF9E1A3B528A5220467124C1D85E20B5D348E6675882D3",
+      "finishedAt": "2026-09-05T03:39:28.6829733Z"
+    },
+    {
+      "path": "temp/remediation-20260905/r5-1-core-verify.log",
+      "sha256": "F3A3DDFA609750B7CE3DAB275DD223EE790113A141653858464CE453B9BEB09B",
+      "finishedAt": "2026-09-05T11:47:22+08:00"
+    },
+    {
+      "path": "temp/remediation-20260905/r5-1-green.log",
+      "sha256": "8949CC84A0F7EAF4650696AC70D9507FA5E32C831FABE51A475CBB429AA810E6",
+      "finishedAt": "2026-09-05T11:43:09+08:00"
+    },
+    {
+      "path": "temp/remediation-20260905/r5-1-red-behavior.log",
+      "sha256": "A315724FC71A1A902A2AC408D0695C2BDB40135DFD0EF866810413F238046961",
+      "finishedAt": "2026-09-05T11:42:07+08:00"
+    },
+    {
+      "path": "temp/remediation-20260905/r5-1-red-scopes.log",
+      "sha256": "C7F24197B94F02452C0B95542FA41D6574BE4E3CF8ECFE4BBAA50ADCD86CC1B2",
+      "finishedAt": "2026-09-05T11:42:36+08:00"
+    },
+    {
+      "path": "temp/remediation-20260905/r5-1-red.log",
+      "sha256": "89DA2A645DA3AD251891D1F4604425E4003B09FF2902302F34585E15D6D70694",
+      "finishedAt": "2026-09-05T11:41:44+08:00"
+    },
+    {
+      "path": "temp/remediation-20260905/r5-2-entrypoint-green.log",
+      "sha256": "AA753B31B9D41A51E8B38328ADF04C058EFC7DF7C1483B599807B79376785C48",
+      "finishedAt": "2026-09-05T03:44:43.3150044Z"
+    },
+    {
+      "path": "temp/remediation-20260905/r5-2-entrypoint-precedence-red.log",
+      "sha256": "4FEFE9D544E147CA916B0E1CF7CA367BC67E4D64F4F6A86110C1673051AF839E",
+      "finishedAt": "2026-09-05T03:44:17.4738293Z"
+    },
+    {
+      "path": "temp/remediation-20260905/r5-2-entrypoint-red.log",
+      "sha256": "3FBCD7718ED58507C0A479B0DB840EA9016EC48E41AD819EE7DB383818B59276",
+      "finishedAt": "2026-09-05T03:44:01.6878285Z"
+    },
+    {
+      "path": "temp/remediation-20260905/r5-3-4-red.log",
+      "sha256": "9B2184E6B25999C5409B25B9936D3E7A801CA5EEE1F617EDE8FB45D1D8A0C502",
+      "finishedAt": "2026-09-05T11:47:55+08:00"
+    },
+    {
+      "path": "temp/remediation-20260905/r5-3-green.log",
+      "sha256": "79273B92D3608DACB7BC63319E271A29991070F0ECAFE3EBE3AFF66702C545FF",
+      "finishedAt": "2026-09-05T11:48:36+08:00"
+    },
+    {
+      "path": "temp/remediation-20260905/r5-4-agent-red.log",
+      "sha256": "26E7700D425FB1593557749A8FD9992EAC24B935A0B4B5F8CCBA805572638D90",
+      "finishedAt": "2026-09-05T11:46:50+08:00"
+    },
+    {
+      "path": "temp/remediation-20260905/r5-4-green-implemented.log",
+      "sha256": "D086AE02C9578EE272DD1BC3D8D8B4B011E6352D17793A5C664AD22C4E055ADC",
+      "finishedAt": "2026-09-05T11:50:41+08:00"
+    },
+    {
+      "path": "temp/remediation-20260905/r5-4-green.log",
+      "sha256": "6310E218FDF2644C6A677FBEAF456DBF6D19E4BCB7D25EE1923486F565CA305F",
+      "finishedAt": "2026-09-05T11:49:54+08:00"
+    },
+    {
+      "path": "temp/remediation-20260905/r5-4-security-red.log",
+      "sha256": "30DE012A467716BEE603EB9AC78DC18B54A9A77FCFC5D2BE9D0680A3293CDBFC",
+      "finishedAt": "2026-09-05T11:49:13+08:00"
+    },
+    {
+      "path": "temp/remediation-20260905/r5-5-green-worker.log",
+      "sha256": "D2C1683370355CA1D61146FCE4BFABE97A5D945BE329CB562B590DA49BDC1826",
+      "finishedAt": "2026-09-05T11:53:44+08:00"
+    },
+    {
+      "path": "temp/remediation-20260905/r5-5-green.log",
+      "sha256": "02655F09A79937A56CFD74BFA71DB88AFDD571B96A7F84EED6760A8725D8E475",
+      "finishedAt": "2026-09-05T11:52:43+08:00"
+    },
+    {
+      "path": "temp/remediation-20260905/r5-5-red.log",
+      "sha256": "9F835A25F2D0EAE9D644AD09FF45F7BB1716BEEB5511E74F039AC28C248FAAC4",
+      "finishedAt": "2026-09-05T11:52:00+08:00"
+    },
+    {
+      "path": "temp/remediation-20260905/r5-5-worker-red.log",
+      "sha256": "F00F561E3A53F646E44B8A22B7435912DD27076F694A4A757AC7215895B1D748",
+      "finishedAt": "2026-09-05T11:53:16+08:00"
+    },
+    {
+      "path": "temp/remediation-20260905/r5-6-worker-green.log",
+      "sha256": "8B8B9EA7E566B53AB76B9EE756EA96E2C96D778E1B242A9561F78D01DAD66009",
+      "finishedAt": "2026-09-05T11:55:29+08:00"
+    },
+    {
+      "path": "temp/remediation-20260905/r5-6-worker-red.log",
+      "sha256": "9373A264E2C337D4FE534CBE881CC741CEB2FD474CB46AF7476545EAAB4C5BE1",
+      "finishedAt": "2026-09-05T11:54:55+08:00"
+    },
+    {
+      "path": "temp/remediation-20260905/r6-controller-preflight.log",
+      "sha256": "D777C5BCAEFC31049D3A51820E32187408D641C6799F8BDEF7F819052E9CAF7F",
+      "finishedAt": "2026-09-05T12:00:45+08:00"
+    },
+    {
+      "path": "temp/remediation-20260905/r6-controller-online-refresh.log",
+      "sha256": "97EED457C34EDADFD913AF0330A0AC8C1587B5372BDE53882DCCD4D0EF4074AF",
+      "finishedAt": "2026-09-05T12:03:12+08:00"
+    }
+  ]
+}

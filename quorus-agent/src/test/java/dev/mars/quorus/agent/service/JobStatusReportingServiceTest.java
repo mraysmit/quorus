@@ -84,6 +84,7 @@ class JobStatusReportingServiceTest {
                 serverPort = server.actualPort();
                 
                 config = new AgentConfiguration.Builder()
+                .securityProfile("development").allowInsecure(true).controllerTlsEnabled(false)
                     .agentId("test-agent-status")
                     .tenantId("test-tenant")
                     .controllerUrl("http://localhost:" + serverPort)
@@ -250,6 +251,7 @@ class JobStatusReportingServiceTest {
     @DisplayName("Should fail on connection error")
     void testConnectionErrorGraceful(Vertx vertx, VertxTestContext testContext) {
         AgentConfiguration badConfig = new AgentConfiguration.Builder()
+                .securityProfile("development").allowInsecure(true).controllerTlsEnabled(false)
             .agentId("test-agent-bad")
             .tenantId("test-tenant")
             .controllerUrl("http://localhost:59999") // Non-existent port

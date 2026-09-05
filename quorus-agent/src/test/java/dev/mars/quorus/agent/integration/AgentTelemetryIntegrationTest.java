@@ -91,6 +91,7 @@ class AgentTelemetryIntegrationTest {
         String otlpEndpoint = "http://localhost:" + otelCollector.getMappedPort(4317);
 
         AgentConfiguration config = new AgentConfiguration.Builder()
+                .securityProfile("development").allowInsecure(true).controllerTlsEnabled(false)
                 .agentId("agent-telemetry-test")
                 .tenantId("telemetry-test")
                 .controllerUrl("http://127.0.0.1:8080/api/v1")

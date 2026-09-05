@@ -408,6 +408,12 @@ Connection tests MUST return redacted stage results for DNS, route/egress policy
 
 The current validation resource is policy-only unless `probeNetwork` is true. An active probe connects only to a controller-approved address within the bounded `probeTimeoutMillis` and may return `ROUTE_VERIFIED`; negotiation, peer identity, authentication, authorization, and read/write capability remain unexecuted and MUST NOT be inferred from a successful TCP route. Submission records `SERVICE_CONNECTION_AUTHORIZED`, while `SERVICE_CONNECTION_LAST_USED` is recorded only after agent-side policy enforcement and secret-authority resolution. A reference past `expiresAt` is durably transitioned to `EXPIRED` and audited before transfer denial.
 
+The service-connection `remotePath` field is a literal absolute path, not a pre-encoded
+URI. Root scope `/` permits descendants. Filename punctuation (`#`, `?`, `%`, spaces)
+and Unicode MUST survive endpoint encoding; traversal segments and backslashes are
+rejected. Portless FTPS uses explicit `AUTH TLS` on port 21. Implicit TLS requires an
+explicit port 990 and an egress allowlist containing that port.
+
 ## 10. Route Resources
 
 | Method | Path | State | Purpose |

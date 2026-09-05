@@ -29,6 +29,7 @@ import dev.mars.quorus.controller.state.CommandResult;
 import dev.mars.quorus.controller.state.ProtobufCommandCodec;
 import dev.mars.quorus.controller.state.RaftCommand;
 import com.google.protobuf.ByteString;
+import io.vertx.core.Context;
 import io.vertx.core.Future;
 import io.vertx.core.Promise;
 import io.vertx.core.Vertx;
@@ -79,6 +80,7 @@ public class RaftNode {
     // ========== NODE CONFIGURATION ==========
 
     private final Vertx vertx;
+    private final Context context;
     private final String nodeId;
     private final Set<String> clusterNodes;
     private final RaftTransport transport;
@@ -284,6 +286,7 @@ public class RaftNode {
             RaftLogApplicator stateMachine, RaftNodeMode mode, long electionTimeoutMs, long heartbeatIntervalMs,
             boolean snapshotEnabled, long snapshotThreshold, long snapshotCheckIntervalMs, long logHardLimit) {
         this.vertx = vertx;
+        this.context = vertx.getOrCreateContext();
         this.nodeId = nodeId;
         this.clusterNodes = new HashSet<>(clusterNodes);
         this.transport = transport;
@@ -373,7 +376,7 @@ public class RaftNode {
 
     public Future<Void> start() {
         Promise<Void> promise = Promise.promise();
-        vertx.runOnContext(v -> {
+        context.runOnContext(v -> {
             try {
                 if (running) {
                     promise.complete();
@@ -584,7 +587,7 @@ public class RaftNode {
 
     public Future<Void> stop() {
         Promise<Void> promise = Promise.promise();
-        vertx.runOnContext(v -> {
+        context.runOnContext(v -> {
             try {
                 if (!running) {
                     promise.complete();
@@ -685,7 +688,7 @@ public class RaftNode {
         synchronized (logWriteLock) {
             Future<T> result = logWriteChain.transform(previous -> {
                 Promise<T> promise = Promise.promise();
-                vertx.runOnContext(v -> {
+                context.runOnContext(v -> {
                     try {
                         operation.get().onComplete(promise);
                     } catch (Exception e) {
@@ -1026,7 +1029,7 @@ public class RaftNode {
 
                 // Using transport (Wait for Future integration)
                 transport.sendVoteRequest(peerId, request)
-                        .onSuccess(response -> vertx.runOnContext(v -> handleVoteResponse(response, term, voteCount)))
+                        .onSuccess(response -> context.runOnContext(v -> handleVoteResponse(response, term, voteCount)))
                         .onFailure(e -> logger.warn("Failed to retrieve vote from {}", peerId));
 
                 // Record edge metric for nodeGraph visualization
@@ -1154,8 +1157,8 @@ public class RaftNode {
      */
     private void handleMessage(RaftMessage message) {
         // Ensure we are on the Vert.x Context
-        if (Vertx.currentContext() != vertx.getOrCreateContext()) {
-            vertx.runOnContext(v -> handleMessage(message));
+        if (Vertx.currentContext() != context) {
+            context.runOnContext(v -> handleMessage(message));
             return;
         }
 
@@ -1175,8 +1178,13 @@ public class RaftNode {
      * </ul>
      */
     public Future<VoteResponse> handleVoteRequest(VoteRequest request) {
+        // A vote remains exclusive while its durability barrier is pending.
+        return serializeLogMutation(() -> processVoteRequest(request));
+    }
+
+    private Future<VoteResponse> processVoteRequest(VoteRequest request) {
         Promise<VoteResponse> promise = Promise.promise();
-        vertx.runOnContext(v -> {
+        context.runOnContext(v -> {
             try {
                 long reqTerm = request.getTerm();
                 boolean higherTermObserved = reqTerm > currentTerm;
@@ -1521,7 +1529,7 @@ public class RaftNode {
         }
 
         transport.sendAppendEntries(target, builder.build())
-                .onSuccess(response -> vertx.runOnContext(v -> handleAppendEntriesResponse(target, response)))
+                .onSuccess(response -> context.runOnContext(v -> handleAppendEntriesResponse(target, response)))
                 .onFailure(e -> logger.warn("Failed to send AppendEntries to {}", target));
 
         // Record edge metric for nodeGraph visualization
@@ -1822,7 +1830,7 @@ public class RaftNode {
         installSnapshotSent.add(1);
 
         transport.sendInstallSnapshot(target, request)
-                .onSuccess(response -> vertx.runOnContext(v -> {
+                .onSuccess(response -> context.runOnContext(v -> {
                     if (response.getTerm() > currentTerm) {
                         stepDown(response.getTerm());
                         installSnapshotInProgress.remove(target);
@@ -1880,7 +1888,7 @@ public class RaftNode {
 
     private Future<InstallSnapshotResponse> processInstallSnapshot(InstallSnapshotRequest request) {
         Promise<InstallSnapshotResponse> promise = Promise.promise();
-        vertx.runOnContext(v -> {
+        context.runOnContext(v -> {
             try {
                 installSnapshotReceived.add(1);
 

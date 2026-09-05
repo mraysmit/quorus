@@ -59,6 +59,7 @@ class TransferExecutionServiceTest {
 
     private static AgentConfiguration createConfig() {
         return new AgentConfiguration.Builder()
+                .securityProfile("development").allowInsecure(true).controllerTlsEnabled(false)
                 .agentId("test-agent")
                 .tenantId("test-tenant")
                 .controllerUrl("http://localhost:8080/api/v1")

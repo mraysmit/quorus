@@ -102,17 +102,22 @@ public final class ConnectionPolicyEnforcer {
         if (value == null || value.isBlank() || !value.startsWith("/")) {
             throw new IllegalArgumentException("remotePath must be an absolute path");
         }
-        String normalized = java.net.URI.create("file:" + value).normalize().getPath();
-        if (!normalized.startsWith("/") || value.contains("..")) {
+        if (value.indexOf('\\') >= 0 || value.chars().anyMatch(Character::isISOControl)
+                || java.util.Arrays.stream(value.split("/", -1)).anyMatch(".."::equals)) {
             throw new IllegalArgumentException("remotePath must not contain traversal segments");
         }
-        return normalized;
+        try {
+            // remotePath is literal filename data, not a URI containing query/fragment syntax.
+            return new java.net.URI(null, null, value, null).normalize().getPath();
+        } catch (java.net.URISyntaxException e) {
+            throw new IllegalArgumentException("remotePath is invalid", e);
+        }
     }
 
     private static boolean within(String root, String path) {
         String normalizedRoot = root.endsWith("/") && root.length() > 1
                 ? root.substring(0, root.length() - 1) : root;
-        return path.equals(normalizedRoot) || path.startsWith(normalizedRoot + "/");
+        return normalizedRoot.equals("/") || path.equals(normalizedRoot) || path.startsWith(normalizedRoot + "/");
     }
 
     private static boolean hostnameMatches(String rule, String host) {

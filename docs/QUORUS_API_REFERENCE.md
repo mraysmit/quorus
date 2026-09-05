@@ -209,7 +209,7 @@ Creates a transfer job. Returns `201 Created` on success.
 | `tenantId` | string | Optional narrowing value; must match the authenticated tenant and executing agent |
 | `jobId` | string | Unique job identifier |
 | `serviceConnectionId` | string | Production service alias |
-| `remotePath` | string | Absolute remote path within the alias policy |
+| `remotePath` | string | Literal absolute remote path within the alias policy; not a URI or pre-encoded URL |
 | `agentPool` | string | Approved executing agent pool |
 
 Governed downloads additionally require `destinationPath`. Governed uploads require `direction: "UPLOAD"` and a local `file:` `sourceUri`. Development-profile direct transfers require a credential-free `sourceUri` and `destinationPath`.
@@ -265,6 +265,12 @@ Service connections expose protocol, credential-free endpoint, service identity 
 The executing agent receives the exact policy version and digest, controller-resolved address pins, redacted service connection, and opaque reference. It repeats authorization, including its deployment-configured pool and network zone, before contacting Vault KV v2. Upload sources and download destinations must remain under the agent's configured local roots after canonical and symbolic-link resolution. HTTPS, FTPS, and SFTP sockets bind to an approved resolved address while retaining the original service hostname for TLS or SSH identity verification. Runtime credentials are memory-only and wiped after completion.
 
 `POST /api/v1/service-connections/:serviceConnectionId/validate` is policy-only by default. With `probeNetwork: true`, it additionally performs a bounded TCP route probe to a controller-approved address and returns `ROUTE_VERIFIED`; it does not retrieve a secret, authenticate to the service, or claim application-level readiness. Submission emits `SERVICE_CONNECTION_AUTHORIZED`. `SERVICE_CONNECTION_LAST_USED` is emitted only after the executing agent has passed its policy checks and resolved secret authority. If an active secret reference is past `expiresAt`, transfer authorization durably marks it `EXPIRED`, records the expiry event, and returns `409`.
+
+Path scope `/` permits descendants. Filename characters such as spaces, `#`, `?`, `%`
+and Unicode are preserved and encoded when constructing the endpoint URI; `..` path
+segments and backslashes are rejected. A literal `%2F` in a filename is not a separator.
+Portless FTPS uses explicit `AUTH TLS` on port 21, matching the adapter. Implicit FTPS
+requires an explicit port 990 and an egress policy allowing that port.
 
 See [Quorus Service Connection Operations Runbook](QUORUS_SERVICE_CONNECTION_OPERATIONS_RUNBOOK.md).
 

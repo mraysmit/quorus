@@ -1,0 +1,177 @@
+diff --git a/quorus-controller/src/main/java/dev/mars/quorus/controller/http/handlers/ServiceConnectionHandler.java b/quorus-controller/src/main/java/dev/mars/quorus/controller/http/handlers/ServiceConnectionHandler.java
+index 31ee236..da253fb 100644
+--- a/quorus-controller/src/main/java/dev/mars/quorus/controller/http/handlers/ServiceConnectionHandler.java
++++ b/quorus-controller/src/main/java/dev/mars/quorus/controller/http/handlers/ServiceConnectionHandler.java
+@@ -41,10 +41,16 @@ public final class ServiceConnectionHandler {
+     private final RaftNode raftNode;
+     private final ServiceConnectionRegistry registry;
+     private final ConnectionPolicyEnforcer policyEnforcer = new ConnectionPolicyEnforcer();
++    private final HostResolver hostResolver;
+ 
+     public ServiceConnectionHandler(RaftNode raftNode, QuorusStateStore stateStore) {
++        this(raftNode, stateStore, HostResolver.system());
++    }
++
++    public ServiceConnectionHandler(RaftNode raftNode, QuorusStateStore stateStore, HostResolver hostResolver) {
+         this.raftNode = raftNode;
+         this.registry = new ServiceConnectionRegistry(stateStore);
++        this.hostResolver = java.util.Objects.requireNonNull(hostResolver);
+     }
+ 
+     public Handler<RoutingContext> createSecret() {
+@@ -177,7 +183,7 @@ public final class ServiceConnectionHandler {
+                     body.getString("direction").toUpperCase(Locale.ROOT)), body.getString("agentPool"), null);
+             try {
+                 ConnectionPolicyEnforcer.ConnectionAuthorization authorization = policyEnforcer
+-                        .authorizeController(connection, request, HostResolver.system());
++                        .authorizeController(connection, request, hostResolver);
+                 JsonArray stages = new JsonArray()
+                         .add(stage("POLICY", "PASS", "Connection policy approved"))
+                         .add(new JsonObject().put("stage", "DNS").put("status", "PASS")
+diff --git a/quorus-controller/src/main/java/dev/mars/quorus/controller/http/handlers/TransferHandler.java b/quorus-controller/src/main/java/dev/mars/quorus/controller/http/handlers/TransferHandler.java
+index eaf27e6..59efed7 100644
+--- a/quorus-controller/src/main/java/dev/mars/quorus/controller/http/handlers/TransferHandler.java
++++ b/quorus-controller/src/main/java/dev/mars/quorus/controller/http/handlers/TransferHandler.java
+@@ -73,17 +73,24 @@ public class TransferHandler {
+     private final ServiceConnectionRegistry connectionRegistry;
+     private final ConnectionPolicyEnforcer connectionPolicyEnforcer;
+     private final SecurityProfile securityProfile;
++    private final HostResolver hostResolver;
+ 
+     public TransferHandler(RaftNode raftNode, QuorusStateStore stateStore) {
+         this(raftNode, stateStore, SecurityProfile.DEVELOPMENT);
+     }
+ 
+     public TransferHandler(RaftNode raftNode, QuorusStateStore stateStore, SecurityProfile securityProfile) {
++        this(raftNode, stateStore, securityProfile, HostResolver.system());
++    }
++
++    public TransferHandler(RaftNode raftNode, QuorusStateStore stateStore, SecurityProfile securityProfile,
++                           HostResolver hostResolver) {
+         this.raftNode = raftNode;
+         this.stateStore = stateStore;
+         this.connectionRegistry = new ServiceConnectionRegistry(stateStore);
+         this.connectionPolicyEnforcer = new ConnectionPolicyEnforcer();
+         this.securityProfile = securityProfile;
++        this.hostResolver = java.util.Objects.requireNonNull(hostResolver);
+     }
+ 
+     /**
+@@ -141,7 +148,7 @@ public class TransferHandler {
+                             body.getString("direction", "DOWNLOAD").toUpperCase(Locale.ROOT));
+                     connectionAuthorization = connectionPolicyEnforcer.authorizeController(connection,
+                             new ConnectionAccessRequest(tenantId, remotePath, direction,
+-                                    agentPool, List.of()), HostResolver.system());
++                                    agentPool, List.of()), hostResolver);
+                     JsonObject metadata = jobBody.getJsonObject("metadata", new JsonObject());
+                     metadata.put("serviceConnectionId", serviceConnectionId)
+                             .put("remotePath", remotePath)
+diff --git a/quorus-controller/src/test/java/dev/mars/quorus/controller/http/ControllerDnsBoundaryTest.java b/quorus-controller/src/test/java/dev/mars/quorus/controller/http/ControllerDnsBoundaryTest.java
+new file mode 100644
+--- /dev/null
++++ b/quorus-controller/src/test/java/dev/mars/quorus/controller/http/ControllerDnsBoundaryTest.java
+@@ -0,0 +1,104 @@
++/* Copyright 2026 Mark Andrew Ray-Smith Cityline Ltd. Licensed under Apache-2.0. */
++package dev.mars.quorus.controller.http;
++
++import dev.mars.quorus.connection.*;
++import dev.mars.quorus.controller.http.handlers.*;
++import dev.mars.quorus.controller.raft.*;
++import dev.mars.quorus.controller.security.SecurityProfile;
++import dev.mars.quorus.controller.state.*;
++import io.vertx.core.*;
++import io.vertx.core.http.HttpServer;
++import io.vertx.core.json.JsonObject;
++import io.vertx.ext.web.Router;
++import io.vertx.ext.web.handler.BodyHandler;
++import io.vertx.ext.web.client.WebClient;
++import io.vertx.junit5.VertxExtension;
++import org.junit.jupiter.api.extension.ExtendWith;
++import org.junit.jupiter.params.ParameterizedTest;
++import org.junit.jupiter.params.provider.ValueSource;
++
++import java.net.InetAddress;
++import java.net.URI;
++import java.time.Duration;
++import java.time.Instant;
++import java.util.List;
++import java.util.Set;
++import java.util.concurrent.atomic.AtomicBoolean;
++
++import static dev.mars.quorus.testing.TestFutureUtils.*;
++import static org.junit.jupiter.api.Assertions.*;
++
++/** Real HTTP entry points with real policy, registry and Raft; only DNS is a purpose-built fixture. */
++@ExtendWith(VertxExtension.class)
++class ControllerDnsBoundaryTest {
++    private static final Duration TIMEOUT = Duration.ofSeconds(10);
++
++    @ParameterizedTest
++    @ValueSource(booleans = {false, true})
++    void dnsNeverRunsOnHttpEventLoop(boolean transfer, Vertx vertx) throws Exception {
++        AtomicBoolean onEventLoop = new AtomicBoolean();
++        HostResolver resolver = host -> {
++            onEventLoop.set(Context.isOnEventLoopThread());
++            return List.of(InetAddress.getByAddress(new byte[]{127, 0, 0, 1}));
++        };
++        try (Fixture fixture = new Fixture(vertx, resolver)) {
++            var response = awaitSuccess(fixture.client.post(fixture.server.actualPort(), "localhost",
++                    transfer ? "/api/v1/transfers" : "/api/v1/service-connections/connection/validate")
++                    .sendJsonObject(body()), TIMEOUT);
++            assertEquals(transfer ? 201 : 200, response.statusCode(), response.bodyAsString());
++            assertFalse(onEventLoop.get(), "DNS resolution must leave the HTTP event loop");
++        }
++    }
++
++    static JsonObject body() {
++        return new JsonObject().put("tenantId", "tenant").put("serviceConnectionId", "connection")
++                .put("remotePath", "/approved/file.dat").put("direction", "DOWNLOAD")
++                .put("agentPool", "pool").put("destinationPath", "downloads/dns-test.dat");
++    }
++
++    static final class Fixture implements AutoCloseable {
++        final QuorusStateStore state = new QuorusStateStore();
++        final RaftNode node;
++        final HttpServer server;
++        final WebClient client;
++
++        Fixture(Vertx vertx, HostResolver resolver) {
++            String id = "dns-" + System.nanoTime();
++            node = RaftNode.builder().vertx(vertx).nodeId(id).clusterNodes(Set.of(id))
++                    .transport(new InMemoryTransportSimulator(id)).stateMachine(state)
++                    .mode(RaftNodeMode.volatileMode()).electionTimeout(250).heartbeatInterval(50).build();
++            awaitSuccess(node.start(), TIMEOUT);
++            awaitSuccess(eventually(vertx, node::isLeader, TIMEOUT), TIMEOUT.plusSeconds(1));
++            var registry = new ServiceConnectionRegistry(state);
++            var secret = new SecretReference("secret", "tenant", "vault", "opaque", "key", "1",
++                    SecretReference.Status.ACTIVE, null, null);
++            var connection = new ServiceConnection("connection", "tenant", ServiceConnection.Protocol.SFTP,
++                    URI.create("sftp://dns.example.test"), "zone", Set.of("/approved"),
++                    Set.of(ServiceConnection.Direction.DOWNLOAD), Set.of("pool"), "owner", "test", "internal",
++                    "secret", "identity", ServiceConnection.AuthenticationType.PASSWORD,
++                    new ServiceConnection.TrustPolicy(false, false, Set.of(), Set.of("SHA256:fixture"), "TLSv1.3"),
++                    new ServiceConnection.EgressPolicy(Set.of("dns.example.test"), Set.of("127.0.0.0/8"),
++                            Set.of(22), false, true), 1, ServiceConnection.Status.ACTIVE, Instant.now(), Instant.now());
++            awaitSuccess(node.submitCommand(new SystemMetadataCommand.Set(registry.secretKey("tenant", "secret"),
++                    ServiceConnectionRegistry.encode(secret))), TIMEOUT);
++            awaitSuccess(node.submitCommand(new SystemMetadataCommand.Set(registry.connectionKey("tenant", "connection"),
++                    ServiceConnectionRegistry.encode(connection))), TIMEOUT);
++            Router router = Router.router(vertx);
++            router.route().handler(BodyHandler.create());
++            router.post("/api/v1/transfers").handler(new TransferHandler(node, state,
++                    SecurityProfile.DEVELOPMENT, resolver).handleCreate());
++            router.post("/api/v1/service-connections/:serviceConnectionId/validate")
++                    .handler(new ServiceConnectionHandler(node, state, resolver).validateConnection());
++            router.get("/health/live").handler(ctx -> ctx.response().end("OK"));
++            router.route().failureHandler(new GlobalErrorHandler());
++            server = awaitSuccess(vertx.createHttpServer().requestHandler(router).listen(0, "127.0.0.1"), TIMEOUT);
++            client = WebClient.create(vertx);
++        }
++
++        public void close() {
++            client.close();
++            awaitSuccess(server.close(), TIMEOUT);
++            awaitSuccess(node.stop(), TIMEOUT);
++        }
++    }
++}
