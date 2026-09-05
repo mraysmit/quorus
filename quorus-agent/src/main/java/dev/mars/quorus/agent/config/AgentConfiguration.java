@@ -114,44 +114,9 @@ public class AgentConfiguration {
     
     public static AgentConfiguration from(AgentConfig config) {
         config.validate();
-        Builder builder = new Builder();
+        Builder builder = new Builder(config);
         builder.agentId(config.getAgentId());
         builder.tenantId(config.getTenantId());
-        builder.controllerUrl(config.getControllerUrl());
-        builder.region(config.getRegion());
-        builder.datacenter(config.getDatacenter());
-        builder.agentPort(config.getAgentPort());
-        builder.maxConcurrentTransfers(config.getMaxConcurrentTransfers());
-        builder.heartbeatInterval(config.getHeartbeatIntervalMs());
-        builder.httpConnectionTimeout(config.getHttpConnectionTimeoutMs());
-        builder.httpIdleTimeout(config.getHttpIdleTimeoutMs());
-        builder.version(config.getVersion());
-        builder.securityProfile(config.getSecurityProfile());
-        builder.allowInsecure(config.isAllowInsecure());
-        builder.controllerTlsEnabled(config.isControllerTlsEnabled());
-        builder.tlsCertificatePath(config.getTlsCertificatePath());
-        builder.tlsPrivateKeyPath(config.getTlsPrivateKeyPath());
-        builder.tlsTrustBundlePath(config.getTlsTrustBundlePath());
-        builder.uploadRoot(Path.of(config.getUploadRoot()));
-        builder.downloadRoot(Path.of(config.getDownloadRoot()));
-        builder.nfsMountRoot(config.getNfsMountRoot());
-        builder.nfsMountSecurityVerified(config.isNfsMountSecurityVerified());
-        builder.smbMountSecurityVerified(config.isSmbMountSecurityVerified());
-        builder.agentPool(config.getAgentPool());
-        builder.networkZone(config.getNetworkZone());
-        builder.jobPollingInitialDelayMs(config.getJobPollingInitialDelayMs());
-        builder.jobPollingIntervalMs(config.getJobPollingIntervalMs());
-        builder.foreignAssignmentMismatchThreshold(config.getForeignAssignmentMismatchThreshold());
-        builder.telemetryEnabled(config.isTelemetryEnabled());
-        builder.prometheusPort(config.getPrometheusPort());
-        builder.otlpEndpoint(config.getOtlpEndpoint());
-        builder.vaultAddress(config.getVaultAddress());
-        builder.vaultToken(config.getVaultToken());
-
-        String protocolsStr = config.getSupportedProtocols();
-        Set<String> protocols = new HashSet<>(Arrays.asList(protocolsStr.split(",")));
-        builder.supportedProtocols(protocols);
-        
         // Auto-detect hostname and IP
         try {
             InetAddress localHost = InetAddress.getLocalHost();
@@ -233,38 +198,81 @@ public class AgentConfiguration {
         private String tenantId;
         private String hostname;
         private String address;
-        private int agentPort = 8080;
-        private String region = "default";
-        private String datacenter = "default";
+        private int agentPort;
+        private String region;
+        private String datacenter;
         private String controllerUrl;
-        private Set<String> supportedProtocols = new HashSet<>();
-        private int maxConcurrentTransfers = 5;
-        private long heartbeatInterval = 30000;
-        private int httpConnectionTimeout = 5000;
-        private int httpIdleTimeout = 10000;
-        private String version = "1.0.0";
-        private String securityProfile = "development";
-        private boolean allowInsecure = true;
-        private boolean controllerTlsEnabled = false;
+        private Set<String> supportedProtocols;
+        private int maxConcurrentTransfers;
+        private long heartbeatInterval;
+        private int httpConnectionTimeout;
+        private int httpIdleTimeout;
+        private String version;
+        private String securityProfile;
+        private boolean allowInsecure;
+        private boolean controllerTlsEnabled;
         private String tlsCertificatePath;
         private String tlsPrivateKeyPath;
         private String tlsTrustBundlePath;
-        private Path uploadRoot = Path.of("data/uploads");
-        private Path downloadRoot = Path.of("data/downloads");
-        private String nfsMountRoot = "";
+        private Path uploadRoot;
+        private Path downloadRoot;
+        private String nfsMountRoot;
         private boolean nfsMountSecurityVerified;
         private boolean smbMountSecurityVerified;
-        private String agentPool = "default";
-        private String networkZone = "default";
-        private long jobPollingInitialDelayMs = 5000;
-        private long jobPollingIntervalMs = 10000;
-        private int foreignAssignmentMismatchThreshold = 3;
-        private boolean telemetryEnabled = true;
-        private int prometheusPort = 9465;
-        private String otlpEndpoint = "http://localhost:4317";
+        private String agentPool;
+        private String networkZone;
+        private long jobPollingInitialDelayMs;
+        private long jobPollingIntervalMs;
+        private int foreignAssignmentMismatchThreshold;
+        private boolean telemetryEnabled;
+        private int prometheusPort;
+        private String otlpEndpoint;
         private String vaultAddress;
         private String vaultToken;
         
+        /** Deterministic packaged defaults; environment is applied at the application boundary. */
+        public Builder() {
+            this(new AgentConfig("default", new java.util.Properties(), java.util.Map.of()));
+        }
+
+        private Builder(AgentConfig config) {
+            this.controllerUrl(config.getControllerUrl());
+            this.region(config.getRegion());
+            this.datacenter(config.getDatacenter());
+            this.agentPort(config.getAgentPort());
+            this.maxConcurrentTransfers(config.getMaxConcurrentTransfers());
+            this.heartbeatInterval(config.getHeartbeatIntervalMs());
+            this.httpConnectionTimeout(config.getHttpConnectionTimeoutMs());
+            this.httpIdleTimeout(config.getHttpIdleTimeoutMs());
+            this.version(config.getVersion());
+            this.securityProfile(config.getSecurityProfile());
+            this.allowInsecure(config.isAllowInsecure());
+            this.controllerTlsEnabled(config.isControllerTlsEnabled());
+            this.tlsCertificatePath(config.getTlsCertificatePath());
+            this.tlsPrivateKeyPath(config.getTlsPrivateKeyPath());
+            this.tlsTrustBundlePath(config.getTlsTrustBundlePath());
+            this.uploadRoot(Path.of(config.getUploadRoot()));
+            this.downloadRoot(Path.of(config.getDownloadRoot()));
+            this.nfsMountRoot(config.getNfsMountRoot());
+            this.nfsMountSecurityVerified(config.isNfsMountSecurityVerified());
+            this.smbMountSecurityVerified(config.isSmbMountSecurityVerified());
+            this.agentPool(config.getAgentPool());
+            this.networkZone(config.getNetworkZone());
+            this.jobPollingInitialDelayMs(config.getJobPollingInitialDelayMs());
+            this.jobPollingIntervalMs(config.getJobPollingIntervalMs());
+            this.foreignAssignmentMismatchThreshold(config.getForeignAssignmentMismatchThreshold());
+            this.telemetryEnabled(config.isTelemetryEnabled());
+            this.prometheusPort(config.getPrometheusPort());
+            this.otlpEndpoint(config.getOtlpEndpoint());
+            this.vaultAddress(config.getVaultAddress());
+            this.vaultToken(config.getVaultToken());
+
+            String protocolsStr = config.getSupportedProtocols();
+            Set<String> protocols = new HashSet<>(Arrays.asList(protocolsStr.split(",")));
+            this.supportedProtocols(protocols);
+        
+        }
+
         public Builder agentId(String agentId) { this.agentId = agentId; return this; }
         public Builder tenantId(String tenantId) { this.tenantId = tenantId; return this; }
         public Builder hostname(String hostname) { this.hostname = hostname; return this; }

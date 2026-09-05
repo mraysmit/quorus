@@ -135,6 +135,8 @@ class QuorusAgentTest {
 
                     // Create agent configuration pointing to our real test server
                     config = new AgentConfiguration.Builder()
+                .securityProfile("development").allowInsecure(true).controllerTlsEnabled(false)
+                .foreignAssignmentMismatchThreshold(3)
                             .agentId("test-agent-001")
                             .tenantId("test-tenant")
                             .controllerUrl("http://localhost:" + controllerPort + "/api/v1")
@@ -394,6 +396,8 @@ class QuorusAgentTest {
     @DisplayName("Should shut down when controller registration fails")
     void testShutdownOnRegistrationFailure(Vertx vertx) throws Exception {
         AgentConfiguration unreachableControllerConfig = new AgentConfiguration.Builder()
+                .securityProfile("development").allowInsecure(true).controllerTlsEnabled(false)
+                .foreignAssignmentMismatchThreshold(3)
                 .agentId("test-agent-unreachable")
                 .tenantId("test-tenant")
                 .controllerUrl("http://localhost:1/api/v1")

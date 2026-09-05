@@ -2,12 +2,80 @@
 
 # Quorus Configuration Isolation Handover — 2026-09-03
 
-**Version:** 1.3  
-**Date:** 2026-09-04  
+**Version:** 1.6  
+**Date:** 2026-09-05  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Status:** Superseded — see the post-handover status below  
-**Scope:** Original configuration handover at `fab72a6`, with remediation updates through `2d8ed83` and the uncommitted R2/R3 changes
+**Scope:** Original configuration handover at `fab72a6`, remediation committed through `28f0530`, and uncommitted R5 and full-suite error remediation
+
+## Remaining remediation — 2026-09-05
+
+**Full-suite error remediation — verified 2026-09-05:** The complete rerun exposed
+18 Docker cluster setup errors and one initial-election timeout. The plaintext Docker
+fixtures now explicitly select development security settings for HTTP and Raft;
+production security defaults remain unchanged. Investigation of the election timeout
+found a follower granting two candidates votes in the same term on different Vert.x
+contexts. `RaftNode` now retains one owning context for lifecycle, RPC and response
+dispatch, and serializes vote decisions through their metadata durability barrier.
+
+Two new regression tests failed before the fix: RPC execution used a different context,
+and 32 overlapping durable vote requests all received grants instead of one. Both now
+pass, including the winning vote's persistence after reopening storage. The focused
+vote/transport/restart run passed 19 tests; the Docker tests passed after rebuilding
+the image from the corrected source.
+
+The final JDK 25 command, `mvn.cmd --fail-at-end clean verify '-Dtest.excludedGroups='`,
+completed at **2026-09-05T15:46:52+08:00** with **BUILD SUCCESS** across all seven
+reactor entries and all five configured JaCoCo gates. Of 2,416 reported tests,
+**2,414 passed, zero failed/errored, and two were skipped**. The skips are existing
+explicit disables for unsupported Docker network partition scenarios; one was
+previously masked by class initialization failure. Integration Examples builds but
+contains no tests. No test was newly disabled or assertion weakened by this fix.
+
+See the [full-suite remediation evidence](../docs-design/evidence/full-suite-error-remediation-2026-09-05.md)
+and its accompanying JSON for commands, red/green results, hashes and limitations.
+This is verification of the current working tree, not a final committed revision or
+isolated-checkout release acceptance. R4, remaining R5 disposition, R6 release
+acceptance and R1 deployment/power-loss gates remain open. No commit or deployment
+was performed.
+
+**Sister-project location:** RaftLog is a separate project in the same parent folder
+as Quorus. From the Quorus repository root, its path is `../raftlog`; on this machine
+that is `C:\Users\mraysmit\dev\idea-projects\raftlog`. Its parent build is
+[`../raftlog/pom.xml`](../../raftlog/pom.xml), and the library consumed by Quorus is
+the `raftlog-core` module. Check this sister checkout first when resolving or developing
+the WAL dependency. It is not an in-repository Quorus module, and Maven does not build
+it automatically as part of the Quorus reactor.
+
+Build and install the independently validated sister-project revision from the Quorus root:
+
+```powershell
+mvn.cmd -f ../raftlog/pom.xml -pl raftlog-core -am clean install 2>&1 | Tee-Object -FilePath temp/raftlog-install.log
+```
+
+**RaftLog release follow-up — 2026-09-05:** The earlier dependency mismatch is resolved by a newly implemented and published `raftlog-core:1.2.0` from RaftLog commit `1c5af80f13a149663926c01eb15f88c14c4f2d25`, tag `v1.2.0`. It supplies physical prefix compaction with forced atomic publication; raw append/replay semantics are unchanged. Quorus's POM already requests this version. All 41 selected Quorus storage/snapshot/restart tests passed against the new implementation. Quorus continues to own durable snapshots and must publish them before compaction.
+
+The previous `db59859` provenance and historical 1.1.0 defect allegations remain unsubstantiated; this is a new release, not validation of those claims. See the [release handover](../docs-design/evidence/raftlog-validation-handover-2026-09-05.md#implemented-capability-and-release--2026-09-05) for artifact hash, test scope and durability limits. R2/R3 remain committed in `28f0530`; R4, R5 closure, R6 full acceptance and deployment/power-loss gates remain open. No deployed storage was changed.
+Independent R5 fixes retain behavioral red and focused green evidence:
+
+- controller entrypoint canonical environment precedence and Linux line endings;
+- root path scopes and literal filename preservation through real HTTPS serialization;
+- pinned TLS hostname verification on non-default ports and ordinary HTTP redirects;
+- agent builder defaults derived from packaged configuration, including production TLS
+  and fail-fast after one foreign assignment; development fixtures opt in explicitly;
+- portless FTPS policy aligned with the existing explicit-TLS port 21 adapter behavior;
+  implicit TLS requires explicit port 990;
+- FTP, SFTP, SMB and NFS worker execution checks corrected to inspect the actual thread,
+  while direct blocking calls on event-loop threads remain rejected.
+
+The [current evidence record](../docs-design/evidence/remediation-r4-r6-2026-09-05.md)
+tracks verification, failed intermediate runs and remaining acceptance work. Shared
+loader consolidation, remaining API cleanup, route-probe default ports, partial trust
+updates, legacy replay compatibility, codec alignment, event retention and client/trust
+manager lifecycle still need disposition and applicable verification. R1 deployment
+durability gates remain open. Do not use the historical recommended steps below as the
+current execution plan.
 
 ## Post-handover status — 2026-09-04
 
@@ -31,7 +99,7 @@ Durable report-outbox recovery and destination reconciliation remain Phase 2 wor
 R4 (non-blocking DNS) is next; R1/R6 release gates remain open.
 
 **R2 tenant-isolation follow-up:** the external-library-only removal was committed as
-`2d8ed83`. The current uncommitted R2 change replaces ambiguous registry addresses with
+`2d8ed83`. The R2 change committed in `28f0530` replaces ambiguous registry addresses with
 versioned collision-free tenant/resource keys, checks stored ownership in projections
 and replicated state application, and atomically migrates validated legacy rows with
 the first successful v2 registry mutation. Ambiguous records fail closed without partial
@@ -51,7 +119,7 @@ remain open. No deployed data was inspected, migrated or deleted.
 
 **External-library-only follow-up:** the internal file WAL was already removed, but RocksDB and memory backends remained. Those implementations, their factory branches, `createInMemory()`, backend-specific tests and RocksDB JNI dependency are now removed. Storage-dependent controller, election and snapshot tests use the external adapter. Seven behavioral rejection cases retain red/green evidence; production code contains only `RaftLogStorageAdapter` as a `RaftStorage` implementation. Quorus retains its Vert.x interface and application-snapshot sidecar, neither of which implements a WAL.
 
-**Prior commit boundaries:** `038da9f` (`fix(raft): persist snapshots and recover safely after compaction`) contains the R1 snapshot recovery remediation; `2d8ed83` contains the subsequent external-library-only removal. The snapshot sidecar must remain while `raftlog-core` 1.2.0 has no snapshot API; removing it would reintroduce the snapshot-compaction recovery defect.
+**Prior commit boundaries:** `038da9f` (`fix(raft): persist snapshots and recover safely after compaction`) contains the R1 snapshot recovery remediation; `2d8ed83` contains the subsequent external-library-only removal. The snapshot sidecar must remain: the inspected external 1.1.0 storage interface has no snapshot API, and Quorus requires durable snapshots for recovery.
 
 **Verification of the removal:** tests ran in the isolated `../quorus-core-tests-20260904` worktree to avoid editor-generated class-file interference. Changed controller sources, resources and POM matched the working tree by file hash.
 
@@ -64,7 +132,7 @@ remain open. No deployed data was inspected, migrated or deleted.
 
 The controller count changed from 530 to 520 because 17 obsolete implementation-specific tests were removed and seven rejection cases were added. Existing node, snapshot and controller tests were migrated to real library storage with per-test temporary directories and awaited shutdown; these migrations are regression coverage, not new TDD evidence. Commands, timestamps, log hashes and the artifact hash are retained under `externalLibraryOnly` in the [Raft evidence record](../docs-design/evidence/raft-log-tdd-evidence-2026-09-04.json). This removal slice did not rerun the full reactor or the configured Docker/slow groups excluded by default controller verification.
 
-**Operational boundary:** controller configuration accepts only `raftlog`; removed backend names fail explicitly. No deployed storage was inspected, migrated or deleted. Preserve any legacy storage before recovery work; switching a property is not an on-disk migration. The remaining R1 production-filesystem/power-loss acceptance gates and R2–R6 remain open; green tests do not close those gates.
+**Operational boundary:** controller configuration accepts only `raftlog`; removed backend names fail explicitly. No deployed storage was inspected, migrated or deleted. Preserve any legacy storage before recovery work; switching a property is not an on-disk migration. The remaining R1 production-filesystem/power-loss acceptance gates and R4–R6 remain open; R2/R3 implementation is complete. Green tests do not close deployment acceptance gates.
 
 **Remediation checkpoint:** the approved review follow-up is tracked in the existing [enterprise implementation plan](../docs-design/task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md#remediation-checkpoint--2026-09-04). M0 durability and Phase 4 acceptance are reopened. Real WAL prefix deletion in `43cdd20` exposed the adapter's memory-only snapshots. R1 adds a durable snapshot sidecar, compaction dependency checks, serialized snapshot mutations and interrupted-install recovery; its behavioral red/green evidence is retained in the [Raft evidence record](../docs-design/evidence/raft-log-tdd-evidence-2026-09-04.json). Release remains blocked by the checkpoint's outstanding gates. `ffc3e64` records a full clean reactor against the 1.2.0 adoption patch, but that historical green result did not exercise snapshot-plus-compaction restart. No deployed storage has been changed or assessed by this remediation.
 

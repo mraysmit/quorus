@@ -249,3 +249,30 @@ On `Q-REPORT-UNRESOLVED` after those retries:
 Durable agent report-outbox recovery, automatic lease-expiry/reassignment and
 destination reconciliation remain open Phase 2 deliverables. Bounded replay is not
 a claim of automatic recovery across agent restarts or prolonged controller outages.
+
+## 13. Handover remediation compatibility — 2026-09-05
+
+The agent configuration builder now derives defaults from packaged configuration.
+It requires production TLS by default and stops after the first foreign assignment.
+Applications using a plaintext development fixture must explicitly select
+`securityProfile("development")`, `allowInsecure(true)` and `controllerTlsEnabled(false)`.
+Explicit builder values still override defaults. Environment values are applied through
+`AgentConfig` at the application boundary, not implicitly by the builder.
+
+Controller entrypoint `QUORUS_*` values take precedence over legacy unprefixed names.
+Shell files require LF line endings, enforced by `.gitattributes` for future checkouts.
+
+Remote paths are literal filename data. Supply `/out/report#1?.dat` for that filename;
+do not pre-encode it as a URL. Root scope `/` permits descendants; traversal segments
+remain denied. Pinned HTTPS retains the original hostname for TLS verification and the
+port in the HTTP Host authority. Ordinary development HTTP transfers may follow
+redirects; governed clients continue to reject them.
+
+Portless `ftps://` uses explicit TLS on port 21. To use implicit TLS, specify `:990`
+and allow 990 in egress policy. Review portless FTPS aliases whose policies only allowed
+990: those policies did not match the adapter's existing connection behavior. No registry
+record or deployed data is migrated automatically by these corrections.
+
+Full release acceptance remains blocked until the recorded raftlog-core 1.2.0 artifact
+is available and the remaining R1/R4/R5/R6 gates pass. Consult the
+[current evidence record](../docs-design/evidence/remediation-r4-r6-2026-09-05.md).

@@ -12,7 +12,7 @@
 ## Status
 **Historical WAL design with current external-library integration contract**
 
-Quorus supports only `io.github.mraysmit:raftlog-core:1.2.0` for WAL and Raft metadata persistence. The internal file WAL was removed previously; the remaining RocksDB and memory backends, factory branches and JNI dependency are now removed. Historical algorithms and review notes below are explanatory material, not instructions to implement another WAL. Appendix F defines the current boundary.
+Quorus uses external `raftlog-core` for WAL and Raft metadata persistence. Its POM requests `1.2.0`. The new release from RaftLog commit `1c5af80f13a149663926c01eb15f88c14c4f2d25` is published and verified and supplies the required prefix-compaction API. This is a newly implemented release, not validation of the earlier `db59859` claim; see Appendix F.5. The internal file WAL was removed previously; the remaining RocksDB and memory backends, factory branches and JNI dependency are now removed. Historical algorithms and review notes below are explanatory material, not instructions to implement another WAL. Appendix F defines the current boundary.
 
 This proposal is non-normative. The current state-authority, durability, snapshot, and release requirements are defined in [QUORUS_ARCHITECTURE_SPECIFICATION.md](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md).
 
@@ -773,7 +773,7 @@ To maintain Raft safety, a follower must never acknowledge an entry until it is 
    - Update `commitIndex` based on `leaderCommit`.
    - Trigger the **Application Loop** (Section 16.4).
 
-**One mutation at a time.** The Prepare step decides what is new by reading the in-memory log, and the in-memory log only reflects an entry after step 4. A second `AppendEntries` that arrives while step 3 is still in flight would therefore plan the same entries again and persist them twice; the same applies to two leader submits reserving the same index. `RaftNode` queues every log mutation behind the previous one (`serializeLogMutation`), and the external `dev.mars.raftlog.storage.FileRaftStorage` runs all I/O on its single-thread executor in submission order. Replay additionally keys records by index: a repeated record with the same term is ignored, a record with a different term supersedes the tail from that index, and a gap fails recovery.
+**One mutation at a time.** The Prepare step decides what is new by reading the in-memory log, and the in-memory log only reflects an entry after step 4. A second `AppendEntries` that arrives while step 3 is still in flight would therefore plan the same entries again and persist them twice; the same applies to two leader submits reserving the same index. `RaftNode` queues every log mutation behind the previous one (`serializeLogMutation`), and the external `dev.mars.raftlog.storage.FileRaftStorage` runs all I/O on its single-thread executor in submission order. Do not rely on replay to suppress duplicates or reject gaps: verified RaftLog 1.1.0 replays raw APPEND records and explicit suffix-truncation markers. Quorus must skip matching entries, truncate from the first conflict, append the entire incoming remainder, and sync before acknowledgment. Appendix F.5 supersedes the earlier unverified replay claims.
 
 **Implementation (Vert.x):**
 
@@ -944,9 +944,9 @@ Before considering the WAL "done":
 - ✅ **Application Order:** Entries are applied to the State Machine strictly in-order
 - ✅ **Leader Consistency:** Leader only advances `commitIndex` after a majority `sync()` is confirmed
 - ✅ **Replay Safety:** Replay truncates corrupt/partial tail safely
-- **Prefix Compaction and Snapshot Recovery — R1 remediation:** `RaftLogStorageAdapter.truncatePrefix` delegates to raftlog-core 1.2.0 only after a durable covering snapshot and recovery-dependency marker have been published. The earlier closure of RAFT-STORAGE-PREFIX-TRUNCATION-001 proved deletion, not restart safety; R1 retains the failing fresh-instance/three-controller restart evidence and the subsequent fixes.
+- **Prefix Compaction and Snapshot Recovery:** RaftLog 1.2.0 from `1c5af80` supplies forced atomic WAL prefix replacement. Quorus must durably publish the covering snapshot and dependency marker before calling it. All 41 selected Quorus storage/snapshot/restart tests passed against this implementation. Deployment power-loss acceptance remains separate; see Appendix F.5.
 - ✅ **Overlap Safety:** Two mutations that overlap an in-flight WAL write never persist or reserve the same index twice
-- ✅ **Replay Idempotence:** A repeated record for an index is ignored; a gap fails recovery instead of misplacing later entries
+- **Retry safety — caller responsibility:** Matching entries must be skipped before persistence; verified raw replay does not deduplicate indexes or reject gaps. See Appendix F.5.
 - ✅ **Election Liveness:** A rejected `RequestVote` does not reset the election timer of a follower
 - ✅ **Crash Test (Append):** Kill during append → restart yields prefix-safe log
 - ✅ **Crash Test (Truncate+Append):** Kill during truncate+append sequence → replay yields last durable state
@@ -2774,9 +2774,9 @@ RaftNode Integration:
 
 ### F.1 Sole Storage Implementation
 
-`RaftLogStorageAdapter` delegates metadata, append, suffix truncation, replay, sync and prefix truncation to the external `raftlog-core` library. Quorus must not contain an internal file WAL, RocksDB backend, memory storage backend, or optional RocksDB JNI dependency.
+`RaftLogStorageAdapter` delegates metadata, append, suffix truncation, replay and sync to external `raftlog-core`. It also delegates prefix truncation to the verified 1.2.0 capability described in F.5. Quorus must not contain an internal file WAL, RocksDB backend, memory storage backend, or optional RocksDB JNI dependency.
 
-The Quorus `RaftStorage` interface provides the Vert.x asynchronous boundary. `FileSnapshotStore` persists application snapshots and the compaction dependency marker because raftlog-core 1.2.0 does not provide a snapshot API. It neither stores log entries nor replaces library WAL logic.
+The Quorus `RaftStorage` interface provides the Vert.x asynchronous boundary. `FileSnapshotStore` persists application snapshots and the compaction dependency marker because application snapshot persistence and its coordination with WAL deletion belong to Quorus; the verified RaftLog API provides no application snapshot operation. It neither stores log entries nor replaces library WAL logic.
 
 ### F.2 Configuration and Startup
 
@@ -2798,3 +2798,16 @@ The former backend-specific tests are removed with their implementations. Extern
 Do not change a RocksDB storage setting to `raftlog` and treat the directory as compatible. There is no automatic cross-format migration. Preserve the original directory and obtain an explicitly validated migration or restore procedure before using existing non-raftlog data. Never clear production directories to make a backend change appear successful.
 
 The R1 snapshot dependency and backup requirements in Section 19 still apply. Removing backend alternatives does not close production durability or the remaining enterprise remediation gates.
+
+### F.5 Independently Verified Contract and Dependency Requirements — 2026-09-05
+
+Quorus consumes `io.github.mraysmit:raftlog-core:1.2.0`, newly implemented and published from RaftLog commit `1c5af80f13a149663926c01eb15f88c14c4f2d25` (tag `v1.2.0`). The former missing prefix capability is now supplied. This release does not substantiate the earlier `db59859` history. See the [release handover](../evidence/raftlog-validation-handover-2026-09-05.md#implemented-capability-and-release--2026-09-05).
+
+- **Append semantics remain unchanged:** Raw append/replay does not deduplicate indexes. Quorus must serialize planning and persistence, skip matching retries, truncate the entire conflicting suffix, append the incoming remainder, then sync before acknowledgment and memory mutation. A matching short request preserves the follower tail. After the first conflict, append later incoming entries even if their terms matched the old suffix. The library's `AppendPlan` assumes a memory log starting at index 1; Quorus owns snapshot-offset-aware planning.
+- **Prefix compaction:** `truncatePrefix(toIndex)` removes indexes less than or equal to its boundary, resolves existing suffix markers and physically rewrites retained entries with unchanged terms, payloads, indexes and order. Metadata is preserved. Zero is a no-op; negatives fail; repeated compaction is safe. Suffix truncation alone still adds a marker and does not reclaim bytes. The former adapter no-op was a Quorus contract defect, not a pre-existing RaftLog compaction promise.
+- **Snapshot ownership:** Quorus owns durable application snapshots, last-included index/term and its dependency marker. Publish a covering snapshot durably before calling prefix compaction; trim memory only after success. RaftLog does not remember a minimum allowed append index, so Quorus must not reintroduce compacted indexes. The former memory-only snapshot defect remains Quorus-owned.
+- **Durability and failures:** The library serializes compaction with other WAL operations, writes `raft.log.tmp`, forces the file, atomically replaces `raft.log`, forces the directory on non-Windows providers, and reopens the WAL before completing its future. No extra sync is needed for compaction. Failed temporary writes preserve the old WAL. Once publication starts, any failure fences the instance: close it and reopen a fresh instance, preserving the snapshot and marker. Recovery discards stale temporary output only when the authoritative WAL exists; corruption must go through explicit replay recovery before compaction. Java Windows lacks directory force, so its guarantees are limited to file force plus atomic replacement.
+- **Compatibility and operations:** WAL format remains version 1; the API default fails explicitly for implementations without compaction. An older reader can decode retained records, but binary rollback cannot restore deleted history and requires snapshot-aware recovery. Back up and restore the whole stopped-node directory consistently. Compaction scans/materializes the logical log and rewrites the retained tail, requiring memory and temporary disk space. There is no automatic/background compaction.
+- **Verification scope:** Strict behavioral red preceded implementation: 23 contract/failure cases failed, then passed. Windows/JDK 25 ran 319 tests with three platform skips; Linux/JDK 21 ran all 319 with no skips, including actual directory force and four abrupt child-process rewrite interruptions. Quorus's five selected storage/snapshot/restart suites passed all 41 tests against the new local artifact. These results establish the capability and integration boundary; they do not close Quorus full-reactor or deployment power-loss acceptance.
+
+Keep historical evidence and its correction notice intact. The earlier missing-method compilation failure is not behavioral red. The new implementation and release have separate provenance in the handover; no internal WAL backend is introduced.
