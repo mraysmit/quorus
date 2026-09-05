@@ -1,0 +1,154 @@
+{
+  "baseRevision": "f8fb15eb5292a20ef16d71d641731d614f9f2c52",
+  "scope": "Uncommitted R4 DNS remediation; working-tree verification",
+  "completed": "2026-09-05T18:55:26+08:00",
+  "jdk": "25",
+  "result": "BUILD SUCCESS",
+  "fullCommand": "mvn.cmd --fail-at-end clean verify '-Dtest.excludedGroups=' 2>&1 | Tee-Object -FilePath temp/r4-dns-full-verify.log",
+  "focusedCommand": "mvn.cmd test -pl quorus-controller -am '-Dtest=ControllerDnsBoundaryTest,ServiceConnectionHttpIntegrationTest,ServiceConnectionRegistryIsolationTest,SecurityBoundaryIntegrationTest,ServiceConnectionRouteProbeTest' '-Dsurefire.failIfNoSpecifiedTests=false' 2>&1 | Tee-Object -FilePath temp/r4-dns-final-focused.log",
+  "redCommandPattern": "mvn.cmd test -pl quorus-controller -am '-Dtest=ControllerDnsBoundaryTest' '-Dsurefire.failIfNoSpecifiedTests=false' 2>&1 | Tee-Object -FilePath <stage-log>",
+  "expiryRedSelection": "ControllerDnsBoundaryTest#secretExpiringDuringDnsRetainsDurableExpiryTransition",
+  "dockerCommand": "docker compose -f quorus-controller/src/test/resources/docker-compose-build-image.yml build 2>&1 | Tee-Object -FilePath temp/r4-dns-final-docker-rebuild.log",
+  "dockerImage": "sha256:5d9f143c2b2805f88738ff06e142e707e3ff07f89bdde65031c38fb1039ead59",
+  "tdd": {
+    "focusedTests": 47,
+    "stages": [
+      "2 event-loop assertion failures",
+      "4 capacity/deadline failures",
+      "3 registry-removal failures",
+      "1 missing durable expiry transition"
+    ],
+    "characterizationCases": 5,
+    "behavioralRedCases": 10
+  },
+  "coverage": "All five configured module gates passed",
+  "total": 2431,
+  "passed": 2429,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 2,
+  "modules": [
+    {
+      "module": "quorus-core",
+      "tests": 1540,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "module": "quorus-workflow",
+      "tests": 134,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "module": "quorus-tenant",
+      "tests": 64,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "module": "quorus-controller",
+      "tests": 593,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 2
+    },
+    {
+      "module": "quorus-agent",
+      "tests": 100,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "module": "quorus-integration-examples",
+      "tests": 0,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ],
+  "sources": [
+    {
+      "path": "quorus-controller/src/main/java/dev/mars/quorus/controller/http/ControllerConnectionAuthorizer.java",
+      "sha256": "0FB36030CCBCF9DA34E8F0CDFF953508E2269E2B24A88B250D92A2139F96AAAD"
+    },
+    {
+      "path": "quorus-controller/src/main/java/dev/mars/quorus/controller/http/HttpApiServer.java",
+      "sha256": "FCB16EF28E8F15033E06031A8082C48B091004A9C79A0682F23C600851A2EEE6"
+    },
+    {
+      "path": "quorus-controller/src/main/java/dev/mars/quorus/controller/http/handlers/ServiceConnectionHandler.java",
+      "sha256": "1E4B09A1BF19B79C89F1A9933FDE1609439861F65326888CBA590AB6BC4F40DE"
+    },
+    {
+      "path": "quorus-controller/src/main/java/dev/mars/quorus/controller/http/handlers/TransferHandler.java",
+      "sha256": "D6B3408E6F576B94FFB9650D41B9A194A3A089D02461D840416E5179C20D173D"
+    },
+    {
+      "path": "quorus-controller/src/main/resources/quorus-controller.properties",
+      "sha256": "5D5FDE6D57CB217509B6C866811C5C1AD8FCA9C7E8A11C41D9961B4B327B35C6"
+    },
+    {
+      "path": "quorus-controller/src/test/java/dev/mars/quorus/controller/http/ControllerDnsBoundaryTest.java",
+      "sha256": "854B44A5595FCCA785D39513DA7752B5A653F3EF5A4AF51E54A9AFEC965EBF33"
+    }
+  ],
+  "logs": [
+    {
+      "path": "temp/r4-dns-eventloop-red.log",
+      "sha256": "117C29F4AF433018858D046E86FFAFA441FF1E6870356992267A3D40CA86ADAC"
+    },
+    {
+      "path": "temp/r4-dns-eventloop-green.log",
+      "sha256": "F855B1476E79F2D8AC5E87E99519C03819FAA9332D553EFC4B6EED7052EBA8CD"
+    },
+    {
+      "path": "temp/r4-dns-capacity-red.log",
+      "sha256": "DA50E91C214F22B76B6D905D9F76F0B7F14FF05915E990943EB2629D06953D6E"
+    },
+    {
+      "path": "temp/r4-dns-capacity-green.log",
+      "sha256": "6BC5F2FF811F3AEE3B427051417446A3FFF3E66D42B68A42BE9CE96718297C4C"
+    },
+    {
+      "path": "temp/r4-dns-revocation-red.log",
+      "sha256": "6EF59B222874571BDC31159F1D94682987A9F7C621E391B5D509B94F885A1F92"
+    },
+    {
+      "path": "temp/r4-dns-revocation-green.log",
+      "sha256": "E7165CE08AFE8BF16B265EE869F30F5F46C484157BA124542A98FEE9CD077658"
+    },
+    {
+      "path": "temp/r4-dns-focused-regression.log",
+      "sha256": "4DDCF5EFC480BE14E2BEFF87A4F428BEB210DF9911D926AF65ED41618ABEB28A"
+    },
+    {
+      "path": "temp/r4-dns-expiry-red.log",
+      "sha256": "C913A26CC94F117169FF4AB99EC5D8F459B9F762E9573C3B6ABAA1F0F63D351B"
+    },
+    {
+      "path": "temp/r4-dns-final-focused.log",
+      "sha256": "794C4FE2679DDF281A37F084F920692BDFA83850EA044D8C5AD97FB3C27C00FB"
+    },
+    {
+      "path": "temp/r4-dns-final-docker-rebuild.log",
+      "sha256": "0330DC0758714A00192540F0A48C8F38C508DF1DA3C6E835B23EAA38BDE5C8EE"
+    },
+    {
+      "path": "temp/r4-dns-full-verify.log",
+      "sha256": "45057EEA0499DEFF18D6A04BA648BF73BA30724DF3ADA21D775C23D2D5198ED2"
+    }
+  ],
+  "limitations": [
+    "R5 disposition remains open",
+    "R6 isolated final-revision acceptance remains open",
+    "R1 deployment and power-loss gates remain open",
+    "Existing network-fault tooling limitations and two disabled tests unchanged",
+    "No mocking framework used",
+    "Revocation-green selected two nonmatching existing class names; only 13 DNS cases ran. Final focused command uses actual class names."
+  ]
+}

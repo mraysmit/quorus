@@ -18,9 +18,18 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /** Default PKIX validation augmented with optional SHA-256 leaf-certificate pins. */
 public final class TlsPeerPolicy {
+    private static final int MAX_TRUST_POLICIES = 64;
+    private static final Map<TrustPolicyKey, X509ExtendedTrustManager> TRUST_MANAGERS =
+            new LinkedHashMap<>(16, 0.75f, true) {
+                @Override protected boolean removeEldestEntry(Map.Entry<TrustPolicyKey, X509ExtendedTrustManager> eldest) {
+                    return size() > MAX_TRUST_POLICIES;
+                }
+            };
     private TlsPeerPolicy() { }
 
     public static String sha256Fingerprint(byte[] encodedCertificate) {
@@ -71,13 +80,19 @@ public final class TlsPeerPolicy {
 
     public static X509ExtendedTrustManager defaultTrustManager(Set<String> approvedCaIds,
                                                                 Set<String> approvedFingerprints) {
+        TrustPolicyKey key = new TrustPolicyKey(Set.copyOf(approvedCaIds), Set.copyOf(approvedFingerprints));
+        synchronized (TRUST_MANAGERS) {
+            return TRUST_MANAGERS.computeIfAbsent(key, TlsPeerPolicy::createTrustManager);
+        }
+    }
+
+    private static X509ExtendedTrustManager createTrustManager(TrustPolicyKey policy) {
         try {
             TrustManagerFactory factory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
             factory.init((KeyStore) null);
             for (var manager : factory.getTrustManagers()) {
                 if (manager instanceof X509TrustManager x509) {
-                    return new PinnedTrustManager(x509, Set.copyOf(approvedCaIds),
-                            Set.copyOf(approvedFingerprints));
+                    return new PinnedTrustManager(x509, policy.approvedCaIds(), policy.approvedFingerprints());
                 }
             }
             throw new IllegalStateException("Default X.509 trust manager is unavailable");
@@ -85,6 +100,8 @@ public final class TlsPeerPolicy {
             throw new IllegalStateException("Unable to initialize the default TLS trust policy", e);
         }
     }
+
+    private record TrustPolicyKey(Set<String> approvedCaIds, Set<String> approvedFingerprints) { }
 
     /** Returns the peer chain augmented with its cryptographically linked local trust anchor. */
     static List<X509Certificate> withSelectedTrustAnchor(List<X509Certificate> peerChain,

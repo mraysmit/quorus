@@ -20,6 +20,25 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ServiceConnectionRouteProbeTest {
 
     @Test
+    void usesTheProtocolDefaultWhenTheApprovedEndpointOmitsItsPort() throws Exception {
+        try (ServerSocket listener = new ServerSocket(22, 1, InetAddress.getLoopbackAddress())) {
+            Thread.startVirtualThread(() -> {
+                try (var ignored = listener.accept()) { }
+                catch (Exception ignored) { }
+            });
+            var authorization = new ConnectionPolicyEnforcer.ConnectionAuthorization(
+                    "connection-default-port", "tenant-1",
+                    URI.create("sftp://localhost/outbound/file.dat"),
+                    List.of(InetAddress.getLoopbackAddress().getHostAddress()), 1, "digest", Instant.now());
+
+            ServiceConnectionRouteProbe.Result result = ServiceConnectionRouteProbe.probe(
+                    authorization, Duration.ofSeconds(2));
+
+            assertEquals("PASS", result.status());
+        }
+    }
+
+    @Test
     void connectsOnlyToTheControllerApprovedAddress() throws Exception {
         try (ServerSocket listener = new ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
             Thread.startVirtualThread(() -> {

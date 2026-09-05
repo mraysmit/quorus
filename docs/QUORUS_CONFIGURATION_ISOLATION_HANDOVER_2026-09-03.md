@@ -2,14 +2,43 @@
 
 # Quorus Configuration Isolation Handover — 2026-09-03
 
-**Version:** 1.6  
+**Version:** 1.8  
 **Date:** 2026-09-05  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Status:** Superseded — see the post-handover status below  
-**Scope:** Original configuration handover at `fab72a6`, remediation committed through `28f0530`, and uncommitted R5 and full-suite error remediation
+**Scope:** Original configuration handover at `fab72a6` and remediation through R5/R6 acceptance
 
 ## Remaining remediation — 2026-09-05
+
+**R4 DNS follow-up:** Both governed transfer submission and service-connection
+validation now resolve DNS on Vert.x workers with shared bounded admission (default
+eight operations) and a deadline including queue time (default 5,000 ms). Overload
+returns 503 and timeout returns 504. Timed-out native work retains capacity until it
+finishes; late results cannot approve work. Registry changes during resolution deny
+the operation, and secrets expiring during resolution retain their durable expiry
+transition and audit event. Egress policy and persisted address pins remain enforced.
+
+Ten boundary cases retain behavioral red before their fixes; five additional cases
+are characterization/regression. All 47 focused tests pass. The full JDK 25 clean
+reactor verification with Docker/slow groups enabled completed at
+**2026-09-05T18:55:26+08:00**: **2,429 passed, zero failures/errors, two existing
+disabled network tests**, all seven reactor entries and five JaCoCo gates passed.
+R4 implementation is complete. See the [R4 evidence](../docs-design/evidence/r4-dns-remediation-2026-09-05.md).
+This update supersedes historical statements below that R4 is next or its draft is
+unimplemented.
+
+**R5 closure:** The remaining handover implementation is complete. Route probes use
+protocol default ports, partial trust-policy updates retain omitted trust fields, and
+controller and agent service-connection JSON uses one shared codec. Configuration
+resource loading and environment precedence share `LayeredProperties`; obsolete public
+convenience constructors were removed. Security-event reads are tenant-scoped, limited
+to 1–1000 rows and cursor-paged without copying the complete metadata map. Events are
+not automatically pruned; enterprise archive, legal hold and retention remain Phase 9.
+Trust managers use a bounded 64-policy cache while governed transfer clients retain
+per-transfer isolation and cleanup. New credential-bearing URIs remain rejected; legacy
+commands are redacted and failed before snapshot persistence. See the
+[R5 evidence](../docs-design/evidence/r5-closure-2026-09-05.md).
 
 **Full-suite error remediation — verified 2026-09-05:** The complete rerun exposed
 18 Docker cluster setup errors and one initial-election timeout. The plaintext Docker
@@ -70,12 +99,9 @@ Independent R5 fixes retain behavioral red and focused green evidence:
   while direct blocking calls on event-loop threads remain rejected.
 
 The [current evidence record](../docs-design/evidence/remediation-r4-r6-2026-09-05.md)
-tracks verification, failed intermediate runs and remaining acceptance work. Shared
-loader consolidation, remaining API cleanup, route-probe default ports, partial trust
-updates, legacy replay compatibility, codec alignment, event retention and client/trust
-manager lifecycle still need disposition and applicable verification. R1 deployment
-durability gates remain open. Do not use the historical recommended steps below as the
-current execution plan.
+tracks verification and failed intermediate runs. R5 is complete. R6 final-tree
+acceptance is the remaining local verification; R1 deployment durability gates remain
+open. Do not use the historical recommended steps below as the current execution plan.
 
 ## Post-handover status — 2026-09-04
 

@@ -18,8 +18,20 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 
 class TlsTrustAnchorPolicyTest {
+
+    @Test
+    void trustManagersAreReusedOnlyForTheSameImmutablePolicy() {
+        var first = TlsPeerPolicy.defaultTrustManager(Set.of("SHA256:ca-a"), Set.of("SHA256:peer-a"));
+        var same = TlsPeerPolicy.defaultTrustManager(Set.of("SHA256:ca-a"), Set.of("SHA256:peer-a"));
+        var rotated = TlsPeerPolicy.defaultTrustManager(Set.of("SHA256:ca-a"), Set.of("SHA256:peer-b"));
+
+        assertSame(first, same);
+        assertNotSame(first, rotated);
+    }
 
     @Test
     void approvedRootMayBeTheSelectedTrustAnchorOmittedByThePeer() throws Exception {

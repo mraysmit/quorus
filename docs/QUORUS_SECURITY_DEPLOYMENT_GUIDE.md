@@ -2,8 +2,8 @@
 
 # Quorus Security Deployment Guide
 
-**Version:** 1.3  
-**Date:** 2026-09-04  
+**Version:** 1.5  
+**Date:** 2026-09-05  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Status:** Phase 1 implementation guide  
@@ -273,6 +273,54 @@ and allow 990 in egress policy. Review portless FTPS aliases whose policies only
 990: those policies did not match the adapter's existing connection behavior. No registry
 record or deployed data is migrated automatically by these corrections.
 
-Full release acceptance remains blocked until the recorded raftlog-core 1.2.0 artifact
-is available and the remaining R1/R4/R5/R6 gates pass. Consult the
+The external dependency is available; full release acceptance still requires the
+remaining remediation and deployment gates. Consult the
 [current evidence record](../docs-design/evidence/remediation-r4-r6-2026-09-05.md).
+
+Portless validation probes use the service protocol default. Partial connection updates
+retain omitted CA, SSH and TLS pin fields and the existing minimum TLS version. Review
+the complete returned redacted connection after every trust change.
+
+Security-event collection reads are bounded: request `limit=1..1000` and follow the
+opaque `nextCursor` until it is absent. The returned `total` is the page row count.
+Quorus does not currently prune these authoritative events. Preserve snapshots and use
+an approved external evidence process until Phase 9 implements archive, legal hold and
+retention controls.
+
+Governed HTTP clients are closed after each transfer. Trust managers are reused through
+a bounded cache of 64 immutable policies; any CA or peer-pin rotation creates a distinct
+policy entry. Operators should expect the old entry to remain only until normal cache
+eviction and must validate the new policy before use.
+
+New transfer requests containing URI user-info are rejected. During compatibility
+replay, a legacy protobuf command containing user-info is stripped and its job is made
+terminal with a redacted resubmission message before authoritative state or snapshots
+are written. Never restore the removed credential from logs or backups; create an
+external secret reference and resubmit through a governed service connection.
+
+## 14. Bounded controller DNS authorization
+
+Transfer submission and service-connection validation share one DNS authorization
+budget per HTTP server. Native DNS and policy checks run on the Vert.x worker pool;
+registry checks, responses and Raft submission resume on the HTTP request context.
+
+| Property | Environment override | Default |
+|---|---|---|
+| `quorus.http.dns.max-concurrent` | `QUORUS_HTTP_DNS_MAX_CONCURRENT` | `8` |
+| `quorus.http.dns.timeout-ms` | `QUORUS_HTTP_DNS_TIMEOUT_MS` | `5000` |
+
+Both settings must be positive. The admission limit includes queued and running work;
+the deadline includes time awaiting a worker. These operations use the existing
+Vert.x worker pool and do not create an independent executor or DNS cache.
+
+`503 SERVICE_UNAVAILABLE` means the budget is occupied. `504 TIMEOUT` means the DNS
+authorization deadline expired. A native lookup may outlive that response: its slot
+remains occupied until the lookup ends, preventing retries from accumulating unbounded
+work. Expired queued tasks do not start another native lookup. Late results do not
+create a transfer or record approval. Investigate resolver availability when capacity
+stays occupied; increasing the request deadline does not cancel an OS lookup.
+
+`409 CONFLICT` requires a fresh request against the current connection/secret state
+when it changes during DNS resolution. Tenant isolation, allowed CIDRs, port/path/pool
+policy and the exact resolved address set remain enforced. The optional TCP route
+probe retains its separate timeout; DNS authorization does not prove service readiness.

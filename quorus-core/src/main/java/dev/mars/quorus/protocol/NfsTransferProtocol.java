@@ -88,10 +88,6 @@ public class NfsTransferProtocol implements TransferProtocol {
         this(getDefaultMountRoot(), false);
     }
 
-    public NfsTransferProtocol(boolean mountSecurityVerified) {
-        this(getDefaultMountRoot(), mountSecurityVerified);
-    }
-
     /**
      * Creates an NFS protocol adapter with an explicit mount root.
      *
@@ -102,7 +98,7 @@ public class NfsTransferProtocol implements TransferProtocol {
     }
 
     public NfsTransferProtocol(String mountRoot, boolean mountSecurityVerified) {
-        this.mountRoot = mountRoot;
+        this.mountRoot = mountRoot == null || mountRoot.isBlank() ? getDefaultMountRoot() : mountRoot;
         this.mountSecurityVerified = mountSecurityVerified;
         logger.debug("NfsTransferProtocol initialized with mountRoot={}", this.mountRoot);
     }

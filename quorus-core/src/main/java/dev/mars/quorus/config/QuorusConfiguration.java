@@ -20,8 +20,7 @@ package dev.mars.quorus.config;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.io.InputStream;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
 
@@ -202,28 +201,14 @@ public class QuorusConfiguration {
     }
     
     private void loadResource(String resourceName, boolean required) {
-        try (InputStream input = getClass().getClassLoader().getResourceAsStream(resourceName)) {
-            if (input != null) {
-                properties.load(input);
-                logger.info("Loaded configuration from {}", resourceName);
-            } else if (required) {
-                logger.warn("Configuration resource {} not found; using built-in defaults", resourceName);
-            } else {
-                logger.debug("Optional configuration profile {} not found", resourceName);
-            }
-        } catch (IOException e) {
-            throw new IllegalStateException("Unable to load configuration resource " + resourceName, e);
-        }
+        if (LayeredProperties.loadResource(properties, getClass().getClassLoader(), resourceName))
+            logger.info("Loaded configuration from {}", resourceName);
+        else if (required) logger.warn("Configuration resource {} not found; using built-in defaults", resourceName);
+        else logger.debug("Optional configuration profile {} not found", resourceName);
     }
 
     private void applyEnvironmentOverrides() {
-        for (String key : properties.stringPropertyNames()) {
-            String environmentKey = key.toUpperCase().replace('.', '_').replace('-', '_');
-            String environmentValue = System.getenv(environmentKey);
-            if (environmentValue != null && !environmentValue.isBlank()) {
-                properties.setProperty(key, environmentValue);
-            }
-        }
+        LayeredProperties.applyEnvironment(properties, System.getenv(), Map.of());
     }
     
     @Override

@@ -6,6 +6,7 @@ package dev.mars.quorus.controller.state;
 
 import dev.mars.quorus.connection.SecretReference;
 import dev.mars.quorus.connection.ServiceConnection;
+import dev.mars.quorus.connection.ServiceConnectionJsonCodec;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 
@@ -18,6 +19,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 
@@ -86,14 +89,28 @@ public final class ServiceConnectionRegistry {
 
     public List<SecurityEvent> listEvents(String tenantId) {
         return rows("security-event", tenantId).stream().map(ServiceConnectionRegistry::eventFromJson)
-                .sorted(Comparator.comparing(SecurityEvent::timestamp)).toList();
+                .sorted(eventOrder()).toList();
+    }
+
+    public EventPage listEvents(String tenantId, int limit, String cursor) {
+        if (limit < 1 || limit > 1_000) throw new IllegalArgumentException("limit must be between 1 and 1000");
+        List<SecurityEvent> ordered = listEvents(tenantId);
+        EventPosition after = cursor == null || cursor.isBlank() ? null : decodeCursor(cursor);
+        List<SecurityEvent> remaining = after == null ? ordered : ordered.stream()
+                .filter(event -> eventOrder().compare(event,
+                        new SecurityEvent(after.eventId(), tenantId, "", "", "", "", "", null,
+                                after.timestamp())) > 0)
+                .toList();
+        List<SecurityEvent> page = remaining.stream().limit(limit).toList();
+        String next = remaining.size() <= page.size() || page.isEmpty() ? null : encodeCursor(page.getLast());
+        return new EventPage(page, next);
     }
 
     private List<JsonObject> rows(String kind, String tenant) {
         safe(tenant);
         String currentPrefix = VERSIONED_PREFIX + kind + "." + tenant + ":";
         String legacyPrefix = "phase4." + kind + "." + tenant + ".";
-        var rows = stateStore.getSystemMetadata().entrySet().stream()
+        var rows = stateStore.registryMetadataView().entrySet().stream()
                 .filter(entry -> entry.getKey().startsWith(currentPrefix) || entry.getKey().startsWith(legacyPrefix))
                 .map(entry -> validated(entry.getKey(), entry.getValue()))
                 .filter(value -> tenant.equals(value.getString("tenantId")))
@@ -219,97 +236,19 @@ public final class ServiceConnectionRegistry {
     public static String encode(SecurityEvent value) { return eventToJson(value).encode(); }
 
     public static JsonObject connectionToJson(ServiceConnection connection) {
-        ServiceConnection.TrustPolicy trust = connection.trustPolicy();
-        ServiceConnection.EgressPolicy egress = connection.egressPolicy();
-        return new JsonObject()
-                .put("serviceConnectionId", connection.serviceConnectionId())
-                .put("tenantId", connection.tenantId())
-                .put("protocol", connection.protocol().name())
-                .put("endpoint", connection.endpoint().toString())
-                .put("networkZone", connection.networkZone())
-                .put("allowedPaths", array(connection.allowedPaths()))
-                .put("allowedDirections", array(connection.allowedDirections().stream().map(Enum::name).toList()))
-                .put("allowedAgentPools", array(connection.allowedAgentPools()))
-                .put("owner", connection.owner())
-                .put("environment", connection.environment())
-                .put("classification", connection.classification())
-                .put("secretReferenceId", connection.secretReferenceId())
-                .put("serviceIdentity", connection.serviceIdentity())
-                .put("authenticationType", connection.authenticationType().name())
-                .put("trustPolicy", new JsonObject()
-                        .put("tlsRequired", trust.tlsRequired())
-                        .put("hostnameVerification", trust.hostnameVerification())
-                        .put("approvedCaIds", array(trust.approvedCaIds()))
-                        .put("sshHostKeyFingerprints", array(trust.sshHostKeyFingerprints()))
-                        .put("minimumTlsVersion", trust.minimumTlsVersion())
-                        .put("tlsPeerFingerprints", array(trust.tlsPeerFingerprints()))
-                        .put("transportEncryptionRequired", trust.transportEncryptionRequired()))
-                .put("egressPolicy", new JsonObject()
-                        .put("allowedHostnames", array(egress.allowedHostnames()))
-                        .put("allowedCidrs", array(egress.allowedCidrs()))
-                        .put("allowedPorts", new JsonArray(egress.allowedPorts().stream().sorted().toList()))
-                        .put("allowRedirects", egress.allowRedirects())
-                        .put("pinResolvedAddresses", egress.pinResolvedAddresses()))
-                .put("policyVersion", connection.policyVersion())
-                .put("status", connection.status().name())
-                .put("createdAt", connection.createdAt().toString())
-                .put("updatedAt", connection.updatedAt().toString());
+        return ServiceConnectionJsonCodec.connectionToJson(connection);
     }
 
     public static ServiceConnection connectionFromJson(JsonObject json) {
-        JsonObject trust = json.getJsonObject("trustPolicy", new JsonObject());
-        JsonObject egress = json.getJsonObject("egressPolicy", new JsonObject());
-        return new ServiceConnection(
-                json.getString("serviceConnectionId"), json.getString("tenantId"),
-                ServiceConnection.Protocol.valueOf(json.getString("protocol").toUpperCase(Locale.ROOT)),
-                URI.create(json.getString("endpoint")), json.getString("networkZone"),
-                strings(json.getJsonArray("allowedPaths")),
-                strings(json.getJsonArray("allowedDirections")).stream()
-                        .map(value -> ServiceConnection.Direction.valueOf(value.toUpperCase(Locale.ROOT)))
-                        .collect(java.util.stream.Collectors.toUnmodifiableSet()),
-                strings(json.getJsonArray("allowedAgentPools")), json.getString("owner"),
-                json.getString("environment"), json.getString("classification"),
-                json.getString("secretReferenceId"),
-                json.getString("serviceIdentity"),
-                ServiceConnection.AuthenticationType.valueOf(json.getString("authenticationType")),
-                new ServiceConnection.TrustPolicy(
-                        trust.getBoolean("tlsRequired", false),
-                        trust.getBoolean("hostnameVerification", false),
-                        strings(trust.getJsonArray("approvedCaIds")),
-                        strings(trust.getJsonArray("sshHostKeyFingerprints")),
-                        trust.getString("minimumTlsVersion", "TLSv1.3"),
-                        strings(trust.getJsonArray("tlsPeerFingerprints")),
-                        trust.getBoolean("transportEncryptionRequired", trust.getBoolean("tlsRequired", false))),
-                new ServiceConnection.EgressPolicy(
-                        strings(egress.getJsonArray("allowedHostnames")),
-                        strings(egress.getJsonArray("allowedCidrs")),
-                        integers(egress.getJsonArray("allowedPorts")),
-                        egress.getBoolean("allowRedirects", false),
-                        egress.getBoolean("pinResolvedAddresses", true)),
-                json.getInteger("policyVersion", 1),
-                ServiceConnection.Status.valueOf(json.getString("status", "ACTIVE")),
-                Instant.parse(json.getString("createdAt")), Instant.parse(json.getString("updatedAt")));
+        return ServiceConnectionJsonCodec.connectionFromJson(json);
     }
 
     public static JsonObject secretToJson(SecretReference reference) {
-        JsonObject json = new JsonObject()
-                .put("secretReferenceId", reference.secretReferenceId())
-                .put("tenantId", reference.tenantId())
-                .put("provider", reference.provider())
-                .put("path", reference.path())
-                .put("key", reference.key())
-                .put("version", reference.version())
-                .put("status", reference.status().name());
-        if (reference.expiresAt() != null) json.put("expiresAt", reference.expiresAt().toString());
-        if (reference.lastRotatedAt() != null) json.put("lastRotatedAt", reference.lastRotatedAt().toString());
-        return json;
+        return ServiceConnectionJsonCodec.secretToJson(reference);
     }
 
     public static SecretReference secretFromJson(JsonObject json) {
-        return new SecretReference(json.getString("secretReferenceId"), json.getString("tenantId"),
-                json.getString("provider"), json.getString("path"), json.getString("key"),
-                json.getString("version"), SecretReference.Status.valueOf(json.getString("status")),
-                instant(json.getString("expiresAt")), instant(json.getString("lastRotatedAt")));
+        return ServiceConnectionJsonCodec.secretFromJson(json);
     }
 
     public static JsonObject eventToJson(SecurityEvent event) {
@@ -342,6 +281,23 @@ public final class ServiceConnectionRegistry {
                 .collect(java.util.stream.Collectors.toUnmodifiableSet());
     }
     private static Instant instant(String value) { return value == null ? null : Instant.parse(value); }
+    private static Comparator<SecurityEvent> eventOrder() {
+        return Comparator.comparing(SecurityEvent::timestamp).thenComparing(SecurityEvent::eventId);
+    }
+    private static String encodeCursor(SecurityEvent event) {
+        String value = event.timestamp() + "\n" + event.eventId();
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(value.getBytes(StandardCharsets.UTF_8));
+    }
+    private static EventPosition decodeCursor(String cursor) {
+        try {
+            String value = new String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8);
+            int separator = value.indexOf('\n');
+            if (separator < 1 || separator == value.length() - 1) throw new IllegalArgumentException();
+            return new EventPosition(Instant.parse(value.substring(0, separator)), value.substring(separator + 1));
+        } catch (RuntimeException error) {
+            throw new IllegalArgumentException("cursor is invalid");
+        }
+    }
     private static String safe(String value) {
         if (value == null || !value.matches("[A-Za-z0-9][A-Za-z0-9._-]{0,127}")) {
             throw new IllegalArgumentException("Resource identifiers must use letters, digits, dot, underscore, or dash");
@@ -353,4 +309,8 @@ public final class ServiceConnectionRegistry {
     public record SecurityEvent(String eventId, String tenantId, String eventType, String resourceType,
                                 String resourceId, String outcome, String reasonCode, Integer policyVersion,
                                 Instant timestamp) { }
+    public record EventPage(List<SecurityEvent> events, String nextCursor) {
+        public EventPage { events = List.copyOf(events); }
+    }
+    private record EventPosition(Instant timestamp, String eventId) { }
 }
