@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-09-05",
+  "status": "R6 local final-source acceptance complete; R1 deployment durability gates remain open",
+  "testedRevision": "b604505d1cbf2ff62c7967f358b4aabe25b4f2ff",
+  "worktree": "temp/r6-final-worktree-2",
+  "worktreeState": "clean detached checkout",
+  "javaHome": "C:\\Users\\mraysmit\\.jdks\\openjdk-25",
+  "command": "mvn.cmd --fail-at-end clean verify '-Dtest.excludedGroups=' 2>&1 | Tee-Object -FilePath temp/r6-final-isolated-full.log",
+  "completed": "2026-09-05T20:24:28+08:00",
+  "duration": "PT8M7S",
+  "result": "BUILD SUCCESS",
+  "coverage": "All five configured module gates passed",
+  "totals": {"tests": 2437, "failures": 0, "errors": 0, "skipped": 2},
+  "modules": [
+    {"module": "quorus-core", "tests": 1541, "failures": 0, "errors": 0, "skipped": 0},
+    {"module": "quorus-workflow", "tests": 134, "failures": 0, "errors": 0, "skipped": 0},
+    {"module": "quorus-tenant", "tests": 64, "failures": 0, "errors": 0, "skipped": 0},
+    {"module": "quorus-controller", "tests": 597, "failures": 0, "errors": 0, "skipped": 2},
+    {"module": "quorus-agent", "tests": 101, "failures": 0, "errors": 0, "skipped": 0},
+    {"module": "quorus-integration-examples", "tests": 0, "failures": 0, "errors": 0, "skipped": 0}
+  ],
+  "artifacts": [
+    {"path": "temp/r6-final-worktree-2/temp/r6-final-isolated-full.log", "sha256": "F6010C257AAC98C1EEEAB25EF4C9A9E7DFBA4CE28E079F65ED5E31068D6EF919"},
+    {"path": "temp/r6-final-worktree-2/temp/r6-final-isolated-docker-build.log", "sha256": "9A0D0EBDF32E81A48AFBBE30AF8A4869073685C192B540F0794F209CB27544C5"},
+    {"dockerImage": "quorus-controller:test", "imageId": "sha256:a887656498f6f941eaecb8f7e5ac833865bbe9136a9ee13cec92737e4e35972c"}
+  ],
+  "firstIsolatedRun": {
+    "revision": "0fefecbc2278893b3668b924c71d7aff86b08b38",
+    "result": "BUILD FAILURE",
+    "controllerFailures": 2,
+    "log": "temp/r6-final-worktree/temp/r6-isolated-full.log",
+    "sha256": "BDEE7391F8DF33027B7DEFBE5758F8949E068415B8F9647C9D76F612D02EAB80",
+    "findings": [
+      "Context assertion observed the callback after an already-completed future",
+      "Transport stop failure skipped storage closure and retained the RaftLog WAL lock"
+    ]
+  },
+  "focusedCorrection": {
+    "tests": 6,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "log": "temp/r6-isolation-fix-slow-green.log",
+    "sha256": "9391A3354E9DF3865AB007FF43890959F83F88BEAD4CD72C745D0DEA17D2FCF7"
+  },
+  "existingSkips": [
+    "AdvancedNetworkTest#testDockerNetworkPartition",
+    "NetworkPartitionTest#testMajorityPartition"
+  ],
+  "sisterProject": {"name": "RaftLog", "relativePath": "../raftlog", "release": "1.2.0", "revision": "1c5af80", "historicalDefectClaims": "unsubstantiated"},
+  "openGates": [
+    "R1 container recreation",
+    "R1 selected production filesystem",
+    "R1 machine power-loss"
+  ]
+}
