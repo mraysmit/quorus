@@ -7,7 +7,13 @@ services:
   controller1:
     image: quorus-controller:test
     hostname: controller1
+    # Plaintext fixture only; production defaults remain fail-closed.
     environment:
+      - QUORUS_SECURITY_PROFILE=development
+      - QUORUS_SECURITY_ENABLED=false
+      - QUORUS_SECURITY_ALLOW_INSECURE=true
+      - QUORUS_SECURITY_HTTP_TLS_ENABLED=false
+      - QUORUS_SECURITY_RAFT_TLS_ENABLED=false
       - QUORUS_NODE_ID=controller1
       - QUORUS_RAFT_HOST=0.0.0.0
       - QUORUS_RAFT_PORT=9080
@@ -30,7 +36,13 @@ services:
   controller2:
     image: quorus-controller:test
     hostname: controller2
+    # Plaintext fixture only; production defaults remain fail-closed.
     environment:
+      - QUORUS_SECURITY_PROFILE=development
+      - QUORUS_SECURITY_ENABLED=false
+      - QUORUS_SECURITY_ALLOW_INSECURE=true
+      - QUORUS_SECURITY_HTTP_TLS_ENABLED=false
+      - QUORUS_SECURITY_RAFT_TLS_ENABLED=false
       - QUORUS_NODE_ID=controller2
       - QUORUS_RAFT_HOST=0.0.0.0
       - QUORUS_RAFT_PORT=9080
@@ -53,7 +65,13 @@ services:
   controller3:
     image: quorus-controller:test
     hostname: controller3
+    # Plaintext fixture only; production defaults remain fail-closed.
     environment:
+      - QUORUS_SECURITY_PROFILE=development
+      - QUORUS_SECURITY_ENABLED=false
+      - QUORUS_SECURITY_ALLOW_INSECURE=true
+      - QUORUS_SECURITY_HTTP_TLS_ENABLED=false
+      - QUORUS_SECURITY_RAFT_TLS_ENABLED=false
       - QUORUS_NODE_ID=controller3
       - QUORUS_RAFT_HOST=0.0.0.0
       - QUORUS_RAFT_PORT=9080

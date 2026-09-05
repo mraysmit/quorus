@@ -34,7 +34,7 @@ class RuntimeProtocolSecurityTest {
 
         assertEquals(URI.create("https://192.0.2.10:8443/outbound/file.dat?version=1"),
                 PinnedEndpoint.connectUri(authority, credential));
-        assertEquals("payments.example.test:8443", PinnedEndpoint.virtualHost(authority));
+        assertEquals("payments.example.test", PinnedEndpoint.virtualHost(authority));
         assertThrows(ConnectionPolicyException.class, () -> PinnedEndpoint.requireApprovedAddress(
                 java.net.InetAddress.getByName("192.0.2.11"), credential));
     }

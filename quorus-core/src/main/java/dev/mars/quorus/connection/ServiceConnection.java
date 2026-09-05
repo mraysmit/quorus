@@ -83,7 +83,11 @@ public record ServiceConnection(
         String normalized = ConnectionPolicyEnforcer.normalizeRemotePath(remotePath);
         String base = endpoint.toString();
         while (base.endsWith("/")) base = base.substring(0, base.length() - 1);
-        return URI.create(base + normalized);
+        try {
+            return URI.create(base + new URI(null, null, normalized, null).toASCIIString());
+        } catch (java.net.URISyntaxException e) {
+            throw new IllegalArgumentException("remotePath is invalid", e);
+        }
     }
 
     public int effectivePort() {
@@ -127,7 +131,7 @@ public record ServiceConnection(
     }
 
     public enum Protocol {
-        SFTP("sftp", 22), HTTPS("https", 443), FTPS("ftps", 990), SMB("smb", 445), NFS("nfs", 2049);
+        SFTP("sftp", 22), HTTPS("https", 443), FTPS("ftps", 21), SMB("smb", 445), NFS("nfs", 2049);
         private final String scheme;
         private final int defaultPort;
         Protocol(String scheme, int defaultPort) { this.scheme = scheme; this.defaultPort = defaultPort; }

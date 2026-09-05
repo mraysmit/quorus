@@ -110,6 +110,7 @@ class AgentRegistrationServiceTest {
                 protocols.add("SFTP");
                 
                 config = new AgentConfiguration.Builder()
+                .securityProfile("development").allowInsecure(true).controllerTlsEnabled(false)
                     .agentId("test-agent-reg")
                     .tenantId("test-tenant")
                     .controllerUrl("http://localhost:" + serverPort)
@@ -221,6 +222,7 @@ class AgentRegistrationServiceTest {
     @DisplayName("Should fail registration on connection error")
     void testRegisterConnectionError(Vertx vertx, VertxTestContext testContext) {
         AgentConfiguration badConfig = new AgentConfiguration.Builder()
+                .securityProfile("development").allowInsecure(true).controllerTlsEnabled(false)
             .agentId("test-agent-bad")
             .tenantId("test-tenant")
             .controllerUrl("http://localhost:59999") // Non-existent port

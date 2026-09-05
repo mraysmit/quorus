@@ -89,6 +89,7 @@ class JobPollingServiceTest {
                 serverPort = server.actualPort();
                 
                 config = new AgentConfiguration.Builder()
+                .securityProfile("development").allowInsecure(true).controllerTlsEnabled(false)
                     .agentId("test-agent-poll")
                     .tenantId("test-tenant")
                     .controllerUrl("http://localhost:" + serverPort)
@@ -291,6 +292,7 @@ class JobPollingServiceTest {
     @DisplayName("Should return empty list on connection error")
     void testPollConnectionError(Vertx vertx, VertxTestContext testContext) {
         AgentConfiguration badConfig = new AgentConfiguration.Builder()
+                .securityProfile("development").allowInsecure(true).controllerTlsEnabled(false)
             .agentId("test-agent-bad")
             .tenantId("test-tenant")
             .controllerUrl("http://localhost:59999") // Non-existent port

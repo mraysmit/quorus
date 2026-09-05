@@ -103,6 +103,7 @@ class PreExecutionFailureIntegrationTest {
         });
         server = awaitSuccess(vertx.createHttpServer().requestHandler(router).listen(0), Duration.ofSeconds(5));
         agent = new QuorusAgent(vertx, new AgentConfiguration.Builder()
+                .securityProfile("development").allowInsecure(true).controllerTlsEnabled(false)
                 .agentId("payments-agent").tenantId("bank-a").agentPort(0)
                 .controllerUrl("http://localhost:" + server.actualPort() + "/api/v1")
                 .downloadRoot(downloadRoot).uploadRoot(root).agentPool("payments").networkZone("restricted")
@@ -193,6 +194,7 @@ class PreExecutionFailureIntegrationTest {
         });
         server = awaitSuccess(vertx.createHttpServer().requestHandler(router).listen(0), Duration.ofSeconds(5));
         agent = new QuorusAgent(vertx, new AgentConfiguration.Builder()
+                .securityProfile("development").allowInsecure(true).controllerTlsEnabled(false)
                 .agentId("payments-agent").tenantId("bank-a").agentPort(0)
                 .controllerUrl("http://localhost:" + server.actualPort() + "/api/v1")
                 .jobPollingInitialDelayMs(1).jobPollingIntervalMs(20).httpIdleTimeout(500)
