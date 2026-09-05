@@ -2,7 +2,7 @@
 
 # Quorus Enterprise Implementation Plan
 
-**Version:** 1.23  
+**Version:** 1.24  
 **Date:** 2026-09-05  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
@@ -82,7 +82,18 @@ New credential-bearing requests remain rejected; replayed legacy URIs are redact
 made terminal. Security events are not automatically pruned, so enterprise archive,
 legal hold and retention remain Phase 9 work. See the
 [R5 evidence](../evidence/r5-closure-2026-09-05.md). R6 isolated final-tree acceptance
-is next; R1 deployment and power-loss gates remain separate.
+is complete; R1 deployment and power-loss gates remain separate.
+
+**R6 final acceptance — 2026-09-05:** Revision `b604505` was verified from a clean
+detached worktree after rebuilding the controller image from that exact tree. The JDK 25
+command `mvn.cmd --fail-at-end clean verify '-Dtest.excludedGroups='` passed all seven
+reactor entries, 2,437 tests with zero failures/errors and two existing explicit skips,
+and all five configured JaCoCo gates. The first isolated run exposed a storage-cleanup
+failure and a test observation race; both were corrected and the six-test focused
+context/restart lane passed before the definitive full rerun. See
+[R6 evidence](../evidence/r6-final-acceptance-2026-09-05.md). R6 local final-source
+acceptance is complete. R1 container-recreation, selected production-filesystem and
+machine power-loss gates remain open and still prevent an enterprise release claim.
 
 **Full-suite verification follow-up — 2026-09-05:** The reported Docker startup
 errors were fixed by explicit development settings in the plaintext test fixtures.
@@ -95,8 +106,8 @@ The complete JDK 25 working-tree command
 reactor entries and five JaCoCo gates: 2,414 passed, zero failures/errors, two existing
 explicitly disabled network tests. Integration Examples has no tests. See
 [the full-suite remediation evidence](../evidence/full-suite-error-remediation-2026-09-05.md).
-This advances local verification, but R4, remaining R5 work and R6 final-revision,
-isolated-checkout and deployment acceptance remain open. Changes are uncommitted.
+This historical run advanced local verification. The later R4, R5 and R6 entries above
+supersede its open-work statement; R1 deployment acceptance remains open.
 
 **2026-09-05 execution update:** R2/R3 are committed in `28f0530`. The current environment
 contains RaftLog as a sister project at `../raftlog` relative to the Quorus root
@@ -122,7 +133,7 @@ Execute the following slices in order under Section 6.1, retaining intended beha
 | R3 — Pre-execution failures | Authorization/secret/path rejection reaches the correct terminal attempt state without artificial IN_PROGRESS; preserve sequencing/fencing and reconcile uncertain acknowledgements. | Implementation complete — clean affected-reactor verify and JaCoCo gates pass; Windows symlink skip covered by passing Linux path-policy tests |
 | R4 — Non-blocking DNS | Slow DNS cannot block unrelated HTTP requests; bounded resolution, overload/timeout handling, default-deny egress and address pinning remain enforced. | Implementation complete — ten behavioral-red cases, five characterization cases; 47 focused tests and full Docker/slow reactor pass; see R4 evidence |
 | R5 — Handover closure | Confirm and disposition every remaining handover item, including entrypoints, defaults, path/port/TLS behavior, trust updates, codecs, compatibility, and retention. | Implementation complete — behavioral red/green and focused regression retained; enterprise retention remains Phase 9 and deployment durability remains R1 |
-| R6 — Final acceptance | Clean isolated-worktree reactor verify at the final revision, configured JaCoCo gates, protocol/security/restart tests, migration/runbook/specification alignment and retained evidence. | Current working-tree full reactor passes, including Docker/slow tests and five coverage gates; final-revision isolated verification and remaining release/deployment gates stay open |
+| R6 — Final acceptance | Clean isolated-worktree reactor verify at the final revision, configured JaCoCo gates, protocol/security/restart tests, migration/runbook/specification alignment and retained evidence. | Complete for local final-source acceptance at `b604505`: clean detached reactor passes 2,437 tests with zero failures/errors, two existing skips and five coverage gates; R1 deployment durability gates remain open |
 
 **R1 implementation evidence:** 14 new tests: 11 exposed missing behavior before their fixes, and three are explicitly recorded as characterization. Seven red/green stages cover recovery and mutation ordering, including interrupted installation followed by a second restart. The final clean controller run passes 530 tests with no failures, errors or skips and meets its JaCoCo gate; the separately enabled slow cluster suite passes four tests. An earlier seven-module clean reactor passed before the last interruption-recovery fixes; it is not represented as a final-revision reactor result. Commands, failure excerpts, timestamps, log hashes, source hashes and limitations are retained in [Raft TDD evidence](../evidence/raft-log-tdd-evidence-2026-09-04.json). R2 progress is recorded below; no remaining slice or production acceptance gate is closed by the R1 result.
 

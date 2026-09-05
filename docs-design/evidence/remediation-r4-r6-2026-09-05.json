@@ -2,7 +2,8 @@
   "subsequentRaftLogRelease20260905": {"status":"New capability implemented and published; historical db59859 claims remain unsubstantiated","version":"1.2.0","revision":"1c5af80f13a149663926c01eb15f88c14c4f2d25","tag":"v1.2.0","coreJarSha256":"7BB73A0F588FC8C5534296D4F0860F890A7D15789145DB742C2A4E3C8D75C426","deploymentId":"5d8e4410-c07d-4bb4-bb7e-b3846bee91cd","behavioralRed":23,"behavioralGreen":23,"windowsTests":319,"windowsSkipped":3,"linuxTests":319,"linuxSkipped":0,"quorusFocusedTests":41,"handover":"docs-design/evidence/raftlog-validation-handover-2026-09-05.md#implemented-capability-and-release--2026-09-05"},
   "baseRevision": "28f053011670655c4938bf176667cde7b8b1f6e7",
   "recordedAt": "2026-09-05T04:01:35.097083Z",
-  "status": "R5 partial; R4 and R6 blocked, no release acceptance",
+  "status": "R4 and R5 implementation complete; R6 local final-source acceptance complete; R1 release gates remain open",
+  "r6FinalAcceptance": "docs-design/evidence/r6-final-acceptance-2026-09-05.json",
   "validationCorrection20260905": "The unresolved 1.2.0 dependency is a Quorus consumer mismatch, not proof that this release exists or is required. External 1.1.0 defect allegations and db59859 provenance remain unsubstantiated. See raftlog-validation-handover-2026-09-05.md. Existing logs, hashes and verification counts describe the previously recorded run and are unchanged.",
   "finalVerification": {
     "command": "mvn.cmd -o clean verify -pl quorus-agent -am -f temp/remediation-20260905/verify-worktree/pom.xml 2>&1 | Tee-Object -FilePath temp/remediation-20260905/isolated-core-agent-verify.log",
