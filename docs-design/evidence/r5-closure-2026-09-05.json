@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "date": "2026-09-05",
-  "status": "R5 implementation complete; R6 and R1 gates separate",
+  "status": "R5 implementation complete; R6 local final-source acceptance complete; R1 gates separate",
   "sisterProject": {
     "name": "RaftLog",
     "relativePath": "../raftlog",
@@ -29,5 +29,6 @@
     {"log":"temp/r5-closure-legacy-replay-green.log","reason":"initial implementation and assertion compilation errors"}
   ],
   "retentionDisposition": "No automatic authoritative-event pruning; Phase 9 owns archive, legal hold and retention policy",
-  "openGates": ["R6 isolated final-tree acceptance", "R1 container recreation", "R1 selected production filesystem", "R1 machine power-loss"]
+  "r6Evidence": "docs-design/evidence/r6-final-acceptance-2026-09-05.md",
+  "openGates": ["R1 container recreation", "R1 selected production filesystem", "R1 machine power-loss"]
 }

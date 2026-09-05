@@ -1,12 +1,15 @@
 # Remaining handover remediation — 2026-09-05
 
-**Current status:** R4 and R5 implementation are complete. The retained historical
+**Current status:** R4 and R5 implementation and R6 local final-source acceptance are
+complete. The retained historical
 sections below describe the sequence that led to the final implementation. See the
 [R4 DNS evidence](r4-dns-remediation-2026-09-05.md) and
-[R5 closure evidence](r5-closure-2026-09-05.md) for the current results. R6 final-tree
-acceptance is recorded separately after its isolated verification.
+[R5 closure evidence](r5-closure-2026-09-05.md) for those results. The clean detached
+R6 run at `b604505` passed 2,437 tests and five coverage gates; see
+[R6 final acceptance](r6-final-acceptance-2026-09-05.md). R1 deployment durability
+gates remain open.
 
-**Subsequent RaftLog release update:** The missing 1.2.0 dependency recorded below was resolved by the newly implemented and published release from commit `1c5af80`. All 41 selected Quorus storage/snapshot/restart tests passed against it. Historical failures/counts below remain unchanged; full R4/R5/R6 and deployment acceptance remain open. See [release handover](raftlog-validation-handover-2026-09-05.md#implemented-capability-and-release--2026-09-05).
+**Subsequent RaftLog release update:** The missing 1.2.0 dependency recorded below was resolved by the newly implemented and published release from commit `1c5af80`. All 41 selected Quorus storage/snapshot/restart tests passed against it. Historical failures/counts below remain unchanged. R4, R5 and local R6 acceptance are now complete; R1 deployment acceptance remains open. See [release handover](raftlog-validation-handover-2026-09-05.md#implemented-capability-and-release--2026-09-05).
 
 Historical base revision: `28f0530`. The implementation now includes the later R4 and
 R5 slices. This record does not close the separate R1 deployment and power-loss gates.
@@ -161,7 +164,7 @@ storage migration, pruning or production acceptance was performed.
 | Security-event retention and full-map listing | Complete for R5: reads are tenant-scoped, bounded to 1–1000 rows and cursor-paged without copying all system metadata. Authoritative events are not automatically pruned; archive, legal hold and retention policy remain Phase 9 work |
 | Per-transfer clients / repeated trust-store loads | Complete for R5: governed clients remain isolated and are closed after each transfer; immutable trust-manager policies use a bounded 64-entry cache, and rotation selects a distinct manager |
 | R1 deployment durability | Container-recreation, selected production filesystem and power-loss gates remain open |
-| R6 | Final isolated source-tree reactor, configured coverage gates, controller protocol/security/restart lanes, specification/runbook alignment and evidence are the remaining acceptance work |
+| R6 | Complete for local final-source acceptance at `b604505`: the clean detached reactor passed 2,437 tests, zero failures/errors, two existing skips and five coverage gates; R1 deployment durability remains open |
 
 R5 completion does not waive R1 container-recreation, selected production-filesystem,
 or machine power-loss acceptance.
