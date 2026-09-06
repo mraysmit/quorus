@@ -53,8 +53,9 @@ and `storage/RaftLogStorageAdapter.java`).
    findings and supported API to the Quorus session so its adapter and dependency can
    be reconciled and controller verification resumed.
 
-R4, remaining R5 work, R6 full-reactor acceptance and R1 deployment durability gates
-remain open in Quorus. The earlier 1,774-test core/workflow/agent verification does
+At this correction checkpoint, R4, remaining R5 work, R6 full-reactor acceptance and
+R1 deployment durability gates remained open in Quorus. The earlier 1,774-test
+core/workflow/agent verification did
 not validate the external RaftLog library or close those gates. This correction changes
 documentation only; no sister-project code, dependency, WAL or deployed data was changed.
 
@@ -83,4 +84,4 @@ Quorus verification completed at 2026-09-05T14:00:40+08:00 against the new local
 
 Central publication and direct artifact downloads were verified. The published core JAR SHA-256 is **7BB73A0F588FC8C5534296D4F0860F890A7D15789145DB742C2A4E3C8D75C426**; Central deployment **5d8e4410-c07d-4bb4-bb7e-b3846bee91cd**. Source: [release commit](https://github.com/mraysmit/raftlog/commit/1c5af80f13a149663926c01eb15f88c14c4f2d25). Artifact: [Central 1.2.0](https://repo.maven.apache.org/maven2/io/github/mraysmit/raftlog-core/1.2.0/).
 
-Timestamped raw logs, source hashes, failure patches and artifact checks remain in the sibling's Git-ignored `test-output/prefix-compaction/`. No generated logs, application code changes or deployed-storage mutations are added to Quorus. Existing full-reactor and production-filesystem durability acceptance gates remain open.
+Timestamped raw logs, source hashes, failure patches and artifact checks remain in the sibling's Git-ignored `test-output/prefix-compaction/`. No generated logs, application code changes or deployed-storage mutations are added to Quorus. Quorus subsequently completed R4, R5 and local R6 full-reactor acceptance at `b604505`; R1 production-filesystem, container-recreation and machine power-loss durability gates remain open.

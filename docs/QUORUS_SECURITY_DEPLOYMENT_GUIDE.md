@@ -2,8 +2,8 @@
 
 # Quorus Security Deployment Guide
 
-**Version:** 1.5  
-**Date:** 2026-09-05  
+**Version:** 1.6  
+**Date:** 2026-09-06  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Status:** Phase 1 implementation guide  
@@ -215,8 +215,9 @@ This is a coordinated upgrade, not a mixed-version rolling upgrade.
    of every subsequent operation; it is not a lossless rollback. A record already
    overwritten by a legacy key collision cannot be reconstructed from its surviving row.
 
-The local test results do not accredit a production deployment. R1 production-filesystem,
-container-recreation and power-loss gates and the R6 release acceptance remain required.
+The local test results do not accredit a production deployment. R6 local final-source
+acceptance is complete; R1 production-filesystem, container-recreation and power-loss
+gates remain required.
 
 ## 12. Pre-execution failure and acknowledgement reconciliation
 
