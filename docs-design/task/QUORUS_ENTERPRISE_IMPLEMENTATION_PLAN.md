@@ -2,8 +2,8 @@
 
 # Quorus Enterprise Implementation Plan
 
-**Version:** 1.24  
-**Date:** 2026-09-05  
+**Version:** 1.25  
+**Date:** 2026-09-06  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Status:** Active — remediation checkpoint open; M0 durability and Phase 4 acceptance reopened; Phase 1 complete; Phases 2 and 3 in progress  
@@ -120,7 +120,7 @@ evidence in [the current execution record](../evidence/remediation-r4-r6-2026-09
 The earlier R5 work is now supplemented by the closure slice above. Deployment and
 power-loss acceptance are not implied by local tests.
 
-**External-library-only correction:** the remaining internal RocksDB and memory storage implementations, backend factory branches, convenience API and RocksDB JNI dependency have been removed. Configuration now accepts only `raftlog`; storage-dependent tests use the external adapter and isolated temporary paths. Seven behavioral tests first proved that the old factory/configuration still admitted internal backends, then passed after removal. The 93-test focused regression and final clean controller verification (520 tests, no failures/errors/skips, JaCoCo gate passed) are green. The shaded JAR contains the external library WAL and no removed internal storage classes or RocksDB JNI. Commands, hashes and test-count accounting are recorded in the existing [Raft evidence record](../evidence/raft-log-tdd-evidence-2026-09-04.json). This corrects the incomplete earlier removal without closing R2–R6 or the outstanding R1 production durability gates.
+**External-library-only correction:** the remaining internal RocksDB and memory storage implementations, backend factory branches, convenience API and RocksDB JNI dependency have been removed. Configuration now accepts only `raftlog`; storage-dependent tests use the external adapter and isolated temporary paths. Seven behavioral tests first proved that the old factory/configuration still admitted internal backends, then passed after removal. The 93-test focused regression and final clean controller verification (520 tests, no failures/errors/skips, JaCoCo gate passed) are green. The shaded JAR contains the external library WAL and no removed internal storage classes or RocksDB JNI. Commands, hashes and test-count accounting are recorded in the existing [Raft evidence record](../evidence/raft-log-tdd-evidence-2026-09-04.json). At that checkpoint this correction did not close R2–R6; the later entries above supersede that status. The R1 production durability gates remain outstanding.
 
 The historical results below are retained, but do not authorize release of the snapshot-compaction behavior at `ffc3e64`: WAL prefix deletion is durable while adapter snapshots are only in memory at that revision. R1 replaces that behavior with durable snapshots and recovery checks; implementation evidence and outstanding deployment gates are recorded below. Existing persistent environments have not been inventoried; preserve their storage before recovery or rollback. Code rollback cannot recover already deleted WAL records.
 
@@ -129,7 +129,7 @@ Execute the following slices in order under Section 6.1, retaining intended beha
 | Slice | Scope and acceptance gate | Status |
 |---|---|---|
 | R1 — Durable snapshots | Snapshot, compact, close, construct fresh storage, and recover state and coordinates; three-controller restart; interrupted publication, corruption, retained tails, and concurrent log mutations. Keep raftlog-core as the only WAL. | Code remediation verified on Windows; container-recreation, production-filesystem and power-loss acceptance remain open |
-| R2 — Tenant isolation | Collision-free versioned registry keys, ownership validation, HTTP CRUD/list boundaries, replicated migration and restart; ambiguous legacy ownership fails closed. | Implementation complete — 546 tests pass in final clean controller verify, no failures/errors/skips; JaCoCo gate passed; deployment acceptance remains under R1/R6 |
+| R2 — Tenant isolation | Collision-free versioned registry keys, ownership validation, HTTP CRUD/list boundaries, replicated migration and restart; ambiguous legacy ownership fails closed. | Implementation complete — 546 tests pass in final clean controller verify, no failures/errors/skips; JaCoCo gate passed; deployment acceptance remains under R1 |
 | R3 — Pre-execution failures | Authorization/secret/path rejection reaches the correct terminal attempt state without artificial IN_PROGRESS; preserve sequencing/fencing and reconcile uncertain acknowledgements. | Implementation complete — clean affected-reactor verify and JaCoCo gates pass; Windows symlink skip covered by passing Linux path-policy tests |
 | R4 — Non-blocking DNS | Slow DNS cannot block unrelated HTTP requests; bounded resolution, overload/timeout handling, default-deny egress and address pinning remain enforced. | Implementation complete — ten behavioral-red cases, five characterization cases; 47 focused tests and full Docker/slow reactor pass; see R4 evidence |
 | R5 — Handover closure | Confirm and disposition every remaining handover item, including entrypoints, defaults, path/port/TLS behavior, trust updates, codecs, compatibility, and retention. | Implementation complete — behavioral red/green and focused regression retained; enterprise retention remains Phase 9 and deployment durability remains R1 |
@@ -169,8 +169,9 @@ Commands, initial assertion corrections, hashes and limitations are retained und
 `remediationR3` in the existing [Phase 4 evidence](../evidence/phase4-tdd-evidence-2026-09-03.json).
 The [reconciliation procedure](../../docs/QUORUS_SECURITY_DEPLOYMENT_GUIDE.md#12-pre-execution-failure-and-acknowledgement-reconciliation)
 distinguishes bounded replay from outstanding durable outbox, automatic lease recovery
-and destination reconciliation work in Phase 2. R4 is the next remediation slice; the
-remaining release gates are not waived.
+and destination reconciliation work in Phase 2. At that checkpoint R4 was the next
+remediation slice; the R4–R6 completion entries above supersede that sequence. The
+remaining R1 release gates are not waived.
 
 | Milestone | Completed phases | Release meaning |
 |---|---|---|
