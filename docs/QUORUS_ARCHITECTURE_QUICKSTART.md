@@ -187,4 +187,4 @@ Use JDK 25 for builds, tests, and IDE tooling in this repository.
 - `docs/QUORUS_USER_GUIDE.md`
 - `docs/QUORUS_WORKFLOWS_README.md`
 - `docs/QUORUS_YAML_SYNTAX_GUIDE.md`
-- `docs-design/task/QUORUS_ALPHA_IMPLEMENTATION_PLAN.md`
+- `docs-design/archive/QUORUS_ALPHA_IMPLEMENTATION_PLAN.md`

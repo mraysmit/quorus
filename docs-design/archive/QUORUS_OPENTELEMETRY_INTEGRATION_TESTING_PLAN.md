@@ -2,13 +2,22 @@
 
 # OpenTelemetry Integration & Testing Plan
 
-**Version:** 2.4  
-**Date:** 2026-03-15  
+**Version:** 2.6  
+**Date:** 2026-09-07  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0
 
+> [!NOTE]
+> **Archived 2026-09-07.** Retained for its collector, Prometheus, Tempo and test-scenario detail,
+> which remains technically useful. Its task grid was reconciled against live source immediately
+> before archival (v2.6), but status is now tracked as `OBS-*` items in the
+> [Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER.md). Treat this document as
+> reference material, not as a live backlog.
+
 > [!IMPORTANT]
 > This plan covers telemetry infrastructure and instrumentation work. Quorus operational observability is transfer-process centered: per-transfer attempts, continuous progress and freshness, deadlines, risk, stalls, integrity, publication, alerts, and operator timelines are the controlling production outcomes. See [QUORUS_ARCHITECTURE_SPECIFICATION.md](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md) and [QUORUS_REST_API_SPECIFICATION.md](../../docs/QUORUS_REST_API_SPECIFICATION.md).
+>
+> **Narrative sections are point-in-time analysis; the [Implementation Task Grid](#implementation-task-grid) is authoritative for status.** The grid was reconciled against live source on 2026-09-07. Earlier prose in this document — particularly the module gap analyses and the "Future Migration Phases" framing — still reflects its original audit dates and may describe delivered work as pending. Open telemetry items also appear as `OBS-*` entries in the [Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER.md), which is the single consolidated view of outstanding work across all planning documents.
 
 ## Table of Contents
 
@@ -46,7 +55,7 @@ This document consolidates the OpenTelemetry migration plan and integration test
 2. **Enable Distributed Tracing**: Implement trace propagation across HTTP requests and async operations
 3. **Standard Export Formats**: Support Prometheus scraping and OTLP export for traces
 4. **Vert.x 5 Integration**: Leverage Vert.x OpenTelemetry integration for reactive stack observability
-5. **Production Readiness**: Ensure observability stack is ready for mid-2026 production launch
+5. **Production Readiness**: Ensure the observability stack meets the enterprise plan's telemetry obligations. Release readiness is decided by the enterprise plan's exit gates, not by this stack.
 
 ### Testing Goals
 
@@ -308,11 +317,15 @@ curl http://localhost:8081/api/v1/status
 - ✅ Distributed tracing enabled
 - ✅ Net code reduction: -137 lines (simplification achieved)
 
-**Production Readiness:**
-- ✅ Ready for mid-2026 production launch
+**Telemetry stack state:**
 - ✅ Prometheus scraping configured
-- ✅ Jaeger trace collection operational
-- ⏳ Integration tests pending (Test Phases 1-5 below)
+- ✅ Trace collection operational
+- ⏳ End-to-end integration test suite pending (`OBS-01`)
+
+> **Not a production-readiness claim.** A working telemetry stack does not make Quorus production
+> ready. The R1 durability acceptance gates (`R1-1`, `R1-2`, `R1-3`) remain open and block the
+> enterprise release claim, and Phases 5–12 are unstarted. See the
+> [Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER.md).
 
 ---
 
@@ -676,7 +689,7 @@ The following gaps were identified during a comprehensive codebase-wide logging 
 **Solution:** Rename `LOG` to `logger` in both files.
 
 **Priority:** 🟢 LOW — Code hygiene  
-**Target:** Q3 2026
+**Target:** see the [Implementation Task Grid](#implementation-task-grid) for current status and owning item
 
 #### Gap 4: HTTP Handlers Missing Loggers
 
@@ -692,7 +705,7 @@ The following gaps were identified during a comprehensive codebase-wide logging 
 **Solution:** Add `private static final Logger logger = LoggerFactory.getLogger(XxxHandler.class);` and structured log statements (at minimum: WARN on failures, DEBUG on successful probes).
 
 **Priority:** 🟠 MEDIUM — Important for production debugging  
-**Target:** Q2 2026
+**Target:** see the [Implementation Task Grid](#implementation-task-grid) for current status and owning item
 
 #### Gap 5: Classes With Declared but Unused Loggers
 
@@ -706,7 +719,7 @@ The following gaps were identified during a comprehensive codebase-wide logging 
 **Solution:** Either add meaningful log statements or remove the unused logger field.
 
 **Priority:** 🟢 LOW — Code hygiene  
-**Target:** Q3 2026
+**Target:** see the [Implementation Task Grid](#implementation-task-grid) for current status and owning item
 
 #### Gap 6: `SimpleTransferEngine` Over-Logging (53 DEBUG Statements)
 
@@ -715,7 +728,7 @@ The following gaps were identified during a comprehensive codebase-wide logging 
 **Solution:** Audit all 53 statements. Promote critical state changes to INFO. Convert high-frequency repetitive messages (e.g., per-chunk progress) to TRACE. Remove redundant messages.
 
 **Priority:** 🟠 MEDIUM — Log noise reduction  
-**Target:** Q3 2026
+**Target:** see the [Implementation Task Grid](#implementation-task-grid) for current status and owning item
 
 #### Gap 7: `JobStatusReportingService` Missing INFO Success Logs
 
@@ -724,7 +737,7 @@ The following gaps were identified during a comprehensive codebase-wide logging 
 **Solution:** Add `logger.info("Job status reported to controller: jobId={}, status={}", jobId, status);` after successful HTTP response.
 
 **Priority:** 🟠 MEDIUM — Agent operational visibility  
-**Target:** Q2 2026
+**Target:** see the [Implementation Task Grid](#implementation-task-grid) for current status and owning item
 
 #### Gap 8: Workflow Parsing Classes Missing Loggers
 
@@ -735,7 +748,7 @@ The following gaps were identified during a comprehensive codebase-wide logging 
 **Solution:** Add SLF4J loggers with INFO for parse start/success, WARN for validation failures, DEBUG for resolved variables.
 
 **Priority:** 🟠 MEDIUM — Debugging workflow issues  
-**Target:** Q2 2026
+**Target:** see the [Implementation Task Grid](#implementation-task-grid) for current status and owning item
 
 #### Gap 9: Completed Handler Logging Patterns (Documentation)
 
@@ -2782,20 +2795,21 @@ Span 1: workflow.execute (SimpleWorkflowEngine)
 
 The following phases represent planned work for extending OpenTelemetry instrumentation to other Quorus modules. These are prioritized based on operational impact and production readiness timeline.
 
-### Timeline Overview
+### Module Overview
 
-| Phase | Module | Priority | Target Timeline | Status |
-|-------|--------|----------|-----------------|--------|
-| 1-5 | quorus-controller | ✅ Complete | Q1 2026 | Done |
-| Test 1-5 | Integration Testing | 🔶 High | Q1-Q2 2026 | In Progress |
-| 6 | quorus-agent | ✅ Complete | Q1 2026 | Done |
-| 7 | quorus-tenant | ✅ Complete | Q1 2026 | Done |
-| 8 | quorus-core | 🔴 Critical | Q2-Q3 2026 | Partial ⚠️ |
-| 9 | quorus-workflow | ✅ Complete | Q1 2026 | Done |
+| Phase | Module | Status |
+|-------|--------|--------|
+| 1-5 | quorus-controller | ✅ Complete |
+| Test 1-5 | Integration Testing | ⚠️ Partial — infrastructure exists, suite pending (`OBS-01`, `OBS-02`) |
+| 6 | quorus-agent | ⚠️ Partial — service-level tracing pending (`OBS-11`) |
+| 7 | quorus-tenant | ✅ Complete |
+| 8 | quorus-core | ⚠️ Partial — adapter metrics and tracing pending (`OBS-08`, `OBS-09`, `OBS-10`) |
+| 9 | quorus-workflow | ⚠️ Partial — graph metrics and tracing pending (`OBS-12`, `OBS-13`) |
 
-**Production Launch:** Mid-2026 with Phases 1-5 complete
-
-**Post-Launch Assessment:** Q4 2026 - Evaluate operational needs and prioritize remaining Phase 8 tasks based on production feedback
+Calendar targets were removed on 2026-09-07: the enterprise plan deliberately assigns no dates
+until team size, platform, identity provider, secrets provider, evidence platform and pilot scope
+are agreed. Sequencing is governed by the enterprise phases, and open items are tracked as `OBS-*`
+in the [Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER.md).
 
 ---
 
@@ -3526,168 +3540,201 @@ After implementing this testing plan:
 
 ## Implementation Task Grid
 
-Track progress on all OpenTelemetry migration, testing, and critical fixes. Check off tasks as you complete them.
+Track progress on all OpenTelemetry migration, testing, and audit work.
 
-### Phase 1-5: Controller Migration (COMPLETED ✅)
+> [!IMPORTANT]
+> **Grid corrected 2026-09-07.** Every row below was reconciled against live source and against
+> [QUORUS_ALPHA_IMPLEMENTATION_PLAN.md](QUORUS_ALPHA_IMPLEMENTATION_PLAN.md) and
+> [QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md](../task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md). Eleven
+> rows were marked pending for work that had already been delivered, including eight rows carrying
+> a 🔴 CRITICAL marker. Those are now recorded as complete with their delivering plan.
+>
+> Calendar targets have been removed. The enterprise plan deliberately assigns no dates until team
+> size, platform, identity provider, secrets provider, evidence platform and pilot scope are agreed.
+> The **Delivery reference** column gives the owning phase or the item ID in the
+> [Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER.md) instead.
+>
+> This grid covers telemetry *infrastructure and instrumentation*. It is not a substitute for
+> enterprise Phase 3, which owns transfer-process operational outcomes — progress, deadlines,
+> risk, stalls, integrity, publication, alerts and operator timelines. Completing this grid does
+> not advance the Phase 3 exit gate.
 
-| Task | Status | Priority | Target Date | Notes |
-|------|--------|----------|-------------|-------|
-| Phase 1: Setup OpenTelemetry dependencies | ✅ Complete | CRITICAL | Q4 2025 | Added SDK (BOM 1.59.0), OTLP exporter, Prometheus exporter |
-| Phase 2: Static configuration class (TelemetryConfig) | ✅ Complete | CRITICAL | Q4 2025 | Created static configure() method |
-| Phase 3: Integrate into QuorusControllerApplication | ✅ Complete | CRITICAL | Q4 2025 | Added TelemetryConfig.configure() |
-| Phase 4: Add 5 Raft metrics to RaftNode | ✅ Complete | CRITICAL | Q4 2025 | state, term, commit_index, last_applied, is_leader |
-| Phase 5: Refactor MetricsHandler | ✅ Complete | CRITICAL | Q4 2025 | Reduced from 267→50 lines, proxy to port 9464 |
+### Phase 1-5: Controller Migration (COMPLETE ✅)
 
-### Test Phases: Integration Testing (PENDING)
+| Task | Status | Priority | Delivery reference | Notes |
+|------|--------|----------|--------------------|-------|
+| Phase 1: Setup OpenTelemetry dependencies | ✅ Complete | CRITICAL | This plan | Added SDK (BOM 1.59.0), OTLP exporter, Prometheus exporter |
+| Phase 2: Static configuration class (TelemetryConfig) | ✅ Complete | CRITICAL | This plan | Created static configure() method |
+| Phase 3: Integrate into QuorusControllerApplication | ✅ Complete | CRITICAL | This plan | Added TelemetryConfig.configure() |
+| Phase 4: Add 5 Raft metrics to RaftNode | ✅ Complete | CRITICAL | This plan | state, term, commit_index, last_applied, is_leader |
+| Phase 5: Refactor MetricsHandler | ✅ Complete | CRITICAL | This plan | Reduced from 267→50 lines, proxy to port 9464 |
 
-| Task | Status | Priority | Target Date | Notes |
-|------|--------|----------|-------------|-------|
-| Test Phase 1: Create Docker Compose config | ⬜ Pending | HIGH | Q1 2026 | 3 controllers, Prometheus, Jaeger, OTel Collector |
-| Test Phase 2: Create OTel Collector config | ⬜ Pending | HIGH | Q1 2026 | Pipeline: receivers, processors, exporters |
-| Test Phase 3: Create Prometheus scrape config | ⬜ Pending | HIGH | Q1 2026 | Scrape 3 controller instances on port 9464 |
-| Test Phase 4: Write integration test class | ⬜ Pending | HIGH | Q1 2026 | 5 test methods using TestContainers |
-| Test Phase 5: Create test execution script | ⬜ Pending | MEDIUM | Q1 2026 | PowerShell script with colored output |
+### Test Phases: Integration Testing (PARTIAL ⚠️)
 
-### Critical Pre-Production Fixes (MUST FIX BEFORE MID-2026 LAUNCH)
+Infrastructure exists; the automated test suite does not.
 
-| Task | Status | Priority | Target Date | Notes |
-|------|--------|----------|-------------|-------|
-| Implement Raft persistence (Custom WAL) | ⬜ Pending | 🔴 CRITICAL | Q1 2026 | RocksDB-backed WAL, snapshot support |
-| Add Raft log compaction/snapshotting | ⬜ Pending | 🔴 CRITICAL | Q1 2026 | Prevent infinite memory growth |
-| Replace Apache HttpClient with Vert.x WebClient (agent) | ⬜ Pending | 🔴 CRITICAL | Q1 2026 | Fix blocking I/O on event loop |
-| Add TransferProtocol.abort() method | ⬜ Pending | 🔴 CRITICAL | Q2 2026 | Hard cancellation for transfers |
-| Implement InstallSnapshot RPC | ⬜ Pending | 🔴 CRITICAL | Q2 2026 | For catching up lagging followers |
-| Add gRPC TLS encryption | ⬜ Pending | 🟡 HIGH | Q2 2026 | Secure Raft communication |
-| Replace Java Serialization with Protobuf | ⬜ Pending | 🟡 HIGH | Q2 2026 | Version-safe state machine replication |
-| Fix tenant module synchronized bottleneck | ⬜ Pending | 🟠 MEDIUM | Q2 2026 | Use ReadWriteLock or ConcurrentHashMap |
+| Task | Status | Priority | Delivery reference | Notes |
+|------|--------|----------|--------------------|-------|
+| Test Phase 1: Docker Compose config | ✅ Complete | HIGH | This plan | `docker/compose/docker-compose-observability.yml`, `docker-compose-observability-cluster.yml` |
+| Test Phase 2: OTel Collector config | ✅ Complete | HIGH | This plan | `docker/compose/otel-collector-config.yaml`, `otel-collector-cluster-config.yaml`; per-module copies under controller and agent test resources |
+| Test Phase 3: Prometheus scrape config | ✅ Complete | HIGH | This plan | `docker/compose/prometheus-observability.yml`, `prometheus-cluster.yml`; Tempo and Loki configs also present |
+| Test Phase 4: Integration test suite over the stack | ⬜ Pending | 🟡 HIGH | `OBS-01` | Existing `InfrastructureWithTelemetryTest`, `TelemetryConfigTest` and `AgentTelemetryIntegrationTest` do not assert collector→Prometheus→Tempo delivery end to end |
+| Test Phase 5: Test execution script | ⬜ Pending | 🟠 MEDIUM | `OBS-02` | `scripts/start-cluster-with-observability.ps1` starts the stack but reports no pass/fail result |
 
-### Phase 6: quorus-agent Migration (COMPLETED ✅)
+### Former "Critical Pre-Production Fixes" (ALL DELIVERED ✅)
 
-| Task | Status | Priority | Target Date | Notes |
-|------|--------|----------|-------------|-------|
-| Add OpenTelemetry dependencies to agent POM | ✅ Complete | 🟡 HIGH | Q1 2026 | vertx-opentelemetry, SDK, OTLP exporter, Prometheus exporter |
-| Create AgentTelemetryConfig class | ✅ Complete | 🟡 HIGH | Q1 2026 | Static configure() with OTLP + Prometheus |
-| Add 12 agent metrics (AgentMetrics.java) | ✅ Complete | 🟡 HIGH | Q1 2026 | status, heartbeats, registrations, jobs, transfers, uptime |
-| Integrate into QuorusAgent | ✅ Complete | 🟡 HIGH | Q1 2026 | TelemetryConfig.configure() in constructor |
-| Vert.x tracing integration | ✅ Complete | 🟡 HIGH | Q1 2026 | OpenTelemetryOptions configured |
-| Instrument AgentRegistrationService | ⬜ Pending | 🟢 LOW | Q3 2026 | Additional service-level tracing |
-| Instrument HeartbeatService | ⬜ Pending | 🟢 LOW | Q3 2026 | Additional service-level tracing |
-| Instrument JobPollingService | ⬜ Pending | 🟢 LOW | Q3 2026 | Additional service-level tracing |
+Every item in this table was delivered by the alpha or enterprise plan. The table is retained so
+that readers of earlier revisions can see the correction rather than reopening closed work.
+
+| Task | Status | Delivered by | Notes |
+|------|--------|--------------|-------|
+| Implement Raft persistence | ✅ Complete | Alpha T5.1, then enterprise R1 | Now the external `raftlog-core` WAL. Internal RocksDB and memory backends and the RocksDB JNI dependency were removed; configuration accepts only `raftlog`. **Do not reintroduce a RocksDB-backed WAL** as the original row proposed. |
+| Add Raft log compaction/snapshotting | ✅ Complete | Alpha T5.2, RaftLog 1.2.0 | Prefix compaction after caller-owned durable snapshots |
+| Replace Apache HttpClient with Vert.x WebClient (agent) | ✅ Complete | Alpha T3.1 | Blocking I/O removed from the event loop |
+| Add `TransferProtocol.abort()` method | ✅ Complete | quorus-core | Default method at `quorus-core/.../protocol/TransferProtocol.java:87` |
+| Implement InstallSnapshot RPC | ✅ Complete | Alpha T5.3 | Chunked transfer via `SnapshotChunkAssembler`; 7 tests |
+| Add gRPC TLS encryption | ✅ Complete | Enterprise Phase 1 | TLS 1.3 mutual authentication for the Raft server and peer clients |
+| Replace Java Serialization with Protobuf | ✅ Complete | Alpha T5.4, then enterprise Phase 2 | Now at version 2 command and snapshot contracts with legacy version 0 and 1 readers |
+| Fix tenant module synchronized bottleneck | ✅ Substantially complete | quorus-tenant | One `synchronized` occurrence remains in `SimpleTenantService`; rescoped to 🟢 LOW, tracked as part of `OBS-14` |
+
+> **Durability caveat.** Raft persistence being implemented does not mean durability is accepted.
+> The R1 container-recreation, production-filesystem and machine power-loss gates remain open and
+> block the enterprise release claim. See register items `R1-1`, `R1-2`, `R1-3`.
+
+### Phase 6: quorus-agent Migration (PARTIAL ⚠️)
+
+| Task | Status | Priority | Delivery reference | Notes |
+|------|--------|----------|--------------------|-------|
+| Add OpenTelemetry dependencies to agent POM | ✅ Complete | 🟡 HIGH | This plan | vertx-opentelemetry, SDK, OTLP exporter, Prometheus exporter |
+| Create AgentTelemetryConfig class | ✅ Complete | 🟡 HIGH | This plan | Static configure() with OTLP + Prometheus |
+| Add 12 agent metrics (AgentMetrics.java) | ✅ Complete | 🟡 HIGH | This plan | status, heartbeats, registrations, jobs, transfers, uptime |
+| Integrate into QuorusAgent | ✅ Complete | 🟡 HIGH | This plan | TelemetryConfig.configure() in constructor |
+| Vert.x tracing integration | ✅ Complete | 🟡 HIGH | This plan | OpenTelemetryOptions configured |
+| Instrument AgentRegistrationService | ⬜ Pending | 🟢 LOW | `OBS-11` | Additional service-level tracing |
+| Instrument HeartbeatService | ⬜ Pending | 🟢 LOW | `OBS-11` | Additional service-level tracing |
+| Instrument JobPollingService | ⬜ Pending | 🟢 LOW | `OBS-11` | Additional service-level tracing |
 
 ### Phase 7: quorus-tenant Migration (COMPLETE ✅)
 
-| Task | Status | Priority | Target Date | Notes |
-|------|--------|----------|-------------|-------|
-| Add OpenTelemetry dependencies | ✅ Complete | 🟠 MEDIUM | Q1 2026 | opentelemetry-api added to pom.xml |
-| Add 7 tenant metrics (TenantMetrics.java) | ✅ Complete | 🟠 MEDIUM | Q1 2026 | total, active, created, deleted, quota violations, reservations, releases |
-| Standardize logging to SLF4J | ✅ Complete | 🟠 MEDIUM | Q1 2026 | SimpleTenantService, SimpleResourceManagementService, TenantMetrics all use SLF4J |
-| Integrate TenantMetrics into services | ✅ Complete | 🟠 MEDIUM | Q1 2026 | TenantMetrics integrated into SimpleTenantService and SimpleResourceManagementService |
-| Export via controller endpoint | ✅ Complete | 🟠 MEDIUM | Q1 2026 | Uses GlobalOpenTelemetry from controller |
+| Task | Status | Priority | Delivery reference | Notes |
+|------|--------|----------|--------------------|-------|
+| Add OpenTelemetry dependencies | ✅ Complete | 🟠 MEDIUM | This plan | opentelemetry-api added to pom.xml |
+| Add 7 tenant metrics (TenantMetrics.java) | ✅ Complete | 🟠 MEDIUM | This plan | total, active, created, deleted, quota violations, reservations, releases |
+| Standardize logging to SLF4J | ✅ Complete | 🟠 MEDIUM | This plan | SimpleTenantService, SimpleResourceManagementService, TenantMetrics |
+| Integrate TenantMetrics into services | ✅ Complete | 🟠 MEDIUM | This plan | Wired into SimpleTenantService and SimpleResourceManagementService |
+| Export via controller endpoint | ✅ Complete | 🟠 MEDIUM | This plan | Uses GlobalOpenTelemetry from controller |
 
 ### Phase 8: quorus-core Migration (PARTIAL ⚠️)
 
-| Task | Status | Priority | Target Date | Notes |
-|------|--------|----------|-------------|-------|
-| Standardize logging to SLF4J | ✅ Complete | 🟡 HIGH | Q1 2026 | Main classes (SimpleTransferEngine, protocols) use SLF4J |
-| Add OpenTelemetry dependencies | ✅ Complete | 🟡 HIGH | Q1 2026 | opentelemetry-api added to pom.xml |
-| Create TransferTelemetryMetrics class | ✅ Complete | 🟡 HIGH | Q1 2026 | 9 metrics: active, total, completed, failed, cancelled, bytes, duration, throughput, retries |
-| Remove old manual TransferMetrics | ⬜ **Pending** | 🟡 HIGH | Q1 2026 | Old TransferMetrics.java still exists and used |
-| Integrate new metrics into SimpleTransferEngine | ⬜ Pending | 🟡 HIGH | Q2 2026 | Wire up TransferTelemetryMetrics calls |
-| Add protocol adapter metrics | ⬜ Pending | 🟠 MEDIUM | Q3 2026 | Per-protocol counters |
-| Instrument SimpleTransferEngine tracing | ⬜ Pending | 🟠 MEDIUM | Q3 2026 | Tracing for transfer lifecycle |
-| Instrument protocol adapters tracing | ⬜ Pending | 🟠 MEDIUM | Q3 2026 | HTTP, SFTP, FTP, SMB tracing |
+| Task | Status | Priority | Delivery reference | Notes |
+|------|--------|----------|--------------------|-------|
+| Standardize logging to SLF4J | ✅ Complete | 🟡 HIGH | This plan | Main classes (SimpleTransferEngine, protocols) use SLF4J |
+| Add OpenTelemetry dependencies | ✅ Complete | 🟡 HIGH | This plan | opentelemetry-api added to pom.xml |
+| Create TransferTelemetryMetrics class | ✅ Complete | 🟡 HIGH | This plan | 9 metrics: active, total, completed, failed, cancelled, bytes, duration, throughput, retries |
+| Integrate new metrics into SimpleTransferEngine | ✅ Complete | 🟡 HIGH | v2.5 | Legacy `TransferMetrics` removed from the engine; `ProtocolStats` read-back added |
+| Delete orphaned `TransferMetrics.java` | ⬜ Pending | 🟠 MEDIUM | `OBS-08` | The file still exists at `quorus-core/.../monitoring/TransferMetrics.java` and is referenced only by its own `TransferMetricsTest`. It is dead code awaiting deletion, not an in-use dual-metrics system. `NetworkTopologyService.getTransferMetrics()` is an unrelated name collision — do not remove it alongside. |
+| Add protocol adapter metrics | ⬜ Pending | 🟠 MEDIUM | `OBS-09` | Per-protocol counters |
+| Instrument SimpleTransferEngine tracing | ✅ Complete | 🟠 MEDIUM | v2.5 | OTel `Span` created in `executeTransfer()` with transfer-specific attributes |
+| Instrument protocol adapters tracing | ⬜ Pending | 🟠 MEDIUM | `OBS-10` | HTTP, SFTP, FTP, SMB tracing |
 
-### Phase 9: quorus-workflow Migration (COMPLETE ✅)
+### Phase 9: quorus-workflow Migration (PARTIAL ⚠️)
 
-| Task | Status | Priority | Target Date | Notes |
-|------|--------|----------|-------------|-------|
-| Add OpenTelemetry dependencies | ✅ Complete | 🟠 MEDIUM | Q1 2026 | opentelemetry-api added to pom.xml |
-| Create WorkflowMetrics class | ✅ Complete | 🟠 MEDIUM | Q1 2026 | 9 metrics: active, total, completed, failed, cancelled, steps, duration, transfers_per_workflow |
-| Standardize logging to SLF4J | ✅ Complete | 🟠 MEDIUM | Q1 2026 | SimpleWorkflowEngine, WorkflowMetrics both use SLF4J |
-| Integrate WorkflowMetrics into engine | ✅ Complete | 🟠 MEDIUM | Q1 2026 | WorkflowMetrics integrated into SimpleWorkflowEngine |
-| Add dependency graph metrics | ⬜ Pending | 🟢 LOW | Q4 2026 | graph_size, cycles_detected, depth |
-| Instrument SimpleWorkflowEngine tracing | ⬜ Pending | 🟢 LOW | Q4 2026 | Tracing for workflow execution |
-| Instrument YamlWorkflowDefinitionParser | ⬜ Pending | 🟢 LOW | Q4 2026 | Tracing for YAML parsing |
+| Task | Status | Priority | Delivery reference | Notes |
+|------|--------|----------|--------------------|-------|
+| Add OpenTelemetry dependencies | ✅ Complete | 🟠 MEDIUM | This plan | opentelemetry-api added to pom.xml |
+| Create WorkflowMetrics class | ✅ Complete | 🟠 MEDIUM | This plan | 9 metrics: active, total, completed, failed, cancelled, steps, duration, transfers_per_workflow |
+| Standardize logging to SLF4J | ✅ Complete | 🟠 MEDIUM | This plan | SimpleWorkflowEngine, WorkflowMetrics both use SLF4J |
+| Integrate WorkflowMetrics into engine | ✅ Complete | 🟠 MEDIUM | This plan | WorkflowMetrics integrated into SimpleWorkflowEngine |
+| Add dependency graph metrics | ⬜ Pending | 🟢 LOW | `OBS-12` | graph_size, cycles_detected, depth |
+| Instrument SimpleWorkflowEngine tracing | ⬜ Pending | 🟢 LOW | `OBS-13` | Tracing for workflow execution |
+| Instrument YamlWorkflowDefinitionParser | ⬜ Pending | 🟢 LOW | `OBS-13` | Tracing for YAML parsing |
 
 ### Logging & OTel Audit Fixes (2026-03-05 Audit)
 
-| Task | Status | Priority | Target Date | Notes |
-|------|--------|----------|-------------|-------|
-| Configure Logging-OTel Bridge (OpenTelemetryAppender) | ⬜ Pending | 🟡 HIGH | Q2 2026 | Enables Grafana trace↔log correlation |
-| Bridge requestId ↔ OTel traceId | ⬜ Pending | 🟡 HIGH | Q2 2026 | Include both in error responses + MDC |
-| Standardize logger field naming (`LOG` → `logger`) | ⬜ Pending | 🟢 LOW | Q3 2026 | RaftLogStorageAdapter, FileRaftStorage |
-| Add loggers to 5 HTTP handlers | ⬜ Pending | 🟠 MEDIUM | Q2 2026 | Status, Readiness, Liveness, Info, Cluster |
-| Remove/use unused logger declarations | ⬜ Pending | 🟢 LOW | Q3 2026 | MetricsHandler, ProtocolFactory, FileManager |
-| Optimize SimpleTransferEngine logging (53 DEBUG) | ⬜ Pending | 🟠 MEDIUM | Q3 2026 | Promote, demote to TRACE, or remove |
-| Add INFO success log to JobStatusReportingService | ⬜ Pending | 🟠 MEDIUM | Q2 2026 | Agent operational visibility |
-| Add loggers to YamlWorkflowDefinitionParser + WorkflowSchemaValidator | ⬜ Pending | 🟠 MEDIUM | Q2 2026 | Workflow debugging |
-| Document completed handler logging patterns | ✅ Complete | 🟢 LOW | Q1 2026 | 6 handlers: entry/success/warn patterns |
+| Task | Status | Priority | Delivery reference | Notes |
+|------|--------|----------|--------------------|-------|
+| Configure Logging-OTel Bridge (OpenTelemetryAppender) | ✅ Complete | 🟡 HIGH | Controller + agent | `opentelemetry-logback-appender-1.0` in both POMs; `OTEL` appender in both `logback.xml`. v2.4 stated this in prose while the grid still showed it pending. |
+| Bridge requestId ↔ OTel traceId | ⚠️ Partial | 🟡 HIGH | `OBS-03` | `ErrorResponse` carries `traceId` from MDC (v2.5). Full request-path correlation in both directions is not yet proven end to end. |
+| Add loggers to 5 HTTP handlers | ⬜ Pending | 🟠 MEDIUM | `OBS-04` | Status, Readiness, Liveness, Info, Cluster |
+| Add loggers to YamlWorkflowDefinitionParser + WorkflowSchemaValidator | ⬜ Pending | 🟠 MEDIUM | `OBS-05` | Workflow debugging |
+| Add INFO success log to JobStatusReportingService | ⬜ Pending | 🟠 MEDIUM | `OBS-06` | Agent operational visibility |
+| Optimize SimpleTransferEngine logging (53 DEBUG) | ⬜ Pending | 🟠 MEDIUM | `OBS-07` | Promote, demote to TRACE, or remove |
+| Standardize logger field naming (`LOG` → `logger`) | ⬜ Pending | 🟢 LOW | `OBS-14` | RaftLogStorageAdapter, FileRaftStorage |
+| Remove/use unused logger declarations | ⬜ Pending | 🟢 LOW | `OBS-14` | MetricsHandler, ProtocolFactory, FileManager |
+| Document completed handler logging patterns | ✅ Complete | 🟢 LOW | This plan | 6 handlers: entry/success/warn patterns |
 
-### Admin UI Decision (POST-LAUNCH)
+### Administration UI
 
-> **Note:** The `quorus-api` module was removed from the codebase on 2026-03-05. If an admin UI is built, it will be a new `quorus-admin-ui` module.
-
-| Task | Status | Priority | Target Date | Notes |
-|------|--------|----------|-------------|-------|
-| Production launch | ⬜ Pending | 🔴 CRITICAL | Mid-2026 | Go-live with current modules |
-| Collect 6 months operational feedback | ⬜ Pending | 🟡 HIGH | Q4 2026 | Understand operator needs |
-| Decide: Build admin UI or rely on CLI + Grafana | ⬜ Pending | 🟠 MEDIUM | Q4 2026 | Based on operator feedback |
-| If needed: Design admin UI architecture | ⬜ Pending | 🟠 MEDIUM | Q1 2027 | Standalone vs embedded decision |
-| If needed: Implement quorus-admin-ui | ⬜ Pending | 🟠 MEDIUM | Q2-Q3 2027 | React/Vue + WebSocket + Prometheus |
+> **Superseded 2026-09-07.** This plan previously deferred an admin UI to a post-launch decision
+> after six months of operational feedback. Enterprise **Phase 11 — Administration and Operations
+> User Interfaces** now makes role-specific operator and administration interfaces a required M4
+> deliverable, built only on supported REST and event contracts. The build/buy question is closed;
+> the remaining work is Phase 11 scope, not an observability decision.
+>
+> The `quorus-api` module was removed from the codebase on 2026-03-05. Phase 11 interfaces would
+> be new modules consuming the Phase 6 REST control plane.
 
 ### Summary Progress
 
-| Category | Total Tasks | Completed | Pending | % Complete |
-|----------|-------------|-----------|---------|------------|
-| **Controller Migration (Phases 1-5)** | 5 | 5 | 0 | 100% ✅ |
-| **Integration Testing (Test Phases 1-5)** | 5 | 0 | 5 | 0% |
-| **Critical Pre-Production Fixes** | 8 | 0 | 8 | 0% 🔴 |
-| **Agent Migration (Phase 6)** | 8 | 5 | 3 | 63% ✅ |
-| **Tenant Migration (Phase 7)** | 5 | 5 | 0 | 100% ✅ |
-| **Core Migration (Phase 8)** | 8 | 3 | 5 | 38% ⚠️ |
-| **Workflow Migration (Phase 9)** | 7 | 4 | 3 | 57% ✅ |
-| **Logging & OTel Audit Fixes** | 9 | 1 | 8 | 11% |
-| **Admin UI Decision** | 5 | 0 | 5 | 0% |
-| **TOTAL** | **60** | **23** | **37** | **38%** |
+| Category | Total | Complete | Open | % Complete |
+|----------|-------|----------|------|------------|
+| Controller Migration (Phases 1-5) | 5 | 5 | 0 | 100% ✅ |
+| Integration Testing (Test Phases 1-5) | 5 | 3 | 2 | 60% ⚠️ |
+| Former Critical Pre-Production Fixes | 8 | 8 | 0 | 100% ✅ |
+| Agent Migration (Phase 6) | 8 | 5 | 3 | 63% ⚠️ |
+| Tenant Migration (Phase 7) | 5 | 5 | 0 | 100% ✅ |
+| Core Migration (Phase 8) | 8 | 5 | 3 | 63% ⚠️ |
+| Workflow Migration (Phase 9) | 7 | 4 | 3 | 57% ⚠️ |
+| Logging & OTel Audit Fixes | 9 | 2 | 7 | 22% ⚠️ |
+| **TOTAL** | **55** | **37** | **18** | **67%** |
+
+The previous revision reported 38% complete across 60 tasks. The change is almost entirely
+correction of stale rows, not new delivery: the five Admin UI decision rows were removed as
+superseded by Phase 11, and eleven rows were reconciled to their actual delivered state.
 
 ### Priority Legend
 
-- 🔴 **CRITICAL**: Must complete before mid-2026 production launch (blocks go-live)
-- 🟡 **HIGH**: Important for production operations (complete Q3 2026)
-- 🟠 **MEDIUM**: Enhances observability (complete Q4 2026)
-- 🟢 **LOW**: Nice to have (post-2026)
+- 🟡 **HIGH**: needed for credible production operations
+- 🟠 **MEDIUM**: materially improves observability
+- 🟢 **LOW**: worthwhile cleanup, no operational dependency
 
-### Next Immediate Actions (Q1-Q2 2026)
+Priorities are relative within this telemetry backlog. They do not compete with enterprise phase
+work: no item in this grid is a release blocker, and none closes a canonical `ARCH` or `API` gap.
+The release blockers are `R1-1`, `R1-2` and `R1-3` in the
+[Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER.md).
 
-#### OpenTelemetry Completion Tasks (Priority Order)
+### Next Actions
 
-1. ✅ ~~**Migrate quorus-tenant logging to SLF4J**~~ - COMPLETE (verified 2026-02-01)
-2. ✅ ~~**Migrate quorus-workflow logging to SLF4J**~~ - COMPLETE (verified 2026-02-01)
-3. ⬜ **Remove old TransferMetrics.java from quorus-core** - Replace with TransferTelemetryMetrics integration
-4. ✅ ~~**Wire TenantMetrics into SimpleTenantService**~~ - COMPLETE (verified 2026-02-01)
-5. ✅ ~~**Wire WorkflowMetrics into SimpleWorkflowEngine**~~ - COMPLETE (verified 2026-02-01)
-6. ⬜ **Create OTel integration test infrastructure** - Test Phases 1-5 (Docker Compose, Collector, Tests)
+In priority order, with register IDs:
 
-#### Logging & OTel Audit Tasks (Priority Order)
-
-1. ⬜ **Configure Logging-OTel Bridge** - Add opentelemetry-logback-appender to controller + agent
-2. ⬜ **Bridge requestId ↔ traceId** - Include both in HTTP error responses and log MDC
-3. ⬜ **Add loggers to 5 HTTP handlers** - StatusHandler, ReadinessHandler, LivenessHandler, InfoHandler, ClusterHandler
-4. ⬜ **Add loggers to workflow parsing** - YamlWorkflowDefinitionParser, WorkflowSchemaValidator
-5. ⬜ **Add INFO success log to JobStatusReportingService** - Agent operational visibility
-6. ⬜ **Optimize SimpleTransferEngine logging** - 53 DEBUG statements → audit, promote/demote/remove
-
-#### Critical Pre-Production Fixes (Blocking Production)
-
-1. ⬜ **Implement Raft persistence** - Custom WAL with RocksDB
-2. ⬜ **Add Raft log compaction** - Prevent infinite memory growth
-3. ⬜ **Implement InstallSnapshot RPC** - For catching up lagging followers
+1. `OBS-01` — integration test suite proving collector → Prometheus → Tempo delivery end to end
+2. `OBS-03` — complete and prove `requestId` ↔ `traceId` correlation in both directions
+3. `OBS-02` — test execution script that reports an actual pass/fail result
+4. `OBS-04`, `OBS-05`, `OBS-06` — the missing handler, workflow-parsing and agent-reporting loggers
+5. `OBS-08` — delete the orphaned `TransferMetrics.java` and its test
+6. `OBS-07` — audit the 53 DEBUG statements in `SimpleTransferEngine`
+7. `OBS-09`, `OBS-10` — protocol adapter metrics and tracing
+8. `OBS-11` … `OBS-14` — remaining low-priority instrumentation and naming cleanup
 
 ---
 
-**Document Status**: All critical OTel gaps resolved  
-**Last Updated**: 2026-03-15  
-**Version**: 2.5
+**Document Status**: Task grid reconciled against live source; telemetry backlog open  
+**Last Updated**: 2026-09-07  
+**Version**: 2.6
+
+**Changes in v2.6:**
+- Reconciled the entire Implementation Task Grid against live source and against the alpha and enterprise plans; eleven rows were pending for already-delivered work
+- Retitled "Critical Pre-Production Fixes" to "Former Critical Pre-Production Fixes" — all eight items are delivered; the eight stale 🔴 CRITICAL markers are removed
+- Recorded Raft persistence as the external `raftlog-core` WAL, with an explicit warning not to reintroduce a RocksDB-backed WAL as the original row proposed
+- Added the durability caveat: implemented Raft persistence does not close the R1 container-recreation, production-filesystem and power-loss acceptance gates
+- Corrected Test Phases 1–3 to complete (`docker/compose/` observability, collector, Prometheus, Tempo and Loki configs exist); only the integration suite and execution script remain open
+- Corrected the Logging-OTel bridge row to complete, matching the v2.4 prose that the grid contradicted
+- Corrected `requestId` ↔ `traceId` to partial rather than pending
+- Recorded `TransferMetrics.java` as orphaned dead code awaiting deletion, with a warning that `NetworkTopologyService.getTransferMetrics()` is an unrelated name collision
+- Replaced all calendar targets with a Delivery reference column citing the owning phase or an `OBS-*` item ID in the new [Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER.md)
+- Superseded the post-launch Admin UI decision: enterprise Phase 11 makes operator and administration interfaces a required M4 deliverable
+- Restated the scope boundary: this grid is telemetry infrastructure and instrumentation, and does not advance the enterprise Phase 3 exit gate
+- Summary progress restated as 37 of 55 complete; the change from the previously reported 38% is correction of stale rows, not new delivery
 
 **Changes in v2.5:**
 - Resolved Gap: quorus-core dual metrics system — removed legacy `TransferMetrics` from `SimpleTransferEngine`, added `ProtocolStats` read-back to `TransferTelemetryMetrics`

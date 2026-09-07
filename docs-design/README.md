@@ -22,12 +22,14 @@ The controlling documents are:
 
 The current phased delivery roadmap is [Quorus Enterprise Implementation Plan](task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md). It sequences the canonical requirements but does not override them.
 
+Outstanding work across every planning document is consolidated in the [Quorus Outstanding Work Register](task/QUORUS_OUTSTANDING_WORK_REGISTER.md). As of 2026-09-07 `task/` holds only those two documents; the alpha plan, Stage 6 security and routes plan, OpenTelemetry plan and sealed-record design moved to `archive/`, with their open items carried into the register.
+
 ## Directory Status
 
 | Directory | Status | How to interpret it |
 |---|---|---|
 | `design/` | Non-normative design material | May combine implemented, superseded, and target-state concepts; canonical specifications take precedence |
-| `task/` | Working and point-in-time plans | Completion markers describe the plan at its recorded date, not current production conformance |
+| `task/` | Current delivery roadmap and the consolidated outstanding-work register | The only two live planning documents; completion markers describe the plan at its recorded date, not current production conformance |
 | `testing/` | Engineering test guidance and investigations | Demonstrates specific test procedures; does not establish security, availability, or production readiness by itself |
 | `performance/` | Point-in-time benchmark and optimization records | Claims apply only to the measured component, workload, hardware, and date |
 | `dev/` | Migration and external engineering advice | Often scoped to Vert.x migration or PeeGeeQ rather than the current Quorus product contract |
