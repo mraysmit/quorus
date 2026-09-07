@@ -9,6 +9,13 @@
 **Status:** Complete (2026-03-05)  
 **Scope:** `quorus-controller` state package — all 6 command classes, 6 codecs, `QuorusStateStore`
 
+> [!NOTE]
+> **Archived 2026-09-07.** The refactoring is complete: sealed-record commands (phases 1–6) and
+> runtime transition validation (phases 7–10) are implemented and covered by
+> `StateTransitionIntegrationTest`. Retained as design rationale. The one open idea — compile-time
+> type-safe state encoding in §15 — is tracked as `DEF-02` in the
+> [Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER.md).
+
 ---
 
 ## Table of Contents

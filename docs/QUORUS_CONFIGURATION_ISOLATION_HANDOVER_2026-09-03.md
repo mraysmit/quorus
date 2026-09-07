@@ -302,7 +302,7 @@ Callers outside this repository, and any local branches, will need these updates
 ### 2.5 Documentation touched by the diff
 
 - [docs-design/design/QUORUS_RAFT_WAL_DESIGN.md](../docs-design/design/QUORUS_RAFT_WAL_DESIGN.md): the `FileRaftWAL` and verticle snippets take an `AppConfig`; the systemd unit no longer passes `-Dquorus.config.file`; one `RaftStorageFactory` snippet shows the asynchronous signature. A second snippet near line 3642 still shows the removed two-argument form.
-- [docs-design/task/QUORUS_ALPHA_IMPLEMENTATION_PLAN.md](../docs-design/task/QUORUS_ALPHA_IMPLEMENTATION_PLAN.md): NFS mount root moved to `quorus.agent.nfs.mount-root`; the `AgentConfig` row and Appendix C describe the new precedence; `QUORUS_HTTP_HOST` default corrected.
+- [docs-design/archive/QUORUS_ALPHA_IMPLEMENTATION_PLAN.md](../docs-design/archive/QUORUS_ALPHA_IMPLEMENTATION_PLAN.md): NFS mount root moved to `quorus.agent.nfs.mount-root`; the `AgentConfig` row and Appendix C describe the new precedence; `QUORUS_HTTP_HOST` default corrected.
 - [QUORUS_SERVICE_CONNECTION_OPERATIONS_RUNBOOK.md](QUORUS_SERVICE_CONNECTION_OPERATIONS_RUNBOOK.md): mount attestations are `QUORUS_AGENT_SMB_ENCRYPTED_AUTHENTICATED_MOUNT` and `QUORUS_AGENT_NFS_ENCRYPTED_AUTHENTICATED_MOUNT`.
 
 ### 2.6 Tests

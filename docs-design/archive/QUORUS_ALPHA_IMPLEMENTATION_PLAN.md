@@ -7,10 +7,16 @@
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0
 
+> [!NOTE]
+> **Archived 2026-09-07.** Retained for provenance and historical implementation evidence; it is
+> not current implementation guidance. Stages 1–5 are complete and Stage 6 was superseded. The
+> controlling roadmap is the [Quorus Enterprise Implementation Plan](../task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md) and open work is
+> tracked in the [Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER.md).
+
 > [!IMPORTANT]
 > This is a point-in-time implementation plan. Completion markers do not establish current production conformance. In particular, tenant field checks are not authenticated tenant isolation, and current assignment, security, transfer-operations telemetry, service-connectivity, and agent-lifecycle gaps are governed by [QUORUS_ARCHITECTURE_SPECIFICATION.md](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md) and [QUORUS_REST_API_SPECIFICATION.md](../../docs/QUORUS_REST_API_SPECIFICATION.md).
 >
-> The current delivery roadmap is [QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md](QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md). This alpha plan is retained as historical implementation evidence.
+> The current delivery roadmap is [QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md](../task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md). This alpha plan is retained as historical implementation evidence.
 
 ---
 
@@ -36,7 +42,10 @@ This implementation plan prioritizes **core functionality and stability** before
 
 ### Guiding Principles
 
-From [QUORUS_ALPHA_ARCH_REVIEW_JAN_2026.md](../archive/QUORUS_ALPHA_ARCH_REVIEW_JAN_2026.md):
+Originally from the January 2026 alpha architecture review (archived document removed 2026-09-07).
+These testing principles remain in force and are extended, not replaced, by the mandatory TDD
+delivery protocol in
+[QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md](../task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md) §6.1:
 
 * **No reflection**: Tests must not use Java reflection API
 * **No mocking**: Tests must not use mocking frameworks (Mockito, PowerMock, EasyMock)

@@ -9,6 +9,15 @@
 **Status:** NOT STARTED  
 **Dependencies:** Core infrastructure complete
 
+> [!NOTE]
+> **Archived 2026-09-07.** Retained for provenance; it is not current implementation guidance.
+> T6.1–T6.5 and T6.8 are delivered or superseded by enterprise Phases 1, 4 and 6; T6.7 Route
+> Architecture is relocated to enterprise Phase 7, whose governed service-alias and
+> secret-reference model supersedes the trigger design here. Do not implement the shared-secret
+> API key scheme in T6.1: Phase 1 delivered certificate-authenticated identity instead. See the
+> [Quorus Enterprise Implementation Plan](../task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md) and the
+> [Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER.md).
+
 > [!IMPORTANT]
 > This is a historical implementation plan, not the current security contract. Enterprise identity, TLS/mTLS, service trust and egress policy, secret references, audit, and secure agent lifecycle controls are production release requirements rather than optional post-stability enhancements. See [QUORUS_ARCHITECTURE_SPECIFICATION.md](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md) and [QUORUS_REST_API_SPECIFICATION.md](../../docs/QUORUS_REST_API_SPECIFICATION.md).
 
