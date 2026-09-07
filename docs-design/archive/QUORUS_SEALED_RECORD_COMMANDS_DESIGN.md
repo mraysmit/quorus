@@ -1,7 +1,11 @@
+<img src="../../docs/quorus-logo.png" alt="Quorus" width="120"/>
+
 # Sealed Record Commands — Design & Refactoring Proposal
 
-**Author:** GitHub Copilot  
+**Version:** 1.0  
 **Date:** 2026-02-20  
+**Author:** Mark Ray-Smith — Cityline Ltd  
+**License:** Apache 2.0
 **Status:** Complete (2026-03-05)  
 **Scope:** `quorus-controller` state package — all 6 command classes, 6 codecs, `QuorusStateStore`
 
