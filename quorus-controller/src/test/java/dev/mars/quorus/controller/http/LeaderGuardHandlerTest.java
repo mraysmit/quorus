@@ -98,11 +98,17 @@ class LeaderGuardHandlerTest {
         RaftNode node3 = RaftNode.builder().vertx(vertx).nodeId("guard-node-3").clusterNodes(clusterNodes).transport(transport3).stateMachine(sm3).mode(RaftNodeMode.volatileMode())
                 .electionTimeout(45000).heartbeatInterval(100).build();
 
-        node1.start();
-        node2.start();
-        node3.start();
+        // Start the slow-election followers first and await them, so that the fast-election
+        // node cannot campaign into a cluster whose peers are not yet listening. Previously
+        // all three start() futures were discarded and the test polled for a leader while
+        // startup was still in flight; node1 could then burn elections against unregistered
+        // transports, which is the intermittent 15-second fixture timeout observed during
+        // Phase 3 verification.
+        awaitSuccess(node2.start(), ASYNC_SETUP_TIMEOUT);
+        awaitSuccess(node3.start(), ASYNC_SETUP_TIMEOUT);
+        awaitSuccess(node1.start(), ASYNC_SETUP_TIMEOUT);
 
-        // Wait for leader election 
+        // Wait for leader election
         awaitSuccess(eventually(vertx, () -> node1.isLeader() || node2.isLeader() || node3.isLeader(),
                 Duration.ofSeconds(15)), Duration.ofSeconds(16));
 

@@ -1,4 +1,3 @@
-version: '3.8'
 
 # Build-only compose file — creates the quorus-controller:test image.
 # Used by SharedDockerCluster to build the image once before all tests.

@@ -1,12 +1,17 @@
-
-# 3-node Raft cluster using pre-built image (no Docker build step).
-# Requires quorus-controller:test image — built by SharedDockerCluster.
-
-# Raft state is written to a named volume at the same path the deployed image uses
-# (see docker/compose/docker-compose-cluster.yml). Before 2026-09-07 these fixtures declared
-# no volume and no storage path, so containerised tests ran Raft state on the container's
-# ephemeral layer and could not have detected a container-level durability regression.
-# Testcontainers removes these volumes when it stops the cluster, so each run starts clean.
+# 3-node Raft cluster with persistent named volumes.
+#
+# R1-1 container-recreation acceptance fixture. Unlike docker-compose-3node-prebuilt.yml,
+# every controller writes its WAL, metadata and snapshots to a named volume mounted at
+# /app/data, and QUORUS_RAFT_STORAGE_PATH points into that volume. Destroying the
+# containers with `docker compose down` (without -v) therefore preserves authoritative
+# state, which is exactly the deployment shape this acceptance gate exercises.
+#
+# The snapshot threshold and check interval are deliberately small so that a handful of
+# submitted transfers produce a real snapshot and a real WAL prefix compaction within the
+# test's runtime. That is the condition R1 cares about: recovery from a durable snapshot
+# plus a compacted log, not recovery by replaying a full WAL.
+#
+# Requires the quorus-controller:test image built by SharedDockerCluster.
 
 services:
   controller1:
@@ -23,17 +28,21 @@ services:
       - QUORUS_RAFT_HOST=0.0.0.0
       - QUORUS_RAFT_PORT=9080
       - QUORUS_HTTP_PORT=8080
-      - QUORUS_RAFT_STORAGE_PATH=/app/data/raft
       - QUORUS_CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080
       - QUORUS_RAFT_ELECTION_TIMEOUT_MS=1500
       - QUORUS_RAFT_HEARTBEAT_INTERVAL_MS=300
+      - QUORUS_RAFT_STORAGE_PATH=/app/data/raft
+      - QUORUS_RAFT_STORAGE_FSYNC=true
+      - QUORUS_RAFT_SNAPSHOT_ENABLED=true
+      - QUORUS_RAFT_SNAPSHOT_THRESHOLD=3
+      - QUORUS_RAFT_SNAPSHOT_CHECK_INTERVAL_MS=2000
       - JAVA_OPTS=-Xmx256m -Xms128m
     ports:
       - "8080"
     volumes:
       - controller1-data:/app/data
     networks:
-      - raft-cluster
+      - raft-durable
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 5s
@@ -55,17 +64,21 @@ services:
       - QUORUS_RAFT_HOST=0.0.0.0
       - QUORUS_RAFT_PORT=9080
       - QUORUS_HTTP_PORT=8080
-      - QUORUS_RAFT_STORAGE_PATH=/app/data/raft
       - QUORUS_CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080
       - QUORUS_RAFT_ELECTION_TIMEOUT_MS=1500
       - QUORUS_RAFT_HEARTBEAT_INTERVAL_MS=300
+      - QUORUS_RAFT_STORAGE_PATH=/app/data/raft
+      - QUORUS_RAFT_STORAGE_FSYNC=true
+      - QUORUS_RAFT_SNAPSHOT_ENABLED=true
+      - QUORUS_RAFT_SNAPSHOT_THRESHOLD=3
+      - QUORUS_RAFT_SNAPSHOT_CHECK_INTERVAL_MS=2000
       - JAVA_OPTS=-Xmx256m -Xms128m
     ports:
       - "8080"
     volumes:
       - controller2-data:/app/data
     networks:
-      - raft-cluster
+      - raft-durable
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 5s
@@ -87,17 +100,21 @@ services:
       - QUORUS_RAFT_HOST=0.0.0.0
       - QUORUS_RAFT_PORT=9080
       - QUORUS_HTTP_PORT=8080
-      - QUORUS_RAFT_STORAGE_PATH=/app/data/raft
       - QUORUS_CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080
       - QUORUS_RAFT_ELECTION_TIMEOUT_MS=1500
       - QUORUS_RAFT_HEARTBEAT_INTERVAL_MS=300
+      - QUORUS_RAFT_STORAGE_PATH=/app/data/raft
+      - QUORUS_RAFT_STORAGE_FSYNC=true
+      - QUORUS_RAFT_SNAPSHOT_ENABLED=true
+      - QUORUS_RAFT_SNAPSHOT_THRESHOLD=3
+      - QUORUS_RAFT_SNAPSHOT_CHECK_INTERVAL_MS=2000
       - JAVA_OPTS=-Xmx256m -Xms128m
     ports:
       - "8080"
     volumes:
       - controller3-data:/app/data
     networks:
-      - raft-cluster
+      - raft-durable
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 5s
@@ -106,7 +123,7 @@ services:
       start_period: 10s
 
 networks:
-  raft-cluster:
+  raft-durable:
     driver: bridge
 
 volumes:
