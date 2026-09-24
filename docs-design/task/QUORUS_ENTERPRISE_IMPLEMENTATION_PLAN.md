@@ -2,11 +2,11 @@
 
 # Quorus Enterprise Implementation Plan
 
-**Version:** 1.25  
-**Date:** 2026-09-06  
+**Version:** 1.26  
+**Date:** 2026-09-07  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
-**Status:** Active — remediation checkpoint open; M0 durability and Phase 4 acceptance reopened; Phase 1 complete; Phases 2 and 3 in progress  
+**Status:** Active — remediation checkpoint open; R1-1 container-recreation acceptance closed 2026-09-07 while R1-2 and R1-3 remain open; M0 durability and Phase 4 acceptance reopened; Phase 1 complete; Phases 2 and 3 in progress  
 **Scope:** Enterprise control plane, transfer operations, security, governance, deployment, and user interfaces
 
 ## 1. Purpose and Authority
@@ -128,12 +128,29 @@ Execute the following slices in order under Section 6.1, retaining intended beha
 
 | Slice | Scope and acceptance gate | Status |
 |---|---|---|
-| R1 — Durable snapshots | Snapshot, compact, close, construct fresh storage, and recover state and coordinates; three-controller restart; interrupted publication, corruption, retained tails, and concurrent log mutations. Keep raftlog-core as the only WAL. | Code remediation verified on Windows; container-recreation, production-filesystem and power-loss acceptance remain open |
+| R1 — Durable snapshots | Snapshot, compact, close, construct fresh storage, and recover state and coordinates; three-controller restart; interrupted publication, corruption, retained tails, and concurrent log mutations. Keep raftlog-core as the only WAL. | Code remediation verified on Windows; container-recreation acceptance closed 2026-09-07; production-filesystem and power-loss acceptance remain open |
 | R2 — Tenant isolation | Collision-free versioned registry keys, ownership validation, HTTP CRUD/list boundaries, replicated migration and restart; ambiguous legacy ownership fails closed. | Implementation complete — 546 tests pass in final clean controller verify, no failures/errors/skips; JaCoCo gate passed; deployment acceptance remains under R1 |
 | R3 — Pre-execution failures | Authorization/secret/path rejection reaches the correct terminal attempt state without artificial IN_PROGRESS; preserve sequencing/fencing and reconcile uncertain acknowledgements. | Implementation complete — clean affected-reactor verify and JaCoCo gates pass; Windows symlink skip covered by passing Linux path-policy tests |
 | R4 — Non-blocking DNS | Slow DNS cannot block unrelated HTTP requests; bounded resolution, overload/timeout handling, default-deny egress and address pinning remain enforced. | Implementation complete — ten behavioral-red cases, five characterization cases; 47 focused tests and full Docker/slow reactor pass; see R4 evidence |
 | R5 — Handover closure | Confirm and disposition every remaining handover item, including entrypoints, defaults, path/port/TLS behavior, trust updates, codecs, compatibility, and retention. | Implementation complete — behavioral red/green and focused regression retained; enterprise retention remains Phase 9 and deployment durability remains R1 |
 | R6 — Final acceptance | Clean isolated-worktree reactor verify at the final revision, configured JaCoCo gates, protocol/security/restart tests, migration/runbook/specification alignment and retained evidence. | Complete for local final-source acceptance at `b604505`: clean detached reactor passes 2,437 tests with zero failures/errors, two existing skips and five coverage gates; R1 deployment durability gates remain open |
+
+**R1-1 container-recreation acceptance — 2026-09-07:** Durable snapshot recovery is now proven
+across destruction and recreation of the controller containers against persistent named volumes,
+using the shipped image. Four tests pass through the real cluster boundary: full-cluster
+recreate, recovery from a durable snapshot after the WAL is compacted to zero bytes, rolling
+single-node recreation under retained quorum, and a negative control proving the gate is not
+vacuous. Controller regression with Docker and slow groups enabled passes 601 tests with zero
+failures or errors, two pre-existing explicit skips and the JaCoCo gate. No product defect was
+found: both retained red failures were incorrect assertions in the new test, so the two recovery
+tests are recorded as retrospective characterization under Section 6.1 rather than as historical
+TDD. Docker is a confirmed production target, so the deployment shape is representative; the
+engine was Docker Desktop on Windows, so the storage class and host kernel are not, and R1-2
+still requires a repeat on the intended Linux engine and storage class. The work also exposed
+that the existing containerised test fixture declares no volumes and no Raft storage path, so no
+prior Docker test could have detected a container-level durability regression. See the
+[R1-1 evidence](../evidence/r1-container-recreation-2026-09-07.md). R1-2 production-filesystem
+and R1-3 machine power-loss acceptance remain open and still prevent an enterprise release claim.
 
 **R1 implementation evidence:** 14 new tests: 11 exposed missing behavior before their fixes, and three are explicitly recorded as characterization. Seven red/green stages cover recovery and mutation ordering, including interrupted installation followed by a second restart. The final clean controller run passes 530 tests with no failures, errors or skips and meets its JaCoCo gate; the separately enabled slow cluster suite passes four tests. An earlier seven-module clean reactor passed before the last interruption-recovery fixes; it is not represented as a final-revision reactor result. Commands, failure excerpts, timestamps, log hashes, source hashes and limitations are retained in [Raft TDD evidence](../evidence/raft-log-tdd-evidence-2026-09-04.json). R2 progress is recorded below; no remaining slice or production acceptance gate is closed by the R1 result.
 

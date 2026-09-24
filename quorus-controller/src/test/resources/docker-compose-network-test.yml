@@ -1,4 +1,3 @@
-version: '3.8'
 
 # Quorus 5-Node Controller Cluster for Advanced Network Testing with Testcontainers
 # NOTE: container_name removed for Testcontainers compatibility

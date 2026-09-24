@@ -1,7 +1,12 @@
-version: '3.8'
 
 # 5-node Raft cluster using pre-built image (no Docker build step).
 # Requires quorus-controller:test image — built by SharedDockerCluster.
+
+# Raft state is written to a named volume at the same path the deployed image uses
+# (see docker/compose/docker-compose-cluster.yml). Before 2026-09-07 these fixtures declared
+# no volume and no storage path, so containerised tests ran Raft state on the container's
+# ephemeral layer and could not have detected a container-level durability regression.
+# Testcontainers removes these volumes when it stops the cluster, so each run starts clean.
 
 services:
   controller1:
@@ -18,12 +23,15 @@ services:
       - QUORUS_RAFT_HOST=0.0.0.0
       - QUORUS_RAFT_PORT=9080
       - QUORUS_HTTP_PORT=8080
+      - QUORUS_RAFT_STORAGE_PATH=/app/data/raft
       - QUORUS_CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080,controller4=controller4:9080,controller5=controller5:9080
       - QUORUS_RAFT_ELECTION_TIMEOUT_MS=1500
       - QUORUS_RAFT_HEARTBEAT_INTERVAL_MS=300
       - JAVA_OPTS=-Xmx256m -Xms128m
     ports:
       - "8080"
+    volumes:
+      - controller1-data:/app/data
     networks:
       - raft-cluster
     healthcheck:
@@ -47,12 +55,15 @@ services:
       - QUORUS_RAFT_HOST=0.0.0.0
       - QUORUS_RAFT_PORT=9080
       - QUORUS_HTTP_PORT=8080
+      - QUORUS_RAFT_STORAGE_PATH=/app/data/raft
       - QUORUS_CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080,controller4=controller4:9080,controller5=controller5:9080
       - QUORUS_RAFT_ELECTION_TIMEOUT_MS=1500
       - QUORUS_RAFT_HEARTBEAT_INTERVAL_MS=300
       - JAVA_OPTS=-Xmx256m -Xms128m
     ports:
       - "8080"
+    volumes:
+      - controller2-data:/app/data
     networks:
       - raft-cluster
     healthcheck:
@@ -76,12 +87,15 @@ services:
       - QUORUS_RAFT_HOST=0.0.0.0
       - QUORUS_RAFT_PORT=9080
       - QUORUS_HTTP_PORT=8080
+      - QUORUS_RAFT_STORAGE_PATH=/app/data/raft
       - QUORUS_CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080,controller4=controller4:9080,controller5=controller5:9080
       - QUORUS_RAFT_ELECTION_TIMEOUT_MS=1500
       - QUORUS_RAFT_HEARTBEAT_INTERVAL_MS=300
       - JAVA_OPTS=-Xmx256m -Xms128m
     ports:
       - "8080"
+    volumes:
+      - controller3-data:/app/data
     networks:
       - raft-cluster
     healthcheck:
@@ -105,12 +119,15 @@ services:
       - QUORUS_RAFT_HOST=0.0.0.0
       - QUORUS_RAFT_PORT=9080
       - QUORUS_HTTP_PORT=8080
+      - QUORUS_RAFT_STORAGE_PATH=/app/data/raft
       - QUORUS_CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080,controller4=controller4:9080,controller5=controller5:9080
       - QUORUS_RAFT_ELECTION_TIMEOUT_MS=1500
       - QUORUS_RAFT_HEARTBEAT_INTERVAL_MS=300
       - JAVA_OPTS=-Xmx256m -Xms128m
     ports:
       - "8080"
+    volumes:
+      - controller4-data:/app/data
     networks:
       - raft-cluster
     healthcheck:
@@ -134,12 +151,15 @@ services:
       - QUORUS_RAFT_HOST=0.0.0.0
       - QUORUS_RAFT_PORT=9080
       - QUORUS_HTTP_PORT=8080
+      - QUORUS_RAFT_STORAGE_PATH=/app/data/raft
       - QUORUS_CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080,controller4=controller4:9080,controller5=controller5:9080
       - QUORUS_RAFT_ELECTION_TIMEOUT_MS=1500
       - QUORUS_RAFT_HEARTBEAT_INTERVAL_MS=300
       - JAVA_OPTS=-Xmx256m -Xms128m
     ports:
       - "8080"
+    volumes:
+      - controller5-data:/app/data
     networks:
       - raft-cluster
     healthcheck:
@@ -152,3 +172,10 @@ services:
 networks:
   raft-cluster:
     driver: bridge
+
+volumes:
+  controller1-data:
+  controller2-data:
+  controller3-data:
+  controller4-data:
+  controller5-data:

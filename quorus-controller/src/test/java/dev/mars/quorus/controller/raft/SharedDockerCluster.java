@@ -120,6 +120,16 @@ public final class SharedDockerCluster {
     }
 
     /**
+     * Builds the shared {@code quorus-controller:test} image if it is not already cached,
+     * without starting either shared cluster. Tests that manage their own container
+     * lifecycle — such as the R1-1 container-recreation acceptance — use this so they
+     * reuse the same image without paying for a cluster they will not use.
+     */
+    public static synchronized void buildImageIfAbsent() {
+        ensureImageBuilt();
+    }
+
+    /**
      * Builds the quorus-controller:test Docker image using the build compose file,
      * unless the image already exists locally. On a local Docker Desktop, skipping
      * a redundant build saves 30–120 seconds.

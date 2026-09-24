@@ -2,7 +2,7 @@
 
 # Quorus Outstanding Work Register
 
-**Version:** 1.1
+**Version:** 1.3
 **Date:** 2026-09-07
 **Author:** Mark Ray-Smith — Cityline Ltd
 **License:** Apache 2.0
@@ -72,17 +72,18 @@ sleeps as synchronization, and non-Vert.x polling are not permitted in new or re
 
 | Section | Area | Open items | Blocking level |
 |---|---|---|---|
-| A | R1 durability acceptance | 3 | 🔴 Release blocker |
+| A | R1 durability acceptance | 2 open, 1 closed | 🔴 Release blocker |
 | B | Phase 2 — attempts, integrity, reconciliation | 12 | 🟡 Phase blocker |
 | C | Phase 3 — transfer operations telemetry | 12 | 🟡 Phase blocker |
 | D | Phases 5–12 — not started | 8 phases | 🔴 / 🟡 by phase |
-| E | Observability and logging backlog | 14 | 🟠 Backlog |
+| E | Observability and logging backlog | 14 (OBS-08 closed, OBS-15 added) | 🟠 Backlog |
 | F | Absorbed and superseded historical tasks | 8 | — reference only |
 | G | Deferred and research | 8 | 🟢 Deferred |
 | H | Documentation corrections | 6 | 🔵 Doc correction |
 
 **Phase position:** Phases 0, 1 and 4 complete. Phases 2 and 3 in progress. Phases 5–12 not
-started. The R1 remediation slice is complete in code but its acceptance gates are open.
+started. The R1 remediation slice is complete in code; `R1-1` container-recreation acceptance
+closed on 2026-09-07, and `R1-2` and `R1-3` remain open and still block the release claim.
 
 ---
 
@@ -93,14 +94,32 @@ clean detached worktree at revision `b604505`: 2,437 tests, zero failures or err
 existing explicit skips, and all five configured JaCoCo gates
 ([R6 evidence](../evidence/r6-final-acceptance-2026-09-05.md)).
 
-R1 durable snapshots is verified in code on Windows. Its acceptance gates are **not** closed,
-and they are the reason no enterprise release claim can currently be made.
+R1 durable snapshots is verified in code on Windows, and container-recreation acceptance is now
+proven (see below). The remaining two gates are **not** closed, and they are the reason no
+enterprise release claim can currently be made.
 
 | ID | Item | Detail | Level |
 |---|---|---|---|
-| **R1-1** | Container-recreation acceptance | Prove durable snapshot and coordinate recovery across controller container destruction and recreation against a persistent volume, not a local working tree | 🔴 |
+| **R1-1** | Container-recreation acceptance | Prove durable snapshot and coordinate recovery across controller container destruction and recreation against a persistent volume, not a local working tree | ✅ **Closed 2026-09-07** for the Docker container-recreation shape |
 | **R1-2** | Production-filesystem acceptance | Repeat R1 recovery, retained-tail, corruption and concurrent-mutation cases on the supported production filesystem and storage class, not the Windows development host | 🔴 |
 | **R1-3** | Machine power-loss acceptance | Prove committed state and snapshot/WAL coordinates survive unclean host power loss; establish that interrupted publication cannot silently replace good state | 🔴 |
+
+**R1-1 result — 2026-09-07.** Four containerised acceptance tests pass through the real
+cluster boundary: full-cluster destroy-and-recreate, recovery from a durable snapshot after
+the WAL is compacted to zero bytes, rolling single-node recreation under retained quorum, and
+a negative control proving the gate is not vacuous. Controller regression with Docker and slow
+groups enabled passes 601 tests with zero failures or errors, two pre-existing explicit skips
+and the JaCoCo gate. **No product defect was found**: both retained red failures were incorrect
+assertions in the new test, so the two recovery tests are classified as retrospective
+characterization under §6.1, not as historical TDD. Docker is a confirmed production target,
+so the deployment shape is representative; the engine was Docker Desktop on Windows, so the
+storage class and host kernel are not. See the
+[R1-1 evidence](../evidence/r1-container-recreation-2026-09-07.md).
+
+A material fixture gap was found and is recorded there: `docker-compose-3node-prebuilt.yml`
+declares no volumes and no `QUORUS_RAFT_STORAGE_PATH`, so every containerised test before this
+slice ran Raft state on the container's ephemeral layer and could not have detected a
+container-level durability regression.
 
 **Constraints carried from the enterprise plan:**
 
@@ -184,9 +203,14 @@ Open:
 **Exit gate:** Operations can detect, understand, own, and act on a critical transfer before its
 deadline is missed. Infrastructure monitoring alone is not accepted as completion.
 
-**Open defect note:** a non-reproducing three-node `LeaderGuardHandlerTest` fixture startup
-timeout (15-second wait) was retained rather than hidden during Phase 3 verification. It has not
-been root-caused. Track it with the Phase 3 lane; do not treat a passing retry as resolution.
+**Open defect note — resolved 2026-09-07.** The non-reproducing three-node
+`LeaderGuardHandlerTest` fixture startup timeout retained during Phase 3 verification has been
+root-caused and fixed. `@BeforeAll` discarded all three `RaftNode.start()` futures and polled
+for a leader while startup was still in flight, letting the deliberately fast-election node
+campaign before its peers' in-memory transports were registered. The fix awaits the start
+futures and starts the slow-election followers first. Setup now completes in about 1.5 s and
+three consecutive runs pass. The same discarded-future pattern elsewhere is tracked as
+`OBS-15`.
 
 ---
 
@@ -306,7 +330,7 @@ From [QUORUS_OPENTELEMETRY_INTEGRATION_TESTING_PLAN.md](../archive/QUORUS_OPENTE
 | **OBS-05** | Add loggers to `YamlWorkflowDefinitionParser` and `WorkflowSchemaValidator` | workflow | 🟠 MEDIUM |
 | **OBS-06** | Add INFO success log to `JobStatusReportingService` | agent | 🟠 MEDIUM |
 | **OBS-07** | Audit the 53 DEBUG statements in `SimpleTransferEngine` — promote, demote to TRACE, or remove | core | 🟠 MEDIUM |
-| **OBS-08** | Remove orphaned `quorus-core/.../monitoring/TransferMetrics.java` and its test | core | 🟠 MEDIUM |
+| **OBS-15** | Await discarded `RaftNode.start()` / server `start()` futures in roughly twenty controller tests (`HttpApiServerHealthTest`, `JobAssignmentHandlerTest`, `StateTransitionIntegrationTest`, `GrpcRaftServerTest`, `RaftFailureTest` and others). Same latent race as the fixed `LeaderGuardHandlerTest` flake, but with no observed failures; needs a deliberate verified pass, not a blind sweep | controller test | 🟠 MEDIUM |
 | **OBS-09** | Per-protocol adapter metrics | core | 🟠 MEDIUM |
 | **OBS-10** | Tracing for HTTP, SFTP, FTP and SMB protocol adapters | core | 🟠 MEDIUM |
 | **OBS-11** | Service-level tracing for `AgentRegistrationService`, `HeartbeatService`, `JobPollingService` | agent | 🟢 LOW |
@@ -314,11 +338,17 @@ From [QUORUS_OPENTELEMETRY_INTEGRATION_TESTING_PLAN.md](../archive/QUORUS_OPENTE
 | **OBS-13** | Tracing for `SimpleWorkflowEngine` and `YamlWorkflowDefinitionParser` | workflow | 🟢 LOW |
 | **OBS-14** | Standardize logger field naming (`LOG` → `logger`) in `RaftLogStorageAdapter` and `FileRaftStorage`; remove unused logger declarations in `MetricsHandler`, `ProtocolFactory`, `FileManager` | mixed | 🟢 LOW |
 
-**OBS-08 note:** verified on 2026-09-07. `TransferMetrics.java` is still present in
-`quorus-core/src/main/java/dev/mars/quorus/monitoring/` and is referenced only by its own
-`TransferMetricsTest`. `SimpleTransferEngine` no longer uses it. It is dead code awaiting
-removal, not an in-use dual-metrics system. The `NetworkTopologyService.getTransferMetrics()`
-accessor is an unrelated name collision and must not be removed with it.
+**OBS-08 — closed 2026-09-07.** `TransferMetrics.java` and `TransferMetricsTest` are deleted.
+The class had no remaining production caller; `NetworkTopologyService.getTransferMetrics()` is
+an unrelated name collision and was left in place. `quorus-core` clean verify passes 1,517
+tests with zero failures, errors or skips and meets its JaCoCo gate.
+
+**OBS-15 note:** discovered while root-causing the `LeaderGuardHandlerTest` timeout. Discarding
+a Vert.x `Future` from `start()` means the test proceeds while startup is still in flight. In
+`LeaderGuardHandlerTest` that let a 400 ms-election node campaign before its peers' transports
+were registered. The other occurrences have no observed failures, so they are listed rather
+than swept: changing twenty startup paths at once risks more than the latent flakiness it
+removes.
 
 ### E.2 Already satisfied — grid entries are stale
 
@@ -462,4 +492,6 @@ Two further corrections were made in the same pass, beyond the six identified ab
 | Version | Date | Changes |
 |---|---|---|
 | 1.0 | 2026-09-07 | Initial consolidation of all outstanding tasks from the five `docs-design/task/` planning documents, with live-source verification of eleven stale OTel grid claims and the sealed-record transition phases |
+| 1.3 | 2026-09-07 | Remediated the three findings from the R1-1 slice: containerised test fixtures now write Raft state to named volumes at the deployed path, orphaned `TransferMetrics` deleted (`OBS-08`), and the `LeaderGuardHandlerTest` startup flake root-caused and fixed; recorded the unswept discarded-`start()`-future pattern as `OBS-15` |
+| 1.2 | 2026-09-07 | Closed `R1-1` container-recreation acceptance with four containerised tests and a controller regression of 601 tests; recorded the non-durable default Docker test fixture found during the work; classified the recovery tests as retrospective characterization because no product defect was found |
 | 1.1 | 2026-09-07 | Applied all six Section H corrections to the OTel plan (v2.5 → v2.6), including removal of three production-readiness claims it should not have made; archived the alpha plan, Stage 6 security/routes plan, OTel plan and sealed-record design, leaving `task/` holding only the enterprise plan and this register; repaired every cross-reference broken by the move |
