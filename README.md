@@ -68,18 +68,25 @@ controller from `GET /api/v1/openapi.yaml`.
 Use JDK 25 for all builds and tests.
 
 ```powershell
-$env:JAVA_HOME = "C:\Users\mraysmit\.jdks\openjdk-25"
-$env:Path = "$env:JAVA_HOME\bin;$env:Path"
+java -version
 mvn clean verify 2>&1 | Tee-Object -FilePath temp\build-output.txt
 ```
+
+```bash
+java -version
+mvn clean verify 2>&1 | tee temp/build-output.txt
+```
+
+Both commands must report JDK 25. Configure `JAVA_HOME` for your own JDK installation if they do not.
 
 ## Quick Start
 
 ### Direct Usage
 
-Build the project, then run an example from `quorus-integration-examples`:
+Install the reactor artifacts, then run an example from `quorus-integration-examples`:
 
 ```powershell
+mvn clean install
 mvn compile exec:java -pl quorus-integration-examples -Dexec.mainClass="dev.mars.quorus.examples.BasicTransferExample"
 ```
 
@@ -87,9 +94,21 @@ Workflow-focused entry points are also available, including `BasicWorkflowExampl
 
 ### Controller Cluster
 
-Start a controller environment with the compose files in `docker/compose`:
+The Compose topologies are explicitly labelled development-only: request security and HTTP/Raft TLS are disabled with the required insecure-development opt-in. They are not production deployment templates.
+
+Build and install the project, point the Docker build at the local Maven group cache, and start the single-controller topology:
 
 ```powershell
+$env:M2_REPO = "$env:USERPROFILE/.m2/repository"
+mvn clean install
+docker compose -f docker/compose/docker-compose-single-controller.yml up -d
+```
+
+On bash-compatible shells:
+
+```bash
+export M2_REPO="$HOME/.m2/repository"
+mvn clean install
 docker compose -f docker/compose/docker-compose-single-controller.yml up -d
 ```
 
@@ -109,6 +128,29 @@ curl http://localhost:8080/api/v1/info
 curl http://localhost:8080/metrics
 ```
 
+### Local mutual-TLS example
+
+The repository also includes a separate, local-only topology that generates a short-lived CA,
+controller certificate, and gateway client certificate, then starts the controller with the
+production fail-closed HTTP and Raft mutual-TLS settings:
+
+```powershell
+$env:M2_REPO = "$env:USERPROFILE/.m2/repository"
+docker compose -f docker/compose/docker-compose-tls-example.yml up -d --build
+docker compose -f docker/compose/docker-compose-tls-example.yml exec controller-tls `
+  curl --fail --cacert /run/quorus-tls/ca.crt `
+  --cert /run/quorus-tls/gateway.crt --key /run/quorus-tls/gateway.key `
+  https://localhost:8080/health/ready
+```
+
+On bash-compatible shells, use `export M2_REPO="$HOME/.m2/repository"` and replace the PowerShell
+backticks with backslashes. The generated certificates are demonstration material, not production
+PKI. Remove the container and the volume holding its private keys when finished:
+
+```powershell
+docker compose -f docker/compose/docker-compose-tls-example.yml down -v
+```
+
 ## Example Workflow
 
 ```yaml
@@ -116,11 +158,22 @@ metadata:
   name: "daily-sync"
   version: "1.0.0"
   description: "Download and stage a daily dataset"
+  type: "download-workflow"
+  author: "Quorus Development"
+  created: "2026-09-25"
+  tags: ["example", "http"]
 
 spec:
   variables:
     sourceBase: "https://example.com"
     outputDir: "/data/out"
+
+  execution:
+    dryRun: false
+    virtualRun: false
+    parallelism: 1
+    timeout: 300s
+    strategy: sequential
 
   transferGroups:
     - name: fetch

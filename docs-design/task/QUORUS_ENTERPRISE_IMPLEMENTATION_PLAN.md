@@ -2,8 +2,8 @@
 
 # Quorus Enterprise Implementation Plan
 
-**Version:** 1.26  
-**Date:** 2026-09-07  
+**Version:** 1.27
+**Date:** 2026-09-25
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Status:** Active — remediation checkpoint open; R1-1 container-recreation acceptance closed 2026-09-07 while R1-2 and R1-3 remain open; M0 durability and Phase 4 acceptance reopened; Phase 1 complete; Phases 2 and 3 in progress  
@@ -19,6 +19,8 @@ This plan defines the phased implementation path from the current Quorus alpha b
 - [Quorus HTTP API Reference](../../docs/QUORUS_API_REFERENCE.md)
 
 The architecture and REST API specifications remain normative. This plan controls delivery order and exit evidence; it does not weaken a canonical requirement. Historical completion markers in older plans do not close current conformance gaps.
+
+Commit identities changed during a history rewrite. Live evidence uses the reachable IDs recorded in the [commit history rewrite map](../reference/QUORUS_COMMIT_HISTORY_REWRITE_MAP.md); use that map when reconciling older external records.
 
 Calendar dates are deliberately not assigned until team size, deployment platform, enterprise identity provider, secrets provider, evidence-retention platform, and pilot scope are agreed. Relative size indicates expected breadth, not a commitment:
 
@@ -61,6 +63,15 @@ The baseline does not yet justify protected enterprise production use. Phase 1 e
 
 ### Remediation checkpoint — 2026-09-04
 
+**CFG-01 container deployment configuration hygiene — 2026-09-25:** The repository Compose
+topologies now state their development-only security posture explicitly, use supported controller
+configuration names, and have validated non-conflicting standalone logging ports. A separate
+local-only topology generates short-lived certificates and proves production-profile HTTP and
+Raft mutual TLS: the controller becomes healthy, a certificate-authenticated readiness request
+succeeds, and a request without a client certificate is rejected during the TLS handshake. The
+image health check now follows the configured HTTP scheme and uses `/health/live`. This closes
+the repository configuration defect; it is not production PKI or deployment accreditation.
+
 **R4 DNS follow-up — 2026-09-05:** Shared bounded worker execution now keeps
 controller DNS authorization off HTTP event loops. Capacity exhaustion returns 503;
 deadline expiry returns 504 without releasing still-running native lookups. Registry
@@ -84,7 +95,7 @@ legal hold and retention remain Phase 9 work. See the
 [R5 evidence](../evidence/r5-closure-2026-09-05.md). R6 isolated final-tree acceptance
 is complete; R1 deployment and power-loss gates remain separate.
 
-**R6 final acceptance — 2026-09-05:** Revision `b604505` was verified from a clean
+**R6 final acceptance — 2026-09-05:** Revision `dc447d4` was verified from a clean
 detached worktree after rebuilding the controller image from that exact tree. The JDK 25
 command `mvn.cmd --fail-at-end clean verify '-Dtest.excludedGroups='` passed all seven
 reactor entries, 2,437 tests with zero failures/errors and two existing explicit skips,
@@ -109,7 +120,7 @@ explicitly disabled network tests. Integration Examples has no tests. See
 This historical run advanced local verification. The later R4, R5 and R6 entries above
 supersede its open-work statement; R1 deployment acceptance remains open.
 
-**2026-09-05 execution update:** R2/R3 are committed in `28f0530`. The current environment
+**2026-09-05 execution update:** R2/R3 are committed in `1a8f2b3`. The current environment
 contains RaftLog as a sister project at `../raftlog` relative to the Quorus root
 (`C:\Users\mraysmit\dev\idea-projects\raftlog`), with its own Maven reactor. Quorus
 consumes its `raftlog-core` artifact; the sister project must be built/installed separately.
@@ -122,7 +133,7 @@ power-loss acceptance are not implied by local tests.
 
 **External-library-only correction:** the remaining internal RocksDB and memory storage implementations, backend factory branches, convenience API and RocksDB JNI dependency have been removed. Configuration now accepts only `raftlog`; storage-dependent tests use the external adapter and isolated temporary paths. Seven behavioral tests first proved that the old factory/configuration still admitted internal backends, then passed after removal. The 93-test focused regression and final clean controller verification (520 tests, no failures/errors/skips, JaCoCo gate passed) are green. The shaded JAR contains the external library WAL and no removed internal storage classes or RocksDB JNI. Commands, hashes and test-count accounting are recorded in the existing [Raft evidence record](../evidence/raft-log-tdd-evidence-2026-09-04.json). At that checkpoint this correction did not close R2–R6; the later entries above supersede that status. The R1 production durability gates remain outstanding.
 
-The historical results below are retained, but do not authorize release of the snapshot-compaction behavior at `ffc3e64`: WAL prefix deletion is durable while adapter snapshots are only in memory at that revision. R1 replaces that behavior with durable snapshots and recovery checks; implementation evidence and outstanding deployment gates are recorded below. Existing persistent environments have not been inventoried; preserve their storage before recovery or rollback. Code rollback cannot recover already deleted WAL records.
+The historical results below are retained, but do not authorize release of the snapshot-compaction behavior at `db532fb`: WAL prefix deletion is durable while adapter snapshots are only in memory at that revision. R1 replaces that behavior with durable snapshots and recovery checks; implementation evidence and outstanding deployment gates are recorded below. Existing persistent environments have not been inventoried; preserve their storage before recovery or rollback. Code rollback cannot recover already deleted WAL records.
 
 Execute the following slices in order under Section 6.1, retaining intended behavioral red failures before production changes:
 
@@ -133,7 +144,7 @@ Execute the following slices in order under Section 6.1, retaining intended beha
 | R3 — Pre-execution failures | Authorization/secret/path rejection reaches the correct terminal attempt state without artificial IN_PROGRESS; preserve sequencing/fencing and reconcile uncertain acknowledgements. | Implementation complete — clean affected-reactor verify and JaCoCo gates pass; Windows symlink skip covered by passing Linux path-policy tests |
 | R4 — Non-blocking DNS | Slow DNS cannot block unrelated HTTP requests; bounded resolution, overload/timeout handling, default-deny egress and address pinning remain enforced. | Implementation complete — ten behavioral-red cases, five characterization cases; 47 focused tests and full Docker/slow reactor pass; see R4 evidence |
 | R5 — Handover closure | Confirm and disposition every remaining handover item, including entrypoints, defaults, path/port/TLS behavior, trust updates, codecs, compatibility, and retention. | Implementation complete — behavioral red/green and focused regression retained; enterprise retention remains Phase 9 and deployment durability remains R1 |
-| R6 — Final acceptance | Clean isolated-worktree reactor verify at the final revision, configured JaCoCo gates, protocol/security/restart tests, migration/runbook/specification alignment and retained evidence. | Complete for local final-source acceptance at `b604505`: clean detached reactor passes 2,437 tests with zero failures/errors, two existing skips and five coverage gates; R1 deployment durability gates remain open |
+| R6 — Final acceptance | Clean isolated-worktree reactor verify at the final revision, configured JaCoCo gates, protocol/security/restart tests, migration/runbook/specification alignment and retained evidence. | Complete for local final-source acceptance at `dc447d4`: clean detached reactor passes 2,437 tests with zero failures/errors, two existing skips and five coverage gates; R1 deployment durability gates remain open |
 
 **R1-1 container-recreation acceptance — 2026-09-07:** Durable snapshot recovery is now proven
 across destruction and recreation of the controller containers against persistent named volumes,
@@ -154,7 +165,7 @@ and R1-3 machine power-loss acceptance remain open and still prevent an enterpri
 
 **R1 implementation evidence:** 14 new tests: 11 exposed missing behavior before their fixes, and three are explicitly recorded as characterization. Seven red/green stages cover recovery and mutation ordering, including interrupted installation followed by a second restart. The final clean controller run passes 530 tests with no failures, errors or skips and meets its JaCoCo gate; the separately enabled slow cluster suite passes four tests. An earlier seven-module clean reactor passed before the last interruption-recovery fixes; it is not represented as a final-revision reactor result. Commands, failure excerpts, timestamps, log hashes, source hashes and limitations are retained in [Raft TDD evidence](../evidence/raft-log-tdd-evidence-2026-09-04.json). R2 progress is recorded below; no remaining slice or production acceptance gate is closed by the R1 result.
 
-The two Raft regression cases without preserved red evidence remain historical process deviations requiring explicit disposition, not historical TDD. The earlier raftlog prefix API's compile-only red also does not satisfy the behavioral-red mandate; its historical record is preserved, not retroactively relabelled. No waiver is inferred from earlier Phase 0/1 approvals. The later full-reactor result recorded by `ffc3e64` corrects the earlier review's verification chronology, but does not cover the missing snapshot/restart behavior. Completion of this checkpoint requires all applicable gates, not a green build alone.
+The two Raft regression cases without preserved red evidence remain historical process deviations requiring explicit disposition, not historical TDD. The earlier raftlog prefix API's compile-only red also does not satisfy the behavioral-red mandate; its historical record is preserved, not retroactively relabelled. No waiver is inferred from earlier Phase 0/1 approvals. The later full-reactor result recorded by `db532fb` corrects the earlier review's verification chronology, but does not cover the missing snapshot/restart behavior. Completion of this checkpoint requires all applicable gates, not a green build alone.
 
 **R2 implementation evidence:** versioned tenant/resource keys, exact-owner reads and
 authoritative writes replace the ambiguous legacy namespace. The first successful v2
@@ -1137,3 +1148,10 @@ At the end of each phase:
 8. obtain architecture, security, operations, quality, and product/domain sign-off.
 
 The plan is revised when requirements or implementation evidence change. Revision history MUST describe changes to sequencing, scope, exit gates, or release meaning.
+
+### Revision history
+
+| Version | Date | Changes |
+|---|---|---|
+| 1.27 | 2026-09-25 | Recorded closed `CFG-01` container configuration hygiene and the generated-certificate mutual-TLS validation boundary |
+| 1.26 | 2026-09-07 | Recorded the R1-1 container-recreation acceptance checkpoint and retained R1-2/R1-3 as release blockers |

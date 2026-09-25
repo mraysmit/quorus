@@ -1,3 +1,5 @@
+# DEVELOPMENT-ONLY topology. Security and TLS are explicitly disabled below.
+# Do not use this file as a production deployment template.
 # Quorus 3-Node Controller Cluster with Observability Stack
 # Grafana + Tempo + Prometheus + Loki + 3 Controllers
 #
@@ -151,6 +153,11 @@ services:
     environment:
       - QUORUS_NODE_ID=controller1
       - QUORUS_HTTP_PORT=8080
+      - QUORUS_SECURITY_PROFILE=development
+      - QUORUS_SECURITY_ENABLED=false
+      - QUORUS_SECURITY_ALLOW_INSECURE=true
+      - QUORUS_SECURITY_HTTP_TLS_ENABLED=false
+      - QUORUS_SECURITY_RAFT_TLS_ENABLED=false
       - QUORUS_RAFT_STORAGE_PATH=/app/data/raft
       - QUORUS_RAFT_PORT=9080
       - QUORUS_CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080
@@ -158,7 +165,7 @@ services:
       - QUORUS_RAFT_HEARTBEAT_INTERVAL_MS=500
       - JAVA_OPTS=-Xmx512m -Xms256m
       # OpenTelemetry configuration
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - QUORUS_TELEMETRY_OTLP_ENDPOINT=http://otel-collector:4317
       - OTEL_METRICS_EXPORTER=otlp
       - OTEL_TRACES_EXPORTER=otlp
       - OTEL_SERVICE_NAME=quorus-controller
@@ -174,7 +181,7 @@ services:
       otel-collector:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health/live"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -195,6 +202,11 @@ services:
     environment:
       - QUORUS_NODE_ID=controller2
       - QUORUS_HTTP_PORT=8080
+      - QUORUS_SECURITY_PROFILE=development
+      - QUORUS_SECURITY_ENABLED=false
+      - QUORUS_SECURITY_ALLOW_INSECURE=true
+      - QUORUS_SECURITY_HTTP_TLS_ENABLED=false
+      - QUORUS_SECURITY_RAFT_TLS_ENABLED=false
       - QUORUS_RAFT_STORAGE_PATH=/app/data/raft
       - QUORUS_RAFT_PORT=9080
       - QUORUS_CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080
@@ -202,7 +214,7 @@ services:
       - QUORUS_RAFT_HEARTBEAT_INTERVAL_MS=500
       - JAVA_OPTS=-Xmx512m -Xms256m
       # OpenTelemetry configuration
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - QUORUS_TELEMETRY_OTLP_ENDPOINT=http://otel-collector:4317
       - OTEL_METRICS_EXPORTER=otlp
       - OTEL_TRACES_EXPORTER=otlp
       - OTEL_SERVICE_NAME=quorus-controller
@@ -220,7 +232,7 @@ services:
       controller1:
         condition: service_started
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health/live"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -241,6 +253,11 @@ services:
     environment:
       - QUORUS_NODE_ID=controller3
       - QUORUS_HTTP_PORT=8080
+      - QUORUS_SECURITY_PROFILE=development
+      - QUORUS_SECURITY_ENABLED=false
+      - QUORUS_SECURITY_ALLOW_INSECURE=true
+      - QUORUS_SECURITY_HTTP_TLS_ENABLED=false
+      - QUORUS_SECURITY_RAFT_TLS_ENABLED=false
       - QUORUS_RAFT_STORAGE_PATH=/app/data/raft
       - QUORUS_RAFT_PORT=9080
       - QUORUS_CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080
@@ -248,7 +265,7 @@ services:
       - QUORUS_RAFT_HEARTBEAT_INTERVAL_MS=500
       - JAVA_OPTS=-Xmx512m -Xms256m
       # OpenTelemetry configuration
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - QUORUS_TELEMETRY_OTLP_ENDPOINT=http://otel-collector:4317
       - OTEL_METRICS_EXPORTER=otlp
       - OTEL_TRACES_EXPORTER=otlp
       - OTEL_SERVICE_NAME=quorus-controller
@@ -268,7 +285,7 @@ services:
       controller2:
         condition: service_started
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health/live"]
       interval: 10s
       timeout: 5s
       retries: 5

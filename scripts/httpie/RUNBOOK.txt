@@ -1,66 +1,108 @@
-HTTPie Quorus Runbook
+Quorus HTTPie Development Runbook
 
-1) Set environment variables from quorus.env.example.
+Version: 1.1
+Date: 2026-09-25
+Owner: Quorus maintainers
+Status: Development-only smoke path; request security and TLS are disabled explicitly
+
+Prerequisites
+
+- JDK 25, Maven, Docker with Compose, HTTPie, and a bash-compatible shell.
+- Run commands from the repository root.
+- Do not use this development topology as a production deployment template.
+
+1) Build and start the development controller
+
+   PowerShell:
+     $env:M2_REPO = "$env:USERPROFILE/.m2/repository"
+     mvn clean install
+     docker compose -f docker/compose/docker-compose-single-controller.yml up -d
+
    Linux/macOS:
+     export M2_REPO="$HOME/.m2/repository"
+     mvn clean install
+     docker compose -f docker/compose/docker-compose-single-controller.yml up -d
+
+   The Compose file explicitly selects the development security profile, allows insecure
+   transport, and disables HTTP and Raft TLS. Wait until this succeeds:
+
+     http --check-status GET http://localhost:8080/health/ready
+
+2) Configure the HTTPie environment
+
+     cp scripts/httpie/quorus.env.example scripts/httpie/quorus.env
      set -a
      . ./scripts/httpie/quorus.env
      set +a
 
-2) Discovery:
-   sh scripts/httpie/commands/01-info.httpie
-   sh scripts/httpie/commands/02-raft-status.httpie
+   Keep TENANT_ID consistent for the agent, heartbeat, transfer, and assignment lifecycle.
 
-2b) Controller unavailability drill (switch one controller off/on):
-   - Note: this is an infrastructure action (not a REST endpoint).
+3) Discovery
 
-   Stop one controller (example: controller2):
-   docker stop quorus-controller2
+     sh scripts/httpie/commands/01-info.httpie
+     sh scripts/httpie/commands/02-raft-status.httpie
 
-   Validate cluster still serves API (quorum should remain):
-   http GET "$BASE_URL/raft/status"
-   http GET "$CONTROLLER1_URL/raft/status"
-   http GET "$CONTROLLER3_URL/raft/status"
+4) Agent lifecycle
 
-   Optional check against stopped node (should fail/unavailable):
-   http GET "$CONTROLLER2_URL/health"
+     sh scripts/httpie/commands/10-register-agent.httpie
+     sh scripts/httpie/commands/11-heartbeat-agent.httpie
+     sh scripts/httpie/commands/12-list-agents.httpie
 
-   Grafana behavior to watch:
-   - Cluster Topology / Node Details: one node unavailable.
-   - Raft leader/follower metrics continue updating on remaining nodes.
-   - Transfer and agent views continue if quorum is healthy.
+5) Transfer lifecycle
 
-   Bring controller back:
-   docker start quorus-controller2
+     sh scripts/httpie/commands/20-create-transfer.httpie
+     sh scripts/httpie/commands/30-create-assignment.httpie
 
-   Re-check recovery:
-   http GET "$CONTROLLER2_URL/health"
-   http GET "$BASE_URL/raft/status"
-   http GET "$BASE_URL/api/v1/agents"
+   The assignment response supplies ATTEMPT_ID. Obtain the authoritative fencing value with:
 
-3) Agent lifecycle:
-   sh scripts/httpie/commands/10-register-agent.httpie
-   sh scripts/httpie/commands/11-heartbeat-agent.httpie
-   sh scripts/httpie/commands/12-list-agents.httpie
+     http GET "$BASE_URL/api/v1/agents/$AGENT_ID/jobs"
 
-4) Transfer lifecycle:
-   sh scripts/httpie/commands/20-create-transfer.httpie
-   sh scripts/httpie/commands/30-create-assignment.httpie
-   sh scripts/httpie/commands/31-accept-assignment.httpie
-   sh scripts/httpie/commands/33-job-progress.httpie
-   sh scripts/httpie/commands/34-job-complete.httpie
-   sh scripts/httpie/commands/21-get-transfer.httpie
+   Copy the response's attemptId and fencingGeneration into scripts/httpie/quorus.env,
+   then reload it with `set -a; . ./scripts/httpie/quorus.env; set +a` before continuing.
+   The remaining commands use the attempt protocol's required expected state and monotonically
+   increasing report sequence:
 
-5) Route operations:
-   sh scripts/httpie/commands/40-create-route.httpie
-   sh scripts/httpie/commands/41-list-routes.httpie
-   sh scripts/httpie/commands/42-suspend-route.httpie
-   sh scripts/httpie/commands/43-resume-route.httpie
+     sh scripts/httpie/commands/31-accept-assignment.httpie
+     sh scripts/httpie/commands/33-job-progress.httpie
+     sh scripts/httpie/commands/34-job-complete.httpie
+     sh scripts/httpie/commands/21-get-transfer.httpie
 
-6) Cleanup:
-   sh scripts/httpie/commands/91-remove-assignment.httpie
-   sh scripts/httpie/commands/90-remove-transfer.httpie
+   Command 32 exercises the administrative assignment-status endpoint directly:
 
-Grafana effects to watch in real time:
-- Transfer Jobs (Real-Time): running assignments / queued / totals.
-- Agents and Topology: agent connectivity, identity table, health and drift.
+     sh scripts/httpie/commands/32-update-assignment-status.httpie
+
+   It is an administrative assignment-only transition check, not an additional step in the
+   attempt lifecycle above. Do not mix it into the smoke sequence because attempt, assignment,
+   and transfer states must advance atomically through the job-status endpoint.
+
+6) Route operations
+
+     sh scripts/httpie/commands/40-create-route.httpie
+     sh scripts/httpie/commands/41-list-routes.httpie
+     sh scripts/httpie/commands/42-suspend-route.httpie
+     sh scripts/httpie/commands/43-resume-route.httpie
+
+7) Optional controller-unavailability drill (multi-controller topology only)
+
+   Stop one controller:
+
+     docker stop quorus-controller2
+
+   Confirm the other controllers still serve the API, then restore it:
+
+     http GET "$CONTROLLER1_URL/raft/status"
+     http GET "$CONTROLLER3_URL/raft/status"
+     docker start quorus-controller2
+     http GET "$CONTROLLER2_URL/health/ready"
+
+8) Cleanup
+
+     sh scripts/httpie/commands/91-remove-assignment.httpie
+     sh scripts/httpie/commands/90-remove-transfer.httpie
+     docker compose -f docker/compose/docker-compose-single-controller.yml down
+
+Grafana effects to watch when using an observability topology:
+
+- Transfer Jobs: running assignments, queued jobs, and totals.
+- Agents and Topology: connectivity, identity, health, and drift.
 - Cluster Topology and Node Details: controller availability and leadership changes.

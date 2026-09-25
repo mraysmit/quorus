@@ -1,3 +1,5 @@
+# DEVELOPMENT-ONLY topology. Security and TLS are explicitly disabled below.
+# Do not use this file as a production deployment template.
 # Advanced Network Testing Configuration for Quorus Controller Cluster
 # This configuration supports dynamic network partitioning and realistic network conditions
 
@@ -12,7 +14,11 @@ services:
     hostname: controller1
     environment:
       - QUORUS_NODE_ID=controller1
-      - QUORUS_RAFT_HOST=0.0.0.0
+      - QUORUS_SECURITY_PROFILE=development
+      - QUORUS_SECURITY_ENABLED=false
+      - QUORUS_SECURITY_ALLOW_INSECURE=true
+      - QUORUS_SECURITY_HTTP_TLS_ENABLED=false
+      - QUORUS_SECURITY_RAFT_TLS_ENABLED=false
       - QUORUS_RAFT_PORT=9080
       - QUORUS_RAFT_STORAGE_PATH=/app/data/raft
       - QUORUS_CLUSTER_NODES=controller1=172.20.0.10:9080,controller2=172.20.0.11:9080,controller3=172.20.0.12:9080,controller4=172.20.0.13:9080,controller5=172.20.0.14:9080
@@ -30,7 +36,7 @@ services:
     cap_add:
       - NET_ADMIN  # Required for network manipulation (tc, iptables)
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health/live"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -47,7 +53,11 @@ services:
     hostname: controller2
     environment:
       - QUORUS_NODE_ID=controller2
-      - QUORUS_RAFT_HOST=0.0.0.0
+      - QUORUS_SECURITY_PROFILE=development
+      - QUORUS_SECURITY_ENABLED=false
+      - QUORUS_SECURITY_ALLOW_INSECURE=true
+      - QUORUS_SECURITY_HTTP_TLS_ENABLED=false
+      - QUORUS_SECURITY_RAFT_TLS_ENABLED=false
       - QUORUS_RAFT_PORT=9080
       - QUORUS_RAFT_STORAGE_PATH=/app/data/raft
       - QUORUS_CLUSTER_NODES=controller1=172.20.0.10:9080,controller2=172.20.0.11:9080,controller3=172.20.0.12:9080,controller4=172.20.0.13:9080,controller5=172.20.0.14:9080
@@ -65,7 +75,7 @@ services:
     cap_add:
       - NET_ADMIN
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health/live"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -82,7 +92,11 @@ services:
     hostname: controller3
     environment:
       - QUORUS_NODE_ID=controller3
-      - QUORUS_RAFT_HOST=0.0.0.0
+      - QUORUS_SECURITY_PROFILE=development
+      - QUORUS_SECURITY_ENABLED=false
+      - QUORUS_SECURITY_ALLOW_INSECURE=true
+      - QUORUS_SECURITY_HTTP_TLS_ENABLED=false
+      - QUORUS_SECURITY_RAFT_TLS_ENABLED=false
       - QUORUS_RAFT_PORT=9080
       - QUORUS_RAFT_STORAGE_PATH=/app/data/raft
       - QUORUS_CLUSTER_NODES=controller1=172.20.0.10:9080,controller2=172.20.0.11:9080,controller3=172.20.0.12:9080,controller4=172.20.0.13:9080,controller5=172.20.0.14:9080
@@ -100,7 +114,7 @@ services:
     cap_add:
       - NET_ADMIN
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health/live"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -117,7 +131,11 @@ services:
     hostname: controller4
     environment:
       - QUORUS_NODE_ID=controller4
-      - QUORUS_RAFT_HOST=0.0.0.0
+      - QUORUS_SECURITY_PROFILE=development
+      - QUORUS_SECURITY_ENABLED=false
+      - QUORUS_SECURITY_ALLOW_INSECURE=true
+      - QUORUS_SECURITY_HTTP_TLS_ENABLED=false
+      - QUORUS_SECURITY_RAFT_TLS_ENABLED=false
       - QUORUS_RAFT_PORT=9080
       - QUORUS_RAFT_STORAGE_PATH=/app/data/raft
       - QUORUS_CLUSTER_NODES=controller1=172.20.0.10:9080,controller2=172.20.0.11:9080,controller3=172.20.0.12:9080,controller4=172.20.0.13:9080,controller5=172.20.0.14:9080
@@ -135,7 +153,7 @@ services:
     cap_add:
       - NET_ADMIN
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health/live"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -152,7 +170,11 @@ services:
     hostname: controller5
     environment:
       - QUORUS_NODE_ID=controller5
-      - QUORUS_RAFT_HOST=0.0.0.0
+      - QUORUS_SECURITY_PROFILE=development
+      - QUORUS_SECURITY_ENABLED=false
+      - QUORUS_SECURITY_ALLOW_INSECURE=true
+      - QUORUS_SECURITY_HTTP_TLS_ENABLED=false
+      - QUORUS_SECURITY_RAFT_TLS_ENABLED=false
       - QUORUS_RAFT_PORT=9080
       - QUORUS_RAFT_STORAGE_PATH=/app/data/raft
       - QUORUS_CLUSTER_NODES=controller1=172.20.0.10:9080,controller2=172.20.0.11:9080,controller3=172.20.0.12:9080,controller4=172.20.0.13:9080,controller5=172.20.0.14:9080
@@ -170,7 +192,7 @@ services:
     cap_add:
       - NET_ADMIN
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health/live"]
       interval: 10s
       timeout: 5s
       retries: 3

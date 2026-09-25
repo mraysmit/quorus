@@ -6,6 +6,7 @@
 **Author:** Mark Ray-Smith — Cityline Ltd
 **License:** Apache 2.0
 **Slice:** `R1-1` — container-recreation acceptance
+**Revision:** `804e11d` — committed evidence, tests, durable fixture, plan/register reconciliation, and `LeaderGuardHandlerTest` correction
 **Register item:** [Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER.md) §3
 **Classification:** external-path behavioral + **retrospective characterization** — see §2
 

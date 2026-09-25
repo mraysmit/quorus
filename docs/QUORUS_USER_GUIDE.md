@@ -2,8 +2,8 @@
 
 # Quorus User Guide
 
-**Version:** 2.2  
-**Date:** 2026-09-01  
+**Version:** 2.3
+**Date:** 2026-09-25
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Scope:** Current implementation guide
@@ -175,7 +175,7 @@ These endpoints and aggregate metrics provide infrastructure evidence, but they 
 
 Quorus currently enforces selected tenant checks between registered agents and transfer jobs. Every agent declares one tenant, and polling and selected status paths filter or reject mismatched tenant fields.
 
-This is not yet a strict authenticated tenant security boundary. The controller does not authenticate the caller, a supplied `tenantId` is not proof of identity, and direct assignment creation does not uniformly enforce every reference and tenant invariant inside state-machine application.
+The production controller authenticates callers through mTLS or a trusted gateway, derives tenant authority from the verified identity, and enforces assignment references and tenant invariants at both the HTTP and replicated state boundaries. A supplied `tenantId` is not proof of identity by itself, and the development Compose profiles deliberately disable request authentication. See [Architecture Specification §3](QUORUS_ARCHITECTURE_SPECIFICATION.md#3-capability-status) and the [Security Deployment Guide](QUORUS_SECURITY_DEPLOYMENT_GUIDE.md).
 
 ### Agent Configuration
 
@@ -197,7 +197,7 @@ If `tenantId` is absent from the agent registration payload, the controller retu
 
 ### Transfer Job Tenant Field
 
-Every transfer job must declare a `tenantId` at creation time. The implemented polling path filters jobs to the registered agent's declared tenant, and selected update paths reject mismatches. Protected multi-tenant operation still requires authenticated identity, authorization, and uniform state-machine invariants.
+Every transfer job must declare a `tenantId` at creation time. Polling filters jobs to the authenticated agent's tenant, update paths reject mismatches, and replicated commands enforce reference and ownership invariants. Broader tenant hierarchy, quota, usage, and inherited-policy management remains incomplete.
 
 ### Enforcement Points
 

@@ -15,12 +15,12 @@ Agents poll controller for jobs, execute transfers via protocol adapters
 **Module structure:**
 | Module | Purpose |
 |--------|---------|
-| `quorus-core` | Transfer engine, protocol adapters (HTTP/FTP/SFTP/SMB), exceptions |
+| `quorus-core` | Transfer engine, protocol adapters (HTTP/FTP/FTPS/SFTP/SMB/NFS), exceptions |
 | `quorus-workflow` | YAML workflow parsing, dependency graphs, execution engine |
 | `quorus-controller` | Raft node, gRPC transport, HTTP API server |
 | `quorus-agent` | Job polling, transfer execution, heartbeat to controller |
 | `quorus-tenant` | Multi-tenancy, quotas, resource management |
-| `quorus-api` | Legacy REST API (being phased out) |
+| `quorus-integration-examples` | Runnable integration examples and workflow validation CLI |
 
 ## Key Conventions
 
@@ -82,9 +82,11 @@ mvn test jacoco:report
 
 ### Docker testing
 ```powershell
-# Start 3-node cluster with monitoring
-docker-compose -f docker/compose/docker-compose.yml up -d
-docker-compose -f docker/compose/docker-compose-loki.yml up -d
+# Start the clearly labelled insecure development topology
+docker compose -f docker/compose/docker-compose-single-controller.yml up -d
+
+# Start the generated-certificate mTLS example
+docker compose -f docker/compose/docker-compose-tls-example.yml up -d --build
 
 # Validate Raft consensus
 ./scripts/prove-metadata-persistence.ps1
@@ -108,77 +110,16 @@ class MyTest {
 }
 ```
 
-### MANDATORY: Pure Vert.x Test Facilities Only
+### Test-concurrency direction
 
-**This is a pure Vert.x system. Tests MUST use exclusively Vert.x concurrency primitives. ZERO tolerance for Java concurrency shortcuts.**
+The migration target for Vert.x asynchronous tests is to use Vert.x `Future`, `Promise`, timers,
+and `VertxTestContext`, with blocking work isolated through `executeBlocking`. Prefer these patterns
+for new or remediated Vert.x boundary tests. Existing tests still contain Java concurrency
+primitives and sleeps, so do not describe the migration as complete or expand those legacy
+patterns into new tests. Purpose-built thread-safety tests may use Java concurrency primitives
+when concurrency itself is the behavior under test.
 
-#### Banned Patterns → Required Replacements
-
-| BANNED (never use in tests) | REPLACEMENT (Vert.x equivalent) |
-|------------------------------|----------------------------------|
-| `CompletableFuture<T>` | `Promise<T>` / `Future<T>` |
-| `CompletableFuture.allOf()` | `Future.all(futures)` |
-| `CompletableFuture.supplyAsync()` | `vertx.executeBlocking(() -> ...)` |
-| `ExecutorService` / `Executors.newFixedThreadPool()` | `vertx.executeBlocking()` per task |
-| `CountDownLatch` | `Promise<Void>` or `Future.all()` to combine results |
-| `executor.submit(() -> ...)` loops | `List<Future<T>>` + `vertx.executeBlocking()` + `Future.all()` |
-| `.get(timeout, TimeUnit)` on CompletableFuture | `awaitSuccess(promise.future(), Duration.ofSeconds(n))` |
-| `.complete(null)` on CompletableFuture<Void> | `promise.complete()` on `Promise<Void>` |
-| `::completeExceptionally` | `::fail` on Promise |
-
-**Exceptions (acceptable):**
-- `TimeUnit` in gRPC API calls (`channel.awaitTermination`, `blockingStub.withDeadlineAfter`) — these are gRPC library API, not concurrency primitives
-- `AtomicInteger`, `AtomicReference`, `AtomicBoolean` — these are thread-safe accumulators, not concurrency control
-- `Thread.sleep` inside `vertx.executeBlocking()` for rate-limiting — acceptable because it's on a worker thread managed by Vert.x
-
-#### Common Test Patterns
-
-**Concurrent blocking calls (e.g., gRPC blocking stubs):**
-```java
-List<Future<Void>> futures = new ArrayList<>();
-for (int i = 0; i < numRequests; i++) {
-    futures.add(vertx.executeBlocking(() -> {
-        blockingStub.requestVote(request);
-        return null;
-    }));
-}
-awaitSuccess(Future.all(futures), Duration.ofSeconds(30));
-```
-
-**Async gRPC StreamObserver callbacks:**
-```java
-Promise<VoteResponse> promise = Promise.promise();
-asyncStub.requestVote(request, new StreamObserver<>() {
-    @Override public void onNext(VoteResponse r) { promise.complete(r); }
-    @Override public void onError(Throwable t) { promise.fail(t); }
-    @Override public void onCompleted() { }
-});
-VoteResponse response = awaitSuccess(promise.future(), Duration.ofSeconds(5));
-```
-
-**Bridging event-loop work to test thread:**
-```java
-Promise<Void> done = Promise.promise();
-vertx.runOnContext(v ->
-    someAsyncOp()
-        .onSuccess(r -> done.complete())
-        .onFailure(done::fail));
-awaitSuccess(done.future(), Duration.ofSeconds(15));
-```
-
-**tearDown with Future-returning stop():**
-```java
-@AfterEach
-void tearDown() {
-    List<Future<Void>> stopFutures = new ArrayList<>();
-    for (RaftNode node : cluster) {
-        stopFutures.add(node.stop());
-    }
-    awaitSuccess(Future.all(stopFutures), Duration.ofSeconds(10));
-}
-```
-
-#### Shared Test Utility
+#### Shared test utility
 `TestFutureUtils` in `quorus-core/src/test/java/dev/mars/quorus/testing/TestFutureUtils.java`:
 - `awaitSuccess(Future<T>, Duration)` — blocks test thread until future completes or times out
 - `awaitFailure(Future<?>, Duration)` — blocks until future fails, returns the cause
@@ -186,11 +127,24 @@ void tearDown() {
 ## Workflow YAML Structure
 ```yaml
 metadata:
-  name: "workflow-name"
-  version: "1.0.0"
+  name: workflow-name
+  version: 1.0.0
+  description: Transfer the daily input file
+  type: transfer-workflow
+  author: Quorus Development
+  created: "2026-09-25"
+  tags:
+    - example
+    - transfer
 spec:
   variables:
-    date: "{{TODAY}}"
+    host: files.example.com
+  execution:
+    dryRun: false
+    virtualRun: false
+    parallelism: 1
+    timeout: 300s
+    strategy: sequential
   transferGroups:
     - name: group1
       dependsOn: []  # Dependency resolution via DependencyGraph
@@ -201,19 +155,21 @@ spec:
           protocol: https
 ```
 
-Variable substitution uses `{{variable}}` syntax. Parser: `YamlWorkflowDefinitionParser` (uses static singleton for performance).
+Variable substitution uses `{{variable}}` syntax. Parser: `YamlWorkflowDefinitionParser`.
 
 ## Raft Consensus (quorus-controller)
 - Storage uses only the external `raftlog-core` library through `RaftLogStorageAdapter`. Do not add internal WAL, RocksDB or memory storage backends. Storage-dependent tests use the real adapter and per-test temporary directories; fault injection wraps real I/O. Quorus's snapshot sidecar is not a WAL.
 - `RaftNode` manages state: FOLLOWER → CANDIDATE → LEADER
 - `GrpcRaftTransport` handles inter-node communication
-- `QuorusStateMachine` applies committed log entries
+- `QuorusStateStore` applies committed log entries
 - Cluster config: `quorus.cluster.nodes=node1=host1:9080,node2=host2:9080`
 
 ## Protocol Adapters (quorus-core/protocol/)
 Implement `TransferProtocol` interface:
 - `HttpTransferProtocol` — reactive, non-blocking
-- `SftpTransferProtocol`, `FtpTransferProtocol`, `SmbTransferProtocol` — blocking, use WorkerExecutor
+- `FtpTransferProtocol` (FTP/FTPS), `SftpTransferProtocol`, `SmbTransferProtocol`, and
+  `NfsTransferProtocol` perform blocking I/O; the default `TransferProtocol.transferReactive()`
+  wrapper isolates it with Vert.x `executeBlocking`
 
 ## Agent-Controller Communication
 
@@ -221,12 +177,14 @@ Agents communicate with the controller via REST API at `{controller}/api/v1`:
 
 ### Lifecycle Flow
 ```
-1. Registration:  POST /agents/register    → agentId, region, datacenter, protocols, capacity
-2. Heartbeat:     POST /agents/heartbeat   → agentId, timestamp, sequenceNumber, status, currentJobs
-3. Job Polling:   GET  /agents/{id}/jobs   → returns pendingJobs[]
-4. Status Report: POST /agents/{id}/status → jobId, status, bytesTransferred, error
-5. Deregister:    DELETE /agents/{id}      → graceful shutdown
+1. Registration:  POST /agents/register        → agentId, tenantId, hostname, address, port, version, region, datacenter, agentPool, networkZone, capabilities
+2. Heartbeat:     POST /agents/heartbeat       → agentId, timestamp, sequenceNumber, status, currentJobs, availableCapacity, metrics
+3. Agent listing: GET  /agents                 → returns registered agents
+4. Job polling:   GET  /agents/{agentId}/jobs  → returns pendingJobs[]
+5. Status report: POST /jobs/{jobId}/status    → agentId, tenantId, status, bytesTransferred, error details and attempt/fencing fields
 ```
+
+There is currently no agent deregistration route exposed by the controller.
 
 ### Key Services (quorus-agent/service/)
 | Service | Responsibility | Interval |
@@ -254,7 +212,7 @@ Agents communicate with the controller via REST API at `{controller}/api/v1`:
 - [RaftNode.java](../quorus-controller/src/main/java/dev/mars/quorus/controller/raft/RaftNode.java) — Raft consensus implementation
 - [SimpleTransferEngine.java](../quorus-core/src/main/java/dev/mars/quorus/transfer/SimpleTransferEngine.java) — Transfer execution
 - [YamlWorkflowDefinitionParser.java](../quorus-workflow/src/main/java/dev/mars/quorus/workflow/YamlWorkflowDefinitionParser.java) — Workflow parsing
-- [docs-design/QUORUS_SYSTEM_DESIGN.md](../docs-design/design/QUORUS_SYSTEM_DESIGN.md) — Comprehensive architecture documentation
+- [Quorus Architecture Specification](../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md) — Canonical architecture and conformance status
 
 ## OpenTelemetry Integration
 
@@ -295,17 +253,6 @@ mvn compile -pl quorus-controller  # protobuf-maven-plugin auto-generates
 1. Edit `raft.proto` with new message/service definitions
 2. Run `mvn compile -pl quorus-controller`
 3. Implement handlers in `GrpcRaftServer.java`
-
-## Legacy API Module (quorus-api) — DEPRECATED
-
-**Status:** Being removed entirely. Do not add new code here.
-
-The `quorus-api` module used Quarkus with a separate API layer. The controller-first architecture embeds HTTP directly in `quorus-controller` via `HttpApiServer`.
-
-**Migration path:**
-- New endpoints → `quorus-controller/http/HttpApiServer.java`
-- Agent endpoints → Already migrated to controller
-- Do not reference `quorus-api` in new code
 
 ## Testing: Critical Truths
 
@@ -405,13 +352,10 @@ When instructed to remove a pattern (e.g., "remove CompletableFuture"), you MUST
 **RIGHT:** Grep everything, fix everything, grep again to prove zero remain.
 
 ### 2. Understand the Full Scope of a Directive
-When given a technical directive like "use exclusively Vert.x test facilities", interpret it broadly:
-- It means ALL Java concurrency primitives are banned, not just the one specifically named
-- `CompletableFuture` → also means `ExecutorService`, `CountDownLatch`, `Thread.sleep`, `Semaphore`, `CyclicBarrier`, etc.
-- Think: "What is the complete set of things that violate this directive?" — then scan for ALL of them upfront
-
-**WRONG:** Remove only CompletableFuture because that's what was named. Get yelled at. Then remove only ExecutorService. Get yelled at again.
-**RIGHT:** Immediately scan for CompletableFuture AND ExecutorService AND CountDownLatch AND Thread.sleep AND all other java.util.concurrent patterns. Fix them all in one pass.
+When given a migration directive, inventory the entire affected scope before editing. For the
+Vert.x test-concurrency target, distinguish legacy usages from new code and from purpose-built
+thread-safety tests; do not claim a repository-wide ban or completed migration unless a full scan
+and verification prove it.
 
 ### 3. When Changing a Return Type, Update ALL Callers
 When a method signature changes (e.g., `void stop()` → `Future<Void> stop()`):

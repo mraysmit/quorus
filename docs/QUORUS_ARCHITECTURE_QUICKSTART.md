@@ -2,8 +2,8 @@
 
 # Quorus Architecture Quickstart
 
-**Version:** 2.3  
-**Date:** 2026-09-04  
+**Version:** 2.4
+**Date:** 2026-09-25
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Scope:** Current implementation snapshot
@@ -168,7 +168,7 @@ The enforcement path is:
 
 These checks run inside the Vert.x controller against Raft-replicated state. The tenant model is stored as a field on `AgentInfo` and `TransferJobSnapshot` in `QuorusStateStore`.
 
-This is not an authenticated tenant security boundary: the API has no built-in authentication, and direct assignment creation does not yet uniformly enforce referential and tenant invariants during state-machine application. See `ARCH-03` and `ARCH-06` in `docs/QUORUS_ARCHITECTURE_SPECIFICATION.md`.
+In the production profile, the API derives tenant authority from an authenticated mTLS or trusted-gateway identity, and assignment references and tenant invariants are enforced both at the handler boundary and during replicated state application. A supplied `tenantId` is not identity by itself, and the development Compose profiles intentionally disable this boundary. See [Architecture Specification §3](QUORUS_ARCHITECTURE_SPECIFICATION.md#3-capability-status) and the [Security Deployment Guide](QUORUS_SECURITY_DEPLOYMENT_GUIDE.md).
 
 ## Java Baseline
 

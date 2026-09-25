@@ -2,15 +2,15 @@
 
 # Docker Infrastructure for Quorus
 
-**Version:** 2.0  
-**Date:** 2026-09-01  
+**Version:** 2.1
+**Date:** 2026-09-25
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Scope:** Development, integration-test, and observability assets
 
 This directory contains all Docker-related configuration files, scripts, and test data for the Quorus distributed file transfer system.
 
-These assets are not a secure production deployment baseline. Controller HTTP currently has no built-in authentication, complete TLS/mTLS identity boundaries are not implemented, and the environments do not establish the full service-connectivity, signed-agent, or critical-transfer telemetry controls required by the [canonical architecture specification](../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md). Use the [current Docker testing guide](../docs/QUORUS-DOCKER-TESTING-README.md) for the verified inventory.
+The controller production profile implements TLS 1.3 mutual authentication, trusted identity resolution, authorization, and audit, but the ordinary Compose topologies in this directory explicitly select an insecure development profile. The generated-certificate TLS example exercises the implemented boundary locally; none of these assets is a production deployment baseline. See [Architecture Specification §3](../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md#3-capability-status), the [Security Deployment Guide](../docs/QUORUS_SECURITY_DEPLOYMENT_GUIDE.md), and the [current Docker testing guide](../docs/QUORUS-DOCKER-TESTING-README.md).
 
 ## Directory Structure
 
@@ -19,6 +19,7 @@ docker/
 ├── compose/                          # Docker Compose configurations
 │   ├── docker-compose.yml           # 5-node development cluster
 │   ├── docker-compose-5node.yml     # 5-node cluster for testing
+│   ├── docker-compose-tls-example.yml # Local generated-certificate mTLS example
 │   ├── docker-compose-loki.yml      # Log aggregation stack (Grafana Loki)
 │   ├── docker-compose-elk.yml       # ELK stack alternative
 │   ├── docker-compose-fluentd.yml   # Fluentd alternative
@@ -193,7 +194,10 @@ docker-compose -f docker/compose/docker-compose.yml logs -f
 ### Log Aggregation
 ```bash
 # Start logging stack
-docker-compose -f docker/compose/docker-compose-loki.yml up -d
+docker compose -f docker/compose/docker-compose-loki.yml up -d
+
+# Standalone logging ports: Grafana 3010, Loki 3110, Prometheus 9091.
+# These do not clash with the full observability topology's 3000/3100/9090.
 
 # Check log collection
 docker logs quorus-promtail
@@ -224,7 +228,7 @@ docker stats --filter "name=quorus-"
 # Build and start everything
 mvn clean package -DskipTests
 docker-compose -f docker/compose/docker-compose.yml up -d
-docker-compose -f docker/compose/docker-compose-loki.yml up -d
+docker compose -f docker/compose/docker-compose-loki.yml up -d
 
 # Run integration tests
 mvn test -Dtest=DockerRaftClusterTest

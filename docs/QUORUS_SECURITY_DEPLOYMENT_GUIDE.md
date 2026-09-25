@@ -2,8 +2,8 @@
 
 # Quorus Security Deployment Guide
 
-**Version:** 1.6  
-**Date:** 2026-09-06  
+**Version:** 1.7
+**Date:** 2026-09-25
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Status:** Phase 1 implementation guide  
@@ -11,7 +11,7 @@
 
 ## 1. Purpose and release boundary
 
-This guide configures the Phase 1 authenticated control-plane foundation. It does not make Quorus production-ready by itself. Runtime revocation, expiry observation, trust-version telemetry, controlled certificate-overlap tests, security-configuration audit, and retained local evidence are implemented. Corporate PKI and gateway accreditation, automatic certificate issuance, agent enrollment, service-connection governance, enterprise evidence-platform integration, and enterprise validation remain release work in the [Enterprise Implementation Plan](../docs-design/task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md).
+This guide configures the Phase 1 authenticated control-plane foundation. It does not make Quorus production-ready by itself. Runtime revocation, expiry observation, trust-version telemetry, controlled certificate-overlap tests, security-configuration audit, retained local evidence, and governed service connections are implemented. Corporate PKI and gateway accreditation, automatic certificate issuance, agent enrollment, enterprise evidence-platform integration, and enterprise validation remain release work in the [Enterprise Implementation Plan](../docs-design/task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md).
 
 Production configuration fails closed. Quorus will not start a production controller unless HTTP and Raft mutual TLS, at least one trusted identity source, and the audit path are configured. A production agent rejects plaintext controller URLs and missing client or trust material.
 
@@ -115,7 +115,9 @@ Certificate serials that must be refused before a replacement trust bundle or CR
 quorus.security.revoked-certificate-serials=01AF44,09BC20
 ```
 
-An actively elevated `SECURITY` identity can atomically replace the runtime serial set with `PUT /api/v1/security/trust/revocations`. The request includes a new `trustBundleVersion` and the complete replacement `revokedCertificateSerials` array. The new state is shared by controller HTTP and Raft enforcement and applies to subsequent requests or RPCs on already-established TLS connections. Because this is replacement rather than merge behavior, operators must supply every serial that must remain revoked.
+Leading zeroes and colon separators are ignored when serials are compared, so OpenSSL forms such as `01:AF:44` match the certificate serial `1AF44`.
+
+An actively elevated `SECURITY` identity can atomically replace the runtime serial set with `PUT /api/v1/security/trust/revocations`. The request includes a new `trustBundleVersion` and the complete replacement `revokedCertificateSerials` array. The new state applies only to the controller that receives the request, where it is shared by that process's HTTP and Raft enforcement and applies to subsequent requests or RPCs on already-established TLS connections. It is held in memory, is not replicated, and is lost when that controller restarts. Send the complete replacement set to every controller and also add it to configuration before any restart. Because this is replacement rather than merge behavior, operators must supply every serial that must remain revoked.
 
 ## 5. Agent production configuration
 
@@ -184,7 +186,7 @@ The release evidence must show rejection of:
 
 ## 10. Current operational limitations
 
-Certificate files and PEM trust bundles are loaded at process start; Quorus does not hot-reload their key or CA material. The validated overlap process therefore deploys trust overlap first and uses a controlled rolling restart while preserving Raft quorum and active control. Runtime serial revocations are the exception: the REST update takes effect without restart for subsequent HTTP requests and Raft RPCs, including established TLS connections. Follow the [Certificate Incident Runbook](QUORUS_CERTIFICATE_INCIDENT_RUNBOOK.md), drain affected agents when required, and preserve the change evidence.
+Certificate files and PEM trust bundles are loaded at process start; Quorus does not hot-reload their key or CA material. The validated overlap process therefore deploys trust overlap first and uses a controlled rolling restart while preserving Raft quorum and active control. A runtime serial-revocation update takes effect without restart only on the receiving controller, including for established HTTP and Raft TLS connections. It is not replicated or persisted. Apply the complete set to every controller and add it to configuration before any restart. Follow the [Certificate Incident Runbook](QUORUS_CERTIFICATE_INCIDENT_RUNBOOK.md), drain affected agents when required, and preserve the change evidence.
 
 The built-in audit provides complete Phase 1 security-boundary evidence and a second retained local chain. Searchable enterprise audit queries, WORM storage, evidence-collector delivery state, signed export, and broader resource-version detail remain part of the complete enterprise audit target.
 

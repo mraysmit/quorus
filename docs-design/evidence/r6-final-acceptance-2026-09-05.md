@@ -1,8 +1,9 @@
 # R6 final acceptance evidence — 2026-09-05
 
-R6 local source-tree acceptance is complete for revision
-`b604505d1cbf2ff62c7967f358b4aabe25b4f2ff`. The revision was checked out in the
-clean detached worktree `temp/r6-final-worktree-2`, its controller image was rebuilt
+R6 local source-tree acceptance was performed at historical revision
+`b604505d1cbf2ff62c7967f358b4aabe25b4f2ff`. Its tree-identical, reachable replacement is
+`dc447d42a5a5692cce4d926ece4b10eb0dcc50be`; see the [history rewrite map](../reference/QUORUS_COMMIT_HISTORY_REWRITE_MAP.md). The historical revision was checked out in the
+clean detached worktree `temp/r6-final-worktree-2`, and its controller image was rebuilt
 from that tree, and the complete Maven reactor was run with the repository's Docker
 and slow test groups enabled.
 
@@ -48,7 +49,8 @@ evidence that those operating-system faults were injected.
 
 ## Isolated-run defects and correction
 
-The first detached run at `0fefecbc2278893b3668b924c71d7aff86b08b38` retained two
+The first detached run at historical revision `0fefecbc2278893b3668b924c71d7aff86b08b38`
+(reachable tree-identical replacement `8b3cf5cc1d93b3dbf3376549d4b01c98a464158f`) retained two
 controller failures in `temp/r6-final-worktree/temp/r6-isolated-full.log` (SHA-256
 `BDEE7391F8DF33027B7DEFBE5758F8949E068415B8F9647C9D76F612D02EAB80`):
 
@@ -64,8 +66,9 @@ retaining the transport failure. The context test uses a small forwarding observ
 around the real storage boundary and asserts the metadata update itself. No mocking
 framework is used. The focused slow lane passed all six context/restart cases; its log
 SHA-256 is `9391A3354E9DF3865AB007FF43890959F83F88BEAD4CD72C745D0DEA17D2FCF7`.
-Commit `b604505d1cbf2ff62c7967f358b4aabe25b4f2ff` contains this correction and is the
-revision used by the definitive isolated run.
+Historical commit `b604505d1cbf2ff62c7967f358b4aabe25b4f2ff`, now represented by reachable
+commit `dc447d42a5a5692cce4d926ece4b10eb0dcc50be`, contains this correction and was the
+tree used by the definitive isolated run.
 
 ## Scope and remaining release gates
 

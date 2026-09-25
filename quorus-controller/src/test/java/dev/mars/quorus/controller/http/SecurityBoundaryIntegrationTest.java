@@ -126,7 +126,9 @@ class SecurityBoundaryIntegrationTest {
         {
             TlsMaterial tls = TlsMaterial.create(tempDir.resolve("tls"));
             SecurityIdentity identity = directIdentity(tls.clientSubject());
-            SecurityConfig config = tls.config(Set.of(), Set.of(tls.clientSerial()),
+            // OpenSSL commonly prints serials with leading zero octets. Configuration and
+            // certificate-derived values must compare as the same positive integer.
+            SecurityConfig config = tls.config(Set.of(), Set.of("00:" + tls.clientSerial()),
                     Map.of(tls.clientSubject(), identity), tempDir.resolve("revoked-audit.jsonl"));
             RunningServer running = startServer(vertx, config, AuditSink.noOp());
             WebClient client = tls.authenticatedClient(vertx);
