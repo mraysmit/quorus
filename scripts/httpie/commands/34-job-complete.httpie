@@ -1,4 +1,8 @@
 http POST "$BASE_URL/api/v1/jobs/$JOB_ID/status" \
   agentId="$AGENT_ID" \
   status="COMPLETED" \
-  bytesTransferred:=1048576
+  bytesTransferred:=1048576 \
+  attemptId="$ATTEMPT_ID" \
+  expectedState="IN_PROGRESS" \
+  fencingGeneration:="$FENCING_GENERATION" \
+  reportSequence:=3

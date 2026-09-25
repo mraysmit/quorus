@@ -2,8 +2,8 @@
 
 # Quorus Outstanding Work Register
 
-**Version:** 1.3
-**Date:** 2026-09-07
+**Version:** 1.4
+**Date:** 2026-09-25
 **Author:** Mark Ray-Smith — Cityline Ltd
 **License:** Apache 2.0
 **Status:** Active — consolidated view of every open task across the current and archived planning documents
@@ -90,7 +90,7 @@ closed on 2026-09-07, and `R1-2` and `R1-3` remain open and still block the rele
 ## 3. Section A — R1 Durability Acceptance (Release Blockers)
 
 Remediation slices R2–R6 are implementation-complete. R6 final acceptance was verified from a
-clean detached worktree at revision `b604505`: 2,437 tests, zero failures or errors, two
+clean detached worktree at revision `dc447d4`: 2,437 tests, zero failures or errors, two
 existing explicit skips, and all five configured JaCoCo gates
 ([R6 evidence](../evidence/r6-final-acceptance-2026-09-05.md)).
 
@@ -309,6 +309,12 @@ Phase 8B workstream. Section A's R1 gates are the durability foundation this pha
   penetration testing; the twelve reference financial-services pilot scenarios; operator game days
   without engineering intervention; and the recorded go/no-go release decision.
 
+### D.6 Completed configuration baseline remediation
+
+| ID | Item | State |
+|---|---|---|
+| **CFG-01** | Make repository Compose security posture explicit, remove unsupported environment settings and duplicate topology, fix image health probing, separate logging-stack names/ports, and provide a generated-certificate mTLS example | ✅ **Closed 2026-09-25** — all 14 Compose models validate; the TLS example is healthy, accepts its generated gateway identity, and rejects a client without a certificate. This is repository-local validation, not production accreditation. |
+
 ---
 
 ## 7. Section E — Observability and Logging Backlog
@@ -491,6 +497,7 @@ Two further corrections were made in the same pass, beyond the six identified ab
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.4 | 2026-09-25 | Recorded `CFG-01` complete after validation of the explicit development posture, Compose cleanup, corrected health probing and generated-certificate mTLS example |
 | 1.0 | 2026-09-07 | Initial consolidation of all outstanding tasks from the five `docs-design/task/` planning documents, with live-source verification of eleven stale OTel grid claims and the sealed-record transition phases |
 | 1.3 | 2026-09-07 | Remediated the three findings from the R1-1 slice: containerised test fixtures now write Raft state to named volumes at the deployed path, orphaned `TransferMetrics` deleted (`OBS-08`), and the `LeaderGuardHandlerTest` startup flake root-caused and fixed; recorded the unswept discarded-`start()`-future pattern as `OBS-15` |
 | 1.2 | 2026-09-07 | Closed `R1-1` container-recreation acceptance with four containerised tests and a controller regression of 601 tests; recorded the non-durable default Docker test fixture found during the work; classified the recovery tests as retrospective characterization because no product defect was found |

@@ -2,8 +2,8 @@
 
 # Quorus REST API Specification
 
-**Version:** 2.4  
-**Date:** 2026-09-05  
+**Version:** 2.5
+**Date:** 2026-09-25
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Status:** Canonical and normative  
@@ -614,22 +614,22 @@ Release documentation MUST publish a generated endpoint coverage report with `Cu
 
 ## 20. Current Conformance Gaps
 
-| ID | Severity | Gap | Production impact |
-|---|---|---|---|
-| API-01 | Critical | No canonical OpenAPI 3.1 contract and automated registered-path coverage | Integrations cannot rely on a complete machine-verifiable contract |
-| API-02 | Critical | No built-in authenticated identity, tenant derivation, or scope enforcement | Caller and tenant claims cannot be trusted at the controller boundary |
-| API-03 | Critical | Transfer API exposes attempt history and an initial dedicated progress view but lacks collection search, timeline, integrity, publication, retry, pause, resume, and reconciliation resources | Technology operations cannot fully run or investigate critical transfers through the API |
-| API-04 | Critical | Per-transfer progress applies configured freshness/stall windows and distinguishes missing and stale telemetry, but the active stall boundary, configurable deadline-risk policy, operational queries, alerts, durable events, timelines, and streaming are incomplete | Time-sensitive transfer failures cannot yet be detected, distributed, and actioned reliably at fleet scale |
-| API-05 | Critical | Agent registration is not a complete enrollment, rotation, quarantine, revocation, and decommissioning API | Enterprise agent trust lifecycle is incomplete |
-| API-06 | Closed in Phase 4 | Service-connection, trust, egress, opaque-secret-reference, validation, and security-event APIs are active and represented in OpenAPI | Remaining asynchronous active test and per-resource projections are additive API work, not a production-transfer bypass |
-| API-07 | High | The attempt-aware status resource enforces attempt, lease, fencing, expected-state, sequence, monotonic progress, and atomic lifecycle rules, but specialized assignment actions, lease renewal, and integrity/publication completion evidence remain incomplete | Retry and reassignment remain unsafe until every mutation and destination commit uses the full contract |
-| API-08 | High | Workflow functionality has no controller REST resources | Workflow definitions and executions cannot be governed or observed consistently |
-| API-09 | High | Tenant, hierarchy, quota, usage, and policy services have no controller REST resources | Administrative behavior requires internal integration rather than a supported contract |
-| API-10 | High | Route API exposes configuration without validation, trigger execution, or execution history | Route CRUD can be mistaken for an operating route service |
-| API-11 | High | No immutable audit query and evidence-export API | Security and operational investigations lack supported evidence access |
-| API-12 | High | No general idempotency, ETag/precondition, asynchronous-operation, pagination, or standard problem contract | Client retry and concurrent administration behavior is unsafe or inconsistent |
-| API-13 | High | Cluster and configuration endpoints do not expose complete consistency, replication, snapshot, and redacted effective-configuration state | Operators lack a supported administrative view of controller health and configuration |
-| API-14 | Medium | API/agent compatibility, deprecation, retention, export, and event-stream replay contracts are not implemented | Long-lived integrations and evidence handling remain fragile |
+| ID | Status | Severity | Gap or delivered boundary | Production impact |
+|---|---|---|---|---|
+| API-01 | Closed | — | The canonical OpenAPI 3.1 contract is served at `GET /api/v1/openapi.yaml`; `OpenApiContractTest` verifies equality between declared operations and registered routes | No remaining impact under this gap; schema and example conformance remain part of the broader release gates |
+| API-02 | Closed | — | Protected routes use mTLS or trusted-gateway authentication, derive tenant identity, enforce role/scope policy, and write hash-chained audit records; production startup fails closed without trust configuration | No remaining impact under this gap; enrollment and identity lifecycle remain API-05 |
+| API-03 | Partial | Critical | Transfer API exposes attempt history and an initial dedicated progress view but lacks collection search, timeline, integrity, publication, retry, pause, resume, and reconciliation resources | Technology operations cannot fully run or investigate critical transfers through the API |
+| API-04 | Partial | Critical | Per-transfer progress applies configured freshness/stall windows and distinguishes missing and stale telemetry, but the active stall boundary, configurable deadline-risk policy, operational queries, alerts, durable events, timelines, and streaming are incomplete | Time-sensitive transfer failures cannot yet be detected, distributed, and actioned reliably at fleet scale |
+| API-05 | Partial | Critical | Agent registration is not a complete enrollment, rotation, quarantine, revocation, and decommissioning API | Enterprise agent trust lifecycle is incomplete |
+| API-06 | Closed | — | Service-connection, trust, egress, opaque-secret-reference, validation, and security-event APIs are active and represented in OpenAPI | Remaining asynchronous active test and per-resource projections are additive API work, not a production-transfer bypass |
+| API-07 | Partial | High | The attempt-aware status resource enforces attempt, lease, fencing, expected-state, sequence, monotonic progress, and atomic lifecycle rules, but specialized assignment actions, lease renewal, and integrity/publication completion evidence remain incomplete | Retry and reassignment remain unsafe until every mutation and destination commit uses the full contract |
+| API-08 | Open | High | Workflow functionality has no controller REST resources | Workflow definitions and executions cannot be governed or observed consistently |
+| API-09 | Open | High | Tenant, hierarchy, quota, usage, and policy services have no controller REST resources | Administrative behavior requires internal integration rather than a supported contract |
+| API-10 | Partial | High | Route API exposes configuration without validation, trigger execution, or execution history | Route CRUD can be mistaken for an operating route service |
+| API-11 | Open | High | No immutable audit query and evidence-export API | Security and operational investigations lack supported evidence access |
+| API-12 | Open | High | No general idempotency, ETag/precondition, asynchronous-operation, pagination, or standard problem contract | Client retry and concurrent administration behavior is unsafe or inconsistent |
+| API-13 | Partial | High | Cluster and configuration endpoints do not expose complete consistency, replication, snapshot, and redacted effective-configuration state | Operators lack a supported administrative view of controller health and configuration |
+| API-14 | Open | Medium | API/agent compatibility, deprecation, retention, export, and event-stream replay contracts are not implemented | Long-lived integrations and evidence handling remain fragile |
 
 Critical gaps block protected production use. High gaps block the affected production capability. A gap is closed only when implementation, OpenAPI, authorization, audit, persistence, and conformance tests are present.
 

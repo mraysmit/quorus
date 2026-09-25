@@ -5,13 +5,13 @@ complete. The retained historical
 sections below describe the sequence that led to the final implementation. See the
 [R4 DNS evidence](r4-dns-remediation-2026-09-05.md) and
 [R5 closure evidence](r5-closure-2026-09-05.md) for those results. The clean detached
-R6 run at `b604505` passed 2,437 tests and five coverage gates; see
+R6 run at `dc447d4` passed 2,437 tests and five coverage gates; see
 [R6 final acceptance](r6-final-acceptance-2026-09-05.md). R1 deployment durability
 gates remain open.
 
 **Subsequent RaftLog release update:** The missing 1.2.0 dependency recorded below was resolved by the newly implemented and published release from commit `1c5af80`. All 41 selected Quorus storage/snapshot/restart tests passed against it. Historical failures/counts below remain unchanged. R4, R5 and local R6 acceptance are now complete; R1 deployment acceptance remains open. See [release handover](raftlog-validation-handover-2026-09-05.md#implemented-capability-and-release--2026-09-05).
 
-Historical base revision: `28f0530`. The implementation now includes the later R4 and
+Historical base revision: `1a8f2b3`. The implementation now includes the later R4 and
 R5 slices. This record does not close the separate R1 deployment and power-loss gates.
 
 RaftLog is the sister project at `../raftlog` relative to the Quorus repository root,
@@ -68,7 +68,7 @@ Acceptance before implementation: reactive NFS performs a mounted-file copy, rea
 
 Log names below are relative to `temp/remediation-20260905`. Each Maven command was
 piped through `2>&1 | Tee-Object -FilePath <log>`; no failure was discarded or relabelled
-as a passing gate. Patch identity is baseline `28f0530` plus the preceding slices in this
+as a passing gate. Patch identity is baseline `1a8f2b3` plus the preceding slices in this
 record and the named new tests. Final source hashes identify the reviewed implementation.
 
 | Slice | Behavioral red | Focused green and refactor |
@@ -118,7 +118,7 @@ None of these are hidden by the successful reruns.
 ## Available-module acceptance and R6 blocker
 
 The isolated worktree is `temp/remediation-20260905/verify-worktree`, detached at
-`28f0530` with the reviewed source changes copied and hash-checked. The final command:
+`1a8f2b3` with the reviewed source changes copied and hash-checked. The final command:
 
 ```powershell
 mvn.cmd -o clean verify -pl quorus-agent -am -f temp/remediation-20260905/verify-worktree/pom.xml 2>&1 | Tee-Object -FilePath temp/remediation-20260905/isolated-core-agent-verify.log
@@ -155,7 +155,7 @@ storage migration, pruning or production acceptance was performed.
 | Finding 6 | Complete: resource loading, environment precedence and typed lookup mechanics are consolidated in `LayeredProperties`; application-specific validation and logging remain at their boundaries |
 | Finding 7 | Builder default duplication removed; live default threshold and production TLS rejection verified |
 | Section 7 DNS | Complete under R4: bounded worker resolution, overload, timeout, authority recheck, pins and HTTP responsiveness retain behavioral red and focused/full green evidence |
-| Section 7 tenant registry / pre-execution reports | R2/R3 committed in `28f0530`; controller-dependent final regression remains required |
+| Section 7 tenant registry / pre-execution reports | R2/R3 committed in `1a8f2b3`; controller-dependent final regression remains required |
 | Section 7 root scopes / literal paths / TLS host / redirects / FTPS | Addressed by R5.1, R5.3 and R5.5; worker scheduling additionally corrected by R5.5/R5.6 |
 | Route probe default ports | Complete: route probes use the shared effective-port contract; portless endpoints reach their documented protocol defaults |
 | Partial trust-policy updates | Complete: omitted CA IDs, host keys, peer pins and minimum TLS settings retain their stored values; supplied fields still replace them |
@@ -164,7 +164,7 @@ storage migration, pruning or production acceptance was performed.
 | Security-event retention and full-map listing | Complete for R5: reads are tenant-scoped, bounded to 1–1000 rows and cursor-paged without copying all system metadata. Authoritative events are not automatically pruned; archive, legal hold and retention policy remain Phase 9 work |
 | Per-transfer clients / repeated trust-store loads | Complete for R5: governed clients remain isolated and are closed after each transfer; immutable trust-manager policies use a bounded 64-entry cache, and rotation selects a distinct manager |
 | R1 deployment durability | Container-recreation, selected production filesystem and power-loss gates remain open |
-| R6 | Complete for local final-source acceptance at `b604505`: the clean detached reactor passed 2,437 tests, zero failures/errors, two existing skips and five coverage gates; R1 deployment durability remains open |
+| R6 | Complete for local final-source acceptance at `dc447d4`: the clean detached reactor passed 2,437 tests, zero failures/errors, two existing skips and five coverage gates; R1 deployment durability remains open |
 
 R5 completion does not waive R1 container-recreation, selected production-filesystem,
 or machine power-loss acceptance.

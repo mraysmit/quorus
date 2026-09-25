@@ -29,12 +29,12 @@ switch ($Service) {
     "logging" {
         Write-Host "Starting log aggregation..." -ForegroundColor Green
         docker-compose -f compose/docker-compose-loki.yml up -d
-        Write-Host "Grafana available at http://localhost:3000 (admin/admin)" -ForegroundColor Cyan
+        Write-Host "Grafana available at http://localhost:3010 (admin/admin)" -ForegroundColor Cyan
     }
     "stop" {
         Write-Host "Stopping services..." -ForegroundColor Yellow
         docker-compose -f compose/docker-compose-controller-first.yml down 2>$null
-        docker-compose -f compose/docker-compose-corrected.yml down 2>$null
+        docker-compose -f compose/docker-compose-single-controller.yml down 2>$null
         docker-compose -f compose/docker-compose-cluster.yml down 2>$null
         docker-compose -f compose/docker-compose.yml down 2>$null
         docker-compose -f compose/docker-compose-loki.yml down 2>$null

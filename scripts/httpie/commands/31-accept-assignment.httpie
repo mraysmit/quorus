@@ -1,1 +1,8 @@
-http PUT "$BASE_URL/api/v1/assignments/$ASSIGNMENT_ID/accept"
+http POST "$BASE_URL/api/v1/jobs/$JOB_ID/status" \
+  agentId="$AGENT_ID" \
+  status="ACCEPTED" \
+  bytesTransferred:=0 \
+  attemptId="$ATTEMPT_ID" \
+  expectedState="OFFERED" \
+  fencingGeneration:="$FENCING_GENERATION" \
+  reportSequence:=1

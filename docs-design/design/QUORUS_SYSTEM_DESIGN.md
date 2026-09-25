@@ -2,11 +2,11 @@
 
 # Quorus Comprehensive System Design
 
-**Version:** 3.6  
+**Version:** 3.7
 **Date:** 2025-08-26  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
-**Updated:** 2026-09-04  
+**Updated:** 2026-09-25
 **Status:** Non-normative target-state vision  
 **Scope:** Historical design material, current concepts, and future architecture
 
@@ -81,7 +81,7 @@ An administration or operations user interface is only a presentation and contro
 
 | Capability | Target outcome | Current design position |
 |---|---|---|
-| Identity, access, and separation of duties | Authenticated human and workload identities with scoped authorization and controlled privileged actions | Required; current controller has no built-in authenticated identity boundary |
+| Identity, access, and separation of duties | Authenticated human and workload identities with scoped authorization and controlled privileged actions | Partial; production HTTP and Raft use mTLS, trusted identities, scoped policy and audit, while corporate SSO, fleet identity lifecycle and complete enterprise evidence remain open |
 | Agent trust and deployment lifecycle | Every agent is enrolled, identifiable, attestable, upgradeable, revocable, and auditable | Required; current alpha registration is incomplete |
 | Governed service connectivity | Agents connect only to approved services, paths, protocols, and network zones using verified peers and secret references | Implemented for the Phase 4 production transfer path; broader route/workflow adoption follows their activation phases |
 | Transfer correctness and recovery | Attempts, leases, fencing, integrity, atomic publication, retry, and reconciliation produce explainable outcomes | Required; duplicate-safe reassignment is not available |
@@ -2427,9 +2427,9 @@ The figures below are target workloads that require reproducible benchmark and f
 
 **Security and Isolation:**
 - **Network Segmentation**: Isolated Docker networks for different tenants
-- **Target-State Encryption**: TLS/mTLS with verified identities at every applicable communication boundary; this is not complete in the current runtime
-- **Authentication**: Mutual TLS authentication between Quorus Controllers and Quorus Agents
-- **Authorization**: Fine-grained access control and permissions
+- **Implemented control-plane encryption**: the production profile requires TLS 1.3 mutual authentication for controller HTTP and Raft, and agents support certificate-authenticated HTTPS
+- **Implemented identity boundary**: trusted gateway subjects and direct certificate bindings resolve callers before tenant, role, and scope policy is evaluated
+- **Remaining deployment boundary**: corporate PKI accreditation, agent enrollment and rotation, peer-to-node binding, and complete telemetry/evidence transport validation remain open; see [Architecture Specification §3](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md#3-capability-status) and the [Security Deployment Guide](../../docs/QUORUS_SECURITY_DEPLOYMENT_GUIDE.md)
 
 ## Core Components
 

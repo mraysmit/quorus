@@ -1,5 +1,6 @@
 {
   "agentId": "agent-demo-001",
-  "status": "ACTIVE",
+  "tenantId": "development",
+  "status": "active",
   "sequenceNumber": 1
 }

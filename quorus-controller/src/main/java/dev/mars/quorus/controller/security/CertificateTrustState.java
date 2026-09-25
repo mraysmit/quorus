@@ -125,7 +125,14 @@ public final class CertificateTrustState {
     }
 
     private static String normalize(String serial) {
-        return serial == null ? "" : serial.replace(":", "").trim().toUpperCase(Locale.ROOT);
+        if (serial == null) return "";
+        String normalized = serial.replace(":", "").trim().toUpperCase(Locale.ROOT);
+        int firstSignificantDigit = 0;
+        while (firstSignificantDigit < normalized.length() - 1
+                && normalized.charAt(firstSignificantDigit) == '0') {
+            firstSignificantDigit++;
+        }
+        return normalized.substring(firstSignificantDigit);
     }
 
     public enum ExpiryAlertState { OK, WARNING, EXPIRED }

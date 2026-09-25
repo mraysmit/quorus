@@ -1,3 +1,5 @@
+# DEVELOPMENT-ONLY topology. Security and TLS are explicitly disabled below.
+# Do not use this file as a production deployment template.
 # Quorus Controller-First Architecture
 # Each controller is a self-contained node with embedded HTTP API
 # This provides natural scaling and fault tolerance
@@ -22,9 +24,13 @@ services:
     hostname: controller1
     environment:
       - QUORUS_NODE_ID=controller1
-      - QUORUS_RAFT_HOST=0.0.0.0
       - QUORUS_RAFT_PORT=9080
       - QUORUS_HTTP_PORT=8080
+      - QUORUS_SECURITY_PROFILE=development
+      - QUORUS_SECURITY_ENABLED=false
+      - QUORUS_SECURITY_ALLOW_INSECURE=true
+      - QUORUS_SECURITY_HTTP_TLS_ENABLED=false
+      - QUORUS_SECURITY_RAFT_TLS_ENABLED=false
       - QUORUS_RAFT_STORAGE_PATH=/app/data/raft
       - QUORUS_CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080
       - QUORUS_RAFT_ELECTION_TIMEOUT_MS=3000
@@ -47,7 +53,7 @@ services:
         max-size: "10m"
         max-file: "3"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health/live"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -68,9 +74,13 @@ services:
     hostname: controller2
     environment:
       - QUORUS_NODE_ID=controller2
-      - QUORUS_RAFT_HOST=0.0.0.0
       - QUORUS_RAFT_PORT=9080
       - QUORUS_HTTP_PORT=8080
+      - QUORUS_SECURITY_PROFILE=development
+      - QUORUS_SECURITY_ENABLED=false
+      - QUORUS_SECURITY_ALLOW_INSECURE=true
+      - QUORUS_SECURITY_HTTP_TLS_ENABLED=false
+      - QUORUS_SECURITY_RAFT_TLS_ENABLED=false
       - QUORUS_RAFT_STORAGE_PATH=/app/data/raft
       - QUORUS_CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080
       - QUORUS_RAFT_ELECTION_TIMEOUT_MS=3000
@@ -93,7 +103,7 @@ services:
         max-size: "10m"
         max-file: "3"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health/live"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -116,9 +126,13 @@ services:
     hostname: controller3
     environment:
       - QUORUS_NODE_ID=controller3
-      - QUORUS_RAFT_HOST=0.0.0.0
       - QUORUS_RAFT_PORT=9080
       - QUORUS_HTTP_PORT=8080
+      - QUORUS_SECURITY_PROFILE=development
+      - QUORUS_SECURITY_ENABLED=false
+      - QUORUS_SECURITY_ALLOW_INSECURE=true
+      - QUORUS_SECURITY_HTTP_TLS_ENABLED=false
+      - QUORUS_SECURITY_RAFT_TLS_ENABLED=false
       - QUORUS_RAFT_STORAGE_PATH=/app/data/raft
       - QUORUS_CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080
       - QUORUS_RAFT_ELECTION_TIMEOUT_MS=3000
@@ -141,7 +155,7 @@ services:
         max-size: "10m"
         max-file: "3"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health/live"]
       interval: 10s
       timeout: 5s
       retries: 3

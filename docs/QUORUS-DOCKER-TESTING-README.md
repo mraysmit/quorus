@@ -38,6 +38,7 @@ These environments are development and test assets. They do not by themselves sa
 - `docker-compose-loki.yml`
 - `docker-compose-observability.yml`
 - `docker-compose-observability-cluster.yml`
+- `docker-compose-tls-example.yml`
 - `docker-compose-elk.yml`
 - `docker-compose-fluentd.yml`
 

@@ -2,15 +2,15 @@
 
 # Quorus Cluster Startup Guide
 
-**Version:** 2.2  
-**Date:** 2026-09-01  
+**Version:** 2.3
+**Date:** 2026-09-25
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Scope:** Current repository-local deployment guide
 
 This guide documents the current repository-local path for starting a controller cluster and observability stack with the compose files that exist today.
 
-The current controller API has no built-in authentication, and complete production TLS/mTLS identity boundaries are not implemented for controller HTTP, Raft, and agent control traffic. The examples in this guide are development and verification procedures, not a secure production deployment baseline. See [QUORUS_ARCHITECTURE_SPECIFICATION.md](QUORUS_ARCHITECTURE_SPECIFICATION.md) for the required security boundary and [QUORUS_REST_API_SPECIFICATION.md](QUORUS_REST_API_SPECIFICATION.md) for the complete operations interface.
+The production controller profile implements TLS 1.3 mutual authentication for HTTP and Raft, trusted identity resolution, authorization, and audit; agent clients support certificate-authenticated HTTPS. The ordinary examples in this guide intentionally use the insecure development profile, while `docker-compose-tls-example.yml` is a local generated-certificate verification topology. Neither is a production deployment baseline. See [Architecture Specification §3](QUORUS_ARCHITECTURE_SPECIFICATION.md#3-capability-status) and the [Security Deployment Guide](QUORUS_SECURITY_DEPLOYMENT_GUIDE.md).
 
 ## Prerequisites
 
@@ -29,6 +29,7 @@ The repository currently ships these relevant compose files in `docker/compose`:
 - `docker-compose-5node.yml`
 - `docker-compose-observability.yml`
 - `docker-compose-observability-cluster.yml`
+- `docker-compose-tls-example.yml`
 - `docker-compose-loki.yml`
 - `docker-compose-full-network.yml`
 - `docker-compose-network-test.yml`
@@ -112,7 +113,7 @@ Alternatively, set the property in `quorus-agent.properties`:
 quorus.agent.tenant.id=<your-tenant-id>
 ```
 
-An agent that registers without a `tenantId` is rejected by the controller with `400 Bad Request`. Transfer jobs without a `tenantId` are equally rejected. These field checks are not authenticated tenant identity or complete tenant isolation; see `docs/QUORUS_USER_GUIDE.md` for the current enforcement boundary.
+An agent that registers without a `tenantId` is rejected by the controller with `400 Bad Request`. Transfer jobs without a `tenantId` are equally rejected. In the production profile, tenant authority is also derived from the authenticated gateway or direct certificate identity; a payload field alone is never treated as identity. See [Architecture Specification §3](QUORUS_ARCHITECTURE_SPECIFICATION.md#3-capability-status) and the [Security Deployment Guide](QUORUS_SECURITY_DEPLOYMENT_GUIDE.md).
 
 ## Current Source of Truth
 

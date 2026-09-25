@@ -150,7 +150,7 @@ function Start-Cluster {
             $env:QUORUS_TELEMETRY_PROMETHEUS_PORT = $prometheusPort
             
             # OTel configuration (send to collector)
-            $env:OTEL_EXPORTER_OTLP_ENDPOINT = "http://localhost:4317"
+            $env:QUORUS_TELEMETRY_OTLP_ENDPOINT = "http://localhost:4317"
             $env:OTEL_METRICS_EXPORTER = "otlp"
             $env:OTEL_TRACES_EXPORTER = "otlp"
             $env:OTEL_SERVICE_NAME = "quorus-controller"

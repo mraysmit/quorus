@@ -73,9 +73,9 @@ function Start-Logging {
         Write-Host "Log aggregation started successfully!" -ForegroundColor Green
         Write-Host ""
         Write-Host "Services available at:" -ForegroundColor Yellow
-        Write-Host "  - Grafana: http://localhost:3000 (admin/admin)" -ForegroundColor White
-        Write-Host "  - Loki API: http://localhost:3100" -ForegroundColor White
-        Write-Host "  - Prometheus: http://localhost:9090" -ForegroundColor White
+        Write-Host "  - Grafana: http://localhost:3010 (admin/admin)" -ForegroundColor White
+        Write-Host "  - Loki API: http://localhost:3110" -ForegroundColor White
+        Write-Host "  - Prometheus: http://localhost:9091" -ForegroundColor White
     } else {
         Write-Host "Failed to start logging stack!" -ForegroundColor Red
     }

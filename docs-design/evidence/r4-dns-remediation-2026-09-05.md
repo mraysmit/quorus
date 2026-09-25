@@ -1,6 +1,6 @@
 # R4 — bounded controller DNS authorization
 
-Base revision: `f8fb15eb5292a20ef16d71d641731d614f9f2c52`. Changes are uncommitted.
+Base revision: `a0103a09074bf30df82d3f9336da00d98cda3cef`. Changes are uncommitted.
 
 ## Acceptance and implementation
 
@@ -88,7 +88,7 @@ commands do not establish those network-fault capabilities.
 The [machine-readable record](r4-dns-remediation-2026-09-05.json) retains source and
 log hashes, command selections and module counts. The 30-document verification
 script and Markdown-aware whitespace check also pass. R4 implementation is complete;
-this is a working-tree result based on `f8fb15e`, not isolated final-revision acceptance.
+this is a working-tree result based on `a0103a0`, not isolated final-revision acceptance.
 
 The retained original R4 draft patch is historical preparation and has now been
 applied and superseded by this implementation. Earlier missing-dependency failures

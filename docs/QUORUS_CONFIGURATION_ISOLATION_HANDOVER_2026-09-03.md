@@ -40,7 +40,7 @@ per-transfer isolation and cleanup. New credential-bearing URIs remain rejected;
 commands are redacted and failed before snapshot persistence. See the
 [R5 evidence](../docs-design/evidence/r5-closure-2026-09-05.md).
 
-**R6 final acceptance:** The clean detached worktree at `b604505` passed the complete
+**R6 final acceptance:** The clean detached worktree at `dc447d4` passed the complete
 JDK 25 reactor with Docker and slow groups enabled: 2,437 tests, zero failures/errors,
 two existing explicit skips, all seven reactor entries and all five configured JaCoCo
 gates. The first isolated run exposed and retained evidence for a storage-cleanup failure
@@ -94,7 +94,7 @@ mvn.cmd -f ../raftlog/pom.xml -pl raftlog-core -am clean install 2>&1 | Tee-Obje
 
 **RaftLog release follow-up — 2026-09-05:** The earlier dependency mismatch is resolved by a newly implemented and published `raftlog-core:1.2.0` from RaftLog commit `1c5af80f13a149663926c01eb15f88c14c4f2d25`, tag `v1.2.0`. It supplies physical prefix compaction with forced atomic publication; raw append/replay semantics are unchanged. Quorus's POM already requests this version. All 41 selected Quorus storage/snapshot/restart tests passed against the new implementation. Quorus continues to own durable snapshots and must publish them before compaction.
 
-The previous `db59859` provenance and historical 1.1.0 defect allegations remain unsubstantiated; this is a new release, not validation of those claims. See the [release handover](../docs-design/evidence/raftlog-validation-handover-2026-09-05.md#implemented-capability-and-release--2026-09-05) for artifact hash, test scope and durability limits. R2/R3 remain committed in `28f0530`; R4, R5 and local R6 acceptance are complete. R1 deployment and power-loss gates remain open. No deployed storage was changed.
+The previous `db59859` provenance and historical 1.1.0 defect allegations remain unsubstantiated; this is a new release, not validation of those claims. See the [release handover](../docs-design/evidence/raftlog-validation-handover-2026-09-05.md#implemented-capability-and-release--2026-09-05) for artifact hash, test scope and durability limits. R2/R3 remain committed in `1a8f2b3`; R4, R5 and local R6 acceptance are complete. R1 deployment and power-loss gates remain open. No deployed storage was changed.
 Independent R5 fixes retain behavioral red and focused green evidence:
 
 - controller entrypoint canonical environment precedence and Linux line endings;
@@ -135,7 +135,7 @@ At this dated checkpoint R4 was next and R1/R6 were open. The current status abo
 supersedes that statement: R4–R6 are complete locally and R1 remains open.
 
 **R2 tenant-isolation follow-up:** the external-library-only removal was committed as
-`2d8ed83`. The R2 change committed in `28f0530` replaces ambiguous registry addresses with
+`7b07825`. The R2 change committed in `1a8f2b3` replaces ambiguous registry addresses with
 versioned collision-free tenant/resource keys, checks stored ownership in projections
 and replicated state application, and atomically migrates validated legacy rows with
 the first successful v2 registry mutation. Ambiguous records fail closed without partial
@@ -155,7 +155,7 @@ remain open. No deployed data was inspected, migrated or deleted.
 
 **External-library-only follow-up:** the internal file WAL was already removed, but RocksDB and memory backends remained. Those implementations, their factory branches, `createInMemory()`, backend-specific tests and RocksDB JNI dependency are now removed. Storage-dependent controller, election and snapshot tests use the external adapter. Seven behavioral rejection cases retain red/green evidence; production code contains only `RaftLogStorageAdapter` as a `RaftStorage` implementation. Quorus retains its Vert.x interface and application-snapshot sidecar, neither of which implements a WAL.
 
-**Prior commit boundaries:** `038da9f` (`fix(raft): persist snapshots and recover safely after compaction`) contains the R1 snapshot recovery remediation; `2d8ed83` contains the subsequent external-library-only removal. The snapshot sidecar must remain: the inspected external 1.1.0 storage interface has no snapshot API, and Quorus requires durable snapshots for recovery.
+**Prior commit boundaries:** `e7c9dbc` (`fix(raft): persist snapshots and recover safely after compaction`) contains the R1 snapshot recovery remediation; `7b07825` contains the subsequent external-library-only removal. The snapshot sidecar must remain: the inspected external 1.1.0 storage interface has no snapshot API, and Quorus requires durable snapshots for recovery.
 
 **Verification of the removal:** tests ran in the isolated `../quorus-core-tests-20260904` worktree to avoid editor-generated class-file interference. Changed controller sources, resources and POM matched the working tree by file hash.
 
@@ -170,7 +170,7 @@ The controller count changed from 530 to 520 because 17 obsolete implementation-
 
 **Operational boundary:** controller configuration accepts only `raftlog`; removed backend names fail explicitly. No deployed storage was inspected, migrated or deleted. Preserve any legacy storage before recovery work; switching a property is not an on-disk migration. At this dated checkpoint R4–R6 remained open; their current completion status is recorded above. The R1 production-filesystem and power-loss acceptance gates remain open. Green tests do not close deployment acceptance gates.
 
-**Remediation checkpoint:** the approved review follow-up is tracked in the existing [enterprise implementation plan](../docs-design/task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md#remediation-checkpoint--2026-09-04). M0 durability and Phase 4 acceptance are reopened. Real WAL prefix deletion in `43cdd20` exposed the adapter's memory-only snapshots. R1 adds a durable snapshot sidecar, compaction dependency checks, serialized snapshot mutations and interrupted-install recovery; its behavioral red/green evidence is retained in the [Raft evidence record](../docs-design/evidence/raft-log-tdd-evidence-2026-09-04.json). Release remains blocked by the checkpoint's outstanding gates. `ffc3e64` records a full clean reactor against the 1.2.0 adoption patch, but that historical green result did not exercise snapshot-plus-compaction restart. No deployed storage has been changed or assessed by this remediation.
+**Remediation checkpoint:** the approved review follow-up is tracked in the existing [enterprise implementation plan](../docs-design/task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md#remediation-checkpoint--2026-09-04). M0 durability and Phase 4 acceptance are reopened. Real WAL prefix deletion in `067bb45` exposed the adapter's memory-only snapshots. R1 adds a durable snapshot sidecar, compaction dependency checks, serialized snapshot mutations and interrupted-install recovery; its behavioral red/green evidence is retained in the [Raft evidence record](../docs-design/evidence/raft-log-tdd-evidence-2026-09-04.json). Release remains blocked by the checkpoint's outstanding gates. `db532fb` records a full clean reactor against the 1.2.0 adoption patch, but that historical green result did not exercise snapshot-plus-compaction restart. No deployed storage has been changed or assessed by this remediation.
 
 The working tree described here was committed as `b35fb25` (`refactor(config): isolate layered config; drop singletons and -D flags`). A follow-up on 2026-09-04 then addressed the blocking findings:
 

@@ -1,6 +1,6 @@
 {
   "subsequentRaftLogRelease20260905": {"status":"New capability implemented and published; historical db59859 claims remain unsubstantiated","version":"1.2.0","revision":"1c5af80f13a149663926c01eb15f88c14c4f2d25","tag":"v1.2.0","coreJarSha256":"7BB73A0F588FC8C5534296D4F0860F890A7D15789145DB742C2A4E3C8D75C426","deploymentId":"5d8e4410-c07d-4bb4-bb7e-b3846bee91cd","behavioralRed":23,"behavioralGreen":23,"windowsTests":319,"windowsSkipped":3,"linuxTests":319,"linuxSkipped":0,"quorusFocusedTests":41,"handover":"docs-design/evidence/raftlog-validation-handover-2026-09-05.md#implemented-capability-and-release--2026-09-05"},
-  "baseRevision": "28f053011670655c4938bf176667cde7b8b1f6e7",
+  "baseRevision": "1a8f2b31a86dc32b379ba13763bcd296b4bffd60",
   "recordedAt": "2026-09-05T04:01:35.097083Z",
   "status": "R4 and R5 implementation complete; R6 local final-source acceptance complete; R1 release gates remain open",
   "r6FinalAcceptance": "docs-design/evidence/r6-final-acceptance-2026-09-05.json",
