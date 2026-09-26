@@ -1,4 +1,4 @@
-<img src="quorus-logo.png" alt="Quorus" width="120"/>
+<img src="../../docs/quorus-logo.png" alt="Quorus" width="120"/>
 
 # Quorus Configuration Isolation Handover — 2026-09-03
 
@@ -8,6 +8,14 @@
 **License:** Apache 2.0  
 **Status:** Superseded — see the post-handover status below  
 **Scope:** Original configuration handover at `fab72a6` and remediation through R5/R6 acceptance
+
+> **Archived 2026-09-26.** Every handover finding is fixed or carried into the
+> [Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER.md), and the dated status
+> layers below are historical. §2.1 and §8 remain the most complete description of the
+> configuration contract until the generated configuration reference (task `DR-D1` in the
+> [documentation review task list](../task/QUORUS_DOCUMENTATION_REVIEW_TASKS.md)) replaces them.
+> Some cited commit IDs were rewritten; see the
+> [commit history rewrite map](../reference/QUORUS_COMMIT_HISTORY_REWRITE_MAP.md).
 
 ## Remaining remediation — 2026-09-05
 
@@ -24,7 +32,7 @@ are characterization/regression. All 47 focused tests pass. The full JDK 25 clea
 reactor verification with Docker/slow groups enabled completed at
 **2026-09-05T18:55:26+08:00**: **2,429 passed, zero failures/errors, two existing
 disabled network tests**, all seven reactor entries and five JaCoCo gates passed.
-R4 implementation is complete. See the [R4 evidence](../docs-design/evidence/r4-dns-remediation-2026-09-05.md).
+R4 implementation is complete. See the [R4 evidence](../evidence/r4-dns-remediation-2026-09-05.md).
 This update supersedes historical statements below that R4 is next or its draft is
 unimplemented.
 
@@ -38,7 +46,7 @@ not automatically pruned; enterprise archive, legal hold and retention remain Ph
 Trust managers use a bounded 64-policy cache while governed transfer clients retain
 per-transfer isolation and cleanup. New credential-bearing URIs remain rejected; legacy
 commands are redacted and failed before snapshot persistence. See the
-[R5 evidence](../docs-design/evidence/r5-closure-2026-09-05.md).
+[R5 evidence](../evidence/r5-closure-2026-09-05.md).
 
 **R6 final acceptance:** The clean detached worktree at `dc447d4` passed the complete
 JDK 25 reactor with Docker and slow groups enabled: 2,437 tests, zero failures/errors,
@@ -46,7 +54,7 @@ two existing explicit skips, all seven reactor entries and all five configured J
 gates. The first isolated run exposed and retained evidence for a storage-cleanup failure
 and a test observation race; the corrections passed a six-test focused restart/context
 lane before the definitive rerun. See the
-[R6 evidence](../docs-design/evidence/r6-final-acceptance-2026-09-05.md). R6 local
+[R6 evidence](../evidence/r6-final-acceptance-2026-09-05.md). R6 local
 final-source acceptance is complete. R1 container-recreation, selected
 production-filesystem and machine power-loss gates remain open.
 
@@ -72,16 +80,15 @@ explicit disables for unsupported Docker network partition scenarios; one was
 previously masked by class initialization failure. Integration Examples builds but
 contains no tests. No test was newly disabled or assertion weakened by this fix.
 
-See the [full-suite remediation evidence](../docs-design/evidence/full-suite-error-remediation-2026-09-05.md)
+See the [full-suite remediation evidence](../evidence/full-suite-error-remediation-2026-09-05.md)
 and its accompanying JSON for commands, red/green results, hashes and limitations.
 This paragraph records the earlier working-tree verification. It was not final committed
 or isolated-checkout acceptance. The later R4, R5 and R6 entries above supersede its
 open-work statement; R1 deployment and power-loss gates remain open.
 
 **Sister-project location:** RaftLog is a separate project in the same parent folder
-as Quorus. From the Quorus repository root, its path is `../raftlog`; on this machine
-that is `C:\Users\mraysmit\dev\idea-projects\raftlog`. Its parent build is
-[`../raftlog/pom.xml`](../../raftlog/pom.xml), and the library consumed by Quorus is
+as Quorus. From the Quorus repository root, its path is `../raftlog`. Its parent build
+is `../raftlog/pom.xml` (outside this repository, so not linked), and the library consumed by Quorus is
 the `raftlog-core` module. Check this sister checkout first when resolving or developing
 the WAL dependency. It is not an in-repository Quorus module, and Maven does not build
 it automatically as part of the Quorus reactor.
@@ -94,7 +101,7 @@ mvn.cmd -f ../raftlog/pom.xml -pl raftlog-core -am clean install 2>&1 | Tee-Obje
 
 **RaftLog release follow-up — 2026-09-05:** The earlier dependency mismatch is resolved by a newly implemented and published `raftlog-core:1.2.0` from RaftLog commit `1c5af80f13a149663926c01eb15f88c14c4f2d25`, tag `v1.2.0`. It supplies physical prefix compaction with forced atomic publication; raw append/replay semantics are unchanged. Quorus's POM already requests this version. All 41 selected Quorus storage/snapshot/restart tests passed against the new implementation. Quorus continues to own durable snapshots and must publish them before compaction.
 
-The previous `db59859` provenance and historical 1.1.0 defect allegations remain unsubstantiated; this is a new release, not validation of those claims. See the [release handover](../docs-design/evidence/raftlog-validation-handover-2026-09-05.md#implemented-capability-and-release--2026-09-05) for artifact hash, test scope and durability limits. R2/R3 remain committed in `1a8f2b3`; R4, R5 and local R6 acceptance are complete. R1 deployment and power-loss gates remain open. No deployed storage was changed.
+The previous `db59859` provenance and historical 1.1.0 defect allegations remain unsubstantiated; this is a new release, not validation of those claims. See the [release handover](../evidence/raftlog-validation-handover-2026-09-05.md#implemented-capability-and-release--2026-09-05) for artifact hash, test scope and durability limits. R2/R3 remain committed in `1a8f2b3`; R4, R5 and local R6 acceptance are complete. R1 deployment and power-loss gates remain open. No deployed storage was changed.
 Independent R5 fixes retain behavioral red and focused green evidence:
 
 - controller entrypoint canonical environment precedence and Linux line endings;
@@ -107,7 +114,7 @@ Independent R5 fixes retain behavioral red and focused green evidence:
 - FTP, SFTP, SMB and NFS worker execution checks corrected to inspect the actual thread,
   while direct blocking calls on event-loop threads remain rejected.
 
-The [current evidence record](../docs-design/evidence/remediation-r4-r6-2026-09-05.md)
+The [current evidence record](../evidence/remediation-r4-r6-2026-09-05.md)
 tracks verification and failed intermediate runs. R5 and R6 local final-source acceptance
 are complete; R1 deployment durability gates remain open. Do not use the historical
 recommended steps below as the current execution plan.
@@ -128,8 +135,8 @@ characterization. Focused verification passes 98 tests and the extended agent la
 one existing Windows symlink-permission skip, and all five JaCoCo gates met. Both
 unchanged path-policy tests pass in a pinned Java 25 Linux container against the verified
 artifacts, with no skips or aborts. R3 implementation is complete. See `remediationR3` in the existing
-[Phase 4 evidence](../docs-design/evidence/phase4-tdd-evidence-2026-09-03.json) and the
-[operator reconciliation procedure](QUORUS_SECURITY_DEPLOYMENT_GUIDE.md#12-pre-execution-failure-and-acknowledgement-reconciliation).
+[Phase 4 evidence](../evidence/phase4-tdd-evidence-2026-09-03.json) and the
+[operator reconciliation procedure](../../docs/QUORUS_SECURITY_DEPLOYMENT_GUIDE.md#12-pre-execution-failure-and-acknowledgement-reconciliation).
 Durable report-outbox recovery and destination reconciliation remain Phase 2 work.
 At this dated checkpoint R4 was next and R1/R6 were open. The current status above
 supersedes that statement: R4–R6 are complete locally and R1 remains open.
@@ -140,7 +147,7 @@ versioned collision-free tenant/resource keys, checks stored ownership in projec
 and replicated state application, and atomically migrates validated legacy rows with
 the first successful v2 registry mutation. Ambiguous records fail closed without partial
 writes. Command and snapshot schema 3 prevents older binaries from reading the new state.
-See the [upgrade and recovery procedure](QUORUS_SECURITY_DEPLOYMENT_GUIDE.md#11-registry-isolation-upgrade-and-recovery)
+See the [upgrade and recovery procedure](../../docs/QUORUS_SECURITY_DEPLOYMENT_GUIDE.md#11-registry-isolation-upgrade-and-recovery)
 before any deployment.
 
 Twenty-two new cases retain intended behavioral red before their fixes. One HTTP case,
@@ -149,7 +156,7 @@ explicitly classified as characterization or regression. The corrected focused s
 sequencing failures are retained, not hidden by the rerun. Final clean controller verification
 passes 546 tests with no failures, errors or skips and meets the JaCoCo gate. R2's implementation
 is complete; commands, hashes and limitations are recorded under `remediationR2` in the existing
-[Phase 4 evidence](../docs-design/evidence/phase4-tdd-evidence-2026-09-03.json).
+[Phase 4 evidence](../evidence/phase4-tdd-evidence-2026-09-03.json).
 R3 progress is recorded above; production acceptance gates
 remain open. No deployed data was inspected, migrated or deleted.
 
@@ -166,11 +173,11 @@ remain open. No deployed data was inspected, migrated or deleted.
 | Clean controller `verify` | 520 tests passed; no failures, errors or skips; JaCoCo gate passed; BUILD SUCCESS |
 | Shaded JAR audit | External `dev/mars/raftlog/storage/FileRaftStorage.class` present; internal WAL implementations and RocksDB JNI absent |
 
-The controller count changed from 530 to 520 because 17 obsolete implementation-specific tests were removed and seven rejection cases were added. Existing node, snapshot and controller tests were migrated to real library storage with per-test temporary directories and awaited shutdown; these migrations are regression coverage, not new TDD evidence. Commands, timestamps, log hashes and the artifact hash are retained under `externalLibraryOnly` in the [Raft evidence record](../docs-design/evidence/raft-log-tdd-evidence-2026-09-04.json). This removal slice did not rerun the full reactor or the configured Docker/slow groups excluded by default controller verification.
+The controller count changed from 530 to 520 because 17 obsolete implementation-specific tests were removed and seven rejection cases were added. Existing node, snapshot and controller tests were migrated to real library storage with per-test temporary directories and awaited shutdown; these migrations are regression coverage, not new TDD evidence. Commands, timestamps, log hashes and the artifact hash are retained under `externalLibraryOnly` in the [Raft evidence record](../evidence/raft-log-tdd-evidence-2026-09-04.json). This removal slice did not rerun the full reactor or the configured Docker/slow groups excluded by default controller verification.
 
 **Operational boundary:** controller configuration accepts only `raftlog`; removed backend names fail explicitly. No deployed storage was inspected, migrated or deleted. Preserve any legacy storage before recovery work; switching a property is not an on-disk migration. At this dated checkpoint R4–R6 remained open; their current completion status is recorded above. The R1 production-filesystem and power-loss acceptance gates remain open. Green tests do not close deployment acceptance gates.
 
-**Remediation checkpoint:** the approved review follow-up is tracked in the existing [enterprise implementation plan](../docs-design/task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md#remediation-checkpoint--2026-09-04). M0 durability and Phase 4 acceptance are reopened. Real WAL prefix deletion in `067bb45` exposed the adapter's memory-only snapshots. R1 adds a durable snapshot sidecar, compaction dependency checks, serialized snapshot mutations and interrupted-install recovery; its behavioral red/green evidence is retained in the [Raft evidence record](../docs-design/evidence/raft-log-tdd-evidence-2026-09-04.json). Release remains blocked by the checkpoint's outstanding gates. `db532fb` records a full clean reactor against the 1.2.0 adoption patch, but that historical green result did not exercise snapshot-plus-compaction restart. No deployed storage has been changed or assessed by this remediation.
+**Remediation checkpoint:** the approved review follow-up is tracked in the existing [enterprise implementation plan](../task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md#remediation-checkpoint--2026-09-04). M0 durability and Phase 4 acceptance are reopened. Real WAL prefix deletion in `067bb45` exposed the adapter's memory-only snapshots. R1 adds a durable snapshot sidecar, compaction dependency checks, serialized snapshot mutations and interrupted-install recovery; its behavioral red/green evidence is retained in the [Raft evidence record](../evidence/raft-log-tdd-evidence-2026-09-04.json). Release remains blocked by the checkpoint's outstanding gates. `db532fb` records a full clean reactor against the 1.2.0 adoption patch, but that historical green result did not exercise snapshot-plus-compaction restart. No deployed storage has been changed or assessed by this remediation.
 
 The working tree described here was committed as `b35fb25` (`refactor(config): isolate layered config; drop singletons and -D flags`). A follow-up on 2026-09-04 then addressed the blocking findings:
 
@@ -187,7 +194,7 @@ This document hands over an uncommitted refactor of the Quorus configuration lay
 
 The change is not committed. Everything described here lives in the working tree only. Nothing is staged.
 
-The normative behaviour of the system remains defined by [QUORUS_ARCHITECTURE_SPECIFICATION.md](QUORUS_ARCHITECTURE_SPECIFICATION.md) and [QUORUS_REST_API_SPECIFICATION.md](QUORUS_REST_API_SPECIFICATION.md). Where this handover describes intent that those documents do not yet capture, the specifications should be updated when the work is committed.
+The normative behaviour of the system remains defined by [QUORUS_ARCHITECTURE_SPECIFICATION.md](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md) and [QUORUS_REST_API_SPECIFICATION.md](../../docs/QUORUS_REST_API_SPECIFICATION.md). Where this handover describes intent that those documents do not yet capture, the specifications should be updated when the work is committed.
 
 ## Executive summary
 
@@ -301,9 +308,9 @@ Callers outside this repository, and any local branches, will need these updates
 
 ### 2.5 Documentation touched by the diff
 
-- [docs-design/design/QUORUS_RAFT_WAL_DESIGN.md](../docs-design/design/QUORUS_RAFT_WAL_DESIGN.md): the `FileRaftWAL` and verticle snippets take an `AppConfig`; the systemd unit no longer passes `-Dquorus.config.file`; one `RaftStorageFactory` snippet shows the asynchronous signature. A second snippet near line 3642 still shows the removed two-argument form.
-- [docs-design/archive/QUORUS_ALPHA_IMPLEMENTATION_PLAN.md](../docs-design/archive/QUORUS_ALPHA_IMPLEMENTATION_PLAN.md): NFS mount root moved to `quorus.agent.nfs.mount-root`; the `AgentConfig` row and Appendix C describe the new precedence; `QUORUS_HTTP_HOST` default corrected.
-- [QUORUS_SERVICE_CONNECTION_OPERATIONS_RUNBOOK.md](QUORUS_SERVICE_CONNECTION_OPERATIONS_RUNBOOK.md): mount attestations are `QUORUS_AGENT_SMB_ENCRYPTED_AUTHENTICATED_MOUNT` and `QUORUS_AGENT_NFS_ENCRYPTED_AUTHENTICATED_MOUNT`.
+- [docs-design/design/QUORUS_RAFT_WAL_DESIGN.md](../design/QUORUS_RAFT_WAL_DESIGN.md): the `FileRaftWAL` and verticle snippets take an `AppConfig`; the systemd unit no longer passes `-Dquorus.config.file`; one `RaftStorageFactory` snippet shows the asynchronous signature. A second snippet near line 3642 still shows the removed two-argument form.
+- [docs-design/archive/QUORUS_ALPHA_IMPLEMENTATION_PLAN.md](../archive/QUORUS_ALPHA_IMPLEMENTATION_PLAN.md): NFS mount root moved to `quorus.agent.nfs.mount-root`; the `AgentConfig` row and Appendix C describe the new precedence; `QUORUS_HTTP_HOST` default corrected.
+- [QUORUS_SERVICE_CONNECTION_OPERATIONS_RUNBOOK.md](../../docs/QUORUS_SERVICE_CONNECTION_OPERATIONS_RUNBOOK.md): mount attestations are `QUORUS_AGENT_SMB_ENCRYPTED_AUTHENTICATED_MOUNT` and `QUORUS_AGENT_NFS_ENCRYPTED_AUTHENTICATED_MOUNT`.
 
 ### 2.6 Tests
 
@@ -351,49 +358,49 @@ A multi-angle code review was run against the diff. Findings inside the diff wer
 ### 5.1 Fix before committing
 
 **Finding 1 — Controller environment overrides for three hyphenated keys are silently dropped.**  
-Location: [AppConfig.java:460](../quorus-controller/src/main/java/dev/mars/quorus/controller/config/AppConfig.java#L460), `resolveEnvironmentKey`.  
+Location: [AppConfig.java:460](../../quorus-controller/src/main/java/dev/mars/quorus/controller/config/AppConfig.java#L460), `resolveEnvironmentKey`.  
 `applyEnvironmentOverrides` converts `QUORUS_JOBS_ATTEMPT_LEASE_DURATION_MS` to `quorus.jobs.attempt.lease.duration.ms` and then searches the already-loaded keys for one whose hyphens, replaced by dots, match. The accessors for `quorus.jobs.attempt.lease-duration-ms`, `quorus.raft.io.queue-size`, and `quorus.raft.snapshot.check-interval-ms` are not present in `quorus-controller.properties`, so the search fails, the dotted key is stored, and the accessor default wins with no warning. Before the refactor `getString` derived the variable name from the accessor key at lookup time, so these variables worked.  
 Fix options, best first: drive the mapping from a declared set of accessor keys; or map at lookup time from the injected environment map while keeping explicit overrides above it; or as a stopgap add the three keys to the packaged file with blank values, which the blank-means-unset rule makes safe. Add a test using the package-private constructor with a hyphenated key that is absent from the packaged file.
 
 **Finding 2 — Agent legacy variable names now override the documented `QUORUS_AGENT_*` names.**  
-Location: [AgentConfig.java:337-360](../quorus-agent/src/main/java/dev/mars/quorus/agent/config/AgentConfig.java#L337-L360).  
-The legacy-name map is applied after the generic pass, so `AGENT_ID` beats `QUORUS_AGENT_ID`. Before the refactor the order was the reverse. The consequence is concrete because [quorus-agent/docker-entrypoint.sh:26-32](../quorus-agent/docker-entrypoint.sh#L26-L32) unconditionally exports `AGENT_REGION`, `AGENT_DATACENTER`, `SUPPORTED_PROTOCOLS`, `MAX_CONCURRENT_TRANSFERS`, `HEARTBEAT_INTERVAL`, `AGENT_PORT`, and `AGENT_VERSION` with defaults. In a container the `QUORUS_AGENT_*` forms of those seven settings can therefore never take effect.  
+Location: [AgentConfig.java:337-360](../../quorus-agent/src/main/java/dev/mars/quorus/agent/config/AgentConfig.java#L337-L360).  
+The legacy-name map is applied after the generic pass, so `AGENT_ID` beats `QUORUS_AGENT_ID`. Before the refactor the order was the reverse. The consequence is concrete because [quorus-agent/docker-entrypoint.sh:26-32](../../quorus-agent/docker-entrypoint.sh#L26-L32) unconditionally exports `AGENT_REGION`, `AGENT_DATACENTER`, `SUPPORTED_PROTOCOLS`, `MAX_CONCURRENT_TRANSFERS`, `HEARTBEAT_INTERVAL`, `AGENT_PORT`, and `AGENT_VERSION` with defaults. In a container the `QUORUS_AGENT_*` forms of those seven settings can therefore never take effect.  
 Fix: apply the legacy map first, as a fallback, and the generic `QUORUS_AGENT_*` pass second. Add a test that sets both names and asserts the documented one wins.  
 Two related points. The generic pass derives variable names only from keys present in the packaged file, so an accessor key that is missing from it becomes unreachable from the environment; today every accessor key is present, but nothing enforces that. And `AgentConfiguration.from` no longer fails when the agent id is unset, because `AgentConfig.getAgentId()` falls back to the hostname; the Docker entrypoint still rejects a missing `AGENT_ID`, but a bare `java -jar` start does not.
 
 **Finding 3 — A non-positive attempt lease duration hangs controller startup instead of failing it.**  
-Location: [JobAssignmentHandler.java:77](../quorus-controller/src/main/java/dev/mars/quorus/controller/http/handlers/JobAssignmentHandler.java#L77), constructed from [QuorusControllerVerticle.java:184](../quorus-controller/src/main/java/dev/mars/quorus/controller/QuorusControllerVerticle.java#L184).  
+Location: [JobAssignmentHandler.java:77](../../quorus-controller/src/main/java/dev/mars/quorus/controller/http/handlers/JobAssignmentHandler.java#L77), constructed from [QuorusControllerVerticle.java:184](../../quorus-controller/src/main/java/dev/mars/quorus/controller/QuorusControllerVerticle.java#L184).  
 The handler now rejects a lease of zero or less. It is constructed inside the `node.start().onSuccess` callback, where a thrown exception is logged by Vert.x and the start promise is never completed, so the deployment sits forever. `AppConfig.validate()` does not check the lease.  
 Fix: validate `quorus.jobs.attempt.lease-duration-ms` in `AppConfig.validate()` so `main` fails fast, and wrap the callback body in a try/catch that fails the start promise so any future constructor exception surfaces.
 
 ### 5.2 Fix soon
 
 **Finding 4 — The controller entrypoint script clobbers compose-provided values.**  
-Location: [quorus-controller/docker-entrypoint.sh:43-47](../quorus-controller/docker-entrypoint.sh#L43-L47).  
+Location: [quorus-controller/docker-entrypoint.sh:43-47](../../quorus-controller/docker-entrypoint.sh#L43-L47).  
 The script exports `QUORUS_NODE_ID="$NODE_ID"` after defaulting `NODE_ID` to `controller1`, so a container that receives only `QUORUS_NODE_ID=controller2`, which is how every compose file is written, would be renamed to `controller1`. It also exits when `CLUSTER_NODES` is unset even if `QUORUS_CLUSTER_NODES` is set. This is latent because the controller `Dockerfile` does not call the script.  
 Fix: make each export fill-only, for example `export QUORUS_NODE_ID="${QUORUS_NODE_ID:-${NODE_ID:-$DEFAULT_NODE_ID}}"`, and validate on `QUORUS_CLUSTER_NODES`; or delete the script and let compose set `QUORUS_*` directly.
 
 ### 5.3 Cleanup
 
 **Finding 5 — Dead and uncalled code left by the refactor.**  
-- `createRocksDbStorage` at [RaftStorageFactory.java:167](../quorus-controller/src/main/java/dev/mars/quorus/controller/raft/storage/RaftStorageFactory.java#L167) lost its only caller when the synchronous `create` overloads were removed.  
-- `ProtocolFactory(Vertx, String)` at [ProtocolFactory.java:62](../quorus-core/src/main/java/dev/mars/quorus/protocol/ProtocolFactory.java#L62) and the five-argument `SimpleTransferEngine` at [SimpleTransferEngine.java:101](../quorus-core/src/main/java/dev/mars/quorus/transfer/SimpleTransferEngine.java#L101) have no callers.  
-- The eight-argument `HttpApiServer` constructor at [HttpApiServer.java:111](../quorus-controller/src/main/java/dev/mars/quorus/controller/http/HttpApiServer.java#L111) has no callers. The `prometheusPort` parameter across the constructor chain exists only so one test can pass a port that its `AppConfig` could carry instead.  
-- The blank-mount-root decision is a ternary in `ProtocolFactory` plus a boolean-only constructor at [NfsTransferProtocol.java:91](../quorus-core/src/main/java/dev/mars/quorus/protocol/NfsTransferProtocol.java#L91). Resolving blank to the platform default inside `NfsTransferProtocol(String, boolean)` removes both.
+- `createRocksDbStorage` at [RaftStorageFactory.java:167](../../quorus-controller/src/main/java/dev/mars/quorus/controller/raft/storage/RaftStorageFactory.java#L167) lost its only caller when the synchronous `create` overloads were removed.  
+- `ProtocolFactory(Vertx, String)` at [ProtocolFactory.java:62](../../quorus-core/src/main/java/dev/mars/quorus/protocol/ProtocolFactory.java#L62) and the five-argument `SimpleTransferEngine` at [SimpleTransferEngine.java:101](../../quorus-core/src/main/java/dev/mars/quorus/transfer/SimpleTransferEngine.java#L101) have no callers.  
+- The eight-argument `HttpApiServer` constructor at [HttpApiServer.java:111](../../quorus-controller/src/main/java/dev/mars/quorus/controller/http/HttpApiServer.java#L111) has no callers. The `prometheusPort` parameter across the constructor chain exists only so one test can pass a port that its `AppConfig` could carry instead.  
+- The blank-mount-root decision is a ternary in `ProtocolFactory` plus a boolean-only constructor at [NfsTransferProtocol.java:91](../../quorus-core/src/main/java/dev/mars/quorus/protocol/NfsTransferProtocol.java#L91). Resolving blank to the platform default inside `NfsTransferProtocol(String, boolean)` removes both.
 
 **Finding 6 — Three copies of the layered loader that already disagree.**  
 `AppConfig`, `AgentConfig`, and `QuorusConfiguration` each carry their own `loadResource`, `applyEnvironmentOverrides`, and typed getters. They differ in environment mapping strategy, in whether the environment is injectable, in trimming, and in blank handling. A single loader in `quorus-core` driven by a declared key set would remove the duplication and fix finding 1 and the fragile half of finding 2 at the same time.
 
 **Finding 7 — `AgentConfiguration.Builder` duplicates defaults.**  
-Location: [AgentConfiguration.java:259-266](../quorus-agent/src/main/java/dev/mars/quorus/agent/config/AgentConfiguration.java#L259-L266).  
+Location: [AgentConfiguration.java:259-266](../../quorus-agent/src/main/java/dev/mars/quorus/agent/config/AgentConfiguration.java#L259-L266).  
 The builder hard-codes a third copy of the defaults. Its foreign-assignment threshold of 3 disagrees with the packaged value of 1, so tests that build through the `Builder` run with values production never uses. Removing the literal defaults that `from(AgentConfig)` always sets, and steering tests through `AgentConfiguration.from(new AgentConfig("test", overrides))`, leaves one source of truth.
 
 ### 5.4 Documentation outside the diff
 
 **Finding 8 — Stale references to removed behaviour.**  
-- [.github/copilot-instructions.md:49-53](../.github/copilot-instructions.md#L49-L53) still lists `-Dquorus.http.port=8080` as a configuration channel and describes `AppConfig.get()` and `AgentConfig.get()` as the access pattern. Anyone following it will write code that no longer compiles or configuration that is silently ignored.  
-- [QUORUS_RAFT_WAL_DESIGN.md:3642](../docs-design/design/QUORUS_RAFT_WAL_DESIGN.md#L3642) still calls `RaftStorageFactory.create(vertx, walExecutor)`.  
-- [QUORUS_ARCHITECTURE_SPECIFICATION.md](QUORUS_ARCHITECTURE_SPECIFICATION.md) should state the new precedence contract if it describes configuration resolution anywhere.
+- [.github/copilot-instructions.md:49-53](../../.github/copilot-instructions.md) still lists `-Dquorus.http.port=8080` as a configuration channel and describes `AppConfig.get()` and `AgentConfig.get()` as the access pattern. Anyone following it will write code that no longer compiles or configuration that is silently ignored.  
+- [QUORUS_RAFT_WAL_DESIGN.md:3642](../design/QUORUS_RAFT_WAL_DESIGN.md) still calls `RaftStorageFactory.create(vertx, walExecutor)`.  
+- [QUORUS_ARCHITECTURE_SPECIFICATION.md](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md) should state the new precedence contract if it describes configuration resolution anywhere.
 
 ## 6. Recommended next steps
 
@@ -403,7 +410,7 @@ The builder hard-codes a third copy of the defaults. Its foreign-assignment thre
    - `AgentConfigTest`: precedence between a legacy name and its `QUORUS_AGENT_*` equivalent. `AgentConfig` reads `System.getenv()` directly, so either add a package-private constructor that accepts an environment map, mirroring `AppConfig`, or assert the ordering through the packaged-key path.
    - `AppConfigNodeIdentityTest`: `validate()` rejects a non-positive lease duration.
 3. Update the two stale documents in finding 8 and the architecture specification.
-4. Run `mvn clean verify`. If Docker is available, also run the compose smoke test described in [QUORUS-DOCKER-TESTING-README.md](QUORUS-DOCKER-TESTING-README.md), because the agent entrypoint changed.
+4. Run `mvn clean verify`. If Docker is available, also run the compose smoke test described in [QUORUS-DOCKER-TESTING-README.md](../../docs/QUORUS-DOCKER-TESTING-README.md), because the agent entrypoint changed.
 5. Commit. A suggested split is one commit for the configuration contract and wiring, and a second for the entrypoint and documentation changes. Suggested subject for the first: `refactor(config): replace singletons and system properties with isolated layered configuration`.
 6. Schedule the cleanup in findings 5 to 7 as a follow-up. Finding 6 is the largest and should be designed rather than patched.
 
@@ -459,9 +466,9 @@ git diff --stat
 
 **Key files for the next engineer**
 
-- [AppConfig.java](../quorus-controller/src/main/java/dev/mars/quorus/controller/config/AppConfig.java) — controller loader and the environment mapping in question.
-- [AgentConfig.java](../quorus-agent/src/main/java/dev/mars/quorus/agent/config/AgentConfig.java) — agent loader and legacy-name map.
-- [AgentConfiguration.java](../quorus-agent/src/main/java/dev/mars/quorus/agent/config/AgentConfiguration.java) — typed agent configuration and builder.
-- [QuorusConfiguration.java](../quorus-core/src/main/java/dev/mars/quorus/config/QuorusConfiguration.java) — core loader.
-- [ControllerTestConfig.java](../quorus-controller/src/test/java/dev/mars/quorus/controller/config/ControllerTestConfig.java) — test helper used by most controller HTTP tests.
-- [quorus-controller.properties](../quorus-controller/src/main/resources/quorus-controller.properties) and [quorus-agent.properties](../quorus-agent/src/main/resources/quorus-agent.properties) — packaged defaults that also define which keys the environment can reach.
+- [AppConfig.java](../../quorus-controller/src/main/java/dev/mars/quorus/controller/config/AppConfig.java) — controller loader and the environment mapping in question.
+- [AgentConfig.java](../../quorus-agent/src/main/java/dev/mars/quorus/agent/config/AgentConfig.java) — agent loader and legacy-name map.
+- [AgentConfiguration.java](../../quorus-agent/src/main/java/dev/mars/quorus/agent/config/AgentConfiguration.java) — typed agent configuration and builder.
+- [QuorusConfiguration.java](../../quorus-core/src/main/java/dev/mars/quorus/config/QuorusConfiguration.java) — core loader.
+- [ControllerTestConfig.java](../../quorus-controller/src/test/java/dev/mars/quorus/controller/config/ControllerTestConfig.java) — test helper used by most controller HTTP tests.
+- [quorus-controller.properties](../../quorus-controller/src/main/resources/quorus-controller.properties) and [quorus-agent.properties](../../quorus-agent/src/main/resources/quorus-agent.properties) — packaged defaults that also define which keys the environment can reach.

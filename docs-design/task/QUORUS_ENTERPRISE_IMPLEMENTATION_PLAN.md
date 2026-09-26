@@ -2,11 +2,11 @@
 
 # Quorus Enterprise Implementation Plan
 
-**Version:** 1.27
-**Date:** 2026-09-25
+**Version:** 1.28
+**Date:** 2026-09-26
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
-**Status:** Active — remediation checkpoint open; R1-1 container-recreation acceptance closed 2026-09-07 while R1-2 and R1-3 remain open; M0 durability and Phase 4 acceptance reopened; Phase 1 complete; Phases 2 and 3 in progress  
+**Status:** Active — remediation checkpoint open; R1-1 container-recreation acceptance closed 2026-09-07 while R1-2 and R1-3 remain open; Phase 0 functionally complete with M0 durability acceptance reopened until R1-2 and R1-3 close; Phase 1 complete; Phase 4 complete (the acceptance reopened on 2026-09-04 was restored by R2–R6 on 2026-09-05); Phases 2 and 3 in progress; Phases 5–12 not started  
 **Scope:** Enterprise control plane, transfer operations, security, governance, deployment, and user interfaces
 
 ## 1. Purpose and Authority
@@ -15,7 +15,7 @@ This plan defines the phased implementation path from the current Quorus alpha b
 
 - [Quorus Architecture Specification](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md)
 - [Quorus REST API Specification](../../docs/QUORUS_REST_API_SPECIFICATION.md)
-- [Quorus Comprehensive System Design](../design/QUORUS_SYSTEM_DESIGN.md)
+- [Quorus Comprehensive System Design](../design/QUORUS_SYSTEM_DESIGN.md) — non-normative and substantially stale (see the [2026-09-24 documentation review](../reviews/QUORUS_DOCUMENTATION_REVIEW_2026-09-24.md) §4.7); use it for target-state intent only
 - [Quorus HTTP API Reference](../../docs/QUORUS_API_REFERENCE.md)
 
 The architecture and REST API specifications remain normative. This plan controls delivery order and exit evidence; it does not weaken a canonical requirement. Historical completion markers in older plans do not close current conformance gaps.
@@ -61,7 +61,7 @@ The baseline does not yet justify protected enterprise production use. Phase 1 e
 
 ## 4. Target Release Milestones
 
-### Remediation checkpoint — 2026-09-04
+### Configuration and documentation remediation — 2026-09-25
 
 **CFG-01 container deployment configuration hygiene — 2026-09-25:** The repository Compose
 topologies now state their development-only security posture explicitly, use supported controller
@@ -70,7 +70,36 @@ local-only topology generates short-lived certificates and proves production-pro
 Raft mutual TLS: the controller becomes healthy, a certificate-authenticated readiness request
 succeeds, and a request without a client certificate is rejected during the TLS handshake. The
 image health check now follows the configured HTTP scheme and uses `/health/live`. This closes
-the repository configuration defect; it is not production PKI or deployment accreditation.
+the repository configuration defect; it is not production PKI or deployment accreditation. Tracked as `CFG-01` in the
+[Outstanding Work Register](QUORUS_OUTSTANDING_WORK_REGISTER.md) Section I.
+
+**Documentation review delivery items — 2026-09-26:** The
+[2026-09-24 documentation review](../reviews/QUORUS_DOCUMENTATION_REVIEW_2026-09-24.md) found
+code and configuration defects alongside its documentation findings. Its
+[task list](QUORUS_DOCUMENTATION_REVIEW_TASKS.md) owns the documentation work. The delivery work
+is added to this plan and carried in register Section I: revocation-serial normalisation
+(`SEC-01`, code fixed, ADR-0009 outstanding) and node-local revocation scope (`SEC-02`); silent
+direct-URI SFTP host-key bypass (`SEC-03`); unbound Raft peer identity (`SEC-04`); first-match
+role evaluation (`SEC-05`); direct-mTLS elevation (`SEC-06`); four configuration residuals
+(`CFG-02` to `CFG-05`); and engineering items `ENG-01` to `ENG-06`, of which `ENG-01` (the
+uninstantiated assignment timeout monitor) belongs with Phase 2 lease automation. Each is
+delivered under Section 6.1; none is assigned to a phase yet. Three existing plan obligations
+also received register IDs: the durable agent-report outbox (`P2-13`), the persistent-environment
+storage inventory (`R1-4`), and disposition of the two Raft regression cases without preserved
+red evidence (`PROC-01`).
+
+**Raw evidence retention — decided 2026-09-26 (`DR-Q6`):** earlier checkpoints and the JSON
+evidence manifests cite raw logs under the git-ignored `temp/` directory, a scratch location
+that could never have been a place to keep evidence. Of 220 cited paths, 153 were already
+gone, including every `temp/phase3-*.txt` file in Section 10. The 62 surviving logs were
+copied unchanged to `docs-design/evidence/raw/`. 47 of them match the SHA-256 recorded when
+they were captured and 15 had no recorded hash. The
+[raw evidence index](../evidence/raw/INDEX.md) maps each old path to its copy and lists what
+is missing. Statements that cite missing logs stay as historical records, but their raw output
+cannot be re-inspected. From now on the Section 6.1 rule applies: cited output goes directly
+to `docs-design/evidence/raw/<slice-id>/`.
+
+### Remediation checkpoint — 2026-09-04
 
 **R4 DNS follow-up — 2026-09-05:** Shared bounded worker execution now keeps
 controller DNS authorization off HTTP event loops. Capacity exhaustion returns 503;
@@ -121,8 +150,8 @@ This historical run advanced local verification. The later R4, R5 and R6 entries
 supersede its open-work statement; R1 deployment acceptance remains open.
 
 **2026-09-05 execution update:** R2/R3 are committed in `1a8f2b3`. The current environment
-contains RaftLog as a sister project at `../raftlog` relative to the Quorus root
-(`C:\Users\mraysmit\dev\idea-projects\raftlog`), with its own Maven reactor. Quorus
+contains RaftLog as a sister project at `../raftlog` relative to the Quorus root, with its
+own Maven reactor. Quorus
 consumes its `raftlog-core` artifact; the sister project must be built/installed separately.
 The external dependency/API gap is now resolved by the newly implemented and published RaftLog 1.2.0 from `1c5af80` (`v1.2.0`): it supplies prefix compaction after caller-owned durable snapshots. All 41 selected Quorus storage/snapshot/restart tests passed against the new artifact. RaftLog's full Windows and Linux reactors passed 319 cases (three Windows skips; no Linux skips). This is separate evidence from the unsubstantiated historical `db59859` build. See the [release handover](../evidence/raftlog-validation-handover-2026-09-05.md#implemented-capability-and-release--2026-09-05). R4 and R5 are now complete; R6 final-tree verification is recorded by the later acceptance entry. Neither local acceptance nor the RaftLog result implies R1 deployment or power-loss durability.
 Independent R5 path, TLS,
@@ -158,8 +187,9 @@ tests are recorded as retrospective characterization under Section 6.1 rather th
 TDD. Docker is a confirmed production target, so the deployment shape is representative; the
 engine was Docker Desktop on Windows, so the storage class and host kernel are not, and R1-2
 still requires a repeat on the intended Linux engine and storage class. The work also exposed
-that the existing containerised test fixture declares no volumes and no Raft storage path, so no
-prior Docker test could have detected a container-level durability regression. See the
+that the containerised test fixture then declared no volumes and no Raft storage path, so no
+earlier Docker test could have detected a container-level durability regression; the fixtures
+were corrected in the same slice (register v1.3) to use named volumes at the deployed path. See the
 [R1-1 evidence](../evidence/r1-container-recreation-2026-09-07.md). R1-2 production-filesystem
 and R1-3 machine power-loss acceptance remain open and still prevent an enterprise release claim.
 
@@ -285,6 +315,8 @@ The mandatory evidence record for each slice contains:
 - test classification: unit, component, external-path behavioral, integration, protocol, multi-node, security, contract, or failure injection;
 - confirmation that request bodies, credentials, keys, and sensitive payloads were not captured in evidence.
 
+Captured output is retained, not just summarised. Every raw log that the record cites is written directly to `docs-design/evidence/raw/<slice-id>/`, committed with the record, and listed in the manifest with its SHA-256. The git-ignored `temp/` directory is scratch space and MUST NOT hold cited evidence; a citation of a `temp/` path does not satisfy this protocol. Historical `temp/` citations are resolved through the [raw evidence index](../evidence/raw/INDEX.md).
+
 For asynchronous behavior, tests MUST use the project-standard Vert.x test facilities. Awaitility, Java executor/latch orchestration, sleeps used as synchronization, and equivalent non-Vert.x polling are not permitted in new or remediated tests. External-path tests MUST enter through the same HTTP, agent, protocol, or cluster boundary used by a real caller. Direct method tests remain useful but cannot independently satisfy the behavioral-test gate.
 
 Existing implementation for which no preserved red stage exists can only receive **retrospective characterization**. It requires an explicit process-deviation record and cannot be relabelled as historical TDD. All subsequent changes to that behavior return to the mandatory red-green-refactor protocol.
@@ -293,7 +325,7 @@ Existing implementation for which no preserved red stage exists can only receive
 
 **Size:** L  
 **Milestone:** M0  
-**Status:** Complete — functional verification and code-side TDD remediation passed; historical process deviation approved on 2026-09-02  
+**Status:** Functionally complete — functional verification and code-side TDD remediation passed; historical process deviation approved on 2026-09-02; durability acceptance reopened by the 2026-09-04 remediation checkpoint until R1-2 and R1-3 close  
 **Primary gaps:** `ARCH-01`, `ARCH-05`, `ARCH-06`, `ARCH-07`, `API-01`, `API-12`
 
 ### Objective
@@ -392,7 +424,7 @@ Coverage-gate remediation completed on 2026-09-02:
 - controller Surefire now preserves the JaCoCo agent argument while adding the required Java modules; the prior configuration silently replaced the agent argument and therefore produced no controller execution data;
 - the existing 60% line-coverage minimum remains unchanged and applies to every authored controller package;
 - only protoc-generated Java and gRPC bindings are excluded from coverage accounting, while live gRPC transport tests continue to exercise that boundary;
-- retrospective Vert.x behavioral coverage now exercises controller deployment, packaged configuration, telemetry bootstrap, assignment lifecycle through Raft, file storage, and RocksDB storage; these tests characterize existing production behavior and are not presented as historical TDD evidence;
+- retrospective Vert.x behavioral coverage now exercises controller deployment, packaged configuration, telemetry bootstrap, assignment lifecycle through Raft, file storage, and RocksDB storage (both internal storage backends were later removed by the external-library-only correction); these tests characterize existing production behavior and are not presented as historical TDD evidence;
 - the authoritative five-module clean verification passed 2,163 tests with zero failures, errors, or skips (core 1,491; workflow 134; tenant 64; controller 474);
 - JaCoCo analyzed 143 authored controller classes and reported 79.0% line coverage and 60.2% branch coverage; the lowest authored package is 60.1%, above the unchanged 60.0% package gate;
 - two existing asynchronous tests exposed instrumented-suite timing assumptions; their assertions and production behavior were retained while their setup/convergence deadlines were aligned to the established 15-second integration-test window, followed by a 17-test focused green run and the clean reactor pass.
@@ -594,7 +626,7 @@ Operations can detect, understand, own, and act on a critical transfer before it
 **Size:** XL  
 **Milestone:** contributes to M2  
 **Primary gaps:** `ARCH-08`, `ARCH-14`, `ARCH-17`, `API-06`  
-**Status:** Complete — delivered on 2026-09-03 under the mandatory TDD gate  
+**Status:** Complete — delivered on 2026-09-03 under the mandatory TDD gate; acceptance reopened by the 2026-09-04 remediation checkpoint and restored when R2–R6 completed on 2026-09-05  
 
 ### Implementation checkpoint — 2026-09-03
 
@@ -651,7 +683,8 @@ Every production service connection has explicit ownership, identity verificatio
 
 **Size:** XL  
 **Milestone:** M2  
-**Primary gaps:** `ARCH-15`, `ARCH-16`, `API-05`
+**Primary gaps:** `ARCH-15`, `ARCH-16`, `API-05`  
+**Status:** Not started
 
 ### Objective
 
@@ -698,7 +731,8 @@ The fleet can be securely admitted, operated, upgraded, rolled back, isolated, a
 
 **Size:** XL  
 **Milestone:** contributes to M3  
-**Primary gaps:** `ARCH-18`, `API-01`, `API-03`, `API-08`, `API-09`, `API-11`, `API-12`, `API-13`, `API-14`
+**Primary gaps:** `ARCH-18`, `API-01`, `API-03`, `API-08`, `API-09`, `API-11`, `API-12`, `API-13`, `API-14`  
+**Status:** Not started
 
 ### Objective
 
@@ -744,7 +778,8 @@ The REST and event contracts are sufficient to operate and integrate the platfor
 
 **Size:** L  
 **Milestone:** contributes to M3  
-**Primary gaps:** `ARCH-04`, `API-08`, `API-10`
+**Primary gaps:** `ARCH-04`, `API-08`, `API-10`  
+**Status:** Not started
 
 ### Objective
 
@@ -790,7 +825,8 @@ Routes and workflows execute autonomously and predictably under governed schedul
 
 **Size:** XL  
 **Milestone:** M3  
-**Primary gaps:** `ARCH-07`, `ARCH-10`, `API-13`, `API-14`
+**Primary gaps:** `ARCH-07`, `ARCH-10`, `API-13`, `API-14`  
+**Status:** Not started
 
 ### Objective
 
@@ -842,7 +878,8 @@ Availability and durability claims are supported by repeatable failure and resto
 
 **Size:** XL  
 **Milestone:** contributes to M4  
-**Primary gaps:** `API-11` plus governance requirements in the main design
+**Primary gaps:** `API-11` plus governance requirements in the main design  
+**Status:** Not started
 
 ### Objective
 
@@ -888,7 +925,8 @@ Security, operational, change, and transfer evidence is searchable, exportable, 
 ## 17. Phase 10 — Configuration, Supportability, Capacity, and Service Management
 
 **Size:** L  
-**Milestone:** contributes to M4
+**Milestone:** contributes to M4  
+**Status:** Not started
 
 ### Objective
 
@@ -935,7 +973,8 @@ Operations and support can reproduce configuration, diagnose incidents, forecast
 ## 18. Phase 11 — Administration and Operations User Interfaces
 
 **Size:** XL  
-**Milestone:** M4
+**Milestone:** M4  
+**Status:** Not started
 
 ### Objective
 
@@ -992,7 +1031,8 @@ Representative operators, security administrators, auditors, application owners,
 ## 19. Phase 12 — Enterprise Validation, Pilot, and Release Candidate
 
 **Size:** XL  
-**Milestone:** M5
+**Milestone:** M5  
+**Status:** Not started
 
 ### Objective
 
@@ -1077,6 +1117,8 @@ Architecture, security, operations, quality, and product/domain owners participa
 
 ## 21. Gap-to-Phase Traceability
 
+This table assigns each gap to its delivery phases. Current closure status is maintained in [register §12](QUORUS_OUTSTANDING_WORK_REGISTER.md#12-gap-to-section-traceability), not here.
+
 | Gap | Delivery phase |
 |---|---|
 | `ARCH-01` Agent omits `IN_PROGRESS` | Phase 0, completed structurally in Phase 2 |
@@ -1153,5 +1195,8 @@ The plan is revised when requirements or implementation evidence change. Revisio
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.28 | 2026-09-26 | Added the documentation-review delivery items (`SEC-01`–`SEC-06`, `CFG-02`–`CFG-05`, `ENG-01`–`ENG-06`) and IDs for three unnumbered obligations (`P2-13`, `R1-4`, `PROC-01`); moved `CFG-01` into its own dated section; settled the Phase 0 and Phase 4 status wording; added Status lines for Phases 5–12; decided raw-evidence retention (`DR-Q6`): cited output goes to `docs-design/evidence/raw/`, never `temp/`, added to the §6.1 protocol, and surviving historical logs rescued; removed a machine-specific path; annotated the historical RocksDB coverage statement; qualified the System Design as a non-normative input |
 | 1.27 | 2026-09-25 | Recorded closed `CFG-01` container configuration hygiene and the generated-certificate mutual-TLS validation boundary |
 | 1.26 | 2026-09-07 | Recorded the R1-1 container-recreation acceptance checkpoint and retained R1-2/R1-3 as release blockers |
+
+Revision history was not recorded before v1.26. Earlier changes are visible only in git history and in the dated checkpoints above.
