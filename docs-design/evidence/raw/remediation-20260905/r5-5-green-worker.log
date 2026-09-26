@@ -1,0 +1,240 @@
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::staticFieldBase has been called by com.google.inject.internal.aop.HiddenClassDefiner (file:/C:/Users/mraysmit/scoop/apps/maven/current/lib/guice-5.1.0-classes.jar)
+WARNING: Please consider reporting this to the maintainers of class com.google.inject.internal.aop.HiddenClassDefiner
+WARNING: sun.misc.Unsafe::staticFieldBase will be removed in a future release
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] ------------------------< dev.mars:quorus-core >------------------------
+[INFO] Building Quorus Core 1.0-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- jacoco:0.8.15:prepare-agent (prepare-agent) @ quorus-core ---
+[INFO] argLine set to -javaagent:C:\\Users\\mraysmit\\.m2\\repository\\org\\jacoco\\org.jacoco.agent\\0.8.15\\org.jacoco.agent-0.8.15-runtime.jar=destfile=C:\\Users\\mraysmit\\dev\\idea-projects\\quorus\\quorus-core\\target\\jacoco.exec,excludes=sun/**:jdk/**:java/**:com/sun/**:org/jcp/**
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ quorus-core ---
+[INFO] Copying 1 resource from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ quorus-core ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ quorus-core ---
+[INFO] Copying 11 resources from src\test\resources to target\test-classes
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ quorus-core ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- surefire:3.2.2:test (default-test) @ quorus-core ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running dev.mars.quorus.connection.FtpsDefaultPortBoundaryTest
+11:53:40.725 [vert.x-worker-thread-0] INFO  d.m.q.protocol.FtpTransferProtocol - Starting FTP transfer: jobId=ftps-port, isUpload=false
+11:53:40.730 [vert.x-worker-thread-0] DEBUG d.m.q.protocol.FtpTransferProtocol - Transfer details: sourceUri=ftps://localhost/approved/file, destinationUri=file:///C:/Users/mraysmit/AppData/Local/Temp/junit13425266285606995308/file
+11:53:40.731 [vert.x-worker-thread-0] DEBUG d.m.q.protocol.FtpTransferProtocol - Routing to FTP download handler
+11:53:40.731 [vert.x-worker-thread-0] INFO  d.m.q.protocol.FtpTransferProtocol - Starting FTP download: ftps://localhost/approved/file -> C:\Users\mraysmit\AppData\Local\Temp\junit13425266285606995308\file
+11:53:40.742 [vert.x-worker-thread-0] DEBUG d.m.q.protocol.FtpTransferProtocol - Parsed URI: scheme=ftps, host=localhost, port=21, ftpsMode=EXPLICIT
+11:53:40.743 [vert.x-worker-thread-0] DEBUG d.m.q.protocol.FtpTransferProtocol - Connection info parsed: host=localhost, port=21, path=/approved/file
+11:53:40.743 [vert.x-worker-thread-0] DEBUG d.m.q.protocol.FtpTransferProtocol - Establishing FTP connection to localhost:21
+11:53:40.746 [vert.x-worker-thread-0] DEBUG d.m.q.protocol.FtpTransferProtocol - Connecting to FTPS (EXPLICIT) server: localhost:21
+11:53:40.838 [vert.x-worker-thread-0] DEBUG d.m.q.protocol.FtpTransferProtocol - TCP connection established to localhost:21
+11:53:40.988 [vert.x-worker-thread-0] DEBUG d.m.q.protocol.FtpTransferProtocol - FTP Response: 220 fixture ready
+11:53:40.989 [vert.x-worker-thread-0] DEBUG d.m.q.protocol.FtpTransferProtocol - Received FTP welcome message
+11:53:40.989 [vert.x-worker-thread-0] DEBUG d.m.q.protocol.FtpTransferProtocol - Explicit FTPS: sending AUTH TLS to upgrade control connection
+11:53:40.989 [vert.x-worker-thread-0] DEBUG d.m.q.protocol.FtpTransferProtocol - FTP Command: AUTH TLS
+11:53:41.006 [vert.x-worker-thread-0] DEBUG d.m.q.protocol.FtpTransferProtocol - FTP Response: 421 fixture stops before authentication
+11:53:41.006 [vert.x-worker-thread-0] DEBUG d.m.q.protocol.FtpTransferProtocol - Disconnecting FTP client
+11:53:41.006 [vert.x-worker-thread-0] DEBUG d.m.q.protocol.FtpTransferProtocol - Disconnecting from FTP server
+11:53:41.007 [vert.x-worker-thread-0] DEBUG d.m.q.protocol.FtpTransferProtocol - FTP Command: QUIT
+11:53:41.009 [vert.x-worker-thread-0] ERROR d.m.q.protocol.FtpTransferProtocol - [QUORUS-1009] FTP server closed connection unexpectedly (EOF)
+11:53:41.010 [vert.x-worker-thread-0] WARN  d.m.q.protocol.FtpTransferProtocol - Error during FTP disconnect: FTP server closed connection unexpectedly
+11:53:41.011 [vert.x-worker-thread-0] DEBUG d.m.q.protocol.FtpTransferProtocol - FTP disconnection complete
+11:53:41.011 [vert.x-worker-thread-0] ERROR d.m.q.protocol.FtpTransferProtocol - [QUORUS-1001] FTP download failed: requestId=ftps-port, error=Server rejected AUTH TLS: 421 fixture stops before authentication
+11:53:41.011 [vert.x-worker-thread-0] DEBUG d.m.q.protocol.FtpTransferProtocol - FTP download exception details for request: ftps-port
+java.io.IOException: Server rejected AUTH TLS: 421 fixture stops before authentication
+	at dev.mars.quorus.protocol.FtpTransferProtocol$FtpClient.upgradeToTls(FtpTransferProtocol.java:563)
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.024 s -- in dev.mars.quorus.connection.FtpsDefaultPortBoundaryTest
+[INFO] Running dev.mars.quorus.connection.GovernedConnectionSecurityTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.021 s -- in dev.mars.quorus.connection.GovernedConnectionSecurityTest
+[INFO] Running dev.mars.quorus.connection.RemotePathBoundaryTest
+[INFO] Tests run: 16, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.440 s -- in dev.mars.quorus.connection.RemotePathBoundaryTest
+[INFO] Running dev.mars.quorus.connection.RuntimeProtocolSecurityTest
+[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.026 s -- in dev.mars.quorus.connection.RuntimeProtocolSecurityTest
+[INFO] Running dev.mars.quorus.protocol.FtpTransferProtocolTest
+11:53:43.552 [main] DEBUG d.m.q.protocol.FtpTransferProtocol - canHandle: request or sourceUri is null
+11:53:43.561 [main] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  EXPECTED ERROR TEST: testFtpUriCustomPortEdgeCase
+  Reason: Connection refused on custom port -- no FTP server
+  Errors below are INTENTIONAL -- testing error handling paths
+========================================================================
+11:53:43.562 [main] DEBUG d.m.q.protocol.FtpTransferProtocol - canHandle: FTP/FTPS download detected, sourceScheme=ftp
+11:53:43.563 [main] INFO  d.m.q.protocol.FtpTransferProtocol - Starting FTP transfer: jobId=test-job-123, isUpload=false
+11:53:43.563 [main] DEBUG d.m.q.protocol.FtpTransferProtocol - Transfer details: sourceUri=ftp://127.0.0.1:2121/path/file.txt, destinationUri=file:///C:/Users/mraysmit/AppData/Local/Temp/junit7557133486748174961/file.txt
+11:53:43.563 [main] DEBUG d.m.q.protocol.FtpTransferProtocol - Routing to FTP download handler
+11:53:43.564 [main] INFO  d.m.q.protocol.FtpTransferProtocol - Starting FTP download: ftp://127.0.0.1:2121/path/file.txt -> C:\Users\mraysmit\AppData\Local\Temp\junit7557133486748174961\file.txt
+11:53:43.564 [main] DEBUG d.m.q.protocol.FtpTransferProtocol - Parsed URI: scheme=ftp, host=127.0.0.1, port=2121, ftpsMode=NONE
+11:53:43.564 [main] DEBUG d.m.q.protocol.FtpTransferProtocol - Connection info parsed: host=127.0.0.1, port=2121, path=/path/file.txt
+11:53:43.564 [main] DEBUG d.m.q.protocol.FtpTransferProtocol - Establishing FTP connection to 127.0.0.1:2121
+11:53:43.564 [main] DEBUG d.m.q.protocol.FtpTransferProtocol - Connecting to FTP server: 127.0.0.1:2121
+11:53:43.583 [main] DEBUG d.m.q.protocol.FtpTransferProtocol - Disconnecting FTP client
+11:53:43.583 [main] DEBUG d.m.q.protocol.FtpTransferProtocol - Disconnecting from FTP server
+11:53:43.583 [main] DEBUG d.m.q.protocol.FtpTransferProtocol - FTP disconnection complete
+11:53:43.583 [main] ERROR d.m.q.protocol.FtpTransferProtocol - [QUORUS-1001] FTP download failed: requestId=test-port-edge, error=Connection refused: getsockopt
+11:53:43.583 [main] DEBUG d.m.q.protocol.FtpTransferProtocol - FTP download exception details for request: test-port-edge
+java.net.ConnectException: Connection refused: getsockopt
+	at java.base/sun.nio.ch.Net.pollConnect(Native Method)
+11:53:43.584 [main] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  END EXPECTED ERROR TEST: testFtpUriCustomPortEdgeCase -- PASSED
+========================================================================
+11:53:43.589 [main] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  EXPECTED ERROR TEST: testChecksumHandling
+  Reason: Connection refused with checksum request -- no FTP server
+  Errors below are INTENTIONAL -- testing error handling paths
+========================================================================
+11:53:43.592 [main] DEBUG d.m.q.protocol.FtpTransferProtocol - canHandle: FTP/FTPS download detected, sourceScheme=ftp
+11:53:43.593 [main] INFO  d.m.q.protocol.FtpTransferProtocol - Starting FTP transfer: jobId=test-job-123, isUpload=false
+11:53:43.594 [main] DEBUG d.m.q.protocol.FtpTransferProtocol - Transfer details: sourceUri=ftp://127.0.0.1/path/file.txt, destinationUri=file:///C:/Users/mraysmit/AppData/Local/Temp/junit14723527448476516389/testfile.txt
+11:53:43.595 [main] DEBUG d.m.q.protocol.FtpTransferProtocol - Routing to FTP download handler
+11:53:43.595 [main] INFO  d.m.q.protocol.FtpTransferProtocol - Starting FTP download: ftp://127.0.0.1/path/file.txt -> C:\Users\mraysmit\AppData\Local\Temp\junit14723527448476516389\testfile.txt
+11:53:43.595 [main] DEBUG d.m.q.protocol.FtpTransferProtocol - Parsed URI: scheme=ftp, host=127.0.0.1, port=21, ftpsMode=NONE
+11:53:43.595 [main] DEBUG d.m.q.protocol.FtpTransferProtocol - Connection info parsed: host=127.0.0.1, port=21, path=/path/file.txt
+11:53:43.595 [main] DEBUG d.m.q.protocol.FtpTransferProtocol - Establishing FTP connection to 127.0.0.1:21
+11:53:43.595 [main] DEBUG d.m.q.protocol.FtpTransferProtocol - Connecting to FTP server: 127.0.0.1:21
+11:53:43.598 [main] DEBUG d.m.q.protocol.FtpTransferProtocol - Disconnecting FTP client
+11:53:43.598 [main] DEBUG d.m.q.protocol.FtpTransferProtocol - Disconnecting from FTP server
+11:53:43.598 [main] DEBUG d.m.q.protocol.FtpTransferProtocol - FTP disconnection complete
+11:53:43.598 [main] ERROR d.m.q.protocol.FtpTransferProtocol - [QUORUS-1001] FTP download failed: requestId=test-checksum, error=Connection refused: getsockopt
+11:53:43.599 [main] DEBUG d.m.q.protocol.FtpTransferProtocol - FTP download exception details for request: test-checksum
+java.net.ConnectException: Connection refused: getsockopt
+	at java.base/sun.nio.ch.Net.pollConnect(Native Method)
+11:53:43.599 [main] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  END EXPECTED ERROR TEST: testChecksumHandling -- PASSED
+========================================================================
+11:53:43.605 [main] DEBUG d.m.q.protocol.FtpTransferProtocol - canHandle: FTP/FTPS download detected, sourceScheme=ftp
+11:53:43.611 [main] DEBUG d.m.q.protocol.FtpTransferProtocol - canHandle: FTP/FTPS download detected, sourceScheme=ftp
+11:53:43.618 [main] DEBUG d.m.q.protocol.FtpTransferProtocol - canHandle: FTP/FTPS download detected, sourceScheme=ftp
+11:53:43.623 [main] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  EXPECTED ERROR TEST: testConnectionTimeout
+  Reason: Connection refused -- verifies timeout error handling
+  Errors below are INTENTIONAL -- testing error handling paths
+========================================================================
+11:53:43.625 [main] DEBUG d.m.q.protocol.FtpTransferProtocol - canHandle: FTP/FTPS download detected, sourceScheme=ftp
+11:53:43.626 [main] INFO  d.m.q.protocol.FtpTransferProtocol - Starting FTP transfer: jobId=test-job-123, isUpload=false
+11:53:43.626 [main] DEBUG d.m.q.protocol.FtpTransferProtocol - Transfer details: sourceUri=ftp://127.0.0.1:1/path/file.txt, destinationUri=file:///C:/Users/mraysmit/AppData/Local/Temp/junit16905829447332213601/testfile.txt
+11:53:43.626 [main] DEBUG d.m.q.protocol.FtpTransferProtocol - Routing to FTP download handler
+11:53:43.626 [main] INFO  d.m.q.protocol.FtpTransferProtocol - Starting FTP download: ftp://127.0.0.1:1/path/file.txt -> C:\Users\mraysmit\AppData\Local\Temp\junit16905829447332213601\testfile.txt
+11:53:43.626 [main] DEBUG d.m.q.protocol.FtpTransferProtocol - Parsed URI: scheme=ftp, host=127.0.0.1, port=1, ftpsMode=NONE
+11:53:43.626 [main] DEBUG d.m.q.protocol.FtpTransferProtocol - Connection info parsed: host=127.0.0.1, port=1, path=/path/file.txt
+11:53:43.626 [main] DEBUG d.m.q.protocol.FtpTransferProtocol - Establishing FTP connection to 127.0.0.1:1
+11:53:43.626 [main] DEBUG d.m.q.protocol.FtpTransferProtocol - Connecting to FTP server: 127.0.0.1:1
+11:53:43.629 [main] DEBUG d.m.q.protocol.FtpTransferProtocol - Disconnecting FTP client
+11:53:43.629 [main] DEBUG d.m.q.protocol.FtpTransferProtocol - Disconnecting from FTP server
+11:53:43.629 [main] DEBUG d.m.q.protocol.FtpTransferProtocol - FTP disconnection complete
+11:53:43.629 [main] ERROR d.m.q.protocol.FtpTransferProtocol - [QUORUS-1001] FTP download failed: requestId=test-timeout, error=Connection refused: getsockopt
+11:53:43.629 [main] DEBUG d.m.q.protocol.FtpTransferProtocol - FTP download exception details for request: test-timeout
+java.net.ConnectException: Connection refused: getsockopt
+	at java.base/sun.nio.ch.Net.pollConnect(Native Method)
+11:53:43.630 [main] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  END EXPECTED ERROR TEST: testConnectionTimeout -- PASSED
+========================================================================
+11:53:43.647 [main] DEBUG d.m.q.protocol.FtpTransferProtocol - canHandle: FTP/FTPS download detected, sourceScheme=ftp
+11:53:43.650 [main] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  EXPECTED ERROR TEST: testTransferWithValidFtpUri
+  Reason: Connection refused -- no FTP server at 127.0.0.1
+  Errors below are INTENTIONAL -- testing error handling paths
+========================================================================
+11:53:43.651 [main] INFO  d.m.q.protocol.FtpTransferProtocol - Starting FTP transfer: jobId=test-job-123, isUpload=false
+11:53:43.652 [main] DEBUG d.m.q.protocol.FtpTransferProtocol - Transfer details: sourceUri=ftp://127.0.0.1/path/testfile.txt, destinationUri=file:///C:/Users/mraysmit/AppData/Local/Temp/junit1857059635267333087/testfile.txt
+11:53:43.652 [main] DEBUG d.m.q.protocol.FtpTransferProtocol - Routing to FTP download handler
+11:53:43.652 [main] INFO  d.m.q.protocol.FtpTransferProtocol - Starting FTP download: ftp://127.0.0.1/path/testfile.txt -> C:\Users\mraysmit\AppData\Local\Temp\junit1857059635267333087\testfile.txt
+11:53:43.652 [main] DEBUG d.m.q.protocol.FtpTransferProtocol - Parsed URI: scheme=ftp, host=127.0.0.1, port=21, ftpsMode=NONE
+11:53:43.652 [main] DEBUG d.m.q.protocol.FtpTransferProtocol - Connection info parsed: host=127.0.0.1, port=21, path=/path/testfile.txt
+11:53:43.652 [main] DEBUG d.m.q.protocol.FtpTransferProtocol - Establishing FTP connection to 127.0.0.1:21
+11:53:43.653 [main] DEBUG d.m.q.protocol.FtpTransferProtocol - Connecting to FTP server: 127.0.0.1:21
+11:53:43.654 [main] DEBUG d.m.q.protocol.FtpTransferProtocol - Disconnecting FTP client
+11:53:43.655 [main] DEBUG d.m.q.protocol.FtpTransferProtocol - Disconnecting from FTP server
+11:53:43.655 [main] DEBUG d.m.q.protocol.FtpTransferProtocol - FTP disconnection complete
+11:53:43.655 [main] ERROR d.m.q.protocol.FtpTransferProtocol - [QUORUS-1001] FTP download failed: requestId=test-ftp-transfer, error=Connection refused: getsockopt
+11:53:43.655 [main] DEBUG d.m.q.protocol.FtpTransferProtocol - FTP download exception details for request: test-ftp-transfer
+java.net.ConnectException: Connection refused: getsockopt
+	at java.base/sun.nio.ch.Net.pollConnect(Native Method)
+11:53:43.656 [main] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  END EXPECTED ERROR TEST: testTransferWithValidFtpUri -- PASSED
+========================================================================
+11:53:43.661 [main] DEBUG d.m.q.protocol.FtpTransferProtocol - canHandle: FTP/FTPS upload check, destScheme=file, canHandle=false
+11:53:43.671 [main] DEBUG d.m.q.protocol.FtpTransferProtocol - canHandle: FTP/FTPS upload check, destScheme=file, canHandle=false
+11:53:43.679 [main] DEBUG d.m.q.protocol.FtpTransferProtocol - canHandle: FTP/FTPS download detected, sourceScheme=ftp
+11:53:43.693 [main] DEBUG d.m.q.protocol.FtpTransferProtocol - canHandle: FTP/FTPS download detected, sourceScheme=ftp
+[INFO] Tests run: 21, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.154 s -- in dev.mars.quorus.protocol.FtpTransferProtocolTest
+[INFO] Running dev.mars.quorus.protocol.HttpRedirectBoundaryTest
+11:53:43.773 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30000ms, readTimeout=60000ms, maxFileSize=10737418240 bytes
+11:53:43.774 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol created with Vert.x Web Client (reactive mode)
+11:53:43.774 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - Starting reactive HTTP transfer: jobId=redirect, direction=DOWNLOAD (Remote -> Local)
+11:53:43.775 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - Validating HTTP transfer request: requestId=redirect
+11:53:43.775 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - canHandle: HTTP download check, scheme=http, canHandle=true
+11:53:43.775 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - Request validation passed
+11:53:43.775 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - Routing to HTTP download handler
+11:53:43.775 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - HTTP download: destination=C:\Users\mraysmit\AppData\Local\Temp\junit8644667990174030284\file.dat, tempFile=C:\Users\mraysmit\AppData\Local\Temp\junit8644667990174030284\file.dat.tmp
+11:53:43.776 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - Created destination directory: C:\Users\mraysmit\AppData\Local\Temp\junit8644667990174030284
+11:53:43.776 [main] INFO  d.m.q.protocol.HttpTransferProtocol - Starting reactive HTTP download from http://127.0.0.1:52535/redirect
+11:53:43.804 [vert.x-eventloop-thread-0] DEBUG d.m.q.protocol.HttpTransferProtocol - HTTP response received: statusCode=200, statusMessage=OK
+11:53:43.805 [vert.x-eventloop-thread-0] DEBUG d.m.q.protocol.HttpTransferProtocol - Response body received: 15 bytes
+11:53:43.805 [vert.x-eventloop-thread-0] DEBUG d.m.q.protocol.HttpTransferProtocol - Calculating checksum for downloaded content
+11:53:43.807 [vert.x-eventloop-thread-0] DEBUG d.m.q.protocol.HttpTransferProtocol - Checksum calculated: c51d9cab89aec430d3274a51bbb930e124935ca08ab6f20d46e1c44651f46497
+11:53:43.808 [vert.x-eventloop-thread-0] DEBUG d.m.q.protocol.HttpTransferProtocol - Writing 15 bytes to temp file: C:\Users\mraysmit\AppData\Local\Temp\junit8644667990174030284\file.dat.tmp
+11:53:43.811 [vert.x-eventloop-thread-0] DEBUG d.m.q.protocol.HttpTransferProtocol - Moving temp file to destination: C:\Users\mraysmit\AppData\Local\Temp\junit8644667990174030284\file.dat.tmp -> C:\Users\mraysmit\AppData\Local\Temp\junit8644667990174030284\file.dat
+11:53:43.814 [vert.x-eventloop-thread-0] INFO  d.m.q.protocol.HttpTransferProtocol - HTTP download completed: jobId=redirect, bytesTransferred=15, checksum=c51d9cab89aec430d3274a51bbb930e124935ca08ab6f20d46e1c44651f46497
+11:53:43.884 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30000ms, readTimeout=60000ms, maxFileSize=10737418240 bytes
+11:53:43.884 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol created with Vert.x Web Client (reactive mode)
+11:53:43.885 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - Starting reactive HTTP transfer: jobId=redirect, direction=DOWNLOAD (Remote -> Local)
+11:53:43.885 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - Validating HTTP transfer request: requestId=redirect
+11:53:43.885 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - canHandle: HTTP download check, scheme=http, canHandle=true
+11:53:43.885 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - Request validation passed
+11:53:43.885 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - Routing to HTTP download handler
+11:53:43.885 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - HTTP download: destination=C:\Users\mraysmit\AppData\Local\Temp\junit18293954056762271361\file.dat, tempFile=C:\Users\mraysmit\AppData\Local\Temp\junit18293954056762271361\file.dat.tmp
+11:53:43.885 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - Created destination directory: C:\Users\mraysmit\AppData\Local\Temp\junit18293954056762271361
+11:53:43.886 [main] INFO  d.m.q.protocol.HttpTransferProtocol - Starting reactive HTTP download from http://127.0.0.1:56282/redirect
+11:53:43.894 [vert.x-eventloop-thread-0] DEBUG d.m.q.protocol.HttpTransferProtocol - HTTP response received: statusCode=302, statusMessage=Found
+11:53:43.895 [vert.x-eventloop-thread-0] ERROR d.m.q.protocol.HttpTransferProtocol - [QUORUS-1203] HTTP download failed: statusCode=302, statusMessage=Found
+11:53:43.896 [vert.x-eventloop-thread-0] ERROR d.m.q.protocol.HttpTransferProtocol - [QUORUS-1206] HTTP download pipeline failed: jobId=redirect, error=Transfer redirect failed: HTTP 302: Found
+11:53:43.896 [vert.x-eventloop-thread-0] DEBUG d.m.q.protocol.HttpTransferProtocol - HTTP download exception details for job: redirect
+dev.mars.quorus.core.exceptions.TransferException: Transfer redirect failed: HTTP 302: Found
+	at dev.mars.quorus.protocol.HttpTransferProtocol.lambda$0(HttpTransferProtocol.java:211)
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.199 s -- in dev.mars.quorus.protocol.HttpRedirectBoundaryTest
+[INFO] 
+[INFO] Results:
+[INFO] 
+[INFO] Tests run: 52, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] 
+[INFO] --- jacoco:0.8.15:report (report) @ quorus-core ---
+[INFO] Loading execution data file C:\Users\mraysmit\dev\idea-projects\quorus\quorus-core\target\jacoco.exec
+[INFO] Analyzed bundle 'Quorus Core' with 124 classes
+[WARNING] Classes in bundle 'Quorus Core' do not match with execution data. For report generation the same class files must be used as at runtime.
+[WARNING] Execution data for class dev/mars/quorus/protocol/SftpTransferProtocol$PinnedHostKeyRepository does not match.
+[WARNING] Execution data for class dev/mars/quorus/protocol/SftpTransferProtocol$SftpConnectionInfo does not match.
+[WARNING] Execution data for class dev/mars/quorus/protocol/ProtocolFactory does not match.
+[WARNING] Execution data for class dev/mars/quorus/connection/ConnectionValidationService does not match.
+[WARNING] Execution data for class dev/mars/quorus/protocol/SftpTransferProtocol$SftpClient$2 does not match.
+[WARNING] Execution data for class dev/mars/quorus/protocol/SftpTransferProtocol$SftpClient$1 does not match.
+[WARNING] Execution data for class dev/mars/quorus/connection/ConnectionValidationService$Result does not match.
+[WARNING] Execution data for class dev/mars/quorus/protocol/SftpTransferProtocol does not match.
+[WARNING] Execution data for class dev/mars/quorus/protocol/SftpTransferProtocol$SftpClient does not match.
+[WARNING] Execution data for class dev/mars/quorus/protocol/FtpTransferProtocol$DataConnectionInfo does not match.
+[WARNING] Execution data for class dev/mars/quorus/connection/ConnectionValidationService$Stage does not match.
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  7.853 s
+[INFO] Finished at: 2026-09-05T11:53:44+08:00
+[INFO] ------------------------------------------------------------------------

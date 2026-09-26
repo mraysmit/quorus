@@ -1,0 +1,36 @@
+Excerpt of: docs-design/evidence/raw/rt-01/superseded-inimage-images-red.log
+Original SHA-256: 2676de03a8e06c874b2b7c0fca19efbfe1f31e15c1b8bac9000225b05b7dd28d
+Original size: 42161 bytes
+Full log not retained under the evidence retention rule (plan §6.1): regression and discarded-attempt output is kept as this excerpt. Reproduce by re-running the recorded command at the recorded revision.
+
+    122: [INFO] NOTHING TO DO: There is nothing to do. If this is unexpected, review the above logs for more details.
+    144: [docker build --build-context m2cache=C:\Users\mraysmit\.m2\repository\dev\mars -f C:\Users\mraysmit\dev\idea-projects\quorus\quorus-controller\Dockerfile -t quorus-controller:rt01 C:\Users\mraysmit\dev\idea-projects\quorus] exit 1
+    165: #29 1.737 [INFO] Reactor Summary for Quorus File Transfer System 1.0-SNAPSHOT:
+    173: #29 1.738 [INFO] BUILD FAILURE
+    175: #29 1.738 [INFO] Total time:  0.719 s
+    176: #29 1.738 [INFO] Finished at: 2026-09-26T11:32:30Z
+    178: #29 1.740 [ERROR] Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.13.0:compile (default-compile) on project quorus-core: Fatal error compiling: error: release version 27 not supported -> [Help 1]
+    184: #29 1.740 [ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoExecutionException
+    191: 1.740 [ERROR] Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.13.0:compile (default-compile) on project quorus-core: Fatal error compiling: error: release version 27 not supported -> [Help 1]
+    197: 1.740 [ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoExecutionException
+    202: ERROR: failed to build: failed to solve: process "/bin/sh -c mvn package -pl quorus-controller -am -DskipTests" did not complete successfully: exit code: 1
+    205: [docker build -f C:\Users\mraysmit\dev\idea-projects\quorus\quorus-agent\Dockerfile -t quorus-agent:rt01 C:\Users\mraysmit\dev\idea-projects\quorus] exit 1
+    219: #4 ERROR: docker.io/library/maven:3.9.9-eclipse-temurin-25: not found
+    230: ERROR: failed to build: failed to solve: maven:3.9.9-eclipse-temurin-25: failed to resolve source metadata for docker.io/library/maven:3.9.9-eclipse-temurin-25: docker.io/library/maven:3.9.9-eclipse-temurin-25: not found
+    233: [ERROR] Tests run: 2, Failures: 2, Errors: 0, Skipped: 0, Time elapsed: 51.60 s <<< FAILURE! -- in dev.mars.quorus.controller.deployment.ContainerImageBaselineTest
+    234: [ERROR] dev.mars.quorus.controller.deployment.ContainerImageBaselineTest.controllerImageRunsCorrettoBaselineAndShipsBaselineClasses -- Time elapsed: 46.78 s <<< FAILURE!
+    276: View build details: docker-desktop://dashboard/build/desktop-linux/desktop-linux/2yc1klzrpe7sy5btngcys6f66 ==> expected: <0> but was: <1>
+    342: [ERROR] dev.mars.quorus.controller.deployment.ContainerImageBaselineTest.agentImageRunsCorrettoBaselineAndShipsBaselineClasses -- Time elapsed: 4.782 s <<< FAILURE!
+    371: View build details: docker-desktop://dashboard/build/desktop-linux/desktop-linux/zrj1tdt47k5motvhkbuymky5i ==> expected: <0> but was: <1>
+    511: [ERROR] Tests run: 2, Failures: 2, Errors: 0, Skipped: 0
+    514: [INFO] Reactor Summary for Quorus File Transfer System 1.0-SNAPSHOT:
+    516: [INFO] Quorus File Transfer System ........................ SUCCESS [  0.214 s]
+    517: [INFO] Quorus Core ........................................ SUCCESS [  1.253 s]
+    518: [INFO] Quorus Workflow Engine ............................. SUCCESS [  0.195 s]
+    519: [INFO] Quorus Tenant Management ........................... SUCCESS [  0.162 s]
+    520: [INFO] Quorus Distributed Controller ...................... FAILURE [ 57.901 s]
+    522: [INFO] BUILD FAILURE
+    524: [INFO] Total time:  59.892 s
+    525: [INFO] Finished at: 2026-09-26T12:32:35+01:00
+    527: [ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.2.2:test (default-test) on project quorus-controller: There are test failures.
+    537: [ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException

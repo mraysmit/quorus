@@ -141,6 +141,9 @@ This standard replaces the Vert.x test facilities for code that has left Vert.x 
   propagated or does *not* leak hold before and after an implementation. Record them as guards, not as
   red evidence.
 - **Repeat concurrency tests** as part of regression, 30–50 runs of the affected test classes, and
-  retain the result as evidence.
+  retain the result as evidence: the pass and fail count in full, the run output as an excerpt.
+- **Evidence retention** (plan §6.1): commit raw red, green, mutation and characterization logs in full;
+  commit regression, repeat and discarded-attempt output only as a `*.excerpt.txt`, with the full log's
+  SHA-256 in the manifest.
 - **Label honestly.** Tests added after the code they cover are retrospective characterization under
   plan §6.1 and must be recorded as such.

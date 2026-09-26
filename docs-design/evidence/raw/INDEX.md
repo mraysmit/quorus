@@ -2,7 +2,7 @@
 
 # Raw Evidence Index
 
-**Version:** 1.0  
+**Version:** 1.1  
 **Date:** 2026-09-26  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
@@ -11,7 +11,10 @@
 
 ## Rule
 
-Raw red, green, regression and verification output that a plan, register or evidence record cites is written directly to `docs-design/evidence/raw/<slice-id>/`. It is never written to `temp/`, which is git-ignored scratch space and may be deleted at any time. Each file is recorded with its SHA-256 in the slice's JSON manifest. Logs must not contain request bodies, credentials, keys or other sensitive payloads (plan §6.1).
+Raw red, green, regression and verification output that a plan, register or evidence record cites is written directly to `docs-design/evidence/raw/<slice-id>/`. It is never written to `temp/`, which is git-ignored scratch space and may be deleted at any time.
+
+Retention: raw red, green, mutation and characterization output is committed in full, because it is the only proof that a test failed for the intended reason and cannot be recreated once the code moves on. Regression, full-build, repeat-run and discarded-attempt output is committed as a `*.excerpt.txt` (summary lines, per-module totals, coverage gates, build result and failure blocks) with the full log's SHA-256 in the manifest; the full log is not kept, because it can be reproduced from the recorded command and revision. `*.log` is otherwise git-ignored, so `.gitignore` re-admits `docs-design/evidence/raw/**`. Before 2026-09-26 the `*.log` rule had silently excluded every log here from git, so the
+logs rescued on that date are the first to be committed. Each file is recorded with its SHA-256 in the slice's JSON manifest. Logs must not contain request bodies, credentials, keys or other sensitive payloads (plan §6.1).
 
 ## Rescued historical logs
 
@@ -23,9 +26,9 @@ Cited paths: 220. Rescued: 62 (47 matches manifest, 15 no recorded hash). Missin
 |---|---|---:|---|---|---|
 | `temp/docker-fixture-green-20260905.log` | [docker-fixture-green-20260905.log](docker-fixture-green-20260905.log) | 61,235 | `1beaa79a650d74f8…` | matches manifest | full-suite-error-remediation-2026-09-05.json, full-suite-error-remediation-2026-09-05.md |
 | `temp/docker-fixture-rebuild-20260905.log` | [docker-fixture-rebuild-20260905.log](docker-fixture-rebuild-20260905.log) | 38,437 | `1fb7f9723ed580ea…` | no recorded hash | full-suite-error-remediation-2026-09-05.md |
-| `temp/full-suite-20260905.log` | [full-suite-20260905.log](full-suite-20260905.log) | 6,599,126 | `3178d907496d40d3…` | matches manifest | full-suite-error-remediation-2026-09-05.json, full-suite-error-remediation-2026-09-05.md |
-| `temp/full-suite-docker-controller2-20260905.log` | [full-suite-docker-controller2-20260905.log](full-suite-docker-controller2-20260905.log) | 10,415 | `66b714a0ee24b03f…` | no recorded hash | full-suite-error-remediation-2026-09-05.md |
-| `temp/full-suite-fixed-20260905.log` | [full-suite-fixed-20260905.log](full-suite-fixed-20260905.log) | 7,088,579 | `117b552c5310dc56…` | matches manifest | full-suite-error-remediation-2026-09-05.json, full-suite-error-remediation-2026-09-05.md |
+| `temp/full-suite-20260905.log` | [full-suite-20260905.log](full-suite-20260905.log.excerpt.txt) (excerpt; full log not retained) | 6,599,126 | `3178d907496d40d3…` | matches manifest | full-suite-error-remediation-2026-09-05.json, full-suite-error-remediation-2026-09-05.md |
+| `temp/full-suite-docker-controller2-20260905.log` | [full-suite-docker-controller2-20260905.log](full-suite-docker-controller2-20260905.log.excerpt.txt) (excerpt; full log not retained) | 10,415 | `66b714a0ee24b03f…` | no recorded hash | full-suite-error-remediation-2026-09-05.md |
+| `temp/full-suite-fixed-20260905.log` | [full-suite-fixed-20260905.log](full-suite-fixed-20260905.log.excerpt.txt) (excerpt; full log not retained) | 7,088,579 | `117b552c5310dc56…` | matches manifest | full-suite-error-remediation-2026-09-05.json, full-suite-error-remediation-2026-09-05.md |
 | `temp/r4-dns-capacity-green.log` | [r4-dns-capacity-green.log](r4-dns-capacity-green.log) | 66,979 | `6bc5f2ff811f3aee…` | matches manifest | r4-dns-remediation-2026-09-05.json, r4-dns-remediation-2026-09-05.md |
 | `temp/r4-dns-capacity-red.log` | [r4-dns-capacity-red.log](r4-dns-capacity-red.log) | 101,477 | `da50e91c214f22b7…` | matches manifest | r4-dns-remediation-2026-09-05.json, r4-dns-remediation-2026-09-05.md |
 | `temp/r4-dns-docker-rebuild.log` | [r4-dns-docker-rebuild.log](r4-dns-docker-rebuild.log) | 111,065 | `e1a8f0a514cb506d…` | no recorded hash | r4-dns-remediation-2026-09-05.md |
@@ -34,8 +37,8 @@ Cited paths: 220. Rescued: 62 (47 matches manifest, 15 no recorded hash). Missin
 | `temp/r4-dns-expiry-red.log` | [r4-dns-expiry-red.log](r4-dns-expiry-red.log) | 28,437 | `c913a26cc94f1171…` | matches manifest | r4-dns-remediation-2026-09-05.json, r4-dns-remediation-2026-09-05.md |
 | `temp/r4-dns-final-docker-rebuild.log` | [r4-dns-final-docker-rebuild.log](r4-dns-final-docker-rebuild.log) | 107,778 | `0330dc0758714a00…` | matches manifest | r4-dns-remediation-2026-09-05.json, r4-dns-remediation-2026-09-05.md |
 | `temp/r4-dns-final-focused.log` | [r4-dns-final-focused.log](r4-dns-final-focused.log) | 312,549 | `794c4fe2679ddf28…` | matches manifest | r4-dns-remediation-2026-09-05.json, r4-dns-remediation-2026-09-05.md |
-| `temp/r4-dns-focused-regression.log` | [r4-dns-focused-regression.log](r4-dns-focused-regression.log) | 306,622 | `4ddcf5efc480be14…` | matches manifest | r4-dns-remediation-2026-09-05.json, r4-dns-remediation-2026-09-05.md |
-| `temp/r4-dns-full-verify.log` | [r4-dns-full-verify.log](r4-dns-full-verify.log) | 7,197,089 | `45057eea0499deff…` | matches manifest | r4-dns-remediation-2026-09-05.json, r4-dns-remediation-2026-09-05.md |
+| `temp/r4-dns-focused-regression.log` | [r4-dns-focused-regression.log](r4-dns-focused-regression.log.excerpt.txt) (excerpt; full log not retained) | 306,622 | `4ddcf5efc480be14…` | matches manifest | r4-dns-remediation-2026-09-05.json, r4-dns-remediation-2026-09-05.md |
+| `temp/r4-dns-full-verify.log` | [r4-dns-full-verify.log](r4-dns-full-verify.log.excerpt.txt) (excerpt; full log not retained) | 7,197,089 | `45057eea0499deff…` | matches manifest | r4-dns-remediation-2026-09-05.json, r4-dns-remediation-2026-09-05.md |
 | `temp/r4-dns-revocation-green.log` | [r4-dns-revocation-green.log](r4-dns-revocation-green.log) | 101,483 | `e7165ce08afe8bf1…` | matches manifest | r4-dns-remediation-2026-09-05.json, r4-dns-remediation-2026-09-05.md |
 | `temp/r4-dns-revocation-red.log` | [r4-dns-revocation-red.log](r4-dns-revocation-red.log) | 118,583 | `6ef59b222874571b…` | matches manifest | r4-dns-remediation-2026-09-05.json, r4-dns-remediation-2026-09-05.md |
 | `temp/r5-closure-codec-green.log` | [r5-closure-codec-green.log](r5-closure-codec-green.log) | 75,229 | `bbfe5e87136e03b6…` | no recorded hash | r5-closure-2026-09-05.json |
@@ -43,7 +46,7 @@ Cited paths: 220. Rescued: 62 (47 matches manifest, 15 no recorded hash). Missin
 | `temp/r5-closure-events-behavioral-red.log` | [r5-closure-events-behavioral-red.log](r5-closure-events-behavioral-red.log) | 32,281 | `bd5ffc82eaf1addf…` | no recorded hash | r5-closure-2026-09-05.json |
 | `temp/r5-closure-events-green.log` | [r5-closure-events-green.log](r5-closure-events-green.log) | 35,826 | `e299aaeca061e85f…` | no recorded hash | r5-closure-2026-09-05.json |
 | `temp/r5-closure-events-red.log` | [r5-closure-events-red.log](r5-closure-events-red.log) | 30,372 | `b0435d432de2fc48…` | no recorded hash | r5-closure-2026-09-05.json |
-| `temp/r5-closure-focused-regression.log` | [r5-closure-focused-regression.log](r5-closure-focused-regression.log) | 449,796 | `027da7dbc90b68b4…` | matches manifest | r5-closure-2026-09-05.json |
+| `temp/r5-closure-focused-regression.log` | [r5-closure-focused-regression.log](r5-closure-focused-regression.log.excerpt.txt) (excerpt; full log not retained) | 449,796 | `027da7dbc90b68b4…` | matches manifest | r5-closure-2026-09-05.json |
 | `temp/r5-closure-legacy-replay-green-2.log` | [r5-closure-legacy-replay-green-2.log](r5-closure-legacy-replay-green-2.log) | 27,045 | `7146a1d102df8eb4…` | no recorded hash | r5-closure-2026-09-05.json |
 | `temp/r5-closure-legacy-replay-green.log` | [r5-closure-legacy-replay-green.log](r5-closure-legacy-replay-green.log) | 68,499 | `ae1cf23dfd3e7c9b…` | no recorded hash | r5-closure-2026-09-05.json |
 | `temp/r5-closure-legacy-replay-red.log` | [r5-closure-legacy-replay-red.log](r5-closure-legacy-replay-red.log) | 19,054 | `16c10d8baa13b36f…` | no recorded hash | r5-closure-2026-09-05.json |
@@ -52,14 +55,14 @@ Cited paths: 220. Rescued: 62 (47 matches manifest, 15 no recorded hash). Missin
 | `temp/r5-closure-trust-cache-green.log` | [r5-closure-trust-cache-green.log](r5-closure-trust-cache-green.log) | 43,233 | `3793fa7fe7bb2408…` | no recorded hash | r5-closure-2026-09-05.json |
 | `temp/r5-closure-trust-cache-red.log` | [r5-closure-trust-cache-red.log](r5-closure-trust-cache-red.log) | 12,192 | `e629973590e071c3…` | no recorded hash | r5-closure-2026-09-05.json |
 | `temp/r6-final-worktree-2/temp/r6-final-isolated-docker-build.log` | [r6-final-worktree-2/temp/r6-final-isolated-docker-build.log](r6-final-worktree-2/temp/r6-final-isolated-docker-build.log) | 38,594 | `9a0d0ebdf32e81a4…` | matches manifest | r6-final-acceptance-2026-09-05.json |
-| `temp/r6-final-worktree-2/temp/r6-final-isolated-full.log` | [r6-final-worktree-2/temp/r6-final-isolated-full.log](r6-final-worktree-2/temp/r6-final-isolated-full.log) | 7,205,659 | `f6010c257aac98c1…` | matches manifest | r6-final-acceptance-2026-09-05.json |
-| `temp/r6-final-worktree/temp/r6-isolated-full.log` | [r6-final-worktree/temp/r6-isolated-full.log](r6-final-worktree/temp/r6-isolated-full.log) | 7,165,493 | `bdee7391f8df3302…` | matches manifest | r6-final-acceptance-2026-09-05.json, r6-final-acceptance-2026-09-05.md |
+| `temp/r6-final-worktree-2/temp/r6-final-isolated-full.log` | [r6-final-worktree-2/temp/r6-final-isolated-full.log](r6-final-worktree-2/temp/r6-final-isolated-full.log.excerpt.txt) (excerpt; full log not retained) | 7,205,659 | `f6010c257aac98c1…` | matches manifest | r6-final-acceptance-2026-09-05.json |
+| `temp/r6-final-worktree/temp/r6-isolated-full.log` | [r6-final-worktree/temp/r6-isolated-full.log](r6-final-worktree/temp/r6-isolated-full.log.excerpt.txt) (excerpt; full log not retained) | 7,165,493 | `bdee7391f8df3302…` | matches manifest | r6-final-acceptance-2026-09-05.json, r6-final-acceptance-2026-09-05.md |
 | `temp/r6-isolation-fix-slow-green.log` | [r6-isolation-fix-slow-green.log](r6-isolation-fix-slow-green.log) | 201,262 | `9391a3354e9df386…` | matches manifest | r6-final-acceptance-2026-09-05.json |
-| `temp/remediation-20260905/isolated-core-agent-verify.log` | [remediation-20260905/isolated-core-agent-verify.log](remediation-20260905/isolated-core-agent-verify.log) | 1,841,159 | `4241c07ea824b442…` | matches manifest | remediation-r4-r6-2026-09-05.json, remediation-r4-r6-2026-09-05.md |
+| `temp/remediation-20260905/isolated-core-agent-verify.log` | [remediation-20260905/isolated-core-agent-verify.log](remediation-20260905/isolated-core-agent-verify.log.excerpt.txt) (excerpt; full log not retained) | 1,841,159 | `4241c07ea824b442…` | matches manifest | remediation-r4-r6-2026-09-05.json, remediation-r4-r6-2026-09-05.md |
 | `temp/remediation-20260905/r4-1-red-elevated.log` | [remediation-20260905/r4-1-red-elevated.log](remediation-20260905/r4-1-red-elevated.log) | 12,781 | `ad3cfd9e72d1c017…` | matches manifest | remediation-r4-r6-2026-09-05.json |
 | `temp/remediation-20260905/r4-1-red-online.log` | [remediation-20260905/r4-1-red-online.log](remediation-20260905/r4-1-red-online.log) | 11,608 | `271a5a2c80057f97…` | matches manifest | remediation-r4-r6-2026-09-05.json |
 | `temp/remediation-20260905/r4-1-red.log` | [remediation-20260905/r4-1-red.log](remediation-20260905/r4-1-red.log) | 25,806 | `6f7ed70e49ce632a…` | matches manifest | remediation-r4-r6-2026-09-05.json |
-| `temp/remediation-20260905/r5-1-core-verify.log` | [remediation-20260905/r5-1-core-verify.log](remediation-20260905/r5-1-core-verify.log) | 1,247,975 | `f3a3ddfa609750b7…` | matches manifest | remediation-r4-r6-2026-09-05.json |
+| `temp/remediation-20260905/r5-1-core-verify.log` | [remediation-20260905/r5-1-core-verify.log](remediation-20260905/r5-1-core-verify.log.excerpt.txt) (excerpt; full log not retained) | 1,247,975 | `f3a3ddfa609750b7…` | matches manifest | remediation-r4-r6-2026-09-05.json |
 | `temp/remediation-20260905/r5-1-green.log` | [remediation-20260905/r5-1-green.log](remediation-20260905/r5-1-green.log) | 3,354 | `8949cc84a0f7eaf4…` | matches manifest | remediation-r4-r6-2026-09-05.json |
 | `temp/remediation-20260905/r5-1-red-behavior.log` | [remediation-20260905/r5-1-red-behavior.log](remediation-20260905/r5-1-red-behavior.log) | 86,978 | `a315724fc71a1a90…` | matches manifest | remediation-r4-r6-2026-09-05.json |
 | `temp/remediation-20260905/r5-1-red-scopes.log` | [remediation-20260905/r5-1-red-scopes.log](remediation-20260905/r5-1-red-scopes.log) | 161,557 | `c7f24197b94f0245…` | matches manifest | remediation-r4-r6-2026-09-05.json |

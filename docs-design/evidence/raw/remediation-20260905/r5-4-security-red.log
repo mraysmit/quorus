@@ -1,0 +1,456 @@
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::staticFieldBase has been called by com.google.inject.internal.aop.HiddenClassDefiner (file:/C:/Users/mraysmit/scoop/apps/maven/current/lib/guice-5.1.0-classes.jar)
+WARNING: Please consider reporting this to the maintainers of class com.google.inject.internal.aop.HiddenClassDefiner
+WARNING: sun.misc.Unsafe::staticFieldBase will be removed in a future release
+[INFO] Scanning for projects...
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Build Order:
+[INFO] 
+[INFO] Quorus File Transfer System                                        [pom]
+[INFO] Quorus Core                                                        [jar]
+[INFO] Quorus Workflow Engine                                             [jar]
+[INFO] Quorus Agent                                                       [jar]
+[INFO] 
+[INFO] --------------------------< dev.mars:quorus >---------------------------
+[INFO] Building Quorus File Transfer System 1.0-SNAPSHOT                  [1/4]
+[INFO]   from pom.xml
+[INFO] --------------------------------[ pom ]---------------------------------
+[INFO] 
+[INFO] --- jacoco:0.8.15:prepare-agent (prepare-agent) @ quorus ---
+[INFO] argLine set to -javaagent:C:\\Users\\mraysmit\\.m2\\repository\\org\\jacoco\\org.jacoco.agent\\0.8.15\\org.jacoco.agent-0.8.15-runtime.jar=destfile=C:\\Users\\mraysmit\\dev\\idea-projects\\quorus\\target\\jacoco.exec,excludes=sun/**:jdk/**:java/**:com/sun/**:org/jcp/**
+[INFO] 
+[INFO] --- jacoco:0.8.15:report (report) @ quorus ---
+[INFO] Skipping JaCoCo execution due to missing execution data file.
+[INFO] 
+[INFO] ------------------------< dev.mars:quorus-core >------------------------
+[INFO] Building Quorus Core 1.0-SNAPSHOT                                  [2/4]
+[INFO]   from quorus-core\pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- jacoco:0.8.15:prepare-agent (prepare-agent) @ quorus-core ---
+[INFO] argLine set to -javaagent:C:\\Users\\mraysmit\\.m2\\repository\\org\\jacoco\\org.jacoco.agent\\0.8.15\\org.jacoco.agent-0.8.15-runtime.jar=destfile=C:\\Users\\mraysmit\\dev\\idea-projects\\quorus\\quorus-core\\target\\jacoco.exec,excludes=sun/**:jdk/**:java/**:com/sun/**:org/jcp/**
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ quorus-core ---
+[INFO] Copying 1 resource from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ quorus-core ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ quorus-core ---
+[INFO] Copying 11 resources from src\test\resources to target\test-classes
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ quorus-core ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- surefire:3.2.2:test (default-test) @ quorus-core ---
+[INFO] 
+[INFO] --- jacoco:0.8.15:report (report) @ quorus-core ---
+[INFO] Loading execution data file C:\Users\mraysmit\dev\idea-projects\quorus\quorus-core\target\jacoco.exec
+[INFO] Analyzed bundle 'Quorus Core' with 124 classes
+[INFO] 
+[INFO] ----------------------< dev.mars:quorus-workflow >----------------------
+[INFO] Building Quorus Workflow Engine 1.0-SNAPSHOT                       [3/4]
+[INFO]   from quorus-workflow\pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- jacoco:0.8.15:prepare-agent (prepare-agent) @ quorus-workflow ---
+[INFO] argLine set to -javaagent:C:\\Users\\mraysmit\\.m2\\repository\\org\\jacoco\\org.jacoco.agent\\0.8.15\\org.jacoco.agent-0.8.15-runtime.jar=destfile=C:\\Users\\mraysmit\\dev\\idea-projects\\quorus\\quorus-workflow\\target\\jacoco.exec,excludes=sun/**:jdk/**:java/**:com/sun/**:org/jcp/**
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ quorus-workflow ---
+[INFO] Copying 1 resource from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ quorus-workflow ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ quorus-workflow ---
+[INFO] Copying 2 resources from src\test\resources to target\test-classes
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ quorus-workflow ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- surefire:3.2.2:test (default-test) @ quorus-workflow ---
+[INFO] 
+[INFO] --- jacoco:0.8.15:report (report) @ quorus-workflow ---
+[INFO] Skipping JaCoCo execution due to missing execution data file.
+[INFO] 
+[INFO] -----------------------< dev.mars:quorus-agent >------------------------
+[INFO] Building Quorus Agent 1.0-SNAPSHOT                                 [4/4]
+[INFO]   from quorus-agent\pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- jacoco:0.8.15:prepare-agent (prepare-agent) @ quorus-agent ---
+[INFO] argLine set to -javaagent:C:\\Users\\mraysmit\\.m2\\repository\\org\\jacoco\\org.jacoco.agent\\0.8.15\\org.jacoco.agent-0.8.15-runtime.jar=destfile=C:\\Users\\mraysmit\\dev\\idea-projects\\quorus\\quorus-agent\\target\\jacoco.exec,excludes=sun/**:jdk/**:java/**:com/sun/**:org/jcp/**
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ quorus-agent ---
+[INFO] Copying 2 resources from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ quorus-agent ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ quorus-agent ---
+[INFO] Copying 2 resources from src\test\resources to target\test-classes
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ quorus-agent ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- surefire:3.2.2:test (default-test) @ quorus-agent ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+11:49:09,369 |-INFO in ch.qos.logback.classic.LoggerContext[default] - Found logback-core version 1.5.32
+11:49:09,371 |-INFO in ch.qos.logback.classic.util.ContextInitializer@551de37d - No custom configurators were discovered as a service.
+11:49:09,371 |-INFO in ch.qos.logback.classic.util.ContextInitializer@551de37d - Trying to configure with ch.qos.logback.classic.util.DefaultJoranConfigurator
+11:49:09,373 |-INFO in ch.qos.logback.classic.util.ContextInitializer@551de37d - Constructed configurator of type class ch.qos.logback.classic.util.DefaultJoranConfigurator
+11:49:09,375 |-INFO in ch.qos.logback.classic.LoggerContext[default] - Found resource [logback-test.xml] at [file:/C:/Users/mraysmit/dev/idea-projects/quorus/quorus-agent/target/test-classes/logback-test.xml]
+11:49:09,377 |-WARN in ch.qos.logback.classic.util.DefaultJoranConfigurator@6ef81f31 - Resource [logback-test.xml] occurs multiple times on the classpath.
+11:49:09,377 |-WARN in ch.qos.logback.classic.util.DefaultJoranConfigurator@6ef81f31 - Resource [logback-test.xml] occurs at [file:/C:/Users/mraysmit/dev/idea-projects/quorus/quorus-core/target/test-classes/logback-test.xml]
+11:49:09,377 |-WARN in ch.qos.logback.classic.util.DefaultJoranConfigurator@6ef81f31 - Resource [logback-test.xml] occurs at [file:/C:/Users/mraysmit/dev/idea-projects/quorus/quorus-agent/target/test-classes/logback-test.xml]
+11:49:09,526 |-INFO in ch.qos.logback.classic.model.processor.ConfigurationModelHandlerFull - Scan attribute not set or set to unrecognized value.
+11:49:09,538 |-INFO in ch.qos.logback.core.model.processor.ModelInterpretationContext@6075b2d3 - value "../test-logs/quorus-test-2026-09-05_03-49-05.log" substituted for "../test-logs/quorus-test-${testRunTimestamp}.log"
+11:49:09,542 |-INFO in ch.qos.logback.core.model.processor.AppenderModelHandler - Processing appender named [CONSOLE]
+11:49:09,542 |-INFO in ch.qos.logback.core.model.processor.AppenderModelHandler - About to instantiate appender of type [ch.qos.logback.core.ConsoleAppender]
+11:49:09,559 |-INFO in ch.qos.logback.core.model.processor.ImplicitModelHandler - Assuming default type [ch.qos.logback.classic.encoder.PatternLayoutEncoder] for [encoder] property
+11:49:09,624 |-INFO in ch.qos.logback.core.ConsoleAppender[CONSOLE] - NOTE: Writing to the console can be slow. Try to avoid logging to the 
+11:49:09,624 |-INFO in ch.qos.logback.core.ConsoleAppender[CONSOLE] - console in production environments, especially in high volume systems.
+11:49:09,624 |-INFO in ch.qos.logback.core.ConsoleAppender[CONSOLE] - See also https://logback.qos.ch/codes.html#slowConsole
+11:49:09,626 |-INFO in ch.qos.logback.core.model.processor.AppenderModelHandler - Processing appender named [FILE]
+11:49:09,626 |-INFO in ch.qos.logback.core.model.processor.AppenderModelHandler - About to instantiate appender of type [ch.qos.logback.core.FileAppender]
+11:49:09,629 |-INFO in ch.qos.logback.core.model.processor.ModelInterpretationContext@6075b2d3 - value "../test-logs/quorus-test-2026-09-05_03-49-05.log" substituted for "../test-logs/quorus-test-${testRunTimestamp}.log"
+11:49:09,636 |-INFO in ch.qos.logback.core.model.processor.ImplicitModelHandler - Assuming default type [ch.qos.logback.classic.encoder.PatternLayoutEncoder] for [encoder] property
+11:49:09,637 |-INFO in ch.qos.logback.core.FileAppender[FILE] - File property is set to [../test-logs/quorus-test-2026-09-05_03-49-05.log]
+11:49:09,643 |-INFO in ch.qos.logback.classic.model.processor.LoggerModelHandler - Setting level of logger [dev.mars.quorus] to DEBUG
+11:49:09,643 |-INFO in ch.qos.logback.classic.model.processor.LoggerModelHandler - Setting level of logger [org.apache] to WARN
+11:49:09,643 |-INFO in ch.qos.logback.classic.model.processor.LoggerModelHandler - Setting level of logger [io.vertx] to WARN
+11:49:09,643 |-INFO in ch.qos.logback.classic.model.processor.LoggerModelHandler - Setting level of logger [io.netty] to WARN
+11:49:09,643 |-INFO in ch.qos.logback.classic.model.processor.RootLoggerModelHandler - Setting level of ROOT logger to INFO
+11:49:09,643 |-INFO in ch.qos.logback.core.model.processor.AppenderRefModelHandler - Attaching appender named [CONSOLE] to Logger[ROOT]
+11:49:09,644 |-INFO in ch.qos.logback.core.model.processor.AppenderRefModelHandler - Attaching appender named [FILE] to Logger[ROOT]
+11:49:09,644 |-INFO in ch.qos.logback.core.model.processor.DefaultProcessor@33abde31 - End of configuration.
+11:49:09,646 |-INFO in ch.qos.logback.classic.joran.JoranConfigurator@997d532 - Registering current configuration as safe fallback point
+11:49:09,650 |-INFO in ch.qos.logback.classic.util.ContextInitializer@551de37d - ch.qos.logback.classic.util.DefaultJoranConfigurator.configure() call lasted 274 milliseconds. ExecutionStatus=DO_NOT_INVOKE_NEXT_IF_ANY
+
+[INFO] Running dev.mars.quorus.agent.AgentDefaultIsolationBoundaryTest
+11:49:10.369 [main] INFO  dev.mars.quorus.agent.QuorusAgent - Creating QuorusAgent with Vert.x instance: 715504968 (using Vert.x timers, no ScheduledExecutorService)
+11:49:10.380 [main] WARN  d.m.q.a.s.ControllerWebClientFactory - INSECURE DEVELOPMENT MODE: agent-to-controller traffic is plaintext
+11:49:10.407 [main] DEBUG d.m.q.a.s.AgentRegistrationService - AgentRegistrationService initialized with Vert.x WebClient (connectTimeout=5000ms, idleTimeout=10000ms)
+11:49:10.408 [main] WARN  d.m.q.a.s.ControllerWebClientFactory - INSECURE DEVELOPMENT MODE: agent-to-controller traffic is plaintext
+11:49:10.409 [main] DEBUG d.m.q.agent.service.HeartbeatService - HeartbeatService initialized with Vert.x WebClient (connectTimeout=5000ms, idleTimeout=10000ms)
+11:49:10.421 [main] DEBUG d.m.q.transfer.SimpleTransferEngine - Initializing SimpleTransferEngine: maxConcurrent=5, maxRetries=3, retryDelay=1000ms
+11:49:10.423 [main] DEBUG d.m.quorus.protocol.ProtocolFactory - Initializing ProtocolFactory with Vert.x instance
+11:49:10.423 [main] DEBUG d.m.quorus.protocol.ProtocolFactory - Registering default transfer protocols
+11:49:10.424 [main] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating HttpTransferProtocol instance
+11:49:10.426 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30000ms, readTimeout=60000ms, maxFileSize=10737418240 bytes
+11:49:10.427 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol created with Vert.x Web Client (reactive mode)
+11:49:10.427 [main] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: http
+11:49:10.427 [main] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=http, class=HttpTransferProtocol, supportsResume=false, supportsPause=true
+11:49:10.427 [main] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol alias: https -> http
+11:49:10.427 [main] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating SmbTransferProtocol instance
+11:49:10.430 [main] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: smb
+11:49:10.431 [main] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=smb, class=SmbTransferProtocol, supportsResume=false, supportsPause=false
+11:49:10.431 [main] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol alias: cifs -> smb
+11:49:10.431 [main] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating FtpTransferProtocol instance
+11:49:10.434 [main] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: ftp
+11:49:10.434 [main] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=ftp, class=FtpTransferProtocol, supportsResume=false, supportsPause=false
+11:49:10.435 [main] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol alias: ftps -> ftp
+11:49:10.435 [main] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating SftpTransferProtocol instance
+11:49:10.436 [main] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: sftp
+11:49:10.436 [main] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=sftp, class=SftpTransferProtocol, supportsResume=false, supportsPause=false
+11:49:10.436 [main] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating NfsTransferProtocol instance
+11:49:10.438 [main] DEBUG d.m.q.protocol.NfsTransferProtocol - NfsTransferProtocol initialized with mountRoot=C:\nfs
+11:49:10.439 [main] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: nfs
+11:49:10.439 [main] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=nfs, class=NfsTransferProtocol, supportsResume=false, supportsPause=false
+11:49:10.439 [main] INFO  d.m.quorus.protocol.ProtocolFactory - Registered default transfer protocols: count=8, schemes=ftps, ftp, http, smb, sftp, nfs, https, cifs
+11:49:10.474 [main] INFO  d.m.q.t.o.TransferTelemetryMetrics - TransferTelemetryMetrics initialized
+11:49:10.475 [main] INFO  d.m.q.transfer.SimpleTransferEngine - SimpleTransferEngine initialized with 5 max concurrent transfers (reactive mode, OpenTelemetry enabled)
+11:49:10.475 [main] DEBUG d.m.q.transfer.SimpleTransferEngine - SimpleTransferEngine initialization complete - startTime=2026-09-05T03:49:10.439979800Z
+11:49:10.484 [main] INFO  d.m.q.a.s.TransferExecutionService - TransferExecutionService initialized (Vert.x reactive mode)
+11:49:10.486 [main] WARN  d.m.q.a.s.ControllerWebClientFactory - INSECURE DEVELOPMENT MODE: agent-to-controller traffic is plaintext
+11:49:10.487 [main] DEBUG d.m.q.a.service.JobPollingService - JobPollingService initialized with Vert.x WebClient (connectTimeout=5000ms, idleTimeout=10000ms)
+11:49:10.488 [main] WARN  d.m.q.a.s.ControllerWebClientFactory - INSECURE DEVELOPMENT MODE: agent-to-controller traffic is plaintext
+11:49:10.489 [main] DEBUG d.m.q.a.s.JobStatusReportingService - JobStatusReportingService initialized with Vert.x WebClient (connectTimeout=5000ms, idleTimeout=10000ms)
+11:49:10.491 [main] INFO  d.m.q.a.observability.AgentMetrics - AgentMetrics initialized for agent: local
+11:49:10.492 [main] INFO  dev.mars.quorus.agent.QuorusAgent - Quorus Agent initialized: local (reactive mode with OpenTelemetry)
+11:49:10.492 [main] INFO  dev.mars.quorus.agent.QuorusAgent - Foreign-assignment mismatch threshold configured to 3
+11:49:10.492 [main] INFO  dev.mars.quorus.agent.QuorusAgent - Starting Quorus Agent services (Vert.x reactive mode)...
+11:49:10.494 [main] INFO  d.m.q.a.s.AgentRegistrationService - Registering agent local with controller at http://localhost:59848/api/v1
+11:49:10.495 [vert.x-eventloop-thread-0] INFO  d.m.q.agent.service.HealthService - Health service started on port 59849
+11:49:11.156 [vert.x-eventloop-thread-0] INFO  d.m.q.a.s.AgentRegistrationService - Agent local registered successfully
+11:49:11.160 [vert.x-eventloop-thread-0] INFO  dev.mars.quorus.agent.QuorusAgent - Agent registered successfully with controller
+11:49:11.160 [vert.x-eventloop-thread-0] INFO  dev.mars.quorus.agent.QuorusAgent - Heartbeat service started (interval: 30000ms) [Vert.x timer ID: 6]
+11:49:11.160 [vert.x-eventloop-thread-0] INFO  d.m.q.a.s.TransferExecutionService - Transfer execution service started with 5 max concurrent transfers
+11:49:11.161 [vert.x-eventloop-thread-0] INFO  dev.mars.quorus.agent.QuorusAgent - Transfer execution service started
+11:49:11.161 [vert.x-eventloop-thread-0] INFO  dev.mars.quorus.agent.QuorusAgent - Quorus Agent started successfully (reactive mode, 0 extra threads)
+11:49:11.162 [vert.x-eventloop-thread-0] INFO  dev.mars.quorus.agent.QuorusAgent - Job polling started (interval: 20ms) [Vert.x timer ID: 8]
+11:49:11.245 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 1 pending jobs
+11:49:11.246 [vert.x-eventloop-thread-0] INFO  dev.mars.quorus.agent.QuorusAgent - Found 1 pending job(s)
+11:49:11.246 [vert.x-eventloop-thread-0] ERROR dev.mars.quorus.agent.QuorusAgent - Refusing to process job foreign because assignment agentId other does not match local agentId local
+11:49:11.247 [vert.x-eventloop-thread-0] ERROR dev.mars.quorus.agent.QuorusAgent - Foreign assignment mismatch count: 1/3
+11:49:11.256 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:11.257 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:11.268 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:11.268 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:11.269 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:11.269 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:11.275 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:11.276 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:11.288 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:11.288 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:11.306 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:11.307 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:11.326 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:11.327 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:11.347 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:11.348 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:11.366 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:11.367 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:11.387 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:11.387 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:11.406 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:11.406 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:11.426 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:11.426 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:11.446 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:11.446 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:11.467 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:11.468 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:11.487 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:11.488 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:11.508 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:11.508 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:11.527 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:11.528 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:11.544 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:11.545 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:11.568 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:11.568 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:11.587 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:11.587 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:11.607 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:11.607 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:11.626 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:11.627 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:11.646 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:11.646 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:11.668 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:11.668 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:11.685 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:11.686 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:11.707 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:11.707 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:11.727 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:11.728 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:11.745 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:11.745 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:11.767 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:11.767 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:11.787 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:11.787 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:11.806 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:11.807 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:11.827 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:11.827 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:11.846 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:11.846 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:11.868 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:11.868 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:11.886 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:11.887 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:11.907 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:11.908 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:11.927 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:11.928 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:11.945 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:11.946 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:11.966 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:11.966 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:11.987 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:11.987 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:12.008 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:12.008 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:12.026 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:12.026 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:12.046 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:12.047 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:12.067 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:12.068 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:12.088 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:12.088 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:12.107 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:12.107 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:12.126 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:12.126 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:12.146 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:12.147 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:12.166 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:12.166 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:12.187 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:12.187 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:12.206 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:12.206 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:12.226 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:12.227 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:12.247 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:12.248 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:12.266 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:12.267 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:12.286 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:12.287 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:12.306 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:12.307 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:12.328 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:12.328 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:12.347 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:12.348 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:12.366 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:12.367 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:12.387 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:12.387 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:12.407 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:12.407 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:12.428 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:12.428 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:12.448 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:12.448 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:12.467 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:12.467 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:12.486 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:12.487 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:12.506 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:12.506 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:12.527 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:12.528 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:12.546 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:12.546 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:12.566 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:12.566 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:12.586 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:12.587 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:12.606 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:12.606 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:12.626 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:12.626 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:12.645 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:12.645 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:12.667 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:12.667 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:12.687 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:12.687 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:12.706 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:12.707 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:12.726 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:12.726 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:12.744 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:12.744 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:12.766 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:12.767 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:12.786 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:12.786 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:12.806 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:12.806 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:12.826 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:12.826 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:12.847 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:12.847 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:12.868 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:12.869 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:12.886 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:12.887 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:12.905 [vert.x-eventloop-thread-0] DEBUG d.m.q.a.service.JobPollingService - Polled for jobs: found 0 pending jobs
+11:49:12.905 [vert.x-eventloop-thread-0] DEBUG dev.mars.quorus.agent.QuorusAgent - No pending jobs found
+11:49:12.906 [main] INFO  dev.mars.quorus.agent.QuorusAgent - Shutting down Quorus Agent (reactive mode)...
+11:49:12.906 [main] INFO  dev.mars.quorus.agent.QuorusAgent - Heartbeat timer cancelled: true [ID: 6]
+11:49:12.906 [main] INFO  dev.mars.quorus.agent.QuorusAgent - Job polling timer cancelled: true [ID: 8]
+11:49:12.906 [main] INFO  d.m.q.a.s.TransferExecutionService - Shutting down transfer execution service...
+11:49:12.906 [main] DEBUG d.m.q.transfer.SimpleTransferEngine - shutdown: initiating with timeout=30s
+11:49:12.906 [main] INFO  d.m.q.transfer.SimpleTransferEngine - Shutting down transfer engine...
+11:49:12.907 [main] DEBUG d.m.q.transfer.SimpleTransferEngine - shutdown: cancelling 0 active transfers
+11:49:12.908 [main] DEBUG d.m.q.transfer.SimpleTransferEngine - awaitActiveTransfers: no active transfers
+11:49:12.909 [main] INFO  d.m.q.transfer.SimpleTransferEngine - Transfer engine shutdown completed
+11:49:12.910 [main] INFO  d.m.q.a.s.TransferExecutionService - Transfer execution service shutdown complete
+11:49:12.910 [main] DEBUG d.m.q.agent.service.HeartbeatService - Shutting down HeartbeatService WebClient
+11:49:12.924 [main] DEBUG d.m.q.a.service.JobPollingService - Shutting down JobPollingService WebClient
+11:49:12.925 [main] DEBUG d.m.q.a.s.JobStatusReportingService - Shutting down JobStatusReportingService WebClient
+11:49:12.930 [vert.x-eventloop-thread-0] INFO  d.m.q.agent.service.HealthService - Health service stopped
+11:49:12.930 [vert.x-eventloop-thread-0] INFO  d.m.q.a.s.AgentRegistrationService - Deregistering agent local from controller
+11:49:12.935 [vert.x-eventloop-thread-0] INFO  d.m.q.a.s.AgentRegistrationService - Agent local deregistered successfully
+11:49:12.935 [vert.x-eventloop-thread-0] INFO  dev.mars.quorus.agent.QuorusAgent - Agent deregistered from controller
+11:49:12.935 [vert.x-eventloop-thread-0] INFO  dev.mars.quorus.agent.QuorusAgent - Quorus Agent shutdown complete (0 threads to cleanup)
+[ERROR] Tests run: 1, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 3.314 s <<< FAILURE! -- in dev.mars.quorus.agent.AgentDefaultIsolationBoundaryTest
+[ERROR] dev.mars.quorus.agent.AgentDefaultIsolationBoundaryTest.defaultAgentStopsAfterOneForeignAssignment(Vertx) -- Time elapsed: 3.269 s <<< FAILURE!
+java.lang.AssertionError: Future failed
+	at dev.mars.quorus.testing.TestFutureUtils.awaitContext(TestFutureUtils.java:125)
+	at dev.mars.quorus.testing.TestFutureUtils.awaitSuccess(TestFutureUtils.java:59)
+	at dev.mars.quorus.agent.AgentDefaultIsolationBoundaryTest.defaultAgentStopsAfterOneForeignAssignment(AgentDefaultIsolationBoundaryTest.java:39)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at io.vertx.junit5.VertxExtension.interceptTestMethod(VertxExtension.java:142)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+Caused by: java.lang.AssertionError: Condition was not satisfied within PT2S
+	at dev.mars.quorus.testing.TestFutureUtils.lambda$eventually$0(TestFutureUtils.java:104)
+	at io.vertx.core.impl.VertxImpl$InternalTimerHandler.handle(VertxImpl.java:1018)
+	at io.vertx.core.impl.VertxImpl$InternalTimerHandler.handle(VertxImpl.java:990)
+	at io.vertx.core.impl.ContextBase.emit(ContextBase.java:82)
+	at io.vertx.core.internal.ContextInternal.emit(ContextInternal.java:179)
+	at io.vertx.core.impl.VertxImpl$InternalTimerHandler.run(VertxImpl.java:1012)
+	at io.netty.util.concurrent.PromiseTask.runTask(PromiseTask.java:98)
+	at io.netty.util.concurrent.ScheduledFutureTask.run(ScheduledFutureTask.java:166)
+	at io.netty.util.concurrent.AbstractEventExecutor.runTask(AbstractEventExecutor.java:148)
+	at io.netty.util.concurrent.AbstractEventExecutor.safeExecute(AbstractEventExecutor.java:141)
+	at io.netty.util.concurrent.SingleThreadEventExecutor.runAllTasks(SingleThreadEventExecutor.java:535)
+	at io.netty.channel.SingleThreadIoEventLoop.run(SingleThreadIoEventLoop.java:201)
+	at io.netty.util.concurrent.SingleThreadEventExecutor$5.run(SingleThreadEventExecutor.java:1195)
+	at io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74)
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	at java.base/java.lang.Thread.run(Thread.java:1474)
+
+[INFO] Running dev.mars.quorus.agent.config.AgentTransportSecurityTest
+[ERROR] Tests run: 2, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 0.018 s <<< FAILURE! -- in dev.mars.quorus.agent.config.AgentTransportSecurityTest
+[ERROR] dev.mars.quorus.agent.config.AgentTransportSecurityTest.defaultBuilderRejectsPlaintextController -- Time elapsed: 0.006 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: Expected java.lang.IllegalArgumentException to be thrown, but nothing was thrown.
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:152)
+	at org.junit.jupiter.api.AssertThrows.assertThrows(AssertThrows.java:73)
+	at org.junit.jupiter.api.AssertThrows.assertThrows(AssertThrows.java:35)
+	at org.junit.jupiter.api.Assertions.assertThrows(Assertions.java:3128)
+	at dev.mars.quorus.agent.config.AgentTransportSecurityTest.defaultBuilderRejectsPlaintextController(AgentTransportSecurityTest.java:17)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+
+[INFO] 
+[INFO] Results:
+[INFO] 
+[ERROR] Failures: 
+[ERROR]   AgentDefaultIsolationBoundaryTest.defaultAgentStopsAfterOneForeignAssignment:39 Future failed
+[ERROR]   AgentTransportSecurityTest.defaultBuilderRejectsPlaintextController:17 Expected java.lang.IllegalArgumentException to be thrown, but nothing was thrown.
+[INFO] 
+[ERROR] Tests run: 3, Failures: 2, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Summary for Quorus File Transfer System 1.0-SNAPSHOT:
+[INFO] 
+[INFO] Quorus File Transfer System ........................ SUCCESS [  0.273 s]
+[INFO] Quorus Core ........................................ SUCCESS [  1.716 s]
+[INFO] Quorus Workflow Engine ............................. SUCCESS [  0.264 s]
+[INFO] Quorus Agent ....................................... FAILURE [  5.696 s]
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  8.158 s
+[INFO] Finished at: 2026-09-05T11:49:13+08:00
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.2.2:test (default-test) on project quorus-agent: There are test failures.
+[ERROR] 
+[ERROR] Please refer to C:\Users\mraysmit\dev\idea-projects\quorus\quorus-agent\target\surefire-reports for the individual test results.
+[ERROR] Please refer to dump files (if any exist) [date].dump, [date]-jvmRun[N].dump and [date].dumpstream.
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+[ERROR] 
+[ERROR] After correcting the problems, you can resume the build with the command
+[ERROR]   mvn <args> -rf :quorus-agent

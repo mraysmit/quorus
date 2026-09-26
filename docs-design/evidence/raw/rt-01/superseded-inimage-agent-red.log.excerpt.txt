@@ -1,0 +1,25 @@
+Excerpt of: docs-design/evidence/raw/rt-01/superseded-inimage-agent-red.log
+Original SHA-256: c61b1ea3b41079a7591e0e3f15e09f488423d1b52bcfe02b5acfe28317926e3b
+Original size: 28804 bytes
+Full log not retained under the evidence retention rule (plan §6.1): regression and discarded-attempt output is kept as this excerpt. Reproduce by re-running the recorded command at the recorded revision.
+
+    122: [INFO] NOTHING TO DO: There is nothing to do. If this is unexpected, review the above logs for more details.
+    143: [docker build -f C:\Users\mraysmit\dev\idea-projects\quorus\quorus-agent\Dockerfile -t quorus-agent:rt01 C:\Users\mraysmit\dev\idea-projects\quorus] exit 1
+    175: #13 2.375 [ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/ProjectBuildingException
+    191: 2.375 [ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/ProjectBuildingException
+    201: ERROR: failed to build: failed to solve: process "/bin/sh -c mvn dependency:go-offline -pl quorus-core,quorus-workflow,quorus-agent -am" did not complete successfully: exit code: 1
+    204: [ERROR] Tests run: 1, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 3.703 s <<< FAILURE! -- in dev.mars.quorus.controller.deployment.ContainerImageBaselineTest
+    205: [ERROR] dev.mars.quorus.controller.deployment.ContainerImageBaselineTest.agentImageRunsCorrettoBaselineAndShipsBaselineClasses -- Time elapsed: 3.675 s <<< FAILURE!
+    247: View build details: docker-desktop://dashboard/build/desktop-linux/desktop-linux/po5qtdfra24f9u44vd8xxoi0a ==> expected: <0> but was: <1>
+    358: [ERROR] Tests run: 1, Failures: 1, Errors: 0, Skipped: 0
+    361: [INFO] Reactor Summary for Quorus File Transfer System 1.0-SNAPSHOT:
+    363: [INFO] Quorus File Transfer System ........................ SUCCESS [  0.212 s]
+    364: [INFO] Quorus Core ........................................ SUCCESS [  1.285 s]
+    365: [INFO] Quorus Workflow Engine ............................. SUCCESS [  0.229 s]
+    366: [INFO] Quorus Tenant Management ........................... SUCCESS [  0.205 s]
+    367: [INFO] Quorus Distributed Controller ...................... FAILURE [  6.015 s]
+    369: [INFO] BUILD FAILURE
+    371: [INFO] Total time:  8.107 s
+    372: [INFO] Finished at: 2026-09-26T12:33:19+01:00
+    374: [ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.2.2:test (default-test) on project quorus-controller: There are test failures.
+    384: [ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException

@@ -2,7 +2,7 @@
 
 # Quorus Enterprise Implementation Plan
 
-**Version:** 1.32
+**Version:** 1.33
 **Date:** 2026-09-26
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
@@ -315,7 +315,7 @@ The mandatory evidence record for each slice contains:
 - test classification: unit, component, external-path behavioral, integration, protocol, multi-node, security, contract, or failure injection;
 - confirmation that request bodies, credentials, keys, and sensitive payloads were not captured in evidence.
 
-Captured output is retained, not just summarised. Every raw log that the record cites is written directly to `docs-design/evidence/raw/<slice-id>/`, committed with the record, and listed in the manifest with its SHA-256. The git-ignored `temp/` directory is scratch space and MUST NOT hold cited evidence; a citation of a `temp/` path does not satisfy this protocol. Historical `temp/` citations are resolved through the [raw evidence index](../evidence/raw/INDEX.md).
+Captured output is retained, not just summarised. Every raw log that the record cites is written directly to `docs-design/evidence/raw/<slice-id>/`, committed with the record, and listed in the manifest with its SHA-256. The git-ignored `temp/` directory is scratch space and MUST NOT hold cited evidence; a citation of a `temp/` path does not satisfy this protocol. Retention: raw red, green, mutation and characterization output is committed in full, because it is the only proof that a test failed for the intended reason and cannot be recreated once the code moves on. Regression, full-build, repeat-run and discarded-attempt output is committed as a `*.excerpt.txt` (summary lines, per-module totals, coverage gates, build result and failure blocks) with the full log's SHA-256 in the manifest; the full log is not kept, because it can be reproduced from the recorded command and revision. `*.log` is otherwise git-ignored, so `.gitignore` re-admits `docs-design/evidence/raw/**`. Historical `temp/` citations are resolved through the [raw evidence index](../evidence/raw/INDEX.md).
 
 For asynchronous behavior, tests MUST use the project-standard asynchronous test facilities: Vert.x test facilities for code that is still on Vert.x, and, for code that has left Vert.x, the test standard in the [Quorus concurrency conventions](../dev/QUORUS_CONCURRENCY_CONVENTIONS.md#6-asynchronous-test-standard) §6 (ADR-0012, workstream `RT-02`): blocking APIs, preemptive timeouts, handshake and interruption synchronisation, the real OpenTelemetry SDK and frozen logback events, and repeated concurrency runs. Awaitility, Java executor/latch orchestration, sleeps used as synchronization, and equivalent non-Vert.x polling are not permitted in new or remediated tests. External-path tests MUST enter through the same HTTP, agent, protocol, or cluster boundary used by a real caller. Direct method tests remain useful but cannot independently satisfy the behavioral-test gate.
 
@@ -1249,6 +1249,7 @@ The plan is revised when requirements or implementation evidence change. Revisio
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.33 | 2026-09-26 | §6.1 evidence retention: keep raw red, green, mutation and characterization output; keep regression and discarded-attempt output as excerpts with the full log hash (DR-Q6 refined) |
 | 1.32 | 2026-09-26 | §6.1 points code that has left Vert.x to the concurrency conventions test standard (`RT-02c`) |
 | 1.31 | 2026-09-26 | Pointed documentation-review references at register Section H and its §3 decision log, after the separate task list was merged into the register |
 | 1.30 | 2026-09-26 | Recorded ADR-0012 decisions: no preview in production, using a Quorus task-scope abstraction (`RT-Q1`); JDK `HttpsServer` (`RT-Q2`); follow six-monthly Java releases (`RT-Q3`), adding the recurring `RT-09` |
