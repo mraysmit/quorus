@@ -31,6 +31,8 @@ Agents poll controller for jobs, execute transfers via protocol adapters
 ## Key Conventions
 
 ### Reactive Patterns
+**Code that has left Vert.x, and new code that needs no Vert.x types, follows [docs-design/dev/QUORUS_CONCURRENCY_CONVENTIONS.md](../docs-design/dev/QUORUS_CONCURRENCY_CONVENTIONS.md):** blocking code on virtual threads, `dev.mars.quorus.concurrent.TaskScope` for concurrent work, and request context in declared `ScopedValue`s. The rules below apply only to modules still on Vert.x.
+
 - All async operations use **`io.vertx.core.Future<T>`** (not CompletableFuture)
 - Controllers run on Vert.x event loop — avoid blocking operations
 - Protocol adapters: use `transferReactive()` over deprecated `transfer()`
@@ -133,6 +135,8 @@ class MyTest {
 ```
 
 ### Test-concurrency direction
+
+For code that has left Vert.x, use the asynchronous test standard in [docs-design/dev/QUORUS_CONCURRENCY_CONVENTIONS.md §5](../docs-design/dev/QUORUS_CONCURRENCY_CONVENTIONS.md#5-asynchronous-test-standard). It requires preemptive `@Timeout(threadMode = SEPARATE_THREAD)`, `CompletableFuture` handshakes and interruption for synchronisation, and no sleeps, Awaitility or polling. Spans are asserted through the real OpenTelemetry SDK with `InMemorySpanExporter`, MDC through logback events frozen with `prepareForDeferredProcessing()`, and concurrency tests are repeated as regression evidence. The paragraph below applies to modules still on Vert.x.
 
 The migration target for Vert.x asynchronous tests is to use Vert.x `Future`, `Promise`, timers,
 and `VertxTestContext`, with blocking work isolated through `executeBlocking`. Prefer these patterns

@@ -2,7 +2,7 @@
 
 # Quorus Enterprise Implementation Plan
 
-**Version:** 1.31
+**Version:** 1.32
 **Date:** 2026-09-26
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
@@ -317,7 +317,7 @@ The mandatory evidence record for each slice contains:
 
 Captured output is retained, not just summarised. Every raw log that the record cites is written directly to `docs-design/evidence/raw/<slice-id>/`, committed with the record, and listed in the manifest with its SHA-256. The git-ignored `temp/` directory is scratch space and MUST NOT hold cited evidence; a citation of a `temp/` path does not satisfy this protocol. Historical `temp/` citations are resolved through the [raw evidence index](../evidence/raw/INDEX.md).
 
-For asynchronous behavior, tests MUST use the project-standard asynchronous test facilities: Vert.x test facilities for code that is still on Vert.x, and the virtual-thread and preemptive-timeout standard of [ADR-0012](../architecture-decisions/ADR-0012-JAVA-RUNTIME-AND-STRUCTURED-CONCURRENCY.md) (workstream `RT-02`) for code that has left it. Awaitility, Java executor/latch orchestration, sleeps used as synchronization, and equivalent non-Vert.x polling are not permitted in new or remediated tests. External-path tests MUST enter through the same HTTP, agent, protocol, or cluster boundary used by a real caller. Direct method tests remain useful but cannot independently satisfy the behavioral-test gate.
+For asynchronous behavior, tests MUST use the project-standard asynchronous test facilities: Vert.x test facilities for code that is still on Vert.x, and, for code that has left Vert.x, the test standard in the [Quorus concurrency conventions](../dev/QUORUS_CONCURRENCY_CONVENTIONS.md#5-asynchronous-test-standard) §5 (ADR-0012, workstream `RT-02`): blocking APIs, preemptive timeouts, handshake and interruption synchronisation, the real OpenTelemetry SDK and frozen logback events, and repeated concurrency runs. Awaitility, Java executor/latch orchestration, sleeps used as synchronization, and equivalent non-Vert.x polling are not permitted in new or remediated tests. External-path tests MUST enter through the same HTTP, agent, protocol, or cluster boundary used by a real caller. Direct method tests remain useful but cannot independently satisfy the behavioral-test gate.
 
 Existing implementation for which no preserved red stage exists can only receive **retrospective characterization**. It requires an explicit process-deviation record and cannot be relabelled as historical TDD. All subsequent changes to that behavior return to the mandatory red-green-refactor protocol.
 
@@ -1249,6 +1249,7 @@ The plan is revised when requirements or implementation evidence change. Revisio
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.32 | 2026-09-26 | §6.1 points code that has left Vert.x to the concurrency conventions test standard (`RT-02c`) |
 | 1.31 | 2026-09-26 | Pointed documentation-review references at register Section H and its §3 decision log, after the separate task list was merged into the register |
 | 1.30 | 2026-09-26 | Recorded ADR-0012 decisions: no preview in production, using a Quorus task-scope abstraction (`RT-Q1`); JDK `HttpsServer` (`RT-Q2`); follow six-monthly Java releases (`RT-Q3`), adding the recurring `RT-09` |
 | 1.29 | 2026-09-26 | Added Section 20, Platform Migration Workstreams: `CE` (consensus through the generic QRaft engine, ADR-0011) and `RT` (leave Vert.x for Java 27 structured concurrency, ADR-0012), with sequencing against Phases 6 and 8 and R1-2/R1-3; renumbered former Sections 20–23 to 21–24; made the §6.1 asynchronous-test rule depend on the module's runtime |
