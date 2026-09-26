@@ -40,11 +40,8 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardWatchEventKinds;
-import java.nio.file.WatchService;
 import java.security.KeyStore;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
@@ -261,40 +258,43 @@ class HttpTransferProtocolBoundaryTest {
                 try (OutputStream out = exchange.getResponseBody()) {
                     out.write(body, 0, half);
                     out.flush();
-                    release.join();                  // hold the second half until the test has seen the first
+                    awaitRelease(release);          // hold the second half until the test has checked the first
                     out.write(body, half, half);
                 }
             });
-            Path temp = destination().resolveSibling(destination().getFileName() + ".tmp");
-            AtomicReference<Throwable> failure = new AtomicReference<>();
-            Thread transfer;
-            try (WatchService watcher = FileSystems.getDefault().newWatchService()) {
-                directory.register(watcher, StandardWatchEventKinds.ENTRY_CREATE, StandardWatchEventKinds.ENTRY_MODIFY);
-                Path ended = directory.resolve("transfer-ended.marker");
-                transfer = Thread.ofVirtual().start(() -> {
-                    try {
-                        download(URI.create("http://127.0.0.1:" + port + "/data.bin"), null);
-                    } catch (Throwable t) {
-                        failure.set(t);
-                    } finally {
-                        try {
-                            Files.createFile(ended);         // wakes the watcher even if the transfer failed early
-                        } catch (IOException ignored) {
-                            // the watcher will still time out through the test timeout
-                        }
+            TransferRequest request = TransferRequest.builder()
+                    .requestId("streaming")
+                    .sourceUri(URI.create("http://127.0.0.1:" + port + "/data.bin"))
+                    .destinationPath(destination())
+                    .build();
+            // Purpose-built context: the adapter consults shouldContinue() before each buffer, so this
+            // signals from the transfer thread itself once half a megabyte has been written.
+            CompletableFuture<Void> partlyWritten = new CompletableFuture<>();
+            TransferContext context = new TransferContext(new TransferJob(request)) {
+                @Override
+                public boolean shouldContinue() {
+                    if (getJob().getBytesTransferred() >= half / 2) {
+                        partlyWritten.complete(null);
                     }
-                });
-                while (!(Files.exists(temp) && Files.size(temp) >= half / 2)) {
-                    if (Files.exists(ended)) {
-                        release.complete(null);
-                        throw new AssertionError("the transfer ended before streaming any data to "
-                                + temp.getFileName(), failure.get());
-                    }
-                    var key = watcher.take();               // event-driven: blocks until the directory changes
-                    key.pollEvents();
-                    key.reset();
+                    return super.shouldContinue();
                 }
-            }
+            };
+            AtomicReference<Throwable> failure = new AtomicReference<>();
+            Thread transfer = Thread.ofVirtual().start(() -> {
+                try {
+                    protocol().transfer(request, context);
+                } catch (Throwable t) {
+                    failure.set(t);
+                } finally {
+                    partlyWritten.completeExceptionally(
+                            new AssertionError("the transfer ended before writing half a megabyte", failure.get()));
+                }
+            });
+
+            partlyWritten.join();
+            Path temp = destination().resolveSibling(destination().getFileName() + ".tmp");
+            assertTrue(Files.readAllBytes(temp).length >= half / 2,
+                    "bytes must be on disk while the response is still arriving");
             assertFalse(Files.exists(destination()), "the destination appears only after the whole body has arrived");
             release.complete(null);
             transfer.join();
@@ -329,6 +329,235 @@ class HttpTransferProtocolBoundaryTest {
             assertEquals(TransferStatus.COMPLETED, result.getFinalStatus());
             assertEquals("PUT", method.get());
             assertArrayEquals(content, received.get());
+        }
+    }
+
+
+    /**
+     * Retrospective characterization (plan §6.1): behaviour implemented during the RT-03b green stage
+     * without a preceding failing test. Recorded as characterization, not TDD evidence.
+     */
+    @Nested
+    class Characterization {
+
+        @Test
+        void abortClosesInFlightConnectionsAndFailsTheTransfer() throws Exception {
+            InterruptedTransfer running = startHeldDownload();
+            running.protocol.abort();
+
+            assertThrows(TransferException.class, running::finish);
+            assertNoDestinationWritten();
+        }
+
+        @Test
+        void cancellingTheContextStopsTheTransferBetweenBuffers() throws Exception {
+            InterruptedTransfer running = startHeldDownload();
+            running.context.cancel();
+
+            TransferException failure = assertThrows(TransferException.class, running::finish);
+            assertTrue(failure.getMessage().contains("cancelled"), failure.getMessage());
+            assertNoDestinationWritten();
+        }
+
+        @Test
+        void interruptingTheTransferThreadStopsTheTransferBetweenBuffers() throws Exception {
+            InterruptedTransfer running = startHeldDownload();
+            running.thread.interrupt();
+
+            TransferException failure = assertThrows(TransferException.class, running::finish);
+            assertTrue(failure.getMessage().contains("cancelled"), failure.getMessage());
+            assertNoDestinationWritten();
+        }
+
+        @Test
+        void aGovernedTransferWithoutApprovedAddressesUsesNormalResolution() throws Exception {
+            byte[] body = "resolved normally".getBytes(StandardCharsets.UTF_8);
+            int port = httpServer(fixedBody(body));
+            RuntimeCredential unpinned = new RuntimeCredential("svc", ServiceConnection.AuthenticationType.BEARER,
+                    "t".toCharArray(), Set.of(), Set.of(), Set.of(), "TLSv1.2", List.of());
+
+            download(URI.create("http://127.0.0.1:" + port + "/data.bin"), unpinned);
+
+            assertArrayEquals(body, Files.readAllBytes(destination()));
+        }
+
+        @Test
+        void aResponseWithoutContentLengthIsStreamedCompletely() throws Exception {
+            byte[] body = randomBytes(300 * 1024);
+            int port = httpServer(exchange -> {
+                exchange.sendResponseHeaders(200, 0);          // chunked: no Content-Length
+                try (OutputStream out = exchange.getResponseBody()) {
+                    out.write(body);
+                }
+            });
+
+            download(URI.create("http://127.0.0.1:" + port + "/data.bin"), null);
+
+            assertArrayEquals(body, Files.readAllBytes(destination()));
+        }
+
+        @Test
+        void aZeroByteFileDownloadsAsAnEmptyFile() throws Exception {
+            int port = httpServer(exchange -> {
+                exchange.sendResponseHeaders(200, -1);         // Content-Length: 0
+                exchange.close();
+            });
+
+            TransferResult result = download(URI.create("http://127.0.0.1:" + port + "/data.bin"), null);
+
+            assertEquals(TransferStatus.COMPLETED, result.getFinalStatus());
+            assertEquals(0, Files.size(destination()));
+        }
+
+        @Test
+        void passwordCredentialsUseBasicAuthentication() throws Exception {
+            AtomicReference<String> authorization = new AtomicReference<>();
+            int port = httpServer(exchange -> {
+                authorization.set(exchange.getRequestHeaders().getFirst("Authorization"));
+                respond(exchange, "ok".getBytes(StandardCharsets.UTF_8));
+            });
+
+            download(URI.create("http://127.0.0.1:" + port + "/data.bin"), pinned(ServiceConnection.AuthenticationType.PASSWORD));
+
+            assertEquals("Basic " + Base64.getEncoder().encodeToString("svc:secret".getBytes(StandardCharsets.UTF_8)),
+                    authorization.get());
+        }
+
+        @Test
+        void credentialTypesWithoutAnHttpSchemeSendNoAuthorizationHeader() throws Exception {
+            AtomicReference<String> authorization = new AtomicReference<>("not-called");
+            int port = httpServer(exchange -> {
+                authorization.set(exchange.getRequestHeaders().getFirst("Authorization"));
+                respond(exchange, "ok".getBytes(StandardCharsets.UTF_8));
+            });
+
+            download(URI.create("http://127.0.0.1:" + port + "/data.bin"),
+                    pinned(ServiceConnection.AuthenticationType.SSH_PRIVATE_KEY));
+
+            assertEquals(null, authorization.get());
+        }
+
+        @Test
+        void aDestinationDirectoryThatCannotBeCreatedFailsTheTransfer() throws Exception {
+            Path blocker = directory.resolve("not-a-directory");
+            Files.writeString(blocker, "a file where a directory is needed");
+            TransferRequest request = TransferRequest.builder()
+                    .requestId("no-directory")
+                    .sourceUri(URI.create("http://127.0.0.1:1/data.bin"))
+                    .destinationPath(blocker.resolve("data.bin"))
+                    .build();
+
+            TransferException failure = assertThrows(TransferException.class,
+                    () -> protocol().transfer(request, contextFor(request)));
+
+            assertTrue(failure.getMessage().contains("Failed to create directory"), failure.getMessage());
+        }
+
+        @Test
+        void anEmptyExpectedChecksumIsNotEnforced() throws Exception {
+            int port = httpServer(fixedBody("content".getBytes(StandardCharsets.UTF_8)));
+            TransferRequest request = TransferRequest.builder()
+                    .requestId("empty-checksum")
+                    .sourceUri(URI.create("http://127.0.0.1:" + port + "/data.bin"))
+                    .destinationPath(destination())
+                    .expectedChecksum("")
+                    .build();
+
+            protocol().transfer(request, contextFor(request));
+
+            assertEquals("content", Files.readString(destination()));
+        }
+
+        @Test
+        void aMatchingExpectedChecksumIsAccepted() throws Exception {
+            byte[] body = "checked content".getBytes(StandardCharsets.UTF_8);
+            dev.mars.quorus.storage.ChecksumCalculator calculator = new dev.mars.quorus.storage.ChecksumCalculator();
+            calculator.update(body, 0, body.length);
+            String expected = calculator.getChecksum();   // getChecksum() finalises the digest: call it once
+            int port = httpServer(fixedBody(body));
+            TransferRequest request = TransferRequest.builder()
+                    .requestId("checksum-match")
+                    .sourceUri(URI.create("http://127.0.0.1:" + port + "/data.bin"))
+                    .destinationPath(destination())
+                    .expectedChecksum(expected)
+                    .build();
+
+            TransferResult result = protocol().transfer(request, contextFor(request));
+
+            assertEquals(expected, result.getActualChecksum().orElseThrow());
+            assertArrayEquals(body, Files.readAllBytes(destination()));
+        }
+
+        @Test
+        void theApprovedAddressResolverAnswersOnlyForTheServiceHostWithoutLookingItUp() throws Exception {
+            var resolver = new HttpTransferProtocol.ApprovedAddressResolver("Transfer.Quorus.Test", List.of("127.0.0.1", "::1"));
+
+            assertEquals(List.of("127.0.0.1", "0:0:0:0:0:0:0:1"),
+                    java.util.Arrays.stream(resolver.resolve("transfer.quorus.test")).map(InetAddress::getHostAddress).toList());
+            assertThrows(java.net.UnknownHostException.class, () -> resolver.resolve("elsewhere.example"));
+            assertEquals("transfer.quorus.test", resolver.resolveCanonicalHostname("transfer.quorus.test"));
+        }
+
+        /** A download held after its first half, with the handles needed to disturb it. */
+        private record InterruptedTransfer(HttpTransferProtocol protocol, TransferContext context, Thread thread,
+                                           CompletableFuture<Void> release, AtomicReference<Throwable> failure) {
+            void finish() throws Throwable {
+                release.complete(null);
+                thread.join();
+                if (failure.get() != null) {
+                    throw failure.get();
+                }
+            }
+        }
+
+        private InterruptedTransfer startHeldDownload() throws Exception {
+            int half = 512 * 1024;
+            byte[] body = randomBytes(2 * half);
+            CompletableFuture<Void> release = new CompletableFuture<>();
+            int port = httpServer(exchange -> {
+                exchange.sendResponseHeaders(200, body.length);
+                try (OutputStream out = exchange.getResponseBody()) {
+                    out.write(body, 0, half);
+                    out.flush();
+                    awaitRelease(release);
+                    out.write(body, half, half);
+                } catch (IOException closedByClient) {
+                    // the client may close the connection on abort
+                }
+            });
+            TransferRequest request = TransferRequest.builder()
+                    .requestId("held")
+                    .sourceUri(URI.create("http://127.0.0.1:" + port + "/data.bin"))
+                    .destinationPath(destination())
+                    .build();
+            CompletableFuture<Void> started = new CompletableFuture<>();
+            TransferContext context = new TransferContext(new TransferJob(request)) {
+                @Override
+                public boolean shouldContinue() {
+                    if (getJob().getBytesTransferred() > 0) {
+                        started.complete(null);
+                    }
+                    return super.shouldContinue();
+                }
+            };
+            HttpTransferProtocol protocol = protocol();
+            AtomicReference<Throwable> failure = new AtomicReference<>();
+            Thread thread = Thread.ofVirtual().start(() -> {
+                try {
+                    protocol.transfer(request, context);
+                } catch (Throwable t) {
+                    failure.set(t);
+                } finally {
+                    started.completeExceptionally(new AssertionError("the transfer ended before streaming", failure.get()));
+                }
+            });
+            started.join();
+            return new InterruptedTransfer(protocol, context, thread, release, failure);
+        }
+
+        private RuntimeCredential pinned(ServiceConnection.AuthenticationType type) {
+            return new RuntimeCredential("svc", type, "secret".toCharArray(), Set.of(), Set.of(), Set.of(),
+                    "TLSv1.2", List.of("127.0.0.1"));
         }
     }
 
@@ -445,6 +674,15 @@ class HttpTransferProtocolBoundaryTest {
             }
             handler.handle(exchange);
         };
+    }
+
+    /** Server-side wait with a bound, so a failing test can never leave a server thread blocked. */
+    private static void awaitRelease(CompletableFuture<Void> release) throws IOException {
+        try {
+            release.get(20, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            throw new IOException("test did not release the response", e);
+        }
     }
 
     private static HttpHandler fixedBody(byte[] body) {

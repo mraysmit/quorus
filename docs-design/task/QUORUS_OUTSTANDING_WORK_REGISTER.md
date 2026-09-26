@@ -631,7 +631,7 @@ plan holds the acceptance criteria; this section lists identity, owner and level
 | **RT-01a** | Quorus | Java 27 compile and test baseline (root pom, `.java-version`), proven by `JavaPlatformBaselineTest` | ✅ 2026-09-26: red, green and a 2,387-test regression on JDK 27 ([evidence](../evidence/rt-01a-java27-baseline-2026-09-26.json)). Commit together with `RT-01b` |
 | **RT-01b** | Quorus | Java 27 controller and agent images and CI container on Amazon Corretto 27 | ✅ 2026-09-26: single-stage images packaging host-built jars on `amazoncorretto:27.0.0-alpine3.24`; no Java or Maven inside Docker. Red, green and a Docker+slow regression of 2,421 tests with 0 failures and 2 pre-existing skips ([evidence](../evidence/rt-01b-java27-images-2026-09-26.json)). CI change not yet executed |
 | **RT-02** | Quorus | Concurrency conventions, the task-scope abstraction and the post-Vert.x test standard | ✅ 2026-09-26: RT-02a TaskScope core ([evidence](../evidence/rt-02a-task-scope-2026-09-26.json)); RT-02b tracing, MDC and `ScopedValue` propagation ([evidence](../evidence/rt-02b-context-propagation-2026-09-26.json)); RT-02c [concurrency conventions](../dev/QUORUS_CONCURRENCY_CONVENTIONS.md) with the post-Vert.x test standard, referenced from plan §6.1 and the Copilot instructions; RT-02d StructuredTaskScope structure rules and migration mapping ([evidence](../evidence/rt-02d-structure-rules-2026-09-26.json)); TaskScope 163/163 lines and 70/70 branches |
-| **RT-03** | Quorus | `quorus-core` off Vert.x; streaming HTTP adapter closes `ARCH-09` | 🟨 RT-03a done 2026-09-26 (dead pool code removed). Next: RT-03b HTTP adapter on `java.net.http.HttpClient` with streaming, then RT-03c blocking `TransferEngine` (option A), RT-03d contract cleanup, RT-03e topology and codec, RT-03f remove `io.vertx` from the core pom |
+| **RT-03** | Quorus | `quorus-core` off Vert.x; streaming HTTP adapter closes `ARCH-09` | 🟨 RT-03a done (dead pool code). RT-03b done 2026-09-26: HTTP adapter on Apache HttpClient 5, blocking and streaming, governed pinning with correct SNI, Host and hostname verification, closing `ARCH-09` ([evidence](../evidence/rt-03b-http-adapter-2026-09-26.json)). Next: RT-03c blocking `TransferEngine` (option A), RT-03d contract cleanup, RT-03e topology and codec, RT-03f remove `io.vertx` from the core pom |
 | **RT-04** | Quorus | `quorus-workflow` and `quorus-integration-examples` off Vert.x | 🟠 |
 | **RT-05** | Quorus | `quorus-agent` off Vert.x | 🟡 |
 | **RT-06** | Quorus | `quorus-controller` HTTP API off Vert.x; removes the `CE-07` bridge | 🟡 |
@@ -658,7 +658,7 @@ the in-repository engine.
 | `ARCH-06` Assignment reference and tenant invariants incomplete | Closed | Phases 0, 1, R2 |
 | `ARCH-07` Persistent controller path and volume not proven | Open | **R1-1, R1-2, R1-3**, `CE-11`, Phase 8 |
 | `ARCH-08` SFTP host-key verification disabled | Closed | Phase 4 |
-| `ARCH-09` HTTP adapter buffers full payload | Open | `RT-03` (streaming `HttpClient`), Phase 12 scale |
+| `ARCH-09` HTTP adapter buffers full payload | Closed 2026-09-26 by `RT-03b` (streaming download and upload) | Phase 12 scale validation still measures it |
 | `ARCH-10` Dynamic membership absent | Deferred | DEF-01 |
 | `ARCH-11` Transfer operations telemetry incomplete | Partly open | P3-01 … P3-12 |
 | `ARCH-12` Operational business context absent | Closed | Phase 3 first slice |
