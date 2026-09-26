@@ -1,0 +1,93 @@
+{
+  "slice": "RT-01b",
+  "title": "Java 27 container images packaging host-built jars on Amazon Corretto 27",
+  "requirement": "ADR-0012 decisions RT-Q3 and RT-Q4 (Amazon Corretto 27, runtime option A: amazoncorretto:27.0.0-alpine3.24); enterprise plan §20 workstream RT; register Section J; register DR-C11",
+  "acceptance": "The controller and agent images are built from the jars the host built and tested, with no Java compilation or Maven inside Docker. Each image runs the Amazon Corretto 27 JVM, ships the host-built jar byte-for-byte, and contains classes compiled for Java 27. Written before implementation.",
+  "classification": "external-path behavioral (Docker image boundary) and contract",
+  "baseRevision": "79e2025 plus the uncommitted RT-01a patch",
+  "patch": {
+    "path": "docs-design/evidence/raw/rt-01/rt-01b.patch",
+    "sha256": "a55e554d50e4ddee263792bb29a5da790a6d9634357ceec61dcdaa03cbd64771"
+  },
+  "environment": {
+    "hostJdk": "OpenJDK 27 GA, build 27+35-2325",
+    "maven": "Apache Maven 3.9.11",
+    "docker": "Docker Engine 29.7.2 (Docker Desktop, linux/amd64)",
+    "imageRuntime": "amazoncorretto:27.0.0-alpine3.24, reporting Corretto-27.0.0.35.1 (build 27+35-FR)",
+    "os": "Windows 11 Pro N 10.0.26340"
+  },
+  "test": {
+    "file": "quorus-controller/src/test/java/dev/mars/quorus/controller/deployment/ContainerImageBaselineTest.java",
+    "tag": "docker",
+    "entryPoint": "docker build of each shipped Dockerfile under a fresh tag (quorus-controller:rt01, quorus-agent:rt01), then java -version, sha256sum /app/app.jar and javap inside the image",
+    "prerequisite": "host-built jars (docker/build-runtime.sh or mvn clean package -pl quorus-controller,quorus-agent -am -DskipTests)"
+  },
+  "discardedAttempts": [
+    {"what": "First red, earlier test version", "reason": "Fixture error: relative -f Dockerfile path resolved against the module directory", "log": {"path": "docs-design/evidence/raw/rt-01/images-red-attempt1-fixture-error.log", "sha256": "a024e79574d3c73652f0d888306af2126c1057c08d408821e0a850286d257817"}},
+    {"what": "Red and green against an in-image Maven builder design", "reason": "Superseded: building Java inside Docker was the wrong approach. The design was abandoned and the Dockerfile edits reverted to HEAD before the host-built slice. The green attempt also failed because the glibc-only protoc-gen-grpc-java cannot run on Alpine", "logs": [
+      {"path": "docs-design/evidence/raw/rt-01/superseded-inimage-images-red.log", "sha256": "2676de03a8e06c874b2b7c0fca19efbfe1f31e15c1b8bac9000225b05b7dd28d"},
+      {"path": "docs-design/evidence/raw/rt-01/superseded-inimage-agent-red.log", "sha256": "c61b1ea3b41079a7591e0e3f15e09f488423d1b52bcfe02b5acfe28317926e3b"},
+      {"path": "docs-design/evidence/raw/rt-01/controller-green-attempt1-protoc-musl.log", "sha256": "73dff6838e7d644811646a6652ac038f36747b1b636c2938a8d24749e742466c"}]},
+    {"what": "Second host-built red", "reason": "Procedure error: host package without clean re-shaded the controller jar and produced duplicate jars", "logs": [
+      {"path": "docs-design/evidence/raw/rt-01/images-red-attempt2-unclean-images-red-hostbuild.log", "sha256": "603e136e8d8e7a9c7f122c8eb7c929a09c2e2f275422ef4e086882fcb8d22baf"},
+      {"path": "docs-design/evidence/raw/rt-01/images-red-attempt2-unclean-images-red.log", "sha256": "c2270fd5aa78e2b73bf85add224978705c783a37e9ce7d808784dab9513afac7"}]}
+  ],
+  "red": {
+    "commands": [
+      "mvn -B clean package -pl quorus-controller,quorus-agent -am -DskipTests",
+      "mvn -B test -pl quorus-controller -am -Dtest=ContainerImageBaselineTest -Dsurefire.failIfNoSpecifiedTests=false -Dtest.excludedGroups="
+    ],
+    "revision": "HEAD Dockerfiles, which compile in-image; the host-built test only",
+    "started": "2026-09-26T13:03:06+01:00",
+    "finished": "2026-09-26T13:03:46+01:00",
+    "expectedFailure": "Neither image can be produced from the host-built jars on Corretto 27, because the HEAD Dockerfiles depend on an in-image Maven build",
+    "result": "Tests run: 2, Failures: 2. Controller: the build requires the in-image m2cache Maven context (docker.io/library/m2cache pull denied). Agent: its in-image builder image maven:3.9.9-eclipse-temurin-25 does not exist (the agent image had been unbuildable since 487ceb7, 2026-02-25). Neither image reaches packaging.",
+    "logs": [
+      {"path": "docs-design/evidence/raw/rt-01/images-red-hostbuild.log", "sha256": "06401105083f5da54e10c2233d1df0851836351cfef1843851d323c442cf6ce9"},
+      {"path": "docs-design/evidence/raw/rt-01/images-red.log", "sha256": "d26fc3d677fc9a9fb81f3a0f4ec82f293c2580a9e00963acf94144af0d2843d0"}
+    ]
+  },
+  "green": {
+    "change": [
+      "quorus-controller/Dockerfile and quorus-agent/Dockerfile: single stage FROM amazoncorretto:27.0.0-alpine3.24, COPY of the host-built jar (agent also target/lib); builder stages, in-image Maven, m2cache and stub poms removed",
+      ".dockerignore admits only the controller jar and the agent jar plus lib/ from target/",
+      "docker/build-runtime.sh and .ps1: clean package of the controller and agent on the host"
+    ],
+    "commands": [
+      "sh docker/build-runtime.sh",
+      "mvn -B test -pl quorus-controller -am -Dtest=ContainerImageBaselineTest -Dsurefire.failIfNoSpecifiedTests=false -Dtest.excludedGroups="
+    ],
+    "started": "2026-09-26T13:04:33+01:00",
+    "finished": "2026-09-26T13:05:46+01:00",
+    "result": "Tests run: 2, Failures: 0. Both images report Corretto-27.0.0.35.1. The shipped /app/app.jar SHA-256 equals the host jar (controller 5d6796a8…, agent e29001f1…). The main classes are class-file major version 71.",
+    "logs": [
+      {"path": "docs-design/evidence/raw/rt-01/images-green-hostbuild.log", "sha256": "dca28ae6153b8b9e74f9a8ae349264a847703e173e099f6ecf745de884ebee75"},
+      {"path": "docs-design/evidence/raw/rt-01/images-green.log", "sha256": "471155cf65760a3a189f2e4d2676c3d5dc92f93a5a9b6eb7fa57f79249528f0a"}
+    ]
+  },
+  "refactor": [
+    "Removed all 43 m2cache build contexts from 9 docker/compose files and 4 test Compose files; removed the Temurin 25 build-argument overrides from docker-compose-controller-first.yml; all Compose models validate with no M2_REPO",
+    "SharedDockerCluster no longer reuses a cached quorus-controller:test image; it packages the host-built jar once per test JVM and fails clearly if the jar is missing",
+    "README, docker/compose/.env, scripts/httpie/RUNBOOK.txt and scripts/start-cluster-with-observability.ps1 use the host build instead of M2_REPO and m2-repo",
+    "CI runs on actions/setup-java with Corretto 27 instead of a maven:*-temurin-25 container",
+    ".github/copilot-instructions.md states the host-built image rule and the Docker test lane"
+  ],
+  "regression": {
+    "commands": ["sh docker/build-runtime.sh", "mvn -B --fail-at-end verify -Dtest.excludedGroups="],
+    "lanes": "All groups including docker and slow (R1-1 container recreation, Docker Raft cluster, network and 5-node suites) on freshly packaged Corretto 27 images",
+    "started": "2026-09-26T13:08:32+01:00",
+    "finished": "2026-09-26T13:17:07+01:00",
+    "result": "BUILD SUCCESS; 2,421 tests, 0 failures, 0 errors, 2 skipped (core 1,519; workflow 134; tenant 64; controller 603 = 601 + 2 new; agent 101); all five JaCoCo gates met. The two skips are the pre-existing network-partition disables AdvancedNetworkTest.testDockerNetworkPartition and NetworkPartitionTest.testMajorityPartition. Surefire attributes some test cases to neighbouring classes in its console lines; per-test results were confirmed from the XML reports.",
+    "logs": [
+      {"path": "docs-design/evidence/raw/rt-01/images-regression-hostbuild.log", "sha256": "20ec81c6af06495d67b2e457ff54c2b96de325cb126b0334728cdf97dda6981c"},
+      {"path": "docs-design/evidence/raw/rt-01/images-regression-docker-slow.log", "sha256": "3a88c72e1b3c02a50366f0c525b53947b16fd829fc7500350cdde6f25d10827a"}
+    ]
+  },
+  "limitations": [
+    "CI was changed but not executed; the first GitHub Actions run is the verification that setup-java provides Corretto 27.",
+    "Image sizes grew because option A ships a full JDK: controller 439 MB and agent 481 MB locally, against 291 MB for the old Temurin 25 JRE controller image.",
+    "Docker-tagged tests need the host-built jars and must not be preceded by clean in the same Maven command.",
+    "The stale local m2-repo/ folder (git-ignored) is not yet deleted, and the testing documents still describe M2_REPO (DR-C8)."
+  ],
+  "sensitiveDataCheck": "Logs contain Maven, Docker build and test output only; no request bodies, credentials, keys or sensitive payloads were captured."
+}

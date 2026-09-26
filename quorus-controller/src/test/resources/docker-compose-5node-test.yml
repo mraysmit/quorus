@@ -14,8 +14,6 @@ services:
     build:
       context: ../../../..
       dockerfile: quorus-controller/Dockerfile
-      additional_contexts:
-        m2cache: ${M2_REPO:-~/.m2/repository}/dev/mars
       args:
         BUILDKIT_INLINE_CACHE: 1
     hostname: controller1
@@ -46,8 +44,6 @@ services:
     build:
       context: ../../../..
       dockerfile: quorus-controller/Dockerfile
-      additional_contexts:
-        m2cache: ${M2_REPO:-~/.m2/repository}/dev/mars
       args:
         BUILDKIT_INLINE_CACHE: 1
     hostname: controller2
@@ -78,8 +74,6 @@ services:
     build:
       context: ../../../..
       dockerfile: quorus-controller/Dockerfile
-      additional_contexts:
-        m2cache: ${M2_REPO:-~/.m2/repository}/dev/mars
       args:
         BUILDKIT_INLINE_CACHE: 1
     hostname: controller3
@@ -110,8 +104,6 @@ services:
     build:
       context: ../../../..
       dockerfile: quorus-controller/Dockerfile
-      additional_contexts:
-        m2cache: ${M2_REPO:-~/.m2/repository}/dev/mars
       args:
         BUILDKIT_INLINE_CACHE: 1
     hostname: controller4
@@ -142,8 +134,6 @@ services:
     build:
       context: ../../../..
       dockerfile: quorus-controller/Dockerfile
-      additional_contexts:
-        m2cache: ${M2_REPO:-~/.m2/repository}/dev/mars
       args:
         BUILDKIT_INLINE_CACHE: 1
     hostname: controller5

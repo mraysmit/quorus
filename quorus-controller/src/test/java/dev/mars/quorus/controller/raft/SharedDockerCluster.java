@@ -120,38 +120,41 @@ public final class SharedDockerCluster {
     }
 
     /**
-     * Builds the shared {@code quorus-controller:test} image if it is not already cached,
-     * without starting either shared cluster. Tests that manage their own container
-     * lifecycle — such as the R1-1 container-recreation acceptance — use this so they
-     * reuse the same image without paying for a cluster they will not use.
+     * Builds the shared {@code quorus-controller:test} image once per test JVM, without starting
+     * either shared cluster. Tests that manage their own container lifecycle, such as the R1-1
+     * container-recreation acceptance, use this so they reuse the same image without paying for a
+     * cluster they will not use.
      */
     public static synchronized void buildImageIfAbsent() {
         ensureImageBuilt();
     }
 
     /**
-     * Builds the quorus-controller:test Docker image using the build compose file,
-     * unless the image already exists locally. On a local Docker Desktop, skipping
-     * a redundant build saves 30–120 seconds.
+     * Packages the host-built controller jar into the {@code quorus-controller:test} image using
+     * the build compose file. The image is rebuilt once per test JVM rather than reused from an
+     * earlier run: packaging a host-built jar takes seconds, and a cached image could be stale
+     * (for example built for an older Java baseline) and silently hide a regression.
      */
     private static synchronized void ensureImageBuilt() {
         if (imageBuilt) return;
 
-        // Fast path: skip the build entirely if the image is already cached
-        if (isImageCached("quorus-controller:test")) {
-            logger.info("Docker image quorus-controller:test already exists -- skipping build");
-            imageBuilt = true;
-            return;
+        File hostJar = new File("target/quorus-controller-1.0-SNAPSHOT.jar");
+        if (!hostJar.isFile()) {
+            throw new IllegalStateException(
+                    "Host-built controller jar not found: " + hostJar.getAbsolutePath()
+                    + " -- images package host-built jars only; run docker/build-runtime.sh"
+                    + " (or mvn package -pl quorus-controller -am -DskipTests) before the Docker tests");
         }
 
         File buildComposeFile = new File("src/test/resources/docker-compose-build-image.yml");
         if (!buildComposeFile.exists()) {
-            throw new RuntimeException(
+            throw new IllegalStateException(
                     "Build compose file not found: " + buildComposeFile.getAbsolutePath()
                     + " -- ensure working directory is the quorus-controller module root");
         }
 
-        logger.info("Building Docker image via: " + buildComposeFile.getAbsolutePath());
+        logger.info("Packaging host-built controller jar into quorus-controller:test via: "
+                + buildComposeFile.getAbsolutePath());
         try {
             ProcessBuilder pb = new ProcessBuilder(
                     "docker", "compose",
@@ -161,20 +164,17 @@ public final class SharedDockerCluster {
             pb.redirectErrorStream(true);
 
             Process process = pb.start();
-
-            // Drain output to prevent blocking
+            String output;
             try (BufferedReader reader = new BufferedReader(
                     new InputStreamReader(process.getInputStream()))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    logger.fine("[Docker Build] " + line);
-                }
+                output = reader.lines().collect(java.util.stream.Collectors.joining("\n"));
             }
+            logger.fine("[Docker Build]\n" + output);
 
             int exitCode = process.waitFor();
             if (exitCode != 0) {
-                throw new RuntimeException(
-                        "Docker image build failed with exit code: " + exitCode);
+                throw new IllegalStateException(
+                        "Docker image build failed with exit code " + exitCode + ":\n" + output);
             }
 
             imageBuilt = true;
@@ -182,25 +182,7 @@ public final class SharedDockerCluster {
         } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {
-            throw new RuntimeException("Failed to build Docker image", e);
-        }
-    }
-
-    /**
-     * Returns {@code true} if the named Docker image exists in the local cache.
-     * Uses {@code docker image inspect} which returns exit code 0 when found.
-     */
-    private static boolean isImageCached(String imageName) {
-        try {
-            Process process = new ProcessBuilder("docker", "image", "inspect", imageName)
-                    .redirectErrorStream(true)
-                    .start();
-            // Drain output to prevent blocking
-            process.getInputStream().readAllBytes();
-            return process.waitFor() == 0;
-        } catch (Exception e) {
-            logger.fine("Could not check for cached image: " + e.getMessage());
-            return false;
+            throw new IllegalStateException("Failed to build Docker image", e);
         }
     }
 

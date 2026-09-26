@@ -96,20 +96,18 @@ Workflow-focused entry points are also available, including `BasicWorkflowExampl
 
 The Compose topologies are explicitly labelled development-only: request security and HTTP/Raft TLS are disabled with the required insecure-development opt-in. They are not production deployment templates.
 
-Build and install the project, point the Docker build at the local Maven group cache, and start the single-controller topology:
+Images package jars built on the host; nothing is compiled inside Docker. Build the controller and agent jars (Java 27), then start the single-controller topology. `--build` makes the image pick up the jar you just built:
 
 ```powershell
-$env:M2_REPO = "$env:USERPROFILE/.m2/repository"
-mvn clean install
-docker compose -f docker/compose/docker-compose-single-controller.yml up -d
+./docker/build-runtime.ps1
+docker compose -f docker/compose/docker-compose-single-controller.yml up -d --build
 ```
 
 On bash-compatible shells:
 
 ```bash
-export M2_REPO="$HOME/.m2/repository"
-mvn clean install
-docker compose -f docker/compose/docker-compose-single-controller.yml up -d
+sh docker/build-runtime.sh
+docker compose -f docker/compose/docker-compose-single-controller.yml up -d --build
 ```
 
 For a multi-node setup:
@@ -135,7 +133,7 @@ controller certificate, and gateway client certificate, then starts the controll
 production fail-closed HTTP and Raft mutual-TLS settings:
 
 ```powershell
-$env:M2_REPO = "$env:USERPROFILE/.m2/repository"
+./docker/build-runtime.ps1
 docker compose -f docker/compose/docker-compose-tls-example.yml up -d --build
 docker compose -f docker/compose/docker-compose-tls-example.yml exec controller-tls `
   curl --fail --cacert /run/quorus-tls/ca.crt `
@@ -143,7 +141,7 @@ docker compose -f docker/compose/docker-compose-tls-example.yml exec controller-
   https://localhost:8080/health/ready
 ```
 
-On bash-compatible shells, use `export M2_REPO="$HOME/.m2/repository"` and replace the PowerShell
+On bash-compatible shells, run `sh docker/build-runtime.sh` first and replace the PowerShell
 backticks with backslashes. The generated certificates are demonstration material, not production
 PKI. Remove the container and the volume holding its private keys when finished:
 

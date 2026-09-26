@@ -9,8 +9,6 @@ services:
     build:
       context: ../..
       dockerfile: quorus-controller/Dockerfile
-      additional_contexts:
-        m2cache: ${M2_REPO}/dev/mars
     container_name: quorus-controller-dev
     environment:
       - QUORUS_NODE_ID=controller-dev
