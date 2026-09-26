@@ -29,6 +29,13 @@
             <artifactId>vertx-web-client</artifactId>
         </dependency>
 
+        <!-- HTTP transfer adapter client: per-client DNS pinning with correct SNI, Host and
+             hostname verification (ADR-0012 RT-Q5) -->
+        <dependency>
+            <groupId>org.apache.httpcomponents.client5</groupId>
+            <artifactId>httpclient5</artifactId>
+        </dependency>
+
         <!-- OpenTelemetry API (Phase 8 - Jan 2026) -->
         <dependency>
             <groupId>io.opentelemetry</groupId>

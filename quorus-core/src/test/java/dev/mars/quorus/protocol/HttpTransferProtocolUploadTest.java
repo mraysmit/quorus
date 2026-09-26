@@ -23,15 +23,11 @@ import dev.mars.quorus.core.TransferStatus;
 import dev.mars.quorus.core.exceptions.TransferException;
 import dev.mars.quorus.testing.ExpectsError;
 import dev.mars.quorus.transfer.TransferContext;
-import io.vertx.core.Vertx;
-import io.vertx.junit5.VertxExtension;
-import io.vertx.junit5.VertxTestContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
@@ -52,20 +48,17 @@ import static org.junit.jupiter.api.Assertions.*;
  * @version 1.0
  * @since 2025
  */
-@ExtendWith(VertxExtension.class)
 @DisplayName("HTTP Upload Protocol Tests")
 class HttpTransferProtocolUploadTest {
 
     private HttpTransferProtocol protocol;
-    private Vertx vertx;
 
     @TempDir
     Path tempDir;
 
     @BeforeEach
-    void setUp(Vertx vertx) {
-        this.vertx = vertx;
-        this.protocol = new HttpTransferProtocol(vertx);
+    void setUp() {
+        this.protocol = new HttpTransferProtocol();
     }
 
     @Nested
@@ -125,7 +118,7 @@ class HttpTransferProtocolUploadTest {
         @Test
         @DisplayName("Upload transfer executes with valid request")
         @ExpectsError("Connection refused -- upload to non-existent server")
-        void uploadExecutesWithValidRequest(VertxTestContext testContext) throws IOException {
+        void uploadExecutesWithValidRequest() throws IOException {
             Path localFile = tempDir.resolve("upload-execute.txt");
             String content = "Test content for HTTP upload";
             Files.writeString(localFile, content);
@@ -139,20 +132,15 @@ class HttpTransferProtocolUploadTest {
             TransferContext context = new TransferContext(new TransferJob(request));
 
             // Upload to non-existent server will fail with connection error
-            protocol.transferReactive(request, context)
-                    .onComplete(testContext.failing(error -> {
-                        testContext.verify(() -> {
-                            assertNotNull(error);
-                            // Connection error expected for non-existent server
-                        });
-                        testContext.completeNow();
-                    }));
+            TransferException error = assertThrows(TransferException.class, () -> protocol.transfer(request, context));
+                    assertNotNull(error);
+                    // Connection error expected for non-existent server
         }
 
         @Test
         @DisplayName("Upload transfer reads local file correctly")
         @ExpectsError("Connection refused -- upload reads file then fails on send")
-        void uploadReadsLocalFile(VertxTestContext testContext) throws IOException {
+        void uploadReadsLocalFile() throws IOException {
             Path localFile = tempDir.resolve("upload-read-test.txt");
             String content = "Test content for reading local file during HTTP upload";
             Files.writeString(localFile, content);
@@ -166,21 +154,16 @@ class HttpTransferProtocolUploadTest {
             TransferContext context = new TransferContext(new TransferJob(request));
 
             // The upload process should read the local file (even though the server doesn't exist)
-            protocol.transferReactive(request, context)
-                    .onComplete(testContext.failing(error -> {
-                        testContext.verify(() -> {
-                            assertNotNull(error);
-                            // File should still exist after attempted upload
-                            assertTrue(Files.exists(localFile));
-                        });
-                        testContext.completeNow();
-                    }));
+            TransferException error = assertThrows(TransferException.class, () -> protocol.transfer(request, context));
+                    assertNotNull(error);
+                    // File should still exist after attempted upload
+                    assertTrue(Files.exists(localFile));
         }
 
         @Test
         @DisplayName("Upload uses PUT method by default")
         @ExpectsError("Connection refused -- PUT method used but server unreachable")
-        void uploadUsesPutMethod(VertxTestContext testContext) throws IOException {
+        void uploadUsesPutMethod() throws IOException {
             Path localFile = tempDir.resolve("upload-put-test.txt");
             Files.writeString(localFile, "PUT method test content");
 
@@ -193,14 +176,9 @@ class HttpTransferProtocolUploadTest {
             TransferContext context = new TransferContext(new TransferJob(request));
 
             // PUT is the standard HTTP method for file uploads
-            protocol.transferReactive(request, context)
-                    .onComplete(testContext.failing(error -> {
-                        testContext.verify(() -> {
-                            assertNotNull(error);
-                            // Connection error expected, but PUT method should be used
-                        });
-                        testContext.completeNow();
-                    }));
+            TransferException error = assertThrows(TransferException.class, () -> protocol.transfer(request, context));
+                    assertNotNull(error);
+                    // Connection error expected, but PUT method should be used
         }
     }
 
@@ -211,7 +189,7 @@ class HttpTransferProtocolUploadTest {
         @Test
         @DisplayName("Upload fails with non-existent local file")
         @ExpectsError("Source file missing -- verifies TransferException before connect")
-        void uploadFailsWithNonExistentFile(VertxTestContext testContext) {
+        void uploadFailsWithNonExistentFile() {
             Path nonExistentFile = tempDir.resolve("does-not-exist.txt");
 
             TransferRequest request = TransferRequest.builder()
@@ -222,20 +200,15 @@ class HttpTransferProtocolUploadTest {
 
             TransferContext context = new TransferContext(new TransferJob(request));
 
-            protocol.transferReactive(request, context)
-                    .onComplete(testContext.failing(error -> {
-                        testContext.verify(() -> {
-                            assertNotNull(error);
-                            assertTrue(error instanceof TransferException);
-                        });
-                        testContext.completeNow();
-                    }));
+            TransferException error = assertThrows(TransferException.class, () -> protocol.transfer(request, context));
+                    assertNotNull(error);
+                    assertTrue(error instanceof TransferException);
         }
 
         @Test
         @DisplayName("Upload fails with connection timeout")
         @ExpectsError("Connection refused -- verifies timeout error handling")
-        void uploadFailsWithConnectionTimeout(VertxTestContext testContext) throws IOException {
+        void uploadFailsWithConnectionTimeout() throws IOException {
             Path localFile = tempDir.resolve("upload-timeout.txt");
             Files.writeString(localFile, "Content for timeout test");
 
@@ -247,19 +220,14 @@ class HttpTransferProtocolUploadTest {
 
             TransferContext context = new TransferContext(new TransferJob(request));
 
-            protocol.transferReactive(request, context)
-                    .onComplete(testContext.failing(error -> {
-                        testContext.verify(() -> {
-                            assertNotNull(error);
-                            // Should get connection error or timeout
-                        });
-                        testContext.completeNow();
-                    }));
+            TransferException error = assertThrows(TransferException.class, () -> protocol.transfer(request, context));
+                    assertNotNull(error);
+                    // Should get connection error or timeout
         }
 
         @Test
         @DisplayName("Upload validates destination URI scheme")
-        void uploadValidatesDestinationScheme(VertxTestContext testContext) throws IOException {
+        void uploadValidatesDestinationScheme() throws IOException {
             Path localFile = tempDir.resolve("upload-scheme-test.txt");
             Files.writeString(localFile, "Content for scheme validation test");
 
@@ -274,7 +242,6 @@ class HttpTransferProtocolUploadTest {
 
             // HTTP protocol should not handle FTP destinations
             assertFalse(protocol.canHandle(request));
-            testContext.completeNow();
         }
     }
 
@@ -285,7 +252,7 @@ class HttpTransferProtocolUploadTest {
         @Test
         @DisplayName("Upload calculates checksum for local file")
         @ExpectsError("Connection refused -- checksum calculated before send fails")
-        void uploadCalculatesChecksum(VertxTestContext testContext) throws IOException {
+        void uploadCalculatesChecksum() throws IOException {
             Path localFile = tempDir.resolve("upload-checksum.txt");
             String content = "Content for checksum calculation during upload";
             Files.writeString(localFile, content);
@@ -299,13 +266,8 @@ class HttpTransferProtocolUploadTest {
             TransferContext context = new TransferContext(new TransferJob(request));
 
             // Upload will fail but checksum should be calculated from local file
-            protocol.transferReactive(request, context)
-                    .onComplete(testContext.failing(error -> {
-                        testContext.verify(() -> {
-                            assertNotNull(error);
-                        });
-                        testContext.completeNow();
-                    }));
+            TransferException error = assertThrows(TransferException.class, () -> protocol.transfer(request, context));
+                    assertNotNull(error);
         }
     }
 
@@ -345,7 +307,7 @@ class HttpTransferProtocolUploadTest {
         @Test
         @DisplayName("Same protocol instance handles multiple transfer types")
         void sameProtocolHandlesMultipleTypes() throws IOException {
-            HttpTransferProtocol sharedProtocol = new HttpTransferProtocol(vertx);
+            HttpTransferProtocol sharedProtocol = new HttpTransferProtocol();
 
             // HTTP download
             TransferRequest httpDownload = TransferRequest.builder()

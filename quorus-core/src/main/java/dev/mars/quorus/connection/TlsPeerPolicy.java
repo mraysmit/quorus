@@ -86,6 +86,24 @@ public final class TlsPeerPolicy {
         }
     }
 
+    /**
+     * Trust manager for a governed TLS connection: normal PKIX validation by {@code baseTrust}, then
+     * the approved-CA restriction and leaf-certificate pins.
+     *
+     * @param baseTrust            the platform trust anchors to validate against; {@code null} means the
+     *                             JVM default trust store (the production default, see register item SEC-07)
+     * @param approvedCaIds        approved CA fingerprints in {@code SHA256:base64} form; empty means any
+     *                             CA trusted by {@code baseTrust}
+     * @param approvedFingerprints approved leaf-certificate fingerprints; empty means no leaf pinning
+     */
+    public static X509ExtendedTrustManager governedTrustManager(X509TrustManager baseTrust, Set<String> approvedCaIds,
+                                                                Set<String> approvedFingerprints) {
+        if (baseTrust == null) {
+            return defaultTrustManager(approvedCaIds, approvedFingerprints);
+        }
+        return new PinnedTrustManager(baseTrust, Set.copyOf(approvedCaIds), Set.copyOf(approvedFingerprints));
+    }
+
     private static X509ExtendedTrustManager createTrustManager(TrustPolicyKey policy) {
         try {
             TrustManagerFactory factory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());

@@ -22,13 +22,9 @@ import dev.mars.quorus.core.TransferStatus;
 import dev.mars.quorus.core.exceptions.TransferException;
 import dev.mars.quorus.testing.ExpectsError;
 import dev.mars.quorus.transfer.TransferContext;
-import io.vertx.core.Vertx;
-import io.vertx.junit5.VertxExtension;
-import io.vertx.junit5.VertxTestContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.io.IOException;
 import java.net.URI;
@@ -45,17 +41,14 @@ import static org.junit.jupiter.api.Assertions.*;
  * @since 2025-12-17
  * @version 1.0
  */
-@ExtendWith(VertxExtension.class)
 class HttpTransferProtocolTest {
 
     private HttpTransferProtocol protocol;
-    private Vertx vertx;
     private Path tempDir;
 
     @BeforeEach
-    void setUp(Vertx vertx) throws IOException {
-        this.vertx = vertx;
-        this.protocol = new HttpTransferProtocol(vertx);
+    void setUp() throws IOException {
+        this.protocol = new HttpTransferProtocol();
         this.tempDir = Files.createTempDirectory("http-test");
     }
 
@@ -168,26 +161,8 @@ class HttpTransferProtocolTest {
     }
 
     @Test
-    void testConstructorWithVertxInstance() {
-        Vertx testVertx = Vertx.vertx();
-        HttpTransferProtocol testProtocol = new HttpTransferProtocol(testVertx);
-        
-        assertNotNull(testProtocol);
-        assertEquals("http", testProtocol.getProtocolName());
-        
-        testVertx.close();
-    }
-
-    @Test
-    void testConstructorWithNullVertxThrowsException() {
-        assertThrows(NullPointerException.class, () -> {
-            new HttpTransferProtocol(null);
-        });
-    }
-
-    @Test
     @ExpectsError("Connection refused -- invalid URL triggers connection error")
-    void testTransferReactiveWithInvalidUrl(VertxTestContext testContext) {
+    void testTransferWithInvalidUrl() {
         TransferRequest request = TransferRequest.builder()
                 .requestId("test-invalid-url")
                 .sourceUri(URI.create("http://127.0.0.1:1/file.txt"))
@@ -196,18 +171,12 @@ class HttpTransferProtocolTest {
 
         TransferContext context = new TransferContext(new TransferJob(request));
 
-        protocol.transferReactive(request, context)
-                .onComplete(testContext.failing(error -> {
-                    testContext.verify(() -> {
-                        assertNotNull(error);
-                        // Connection error or timeout expected
-                    });
-                    testContext.completeNow();
-                }));
+        TransferException error = assertThrows(TransferException.class, () -> protocol.transfer(request, context));
+        assertNotNull(error.getCause(), "the connection failure must be carried as the cause");
     }
 
     @Test
-    void testTransferReactiveWithNullSourceUri(VertxTestContext testContext) {
+    void testTransferWithNullSourceUri() {
         // TransferRequest constructor validates that sourceUri cannot be null
         // So we test that the constructor throws NullPointerException
         assertThrows(NullPointerException.class, () -> {
@@ -217,11 +186,10 @@ class HttpTransferProtocolTest {
                     .destinationPath(tempDir.resolve("file.txt"))
                     .build();
         });
-        testContext.completeNow();
     }
 
     @Test
-    void testTransferReactiveWithNullDestination(VertxTestContext testContext) {
+    void testTransferWithNullDestination() {
         // TransferRequest constructor validates that destinationPath cannot be null
         // So we test that the constructor throws NullPointerException
         assertThrows(NullPointerException.class, () -> {
@@ -231,12 +199,11 @@ class HttpTransferProtocolTest {
                     .destinationPath((Path) null)
                     .build();
         });
-        testContext.completeNow();
     }
 
     @Test
     @ExpectsError("Wrong protocol scheme -- HTTP rejects ftp:// URI")
-    void testTransferReactiveWithNonHttpProtocol(VertxTestContext testContext) {
+    void testTransferWithNonHttpProtocol() {
         TransferRequest request = TransferRequest.builder()
                 .requestId("test-wrong-protocol")
                 .sourceUri(URI.create("ftp://example.com/file.txt"))
@@ -245,20 +212,13 @@ class HttpTransferProtocolTest {
 
         TransferContext context = new TransferContext(new TransferJob(request));
 
-        protocol.transferReactive(request, context)
-                .onComplete(testContext.failing(error -> {
-                    testContext.verify(() -> {
-                        assertTrue(error instanceof TransferException);
-                        TransferException te = (TransferException) error;
-                        assertTrue(te.getMessage().contains("HTTP protocol cannot handle this request"));
-                    });
-                    testContext.completeNow();
-                }));
+        TransferException error = assertThrows(TransferException.class, () -> protocol.transfer(request, context));
+        assertTrue(error.getMessage().contains("HTTP protocol cannot handle this request"));
     }
 
     @Test
-    @ExpectsError("Connection refused -- blocking transfer wraps reactive failure")
-    void testTransferBlockingCallsReactive() {
+    @ExpectsError("Connection refused -- blocking transfer reports the connection failure")
+    void testBlockingTransferReportsConnectionFailure() {
         TransferRequest request = TransferRequest.builder()
                 .requestId("test-blocking")
                 .sourceUri(URI.create("http://127.0.0.1:1/file.txt"))
@@ -343,7 +303,7 @@ class HttpTransferProtocolTest {
 
     @Test
     @ExpectsError("Connection refused -- verifies destination directory created before failure")
-    void testCreatesDestinationDirectoryIfNeeded(VertxTestContext testContext) {
+    void testCreatesDestinationDirectoryIfNeeded() {
         Path nestedDir = tempDir.resolve("level1/level2/level3");
         
         TransferRequest request = TransferRequest.builder()
@@ -354,14 +314,8 @@ class HttpTransferProtocolTest {
 
         TransferContext context = new TransferContext(new TransferJob(request));
 
-        protocol.transferReactive(request, context)
-                .onComplete(testContext.failing(error -> {
-                    // Transfer will fail, but directory should be created
-                    testContext.verify(() -> {
-                        assertTrue(Files.exists(nestedDir));
-                        assertTrue(Files.isDirectory(nestedDir));
-                    });
-                    testContext.completeNow();
-                }));
+        // The transfer fails, but the destination directory must already have been created.
+        assertThrows(TransferException.class, () -> protocol.transfer(request, context));
+        assertTrue(Files.isDirectory(nestedDir));
     }
 }
