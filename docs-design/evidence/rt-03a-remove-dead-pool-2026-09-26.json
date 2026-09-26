@@ -1,0 +1,22 @@
+{
+  "slice": "RT-03a",
+  "title": "Remove the dead ConnectionPoolService and vertx-pg-client from quorus-core",
+  "requirement": "ADR-0012 (leave Vert.x); plan §20 RT-03; register DR-C9 (in part)",
+  "classification": "deletion of unused code; no behaviour change, so no red stage",
+  "baseRevision": "a39206e",
+  "change": [
+    "Deleted quorus-core/src/main/java/dev/mars/quorus/network/ConnectionPoolService.java (no production caller) and its test",
+    "Removed io.vertx:vertx-pg-client from quorus-core/pom.xml",
+    "Removed the unused pool field, construction and shutdown from EnterpriseProtocolExample"
+  ],
+  "patch": {"path": "docs-design/evidence/raw/rt-03/rt-03a.patch", "sha256": "b7df2a5a18ae6b2f47a52b6fe7bb17c5226d93a4aef01433b53a7d01af7cb687"},
+  "regression": {
+    "command": "mvn -B --fail-at-end clean verify",
+    "started": "2026-09-26T15:29:03+01:00",
+    "finished": "2026-09-26T15:34:49+01:00",
+    "result": "BUILD SUCCESS; core 1,552 (1,556 minus 4 deleted pool tests), workflow 134, tenant 64, controller 569, agent 101; 0 failures; all five JaCoCo gates met. The quorus-core dependency tree contains neither vertx-pg-client nor vertx-sql-client.",
+    "log": {"path": "docs-design/evidence/raw/rt-03/rt-03a-reactor-verify.log", "sha256": "d4394b2ee15225f1beff6d8e42ff2f843f94138cc20d1096878a968abc536942"}
+  },
+  "notDone": "The documents in docs-design/dev/vertx-migration, dev/vertx5-advice and the performance CONNECTION_POOL_* files still describe the pool; they are scheduled for archiving or removal under DR-C1 and DR-C2. Remaining DR-C9 items: PeeGeeQ references and the vertx-grpc-* dependencies.",
+  "sensitiveDataCheck": "Logs contain Maven and test output only."
+}

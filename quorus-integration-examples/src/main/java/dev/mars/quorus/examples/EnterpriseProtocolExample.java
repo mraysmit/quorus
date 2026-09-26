@@ -19,7 +19,6 @@ package dev.mars.quorus.examples;
 import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferResult;
 import dev.mars.quorus.examples.util.ExampleLogger;
-import dev.mars.quorus.network.ConnectionPoolService;
 import dev.mars.quorus.network.NetworkTopologyService;
 import dev.mars.quorus.protocol.ProtocolFactory;
 import dev.mars.quorus.protocol.TransferProtocol;
@@ -62,7 +61,6 @@ public class EnterpriseProtocolExample {
     
     private TransferEngine transferEngine;
     private NetworkTopologyService networkService;
-    private ConnectionPoolService connectionPoolService;
     private ProtocolFactory protocolFactory;
     private Vertx vertx;
     
@@ -119,7 +117,6 @@ public class EnterpriseProtocolExample {
         // Initialize services with enterprise-optimized settings
         transferEngine = new SimpleTransferEngine(vertx, 20, 4, 1024 * 1024); // 20 concurrent, 4 threads, 1MB chunks
         networkService = new NetworkTopologyService(vertx);
-        connectionPoolService = new ConnectionPoolService(vertx);
         protocolFactory = new ProtocolFactory(vertx);
         
         log.expectedSuccess("Enterprise services initialized");
@@ -343,10 +340,6 @@ public class EnterpriseProtocolExample {
         log.section("Cleaning up resources...");
         
         try {
-            if (connectionPoolService != null) {
-                connectionPoolService.shutdown();
-            }
-            
             if (vertx != null) {
                 vertx.close();
             }
