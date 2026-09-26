@@ -143,6 +143,13 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- Real OpenTelemetry SDK with an in-memory exporter, for asserting spans in tests -->
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-sdk-testing</artifactId>
+            <scope>test</scope>
+        </dependency>
+
     </dependencies>
 
     <build>
