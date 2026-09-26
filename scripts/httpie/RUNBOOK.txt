@@ -7,21 +7,19 @@ Status: Development-only smoke path; request security and TLS are disabled expli
 
 Prerequisites
 
-- JDK 25, Maven, Docker with Compose, HTTPie, and a bash-compatible shell.
+- JDK 27, Maven, Docker with Compose, HTTPie, and a bash-compatible shell.
 - Run commands from the repository root.
 - Do not use this development topology as a production deployment template.
 
 1) Build and start the development controller
 
    PowerShell:
-     $env:M2_REPO = "$env:USERPROFILE/.m2/repository"
-     mvn clean install
-     docker compose -f docker/compose/docker-compose-single-controller.yml up -d
+     ./docker/build-runtime.ps1
+     docker compose -f docker/compose/docker-compose-single-controller.yml up -d --build
 
    Linux/macOS:
-     export M2_REPO="$HOME/.m2/repository"
-     mvn clean install
-     docker compose -f docker/compose/docker-compose-single-controller.yml up -d
+     sh docker/build-runtime.sh
+     docker compose -f docker/compose/docker-compose-single-controller.yml up -d --build
 
    The Compose file explicitly selects the development security profile, allows insecure
    transport, and disables HTTP and Raft TLS. Wait until this succeeds:

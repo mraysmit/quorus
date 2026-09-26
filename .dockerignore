@@ -3,8 +3,16 @@
 # Reduces context transfer from ~100MB to ~10MB per build.
 # =============================================================================
 
-# Build outputs (55MB+ waste — rebuilt inside Docker anyway)
+# Build outputs. Images package host-built artifacts only; nothing is compiled inside Docker.
+# Everything under target/ is excluded except the runtime jars the Dockerfiles copy.
 **/target/
+!quorus-controller/target/
+quorus-controller/target/*
+!quorus-controller/target/quorus-controller-*.jar
+!quorus-agent/target/
+quorus-agent/target/*
+!quorus-agent/target/quorus-agent-*.jar
+!quorus-agent/target/lib/
 
 # Version control
 .git/

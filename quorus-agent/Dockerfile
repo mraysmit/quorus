@@ -1,29 +1,15 @@
-# Multi-stage build for Quorus Agent
-FROM maven:3.9.9-eclipse-temurin-25 AS builder
+# Quorus Agent runtime image.
+#
+# The image packages the agent jar and its dependency jars built and tested on the host; it never
+# runs Maven or compiles Java. Build them first, then the image:
+#
+#   docker/build-runtime.sh            (or docker/build-runtime.ps1)
+#   docker build -f quorus-agent/Dockerfile -t quorus-agent .
+#
+# Runtime: Amazon Corretto 27 on Alpine (ADR-0012, decision RT-Q4), pinned to an exact release.
 
-# Set working directory
-WORKDIR /app
-
-# Copy parent POM and module POMs first for better layer caching
-COPY pom.xml .
-COPY quorus-core/pom.xml quorus-core/
-COPY quorus-workflow/pom.xml quorus-workflow/
-COPY quorus-agent/pom.xml quorus-agent/
-
-# Download dependencies
-RUN mvn dependency:go-offline -pl quorus-core,quorus-workflow,quorus-agent -am
-
-# Copy source code
-COPY quorus-core/src quorus-core/src
-COPY quorus-workflow/src quorus-workflow/src
-COPY quorus-agent/src quorus-agent/src
-
-# Build the agent and dependencies
-RUN mvn clean package -pl quorus-agent -am -DskipTests
-
-# ============================================================================
-# Runtime stage
-FROM eclipse-temurin:25-jre-alpine
+ARG RUNTIME_IMAGE=amazoncorretto:27.0.0-alpine3.24
+FROM ${RUNTIME_IMAGE}
 
 # Install required packages
 RUN apk add --no-cache \
@@ -40,8 +26,8 @@ RUN addgroup -g 1001 quorus && \
 WORKDIR /app
 
 # Copy the built JAR and dependencies
-COPY --from=builder /app/quorus-agent/target/quorus-agent-*.jar app.jar
-COPY --from=builder /app/quorus-agent/target/lib/ lib/
+COPY quorus-agent/target/quorus-agent-*.jar app.jar
+COPY quorus-agent/target/lib/ lib/
 
 # Copy configuration files from resources
 COPY quorus-agent/src/main/resources/logback.xml config/logback.xml

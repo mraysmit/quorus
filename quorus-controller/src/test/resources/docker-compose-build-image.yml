@@ -9,6 +9,4 @@ services:
     build:
       context: ../../../..
       dockerfile: quorus-controller/Dockerfile
-      additional_contexts:
-        m2cache: ${M2_REPO:-~/.m2/repository}/dev/mars
     image: quorus-controller:test

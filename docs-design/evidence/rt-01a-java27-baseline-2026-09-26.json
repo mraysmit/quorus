@@ -1,0 +1,54 @@
+{
+  "slice": "RT-01a",
+  "title": "Java 27 compile and test baseline",
+  "requirement": "ADR-0012 decision 3 and RT-Q3; enterprise plan §20 workstream RT; register Section J",
+  "acceptance": "Quorus production classes are compiled for Java 27 (class-file major version 71) and the test suite runs on a Java 27 or later runtime. Written before implementation.",
+  "classification": "contract",
+  "baseRevision": "79e2025",
+  "patch": {
+    "path": "docs-design/evidence/raw/rt-01/rt-01a.patch",
+    "sha256": "c8a38d7b0350b63ac65e6a863ae6455a14dec0ab51610a9900b384fe0c8c33b1",
+    "files": ["pom.xml", ".java-version", "quorus-core/src/test/java/dev/mars/quorus/platform/JavaPlatformBaselineTest.java"]
+  },
+  "environment": {
+    "jdk": "OpenJDK 27 GA, build 27+35-2325 (Oracle Corporation), ~/.jdks/openjdk-27-1",
+    "maven": "Apache Maven 3.9.11",
+    "os": "Windows 11 Pro N 10.0.26340"
+  },
+  "test": {
+    "file": "quorus-core/src/test/java/dev/mars/quorus/platform/JavaPlatformBaselineTest.java",
+    "entryPoint": "Compiled production class file (TransferProtocol.class) and the test JVM runtime version"
+  },
+  "red": {
+    "command": "mvn -B clean test -pl quorus-core -Dtest=JavaPlatformBaselineTest -Dsurefire.failIfNoSpecifiedTests=false",
+    "revision": "79e2025 plus the new test only (root pom still at java.version 25)",
+    "started": "2026-09-26T12:11:55+01:00",
+    "finished": "2026-09-26T12:12:04+01:00",
+    "expectedFailure": "productionClassesTargetTheJavaBaseline fails because classes are major version 69 (Java 25), not 71 (Java 27)",
+    "result": "Tests run: 2, Failures: 1, Errors: 0. Failure: expected <71> but was <69>. testsRunOnTheJavaBaselineOrLater passed on the JDK 27 runtime. No environment or fixture error.",
+    "log": {"path": "docs-design/evidence/raw/rt-01/baseline-red.log", "sha256": "bc5a3f1e1dfe76f209eda52cf4be22be8ddf77f9797a648944a4496ee6cfd183"}
+  },
+  "green": {
+    "change": "Root pom java.version 25 -> 27 (maven.compiler.release follows it); .java-version 25 -> 27",
+    "command": "mvn -B clean test -pl quorus-core -Dtest=JavaPlatformBaselineTest -Dsurefire.failIfNoSpecifiedTests=false",
+    "started": "2026-09-26T12:12:20+01:00",
+    "finished": "2026-09-26T12:12:40+01:00",
+    "result": "Tests run: 2, Failures: 0, Errors: 0, Skipped: 0. BUILD SUCCESS",
+    "log": {"path": "docs-design/evidence/raw/rt-01/baseline-green.log", "sha256": "fd591b2a37703258c6061a74ee08a3fdef6185988b8ce018dd94a8cab15536ba"}
+  },
+  "refactor": "None required",
+  "regression": {
+    "command": "mvn -B --fail-at-end clean verify",
+    "lanes": "Default groups (docker and slow excluded by the controller configuration)",
+    "started": "2026-09-26T12:12:57+01:00",
+    "finished": "2026-09-26T12:18:39+01:00",
+    "result": "BUILD SUCCESS; all seven reactor entries; 2,387 tests, 0 failures, 0 errors, 0 skipped (core 1,519; workflow 134; tenant 64; controller 569; agent 101; integration examples 0); all five JaCoCo gates met; JaCoCo analysed the Java 27 class files with no instrumentation errors",
+    "log": {"path": "docs-design/evidence/raw/rt-01/reactor-verify-jdk27.log", "sha256": "e8ba5eb9ff5f519c4ca36ff249b018aab88db01d7bd1f5cd53d61ee5eb56b66f"}
+  },
+  "limitations": [
+    "Docker and slow groups were not run. The controller and agent Dockerfiles, the Compose build arguments and the CI container still use Eclipse Temurin 25 images, which cannot compile --release 27 or run Java 27 classes. Temurin publishes no Java 27 images (checked 2026-09-26). This is slice RT-01b, blocked on decision RT-Q4.",
+    "Until RT-01b lands, image builds, the Compose quick start and Docker-tagged tests are broken by this change. It should not be committed on its own unless that window is explicitly accepted.",
+    "Only quorus-core carries the class-file assertion. The other modules inherit the same root property, and the reactor proves they compile and pass tests on JDK 27."
+  ],
+  "sensitiveDataCheck": "Logs contain Maven and test output only; no request bodies, credentials, keys or sensitive payloads were captured."
+}

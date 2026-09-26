@@ -1,64 +1,15 @@
-# syntax=docker/dockerfile:1.4
-# Multi-stage build for Quorus Controller
-# Requires Docker BuildKit (DOCKER_BUILDKIT=1)
+# Quorus Controller runtime image.
 #
-# BUILD COMMAND (uses additional build context for local Maven artifacts):
-#   docker build --build-context m2cache=$HOME/.m2/repository \
-#                -f quorus-controller/Dockerfile -t quorus-controller .
+# The image packages the controller jar built and tested on the host; it never runs Maven or
+# compiles Java. Build the jar first, then the image:
 #
-# This eliminates the need for an m2-repo directory in the build context.
-# The raftlog-core dependency (not on Maven Central) is pulled from your
-# local Maven cache via BuildKit's named context feature.
+#   docker/build-runtime.sh            (or docker/build-runtime.ps1)
+#   docker build -f quorus-controller/Dockerfile -t quorus-controller .
+#
+# Runtime: Amazon Corretto 27 on Alpine (ADR-0012, decision RT-Q4). The tag is pinned to an exact
+# Corretto release; plan item RT-09 moves it with each Java release.
 
-ARG BUILDER_IMAGE=maven:3.9.11-eclipse-temurin-25
-ARG RUNTIME_IMAGE=eclipse-temurin:25-jre-alpine
-
-FROM ${BUILDER_IMAGE} AS builder
-
-# Set working directory
-WORKDIR /app
-
-# Copy parent pom and module poms first for better layer caching
-COPY pom.xml .
-COPY quorus-core/pom.xml quorus-core/
-COPY quorus-workflow/pom.xml quorus-workflow/
-COPY quorus-tenant/pom.xml quorus-tenant/
-COPY quorus-controller/pom.xml quorus-controller/
-
-# Create empty stub poms for modules not needed for controller build
-RUN mkdir -p quorus-integration-examples && echo '<?xml version="1.0" encoding="UTF-8"?><project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"><modelVersion>4.0.0</modelVersion><parent><groupId>dev.mars</groupId><artifactId>quorus</artifactId><version>1.0-SNAPSHOT</version></parent><artifactId>quorus-integration-examples</artifactId><packaging>pom</packaging></project>' > quorus-integration-examples/pom.xml
-
-RUN mkdir -p quorus-agent && echo '<?xml version="1.0" encoding="UTF-8"?><project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"><modelVersion>4.0.0</modelVersion><parent><groupId>dev.mars</groupId><artifactId>quorus</artifactId><version>1.0-SNAPSHOT</version></parent><artifactId>quorus-agent</artifactId><packaging>pom</packaging></project>' > quorus-agent/pom.xml
-
-RUN mkdir -p quorus-api && echo '<?xml version="1.0" encoding="UTF-8"?><project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"><modelVersion>4.0.0</modelVersion><parent><groupId>dev.mars</groupId><artifactId>quorus</artifactId><version>1.0-SNAPSHOT</version></parent><artifactId>quorus-api</artifactId><packaging>pom</packaging></project>' > quorus-api/pom.xml
-
-# Copy local Maven artifacts from named build context (raftlog-core not on Maven Central)
-# BuildKit pulls these from host's ~/.m2/repository/dev/mars via --build-context m2cache=...
-# Context is pointed directly at dev/mars to avoid transferring the entire Maven cache
-COPY --from=m2cache / /root/.m2/repository/dev/mars
-
-# Download dependencies (cached via Docker BuildKit cache mount)
-RUN --mount=type=cache,target=/root/.m2/repository/org \
-    --mount=type=cache,target=/root/.m2/repository/io \
-    --mount=type=cache,target=/root/.m2/repository/com \
-    --mount=type=cache,target=/root/.m2/repository/net \
-    mvn dependency:go-offline -pl quorus-controller -am -Dsilent=true || true
-
-# Copy source code (changes here don't invalidate dependency layer)
-COPY quorus-core/src quorus-core/src
-COPY quorus-workflow/src quorus-workflow/src
-COPY quorus-tenant/src quorus-tenant/src
-COPY quorus-controller/src quorus-controller/src
-
-# Build the application
-# -U flag removed: no longer needed since raftlog is properly available
-RUN --mount=type=cache,target=/root/.m2/repository/org \
-    --mount=type=cache,target=/root/.m2/repository/io \
-    --mount=type=cache,target=/root/.m2/repository/com \
-    --mount=type=cache,target=/root/.m2/repository/net \
-    mvn package -pl quorus-controller -am -DskipTests
-
-# Runtime stage
+ARG RUNTIME_IMAGE=amazoncorretto:27.0.0-alpine3.24
 FROM ${RUNTIME_IMAGE}
 
 # Install curl for health checks
@@ -72,7 +23,7 @@ RUN addgroup -g 1001 quorus && \
 WORKDIR /app
 
 # Copy the built JAR
-COPY --from=builder /app/quorus-controller/target/quorus-controller-*.jar app.jar
+COPY quorus-controller/target/quorus-controller-*.jar app.jar
 
 # Create directories for logs and data
 RUN mkdir -p /app/logs /app/data && \

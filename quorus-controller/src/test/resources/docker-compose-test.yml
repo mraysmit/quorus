@@ -13,8 +13,6 @@ services:
     build:
       context: ../../../..
       dockerfile: quorus-controller/Dockerfile
-      additional_contexts:
-        m2cache: ${M2_REPO:-~/.m2/repository}/dev/mars
     hostname: controller1
     environment:
       - QUORUS_NODE_ID=controller1
@@ -43,8 +41,6 @@ services:
     build:
       context: ../../../..
       dockerfile: quorus-controller/Dockerfile
-      additional_contexts:
-        m2cache: ${M2_REPO:-~/.m2/repository}/dev/mars
     hostname: controller2
     environment:
       - QUORUS_NODE_ID=controller2
@@ -73,8 +69,6 @@ services:
     build:
       context: ../../../..
       dockerfile: quorus-controller/Dockerfile
-      additional_contexts:
-        m2cache: ${M2_REPO:-~/.m2/repository}/dev/mars
     hostname: controller3
     environment:
       - QUORUS_NODE_ID=controller3

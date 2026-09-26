@@ -147,23 +147,14 @@ if ($blockedPorts.Count -gt 0) {
     }
 }
 
-# Check m2-repo exists
-$m2RepoPath = Join-Path $ProjectRoot "m2-repo\raftlog\raftlog-core\1.0"
-if (-not (Test-Path $m2RepoPath)) {
-    Write-Warning "m2-repo directory not found. Creating from local Maven repository..."
-    
-    $sourceRepo = "$env:USERPROFILE\.m2\repository\dev\mars\raftlog"
-    if (Test-Path $sourceRepo) {
-        New-Item -ItemType Directory -Force -Path "m2-repo" | Out-Null
-        Copy-Item -Recurse "$sourceRepo\*" "m2-repo\" -Force
-        Write-Success "Copied raftlog artifacts to m2-repo"
-    } else {
-        Write-Error "raftlog-core not found in local Maven repository. Please build raftlog first."
-        exit 1
-    }
-}
-
 Write-Success "Prerequisites check complete"
+
+# Images package host-built jars; nothing is compiled inside Docker. Build them first.
+& (Join-Path $ProjectRoot "docker\build-runtime.ps1")
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "Host build of the runtime jars failed"
+    exit 1
+}
 
 # -----------------------------------------------------------------------------
 # Step 2: Rebuild Images (optional)
