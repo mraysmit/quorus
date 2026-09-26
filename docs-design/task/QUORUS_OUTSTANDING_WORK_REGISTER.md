@@ -2,8 +2,8 @@
 
 # Quorus Outstanding Work Register
 
-**Version:** 1.4
-**Date:** 2026-09-25
+**Version:** 1.5
+**Date:** 2026-09-26
 **Author:** Mark Ray-Smith — Cityline Ltd
 **License:** Apache 2.0
 **Status:** Active — consolidated view of every open task across the current and archived planning documents
@@ -17,10 +17,12 @@ documents that existed in [docs-design/task/](.) on 2026-09-07. It exists so tha
 be found in one place rather than reconstructed from five documents written at different times
 under different status vocabularies.
 
-Following that consolidation, `task/` holds only the two current documents — the enterprise plan
-and this register. The other three plans and the sealed-record design were moved to
+Following that consolidation, the other three plans and the sealed-record design were moved to
 [../archive/](../archive/) on 2026-09-07: their open work is carried here, and they are retained
-for provenance and technical reference rather than as live backlogs.
+for provenance and technical reference rather than as live backlogs. `task/` now holds the
+enterprise plan, this register, and the
+[documentation review task list](QUORUS_DOCUMENTATION_REVIEW_TASKS.md) added on 2026-09-25.
+Delivery work that the task list identifies is carried in Section I.
 
 **This register is derivative, not normative.** Precedence is unchanged:
 
@@ -41,7 +43,8 @@ Closing an item here does not close a phase exit gate. Phase closure follows
 
 | Document | Role | Contribution to this register |
 |---|---|---|
-| [QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md](QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md) v1.25 | Controlling roadmap | Sections A–D, F |
+| [QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md](QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md) v1.28 | Controlling roadmap | Sections A–D, F, I |
+| [QUORUS_DOCUMENTATION_REVIEW_TASKS.md](QUORUS_DOCUMENTATION_REVIEW_TASKS.md) v1.6 | Documentation review remediation | Section I (delivery items marked **→ Register**) |
 | [QUORUS_OPENTELEMETRY_INTEGRATION_TESTING_PLAN.md](../archive/QUORUS_OPENTELEMETRY_INTEGRATION_TESTING_PLAN.md) v2.6 — archived | Observability backlog and collector/test reference | Section E |
 | [QUORUS_TLS_SECURITY_ROUTES.md](../archive/QUORUS_TLS_SECURITY_ROUTES.md) v1.0 — archived | Historical Stage 6 detail | Section F (absorbed), route detail for Phase 7 |
 | [QUORUS_ALPHA_IMPLEMENTATION_PLAN.md](../archive/QUORUS_ALPHA_IMPLEMENTATION_PLAN.md) v1.9 — archived | Historical alpha evidence | No open items; see §8 |
@@ -72,18 +75,22 @@ sleeps as synchronization, and non-Vert.x polling are not permitted in new or re
 
 | Section | Area | Open items | Blocking level |
 |---|---|---|---|
-| A | R1 durability acceptance | 2 open, 1 closed | 🔴 Release blocker |
-| B | Phase 2 — attempts, integrity, reconciliation | 12 | 🟡 Phase blocker |
+| A | R1 durability acceptance and related process items | 4 open (R1-2, R1-3, R1-4, PROC-01), 1 closed | 🔴 Release blocker |
+| B | Phase 2 — attempts, integrity, reconciliation | 13 | 🟡 Phase blocker |
 | C | Phase 3 — transfer operations telemetry | 12 | 🟡 Phase blocker |
 | D | Phases 5–12 — not started | 8 phases | 🔴 / 🟡 by phase |
-| E | Observability and logging backlog | 14 (OBS-08 closed, OBS-15 added) | 🟠 Backlog |
-| F | Absorbed and superseded historical tasks | 8 | — reference only |
-| G | Deferred and research | 8 | 🟢 Deferred |
-| H | Documentation corrections | 6 | 🔵 Doc correction |
+| E | Observability and logging backlog | 11 open (OBS-04, -05, -08, -14 closed) | 🟠 Backlog |
+| F | Absorbed and superseded historical tasks | 10 | — reference only |
+| G | Deferred and research | 8 deferred, 1 superseded | 🟢 Deferred |
+| H | Documentation corrections | 0 open (6 applied 2026-09-07) | 🔵 Doc correction |
+| I | Configuration and documentation-review delivery items | 16 open, 1 closed | 🟠 Backlog |
 
-**Phase position:** Phases 0, 1 and 4 complete. Phases 2 and 3 in progress. Phases 5–12 not
-started. The R1 remediation slice is complete in code; `R1-1` container-recreation acceptance
-closed on 2026-09-07, and `R1-2` and `R1-3` remain open and still block the release claim.
+**Phase position:** Phase 1 complete. Phase 0 is functionally complete, but its durability
+acceptance stays reopened until `R1-2` and `R1-3` close. Phase 4 is complete: the acceptance
+reopened by the 2026-09-04 remediation checkpoint was restored when R2–R6 completed on
+2026-09-05. Phases 2 and 3 in progress. Phases 5–12 not started. The R1 remediation slice is
+complete in code; `R1-1` container-recreation acceptance closed on 2026-09-07, and `R1-2` and
+`R1-3` remain open and still block the release claim.
 
 ---
 
@@ -116,20 +123,28 @@ so the deployment shape is representative; the engine was Docker Desktop on Wind
 storage class and host kernel are not. See the
 [R1-1 evidence](../evidence/r1-container-recreation-2026-09-07.md).
 
-A material fixture gap was found and is recorded there: `docker-compose-3node-prebuilt.yml`
-declares no volumes and no `QUORUS_RAFT_STORAGE_PATH`, so every containerised test before this
-slice ran Raft state on the container's ephemeral layer and could not have detected a
-container-level durability regression.
+A material fixture gap was found and is recorded there: before this slice,
+`docker-compose-3node-prebuilt.yml` declared no volumes and no `QUORUS_RAFT_STORAGE_PATH`, so
+every earlier containerised test ran Raft state on the container's ephemeral layer and could not
+have detected a container-level durability regression. The fixtures were corrected in register
+v1.3: containerised tests now write Raft state to named volumes at the deployed path.
+
+| ID | Related open item | Detail | Level |
+|---|---|---|---|
+| **R1-4** | Persistent-environment storage inventory | Inventory existing persistent environments and preserve their storage before any recovery or rollback attempt (constraint below) | 🔴 |
+| **PROC-01** | Disposition of the two Raft regression cases | The two Raft regression cases without preserved red evidence need an explicit, recorded process-deviation disposition (constraint below) | 🟡 |
 
 **Constraints carried from the enterprise plan:**
 
 - `raftlog-core` (external RaftLog 1.2.0, sister project at `../raftlog`) is the only WAL.
   Internal RocksDB and memory backends and the RocksDB JNI dependency are removed; configuration
   accepts only `raftlog`. Do not reintroduce an internal backend to satisfy a test.
-- Existing persistent environments have **not** been inventoried. Preserve their storage before
-  any recovery or rollback attempt. Code rollback cannot recover already-deleted WAL records.
+- Existing persistent environments have **not** been inventoried (`R1-4`). Preserve their
+  storage before any recovery or rollback attempt. Code rollback cannot recover already-deleted
+  WAL records.
 - The two Raft regression cases without preserved red evidence remain historical process
-  deviations requiring explicit disposition. They cannot be relabelled as historical TDD.
+  deviations requiring explicit disposition (`PROC-01`). They cannot be relabelled as
+  historical TDD.
 
 ---
 
@@ -159,6 +174,10 @@ Open:
 | **P2-10** | Migration tooling for the attempt model | Existing jobs, assignments and snapshots migrate to the versioned attempt model, with rollback | 🟡 |
 | **P2-11** | Classified terminal reasons and complete attempt evidence | Every terminal transfer carries complete attempt and publication evidence | 🟡 |
 | **P2-12** | Failure-path test lane | Crash, network partition, lost response, lease expiry, duplicate report, and failover-during-each-transition tests pass | 🟡 |
+| **P2-13** | Durable agent-report outbox | Agent status reports survive agent restart and are recovered from a durable outbox; R3 provides only bounded in-memory replay (three sends) | 🟡 |
+
+`ENG-01` in Section I (the uninstantiated `JobAssignmentService` timeout monitor) should be
+settled before or during `P2-01`.
 
 **Exit gate:** Quorus can safely explain what ran, where it ran, which attempt is authoritative,
 what was published, and what requires reconciliation. It still does not claim exactly-once
@@ -309,17 +328,11 @@ Phase 8B workstream. Section A's R1 gates are the durability foundation this pha
   penetration testing; the twelve reference financial-services pilot scenarios; operator game days
   without engineering intervention; and the recorded go/no-go release decision.
 
-### D.6 Completed configuration baseline remediation
-
-| ID | Item | State |
-|---|---|---|
-| **CFG-01** | Make repository Compose security posture explicit, remove unsupported environment settings and duplicate topology, fix image health probing, separate logging-stack names/ports, and provide a generated-certificate mTLS example | ✅ **Closed 2026-09-25** — all 14 Compose models validate; the TLS example is healthy, accepts its generated gateway identity, and rejects a client without a certificate. This is repository-local validation, not production accreditation. |
-
 ---
 
 ## 7. Section E — Observability and Logging Backlog
 
-From [QUORUS_OPENTELEMETRY_INTEGRATION_TESTING_PLAN.md](../archive/QUORUS_OPENTELEMETRY_INTEGRATION_TESTING_PLAN.md) v2.5.
+From [QUORUS_OPENTELEMETRY_INTEGRATION_TESTING_PLAN.md](../archive/QUORUS_OPENTELEMETRY_INTEGRATION_TESTING_PLAN.md) v2.6.
 
 > **Scope boundary.** This backlog is telemetry *infrastructure and instrumentation*. It is not
 > a substitute for Phase 3, which owns transfer-process operational outcomes. Completing this
@@ -332,17 +345,20 @@ From [QUORUS_OPENTELEMETRY_INTEGRATION_TESTING_PLAN.md](../archive/QUORUS_OPENTE
 | **OBS-01** | OTel integration test suite over the observability stack | controller test | 🟡 HIGH |
 | **OBS-02** | Test execution script with reproducible pass/fail reporting | scripts | 🟠 MEDIUM |
 | **OBS-03** | Bridge `requestId` ↔ OTel `traceId` end to end | controller | 🟡 HIGH |
-| **OBS-04** | Add loggers to Status, Readiness, Liveness, Info and Cluster handlers | controller | 🟠 MEDIUM |
-| **OBS-05** | Add loggers to `YamlWorkflowDefinitionParser` and `WorkflowSchemaValidator` | workflow | 🟠 MEDIUM |
-| **OBS-06** | Add INFO success log to `JobStatusReportingService` | agent | 🟠 MEDIUM |
-| **OBS-07** | Audit the 53 DEBUG statements in `SimpleTransferEngine` — promote, demote to TRACE, or remove | core | 🟠 MEDIUM |
+| **OBS-06** | Add INFO success log to `JobStatusReportingService` (re-verified open 2026-09-26: no INFO call) | agent | 🟠 MEDIUM |
+| **OBS-07** | Audit the 37 DEBUG statements in `SimpleTransferEngine` — promote, demote to TRACE, or remove (count corrected from 53 on 2026-09-26) | core | 🟠 MEDIUM |
 | **OBS-15** | Await discarded `RaftNode.start()` / server `start()` futures in roughly twenty controller tests (`HttpApiServerHealthTest`, `JobAssignmentHandlerTest`, `StateTransitionIntegrationTest`, `GrpcRaftServerTest`, `RaftFailureTest` and others). Same latent race as the fixed `LeaderGuardHandlerTest` flake, but with no observed failures; needs a deliberate verified pass, not a blind sweep | controller test | 🟠 MEDIUM |
 | **OBS-09** | Per-protocol adapter metrics | core | 🟠 MEDIUM |
 | **OBS-10** | Tracing for HTTP, SFTP, FTP and SMB protocol adapters | core | 🟠 MEDIUM |
 | **OBS-11** | Service-level tracing for `AgentRegistrationService`, `HeartbeatService`, `JobPollingService` | agent | 🟢 LOW |
 | **OBS-12** | Workflow dependency-graph metrics (graph size, cycles detected, depth) | workflow | 🟢 LOW |
 | **OBS-13** | Tracing for `SimpleWorkflowEngine` and `YamlWorkflowDefinitionParser` | workflow | 🟢 LOW |
-| **OBS-14** | Standardize logger field naming (`LOG` → `logger`) in `RaftLogStorageAdapter` and `FileRaftStorage`; remove unused logger declarations in `MetricsHandler`, `ProtocolFactory`, `FileManager` | mixed | 🟢 LOW |
+
+**OBS-04, OBS-05 and OBS-14 — closed 2026-09-26 as already satisfied.** Checked against live
+source: the Status, Readiness, Liveness, Info and Cluster handlers, `YamlWorkflowDefinitionParser`
+and `WorkflowSchemaValidator` all declare and use a logger. `RaftLogStorageAdapter` already
+names its field `logger`, and `FileRaftStorage` is an external `raftlog-core` class. The
+`MetricsHandler`, `ProtocolFactory` and `FileManager` loggers are all used.
 
 **OBS-08 — closed 2026-09-07.** `TransferMetrics.java` and `TransferMetricsTest` are deleted.
 The class had no remaining production caller; `NetworkTopologyService.getTransferMetrics()` is
@@ -409,7 +425,7 @@ Deferral is explicit. Documentation MUST NOT imply any of these is current
 | **DEF-06** | Automatic controller sharding | Enterprise follow-on |
 | **DEF-07** | Additional secrets, SIEM, ITSM, scheduler and notification providers beyond the first supported integration in each category | Enterprise follow-on |
 | **DEF-08** | Advanced chargeback and cost optimization | Enterprise follow-on |
-| **DEF-09** | Admin UI build/buy decision as framed in the OTel plan (six months of operational feedback, then decide) | **Superseded** — Phase 11 makes the operator and administration interfaces a required M4 deliverable. Remove the deferral framing from the OTel plan. |
+| **DEF-09** | Admin UI build/buy decision as framed in the OTel plan (six months of operational feedback, then decide) | **Superseded** — Phase 11 makes the operator and administration interfaces a required M4 deliverable. The OTel plan's deferral framing was removed on 2026-09-07 (`DOC-06`). |
 
 `ARCH-09` (HTTP adapter buffers the full payload) is not deferred: it is assigned to Phase 4
 protocol hardening and Phase 12 scale validation. It remains open and unlisted in Phase 4's
@@ -419,31 +435,50 @@ completion checkpoint; confirm its disposition during Phase 6 or Phase 12 planni
 
 ## 10. Section H — Documentation Corrections
 
-The code is correct in each case; the document misleads a reader. Correcting these is
-documentation hygiene, not a delivery gate.
+No documentation corrections are open. `DOC-01` to `DOC-06` were applied to the OTel plan on
+2026-09-07 (v2.5 → v2.6), together with a header/footer version fix and a note that the plan's
+narrative sections are point-in-time analysis. Their rows were retained for the required one
+revision and removed in v1.5 under §13.4; register v1.4 holds the full detail.
 
-**All six were applied to the OTel plan on 2026-09-07 (v2.5 → v2.6).** Rows are retained for one
-revision so the correction is visible, then removed per §12.4.
-
-| ID | Document | Correction | State |
-|---|---|---|---|
-| **DOC-01** | OTel plan, "Critical Pre-Production Fixes" grid | All eight entries are complete or substantially complete (Section E.2). The table presented delivered Raft persistence, compaction, InstallSnapshot, WebClient migration, Protobuf, gRPC TLS and `abort()` as 🔴 CRITICAL pending, contradicting the alpha and enterprise plans. | ✅ Applied — retitled "Former Critical Pre-Production Fixes", all rows marked delivered with their delivering plan, plus an explicit warning not to reintroduce a RocksDB-backed WAL and a durability caveat pointing at `R1-1`…`R1-3` |
-| **DOC-02** | OTel plan, "Test Phases 1–5" grid | Test Phases 1–3 infrastructure exists in `docker/compose/`. Only the integration test suite and execution script are genuinely open. | ✅ Applied — Test Phases 1–3 marked complete with file paths; 4 and 5 mapped to `OBS-01` and `OBS-02` |
-| **DOC-03** | OTel plan, "Logging & OTel Audit Fixes" grid | The Logging-OTel bridge is implemented in controller and agent; v2.4 already stated this in prose while the grid showed it pending. | ✅ Applied — marked complete; `requestId` ↔ `traceId` rescoped from pending to partial |
-| **DOC-04** | OTel plan, `TransferMetrics` entries | v2.5 prose says removed; the file still exists as dead code. | ✅ Applied — recorded as orphaned pending deletion (`OBS-08`), with a warning that `NetworkTopologyService.getTransferMetrics()` is an unrelated name collision |
-| **DOC-05** | OTel plan, target dates and "mid-2026 launch" | Every date is in the past and the enterprise plan deliberately assigns no calendar dates. | ✅ Applied — Target Date column replaced throughout by a Delivery reference column citing the owning phase or an `OBS-*` ID |
-| **DOC-06** | OTel plan, "Admin UI Decision (POST-LAUNCH)" | Superseded by Phase 11. See `DEF-09`. | ✅ Applied — replaced by a superseded notice; the five decision rows removed from the progress table |
-
-Two further corrections were made in the same pass, beyond the six identified above:
-
-- the document header read v2.4 while its footer read v2.5; both now read v2.6;
-- a header note now records that the narrative sections remain point-in-time analysis and that the
-  task grid is authoritative for status, so the un-reconciled module gap analyses and the "Future
-  Migration Phases" framing cannot be read as current.
+Documentation corrections found by the 2026-09-24 review are tracked in the
+[documentation review task list](QUORUS_DOCUMENTATION_REVIEW_TASKS.md), not here.
 
 ---
 
-## 11. Gap-to-Section Traceability
+## 11. Section I — Configuration and Documentation-Review Delivery Items
+
+Delivery work identified by the configuration baseline remediation and by the
+[2026-09-24 documentation review](../reviews/QUORUS_DOCUMENTATION_REVIEW_2026-09-24.md). The
+corresponding `DR-*` task names the review evidence. Rows marked *reported* were confirmed by the
+review on 2026-09-25 but have not been re-checked since; re-verify each against the current tree
+before implementation. None has been assigned to a phase yet; assign each during the next plan
+revision.
+
+| ID | Item | Task | Evidence state | Level |
+|---|---|---|---|---|
+| **CFG-01** | Make repository Compose security posture explicit, remove unsupported environment settings and duplicate topology, fix image health probing, separate logging-stack names/ports, and provide a generated-certificate mTLS example | `DR-A5` | ✅ **Closed 2026-09-25** — all 14 Compose models validate; the TLS example is healthy, accepts its generated gateway identity, and rejects a client without a certificate. Repository-local validation, not production accreditation. | ✅ |
+| **CFG-02** | `AgentConfig.getForeignAssignmentMismatchThreshold()` defaults to 3 while the packaged value is 1, so builder- or override-based configurations can diverge from production | `DR-X16` (review §6 #16) | Verified 2026-09-26 (`AgentConfig.java:174`, `quorus-agent.properties:96`) | 🟢 |
+| **CFG-03** | Invalid numeric configuration values fall back to the accessor default with a WARN instead of failing validation | review §6 #16 | Verified 2026-09-26 (`LayeredProperties.java:54-67`); the review's "silently" is corrected — a warning is logged | 🟢 |
+| **CFG-04** | A blank environment value cannot clear a packaged value, because blank overrides are skipped | review §6 #16 | Verified 2026-09-26 (`LayeredProperties.java:85`) | 🟢 |
+| **CFG-05** | `QuorusConfiguration` reads `System.getenv()` directly, so its environment layer cannot be injected in tests the way `AppConfig`'s can | review §6 #16 | Verified 2026-09-26 (`QuorusConfiguration.java:211`) | 🟢 |
+| **SEC-01** | Revocation serials with leading zeros never matched | `DR-A4` | Code fixed: `CertificateTrustState.normalize` strips leading zeros (verified 2026-09-26); the task list records 17/17 focused `SecurityBoundaryIntegrationTest` passes and updated operating guidance. Closure awaits ADR-0009 and retained evidence. | 🟠 |
+| **SEC-02** | Runtime revocation is node-local and volatile | `DR-Q2`, `DR-A4`, `DR-D4` | Decision recorded 2026-09-25: keep node-local; operators update every controller and persist the set in configuration before restart. ADR-0009 outstanding. | 🟠 |
+| **SEC-03** | Direct-URI SFTP disables host-key checking without logging (residual of `QR-03`) | `DR-X06` | Reported (`SftpTransferProtocol.java:406-408`) | 🟠 |
+| **SEC-04** | Raft peer certificates are not bound to the `QUORUS_CLUSTER_NODES` identity; any cluster-CA certificate can make Raft RPCs | `DR-X07` | Reported (`RaftPeerAuthorizationInterceptor`) | 🟠 |
+| **SEC-05** | `roleAllows` returns on the first matching role, so multi-role identities can be denied scopes another role grants | `DR-X09` | Verified still present 2026-09-26 (`AuthorizationPolicyEngine.java:78-107`) | 🟠 |
+| **SEC-06** | Direct mTLS identities cannot hold elevation; only gateway-asserted identities can perform elevated operations | `DR-Q3`, `DR-B5` | Reported; decision pending | 🟠 |
+| **ENG-01** | `JobAssignmentService`, which owns the assignment timeout monitor, is constructed only by its test | `DR-X11` | Reported; settle with `P2-01` | 🟡 |
+| **ENG-02** | `*IT` and `*Benchmark` classes never run: no Failsafe plugin and no Surefire includes | `DR-Q4`, `DR-X18` | Reported; decision pending | 🟠 |
+| **ENG-03** | `QuorusAgent.java:372` calls `.join()`; whether it can run on an event loop is untraced | `DR-X24` | Reported, not traced | 🟠 |
+| **ENG-04** | `SimpleWorkflowEngine` public constructor calls `Vertx.vertx()` | `DR-X19` | Reported | 🟢 |
+| **ENG-05** | `workflow-schema.json` is never loaded although `json-schema-validator` is a dependency | `DR-X21` | Reported | 🟢 |
+| **ENG-06** | Small code-comment corrections: the `mvn test -Dgroups=docker,slow` pom comment, and Javadoc mentioning the removed `memory` storage type and "blocking mode" | `DR-X17`, `DR-X20` | Reported | 🟢 |
+
+`DR-X05` (HTTP adapter buffering) is the existing `ARCH-09` and is not duplicated here.
+
+---
+
+## 12. Gap-to-Section Traceability
 
 | Gap | Status | Where the remaining work lives |
 |---|---|---|
@@ -482,7 +517,7 @@ Two further corrections were made in the same pass, beyond the six identified ab
 
 ---
 
-## 12. Register Governance
+## 13. Register Governance
 
 1. This register is regenerated from its source documents, never edited to disagree with them.
 2. An item is removed only when the source plan's exit criterion is met with retained evidence
@@ -497,8 +532,9 @@ Two further corrections were made in the same pass, beyond the six identified ab
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.5 | 2026-09-26 | Documentation-review pass (`DR-B7`): closed OBS-04, OBS-05 and OBS-14 as already satisfied and corrected OBS-07 to 37 statements; fixed the section counts, plan and OTel versions and revision order; settled the Phase 0 and Phase 4 status statement; past-tensed the fixed fixture-volume statement; added `R1-4`, `PROC-01` and `P2-13` for plan items without IDs; added Section I for `CFG-01` (moved from D.6), the four configuration residuals, and the security and engineering defects from the documentation review; collapsed Section H after its retention revision; renumbered traceability and governance to §12 and §13 |
 | 1.4 | 2026-09-25 | Recorded `CFG-01` complete after validation of the explicit development posture, Compose cleanup, corrected health probing and generated-certificate mTLS example |
-| 1.0 | 2026-09-07 | Initial consolidation of all outstanding tasks from the five `docs-design/task/` planning documents, with live-source verification of eleven stale OTel grid claims and the sealed-record transition phases |
 | 1.3 | 2026-09-07 | Remediated the three findings from the R1-1 slice: containerised test fixtures now write Raft state to named volumes at the deployed path, orphaned `TransferMetrics` deleted (`OBS-08`), and the `LeaderGuardHandlerTest` startup flake root-caused and fixed; recorded the unswept discarded-`start()`-future pattern as `OBS-15` |
 | 1.2 | 2026-09-07 | Closed `R1-1` container-recreation acceptance with four containerised tests and a controller regression of 601 tests; recorded the non-durable default Docker test fixture found during the work; classified the recovery tests as retrospective characterization because no product defect was found |
 | 1.1 | 2026-09-07 | Applied all six Section H corrections to the OTel plan (v2.5 → v2.6), including removal of three production-readiness claims it should not have made; archived the alpha plan, Stage 6 security/routes plan, OTel plan and sealed-record design, leaving `task/` holding only the enterprise plan and this register; repaired every cross-reference broken by the move |
+| 1.0 | 2026-09-07 | Initial consolidation of all outstanding tasks from the five `docs-design/task/` planning documents, with live-source verification of eleven stale OTel grid claims and the sealed-record transition phases |

@@ -1,12 +1,12 @@
-<img src="quorus-logo.png" alt="Quorus" width="120"/>
+<img src="../../docs/quorus-logo.png" alt="Quorus" width="120"/>
 
 # Quorus Codebase and Documentation Review — 2026-08-31
 
-**Version:** 1.0  
+**Version:** 1.1  
 **Date:** 2026-08-31  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
-**Status:** Point-in-time technical review  
+**Status:** Point-in-time technical review; finding status annex added 2026-09-26  
 **Scope:** Repository state inspected on 2026-08-31
 
 ## Document purpose
@@ -15,7 +15,7 @@ This document records a point-in-time review of the Quorus source code, automate
 
 The review is based on the repository state inspected on 2026-08-31. It is a technical assessment rather than a certification, penetration test, or exhaustive line-by-line audit of every experimental and archived artifact.
 
-The current normative requirements are maintained in [QUORUS_ARCHITECTURE_SPECIFICATION.md](QUORUS_ARCHITECTURE_SPECIFICATION.md) and [QUORUS_REST_API_SPECIFICATION.md](QUORUS_REST_API_SPECIFICATION.md). Those specifications supersede this review when later implementation or architecture decisions differ.
+The current normative requirements are maintained in [QUORUS_ARCHITECTURE_SPECIFICATION.md](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md) and [QUORUS_REST_API_SPECIFICATION.md](../../docs/QUORUS_REST_API_SPECIFICATION.md). Those specifications supersede this review when later implementation or architecture decisions differ.
 
 ## Executive summary
 
@@ -75,11 +75,11 @@ The production agent reports that it accepted a job and then immediately execute
 
 Evidence:
 
-- [`QuorusAgent.processJob`](../quorus-agent/src/main/java/dev/mars/quorus/agent/QuorusAgent.java#L413) reports `ACCEPTED` and starts execution.
-- [`QuorusAgent.handleTransferSuccess`](../quorus-agent/src/main/java/dev/mars/quorus/agent/QuorusAgent.java#L446) reports `COMPLETED` directly.
-- [`JobStatusReportingService`](../quorus-agent/src/main/java/dev/mars/quorus/agent/service/JobStatusReportingService.java#L67) provides `reportInProgress`, but production execution does not invoke it.
-- [`JobAssignmentStatus`](../quorus-core/src/main/java/dev/mars/quorus/core/JobAssignmentStatus.java#L170) permits `ACCEPTED -> IN_PROGRESS`, but not `ACCEPTED -> COMPLETED`.
-- [`JobStatusHandler`](../quorus-controller/src/main/java/dev/mars/quorus/controller/http/handlers/JobStatusHandler.java#L105) rejects invalid transitions.
+- [`QuorusAgent.processJob`](../../quorus-agent/src/main/java/dev/mars/quorus/agent/QuorusAgent.java#L413) reports `ACCEPTED` and starts execution.
+- [`QuorusAgent.handleTransferSuccess`](../../quorus-agent/src/main/java/dev/mars/quorus/agent/QuorusAgent.java#L446) reports `COMPLETED` directly.
+- [`JobStatusReportingService`](../../quorus-agent/src/main/java/dev/mars/quorus/agent/service/JobStatusReportingService.java#L67) provides `reportInProgress`, but production execution does not invoke it.
+- [`JobAssignmentStatus`](../../quorus-core/src/main/java/dev/mars/quorus/core/JobAssignmentStatus.java#L170) permits `ACCEPTED -> IN_PROGRESS`, but not `ACCEPTED -> COMPLETED`.
+- [`JobStatusHandler`](../../quorus-controller/src/main/java/dev/mars/quorus/controller/http/handlers/JobStatusHandler.java#L105) rejects invalid transitions.
 
 Consequently, a successful physical transfer receives an HTTP conflict when it attempts to report completion. Its replicated assignment remains `ACCEPTED`, continues to appear in active polling results, and cannot be completed through the normal production path. On a later poll, reporting `ACCEPTED` again is itself invalid, so the job is effectively stranded.
 
@@ -94,10 +94,10 @@ Consequently, a successful physical transfer receives an HTTP conflict when it a
 
 Evidence:
 
-- [`quorus-controller.properties`](../quorus-controller/src/main/resources/quorus-controller.properties#L49) defines an empty storage path.
-- [`AppConfig.getRaftStoragePath`](../quorus-controller/src/main/java/dev/mars/quorus/controller/config/AppConfig.java#L145) only applies its fallback when the property is absent.
-- [`QuorusControllerVerticle`](../quorus-controller/src/main/java/dev/mars/quorus/controller/QuorusControllerVerticle.java#L102) constructs a path directly from the returned string.
-- The recommended controller-first Compose file mounts only [`/app/data`](../docker/compose/docker-compose-controller-first.yml#L38).
+- [`quorus-controller.properties`](../../quorus-controller/src/main/resources/quorus-controller.properties#L49) defines an empty storage path.
+- [`AppConfig.getRaftStoragePath`](../../quorus-controller/src/main/java/dev/mars/quorus/controller/config/AppConfig.java#L145) only applies its fallback when the property is absent.
+- [`QuorusControllerVerticle`](../../quorus-controller/src/main/java/dev/mars/quorus/controller/QuorusControllerVerticle.java#L102) constructs a path directly from the returned string.
+- The recommended controller-first Compose file mounts only [`/app/data`](../../docker/compose/docker-compose-controller-first.yml#L38).
 
 Under the container layout, the effective Raft files are therefore written beneath `/app`, not `/app/data`. Recreating a controller container can discard its write-ahead log and snapshots even though the deployment appears to configure a persistent volume.
 
@@ -108,7 +108,7 @@ Under the container layout, the effective Raft files are therefore written benea
 **Severity:** High  
 **Components:** SFTP transfer protocol, security configuration
 
-The SFTP implementation unconditionally sets `StrictHostKeyChecking` to `no` in production code at [`SftpTransferProtocol.java`](../quorus-core/src/main/java/dev/mars/quorus/protocol/SftpTransferProtocol.java#L380). This makes an encrypted connection but does not authenticate the remote server. An attacker able to intercept the connection can impersonate the destination, capture credentials, and read or modify transferred data.
+The SFTP implementation unconditionally sets `StrictHostKeyChecking` to `no` in production code at [`SftpTransferProtocol.java`](../../quorus-core/src/main/java/dev/mars/quorus/protocol/SftpTransferProtocol.java#L380). This makes an encrypted connection but does not authenticate the remote server. An attacker able to intercept the connection can impersonate the destination, capture credentials, and read or modify transferred data.
 
 The inline comment describes this as being for demonstration purposes, but the behavior is not isolated to examples or a development profile.
 
@@ -121,7 +121,7 @@ The inline comment describes this as being for demonstration purposes, but the b
 
 The controller maps properties such as `quorus.http.port` to environment variables with a `QUORUS_` prefix. The controller-first Compose file follows that contract, but several other advertised files do not.
 
-For example, [`docker-compose-full-network.yml`](../docker/compose/docker-compose-full-network.yml#L21) uses `NODE_ID`, `RAFT_PORT`, `HTTP_PORT`, and `CLUSTER_NODES`. These values are ignored by [`AppConfig`](../quorus-controller/src/main/java/dev/mars/quorus/controller/config/AppConfig.java#L268), causing controllers to fall back to generated/default identities and membership rather than the requested three-node cluster. The same Compose topology does not set `AGENT_TENANT_ID`, even though [`AgentConfiguration`](../quorus-agent/src/main/java/dev/mars/quorus/agent/config/AgentConfiguration.java#L76) requires it.
+For example, [`docker-compose-full-network.yml`](../../docker/compose/docker-compose-full-network.yml#L21) uses `NODE_ID`, `RAFT_PORT`, `HTTP_PORT`, and `CLUSTER_NODES`. These values are ignored by [`AppConfig`](../../quorus-controller/src/main/java/dev/mars/quorus/controller/config/AppConfig.java#L268), causing controllers to fall back to generated/default identities and membership rather than the requested three-node cluster. The same Compose topology does not set `AGENT_TENANT_ID`, even though [`AgentConfiguration`](../../quorus-agent/src/main/java/dev/mars/quorus/agent/config/AgentConfiguration.java#L76) requires it.
 
 Similar obsolete controller variables appear in other Compose variants and in the controller Dockerfile. Documentation currently presents several of these files as runnable alternatives.
 
@@ -132,7 +132,7 @@ Similar obsolete controller variables appear in other Compose variants and in th
 **Severity:** High  
 **Components:** agent test suite, CI readiness
 
-A clean Maven test compilation fails at [`AgentTelemetryIntegrationTest.java`](../quorus-agent/src/test/java/dev/mars/quorus/agent/integration/AgentTelemetryIntegrationTest.java#L182). The test calls `ConditionFactory.failMessage(String)`, which is not provided by the configured Awaitility version.
+A clean Maven test compilation fails at [`AgentTelemetryIntegrationTest.java`](../../quorus-agent/src/test/java/dev/mars/quorus/agent/integration/AgentTelemetryIntegrationTest.java#L182). The test calls `ConditionFactory.failMessage(String)`, which is not provided by the configured Awaitility version.
 
 The following command was used:
 
@@ -158,16 +158,16 @@ Before the clean compilation, a broader test run also exposed agent tests whose 
 **Severity:** High  
 **Components:** assignment API, replicated state, tenant isolation
 
-[`JobAssignmentHandler.handleAssign`](../quorus-controller/src/main/java/dev/mars/quorus/controller/http/handlers/JobAssignmentHandler.java#L76) maps the request into an assignment command without verifying that:
+[`JobAssignmentHandler.handleAssign`](../../quorus-controller/src/main/java/dev/mars/quorus/controller/http/handlers/JobAssignmentHandler.java#L76) maps the request into an assignment command without verifying that:
 
 - the referenced transfer exists;
 - the referenced agent exists;
 - the transfer and agent belong to the same tenant;
 - the assignment tenant is present and consistent with both objects.
 
-[`QuorusStateStore.applyJobAssignmentCommand`](../quorus-controller/src/main/java/dev/mars/quorus/controller/state/QuorusStateStore.java#L351) then inserts the assignment without enforcing those invariants. Polling filters can prevent a mismatched assignment from being delivered, but that only converts the problem into permanently stranded replicated state.
+[`QuorusStateStore.applyJobAssignmentCommand`](../../quorus-controller/src/main/java/dev/mars/quorus/controller/state/QuorusStateStore.java#L351) then inserts the assignment without enforcing those invariants. Polling filters can prevent a mismatched assignment from being delivered, but that only converts the problem into permanently stranded replicated state.
 
-This behavior conflicts with the statement in [`QUORUS_API_REFERENCE.md`](QUORUS_API_REFERENCE.md#L23) that tenant isolation is enforced at every write path.
+This behavior conflicts with the statement in [`QUORUS_API_REFERENCE.md`](../../docs/QUORUS_API_REFERENCE.md) that tenant isolation is enforced at every write path.
 
 **Recommendation:** Validate all referenced entities and derive tenant identity from authoritative stored objects rather than trusting request duplication. Repeat the invariant checks inside deterministic state-machine application so every command path, including future internal callers, receives the same protection.
 
@@ -176,7 +176,7 @@ This behavior conflicts with the statement in [`QUORUS_API_REFERENCE.md`](QUORUS
 **Severity:** High  
 **Components:** assignment API, Raft state machine, concurrency
 
-Assignment handlers validate a transition against current state before submitting a Raft command. The committed state may change between that read and command application. The specialized accept, reject, timeout, and cancel command handlers then overwrite the current assignment without comparing its committed status to the expected status. Examples begin at [`QuorusStateStore.java`](../quorus-controller/src/main/java/dev/mars/quorus/controller/state/QuorusStateStore.java#L365).
+Assignment handlers validate a transition against current state before submitting a Raft command. The committed state may change between that read and command application. The specialized accept, reject, timeout, and cancel command handlers then overwrite the current assignment without comparing its committed status to the expected status. Examples begin at [`QuorusStateStore.java`](../../quorus-controller/src/main/java/dev/mars/quorus/controller/state/QuorusStateStore.java#L365).
 
 Raft serializes commands, but serialization alone does not preserve the invariant: two handlers can both observe `ASSIGNED`, submit competing commands, and have the later command overwrite the first command's terminal result.
 
@@ -189,7 +189,7 @@ The generic status-update command already performs an expected-status comparison
 **Severity:** Medium  
 **Components:** HTTP transfer protocol, memory use, progress reporting
 
-HTTP downloads materialize the full response with [`response.body()`](../quorus-core/src/main/java/dev/mars/quorus/protocol/HttpTransferProtocol.java#L193), and uploads read the complete source using [`readFile()`](../quorus-core/src/main/java/dev/mars/quorus/protocol/HttpTransferProtocol.java#L285) before calling `sendBuffer`. Checksum calculation creates additional byte-array views/copies.
+HTTP downloads materialize the full response with [`response.body()`](../../quorus-core/src/main/java/dev/mars/quorus/protocol/HttpTransferProtocol.java#L193), and uploads read the complete source using [`readFile()`](../../quorus-core/src/main/java/dev/mars/quorus/protocol/HttpTransferProtocol.java#L285) before calling `sendBuffer`. Checksum calculation creates additional byte-array views/copies.
 
 Memory consumption therefore scales with transfer size and concurrent-transfer count. Large files can exhaust the agent heap, and progress cannot be reported accurately until an entire body has been buffered.
 
@@ -200,7 +200,7 @@ Memory consumption therefore scales with transfer size and concurrent-transfer c
 **Severity:** Medium  
 **Components:** controller API server, network exposure
 
-`AppConfig` reads and logs `quorus.http.host`, but [`HttpApiServer.start`](../quorus-controller/src/main/java/dev/mars/quorus/controller/http/HttpApiServer.java#L153) calls `listen(port)` without supplying that host. Operators who configure loopback or a specific interface do not receive the requested binding.
+`AppConfig` reads and logs `quorus.http.host`, but [`HttpApiServer.start`](../../quorus-controller/src/main/java/dev/mars/quorus/controller/http/HttpApiServer.java#L153) calls `listen(port)` without supplying that host. Operators who configure loopback or a specific interface do not receive the requested binding.
 
 This is especially important because the API documentation correctly states that Quorus has no built-in authentication and expects authentication and authorization to be supplied by external infrastructure.
 
@@ -211,7 +211,7 @@ This is especially important because the API documentation correctly states that
 **Severity:** Medium  
 **Components:** controller configuration, storage documentation
 
-The packaged properties list RocksDB as a supported backend at [`quorus-controller.properties`](../quorus-controller/src/main/resources/quorus-controller.properties#L39), and [`RaftStorageFactory`](../quorus-controller/src/main/java/dev/mars/quorus/controller/raft/storage/RaftStorageFactory.java#L230) parses the option. Normal application configuration validation, however, permits only `raftlog`, `file`, and `memory`, so `rocksdb` is rejected before the factory is reached.
+The packaged properties list RocksDB as a supported backend at [`quorus-controller.properties`](../../quorus-controller/src/main/resources/quorus-controller.properties#L39), and [`RaftStorageFactory`](../../quorus-controller/src/main/java/dev/mars/quorus/controller/raft/storage/RaftStorageFactory.java#L230) parses the option. Normal application configuration validation, however, permits only `raftlog`, `file`, and `memory`, so `rocksdb` is rejected before the factory is reached.
 
 **Recommendation:** Decide whether RocksDB is supported. If it is, align validation and dependencies and add a persistence test. If it is experimental or unsupported, remove it from normal configuration documentation and expose it only through an explicitly experimental profile.
 
@@ -220,7 +220,7 @@ The packaged properties list RocksDB as a supported backend at [`quorus-controll
 **Severity:** Low  
 **Components:** README, design documents, engineering guidance
 
-The root README links to `docs/QUORUS_SYSTEM_DESIGN.md` at [`README.md`](../README.md#L142), but the referenced file is stored under `docs-design/design/`. An internal Markdown-link scan found this as the principal broken link in the root README and active docs.
+The root README links to `docs/QUORUS_SYSTEM_DESIGN.md` at [`README.md`](../../README.md), but the referenced file is stored under `docs-design/design/`. An internal Markdown-link scan found this as the principal broken link in the root README and active docs.
 
 Some noncanonical design material also recommends Mockito even though current repository engineering rules prohibit Mockito and substitute mocking frameworks. No Mockito dependency or usage was found in active implementation or test code, so this is documentation drift rather than an implementation violation.
 
@@ -308,3 +308,25 @@ The documentation should be generated or checked against configuration metadata 
 Quorus should not currently be promoted as production-ready or enterprise-ready. QR-01 through QR-05 should be treated as release blockers. QR-06 and QR-07 should also be resolved before exposing assignment APIs to multiple tenants or concurrent operators. Once those findings are fixed, the project should pass a clean Maven verification build and a documented multi-node Docker acceptance test before a release candidate is cut.
 
 The underlying architecture is serviceable, and most findings can be addressed without a wholesale redesign. The central requirement is to make invariants—job lifecycle, tenant ownership, committed-state transitions, durable storage locations, and secure peer identity—executable and testable rather than relying on coordination between independently correct components.
+
+## Annex — Finding status (added 2026-09-26)
+
+This annex records what happened to each finding. The body above is unchanged and still
+describes the repository as it was on 2026-08-31. Status comes from §5 of the
+[2026-09-24 documentation review](QUORUS_DOCUMENTATION_REVIEW_2026-09-24.md), checked against
+HEAD `216348a` plus the working tree, and is updated for work completed on 2026-09-25.
+Re-verify against the current tree before relying on it.
+
+| ID | Status | Evidence or remaining work |
+| --- | --- | --- |
+| QR-01 | Fixed | The agent reports `ACCEPTED`, then `IN_PROGRESS`, before executing |
+| QR-02 | Fixed for containers | Compose and the Dockerfile set `QUORUS_RAFT_STORAGE_PATH`, a blank value now means "use the default", and R1-1 container-recreation acceptance closed on 2026-09-07 (`804e11d`). Production-filesystem and power-loss acceptance (R1-2, R1-3) remain open |
+| QR-03 | Partly fixed | Governed SFTP requires SHA-256 host-key pins. Direct-URI SFTP still disables host-key checking silently (task `DR-X06`) |
+| QR-04 | Fixed in the repository | Compose files declare an explicit development posture and use `QUORUS_*` names, and a generated-certificate mTLS example exists (`CFG-01`, closed 2026-09-25) |
+| QR-05 | Fixed | The unsupported Awaitility call is gone |
+| QR-06 | Fixed | Handler and apply-time reference and tenant checks |
+| QR-07 | Fixed, not re-tested | Transition commands carry `expectedStatus`, which is enforced on apply |
+| QR-08 | Open | HTTP adapter still buffers the body (`ARCH-09`, task `DR-X05`) |
+| QR-09 | Fixed | `HttpApiServer` listens on the configured host |
+| QR-10 | Fixed | Internal backends removed; only `raftlog` is accepted |
+| QR-11 | Partly fixed | Tracked by the [documentation review task list](../task/QUORUS_DOCUMENTATION_REVIEW_TASKS.md) |

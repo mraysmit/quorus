@@ -831,5 +831,6 @@ The following decisions are effective with this specification:
 - [Enterprise implementation plan](../docs-design/task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md) — phased delivery, verification, and exit gates
 - [HTTP API reference](QUORUS_API_REFERENCE.md) — active HTTP endpoints and payloads
 - [Cluster startup guide](QUORUS_CLUSTER_STARTUP_GUIDE.md) — supported startup and deployment guidance
-- [Codebase and documentation review, 2026-08-31](QUORUS_CODEBASE_AND_DOCUMENTATION_REVIEW_2026-08-31.md) — point-in-time implementation review
+- [Codebase and documentation review, 2026-08-31](../docs-design/reviews/QUORUS_CODEBASE_AND_DOCUMENTATION_REVIEW_2026-08-31.md) — point-in-time implementation review, with a finding-status annex
+- [Documentation review, 2026-09-24](../docs-design/reviews/QUORUS_DOCUMENTATION_REVIEW_2026-09-24.md) — point-in-time documentation and code cross-check
 - [Comprehensive system design](../docs-design/design/QUORUS_SYSTEM_DESIGN.md) — non-normative target-state vision
