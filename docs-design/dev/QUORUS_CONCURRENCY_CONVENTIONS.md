@@ -2,7 +2,7 @@
 
 # Quorus Concurrency Conventions
 
-**Version:** 1.0  
+**Version:** 1.1  
 **Date:** 2026-09-26  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
@@ -59,6 +59,14 @@ try (TaskScope scope = TaskScope.builder("replicate-segment", Duration.ofSeconds
   span name `taskscope <name>` and the subtask thread-name prefix.
 - **Keep subtasks coarse.** Every scope and every subtask produces a span. Fork a transfer, a protocol
   call or a polling loop, not a single field computation.
+- **Fork only under the bindings in force when the scope opened.** Do not call `fork` inside a nested
+  `ScopedValue.where(...)`, and do not let a scope escape the `where(...)` that opened it. A declared
+  key bound differently at `fork` throws `TaskScope.StructureViolationException`. Final APIs cannot
+  see undeclared keys, so `TaskScope` cannot detect changes to those, but `StructuredTaskScope` can
+  and will reject them after migration. Treat the rule as absolute.
+- **Close scopes in reverse order of opening.** Nested try-with-resources does this automatically.
+  Closing an outer scope while an inner one is still open closes the inner scope first, then throws
+  `TaskScope.StructureViolationException`, with any close failures attached as suppressed exceptions.
 
 ## 3. Context propagation
 
@@ -75,7 +83,25 @@ Request and security context (tenant, identity, request ID) belongs in `ScopedVa
 thread-locals. The MDC stays the bridge to logging, because logback reads only the MDC. The MDC keys in
 use are `requestId`, `traceId`, `spanId`, `nodeId`, `raftRole`, `raftTerm`, `rpcType` and `agentId`.
 
-## 4. Shared state
+## 4. Migration to `StructuredTaskScope`
+
+`StructuredTaskScope` is a preview API in JDK 27. It is also still preview in JDK 28 early access
+(28-ea+17), and no structured-concurrency JEP was targeted to JDK 28 as of 2026-09-26. When a Java
+release that Quorus adopts (plan item `RT-09`) makes it final, the switch happens inside `TaskScope`,
+and callers do not change:
+
+| `TaskScope` today | After the switch |
+|---|---|
+| Fork, join, cancellation and deadline on virtual threads | Delegated to `StructuredTaskScope` with its default all-must-succeed policy and the scope deadline as its timeout |
+| `FailedException`, `TimeoutException`, `StructureViolationException` | Kept as Quorus types, mapped from the JDK exceptions |
+| Structure checks for declared keys and close order | Removed; the JDK enforces the same rules, and more completely |
+| `Builder.inherit(...)` | Redundant, because every binding is inherited. The declarations can be deleted |
+| Tracing, span outcomes, MDC propagation | Kept. The JDK scope does not carry thread-locals, so each fork keeps wrapping its task |
+
+Code that follows §2 today needs no change at migration. The `TaskScope*Test` classes are the
+regression gate for the switch.
+
+## 5. Shared state
 
 - Give every piece of mutable state one owner and state how it is serialised: confined to one thread,
   guarded by a named lock, or immutable.
@@ -84,7 +110,7 @@ use are `requestId`, `traceId`, `spanId`, `nodeId`, `raftRole`, `raftTerm`, `rpc
   virtual threads. Use `ReentrantLock` when you need a `Condition` or a timed acquire.
 - Prefer immutable records and copy-on-publish over shared mutable collections.
 
-## 5. Asynchronous test standard
+## 6. Asynchronous test standard
 
 This standard replaces the Vert.x test facilities for code that has left Vert.x (plan §6.1).
 
@@ -101,6 +127,10 @@ This standard replaces the Vert.x test facilities for code that has left Vert.x 
   legitimately cancel the subtask before it runs, and the test hangs (seen in RT-02b).
 - **To keep a subtask alive past cancellation,** block it in `CompletableFuture.join()`, which ignores
   interruption, and release it from the test.
+- **Do not race an interrupt against a release.** A virtual thread may see "the subtask ended" before
+  it sees its own interrupt, so a test that interrupts a thread from outside and then releases work
+  may never exercise the interrupted path, and still pass. When a test needs the interrupt to be seen,
+  have the thread set its own interrupt status at the point under test (seen in RT-02d).
 - **Assert spans with the real OpenTelemetry SDK:** an `SdkTracerProvider` with a
   `SimpleSpanProcessor` over an `InMemorySpanExporter`, injected with `Builder.tracer(...)`. No mocks.
 - **Assert MDC through real log events, frozen on the logging thread.** Logback evaluates an event's

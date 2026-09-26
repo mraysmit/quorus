@@ -15,7 +15,9 @@ import io.opentelemetry.context.Scope;
 import org.slf4j.MDC;
 
 import java.time.Duration;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -67,6 +69,43 @@ import java.util.function.Supplier;
  *       captured when the scope opens (as {@code StructuredTaskScope} captures bindings). Once the
  *       JDK scope is adopted it inherits all bindings, and the declarations can be removed.</li>
  * </ul>
+ *
+ * <p>Structure rules (plan item RT-02d). {@code StructuredTaskScope} rejects two kinds of misuse
+ * with {@code StructureViolationException}. This class enforces the same rules now, throwing
+ * {@link StructureViolationException}, so code that runs today keeps running after the switch:
+ * <ul>
+ *   <li><b>Fork under the bindings in force at open.</b> {@link #fork} fails if a key declared with
+ *       {@link Builder#inherit} is bound differently than when the scope was opened: bound to
+ *       another value (compared by identity), newly bound, or no longer bound. Typical cause: calling
+ *       {@code fork} inside a nested {@code ScopedValue.where(...)}. Limitation: final APIs cannot
+ *       enumerate a thread's bindings, so changes to <em>undeclared</em> keys are not detected, and
+ *       rebinding a declared key to the identical object is not detected. The JDK scope detects
+ *       both; do not rely on either.</li>
+ *   <li><b>Close in reverse order of opening.</b> Scopes opened by one thread nest. Closing a scope
+ *       while scopes opened after it on the same thread are still open first closes those inner
+ *       scopes, innermost first, cancelling and awaiting their subtasks, then closes this scope, and
+ *       finally throws {@link StructureViolationException}. Failures from closing the inner scopes
+ *       are attached as suppressed exceptions. Try-with-resources always closes in the correct
+ *       order.</li>
+ * </ul>
+ * The open scopes of each thread are tracked in an internal {@code ThreadLocal} stack. This is
+ * owner-thread bookkeeping only; request context never travels in thread-locals.
+ *
+ * <p>Migration to {@code java.util.concurrent.StructuredTaskScope} (plan item RT-09, once the API
+ * is final in a Java release Quorus has adopted; still preview in JDK 27 and in JDK 28 early access
+ * as of 2026-09-26). Callers do not change; only this class does:
+ * <ul>
+ *   <li>{@link #open}, {@link #fork}, {@link #join} and {@link #close} delegate to a
+ *       {@code StructuredTaskScope} opened with its default all-must-succeed policy and the scope
+ *       deadline as its timeout; {@link Subtask} states map one to one.</li>
+ *   <li>{@link FailedException}, {@link TimeoutException} and {@link StructureViolationException}
+ *       remain the Quorus types, mapped from the JDK exceptions, so callers see no change.</li>
+ *   <li>The structure checks here are removed; the JDK enforces them (more completely).</li>
+ *   <li>{@link Builder#inherit} becomes redundant, because the JDK scope inherits every binding.</li>
+ *   <li>Tracing, span outcomes and MDC propagation stay: the JDK scope does not carry thread-locals,
+ *       so each fork keeps wrapping the task exactly as {@code SubtaskImpl#run} does now.</li>
+ *   <li>The existing {@code TaskScope*Test} classes are the regression gate for the switch.</li>
+ * </ul>
  */
 public final class TaskScope implements AutoCloseable {
 
@@ -84,6 +123,9 @@ public final class TaskScope implements AutoCloseable {
 
     private enum Phase { OPEN, JOINED, CLOSED }
 
+    /** Scopes opened, and not yet closed, by each thread, innermost last. Owner bookkeeping only. */
+    private static final ThreadLocal<Deque<TaskScope>> OPEN_SCOPES = ThreadLocal.withInitial(ArrayDeque::new);
+
     private final String name;
     private final Thread owner;
     private final long deadlineNanos;
@@ -91,6 +133,7 @@ public final class TaskScope implements AutoCloseable {
     private final Tracer tracer;
     private final Span scopeSpan;
     private final Context scopeContext;
+    private final List<ScopedValue<?>> declaredKeys;
     private final List<Binding<?>> bindings;
 
     private final ReentrantLock lock = new ReentrantLock();
@@ -117,7 +160,9 @@ public final class TaskScope implements AutoCloseable {
                 .setAttribute(NAME, name)
                 .startSpan();
         this.scopeContext = parent.with(scopeSpan);
+        this.declaredKeys = inherited;
         this.bindings = captureBindings(inherited);
+        OPEN_SCOPES.get().addLast(this);
     }
 
     /**
@@ -144,10 +189,16 @@ public final class TaskScope implements AutoCloseable {
     /**
      * Forks a subtask on a new virtual thread. If the scope is already cancelled, the subtask is not
      * started and stays {@link Subtask.State#UNAVAILABLE}.
+     *
+     * @throws WrongThreadException        if called by a thread other than the owner
+     * @throws StructureViolationException if a declared {@code ScopedValue} is bound differently than
+     *                                     when the scope was opened
+     * @throws IllegalStateException       if {@link #join()} or {@link #close()} was already called
      */
     public <T> Subtask<T> fork(Callable<? extends T> task) {
         Objects.requireNonNull(task, "task");
         ensureOwner();
+        ensureBindingsUnchanged();
         if (phase != Phase.OPEN) {
             throw new IllegalStateException("scope '" + name + "' has already been " + phase.name().toLowerCase());
         }
@@ -208,9 +259,16 @@ public final class TaskScope implements AutoCloseable {
 
     /**
      * Cancels unfinished subtasks, waits for every subtask thread to end, and ends the scope span.
+     * Closing an already closed scope does nothing.
      *
-     * @throws IllegalStateException after the wait, if subtasks were forked but {@link #join()} was
-     *                               never called
+     * <p>If scopes opened after this one by the owner thread are still open, they are closed first,
+     * innermost first, and a {@link StructureViolationException} is thrown once everything is
+     * closed. Exceptions from closing those inner scopes, and this scope's missing-join
+     * {@link IllegalStateException}, are attached to it as suppressed exceptions.
+     *
+     * @throws StructureViolationException if scopes opened inside this one were still open
+     * @throws IllegalStateException       after the wait, if subtasks were forked but {@link #join()}
+     *                                     was never called
      */
     @Override
     public void close() {
@@ -218,6 +276,44 @@ public final class TaskScope implements AutoCloseable {
         if (phase == Phase.CLOSED) {
             return;
         }
+        List<TaskScope> innerOpen = openScopesInside();
+        if (innerOpen.isEmpty()) {
+            closeWithinStructure();
+            return;
+        }
+        StructureViolationException violation = new StructureViolationException("scope '" + name
+                + "' was closed while " + innerOpen.size() + " scope(s) opened inside it were still open");
+        for (TaskScope inner : innerOpen) {
+            try {
+                inner.closeWithinStructure();
+            } catch (RuntimeException e) {
+                violation.addSuppressed(e);
+            }
+        }
+        try {
+            closeWithinStructure();
+        } catch (RuntimeException e) {
+            violation.addSuppressed(e);
+        }
+        throw violation;
+    }
+
+    /**
+     * Scopes opened on the owner thread after this one and still open, innermost first. An open
+     * scope is always on its owner's stack: the constructor pushes it and only
+     * {@link #closeWithinStructure()} removes it.
+     */
+    private List<TaskScope> openScopesInside() {
+        List<TaskScope> stack = new ArrayList<>(OPEN_SCOPES.get());
+        return List.copyOf(stack.subList(stack.lastIndexOf(this) + 1, stack.size()).reversed());
+    }
+
+    /**
+     * Closes this open scope alone: cancel, await subtask threads, end the span, leave the owner's
+     * open-scope stack. Callers guarantee the scope is not yet closed.
+     */
+    private void closeWithinStructure() {
+        OPEN_SCOPES.get().remove(this);
         boolean joined = phase == Phase.JOINED;
         phase = Phase.CLOSED;
         List<Thread> toAwait;
@@ -290,6 +386,31 @@ public final class TaskScope implements AutoCloseable {
             }
         }
         changed.signalAll();
+    }
+
+    /**
+     * Fails if any declared key is bound differently than when the scope was opened. Identity
+     * comparison mirrors {@code StructuredTaskScope}, which compares binding snapshots.
+     */
+    private void ensureBindingsUnchanged() {
+        for (ScopedValue<?> key : declaredKeys) {
+            Binding<?> captured = capturedBinding(key);
+            boolean boundNow = key.isBound();
+            boolean changed = captured == null ? boundNow : !boundNow || key.get() != captured.value();
+            if (changed) {
+                throw new StructureViolationException("scope '" + name + "': a declared ScopedValue is bound"
+                        + " differently than when the scope was opened; fork only under the bindings in force at open");
+            }
+        }
+    }
+
+    private Binding<?> capturedBinding(ScopedValue<?> key) {
+        for (Binding<?> binding : bindings) {
+            if (binding.key() == key) {
+                return binding;
+            }
+        }
+        return null;
     }
 
     private static List<Binding<?>> captureBindings(List<ScopedValue<?>> keys) {
@@ -509,6 +630,18 @@ public final class TaskScope implements AutoCloseable {
     public static final class FailedException extends RuntimeException {
         public FailedException(Throwable cause) {
             super(cause);
+        }
+    }
+
+    /**
+     * Thrown when a scope is used outside its structure: forking under different {@code ScopedValue}
+     * bindings from those in force at open, or closing a scope while scopes opened inside it are still
+     * open. Mirrors {@code java.util.concurrent.StructureViolationException}, which is itself a preview
+     * API in JDK 27.
+     */
+    public static final class StructureViolationException extends RuntimeException {
+        public StructureViolationException(String message) {
+            super(message);
         }
     }
 

@@ -225,6 +225,9 @@ class TaskScopeTest {
                 }
             });
             subtaskStarted.join();                   // close only once the subtask is running
+            // Interrupt the owner before close() waits, so its first wait is deterministically
+            // interrupted; interrupting from another thread races with the subtask ending.
+            Thread.currentThread().interrupt();
             try {
                 scope.close();                       // cancels, then waits for the subtask
             } catch (IllegalStateException closedWithoutJoin) {
@@ -232,8 +235,7 @@ class TaskScopeTest {
                 interruptRestored.set(Thread.currentThread().isInterrupted());
             }
         });
-        subtaskCancelled.join();
-        owner.interrupt();                           // interrupt the owner while close() waits
+        subtaskCancelled.join();                     // close() has cancelled and is now waiting
         release.complete(null);
         owner.join();
 
