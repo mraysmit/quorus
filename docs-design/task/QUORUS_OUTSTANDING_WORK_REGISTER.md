@@ -628,7 +628,7 @@ plan holds the acceptance criteria; this section lists identity, owner and level
 | **RT-Q3** | Quorus | Decision: Java support policy | ✅ Decided 2026-09-26: follow six-monthly releases |
 | **RT-01a** | Quorus | Java 27 compile and test baseline (root pom, `.java-version`), proven by `JavaPlatformBaselineTest` | ✅ 2026-09-26: red, green and a 2,387-test regression on JDK 27 ([evidence](../evidence/rt-01a-java27-baseline-2026-09-26.json)). Commit together with `RT-01b` |
 | **RT-01b** | Quorus | Java 27 controller and agent images and CI container on Amazon Corretto 27 | ✅ 2026-09-26: single-stage images packaging host-built jars on `amazoncorretto:27.0.0-alpine3.24`; no Java or Maven inside Docker. Red, green and a Docker+slow regression of 2,421 tests with 0 failures and 2 pre-existing skips ([evidence](../evidence/rt-01b-java27-images-2026-09-26.json)). CI change not yet executed |
-| **RT-02** | Quorus | Concurrency conventions, the task-scope abstraction and the post-Vert.x test standard | 🟡 |
+| **RT-02** | Quorus | Concurrency conventions, the task-scope abstraction and the post-Vert.x test standard | 🟨 Slice RT-02a done 2026-09-26: `dev.mars.quorus.concurrent.TaskScope` on final APIs, TDD red and green plus four characterization tests ([evidence](../evidence/rt-02a-task-scope-2026-09-26.json)). Open: RT-02b `ScopedValue` context propagation (design decision needed), conventions document and test standard |
 | **RT-03** | Quorus | `quorus-core` off Vert.x; streaming HTTP adapter closes `ARCH-09` | 🟡 |
 | **RT-04** | Quorus | `quorus-workflow` and `quorus-integration-examples` off Vert.x | 🟠 |
 | **RT-05** | Quorus | `quorus-agent` off Vert.x | 🟡 |

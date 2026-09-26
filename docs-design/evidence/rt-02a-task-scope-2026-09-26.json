@@ -1,0 +1,62 @@
+{
+  "slice": "RT-02a",
+  "title": "Quorus task scope on final APIs (structured concurrency without preview)",
+  "requirement": "ADR-0012 decision RT-Q1; enterprise plan §20 workstream RT item RT-02; register Section J",
+  "acceptance": [
+    "Subtasks run on virtual threads; join() returns after all succeed and results are then available",
+    "The first failure makes join() fail with that failure as cause and cancels sibling subtasks by interruption",
+    "Deadline expiry makes join() fail with a timeout and cancels unfinished subtasks",
+    "close() cancels unfinished subtasks and waits for every subtask thread to end; closing after forking without join is reported",
+    "Only the owner thread may fork or join (WrongThreadException); join happens once; no fork after join"
+  ],
+  "acceptanceWrittenBeforeImplementation": true,
+  "classification": "unit (JDK concurrency boundary)",
+  "baseRevision": "f7005fc",
+  "patch": {"path": "docs-design/evidence/raw/rt-02/rt-02a.patch", "sha256": "2c62012095705d01ab557658d624b9baed396064fbd8571019345772efbf2f79"},
+  "environment": {"jdk": "OpenJDK 27 GA, build 27+35-2325", "maven": "Apache Maven 3.9.11", "os": "Windows 11 Pro N 10.0.26340"},
+  "test": {
+    "file": "quorus-core/src/test/java/dev/mars/quorus/concurrent/TaskScopeTest.java",
+    "synchronisation": "CompletableFuture handshakes and interruption only; no sleeps and no polling; preemptive 10-second timeout per test"
+  },
+  "red": {
+    "command": "mvn -B clean test -pl quorus-core -Dtest=TaskScopeTest -Dsurefire.failIfNoSpecifiedTests=false",
+    "revision": "f7005fc plus a compiling TaskScope skeleton whose operations throw UnsupportedOperationException, and the six behavioural tests",
+    "started": "2026-09-26T13:34:55+01:00",
+    "finished": "2026-09-26T13:35:05+01:00",
+    "expectedFailure": "Every behaviour is missing",
+    "result": "Tests run: 6, Errors: 6, each 'TaskScope.open is not implemented'. Runtime behavioural red, not a compile failure; no fixture or environment error.",
+    "log": {"path": "docs-design/evidence/raw/rt-02/taskscope-red.log", "sha256": "d869db05100a9a3769cc11907e924ecbda19db5d6cf37308490b60c7dab64249"}
+  },
+  "green": {
+    "change": "TaskScope implemented on virtual threads with one lock and condition, first-failure capture, cancellation by flag then interruption under the lock, a deadline in join(), and close() awaiting every subtask thread",
+    "command": "mvn -B clean test -pl quorus-core -Dtest=TaskScopeTest -Dsurefire.failIfNoSpecifiedTests=false",
+    "started": "2026-09-26T13:36:05+01:00",
+    "finished": "2026-09-26T13:36:15+01:00",
+    "result": "Tests run: 6, Failures: 0, Errors: 0",
+    "log": {"path": "docs-design/evidence/raw/rt-02/taskscope-green.log", "sha256": "c2dd1abcf03e5acde0d3bce5dd5c692cbee9c1a2675b2ae659d47e2433e30f42"}
+  },
+  "refactor": "None",
+  "regression": [
+    {"command": "mvn -B clean verify -pl quorus-core", "result": "1,525 tests, 0 failures; JaCoCo gate met", "log": {"path": "docs-design/evidence/raw/rt-02/core-verify.log", "sha256": "bc39269efc7c4f5e496702c07294f8906d3b6c1d0f74eebaac396609fad56d6c"}},
+    {"command": "30 x mvn -B -q surefire:test -pl quorus-core -Dtest=TaskScopeTest", "result": "30 passed, 0 failed", "log": {"path": "docs-design/evidence/raw/rt-02/taskscope-repeat.log", "sha256": "9d8edd4224d91786963852aaa6e8e23b57827dc634fef8bcfa35e34294c7de86"}}
+  ],
+  "processDeviation": {
+    "description": "Coverage after green showed behaviour implemented without a preceding failing test: argument validation in open(), owner interruption during join(), fork after cancellation, and repeated close(). Four tests were then added and are classified as retrospective characterization under plan §6.1, not as TDD evidence.",
+    "characterizationTests": [
+      "openRejectsMissingNameAndNonPositiveTimeout",
+      "ownerInterruptedDuringJoinCancelsSubtasksAndPropagatesTheInterrupt",
+      "forkAfterCancellationReturnsAnUnstartedSubtask",
+      "closingTwiceIsHarmless"
+    ],
+    "verification": [
+      {"command": "mvn -B clean verify -pl quorus-core", "started": "2026-09-26T13:42:09+01:00", "result": "1,529 tests, 0 failures; JaCoCo gate met; TaskScope 81/85 lines and 36/38 branches, SubtaskImpl 33/35 lines and 7/10 branches", "log": {"path": "docs-design/evidence/raw/rt-02/characterization-core-verify.log", "sha256": "7e88e7f1b2ac705f4bfbf9b6a7ee0e984b2d5a18e16b38084d1ea2e6bf310532"}},
+      {"command": "30 x mvn -B -q surefire:test -pl quorus-core -Dtest=TaskScopeTest (10 tests)", "result": "30 passed, 0 failed", "log": {"path": "docs-design/evidence/raw/rt-02/characterization-repeat.log", "sha256": "07932f7a10246f628b77e9c86c925b35608aa491ab423e7d51e2aaa3aafcad66"}}
+    ]
+  },
+  "limitations": [
+    "ScopedValue bindings of the owner are not inherited by subtasks, unlike StructuredTaskScope. Context propagation (RT-02b) needs a design decision.",
+    "No production code uses TaskScope yet; the first consumer arrives with RT-03.",
+    "Uncovered: the owner being interrupted while close() waits, and the IllegalStateException paths of Subtask.get() and Subtask.exception() on unfinished subtasks."
+  ],
+  "sensitiveDataCheck": "Logs contain Maven and test output only; no request bodies, credentials, keys or sensitive payloads."
+}
