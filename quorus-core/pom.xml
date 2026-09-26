@@ -29,12 +29,6 @@
             <artifactId>vertx-web-client</artifactId>
         </dependency>
 
-        <!-- Vert.x PostgreSQL Client (Phase 4 - Jan 2026) -->
-        <dependency>
-            <groupId>io.vertx</groupId>
-            <artifactId>vertx-pg-client</artifactId>
-        </dependency>
-
         <!-- OpenTelemetry API (Phase 8 - Jan 2026) -->
         <dependency>
             <groupId>io.opentelemetry</groupId>
