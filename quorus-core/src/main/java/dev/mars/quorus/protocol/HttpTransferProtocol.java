@@ -79,9 +79,6 @@ import static dev.mars.quorus.core.exceptions.QuorusErrorCode.QUORUS_1206;
 import static dev.mars.quorus.core.exceptions.QuorusErrorCode.QUORUS_1208;
 import static dev.mars.quorus.core.exceptions.QuorusErrorCode.QUORUS_1209;
 import static dev.mars.quorus.core.exceptions.QuorusErrorCode.QUORUS_1211;
-import static dev.mars.quorus.core.exceptions.QuorusErrorCode.QUORUS_1213;
-import static dev.mars.quorus.core.exceptions.QuorusErrorCode.QUORUS_1214;
-import static dev.mars.quorus.core.exceptions.QuorusErrorCode.QUORUS_1215;
 import static dev.mars.quorus.core.exceptions.QuorusErrorCode.QUORUS_1216;
 
 /**
@@ -165,22 +162,20 @@ public class HttpTransferProtocol implements TransferProtocol {
         return "http";
     }
 
+    /**
+     * Handles downloads from an {@code http}/{@code https} source and uploads to an {@code http}/{@code https}
+     * destination. {@link TransferRequest} guarantees non-null URIs and refuses remote-to-remote requests,
+     * so the direction is always one of the two.
+     */
     @Override
     public boolean canHandle(TransferRequest request) {
-        if (request == null || request.getSourceUri() == null) {
-            logger.debug("canHandle: request or sourceUri is null");
+        if (request == null) {
             return false;
         }
-        TransferDirection direction = request.getDirection();
-        if (direction == TransferDirection.DOWNLOAD) {
-            return isHttp(request.getSourceUri());
-        }
-        if (direction == TransferDirection.UPLOAD) {
-            URI destinationUri = request.getDestinationUri();
-            return destinationUri != null && isHttp(destinationUri);
-        }
-        logger.debug("canHandle: unsupported direction={}", direction);
-        return false;
+        URI remote = request.getDirection() == TransferDirection.UPLOAD
+                ? request.getDestinationUri()
+                : request.getSourceUri();
+        return isHttp(remote);
     }
 
     /**
@@ -254,6 +249,8 @@ public class HttpTransferProtocol implements TransferProtocol {
             String checksum = execute(client, get, context, response -> {
                 requireStatus(response, context, 200);
                 HttpEntity entity = response.getEntity();
+                // HttpClient 5 supplies an entity for every 200 response to GET, including an empty
+                // body (see the zero-byte test); this guard only protects against a library change.
                 if (entity == null) {
                     logger.error("[{}] HTTP download failed: empty response body", QUORUS_1204.code());
                     throw new TransferException(context.getJobId(), "Empty response body");
@@ -378,28 +375,41 @@ public class HttpTransferProtocol implements TransferProtocol {
      */
     private static DnsResolver approvedAddressResolver(RuntimeCredential credential, URI target) {
         List<String> approved = credential.approvedResolvedAddresses();
-        if (approved.isEmpty()) {
-            return SystemDefaultDnsResolver.INSTANCE;
-        }
-        String serviceHost = target.getHost();
-        return new DnsResolver() {
-            @Override
-            public InetAddress[] resolve(String host) throws UnknownHostException {
-                if (!serviceHost.equalsIgnoreCase(host)) {
-                    throw new UnknownHostException("host is not the governed service endpoint: " + host);
-                }
-                InetAddress[] addresses = new InetAddress[approved.size()];
-                for (int i = 0; i < addresses.length; i++) {
-                    addresses[i] = InetAddress.ofLiteral(approved.get(i));
-                }
-                return addresses;
-            }
+        return approved.isEmpty()
+                ? SystemDefaultDnsResolver.INSTANCE
+                : new ApprovedAddressResolver(target.getHost(), approved);
+    }
 
-            @Override
-            public String resolveCanonicalHostname(String host) {
-                return host;
+    /**
+     * DNS resolver for a governed transfer: the service hostname resolves only to the agent-approved
+     * addresses, and no other hostname resolves at all. Nothing is looked up in DNS.
+     */
+    static final class ApprovedAddressResolver implements DnsResolver {
+        private final String serviceHost;
+        private final List<String> approvedAddresses;
+
+        ApprovedAddressResolver(String serviceHost, List<String> approvedAddresses) {
+            this.serviceHost = serviceHost;
+            this.approvedAddresses = List.copyOf(approvedAddresses);
+        }
+
+        @Override
+        public InetAddress[] resolve(String host) throws UnknownHostException {
+            if (!serviceHost.equalsIgnoreCase(host)) {
+                throw new UnknownHostException("host is not the governed service endpoint: " + host);
             }
-        };
+            InetAddress[] addresses = new InetAddress[approvedAddresses.size()];
+            for (int i = 0; i < addresses.length; i++) {
+                addresses[i] = InetAddress.ofLiteral(approvedAddresses.get(i));
+            }
+            return addresses;
+        }
+
+        /** Canonical-name lookups are never performed; the name is returned unchanged. */
+        @Override
+        public String resolveCanonicalHostname(String host) {
+            return host;
+        }
     }
 
     private static void applyAuthorization(ClassicHttpRequest request, RuntimeCredential credential) {
@@ -543,20 +553,8 @@ public class HttpTransferProtocol implements TransferProtocol {
 
     // ------------------------------------------------------------------ validation
 
+    /** The builder of {@link TransferRequest} already rejects missing URIs; only the scheme can be wrong here. */
     private void validateRequest(TransferRequest request) throws TransferException {
-        if (request.getSourceUri() == null) {
-            logger.error("[{}] HTTP validation: source URI is null", QUORUS_1213.code());
-            throw new TransferException(request.getRequestId(), "Source URI cannot be null");
-        }
-        TransferDirection direction = request.getDirection();
-        if (direction == TransferDirection.DOWNLOAD && request.getDestinationPath() == null) {
-            logger.error("[{}] HTTP validation: destination path is null for download", QUORUS_1214.code());
-            throw new TransferException(request.getRequestId(), "Destination path cannot be null for download");
-        }
-        if (direction == TransferDirection.UPLOAD && request.getDestinationUri() == null) {
-            logger.error("[{}] HTTP validation: destination URI is null for upload", QUORUS_1215.code());
-            throw new TransferException(request.getRequestId(), "Destination URI cannot be null for upload");
-        }
         if (!canHandle(request)) {
             logger.error("[{}] HTTP validation: protocol cannot handle this request", QUORUS_1216.code());
             throw new TransferException(request.getRequestId(), "HTTP protocol cannot handle this request");
