@@ -12,8 +12,8 @@
 > **Archived 2026-09-26.** Every handover finding is fixed or carried into the
 > [Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER.md), and the dated status
 > layers below are historical. §2.1 and §8 remain the most complete description of the
-> configuration contract until the generated configuration reference (task `DR-D1` in the
-> [documentation review task list](../task/QUORUS_DOCUMENTATION_REVIEW_TASKS.md)) replaces them.
+> configuration contract until the generated configuration reference (task `DR-D1` in
+> [register Section H](../task/QUORUS_OUTSTANDING_WORK_REGISTER.md#11-section-h--documentation-remediation)) replaces them.
 > Some cited commit IDs were rewritten; see the
 > [commit history rewrite map](../reference/QUORUS_COMMIT_HISTORY_REWRITE_MAP.md).
 

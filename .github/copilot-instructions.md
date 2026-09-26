@@ -3,6 +3,12 @@
 ## Project Overview
 Quorus is an enterprise-grade distributed file transfer system built with **Java 25** and **Vert.x 5.0.8**. It uses a **controller-first architecture** with Raft consensus for distributed state management.
 
+**Direction of travel (accepted 2026-09-26; see plan §20):**
+- Quorus will consume consensus through the generic QRaft engine (`../qraft`), not through its own `RaftNode` or a direct `raftlog-core` dependency ([ADR-0011](../docs-design/architecture-decisions/ADR-0011-CONSENSUS-VIA-QRAFT-GENERIC-ENGINE.md)). The Quorus–QRaft interface must stay 100% generic: never add a Quorus concept (transfer, job, agent, tenant, route, role, HTTP resource) to QRaft.
+- Quorus will leave Vert.x for Java 27 virtual threads, `ScopedValue` and structured concurrency ([ADR-0012](../docs-design/architecture-decisions/ADR-0012-JAVA-RUNTIME-AND-STRUCTURED-CONCURRENCY.md)). `StructuredTaskScope` is still a preview API in JDK 27. Never compile with `--enable-preview`: write structured code against the Quorus task-scope abstraction (`RT-02`), which moves to `StructuredTaskScope` once it is final. The controller HTTP server will be the JDK `HttpsServer`, and Quorus follows each six-monthly Java release.
+
+The conventions below describe the current Vert.x code. Follow them for existing modules until their `RT` migration item lands. Do not add new Vert.x coupling where a JDK-typed interface would do.
+
 ## Architecture (Controller-First Pattern)
 
 ```
@@ -86,12 +92,23 @@ mvn test jacoco:report
 ```
 
 ### Docker testing
+
+**Images package host-built jars only. Never compile Java or run Maven inside a Docker image.** Do not add builder stages, Maven installs, `m2cache` build contexts or dependency-download layers. Dockerfiles are single-stage: `FROM amazoncorretto:27.0.0-alpine3.24` plus `COPY <module>/target/<jar>`. `.dockerignore` admits only those jars.
+
+Docker-tagged tests run in Maven's `test` phase, before `package`, so build the jars first and do not `clean` in the same command:
+
 ```powershell
+# Build the controller and agent jars on the host (clean package, Java 27)
+./docker/build-runtime.ps1
+
 # Start the clearly labelled insecure development topology
-docker compose -f docker/compose/docker-compose-single-controller.yml up -d
+docker compose -f docker/compose/docker-compose-single-controller.yml up -d --build
 
 # Start the generated-certificate mTLS example
 docker compose -f docker/compose/docker-compose-tls-example.yml up -d --build
+
+# Docker and slow test groups (after build-runtime; no clean)
+mvn verify '-Dtest.excludedGroups='
 
 # Validate Raft consensus
 ./scripts/prove-metadata-persistence.ps1
@@ -163,7 +180,7 @@ spec:
 Variable substitution uses `{{variable}}` syntax. Parser: `YamlWorkflowDefinitionParser`.
 
 ## Raft Consensus (quorus-controller)
-- Storage uses only the external `raftlog-core` library through `RaftLogStorageAdapter`. Do not add internal WAL, RocksDB or memory storage backends. Storage-dependent tests use the real adapter and per-test temporary directories; fault injection wraps real I/O. Quorus's snapshot sidecar is not a WAL.
+- Storage uses only the external `raftlog-core` library through `RaftLogStorageAdapter`; after plan item `CE-10` it is reached only through QRaft. Do not add internal WAL, RocksDB or memory storage backends. Storage-dependent tests use the real adapter and per-test temporary directories; fault injection wraps real I/O. Quorus's snapshot sidecar is not a WAL.
 - `RaftNode` manages state: FOLLOWER → CANDIDATE → LEADER
 - `GrpcRaftTransport` handles inter-node communication
 - `QuorusStateStore` applies committed log entries

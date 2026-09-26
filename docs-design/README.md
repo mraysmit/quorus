@@ -22,14 +22,14 @@ The controlling documents are:
 
 The current phased delivery roadmap is [Quorus Enterprise Implementation Plan](task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md). It sequences the canonical requirements but does not override them.
 
-Outstanding work across every planning document is consolidated in the [Quorus Outstanding Work Register](task/QUORUS_OUTSTANDING_WORK_REGISTER.md). Documentation remediation from the 2026-09-24 review is tracked in the [Documentation Review Task List](task/QUORUS_DOCUMENTATION_REVIEW_TASKS.md); delivery work it identifies is also carried in the plan and register. The alpha plan, Stage 6 security and routes plan, OpenTelemetry plan, sealed-record design and configuration isolation handover are in `archive/`, with their open items carried into the register.
+Outstanding work across every planning document is consolidated in the [Quorus Outstanding Work Register](task/QUORUS_OUTSTANDING_WORK_REGISTER.md). The register is the single task list: it also holds the documentation remediation from the 2026-09-24 review (Section H) and a decision log (§3). The alpha plan, Stage 6 security and routes plan, OpenTelemetry plan, sealed-record design and configuration isolation handover are in `archive/`, with their open items carried into the register.
 
 ## Directory Status
 
 | Directory | Status | How to interpret it |
 |---|---|---|
 | `design/` | Non-normative design material | May combine implemented, superseded, and target-state concepts; canonical specifications take precedence |
-| `task/` | Live planning: the delivery roadmap, the outstanding-work register and the documentation review task list | Completion markers describe the plan at its recorded date, not current production conformance |
+| `task/` | Live planning: the delivery roadmap and the outstanding-work register, which is the single task list | Completion markers describe the plan at its recorded date, not current production conformance |
 | `evidence/` | Dated verification records and JSON manifests | Each record applies to the revision and environment it names |
 | `reviews/` | Point-in-time codebase and documentation reviews | Findings describe the reviewed revision; follow-up status lives in the task list or a status annex |
 | `architecture-decisions/` | Architecture decision records | A decision stands until a later ADR supersedes it |

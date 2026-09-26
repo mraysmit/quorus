@@ -7,7 +7,7 @@
 **Prepared for:** Mark Ray-Smith — Cityline Ltd  
 **Prepared by:** Claude (Cowork), documentation and code cross-check  
 **License:** Apache 2.0  
-**Status:** Point-in-time review. Findings apply to HEAD `216348a` (2026-09-07) plus the uncommitted working tree as observed on 2026-09-24. Remediation progress is tracked in the [documentation review task list](../task/QUORUS_DOCUMENTATION_REVIEW_TASKS.md), not here.  
+**Status:** Point-in-time review. Findings apply to HEAD `216348a` (2026-09-07) plus the uncommitted working tree as observed on 2026-09-24. Remediation progress is tracked in the [Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER.md#11-section-h--documentation-remediation) (Section H, and Section I for code defects), not here.  
 **Scope:** Live documentation. That is `docs/`, `docs-design/` except `archive/`, the root and module READMEs, ADRs, runbooks and repo-meta documents.
 
 ---
