@@ -1,0 +1,1055 @@
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::staticFieldBase has been called by com.google.inject.internal.aop.HiddenClassDefiner (file:/C:/Users/mraysmit/scoop/apps/maven/current/lib/guice-5.1.0-classes.jar)
+WARNING: Please consider reporting this to the maintainers of class com.google.inject.internal.aop.HiddenClassDefiner
+WARNING: sun.misc.Unsafe::staticFieldBase will be removed in a future release
+[INFO] Scanning for projects...
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Build Order:
+[INFO] 
+[INFO] Quorus File Transfer System                                        [pom]
+[INFO] Quorus Core                                                        [jar]
+[INFO] Quorus Workflow Engine                                             [jar]
+[INFO] Quorus Tenant Management                                           [jar]
+[INFO] Quorus Distributed Controller                                      [jar]
+[INFO] 
+[INFO] --------------------------< dev.mars:quorus >---------------------------
+[INFO] Building Quorus File Transfer System 1.0-SNAPSHOT                  [1/5]
+[INFO]   from pom.xml
+[INFO] --------------------------------[ pom ]---------------------------------
+[INFO] 
+[INFO] --- jacoco:0.8.15:prepare-agent (prepare-agent) @ quorus ---
+[INFO] argLine set to -javaagent:C:\\Users\\mraysmit\\.m2\\repository\\org\\jacoco\\org.jacoco.agent\\0.8.15\\org.jacoco.agent-0.8.15-runtime.jar=destfile=C:\\Users\\mraysmit\\dev\\idea-projects\\quorus\\target\\jacoco.exec,excludes=sun/**:jdk/**:java/**:com/sun/**:org/jcp/**
+[INFO] 
+[INFO] --- jacoco:0.8.15:report (report) @ quorus ---
+[INFO] Skipping JaCoCo execution due to missing execution data file.
+[INFO] 
+[INFO] ------------------------< dev.mars:quorus-core >------------------------
+[INFO] Building Quorus Core 1.0-SNAPSHOT                                  [2/5]
+[INFO]   from quorus-core\pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- jacoco:0.8.15:prepare-agent (prepare-agent) @ quorus-core ---
+[INFO] argLine set to -javaagent:C:\\Users\\mraysmit\\.m2\\repository\\org\\jacoco\\org.jacoco.agent\\0.8.15\\org.jacoco.agent-0.8.15-runtime.jar=destfile=C:\\Users\\mraysmit\\dev\\idea-projects\\quorus\\quorus-core\\target\\jacoco.exec,excludes=sun/**:jdk/**:java/**:com/sun/**:org/jcp/**
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ quorus-core ---
+[INFO] Copying 1 resource from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ quorus-core ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ quorus-core ---
+[INFO] Copying 11 resources from src\test\resources to target\test-classes
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ quorus-core ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- surefire:3.2.2:test (default-test) @ quorus-core ---
+[INFO] 
+[INFO] --- jacoco:0.8.15:report (report) @ quorus-core ---
+[INFO] Loading execution data file C:\Users\mraysmit\dev\idea-projects\quorus\quorus-core\target\jacoco.exec
+[INFO] Analyzed bundle 'Quorus Core' with 124 classes
+[INFO] 
+[INFO] ----------------------< dev.mars:quorus-workflow >----------------------
+[INFO] Building Quorus Workflow Engine 1.0-SNAPSHOT                       [3/5]
+[INFO]   from quorus-workflow\pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- jacoco:0.8.15:prepare-agent (prepare-agent) @ quorus-workflow ---
+[INFO] argLine set to -javaagent:C:\\Users\\mraysmit\\.m2\\repository\\org\\jacoco\\org.jacoco.agent\\0.8.15\\org.jacoco.agent-0.8.15-runtime.jar=destfile=C:\\Users\\mraysmit\\dev\\idea-projects\\quorus\\quorus-workflow\\target\\jacoco.exec,excludes=sun/**:jdk/**:java/**:com/sun/**:org/jcp/**
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ quorus-workflow ---
+[INFO] Copying 1 resource from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ quorus-workflow ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ quorus-workflow ---
+[INFO] Copying 2 resources from src\test\resources to target\test-classes
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ quorus-workflow ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- surefire:3.2.2:test (default-test) @ quorus-workflow ---
+[INFO] 
+[INFO] --- jacoco:0.8.15:report (report) @ quorus-workflow ---
+[INFO] Loading execution data file C:\Users\mraysmit\dev\idea-projects\quorus\quorus-workflow\target\jacoco.exec
+[INFO] Analyzed bundle 'Quorus Workflow Engine' with 24 classes
+[INFO] 
+[INFO] -----------------------< dev.mars:quorus-tenant >-----------------------
+[INFO] Building Quorus Tenant Management 1.0-SNAPSHOT                     [4/5]
+[INFO]   from quorus-tenant\pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- jacoco:0.8.15:prepare-agent (prepare-agent) @ quorus-tenant ---
+[INFO] argLine set to -javaagent:C:\\Users\\mraysmit\\.m2\\repository\\org\\jacoco\\org.jacoco.agent\\0.8.15\\org.jacoco.agent-0.8.15-runtime.jar=destfile=C:\\Users\\mraysmit\\dev\\idea-projects\\quorus\\quorus-tenant\\target\\jacoco.exec,excludes=sun/**:jdk/**:java/**:com/sun/**:org/jcp/**
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ quorus-tenant ---
+[INFO] skip non existing resourceDirectory C:\Users\mraysmit\dev\idea-projects\quorus\quorus-tenant\src\main\resources
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ quorus-tenant ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ quorus-tenant ---
+[INFO] Copying 1 resource from src\test\resources to target\test-classes
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ quorus-tenant ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- surefire:3.2.2:test (default-test) @ quorus-tenant ---
+[INFO] 
+[INFO] --- jacoco:0.8.15:report (report) @ quorus-tenant ---
+[INFO] Loading execution data file C:\Users\mraysmit\dev\idea-projects\quorus\quorus-tenant\target\jacoco.exec
+[INFO] Analyzed bundle 'Quorus Tenant Management' with 25 classes
+[INFO] 
+[INFO] ---------------------< dev.mars:quorus-controller >---------------------
+[INFO] Building Quorus Distributed Controller 1.0-SNAPSHOT                [5/5]
+[INFO]   from quorus-controller\pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- jacoco:0.8.15:prepare-agent (prepare-agent) @ quorus-controller ---
+[INFO] argLine set to -javaagent:C:\\Users\\mraysmit\\.m2\\repository\\org\\jacoco\\org.jacoco.agent\\0.8.15\\org.jacoco.agent-0.8.15-runtime.jar=destfile=C:\\Users\\mraysmit\\dev\\idea-projects\\quorus\\quorus-controller\\target\\jacoco.exec,excludes=sun/**:jdk/**:java/**:com/sun/**:org/jcp/**:dev/mars/quorus/controller/raft/grpc/**
+[INFO] 
+[INFO] --- protobuf:4.1.2:generate (default) @ quorus-controller ---
+[WARNING]  Parameter 'binaryMavenPlugins' is deprecated: Users should now use plugins instead. This option will be removed in v5.
+[INFO] Resolving artifact "com.google.protobuf:protoc:exe:windows-x86_64:3.25.5"
+[INFO] Resolving artifact "io.grpc:protoc-gen-grpc-java:exe:windows-x86_64:1.68.1"
+[INFO] Registering "C:\Users\mraysmit\dev\idea-projects\quorus\quorus-controller\target\generated-sources\protobuf" as a Maven main source root for compiler plugins
+[INFO] Registering "C:\Users\mraysmit\dev\idea-projects\quorus\quorus-controller\target\generated-sources\protobuf" as a Maven main source root for compiler plugins
+[INFO] Found 2 proto source files and 0 descriptor files to compile, but all are up-to-date so none will be built this time
+[INFO] NOTHING TO DO: There is nothing to do. If this is unexpected, review the above logs for more details.
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ quorus-controller ---
+[INFO] Copying 3 resources from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ quorus-controller ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ quorus-controller ---
+[INFO] Copying 11 resources from src\test\resources to target\test-classes
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ quorus-controller ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- surefire:3.2.2:test (default-test) @ quorus-controller ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+18:36:52,373 |-INFO in ch.qos.logback.classic.LoggerContext[default] - Found logback-core version 1.5.32
+18:36:52,375 |-INFO in ch.qos.logback.classic.util.ContextInitializer@39083449 - No custom configurators were discovered as a service.
+18:36:52,375 |-INFO in ch.qos.logback.classic.util.ContextInitializer@39083449 - Trying to configure with ch.qos.logback.classic.util.DefaultJoranConfigurator
+18:36:52,376 |-INFO in ch.qos.logback.classic.util.ContextInitializer@39083449 - Constructed configurator of type class ch.qos.logback.classic.util.DefaultJoranConfigurator
+18:36:52,379 |-INFO in ch.qos.logback.classic.LoggerContext[default] - Found resource [logback-test.xml] at [file:/C:/Users/mraysmit/dev/idea-projects/quorus/quorus-controller/target/test-classes/logback-test.xml]
+18:36:52,379 |-WARN in ch.qos.logback.classic.util.DefaultJoranConfigurator@527b7c84 - Resource [logback-test.xml] occurs multiple times on the classpath.
+18:36:52,379 |-WARN in ch.qos.logback.classic.util.DefaultJoranConfigurator@527b7c84 - Resource [logback-test.xml] occurs at [file:/C:/Users/mraysmit/dev/idea-projects/quorus/quorus-core/target/test-classes/logback-test.xml]
+18:36:52,379 |-WARN in ch.qos.logback.classic.util.DefaultJoranConfigurator@527b7c84 - Resource [logback-test.xml] occurs at [file:/C:/Users/mraysmit/dev/idea-projects/quorus/quorus-controller/target/test-classes/logback-test.xml]
+18:36:52,538 |-INFO in ch.qos.logback.classic.model.processor.ConfigurationModelHandlerFull - Scan attribute not set or set to unrecognized value.
+18:36:52,555 |-INFO in ch.qos.logback.core.model.processor.ModelInterpretationContext@6915b13a - value "../test-logs/quorus-test-2026-09-05_10-36-47.log" substituted for "../test-logs/quorus-test-${testRunTimestamp}.log"
+18:36:52,558 |-INFO in ch.qos.logback.core.model.processor.AppenderModelHandler - Processing appender named [CONSOLE]
+18:36:52,558 |-INFO in ch.qos.logback.core.model.processor.AppenderModelHandler - About to instantiate appender of type [ch.qos.logback.core.ConsoleAppender]
+18:36:52,578 |-INFO in ch.qos.logback.core.model.processor.ImplicitModelHandler - Assuming default type [ch.qos.logback.classic.encoder.PatternLayoutEncoder] for [encoder] property
+18:36:52,645 |-INFO in ch.qos.logback.core.ConsoleAppender[CONSOLE] - NOTE: Writing to the console can be slow. Try to avoid logging to the 
+18:36:52,645 |-INFO in ch.qos.logback.core.ConsoleAppender[CONSOLE] - console in production environments, especially in high volume systems.
+18:36:52,645 |-INFO in ch.qos.logback.core.ConsoleAppender[CONSOLE] - See also https://logback.qos.ch/codes.html#slowConsole
+18:36:52,647 |-INFO in ch.qos.logback.core.model.processor.AppenderModelHandler - Processing appender named [FILE]
+18:36:52,647 |-INFO in ch.qos.logback.core.model.processor.AppenderModelHandler - About to instantiate appender of type [ch.qos.logback.core.FileAppender]
+18:36:52,649 |-INFO in ch.qos.logback.core.model.processor.ModelInterpretationContext@6915b13a - value "../test-logs/quorus-test-2026-09-05_10-36-47.log" substituted for "../test-logs/quorus-test-${testRunTimestamp}.log"
+18:36:52,651 |-INFO in ch.qos.logback.core.model.processor.ImplicitModelHandler - Assuming default type [ch.qos.logback.classic.encoder.PatternLayoutEncoder] for [encoder] property
+18:36:52,652 |-INFO in ch.qos.logback.core.FileAppender[FILE] - File property is set to [../test-logs/quorus-test-2026-09-05_10-36-47.log]
+18:36:52,656 |-INFO in ch.qos.logback.classic.model.processor.LoggerModelHandler - Setting level of logger [dev.mars.quorus] to DEBUG
+18:36:52,656 |-INFO in ch.qos.logback.classic.model.processor.LoggerModelHandler - Setting level of logger [org.apache] to WARN
+18:36:52,656 |-INFO in ch.qos.logback.classic.model.processor.LoggerModelHandler - Setting level of logger [io.vertx] to WARN
+18:36:52,656 |-INFO in ch.qos.logback.classic.model.processor.LoggerModelHandler - Setting level of logger [io.netty] to WARN
+18:36:52,656 |-INFO in ch.qos.logback.classic.model.processor.LoggerModelHandler - Setting level of logger [io.grpc] to WARN
+18:36:52,656 |-INFO in ch.qos.logback.classic.model.processor.RootLoggerModelHandler - Setting level of ROOT logger to INFO
+18:36:52,656 |-INFO in ch.qos.logback.core.model.processor.AppenderRefModelHandler - Attaching appender named [CONSOLE] to Logger[ROOT]
+18:36:52,657 |-INFO in ch.qos.logback.core.model.processor.AppenderRefModelHandler - Attaching appender named [FILE] to Logger[ROOT]
+18:36:52,657 |-INFO in ch.qos.logback.core.model.processor.DefaultProcessor@2cf8dec4 - End of configuration.
+18:36:52,658 |-INFO in ch.qos.logback.classic.joran.JoranConfigurator@54aa0d6e - Registering current configuration as safe fallback point
+18:36:52,660 |-INFO in ch.qos.logback.classic.util.ContextInitializer@39083449 - ch.qos.logback.classic.util.DefaultJoranConfigurator.configure() call lasted 282 milliseconds. ExecutionStatus=DO_NOT_INVOKE_NEXT_IF_ANY
+
+[INFO] Running dev.mars.quorus.controller.http.ControllerDnsBoundaryTest
+18:36:53.582 [ForkJoinPool-1-worker-1] DEBUG d.m.q.c.state.QuorusStateStore - Initializing default metadata: version=2.0
+18:36:53.637 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode - Starting Raft node: dns-166634255409500
+18:36:53.638 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/0] - No storage configured, running in volatile mode
+18:36:53.639 [vert.x-eventloop-thread-0] INFO  d.m.q.c.r.InMemoryTransportSimulator [FOLLOWER/0] - Started in-memory transport for node: dns-166634255409500
+18:36:53.650 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/0] - Raft node dns-166634255409500 started successfully (term=0, logSize=1)
+18:36:54.137 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/0] - Starting election for node: dns-166634255409500
+18:36:54.137 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [CANDIDATE/1] - Persisting raft metadata: term=1, votedForPresent=true, votedFor=dns-166634255409500
+18:36:54.139 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Node dns-166634255409500 became LEADER for term 1
+18:36:54.145 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Command submitted at index 1 term 1
+18:36:54.145 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [LEADER/1] - Committed leader no-op entry for term 1
+18:36:54.194 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Command submitted at index 2 term 1
+18:36:54.194 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Applying command: type=Set
+18:36:54.222 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Processing system metadata command: key=phase4.v2.secret-reference.tenant:secret, type=Set
+18:36:54.224 [vert.x-eventloop-thread-0] INFO  d.m.q.c.state.QuorusStateStore [LEADER/1] - Set system metadata: key=phase4.v2.secret-reference.tenant:secret, valuePresent=true, replaced=false
+18:36:54.225 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Command applied successfully: type=Set, result=Success
+18:36:54.250 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Command submitted at index 3 term 1
+18:36:54.250 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Applying command: type=Set
+18:36:54.257 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Processing system metadata command: key=phase4.v2.service-connection.tenant:connection, type=Set
+18:36:54.257 [vert.x-eventloop-thread-0] INFO  d.m.q.c.state.QuorusStateStore [LEADER/1] - Set system metadata: key=phase4.v2.service-connection.tenant:connection, valuePresent=true, replaced=false
+18:36:54.257 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Command applied successfully: type=Set, result=Success
+18:36:54.916 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Command submitted at index 4 term 1
+18:36:54.917 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Applying command: type=Set
+18:36:54.919 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Processing system metadata command: key=phase4.v2.security-event.tenant:1788604614913.0e2bd089-faeb-4cd2-9cf8-8705027b9ae2, type=Set
+18:36:54.919 [vert.x-eventloop-thread-0] INFO  d.m.q.c.state.QuorusStateStore [LEADER/1] - Set system metadata: key=phase4.v2.security-event.tenant:1788604614913.0e2bd089-faeb-4cd2-9cf8-8705027b9ae2, valuePresent=true, replaced=false
+18:36:54.919 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Command applied successfully: type=Set, result=Success
+18:36:54.960 [vert.x-eventloop-thread-0] INFO  d.m.q.c.r.InMemoryTransportSimulator [LEADER/1] - Stopped in-memory transport for node: dns-166634255409500
+18:36:54.961 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Raft node stopped: dns-166634255409500
+18:36:55.040 [ForkJoinPool-1-worker-1] DEBUG d.m.q.c.state.QuorusStateStore - Initializing default metadata: version=2.0
+18:36:55.041 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode - Starting Raft node: dns-166635684021700
+18:36:55.042 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/0] - No storage configured, running in volatile mode
+18:36:55.042 [vert.x-eventloop-thread-0] INFO  d.m.q.c.r.InMemoryTransportSimulator [FOLLOWER/0] - Started in-memory transport for node: dns-166635684021700
+18:36:55.042 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/0] - Raft node dns-166635684021700 started successfully (term=0, logSize=1)
+18:36:55.541 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/0] - Starting election for node: dns-166635684021700
+18:36:55.542 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [CANDIDATE/1] - Persisting raft metadata: term=1, votedForPresent=true, votedFor=dns-166635684021700
+18:36:55.542 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Node dns-166635684021700 became LEADER for term 1
+18:36:55.543 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Command submitted at index 1 term 1
+18:36:55.543 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [LEADER/1] - Committed leader no-op entry for term 1
+18:36:55.543 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Command submitted at index 2 term 1
+18:36:55.543 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Applying command: type=Set
+18:36:55.544 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Processing system metadata command: key=phase4.v2.secret-reference.tenant:secret, type=Set
+18:36:55.544 [vert.x-eventloop-thread-0] INFO  d.m.q.c.state.QuorusStateStore [LEADER/1] - Set system metadata: key=phase4.v2.secret-reference.tenant:secret, valuePresent=true, replaced=false
+18:36:55.544 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Command applied successfully: type=Set, result=Success
+18:36:55.545 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Command submitted at index 3 term 1
+18:36:55.546 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Applying command: type=Set
+18:36:55.547 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Processing system metadata command: key=phase4.v2.service-connection.tenant:connection, type=Set
+18:36:55.547 [vert.x-eventloop-thread-0] INFO  d.m.q.c.state.QuorusStateStore [LEADER/1] - Set system metadata: key=phase4.v2.service-connection.tenant:connection, valuePresent=true, replaced=false
+18:36:55.548 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Command applied successfully: type=Set, result=Success
+18:36:55.654 [vert.x-eventloop-thread-0] INFO  d.m.q.c.h.handlers.TransferHandler [LEADER/1] - Creating transfer job: jobId=d651aaf5-f612-4ac5-abe5-56793ddf3410, tenantId=tenant
+18:36:55.656 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Command submitted at index 4 term 1
+18:36:55.657 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Applying command: type=Create
+18:36:55.661 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Creating transfer job: jobId=d651aaf5-f612-4ac5-abe5-56793ddf3410, sourceUri=sftp://dns.example.test/approved/file.dat, destPath=file:///C:/Users/mraysmit/dev/idea-projects/quorus/quorus-controller/downloads/dns-test.dat
+18:36:55.665 [vert.x-eventloop-thread-0] INFO  d.m.q.c.state.QuorusStateStore [LEADER/1] - Created transfer job: jobId=d651aaf5-f612-4ac5-abe5-56793ddf3410, protocol=http, totalJobs=1
+18:36:55.665 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Command applied successfully: type=Create, result=Success
+18:36:55.665 [vert.x-eventloop-thread-0] INFO  d.m.q.c.h.handlers.TransferHandler [LEADER/1] - Transfer job created: jobId=d651aaf5-f612-4ac5-abe5-56793ddf3410
+18:36:55.667 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Command submitted at index 5 term 1
+18:36:55.667 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Applying command: type=Set
+18:36:55.668 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Processing system metadata command: key=phase4.v2.security-event.tenant:1788604615666.6cde8b40-e659-414c-a53e-2c6e0a6e4a2a, type=Set
+18:36:55.668 [vert.x-eventloop-thread-0] INFO  d.m.q.c.state.QuorusStateStore [LEADER/1] - Set system metadata: key=phase4.v2.security-event.tenant:1788604615666.6cde8b40-e659-414c-a53e-2c6e0a6e4a2a, valuePresent=true, replaced=false
+18:36:55.668 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Command applied successfully: type=Set, result=Success
+18:36:55.674 [vert.x-eventloop-thread-0] INFO  d.m.q.c.r.InMemoryTransportSimulator [LEADER/1] - Stopped in-memory transport for node: dns-166635684021700
+18:36:55.675 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Raft node stopped: dns-166635684021700
+18:36:55.746 [ForkJoinPool-1-worker-1] DEBUG d.m.q.c.state.QuorusStateStore - Initializing default metadata: version=2.0
+18:36:55.748 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode - Starting Raft node: dns-166636390096400
+18:36:55.748 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/0] - No storage configured, running in volatile mode
+18:36:55.748 [vert.x-eventloop-thread-0] INFO  d.m.q.c.r.InMemoryTransportSimulator [FOLLOWER/0] - Started in-memory transport for node: dns-166636390096400
+18:36:55.748 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/0] - Raft node dns-166636390096400 started successfully (term=0, logSize=1)
+18:36:56.236 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/0] - Starting election for node: dns-166636390096400
+18:36:56.236 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [CANDIDATE/1] - Persisting raft metadata: term=1, votedForPresent=true, votedFor=dns-166636390096400
+18:36:56.237 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Node dns-166636390096400 became LEADER for term 1
+18:36:56.237 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Command submitted at index 1 term 1
+18:36:56.238 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [LEADER/1] - Committed leader no-op entry for term 1
+18:36:56.253 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Command submitted at index 2 term 1
+18:36:56.253 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Applying command: type=Set
+18:36:56.253 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Processing system metadata command: key=phase4.v2.secret-reference.tenant:secret, type=Set
+18:36:56.254 [vert.x-eventloop-thread-0] INFO  d.m.q.c.state.QuorusStateStore [LEADER/1] - Set system metadata: key=phase4.v2.secret-reference.tenant:secret, valuePresent=true, replaced=false
+18:36:56.254 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Command applied successfully: type=Set, result=Success
+18:36:56.255 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Command submitted at index 3 term 1
+18:36:56.256 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Applying command: type=Set
+18:36:56.256 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Processing system metadata command: key=phase4.v2.service-connection.tenant:connection, type=Set
+18:36:56.256 [vert.x-eventloop-thread-0] INFO  d.m.q.c.state.QuorusStateStore [LEADER/1] - Set system metadata: key=phase4.v2.service-connection.tenant:connection, valuePresent=true, replaced=false
+18:36:56.256 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Command applied successfully: type=Set, result=Success
+18:36:56.382 [vert.x-eventloop-thread-0] ERROR d.m.q.c.http.GlobalErrorHandler [LEADER/1] - Server error [TIMEOUT] at /api/v1/service-connections/connection/validate: DNS authorization timed out
+18:36:56.382 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.http.GlobalErrorHandler [LEADER/1] - Stack trace for server error [TIMEOUT] at /api/v1/service-connections/connection/validate
+dev.mars.quorus.controller.http.QuorusApiException: DNS authorization timed out
+	at dev.mars.quorus.controller.http.ControllerConnectionAuthorizer.timeout(ControllerConnectionAuthorizer.java:88)
+	at dev.mars.quorus.controller.http.ControllerConnectionAuthorizer.lambda$0(ControllerConnectionAuthorizer.java:45)
+	at io.vertx.core.impl.VertxImpl$InternalTimerHandler.handle(VertxImpl.java:1023)
+	at io.vertx.core.impl.VertxImpl$InternalTimerHandler.handle(VertxImpl.java:990)
+	at io.vertx.core.impl.ContextBase.emit(ContextBase.java:82)
+	at io.vertx.core.internal.ContextInternal.emit(ContextInternal.java:179)
+	at io.vertx.core.impl.VertxImpl$InternalTimerHandler.run(VertxImpl.java:1012)
+	at io.netty.util.concurrent.PromiseTask.runTask(PromiseTask.java:98)
+	at io.netty.util.concurrent.ScheduledFutureTask.run(ScheduledFutureTask.java:160)
+	at io.netty.util.concurrent.AbstractEventExecutor.runTask(AbstractEventExecutor.java:148)
+	at io.netty.util.concurrent.AbstractEventExecutor.safeExecute(AbstractEventExecutor.java:141)
+	at io.netty.util.concurrent.SingleThreadEventExecutor.runAllTasks(SingleThreadEventExecutor.java:535)
+	at io.netty.channel.SingleThreadIoEventLoop.run(SingleThreadIoEventLoop.java:201)
+	at io.netty.util.concurrent.SingleThreadEventExecutor$5.run(SingleThreadEventExecutor.java:1195)
+	at io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74)
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	at java.base/java.lang.Thread.run(Thread.java:1474)
+18:36:56.393 [vert.x-eventloop-thread-0] ERROR d.m.q.c.http.GlobalErrorHandler [LEADER/1] - Server error [SERVICE_UNAVAILABLE] at /api/v1/transfers: DNS authorization capacity is exhausted
+18:36:56.394 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.http.GlobalErrorHandler [LEADER/1] - Stack trace for server error [SERVICE_UNAVAILABLE] at /api/v1/transfers
+dev.mars.quorus.controller.http.QuorusApiException: DNS authorization capacity is exhausted
+	at dev.mars.quorus.controller.http.ControllerConnectionAuthorizer.authorize(ControllerConnectionAuthorizer.java:38)
+	at dev.mars.quorus.controller.http.handlers.TransferHandler.lambda$0(TransferHandler.java:155)
+	at io.vertx.ext.web.impl.RouteState.handleContext(RouteState.java:1344)
+	at io.vertx.ext.web.impl.RoutingContextImplBase.iterateNext(RoutingContextImplBase.java:196)
+	at io.vertx.ext.web.impl.RoutingContextImpl.next(RoutingContextImpl.java:150)
+	at io.vertx.ext.web.handler.impl.BodyHandlerImpl$BHandler.doEnd(BodyHandlerImpl.java:365)
+	at io.vertx.ext.web.handler.impl.BodyHandlerImpl$BHandler.end(BodyHandlerImpl.java:342)
+	at io.vertx.core.internal.ContextInternal.dispatch(ContextInternal.java:249)
+	at io.vertx.core.internal.ContextInternal.dispatch(ContextInternal.java:231)
+	at io.vertx.core.http.impl.HttpEventHandler.handleEnd(HttpEventHandler.java:76)
+	at io.vertx.core.http.impl.Http1xServerRequest.onEnd(Http1xServerRequest.java:593)
+	at io.vertx.core.http.impl.Http1xServerRequest$1.handleMessage(Http1xServerRequest.java:111)
+	at io.vertx.core.internal.concurrent.InboundMessageQueue.test(InboundMessageQueue.java:86)
+	at io.vertx.core.streams.impl.MessagePassingQueue.drain(MessagePassingQueue.java:228)
+	at io.vertx.core.streams.impl.MessagePassingQueue.drain(MessagePassingQueue.java:210)
+	at io.vertx.core.internal.concurrent.InboundMessageQueue.drainInternal(InboundMessageQueue.java:168)
+	at io.vertx.core.internal.concurrent.InboundMessageQueue.drain(InboundMessageQueue.java:145)
+	at io.vertx.core.http.impl.Http1xServerRequest.handleEnd(Http1xServerRequest.java:175)
+	at io.vertx.core.http.impl.Http1xServerRequest.handleEnd(Http1xServerRequest.java:166)
+	at io.vertx.core.http.impl.Http1xServerConnection.onEnd(Http1xServerConnection.java:199)
+	at io.vertx.core.http.impl.Http1xServerConnection.onContent(Http1xServerConnection.java:190)
+	at io.vertx.core.http.impl.Http1xServerConnection.handleOther(Http1xServerConnection.java:175)
+	at io.vertx.core.http.impl.Http1xServerConnection.handleMessage(Http1xServerConnection.java:168)
+	at io.vertx.core.net.impl.VertxConnection.read(VertxConnection.java:247)
+	at io.vertx.core.net.impl.VertxHandler.channelRead(VertxHandler.java:148)
+	at io.netty.channel.AbstractChannelHandlerContext.fireChannelRead(AbstractChannelHandlerContext.java:355)
+	at io.netty.channel.ChannelInboundHandlerAdapter.channelRead(ChannelInboundHandlerAdapter.java:93)
+	at io.netty.handler.codec.http.websocketx.extensions.WebSocketServerExtensionHandler.channelRead(WebSocketServerExtensionHandler.java:84)
+	at io.netty.channel.AbstractChannelHandlerContext.fireChannelRead(AbstractChannelHandlerContext.java:355)
+	at io.netty.handler.codec.ByteToMessageDecoder.fireChannelRead(ByteToMessageDecoder.java:361)
+	at io.netty.handler.codec.ByteToMessageDecoder.channelRead(ByteToMessageDecoder.java:325)
+	at io.netty.channel.AbstractChannelHandlerContext.fireChannelRead(AbstractChannelHandlerContext.java:357)
+	at io.netty.channel.DefaultChannelPipeline$HeadContext.channelRead(DefaultChannelPipeline.java:1429)
+	at io.netty.channel.DefaultChannelPipeline.fireChannelRead(DefaultChannelPipeline.java:918)
+	at io.netty.channel.nio.AbstractNioByteChannel$NioByteUnsafe.read(AbstractNioByteChannel.java:176)
+	at io.netty.channel.nio.AbstractNioChannel$AbstractNioUnsafe.handle(AbstractNioChannel.java:445)
+	at io.netty.channel.nio.NioIoHandler$DefaultNioRegistration.handle(NioIoHandler.java:388)
+	at io.netty.channel.nio.NioIoHandler.processSelectedKey(NioIoHandler.java:596)
+	at io.netty.channel.nio.NioIoHandler.processSelectedKeysPlain(NioIoHandler.java:541)
+	at io.netty.channel.nio.NioIoHandler.processSelectedKeys(NioIoHandler.java:514)
+	at io.netty.channel.nio.NioIoHandler.run(NioIoHandler.java:484)
+	at io.netty.channel.SingleThreadIoEventLoop.runIo(SingleThreadIoEventLoop.java:225)
+	at io.netty.channel.SingleThreadIoEventLoop.run(SingleThreadIoEventLoop.java:196)
+	at io.netty.util.concurrent.SingleThreadEventExecutor$5.run(SingleThreadEventExecutor.java:1195)
+	at io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74)
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	at java.base/java.lang.Thread.run(Thread.java:1474)
+18:36:56.401 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Command submitted at index 4 term 1
+18:36:56.402 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Applying command: type=Set
+18:36:56.402 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Processing system metadata command: key=phase4.v2.security-event.tenant:1788604616401.c3c309fd-900c-4e89-bef8-a3479b03c2b6, type=Set
+18:36:56.403 [vert.x-eventloop-thread-0] INFO  d.m.q.c.state.QuorusStateStore [LEADER/1] - Set system metadata: key=phase4.v2.security-event.tenant:1788604616401.c3c309fd-900c-4e89-bef8-a3479b03c2b6, valuePresent=true, replaced=false
+18:36:56.403 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Command applied successfully: type=Set, result=Success
+18:36:56.406 [vert.x-eventloop-thread-0] INFO  d.m.q.c.r.InMemoryTransportSimulator [LEADER/1] - Stopped in-memory transport for node: dns-166636390096400
+18:36:56.406 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Raft node stopped: dns-166636390096400
+18:36:56.470 [ForkJoinPool-1-worker-1] DEBUG d.m.q.c.state.QuorusStateStore - Initializing default metadata: version=2.0
+18:36:56.471 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode - Starting Raft node: dns-166637113302000
+18:36:56.471 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/0] - No storage configured, running in volatile mode
+18:36:56.471 [vert.x-eventloop-thread-0] INFO  d.m.q.c.r.InMemoryTransportSimulator [FOLLOWER/0] - Started in-memory transport for node: dns-166637113302000
+18:36:56.471 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/0] - Raft node dns-166637113302000 started successfully (term=0, logSize=1)
+18:36:56.783 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/0] - Starting election for node: dns-166637113302000
+18:36:56.783 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [CANDIDATE/1] - Persisting raft metadata: term=1, votedForPresent=true, votedFor=dns-166637113302000
+18:36:56.784 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Node dns-166637113302000 became LEADER for term 1
+18:36:56.784 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Command submitted at index 1 term 1
+18:36:56.784 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [LEADER/1] - Committed leader no-op entry for term 1
+18:36:56.785 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Command submitted at index 2 term 1
+18:36:56.785 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Applying command: type=Set
+18:36:56.785 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Processing system metadata command: key=phase4.v2.secret-reference.tenant:secret, type=Set
+18:36:56.785 [vert.x-eventloop-thread-0] INFO  d.m.q.c.state.QuorusStateStore [LEADER/1] - Set system metadata: key=phase4.v2.secret-reference.tenant:secret, valuePresent=true, replaced=false
+18:36:56.786 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Command applied successfully: type=Set, result=Success
+18:36:56.786 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Command submitted at index 3 term 1
+18:36:56.786 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Applying command: type=Set
+18:36:56.787 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Processing system metadata command: key=phase4.v2.service-connection.tenant:connection, type=Set
+18:36:56.787 [vert.x-eventloop-thread-0] INFO  d.m.q.c.state.QuorusStateStore [LEADER/1] - Set system metadata: key=phase4.v2.service-connection.tenant:connection, valuePresent=true, replaced=false
+18:36:56.787 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Command applied successfully: type=Set, result=Success
+18:36:56.907 [vert.x-eventloop-thread-0] ERROR d.m.q.c.http.GlobalErrorHandler [LEADER/1] - Server error [TIMEOUT] at /api/v1/transfers: DNS authorization timed out
+18:36:56.908 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.http.GlobalErrorHandler [LEADER/1] - Stack trace for server error [TIMEOUT] at /api/v1/transfers
+dev.mars.quorus.controller.http.QuorusApiException: DNS authorization timed out
+	at dev.mars.quorus.controller.http.ControllerConnectionAuthorizer.timeout(ControllerConnectionAuthorizer.java:88)
+	at dev.mars.quorus.controller.http.ControllerConnectionAuthorizer.lambda$0(ControllerConnectionAuthorizer.java:45)
+	at io.vertx.core.impl.VertxImpl$InternalTimerHandler.handle(VertxImpl.java:1023)
+	at io.vertx.core.impl.VertxImpl$InternalTimerHandler.handle(VertxImpl.java:990)
+	at io.vertx.core.impl.ContextBase.emit(ContextBase.java:82)
+	at io.vertx.core.internal.ContextInternal.emit(ContextInternal.java:179)
+	at io.vertx.core.impl.VertxImpl$InternalTimerHandler.run(VertxImpl.java:1012)
+	at io.netty.util.concurrent.PromiseTask.runTask(PromiseTask.java:98)
+	at io.netty.util.concurrent.ScheduledFutureTask.run(ScheduledFutureTask.java:160)
+	at io.netty.util.concurrent.AbstractEventExecutor.runTask(AbstractEventExecutor.java:148)
+	at io.netty.util.concurrent.AbstractEventExecutor.safeExecute(AbstractEventExecutor.java:141)
+	at io.netty.util.concurrent.SingleThreadEventExecutor.runAllTasks(SingleThreadEventExecutor.java:535)
+	at io.netty.channel.SingleThreadIoEventLoop.run(SingleThreadIoEventLoop.java:201)
+	at io.netty.util.concurrent.SingleThreadEventExecutor$5.run(SingleThreadEventExecutor.java:1195)
+	at io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74)
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	at java.base/java.lang.Thread.run(Thread.java:1474)
+18:36:56.916 [vert.x-eventloop-thread-0] ERROR d.m.q.c.http.GlobalErrorHandler [LEADER/1] - Server error [SERVICE_UNAVAILABLE] at /api/v1/service-connections/connection/validate: DNS authorization capacity is exhausted
+18:36:56.916 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.http.GlobalErrorHandler [LEADER/1] - Stack trace for server error [SERVICE_UNAVAILABLE] at /api/v1/service-connections/connection/validate
+dev.mars.quorus.controller.http.QuorusApiException: DNS authorization capacity is exhausted
+	at dev.mars.quorus.controller.http.ControllerConnectionAuthorizer.authorize(ControllerConnectionAuthorizer.java:38)
+	at dev.mars.quorus.controller.http.handlers.ServiceConnectionHandler.lambda$36(ServiceConnectionHandler.java:189)
+	at dev.mars.quorus.controller.http.handlers.ServiceConnectionHandler.execute(ServiceConnectionHandler.java:383)
+	at dev.mars.quorus.controller.http.handlers.ServiceConnectionHandler.lambda$35(ServiceConnectionHandler.java:182)
+	at io.vertx.ext.web.impl.RouteState.handleContext(RouteState.java:1344)
+	at io.vertx.ext.web.impl.RoutingContextImplBase.iterateNext(RoutingContextImplBase.java:196)
+	at io.vertx.ext.web.impl.RoutingContextImpl.next(RoutingContextImpl.java:150)
+	at io.vertx.ext.web.handler.impl.BodyHandlerImpl$BHandler.doEnd(BodyHandlerImpl.java:365)
+	at io.vertx.ext.web.handler.impl.BodyHandlerImpl$BHandler.end(BodyHandlerImpl.java:342)
+	at io.vertx.core.internal.ContextInternal.dispatch(ContextInternal.java:249)
+	at io.vertx.core.internal.ContextInternal.dispatch(ContextInternal.java:231)
+	at io.vertx.core.http.impl.HttpEventHandler.handleEnd(HttpEventHandler.java:76)
+	at io.vertx.core.http.impl.Http1xServerRequest.onEnd(Http1xServerRequest.java:593)
+	at io.vertx.core.http.impl.Http1xServerRequest$1.handleMessage(Http1xServerRequest.java:111)
+	at io.vertx.core.internal.concurrent.InboundMessageQueue.test(InboundMessageQueue.java:86)
+	at io.vertx.core.streams.impl.MessagePassingQueue.drain(MessagePassingQueue.java:228)
+	at io.vertx.core.streams.impl.MessagePassingQueue.drain(MessagePassingQueue.java:210)
+	at io.vertx.core.internal.concurrent.InboundMessageQueue.drainInternal(InboundMessageQueue.java:168)
+	at io.vertx.core.internal.concurrent.InboundMessageQueue.drain(InboundMessageQueue.java:145)
+	at io.vertx.core.http.impl.Http1xServerRequest.handleEnd(Http1xServerRequest.java:175)
+	at io.vertx.core.http.impl.Http1xServerRequest.handleEnd(Http1xServerRequest.java:166)
+	at io.vertx.core.http.impl.Http1xServerConnection.onEnd(Http1xServerConnection.java:199)
+	at io.vertx.core.http.impl.Http1xServerConnection.onContent(Http1xServerConnection.java:190)
+	at io.vertx.core.http.impl.Http1xServerConnection.handleOther(Http1xServerConnection.java:175)
+	at io.vertx.core.http.impl.Http1xServerConnection.handleMessage(Http1xServerConnection.java:168)
+	at io.vertx.core.net.impl.VertxConnection.read(VertxConnection.java:247)
+	at io.vertx.core.net.impl.VertxHandler.channelRead(VertxHandler.java:148)
+	at io.netty.channel.AbstractChannelHandlerContext.fireChannelRead(AbstractChannelHandlerContext.java:355)
+	at io.netty.channel.ChannelInboundHandlerAdapter.channelRead(ChannelInboundHandlerAdapter.java:93)
+	at io.netty.handler.codec.http.websocketx.extensions.WebSocketServerExtensionHandler.channelRead(WebSocketServerExtensionHandler.java:84)
+	at io.netty.channel.AbstractChannelHandlerContext.fireChannelRead(AbstractChannelHandlerContext.java:355)
+	at io.netty.handler.codec.ByteToMessageDecoder.fireChannelRead(ByteToMessageDecoder.java:361)
+	at io.netty.handler.codec.ByteToMessageDecoder.channelRead(ByteToMessageDecoder.java:325)
+	at io.netty.channel.AbstractChannelHandlerContext.fireChannelRead(AbstractChannelHandlerContext.java:357)
+	at io.netty.channel.DefaultChannelPipeline$HeadContext.channelRead(DefaultChannelPipeline.java:1429)
+	at io.netty.channel.DefaultChannelPipeline.fireChannelRead(DefaultChannelPipeline.java:918)
+	at io.netty.channel.nio.AbstractNioByteChannel$NioByteUnsafe.read(AbstractNioByteChannel.java:176)
+	at io.netty.channel.nio.AbstractNioChannel$AbstractNioUnsafe.handle(AbstractNioChannel.java:445)
+	at io.netty.channel.nio.NioIoHandler$DefaultNioRegistration.handle(NioIoHandler.java:388)
+	at io.netty.channel.nio.NioIoHandler.processSelectedKey(NioIoHandler.java:596)
+	at io.netty.channel.nio.NioIoHandler.processSelectedKeysPlain(NioIoHandler.java:541)
+	at io.netty.channel.nio.NioIoHandler.processSelectedKeys(NioIoHandler.java:514)
+	at io.netty.channel.nio.NioIoHandler.run(NioIoHandler.java:484)
+	at io.netty.channel.SingleThreadIoEventLoop.runIo(SingleThreadIoEventLoop.java:225)
+	at io.netty.channel.SingleThreadIoEventLoop.run(SingleThreadIoEventLoop.java:196)
+	at io.netty.util.concurrent.SingleThreadEventExecutor$5.run(SingleThreadEventExecutor.java:1195)
+	at io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74)
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	at java.base/java.lang.Thread.run(Thread.java:1474)
+18:36:56.922 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Command submitted at index 4 term 1
+18:36:56.922 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Applying command: type=Set
+18:36:56.923 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Processing system metadata command: key=phase4.v2.security-event.tenant:1788604616922.bd50dc71-cbb4-4c09-92b2-da283137dcce, type=Set
+18:36:56.923 [vert.x-eventloop-thread-0] INFO  d.m.q.c.state.QuorusStateStore [LEADER/1] - Set system metadata: key=phase4.v2.security-event.tenant:1788604616922.bd50dc71-cbb4-4c09-92b2-da283137dcce, valuePresent=true, replaced=false
+18:36:56.923 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Command applied successfully: type=Set, result=Success
+18:36:56.927 [vert.x-eventloop-thread-0] INFO  d.m.q.c.r.InMemoryTransportSimulator [LEADER/1] - Stopped in-memory transport for node: dns-166637113302000
+18:36:56.928 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Raft node stopped: dns-166637113302000
+18:36:56.994 [ForkJoinPool-1-worker-1] DEBUG d.m.q.c.state.QuorusStateStore - Initializing default metadata: version=2.0
+18:36:56.995 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode - Starting Raft node: dns-166637637663200
+18:36:56.996 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/0] - No storage configured, running in volatile mode
+18:36:56.996 [vert.x-eventloop-thread-0] INFO  d.m.q.c.r.InMemoryTransportSimulator [FOLLOWER/0] - Started in-memory transport for node: dns-166637637663200
+18:36:56.996 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/0] - Raft node dns-166637637663200 started successfully (term=0, logSize=1)
+18:36:57.324 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/0] - Starting election for node: dns-166637637663200
+18:36:57.324 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [CANDIDATE/1] - Persisting raft metadata: term=1, votedForPresent=true, votedFor=dns-166637637663200
+18:36:57.326 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Node dns-166637637663200 became LEADER for term 1
+18:36:57.326 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Command submitted at index 1 term 1
+18:36:57.326 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [LEADER/1] - Committed leader no-op entry for term 1
+18:36:57.340 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Command submitted at index 2 term 1
+18:36:57.340 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Applying command: type=Set
+18:36:57.341 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Processing system metadata command: key=phase4.v2.secret-reference.tenant:secret, type=Set
+18:36:57.341 [vert.x-eventloop-thread-0] INFO  d.m.q.c.state.QuorusStateStore [LEADER/1] - Set system metadata: key=phase4.v2.secret-reference.tenant:secret, valuePresent=true, replaced=false
+18:36:57.341 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Command applied successfully: type=Set, result=Success
+18:36:57.342 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Command submitted at index 3 term 1
+18:36:57.343 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Applying command: type=Set
+18:36:57.343 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Processing system metadata command: key=phase4.v2.service-connection.tenant:connection, type=Set
+18:36:57.343 [vert.x-eventloop-thread-0] INFO  d.m.q.c.state.QuorusStateStore [LEADER/1] - Set system metadata: key=phase4.v2.service-connection.tenant:connection, valuePresent=true, replaced=false
+18:36:57.345 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Command applied successfully: type=Set, result=Success
+18:36:57.356 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Command submitted at index 4 term 1
+18:36:57.357 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Applying command: type=Delete
+18:36:57.357 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Processing system metadata command: key=phase4.v2.service-connection.tenant:connection, type=Delete
+18:36:57.358 [vert.x-eventloop-thread-0] INFO  d.m.q.c.state.QuorusStateStore [LEADER/1] - Deleted system metadata: key=phase4.v2.service-connection.tenant:connection, valueRemoved=true
+18:36:57.358 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Command applied successfully: type=Delete, result=Success
+18:36:57.359 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Command submitted at index 5 term 1
+18:36:57.359 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Applying command: type=Set
+18:36:57.360 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Processing system metadata command: key=phase4.v2.security-event.tenant:1788604617359.9c968cf8-361c-48be-850c-c3fad00c1780, type=Set
+18:36:57.360 [vert.x-eventloop-thread-0] INFO  d.m.q.c.state.QuorusStateStore [LEADER/1] - Set system metadata: key=phase4.v2.security-event.tenant:1788604617359.9c968cf8-361c-48be-850c-c3fad00c1780, valuePresent=true, replaced=false
+18:36:57.360 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Command applied successfully: type=Set, result=Success
+18:36:57.366 [vert.x-eventloop-thread-0] INFO  d.m.q.c.r.InMemoryTransportSimulator [LEADER/1] - Stopped in-memory transport for node: dns-166637637663200
+18:36:57.366 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Raft node stopped: dns-166637637663200
+18:36:57.436 [ForkJoinPool-1-worker-1] DEBUG d.m.q.c.state.QuorusStateStore - Initializing default metadata: version=2.0
+18:36:57.437 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode - Starting Raft node: dns-166638079836900
+18:36:57.438 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/0] - No storage configured, running in volatile mode
+18:36:57.438 [vert.x-eventloop-thread-0] INFO  d.m.q.c.r.InMemoryTransportSimulator [FOLLOWER/0] - Started in-memory transport for node: dns-166638079836900
+18:36:57.438 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/0] - Raft node dns-166638079836900 started successfully (term=0, logSize=1)
+18:36:57.728 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/0] - Starting election for node: dns-166638079836900
+18:36:57.728 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [CANDIDATE/1] - Persisting raft metadata: term=1, votedForPresent=true, votedFor=dns-166638079836900
+18:36:57.728 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Node dns-166638079836900 became LEADER for term 1
+18:36:57.728 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Command submitted at index 1 term 1
+18:36:57.728 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [LEADER/1] - Committed leader no-op entry for term 1
+18:36:57.729 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Command submitted at index 2 term 1
+18:36:57.729 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Applying command: type=Set
+18:36:57.729 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Processing system metadata command: key=phase4.v2.secret-reference.tenant:secret, type=Set
+18:36:57.729 [vert.x-eventloop-thread-0] INFO  d.m.q.c.state.QuorusStateStore [LEADER/1] - Set system metadata: key=phase4.v2.secret-reference.tenant:secret, valuePresent=true, replaced=false
+18:36:57.729 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Command applied successfully: type=Set, result=Success
+18:36:57.731 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Command submitted at index 3 term 1
+18:36:57.731 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Applying command: type=Set
+18:36:57.732 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Processing system metadata command: key=phase4.v2.service-connection.tenant:connection, type=Set
+18:36:57.732 [vert.x-eventloop-thread-0] INFO  d.m.q.c.state.QuorusStateStore [LEADER/1] - Set system metadata: key=phase4.v2.service-connection.tenant:connection, valuePresent=true, replaced=false
+18:36:57.732 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Command applied successfully: type=Set, result=Success
+18:36:57.742 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Command submitted at index 4 term 1
+18:36:57.742 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Applying command: type=Delete
+18:36:57.743 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Processing system metadata command: key=phase4.v2.service-connection.tenant:connection, type=Delete
+18:36:57.743 [vert.x-eventloop-thread-0] INFO  d.m.q.c.state.QuorusStateStore [LEADER/1] - Deleted system metadata: key=phase4.v2.service-connection.tenant:connection, valueRemoved=true
+18:36:57.743 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Command applied successfully: type=Delete, result=Success
+18:36:57.744 [vert.x-eventloop-thread-0] INFO  d.m.q.c.h.handlers.TransferHandler [LEADER/1] - Creating transfer job: jobId=cb405452-093c-469e-a6e0-a715841ed233, tenantId=tenant
+18:36:57.745 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Command submitted at index 5 term 1
+18:36:57.745 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Applying command: type=Create
+18:36:57.745 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Creating transfer job: jobId=cb405452-093c-469e-a6e0-a715841ed233, sourceUri=sftp://dns.example.test/approved/file.dat, destPath=file:///C:/Users/mraysmit/dev/idea-projects/quorus/quorus-controller/downloads/dns-test.dat
+18:36:57.745 [vert.x-eventloop-thread-0] INFO  d.m.q.c.state.QuorusStateStore [LEADER/1] - Created transfer job: jobId=cb405452-093c-469e-a6e0-a715841ed233, protocol=http, totalJobs=1
+18:36:57.745 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Command applied successfully: type=Create, result=Success
+18:36:57.745 [vert.x-eventloop-thread-0] INFO  d.m.q.c.h.handlers.TransferHandler [LEADER/1] - Transfer job created: jobId=cb405452-093c-469e-a6e0-a715841ed233
+18:36:57.746 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Command submitted at index 6 term 1
+18:36:57.746 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Applying command: type=Set
+18:36:57.746 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Processing system metadata command: key=phase4.v2.security-event.tenant:1788604617745.dcbe913f-e2e9-4a82-ac40-bb41bd036060, type=Set
+18:36:57.746 [vert.x-eventloop-thread-0] INFO  d.m.q.c.state.QuorusStateStore [LEADER/1] - Set system metadata: key=phase4.v2.security-event.tenant:1788604617745.dcbe913f-e2e9-4a82-ac40-bb41bd036060, valuePresent=true, replaced=false
+18:36:57.746 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Command applied successfully: type=Set, result=Success
+18:36:57.749 [vert.x-eventloop-thread-0] INFO  d.m.q.c.r.InMemoryTransportSimulator [LEADER/1] - Stopped in-memory transport for node: dns-166638079836900
+18:36:57.749 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Raft node stopped: dns-166638079836900
+18:36:57.803 [ForkJoinPool-1-worker-1] DEBUG d.m.q.c.state.QuorusStateStore - Initializing default metadata: version=2.0
+18:36:57.804 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode - Starting Raft node: dns-166638446219800
+18:36:57.804 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/0] - No storage configured, running in volatile mode
+18:36:57.804 [vert.x-eventloop-thread-0] INFO  d.m.q.c.r.InMemoryTransportSimulator [FOLLOWER/0] - Started in-memory transport for node: dns-166638446219800
+18:36:57.804 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/0] - Raft node dns-166638446219800 started successfully (term=0, logSize=1)
+18:36:58.274 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/0] - Starting election for node: dns-166638446219800
+18:36:58.275 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [CANDIDATE/1] - Persisting raft metadata: term=1, votedForPresent=true, votedFor=dns-166638446219800
+18:36:58.275 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Node dns-166638446219800 became LEADER for term 1
+18:36:58.275 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Command submitted at index 1 term 1
+18:36:58.276 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [LEADER/1] - Committed leader no-op entry for term 1
+18:36:58.276 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Command submitted at index 2 term 1
+18:36:58.276 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Applying command: type=Set
+18:36:58.277 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Processing system metadata command: key=phase4.v2.secret-reference.tenant:secret, type=Set
+18:36:58.277 [vert.x-eventloop-thread-0] INFO  d.m.q.c.state.QuorusStateStore [LEADER/1] - Set system metadata: key=phase4.v2.secret-reference.tenant:secret, valuePresent=true, replaced=false
+18:36:58.277 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Command applied successfully: type=Set, result=Success
+18:36:58.279 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Command submitted at index 3 term 1
+18:36:58.279 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Applying command: type=Set
+18:36:58.279 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Processing system metadata command: key=phase4.v2.service-connection.tenant:connection, type=Set
+18:36:58.279 [vert.x-eventloop-thread-0] INFO  d.m.q.c.state.QuorusStateStore [LEADER/1] - Set system metadata: key=phase4.v2.service-connection.tenant:connection, valuePresent=true, replaced=false
+18:36:58.279 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Command applied successfully: type=Set, result=Success
+18:36:58.298 [vert.x-eventloop-thread-0] ERROR d.m.q.c.http.GlobalErrorHandler [LEADER/1] - Server error [SERVICE_UNAVAILABLE] at /api/v1/transfers: DNS authorization capacity is exhausted
+18:36:58.299 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.http.GlobalErrorHandler [LEADER/1] - Stack trace for server error [SERVICE_UNAVAILABLE] at /api/v1/transfers
+dev.mars.quorus.controller.http.QuorusApiException: DNS authorization capacity is exhausted
+	at dev.mars.quorus.controller.http.ControllerConnectionAuthorizer.authorize(ControllerConnectionAuthorizer.java:38)
+	at dev.mars.quorus.controller.http.handlers.TransferHandler.lambda$0(TransferHandler.java:155)
+	at io.vertx.ext.web.impl.RouteState.handleContext(RouteState.java:1344)
+	at io.vertx.ext.web.impl.RoutingContextImplBase.iterateNext(RoutingContextImplBase.java:196)
+	at io.vertx.ext.web.impl.RoutingContextImpl.next(RoutingContextImpl.java:150)
+	at io.vertx.ext.web.handler.impl.BodyHandlerImpl$BHandler.doEnd(BodyHandlerImpl.java:365)
+	at io.vertx.ext.web.handler.impl.BodyHandlerImpl$BHandler.end(BodyHandlerImpl.java:342)
+	at io.vertx.core.internal.ContextInternal.dispatch(ContextInternal.java:249)
+	at io.vertx.core.internal.ContextInternal.dispatch(ContextInternal.java:231)
+	at io.vertx.core.http.impl.HttpEventHandler.handleEnd(HttpEventHandler.java:76)
+	at io.vertx.core.http.impl.Http1xServerRequest.onEnd(Http1xServerRequest.java:593)
+	at io.vertx.core.http.impl.Http1xServerRequest$1.handleMessage(Http1xServerRequest.java:111)
+	at io.vertx.core.internal.concurrent.InboundMessageQueue.test(InboundMessageQueue.java:86)
+	at io.vertx.core.streams.impl.MessagePassingQueue.drain(MessagePassingQueue.java:228)
+	at io.vertx.core.streams.impl.MessagePassingQueue.drain(MessagePassingQueue.java:210)
+	at io.vertx.core.internal.concurrent.InboundMessageQueue.drainInternal(InboundMessageQueue.java:168)
+	at io.vertx.core.internal.concurrent.InboundMessageQueue.drain(InboundMessageQueue.java:145)
+	at io.vertx.core.http.impl.Http1xServerRequest.handleEnd(Http1xServerRequest.java:175)
+	at io.vertx.core.http.impl.Http1xServerRequest.handleEnd(Http1xServerRequest.java:166)
+	at io.vertx.core.http.impl.Http1xServerConnection.onEnd(Http1xServerConnection.java:199)
+	at io.vertx.core.http.impl.Http1xServerConnection.onContent(Http1xServerConnection.java:190)
+	at io.vertx.core.http.impl.Http1xServerConnection.handleOther(Http1xServerConnection.java:175)
+	at io.vertx.core.http.impl.Http1xServerConnection.handleMessage(Http1xServerConnection.java:168)
+	at io.vertx.core.net.impl.VertxConnection.read(VertxConnection.java:247)
+	at io.vertx.core.net.impl.VertxHandler.channelRead(VertxHandler.java:148)
+	at io.netty.channel.AbstractChannelHandlerContext.fireChannelRead(AbstractChannelHandlerContext.java:355)
+	at io.netty.channel.ChannelInboundHandlerAdapter.channelRead(ChannelInboundHandlerAdapter.java:93)
+	at io.netty.handler.codec.http.websocketx.extensions.WebSocketServerExtensionHandler.channelRead(WebSocketServerExtensionHandler.java:84)
+	at io.netty.channel.AbstractChannelHandlerContext.fireChannelRead(AbstractChannelHandlerContext.java:355)
+	at io.netty.handler.codec.ByteToMessageDecoder.fireChannelRead(ByteToMessageDecoder.java:361)
+	at io.netty.handler.codec.ByteToMessageDecoder.channelRead(ByteToMessageDecoder.java:325)
+	at io.netty.channel.AbstractChannelHandlerContext.fireChannelRead(AbstractChannelHandlerContext.java:357)
+	at io.netty.channel.DefaultChannelPipeline$HeadContext.channelRead(DefaultChannelPipeline.java:1429)
+	at io.netty.channel.DefaultChannelPipeline.fireChannelRead(DefaultChannelPipeline.java:918)
+	at io.netty.channel.nio.AbstractNioByteChannel$NioByteUnsafe.read(AbstractNioByteChannel.java:176)
+	at io.netty.channel.nio.AbstractNioChannel$AbstractNioUnsafe.handle(AbstractNioChannel.java:445)
+	at io.netty.channel.nio.NioIoHandler$DefaultNioRegistration.handle(NioIoHandler.java:388)
+	at io.netty.channel.nio.NioIoHandler.processSelectedKey(NioIoHandler.java:596)
+	at io.netty.channel.nio.NioIoHandler.processSelectedKeysPlain(NioIoHandler.java:541)
+	at io.netty.channel.nio.NioIoHandler.processSelectedKeys(NioIoHandler.java:514)
+	at io.netty.channel.nio.NioIoHandler.run(NioIoHandler.java:484)
+	at io.netty.channel.SingleThreadIoEventLoop.runIo(SingleThreadIoEventLoop.java:225)
+	at io.netty.channel.SingleThreadIoEventLoop.run(SingleThreadIoEventLoop.java:196)
+	at io.netty.util.concurrent.SingleThreadEventExecutor$5.run(SingleThreadEventExecutor.java:1195)
+	at io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74)
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	at java.base/java.lang.Thread.run(Thread.java:1474)
+18:36:58.301 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Command submitted at index 4 term 1
+18:36:58.302 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Applying command: type=Set
+18:36:58.302 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Processing system metadata command: key=phase4.v2.security-event.tenant:1788604618301.cb016489-127e-4a47-9ea8-8e0006d32d86, type=Set
+18:36:58.302 [vert.x-eventloop-thread-0] INFO  d.m.q.c.state.QuorusStateStore [LEADER/1] - Set system metadata: key=phase4.v2.security-event.tenant:1788604618301.cb016489-127e-4a47-9ea8-8e0006d32d86, valuePresent=true, replaced=false
+18:36:58.302 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Command applied successfully: type=Set, result=Success
+18:36:58.305 [vert.x-eventloop-thread-0] INFO  d.m.q.c.r.InMemoryTransportSimulator [LEADER/1] - Stopped in-memory transport for node: dns-166638446219800
+18:36:58.305 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Raft node stopped: dns-166638446219800
+18:36:58.368 [ForkJoinPool-1-worker-1] DEBUG d.m.q.c.state.QuorusStateStore - Initializing default metadata: version=2.0
+18:36:58.370 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode - Starting Raft node: dns-166639011999600
+18:36:58.370 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/0] - No storage configured, running in volatile mode
+18:36:58.370 [vert.x-eventloop-thread-0] INFO  d.m.q.c.r.InMemoryTransportSimulator [FOLLOWER/0] - Started in-memory transport for node: dns-166639011999600
+18:36:58.370 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/0] - Raft node dns-166639011999600 started successfully (term=0, logSize=1)
+18:36:58.771 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/0] - Starting election for node: dns-166639011999600
+18:36:58.772 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [CANDIDATE/1] - Persisting raft metadata: term=1, votedForPresent=true, votedFor=dns-166639011999600
+18:36:58.772 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Node dns-166639011999600 became LEADER for term 1
+18:36:58.773 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Command submitted at index 1 term 1
+18:36:58.773 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [LEADER/1] - Committed leader no-op entry for term 1
+18:36:58.773 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Command submitted at index 2 term 1
+18:36:58.774 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Applying command: type=Set
+18:36:58.774 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Processing system metadata command: key=phase4.v2.secret-reference.tenant:secret, type=Set
+18:36:58.774 [vert.x-eventloop-thread-0] INFO  d.m.q.c.state.QuorusStateStore [LEADER/1] - Set system metadata: key=phase4.v2.secret-reference.tenant:secret, valuePresent=true, replaced=false
+18:36:58.774 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Command applied successfully: type=Set, result=Success
+18:36:58.775 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Command submitted at index 3 term 1
+18:36:58.775 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Applying command: type=Set
+18:36:58.776 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Processing system metadata command: key=phase4.v2.service-connection.tenant:connection, type=Set
+18:36:58.777 [vert.x-eventloop-thread-0] INFO  d.m.q.c.state.QuorusStateStore [LEADER/1] - Set system metadata: key=phase4.v2.service-connection.tenant:connection, valuePresent=true, replaced=false
+18:36:58.777 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Command applied successfully: type=Set, result=Success
+18:36:58.796 [vert.x-eventloop-thread-0] ERROR d.m.q.c.http.GlobalErrorHandler [LEADER/1] - Server error [SERVICE_UNAVAILABLE] at /api/v1/service-connections/connection/validate: DNS authorization capacity is exhausted
+18:36:58.797 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.http.GlobalErrorHandler [LEADER/1] - Stack trace for server error [SERVICE_UNAVAILABLE] at /api/v1/service-connections/connection/validate
+dev.mars.quorus.controller.http.QuorusApiException: DNS authorization capacity is exhausted
+	at dev.mars.quorus.controller.http.ControllerConnectionAuthorizer.authorize(ControllerConnectionAuthorizer.java:38)
+	at dev.mars.quorus.controller.http.handlers.ServiceConnectionHandler.lambda$36(ServiceConnectionHandler.java:189)
+	at dev.mars.quorus.controller.http.handlers.ServiceConnectionHandler.execute(ServiceConnectionHandler.java:383)
+	at dev.mars.quorus.controller.http.handlers.ServiceConnectionHandler.lambda$35(ServiceConnectionHandler.java:182)
+	at io.vertx.ext.web.impl.RouteState.handleContext(RouteState.java:1344)
+	at io.vertx.ext.web.impl.RoutingContextImplBase.iterateNext(RoutingContextImplBase.java:196)
+	at io.vertx.ext.web.impl.RoutingContextImpl.next(RoutingContextImpl.java:150)
+	at io.vertx.ext.web.handler.impl.BodyHandlerImpl$BHandler.doEnd(BodyHandlerImpl.java:365)
+	at io.vertx.ext.web.handler.impl.BodyHandlerImpl$BHandler.end(BodyHandlerImpl.java:342)
+	at io.vertx.core.internal.ContextInternal.dispatch(ContextInternal.java:249)
+	at io.vertx.core.internal.ContextInternal.dispatch(ContextInternal.java:231)
+	at io.vertx.core.http.impl.HttpEventHandler.handleEnd(HttpEventHandler.java:76)
+	at io.vertx.core.http.impl.Http1xServerRequest.onEnd(Http1xServerRequest.java:593)
+	at io.vertx.core.http.impl.Http1xServerRequest$1.handleMessage(Http1xServerRequest.java:111)
+	at io.vertx.core.internal.concurrent.InboundMessageQueue.test(InboundMessageQueue.java:86)
+	at io.vertx.core.streams.impl.MessagePassingQueue.drain(MessagePassingQueue.java:228)
+	at io.vertx.core.streams.impl.MessagePassingQueue.drain(MessagePassingQueue.java:210)
+	at io.vertx.core.internal.concurrent.InboundMessageQueue.drainInternal(InboundMessageQueue.java:168)
+	at io.vertx.core.internal.concurrent.InboundMessageQueue.drain(InboundMessageQueue.java:145)
+	at io.vertx.core.http.impl.Http1xServerRequest.handleEnd(Http1xServerRequest.java:175)
+	at io.vertx.core.http.impl.Http1xServerRequest.handleEnd(Http1xServerRequest.java:166)
+	at io.vertx.core.http.impl.Http1xServerConnection.onEnd(Http1xServerConnection.java:199)
+	at io.vertx.core.http.impl.Http1xServerConnection.onContent(Http1xServerConnection.java:190)
+	at io.vertx.core.http.impl.Http1xServerConnection.handleOther(Http1xServerConnection.java:175)
+	at io.vertx.core.http.impl.Http1xServerConnection.handleMessage(Http1xServerConnection.java:168)
+	at io.vertx.core.net.impl.VertxConnection.read(VertxConnection.java:247)
+	at io.vertx.core.net.impl.VertxHandler.channelRead(VertxHandler.java:148)
+	at io.netty.channel.AbstractChannelHandlerContext.fireChannelRead(AbstractChannelHandlerContext.java:355)
+	at io.netty.channel.ChannelInboundHandlerAdapter.channelRead(ChannelInboundHandlerAdapter.java:93)
+	at io.netty.handler.codec.http.websocketx.extensions.WebSocketServerExtensionHandler.channelRead(WebSocketServerExtensionHandler.java:84)
+	at io.netty.channel.AbstractChannelHandlerContext.fireChannelRead(AbstractChannelHandlerContext.java:355)
+	at io.netty.handler.codec.ByteToMessageDecoder.fireChannelRead(ByteToMessageDecoder.java:361)
+	at io.netty.handler.codec.ByteToMessageDecoder.channelRead(ByteToMessageDecoder.java:325)
+	at io.netty.channel.AbstractChannelHandlerContext.fireChannelRead(AbstractChannelHandlerContext.java:357)
+	at io.netty.channel.DefaultChannelPipeline$HeadContext.channelRead(DefaultChannelPipeline.java:1429)
+	at io.netty.channel.DefaultChannelPipeline.fireChannelRead(DefaultChannelPipeline.java:918)
+	at io.netty.channel.nio.AbstractNioByteChannel$NioByteUnsafe.read(AbstractNioByteChannel.java:176)
+	at io.netty.channel.nio.AbstractNioChannel$AbstractNioUnsafe.handle(AbstractNioChannel.java:445)
+	at io.netty.channel.nio.NioIoHandler$DefaultNioRegistration.handle(NioIoHandler.java:388)
+	at io.netty.channel.nio.NioIoHandler.processSelectedKey(NioIoHandler.java:596)
+	at io.netty.channel.nio.NioIoHandler.processSelectedKeysPlain(NioIoHandler.java:541)
+	at io.netty.channel.nio.NioIoHandler.processSelectedKeys(NioIoHandler.java:514)
+	at io.netty.channel.nio.NioIoHandler.run(NioIoHandler.java:484)
+	at io.netty.channel.SingleThreadIoEventLoop.runIo(SingleThreadIoEventLoop.java:225)
+	at io.netty.channel.SingleThreadIoEventLoop.run(SingleThreadIoEventLoop.java:196)
+	at io.netty.util.concurrent.SingleThreadEventExecutor$5.run(SingleThreadEventExecutor.java:1195)
+	at io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74)
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	at java.base/java.lang.Thread.run(Thread.java:1474)
+18:36:58.799 [vert.x-eventloop-thread-0] INFO  d.m.q.c.h.handlers.TransferHandler [LEADER/1] - Creating transfer job: jobId=063194fc-3848-4d3f-984b-fabe69c20e33, tenantId=tenant
+18:36:58.800 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Command submitted at index 4 term 1
+18:36:58.800 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Applying command: type=Create
+18:36:58.800 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Creating transfer job: jobId=063194fc-3848-4d3f-984b-fabe69c20e33, sourceUri=sftp://dns.example.test/approved/file.dat, destPath=file:///C:/Users/mraysmit/dev/idea-projects/quorus/quorus-controller/downloads/dns-test.dat
+18:36:58.800 [vert.x-eventloop-thread-0] INFO  d.m.q.c.state.QuorusStateStore [LEADER/1] - Created transfer job: jobId=063194fc-3848-4d3f-984b-fabe69c20e33, protocol=http, totalJobs=1
+18:36:58.800 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Command applied successfully: type=Create, result=Success
+18:36:58.800 [vert.x-eventloop-thread-0] INFO  d.m.q.c.h.handlers.TransferHandler [LEADER/1] - Transfer job created: jobId=063194fc-3848-4d3f-984b-fabe69c20e33
+18:36:58.801 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Command submitted at index 5 term 1
+18:36:58.801 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Applying command: type=Set
+18:36:58.801 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Processing system metadata command: key=phase4.v2.security-event.tenant:1788604618800.e73e6731-db65-4e4e-a17e-96016968da7e, type=Set
+18:36:58.801 [vert.x-eventloop-thread-0] INFO  d.m.q.c.state.QuorusStateStore [LEADER/1] - Set system metadata: key=phase4.v2.security-event.tenant:1788604618800.e73e6731-db65-4e4e-a17e-96016968da7e, valuePresent=true, replaced=false
+18:36:58.802 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Command applied successfully: type=Set, result=Success
+18:36:58.805 [vert.x-eventloop-thread-0] INFO  d.m.q.c.r.InMemoryTransportSimulator [LEADER/1] - Stopped in-memory transport for node: dns-166639011999600
+18:36:58.805 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Raft node stopped: dns-166639011999600
+18:36:58.869 [ForkJoinPool-1-worker-1] DEBUG d.m.q.c.state.QuorusStateStore - Initializing default metadata: version=2.0
+18:36:58.871 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode - Starting Raft node: dns-166639512933100
+18:36:58.871 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/0] - No storage configured, running in volatile mode
+18:36:58.871 [vert.x-eventloop-thread-0] INFO  d.m.q.c.r.InMemoryTransportSimulator [FOLLOWER/0] - Started in-memory transport for node: dns-166639512933100
+18:36:58.871 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/0] - Raft node dns-166639512933100 started successfully (term=0, logSize=1)
+18:36:59.270 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/0] - Starting election for node: dns-166639512933100
+18:36:59.270 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [CANDIDATE/1] - Persisting raft metadata: term=1, votedForPresent=true, votedFor=dns-166639512933100
+18:36:59.271 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Node dns-166639512933100 became LEADER for term 1
+18:36:59.271 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Command submitted at index 1 term 1
+18:36:59.271 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [LEADER/1] - Committed leader no-op entry for term 1
+18:36:59.272 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Command submitted at index 2 term 1
+18:36:59.272 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Applying command: type=Set
+18:36:59.272 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Processing system metadata command: key=phase4.v2.secret-reference.tenant:secret, type=Set
+18:36:59.272 [vert.x-eventloop-thread-0] INFO  d.m.q.c.state.QuorusStateStore [LEADER/1] - Set system metadata: key=phase4.v2.secret-reference.tenant:secret, valuePresent=true, replaced=false
+18:36:59.272 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Command applied successfully: type=Set, result=Success
+18:36:59.274 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Command submitted at index 3 term 1
+18:36:59.274 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Applying command: type=Set
+18:36:59.275 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Processing system metadata command: key=phase4.v2.service-connection.tenant:connection, type=Set
+18:36:59.275 [vert.x-eventloop-thread-0] INFO  d.m.q.c.state.QuorusStateStore [LEADER/1] - Set system metadata: key=phase4.v2.service-connection.tenant:connection, valuePresent=true, replaced=false
+18:36:59.275 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Command applied successfully: type=Set, result=Success
+18:36:59.287 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Command submitted at index 4 term 1
+18:36:59.287 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Applying command: type=Delete
+18:36:59.288 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Processing system metadata command: key=phase4.v2.secret-reference.tenant:secret, type=Delete
+18:36:59.288 [vert.x-eventloop-thread-0] INFO  d.m.q.c.state.QuorusStateStore [LEADER/1] - Deleted system metadata: key=phase4.v2.secret-reference.tenant:secret, valueRemoved=true
+18:36:59.288 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Command applied successfully: type=Delete, result=Success
+18:36:59.289 [vert.x-eventloop-thread-0] INFO  d.m.q.c.h.handlers.TransferHandler [LEADER/1] - Creating transfer job: jobId=f975a48f-126e-46f9-8cb0-122cb5db7acb, tenantId=tenant
+18:36:59.289 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Command submitted at index 5 term 1
+18:36:59.289 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Applying command: type=Create
+18:36:59.289 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Creating transfer job: jobId=f975a48f-126e-46f9-8cb0-122cb5db7acb, sourceUri=sftp://dns.example.test/approved/file.dat, destPath=file:///C:/Users/mraysmit/dev/idea-projects/quorus/quorus-controller/downloads/dns-test.dat
+18:36:59.291 [vert.x-eventloop-thread-0] INFO  d.m.q.c.state.QuorusStateStore [LEADER/1] - Created transfer job: jobId=f975a48f-126e-46f9-8cb0-122cb5db7acb, protocol=http, totalJobs=1
+18:36:59.291 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Command applied successfully: type=Create, result=Success
+18:36:59.291 [vert.x-eventloop-thread-0] INFO  d.m.q.c.h.handlers.TransferHandler [LEADER/1] - Transfer job created: jobId=f975a48f-126e-46f9-8cb0-122cb5db7acb
+18:36:59.291 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Command submitted at index 6 term 1
+18:36:59.291 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Applying command: type=Set
+18:36:59.292 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Processing system metadata command: key=phase4.v2.security-event.tenant:1788604619291.395942f1-c047-4d3f-985e-ac0faf1b7d47, type=Set
+18:36:59.292 [vert.x-eventloop-thread-0] INFO  d.m.q.c.state.QuorusStateStore [LEADER/1] - Set system metadata: key=phase4.v2.security-event.tenant:1788604619291.395942f1-c047-4d3f-985e-ac0faf1b7d47, valuePresent=true, replaced=false
+18:36:59.292 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [LEADER/1] - Command applied successfully: type=Set, result=Success
+18:36:59.297 [vert.x-eventloop-thread-0] INFO  d.m.q.c.r.InMemoryTransportSimulator [LEADER/1] - Stopped in-memory transport for node: dns-166639512933100
+18:36:59.297 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Raft node stopped: dns-166639512933100
+[ERROR] Tests run: 9, Failures: 3, Errors: 0, Skipped: 0, Time elapsed: 6.606 s <<< FAILURE! -- in dev.mars.quorus.controller.http.ControllerDnsBoundaryTest
+[ERROR] dev.mars.quorus.controller.http.ControllerDnsBoundaryTest.removedConnectionCannotBeApprovedAfterDnsReturns(boolean, Vertx)[1] -- Time elapsed: 0.436 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: expected: <409> but was: <200>
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+	at org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
+	at org.junit.jupiter.api.AssertEquals.failNotEqual(AssertEquals.java:197)
+	at org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:150)
+	at org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:145)
+	at org.junit.jupiter.api.Assertions.assertEquals(Assertions.java:528)
+	at dev.mars.quorus.controller.http.ControllerDnsBoundaryTest.removedConnectionCannotBeApprovedAfterDnsReturns(ControllerDnsBoundaryTest.java:128)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:104)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at org.junit.platform.commons.util.ReflectionUtils.invokeMethod(ReflectionUtils.java:727)
+	at org.junit.jupiter.engine.execution.MethodInvocation.proceed(MethodInvocation.java:60)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$ValidatingInvocation.proceed(InvocationInterceptorChain.java:131)
+	at io.vertx.junit5.VertxExtension.interceptTestTemplateMethod(VertxExtension.java:154)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker$ReflectiveInterceptorCall.lambda$ofVoidMethod$0(InterceptingExecutableInvoker.java:103)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.lambda$invoke$0(InterceptingExecutableInvoker.java:93)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$InterceptedInvocation.proceed(InvocationInterceptorChain.java:106)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.intercept(TimeoutExtension.java:156)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.interceptTestableMethod(TimeoutExtension.java:147)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.interceptTestTemplateMethod(TimeoutExtension.java:94)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker$ReflectiveInterceptorCall.lambda$ofVoidMethod$0(InterceptingExecutableInvoker.java:103)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.lambda$invoke$0(InterceptingExecutableInvoker.java:93)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$InterceptedInvocation.proceed(InvocationInterceptorChain.java:106)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.proceed(InvocationInterceptorChain.java:64)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.chainAndInvoke(InvocationInterceptorChain.java:45)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.invoke(InvocationInterceptorChain.java:37)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:92)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:86)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.lambda$invokeTestMethod$7(TestMethodTestDescriptor.java:217)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.invokeTestMethod(TestMethodTestDescriptor.java:213)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.execute(TestMethodTestDescriptor.java:138)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.execute(TestMethodTestDescriptor.java:68)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:151)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:141)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:139)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:138)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:95)
+	at org.junit.platform.engine.support.hierarchical.ForkJoinPoolHierarchicalTestExecutorService$ExclusiveTask.compute(ForkJoinPoolHierarchicalTestExecutorService.java:202)
+	at org.junit.platform.engine.support.hierarchical.ForkJoinPoolHierarchicalTestExecutorService.submit(ForkJoinPoolHierarchicalTestExecutorService.java:135)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask$DefaultDynamicTestExecutor.execute(NodeTestTask.java:226)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask$DefaultDynamicTestExecutor.execute(NodeTestTask.java:204)
+	at org.junit.jupiter.engine.descriptor.TestTemplateTestDescriptor.execute(TestTemplateTestDescriptor.java:142)
+	at org.junit.jupiter.engine.descriptor.TestTemplateTestDescriptor.lambda$execute$2(TestTemplateTestDescriptor.java:110)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.accept(ForEachOps.java:186)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:214)
+	at java.base/java.util.stream.ReferencePipeline$2$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:214)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.accept(ForEachOps.java:186)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:214)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:214)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:214)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.accept(ForEachOps.java:186)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:214)
+	at java.base/java.util.Spliterators$ArraySpliterator.forEachRemaining(Spliterators.java:1024)
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:570)
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:560)
+	at java.base/java.util.stream.ForEachOps$ForEachOp.evaluateSequential(ForEachOps.java:153)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.evaluateSequential(ForEachOps.java:176)
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:265)
+	at java.base/java.util.stream.ReferencePipeline.forEach(ReferencePipeline.java:632)
+	at java.base/java.util.stream.ReferencePipeline$7$1FlatMap.accept(ReferencePipeline.java:293)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:214)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:214)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:214)
+	at java.base/java.util.ArrayList$ArrayListSpliterator.forEachRemaining(ArrayList.java:1716)
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:570)
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:560)
+	at java.base/java.util.stream.ForEachOps$ForEachOp.evaluateSequential(ForEachOps.java:153)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.evaluateSequential(ForEachOps.java:176)
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:265)
+	at java.base/java.util.stream.ReferencePipeline.forEach(ReferencePipeline.java:632)
+	at java.base/java.util.stream.ReferencePipeline$7$1FlatMap.accept(ReferencePipeline.java:293)
+	at java.base/java.util.ArrayList$ArrayListSpliterator.forEachRemaining(ArrayList.java:1716)
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:570)
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:560)
+	at java.base/java.util.stream.ForEachOps$ForEachOp.evaluateSequential(ForEachOps.java:153)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.evaluateSequential(ForEachOps.java:176)
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:265)
+	at java.base/java.util.stream.ReferencePipeline.forEach(ReferencePipeline.java:632)
+	at org.junit.jupiter.engine.descriptor.TestTemplateTestDescriptor.execute(TestTemplateTestDescriptor.java:110)
+	at org.junit.jupiter.engine.descriptor.TestTemplateTestDescriptor.execute(TestTemplateTestDescriptor.java:44)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:151)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:141)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:139)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:138)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:95)
+	at org.junit.platform.engine.support.hierarchical.ForkJoinPoolHierarchicalTestExecutorService$ExclusiveTask.compute(ForkJoinPoolHierarchicalTestExecutorService.java:202)
+	at org.junit.platform.engine.support.hierarchical.ForkJoinPoolHierarchicalTestExecutorService.executeNonConcurrentTasks(ForkJoinPoolHierarchicalTestExecutorService.java:172)
+	at org.junit.platform.engine.support.hierarchical.ForkJoinPoolHierarchicalTestExecutorService.invokeAll(ForkJoinPoolHierarchicalTestExecutorService.java:152)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:155)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:141)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:139)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:138)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:95)
+	at org.junit.platform.engine.support.hierarchical.ForkJoinPoolHierarchicalTestExecutorService$ExclusiveTask.compute(ForkJoinPoolHierarchicalTestExecutorService.java:202)
+	at org.junit.platform.engine.support.hierarchical.ForkJoinPoolHierarchicalTestExecutorService.invokeAll(ForkJoinPoolHierarchicalTestExecutorService.java:146)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:155)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:141)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:139)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:138)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:95)
+	at org.junit.platform.engine.support.hierarchical.ForkJoinPoolHierarchicalTestExecutorService$ExclusiveTask.compute(ForkJoinPoolHierarchicalTestExecutorService.java:202)
+	at java.base/java.util.concurrent.RecursiveAction.exec(RecursiveAction.java:194)
+	at java.base/java.util.concurrent.ForkJoinTask.doExec(ForkJoinTask.java:511)
+	at java.base/java.util.concurrent.ForkJoinPool$WorkQueue.topLevelExec(ForkJoinPool.java:1450)
+	at java.base/java.util.concurrent.ForkJoinPool.runWorker(ForkJoinPool.java:2019)
+	at java.base/java.util.concurrent.ForkJoinWorkerThread.run(ForkJoinWorkerThread.java:187)
+
+[ERROR] dev.mars.quorus.controller.http.ControllerDnsBoundaryTest.removedConnectionCannotBeApprovedAfterDnsReturns(boolean, Vertx)[2] -- Time elapsed: 0.376 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: expected: <409> but was: <201>
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+	at org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
+	at org.junit.jupiter.api.AssertEquals.failNotEqual(AssertEquals.java:197)
+	at org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:150)
+	at org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:145)
+	at org.junit.jupiter.api.Assertions.assertEquals(Assertions.java:528)
+	at dev.mars.quorus.controller.http.ControllerDnsBoundaryTest.removedConnectionCannotBeApprovedAfterDnsReturns(ControllerDnsBoundaryTest.java:128)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:104)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at org.junit.platform.commons.util.ReflectionUtils.invokeMethod(ReflectionUtils.java:727)
+	at org.junit.jupiter.engine.execution.MethodInvocation.proceed(MethodInvocation.java:60)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$ValidatingInvocation.proceed(InvocationInterceptorChain.java:131)
+	at io.vertx.junit5.VertxExtension.interceptTestTemplateMethod(VertxExtension.java:154)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker$ReflectiveInterceptorCall.lambda$ofVoidMethod$0(InterceptingExecutableInvoker.java:103)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.lambda$invoke$0(InterceptingExecutableInvoker.java:93)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$InterceptedInvocation.proceed(InvocationInterceptorChain.java:106)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.intercept(TimeoutExtension.java:156)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.interceptTestableMethod(TimeoutExtension.java:147)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.interceptTestTemplateMethod(TimeoutExtension.java:94)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker$ReflectiveInterceptorCall.lambda$ofVoidMethod$0(InterceptingExecutableInvoker.java:103)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.lambda$invoke$0(InterceptingExecutableInvoker.java:93)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$InterceptedInvocation.proceed(InvocationInterceptorChain.java:106)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.proceed(InvocationInterceptorChain.java:64)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.chainAndInvoke(InvocationInterceptorChain.java:45)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.invoke(InvocationInterceptorChain.java:37)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:92)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:86)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.lambda$invokeTestMethod$7(TestMethodTestDescriptor.java:217)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.invokeTestMethod(TestMethodTestDescriptor.java:213)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.execute(TestMethodTestDescriptor.java:138)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.execute(TestMethodTestDescriptor.java:68)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:151)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:141)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:139)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:138)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:95)
+	at org.junit.platform.engine.support.hierarchical.ForkJoinPoolHierarchicalTestExecutorService$ExclusiveTask.compute(ForkJoinPoolHierarchicalTestExecutorService.java:202)
+	at org.junit.platform.engine.support.hierarchical.ForkJoinPoolHierarchicalTestExecutorService.submit(ForkJoinPoolHierarchicalTestExecutorService.java:135)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask$DefaultDynamicTestExecutor.execute(NodeTestTask.java:226)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask$DefaultDynamicTestExecutor.execute(NodeTestTask.java:204)
+	at org.junit.jupiter.engine.descriptor.TestTemplateTestDescriptor.execute(TestTemplateTestDescriptor.java:142)
+	at org.junit.jupiter.engine.descriptor.TestTemplateTestDescriptor.lambda$execute$2(TestTemplateTestDescriptor.java:110)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.accept(ForEachOps.java:186)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:214)
+	at java.base/java.util.stream.ReferencePipeline$2$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:214)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.accept(ForEachOps.java:186)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:214)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:214)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:214)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.accept(ForEachOps.java:186)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:214)
+	at java.base/java.util.Spliterators$ArraySpliterator.forEachRemaining(Spliterators.java:1024)
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:570)
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:560)
+	at java.base/java.util.stream.ForEachOps$ForEachOp.evaluateSequential(ForEachOps.java:153)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.evaluateSequential(ForEachOps.java:176)
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:265)
+	at java.base/java.util.stream.ReferencePipeline.forEach(ReferencePipeline.java:632)
+	at java.base/java.util.stream.ReferencePipeline$7$1FlatMap.accept(ReferencePipeline.java:293)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:214)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:214)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:214)
+	at java.base/java.util.ArrayList$ArrayListSpliterator.forEachRemaining(ArrayList.java:1716)
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:570)
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:560)
+	at java.base/java.util.stream.ForEachOps$ForEachOp.evaluateSequential(ForEachOps.java:153)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.evaluateSequential(ForEachOps.java:176)
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:265)
+	at java.base/java.util.stream.ReferencePipeline.forEach(ReferencePipeline.java:632)
+	at java.base/java.util.stream.ReferencePipeline$7$1FlatMap.accept(ReferencePipeline.java:293)
+	at java.base/java.util.ArrayList$ArrayListSpliterator.forEachRemaining(ArrayList.java:1716)
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:570)
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:560)
+	at java.base/java.util.stream.ForEachOps$ForEachOp.evaluateSequential(ForEachOps.java:153)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.evaluateSequential(ForEachOps.java:176)
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:265)
+	at java.base/java.util.stream.ReferencePipeline.forEach(ReferencePipeline.java:632)
+	at org.junit.jupiter.engine.descriptor.TestTemplateTestDescriptor.execute(TestTemplateTestDescriptor.java:110)
+	at org.junit.jupiter.engine.descriptor.TestTemplateTestDescriptor.execute(TestTemplateTestDescriptor.java:44)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:151)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:141)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:139)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:138)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:95)
+	at org.junit.platform.engine.support.hierarchical.ForkJoinPoolHierarchicalTestExecutorService$ExclusiveTask.compute(ForkJoinPoolHierarchicalTestExecutorService.java:202)
+	at org.junit.platform.engine.support.hierarchical.ForkJoinPoolHierarchicalTestExecutorService.executeNonConcurrentTasks(ForkJoinPoolHierarchicalTestExecutorService.java:172)
+	at org.junit.platform.engine.support.hierarchical.ForkJoinPoolHierarchicalTestExecutorService.invokeAll(ForkJoinPoolHierarchicalTestExecutorService.java:152)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:155)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:141)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:139)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:138)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:95)
+	at org.junit.platform.engine.support.hierarchical.ForkJoinPoolHierarchicalTestExecutorService$ExclusiveTask.compute(ForkJoinPoolHierarchicalTestExecutorService.java:202)
+	at org.junit.platform.engine.support.hierarchical.ForkJoinPoolHierarchicalTestExecutorService.invokeAll(ForkJoinPoolHierarchicalTestExecutorService.java:146)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:155)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:141)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:139)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:138)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:95)
+	at org.junit.platform.engine.support.hierarchical.ForkJoinPoolHierarchicalTestExecutorService$ExclusiveTask.compute(ForkJoinPoolHierarchicalTestExecutorService.java:202)
+	at java.base/java.util.concurrent.RecursiveAction.exec(RecursiveAction.java:194)
+	at java.base/java.util.concurrent.ForkJoinTask.doExec(ForkJoinTask.java:511)
+	at java.base/java.util.concurrent.ForkJoinPool$WorkQueue.topLevelExec(ForkJoinPool.java:1450)
+	at java.base/java.util.concurrent.ForkJoinPool.runWorker(ForkJoinPool.java:2019)
+	at java.base/java.util.concurrent.ForkJoinWorkerThread.run(ForkJoinWorkerThread.java:187)
+
+[ERROR] dev.mars.quorus.controller.http.ControllerDnsBoundaryTest.removedSecretCannotAuthorizeTransferAfterDnsReturns(Vertx) -- Time elapsed: 0.490 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: expected: <409> but was: <201>
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+	at org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
+	at org.junit.jupiter.api.AssertEquals.failNotEqual(AssertEquals.java:197)
+	at org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:150)
+	at org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:145)
+	at org.junit.jupiter.api.Assertions.assertEquals(Assertions.java:528)
+	at dev.mars.quorus.controller.http.ControllerDnsBoundaryTest.removedSecretCannotAuthorizeTransferAfterDnsReturns(ControllerDnsBoundaryTest.java:147)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:104)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at org.junit.platform.commons.util.ReflectionUtils.invokeMethod(ReflectionUtils.java:727)
+	at org.junit.jupiter.engine.execution.MethodInvocation.proceed(MethodInvocation.java:60)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$ValidatingInvocation.proceed(InvocationInterceptorChain.java:131)
+	at io.vertx.junit5.VertxExtension.interceptTestMethod(VertxExtension.java:142)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker$ReflectiveInterceptorCall.lambda$ofVoidMethod$0(InterceptingExecutableInvoker.java:103)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.lambda$invoke$0(InterceptingExecutableInvoker.java:93)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$InterceptedInvocation.proceed(InvocationInterceptorChain.java:106)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.intercept(TimeoutExtension.java:156)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.interceptTestableMethod(TimeoutExtension.java:147)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.interceptTestMethod(TimeoutExtension.java:86)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker$ReflectiveInterceptorCall.lambda$ofVoidMethod$0(InterceptingExecutableInvoker.java:103)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.lambda$invoke$0(InterceptingExecutableInvoker.java:93)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$InterceptedInvocation.proceed(InvocationInterceptorChain.java:106)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.proceed(InvocationInterceptorChain.java:64)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.chainAndInvoke(InvocationInterceptorChain.java:45)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.invoke(InvocationInterceptorChain.java:37)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:92)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:86)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.lambda$invokeTestMethod$7(TestMethodTestDescriptor.java:217)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.invokeTestMethod(TestMethodTestDescriptor.java:213)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.execute(TestMethodTestDescriptor.java:138)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.execute(TestMethodTestDescriptor.java:68)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:151)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:141)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:139)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:138)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:95)
+	at org.junit.platform.engine.support.hierarchical.ForkJoinPoolHierarchicalTestExecutorService$ExclusiveTask.compute(ForkJoinPoolHierarchicalTestExecutorService.java:202)
+	at org.junit.platform.engine.support.hierarchical.ForkJoinPoolHierarchicalTestExecutorService.executeNonConcurrentTasks(ForkJoinPoolHierarchicalTestExecutorService.java:172)
+	at org.junit.platform.engine.support.hierarchical.ForkJoinPoolHierarchicalTestExecutorService.invokeAll(ForkJoinPoolHierarchicalTestExecutorService.java:152)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:155)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:141)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:139)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:138)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:95)
+	at org.junit.platform.engine.support.hierarchical.ForkJoinPoolHierarchicalTestExecutorService$ExclusiveTask.compute(ForkJoinPoolHierarchicalTestExecutorService.java:202)
+	at org.junit.platform.engine.support.hierarchical.ForkJoinPoolHierarchicalTestExecutorService.invokeAll(ForkJoinPoolHierarchicalTestExecutorService.java:146)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:155)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:141)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:139)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:138)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:95)
+	at org.junit.platform.engine.support.hierarchical.ForkJoinPoolHierarchicalTestExecutorService$ExclusiveTask.compute(ForkJoinPoolHierarchicalTestExecutorService.java:202)
+	at java.base/java.util.concurrent.RecursiveAction.exec(RecursiveAction.java:194)
+	at java.base/java.util.concurrent.ForkJoinTask.doExec(ForkJoinTask.java:511)
+	at java.base/java.util.concurrent.ForkJoinPool$WorkQueue.topLevelExec(ForkJoinPool.java:1450)
+	at java.base/java.util.concurrent.ForkJoinPool.runWorker(ForkJoinPool.java:2019)
+	at java.base/java.util.concurrent.ForkJoinWorkerThread.run(ForkJoinWorkerThread.java:187)
+
+[INFO] 
+[INFO] Results:
+[INFO] 
+[ERROR] Failures: 
+[ERROR]   ControllerDnsBoundaryTest.removedConnectionCannotBeApprovedAfterDnsReturns:128 expected: <409> but was: <200>
+[ERROR]   ControllerDnsBoundaryTest.removedConnectionCannotBeApprovedAfterDnsReturns:128 expected: <409> but was: <201>
+[ERROR]   ControllerDnsBoundaryTest.removedSecretCannotAuthorizeTransferAfterDnsReturns:147 expected: <409> but was: <201>
+[INFO] 
+[ERROR] Tests run: 9, Failures: 3, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Summary for Quorus File Transfer System 1.0-SNAPSHOT:
+[INFO] 
+[INFO] Quorus File Transfer System ........................ SUCCESS [  0.270 s]
+[INFO] Quorus Core ........................................ SUCCESS [  1.630 s]
+[INFO] Quorus Workflow Engine ............................. SUCCESS [  0.336 s]
+[INFO] Quorus Tenant Management ........................... SUCCESS [  0.212 s]
+[INFO] Quorus Distributed Controller ...................... FAILURE [ 10.039 s]
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  12.700 s
+[INFO] Finished at: 2026-09-05T18:36:59+08:00
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.2.2:test (default-test) on project quorus-controller: There are test failures.
+[ERROR] 
+[ERROR] Please refer to C:\Users\mraysmit\dev\idea-projects\quorus\quorus-controller\target\surefire-reports for the individual test results.
+[ERROR] Please refer to dump files (if any exist) [date].dump, [date]-jvmRun[N].dump and [date].dumpstream.
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+[ERROR] 
+[ERROR] After correcting the problems, you can resume the build with the command
+[ERROR]   mvn <args> -rf :quorus-controller

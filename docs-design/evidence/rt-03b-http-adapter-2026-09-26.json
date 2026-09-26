@@ -35,7 +35,12 @@
       "reason": "Compile errors in the new test, and an ambiguous constructor call in an existing test (fixture defects)",
       "log": {
         "path": "docs-design/evidence/raw/rt-03/http-b-red-attempt1-compile.log",
-        "sha256": "822b1c31a10c84cdba80adf29be1ad0e797dd8ef91ddad35099d765e314151c9"
+        "sha256": "822b1c31a10c84cdba80adf29be1ad0e797dd8ef91ddad35099d765e314151c9",
+        "retained": "excerpt only (retention rule, plan §6.1)",
+        "excerpt": {
+          "path": "docs-design/evidence/raw/rt-03/http-b-red-attempt1-compile.log.excerpt.txt",
+          "sha256": "279b5fe3e6f8c8ca279ccb9a4c8f56da5afff98f0f549069a78fa0e56db0aea8"
+        }
       }
     },
     {
@@ -43,7 +48,12 @@
       "reason": "Five rejection tests passed against the skeleton for the wrong reason, because they only asserted that some TransferException was thrown. They were tightened to assert the specific cause before the red was accepted",
       "log": {
         "path": "docs-design/evidence/raw/rt-03/http-b-red-attempt2-weak-rejections.log",
-        "sha256": "3a50050bd1d56466adc54156a86f7805f3a883651776f988390aa668c22f53a1"
+        "sha256": "3a50050bd1d56466adc54156a86f7805f3a883651776f988390aa668c22f53a1",
+        "retained": "excerpt only (retention rule, plan §6.1)",
+        "excerpt": {
+          "path": "docs-design/evidence/raw/rt-03/http-b-red-attempt2-weak-rejections.log.excerpt.txt",
+          "sha256": "7f8a0459eb967bd38ab118b16f63a0b73f9191b746f4aaec115f6dda2b7771eb"
+        }
       }
     },
     {
@@ -51,7 +61,12 @@
       "reason": "The streaming test used WatchService, which on Windows did not report the growing .tmp file. The test hung, and its held server thread kept the test JVM alive. It was redesigned to signal from the transfer thread through a purpose-built TransferContext, with a bounded server wait. The hung test JVM was stopped by specific PID",
       "log": {
         "path": "docs-design/evidence/raw/rt-03/http-b-green-attempt1-watchservice-hang.log",
-        "sha256": "01aaa33892b87edc5272ae0be65196641dcee102808aed6a561e96d0e7d1bae0"
+        "sha256": "01aaa33892b87edc5272ae0be65196641dcee102808aed6a561e96d0e7d1bae0",
+        "retained": "excerpt only (retention rule, plan §6.1)",
+        "excerpt": {
+          "path": "docs-design/evidence/raw/rt-03/http-b-green-attempt1-watchservice-hang.log.excerpt.txt",
+          "sha256": "6e7f64900e73e84f14e09ae98e3c69bed6385c23b836c9cfa2124406fdb54a8b"
+        }
       }
     },
     {
@@ -60,11 +75,21 @@
       "logs": [
         {
           "path": "docs-design/evidence/raw/rt-03/http-b-reactor-verify-attempt2-checksum-test-defect.log",
-          "sha256": "ed6979fe8f676b731f1f5e0bf5cdc28eb0516f297afb096a468952432abbe7d3"
+          "sha256": "ed6979fe8f676b731f1f5e0bf5cdc28eb0516f297afb096a468952432abbe7d3",
+          "retained": "excerpt only (retention rule, plan §6.1)",
+          "excerpt": {
+            "path": "docs-design/evidence/raw/rt-03/http-b-reactor-verify-attempt2-checksum-test-defect.log.excerpt.txt",
+            "sha256": "b80d73672f8a8855717b2ad24360652ab1f7cfb4321f1dc18d68f9f3ec8ead9e"
+          }
         },
         {
           "path": "docs-design/evidence/raw/rt-03/http-b-repeat-attempt1-checksum-test-defect.log",
-          "sha256": "ad2c6a45475ef9f2269ffdd93feb05d6999c90723ecf061a1998032dec41d00b"
+          "sha256": "ad2c6a45475ef9f2269ffdd93feb05d6999c90723ecf061a1998032dec41d00b",
+          "retained": "excerpt only (retention rule, plan §6.1)",
+          "excerpt": {
+            "path": "docs-design/evidence/raw/rt-03/http-b-repeat-attempt1-checksum-test-defect.log.excerpt.txt",
+            "sha256": "5926d53739f58e29258c736b1396510db06d5ee739c3ea40465538a447798c17"
+          }
         }
       ]
     }
@@ -112,7 +137,12 @@
       "result": "1,574 tests, 0 failures (before the checksum-match test); JaCoCo gate met",
       "log": {
         "path": "docs-design/evidence/raw/rt-03/http-b-core-verify.log",
-        "sha256": "ce0dbf59874088b72dafda70a46cbedc4c8035f312914cdebaae2f154c264f91"
+        "sha256": "ce0dbf59874088b72dafda70a46cbedc4c8035f312914cdebaae2f154c264f91",
+        "retained": "excerpt only (retention rule, plan §6.1)",
+        "excerpt": {
+          "path": "docs-design/evidence/raw/rt-03/http-b-core-verify.log.excerpt.txt",
+          "sha256": "4208be14b7193b4faa570ddc4b8ffd42ebf6048121f003be81014c6874c4192d"
+        }
       }
     },
     {
@@ -120,7 +150,12 @@
       "result": "BUILD SUCCESS; 2,443 tests (core 1,575, workflow 134, tenant 64, controller 569, agent 101), 0 failures, all five JaCoCo gates met. HttpTransferProtocol 207/215 lines and 59/60 branches; ApprovedAddressResolver 11/11 lines and 4/4 branches",
       "log": {
         "path": "docs-design/evidence/raw/rt-03/http-b-reactor-verify.log",
-        "sha256": "3df8b1b352e0a41ae0050b09447ad947b7b559fd44f2ad36199cf9c06aade4d3"
+        "sha256": "3df8b1b352e0a41ae0050b09447ad947b7b559fd44f2ad36199cf9c06aade4d3",
+        "retained": "excerpt only (retention rule, plan §6.1)",
+        "excerpt": {
+          "path": "docs-design/evidence/raw/rt-03/http-b-reactor-verify.log.excerpt.txt",
+          "sha256": "39c9f415d31f637f8f05789c5882b9ea1b45fe6521a7998e0f36071e5ed43228"
+        }
       }
     },
     {
@@ -128,7 +163,12 @@
       "result": "20 passed, 0 failed",
       "log": {
         "path": "docs-design/evidence/raw/rt-03/http-b-repeat.log",
-        "sha256": "7b64af555d87930109ef475107921f341d9edc61a7b3a2f4c26c87481ea91bdd"
+        "sha256": "7b64af555d87930109ef475107921f341d9edc61a7b3a2f4c26c87481ea91bdd",
+        "retained": "excerpt only (retention rule, plan §6.1)",
+        "excerpt": {
+          "path": "docs-design/evidence/raw/rt-03/http-b-repeat.log.excerpt.txt",
+          "sha256": "494170d037e46a794680cbd36d0493f9f2f8591da6b656f1b61fee00e235c51b"
+        }
       }
     }
   ],

@@ -1,0 +1,311 @@
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::staticFieldBase has been called by com.google.inject.internal.aop.HiddenClassDefiner (file:/C:/Users/mraysmit/scoop/apps/maven/current/lib/guice-5.1.0-classes.jar)
+WARNING: Please consider reporting this to the maintainers of class com.google.inject.internal.aop.HiddenClassDefiner
+WARNING: sun.misc.Unsafe::staticFieldBase will be removed in a future release
+WARNING: Final field _cipher in class org.sonatype.plexus.components.sec.dispatcher.DefaultSecDispatcher has been mutated reflectively by class org.eclipse.sisu.bean.BeanPropertyField in unnamed module @1f3f4916 (file:/C:/Users/mraysmit/scoop/apps/maven/current/lib/org.eclipse.sisu.inject-0.9.0.M4.jar)
+WARNING: Use --enable-final-field-mutation=ALL-UNNAMED to avoid a warning
+WARNING: Mutating final fields will be blocked in a future release unless final field mutation is enabled
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] ------------------------< dev.mars:quorus-core >------------------------
+[INFO] Building Quorus Core 1.0-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- clean:3.2.0:clean (default-clean) @ quorus-core ---
+[INFO] Deleting C:\Users\mraysmit\dev\idea-projects\quorus\quorus-core\target
+[INFO] 
+[INFO] --- jacoco:0.8.15:prepare-agent (prepare-agent) @ quorus-core ---
+[INFO] argLine set to -javaagent:C:\\Users\\mraysmit\\.m2\\repository\\org\\jacoco\\org.jacoco.agent\\0.8.15\\org.jacoco.agent-0.8.15-runtime.jar=destfile=C:\\Users\\mraysmit\\dev\\idea-projects\\quorus\\quorus-core\\target\\jacoco.exec,excludes=sun/**:jdk/**:java/**:com/sun/**:org/jcp/**
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ quorus-core ---
+[INFO] Copying 1 resource from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ quorus-core ---
+[INFO] Recompiling the module because of changed source code.
+[INFO] Compiling 73 source files with javac [debug release 27] to target\classes
+[INFO] /C:/Users/mraysmit/dev/idea-projects/quorus/quorus-core/src/main/java/dev/mars/quorus/protocol/FtpTransferProtocol.java: Some input files use or override a deprecated API.
+[INFO] /C:/Users/mraysmit/dev/idea-projects/quorus/quorus-core/src/main/java/dev/mars/quorus/protocol/FtpTransferProtocol.java: Recompile with -Xlint:deprecation for details.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ quorus-core ---
+[INFO] Copying 16 resources from src\test\resources to target\test-classes
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ quorus-core ---
+[INFO] Recompiling the module because of changed dependency.
+[INFO] Compiling 92 source files with javac [debug release 27] to target\test-classes
+[INFO] /C:/Users/mraysmit/dev/idea-projects/quorus/quorus-core/src/test/java/dev/mars/quorus/connection/TlsTrustAnchorPolicyTest.java: Some input files use or override a deprecated API.
+[INFO] /C:/Users/mraysmit/dev/idea-projects/quorus/quorus-core/src/test/java/dev/mars/quorus/connection/TlsTrustAnchorPolicyTest.java: Recompile with -Xlint:deprecation for details.
+[INFO] 
+[INFO] --- surefire:3.2.2:test (default-test) @ quorus-core ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running dev.mars.quorus.protocol.HttpRedirectBoundaryTest
+16:21:01.416 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:01.423 [main] INFO  d.m.q.protocol.HttpTransferProtocol - Starting HTTP download from http://127.0.0.1:52918/redirect
+16:21:01.691 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HTTP download completed: jobId=redirect, bytesTransferred=15, checksum=c51d9cab89aec430d3274a51bbb930e124935ca08ab6f20d46e1c44651f46497
+16:21:01.716 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:01.717 [main] INFO  d.m.q.protocol.HttpTransferProtocol - Starting HTTP download from http://127.0.0.1:52921/redirect
+16:21:01.731 [main] ERROR d.m.q.protocol.HttpTransferProtocol - [QUORUS-1203] HTTP request failed: statusCode=302, reason=Temporary Redirect
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.730 s -- in dev.mars.quorus.protocol.HttpRedirectBoundaryTest
+[INFO] Running dev.mars.quorus.protocol.HttpTransferProtocolBoundaryTest
+[INFO] Running dev.mars.quorus.protocol.HttpTransferProtocolBoundaryTest$Characterization
+16:21:01.759 [junit-timeout-thread-1] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:01.759 [junit-timeout-thread-1] INFO  d.m.q.protocol.HttpTransferProtocol - Starting HTTP download from http://127.0.0.1:1/data.bin
+16:21:01.760 [junit-timeout-thread-1] ERROR d.m.q.protocol.HttpTransferProtocol - [QUORUS-1202] HTTP destination directory creation failed: jobId=no-directory, error=C:\Users\mraysmit\AppData\Local\Temp\junit9477807486519121635\not-a-directory
+16:21:01.776 [junit-timeout-thread-2] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:01.779 [virtual-64] INFO  d.m.q.protocol.HttpTransferProtocol - Starting HTTP download from http://127.0.0.1:52923/data.bin
+16:21:01.800 [junit-timeout-thread-3] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:01.800 [junit-timeout-thread-3] INFO  d.m.q.protocol.HttpTransferProtocol - Starting HTTP download from http://127.0.0.1:52926/data.bin
+16:21:01.804 [junit-timeout-thread-3] INFO  d.m.q.protocol.HttpTransferProtocol - HTTP download completed: jobId=download, bytesTransferred=0, checksum=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+16:21:01.813 [junit-timeout-thread-4] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:01.813 [junit-timeout-thread-4] INFO  d.m.q.protocol.HttpTransferProtocol - Starting HTTP download from http://127.0.0.1:52928/data.bin
+16:21:01.818 [junit-timeout-thread-4] INFO  d.m.q.protocol.HttpTransferProtocol - HTTP download completed: jobId=download, bytesTransferred=2, checksum=2689367b205c16ce32ed4200942b8b8b1e262dfc70d9bc9fbc77c49699a4f1df
+16:21:01.824 [junit-timeout-thread-5] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:01.824 [junit-timeout-thread-5] INFO  d.m.q.protocol.HttpTransferProtocol - Starting HTTP download from http://127.0.0.1:52930/data.bin
+16:21:01.829 [junit-timeout-thread-5] INFO  d.m.q.protocol.HttpTransferProtocol - HTTP download completed: jobId=download, bytesTransferred=2, checksum=2689367b205c16ce32ed4200942b8b8b1e262dfc70d9bc9fbc77c49699a4f1df
+16:21:01.845 [junit-timeout-thread-7] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:01.845 [junit-timeout-thread-7] INFO  d.m.q.protocol.HttpTransferProtocol - Starting HTTP download from http://127.0.0.1:52932/data.bin
+16:21:01.849 [junit-timeout-thread-7] INFO  d.m.q.protocol.HttpTransferProtocol - HTTP download completed: jobId=download, bytesTransferred=17, checksum=6cfcc03995ff67f0e9c122da88c400a8dbdcc9d250d123f77e9816cc51eb0cdf
+16:21:01.862 [junit-timeout-thread-8] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:01.863 [junit-timeout-thread-8] INFO  d.m.q.protocol.HttpTransferProtocol - Starting HTTP download from http://127.0.0.1:52934/data.bin
+16:21:01.869 [junit-timeout-thread-8] INFO  d.m.q.protocol.HttpTransferProtocol - HTTP download completed: jobId=empty-checksum, bytesTransferred=7, checksum=ed7002b439e9ac845f22357d822bac1444730fbdb6016d3ec9432297b9ec9f73
+16:21:01.883 [junit-timeout-thread-9] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:01.884 [junit-timeout-thread-9] INFO  d.m.q.protocol.HttpTransferProtocol - Starting HTTP download from http://127.0.0.1:52936/data.bin
+16:21:01.897 [junit-timeout-thread-9] INFO  d.m.q.protocol.HttpTransferProtocol - HTTP download completed: jobId=download, bytesTransferred=307200, checksum=8ef4d36bb880518e388b755ad56b6b0ad95b349425b8e585266d4478444b9ec1
+16:21:01.914 [junit-timeout-thread-10] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:01.915 [virtual-94] INFO  d.m.q.protocol.HttpTransferProtocol - Starting HTTP download from http://127.0.0.1:52938/data.bin
+16:21:01.933 [junit-timeout-thread-11] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:01.934 [virtual-98] INFO  d.m.q.protocol.HttpTransferProtocol - Starting HTTP download from http://127.0.0.1:52940/data.bin
+16:21:01.939 [junit-timeout-thread-11] DEBUG d.m.q.protocol.HttpTransferProtocol - HTTP abort: closing 1 in-flight client(s)
+16:21:01.940 [virtual-98] ERROR d.m.q.protocol.HttpTransferProtocol - [QUORUS-1206] HTTP download failed: jobId=held, error=Socket closed
+[INFO] Tests run: 11, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.196 s -- in dev.mars.quorus.protocol.HttpTransferProtocolBoundaryTest$Characterization
+[INFO] Running dev.mars.quorus.protocol.HttpTransferProtocolBoundaryTest$Ungoverned
+16:21:01.949 [junit-timeout-thread-12] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:01.950 [junit-timeout-thread-12] INFO  d.m.q.protocol.HttpTransferProtocol - Starting HTTP download from http://127.0.0.1:52942/data.bin
+16:21:01.953 [junit-timeout-thread-12] ERROR d.m.q.protocol.HttpTransferProtocol - [QUORUS-1203] HTTP request failed: statusCode=404, reason=Not Found
+16:21:01.963 [junit-timeout-thread-13] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:01.965 [junit-timeout-thread-13] INFO  d.m.q.protocol.HttpTransferProtocol - Starting HTTP upload to http://127.0.0.1:52944/upload.bin
+16:21:01.976 [junit-timeout-thread-13] INFO  d.m.q.protocol.HttpTransferProtocol - HTTP upload completed: jobId=upload, bytesTransferred=262144
+16:21:01.983 [junit-timeout-thread-14] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:01.983 [junit-timeout-thread-14] INFO  d.m.q.protocol.HttpTransferProtocol - Starting HTTP download from http://127.0.0.1:52946/data.bin
+16:21:01.989 [junit-timeout-thread-14] INFO  d.m.q.protocol.HttpTransferProtocol - HTTP download completed: jobId=download, bytesTransferred=14, checksum=9fe054a8becd5a32584628e4f88b465ace9b78ab7dd812eb5a5c5a1c854c27a2
+16:21:02.000 [junit-timeout-thread-15] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:02.000 [junit-timeout-thread-15] INFO  d.m.q.protocol.HttpTransferProtocol - Starting HTTP download from http://127.0.0.1:52948/data.bin
+16:21:02.004 [junit-timeout-thread-15] ERROR d.m.q.protocol.HttpTransferProtocol - [QUORUS-1205] HTTP checksum mismatch: expected=0000000000000000000000000000000000000000000000000000000000000000, actual=ed7002b439e9ac845f22357d822bac1444730fbdb6016d3ec9432297b9ec9f73
+16:21:02.017 [virtual-114] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:02.017 [virtual-114] INFO  d.m.q.protocol.HttpTransferProtocol - Starting HTTP download from http://127.0.0.1:52950/data.bin
+16:21:02.050 [virtual-114] INFO  d.m.q.protocol.HttpTransferProtocol - HTTP download completed: jobId=streaming, bytesTransferred=2097152, checksum=656d40549f7c9a8ae2992f5a2ae3b083e171bdc0466973ebc64108c7dca954dc
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.118 s -- in dev.mars.quorus.protocol.HttpTransferProtocolBoundaryTest$Ungoverned
+[INFO] Running dev.mars.quorus.protocol.HttpTransferProtocolBoundaryTest$GovernedHttps
+16:21:02.140 [junit-timeout-thread-17] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:02.141 [junit-timeout-thread-17] INFO  d.m.q.protocol.HttpTransferProtocol - Starting HTTP download from https://transfer.quorus.test:52952/data.bin
+16:21:02.246 [junit-timeout-thread-17] ERROR d.m.q.protocol.HttpTransferProtocol - [QUORUS-1206] HTTP download failed: jobId=download, error=(certificate_unknown) TLS peer certificate is not approved
+16:21:02.262 [junit-timeout-thread-18] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:02.262 [junit-timeout-thread-18] INFO  d.m.q.protocol.HttpTransferProtocol - Starting HTTP download from https://transfer.quorus.test:52954/data.bin
+16:21:02.288 [junit-timeout-thread-18] ERROR d.m.q.protocol.HttpTransferProtocol - [QUORUS-1206] HTTP download failed: jobId=download, error=(certificate_unknown) No subject alternative DNS name matching transfer.quorus.test found.
+16:21:02.304 [junit-timeout-thread-19] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:02.304 [junit-timeout-thread-19] INFO  d.m.q.protocol.HttpTransferProtocol - Starting HTTP download from https://transfer.quorus.test:52956/data.bin
+16:21:02.322 [junit-timeout-thread-19] INFO  d.m.q.protocol.HttpTransferProtocol - HTTP download completed: jobId=download, bytesTransferred=6, checksum=3fab5c181bd28a09b64397df76ae2bfaf1eac182979b5fdb7a342858004f36af
+16:21:02.338 [junit-timeout-thread-20] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:02.339 [junit-timeout-thread-20] INFO  d.m.q.protocol.HttpTransferProtocol - Starting HTTP download from https://transfer.quorus.test:52958/data.bin
+16:21:02.355 [junit-timeout-thread-20] INFO  d.m.q.protocol.HttpTransferProtocol - HTTP download completed: jobId=download, bytesTransferred=2, checksum=2689367b205c16ce32ed4200942b8b8b1e262dfc70d9bc9fbc77c49699a4f1df
+16:21:02.367 [junit-timeout-thread-21] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:02.367 [junit-timeout-thread-21] INFO  d.m.q.protocol.HttpTransferProtocol - Starting HTTP download from https://transfer.quorus.test:52960/data.bin
+16:21:02.385 [junit-timeout-thread-21] INFO  d.m.q.protocol.HttpTransferProtocol - HTTP download completed: jobId=download, bytesTransferred=65536, checksum=2dd61bdaa606b7625696eaeac6caba36900994d4fd16f9181c74811a9f1ff008
+16:21:02.402 [junit-timeout-thread-22] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:02.403 [junit-timeout-thread-22] INFO  d.m.q.protocol.HttpTransferProtocol - Starting HTTP download from https://transfer.quorus.test:52962/data.bin
+16:21:02.413 [junit-timeout-thread-22] ERROR d.m.q.protocol.HttpTransferProtocol - [QUORUS-1206] HTTP download failed: jobId=download, error=(certificate_unknown) TLS certificate authority is not approved
+16:21:02.423 [junit-timeout-thread-23] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:02.423 [junit-timeout-thread-23] INFO  d.m.q.protocol.HttpTransferProtocol - Starting HTTP download from https://transfer.quorus.test:52964/data.bin
+16:21:02.435 [junit-timeout-thread-23] ERROR d.m.q.protocol.HttpTransferProtocol - [QUORUS-1203] HTTP request failed: statusCode=302, reason=Temporary Redirect
+16:21:02.446 [junit-timeout-thread-24] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:02.447 [junit-timeout-thread-24] INFO  d.m.q.protocol.HttpTransferProtocol - Starting HTTP download from https://transfer.quorus.test:52966/data.bin
+16:21:02.450 [junit-timeout-thread-24] ERROR d.m.q.protocol.HttpTransferProtocol - [QUORUS-1206] HTTP download failed: jobId=download, error=(protocol_version) Received fatal alert: protocol_version
+[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.388 s -- in dev.mars.quorus.protocol.HttpTransferProtocolBoundaryTest$GovernedHttps
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.708 s -- in dev.mars.quorus.protocol.HttpTransferProtocolBoundaryTest
+[INFO] Running dev.mars.quorus.protocol.HttpTransferProtocolTest
+16:21:02.457 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:02.460 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:02.461 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:02.463 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:02.464 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:02.466 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:02.468 [main] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  EXPECTED ERROR TEST: testTransferWithInvalidUrl
+  Reason: Connection refused -- invalid URL triggers connection error
+  Errors below are INTENTIONAL -- testing error handling paths
+========================================================================
+16:21:02.468 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:02.469 [main] INFO  d.m.q.protocol.HttpTransferProtocol - Starting HTTP download from http://127.0.0.1:1/file.txt
+16:21:02.471 [main] ERROR d.m.q.protocol.HttpTransferProtocol - [QUORUS-1206] HTTP download failed: jobId=test-invalid-url, error=Connect to http://127.0.0.1:1 failed: Connection refused
+16:21:02.472 [main] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  END EXPECTED ERROR TEST: testTransferWithInvalidUrl -- PASSED
+========================================================================
+16:21:02.473 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:02.473 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:02.476 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:02.477 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:02.478 [main] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  EXPECTED ERROR TEST: testTransferWithNonHttpProtocol
+  Reason: Wrong protocol scheme -- HTTP rejects ftp:// URI
+  Errors below are INTENTIONAL -- testing error handling paths
+========================================================================
+16:21:02.478 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:02.479 [main] ERROR d.m.q.protocol.HttpTransferProtocol - [QUORUS-1216] HTTP validation: protocol cannot handle this request
+16:21:02.479 [main] ERROR d.m.q.protocol.HttpTransferProtocol - [QUORUS-1201] HTTP request validation failed: jobId=test-wrong-protocol, error=Transfer test-wrong-protocol failed: HTTP protocol cannot handle this request
+16:21:02.480 [main] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  END EXPECTED ERROR TEST: testTransferWithNonHttpProtocol -- PASSED
+========================================================================
+16:21:02.480 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:02.482 [main] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  EXPECTED ERROR TEST: testCreatesDestinationDirectoryIfNeeded
+  Reason: Connection refused -- verifies destination directory created before failure
+  Errors below are INTENTIONAL -- testing error handling paths
+========================================================================
+16:21:02.482 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:02.482 [main] INFO  d.m.q.protocol.HttpTransferProtocol - Starting HTTP download from http://127.0.0.1:1/file.txt
+16:21:02.485 [main] ERROR d.m.q.protocol.HttpTransferProtocol - [QUORUS-1206] HTTP download failed: jobId=test-create-dir, error=Connect to http://127.0.0.1:1 failed: Connection refused
+16:21:02.486 [main] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  END EXPECTED ERROR TEST: testCreatesDestinationDirectoryIfNeeded -- PASSED
+========================================================================
+16:21:02.487 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:02.489 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:02.490 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:02.492 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:02.493 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:02.495 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:02.496 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:02.497 [main] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  EXPECTED ERROR TEST: testBlockingTransferReportsConnectionFailure
+  Reason: Connection refused -- blocking transfer reports the connection failure
+  Errors below are INTENTIONAL -- testing error handling paths
+========================================================================
+16:21:02.498 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:02.498 [main] INFO  d.m.q.protocol.HttpTransferProtocol - Starting HTTP download from http://127.0.0.1:1/file.txt
+16:21:02.510 [main] ERROR d.m.q.protocol.HttpTransferProtocol - [QUORUS-1206] HTTP download failed: jobId=test-blocking, error=Connect to http://127.0.0.1:1 failed: Connection refused
+16:21:02.511 [main] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  END EXPECTED ERROR TEST: testBlockingTransferReportsConnectionFailure -- PASSED
+========================================================================
+[INFO] Tests run: 22, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.056 s -- in dev.mars.quorus.protocol.HttpTransferProtocolTest
+[INFO] Running dev.mars.quorus.protocol.HttpTransferProtocolUploadTest
+[INFO] Running dev.mars.quorus.protocol.HttpTransferProtocolUploadTest$UploadDownloadCoexistenceTests
+16:21:02.514 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:02.517 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:02.517 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.006 s -- in dev.mars.quorus.protocol.HttpTransferProtocolUploadTest$UploadDownloadCoexistenceTests
+[INFO] Running dev.mars.quorus.protocol.HttpTransferProtocolUploadTest$UploadChecksumTests
+16:21:02.521 [main] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  EXPECTED ERROR TEST: uploadCalculatesChecksum
+  Reason: Connection refused -- checksum calculated before send fails
+  Errors below are INTENTIONAL -- testing error handling paths
+========================================================================
+16:21:02.521 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:02.522 [main] INFO  d.m.q.protocol.HttpTransferProtocol - Starting HTTP upload to http://127.0.0.1:1/uploads/file.txt
+16:21:02.541 [main] ERROR d.m.q.protocol.HttpTransferProtocol - [QUORUS-1211] HTTP upload failed: jobId=upload-checksum-test, error=Connect to http://127.0.0.1:1 failed: Connection refused
+16:21:02.542 [main] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  END EXPECTED ERROR TEST: uploadCalculatesChecksum -- PASSED
+========================================================================
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.024 s -- in dev.mars.quorus.protocol.HttpTransferProtocolUploadTest$UploadChecksumTests
+[INFO] Running dev.mars.quorus.protocol.HttpTransferProtocolUploadTest$UploadErrorHandlingTests
+16:21:02.545 [main] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  EXPECTED ERROR TEST: uploadFailsWithConnectionTimeout
+  Reason: Connection refused -- verifies timeout error handling
+  Errors below are INTENTIONAL -- testing error handling paths
+========================================================================
+16:21:02.546 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:02.547 [main] INFO  d.m.q.protocol.HttpTransferProtocol - Starting HTTP upload to http://127.0.0.1:1/uploads/file.txt
+16:21:02.551 [main] ERROR d.m.q.protocol.HttpTransferProtocol - [QUORUS-1211] HTTP upload failed: jobId=upload-timeout-test, error=Connect to http://127.0.0.1:1 failed: Connection refused
+16:21:02.551 [main] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  END EXPECTED ERROR TEST: uploadFailsWithConnectionTimeout -- PASSED
+========================================================================
+16:21:02.554 [main] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  EXPECTED ERROR TEST: uploadFailsWithNonExistentFile
+  Reason: Source file missing -- verifies TransferException before connect
+  Errors below are INTENTIONAL -- testing error handling paths
+========================================================================
+16:21:02.555 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:02.556 [main] ERROR d.m.q.protocol.HttpTransferProtocol - [QUORUS-1208] HTTP upload source file not found: C:\Users\mraysmit\AppData\Local\Temp\junit8393629213536227344\does-not-exist.txt
+16:21:02.557 [main] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  END EXPECTED ERROR TEST: uploadFailsWithNonExistentFile -- PASSED
+========================================================================
+16:21:02.560 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.019 s -- in dev.mars.quorus.protocol.HttpTransferProtocolUploadTest$UploadErrorHandlingTests
+[INFO] Running dev.mars.quorus.protocol.HttpTransferProtocolUploadTest$UploadTransferExecutionTests
+16:21:02.567 [main] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  EXPECTED ERROR TEST: uploadExecutesWithValidRequest
+  Reason: Connection refused -- upload to non-existent server
+  Errors below are INTENTIONAL -- testing error handling paths
+========================================================================
+16:21:02.567 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:02.569 [main] INFO  d.m.q.protocol.HttpTransferProtocol - Starting HTTP upload to http://127.0.0.1:1/uploads/file.txt
+16:21:02.571 [main] ERROR d.m.q.protocol.HttpTransferProtocol - [QUORUS-1211] HTTP upload failed: jobId=upload-exec-test, error=Connect to http://127.0.0.1:1 failed: Connection refused
+16:21:02.571 [main] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  END EXPECTED ERROR TEST: uploadExecutesWithValidRequest -- PASSED
+========================================================================
+16:21:02.574 [main] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  EXPECTED ERROR TEST: uploadUsesPutMethod
+  Reason: Connection refused -- PUT method used but server unreachable
+  Errors below are INTENTIONAL -- testing error handling paths
+========================================================================
+16:21:02.574 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:02.576 [main] INFO  d.m.q.protocol.HttpTransferProtocol - Starting HTTP upload to http://127.0.0.1:1/uploads/file.txt
+16:21:02.584 [main] ERROR d.m.q.protocol.HttpTransferProtocol - [QUORUS-1211] HTTP upload failed: jobId=upload-put-method-test, error=Connect to http://127.0.0.1:1 failed: Connection refused
+16:21:02.584 [main] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  END EXPECTED ERROR TEST: uploadUsesPutMethod -- PASSED
+========================================================================
+16:21:02.586 [main] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  EXPECTED ERROR TEST: uploadReadsLocalFile
+  Reason: Connection refused -- upload reads file then fails on send
+  Errors below are INTENTIONAL -- testing error handling paths
+========================================================================
+16:21:02.587 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:02.588 [main] INFO  d.m.q.protocol.HttpTransferProtocol - Starting HTTP upload to http://127.0.0.1:1/uploads/file.txt
+16:21:02.608 [main] ERROR d.m.q.protocol.HttpTransferProtocol - [QUORUS-1211] HTTP upload failed: jobId=upload-read-local-test, error=Connect to http://127.0.0.1:1 failed: Connection refused
+16:21:02.609 [main] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  END EXPECTED ERROR TEST: uploadReadsLocalFile -- PASSED
+========================================================================
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.046 s -- in dev.mars.quorus.protocol.HttpTransferProtocolUploadTest$UploadTransferExecutionTests
+[INFO] Running dev.mars.quorus.protocol.HttpTransferProtocolUploadTest$UploadRequestHandlingTests
+16:21:02.611 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:02.616 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+16:21:02.619 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.011 s -- in dev.mars.quorus.protocol.HttpTransferProtocolUploadTest$UploadRequestHandlingTests
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.111 s -- in dev.mars.quorus.protocol.HttpTransferProtocolUploadTest
+[INFO] 
+[INFO] Results:
+[INFO] 
+[INFO] Tests run: 60, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] 
+[INFO] --- jacoco:0.8.15:report (report) @ quorus-core ---
+[INFO] Loading execution data file C:\Users\mraysmit\dev\idea-projects\quorus\quorus-core\target\jacoco.exec
+[INFO] Analyzed bundle 'Quorus Core' with 135 classes
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  9.232 s
+[INFO] Finished at: 2026-09-26T16:21:03+01:00
+[INFO] ------------------------------------------------------------------------

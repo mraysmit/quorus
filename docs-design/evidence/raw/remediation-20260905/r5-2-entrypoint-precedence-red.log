@@ -1,0 +1,8 @@
+Starting Quorus Controller...
+Node ID: controller1
+Raft Host: 0.0.0.0
+Raft Port: 9080
+Election Timeout: 5000ms
+Heartbeat Interval: 1000ms
+ERROR: CLUSTER_NODES environment variable is required
+Format: node1=host1:port1,node2=host2:port2,node3=host3:port3

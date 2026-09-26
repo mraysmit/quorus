@@ -1,0 +1,392 @@
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::staticFieldBase has been called by com.google.inject.internal.aop.HiddenClassDefiner (file:/C:/Users/mraysmit/scoop/apps/maven/current/lib/guice-5.1.0-classes.jar)
+WARNING: Please consider reporting this to the maintainers of class com.google.inject.internal.aop.HiddenClassDefiner
+WARNING: sun.misc.Unsafe::staticFieldBase will be removed in a future release
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] ------------------------< dev.mars:quorus-core >------------------------
+[INFO] Building Quorus Core 1.0-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- jacoco:0.8.15:prepare-agent (prepare-agent) @ quorus-core ---
+[INFO] argLine set to -javaagent:C:\\Users\\mraysmit\\.m2\\repository\\org\\jacoco\\org.jacoco.agent\\0.8.15\\org.jacoco.agent-0.8.15-runtime.jar=destfile=C:\\Users\\mraysmit\\dev\\idea-projects\\quorus\\quorus-core\\target\\jacoco.exec,excludes=sun/**:jdk/**:java/**:com/sun/**:org/jcp/**
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ quorus-core ---
+[INFO] Copying 1 resource from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ quorus-core ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ quorus-core ---
+[INFO] Copying 11 resources from src\test\resources to target\test-classes
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ quorus-core ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- surefire:3.2.2:test (default-test) @ quorus-core ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running dev.mars.quorus.connection.RuntimeProtocolSecurityTest
+[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.091 s -- in dev.mars.quorus.connection.RuntimeProtocolSecurityTest
+[INFO] Running dev.mars.quorus.connection.TlsTrustAnchorPolicyTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.066 s -- in dev.mars.quorus.connection.TlsTrustAnchorPolicyTest
+[INFO] Running dev.mars.quorus.protocol.HttpTransferProtocolTest
+19:40:58.162 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30000ms, readTimeout=60000ms, maxFileSize=10737418240 bytes
+19:40:58.166 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol created with Vert.x Web Client (reactive mode)
+19:40:58.167 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - canHandle: request or sourceUri is null
+19:40:58.212 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30000ms, readTimeout=60000ms, maxFileSize=10737418240 bytes
+19:40:58.223 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol created with Vert.x Web Client (reactive mode)
+19:40:58.225 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - canHandle: HTTP download check, scheme=https, canHandle=true
+19:40:58.268 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30000ms, readTimeout=60000ms, maxFileSize=10737418240 bytes
+19:40:58.268 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol created with Vert.x Web Client (reactive mode)
+19:40:58.269 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - canHandle: HTTP download check, scheme=http, canHandle=true
+19:40:58.304 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30000ms, readTimeout=60000ms, maxFileSize=10737418240 bytes
+19:40:58.304 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol created with Vert.x Web Client (reactive mode)
+19:40:58.305 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - canHandle: HTTP download check, scheme=http, canHandle=true
+19:40:58.305 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - canHandle: HTTP download check, scheme=HTTP, canHandle=true
+19:40:58.305 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - canHandle: HTTP download check, scheme=https, canHandle=true
+19:40:58.305 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - canHandle: HTTP download check, scheme=HTTPS, canHandle=true
+19:40:58.342 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30000ms, readTimeout=60000ms, maxFileSize=10737418240 bytes
+19:40:58.343 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol created with Vert.x Web Client (reactive mode)
+19:40:58.392 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30000ms, readTimeout=60000ms, maxFileSize=10737418240 bytes
+19:40:58.392 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol created with Vert.x Web Client (reactive mode)
+19:40:58.393 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - canHandle: HTTP download check, scheme=sftp, canHandle=false
+19:40:58.429 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30000ms, readTimeout=60000ms, maxFileSize=10737418240 bytes
+19:40:58.429 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol created with Vert.x Web Client (reactive mode)
+19:40:58.463 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30000ms, readTimeout=60000ms, maxFileSize=10737418240 bytes
+19:40:58.463 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol created with Vert.x Web Client (reactive mode)
+19:40:58.500 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30000ms, readTimeout=60000ms, maxFileSize=10737418240 bytes
+19:40:58.501 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol created with Vert.x Web Client (reactive mode)
+19:40:58.501 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - canHandle: HTTP download check, scheme=HtTp, canHandle=true
+19:40:58.503 [main] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  EXPECTED ERROR TEST: testTransferReactiveWithInvalidUrl
+  Reason: Connection refused -- invalid URL triggers connection error
+  Errors below are INTENTIONAL -- testing error handling paths
+========================================================================
+19:40:58.539 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30000ms, readTimeout=60000ms, maxFileSize=10737418240 bytes
+19:40:58.539 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol created with Vert.x Web Client (reactive mode)
+19:40:58.543 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - Starting reactive HTTP transfer: jobId=test-invalid-url, direction=DOWNLOAD (Remote -> Local)
+19:40:58.543 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - Validating HTTP transfer request: requestId=test-invalid-url
+19:40:58.544 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - canHandle: HTTP download check, scheme=http, canHandle=true
+19:40:58.544 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - Request validation passed
+19:40:58.544 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - Routing to HTTP download handler
+19:40:58.544 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - HTTP download: destination=C:\Users\mraysmit\AppData\Local\Temp\http-test7592065115673046752\file.txt, tempFile=C:\Users\mraysmit\AppData\Local\Temp\http-test7592065115673046752\file.txt.tmp
+19:40:58.545 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - Created destination directory: C:\Users\mraysmit\AppData\Local\Temp\http-test7592065115673046752
+19:40:58.546 [main] INFO  d.m.q.protocol.HttpTransferProtocol - Starting reactive HTTP download from http://127.0.0.1:1/file.txt
+19:40:58.724 [vert.x-eventloop-thread-1] ERROR d.m.q.protocol.HttpTransferProtocol - [QUORUS-1206] HTTP download pipeline failed: jobId=test-invalid-url, error=Connection refused: getsockopt: /127.0.0.1:1
+19:40:58.725 [vert.x-eventloop-thread-1] DEBUG d.m.q.protocol.HttpTransferProtocol - HTTP download exception details for job: test-invalid-url
+io.netty.channel.AbstractChannel$AnnotatedConnectException: Connection refused: getsockopt: /127.0.0.1:1
+Caused by: java.net.ConnectException: Connection refused: getsockopt
+	at java.base/sun.nio.ch.Net.pollConnect(Native Method)
+19:40:58.729 [main] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  END EXPECTED ERROR TEST: testTransferReactiveWithInvalidUrl -- PASSED
+========================================================================
+19:40:58.730 [main] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  EXPECTED ERROR TEST: testCreatesDestinationDirectoryIfNeeded
+  Reason: Connection refused -- verifies destination directory created before failure
+  Errors below are INTENTIONAL -- testing error handling paths
+========================================================================
+19:40:58.764 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30000ms, readTimeout=60000ms, maxFileSize=10737418240 bytes
+19:40:58.765 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol created with Vert.x Web Client (reactive mode)
+19:40:58.765 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - Starting reactive HTTP transfer: jobId=test-create-dir, direction=DOWNLOAD (Remote -> Local)
+19:40:58.766 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - Validating HTTP transfer request: requestId=test-create-dir
+19:40:58.766 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - canHandle: HTTP download check, scheme=http, canHandle=true
+19:40:58.766 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - Request validation passed
+19:40:58.766 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - Routing to HTTP download handler
+19:40:58.766 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - HTTP download: destination=C:\Users\mraysmit\AppData\Local\Temp\http-test675234921171168515\level1\level2\level3\file.txt, tempFile=C:\Users\mraysmit\AppData\Local\Temp\http-test675234921171168515\level1\level2\level3\file.txt.tmp
+19:40:58.767 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - Created destination directory: C:\Users\mraysmit\AppData\Local\Temp\http-test675234921171168515\level1\level2\level3
+19:40:58.767 [main] INFO  d.m.q.protocol.HttpTransferProtocol - Starting reactive HTTP download from http://127.0.0.1:1/file.txt
+19:40:58.770 [vert.x-eventloop-thread-1] ERROR d.m.q.protocol.HttpTransferProtocol - [QUORUS-1206] HTTP download pipeline failed: jobId=test-create-dir, error=Connection refused: getsockopt: /127.0.0.1:1
+19:40:58.770 [vert.x-eventloop-thread-1] DEBUG d.m.q.protocol.HttpTransferProtocol - HTTP download exception details for job: test-create-dir
+io.netty.channel.AbstractChannel$AnnotatedConnectException: Connection refused: getsockopt: /127.0.0.1:1
+Caused by: java.net.ConnectException: Connection refused: getsockopt
+	at java.base/sun.nio.ch.Net.pollConnect(Native Method)
+19:40:58.772 [main] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  END EXPECTED ERROR TEST: testCreatesDestinationDirectoryIfNeeded -- PASSED
+========================================================================
+19:40:58.810 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30000ms, readTimeout=60000ms, maxFileSize=10737418240 bytes
+19:40:58.811 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol created with Vert.x Web Client (reactive mode)
+19:40:58.845 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30000ms, readTimeout=60000ms, maxFileSize=10737418240 bytes
+19:40:58.845 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol created with Vert.x Web Client (reactive mode)
+19:40:58.879 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30000ms, readTimeout=60000ms, maxFileSize=10737418240 bytes
+19:40:58.880 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol created with Vert.x Web Client (reactive mode)
+19:40:58.914 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30000ms, readTimeout=60000ms, maxFileSize=10737418240 bytes
+19:40:58.914 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol created with Vert.x Web Client (reactive mode)
+19:40:58.917 [main] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  EXPECTED ERROR TEST: testTransferBlockingCallsReactive
+  Reason: Connection refused -- blocking transfer wraps reactive failure
+  Errors below are INTENTIONAL -- testing error handling paths
+========================================================================
+19:40:58.950 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30000ms, readTimeout=60000ms, maxFileSize=10737418240 bytes
+19:40:58.950 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol created with Vert.x Web Client (reactive mode)
+19:40:58.952 [main] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  END EXPECTED ERROR TEST: testTransferBlockingCallsReactive -- PASSED
+========================================================================
+19:40:58.983 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30000ms, readTimeout=60000ms, maxFileSize=10737418240 bytes
+19:40:58.983 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol created with Vert.x Web Client (reactive mode)
+19:40:59.017 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30000ms, readTimeout=60000ms, maxFileSize=10737418240 bytes
+19:40:59.017 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol created with Vert.x Web Client (reactive mode)
+19:40:59.017 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - canHandle: HTTP download check, scheme=sftp, canHandle=false
+19:40:59.049 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30000ms, readTimeout=60000ms, maxFileSize=10737418240 bytes
+19:40:59.050 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol created with Vert.x Web Client (reactive mode)
+19:40:59.082 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30000ms, readTimeout=60000ms, maxFileSize=10737418240 bytes
+19:40:59.082 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol created with Vert.x Web Client (reactive mode)
+19:40:59.083 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - canHandle: HTTP download check, scheme=ftp, canHandle=false
+19:40:59.113 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30000ms, readTimeout=60000ms, maxFileSize=10737418240 bytes
+19:40:59.114 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol created with Vert.x Web Client (reactive mode)
+19:40:59.115 [main] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  EXPECTED ERROR TEST: testTransferReactiveWithNonHttpProtocol
+  Reason: Wrong protocol scheme -- HTTP rejects ftp:// URI
+  Errors below are INTENTIONAL -- testing error handling paths
+========================================================================
+19:40:59.145 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30000ms, readTimeout=60000ms, maxFileSize=10737418240 bytes
+19:40:59.145 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol created with Vert.x Web Client (reactive mode)
+19:40:59.146 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - Starting reactive HTTP transfer: jobId=test-wrong-protocol, direction=DOWNLOAD (Remote -> Local)
+19:40:59.146 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - Validating HTTP transfer request: requestId=test-wrong-protocol
+19:40:59.146 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - canHandle: HTTP download check, scheme=ftp, canHandle=false
+19:40:59.146 [main] ERROR d.m.q.protocol.HttpTransferProtocol - [QUORUS-1216] HTTP validation: protocol cannot handle this request type
+19:40:59.146 [main] ERROR d.m.q.protocol.HttpTransferProtocol - [QUORUS-1201] HTTP request validation failed: jobId=test-wrong-protocol, error=Transfer test-wrong-protocol failed: HTTP protocol cannot handle this request
+19:40:59.147 [main] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  END EXPECTED ERROR TEST: testTransferReactiveWithNonHttpProtocol -- PASSED
+========================================================================
+19:40:59.176 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30000ms, readTimeout=60000ms, maxFileSize=10737418240 bytes
+19:40:59.177 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol created with Vert.x Web Client (reactive mode)
+19:40:59.178 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - canHandle: HTTP download check, scheme=smb, canHandle=false
+19:40:59.209 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30000ms, readTimeout=60000ms, maxFileSize=10737418240 bytes
+19:40:59.210 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol created with Vert.x Web Client (reactive mode)
+19:40:59.239 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30000ms, readTimeout=60000ms, maxFileSize=10737418240 bytes
+19:40:59.239 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol created with Vert.x Web Client (reactive mode)
+[INFO] Tests run: 24, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.475 s -- in dev.mars.quorus.protocol.HttpTransferProtocolTest
+[INFO] Running dev.mars.quorus.protocol.HttpTransferProtocolUploadTest
+[INFO] Running dev.mars.quorus.protocol.HttpTransferProtocolUploadTest$UploadDownloadCoexistenceTests
+19:40:59.295 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30000ms, readTimeout=60000ms, maxFileSize=10737418240 bytes
+19:40:59.296 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol created with Vert.x Web Client (reactive mode)
+19:40:59.297 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - canHandle: HTTP download check, scheme=http, canHandle=true
+19:40:59.297 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - canHandle: HTTP upload check, scheme=http, canHandle=true
+19:40:59.330 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30000ms, readTimeout=60000ms, maxFileSize=10737418240 bytes
+19:40:59.330 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol created with Vert.x Web Client (reactive mode)
+19:40:59.330 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30000ms, readTimeout=60000ms, maxFileSize=10737418240 bytes
+19:40:59.330 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol created with Vert.x Web Client (reactive mode)
+19:40:59.331 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - canHandle: HTTP download check, scheme=http, canHandle=true
+19:40:59.331 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - canHandle: HTTP download check, scheme=https, canHandle=true
+19:40:59.331 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - canHandle: HTTP upload check, scheme=http, canHandle=true
+19:40:59.331 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - canHandle: HTTP upload check, scheme=https, canHandle=true
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.074 s -- in dev.mars.quorus.protocol.HttpTransferProtocolUploadTest$UploadDownloadCoexistenceTests
+[INFO] Running dev.mars.quorus.protocol.HttpTransferProtocolUploadTest$UploadChecksumTests
+19:40:59.334 [main] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  EXPECTED ERROR TEST: uploadCalculatesChecksum
+  Reason: Connection refused -- checksum calculated before send fails
+  Errors below are INTENTIONAL -- testing error handling paths
+========================================================================
+19:40:59.368 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30000ms, readTimeout=60000ms, maxFileSize=10737418240 bytes
+19:40:59.368 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol created with Vert.x Web Client (reactive mode)
+19:40:59.369 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - Starting reactive HTTP transfer: jobId=upload-checksum-test, direction=UPLOAD (Local -> Remote)
+19:40:59.369 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - Validating HTTP transfer request: requestId=upload-checksum-test
+19:40:59.369 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - canHandle: HTTP upload check, scheme=http, canHandle=true
+19:40:59.369 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - Request validation passed
+19:40:59.369 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - Routing to HTTP upload handler
+19:40:59.369 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - HTTP upload: sourcePath=C:\Users\mraysmit\AppData\Local\Temp\junit1715983224572490890\upload-checksum.txt
+19:40:59.369 [main] INFO  d.m.q.protocol.HttpTransferProtocol - Starting reactive HTTP upload to http://127.0.0.1:1/uploads/file.txt
+19:40:59.369 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - Reading source file: C:\Users\mraysmit\AppData\Local\Temp\junit1715983224572490890\upload-checksum.txt
+19:40:59.386 [vert.x-eventloop-thread-1] DEBUG d.m.q.protocol.HttpTransferProtocol - Source file loaded: 46 bytes
+19:40:59.386 [vert.x-eventloop-thread-1] DEBUG d.m.q.protocol.HttpTransferProtocol - Calculating checksum for source file
+19:40:59.387 [vert.x-eventloop-thread-1] DEBUG d.m.q.protocol.HttpTransferProtocol - Source file checksum: 868ccad2b2b9662f2bee855c3dcf1cb1a94450870871bdf79f8acc656e97d71a
+19:40:59.387 [vert.x-eventloop-thread-1] DEBUG d.m.q.protocol.HttpTransferProtocol - Sending HTTP PUT request: 46 bytes to http://127.0.0.1:1/uploads/file.txt
+19:40:59.392 [vert.x-eventloop-thread-1] ERROR d.m.q.protocol.HttpTransferProtocol - [QUORUS-1211] HTTP upload pipeline failed: jobId=upload-checksum-test, error=Connection refused: getsockopt: /127.0.0.1:1
+19:40:59.392 [vert.x-eventloop-thread-1] DEBUG d.m.q.protocol.HttpTransferProtocol - HTTP upload exception details for job: upload-checksum-test
+io.netty.channel.AbstractChannel$AnnotatedConnectException: Connection refused: getsockopt: /127.0.0.1:1
+Caused by: java.net.ConnectException: Connection refused: getsockopt
+	at java.base/sun.nio.ch.Net.pollConnect(Native Method)
+19:40:59.393 [main] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  END EXPECTED ERROR TEST: uploadCalculatesChecksum -- PASSED
+========================================================================
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.061 s -- in dev.mars.quorus.protocol.HttpTransferProtocolUploadTest$UploadChecksumTests
+[INFO] Running dev.mars.quorus.protocol.HttpTransferProtocolUploadTest$UploadErrorHandlingTests
+19:40:59.396 [main] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  EXPECTED ERROR TEST: uploadFailsWithConnectionTimeout
+  Reason: Connection refused -- verifies timeout error handling
+  Errors below are INTENTIONAL -- testing error handling paths
+========================================================================
+19:40:59.427 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30000ms, readTimeout=60000ms, maxFileSize=10737418240 bytes
+19:40:59.427 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol created with Vert.x Web Client (reactive mode)
+19:40:59.429 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - Starting reactive HTTP transfer: jobId=upload-timeout-test, direction=UPLOAD (Local -> Remote)
+19:40:59.429 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - Validating HTTP transfer request: requestId=upload-timeout-test
+19:40:59.429 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - canHandle: HTTP upload check, scheme=http, canHandle=true
+19:40:59.429 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - Request validation passed
+19:40:59.429 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - Routing to HTTP upload handler
+19:40:59.429 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - HTTP upload: sourcePath=C:\Users\mraysmit\AppData\Local\Temp\junit10129727647078480289\upload-timeout.txt
+19:40:59.430 [main] INFO  d.m.q.protocol.HttpTransferProtocol - Starting reactive HTTP upload to http://127.0.0.1:1/uploads/file.txt
+19:40:59.430 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - Reading source file: C:\Users\mraysmit\AppData\Local\Temp\junit10129727647078480289\upload-timeout.txt
+19:40:59.436 [vert.x-eventloop-thread-1] DEBUG d.m.q.protocol.HttpTransferProtocol - Source file loaded: 24 bytes
+19:40:59.437 [vert.x-eventloop-thread-1] DEBUG d.m.q.protocol.HttpTransferProtocol - Calculating checksum for source file
+19:40:59.437 [vert.x-eventloop-thread-1] DEBUG d.m.q.protocol.HttpTransferProtocol - Source file checksum: fce55c9ac4aaff218d1049f2eefcb10fa3fa1e6ac5a105c05bcf28521e93a813
+19:40:59.437 [vert.x-eventloop-thread-1] DEBUG d.m.q.protocol.HttpTransferProtocol - Sending HTTP PUT request: 24 bytes to http://127.0.0.1:1/uploads/file.txt
+19:40:59.439 [vert.x-eventloop-thread-1] ERROR d.m.q.protocol.HttpTransferProtocol - [QUORUS-1211] HTTP upload pipeline failed: jobId=upload-timeout-test, error=Connection refused: getsockopt: /127.0.0.1:1
+19:40:59.439 [vert.x-eventloop-thread-1] DEBUG d.m.q.protocol.HttpTransferProtocol - HTTP upload exception details for job: upload-timeout-test
+io.netty.channel.AbstractChannel$AnnotatedConnectException: Connection refused: getsockopt: /127.0.0.1:1
+Caused by: java.net.ConnectException: Connection refused: getsockopt
+	at java.base/sun.nio.ch.Net.pollConnect(Native Method)
+19:40:59.441 [main] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  END EXPECTED ERROR TEST: uploadFailsWithConnectionTimeout -- PASSED
+========================================================================
+19:40:59.442 [main] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  EXPECTED ERROR TEST: uploadFailsWithNonExistentFile
+  Reason: Source file missing -- verifies TransferException before connect
+  Errors below are INTENTIONAL -- testing error handling paths
+========================================================================
+19:40:59.472 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30000ms, readTimeout=60000ms, maxFileSize=10737418240 bytes
+19:40:59.473 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol created with Vert.x Web Client (reactive mode)
+19:40:59.473 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - Starting reactive HTTP transfer: jobId=upload-missing-file-test, direction=UPLOAD (Local -> Remote)
+19:40:59.473 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - Validating HTTP transfer request: requestId=upload-missing-file-test
+19:40:59.473 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - canHandle: HTTP upload check, scheme=http, canHandle=true
+19:40:59.473 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - Request validation passed
+19:40:59.473 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - Routing to HTTP upload handler
+19:40:59.473 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - HTTP upload: sourcePath=C:\Users\mraysmit\AppData\Local\Temp\junit9664392705954970167\does-not-exist.txt
+19:40:59.474 [main] ERROR d.m.q.protocol.HttpTransferProtocol - [QUORUS-1208] HTTP upload source file not found: C:\Users\mraysmit\AppData\Local\Temp\junit9664392705954970167\does-not-exist.txt
+19:40:59.474 [main] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  END EXPECTED ERROR TEST: uploadFailsWithNonExistentFile -- PASSED
+========================================================================
+19:40:59.508 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30000ms, readTimeout=60000ms, maxFileSize=10737418240 bytes
+19:40:59.509 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol created with Vert.x Web Client (reactive mode)
+19:40:59.510 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - canHandle: HTTP upload check, scheme=ftp, canHandle=false
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.116 s -- in dev.mars.quorus.protocol.HttpTransferProtocolUploadTest$UploadErrorHandlingTests
+[INFO] Running dev.mars.quorus.protocol.HttpTransferProtocolUploadTest$UploadTransferExecutionTests
+19:40:59.514 [main] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  EXPECTED ERROR TEST: uploadExecutesWithValidRequest
+  Reason: Connection refused -- upload to non-existent server
+  Errors below are INTENTIONAL -- testing error handling paths
+========================================================================
+19:40:59.549 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30000ms, readTimeout=60000ms, maxFileSize=10737418240 bytes
+19:40:59.549 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol created with Vert.x Web Client (reactive mode)
+19:40:59.550 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - Starting reactive HTTP transfer: jobId=upload-exec-test, direction=UPLOAD (Local -> Remote)
+19:40:59.550 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - Validating HTTP transfer request: requestId=upload-exec-test
+19:40:59.550 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - canHandle: HTTP upload check, scheme=http, canHandle=true
+19:40:59.550 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - Request validation passed
+19:40:59.551 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - Routing to HTTP upload handler
+19:40:59.551 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - HTTP upload: sourcePath=C:\Users\mraysmit\AppData\Local\Temp\junit16759927627652743835\upload-execute.txt
+19:40:59.551 [main] INFO  d.m.q.protocol.HttpTransferProtocol - Starting reactive HTTP upload to http://127.0.0.1:1/uploads/file.txt
+19:40:59.551 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - Reading source file: C:\Users\mraysmit\AppData\Local\Temp\junit16759927627652743835\upload-execute.txt
+19:40:59.557 [vert.x-eventloop-thread-1] DEBUG d.m.q.protocol.HttpTransferProtocol - Source file loaded: 28 bytes
+19:40:59.557 [vert.x-eventloop-thread-1] DEBUG d.m.q.protocol.HttpTransferProtocol - Calculating checksum for source file
+19:40:59.558 [vert.x-eventloop-thread-1] DEBUG d.m.q.protocol.HttpTransferProtocol - Source file checksum: c5fcd2c8f770d14a02d2c443382f5da4c2f24fd1a7375e39803ea30d8b359963
+19:40:59.558 [vert.x-eventloop-thread-1] DEBUG d.m.q.protocol.HttpTransferProtocol - Sending HTTP PUT request: 28 bytes to http://127.0.0.1:1/uploads/file.txt
+19:40:59.561 [vert.x-eventloop-thread-1] ERROR d.m.q.protocol.HttpTransferProtocol - [QUORUS-1211] HTTP upload pipeline failed: jobId=upload-exec-test, error=Connection refused: getsockopt: /127.0.0.1:1
+19:40:59.561 [vert.x-eventloop-thread-1] DEBUG d.m.q.protocol.HttpTransferProtocol - HTTP upload exception details for job: upload-exec-test
+io.netty.channel.AbstractChannel$AnnotatedConnectException: Connection refused: getsockopt: /127.0.0.1:1
+Caused by: java.net.ConnectException: Connection refused: getsockopt
+	at java.base/sun.nio.ch.Net.pollConnect(Native Method)
+19:40:59.562 [main] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  END EXPECTED ERROR TEST: uploadExecutesWithValidRequest -- PASSED
+========================================================================
+19:40:59.564 [main] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  EXPECTED ERROR TEST: uploadUsesPutMethod
+  Reason: Connection refused -- PUT method used but server unreachable
+  Errors below are INTENTIONAL -- testing error handling paths
+========================================================================
+19:40:59.595 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30000ms, readTimeout=60000ms, maxFileSize=10737418240 bytes
+19:40:59.596 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol created with Vert.x Web Client (reactive mode)
+19:40:59.597 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - Starting reactive HTTP transfer: jobId=upload-put-method-test, direction=UPLOAD (Local -> Remote)
+19:40:59.597 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - Validating HTTP transfer request: requestId=upload-put-method-test
+19:40:59.597 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - canHandle: HTTP upload check, scheme=http, canHandle=true
+19:40:59.597 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - Request validation passed
+19:40:59.597 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - Routing to HTTP upload handler
+19:40:59.597 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - HTTP upload: sourcePath=C:\Users\mraysmit\AppData\Local\Temp\junit13144148802548008979\upload-put-test.txt
+19:40:59.597 [main] INFO  d.m.q.protocol.HttpTransferProtocol - Starting reactive HTTP upload to http://127.0.0.1:1/uploads/file.txt
+19:40:59.597 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - Reading source file: C:\Users\mraysmit\AppData\Local\Temp\junit13144148802548008979\upload-put-test.txt
+19:40:59.605 [vert.x-eventloop-thread-1] DEBUG d.m.q.protocol.HttpTransferProtocol - Source file loaded: 23 bytes
+19:40:59.605 [vert.x-eventloop-thread-1] DEBUG d.m.q.protocol.HttpTransferProtocol - Calculating checksum for source file
+19:40:59.606 [vert.x-eventloop-thread-1] DEBUG d.m.q.protocol.HttpTransferProtocol - Source file checksum: 424bfe9342a4d06c4d0347b99025a91681db92ea421814363bde8d6cd7171151
+19:40:59.606 [vert.x-eventloop-thread-1] DEBUG d.m.q.protocol.HttpTransferProtocol - Sending HTTP PUT request: 23 bytes to http://127.0.0.1:1/uploads/file.txt
+19:40:59.609 [vert.x-eventloop-thread-1] ERROR d.m.q.protocol.HttpTransferProtocol - [QUORUS-1211] HTTP upload pipeline failed: jobId=upload-put-method-test, error=Connection refused: getsockopt: /127.0.0.1:1
+19:40:59.610 [vert.x-eventloop-thread-1] DEBUG d.m.q.protocol.HttpTransferProtocol - HTTP upload exception details for job: upload-put-method-test
+io.netty.channel.AbstractChannel$AnnotatedConnectException: Connection refused: getsockopt: /127.0.0.1:1
+Caused by: java.net.ConnectException: Connection refused: getsockopt
+	at java.base/sun.nio.ch.Net.pollConnect(Native Method)
+19:40:59.611 [main] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  END EXPECTED ERROR TEST: uploadUsesPutMethod -- PASSED
+========================================================================
+19:40:59.615 [main] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  EXPECTED ERROR TEST: uploadReadsLocalFile
+  Reason: Connection refused -- upload reads file then fails on send
+  Errors below are INTENTIONAL -- testing error handling paths
+========================================================================
+19:40:59.671 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30000ms, readTimeout=60000ms, maxFileSize=10737418240 bytes
+19:40:59.671 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol created with Vert.x Web Client (reactive mode)
+19:40:59.674 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - Starting reactive HTTP transfer: jobId=upload-read-local-test, direction=UPLOAD (Local -> Remote)
+19:40:59.674 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - Validating HTTP transfer request: requestId=upload-read-local-test
+19:40:59.674 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - canHandle: HTTP upload check, scheme=http, canHandle=true
+19:40:59.674 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - Request validation passed
+19:40:59.674 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - Routing to HTTP upload handler
+19:40:59.674 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - HTTP upload: sourcePath=C:\Users\mraysmit\AppData\Local\Temp\junit2967846992634943709\upload-read-test.txt
+19:40:59.674 [main] INFO  d.m.q.protocol.HttpTransferProtocol - Starting reactive HTTP upload to http://127.0.0.1:1/uploads/file.txt
+19:40:59.674 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - Reading source file: C:\Users\mraysmit\AppData\Local\Temp\junit2967846992634943709\upload-read-test.txt
+19:40:59.683 [vert.x-eventloop-thread-1] DEBUG d.m.q.protocol.HttpTransferProtocol - Source file loaded: 54 bytes
+19:40:59.683 [vert.x-eventloop-thread-1] DEBUG d.m.q.protocol.HttpTransferProtocol - Calculating checksum for source file
+19:40:59.683 [vert.x-eventloop-thread-1] DEBUG d.m.q.protocol.HttpTransferProtocol - Source file checksum: aefc34f30da3fffdd0eeaf92654e8c97eee760f3b071fb5efe6979761287f7c1
+19:40:59.684 [vert.x-eventloop-thread-1] DEBUG d.m.q.protocol.HttpTransferProtocol - Sending HTTP PUT request: 54 bytes to http://127.0.0.1:1/uploads/file.txt
+19:40:59.687 [vert.x-eventloop-thread-1] ERROR d.m.q.protocol.HttpTransferProtocol - [QUORUS-1211] HTTP upload pipeline failed: jobId=upload-read-local-test, error=Connection refused: getsockopt: /127.0.0.1:1
+19:40:59.688 [vert.x-eventloop-thread-1] DEBUG d.m.q.protocol.HttpTransferProtocol - HTTP upload exception details for job: upload-read-local-test
+io.netty.channel.AbstractChannel$AnnotatedConnectException: Connection refused: getsockopt: /127.0.0.1:1
+Caused by: java.net.ConnectException: Connection refused: getsockopt
+	at java.base/sun.nio.ch.Net.pollConnect(Native Method)
+19:40:59.689 [main] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  END EXPECTED ERROR TEST: uploadReadsLocalFile -- PASSED
+========================================================================
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.178 s -- in dev.mars.quorus.protocol.HttpTransferProtocolUploadTest$UploadTransferExecutionTests
+[INFO] Running dev.mars.quorus.protocol.HttpTransferProtocolUploadTest$UploadRequestHandlingTests
+19:40:59.748 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30000ms, readTimeout=60000ms, maxFileSize=10737418240 bytes
+19:40:59.762 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol created with Vert.x Web Client (reactive mode)
+19:40:59.764 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - canHandle: HTTP upload check, scheme=https, canHandle=true
+19:40:59.819 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30000ms, readTimeout=60000ms, maxFileSize=10737418240 bytes
+19:40:59.819 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol created with Vert.x Web Client (reactive mode)
+19:40:59.874 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30000ms, readTimeout=60000ms, maxFileSize=10737418240 bytes
+19:40:59.874 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol created with Vert.x Web Client (reactive mode)
+19:40:59.875 [main] DEBUG d.m.q.protocol.HttpTransferProtocol - canHandle: HTTP upload check, scheme=http, canHandle=true
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.185 s -- in dev.mars.quorus.protocol.HttpTransferProtocolUploadTest$UploadRequestHandlingTests
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.622 s -- in dev.mars.quorus.protocol.HttpTransferProtocolUploadTest
+[INFO] 
+[INFO] Results:
+[INFO] 
+[INFO] Tests run: 46, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] 
+[INFO] --- jacoco:0.8.15:report (report) @ quorus-core ---
+[INFO] Loading execution data file C:\Users\mraysmit\dev\idea-projects\quorus\quorus-core\target\jacoco.exec
+[INFO] Analyzed bundle 'Quorus Core' with 128 classes
+[WARNING] Classes in bundle 'Quorus Core' do not match with execution data. For report generation the same class files must be used as at runtime.
+[WARNING] Execution data for class dev/mars/quorus/protocol/FtpTransferProtocol$FtpClient does not match.
+[WARNING] Execution data for class dev/mars/quorus/protocol/ProtocolFactory does not match.
+[WARNING] Execution data for class dev/mars/quorus/protocol/FtpTransferProtocol does not match.
+[WARNING] Execution data for class dev/mars/quorus/protocol/FtpTransferProtocol$FtpConnectionInfo does not match.
+[WARNING] Execution data for class dev/mars/quorus/protocol/FtpTransferProtocol$DataConnectionInfo does not match.
+[WARNING] Execution data for class dev/mars/quorus/protocol/FtpTransferProtocol$FtpsMode does not match.
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  5.682 s
+[INFO] Finished at: 2026-09-05T19:41:00+08:00
+[INFO] ------------------------------------------------------------------------

@@ -1,0 +1,1906 @@
+time="2026-09-05T18:41:10+08:00" level=warning msg="C:\\Users\\mraysmit\\dev\\idea-projects\\quorus\\quorus-controller\\src\\test\\resources\\docker-compose-build-image.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Image quorus-controller:test Building 
+#1 [internal] load local bake definitions
+#1 reading from stdin 686B done
+#1 DONE 0.0s
+
+#2 [internal] load build definition from Dockerfile
+#2 transferring dockerfile: 5.28kB done
+#2 DONE 0.0s
+
+#3 resolve image config for docker-image://docker.io/docker/dockerfile:1.4
+#3 ...
+
+#4 [auth] docker/dockerfile:pull token for registry-1.docker.io
+#4 DONE 0.0s
+
+#3 resolve image config for docker-image://docker.io/docker/dockerfile:1.4
+#3 DONE 2.7s
+
+#5 docker-image://docker.io/docker/dockerfile:1.4@sha256:9ba7531bd80fb0a858632727cf7a112fbfd19b17e94c4e84ced81e24ef1a0dbc
+#5 CACHED
+
+#6 [internal] load .dockerignore
+#6 transferring context: 801B done
+#6 DONE 0.0s
+
+#7 [context m2cache] load .dockerignore
+#7 transferring m2cache: 2B done
+#7 DONE 0.0s
+
+#8 [internal] load metadata for docker.io/library/maven:3.9.11-eclipse-temurin-25
+#8 ...
+
+#9 [auth] library/maven:pull token for registry-1.docker.io
+#9 DONE 0.0s
+
+#10 [auth] library/eclipse-temurin:pull token for registry-1.docker.io
+#10 DONE 0.0s
+
+#11 [internal] load metadata for docker.io/library/eclipse-temurin:25-jre-alpine
+#11 ...
+
+#8 [internal] load metadata for docker.io/library/maven:3.9.11-eclipse-temurin-25
+#8 DONE 1.5s
+
+#11 [internal] load metadata for docker.io/library/eclipse-temurin:25-jre-alpine
+#11 DONE 1.5s
+
+#12 [builder  1/17] FROM docker.io/library/maven:3.9.11-eclipse-temurin-25@sha256:407c4423cec0cf2981055bc2c6c0dc211d9605b6669279b95997f2d1c7e91e2c
+#12 DONE 0.0s
+
+#13 [stage-1 1/6] FROM docker.io/library/eclipse-temurin:25-jre-alpine@sha256:3137541deb3cac6626b5d9a4a2187bc0d6a34312f858bd2c67dd01e732e6b682
+#13 DONE 0.0s
+
+#14 [context m2cache] load from client
+#14 transferring m2cache: 933.70kB 0.1s done
+#14 DONE 0.1s
+
+#15 [internal] load build context
+#15 transferring context: 144.47kB 0.1s done
+#15 DONE 0.1s
+
+#16 [builder  2/17] WORKDIR /app
+#16 CACHED
+
+#17 [builder  4/17] COPY quorus-core/pom.xml quorus-core/
+#17 CACHED
+
+#18 [builder  6/17] COPY quorus-tenant/pom.xml quorus-tenant/
+#18 CACHED
+
+#19 [builder  9/17] RUN mkdir -p quorus-agent && echo '<?xml version="1.0" encoding="UTF-8"?><project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"><modelVersion>4.0.0</modelVersion><parent><groupId>dev.mars</groupId><artifactId>quorus</artifactId><version>1.0-SNAPSHOT</version></parent><artifactId>quorus-agent</artifactId><packaging>pom</packaging></project>' > quorus-agent/pom.xml
+#19 CACHED
+
+#20 [builder  3/17] COPY pom.xml .
+#20 CACHED
+
+#21 [builder  7/17] COPY quorus-controller/pom.xml quorus-controller/
+#21 CACHED
+
+#22 [builder  5/17] COPY quorus-workflow/pom.xml quorus-workflow/
+#22 CACHED
+
+#23 [builder  8/17] RUN mkdir -p quorus-integration-examples && echo '<?xml version="1.0" encoding="UTF-8"?><project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"><modelVersion>4.0.0</modelVersion><parent><groupId>dev.mars</groupId><artifactId>quorus</artifactId><version>1.0-SNAPSHOT</version></parent><artifactId>quorus-integration-examples</artifactId><packaging>pom</packaging></project>' > quorus-integration-examples/pom.xml
+#23 CACHED
+
+#24 [builder 10/17] RUN mkdir -p quorus-api && echo '<?xml version="1.0" encoding="UTF-8"?><project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"><modelVersion>4.0.0</modelVersion><parent><groupId>dev.mars</groupId><artifactId>quorus</artifactId><version>1.0-SNAPSHOT</version></parent><artifactId>quorus-api</artifactId><packaging>pom</packaging></project>' > quorus-api/pom.xml
+#24 CACHED
+
+#25 [builder 11/17] COPY --from=m2cache / /root/.m2/repository/dev/mars
+#25 DONE 1.0s
+
+#26 [builder 12/17] RUN --mount=type=cache,target=/root/.m2/repository/org     --mount=type=cache,target=/root/.m2/repository/io     --mount=type=cache,target=/root/.m2/repository/com     --mount=type=cache,target=/root/.m2/repository/net     mvn dependency:go-offline -pl quorus-controller -am -Dsilent=true || true
+#26 1.726 WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+#26 1.726 WARNING: sun.misc.Unsafe::staticFieldBase has been called by com.google.inject.internal.aop.HiddenClassDefiner (file:/usr/share/maven/lib/guice-5.1.0-classes.jar)
+#26 1.726 WARNING: Please consider reporting this to the maintainers of class com.google.inject.internal.aop.HiddenClassDefiner
+#26 1.726 WARNING: sun.misc.Unsafe::staticFieldBase will be removed in a future release
+#26 2.155 [INFO] Scanning for projects...
+#26 2.370 [INFO] ------------------------------------------------------------------------
+#26 2.370 [INFO] Reactor Build Order:
+#26 2.370 [INFO] 
+#26 2.371 [INFO] Quorus File Transfer System                                        [pom]
+#26 2.371 [INFO] Quorus Core                                                        [jar]
+#26 2.371 [INFO] Quorus Workflow Engine                                             [jar]
+#26 2.372 [INFO] Quorus Tenant Management                                           [jar]
+#26 2.372 [INFO] Quorus Distributed Controller                                      [jar]
+#26 2.596 [INFO] 
+#26 2.596 [INFO] --------------------------< dev.mars:quorus >---------------------------
+#26 2.596 [INFO] Building Quorus File Transfer System 1.0-SNAPSHOT                  [1/5]
+#26 2.597 [INFO]   from pom.xml
+#26 2.597 [INFO] --------------------------------[ pom ]---------------------------------
+#26 2.603 [INFO] 
+#26 2.603 [INFO] --- dependency:3.7.0:go-offline (default-cli) @ quorus ---
+#26 2.914 Downloading from central: https://repo.maven.apache.org/maven2/commons-io/commons-io/2.6/commons-io-2.6.pom
+#26 4.672 Progress (1): 782 B
+Progress (1): 1.7 kB
+Progress (1): 4.5 kB
+Progress (1): 7.0 kB
+Progress (1): 8.3 kB
+Progress (1): 10 kB 
+Progress (1): 13 kB
+Progress (1): 14 kB
+                   
+Downloaded from central: https://repo.maven.apache.org/maven2/commons-io/commons-io/2.6/commons-io-2.6.pom (14 kB at 8.0 kB/s)
+#26 4.819 Downloading from central: https://repo.maven.apache.org/maven2/commons-logging/commons-logging/1.2/commons-logging-1.2.pom
+#26 5.035 Progress (1): 768 B
+Progress (1): 1.7 kB
+Progress (1): 4.5 kB
+Progress (1): 6.6 kB
+Progress (1): 9.3 kB
+Progress (1): 12 kB 
+Progress (1): 15 kB
+Progress (1): 17 kB
+Progress (1): 19 kB
+                   
+Downloaded from central: https://repo.maven.apache.org/maven2/commons-logging/commons-logging/1.2/commons-logging-1.2.pom (19 kB at 82 kB/s)
+#26 5.062 Downloading from central: https://repo.maven.apache.org/maven2/commons-codec/commons-codec/1.11/commons-codec-1.11.pom
+#26 5.278 Progress (1): 752 B
+Progress (1): 1.6 kB
+Progress (1): 3.3 kB
+Progress (1): 5.8 kB
+Progress (1): 7.3 kB
+Progress (1): 9.3 kB
+Progress (1): 12 kB 
+Progress (1): 14 kB
+                   
+Downloaded from central: https://repo.maven.apache.org/maven2/commons-codec/commons-codec/1.11/commons-codec-1.11.pom (14 kB at 62 kB/s)
+#26 5.373 Downloading from central: https://repo.maven.apache.org/maven2/commons-collections/commons-collections/3.1/commons-collections-3.1.pom
+#26 5.585 Progress (1): 2.2 kB
+Progress (1): 4.8 kB
+Progress (1): 6.1 kB
+                    
+Downloaded from central: https://repo.maven.apache.org/maven2/commons-collections/commons-collections/3.1/commons-collections-3.1.pom (6.1 kB at 28 kB/s)
+#26 5.595 Downloading from central: https://repo.maven.apache.org/maven2/commons-collections/commons-collections/3.2.1/commons-collections-3.2.1.pom
+#26 5.812 Progress (1): 795 B
+Progress (1): 1.8 kB
+Progress (1): 5.0 kB
+Progress (1): 8.8 kB
+Progress (1): 11 kB 
+Progress (1): 13 kB
+                   
+Downloaded from central: https://repo.maven.apache.org/maven2/commons-collections/commons-collections/3.2.1/commons-collections-3.2.1.pom (13 kB at 55 kB/s)
+#26 5.828 Downloading from central: https://repo.maven.apache.org/maven2/commons-lang/commons-lang/2.4/commons-lang-2.4.pom
+#26 6.075 Progress (1): 791 B
+Progress (1): 1.7 kB
+Progress (1): 5.0 kB
+Progress (1): 9.1 kB
+Progress (1): 12 kB 
+Progress (1): 14 kB
+Progress (1): 14 kB
+                   
+Downloaded from central: https://repo.maven.apache.org/maven2/commons-lang/commons-lang/2.4/commons-lang-2.4.pom (14 kB at 55 kB/s)
+#26 6.091 Downloading from central: https://repo.maven.apache.org/maven2/commons-beanutils/commons-beanutils/1.7.0/commons-beanutils-1.7.0.pom
+#26 6.305 Progress (1): 357 B
+                   
+Downloaded from central: https://repo.maven.apache.org/maven2/commons-beanutils/commons-beanutils/1.7.0/commons-beanutils-1.7.0.pom (357 B at 1.6 kB/s)
+#26 6.314 Downloading from central: https://repo.maven.apache.org/maven2/commons-logging/commons-logging/1.0.3/commons-logging-1.0.3.pom
+#26 6.525 Progress (1): 866 B
+                   
+Downloaded from central: https://repo.maven.apache.org/maven2/commons-logging/commons-logging/1.0.3/commons-logging-1.0.3.pom (866 B at 4.1 kB/s)
+#26 6.530 Downloading from central: https://repo.maven.apache.org/maven2/commons-digester/commons-digester/1.8/commons-digester-1.8.pom
+#26 6.742 Progress (1): 1.1 kB
+Progress (1): 2.9 kB
+Progress (1): 5.7 kB
+Progress (1): 7.0 kB
+                    
+Downloaded from central: https://repo.maven.apache.org/maven2/commons-digester/commons-digester/1.8/commons-digester-1.8.pom (7.0 kB at 33 kB/s)
+#26 6.748 Downloading from central: https://repo.maven.apache.org/maven2/commons-logging/commons-logging/1.1/commons-logging-1.1.pom
+#26 6.962 Progress (1): 1.4 kB
+Progress (1): 3.8 kB
+Progress (1): 6.1 kB
+Progress (1): 6.2 kB
+                    
+Downloaded from central: https://repo.maven.apache.org/maven2/commons-logging/commons-logging/1.1/commons-logging-1.1.pom (6.2 kB at 28 kB/s)
+#26 6.973 Downloading from central: https://repo.maven.apache.org/maven2/log4j/log4j/1.2.12/log4j-1.2.12.pom
+#26 7.188 Progress (1): 145 B
+                   
+Downloaded from central: https://repo.maven.apache.org/maven2/log4j/log4j/1.2.12/log4j-1.2.12.pom (145 B at 671 B/s)
+#26 7.192 Downloading from central: https://repo.maven.apache.org/maven2/logkit/logkit/1.0.1/logkit-1.0.1.pom
+#26 7.411 Progress (1): 147 B
+                   
+Downloaded from central: https://repo.maven.apache.org/maven2/logkit/logkit/1.0.1/logkit-1.0.1.pom (147 B at 668 B/s)
+#26 7.415 Downloading from central: https://repo.maven.apache.org/maven2/avalon-framework/avalon-framework/4.1.3/avalon-framework-4.1.3.pom
+#26 7.628 Progress (1): 167 B
+                   
+Downloaded from central: https://repo.maven.apache.org/maven2/avalon-framework/avalon-framework/4.1.3/avalon-framework-4.1.3.pom (167 B at 776 B/s)
+#26 7.632 Downloading from central: https://repo.maven.apache.org/maven2/commons-chain/commons-chain/1.1/commons-chain-1.1.pom
+#26 7.848 Progress (1): 1.5 kB
+Progress (1): 3.0 kB
+Progress (1): 6.0 kB
+Progress (1): 6.0 kB
+                    
+Downloaded from central: https://repo.maven.apache.org/maven2/commons-chain/commons-chain/1.1/commons-chain-1.1.pom (6.0 kB at 27 kB/s)
+#26 7.855 Downloading from central: https://repo.maven.apache.org/maven2/commons-digester/commons-digester/1.6/commons-digester-1.6.pom
+#26 8.063 Progress (1): 974 B
+                   
+Downloaded from central: https://repo.maven.apache.org/maven2/commons-digester/commons-digester/1.6/commons-digester-1.6.pom (974 B at 4.6 kB/s)
+#26 8.069 Downloading from central: https://repo.maven.apache.org/maven2/commons-beanutils/commons-beanutils/1.6/commons-beanutils-1.6.pom
+#26 8.283 Progress (1): 1.9 kB
+Progress (1): 2.3 kB
+                    
+Downloaded from central: https://repo.maven.apache.org/maven2/commons-beanutils/commons-beanutils/1.6/commons-beanutils-1.6.pom (2.3 kB at 11 kB/s)
+#26 8.292 Downloading from central: https://repo.maven.apache.org/maven2/commons-logging/commons-logging/1.0/commons-logging-1.0.pom
+#26 8.507 Progress (1): 163 B
+                   
+Downloaded from central: https://repo.maven.apache.org/maven2/commons-logging/commons-logging/1.0/commons-logging-1.0.pom (163 B at 754 B/s)
+#26 8.512 Downloading from central: https://repo.maven.apache.org/maven2/commons-collections/commons-collections/2.0/commons-collections-2.0.pom
+#26 8.723 Progress (1): 171 B
+                   
+Downloaded from central: https://repo.maven.apache.org/maven2/commons-collections/commons-collections/2.0/commons-collections-2.0.pom (171 B at 806 B/s)
+#26 8.730 Downloading from central: https://repo.maven.apache.org/maven2/commons-collections/commons-collections/2.1/commons-collections-2.1.pom
+#26 8.941 Progress (1): 2.7 kB
+Progress (1): 3.3 kB
+                    
+Downloaded from central: https://repo.maven.apache.org/maven2/commons-collections/commons-collections/2.1/commons-collections-2.1.pom (3.3 kB at 16 kB/s)
+#26 8.948 Downloading from central: https://repo.maven.apache.org/maven2/xml-apis/xml-apis/1.0.b2/xml-apis-1.0.b2.pom
+#26 9.158 Progress (1): 955 B
+Progress (1): 2.2 kB
+                    
+Downloaded from central: https://repo.maven.apache.org/maven2/xml-apis/xml-apis/1.0.b2/xml-apis-1.0.b2.pom (2.2 kB at 11 kB/s)
+#26 9.166 Downloading from central: https://repo.maven.apache.org/maven2/commons-collections/commons-collections/3.2/commons-collections-3.2.pom
+#26 9.376 Progress (1): 1.5 kB
+Progress (1): 4.9 kB
+Progress (1): 8.5 kB
+Progress (1): 10 kB 
+Progress (1): 11 kB
+                   
+Downloaded from central: https://repo.maven.apache.org/maven2/commons-collections/commons-collections/3.2/commons-collections-3.2.pom (11 kB at 51 kB/s)
+#26 9.388 Downloading from central: https://repo.maven.apache.org/maven2/dom4j/dom4j/1.1/dom4j-1.1.pom
+#26 9.605 Progress (1): 142 B
+                   
+Downloaded from central: https://repo.maven.apache.org/maven2/dom4j/dom4j/1.1/dom4j-1.1.pom (142 B at 648 B/s)
+#26 9.609 Downloading from central: https://repo.maven.apache.org/maven2/oro/oro/2.0.8/oro-2.0.8.pom
+#26 9.828 Progress (1): 140 B
+                   
+Downloaded from central: https://repo.maven.apache.org/maven2/oro/oro/2.0.8/oro-2.0.8.pom (140 B at 633 B/s)
+#26 9.835 Downloading from central: https://repo.maven.apache.org/maven2/commons-collections/commons-collections/3.2.2/commons-collections-3.2.2.pom
+#26 10.05 Progress (1): 785 B
+Progress (1): 2.4 kB
+Progress (1): 5.9 kB
+Progress (1): 9.5 kB
+Progress (1): 11 kB 
+Progress (1): 12 kB
+                   
+Downloaded from central: https://repo.maven.apache.org/maven2/commons-collections/commons-collections/3.2.2/commons-collections-3.2.2.pom (12 kB at 57 kB/s)
+#26 10.07 Downloading from central: https://repo.maven.apache.org/maven2/javax/inject/javax.inject/1/javax.inject-1.pom
+#26 10.28 Progress (1): 612 B
+                   
+Downloaded from central: https://repo.maven.apache.org/maven2/javax/inject/javax.inject/1/javax.inject-1.pom (612 B at 2.8 kB/s)
+#26 10.30 Downloading from central: https://repo.maven.apache.org/maven2/commons-io/commons-io/2.15.1/commons-io-2.15.1.pom
+#26 10.52 Progress (1): 765 B
+Progress (1): 2.1 kB
+Progress (1): 5.2 kB
+Progress (1): 7.6 kB
+Progress (1): 10 kB 
+Progress (1): 12 kB
+Progress (1): 15 kB
+Progress (1): 16 kB
+Progress (1): 19 kB
+Progress (1): 20 kB
+                   
+Downloaded from central: https://repo.maven.apache.org/maven2/commons-io/commons-io/2.15.1/commons-io-2.15.1.pom (20 kB at 87 kB/s)
+#26 10.55 Downloading from central: https://repo.maven.apache.org/maven2/commons-codec/commons-codec/1.16.1/commons-codec-1.16.1.pom
+#26 10.77 Progress (1): 749 B
+Progress (1): 1.9 kB
+Progress (1): 3.8 kB
+Progress (1): 6.3 kB
+Progress (1): 8.7 kB
+Progress (1): 11 kB 
+Progress (1): 13 kB
+Progress (1): 14 kB
+Progress (1): 16 kB
+                   
+Downloaded from central: https://repo.maven.apache.org/maven2/commons-codec/commons-codec/1.16.1/commons-codec-1.16.1.pom (16 kB at 72 kB/s)
+#26 10.87 Downloading from central: https://repo.maven.apache.org/maven2/commons-io/commons-io/2.5/commons-io-2.5.pom
+#26 11.09 Progress (1): 789 B
+Progress (1): 2.2 kB
+Progress (1): 5.4 kB
+Progress (1): 7.7 kB
+Progress (1): 9.7 kB
+Progress (1): 13 kB 
+Progress (1): 13 kB
+                   
+Downloaded from central: https://repo.maven.apache.org/maven2/commons-io/commons-io/2.5/commons-io-2.5.pom (13 kB at 60 kB/s)
+#26 11.12 Downloading from central: https://repo.maven.apache.org/maven2/commons-io/commons-io/2.11.0/commons-io-2.11.0.pom
+#26 11.34 Progress (1): 764 B
+Progress (1): 2.1 kB
+Progress (1): 5.2 kB
+Progress (1): 7.8 kB
+Progress (1): 10 kB 
+Progress (1): 12 kB
+Progress (1): 15 kB
+Progress (1): 16 kB
+Progress (1): 19 kB
+Progress (1): 20 kB
+                   
+Downloaded from central: https://repo.maven.apache.org/maven2/commons-io/commons-io/2.11.0/commons-io-2.11.0.pom (20 kB at 90 kB/s)
+#26 11.37 Downloading from central: https://repo.maven.apache.org/maven2/commons-logging/commons-logging/1.2/commons-logging-1.2.jar
+#26 11.59 Progress (1): 3.8/62 kB
+Progress (1): 8.0/62 kB
+Progress (1): 8.2/62 kB
+Progress (1): 12/62 kB 
+Progress (1): 17/62 kB
+Progress (1): 33/62 kB
+Progress (1): 49/62 kB
+Progress (1): 62 kB   
+                   
+Downloaded from central: https://repo.maven.apache.org/maven2/commons-logging/commons-logging/1.2/commons-logging-1.2.jar (62 kB at 113 kB/s)
+#26 11.92 Downloading from central: https://repo.maven.apache.org/maven2/commons-lang/commons-lang/2.4/commons-lang-2.4.jar
+#26 11.92 Downloading from central: https://repo.maven.apache.org/maven2/commons-beanutils/commons-beanutils/1.7.0/commons-beanutils-1.7.0.jar
+#26 11.92 Downloading from central: https://repo.maven.apache.org/maven2/commons-digester/commons-digester/1.8/commons-digester-1.8.jar
+#26 11.92 Downloading from central: https://repo.maven.apache.org/maven2/commons-chain/commons-chain/1.1/commons-chain-1.1.jar
+#26 11.93 Downloading from central: https://repo.maven.apache.org/maven2/dom4j/dom4j/1.1/dom4j-1.1.jar
+#26 12.14 Progress (1): 3.2/189 kB
+Progress (1): 11/189 kB 
+Progress (1): 28/189 kB
+Progress (1): 36/189 kB
+Progress (1): 52/189 kB
+Progress (1): 69/189 kB
+Progress (1): 85/189 kB
+Progress (1): 93/189 kB
+Progress (1): 110/189 kB
+Progress (1): 118/189 kB
+Progress (1): 134/189 kB
+Progress (1): 151/189 kB
+Progress (1): 159/189 kB
+Progress (1): 175/189 kB
+Progress (2): 175/189 kB | 0.9/90 kB
+Progress (2): 175/189 kB | 2.3/90 kB
+Progress (2): 175/189 kB | 3.6/90 kB
+Progress (2): 175/189 kB | 5.0/90 kB
+Progress (2): 175/189 kB | 6.4/90 kB
+Progress (3): 175/189 kB | 6.4/90 kB | 0.9/262 kB
+Progress (3): 175/189 kB | 6.4/90 kB | 2.3/262 kB
+Progress (3): 175/189 kB | 6.4/90 kB | 3.6/262 kB
+Progress (3): 175/189 kB | 6.4/90 kB | 5.0/262 kB
+Progress (3): 175/189 kB | 6.4/90 kB | 6.4/262 kB
+Progress (3): 175/189 kB | 6.4/90 kB | 7.7/262 kB
+Progress (3): 175/189 kB | 6.4/90 kB | 9.1/262 kB
+Progress (3): 175/189 kB | 6.4/90 kB | 10/262 kB 
+Progress (3): 175/189 kB | 6.4/90 kB | 11/262 kB
+Progress (4): 175/189 kB | 6.4/90 kB | 11/262 kB | 0.9/144 kB
+Progress (4): 175/189 kB | 6.4/90 kB | 11/262 kB | 2.3/144 kB
+Progress (4): 175/189 kB | 6.4/90 kB | 11/262 kB | 3.6/144 kB
+Progress (4): 175/189 kB | 6.4/90 kB | 11/262 kB | 5.0/144 kB
+Progress (4): 175/189 kB | 6.4/90 kB | 11/262 kB | 6.4/144 kB
+Progress (4): 175/189 kB | 6.4/90 kB | 11/262 kB | 7.7/144 kB
+Progress (4): 175/189 kB | 6.4/90 kB | 11/262 kB | 9.1/144 kB
+Progress (5): 175/189 kB | 6.4/90 kB | 11/262 kB | 9.1/144 kB | 0.9/457 kB
+Progress (5): 175/189 kB | 6.4/90 kB | 11/262 kB | 9.1/144 kB | 2.3/457 kB
+Progress (5): 175/189 kB | 6.4/90 kB | 11/262 kB | 9.1/144 kB | 3.6/457 kB
+Progress (5): 175/189 kB | 6.4/90 kB | 11/262 kB | 9.1/144 kB | 5.0/457 kB
+Progress (5): 175/189 kB | 6.4/90 kB | 11/262 kB | 9.1/144 kB | 6.4/457 kB
+Progress (5): 175/189 kB | 6.4/90 kB | 11/262 kB | 9.1/144 kB | 7.7/457 kB
+Progress (5): 175/189 kB | 7.7/90 kB | 11/262 kB | 9.1/144 kB | 7.7/457 kB
+Progress (5): 175/189 kB | 9.1/90 kB | 11/262 kB | 9.1/144 kB | 7.7/457 kB
+Progress (5): 189 kB | 9.1/90 kB | 11/262 kB | 9.1/144 kB | 7.7/457 kB    
+                                                                      
+Downloaded from central: https://repo.maven.apache.org/maven2/commons-beanutils/commons-beanutils/1.7.0/commons-beanutils-1.7.0.jar (189 kB at 304 kB/s)
+#26 12.54 Downloading from central: https://repo.maven.apache.org/maven2/oro/oro/2.0.8/oro-2.0.8.jar
+#26 12.55 Progress (4): 9.1/90 kB | 11/262 kB | 9.1/144 kB | 9.1/457 kB
+Progress (4): 9.1/90 kB | 11/262 kB | 9.1/144 kB | 10/457 kB 
+Progress (4): 9.1/90 kB | 11/262 kB | 9.1/144 kB | 11/457 kB
+Progress (4): 10/90 kB | 11/262 kB | 9.1/144 kB | 11/457 kB 
+Progress (4): 12/90 kB | 11/262 kB | 9.1/144 kB | 11/457 kB
+Progress (4): 12/90 kB | 11/262 kB | 9.1/144 kB | 13/457 kB
+Progress (4): 12/90 kB | 11/262 kB | 9.1/144 kB | 14/457 kB
+Progress (4): 13/90 kB | 11/262 kB | 9.1/144 kB | 14/457 kB
+Progress (4): 13/90 kB | 13/262 kB | 9.1/144 kB | 14/457 kB
+Progress (4): 13/90 kB | 13/262 kB | 10/144 kB | 14/457 kB 
+Progress (4): 13/90 kB | 14/262 kB | 10/144 kB | 14/457 kB
+Progress (4): 13/90 kB | 14/262 kB | 11/144 kB | 14/457 kB
+Progress (4): 15/90 kB | 14/262 kB | 11/144 kB | 14/457 kB
+Progress (4): 15/90 kB | 14/262 kB | 13/144 kB | 14/457 kB
+Progress (4): 16/90 kB | 14/262 kB | 13/144 kB | 14/457 kB
+Progress (4): 16/90 kB | 14/262 kB | 14/144 kB | 14/457 kB
+Progress (4): 16/90 kB | 14/262 kB | 14/144 kB | 15/457 kB
+Progress (4): 17/90 kB | 14/262 kB | 14/144 kB | 15/457 kB
+Progress (4): 17/90 kB | 15/262 kB | 14/144 kB | 15/457 kB
+Progress (4): 17/90 kB | 15/262 kB | 15/144 kB | 15/457 kB
+Progress (4): 17/90 kB | 17/262 kB | 15/144 kB | 15/457 kB
+Progress (4): 19/90 kB | 17/262 kB | 15/144 kB | 15/457 kB
+Progress (4): 19/90 kB | 17/262 kB | 15/144 kB | 17/457 kB
+Progress (4): 19/90 kB | 17/262 kB | 15/144 kB | 18/457 kB
+Progress (4): 19/90 kB | 17/262 kB | 17/144 kB | 18/457 kB
+Progress (4): 19/90 kB | 17/262 kB | 17/144 kB | 20/457 kB
+Progress (4): 19/90 kB | 17/262 kB | 17/144 kB | 21/457 kB
+Progress (4): 20/90 kB | 17/262 kB | 17/144 kB | 21/457 kB
+Progress (4): 20/90 kB | 18/262 kB | 17/144 kB | 21/457 kB
+Progress (4): 20/90 kB | 20/262 kB | 17/144 kB | 21/457 kB
+Progress (4): 20/90 kB | 20/262 kB | 18/144 kB | 21/457 kB
+Progress (4): 21/90 kB | 20/262 kB | 18/144 kB | 21/457 kB
+Progress (4): 21/90 kB | 20/262 kB | 20/144 kB | 21/457 kB
+Progress (4): 21/90 kB | 20/262 kB | 20/144 kB | 22/457 kB
+Progress (4): 21/90 kB | 20/262 kB | 20/144 kB | 24/457 kB
+Progress (5): 21/90 kB | 20/262 kB | 20/144 kB | 24/457 kB | 3.2/65 kB
+Progress (5): 21/90 kB | 21/262 kB | 20/144 kB | 24/457 kB | 3.2/65 kB
+Progress (5): 21/90 kB | 21/262 kB | 21/144 kB | 24/457 kB | 3.2/65 kB
+Progress (5): 23/90 kB | 21/262 kB | 21/144 kB | 24/457 kB | 3.2/65 kB
+Progress (5): 23/90 kB | 21/262 kB | 22/144 kB | 24/457 kB | 3.2/65 kB
+Progress (5): 23/90 kB | 22/262 kB | 22/144 kB | 24/457 kB | 3.2/65 kB
+Progress (5): 24/90 kB | 22/262 kB | 22/144 kB | 24/457 kB | 3.2/65 kB
+Progress (5): 24/90 kB | 22/262 kB | 22/144 kB | 25/457 kB | 3.2/65 kB
+Progress (5): 24/90 kB | 22/262 kB | 22/144 kB | 25/457 kB | 20/65 kB 
+Progress (5): 24/90 kB | 22/262 kB | 22/144 kB | 26/457 kB | 20/65 kB
+Progress (5): 26/90 kB | 22/262 kB | 22/144 kB | 26/457 kB | 20/65 kB
+Progress (5): 27/90 kB | 22/262 kB | 22/144 kB | 26/457 kB | 20/65 kB
+Progress (5): 27/90 kB | 24/262 kB | 22/144 kB | 26/457 kB | 20/65 kB
+Progress (5): 27/90 kB | 25/262 kB | 22/144 kB | 26/457 kB | 20/65 kB
+Progress (5): 27/90 kB | 25/262 kB | 24/144 kB | 26/457 kB | 20/65 kB
+Progress (5): 27/90 kB | 25/262 kB | 25/144 kB | 26/457 kB | 20/65 kB
+Progress (5): 27/90 kB | 25/262 kB | 25/144 kB | 28/457 kB | 20/65 kB
+Progress (5): 27/90 kB | 25/262 kB | 25/144 kB | 28/457 kB | 36/65 kB
+Progress (5): 27/90 kB | 25/262 kB | 25/144 kB | 29/457 kB | 36/65 kB
+Progress (5): 28/90 kB | 25/262 kB | 25/144 kB | 29/457 kB | 36/65 kB
+Progress (5): 30/90 kB | 25/262 kB | 25/144 kB | 29/457 kB | 36/65 kB
+Progress (5): 30/90 kB | 26/262 kB | 25/144 kB | 29/457 kB | 36/65 kB
+Progress (5): 30/90 kB | 28/262 kB | 25/144 kB | 29/457 kB | 36/65 kB
+Progress (5): 30/90 kB | 28/262 kB | 26/144 kB | 29/457 kB | 36/65 kB
+Progress (5): 30/90 kB | 28/262 kB | 28/144 kB | 29/457 kB | 36/65 kB
+Progress (5): 30/90 kB | 28/262 kB | 28/144 kB | 29/457 kB | 52/65 kB
+Progress (5): 30/90 kB | 28/262 kB | 28/144 kB | 31/457 kB | 52/65 kB
+Progress (5): 30/90 kB | 28/262 kB | 28/144 kB | 32/457 kB | 52/65 kB
+Progress (5): 31/90 kB | 28/262 kB | 28/144 kB | 32/457 kB | 52/65 kB
+Progress (5): 31/90 kB | 28/262 kB | 28/144 kB | 32/457 kB | 65 kB   
+Progress (5): 32/90 kB | 28/262 kB | 28/144 kB | 32/457 kB | 65 kB
+                                                                  
+Downloaded from central: https://repo.maven.apache.org/maven2/oro/oro/2.0.8/oro-2.0.8.jar (65 kB at 75 kB/s)
+#26 12.79 Downloading from central: https://repo.maven.apache.org/maven2/commons-collections/commons-collections/3.2.2/commons-collections-3.2.2.jar
+#26 12.79 Progress (4): 32/90 kB | 29/262 kB | 28/144 kB | 32/457 kB
+Progress (4): 32/90 kB | 31/262 kB | 28/144 kB | 32/457 kB
+Progress (4): 32/90 kB | 31/262 kB | 29/144 kB | 32/457 kB
+Progress (4): 32/90 kB | 31/262 kB | 31/144 kB | 32/457 kB
+Progress (4): 32/90 kB | 31/262 kB | 31/144 kB | 33/457 kB
+Progress (4): 32/90 kB | 31/262 kB | 31/144 kB | 35/457 kB
+Progress (4): 32/90 kB | 31/262 kB | 32/144 kB | 35/457 kB
+Progress (4): 34/90 kB | 31/262 kB | 32/144 kB | 35/457 kB
+Progress (4): 34/90 kB | 32/262 kB | 32/144 kB | 35/457 kB
+Progress (4): 35/90 kB | 32/262 kB | 32/144 kB | 35/457 kB
+Progress (4): 35/90 kB | 32/262 kB | 33/144 kB | 35/457 kB
+Progress (4): 35/90 kB | 33/262 kB | 33/144 kB | 35/457 kB
+Progress (4): 35/90 kB | 33/262 kB | 33/144 kB | 36/457 kB
+Progress (4): 35/90 kB | 33/262 kB | 33/144 kB | 37/457 kB
+Progress (4): 36/90 kB | 33/262 kB | 33/144 kB | 37/457 kB
+Progress (4): 38/90 kB | 33/262 kB | 33/144 kB | 37/457 kB
+Progress (4): 38/90 kB | 35/262 kB | 33/144 kB | 37/457 kB
+Progress (4): 38/90 kB | 35/262 kB | 35/144 kB | 37/457 kB
+Progress (4): 38/90 kB | 36/262 kB | 35/144 kB | 37/457 kB
+Progress (4): 38/90 kB | 36/262 kB | 36/144 kB | 37/457 kB
+Progress (4): 38/90 kB | 36/262 kB | 36/144 kB | 39/457 kB
+Progress (4): 38/90 kB | 36/262 kB | 36/144 kB | 40/457 kB
+Progress (4): 39/90 kB | 36/262 kB | 36/144 kB | 40/457 kB
+Progress (4): 41/90 kB | 36/262 kB | 36/144 kB | 40/457 kB
+Progress (4): 41/90 kB | 36/262 kB | 37/144 kB | 40/457 kB
+Progress (4): 41/90 kB | 37/262 kB | 37/144 kB | 40/457 kB
+Progress (4): 41/90 kB | 37/262 kB | 39/144 kB | 40/457 kB
+Progress (4): 41/90 kB | 39/262 kB | 39/144 kB | 40/457 kB
+Progress (4): 41/90 kB | 39/262 kB | 39/144 kB | 41/457 kB
+Progress (4): 41/90 kB | 39/262 kB | 39/144 kB | 43/457 kB
+Progress (4): 42/90 kB | 39/262 kB | 39/144 kB | 43/457 kB
+Progress (4): 43/90 kB | 39/262 kB | 39/144 kB | 43/457 kB
+Progress (4): 43/90 kB | 40/262 kB | 39/144 kB | 43/457 kB
+Progress (4): 43/90 kB | 40/262 kB | 40/144 kB | 43/457 kB
+Progress (4): 43/90 kB | 41/262 kB | 40/144 kB | 43/457 kB
+Progress (4): 43/90 kB | 41/262 kB | 41/144 kB | 43/457 kB
+Progress (4): 43/90 kB | 41/262 kB | 41/144 kB | 44/457 kB
+Progress (4): 43/90 kB | 41/262 kB | 41/144 kB | 46/457 kB
+Progress (4): 45/90 kB | 41/262 kB | 41/144 kB | 46/457 kB
+Progress (4): 46/90 kB | 41/262 kB | 41/144 kB | 46/457 kB
+Progress (4): 46/90 kB | 41/262 kB | 41/144 kB | 47/457 kB
+Progress (4): 46/90 kB | 41/262 kB | 41/144 kB | 48/457 kB
+Progress (4): 47/90 kB | 41/262 kB | 41/144 kB | 48/457 kB
+Progress (4): 49/90 kB | 41/262 kB | 41/144 kB | 48/457 kB
+Progress (4): 49/90 kB | 41/262 kB | 41/144 kB | 50/457 kB
+Progress (4): 49/90 kB | 41/262 kB | 41/144 kB | 51/457 kB
+Progress (4): 49/90 kB | 43/262 kB | 41/144 kB | 51/457 kB
+Progress (4): 49/90 kB | 43/262 kB | 43/144 kB | 51/457 kB
+Progress (4): 49/90 kB | 43/262 kB | 44/144 kB | 51/457 kB
+Progress (4): 50/90 kB | 43/262 kB | 44/144 kB | 51/457 kB
+Progress (4): 50/90 kB | 44/262 kB | 44/144 kB | 51/457 kB
+Progress (4): 52/90 kB | 44/262 kB | 44/144 kB | 51/457 kB
+Progress (4): 53/90 kB | 44/262 kB | 44/144 kB | 51/457 kB
+Progress (4): 54/90 kB | 44/262 kB | 44/144 kB | 51/457 kB
+Progress (4): 54/90 kB | 46/262 kB | 44/144 kB | 51/457 kB
+Progress (4): 54/90 kB | 46/262 kB | 46/144 kB | 51/457 kB
+Progress (4): 54/90 kB | 46/262 kB | 47/144 kB | 51/457 kB
+Progress (4): 54/90 kB | 46/262 kB | 47/144 kB | 52/457 kB
+Progress (4): 54/90 kB | 47/262 kB | 47/144 kB | 52/457 kB
+Progress (4): 54/90 kB | 47/262 kB | 47/144 kB | 54/457 kB
+Progress (4): 54/90 kB | 47/262 kB | 47/144 kB | 55/457 kB
+Progress (4): 56/90 kB | 47/262 kB | 47/144 kB | 55/457 kB
+Progress (4): 56/90 kB | 48/262 kB | 47/144 kB | 55/457 kB
+Progress (4): 56/90 kB | 48/262 kB | 48/144 kB | 55/457 kB
+Progress (4): 56/90 kB | 48/262 kB | 50/144 kB | 55/457 kB
+Progress (4): 56/90 kB | 50/262 kB | 50/144 kB | 55/457 kB
+Progress (4): 60/90 kB | 50/262 kB | 50/144 kB | 55/457 kB
+Progress (4): 60/90 kB | 51/262 kB | 50/144 kB | 55/457 kB
+Progress (4): 60/90 kB | 52/262 kB | 50/144 kB | 55/457 kB
+Progress (4): 60/90 kB | 52/262 kB | 51/144 kB | 55/457 kB
+Progress (4): 60/90 kB | 52/262 kB | 52/144 kB | 55/457 kB
+Progress (4): 60/90 kB | 52/262 kB | 52/144 kB | 59/457 kB
+Progress (4): 64/90 kB | 52/262 kB | 52/144 kB | 59/457 kB
+Progress (4): 64/90 kB | 52/262 kB | 54/144 kB | 59/457 kB
+Progress (4): 64/90 kB | 54/262 kB | 54/144 kB | 59/457 kB
+Progress (4): 64/90 kB | 55/262 kB | 54/144 kB | 59/457 kB
+Progress (4): 64/90 kB | 55/262 kB | 55/144 kB | 59/457 kB
+Progress (4): 64/90 kB | 55/262 kB | 55/144 kB | 64/457 kB
+Progress (4): 68/90 kB | 55/262 kB | 55/144 kB | 64/457 kB
+Progress (4): 68/90 kB | 55/262 kB | 59/144 kB | 64/457 kB
+Progress (4): 68/90 kB | 59/262 kB | 59/144 kB | 64/457 kB
+Progress (4): 68/90 kB | 59/262 kB | 59/144 kB | 68/457 kB
+Progress (4): 73/90 kB | 59/262 kB | 59/144 kB | 68/457 kB
+Progress (4): 73/90 kB | 64/262 kB | 59/144 kB | 68/457 kB
+Progress (4): 77/90 kB | 64/262 kB | 59/144 kB | 68/457 kB
+Progress (4): 77/90 kB | 64/262 kB | 59/144 kB | 72/457 kB
+Progress (4): 77/90 kB | 64/262 kB | 64/144 kB | 72/457 kB
+Progress (5): 77/90 kB | 64/262 kB | 64/144 kB | 72/457 kB | 7.7/588 kB
+Progress (5): 77/90 kB | 64/262 kB | 64/144 kB | 72/457 kB | 16/588 kB 
+Progress (5): 81/90 kB | 64/262 kB | 64/144 kB | 72/457 kB | 16/588 kB
+Progress (5): 81/90 kB | 64/262 kB | 64/144 kB | 72/457 kB | 25/588 kB
+Progress (5): 81/90 kB | 64/262 kB | 64/144 kB | 76/457 kB | 25/588 kB
+Progress (5): 81/90 kB | 68/262 kB | 64/144 kB | 76/457 kB | 25/588 kB
+Progress (5): 81/90 kB | 68/262 kB | 68/144 kB | 76/457 kB | 25/588 kB
+Progress (5): 85/90 kB | 68/262 kB | 68/144 kB | 76/457 kB | 25/588 kB
+Progress (5): 85/90 kB | 68/262 kB | 68/144 kB | 81/457 kB | 25/588 kB
+Progress (5): 85/90 kB | 68/262 kB | 68/144 kB | 81/457 kB | 41/588 kB
+Progress (5): 85/90 kB | 72/262 kB | 68/144 kB | 81/457 kB | 41/588 kB
+Progress (5): 85/90 kB | 72/262 kB | 68/144 kB | 81/457 kB | 49/588 kB
+Progress (5): 85/90 kB | 72/262 kB | 68/144 kB | 81/457 kB | 57/588 kB
+Progress (5): 85/90 kB | 72/262 kB | 72/144 kB | 81/457 kB | 57/588 kB
+Progress (5): 85/90 kB | 72/262 kB | 72/144 kB | 81/457 kB | 66/588 kB
+Progress (5): 89/90 kB | 72/262 kB | 72/144 kB | 81/457 kB | 66/588 kB
+Progress (5): 90 kB | 72/262 kB | 72/144 kB | 81/457 kB | 66/588 kB   
+                                                                   
+Downloaded from central: https://repo.maven.apache.org/maven2/commons-chain/commons-chain/1.1/commons-chain-1.1.jar (90 kB at 80 kB/s)
+#26 13.05 Downloading from central: https://repo.maven.apache.org/maven2/javax/inject/javax.inject/1/javax.inject-1.jar
+#26 13.05 Progress (4): 72/262 kB | 72/144 kB | 85/457 kB | 66/588 kB
+Progress (4): 76/262 kB | 72/144 kB | 85/457 kB | 66/588 kB
+Progress (4): 76/262 kB | 76/144 kB | 85/457 kB | 66/588 kB
+Progress (4): 76/262 kB | 76/144 kB | 85/457 kB | 82/588 kB
+Progress (4): 76/262 kB | 76/144 kB | 89/457 kB | 82/588 kB
+Progress (4): 81/262 kB | 76/144 kB | 89/457 kB | 82/588 kB
+Progress (4): 81/262 kB | 76/144 kB | 89/457 kB | 98/588 kB
+Progress (4): 81/262 kB | 81/144 kB | 89/457 kB | 98/588 kB
+Progress (4): 81/262 kB | 81/144 kB | 93/457 kB | 98/588 kB
+Progress (4): 81/262 kB | 81/144 kB | 93/457 kB | 115/588 kB
+Progress (4): 85/262 kB | 81/144 kB | 93/457 kB | 115/588 kB
+Progress (4): 85/262 kB | 85/144 kB | 93/457 kB | 115/588 kB
+Progress (4): 85/262 kB | 85/144 kB | 97/457 kB | 115/588 kB
+Progress (4): 85/262 kB | 85/144 kB | 97/457 kB | 123/588 kB
+Progress (4): 85/262 kB | 85/144 kB | 97/457 kB | 139/588 kB
+Progress (4): 89/262 kB | 85/144 kB | 97/457 kB | 139/588 kB
+Progress (4): 93/262 kB | 85/144 kB | 97/457 kB | 139/588 kB
+Progress (4): 97/262 kB | 85/144 kB | 97/457 kB | 139/588 kB
+Progress (4): 102/262 kB | 85/144 kB | 97/457 kB | 139/588 kB
+Progress (4): 102/262 kB | 85/144 kB | 102/457 kB | 139/588 kB
+Progress (4): 102/262 kB | 85/144 kB | 106/457 kB | 139/588 kB
+Progress (4): 106/262 kB | 85/144 kB | 106/457 kB | 139/588 kB
+Progress (4): 110/262 kB | 85/144 kB | 106/457 kB | 139/588 kB
+Progress (4): 110/262 kB | 85/144 kB | 110/457 kB | 139/588 kB
+Progress (4): 114/262 kB | 85/144 kB | 110/457 kB | 139/588 kB
+Progress (4): 114/262 kB | 85/144 kB | 114/457 kB | 139/588 kB
+Progress (4): 114/262 kB | 85/144 kB | 115/457 kB | 139/588 kB
+Progress (4): 119/262 kB | 85/144 kB | 115/457 kB | 139/588 kB
+Progress (4): 119/262 kB | 85/144 kB | 119/457 kB | 139/588 kB
+Progress (4): 123/262 kB | 85/144 kB | 119/457 kB | 139/588 kB
+Progress (4): 123/262 kB | 85/144 kB | 123/457 kB | 139/588 kB
+Progress (4): 123/262 kB | 85/144 kB | 127/457 kB | 139/588 kB
+Progress (4): 123/262 kB | 85/144 kB | 131/457 kB | 139/588 kB
+Progress (4): 127/262 kB | 85/144 kB | 131/457 kB | 139/588 kB
+Progress (4): 131/262 kB | 85/144 kB | 131/457 kB | 139/588 kB
+Progress (4): 131/262 kB | 85/144 kB | 135/457 kB | 139/588 kB
+Progress (4): 131/262 kB | 85/144 kB | 140/457 kB | 139/588 kB
+Progress (4): 136/262 kB | 85/144 kB | 140/457 kB | 139/588 kB
+Progress (4): 136/262 kB | 85/144 kB | 144/457 kB | 139/588 kB
+Progress (5): 136/262 kB | 85/144 kB | 144/457 kB | 139/588 kB | 2.5 kB
+                                                                       
+Downloaded from central: https://repo.maven.apache.org/maven2/javax/inject/javax.inject/1/javax.inject-1.jar (2.5 kB at 1.3 kB/s)
+#26 13.86 Downloading from central: https://repo.maven.apache.org/maven2/commons-io/commons-io/2.15.1/commons-io-2.15.1.jar
+#26 13.86 Progress (4): 140/262 kB | 85/144 kB | 144/457 kB | 139/588 kB
+Progress (4): 140/262 kB | 89/144 kB | 144/457 kB | 139/588 kB
+Progress (4): 142/262 kB | 89/144 kB | 144/457 kB | 139/588 kB
+Progress (4): 142/262 kB | 93/144 kB | 144/457 kB | 139/588 kB
+Progress (4): 142/262 kB | 93/144 kB | 147/457 kB | 139/588 kB
+Progress (4): 142/262 kB | 93/144 kB | 152/457 kB | 139/588 kB
+Progress (4): 142/262 kB | 97/144 kB | 152/457 kB | 139/588 kB
+Progress (4): 147/262 kB | 97/144 kB | 152/457 kB | 139/588 kB
+Progress (4): 147/262 kB | 97/144 kB | 156/457 kB | 139/588 kB
+Progress (4): 147/262 kB | 102/144 kB | 156/457 kB | 139/588 kB
+Progress (4): 147/262 kB | 102/144 kB | 160/457 kB | 139/588 kB
+Progress (4): 147/262 kB | 106/144 kB | 160/457 kB | 139/588 kB
+Progress (4): 147/262 kB | 106/144 kB | 164/457 kB | 139/588 kB
+Progress (4): 147/262 kB | 110/144 kB | 164/457 kB | 139/588 kB
+Progress (4): 147/262 kB | 110/144 kB | 169/457 kB | 139/588 kB
+Progress (4): 147/262 kB | 110/144 kB | 173/457 kB | 139/588 kB
+Progress (4): 147/262 kB | 114/144 kB | 173/457 kB | 139/588 kB
+Progress (4): 147/262 kB | 114/144 kB | 177/457 kB | 139/588 kB
+Progress (4): 147/262 kB | 119/144 kB | 177/457 kB | 139/588 kB
+Progress (4): 147/262 kB | 119/144 kB | 181/457 kB | 139/588 kB
+Progress (4): 147/262 kB | 123/144 kB | 181/457 kB | 139/588 kB
+Progress (4): 147/262 kB | 123/144 kB | 186/457 kB | 139/588 kB
+Progress (4): 147/262 kB | 127/144 kB | 186/457 kB | 139/588 kB
+Progress (4): 147/262 kB | 127/144 kB | 190/457 kB | 139/588 kB
+Progress (4): 147/262 kB | 127/144 kB | 194/457 kB | 139/588 kB
+Progress (4): 147/262 kB | 131/144 kB | 194/457 kB | 139/588 kB
+Progress (4): 147/262 kB | 131/144 kB | 197/457 kB | 139/588 kB
+Progress (4): 147/262 kB | 135/144 kB | 197/457 kB | 139/588 kB
+Progress (4): 151/262 kB | 135/144 kB | 197/457 kB | 139/588 kB
+Progress (4): 155/262 kB | 135/144 kB | 197/457 kB | 139/588 kB
+Progress (4): 155/262 kB | 140/144 kB | 197/457 kB | 139/588 kB
+Progress (4): 159/262 kB | 140/144 kB | 197/457 kB | 139/588 kB
+Progress (4): 159/262 kB | 142/144 kB | 197/457 kB | 139/588 kB
+Progress (4): 159/262 kB | 144 kB | 197/457 kB | 139/588 kB    
+                                                           
+Downloaded from central: https://repo.maven.apache.org/maven2/commons-digester/commons-digester/1.8/commons-digester-1.8.jar (144 kB at 70 kB/s)
+#26 13.97 Downloading from central: https://repo.maven.apache.org/maven2/commons-codec/commons-codec/1.16.1/commons-codec-1.16.1.jar
+#26 13.97 Progress (3): 164/262 kB | 197/457 kB | 139/588 kB
+Progress (3): 164/262 kB | 201/457 kB | 139/588 kB
+Progress (3): 168/262 kB | 201/457 kB | 139/588 kB
+Progress (3): 168/262 kB | 205/457 kB | 139/588 kB
+Progress (3): 172/262 kB | 205/457 kB | 139/588 kB
+Progress (3): 172/262 kB | 209/457 kB | 139/588 kB
+Progress (3): 172/262 kB | 213/457 kB | 139/588 kB
+Progress (3): 176/262 kB | 213/457 kB | 139/588 kB
+Progress (3): 181/262 kB | 213/457 kB | 139/588 kB
+Progress (3): 181/262 kB | 217/457 kB | 139/588 kB
+Progress (3): 185/262 kB | 217/457 kB | 139/588 kB
+Progress (3): 189/262 kB | 217/457 kB | 139/588 kB
+Progress (3): 189/262 kB | 229/457 kB | 139/588 kB
+Progress (3): 193/262 kB | 229/457 kB | 139/588 kB
+Progress (3): 197/262 kB | 229/457 kB | 139/588 kB
+Progress (3): 202/262 kB | 229/457 kB | 139/588 kB
+Progress (3): 202/262 kB | 246/457 kB | 139/588 kB
+Progress (3): 206/262 kB | 246/457 kB | 139/588 kB
+Progress (3): 210/262 kB | 246/457 kB | 139/588 kB
+Progress (3): 214/262 kB | 246/457 kB | 139/588 kB
+Progress (3): 219/262 kB | 246/457 kB | 139/588 kB
+Progress (3): 219/262 kB | 262/457 kB | 139/588 kB
+Progress (4): 219/262 kB | 262/457 kB | 139/588 kB | 3.8/501 kB
+Progress (4): 223/262 kB | 262/457 kB | 139/588 kB | 3.8/501 kB
+Progress (4): 223/262 kB | 262/457 kB | 139/588 kB | 8.0/501 kB
+Progress (4): 223/262 kB | 262/457 kB | 139/588 kB | 12/501 kB 
+Progress (4): 223/262 kB | 262/457 kB | 139/588 kB | 16/501 kB
+Progress (4): 223/262 kB | 279/457 kB | 139/588 kB | 16/501 kB
+Progress (4): 223/262 kB | 279/457 kB | 139/588 kB | 21/501 kB
+Progress (4): 223/262 kB | 279/457 kB | 139/588 kB | 24/501 kB
+Progress (4): 239/262 kB | 279/457 kB | 139/588 kB | 24/501 kB
+Progress (4): 239/262 kB | 279/457 kB | 139/588 kB | 28/501 kB
+Progress (4): 239/262 kB | 295/457 kB | 139/588 kB | 28/501 kB
+Progress (4): 239/262 kB | 295/457 kB | 139/588 kB | 33/501 kB
+Progress (4): 239/262 kB | 295/457 kB | 139/588 kB | 37/501 kB
+Progress (4): 250/262 kB | 295/457 kB | 139/588 kB | 37/501 kB
+Progress (4): 250/262 kB | 295/457 kB | 139/588 kB | 41/501 kB
+Progress (4): 250/262 kB | 295/457 kB | 139/588 kB | 45/501 kB
+Progress (4): 250/262 kB | 311/457 kB | 139/588 kB | 45/501 kB
+Progress (4): 262 kB | 311/457 kB | 139/588 kB | 45/501 kB    
+                                                          
+Downloaded from central: https://repo.maven.apache.org/maven2/commons-lang/commons-lang/2.4/commons-lang-2.4.jar (262 kB at 117 kB/s)
+#26 14.15 Progress (3): 311/457 kB | 139/588 kB | 49/501 kB
+Progress (3): 311/457 kB | 139/588 kB | 54/501 kB
+Progress (3): 311/457 kB | 139/588 kB | 58/501 kB
+Progress (3): 328/457 kB | 139/588 kB | 58/501 kB
+Progress (3): 328/457 kB | 139/588 kB | 62/501 kB
+Progress (4): 328/457 kB | 139/588 kB | 62/501 kB | 3.8/365 kB
+Progress (4): 328/457 kB | 139/588 kB | 66/501 kB | 3.8/365 kB
+Progress (4): 328/457 kB | 139/588 kB | 71/501 kB | 3.8/365 kB
+Progress (4): 344/457 kB | 139/588 kB | 71/501 kB | 3.8/365 kB
+Progress (4): 344/457 kB | 139/588 kB | 71/501 kB | 8.0/365 kB
+Progress (4): 360/457 kB | 139/588 kB | 71/501 kB | 8.0/365 kB
+Progress (4): 360/457 kB | 139/588 kB | 75/501 kB | 8.0/365 kB
+Progress (4): 360/457 kB | 139/588 kB | 75/501 kB | 12/365 kB 
+Progress (4): 360/457 kB | 139/588 kB | 79/501 kB | 12/365 kB
+Progress (4): 377/457 kB | 139/588 kB | 79/501 kB | 12/365 kB
+Progress (4): 377/457 kB | 139/588 kB | 79/501 kB | 16/365 kB
+Progress (4): 377/457 kB | 139/588 kB | 83/501 kB | 16/365 kB
+Progress (4): 377/457 kB | 139/588 kB | 83/501 kB | 21/365 kB
+Progress (4): 377/457 kB | 139/588 kB | 88/501 kB | 21/365 kB
+Progress (4): 393/457 kB | 139/588 kB | 88/501 kB | 21/365 kB
+Progress (4): 393/457 kB | 139/588 kB | 92/501 kB | 21/365 kB
+Progress (4): 393/457 kB | 139/588 kB | 92/501 kB | 25/365 kB
+Progress (4): 393/457 kB | 139/588 kB | 92/501 kB | 28/365 kB
+Progress (4): 410/457 kB | 139/588 kB | 92/501 kB | 28/365 kB
+Progress (4): 410/457 kB | 139/588 kB | 96/501 kB | 28/365 kB
+Progress (4): 410/457 kB | 139/588 kB | 96/501 kB | 32/365 kB
+Progress (4): 410/457 kB | 139/588 kB | 96/501 kB | 36/365 kB
+Progress (4): 426/457 kB | 139/588 kB | 96/501 kB | 36/365 kB
+Progress (4): 426/457 kB | 139/588 kB | 96/501 kB | 40/365 kB
+Progress (4): 426/457 kB | 139/588 kB | 96/501 kB | 45/365 kB
+Progress (4): 442/457 kB | 139/588 kB | 96/501 kB | 45/365 kB
+Progress (4): 442/457 kB | 139/588 kB | 96/501 kB | 49/365 kB
+Progress (4): 442/457 kB | 139/588 kB | 100/501 kB | 49/365 kB
+Progress (4): 457 kB | 139/588 kB | 100/501 kB | 49/365 kB    
+                                                          
+Downloaded from central: https://repo.maven.apache.org/maven2/dom4j/dom4j/1.1/dom4j-1.1.jar (457 kB at 195 kB/s)
+#26 14.28 Progress (3): 139/588 kB | 100/501 kB | 53/365 kB
+Progress (3): 139/588 kB | 104/501 kB | 53/365 kB
+Progress (3): 139/588 kB | 109/501 kB | 53/365 kB
+Progress (3): 139/588 kB | 109/501 kB | 57/365 kB
+Progress (3): 139/588 kB | 113/501 kB | 57/365 kB
+Progress (3): 139/588 kB | 113/501 kB | 62/365 kB
+Progress (3): 139/588 kB | 117/501 kB | 62/365 kB
+Progress (3): 139/588 kB | 117/501 kB | 66/365 kB
+Progress (3): 139/588 kB | 121/501 kB | 66/365 kB
+Progress (3): 139/588 kB | 121/501 kB | 70/365 kB
+Progress (3): 139/588 kB | 126/501 kB | 70/365 kB
+Progress (3): 139/588 kB | 126/501 kB | 74/365 kB
+Progress (3): 147/588 kB | 126/501 kB | 74/365 kB
+Progress (3): 147/588 kB | 142/501 kB | 74/365 kB
+Progress (3): 147/588 kB | 155/501 kB | 74/365 kB
+Progress (3): 147/588 kB | 155/501 kB | 91/365 kB
+Progress (3): 147/588 kB | 172/501 kB | 91/365 kB
+Progress (3): 147/588 kB | 188/501 kB | 91/365 kB
+Progress (3): 147/588 kB | 188/501 kB | 107/365 kB
+Progress (3): 147/588 kB | 204/501 kB | 107/365 kB
+Progress (3): 147/588 kB | 204/501 kB | 118/365 kB
+Progress (3): 147/588 kB | 221/501 kB | 118/365 kB
+Progress (3): 147/588 kB | 221/501 kB | 134/365 kB
+Progress (3): 147/588 kB | 237/501 kB | 134/365 kB
+Progress (3): 147/588 kB | 253/501 kB | 134/365 kB
+Progress (3): 147/588 kB | 253/501 kB | 151/365 kB
+Progress (3): 147/588 kB | 270/501 kB | 151/365 kB
+Progress (3): 147/588 kB | 286/501 kB | 151/365 kB
+Progress (3): 147/588 kB | 286/501 kB | 167/365 kB
+Progress (3): 147/588 kB | 303/501 kB | 167/365 kB
+Progress (3): 164/588 kB | 303/501 kB | 167/365 kB
+Progress (3): 164/588 kB | 319/501 kB | 167/365 kB
+Progress (3): 164/588 kB | 319/501 kB | 183/365 kB
+Progress (3): 164/588 kB | 335/501 kB | 183/365 kB
+Progress (3): 164/588 kB | 348/501 kB | 183/365 kB
+Progress (3): 164/588 kB | 348/501 kB | 200/365 kB
+Progress (3): 164/588 kB | 364/501 kB | 200/365 kB
+Progress (3): 164/588 kB | 364/501 kB | 216/365 kB
+Progress (3): 164/588 kB | 381/501 kB | 216/365 kB
+Progress (3): 164/588 kB | 397/501 kB | 216/365 kB
+Progress (3): 164/588 kB | 397/501 kB | 233/365 kB
+Progress (3): 164/588 kB | 413/501 kB | 233/365 kB
+Progress (3): 164/588 kB | 413/501 kB | 246/365 kB
+Progress (3): 164/588 kB | 430/501 kB | 246/365 kB
+Progress (3): 164/588 kB | 446/501 kB | 246/365 kB
+Progress (3): 164/588 kB | 446/501 kB | 262/365 kB
+Progress (3): 164/588 kB | 463/501 kB | 262/365 kB
+Progress (3): 164/588 kB | 463/501 kB | 279/365 kB
+Progress (3): 164/588 kB | 463/501 kB | 295/365 kB
+Progress (3): 164/588 kB | 479/501 kB | 295/365 kB
+Progress (3): 164/588 kB | 495/501 kB | 295/365 kB
+Progress (3): 164/588 kB | 495/501 kB | 311/365 kB
+Progress (3): 164/588 kB | 501 kB | 311/365 kB    
+                                              
+Downloaded from central: https://repo.maven.apache.org/maven2/commons-io/commons-io/2.15.1/commons-io-2.15.1.jar (501 kB at 183 kB/s)
+#26 14.68 Progress (2): 164/588 kB | 328/365 kB
+Progress (2): 164/588 kB | 344/365 kB
+Progress (2): 180/588 kB | 344/365 kB
+Progress (2): 180/588 kB | 360/365 kB
+Progress (2): 180/588 kB | 365 kB    
+Progress (2): 197/588 kB | 365 kB
+                                 
+Downloaded from central: https://repo.maven.apache.org/maven2/commons-codec/commons-codec/1.16.1/commons-codec-1.16.1.jar (365 kB at 131 kB/s)
+#26 14.72 Progress (1): 205/588 kB
+Progress (1): 221/588 kB
+Progress (1): 238/588 kB
+Progress (1): 246/588 kB
+Progress (1): 262/588 kB
+Progress (1): 279/588 kB
+Progress (1): 295/588 kB
+Progress (1): 311/588 kB
+Progress (1): 328/588 kB
+Progress (1): 344/588 kB
+Progress (1): 360/588 kB
+Progress (1): 377/588 kB
+Progress (1): 393/588 kB
+Progress (1): 410/588 kB
+Progress (1): 426/588 kB
+Progress (1): 442/588 kB
+Progress (1): 459/588 kB
+Progress (1): 475/588 kB
+Progress (1): 492/588 kB
+Progress (1): 508/588 kB
+Progress (1): 524/588 kB
+Progress (1): 541/588 kB
+Progress (1): 557/588 kB
+Progress (1): 573/588 kB
+Progress (1): 582/588 kB
+Progress (1): 588 kB    
+                    
+Downloaded from central: https://repo.maven.apache.org/maven2/commons-collections/commons-collections/3.2.2/commons-collections-3.2.2.jar (588 kB at 172 kB/s)
+#26 15.63 Downloading from central: https://repo.maven.apache.org/maven2/commons-io/commons-io/2.6/commons-io-2.6.jar
+#26 15.84 Progress (1): 7.7/215 kB
+Progress (1): 8.2/215 kB
+Progress (1): 25/215 kB 
+Progress (1): 41/215 kB
+Progress (1): 57/215 kB
+Progress (1): 74/215 kB
+Progress (1): 90/215 kB
+Progress (1): 106/215 kB
+Progress (1): 123/215 kB
+Progress (1): 139/215 kB
+Progress (1): 156/215 kB
+Progress (1): 172/215 kB
+Progress (1): 188/215 kB
+Progress (1): 205/215 kB
+Progress (1): 208/215 kB
+Progress (1): 215 kB    
+                    
+Downloaded from central: https://repo.maven.apache.org/maven2/commons-io/commons-io/2.6/commons-io-2.6.jar (215 kB at 743 kB/s)
+#26 15.94 Downloading from central: https://repo.maven.apache.org/maven2/commons-io/commons-io/2.19.0/commons-io-2.19.0.pom
+#26 16.16 Progress (1): 763 B
+Progress (1): 2.1 kB
+Progress (1): 4.7 kB
+Progress (1): 6.7 kB
+Progress (1): 8.9 kB
+Progress (1): 12 kB 
+Progress (1): 14 kB
+Progress (1): 18 kB
+Progress (1): 20 kB
+Progress (1): 21 kB
+                   
+Downloaded from central: https://repo.maven.apache.org/maven2/commons-io/commons-io/2.19.0/commons-io-2.19.0.pom (21 kB at 93 kB/s)
+#26 16.19 Downloading from central: https://repo.maven.apache.org/maven2/commons-io/commons-io/2.19.0/commons-io-2.19.0.jar
+#26 16.40 Progress (1): 7.7/556 kB
+Progress (1): 16/556 kB 
+Progress (1): 32/556 kB
+Progress (1): 49/556 kB
+Progress (1): 65/556 kB
+Progress (1): 81/556 kB
+Progress (1): 98/556 kB
+Progress (1): 114/556 kB
+Progress (1): 131/556 kB
+Progress (1): 147/556 kB
+Progress (1): 163/556 kB
+Progress (1): 180/556 kB
+Progress (1): 196/556 kB
+Progress (1): 212/556 kB
+Progress (1): 229/556 kB
+Progress (1): 245/556 kB
+Progress (1): 262/556 kB
+Progress (1): 278/556 kB
+Progress (1): 294/556 kB
+Progress (1): 311/556 kB
+Progress (1): 327/556 kB
+Progress (1): 328/556 kB
+Progress (1): 344/556 kB
+Progress (1): 360/556 kB
+Progress (1): 377/556 kB
+Progress (1): 393/556 kB
+Progress (1): 410/556 kB
+Progress (1): 426/556 kB
+Progress (1): 442/556 kB
+Progress (1): 459/556 kB
+Progress (1): 475/556 kB
+Progress (1): 492/556 kB
+Progress (1): 508/556 kB
+Progress (1): 524/556 kB
+Progress (1): 541/556 kB
+Progress (1): 556 kB    
+                    
+Downloaded from central: https://repo.maven.apache.org/maven2/commons-io/commons-io/2.19.0/commons-io-2.19.0.jar (556 kB at 66 kB/s)
+#26 24.66 Downloading from central: https://repo.maven.apache.org/maven2/javax/annotation/javax.annotation-api/1.2/javax.annotation-api-1.2.pom
+#26 24.87 Progress (1): 702 B
+Progress (1): 2.0 kB
+Progress (1): 3.5 kB
+Progress (1): 5.5 kB
+Progress (1): 8.7 kB
+Progress (1): 12 kB 
+Progress (1): 13 kB
+                   
+Downloaded from central: https://repo.maven.apache.org/maven2/javax/annotation/javax.annotation-api/1.2/javax.annotation-api-1.2.pom (13 kB at 62 kB/s)
+#26 24.88 Downloading from central: https://repo.maven.apache.org/maven2/javax/enterprise/cdi-api/1.2/cdi-api-1.2.pom
+#26 25.09 Progress (1): 1.0 kB
+Progress (1): 3.3 kB
+Progress (1): 5.8 kB
+Progress (1): 6.3 kB
+                    
+Downloaded from central: https://repo.maven.apache.org/maven2/javax/enterprise/cdi-api/1.2/cdi-api-1.2.pom (6.3 kB at 29 kB/s)
+#26 25.12 Downloading from central: https://repo.maven.apache.org/maven2/aopalliance/aopalliance/1.0/aopalliance-1.0.pom
+#26 25.34 Progress (1): 363 B
+                   
+Downloaded from central: https://repo.maven.apache.org/maven2/aopalliance/aopalliance/1.0/aopalliance-1.0.pom (363 B at 1.6 kB/s)
+#26 25.51 Downloading from central: https://repo.maven.apache.org/maven2/junit/junit/3.8.1/junit-3.8.1.pom
+#26 25.73 Progress (1): 998 B
+                   
+Downloaded from central: https://repo.maven.apache.org/maven2/junit/junit/3.8.1/junit-3.8.1.pom (998 B at 4.7 kB/s)
+#26 25.74 Downloading from central: https://repo.maven.apache.org/maven2/classworlds/classworlds/1.1-alpha-2/classworlds-1.1-alpha-2.pom
+#26 26.57 Progress (1): 2.0 kB
+Progress (1): 3.1 kB
+                    
+Downloaded from central: https://repo.maven.apache.org/maven2/classworlds/classworlds/1.1-alpha-2/classworlds-1.1-alpha-2.pom (3.1 kB at 3.8 kB/s)
+#26 26.60 Downloading from central: https://repo.maven.apache.org/maven2/javax/servlet/javax.servlet-api/3.1.0/javax.servlet-api-3.1.0.pom
+#26 26.81 Progress (1): 701 B
+Progress (1): 2.0 kB
+Progress (1): 3.5 kB
+Progress (1): 5.8 kB
+Progress (1): 9.4 kB
+Progress (1): 12 kB 
+Progress (1): 14 kB
+                   
+Downloaded from central: https://repo.maven.apache.org/maven2/javax/servlet/javax.servlet-api/3.1.0/javax.servlet-api-3.1.0.pom (14 kB at 64 kB/s)
+#26 26.85 Downloading from central: https://repo.maven.apache.org/maven2/javax/annotation/javax.annotation-api/1.2/javax.annotation-api-1.2.jar
+#26 27.06 Progress (1): 7.7/26 kB
+Progress (1): 7.7/26 kB
+Progress (1): 24/26 kB 
+Progress (1): 26 kB   
+                   
+Downloaded from central: https://repo.maven.apache.org/maven2/javax/annotation/javax.annotation-api/1.2/javax.annotation-api-1.2.jar (26 kB at 119 kB/s)
+#26 27.07 Downloading from central: https://repo.maven.apache.org/maven2/javax/enterprise/cdi-api/1.2/cdi-api-1.2.jar
+#26 27.07 Downloading from central: https://repo.maven.apache.org/maven2/aopalliance/aopalliance/1.0/aopalliance-1.0.jar
+#26 27.07 Downloading from central: https://repo.maven.apache.org/maven2/commons-codec/commons-codec/1.11/commons-codec-1.11.jar
+#26 27.08 Downloading from central: https://repo.maven.apache.org/maven2/javax/servlet/javax.servlet-api/3.1.0/javax.servlet-api-3.1.0.jar
+#26 27.29 Progress (1): 4.5 kB
+Progress (2): 4.5 kB | 7.7/71 kB
+Progress (2): 4.5 kB | 11/71 kB 
+                               
+Downloaded from central: https://repo.maven.apache.org/maven2/aopalliance/aopalliance/1.0/aopalliance-1.0.jar (4.5 kB at 21 kB/s)
+#26 27.29 Progress (1): 28/71 kB
+Progress (2): 28/71 kB | 3.2/96 kB
+Progress (3): 28/71 kB | 3.2/96 kB | 7.7/335 kB
+Progress (3): 28/71 kB | 3.2/96 kB | 16/335 kB 
+Progress (3): 44/71 kB | 3.2/96 kB | 16/335 kB
+Progress (3): 44/71 kB | 20/96 kB | 16/335 kB 
+Progress (3): 44/71 kB | 20/96 kB | 28/335 kB
+Progress (3): 61/71 kB | 20/96 kB | 28/335 kB
+Progress (3): 61/71 kB | 36/96 kB | 28/335 kB
+Progress (3): 71 kB | 36/96 kB | 28/335 kB   
+                                          
+Downloaded from central: https://repo.maven.apache.org/maven2/javax/enterprise/cdi-api/1.2/cdi-api-1.2.jar (71 kB at 306 kB/s)
+#26 27.31 Progress (2): 36/96 kB | 44/335 kB
+Progress (2): 52/96 kB | 44/335 kB
+Progress (2): 52/96 kB | 61/335 kB
+Progress (2): 69/96 kB | 61/335 kB
+Progress (2): 69/96 kB | 77/335 kB
+Progress (2): 85/96 kB | 77/335 kB
+Progress (2): 85/96 kB | 93/335 kB
+Progress (2): 96 kB | 93/335 kB   
+                               
+Downloaded from central: https://repo.maven.apache.org/maven2/javax/servlet/javax.servlet-api/3.1.0/javax.servlet-api-3.1.0.jar (96 kB at 383 kB/s)
+#26 27.33 Progress (1): 110/335 kB
+Progress (1): 126/335 kB
+Progress (1): 142/335 kB
+Progress (1): 159/335 kB
+Progress (1): 175/335 kB
+Progress (1): 192/335 kB
+Progress (1): 200/335 kB
+Progress (1): 216/335 kB
+Progress (1): 233/335 kB
+Progress (1): 249/335 kB
+Progress (1): 265/335 kB
+Progress (1): 282/335 kB
+Progress (1): 290/335 kB
+Progress (1): 306/335 kB
+Progress (1): 323/335 kB
+Progress (1): 335 kB    
+                    
+Downloaded from central: https://repo.maven.apache.org/maven2/commons-codec/commons-codec/1.11/commons-codec-1.11.jar (335 kB at 997 kB/s)
+#26 27.42 [INFO] 
+#26 27.42 [INFO] ------------------------< dev.mars:quorus-core >------------------------
+#26 27.42 [INFO] Building Quorus Core 1.0-SNAPSHOT                                  [2/5]
+#26 27.42 [INFO]   from quorus-core/pom.xml
+#26 27.42 [INFO] --------------------------------[ jar ]---------------------------------
+#26 27.44 [INFO] 
+#26 27.44 [INFO] --- dependency:3.7.0:go-offline (default-cli) @ quorus-core ---
+#26 27.47 Downloading from central: https://repo.maven.apache.org/maven2/commons-io/commons-io/2.11.0/commons-io-2.11.0.jar
+#26 27.68 Progress (1): 7.7/327 kB
+Progress (1): 11/327 kB 
+Progress (1): 28/327 kB
+Progress (1): 44/327 kB
+Progress (1): 61/327 kB
+Progress (1): 77/327 kB
+Progress (1): 93/327 kB
+Progress (1): 110/327 kB
+Progress (1): 126/327 kB
+Progress (1): 134/327 kB
+Progress (1): 151/327 kB
+Progress (1): 167/327 kB
+Progress (1): 183/327 kB
+Progress (1): 200/327 kB
+Progress (1): 216/327 kB
+Progress (1): 224/327 kB
+Progress (1): 241/327 kB
+Progress (1): 257/327 kB
+Progress (1): 266/327 kB
+Progress (1): 282/327 kB
+Progress (1): 299/327 kB
+Progress (1): 315/327 kB
+Progress (1): 327 kB    
+                    
+Downloaded from central: https://repo.maven.apache.org/maven2/commons-io/commons-io/2.11.0/commons-io-2.11.0.jar (327 kB at 1.0 MB/s)
+#26 27.88 Downloading from central: https://repo.maven.apache.org/maven2/commons-io/commons-io/2.12.0/commons-io-2.12.0.pom
+#26 28.09 Progress (1): 770 B
+Progress (1): 2.1 kB
+Progress (1): 5.2 kB
+Progress (1): 7.9 kB
+Progress (1): 10 kB 
+Progress (1): 12 kB
+Progress (1): 15 kB
+Progress (1): 18 kB
+Progress (1): 20 kB
+                   
+Downloaded from central: https://repo.maven.apache.org/maven2/commons-io/commons-io/2.12.0/commons-io-2.12.0.pom (20 kB at 96 kB/s)
+#26 28.10 Downloading from central: https://repo.maven.apache.org/maven2/commons-io/commons-io/2.12.0/commons-io-2.12.0.jar
+#26 28.32 Progress (1): 7.7/474 kB
+Progress (1): 16/474 kB 
+Progress (1): 32/474 kB
+Progress (1): 49/474 kB
+Progress (1): 65/474 kB
+Progress (1): 81/474 kB
+Progress (1): 98/474 kB
+Progress (1): 114/474 kB
+Progress (1): 131/474 kB
+Progress (1): 147/474 kB
+Progress (1): 163/474 kB
+Progress (1): 180/474 kB
+Progress (1): 196/474 kB
+Progress (1): 205/474 kB
+Progress (1): 221/474 kB
+Progress (1): 238/474 kB
+Progress (1): 254/474 kB
+Progress (1): 270/474 kB
+Progress (1): 287/474 kB
+Progress (1): 303/474 kB
+Progress (1): 319/474 kB
+Progress (1): 336/474 kB
+Progress (1): 352/474 kB
+Progress (1): 369/474 kB
+Progress (1): 385/474 kB
+Progress (1): 401/474 kB
+Progress (1): 418/474 kB
+Progress (1): 424/474 kB
+Progress (1): 440/474 kB
+Progress (1): 457/474 kB
+Progress (1): 473/474 kB
+Progress (1): 474 kB    
+                    
+Downloaded from central: https://repo.maven.apache.org/maven2/commons-io/commons-io/2.12.0/commons-io-2.12.0.jar (474 kB at 1.1 MB/s)
+#26 28.56 Downloading from central: https://repo.maven.apache.org/maven2/commons-codec/commons-codec/1.19.0/commons-codec-1.19.0.pom
+#26 28.78 Progress (1): 739 B
+Progress (1): 1.9 kB
+Progress (1): 4.0 kB
+Progress (1): 5.7 kB
+Progress (1): 8.2 kB
+Progress (1): 11 kB 
+Progress (1): 14 kB
+Progress (1): 17 kB
+Progress (1): 18 kB
+                   
+Downloaded from central: https://repo.maven.apache.org/maven2/commons-codec/commons-codec/1.19.0/commons-codec-1.19.0.pom (18 kB at 81 kB/s)
+#26 28.78 Downloading from central: https://repo.maven.apache.org/maven2/commons-io/commons-io/2.20.0/commons-io-2.20.0.pom
+#26 29.00 Progress (1): 761 B
+Progress (1): 2.0 kB
+Progress (1): 4.8 kB
+Progress (1): 6.6 kB
+Progress (1): 8.8 kB
+Progress (1): 12 kB 
+Progress (1): 14 kB
+Progress (1): 18 kB
+Progress (1): 20 kB
+Progress (1): 20 kB
+                   
+Downloaded from central: https://repo.maven.apache.org/maven2/commons-io/commons-io/2.20.0/commons-io-2.20.0.pom (20 kB at 96 kB/s)
+#26 29.03 Downloading from central: https://repo.maven.apache.org/maven2/commons-codec/commons-codec/1.19.0/commons-codec-1.19.0.jar
+#26 29.25 Progress (1): 7.7/375 kB
+Progress (1): 11/375 kB 
+Progress (1): 16/375 kB
+Progress (1): 25/375 kB
+Progress (1): 41/375 kB
+Progress (1): 57/375 kB
+Progress (1): 74/375 kB
+Progress (1): 90/375 kB
+Progress (1): 106/375 kB
+Progress (1): 123/375 kB
+Progress (1): 139/375 kB
+Progress (1): 156/375 kB
+Progress (1): 172/375 kB
+Progress (1): 188/375 kB
+Progress (1): 205/375 kB
+Progress (1): 221/375 kB
+Progress (1): 238/375 kB
+Progress (1): 254/375 kB
+Progress (1): 270/375 kB
+Progress (1): 282/375 kB
+Progress (1): 299/375 kB
+Progress (1): 315/375 kB
+Progress (1): 331/375 kB
+Progress (1): 348/375 kB
+Progress (1): 364/375 kB
+Progress (1): 375 kB    
+                    
+Downloaded from central: https://repo.maven.apache.org/maven2/commons-codec/commons-codec/1.19.0/commons-codec-1.19.0.jar (375 kB at 1.3 MB/s)
+#26 29.31 Downloading from central: https://repo.maven.apache.org/maven2/commons-io/commons-io/2.20.0/commons-io-2.20.0.jar
+#26 29.85 Progress (1): 7.7/564 kB
+Progress (1): 16/564 kB 
+Progress (1): 32/564 kB
+Progress (1): 49/564 kB
+Progress (1): 65/564 kB
+Progress (1): 81/564 kB
+Progress (1): 98/564 kB
+Progress (1): 114/564 kB
+Progress (1): 115/564 kB
+Progress (1): 131/564 kB
+Progress (1): 139/564 kB
+Progress (1): 156/564 kB
+Progress (1): 172/564 kB
+Progress (1): 180/564 kB
+Progress (1): 197/564 kB
+Progress (1): 213/564 kB
+Progress (1): 229/564 kB
+Progress (1): 246/564 kB
+Progress (1): 262/564 kB
+Progress (1): 270/564 kB
+Progress (1): 287/564 kB
+Progress (1): 295/564 kB
+Progress (1): 311/564 kB
+Progress (1): 328/564 kB
+Progress (1): 344/564 kB
+Progress (1): 360/564 kB
+Progress (1): 377/564 kB
+Progress (1): 393/564 kB
+Progress (1): 410/564 kB
+Progress (1): 426/564 kB
+Progress (1): 442/564 kB
+Progress (1): 459/564 kB
+Progress (1): 475/564 kB
+Progress (1): 492/564 kB
+Progress (1): 508/564 kB
+Progress (1): 516/564 kB
+Progress (1): 524/564 kB
+Progress (1): 541/564 kB
+Progress (1): 557/564 kB
+Progress (1): 564 kB    
+                    
+Downloaded from central: https://repo.maven.apache.org/maven2/commons-io/commons-io/2.20.0/commons-io-2.20.0.jar (564 kB at 929 kB/s)
+#26 30.03 Downloading from central: https://repo.maven.apache.org/maven2/eu/agno3/jcifs/jcifs-ng/2.1.10/jcifs-ng-2.1.10.pom
+#26 30.25 Progress (1): 1.0 kB
+Progress (1): 3.2 kB
+Progress (1): 5.4 kB
+Progress (1): 7.9 kB
+Progress (1): 11 kB 
+Progress (1): 15 kB
+Progress (1): 16 kB
+                   
+Downloaded from central: https://repo.maven.apache.org/maven2/eu/agno3/jcifs/jcifs-ng/2.1.10/jcifs-ng-2.1.10.pom (16 kB at 73 kB/s)
+#26 30.26 Downloading from central: https://repo.maven.apache.org/maven2/eu/agno3/jcifs/jcifs-ng/2.1.10/jcifs-ng-2.1.10.jar
+#26 30.47 Progress (1): 7.7/823 kB
+Progress (1): 11/823 kB 
+Progress (1): 28/823 kB
+Progress (1): 44/823 kB
+Progress (1): 61/823 kB
+Progress (1): 66/823 kB
+Progress (1): 74/823 kB
+Progress (1): 90/823 kB
+Progress (1): 106/823 kB
+Progress (1): 115/823 kB
+Progress (1): 123/823 kB
+Progress (1): 139/823 kB
+Progress (1): 156/823 kB
+Progress (1): 164/823 kB
+Progress (1): 180/823 kB
+Progress (1): 197/823 kB
+Progress (1): 213/823 kB
+Progress (1): 229/823 kB
+Progress (1): 238/823 kB
+Progress (1): 254/823 kB
+Progress (1): 270/823 kB
+Progress (1): 287/823 kB
+Progress (1): 295/823 kB
+Progress (1): 311/823 kB
+Progress (1): 328/823 kB
+Progress (1): 344/823 kB
+Progress (1): 360/823 kB
+Progress (1): 377/823 kB
+Progress (1): 393/823 kB
+Progress (1): 410/823 kB
+Progress (1): 426/823 kB
+Progress (1): 442/823 kB
+Progress (1): 459/823 kB
+Progress (1): 475/823 kB
+Progress (1): 492/823 kB
+Progress (1): 508/823 kB
+Progress (1): 516/823 kB
+Progress (1): 532/823 kB
+Progress (1): 549/823 kB
+Progress (1): 557/823 kB
+Progress (1): 573/823 kB
+Progress (1): 590/823 kB
+Progress (1): 606/823 kB
+Progress (1): 623/823 kB
+Progress (1): 631/823 kB
+Progress (1): 647/823 kB
+Progress (1): 655/823 kB
+Progress (1): 672/823 kB
+Progress (1): 688/823 kB
+Progress (1): 705/823 kB
+Progress (1): 721/823 kB
+Progress (1): 737/823 kB
+Progress (1): 754/823 kB
+Progress (1): 770/823 kB
+Progress (1): 786/823 kB
+Progress (1): 803/823 kB
+Progress (1): 819/823 kB
+Progress (1): 823 kB    
+                    
+Downloaded from central: https://repo.maven.apache.org/maven2/eu/agno3/jcifs/jcifs-ng/2.1.10/jcifs-ng-2.1.10.jar (823 kB at 2.5 MB/s)
+#26 30.64 Downloading from central: https://repo.maven.apache.org/maven2/ch/qos/logback/logback-classic/1.5.32/logback-classic-1.5.32.pom
+#26 30.85 Progress (1): 2.1 kB
+Progress (1): 5.4 kB
+Progress (1): 9.1 kB
+Progress (1): 13 kB 
+Progress (1): 15 kB
+Progress (1): 16 kB
+                   
+Downloaded from central: https://repo.maven.apache.org/maven2/ch/qos/logback/logback-classic/1.5.32/logback-classic-1.5.32.pom (16 kB at 74 kB/s)
+#26 30.86 Downloading from central: https://repo.maven.apache.org/maven2/ch/qos/logback/logback-parent/1.5.32/logback-parent-1.5.32.pom
+#26 31.08 Progress (1): 1.1 kB
+Progress (1): 2.8 kB
+Progress (1): 4.9 kB
+Progress (1): 9.8 kB
+Progress (1): 14 kB 
+Progress (1): 17 kB
+Progress (1): 20 kB
+                   
+Downloaded from central: https://repo.maven.apache.org/maven2/ch/qos/logback/logback-parent/1.5.32/logback-parent-1.5.32.pom (20 kB at 87 kB/s)
+#26 31.08 Downloading from central: https://repo.maven.apache.org/maven2/ch/qos/logback/logback-core/1.5.32/logback-core-1.5.32.pom
+#26 31.30 Progress (1): 1.5 kB
+Progress (1): 5.0 kB
+Progress (1): 7.9 kB
+Progress (1): 9.4 kB
+                    
+Downloaded from central: https://repo.maven.apache.org/maven2/ch/qos/logback/logback-core/1.5.32/logback-core-1.5.32.pom (9.4 kB at 44 kB/s)
+#26 31.30 Downloading from central: https://repo.maven.apache.org/maven2/jakarta/mail/jakarta.mail-api/2.1.5/jakarta.mail-api-2.1.5.pom
+#26 31.51 Progress (1): 819 B
+Progress (1): 2.6 kB
+Progress (1): 6.0 kB
+Progress (1): 11 kB 
+Progress (1): 15 kB
+Progress (1): 18 kB
+Progress (1): 21 kB
+Progress (1): 22 kB
+                   
+Downloaded from central: https://repo.maven.apache.org/maven2/jakarta/mail/jakarta.mail-api/2.1.5/jakarta.mail-api-2.1.5.pom (22 kB at 103 kB/s)
+#26 31.52 Downloading from central: https://repo.maven.apache.org/maven2/jakarta/activation/jakarta.activation-api/2.1.4/jakarta.activation-api-2.1.4.pom
+#26 31.74 Progress (1): 857 B
+Progress (1): 2.6 kB
+Progress (1): 5.3 kB
+Progress (1): 9.4 kB
+Progress (1): 12 kB 
+Progress (1): 17 kB
+Progress (1): 19 kB
+                   
+Downloaded from central: https://repo.maven.apache.org/maven2/jakarta/activation/jakarta.activation-api/2.1.4/jakarta.activation-api-2.1.4.pom (19 kB at 85 kB/s)
+#26 31.75 Downloading from central: https://repo.maven.apache.org/maven2/ch/qos/logback/logback-classic/1.5.32/logback-classic-1.5.32.jar
+#26 31.96 Progress (1): 7.7/286 kB
+Progress (1): 7.7/286 kB
+Progress (1): 24/286 kB 
+Progress (1): 40/286 kB
+Progress (1): 57/286 kB
+Progress (1): 73/286 kB
+Progress (1): 90/286 kB
+Progress (1): 106/286 kB
+Progress (1): 122/286 kB
+Progress (1): 139/286 kB
+Progress (1): 155/286 kB
+Progress (1): 172/286 kB
+Progress (1): 188/286 kB
+Progress (1): 204/286 kB
+Progress (1): 221/286 kB
+Progress (1): 237/286 kB
+Progress (1): 253/286 kB
+Progress (1): 270/286 kB
+Progress (1): 286/286 kB
+Progress (1): 286 kB    
+                    
+Downloaded from central: https://repo.maven.apache.org/maven2/ch/qos/logback/logback-classic/1.5.32/logback-classic-1.5.32.jar (286 kB at 1.1 MB/s)
+#26 32.00 Downloading from central: https://repo.maven.apache.org/maven2/ch/qos/logback/logback-core/1.5.32/logback-core-1.5.32.jar
+#26 32.00 Downloading from central: https://repo.maven.apache.org/maven2/jakarta/mail/jakarta.mail-api/2.1.5/jakarta.mail-api-2.1.5.jar
+#26 32.00 Downloading from central: https://repo.maven.apache.org/maven2/jakarta/activation/jakarta.activation-api/2.1.4/jakarta.activation-api-2.1.4.jar
+#26 32.21 Progress (1): 7.7/644 kB
+Progress (1): 16/644 kB 
+Progress (1): 24/644 kB
+Progress (1): 40/644 kB
+Progress (1): 57/644 kB
+Progress (2): 57/644 kB | 7.7/237 kB
+Progress (2): 57/644 kB | 8.2/237 kB
+Progress (2): 73/644 kB | 8.2/237 kB
+Progress (2): 73/644 kB | 25/237 kB 
+Progress (2): 90/644 kB | 25/237 kB
+Progress (2): 106/644 kB | 25/237 kB
+Progress (2): 115/644 kB | 25/237 kB
+Progress (2): 115/644 kB | 41/237 kB
+Progress (2): 131/644 kB | 41/237 kB
+Progress (2): 139/644 kB | 41/237 kB
+Progress (3): 139/644 kB | 41/237 kB | 7.7/67 kB
+Progress (3): 139/644 kB | 41/237 kB | 16/67 kB 
+Progress (3): 139/644 kB | 57/237 kB | 16/67 kB
+Progress (3): 156/644 kB | 57/237 kB | 16/67 kB
+Progress (3): 164/644 kB | 57/237 kB | 16/67 kB
+Progress (3): 164/644 kB | 57/237 kB | 28/67 kB
+Progress (3): 164/644 kB | 74/237 kB | 28/67 kB
+Progress (3): 180/644 kB | 74/237 kB | 28/67 kB
+Progress (3): 188/644 kB | 74/237 kB | 28/67 kB
+Progress (3): 205/644 kB | 74/237 kB | 28/67 kB
+Progress (3): 205/644 kB | 90/237 kB | 28/67 kB
+Progress (3): 205/644 kB | 90/237 kB | 44/67 kB
+Progress (3): 221/644 kB | 90/237 kB | 44/67 kB
+Progress (3): 229/644 kB | 90/237 kB | 44/67 kB
+Progress (3): 229/644 kB | 106/237 kB | 44/67 kB
+Progress (3): 246/644 kB | 106/237 kB | 44/67 kB
+Progress (3): 246/644 kB | 106/237 kB | 61/67 kB
+Progress (3): 246/644 kB | 106/237 kB | 67 kB   
+Progress (3): 262/644 kB | 106/237 kB | 67 kB
+Progress (3): 262/644 kB | 123/237 kB | 67 kB
+Progress (3): 270/644 kB | 123/237 kB | 67 kB
+                                             
+Downloaded from central: https://repo.maven.apache.org/maven2/jakarta/activation/jakarta.activation-api/2.1.4/jakarta.activation-api-2.1.4.jar (67 kB at 276 kB/s)
+#26 32.24 Progress (2): 287/644 kB | 123/237 kB
+Progress (2): 303/644 kB | 123/237 kB
+Progress (2): 303/644 kB | 139/237 kB
+Progress (2): 319/644 kB | 139/237 kB
+Progress (2): 319/644 kB | 156/237 kB
+Progress (2): 336/644 kB | 156/237 kB
+Progress (2): 352/644 kB | 156/237 kB
+Progress (2): 352/644 kB | 172/237 kB
+Progress (2): 369/644 kB | 172/237 kB
+Progress (2): 377/644 kB | 172/237 kB
+Progress (2): 393/644 kB | 172/237 kB
+Progress (2): 393/644 kB | 188/237 kB
+Progress (2): 410/644 kB | 188/237 kB
+Progress (2): 426/644 kB | 188/237 kB
+Progress (2): 426/644 kB | 205/237 kB
+Progress (2): 442/644 kB | 205/237 kB
+Progress (2): 459/644 kB | 205/237 kB
+Progress (2): 467/644 kB | 205/237 kB
+Progress (2): 467/644 kB | 221/237 kB
+Progress (2): 467/644 kB | 233/237 kB
+Progress (2): 483/644 kB | 233/237 kB
+Progress (2): 483/644 kB | 237 kB    
+Progress (2): 500/644 kB | 237 kB
+                                 
+Downloaded from central: https://repo.maven.apache.org/maven2/jakarta/mail/jakarta.mail-api/2.1.5/jakarta.mail-api-2.1.5.jar (237 kB at 863 kB/s)
+#26 32.28 Progress (1): 516/644 kB
+Progress (1): 532/644 kB
+Progress (1): 549/644 kB
+Progress (1): 565/644 kB
+Progress (1): 582/644 kB
+Progress (1): 590/644 kB
+Progress (1): 606/644 kB
+Progress (1): 623/644 kB
+Progress (1): 631/644 kB
+Progress (1): 644 kB    
+                    
+Downloaded from central: https://repo.maven.apache.org/maven2/ch/qos/logback/logback-core/1.5.32/logback-core-1.5.32.jar (644 kB at 2.2 MB/s)
+#26 32.30 Downloading from central: https://repo.maven.apache.org/maven2/commons-net/commons-net/3.12.0/commons-net-3.12.0.pom
+#26 32.52 Progress (1): 772 B
+Progress (1): 1.9 kB
+Progress (1): 3.6 kB
+Progress (1): 5.6 kB
+Progress (1): 9.5 kB
+Progress (1): 13 kB 
+Progress (1): 18 kB
+Progress (1): 22 kB
+Progress (1): 25 kB
+Progress (1): 27 kB
+                   
+Downloaded from central: https://repo.maven.apache.org/maven2/commons-net/commons-net/3.12.0/commons-net-3.12.0.pom (27 kB at 122 kB/s)
+#26 32.52 Downloading from central: https://repo.maven.apache.org/maven2/commons-net/commons-net/3.12.0/commons-net-3.12.0.jar
+#26 32.73 Progress (1): 7.7/330 kB
+Progress (1): 16/330 kB 
+Progress (1): 32/330 kB
+Progress (1): 49/330 kB
+Progress (1): 65/330 kB
+Progress (1): 81/330 kB
+Progress (1): 98/330 kB
+Progress (1): 114/330 kB
+Progress (1): 131/330 kB
+Progress (1): 147/330 kB
+Progress (1): 163/330 kB
+Progress (1): 180/330 kB
+Progress (1): 180/330 kB
+Progress (1): 197/330 kB
+Progress (1): 213/330 kB
+Progress (1): 229/330 kB
+Progress (1): 246/330 kB
+Progress (1): 262/330 kB
+Progress (1): 279/330 kB
+Progress (1): 295/330 kB
+Progress (1): 311/330 kB
+Progress (1): 328/330 kB
+Progress (1): 330 kB    
+                    
+Downloaded from central: https://repo.maven.apache.org/maven2/commons-net/commons-net/3.12.0/commons-net-3.12.0.jar (330 kB at 1.3 MB/s)
+#26 32.79 [INFO] 
+#26 32.79 [INFO] ----------------------< dev.mars:quorus-workflow >----------------------
+#26 32.79 [INFO] Building Quorus Workflow Engine 1.0-SNAPSHOT                       [3/5]
+#26 32.79 [INFO]   from quorus-workflow/pom.xml
+#26 32.79 [INFO] --------------------------------[ jar ]---------------------------------
+#26 32.80 [INFO] 
+#26 32.80 [INFO] --- dependency:3.7.0:go-offline (default-cli) @ quorus-workflow ---
+#26 32.80 Downloading from central: https://repo.maven.apache.org/maven2/commons-io/commons-io/2.16.1/commons-io-2.16.1.pom
+#26 33.02 Progress (1): 762 B
+Progress (1): 2.0 kB
+Progress (1): 4.9 kB
+Progress (1): 6.7 kB
+Progress (1): 8.8 kB
+Progress (1): 12 kB 
+Progress (1): 15 kB
+Progress (1): 18 kB
+Progress (1): 20 kB
+                   
+Downloaded from central: https://repo.maven.apache.org/maven2/commons-io/commons-io/2.16.1/commons-io-2.16.1.pom (20 kB at 93 kB/s)
+#26 33.03 Downloading from central: https://repo.maven.apache.org/maven2/commons-io/commons-io/2.16.1/commons-io-2.16.1.jar
+#26 33.25 Progress (1): 7.7/509 kB
+Progress (1): 11/509 kB 
+Progress (1): 28/509 kB
+Progress (1): 44/509 kB
+Progress (1): 61/509 kB
+Progress (1): 77/509 kB
+Progress (1): 93/509 kB
+Progress (1): 110/509 kB
+Progress (1): 126/509 kB
+Progress (1): 142/509 kB
+Progress (1): 159/509 kB
+Progress (1): 175/509 kB
+Progress (1): 192/509 kB
+Progress (1): 200/509 kB
+Progress (1): 216/509 kB
+Progress (1): 233/509 kB
+Progress (1): 249/509 kB
+Progress (1): 265/509 kB
+Progress (1): 274/509 kB
+Progress (1): 290/509 kB
+Progress (1): 307/509 kB
+Progress (1): 323/509 kB
+Progress (1): 340/509 kB
+Progress (1): 348/509 kB
+Progress (1): 364/509 kB
+Progress (1): 381/509 kB
+Progress (1): 397/509 kB
+Progress (1): 410/509 kB
+Progress (1): 426/509 kB
+Progress (1): 442/509 kB
+Progress (1): 459/509 kB
+Progress (1): 467/509 kB
+Progress (1): 483/509 kB
+Progress (1): 500/509 kB
+Progress (1): 509 kB    
+                    
+Downloaded from central: https://repo.maven.apache.org/maven2/commons-io/commons-io/2.16.1/commons-io-2.16.1.jar (509 kB at 1.8 MB/s)
+#26 33.41 [INFO] 
+#26 33.41 [INFO] -----------------------< dev.mars:quorus-tenant >-----------------------
+#26 33.41 [INFO] Building Quorus Tenant Management 1.0-SNAPSHOT                     [4/5]
+#26 33.41 [INFO]   from quorus-tenant/pom.xml
+#26 33.41 [INFO] --------------------------------[ jar ]---------------------------------
+#26 33.41 [INFO] 
+#26 33.41 [INFO] --- dependency:3.7.0:go-offline (default-cli) @ quorus-tenant ---
+#26 33.45 Downloading from central: https://repo.maven.apache.org/maven2/jakarta/validation/jakarta.validation-api/3.0.2/jakarta.validation-api-3.0.2.pom
+#26 33.66 Progress (1): 1.0 kB
+Progress (1): 3.7 kB
+Progress (1): 6.2 kB
+Progress (1): 9.4 kB
+Progress (1): 11 kB 
+                   
+Downloaded from central: https://repo.maven.apache.org/maven2/jakarta/validation/jakarta.validation-api/3.0.2/jakarta.validation-api-3.0.2.pom (11 kB at 52 kB/s)
+#26 33.67 Downloading from central: https://repo.maven.apache.org/maven2/jakarta/validation/jakarta.validation-api/3.0.2/jakarta.validation-api-3.0.2.jar
+#26 33.88 Progress (1): 7.7/93 kB
+Progress (1): 11/93 kB 
+Progress (1): 28/93 kB
+Progress (1): 44/93 kB
+Progress (1): 61/93 kB
+Progress (1): 77/93 kB
+Progress (1): 93/93 kB
+Progress (1): 93 kB   
+                   
+Downloaded from central: https://repo.maven.apache.org/maven2/jakarta/validation/jakarta.validation-api/3.0.2/jakarta.validation-api-3.0.2.jar (93 kB at 415 kB/s)
+#26 33.92 [INFO] 
+#26 33.92 [INFO] ---------------------< dev.mars:quorus-controller >---------------------
+#26 33.92 [INFO] Building Quorus Distributed Controller 1.0-SNAPSHOT                [5/5]
+#26 33.92 [INFO]   from quorus-controller/pom.xml
+#26 33.92 [INFO] --------------------------------[ jar ]---------------------------------
+#26 33.94 [INFO] 
+#26 33.94 [INFO] --- dependency:3.7.0:go-offline (default-cli) @ quorus-controller ---
+#26 33.95 Downloading from central: https://repo.maven.apache.org/maven2/javax/annotation/javax.annotation-api/1.3.2/javax.annotation-api-1.3.2.pom
+#26 34.16 Progress (1): 728 B
+Progress (1): 2.0 kB
+Progress (1): 3.5 kB
+Progress (1): 5.4 kB
+Progress (1): 8.7 kB
+Progress (1): 12 kB 
+Progress (1): 14 kB
+                   
+Downloaded from central: https://repo.maven.apache.org/maven2/javax/annotation/javax.annotation-api/1.3.2/javax.annotation-api-1.3.2.pom (14 kB at 69 kB/s)
+#26 34.17 Downloading from central: https://repo.maven.apache.org/maven2/javax/annotation/javax.annotation-api/1.3.2/javax.annotation-api-1.3.2.jar
+#26 34.38 Progress (1): 7.7/27 kB
+Progress (1): 16/27 kB 
+Progress (1): 27 kB   
+                   
+Downloaded from central: https://repo.maven.apache.org/maven2/javax/annotation/javax.annotation-api/1.3.2/javax.annotation-api-1.3.2.jar (27 kB at 124 kB/s)
+#26 34.74 [INFO] ------------------------------------------------------------------------
+#26 34.74 [INFO] Reactor Summary for Quorus File Transfer System 1.0-SNAPSHOT:
+#26 34.74 [INFO] 
+#26 34.74 [INFO] Quorus File Transfer System ........................ SUCCESS [ 24.825 s]
+#26 34.74 [INFO] Quorus Core ........................................ SUCCESS [  5.371 s]
+#26 34.74 [INFO] Quorus Workflow Engine ............................. SUCCESS [  0.618 s]
+#26 34.74 [INFO] Quorus Tenant Management ........................... SUCCESS [  0.508 s]
+#26 34.74 [INFO] Quorus Distributed Controller ...................... SUCCESS [  0.825 s]
+#26 34.74 [INFO] ------------------------------------------------------------------------
+#26 34.75 [INFO] BUILD SUCCESS
+#26 34.75 [INFO] ------------------------------------------------------------------------
+#26 34.75 [INFO] Total time:  32.625 s
+#26 34.75 [INFO] Finished at: 2026-09-05T10:41:51Z
+#26 34.75 [INFO] ------------------------------------------------------------------------
+#26 DONE 34.8s
+
+#27 [builder 13/17] COPY quorus-core/src quorus-core/src
+#27 DONE 0.1s
+#28 [builder 14/17] COPY quorus-workflow/src quorus-workflow/src
+#28 DONE 0.1s
+
+#29 [builder 15/17] COPY quorus-tenant/src quorus-tenant/src
+#29 DONE 0.1s
+
+#30 [builder 16/17] COPY quorus-controller/src quorus-controller/src
+#30 DONE 0.1s
+
+#31 [builder 17/17] RUN --mount=type=cache,target=/root/.m2/repository/org     --mount=type=cache,target=/root/.m2/repository/io     --mount=type=cache,target=/root/.m2/repository/com     --mount=type=cache,target=/root/.m2/repository/net     mvn package -pl quorus-controller -am -DskipTests
+#31 0.862 WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+#31 0.862 WARNING: sun.misc.Unsafe::staticFieldBase has been called by com.google.inject.internal.aop.HiddenClassDefiner (file:/usr/share/maven/lib/guice-5.1.0-classes.jar)
+#31 0.862 WARNING: Please consider reporting this to the maintainers of class com.google.inject.internal.aop.HiddenClassDefiner
+#31 0.862 WARNING: sun.misc.Unsafe::staticFieldBase will be removed in a future release
+#31 1.122 [INFO] Scanning for projects...
+#31 1.230 [INFO] ------------------------------------------------------------------------
+#31 1.230 [INFO] Reactor Build Order:
+#31 1.230 [INFO] 
+#31 1.231 [INFO] Quorus File Transfer System                                        [pom]
+#31 1.231 [INFO] Quorus Core                                                        [jar]
+#31 1.231 [INFO] Quorus Workflow Engine                                             [jar]
+#31 1.231 [INFO] Quorus Tenant Management                                           [jar]
+#31 1.232 [INFO] Quorus Distributed Controller                                      [jar]
+#31 1.241 [INFO] 
+#31 1.241 [INFO] --------------------------< dev.mars:quorus >---------------------------
+#31 1.241 [INFO] Building Quorus File Transfer System 1.0-SNAPSHOT                  [1/5]
+#31 1.241 [INFO]   from pom.xml
+#31 1.241 [INFO] --------------------------------[ pom ]---------------------------------
+#31 1.287 [INFO] 
+#31 1.287 [INFO] --- jacoco:0.8.15:prepare-agent (prepare-agent) @ quorus ---
+#31 1.424 [INFO] argLine set to -javaagent:/root/.m2/repository/org/jacoco/org.jacoco.agent/0.8.15/org.jacoco.agent-0.8.15-runtime.jar=destfile=/app/target/jacoco.exec,excludes=sun/**:jdk/**:java/**:com/sun/**:org/jcp/**
+#31 1.424 [INFO] 
+#31 1.424 [INFO] --- jacoco:0.8.15:report (report) @ quorus ---
+#31 1.429 [INFO] Skipping JaCoCo execution due to missing execution data file.
+#31 1.429 [INFO] 
+#31 1.429 [INFO] ------------------------< dev.mars:quorus-core >------------------------
+#31 1.429 [INFO] Building Quorus Core 1.0-SNAPSHOT                                  [2/5]
+#31 1.429 [INFO]   from quorus-core/pom.xml
+#31 1.429 [INFO] --------------------------------[ jar ]---------------------------------
+#31 1.668 [INFO] 
+#31 1.668 [INFO] --- jacoco:0.8.15:prepare-agent (prepare-agent) @ quorus-core ---
+#31 1.670 [INFO] argLine set to -javaagent:/root/.m2/repository/org/jacoco/org.jacoco.agent/0.8.15/org.jacoco.agent-0.8.15-runtime.jar=destfile=/app/quorus-core/target/jacoco.exec,excludes=sun/**:jdk/**:java/**:com/sun/**:org/jcp/**
+#31 1.670 [INFO] 
+#31 1.670 [INFO] --- resources:3.3.1:resources (default-resources) @ quorus-core ---
+#31 1.744 [INFO] Copying 1 resource from src/main/resources to target/classes
+#31 1.748 [INFO] 
+#31 1.748 [INFO] --- compiler:3.13.0:compile (default-compile) @ quorus-core ---
+#31 1.847 [INFO] Recompiling the module because of changed source code.
+#31 1.856 [INFO] Compiling 72 source files with javac [debug release 25] to target/classes
+#31 3.654 [INFO] /app/quorus-core/src/main/java/dev/mars/quorus/protocol/FtpTransferProtocol.java: Some input files use or override a deprecated API.
+#31 3.654 [INFO] /app/quorus-core/src/main/java/dev/mars/quorus/protocol/FtpTransferProtocol.java: Recompile with -Xlint:deprecation for details.
+#31 3.659 [INFO] 
+#31 3.659 [INFO] --- resources:3.3.1:testResources (default-testResources) @ quorus-core ---
+#31 3.663 [INFO] Copying 11 resources from src/test/resources to target/test-classes
+#31 3.666 [INFO] 
+#31 3.666 [INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ quorus-core ---
+#31 3.677 [INFO] Recompiling the module because of changed dependency.
+#31 3.678 [INFO] Compiling 89 source files with javac [debug release 25] to target/test-classes
+#31 5.869 [INFO] /app/quorus-core/src/test/java/dev/mars/quorus/connection/TlsTrustAnchorPolicyTest.java: Some input files use or override a deprecated API.
+#31 5.869 [INFO] /app/quorus-core/src/test/java/dev/mars/quorus/connection/TlsTrustAnchorPolicyTest.java: Recompile with -Xlint:deprecation for details.
+#31 5.869 [INFO] 
+#31 5.869 [INFO] --- surefire:3.2.2:test (default-test) @ quorus-core ---
+#31 6.024 [INFO] Tests are skipped.
+#31 6.024 [INFO] 
+#31 6.024 [INFO] --- jacoco:0.8.15:report (report) @ quorus-core ---
+#31 6.027 [INFO] Skipping JaCoCo execution due to missing execution data file.
+#31 6.027 [INFO] 
+#31 6.027 [INFO] --- jar:3.3.0:jar (default-jar) @ quorus-core ---
+#31 6.207 [INFO] Building jar: /app/quorus-core/target/quorus-core-1.0-SNAPSHOT.jar
+#31 6.264 [INFO] 
+#31 6.264 [INFO] --- jar:3.3.0:test-jar (default) @ quorus-core ---
+#31 6.290 [INFO] Building jar: /app/quorus-core/target/quorus-core-1.0-SNAPSHOT-tests.jar
+#31 6.319 [INFO] 
+#31 6.319 [INFO] ----------------------< dev.mars:quorus-workflow >----------------------
+#31 6.319 [INFO] Building Quorus Workflow Engine 1.0-SNAPSHOT                       [3/5]
+#31 6.319 [INFO]   from quorus-workflow/pom.xml
+#31 6.319 [INFO] --------------------------------[ jar ]---------------------------------
+#31 6.354 [INFO] 
+#31 6.354 [INFO] --- jacoco:0.8.15:prepare-agent (prepare-agent) @ quorus-workflow ---
+#31 6.356 [INFO] argLine set to -javaagent:/root/.m2/repository/org/jacoco/org.jacoco.agent/0.8.15/org.jacoco.agent-0.8.15-runtime.jar=destfile=/app/quorus-workflow/target/jacoco.exec,excludes=sun/**:jdk/**:java/**:com/sun/**:org/jcp/**
+#31 6.356 [INFO] 
+#31 6.356 [INFO] --- resources:3.3.1:resources (default-resources) @ quorus-workflow ---
+#31 6.359 [INFO] Copying 1 resource from src/main/resources to target/classes
+#31 6.360 [INFO] 
+#31 6.360 [INFO] --- compiler:3.13.0:compile (default-compile) @ quorus-workflow ---
+#31 6.369 [INFO] Recompiling the module because of changed dependency.
+#31 6.369 [INFO] Compiling 15 source files with javac [debug release 25] to target/classes
+#31 6.598 [INFO] 
+#31 6.598 [INFO] --- resources:3.3.1:testResources (default-testResources) @ quorus-workflow ---
+#31 6.600 [INFO] Copying 2 resources from src/test/resources to target/test-classes
+#31 6.601 [INFO] 
+#31 6.601 [INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ quorus-workflow ---
+#31 6.607 [INFO] Recompiling the module because of changed dependency.
+#31 6.608 [INFO] Compiling 11 source files with javac [debug release 25] to target/test-classes
+#31 6.934 [INFO] 
+#31 6.934 [INFO] --- surefire:3.2.2:test (default-test) @ quorus-workflow ---
+#31 6.939 [INFO] Tests are skipped.
+#31 6.939 [INFO] 
+#31 6.940 [INFO] --- jacoco:0.8.15:report (report) @ quorus-workflow ---
+#31 6.941 [INFO] Skipping JaCoCo execution due to missing execution data file.
+#31 6.942 [INFO] 
+#31 6.942 [INFO] --- jar:3.4.1:jar (default-jar) @ quorus-workflow ---
+#31 7.196 [INFO] Building jar: /app/quorus-workflow/target/quorus-workflow-1.0-SNAPSHOT.jar
+#31 7.246 [INFO] 
+#31 7.246 [INFO] -----------------------< dev.mars:quorus-tenant >-----------------------
+#31 7.246 [INFO] Building Quorus Tenant Management 1.0-SNAPSHOT                     [4/5]
+#31 7.246 [INFO]   from quorus-tenant/pom.xml
+#31 7.247 [INFO] --------------------------------[ jar ]---------------------------------
+#31 7.260 [INFO] 
+#31 7.260 [INFO] --- jacoco:0.8.15:prepare-agent (prepare-agent) @ quorus-tenant ---
+#31 7.263 [INFO] argLine set to -javaagent:/root/.m2/repository/org/jacoco/org.jacoco.agent/0.8.15/org.jacoco.agent-0.8.15-runtime.jar=destfile=/app/quorus-tenant/target/jacoco.exec,excludes=sun/**:jdk/**:java/**:com/sun/**:org/jcp/**
+#31 7.263 [INFO] 
+#31 7.263 [INFO] --- resources:3.3.1:resources (default-resources) @ quorus-tenant ---
+#31 7.264 [INFO] skip non existing resourceDirectory /app/quorus-tenant/src/main/resources
+#31 7.264 [INFO] 
+#31 7.265 [INFO] --- compiler:3.13.0:compile (default-compile) @ quorus-tenant ---
+#31 7.271 [INFO] Recompiling the module because of changed dependency.
+#31 7.272 [INFO] Compiling 8 source files with javac [debug release 25] to target/classes
+#31 7.397 [INFO] 
+#31 7.397 [INFO] --- resources:3.3.1:testResources (default-testResources) @ quorus-tenant ---
+#31 7.399 [INFO] Copying 1 resource from src/test/resources to target/test-classes
+#31 7.399 [INFO] 
+#31 7.399 [INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ quorus-tenant ---
+#31 7.405 [INFO] Recompiling the module because of changed dependency.
+#31 7.406 [INFO] Compiling 5 source files with javac [debug release 25] to target/test-classes
+#31 7.545 [INFO] 
+#31 7.545 [INFO] --- surefire:3.2.2:test (default-test) @ quorus-tenant ---
+#31 7.548 [INFO] Tests are skipped.
+#31 7.548 [INFO] 
+#31 7.548 [INFO] --- jacoco:0.8.15:report (report) @ quorus-tenant ---
+#31 7.549 [INFO] Skipping JaCoCo execution due to missing execution data file.
+#31 7.550 [INFO] 
+#31 7.550 [INFO] --- jar:3.4.1:jar (default-jar) @ quorus-tenant ---
+#31 7.555 [INFO] Building jar: /app/quorus-tenant/target/quorus-tenant-1.0-SNAPSHOT.jar
+#31 7.561 [INFO] 
+#31 7.561 [INFO] ---------------------< dev.mars:quorus-controller >---------------------
+#31 7.561 [INFO] Building Quorus Distributed Controller 1.0-SNAPSHOT                [5/5]
+#31 7.561 [INFO]   from quorus-controller/pom.xml
+#31 7.561 [INFO] --------------------------------[ jar ]---------------------------------
+#31 7.659 [INFO] 
+#31 7.659 [INFO] --- jacoco:0.8.15:prepare-agent (prepare-agent) @ quorus-controller ---
+#31 7.661 [INFO] argLine set to -javaagent:/root/.m2/repository/org/jacoco/org.jacoco.agent/0.8.15/org.jacoco.agent-0.8.15-runtime.jar=destfile=/app/quorus-controller/target/jacoco.exec,excludes=sun/**:jdk/**:java/**:com/sun/**:org/jcp/**:dev/mars/quorus/controller/raft/grpc/**
+#31 7.661 [INFO] 
+#31 7.661 [INFO] --- protobuf:4.1.2:generate (default) @ quorus-controller ---
+#31 7.939 [WARNING]  Parameter 'binaryMavenPlugins' is deprecated: Users should now use plugins instead. This option will be removed in v5.
+#31 7.953 [INFO] Resolving artifact "com.google.protobuf:protoc:exe:linux-x86_64:3.25.5"
+#31 7.972 [INFO] Resolving artifact "io.grpc:protoc-gen-grpc-java:exe:linux-x86_64:1.68.1"
+#31 8.135 [INFO] Registering "/app/quorus-controller/target/generated-sources/protobuf" as a Maven main source root for compiler plugins
+#31 8.136 [INFO] Registering "/app/quorus-controller/target/generated-sources/protobuf" as a Maven main source root for compiler plugins
+#31 8.190 [INFO] All sources will be compiled, as no previous build data was detected
+#31 8.193 [INFO] Generating source code from 2 proto source files and 0 descriptor files (discovered a total of 2 proto source files and 0 descriptor files)
+#31 8.205 [INFO] Invoking protoc. Enable debug logs (--debug --errors) for more details
+#31 8.258 [INFO] protoc (pid 173) returned exit code 0 (success) after 52ms
+#31 8.258 [INFO] Embedding sources from "/app/quorus-controller/src/main/proto" in Maven main class outputs
+#31 8.261 [INFO] PROTOC SUCCEEDED: Protoc invocation succeeded.
+#31 8.262 [INFO] 
+#31 8.262 [INFO] --- resources:3.3.1:resources (default-resources) @ quorus-controller ---
+#31 8.265 [INFO] Copying 3 resources from src/main/resources to target/classes
+#31 8.266 [INFO] 
+#31 8.266 [INFO] --- compiler:3.13.0:compile (default-compile) @ quorus-controller ---
+#31 8.276 [INFO] Recompiling the module because of changed dependency.
+#31 8.277 [INFO] Compiling 168 source files with javac [debug release 25] to target/classes
+#31 10.56 [INFO] 
+#31 10.56 [INFO] --- resources:3.3.1:testResources (default-testResources) @ quorus-controller ---
+#31 10.56 [INFO] Copying 11 resources from src/test/resources to target/test-classes
+#31 10.56 [INFO] 
+#31 10.56 [INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ quorus-controller ---
+#31 10.57 [INFO] Recompiling the module because of changed dependency.
+#31 10.57 [INFO] Compiling 74 source files with javac [debug release 25] to target/test-classes
+#31 11.98 [INFO] 
+#31 11.98 [INFO] --- surefire:3.2.2:test (default-test) @ quorus-controller ---
+#31 11.99 [INFO] Tests are skipped.
+#31 11.99 [INFO] 
+#31 11.99 [INFO] --- jacoco:0.8.15:report (report) @ quorus-controller ---
+#31 11.99 [INFO] Skipping JaCoCo execution due to missing execution data file.
+#31 11.99 [INFO] 
+#31 11.99 [INFO] --- jar:3.4.1:jar (default-jar) @ quorus-controller ---
+#31 12.02 [INFO] Building jar: /app/quorus-controller/target/quorus-controller-1.0-SNAPSHOT.jar
+#31 12.07 [INFO] 
+#31 12.07 [INFO] --- shade:3.4.1:shade (default) @ quorus-controller ---
+#31 12.24 [INFO] Including dev.mars:quorus-core:jar:1.0-SNAPSHOT in the shaded jar.
+#31 12.24 [INFO] Including io.vertx:vertx-web-client:jar:5.0.8 in the shaded jar.
+#31 12.24 [INFO] Including io.vertx:vertx-uri-template:jar:5.0.8 in the shaded jar.
+#31 12.24 [INFO] Including io.vertx:vertx-pg-client:jar:5.0.8 in the shaded jar.
+#31 12.24 [INFO] Including io.vertx:vertx-sql-client:jar:5.0.8 in the shaded jar.
+#31 12.24 [INFO] Including com.ongres.scram:scram-client:jar:3.2 in the shaded jar.
+#31 12.24 [INFO] Including com.ongres.scram:scram-common:jar:3.2 in the shaded jar.
+#31 12.24 [INFO] Including com.ongres.stringprep:saslprep:jar:2.2 in the shaded jar.
+#31 12.24 [INFO] Including com.ongres.stringprep:stringprep:jar:2.2 in the shaded jar.
+#31 12.24 [INFO] Including io.opentelemetry:opentelemetry-api:jar:1.59.0 in the shaded jar.
+#31 12.24 [INFO] Including io.opentelemetry:opentelemetry-context:jar:1.59.0 in the shaded jar.
+#31 12.24 [INFO] Including io.opentelemetry:opentelemetry-common:jar:1.59.0 in the shaded jar.
+#31 12.24 [INFO] Including com.fasterxml.jackson.core:jackson-annotations:jar:2.18.2 in the shaded jar.
+#31 12.24 [INFO] Including com.fasterxml.jackson.core:jackson-core:jar:2.18.2 in the shaded jar.
+#31 12.24 [INFO] Including com.github.mwiede:jsch:jar:0.2.26 in the shaded jar.
+#31 12.24 [INFO] Including dev.mars:quorus-workflow:jar:1.0-SNAPSHOT in the shaded jar.
+#31 12.24 [INFO] Including org.yaml:snakeyaml:jar:2.0 in the shaded jar.
+#31 12.24 [INFO] Including com.networknt:json-schema-validator:jar:1.5.9 in the shaded jar.
+#31 12.24 [INFO] Including com.ethlo.time:itu:jar:1.14.0 in the shaded jar.
+#31 12.24 [INFO] Including org.springframework:spring-expression:jar:6.2.16 in the shaded jar.
+#31 12.24 [INFO] Including org.springframework:spring-core:jar:6.2.16 in the shaded jar.
+#31 12.24 [INFO] Including org.springframework:spring-jcl:jar:6.2.16 in the shaded jar.
+#31 12.24 [INFO] Including dev.mars:quorus-tenant:jar:1.0-SNAPSHOT in the shaded jar.
+#31 12.24 [INFO] Including com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:jar:2.18.2 in the shaded jar.
+#31 12.24 [INFO] Including jakarta.validation:jakarta.validation-api:jar:3.0.2 in the shaded jar.
+#31 12.24 [INFO] Including io.vertx:vertx-opentelemetry:jar:5.0.8 in the shaded jar.
+#31 12.24 [INFO] Including io.opentelemetry:opentelemetry-sdk-trace:jar:1.59.0 in the shaded jar.
+#31 12.24 [INFO] Including io.vertx:vertx-core:jar:5.0.8 in the shaded jar.
+#31 12.24 [INFO] Including io.vertx:vertx-core-logging:jar:5.0.8 in the shaded jar.
+#31 12.24 [INFO] Including io.netty:netty-common:jar:4.2.10.Final in the shaded jar.
+#31 12.24 [INFO] Including io.netty:netty-buffer:jar:4.2.10.Final in the shaded jar.
+#31 12.24 [INFO] Including io.netty:netty-transport:jar:4.2.10.Final in the shaded jar.
+#31 12.24 [INFO] Including io.netty:netty-handler:jar:4.2.10.Final in the shaded jar.
+#31 12.24 [INFO] Including io.netty:netty-codec-base:jar:4.2.10.Final in the shaded jar.
+#31 12.24 [INFO] Including io.netty:netty-handler-proxy:jar:4.2.10.Final in the shaded jar.
+#31 12.24 [INFO] Including io.netty:netty-codec-socks:jar:4.2.10.Final in the shaded jar.
+#31 12.24 [INFO] Including io.netty:netty-codec-http:jar:4.2.10.Final in the shaded jar.
+#31 12.24 [INFO] Including io.netty:netty-codec-compression:jar:4.2.10.Final in the shaded jar.
+#31 12.24 [INFO] Including io.netty:netty-codec-http2:jar:4.2.10.Final in the shaded jar.
+#31 12.24 [INFO] Including io.netty:netty-resolver:jar:4.2.10.Final in the shaded jar.
+#31 12.24 [INFO] Including io.netty:netty-resolver-dns:jar:4.2.10.Final in the shaded jar.
+#31 12.24 [INFO] Including io.netty:netty-codec-dns:jar:4.2.10.Final in the shaded jar.
+#31 12.24 [INFO] Including io.vertx:vertx-web:jar:5.0.8 in the shaded jar.
+#31 12.24 [INFO] Including io.vertx:vertx-web-common:jar:5.0.8 in the shaded jar.
+#31 12.24 [INFO] Including io.vertx:vertx-auth-common:jar:5.0.8 in the shaded jar.
+#31 12.24 [INFO] Including io.vertx:vertx-bridge-common:jar:5.0.8 in the shaded jar.
+#31 12.24 [INFO] Including io.vertx:vertx-grpc-server:jar:5.0.8 in the shaded jar.
+#31 12.24 [INFO] Including io.vertx:vertx-grpc-common:jar:5.0.8 in the shaded jar.
+#31 12.24 [INFO] Including io.vertx:vertx-grpc-client:jar:5.0.8 in the shaded jar.
+#31 12.24 [INFO] Including io.github.mraysmit:raftlog-core:jar:1.2.0 in the shaded jar.
+#31 12.24 [INFO] Including io.opentelemetry:opentelemetry-sdk:jar:1.59.0 in the shaded jar.
+#31 12.24 [INFO] Including io.opentelemetry:opentelemetry-sdk-common:jar:1.59.0 in the shaded jar.
+#31 12.24 [INFO] Including io.opentelemetry:opentelemetry-sdk-metrics:jar:1.59.0 in the shaded jar.
+#31 12.24 [INFO] Including io.opentelemetry:opentelemetry-sdk-logs:jar:1.59.0 in the shaded jar.
+#31 12.24 [INFO] Including io.opentelemetry:opentelemetry-exporter-otlp:jar:1.59.0 in the shaded jar.
+#31 12.24 [INFO] Including io.opentelemetry:opentelemetry-exporter-otlp-common:jar:1.59.0 in the shaded jar.
+#31 12.24 [INFO] Including io.opentelemetry:opentelemetry-exporter-sender-okhttp:jar:1.59.0 in the shaded jar.
+#31 12.24 [INFO] Including com.squareup.okhttp3:okhttp-jvm:jar:5.3.2 in the shaded jar.
+#31 12.24 [INFO] Including com.squareup.okio:okio-jvm:jar:3.16.4 in the shaded jar.
+#31 12.24 [INFO] Including org.jetbrains.kotlin:kotlin-stdlib:jar:2.2.21 in the shaded jar.
+#31 12.24 [INFO] Including io.opentelemetry:opentelemetry-sdk-extension-autoconfigure-spi:jar:1.59.0 in the shaded jar.
+#31 12.24 [INFO] Including io.opentelemetry:opentelemetry-exporter-prometheus:jar:1.59.0-alpha in the shaded jar.
+#31 12.24 [INFO] Including io.opentelemetry:opentelemetry-exporter-common:jar:1.59.0 in the shaded jar.
+#31 12.24 [INFO] Including io.prometheus:prometheus-metrics-exporter-httpserver:jar:1.3.10 in the shaded jar.
+#31 12.24 [INFO] Including io.prometheus:prometheus-metrics-exporter-common:jar:1.3.10 in the shaded jar.
+#31 12.24 [INFO] Including io.prometheus:prometheus-metrics-model:jar:1.3.10 in the shaded jar.
+#31 12.24 [INFO] Including io.prometheus:prometheus-metrics-exposition-formats-no-protobuf:jar:1.3.10 in the shaded jar.
+#31 12.24 [INFO] Including io.prometheus:prometheus-metrics-exposition-textformats:jar:1.3.10 in the shaded jar.
+#31 12.24 [INFO] Including io.prometheus:prometheus-metrics-config:jar:1.3.10 in the shaded jar.
+#31 12.24 [INFO] Including io.opentelemetry.instrumentation:opentelemetry-logback-appender-1.0:jar:2.14.0-alpha in the shaded jar.
+#31 12.24 [INFO] Including io.opentelemetry.instrumentation:opentelemetry-instrumentation-api:jar:2.14.0 in the shaded jar.
+#31 12.24 [INFO] Including io.opentelemetry:opentelemetry-api-incubator:jar:1.48.0-alpha in the shaded jar.
+#31 12.24 [INFO] Including io.opentelemetry.semconv:opentelemetry-semconv:jar:1.30.0 in the shaded jar.
+#31 12.24 [INFO] Including io.opentelemetry.instrumentation:opentelemetry-instrumentation-api-incubator:jar:2.14.0-alpha in the shaded jar.
+#31 12.24 [INFO] Including com.fasterxml.jackson.core:jackson-databind:jar:2.18.2 in the shaded jar.
+#31 12.24 [INFO] Including com.fasterxml.jackson.datatype:jackson-datatype-jsr310:jar:2.19.4 in the shaded jar.
+#31 12.24 [INFO] Including io.grpc:grpc-protobuf:jar:1.68.1 in the shaded jar.
+#31 12.24 [INFO] Including io.grpc:grpc-api:jar:1.68.1 in the shaded jar.
+#31 12.24 [INFO] Including com.google.code.findbugs:jsr305:jar:3.0.2 in the shaded jar.
+#31 12.24 [INFO] Including com.google.api.grpc:proto-google-common-protos:jar:2.41.0 in the shaded jar.
+#31 12.24 [INFO] Including io.grpc:grpc-protobuf-lite:jar:1.68.1 in the shaded jar.
+#31 12.24 [INFO] Including io.grpc:grpc-stub:jar:1.68.1 in the shaded jar.
+#31 12.24 [INFO] Including com.google.errorprone:error_prone_annotations:jar:2.28.0 in the shaded jar.
+#31 12.24 [INFO] Including io.grpc:grpc-netty:jar:1.68.1 in the shaded jar.
+#31 12.24 [INFO] Including io.grpc:grpc-core:jar:1.68.1 in the shaded jar.
+#31 12.24 [INFO] Including com.google.android:annotations:jar:4.1.1.4 in the shaded jar.
+#31 12.24 [INFO] Including org.codehaus.mojo:animal-sniffer-annotations:jar:1.24 in the shaded jar.
+#31 12.24 [INFO] Including io.grpc:grpc-context:jar:1.68.1 in the shaded jar.
+#31 12.24 [INFO] Including io.perfmark:perfmark-api:jar:0.27.0 in the shaded jar.
+#31 12.24 [INFO] Including io.netty:netty-transport-native-unix-common:jar:4.2.10.Final in the shaded jar.
+#31 12.25 [INFO] Including io.grpc:grpc-util:jar:1.68.1 in the shaded jar.
+#31 12.25 [INFO] Including com.google.guava:guava:jar:33.5.0-jre in the shaded jar.
+#31 12.25 [INFO] Including com.google.guava:failureaccess:jar:1.0.3 in the shaded jar.
+#31 12.25 [INFO] Including com.google.guava:listenablefuture:jar:9999.0-empty-to-avoid-conflict-with-guava in the shaded jar.
+#31 12.25 [INFO] Including org.jspecify:jspecify:jar:1.0.0 in the shaded jar.
+#31 12.25 [INFO] Including com.google.j2objc:j2objc-annotations:jar:3.1 in the shaded jar.
+#31 12.25 [INFO] Including com.google.protobuf:protobuf-java:jar:3.25.5 in the shaded jar.
+#31 12.25 [INFO] Including com.google.protobuf:protobuf-java-util:jar:3.25.5 in the shaded jar.
+#31 12.25 [INFO] Including com.google.code.gson:gson:jar:2.8.9 in the shaded jar.
+#31 12.25 [INFO] Including org.slf4j:slf4j-api:jar:2.0.17 in the shaded jar.
+#31 12.25 [INFO] Including org.slf4j:jul-to-slf4j:jar:2.0.17 in the shaded jar.
+#31 12.25 [INFO] Including javax.annotation:javax.annotation-api:jar:1.3.2 in the shaded jar.
+#31 12.25 [INFO] Including ch.qos.logback:logback-classic:jar:1.5.32 in the shaded jar.
+#31 12.25 [INFO] Including ch.qos.logback:logback-core:jar:1.5.32 in the shaded jar.
+#31 12.25 [INFO] Including org.jetbrains:annotations:jar:17.0.0 in the shaded jar.
+#31 12.39 [WARNING] Discovered module-info.class. Shading will break its strong encapsulation.
+#31 12.39 [WARNING] Discovered module-info.class. Shading will break its strong encapsulation.
+#31 12.41 [WARNING] Discovered module-info.class. Shading will break its strong encapsulation.
+#31 12.43 [WARNING] Discovered module-info.class. Shading will break its strong encapsulation.
+#31 12.47 [WARNING] Discovered module-info.class. Shading will break its strong encapsulation.
+#31 12.96 [WARNING] Discovered module-info.class. Shading will break its strong encapsulation.
+#31 12.97 [WARNING] Discovered module-info.class. Shading will break its strong encapsulation.
+#31 13.11 [WARNING] Discovered module-info.class. Shading will break its strong encapsulation.
+#31 13.11 [WARNING] Discovered module-info.class. Shading will break its strong encapsulation.
+#31 13.49 [WARNING] Discovered module-info.class. Shading will break its strong encapsulation.
+#31 13.49 [WARNING] Discovered module-info.class. Shading will break its strong encapsulation.
+#31 13.50 [WARNING] Discovered module-info.class. Shading will break its strong encapsulation.
+#31 13.51 [WARNING] Discovered module-info.class. Shading will break its strong encapsulation.
+#31 13.51 [WARNING] Discovered module-info.class. Shading will break its strong encapsulation.
+#31 13.52 [WARNING] Discovered module-info.class. Shading will break its strong encapsulation.
+#31 13.52 [WARNING] Discovered module-info.class. Shading will break its strong encapsulation.
+#31 13.84 [WARNING] Discovered module-info.class. Shading will break its strong encapsulation.
+#31 14.89 [WARNING] Discovered module-info.class. Shading will break its strong encapsulation.
+#31 14.91 [WARNING] Discovered module-info.class. Shading will break its strong encapsulation.
+#31 14.96 [WARNING] Discovered module-info.class. Shading will break its strong encapsulation.
+#31 14.98 [WARNING] spring-core-6.2.16.jar, spring-expression-6.2.16.jar, spring-jcl-6.2.16.jar define 2 overlapping resources: 
+#31 14.98 [WARNING]   - META-INF/license.txt
+#31 14.98 [WARNING]   - META-INF/notice.txt
+#31 14.98 [WARNING] animal-sniffer-annotations-1.24.jar, annotations-17.0.0.jar, annotations-4.1.1.4.jar, error_prone_annotations-2.28.0.jar, failureaccess-1.0.3.jar, grpc-api-1.68.1.jar, grpc-context-1.68.1.jar, grpc-core-1.68.1.jar, grpc-netty-1.68.1.jar, grpc-protobuf-1.68.1.jar, grpc-protobuf-lite-1.68.1.jar, grpc-stub-1.68.1.jar, grpc-util-1.68.1.jar, gson-2.8.9.jar, guava-33.5.0-jre.jar, itu-1.14.0.jar, j2objc-annotations-3.1.jar, jackson-annotations-2.18.2.jar, jackson-core-2.18.2.jar, jackson-databind-2.18.2.jar, jackson-dataformat-yaml-2.18.2.jar, jackson-datatype-jsr310-2.19.4.jar, jakarta.validation-api-3.0.2.jar, javax.annotation-api-1.3.2.jar, jsch-0.2.26.jar, json-schema-validator-1.5.9.jar, jspecify-1.0.0.jar, jsr305-3.0.2.jar, jul-to-slf4j-2.0.17.jar, kotlin-stdlib-2.2.21.jar, listenablefuture-9999.0-empty-to-avoid-conflict-with-guava.jar, logback-classic-1.5.32.jar, logback-core-1.5.32.jar, netty-buffer-4.2.10.Final.jar, netty-codec-base-4.2.10.Final.jar, netty-codec-compression-4.2.10.Final.jar, netty-codec-dns-4.2.10.Final.jar, netty-codec-http-4.2.10.Final.jar, netty-codec-http2-4.2.10.Final.jar, netty-codec-socks-4.2.10.Final.jar, netty-common-4.2.10.Final.jar, netty-handler-4.2.10.Final.jar, netty-handler-proxy-4.2.10.Final.jar, netty-resolver-4.2.10.Final.jar, netty-resolver-dns-4.2.10.Final.jar, netty-transport-4.2.10.Final.jar, netty-transport-native-unix-common-4.2.10.Final.jar, okhttp-jvm-5.3.2.jar, okio-jvm-3.16.4.jar, opentelemetry-api-1.59.0.jar, opentelemetry-api-incubator-1.48.0-alpha.jar, opentelemetry-common-1.59.0.jar, opentelemetry-context-1.59.0.jar, opentelemetry-exporter-common-1.59.0.jar, opentelemetry-exporter-otlp-1.59.0.jar, opentelemetry-exporter-otlp-common-1.59.0.jar, opentelemetry-exporter-prometheus-1.59.0-alpha.jar, opentelemetry-exporter-sender-okhttp-1.59.0.jar, opentelemetry-instrumentation-api-2.14.0.jar, opentelemetry-instrumentation-api-incubator-2.14.0-alpha.jar, opentelemetry-logback-appender-1.0-2.14.0-alpha.jar, opentelemetry-sdk-1.59.0.jar, opentelemetry-sdk-common-1.59.0.jar, opentelemetry-sdk-extension-autoconfigure-spi-1.59.0.jar, opentelemetry-sdk-logs-1.59.0.jar, opentelemetry-sdk-metrics-1.59.0.jar, opentelemetry-sdk-trace-1.59.0.jar, opentelemetry-semconv-1.30.0.jar, perfmark-api-0.27.0.jar, prometheus-metrics-config-1.3.10.jar, prometheus-metrics-exporter-common-1.3.10.jar, prometheus-metrics-exporter-httpserver-1.3.10.jar, prometheus-metrics-exposition-formats-no-protobuf-1.3.10.jar, prometheus-metrics-exposition-textformats-1.3.10.jar, prometheus-metrics-model-1.3.10.jar, proto-google-common-protos-2.41.0.jar, protobuf-java-3.25.5.jar, protobuf-java-util-3.25.5.jar, quorus-controller-1.0-SNAPSHOT.jar, quorus-core-1.0-SNAPSHOT.jar, quorus-tenant-1.0-SNAPSHOT.jar, quorus-workflow-1.0-SNAPSHOT.jar, raftlog-core-1.2.0.jar, saslprep-2.2.jar, scram-client-3.2.jar, scram-common-3.2.jar, slf4j-api-2.0.17.jar, snakeyaml-2.0.jar, spring-core-6.2.16.jar, spring-expression-6.2.16.jar, spring-jcl-6.2.16.jar, stringprep-2.2.jar, vertx-auth-common-5.0.8.jar, vertx-bridge-common-5.0.8.jar, vertx-core-5.0.8.jar, vertx-core-logging-5.0.8.jar, vertx-grpc-client-5.0.8.jar, vertx-grpc-common-5.0.8.jar, vertx-grpc-server-5.0.8.jar, vertx-opentelemetry-5.0.8.jar, vertx-pg-client-5.0.8.jar, vertx-sql-client-5.0.8.jar, vertx-uri-template-5.0.8.jar, vertx-web-5.0.8.jar, vertx-web-client-5.0.8.jar, vertx-web-common-5.0.8.jar define 1 overlapping resource: 
+#31 14.98 [WARNING]   - META-INF/MANIFEST.MF
+#31 14.98 [WARNING] failureaccess-1.0.3.jar, guava-33.5.0-jre.jar, jackson-annotations-2.18.2.jar, jackson-core-2.18.2.jar, jackson-databind-2.18.2.jar, jackson-dataformat-yaml-2.18.2.jar, jackson-datatype-jsr310-2.19.4.jar, saslprep-2.2.jar, scram-client-3.2.jar, scram-common-3.2.jar, stringprep-2.2.jar define 1 overlapping resource: 
+#31 14.98 [WARNING]   - META-INF/LICENSE
+#31 14.98 [WARNING] jsch-0.2.26.jar, jspecify-1.0.0.jar, okhttp-jvm-5.3.2.jar define 1 overlapping resource: 
+#31 14.98 [WARNING]   - META-INF/versions/9/OSGI-INF/MANIFEST.MF
+#31 14.98 [WARNING] jackson-annotations-2.18.2.jar, jackson-core-2.18.2.jar, jackson-databind-2.18.2.jar, jackson-dataformat-yaml-2.18.2.jar, jackson-datatype-jsr310-2.19.4.jar define 1 overlapping resource: 
+#31 14.98 [WARNING]   - META-INF/NOTICE
+#31 14.98 [WARNING] error_prone_annotations-2.28.0.jar, failureaccess-1.0.3.jar, guava-33.5.0-jre.jar, itu-1.14.0.jar, j2objc-annotations-3.1.jar, jackson-core-2.18.2.jar, jackson-databind-2.18.2.jar, jackson-dataformat-yaml-2.18.2.jar, jackson-datatype-jsr310-2.19.4.jar, jsch-0.2.26.jar, json-schema-validator-1.5.9.jar, jspecify-1.0.0.jar, jul-to-slf4j-2.0.17.jar, kotlin-stdlib-2.2.21.jar, okhttp-jvm-5.3.2.jar, saslprep-2.2.jar, scram-client-3.2.jar, scram-common-3.2.jar, slf4j-api-2.0.17.jar, snakeyaml-2.0.jar, stringprep-2.2.jar define 1 overlapping classes: 
+#31 14.98 [WARNING]   - META-INF.versions.9.module-info
+#31 14.98 [WARNING] javax.annotation-api-1.3.2.jar, jsch-0.2.26.jar, jul-to-slf4j-2.0.17.jar, slf4j-api-2.0.17.jar define 1 overlapping resource: 
+#31 14.98 [WARNING]   - META-INF/LICENSE.txt
+#31 14.98 [WARNING] netty-common-4.2.10.Final.jar, opentelemetry-sdk-trace-1.59.0.jar define 2 overlapping resources: 
+#31 14.98 [WARNING]   - META-INF/maven/org.jctools/jctools-core/pom.properties
+#31 14.98 [WARNING]   - META-INF/maven/org.jctools/jctools-core/pom.xml
+#31 14.98 [WARNING] netty-buffer-4.2.10.Final.jar, netty-codec-base-4.2.10.Final.jar, netty-codec-compression-4.2.10.Final.jar, netty-codec-dns-4.2.10.Final.jar, netty-codec-http-4.2.10.Final.jar, netty-codec-http2-4.2.10.Final.jar, netty-codec-socks-4.2.10.Final.jar, netty-common-4.2.10.Final.jar, netty-handler-4.2.10.Final.jar, netty-handler-proxy-4.2.10.Final.jar, netty-resolver-4.2.10.Final.jar, netty-resolver-dns-4.2.10.Final.jar, netty-transport-4.2.10.Final.jar, netty-transport-native-unix-common-4.2.10.Final.jar define 2 overlapping class and resource: 
+#31 14.98 [WARNING]   - META-INF.versions.11.module-info
+#31 14.98 [WARNING]   - META-INF/io.netty.versions.properties
+#31 14.98 [WARNING] maven-shade-plugin has detected that some class files are
+#31 14.98 [WARNING] present in two or more JARs. When this happens, only one
+#31 14.98 [WARNING] single version of the class is copied to the uber jar.
+#31 14.98 [WARNING] Usually this is not harmful and you can skip these warnings,
+#31 14.98 [WARNING] otherwise try to manually exclude artifacts based on
+#31 14.98 [WARNING] mvn dependency:tree -Ddetail=true and the above output.
+#31 14.98 [WARNING] See https://maven.apache.org/plugins/maven-shade-plugin/
+#31 14.99 [INFO] Replacing original artifact with shaded artifact.
+#31 14.99 [INFO] Replacing /app/quorus-controller/target/quorus-controller-1.0-SNAPSHOT.jar with /app/quorus-controller/target/quorus-controller-1.0-SNAPSHOT-shaded.jar
+#31 14.99 [INFO] ------------------------------------------------------------------------
+#31 14.99 [INFO] Reactor Summary for Quorus File Transfer System 1.0-SNAPSHOT:
+#31 14.99 [INFO] 
+#31 14.99 [INFO] Quorus File Transfer System ........................ SUCCESS [  0.188 s]
+#31 14.99 [INFO] Quorus Core ........................................ SUCCESS [  4.890 s]
+#31 14.99 [INFO] Quorus Workflow Engine ............................. SUCCESS [  0.927 s]
+#31 14.99 [INFO] Quorus Tenant Management ........................... SUCCESS [  0.316 s]
+#31 14.99 [INFO] Quorus Distributed Controller ...................... SUCCESS [  7.432 s]
+#31 14.99 [INFO] ------------------------------------------------------------------------
+#31 14.99 [INFO] BUILD SUCCESS
+#31 14.99 [INFO] ------------------------------------------------------------------------
+#31 14.99 [INFO] Total time:  13.888 s
+#31 14.99 [INFO] Finished at: 2026-09-05T10:42:07Z
+#31 14.99 [INFO] ------------------------------------------------------------------------
+#31 DONE 15.1s
+
+#32 [stage-1 2/6] RUN apk add --no-cache curl
+#32 CACHED
+
+#33 [stage-1 3/6] RUN addgroup -g 1001 quorus &&     adduser -D -s /bin/sh -u 1001 -G quorus quorus
+#33 CACHED
+
+#34 [stage-1 4/6] WORKDIR /app
+#34 CACHED
+
+#35 [stage-1 5/6] COPY --from=builder /app/quorus-controller/target/quorus-controller-*.jar app.jar
+#35 DONE 0.1s
+
+#36 [stage-1 6/6] RUN mkdir -p /app/logs /app/data &&     chown -R quorus:quorus /app
+#36 DONE 0.3s
+
+#37 exporting to image
+#37 exporting layers 0.1s done
+#37 writing image sha256:5df2c46b983ef4ad1a2402b91f4084864054bdd985614a4d56194fbe9302fcb1 done
+#37 naming to docker.io/library/quorus-controller:test done
+#37 DONE 0.2s
+
+#38 resolving provenance for metadata file
+#38 DONE 0.0s
+ Image quorus-controller:test Built 

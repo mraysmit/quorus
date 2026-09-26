@@ -1,0 +1,412 @@
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::staticFieldBase has been called by com.google.inject.internal.aop.HiddenClassDefiner (file:/C:/Users/mraysmit/scoop/apps/maven/current/lib/guice-5.1.0-classes.jar)
+WARNING: Please consider reporting this to the maintainers of class com.google.inject.internal.aop.HiddenClassDefiner
+WARNING: sun.misc.Unsafe::staticFieldBase will be removed in a future release
+WARNING: Final field _cipher in class org.sonatype.plexus.components.sec.dispatcher.DefaultSecDispatcher has been mutated reflectively by class org.eclipse.sisu.bean.BeanPropertyField in unnamed module @2b6faea6 (file:/C:/Users/mraysmit/scoop/apps/maven/current/lib/org.eclipse.sisu.inject-0.9.0.M4.jar)
+WARNING: Use --enable-final-field-mutation=ALL-UNNAMED to avoid a warning
+WARNING: Mutating final fields will be blocked in a future release unless final field mutation is enabled
+[INFO] Scanning for projects...
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Build Order:
+[INFO] 
+[INFO] Quorus File Transfer System                                        [pom]
+[INFO] Quorus Core                                                        [jar]
+[INFO] Quorus Workflow Engine                                             [jar]
+[INFO] Quorus Tenant Management                                           [jar]
+[INFO] Quorus Distributed Controller                                      [jar]
+[INFO] 
+[INFO] --------------------------< dev.mars:quorus >---------------------------
+[INFO] Building Quorus File Transfer System 1.0-SNAPSHOT                  [1/5]
+[INFO]   from pom.xml
+[INFO] --------------------------------[ pom ]---------------------------------
+[INFO] 
+[INFO] --- jacoco:0.8.15:prepare-agent (prepare-agent) @ quorus ---
+[INFO] argLine set to -javaagent:C:\\Users\\mraysmit\\.m2\\repository\\org\\jacoco\\org.jacoco.agent\\0.8.15\\org.jacoco.agent-0.8.15-runtime.jar=destfile=C:\\Users\\mraysmit\\dev\\idea-projects\\quorus\\target\\jacoco.exec,excludes=sun/**:jdk/**:java/**:com/sun/**:org/jcp/**
+[INFO] 
+[INFO] --- jacoco:0.8.15:report (report) @ quorus ---
+[INFO] Skipping JaCoCo execution due to missing execution data file.
+[INFO] 
+[INFO] ------------------------< dev.mars:quorus-core >------------------------
+[INFO] Building Quorus Core 1.0-SNAPSHOT                                  [2/5]
+[INFO]   from quorus-core\pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- jacoco:0.8.15:prepare-agent (prepare-agent) @ quorus-core ---
+[INFO] argLine set to -javaagent:C:\\Users\\mraysmit\\.m2\\repository\\org\\jacoco\\org.jacoco.agent\\0.8.15\\org.jacoco.agent-0.8.15-runtime.jar=destfile=C:\\Users\\mraysmit\\dev\\idea-projects\\quorus\\quorus-core\\target\\jacoco.exec,excludes=sun/**:jdk/**:java/**:com/sun/**:org/jcp/**
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ quorus-core ---
+[INFO] Copying 1 resource from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ quorus-core ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ quorus-core ---
+[INFO] Copying 11 resources from src\test\resources to target\test-classes
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ quorus-core ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- surefire:3.2.2:test (default-test) @ quorus-core ---
+[INFO] 
+[INFO] --- jacoco:0.8.15:report (report) @ quorus-core ---
+[INFO] Skipping JaCoCo execution due to missing execution data file.
+[INFO] 
+[INFO] ----------------------< dev.mars:quorus-workflow >----------------------
+[INFO] Building Quorus Workflow Engine 1.0-SNAPSHOT                       [3/5]
+[INFO]   from quorus-workflow\pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- jacoco:0.8.15:prepare-agent (prepare-agent) @ quorus-workflow ---
+[INFO] argLine set to -javaagent:C:\\Users\\mraysmit\\.m2\\repository\\org\\jacoco\\org.jacoco.agent\\0.8.15\\org.jacoco.agent-0.8.15-runtime.jar=destfile=C:\\Users\\mraysmit\\dev\\idea-projects\\quorus\\quorus-workflow\\target\\jacoco.exec,excludes=sun/**:jdk/**:java/**:com/sun/**:org/jcp/**
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ quorus-workflow ---
+[INFO] Copying 1 resource from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ quorus-workflow ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ quorus-workflow ---
+[INFO] Copying 2 resources from src\test\resources to target\test-classes
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ quorus-workflow ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- surefire:3.2.2:test (default-test) @ quorus-workflow ---
+[INFO] 
+[INFO] --- jacoco:0.8.15:report (report) @ quorus-workflow ---
+[INFO] Skipping JaCoCo execution due to missing execution data file.
+[INFO] 
+[INFO] -----------------------< dev.mars:quorus-tenant >-----------------------
+[INFO] Building Quorus Tenant Management 1.0-SNAPSHOT                     [4/5]
+[INFO]   from quorus-tenant\pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- jacoco:0.8.15:prepare-agent (prepare-agent) @ quorus-tenant ---
+[INFO] argLine set to -javaagent:C:\\Users\\mraysmit\\.m2\\repository\\org\\jacoco\\org.jacoco.agent\\0.8.15\\org.jacoco.agent-0.8.15-runtime.jar=destfile=C:\\Users\\mraysmit\\dev\\idea-projects\\quorus\\quorus-tenant\\target\\jacoco.exec,excludes=sun/**:jdk/**:java/**:com/sun/**:org/jcp/**
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ quorus-tenant ---
+[INFO] skip non existing resourceDirectory C:\Users\mraysmit\dev\idea-projects\quorus\quorus-tenant\src\main\resources
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ quorus-tenant ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ quorus-tenant ---
+[INFO] Copying 1 resource from src\test\resources to target\test-classes
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ quorus-tenant ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- surefire:3.2.2:test (default-test) @ quorus-tenant ---
+[INFO] 
+[INFO] --- jacoco:0.8.15:report (report) @ quorus-tenant ---
+[INFO] Skipping JaCoCo execution due to missing execution data file.
+[INFO] 
+[INFO] ---------------------< dev.mars:quorus-controller >---------------------
+[INFO] Building Quorus Distributed Controller 1.0-SNAPSHOT                [5/5]
+[INFO]   from quorus-controller\pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- jacoco:0.8.15:prepare-agent (prepare-agent) @ quorus-controller ---
+[INFO] argLine set to -javaagent:C:\\Users\\mraysmit\\.m2\\repository\\org\\jacoco\\org.jacoco.agent\\0.8.15\\org.jacoco.agent-0.8.15-runtime.jar=destfile=C:\\Users\\mraysmit\\dev\\idea-projects\\quorus\\quorus-controller\\target\\jacoco.exec,excludes=sun/**:jdk/**:java/**:com/sun/**:org/jcp/**:dev/mars/quorus/controller/raft/grpc/**
+[INFO] 
+[INFO] --- protobuf:4.1.2:generate (default) @ quorus-controller ---
+[WARNING]  Parameter 'binaryMavenPlugins' is deprecated: Users should now use plugins instead. This option will be removed in v5.
+[INFO] Resolving artifact "com.google.protobuf:protoc:exe:windows-x86_64:3.25.5"
+[INFO] Resolving artifact "io.grpc:protoc-gen-grpc-java:exe:windows-x86_64:1.68.1"
+[INFO] Registering "C:\Users\mraysmit\dev\idea-projects\quorus\quorus-controller\target\generated-sources\protobuf" as a Maven main source root for compiler plugins
+[INFO] Registering "C:\Users\mraysmit\dev\idea-projects\quorus\quorus-controller\target\generated-sources\protobuf" as a Maven main source root for compiler plugins
+[INFO] Found 2 proto source files and 0 descriptor files to compile, but all are up-to-date so none will be built this time
+[INFO] NOTHING TO DO: There is nothing to do. If this is unexpected, review the above logs for more details.
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ quorus-controller ---
+[INFO] Copying 3 resources from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ quorus-controller ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ quorus-controller ---
+[INFO] Copying 12 resources from src\test\resources to target\test-classes
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ quorus-controller ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- surefire:3.2.2:test (default-test) @ quorus-controller ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running dev.mars.quorus.controller.deployment.ContainerImageBaselineTest
+[docker build -f C:\Users\mraysmit\dev\idea-projects\quorus\quorus-agent\Dockerfile -t quorus-agent:rt01 C:\Users\mraysmit\dev\idea-projects\quorus] exit 0
+
+#5 [ 1/10] FROM docker.io/library/amazoncorretto:27.0.0-alpine3.24@sha256:6fba5f9f2f4730e2d3e81055ce0378a8587c12a48611ee545c5db04c3a28f889
+#5 CACHED
+
+#6 [internal] load build context
+#6 transferring context: 50.21MB 1.7s done
+#6 DONE 1.7s
+
+#7 [ 2/10] RUN apk add --no-cache     curl     bash     tzdata     && rm -rf /var/cache/apk/*
+#7 9.838 ( 1/14) Installing ncurses-terminfo-base (6.6_p20260516-r0)
+#7 9.890 ( 2/14) Installing libncursesw (6.6_p20260516-r0)
+#7 9.947 ( 3/14) Installing readline (8.3.3-r1)
+#7 10.01 ( 4/14) Installing bash (5.3.9-r1)
+#7 10.17   Executing bash-5.3.9-r1.post-install
+#7 10.18 ( 5/14) Installing brotli-libs (1.2.0-r1)
+#7 10.32 ( 6/14) Installing c-ares (1.34.8-r0)
+#7 10.38 ( 7/14) Installing libunistring (1.4.2-r0)
+#7 10.61 ( 8/14) Installing libidn2 (2.3.8-r0)
+#7 10.67 ( 9/14) Installing nghttp2-libs (1.69.0-r0)
+#7 10.70 (10/14) Installing libpsl (0.21.5-r3)
+#7 10.73 (11/14) Installing zstd-libs (1.5.7-r2)
+#7 10.87 (12/14) Installing libcurl (8.22.0-r0)
+#7 11.02 (13/14) Installing curl (8.22.0-r0)
+#7 11.11 (14/14) Installing tzdata (2026d-r0)
+#7 11.21 Executing busybox-1.37.0-r31.trigger
+#7 11.22 OK: 413.4 MiB in 43 packages
+#7 DONE 11.3s
+
+#8 [ 3/10] RUN addgroup -g 1001 quorus &&     adduser -D -u 1001 -G quorus quorus
+#8 DONE 0.2s
+
+#9 [ 4/10] WORKDIR /app
+#9 DONE 0.1s
+
+#10 [ 5/10] COPY quorus-agent/target/quorus-agent-*.jar app.jar
+#10 DONE 0.1s
+
+#11 [ 6/10] COPY quorus-agent/target/lib/ lib/
+#11 DONE 0.1s
+
+#12 [ 7/10] COPY quorus-agent/src/main/resources/logback.xml config/logback.xml
+#12 DONE 0.1s
+
+#13 [ 8/10] RUN mkdir -p /app/logs /app/data /app/transfers &&     chown -R quorus:quorus /app
+#13 DONE 0.7s
+
+#14 [ 9/10] COPY quorus-agent/docker-entrypoint.sh /docker-entrypoint.sh
+#14 DONE 0.1s
+
+#15 [10/10] RUN chmod +x /docker-entrypoint.sh
+#15 DONE 0.3s
+
+#16 exporting to image
+#16 exporting layers
+#16 exporting layers 0.3s done
+#16 writing image sha256:7e4cd3d49b6b14b7002e327571d97cd35a87ecc56f79f818c6aa0a256250c61a done
+#16 naming to docker.io/library/quorus-agent:rt01 0.0s done
+#16 DONE 0.3s
+
+View build details: docker-desktop://dashboard/build/desktop-linux/desktop-linux/rlnehw9h70pw423oxd685t0nv
+[docker run --rm --entrypoint java quorus-agent:rt01 -version] exit 0
+openjdk version "27" 2026-09-15
+OpenJDK Runtime Environment Corretto-27.0.0.35.1 (build 27+35-FR)
+OpenJDK 64-Bit Server VM Corretto-27.0.0.35.1 (build 27+35-FR, mixed mode, sharing)
+[docker run --rm --entrypoint sha256sum quorus-agent:rt01 /app/app.jar] exit 0
+e29001f1add8756be408ad807fecdb28c53e8641b7a94e167eeeb951c0695ff5  /app/app.jar
+[docker run --rm --entrypoint javap quorus-agent:rt01 -cp /app/app.jar -v dev.mars.quorus.agent.QuorusAgent] exit 0
+      #1098 REF_invokeStatic dev/mars/quorus/agent/QuorusAgent.lambda$handleTransferComplete$2:(Ljava/lang/String;Ljava/lang/Throwable;)V
+      #1023 (Ljava/lang/Throwable;)V
+  23: #1137 REF_invokeStatic java/lang/invoke/LambdaMetafactory.metafactory:(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite;
+    Method arguments:
+      #1018 (Ljava/lang/Object;)V
+      #1101 REF_invokeStatic dev/mars/quorus/agent/QuorusAgent.lambda$handleTransferComplete$3:(Ljava/lang/String;Ljava/lang/Throwable;)V
+      #1023 (Ljava/lang/Throwable;)V
+  24: #1137 REF_invokeStatic java/lang/invoke/LambdaMetafactory.metafactory:(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite;
+    Method arguments:
+      #1018 (Ljava/lang/Object;)V
+      #1104 REF_invokeStatic dev/mars/quorus/agent/QuorusAgent.lambda$handleTransferError$0:(Ljava/lang/String;Ljava/lang/Throwable;)V
+      #1023 (Ljava/lang/Throwable;)V
+  25: #1144 REF_invokeStatic java/lang/invoke/StringConcatFactory.makeConcatWithConstants:(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/invoke/CallSite;
+    Method arguments:
+      #1107 \u0001ms
+  26: #1137 REF_invokeStatic java/lang/invoke/LambdaMetafactory.metafactory:(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite;
+    Method arguments:
+      #1109 ()Ljava/lang/Object;
+      #1110 REF_invokeVirtual dev/mars/quorus/agent/QuorusAgent.lambda$processJob$2:(Ldev/mars/quorus/agent/service/JobPollingService$PendingJob;Ljava/util/concurrent/atomic/AtomicBoolean;)Lio/vertx/core/Future;
+      #1113 ()Lio/vertx/core/Future;
+  27: #1137 REF_invokeStatic java/lang/invoke/LambdaMetafactory.metafactory:(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite;
+    Method arguments:
+      #1018 (Ljava/lang/Object;)V
+      #1114 REF_invokeVirtual dev/mars/quorus/agent/QuorusAgent.lambda$processJob$4:(Ldev/mars/quorus/agent/service/JobPollingService$PendingJob;Ldev/mars/quorus/core/TransferResult;)V
+      #1117 (Ldev/mars/quorus/core/TransferResult;)V
+  28: #1137 REF_invokeStatic java/lang/invoke/LambdaMetafactory.metafactory:(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite;
+    Method arguments:
+      #1018 (Ljava/lang/Object;)V
+      #1119 REF_invokeVirtual dev/mars/quorus/agent/QuorusAgent.lambda$processJob$5:(Ldev/mars/quorus/agent/service/JobPollingService$PendingJob;Ljava/util/concurrent/atomic/AtomicBoolean;Ljava/lang/Throwable;)V
+      #1023 (Ljava/lang/Throwable;)V
+  29: #1137 REF_invokeStatic java/lang/invoke/LambdaMetafactory.metafactory:(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite;
+    Method arguments:
+      #1018 (Ljava/lang/Object;)V
+      #1122 REF_invokeStatic dev/mars/quorus/agent/QuorusAgent.lambda$processJob$3:(Ljava/util/concurrent/atomic/AtomicBoolean;Ljava/lang/Void;)V
+      #1067 (Ljava/lang/Void;)V
+  30: #1137 REF_invokeStatic java/lang/invoke/LambdaMetafactory.metafactory:(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite;
+    Method arguments:
+      #1018 (Ljava/lang/Object;)V
+      #1125 REF_invokeVirtual dev/mars/quorus/agent/QuorusAgent.lambda$startBackgroundServices$4:(Ljava/lang/Long;)V
+      #1034 (Ljava/lang/Long;)V
+  31: #1137 REF_invokeStatic java/lang/invoke/LambdaMetafactory.metafactory:(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite;
+    Method arguments:
+      #1018 (Ljava/lang/Object;)V
+      #1128 REF_invokeVirtual dev/mars/quorus/agent/QuorusAgent.lambda$startBackgroundServices$1:(Ljava/lang/Boolean;)V
+      #1027 (Ljava/lang/Boolean;)V
+  32: #1137 REF_invokeStatic java/lang/invoke/LambdaMetafactory.metafactory:(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite;
+    Method arguments:
+      #1018 (Ljava/lang/Object;)V
+      #1131 REF_invokeVirtual dev/mars/quorus/agent/QuorusAgent.lambda$startBackgroundServices$2:(Ljava/lang/Throwable;)V
+      #1023 (Ljava/lang/Throwable;)V
+  33: #1137 REF_invokeStatic java/lang/invoke/LambdaMetafactory.metafactory:(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite;
+    Method arguments:
+      #1018 (Ljava/lang/Object;)V
+      #1134 REF_invokeStatic dev/mars/quorus/agent/QuorusAgent.lambda$main$1:(Lio/vertx/core/AsyncResult;)V
+      #1041 (Lio/vertx/core/AsyncResult;)V
+InnerClasses:
+  public static #1151= #474 of #147;      // PendingJob=class dev/mars/quorus/agent/service/JobPollingService$PendingJob of class dev/mars/quorus/agent/service/JobPollingService
+  public static final #1153= #639 of #154; // StatusReportException=class dev/mars/quorus/agent/service/JobStatusReportingService$StatusReportException of class dev/mars/quorus/agent/service/JobStatusReportingService
+  public static #1156= #739 of #1154;     // Entry=class java/util/Map$Entry of class java/util/Map
+  public static final #1161= #1157 of #1159; // Lookup=class java/lang/invoke/MethodHandles$Lookup of class java/lang/invoke/MethodHandles
+[docker build -f C:\Users\mraysmit\dev\idea-projects\quorus\quorus-controller\Dockerfile -t quorus-controller:rt01 C:\Users\mraysmit\dev\idea-projects\quorus] exit 0
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 2.45kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/amazoncorretto:27.0.0-alpine3.24
+#2 DONE 0.8s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 1.09kB done
+#3 DONE 0.0s
+
+#4 [1/6] FROM docker.io/library/amazoncorretto:27.0.0-alpine3.24@sha256:6fba5f9f2f4730e2d3e81055ce0378a8587c12a48611ee545c5db04c3a28f889
+#4 CACHED
+
+#5 [internal] load build context
+#5 transferring context: 30.70MB 2.0s done
+#5 DONE 2.0s
+
+#6 [2/6] RUN apk add --no-cache curl
+#6 6.482 (1/9) Installing brotli-libs (1.2.0-r1)
+#6 7.549 (2/9) Installing c-ares (1.34.8-r0)
+#6 8.156 (3/9) Installing libunistring (1.4.2-r0)
+#6 9.764 (4/9) Installing libidn2 (2.3.8-r0)
+#6 10.38 (5/9) Installing nghttp2-libs (1.69.0-r0)
+#6 10.92 (6/9) Installing libpsl (0.21.5-r3)
+#6 11.47 (7/9) Installing zstd-libs (1.5.7-r2)
+#6 12.50 (8/9) Installing libcurl (8.22.0-r0)
+#6 13.49 (9/9) Installing curl (8.22.0-r0)
+#6 13.88 Executing busybox-1.37.0-r31.trigger
+#6 13.89 OK: 411.0 MiB in 38 packages
+#6 DONE 14.0s
+
+#7 [3/6] RUN addgroup -g 1001 quorus &&     adduser -D -s /bin/sh -u 1001 -G quorus quorus
+#7 DONE 0.3s
+
+#8 [4/6] WORKDIR /app
+#8 DONE 0.1s
+
+#9 [5/6] COPY quorus-controller/target/quorus-controller-*.jar app.jar
+#9 DONE 0.1s
+
+#10 [6/6] RUN mkdir -p /app/logs /app/data &&     chown -R quorus:quorus /app
+#10 DONE 0.2s
+
+#11 exporting to image
+#11 exporting layers 0.1s done
+#11 writing image sha256:0e5526a3c9a46833a30f3e2ca9996f70517ff185dd544017fa9b99b39ad858f0 done
+#11 naming to docker.io/library/quorus-controller:rt01 done
+#11 DONE 0.2s
+
+View build details: docker-desktop://dashboard/build/desktop-linux/desktop-linux/q62ldl8m96j513mvgt5o4a5nb
+[docker run --rm --entrypoint java quorus-controller:rt01 -version] exit 0
+openjdk version "27" 2026-09-15
+OpenJDK Runtime Environment Corretto-27.0.0.35.1 (build 27+35-FR)
+OpenJDK 64-Bit Server VM Corretto-27.0.0.35.1 (build 27+35-FR, mixed mode, sharing)
+[docker run --rm --entrypoint sha256sum quorus-controller:rt01 /app/app.jar] exit 0
+5d6796a891a0112e353f2346cc0ca32d1ee47266736d5d0720ab031f01c81dc4  /app/app.jar
+[docker run --rm --entrypoint javap quorus-controller:rt01 -cp /app/app.jar -v dev.mars.quorus.controller.QuorusControllerApplication] exit 0
+        line 74: 82
+        line 75: 88
+        line 74: 98
+        line 79: 103
+        line 80: 122
+        line 83: 132
+        line 90: 138
+        line 99: 157
+      LocalVariableTable:
+        Start  Length  Slot  Name   Signature
+            0     158     0  args   [Ljava/lang/String;
+           38     120     1 config   Ldev/mars/quorus/controller/config/AppConfig;
+           64      94     2 options   Lio/vertx/core/VertxOptions;
+           75      83     3 vertx   Lio/vertx/core/Vertx;
+      StackMapTable: number_of_entries = 1
+        frame_type = 254 /* append */
+          offset_delta = 103
+          locals = [ class dev/mars/quorus/controller/config/AppConfig, class io/vertx/core/VertxOptions, class io/vertx/core/Vertx ]
+
+  static {};
+    descriptor: ()V
+    flags: (0x0008) ACC_STATIC
+    Code:
+      stack=1, locals=0, args_size=0
+         0: ldc           #8                  // class dev/mars/quorus/controller/QuorusControllerApplication
+         2: invokestatic  #195                // Method org/slf4j/LoggerFactory.getLogger:(Ljava/lang/Class;)Lorg/slf4j/Logger;
+         5: putstatic     #26                 // Field logger:Lorg/slf4j/Logger;
+         8: return
+      LineNumberTable:
+        line 42: 0
+}
+SourceFile: "QuorusControllerApplication.java"
+BootstrapMethods:
+  0: #257 REF_invokeStatic java/lang/invoke/LambdaMetafactory.metafactory:(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite;
+    Method arguments:
+      #236 (Ljava/lang/Object;)V
+      #238 REF_invokeStatic dev/mars/quorus/controller/QuorusControllerApplication.lambda$main$0:(Ljava/lang/String;)V
+      #241 (Ljava/lang/String;)V
+  1: #257 REF_invokeStatic java/lang/invoke/LambdaMetafactory.metafactory:(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite;
+    Method arguments:
+      #236 (Ljava/lang/Object;)V
+      #242 REF_invokeStatic dev/mars/quorus/controller/QuorusControllerApplication.lambda$main$1:(Ljava/lang/Throwable;)V
+      #245 (Ljava/lang/Throwable;)V
+  2: #257 REF_invokeStatic java/lang/invoke/LambdaMetafactory.metafactory:(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite;
+    Method arguments:
+      #246 ()V
+      #247 REF_invokeStatic dev/mars/quorus/controller/QuorusControllerApplication.lambda$main$2:(Lio/vertx/core/Vertx;)V
+      #246 ()V
+  3: #257 REF_invokeStatic java/lang/invoke/LambdaMetafactory.metafactory:(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite;
+    Method arguments:
+      #236 (Ljava/lang/Object;)V
+      #250 REF_invokeStatic dev/mars/quorus/controller/QuorusControllerApplication.lambda$main$3:(Ljava/lang/Void;)V
+      #253 (Ljava/lang/Void;)V
+  4: #257 REF_invokeStatic java/lang/invoke/LambdaMetafactory.metafactory:(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite;
+    Method arguments:
+      #236 (Ljava/lang/Object;)V
+      #254 REF_invokeStatic dev/mars/quorus/controller/QuorusControllerApplication.lambda$main$4:(Ljava/lang/Throwable;)V
+      #245 (Ljava/lang/Throwable;)V
+InnerClasses:
+  public static final #269= #265 of #267; // Lookup=class java/lang/invoke/MethodHandles$Lookup of class java/lang/invoke/MethodHandles
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 40.12 s -- in dev.mars.quorus.controller.deployment.ContainerImageBaselineTest
+[INFO] 
+[INFO] Results:
+[INFO] 
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] 
+[INFO] --- jacoco:0.8.15:report (report) @ quorus-controller ---
+[INFO] Loading execution data file C:\Users\mraysmit\dev\idea-projects\quorus\quorus-controller\target\jacoco.exec
+[INFO] Analyzed bundle 'Quorus Distributed Controller' with 160 classes
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Summary for Quorus File Transfer System 1.0-SNAPSHOT:
+[INFO] 
+[INFO] Quorus File Transfer System ........................ SUCCESS [  0.239 s]
+[INFO] Quorus Core ........................................ SUCCESS [  1.208 s]
+[INFO] Quorus Workflow Engine ............................. SUCCESS [  0.191 s]
+[INFO] Quorus Tenant Management ........................... SUCCESS [  0.141 s]
+[INFO] Quorus Distributed Controller ...................... SUCCESS [ 43.830 s]
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  45.828 s
+[INFO] Finished at: 2026-09-26T13:05:46+01:00
+[INFO] ------------------------------------------------------------------------

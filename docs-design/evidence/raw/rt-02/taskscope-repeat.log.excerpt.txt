@@ -1,0 +1,6 @@
+Excerpt of: docs-design/evidence/raw/rt-02/taskscope-repeat.log
+Original SHA-256: 9d8edd4224d91786963852aaa6e8e23b57827dc634fef8bcfa35e34294c7de86
+Original size: 28380 bytes
+Full log not retained under the evidence retention rule (plan §6.1): regression and discarded-attempt output is kept as this excerpt. Reproduce by re-running the recorded command at the recorded revision.
+
+

@@ -1,0 +1,6 @@
+Excerpt of: docs-design/evidence/raw/full-suite-docker-controller2-20260905.log
+Original SHA-256: 66b714a0ee24b03f5bb31bf6b3f85c886105e7c4f449d493388f4877712df2c3
+Original size: 10415 bytes
+Full log not retained under the evidence retention rule (plan §6.1): regression and discarded-attempt output is kept as this excerpt. Reproduce by re-running the recorded command at the recorded revision.
+
+     81: Exception in thread "main" java.lang.IllegalStateException: HTTP certificate must reference a readable file

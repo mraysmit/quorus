@@ -1,0 +1,30 @@
+Excerpt of: docs-design/evidence/raw/r4-dns-focused-regression.log
+Original SHA-256: 4ddcf5efc480be14e2beff87a4f428beb210df9911d926af65ed41618abeb28a
+Original size: 306622 bytes
+Full log not retained under the evidence retention rule (plan §6.1): regression and discarded-attempt output is kept as this excerpt. Reproduce by re-running the recorded command at the recorded revision.
+
+    119: [INFO] NOTHING TO DO: There is nothing to do. If this is unexpected, review the above logs for more details.
+    195: dev.mars.quorus.controller.http.QuorusApiException: DNS authorization capacity is exhausted
+    346: 18:39:47.771 [vert.x-eventloop-thread-0] ERROR d.m.q.c.http.GlobalErrorHandler [LEADER/1] - Server error [TIMEOUT] at /api/v1/service-connections/connection/validate: DNS authorization timed out
+    348: dev.mars.quorus.controller.http.QuorusApiException: DNS authorization timed out
+    443: 18:39:48.437 [vert.x-eventloop-thread-0] ERROR d.m.q.c.http.GlobalErrorHandler [LEADER/1] - Server error [TIMEOUT] at /api/v1/transfers: DNS authorization timed out
+    542: 18:39:49.045 [vert.x-eventloop-thread-0] ERROR d.m.q.c.http.GlobalErrorHandler [LEADER/1] - Server error [TIMEOUT] at /api/v1/transfers: DNS authorization timed out
+    562: 18:39:49.048 [vert.x-eventloop-thread-0] ERROR d.m.q.c.http.GlobalErrorHandler [LEADER/1] - Server error [TIMEOUT] at /api/v1/service-connections/connection/validate: DNS authorization timed out
+   1018: 18:39:54.231 [vert.x-eventloop-thread-0] WARN  d.m.q.c.http.GlobalErrorHandler [LEADER/1] [req-af644d4d-fe80-44ab-9b85-4713a2e2cc36] - Client error [NOT_FOUND] at /api/v1/secret-references/branch.ledger: Secret reference not found
+   1188: 18:39:55.829 [vert.x-eventloop-thread-0] WARN  d.m.q.c.http.GlobalErrorHandler [LEADER/1] [req-a148e635-c983-4be1-86e5-ed99e9d727ce] - Client error [NOT_FOUND] at /api/v1/secret-references/branch.ledger: Secret reference not found
+   1242: 18:39:56.352 [vert.x-eventloop-thread-0] WARN  d.m.q.c.http.GlobalErrorHandler [LEADER/1] [req-6f0e1409-8767-482c-9325-2e52bae14452] - Client error [NOT_FOUND] at /api/v1/secret-references/branch.ledger: Secret reference not found
+   1316: 18:39:56.943 [vert.x-eventloop-thread-0] WARN  d.m.q.c.http.GlobalErrorHandler [LEADER/1] [req-893c7c1e-40cd-451a-aedb-1752b77a3259] - Client error [NOT_FOUND] at /api/v1/service-connections/branch.ledger: Service connection not found
+   1546: 18:39:58.615 [vert.x-eventloop-thread-0] WARN  d.m.q.c.http.GlobalErrorHandler [LEADER/1] [req-c2199106-2aa1-4fcf-83af-6cbd8c48d242] - Client error [NOT_FOUND] at /api/v1/service-connections/branch.ledger: Service connection not found
+   1620: 18:39:59.181 [vert.x-eventloop-thread-0] WARN  d.m.q.c.http.GlobalErrorHandler [LEADER/1] [req-d0acf18f-af66-48e2-8e75-da62c74e66fc] - Client error [NOT_FOUND] at /api/v1/service-connections/branch.ledger: Service connection not found
+   1906: 18:40:02.570 [vert.x-eventloop-thread-0] ERROR i.vertx.core.net.impl.ConnectionBase [LEADER/1] - javax.net.ssl.SSLHandshakeException: (certificate_required) Received fatal alert: certificate_required
+   2125: 18:40:03.242 [ForkJoinPool-1-worker-1] WARN  d.m.q.c.state.QuorusStateStore - System metadata not found for deletion: key=phase4.v2.secret-reference.bank:absent
+   2183: [INFO] Tests run: 46, Failures: 0, Errors: 0, Skipped: 0
+   2190: [INFO] Reactor Summary for Quorus File Transfer System 1.0-SNAPSHOT:
+   2192: [INFO] Quorus File Transfer System ........................ SUCCESS [  0.210 s]
+   2193: [INFO] Quorus Core ........................................ SUCCESS [  1.381 s]
+   2194: [INFO] Quorus Workflow Engine ............................. SUCCESS [  0.209 s]
+   2195: [INFO] Quorus Tenant Management ........................... SUCCESS [  0.184 s]
+   2196: [INFO] Quorus Distributed Controller ...................... SUCCESS [ 23.513 s]
+   2198: [INFO] BUILD SUCCESS
+   2200: [INFO] Total time:  25.664 s
+   2201: [INFO] Finished at: 2026-09-05T18:40:04+08:00
