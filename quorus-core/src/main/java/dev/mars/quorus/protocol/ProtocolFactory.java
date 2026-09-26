@@ -69,7 +69,7 @@ public class ProtocolFactory {
         
         // Register HTTP protocol for both http and https schemes
         logger.debug("Creating HttpTransferProtocol instance");
-        HttpTransferProtocol httpProtocol = new HttpTransferProtocol(vertx);
+        HttpTransferProtocol httpProtocol = new HttpTransferProtocol();
         registerProtocol(httpProtocol);
         registerProtocolAlias("https", httpProtocol);
 

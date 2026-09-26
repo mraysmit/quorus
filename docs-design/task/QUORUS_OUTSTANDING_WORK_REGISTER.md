@@ -80,7 +80,7 @@ sleeps as synchronization, and non-Vert.x polling are not permitted in new or re
 
 | Section | Area | Open items | Blocking level |
 |---|---|---|---|
-| §3 | Decision log | 9 taken, 4 open (DR-Q1, DR-Q3, DR-Q4, DR-Q5); `RT-Q4` runtime variant to confirm | Open decisions block named tasks |
+| §3 | Decision log | 10 taken, 4 open (DR-Q1, DR-Q3, DR-Q4, DR-Q5) | Open decisions block named tasks |
 | A | R1 durability acceptance and related process items | 4 open (R1-2, R1-3, R1-4, PROC-01), 1 closed | 🔴 Release blocker |
 | B | Phase 2 — attempts, integrity, reconciliation | 13 | 🟡 Phase blocker |
 | C | Phase 3 — transfer operations telemetry | 12 | 🟡 Phase blocker |
@@ -89,7 +89,7 @@ sleeps as synchronization, and non-Vert.x polling are not permitted in new or re
 | F | Absorbed and superseded historical tasks | 10 | — reference only |
 | G | Deferred and research | 8 deferred, 1 superseded | 🟢 Deferred |
 | H | Documentation remediation (from the 2026-09-24 review) | 47 tasks: 9 done, 7 in progress, 29 open, 2 superseded | 🔵 Documentation |
-| I | Configuration and documentation-review delivery items | 16 open, 1 closed | 🟠 Backlog |
+| I | Configuration and documentation-review delivery items | 17 open, 1 closed | 🟠 Backlog |
 | J | Platform migration — QRaft consensus and Vert.x exit | 21 open (11 CE, 10 RT), 4 decisions taken | 🟡 / 🔴 by item |
 
 **Phase position:** Phase 1 complete. Phase 0 is functionally complete, but its durability
@@ -118,6 +118,7 @@ An open decision names the work it blocks.
 | **DR-Q6** | Raw evidence retention | Cited raw output is committed under `docs-design/evidence/raw/<slice-id>/` with its SHA-256 in the manifest; `temp/` never holds evidence | Plan §6.1; [raw evidence index](../evidence/raw/INDEX.md) | DR-C10, DR-A1 | ✅ 2026-09-26 |
 | **STATUS-01** | Phase 0 and Phase 4 status wording | Phase 0 functionally complete, with durability acceptance reopened until R1-2 and R1-3; Phase 4 complete, its 2026-09-04 reopening restored by R2–R6 | Plan header, §7, §11 | Section 2 phase position | ✅ 2026-09-26 |
 | **RT-Q4** | Java 27 container image vendor | **Amazon Corretto 27** (`amazoncorretto:27*`, amd64 and arm64, published 2026-09-18). Temurin had no Java 27 images and the official `openjdk` image offers only non-production `27-rc` tags (checked 2026-09-26). No official `maven` image carries Java 27, so the builder adds a pinned, checksum-verified Maven. Runtime image variant still to confirm: Corretto 27 has no JRE-only Alpine image | ADR-0012 | `RT-01b`, Docker-tagged lanes, DR-C11 verification | ✅ 2026-09-26 (vendor); variant open |
+| **RT-Q5** | HTTP client for the HTTP transfer adapter | Apache HttpClient 5 (classic API). `java.net.http` cannot connect to a pinned IP while enforcing hostname verification and sending the correct `Host` (measured 2026-09-26) | ADR-0012 | `RT-03b` | ✅ 2026-09-26 |
 | **DR-Q1** | Workflow YAML semantics (review §4.3) | (a) Change the guides to match the parser and engine; (b) implement `execution.dryRun`, `parallelism`, `timeout` and `strategy`, group `retryCount`, `options` pass-through and recursive variable substitution | ADR-0010 when decided | DR-B4, DR-D4 | ⬜ |
 | **DR-Q3** | Elevation for direct mTLS identities (review §6 #8) | (a) Document that only gateway-asserted identities can hold elevation; (b) add a direct-binding elevation mechanism | — | DR-B5, `SEC-06` | ⬜ |
 | **DR-Q4** | How `*IT` and `*Benchmark` classes run (review §6 #18) | (a) Add the Failsafe plugin; (b) rename the classes and tag them | — | `ENG-02`, DR-F16 | ⬜ |
@@ -591,6 +592,7 @@ revision.
 | **SEC-04** | Raft peer certificates are not bound to the `QUORUS_CLUSTER_NODES` identity; any cluster-CA certificate can make Raft RPCs | `DR-X07` | Reported (`RaftPeerAuthorizationInterceptor`) | 🟠 |
 | **SEC-05** | `roleAllows` returns on the first matching role, so multi-role identities can be denied scopes another role grants | `DR-X09` | Verified still present 2026-09-26 (`AuthorizationPolicyEngine.java:78-107`) | 🟠 |
 | **SEC-06** | Direct mTLS identities cannot hold elevation; only gateway-asserted identities can perform elevated operations | `DR-Q3`, `DR-B5` | Reported; decision pending | 🟠 |
+| **SEC-07** | Governed TLS trusts only the JVM default trust store (`TlsPeerPolicy` uses `TrustManagerFactory.init(null)`), so endpoints issued by a private corporate CA work only if that CA is added to the JVM `cacerts`; there is no Quorus configuration for trust anchors | found by `RT-03b` | Verified 2026-09-26 (`TlsPeerPolicy.createTrustManager`). The rewritten HTTP adapter accepts an injected base trust for tests; production still uses the JVM default | 🟠 |
 | **ENG-01** | `JobAssignmentService`, which owns the assignment timeout monitor, is constructed only by its test | `DR-X11` | Reported; settle with `P2-01` | 🟡 |
 | **ENG-02** | `*IT` and `*Benchmark` classes never run: no Failsafe plugin and no Surefire includes | `DR-Q4`, `DR-X18` | Reported; decision pending | 🟠 |
 | **ENG-03** | `QuorusAgent.java:372` calls `.join()`; whether it can run on an event loop is untraced | `DR-X24` | Reported, not traced | 🟠 |

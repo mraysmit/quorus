@@ -7,7 +7,7 @@
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0
 
-**Status:** Accepted by project authority on 2026-09-26, including decisions `RT-Q1` to `RT-Q4` below. Delivery is workstream `RT` in the [enterprise implementation plan](../task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md#20-platform-migration-workstreams).
+**Status:** Accepted by project authority on 2026-09-26, including decisions `RT-Q1` to `RT-Q5` below. Delivery is workstream `RT` in the [enterprise implementation plan](../task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md#20-platform-migration-workstreams).
 
 ## Context
 
@@ -99,6 +99,22 @@ Class files compiled with preview features only run on the exact Java feature re
   adds a pinned, checksum-verified Maven. Image tags pin an exact Corretto release (for example
   `27.0.0-…`), and `RT-09` moves them with each Java release. The runtime variant (Alpine JDK,
   Amazon Linux 2023 headless, or a jlink-built runtime) is confirmed before `RT-01b` starts.
+
+- **`RT-Q5` — HTTP client for the HTTP transfer adapter. Decided: Apache HttpClient 5 (classic,
+  blocking API), a demonstrated exception to "JDK facilities first".** Governed transfers must connect
+  to the agent-approved IP address while SNI, the `Host` header and certificate hostname verification
+  all use the service's hostname. Measured on JDK 27 GA (2026-09-26), `java.net.http.HttpClient`
+  cannot do this safely:
+  - connecting to the IP literal with SNI set to a hostname completed the handshake even when the SNI
+    name did not match the certificate, so hostname verification was not enforced against the
+    intended name;
+  - the server received `Host: <ip>:<port>`, and setting `Host` is rejected as a restricted header
+    unless the JVM-wide `jdk.httpclient.allowRestrictedHeaders` property is set.
+
+  Apache HttpClient 5 supports a per-client DNS resolver, so the request URI keeps the hostname: SNI,
+  `Host` and RFC 6125 hostname verification are all correct while the socket can only reach approved
+  addresses. It is blocking I/O, suited to virtual threads. The controller's own HTTP stack remains the
+  JDK (`RT-Q2`).
 
 ## Alternatives considered
 

@@ -30,12 +30,19 @@
         <testcontainers.version>2.0.3</testcontainers.version>
         <jacoco.version>0.8.15</jacoco.version>
         <raftlog.version>1.2.0</raftlog.version>
+        <httpclient5.version>5.6.4</httpclient5.version>
         <!-- Shared timestamp for consolidated test log file across all modules -->
         <maven.build.timestamp.format>yyyy-MM-dd_HH-mm-ss</maven.build.timestamp.format>
     </properties>
 
     <dependencyManagement>
         <dependencies>
+            <!-- Apache HttpClient 5 for the HTTP transfer adapter (ADR-0012 RT-Q5) -->
+            <dependency>
+                <groupId>org.apache.httpcomponents.client5</groupId>
+                <artifactId>httpclient5</artifactId>
+                <version>${httpclient5.version}</version>
+            </dependency>
             <!-- Vert.x 5 BOM -->
             <dependency>
                 <groupId>io.vertx</groupId>
