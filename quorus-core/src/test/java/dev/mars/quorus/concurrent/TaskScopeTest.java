@@ -202,6 +202,77 @@ class TaskScopeTest {
     }
 
     @Test
+    void ownerInterruptedWhileCloseWaitsKeepsWaitingAndRestoresTheInterrupt() throws Exception {
+        CompletableFuture<Void> subtaskStarted = new CompletableFuture<>();
+        CompletableFuture<Void> subtaskCancelled = new CompletableFuture<>();
+        CompletableFuture<Void> release = new CompletableFuture<>();
+        AtomicBoolean subtaskEnded = new AtomicBoolean();
+        AtomicBoolean endedBeforeCloseReturned = new AtomicBoolean();
+        AtomicBoolean interruptRestored = new AtomicBoolean();
+
+        Thread owner = Thread.ofVirtual().start(() -> {
+            TaskScope scope = TaskScope.open("close-interrupted", GENEROUS);
+            scope.fork(() -> {
+                subtaskStarted.complete(null);
+                try {
+                    return blockUntilInterrupted(new AtomicBoolean());
+                } catch (InterruptedException cancelled) {
+                    subtaskCancelled.complete(null);
+                    release.join();                 // outlives the cancellation until released
+                    return null;
+                } finally {
+                    subtaskEnded.set(true);
+                }
+            });
+            subtaskStarted.join();                   // close only once the subtask is running
+            try {
+                scope.close();                       // cancels, then waits for the subtask
+            } catch (IllegalStateException closedWithoutJoin) {
+                endedBeforeCloseReturned.set(subtaskEnded.get());
+                interruptRestored.set(Thread.currentThread().isInterrupted());
+            }
+        });
+        subtaskCancelled.join();
+        owner.interrupt();                           // interrupt the owner while close() waits
+        release.complete(null);
+        owner.join();
+
+        assertTrue(endedBeforeCloseReturned.get(), "close must keep waiting for the subtask despite the interrupt");
+        assertTrue(interruptRestored.get(), "close must restore the owner's interrupt status");
+    }
+
+    @Test
+    void aSubtaskThatSucceedsAfterCancellationHasItsResultDiscarded() throws Exception {
+        CompletableFuture<Void> slowStarted = new CompletableFuture<>();
+        CompletableFuture<Void> release = new CompletableFuture<>();
+        Subtask<String> slow;
+        try (TaskScope scope = TaskScope.open("late-success", GENEROUS)) {
+            slow = scope.fork(() -> {
+                slowStarted.complete(null);
+                release.join();                      // ignores the cancellation interrupt
+                return "too late";
+            });
+            scope.fork(() -> {
+                slowStarted.join();
+                throw new IllegalStateException("cancel the scope");
+            });
+            assertThrows(TaskScope.FailedException.class, scope::join);
+            release.complete(null);
+        }
+
+        assertEquals(Subtask.State.UNAVAILABLE, slow.state());
+    }
+
+    @Test
+    void exceptionOfASubtaskThatDidNotFailIsRejected() throws Exception {
+        try (TaskScope scope = TaskScope.open("no-exception", GENEROUS)) {
+            Subtask<String> ok = scope.fork(() -> "fine");
+            scope.join();
+            assertThrows(IllegalStateException.class, ok::exception);
+        }
+    }
+
+    @Test
     void closingTwiceIsHarmless() throws Exception {
         TaskScope scope = TaskScope.open("close-twice", GENEROUS);
         scope.fork(() -> "done");

@@ -1,0 +1,63 @@
+{
+  "slice": "RT-02b",
+  "title": "TaskScope context propagation: structured tracing, MDC and ScopedValue",
+  "requirement": "ADR-0012 (ScopedValue request context, structured concurrency); decision recorded 2026-09-26: always propagate OpenTelemetry context and MDC, a span per scope and per subtask always on, ScopedValue by declared keys; plan §20 item RT-02; register Section J",
+  "acceptance": [
+    "The scope span is a child of the owner's current span; subtask spans are children of the scope span; spans started inside a subtask are children of the subtask span",
+    "Spans record quorus.taskscope.outcome: success; failed with the exception and ERROR status; cancelled for siblings; timeout with ERROR status on the scope span",
+    "Subtask log events carry the owner's MDC; the subtask MDC traceId and spanId equal the subtask span; subtask MDC changes do not leak into the owner or later subtasks",
+    "Declared ScopedValue keys bound in the owner are re-bound in subtasks; undeclared keys are not; a declared key the owner has not bound stays unbound"
+  ],
+  "acceptanceWrittenBeforeImplementation": true,
+  "classification": "unit and component (real OpenTelemetry SDK with in-memory exporter; real logback appender)",
+  "baseRevision": "341a509",
+  "patch": {"path": "docs-design/evidence/raw/rt-02/rt-02b.patch", "sha256": "bae629eff742cb516513d74796fc02b843e2d7a016c77398bd2d2913036e233c"},
+  "environment": {"jdk": "OpenJDK 27 GA, build 27+35-2325", "maven": "Apache Maven 3.9.11", "otel": "opentelemetry-bom 1.59.0 (opentelemetry-sdk-testing added, test scope)", "os": "Windows 11 Pro N 10.0.26340"},
+  "test": {
+    "file": "quorus-core/src/test/java/dev/mars/quorus/concurrent/TaskScopeContextPropagationTest.java",
+    "synchronisation": "CompletableFuture handshakes and interruption only; no sleeps, no polling; preemptive 10-second timeout per test"
+  },
+  "discardedAttempts": [
+    {
+      "what": "First red",
+      "reason": "Test defect: logback evaluates an event's MDC lazily and ListAppender does not freeze it, so the MDC assertions read the owner thread's MDC. Two MDC tests passed falsely. A probe confirmed that LogbackMDCAdapter uses a plain ThreadLocal and a new virtual thread sees no MDC. Fixed with a real logback appender that calls prepareForDeferredProcessing().",
+      "log": {"path": "docs-design/evidence/raw/rt-02/taskscope-b-red-attempt1-lazy-mdc.log", "sha256": "96ee01e8caa472adefc9dd309be81163360417a42d5ae86633d6f2a85e8467d2"}
+    }
+  ],
+  "red": {
+    "command": "mvn -B clean test -pl quorus-core -Dtest=TaskScope*Test -Dsurefire.failIfNoSpecifiedTests=false",
+    "revision": "341a509 plus a compiling Builder skeleton (tracer and inherit accepted but ignored) and the 11 new tests",
+    "started": "2026-09-26T14:12:05+01:00",
+    "finished": "2026-09-26T14:12:16+01:00",
+    "result": "8 of 11 new tests failed for missing behaviour: no scope or subtask spans; the owner MDC and trace IDs absent in subtask log events; the declared tenant unbound. 3 new tests passed as intended guards that must hold before and after the change: undeclared keys not inherited, an unbound key stays unbound, no MDC leakage. The 10 existing TaskScopeTest tests passed.",
+    "log": {"path": "docs-design/evidence/raw/rt-02/taskscope-b-red.log", "sha256": "c70f454ae751970a704bc77e92f17ad2b59e48d082949dec8a375e41a0b70d2d"}
+  },
+  "green": {
+    "change": "TaskScope starts a scope span at open under Context.current(); each subtask runs in a child span made current, records outcome, exception and status, installs a copy of the owner's MDC plus its own traceId and spanId, clears the MDC on exit, and re-binds the ScopedValue bindings captured at open; close() ends the scope span with success, failed, timeout or cancelled",
+    "command": "mvn -B clean test -pl quorus-core -Dtest=TaskScope*Test -Dsurefire.failIfNoSpecifiedTests=false",
+    "started": "2026-09-26T14:13:33+01:00",
+    "finished": "2026-09-26T14:13:43+01:00",
+    "result": "21 tests, 0 failures",
+    "log": {"path": "docs-design/evidence/raw/rt-02/taskscope-b-green.log", "sha256": "fb9aaf654abafb0614951ff96512f9ae221a9a975f9f0162791170b733d2f5fd"}
+  },
+  "refactor": "open(name, timeout) delegates to the builder, removing duplicated validation",
+  "processDeviation": {
+    "description": "Behaviour implemented during green without a preceding failing test is covered by tests classified as retrospective characterization under plan §6.1.",
+    "characterizationTests": [
+      "TaskScopeContextPropagationTest$Characterization: scopeClosedWithoutASuccessfulJoinRecordsACancelledOutcome, everyDeclaredScopedValueIsRebound, withTracingDisabledTheSubtaskKeepsTheOwnersTraceIdentifiersInMdc, aSubtaskThatSucceedsAfterCancellationRecordsACancelledSpan, aSubtaskForkedAfterCancellationProducesNoSpan",
+      "TaskScopeTest: ownerInterruptedWhileCloseWaitsKeepsWaitingAndRestoresTheInterrupt, aSubtaskThatSucceedsAfterCancellationHasItsResultDiscarded, exceptionOfASubtaskThatDidNotFailIsRejected"
+    ],
+    "testDefectFound": "The first version of ownerInterruptedWhileCloseWaitsKeepsWaitingAndRestoresTheInterrupt hung. The owner could call close() before the subtask thread ran, so TaskScope correctly skipped the task and the test's handshake never completed. Fixed with a start handshake. This shows the start-of-run cancellation guard does fire in real races.",
+    "failedRunLog": {"path": "docs-design/evidence/raw/rt-02/taskscope-b-core-verify-attempt1-test-race.log", "sha256": "77a5702c93f3bc70f08562deb7052f46803d39e13538a59b5fdeb764c0f931b6"}
+  },
+  "regression": [
+    {"command": "mvn -B clean verify -pl quorus-core", "result": "1,548 tests, 0 failures; JaCoCo gate met. TaskScope 126/126 lines and 52/52 branches; SubtaskImpl 63/64 lines and 17/18 branches; Builder and Binding 100%", "log": {"path": "docs-design/evidence/raw/rt-02/taskscope-b-core-verify.log", "sha256": "31946f51b86136a72f8b69d33f967585de97ef9773ec76b910be14066e7af9f1"}},
+    {"command": "50 x mvn -B -q surefire:test -pl quorus-core -Dtest=TaskScope*Test", "result": "50 passed, 0 failed", "log": {"path": "docs-design/evidence/raw/rt-02/taskscope-b-repeat.log", "sha256": "164c65585365d3313a75c72cb9391e481c3dddfb83fd8ee7c3f0a73fc6704bbb"}}
+  ],
+  "limitations": [
+    "The one uncovered line is the start-of-run cancellation guard, which is hit only when cancellation races thread start. It cannot be triggered deterministically without a test hook in production code.",
+    "The log of the first successful core verify after green was overwritten by the next run before it was renamed; the retained logs are the failed race run and the final successful run.",
+    "No production code uses TaskScope yet; the first consumer arrives with RT-03. Consumers must declare their request-context ScopedValue keys."
+  ],
+  "sensitiveDataCheck": "Logs contain Maven and test output only; no request bodies, credentials, keys or sensitive payloads."
+}

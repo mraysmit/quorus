@@ -1,0 +1,908 @@
+diff --git a/quorus-core/pom.xml b/quorus-core/pom.xml
+index 1d4358a..d738301 100644
+--- a/quorus-core/pom.xml
++++ b/quorus-core/pom.xml
+@@ -143,6 +143,13 @@
+             <scope>test</scope>
+         </dependency>
+ 
++        <!-- Real OpenTelemetry SDK with an in-memory exporter, for asserting spans in tests -->
++        <dependency>
++            <groupId>io.opentelemetry</groupId>
++            <artifactId>opentelemetry-sdk-testing</artifactId>
++            <scope>test</scope>
++        </dependency>
++
+     </dependencies>
+ 
+     <build>
+diff --git a/quorus-core/src/main/java/dev/mars/quorus/concurrent/TaskScope.java b/quorus-core/src/main/java/dev/mars/quorus/concurrent/TaskScope.java
+index 177d347..fb17bdb 100644
+--- a/quorus-core/src/main/java/dev/mars/quorus/concurrent/TaskScope.java
++++ b/quorus-core/src/main/java/dev/mars/quorus/concurrent/TaskScope.java
+@@ -4,9 +4,20 @@
+  */
+ package dev.mars.quorus.concurrent;
+ 
++import io.opentelemetry.api.GlobalOpenTelemetry;
++import io.opentelemetry.api.common.AttributeKey;
++import io.opentelemetry.api.trace.Span;
++import io.opentelemetry.api.trace.SpanContext;
++import io.opentelemetry.api.trace.StatusCode;
++import io.opentelemetry.api.trace.Tracer;
++import io.opentelemetry.context.Context;
++import io.opentelemetry.context.Scope;
++import org.slf4j.MDC;
++
+ import java.time.Duration;
+ import java.util.ArrayList;
+ import java.util.List;
++import java.util.Map;
+ import java.util.Objects;
+ import java.util.concurrent.Callable;
+ import java.util.concurrent.ThreadFactory;
+@@ -40,48 +51,94 @@ import java.util.function.Supplier;
+  *       that end because of cancellation stay {@link Subtask.State#UNAVAILABLE}.</li>
+  * </ul>
+  *
+- * <p>Known difference from {@code StructuredTaskScope}: {@code ScopedValue} bindings of the owner
+- * are not inherited by subtasks. Context propagation is a separate, explicit design (plan item RT-02).
++ * <p>Context propagation (plan item RT-02b). A subtask runs on a fresh virtual thread, so anything
++ * the owner holds per thread is propagated explicitly:
++ * <ul>
++ *   <li><b>Structured tracing.</b> Opening the scope starts a span {@code taskscope <name>} as a
++ *       child of the owner's current OpenTelemetry context. Each subtask runs inside a child span
++ *       {@code taskscope <name> subtask} that is current while the subtask runs, so spans the
++ *       subtask starts nest under it. Every span records {@value #OUTCOME_ATTRIBUTE}:
++ *       {@code success}, {@code failed} (with the exception and error status), {@code cancelled}
++ *       or, for the scope span only, {@code timeout} (error status).</li>
++ *   <li><b>MDC.</b> Each fork copies the owner's SLF4J MDC into the subtask, and adds the subtask
++ *       span's {@value #MDC_TRACE_ID} and {@value #MDC_SPAN_ID}. The subtask's MDC is cleared when it
++ *       ends; subtask changes never reach the owner or other subtasks.</li>
++ *   <li><b>ScopedValue.</b> Only the keys declared with {@link Builder#inherit} are propagated,
++ *       captured when the scope opens (as {@code StructuredTaskScope} captures bindings). Once the
++ *       JDK scope is adopted it inherits all bindings, and the declarations can be removed.</li>
++ * </ul>
+  */
+ public final class TaskScope implements AutoCloseable {
+ 
++    /** Span attribute recording how a scope or subtask ended. */
++    public static final String OUTCOME_ATTRIBUTE = "quorus.taskscope.outcome";
++    /** Span attribute carrying the scope name. */
++    public static final String NAME_ATTRIBUTE = "quorus.taskscope.name";
++    /** MDC key for the current trace ID; matches the controller's request correlation. */
++    public static final String MDC_TRACE_ID = "traceId";
++    /** MDC key for the current span ID; matches the controller's request correlation. */
++    public static final String MDC_SPAN_ID = "spanId";
++
++    private static final AttributeKey<String> OUTCOME = AttributeKey.stringKey(OUTCOME_ATTRIBUTE);
++    private static final AttributeKey<String> NAME = AttributeKey.stringKey(NAME_ATTRIBUTE);
++
+     private enum Phase { OPEN, JOINED, CLOSED }
+ 
+     private final String name;
+     private final Thread owner;
+     private final long deadlineNanos;
+     private final ThreadFactory threadFactory;
++    private final Tracer tracer;
++    private final Span scopeSpan;
++    private final Context scopeContext;
++    private final List<Binding<?>> bindings;
+ 
+     private final ReentrantLock lock = new ReentrantLock();
+     private final Condition changed = lock.newCondition();
+     private final List<Thread> threads = new ArrayList<>();   // guarded by lock
+     private int running;                                      // guarded by lock
+     private boolean cancelled;                                // guarded by lock
++    private boolean timedOut;                                 // guarded by lock
+     private Throwable firstFailure;                           // guarded by lock
+ 
+     private Phase phase = Phase.OPEN;                         // owner thread only
+     private boolean forked;                                   // owner thread only
++    private boolean joinedSuccessfully;                       // owner thread only
+ 
+-    private TaskScope(String name, Duration timeout) {
++    private TaskScope(String name, Duration timeout, Tracer tracer, List<ScopedValue<?>> inherited) {
+         this.name = name;
+         this.owner = Thread.currentThread();
+         this.deadlineNanos = System.nanoTime() + timeout.toNanos();
+         this.threadFactory = Thread.ofVirtual().name(name + "-", 0).factory();
++        this.tracer = tracer;
++        Context parent = Context.current();
++        this.scopeSpan = tracer.spanBuilder("taskscope " + name)
++                .setParent(parent)
++                .setAttribute(NAME, name)
++                .startSpan();
++        this.scopeContext = parent.with(scopeSpan);
++        this.bindings = captureBindings(inherited);
+     }
+ 
+     /**
+-     * Opens a scope owned by the calling thread.
++     * Opens a scope owned by the calling thread, traced with the global OpenTelemetry tracer and
++     * inheriting no scoped values.
+      *
+-     * @param name    scope name, used for subtask thread names and diagnostics
++     * @param name    scope name, used for span and subtask thread names
+      * @param timeout deadline for the whole scope, measured from now; must be positive
+      */
+     public static TaskScope open(String name, Duration timeout) {
++        return builder(name, timeout).open();
++    }
++
++    /** Starts configuring a scope; {@link Builder#open()} opens it on the calling thread. */
++    public static Builder builder(String name, Duration timeout) {
+         Objects.requireNonNull(name, "name");
+         Objects.requireNonNull(timeout, "timeout");
+         if (timeout.isNegative() || timeout.isZero()) {
+             throw new IllegalArgumentException("timeout must be positive: " + timeout);
+         }
+-        return new TaskScope(name, timeout);
++        return new Builder(name, timeout);
+     }
+ 
+     /**
+@@ -95,7 +152,7 @@ public final class TaskScope implements AutoCloseable {
+             throw new IllegalStateException("scope '" + name + "' has already been " + phase.name().toLowerCase());
+         }
+         forked = true;
+-        SubtaskImpl<T> subtask = new SubtaskImpl<>(task);
++        SubtaskImpl<T> subtask = new SubtaskImpl<>(task, MDC.getCopyOfContextMap());
+         Thread thread = threadFactory.newThread(subtask::run);
+         lock.lock();
+         try {
+@@ -129,6 +186,7 @@ public final class TaskScope implements AutoCloseable {
+             while (running > 0 && !cancelled) {
+                 long remaining = deadlineNanos - System.nanoTime();
+                 if (remaining <= 0) {
++                    timedOut = true;
+                     cancelLocked();
+                     throw new TimeoutException("scope '" + name + "' exceeded its deadline");
+                 }
+@@ -142,13 +200,14 @@ public final class TaskScope implements AutoCloseable {
+             if (firstFailure != null) {
+                 throw new FailedException(firstFailure);
+             }
++            joinedSuccessfully = true;
+         } finally {
+             lock.unlock();
+         }
+     }
+ 
+     /**
+-     * Cancels unfinished subtasks and waits for every subtask thread to end.
++     * Cancels unfinished subtasks, waits for every subtask thread to end, and ends the scope span.
+      *
+      * @throws IllegalStateException after the wait, if subtasks were forked but {@link #join()} was
+      *                               never called
+@@ -183,11 +242,35 @@ public final class TaskScope implements AutoCloseable {
+         if (interrupted) {
+             Thread.currentThread().interrupt();
+         }
++        endScopeSpan();
+         if (forked && !joined) {
+             throw new IllegalStateException("scope '" + name + "' was closed without join()");
+         }
+     }
+ 
++    private void endScopeSpan() {
++        Throwable failure;
++        boolean timeout;
++        lock.lock();
++        try {
++            failure = firstFailure;
++            timeout = timedOut;
++        } finally {
++            lock.unlock();
++        }
++        if (failure != null) {
++            scopeSpan.recordException(failure);
++            scopeSpan.setStatus(StatusCode.ERROR, "subtask failed");
++            scopeSpan.setAttribute(OUTCOME, "failed");
++        } else if (timeout) {
++            scopeSpan.setStatus(StatusCode.ERROR, "deadline exceeded");
++            scopeSpan.setAttribute(OUTCOME, "timeout");
++        } else {
++            scopeSpan.setAttribute(OUTCOME, joinedSuccessfully ? "success" : "cancelled");
++        }
++        scopeSpan.end();
++    }
++
+     private void ensureOwner() {
+         if (Thread.currentThread() != owner) {
+             throw new WrongThreadException("scope '" + name + "' is owned by " + owner);
+@@ -209,15 +292,50 @@ public final class TaskScope implements AutoCloseable {
+         changed.signalAll();
+     }
+ 
++    private static List<Binding<?>> captureBindings(List<ScopedValue<?>> keys) {
++        List<Binding<?>> captured = new ArrayList<>(keys.size());
++        for (ScopedValue<?> key : keys) {
++            if (key.isBound()) {
++                captured.add(Binding.of(key));
++            }
++        }
++        return List.copyOf(captured);
++    }
++
++    private <T> T callWithBindings(Callable<? extends T> task) throws Exception {
++        if (bindings.isEmpty()) {
++            return task.call();
++        }
++        ScopedValue.Carrier carrier = null;
++        for (Binding<?> binding : bindings) {
++            carrier = binding.bind(carrier);
++        }
++        return carrier.call(task::call);
++    }
++
++    /** A captured scoped-value binding, re-applied in each subtask. */
++    private record Binding<V>(ScopedValue<V> key, V value) {
++
++        static <V> Binding<V> of(ScopedValue<V> key) {
++            return new Binding<>(key, key.get());
++        }
++
++        ScopedValue.Carrier bind(ScopedValue.Carrier carrier) {
++            return carrier == null ? ScopedValue.where(key, value) : carrier.where(key, value);
++        }
++    }
++
+     private final class SubtaskImpl<T> implements Subtask<T> {
+ 
+         private final Callable<? extends T> task;
++        private final Map<String, String> ownerMdc;
+         private volatile State state = State.UNAVAILABLE;
+         private volatile T result;
+         private volatile Throwable exception;
+ 
+-        private SubtaskImpl(Callable<? extends T> task) {
++        private SubtaskImpl(Callable<? extends T> task, Map<String, String> ownerMdc) {
+             this.task = task;
++            this.ownerMdc = ownerMdc;
+         }
+ 
+         private void run() {
+@@ -225,27 +343,27 @@ public final class TaskScope implements AutoCloseable {
+                 if (isCancelled()) {
+                     return;
+                 }
+-                T value = task.call();
+-                lock.lock();
+-                try {
+-                    if (!cancelled) {
+-                        result = value;
+-                        state = State.SUCCESS;
++                Span span = tracer.spanBuilder("taskscope " + name + " subtask")
++                        .setParent(scopeContext)
++                        .setAttribute(NAME, name)
++                        .startSpan();
++                String outcome = "cancelled";
++                try (Scope ignored = scopeContext.with(span).makeCurrent()) {
++                    installMdc(span);
++                    T value = callWithBindings(task);
++                    if (recordSuccess(value)) {
++                        outcome = "success";
+                     }
+-                } finally {
+-                    lock.unlock();
+-                }
+-            } catch (Throwable failure) {
+-                lock.lock();
+-                try {
+-                    if (!cancelled) {
+-                        exception = failure;
+-                        state = State.FAILED;
+-                        firstFailure = failure;
+-                        cancelLocked();
++                } catch (Throwable failure) {
++                    if (recordFailure(failure)) {
++                        outcome = "failed";
++                        span.recordException(failure);
++                        span.setStatus(StatusCode.ERROR, String.valueOf(failure.getMessage()));
+                     }
+                 } finally {
+-                    lock.unlock();
++                    span.setAttribute(OUTCOME, outcome);
++                    span.end();
++                    MDC.clear();
+                 }
+             } finally {
+                 lock.lock();
+@@ -258,6 +376,49 @@ public final class TaskScope implements AutoCloseable {
+             }
+         }
+ 
++        private void installMdc(Span span) {
++            if (ownerMdc != null) {
++                MDC.setContextMap(ownerMdc);
++            } else {
++                MDC.clear();
++            }
++            SpanContext context = span.getSpanContext();
++            if (context.isValid()) {
++                MDC.put(MDC_TRACE_ID, context.getTraceId());
++                MDC.put(MDC_SPAN_ID, context.getSpanId());
++            }
++        }
++
++        private boolean recordSuccess(T value) {
++            lock.lock();
++            try {
++                if (cancelled) {
++                    return false;
++                }
++                result = value;
++                state = State.SUCCESS;
++                return true;
++            } finally {
++                lock.unlock();
++            }
++        }
++
++        private boolean recordFailure(Throwable failure) {
++            lock.lock();
++            try {
++                if (cancelled) {
++                    return false;
++                }
++                exception = failure;
++                state = State.FAILED;
++                firstFailure = failure;
++                cancelLocked();
++                return true;
++            } finally {
++                lock.unlock();
++            }
++        }
++
+         private boolean isCancelled() {
+             lock.lock();
+             try {
+@@ -289,6 +450,38 @@ public final class TaskScope implements AutoCloseable {
+         }
+     }
+ 
++    /** Scope configuration. */
++    public static final class Builder {
++        private final String name;
++        private final Duration timeout;
++        private Tracer tracer = GlobalOpenTelemetry.getTracer("dev.mars.quorus.concurrent");
++        private final List<ScopedValue<?>> inherited = new ArrayList<>();
++
++        private Builder(String name, Duration timeout) {
++            this.name = name;
++            this.timeout = timeout;
++        }
++
++        /** Tracer for the scope and subtask spans; defaults to the global OpenTelemetry tracer. */
++        public Builder tracer(Tracer tracer) {
++            this.tracer = Objects.requireNonNull(tracer, "tracer");
++            return this;
++        }
++
++        /** Scoped values whose bindings in the owner, captured at open, are re-bound in every subtask. */
++        public Builder inherit(ScopedValue<?>... keys) {
++            for (ScopedValue<?> key : keys) {
++                inherited.add(Objects.requireNonNull(key, "key"));
++            }
++            return this;
++        }
++
++        /** Opens the scope, owned by the calling thread. */
++        public TaskScope open() {
++            return new TaskScope(name, timeout, tracer, List.copyOf(inherited));
++        }
++    }
++
+     /** A forked subtask. */
+     public interface Subtask<T> extends Supplier<T> {
+ 
+diff --git a/quorus-core/src/test/java/dev/mars/quorus/concurrent/TaskScopeTest.java b/quorus-core/src/test/java/dev/mars/quorus/concurrent/TaskScopeTest.java
+index e4fcead..03eec57 100644
+--- a/quorus-core/src/test/java/dev/mars/quorus/concurrent/TaskScopeTest.java
++++ b/quorus-core/src/test/java/dev/mars/quorus/concurrent/TaskScopeTest.java
+@@ -201,6 +201,77 @@ class TaskScopeTest {
+         assertTrue(!ran.get(), "a subtask forked after cancellation must not run");
+     }
+ 
++    @Test
++    void ownerInterruptedWhileCloseWaitsKeepsWaitingAndRestoresTheInterrupt() throws Exception {
++        CompletableFuture<Void> subtaskStarted = new CompletableFuture<>();
++        CompletableFuture<Void> subtaskCancelled = new CompletableFuture<>();
++        CompletableFuture<Void> release = new CompletableFuture<>();
++        AtomicBoolean subtaskEnded = new AtomicBoolean();
++        AtomicBoolean endedBeforeCloseReturned = new AtomicBoolean();
++        AtomicBoolean interruptRestored = new AtomicBoolean();
++
++        Thread owner = Thread.ofVirtual().start(() -> {
++            TaskScope scope = TaskScope.open("close-interrupted", GENEROUS);
++            scope.fork(() -> {
++                subtaskStarted.complete(null);
++                try {
++                    return blockUntilInterrupted(new AtomicBoolean());
++                } catch (InterruptedException cancelled) {
++                    subtaskCancelled.complete(null);
++                    release.join();                 // outlives the cancellation until released
++                    return null;
++                } finally {
++                    subtaskEnded.set(true);
++                }
++            });
++            subtaskStarted.join();                   // close only once the subtask is running
++            try {
++                scope.close();                       // cancels, then waits for the subtask
++            } catch (IllegalStateException closedWithoutJoin) {
++                endedBeforeCloseReturned.set(subtaskEnded.get());
++                interruptRestored.set(Thread.currentThread().isInterrupted());
++            }
++        });
++        subtaskCancelled.join();
++        owner.interrupt();                           // interrupt the owner while close() waits
++        release.complete(null);
++        owner.join();
++
++        assertTrue(endedBeforeCloseReturned.get(), "close must keep waiting for the subtask despite the interrupt");
++        assertTrue(interruptRestored.get(), "close must restore the owner's interrupt status");
++    }
++
++    @Test
++    void aSubtaskThatSucceedsAfterCancellationHasItsResultDiscarded() throws Exception {
++        CompletableFuture<Void> slowStarted = new CompletableFuture<>();
++        CompletableFuture<Void> release = new CompletableFuture<>();
++        Subtask<String> slow;
++        try (TaskScope scope = TaskScope.open("late-success", GENEROUS)) {
++            slow = scope.fork(() -> {
++                slowStarted.complete(null);
++                release.join();                      // ignores the cancellation interrupt
++                return "too late";
++            });
++            scope.fork(() -> {
++                slowStarted.join();
++                throw new IllegalStateException("cancel the scope");
++            });
++            assertThrows(TaskScope.FailedException.class, scope::join);
++            release.complete(null);
++        }
++
++        assertEquals(Subtask.State.UNAVAILABLE, slow.state());
++    }
++
++    @Test
++    void exceptionOfASubtaskThatDidNotFailIsRejected() throws Exception {
++        try (TaskScope scope = TaskScope.open("no-exception", GENEROUS)) {
++            Subtask<String> ok = scope.fork(() -> "fine");
++            scope.join();
++            assertThrows(IllegalStateException.class, ok::exception);
++        }
++    }
++
+     @Test
+     void closingTwiceIsHarmless() throws Exception {
+         TaskScope scope = TaskScope.open("close-twice", GENEROUS);
+diff --git a/quorus-core/src/test/java/dev/mars/quorus/concurrent/TaskScopeContextPropagationTest.java b/quorus-core/src/test/java/dev/mars/quorus/concurrent/TaskScopeContextPropagationTest.java
+new file mode 100644
+index 0000000..ddb3042
+--- /dev/null
++++ b/quorus-core/src/test/java/dev/mars/quorus/concurrent/TaskScopeContextPropagationTest.java
+@@ -0,0 +1,420 @@
++/*
++ * Copyright 2026 Mark Andrew Ray-Smith Cityline Ltd
++ * Licensed under the Apache License, Version 2.0.
++ */
++package dev.mars.quorus.concurrent;
++
++import ch.qos.logback.classic.Level;
++import ch.qos.logback.classic.Logger;
++import ch.qos.logback.classic.spi.ILoggingEvent;
++import ch.qos.logback.core.AppenderBase;
++import dev.mars.quorus.concurrent.TaskScope.Subtask;
++import io.opentelemetry.api.common.AttributeKey;
++import io.opentelemetry.api.trace.Span;
++import io.opentelemetry.api.trace.StatusCode;
++import io.opentelemetry.api.trace.Tracer;
++import io.opentelemetry.context.Scope;
++import io.opentelemetry.sdk.testing.exporter.InMemorySpanExporter;
++import io.opentelemetry.sdk.trace.SdkTracerProvider;
++import io.opentelemetry.sdk.trace.data.SpanData;
++import io.opentelemetry.sdk.trace.export.SimpleSpanProcessor;
++import org.junit.jupiter.api.AfterEach;
++import org.junit.jupiter.api.BeforeEach;
++import org.junit.jupiter.api.Nested;
++import org.junit.jupiter.api.Test;
++import org.junit.jupiter.api.Timeout;
++import org.slf4j.LoggerFactory;
++import org.slf4j.MDC;
++
++import java.time.Duration;
++import java.util.List;
++import java.util.concurrent.CopyOnWriteArrayList;
++import java.util.Map;
++import java.util.UUID;
++import java.util.concurrent.CompletableFuture;
++import java.util.concurrent.ExecutionException;
++import java.util.concurrent.TimeUnit;
++
++import static org.junit.jupiter.api.Assertions.assertEquals;
++import static org.junit.jupiter.api.Assertions.assertFalse;
++import static org.junit.jupiter.api.Assertions.assertNotEquals;
++import static org.junit.jupiter.api.Assertions.assertNull;
++import static org.junit.jupiter.api.Assertions.assertThrows;
++import static org.junit.jupiter.api.Assertions.assertTrue;
++
++/**
++ * Context propagation contract of the Quorus task scope (plan item RT-02b; ADR-0012).
++ *
++ * <p>Subtasks run on fresh virtual threads, so everything the owner holds per thread would be
++ * lost without explicit propagation: the OpenTelemetry context, the SLF4J MDC, and
++ * {@code ScopedValue} bindings. Spans are checked with the real OpenTelemetry SDK and an in-memory
++ * exporter, and MDC with real logback events. There are no mocks, sleeps or polling.
++ */
++@Timeout(value = 10, unit = TimeUnit.SECONDS, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
++class TaskScopeContextPropagationTest {
++
++    private static final Duration GENEROUS = Duration.ofSeconds(5);
++    private static final AttributeKey<String> OUTCOME = AttributeKey.stringKey("quorus.taskscope.outcome");
++    private static final AttributeKey<String> SCOPE_NAME = AttributeKey.stringKey("quorus.taskscope.name");
++
++    private InMemorySpanExporter exporter;
++    private SdkTracerProvider tracerProvider;
++    private Tracer tracer;
++
++    @BeforeEach
++    void installTracing() {
++        exporter = InMemorySpanExporter.create();
++        tracerProvider = SdkTracerProvider.builder().addSpanProcessor(SimpleSpanProcessor.create(exporter)).build();
++        tracer = tracerProvider.get("task-scope-test");
++    }
++
++    @AfterEach
++    void removeTracingAndMdc() {
++        tracerProvider.close();
++        MDC.clear();
++    }
++
++    @Nested
++    class StructuredTracing {
++
++        @Test
++        void scopeSpanIsAChildOfTheOwnerSpanAndSubtaskSpansAreChildrenOfTheScopeSpan() throws Exception {
++            Span owner = tracer.spanBuilder("owner").startSpan();
++            try (Scope ignored = owner.makeCurrent();
++                 TaskScope scope = TaskScope.builder("fetch", GENEROUS).tracer(tracer).open()) {
++                scope.fork(() -> "first");
++                scope.fork(() -> "second");
++                scope.join();
++            } finally {
++                owner.end();
++            }
++
++            SpanData scopeSpan = single("taskscope fetch");
++            List<SpanData> subtasks = named("taskscope fetch subtask");
++            assertEquals(owner.getSpanContext().getSpanId(), scopeSpan.getParentSpanId());
++            assertEquals("fetch", scopeSpan.getAttributes().get(SCOPE_NAME));
++            assertEquals(2, subtasks.size());
++            for (SpanData subtask : subtasks) {
++                assertEquals(scopeSpan.getSpanId(), subtask.getParentSpanId());
++                assertEquals(owner.getSpanContext().getTraceId(), subtask.getTraceId());
++            }
++        }
++
++        @Test
++        void spansStartedInsideASubtaskAreChildrenOfTheSubtaskSpan() throws Exception {
++            try (TaskScope scope = TaskScope.builder("nested", GENEROUS).tracer(tracer).open()) {
++                scope.fork(() -> {
++                    tracer.spanBuilder("protocol call").startSpan().end();
++                    return null;
++                });
++                scope.join();
++            }
++
++            assertEquals(single("taskscope nested subtask").getSpanId(), single("protocol call").getParentSpanId());
++        }
++
++        @Test
++        void successfulScopeAndSubtasksRecordASuccessOutcome() throws Exception {
++            try (TaskScope scope = TaskScope.builder("ok", GENEROUS).tracer(tracer).open()) {
++                scope.fork(() -> "done");
++                scope.join();
++            }
++
++            assertEquals("success", single("taskscope ok").getAttributes().get(OUTCOME));
++            assertNotEquals(StatusCode.ERROR, single("taskscope ok").getStatus().getStatusCode());
++            assertEquals("success", single("taskscope ok subtask").getAttributes().get(OUTCOME));
++        }
++
++        @Test
++        void failureIsRecordedOnTheFailingSubtaskAndScopeAndSiblingsAreMarkedCancelled() throws Exception {
++            CompletableFuture<Void> siblingStarted = new CompletableFuture<>();
++            IllegalStateException failure = new IllegalStateException("step failed");
++            try (TaskScope scope = TaskScope.builder("fail", GENEROUS).tracer(tracer).open()) {
++                scope.fork(() -> {
++                    siblingStarted.complete(null);
++                    return blockUntilInterrupted();
++                });
++                scope.fork(() -> {
++                    siblingStarted.join();
++                    throw failure;
++                });
++                assertThrows(TaskScope.FailedException.class, scope::join);
++            }
++
++            List<SpanData> subtasks = named("taskscope fail subtask");
++            SpanData failed = subtasks.stream().filter(s -> "failed".equals(s.getAttributes().get(OUTCOME))).findFirst().orElseThrow();
++            SpanData cancelled = subtasks.stream().filter(s -> "cancelled".equals(s.getAttributes().get(OUTCOME))).findFirst().orElseThrow();
++            assertEquals(StatusCode.ERROR, failed.getStatus().getStatusCode());
++            assertTrue(failed.getEvents().stream().anyMatch(e -> "exception".equals(e.getName())),
++                    "the failing subtask span must record the exception");
++            assertNotEquals(StatusCode.ERROR, cancelled.getStatus().getStatusCode());
++            SpanData scopeSpan = single("taskscope fail");
++            assertEquals("failed", scopeSpan.getAttributes().get(OUTCOME));
++            assertEquals(StatusCode.ERROR, scopeSpan.getStatus().getStatusCode());
++        }
++
++        @Test
++        void deadlineExpiryMarksTheScopeSpanAsTimedOutAndUnfinishedSubtasksAsCancelled() throws Exception {
++            try (TaskScope scope = TaskScope.builder("slow", Duration.ofMillis(200)).tracer(tracer).open()) {
++                scope.fork(TaskScopeContextPropagationTest::blockUntilInterrupted);
++                assertThrows(TaskScope.TimeoutException.class, scope::join);
++            }
++
++            SpanData scopeSpan = single("taskscope slow");
++            assertEquals("timeout", scopeSpan.getAttributes().get(OUTCOME));
++            assertEquals(StatusCode.ERROR, scopeSpan.getStatus().getStatusCode());
++            assertEquals("cancelled", single("taskscope slow subtask").getAttributes().get(OUTCOME));
++        }
++    }
++
++    @Nested
++    class MappedDiagnosticContext {
++
++        private Logger logger;
++        private CapturingAppender appender;
++
++        @BeforeEach
++        void captureLogs() {
++            logger = (Logger) LoggerFactory.getLogger("task-scope-mdc-" + UUID.randomUUID());
++            appender = new CapturingAppender();
++            appender.start();
++            logger.addAppender(appender);
++            logger.setLevel(Level.INFO);
++            logger.setAdditive(false);
++        }
++
++        @Test
++        void subtaskLogEventsCarryTheOwnersMdc() throws Exception {
++            MDC.put("requestId", "req-42");
++            MDC.put("nodeId", "controller1");
++            try (TaskScope scope = TaskScope.builder("mdc", GENEROUS).tracer(tracer).open()) {
++                scope.fork(() -> {
++                    logger.info("inside subtask");
++                    return null;
++                });
++                scope.join();
++            }
++
++            Map<String, String> mdc = onlyEvent().getMDCPropertyMap();
++            assertEquals("req-42", mdc.get("requestId"));
++            assertEquals("controller1", mdc.get("nodeId"));
++        }
++
++        @Test
++        void subtaskMdcTraceIdentifiersMatchTheSubtaskSpan() throws Exception {
++            try (TaskScope scope = TaskScope.builder("mdc-trace", GENEROUS).tracer(tracer).open()) {
++                scope.fork(() -> {
++                    logger.info("inside subtask");
++                    return null;
++                });
++                scope.join();
++            }
++
++            SpanData subtask = single("taskscope mdc-trace subtask");
++            Map<String, String> mdc = onlyEvent().getMDCPropertyMap();
++            assertEquals(subtask.getTraceId(), mdc.get("traceId"));
++            assertEquals(subtask.getSpanId(), mdc.get("spanId"));
++        }
++
++        @Test
++        void subtaskMdcChangesDoNotLeakIntoTheOwnerOrLaterSubtasks() throws Exception {
++            MDC.put("requestId", "req-7");
++            CompletableFuture<Void> firstDone = new CompletableFuture<>();
++            try (TaskScope scope = TaskScope.builder("mdc-isolation", GENEROUS).tracer(tracer).open()) {
++                scope.fork(() -> {
++                    MDC.put("rpcType", "changed-in-subtask");
++                    firstDone.complete(null);
++                    return null;
++                });
++                firstDone.join();
++                scope.fork(() -> {
++                    logger.info("second subtask");
++                    return null;
++                });
++                scope.join();
++            }
++
++            assertNull(onlyEvent().getMDCPropertyMap().get("rpcType"));
++            assertNull(MDC.get("rpcType"), "the owner's MDC must be unchanged");
++            assertEquals("req-7", MDC.get("requestId"));
++        }
++
++        private ILoggingEvent onlyEvent() {
++            assertEquals(1, appender.events.size(), "expected exactly one log event");
++            return appender.events.getFirst();
++        }
++    }
++
++    /**
++     * Real logback appender that freezes each event on the logging thread. Logback evaluates an
++     * event's MDC lazily, so without {@code prepareForDeferredProcessing()} an assertion would read
++     * the MDC of whichever thread inspects the event later, not the thread that logged it.
++     */
++    private static final class CapturingAppender extends AppenderBase<ILoggingEvent> {
++        private final List<ILoggingEvent> events = new CopyOnWriteArrayList<>();
++
++        @Override
++        protected void append(ILoggingEvent event) {
++            event.prepareForDeferredProcessing();
++            events.add(event);
++        }
++    }
++
++    @Nested
++    class ScopedValues {
++
++        private static final ScopedValue<String> TENANT = ScopedValue.newInstance();
++        private static final ScopedValue<String> UNDECLARED = ScopedValue.newInstance();
++
++        @Test
++        void declaredScopedValuesAreReboundInSubtasks() throws Exception {
++            String seen = ScopedValue.where(TENANT, "tenant-a").call(() -> {
++                try (TaskScope scope = TaskScope.builder("sv", GENEROUS).tracer(tracer).inherit(TENANT).open()) {
++                    Subtask<String> subtask = scope.fork(() -> TENANT.isBound() ? TENANT.get() : "unbound");
++                    scope.join();
++                    return subtask.get();
++                }
++            });
++
++            assertEquals("tenant-a", seen);
++        }
++
++        @Test
++        void undeclaredScopedValuesAreNotInherited() throws Exception {
++            boolean bound = ScopedValue.where(UNDECLARED, "secret").call(() -> {
++                try (TaskScope scope = TaskScope.builder("sv-undeclared", GENEROUS).tracer(tracer).inherit(TENANT).open()) {
++                    Subtask<Boolean> subtask = scope.fork(UNDECLARED::isBound);
++                    scope.join();
++                    return subtask.get();
++                }
++            });
++
++            assertFalse(bound, "only declared scoped values are propagated");
++        }
++
++        @Test
++        void aDeclaredValueThatTheOwnerHasNotBoundStaysUnbound() throws Exception {
++            try (TaskScope scope = TaskScope.builder("sv-unbound", GENEROUS).tracer(tracer).inherit(TENANT).open()) {
++                Subtask<Boolean> subtask = scope.fork(TENANT::isBound);
++                scope.join();
++                assertFalse(subtask.get());
++            }
++        }
++    }
++
++    /**
++     * Retrospective characterization (plan §6.1): behaviour implemented during the RT-02b green
++     * stage without a preceding failing test. Recorded as characterization, not TDD evidence.
++     */
++    @Nested
++    class Characterization {
++
++        private static final ScopedValue<String> TENANT = ScopedValue.newInstance();
++        private static final ScopedValue<String> REQUEST = ScopedValue.newInstance();
++
++        @Test
++        void scopeClosedWithoutASuccessfulJoinRecordsACancelledOutcome() {
++            TaskScope scope = TaskScope.builder("abandoned", GENEROUS).tracer(tracer).open();
++            scope.fork(() -> "never joined");
++
++            assertThrows(IllegalStateException.class, scope::close);
++
++            assertEquals("cancelled", single("taskscope abandoned").getAttributes().get(OUTCOME));
++        }
++
++        @Test
++        void everyDeclaredScopedValueIsRebound() throws Exception {
++            String seen = ScopedValue.where(TENANT, "tenant-b").where(REQUEST, "req-9").call(() -> {
++                try (TaskScope scope = TaskScope.builder("sv-many", GENEROUS).tracer(tracer).inherit(TENANT, REQUEST).open()) {
++                    Subtask<String> subtask = scope.fork(() -> TENANT.get() + "/" + REQUEST.get());
++                    scope.join();
++                    return subtask.get();
++                }
++            });
++
++            assertEquals("tenant-b/req-9", seen);
++        }
++
++        @Test
++        void withTracingDisabledTheSubtaskKeepsTheOwnersTraceIdentifiersInMdc() throws Exception {
++            MDC.put(TaskScope.MDC_TRACE_ID, "owner-trace");
++            MDC.put(TaskScope.MDC_SPAN_ID, "owner-span");
++            Subtask<String> subtask;
++            try (TaskScope scope = TaskScope.builder("no-tracing", GENEROUS)
++                    .tracer(io.opentelemetry.api.OpenTelemetry.noop().getTracer("noop")).open()) {
++                subtask = scope.fork(() -> MDC.get(TaskScope.MDC_TRACE_ID) + "/" + MDC.get(TaskScope.MDC_SPAN_ID));
++                scope.join();
++            }
++
++            assertEquals("owner-trace/owner-span", subtask.get());
++        }
++
++        @Test
++        void aSubtaskThatSucceedsAfterCancellationRecordsACancelledSpan() throws Exception {
++            CompletableFuture<Void> slowStarted = new CompletableFuture<>();
++            CompletableFuture<Void> release = new CompletableFuture<>();
++            try (TaskScope scope = TaskScope.builder("late-success", GENEROUS).tracer(tracer).open()) {
++                scope.fork(() -> {
++                    slowStarted.complete(null);
++                    release.join();                  // ignores the cancellation interrupt
++                    return "too late";
++                });
++                scope.fork(() -> {
++                    slowStarted.join();
++                    throw new IllegalStateException("cancel the scope");
++                });
++                assertThrows(TaskScope.FailedException.class, scope::join);
++                release.complete(null);
++            }
++
++            List<SpanData> subtasks = named("taskscope late-success subtask");
++            assertTrue(subtasks.stream().anyMatch(s -> "cancelled".equals(s.getAttributes().get(OUTCOME))),
++                    "a result produced after cancellation must be recorded as cancelled");
++        }
++
++        @Test
++        void aSubtaskForkedAfterCancellationProducesNoSpan() throws Exception {
++            CompletableFuture<Void> siblingStarted = new CompletableFuture<>();
++            CompletableFuture<Void> scopeCancelled = new CompletableFuture<>();
++            try (TaskScope scope = TaskScope.builder("late", GENEROUS).tracer(tracer).open()) {
++                scope.fork(() -> {
++                    siblingStarted.complete(null);
++                    try {
++                        return blockUntilInterrupted();
++                    } finally {
++                        scopeCancelled.complete(null);
++                    }
++                });
++                scope.fork(() -> {
++                    siblingStarted.join();
++                    throw new IllegalStateException("cancel");
++                });
++                scopeCancelled.join();
++                scope.fork(() -> "late");
++                assertThrows(TaskScope.FailedException.class, scope::join);
++            }
++
++            assertEquals(2, named("taskscope late subtask").size(), "only the two started subtasks have spans");
++        }
++    }
++
++    private SpanData single(String name) {
++        List<SpanData> spans = named(name);
++        assertEquals(1, spans.size(), "expected one span named '" + name + "' but found "
++                + exporter.getFinishedSpanItems().stream().map(SpanData::getName).toList());
++        return spans.getFirst();
++    }
++
++    private List<SpanData> named(String name) {
++        return exporter.getFinishedSpanItems().stream().filter(s -> s.getName().equals(name)).toList();
++    }
++
++    private static Void blockUntilInterrupted() throws InterruptedException {
++        try {
++            new CompletableFuture<Void>().get();
++            throw new AssertionError("an incomplete future cannot complete");
++        } catch (ExecutionException e) {
++            throw new AssertionError(e);
++        }
++    }
++}
