@@ -2,11 +2,13 @@
 
 # Quorus Documentation Review — Task List
 
-**Version:** 1.6
+**Version:** 1.7
 **Date:** 2026-09-26
 **Author:** Mark Ray-Smith — Cityline Ltd
 **License:** Apache 2.0
-**Status:** Active — actionable breakdown of the [2026-09-24 documentation review](../reviews/QUORUS_DOCUMENTATION_REVIEW_2026-09-24.md)
+**Status:** Archived 2026-09-26 — merged into the [Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER.md)
+
+> **Archived.** This list was merged into the register, which is the project's single task list: documentation tasks are [Section H](../task/QUORUS_OUTSTANDING_WORK_REGISTER.md#11-section-h--documentation-remediation), code defects are Section I, and decisions are in the §3 decision log. Task IDs are unchanged. Do not update this file; its progress notes are kept as history.
 
 ---
 
@@ -18,10 +20,10 @@ tasks with stable IDs. It covers every action in the review's §9 remediation pl
 configuration defect in §6, and the per-document fixes in §3 and §7 that §9 does not name.
 
 **This list is derivative, like the
-[Outstanding Work Register](QUORUS_OUTSTANDING_WORK_REGISTER.md).** Where a task is delivery work
+[Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER.md).** Where a task is delivery work
 rather than a documentation correction, it goes into the
-[enterprise plan](QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md) first and is then reflected in the
-register (register §13.3). Tasks marked **→ Register** need that step.
+[enterprise plan](../task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md) first and is then reflected in the
+register (register §14.3). Tasks marked **→ Register** need that step.
 
 The review was done by static analysis at HEAD `216348a` plus the working tree of 2026-09-24.
 Re-check each finding against the current tree before acting on it.
@@ -129,7 +131,7 @@ DR-D1 is best done before DR-B3 and DR-F13.
 | **DR-C3** | Write `docs-design/dev/QUORUS_VERTX5_CONVENTIONS.md` based on what the code actually does, and link it from `.github/copilot-instructions.md`. | ⬜ |
 | **DR-C4** | Merge `docs/QUORUS_CLUSTER_STARTUP_GUIDE.md`, `docs/QUORUS-DOCKER-TESTING-README.md` and `quorus-controller/DOCKER_BUILD_OPTIMIZATION.md` into `docker/README.md`. The result has one table giving each Compose file's topology, host ports, required environment and status, and it documents `--build-context m2cache`. Fix the Quick Start port (8080 is not mapped), use `docker compose` throughout, and fix the last link label. | ⬜ |
 | **DR-C5** | Split `QUORUS_SYSTEM_DESIGN.md`. Move the enterprise requirements to the Architecture Spec (or delete them and link). Archive the PostgreSQL/Redis/etcd, Kubernetes, SQL, changelog, duplicated and file-organisation sections. Badge what remains. Rename `QuorusStateMachine` to `QuorusStateStore` throughout. Fix the environment names (`QUORUS_RAFT_*`), the `AppConfig` loading description, the tech-stack versions, the health JSON and the metric names. | ⬜ |
-| **DR-C6** | Extract `docs-design/reference/QUORUS_RAFT_STORAGE_REFERENCE.md` from the Raft WAL design, with the contents listed in review §10: coordinates, layering, method contract, on-disk layout, every storage and snapshot key, recovery order, InstallSnapshot, operator rules, test map, and the unproven power-loss case. Archive the remainder. | ⬜ |
+| **DR-C6** | Extract `docs-design/reference/QUORUS_RAFT_STORAGE_REFERENCE.md` from the Raft WAL design, with the contents listed in review §10: coordinates, layering, method contract, on-disk layout, every storage and snapshot key, recovery order, InstallSnapshot, operator rules, test map, and the unproven power-loss case. Archive the remainder. | ⬜ Scope narrowed on 2026-09-26: under ADR-0011 the in-repository engine and sidecar are replaced by QRaft (`CE-10`), so the reference should cover the current design briefly and link to QRaft's storage documentation rather than duplicate it |
 | **DR-C7** | Trim the Simulators design. Rewrite §1 against current code. Relabel §2–7 as standalone test doubles. Restore the links to `RaftChaosTest`, `RaftFailureTest` and `InfrastructureSmokeTest`. Delete Appendix C. Document `MockRaftTransport`, update the `RaftTransport` listing, mark the DSL and full-stack examples as proposals, and tick the delivered Appendix D items. | ⬜ |
 | **DR-C8** | Rewrite `QUORUS_NEGATIVE_TESTING_STRATEGY.md` around `@ExpectsError` / `ExpectsErrorExtension` (negative tests have run by default since `8864c2f`). Align `QUORUS_LOG_STYLE.md` with the code: ASCII markers, the TRACE levels, the real `logback-test.xml`, no `-Dtest.loglevel`, and no personal hostname, username or IP. Update `QUORUS_PROTOCOL_SERVERS_TESTING.md` (images, environment, the Testcontainers tests, `*IT` never runs) and `QUORUS_RAFT_CLUSTER_TESTING.md` (`--build-context m2cache`, `QUORUS_RAFT_*`, 5000/1000, raftlog 1.2.0, `quorus-loadbalancer`, `raft` read from the top level of `/health` rather than `checks.raft.state`, the JUnit Docker suites, the header). Add `ContainerRecreationDurabilityTest` to `DOCKER_TEST_PERFORMANCE.md` and record CPU and RAM. Have LOG_STYLE and NEGATIVE_TESTING link to the Testing README instead of carrying their own logback samples. | ⬜ |
 | **DR-C9** | Scrub the PeeGeeQ references from `QuorusConfiguration.java:30`, `AppConfigNodeIdentityTest.java:82`, `VertxPerformanceBenchmark.java:45`, `scripts/add-license-headers.sh` and `scripts/setup-git-hooks.sh` (the hook checks `peegeeq-*` paths, so it does nothing in Quorus). Remove `vertx-pg-client` and `ConnectionPoolService`, and the unused `vertx-grpc-*` dependencies, or document why they stay (§6 #15, #22). | ⬜ |
@@ -144,7 +146,7 @@ DR-D1 is best done before DR-B3 and DR-F13.
 | **DR-D1** | **Generate, don't copy.** Generate the "Current" endpoint table (REST §5–15, the API Reference skeleton and `InfoHandler`, §6 #14) from `quorus-controller-v1.yaml`. Generate `docs/QUORUS_CONFIGURATION_REFERENCE.md` from the properties files and the `AppConfig` / `AgentConfig` key constants, seeded from Configuration Handover §2.1 and §8. | ⬜ |
 | **DR-D2** | **CI documentation checks:** relative-link checker; header linter for Version, Date and Status; ban on `C:\Users\` and similar personal paths; `docker compose config` on every `docker/compose/*.yml`; and a smoke job that starts the single-controller topology. | ⬜ |
 | **DR-D3** | **One status vocabulary.** Implemented / Partial / Planned for capabilities; Current / Required / Planned for API items. Remove the seven ad-hoc values in Arch Spec §13. | ⬜ |
-| **DR-D4** | **ADR hygiene** (⏸ DR-Q1, DR-Q2). Add ADR-0006 (raftlog-core WAL and snapshot sidecar), ADR-0007 (layered configuration, no system properties), ADR-0008 (schema-3 coordinated upgrade), ADR-0009 (trust-state scope), ADR-0010 (YAML semantics), and consider one for Raft over grpc-java rather than Vert.x gRPC. Add an index, Supersedes / Superseded-by fields and an Alternatives section. Fix ADR-0002's fencing statement, which is now out of date. | ⬜ |
+| **DR-D4** | **ADR hygiene** (⏸ DR-Q1, DR-Q2). Add ADR-0006 (raftlog-core WAL and snapshot sidecar), ADR-0007 (layered configuration, no system properties), ADR-0008 (schema-3 coordinated upgrade), ADR-0009 (trust-state scope), ADR-0010 (YAML semantics), and consider one for Raft over grpc-java rather than Vert.x gRPC. Add an index, Supersedes / Superseded-by fields and an Alternatives section. Fix ADR-0002's fencing statement, which is now out of date. | ⬜ ADR-0011 (consensus through QRaft) and ADR-0012 (leave Vert.x for Java 27) were added on 2026-09-26 outside this list. ADR-0006 should record only the current raftlog-and-sidecar design and point to ADR-0011 as its planned successor |
 | **DR-D5** | **Definition of done:** any change to a public contract (endpoint, key, environment variable, Compose file or status) updates its canonical document in the same commit, and plans and registers cite a SHA only after the commit exists. Add this to plan §6 and to `.github/copilot-instructions.md`. | ⬜ |
 
 ---
@@ -205,6 +207,7 @@ X18 → `ENG-02`, X19 → `ENG-04`, X21 → `ENG-05`, X24 → `ENG-03`. X05 is t
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.7 | 2026-09-26 | Noted ADR-0011 and ADR-0012 against DR-D4 and narrowed DR-C6 because the in-repository Raft storage is due for replacement by QRaft |
 | 1.6 | 2026-09-26 | Completed DR-B7, DR-F07, DR-F08 and DR-F13; DR-C2 and DR-F14 in progress; recorded the §8 and DR-A4 register IDs; added and decided DR-Q6: cited raw evidence is committed under `docs-design/evidence/raw/`, never kept in `temp/`, and the surviving historical logs were rescued there; added per-section state counts; repointed links after the reviews moved to `docs-design/reviews/` |
 | 1.5 | 2026-09-25 | Marked DR-A3 complete after removing the APEX prompt material and reconciling Copilot guidance with the current modules, schema, routes, protocol execution and test-concurrency migration state |
 | 1.4 | 2026-09-25 | Marked DR-A7 complete after reconciling the remaining stale authentication statements and the Architecture authentication verification gate |

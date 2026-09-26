@@ -2,12 +2,12 @@
 
 # Quorus Enterprise Implementation Plan
 
-**Version:** 1.28
+**Version:** 1.31
 **Date:** 2026-09-26
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Status:** Active — remediation checkpoint open; R1-1 container-recreation acceptance closed 2026-09-07 while R1-2 and R1-3 remain open; Phase 0 functionally complete with M0 durability acceptance reopened until R1-2 and R1-3 close; Phase 1 complete; Phase 4 complete (the acceptance reopened on 2026-09-04 was restored by R2–R6 on 2026-09-05); Phases 2 and 3 in progress; Phases 5–12 not started  
-**Scope:** Enterprise control plane, transfer operations, security, governance, deployment, and user interfaces
+**Scope:** Enterprise control plane, transfer operations, security, governance, deployment, and user interfaces; platform migration to the generic QRaft consensus engine and to Java 27 structured concurrency (Section 20)
 
 ## 1. Purpose and Authority
 
@@ -75,8 +75,8 @@ the repository configuration defect; it is not production PKI or deployment accr
 
 **Documentation review delivery items — 2026-09-26:** The
 [2026-09-24 documentation review](../reviews/QUORUS_DOCUMENTATION_REVIEW_2026-09-24.md) found
-code and configuration defects alongside its documentation findings. Its
-[task list](QUORUS_DOCUMENTATION_REVIEW_TASKS.md) owns the documentation work. The delivery work
+code and configuration defects alongside its documentation findings. The documentation work is
+[register Section H](QUORUS_OUTSTANDING_WORK_REGISTER.md#11-section-h--documentation-remediation), and its decisions are in the register's §3 decision log. The delivery work
 is added to this plan and carried in register Section I: revocation-serial normalisation
 (`SEC-01`, code fixed, ADR-0009 outstanding) and node-local revocation scope (`SEC-02`); silent
 direct-URI SFTP host-key bypass (`SEC-03`); unbound Raft peer identity (`SEC-04`); first-match
@@ -317,7 +317,7 @@ The mandatory evidence record for each slice contains:
 
 Captured output is retained, not just summarised. Every raw log that the record cites is written directly to `docs-design/evidence/raw/<slice-id>/`, committed with the record, and listed in the manifest with its SHA-256. The git-ignored `temp/` directory is scratch space and MUST NOT hold cited evidence; a citation of a `temp/` path does not satisfy this protocol. Historical `temp/` citations are resolved through the [raw evidence index](../evidence/raw/INDEX.md).
 
-For asynchronous behavior, tests MUST use the project-standard Vert.x test facilities. Awaitility, Java executor/latch orchestration, sleeps used as synchronization, and equivalent non-Vert.x polling are not permitted in new or remediated tests. External-path tests MUST enter through the same HTTP, agent, protocol, or cluster boundary used by a real caller. Direct method tests remain useful but cannot independently satisfy the behavioral-test gate.
+For asynchronous behavior, tests MUST use the project-standard asynchronous test facilities: Vert.x test facilities for code that is still on Vert.x, and the virtual-thread and preemptive-timeout standard of [ADR-0012](../architecture-decisions/ADR-0012-JAVA-RUNTIME-AND-STRUCTURED-CONCURRENCY.md) (workstream `RT-02`) for code that has left it. Awaitility, Java executor/latch orchestration, sleeps used as synchronization, and equivalent non-Vert.x polling are not permitted in new or remediated tests. External-path tests MUST enter through the same HTTP, agent, protocol, or cluster boundary used by a real caller. Direct method tests remain useful but cannot independently satisfy the behavioral-test gate.
 
 Existing implementation for which no preserved red stage exists can only receive **retrospective characterization**. It requires an explicit process-deviation record and cannot be relabelled as historical TDD. All subsequent changes to that behavior return to the mandatory red-green-refactor protocol.
 
@@ -1094,7 +1094,61 @@ Prove the complete platform in a representative enterprise environment and produ
 
 The enterprise release candidate is approved only when all critical canonical gaps are closed, applicable high gaps are closed or explicitly release-blocking, measurable release gates pass, pilot stakeholders accept the operating model, and no undocumented privileged procedure is required.
 
-## 20. Workstreams and Ownership Model
+## 20. Platform Migration Workstreams
+
+**Status:** Not started. Direction accepted on 2026-09-26
+**Decisions:** [ADR-0011](../architecture-decisions/ADR-0011-CONSENSUS-VIA-QRAFT-GENERIC-ENGINE.md) (consensus through the generic QRaft engine) and [ADR-0012](../architecture-decisions/ADR-0012-JAVA-RUNTIME-AND-STRUCTURED-CONCURRENCY.md) (leave Vert.x for Java 27 structured concurrency)
+
+These two workstreams change the platform beneath the phases rather than adding enterprise capability. Each item is delivered under Section 6.1 and must keep every delivered phase's boundary tests green. Neither workstream may weaken a delivered exit gate. In particular, Phase 1's controller-to-controller mutual TLS, peer rejection and revocation behaviour must pass unchanged through the new engine.
+
+### Workstream CE — Consensus through QRaft
+
+Quorus stops owning a Raft engine and consumes QRaft's engine through a 100% generic, JDK-typed API. QRaft must never name a Quorus concept. Items `CE-01` to `CE-06` are deliverables of the QRaft project and are prerequisites for Quorus; they are tracked here because Quorus depends on them.
+
+| ID | Owner | Item | Acceptance |
+|---|---|---|---|
+| **CE-01** | QRaft | Extract the reusable engine | `RaftNode`, Raft transport, storage wiring and snapshot store move from `qraft-controller` into the engine artifacts. The engine has no dependency on catalog, tenancy, HTTP or runtime modes |
+| **CE-02** | QRaft | Generic public API | Node lifecycle, command submission, and read-only leadership, term, commit and state views. Static membership and storage configuration. Typed generic errors (not-leader with hint, outcome unknown, timeout, shutting down, storage failure). JDK types only. `ReplicatedCommand` no longer requires `Serializable` |
+| **CE-03** | QRaft | Transport security interfaces | TLS 1.3 mutual authentication on Raft gRPC from supplied key and trust material; a peer authorizer consulted on connection and on every RPC with the verified chain and the claimed node ID; fail-closed unless an explicit, warned development mode is selected |
+| **CE-04** | QRaft | Observability interface | Generic metrics and event listener with no application names |
+| **CE-05** | QRaft | Genericity enforcement | QRaft's catalog and key/value state use only the public engine API. A build check fails if the engine dependency tree contains `dev.mars:quorus*` or `io.vertx` |
+| **CE-06** | QRaft | Versioned artifacts | Engine artifacts published to a repository Quorus builds can resolve, with a compatibility and deprecation policy |
+| **CE-07** | Quorus | Engine adapter | `QuorusStateStore` implements the state-machine contract; the versioned protobuf command codec implements `CommandCodec`; engine errors map to the existing HTTP leader and conflict behaviour. At most one temporary class converts JDK futures to Vert.x futures, and it is removed by `RT-06` |
+| **CE-08** | Quorus | Security wiring | `CertificateTrustState` and the Phase 1 trust configuration supply the TLS material and peer authorizer. Every Phase 1 Raft trust test passes through QRaft, and certificate-to-node-ID binding closes register item `SEC-04` |
+| **CE-09** | Quorus | Raft state migration | Establish on-disk compatibility between raftlog 1.2.0 and QRaft's raftlog version, and between Quorus's snapshot sidecar and QRaft's `SnapshotStore`. Deliver a tested coordinated cutover with rollback; no mixed-engine cluster |
+| **CE-10** | Quorus | Remove the in-repository engine | Delete Quorus's `RaftNode`, Raft gRPC server and transport, `RaftLogStorageAdapter`, the snapshot sidecar and the direct `raftlog-core` dependency. Keep the command protobuf schemas |
+| **CE-11** | Quorus | Re-establish durability evidence | Repeat R1-1 and the Raft failure, restart and snapshot lanes on the QRaft-based build. R1-2 and R1-3 are run once, against this build |
+
+### Workstream RT — Leave Vert.x for Java 27 structured concurrency
+
+| ID | Item | Acceptance |
+|---|---|---|
+| **RT-Q1** | Decision: preview `StructuredTaskScope` in production | ✅ Decided 2026-09-26: no preview in production. Structured code uses a Quorus-owned task-scope abstraction on final APIs, switched to `StructuredTaskScope` when it is final in an adopted release (ADR-0012) |
+| **RT-Q2** | Decision: controller HTTP server | ✅ Decided 2026-09-26: JDK `HttpsServer`. `RT-06` must prove required client certificates, middleware, request limits, SSE with backpressure and throughput, or reopen the decision with evidence |
+| **RT-Q3** | Decision: Java support policy | ✅ Decided 2026-09-26: follow each six-monthly feature release within its update window (`RT-09`) |
+| **RT-01a** | Java 27 compile and test baseline | The root pom and `.java-version` target 27. `JavaPlatformBaselineTest` proves production classes are class-file major version 71 and tests run on Java 27 or later. The full reactor and JaCoCo gates pass on 27 before any Vert.x removal |
+| **RT-01b** | Java 27 images and CI | Controller and agent builder and runtime images and the CI container move to Amazon Corretto 27 (`RT-Q4`), with image tags pinned to an exact Corretto release that `RT-09` updates. Docker-tagged lanes pass on the new images, starting from a fresh image build, because a cached `quorus-controller:test` image would hide the red stage |
+| **RT-Q4** | Decision: Java 27 container image vendor | ✅ Decided 2026-09-26: Amazon Corretto 27. The builder adds a pinned, checksum-verified Maven. The runtime variant (Alpine JDK, Amazon Linux 2023 headless, or a jlink-built runtime) is confirmed before `RT-01b` starts |
+| **RT-02** | Concurrency conventions, task-scope abstraction and test standard | Written conventions for virtual threads, structured scopes, `ScopedValue` context, cancellation and deadlines. The Quorus task-scope abstraction (`RT-Q1`) is delivered test-first with ownership, cancellation, deadline and failure-propagation tests. §6.1 and the Copilot instructions are updated as modules move |
+| **RT-03** | `quorus-core` | Protocol adapters run blocking I/O on virtual threads with no `executeBlocking`. The HTTP adapter uses `java.net.http.HttpClient` and streams to file, closing `ARCH-09` |
+| **RT-04** | `quorus-workflow` and `quorus-integration-examples` | No Vert.x types. Workflow execution uses structured scopes |
+| **RT-05** | `quorus-agent` | Controller client on `java.net.http.HttpClient` with mutual TLS and hostname verification. Registration, heartbeat and polling run as structured loops with bounded shutdown. The Phase 1 agent trust tests and R3 reporting tests pass |
+| **RT-06** | `quorus-controller` | HTTP API on the `RT-Q2` server with TLS 1.3 and required client certificates. Authentication, authorization and audit middleware preserved. `OpenApiContractTest` stays equal. The `CE-07` bridge is removed |
+| **RT-07** | Observability | OpenTelemetry traces, metrics and log correlation for the new HTTP server and client, replacing Vert.x tracing integration |
+| **RT-08** | Vert.x removal gate | No `io.vertx` artifact in any module. A build check fails if one is reintroduced |
+| **RT-09** | Java release cadence (recurring) | Each Java GA feature release is adopted within its update window: toolchain, CI and images; full reactor and coverage gates; Docker, slow, Raft durability and restart lanes on the new runtime. When `StructuredTaskScope` is final in an adopted release, the task-scope implementation switches to it with its tests as the gate |
+
+### Sequencing
+
+1. `RT-01` can start at once and has no dependency on QRaft. `RT-02` delivers the task-scope abstraction before any module migration uses it.
+2. `CE-01` to `CE-06` (QRaft) run in parallel with `RT-01` to `RT-04`.
+3. `CE-07` to `CE-11` follow `CE-06`. Adopting QRaft removes Quorus's largest Vert.x-coupled component, the Raft node and its gRPC transport, before the controller HTTP migration.
+4. `RT-05` and `RT-06` follow. `RT-06` should precede the bulk of Phase 6 so that new REST resources are written once.
+5. Phase 8 durability work and the R1-2 and R1-3 acceptance runs should follow `CE-11`, so that production-filesystem and power-loss evidence describes the engine that will ship.
+
+Phases 2 and 3 continue meanwhile. Their new code must avoid adding Vert.x coupling that `RT` would have to remove: new logic sits behind JDK-typed interfaces where practical.
+
+## 21. Workstreams and Ownership Model
 
 Named individuals are assigned during delivery planning. At minimum, each phase requires accountable ownership for:
 
@@ -1115,9 +1169,9 @@ Named individuals are assigned during delivery planning. At minimum, each phase 
 
 Architecture, security, operations, quality, and product/domain owners participate in every phase gate; they are not final-phase reviewers.
 
-## 21. Gap-to-Phase Traceability
+## 22. Gap-to-Phase Traceability
 
-This table assigns each gap to its delivery phases. Current closure status is maintained in [register §12](QUORUS_OUTSTANDING_WORK_REGISTER.md#12-gap-to-section-traceability), not here.
+This table assigns each gap to its delivery phases. Current closure status is maintained in [register §14](QUORUS_OUTSTANDING_WORK_REGISTER.md#14-gap-to-section-traceability), not here.
 
 | Gap | Delivery phase |
 |---|---|
@@ -1154,7 +1208,7 @@ This table assigns each gap to its delivery phases. Current closure status is ma
 | `API-13` Cluster and configuration administration incomplete | Phases 6, 8, and 10 |
 | `API-14` Compatibility, retention, export, and replay incomplete | Phases 3, 6, 8, and 9 |
 
-## 22. Backlog Classification
+## 23. Backlog Classification
 
 Every implementation item is classified as one of:
 
@@ -1176,7 +1230,7 @@ The following should default to enterprise follow-on unless the pilot requires t
 
 Deferral MUST be explicit and must not leave documentation implying that the feature is current.
 
-## 23. Plan Governance
+## 24. Plan Governance
 
 At the end of each phase:
 
@@ -1195,6 +1249,9 @@ The plan is revised when requirements or implementation evidence change. Revisio
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.31 | 2026-09-26 | Pointed documentation-review references at register Section H and its §3 decision log, after the separate task list was merged into the register |
+| 1.30 | 2026-09-26 | Recorded ADR-0012 decisions: no preview in production, using a Quorus task-scope abstraction (`RT-Q1`); JDK `HttpsServer` (`RT-Q2`); follow six-monthly Java releases (`RT-Q3`), adding the recurring `RT-09` |
+| 1.29 | 2026-09-26 | Added Section 20, Platform Migration Workstreams: `CE` (consensus through the generic QRaft engine, ADR-0011) and `RT` (leave Vert.x for Java 27 structured concurrency, ADR-0012), with sequencing against Phases 6 and 8 and R1-2/R1-3; renumbered former Sections 20–23 to 21–24; made the §6.1 asynchronous-test rule depend on the module's runtime |
 | 1.28 | 2026-09-26 | Added the documentation-review delivery items (`SEC-01`–`SEC-06`, `CFG-02`–`CFG-05`, `ENG-01`–`ENG-06`) and IDs for three unnumbered obligations (`P2-13`, `R1-4`, `PROC-01`); moved `CFG-01` into its own dated section; settled the Phase 0 and Phase 4 status wording; added Status lines for Phases 5–12; decided raw-evidence retention (`DR-Q6`): cited output goes to `docs-design/evidence/raw/`, never `temp/`, added to the §6.1 protocol, and surviving historical logs rescued; removed a machine-specific path; annotated the historical RocksDB coverage statement; qualified the System Design as a non-normative input |
 | 1.27 | 2026-09-25 | Recorded closed `CFG-01` container configuration hygiene and the generated-certificate mutual-TLS validation boundary |
 | 1.26 | 2026-09-07 | Recorded the R1-1 container-recreation acceptance checkpoint and retained R1-2/R1-3 as release blockers |

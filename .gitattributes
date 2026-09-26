@@ -1,2 +1,5 @@
 # Linux entrypoints and shell acceptance fixtures must survive Windows checkout.
 *.sh text eol=lf
+
+# Raw evidence is hashed in the manifests; store and check out byte-for-byte.
+docs-design/evidence/raw/** -text
