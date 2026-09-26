@@ -136,7 +136,7 @@ class MyTest {
 
 ### Test-concurrency direction
 
-For code that has left Vert.x, use the asynchronous test standard in [docs-design/dev/QUORUS_CONCURRENCY_CONVENTIONS.md §5](../docs-design/dev/QUORUS_CONCURRENCY_CONVENTIONS.md#5-asynchronous-test-standard). It requires preemptive `@Timeout(threadMode = SEPARATE_THREAD)`, `CompletableFuture` handshakes and interruption for synchronisation, and no sleeps, Awaitility or polling. Spans are asserted through the real OpenTelemetry SDK with `InMemorySpanExporter`, MDC through logback events frozen with `prepareForDeferredProcessing()`, and concurrency tests are repeated as regression evidence. The paragraph below applies to modules still on Vert.x.
+For code that has left Vert.x, use the asynchronous test standard in [docs-design/dev/QUORUS_CONCURRENCY_CONVENTIONS.md §6](../docs-design/dev/QUORUS_CONCURRENCY_CONVENTIONS.md#6-asynchronous-test-standard). It requires preemptive `@Timeout(threadMode = SEPARATE_THREAD)`, `CompletableFuture` handshakes and interruption for synchronisation, and no sleeps, Awaitility or polling. Spans are asserted through the real OpenTelemetry SDK with `InMemorySpanExporter`, MDC through logback events frozen with `prepareForDeferredProcessing()`, and concurrency tests are repeated as regression evidence. The paragraph below applies to modules still on Vert.x.
 
 The migration target for Vert.x asynchronous tests is to use Vert.x `Future`, `Promise`, timers,
 and `VertxTestContext`, with blocking work isolated through `executeBlocking`. Prefer these patterns

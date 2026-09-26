@@ -1,0 +1,46 @@
+{
+  "slice": "RT-02d",
+  "title": "TaskScope enforces StructuredTaskScope structure rules",
+  "requirement": "Keep TaskScope migratable to StructuredTaskScope once it is final (StructuredTaskScope is preview in JDK 27 and in JDK 28 early access 28-ea+17; no structured-concurrency JEP was targeted to JDK 28 as of 2026-09-26); ADR-0012 RT-Q1; plan §20 RT-02",
+  "acceptance": [
+    "fork() throws TaskScope.StructureViolationException when a declared ScopedValue is bound to a different value than at open, or has become bound since open",
+    "fork() under the bindings in force at open is allowed",
+    "Closing a scope while scopes opened after it on the same thread are open closes those inner scopes first (cancelling and awaiting their subtasks), then this scope, then throws StructureViolationException",
+    "Properly nested scopes close normally"
+  ],
+  "acceptanceWrittenBeforeImplementation": true,
+  "knownLimitation": "Final APIs cannot enumerate a thread's ScopedValue bindings, so changes to undeclared keys, and rebinding a declared key to the identical object, are not detected. StructuredTaskScope detects both. This is documented in the TaskScope Javadoc and conventions §2.",
+  "classification": "unit (JDK concurrency boundary)",
+  "baseRevision": "95ed659",
+  "patch": {"path": "docs-design/evidence/raw/rt-02/rt-02d.patch", "sha256": "209544d5353b7fde20698b489c02792fc996185d4b720a2202d2c6e8a9c2714e"},
+  "environment": {"jdk": "OpenJDK 27 GA, build 27+35-2325", "jdk28Probe": "openjdk:28-ea-slim, build 28-ea+17-1282: StructuredTaskScope requires --enable-preview", "maven": "Apache Maven 3.9.11", "os": "Windows 11 Pro N 10.0.26340"},
+  "test": {"file": "quorus-core/src/test/java/dev/mars/quorus/concurrent/TaskScopeStructureTest.java"},
+  "red": {
+    "command": "mvn -B clean test -pl quorus-core -Dtest=TaskScope*Test -Dsurefire.failIfNoSpecifiedTests=false",
+    "revision": "95ed659 plus the StructureViolationException type (no enforcement) and the five new tests",
+    "started": "2026-09-26T15:11:56+01:00",
+    "finished": "2026-09-26T15:12:04+01:00",
+    "result": "3 rule tests failed: 'Expected StructureViolationException to be thrown, but nothing was thrown'. 2 guard tests (same bindings; proper nesting) passed, as intended.",
+    "log": {"path": "docs-design/evidence/raw/rt-02/taskscope-d-red.log", "sha256": "9a025857a92e3b4c791c16d625288e957079f56b0c33ddd6f388d73ee27a9ec6"}
+  },
+  "green": {
+    "change": "A per-thread open-scope stack (internal ThreadLocal, owner bookkeeping only); fork() compares declared keys with the bindings captured at open by identity; close() closes still-open inner scopes innermost first, then itself, then throws StructureViolationException with inner and own close failures suppressed. Class Javadoc documents the structure rules, their limitation and a part-by-part migration mapping to StructuredTaskScope.",
+    "command": "mvn -B clean test -pl quorus-core -Dtest=TaskScope*Test -Dsurefire.failIfNoSpecifiedTests=false",
+    "started": "2026-09-26T15:13:03+01:00",
+    "finished": "2026-09-26T15:13:12+01:00",
+    "result": "34 tests, 0 failures",
+    "log": {"path": "docs-design/evidence/raw/rt-02/taskscope-d-green.log", "sha256": "b6ac42920ed6e61a03b185afe445165a7ef3119220dbd139887444fbbfef82e1"}
+  },
+  "refactor": "Removed two unreachable defensive branches found by coverage (the scope-not-on-stack fallback and a CLOSED check in closeWithinStructure); the stack lookup is now a branch-free sublist. Conventions document v1.1 adds the structure rules, a migration section and a test-standard rule on interrupt races; plan §6.1 and the Copilot instructions link to the renumbered §6.",
+  "processDeviation": {
+    "description": "Behaviour implemented during green without a preceding failing test is covered by tests classified as retrospective characterization.",
+    "characterizationTests": ["forkingAfterLeavingTheBindingInForceAtOpenIsAStructureViolation", "outOfOrderCloseOfACleanInnerScopeReportsOnlyTheViolation", "outOfOrderCloseAttachesTheOuterScopesMissingJoinAsSuppressed"],
+    "testDefectFound": "The RT-02b test ownerInterruptedWhileCloseWaitsKeepsWaitingAndRestoresTheInterrupt was non-deterministic. It interrupted the owner from another thread and then released the subtask, and a virtual thread may observe termination before its own interrupt, so the interrupted wait path was sometimes not exercised although the test passed (seen as uncovered lines in one full verify; covered in 4 of 4 isolated runs). The owner now sets its own interrupt status before close(), making the path deterministic.",
+    "failedRunLog": {"path": "docs-design/evidence/raw/rt-02/taskscope-d-core-verify-attempt1-nondeterministic-interrupt.log", "sha256": "6d3a7b79841b7284a766c5edac10461100f073628f32fd247be106616369653e"}
+  },
+  "regression": [
+    {"command": "mvn -B clean verify -pl quorus-core", "result": "1,556 tests, 0 failures; JaCoCo gate met. TaskScope 163/163 lines and 70/70 branches; SubtaskImpl 63/64 lines and 17/18 branches (the documented start-of-run race guard)", "log": {"path": "docs-design/evidence/raw/rt-02/taskscope-d-core-verify.log", "sha256": "e00ba12f0d9501a47f66cde959efbe8d20c53cc062315168254e2835a2639919"}},
+    {"command": "50 x mvn -B -q surefire:test -pl quorus-core -Dtest=TaskScope*Test (37 tests)", "result": "50 passed, 0 failed", "log": {"path": "docs-design/evidence/raw/rt-02/taskscope-d-repeat.log", "sha256": "aa54192d5062d0cd762c9a2395b7458ca45e63928701ff447dc5f1b20fbebe99"}}
+  ],
+  "sensitiveDataCheck": "Logs contain Maven and test output only; no request bodies, credentials, keys or sensitive payloads."
+}

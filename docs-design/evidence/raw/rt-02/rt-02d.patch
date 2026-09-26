@@ -1,0 +1,476 @@
+diff --git a/docs-design/dev/QUORUS_CONCURRENCY_CONVENTIONS.md b/docs-design/dev/QUORUS_CONCURRENCY_CONVENTIONS.md
+index b2d6956..ea5e7e1 100644
+--- a/docs-design/dev/QUORUS_CONCURRENCY_CONVENTIONS.md
++++ b/docs-design/dev/QUORUS_CONCURRENCY_CONVENTIONS.md
+@@ -2,7 +2,7 @@
+ 
+ # Quorus Concurrency Conventions
+ 
+-**Version:** 1.0  
++**Version:** 1.1  
+ **Date:** 2026-09-26  
+ **Author:** Mark Ray-Smith — Cityline Ltd  
+ **License:** Apache 2.0  
+@@ -59,6 +59,14 @@ try (TaskScope scope = TaskScope.builder("replicate-segment", Duration.ofSeconds
+   span name `taskscope <name>` and the subtask thread-name prefix.
+ - **Keep subtasks coarse.** Every scope and every subtask produces a span. Fork a transfer, a protocol
+   call or a polling loop, not a single field computation.
++- **Fork only under the bindings in force when the scope opened.** Do not call `fork` inside a nested
++  `ScopedValue.where(...)`, and do not let a scope escape the `where(...)` that opened it. A declared
++  key bound differently at `fork` throws `TaskScope.StructureViolationException`. Final APIs cannot
++  see undeclared keys, so `TaskScope` cannot detect changes to those, but `StructuredTaskScope` can
++  and will reject them after migration. Treat the rule as absolute.
++- **Close scopes in reverse order of opening.** Nested try-with-resources does this automatically.
++  Closing an outer scope while an inner one is still open closes the inner scope first, then throws
++  `TaskScope.StructureViolationException`, with any close failures attached as suppressed exceptions.
+ 
+ ## 3. Context propagation
+ 
+@@ -75,7 +83,25 @@ Request and security context (tenant, identity, request ID) belongs in `ScopedVa
+ thread-locals. The MDC stays the bridge to logging, because logback reads only the MDC. The MDC keys in
+ use are `requestId`, `traceId`, `spanId`, `nodeId`, `raftRole`, `raftTerm`, `rpcType` and `agentId`.
+ 
+-## 4. Shared state
++## 4. Migration to `StructuredTaskScope`
++
++`StructuredTaskScope` is a preview API in JDK 27. It is also still preview in JDK 28 early access
++(28-ea+17), and no structured-concurrency JEP was targeted to JDK 28 as of 2026-09-26. When a Java
++release that Quorus adopts (plan item `RT-09`) makes it final, the switch happens inside `TaskScope`,
++and callers do not change:
++
++| `TaskScope` today | After the switch |
++|---|---|
++| Fork, join, cancellation and deadline on virtual threads | Delegated to `StructuredTaskScope` with its default all-must-succeed policy and the scope deadline as its timeout |
++| `FailedException`, `TimeoutException`, `StructureViolationException` | Kept as Quorus types, mapped from the JDK exceptions |
++| Structure checks for declared keys and close order | Removed; the JDK enforces the same rules, and more completely |
++| `Builder.inherit(...)` | Redundant, because every binding is inherited. The declarations can be deleted |
++| Tracing, span outcomes, MDC propagation | Kept. The JDK scope does not carry thread-locals, so each fork keeps wrapping its task |
++
++Code that follows §2 today needs no change at migration. The `TaskScope*Test` classes are the
++regression gate for the switch.
++
++## 5. Shared state
+ 
+ - Give every piece of mutable state one owner and state how it is serialised: confined to one thread,
+   guarded by a named lock, or immutable.
+@@ -84,7 +110,7 @@ use are `requestId`, `traceId`, `spanId`, `nodeId`, `raftRole`, `raftTerm`, `rpc
+   virtual threads. Use `ReentrantLock` when you need a `Condition` or a timed acquire.
+ - Prefer immutable records and copy-on-publish over shared mutable collections.
+ 
+-## 5. Asynchronous test standard
++## 6. Asynchronous test standard
+ 
+ This standard replaces the Vert.x test facilities for code that has left Vert.x (plan §6.1).
+ 
+@@ -101,6 +127,10 @@ This standard replaces the Vert.x test facilities for code that has left Vert.x
+   legitimately cancel the subtask before it runs, and the test hangs (seen in RT-02b).
+ - **To keep a subtask alive past cancellation,** block it in `CompletableFuture.join()`, which ignores
+   interruption, and release it from the test.
++- **Do not race an interrupt against a release.** A virtual thread may see "the subtask ended" before
++  it sees its own interrupt, so a test that interrupts a thread from outside and then releases work
++  may never exercise the interrupted path, and still pass. When a test needs the interrupt to be seen,
++  have the thread set its own interrupt status at the point under test (seen in RT-02d).
+ - **Assert spans with the real OpenTelemetry SDK:** an `SdkTracerProvider` with a
+   `SimpleSpanProcessor` over an `InMemorySpanExporter`, injected with `Builder.tracer(...)`. No mocks.
+ - **Assert MDC through real log events, frozen on the logging thread.** Logback evaluates an event's
+diff --git a/quorus-core/src/main/java/dev/mars/quorus/concurrent/TaskScope.java b/quorus-core/src/main/java/dev/mars/quorus/concurrent/TaskScope.java
+index fb17bdb..c9a4b21 100644
+--- a/quorus-core/src/main/java/dev/mars/quorus/concurrent/TaskScope.java
++++ b/quorus-core/src/main/java/dev/mars/quorus/concurrent/TaskScope.java
+@@ -15,7 +15,9 @@ import io.opentelemetry.context.Scope;
+ import org.slf4j.MDC;
+ 
+ import java.time.Duration;
++import java.util.ArrayDeque;
+ import java.util.ArrayList;
++import java.util.Deque;
+ import java.util.List;
+ import java.util.Map;
+ import java.util.Objects;
+@@ -67,6 +69,43 @@ import java.util.function.Supplier;
+  *       captured when the scope opens (as {@code StructuredTaskScope} captures bindings). Once the
+  *       JDK scope is adopted it inherits all bindings, and the declarations can be removed.</li>
+  * </ul>
++ *
++ * <p>Structure rules (plan item RT-02d). {@code StructuredTaskScope} rejects two kinds of misuse
++ * with {@code StructureViolationException}. This class enforces the same rules now, throwing
++ * {@link StructureViolationException}, so code that runs today keeps running after the switch:
++ * <ul>
++ *   <li><b>Fork under the bindings in force at open.</b> {@link #fork} fails if a key declared with
++ *       {@link Builder#inherit} is bound differently than when the scope was opened: bound to
++ *       another value (compared by identity), newly bound, or no longer bound. Typical cause: calling
++ *       {@code fork} inside a nested {@code ScopedValue.where(...)}. Limitation: final APIs cannot
++ *       enumerate a thread's bindings, so changes to <em>undeclared</em> keys are not detected, and
++ *       rebinding a declared key to the identical object is not detected. The JDK scope detects
++ *       both; do not rely on either.</li>
++ *   <li><b>Close in reverse order of opening.</b> Scopes opened by one thread nest. Closing a scope
++ *       while scopes opened after it on the same thread are still open first closes those inner
++ *       scopes, innermost first, cancelling and awaiting their subtasks, then closes this scope, and
++ *       finally throws {@link StructureViolationException}. Failures from closing the inner scopes
++ *       are attached as suppressed exceptions. Try-with-resources always closes in the correct
++ *       order.</li>
++ * </ul>
++ * The open scopes of each thread are tracked in an internal {@code ThreadLocal} stack. This is
++ * owner-thread bookkeeping only; request context never travels in thread-locals.
++ *
++ * <p>Migration to {@code java.util.concurrent.StructuredTaskScope} (plan item RT-09, once the API
++ * is final in a Java release Quorus has adopted; still preview in JDK 27 and in JDK 28 early access
++ * as of 2026-09-26). Callers do not change; only this class does:
++ * <ul>
++ *   <li>{@link #open}, {@link #fork}, {@link #join} and {@link #close} delegate to a
++ *       {@code StructuredTaskScope} opened with its default all-must-succeed policy and the scope
++ *       deadline as its timeout; {@link Subtask} states map one to one.</li>
++ *   <li>{@link FailedException}, {@link TimeoutException} and {@link StructureViolationException}
++ *       remain the Quorus types, mapped from the JDK exceptions, so callers see no change.</li>
++ *   <li>The structure checks here are removed; the JDK enforces them (more completely).</li>
++ *   <li>{@link Builder#inherit} becomes redundant, because the JDK scope inherits every binding.</li>
++ *   <li>Tracing, span outcomes and MDC propagation stay: the JDK scope does not carry thread-locals,
++ *       so each fork keeps wrapping the task exactly as {@code SubtaskImpl#run} does now.</li>
++ *   <li>The existing {@code TaskScope*Test} classes are the regression gate for the switch.</li>
++ * </ul>
+  */
+ public final class TaskScope implements AutoCloseable {
+ 
+@@ -84,6 +123,9 @@ public final class TaskScope implements AutoCloseable {
+ 
+     private enum Phase { OPEN, JOINED, CLOSED }
+ 
++    /** Scopes opened, and not yet closed, by each thread, innermost last. Owner bookkeeping only. */
++    private static final ThreadLocal<Deque<TaskScope>> OPEN_SCOPES = ThreadLocal.withInitial(ArrayDeque::new);
++
+     private final String name;
+     private final Thread owner;
+     private final long deadlineNanos;
+@@ -91,6 +133,7 @@ public final class TaskScope implements AutoCloseable {
+     private final Tracer tracer;
+     private final Span scopeSpan;
+     private final Context scopeContext;
++    private final List<ScopedValue<?>> declaredKeys;
+     private final List<Binding<?>> bindings;
+ 
+     private final ReentrantLock lock = new ReentrantLock();
+@@ -117,7 +160,9 @@ public final class TaskScope implements AutoCloseable {
+                 .setAttribute(NAME, name)
+                 .startSpan();
+         this.scopeContext = parent.with(scopeSpan);
++        this.declaredKeys = inherited;
+         this.bindings = captureBindings(inherited);
++        OPEN_SCOPES.get().addLast(this);
+     }
+ 
+     /**
+@@ -144,10 +189,16 @@ public final class TaskScope implements AutoCloseable {
+     /**
+      * Forks a subtask on a new virtual thread. If the scope is already cancelled, the subtask is not
+      * started and stays {@link Subtask.State#UNAVAILABLE}.
++     *
++     * @throws WrongThreadException        if called by a thread other than the owner
++     * @throws StructureViolationException if a declared {@code ScopedValue} is bound differently than
++     *                                     when the scope was opened
++     * @throws IllegalStateException       if {@link #join()} or {@link #close()} was already called
+      */
+     public <T> Subtask<T> fork(Callable<? extends T> task) {
+         Objects.requireNonNull(task, "task");
+         ensureOwner();
++        ensureBindingsUnchanged();
+         if (phase != Phase.OPEN) {
+             throw new IllegalStateException("scope '" + name + "' has already been " + phase.name().toLowerCase());
+         }
+@@ -208,9 +259,16 @@ public final class TaskScope implements AutoCloseable {
+ 
+     /**
+      * Cancels unfinished subtasks, waits for every subtask thread to end, and ends the scope span.
++     * Closing an already closed scope does nothing.
++     *
++     * <p>If scopes opened after this one by the owner thread are still open, they are closed first,
++     * innermost first, and a {@link StructureViolationException} is thrown once everything is
++     * closed. Exceptions from closing those inner scopes, and this scope's missing-join
++     * {@link IllegalStateException}, are attached to it as suppressed exceptions.
+      *
+-     * @throws IllegalStateException after the wait, if subtasks were forked but {@link #join()} was
+-     *                               never called
++     * @throws StructureViolationException if scopes opened inside this one were still open
++     * @throws IllegalStateException       after the wait, if subtasks were forked but {@link #join()}
++     *                                     was never called
+      */
+     @Override
+     public void close() {
+@@ -218,6 +276,44 @@ public final class TaskScope implements AutoCloseable {
+         if (phase == Phase.CLOSED) {
+             return;
+         }
++        List<TaskScope> innerOpen = openScopesInside();
++        if (innerOpen.isEmpty()) {
++            closeWithinStructure();
++            return;
++        }
++        StructureViolationException violation = new StructureViolationException("scope '" + name
++                + "' was closed while " + innerOpen.size() + " scope(s) opened inside it were still open");
++        for (TaskScope inner : innerOpen) {
++            try {
++                inner.closeWithinStructure();
++            } catch (RuntimeException e) {
++                violation.addSuppressed(e);
++            }
++        }
++        try {
++            closeWithinStructure();
++        } catch (RuntimeException e) {
++            violation.addSuppressed(e);
++        }
++        throw violation;
++    }
++
++    /**
++     * Scopes opened on the owner thread after this one and still open, innermost first. An open
++     * scope is always on its owner's stack: the constructor pushes it and only
++     * {@link #closeWithinStructure()} removes it.
++     */
++    private List<TaskScope> openScopesInside() {
++        List<TaskScope> stack = new ArrayList<>(OPEN_SCOPES.get());
++        return List.copyOf(stack.subList(stack.lastIndexOf(this) + 1, stack.size()).reversed());
++    }
++
++    /**
++     * Closes this open scope alone: cancel, await subtask threads, end the span, leave the owner's
++     * open-scope stack. Callers guarantee the scope is not yet closed.
++     */
++    private void closeWithinStructure() {
++        OPEN_SCOPES.get().remove(this);
+         boolean joined = phase == Phase.JOINED;
+         phase = Phase.CLOSED;
+         List<Thread> toAwait;
+@@ -292,6 +388,31 @@ public final class TaskScope implements AutoCloseable {
+         changed.signalAll();
+     }
+ 
++    /**
++     * Fails if any declared key is bound differently than when the scope was opened. Identity
++     * comparison mirrors {@code StructuredTaskScope}, which compares binding snapshots.
++     */
++    private void ensureBindingsUnchanged() {
++        for (ScopedValue<?> key : declaredKeys) {
++            Binding<?> captured = capturedBinding(key);
++            boolean boundNow = key.isBound();
++            boolean changed = captured == null ? boundNow : !boundNow || key.get() != captured.value();
++            if (changed) {
++                throw new StructureViolationException("scope '" + name + "': a declared ScopedValue is bound"
++                        + " differently than when the scope was opened; fork only under the bindings in force at open");
++            }
++        }
++    }
++
++    private Binding<?> capturedBinding(ScopedValue<?> key) {
++        for (Binding<?> binding : bindings) {
++            if (binding.key() == key) {
++                return binding;
++            }
++        }
++        return null;
++    }
++
+     private static List<Binding<?>> captureBindings(List<ScopedValue<?>> keys) {
+         List<Binding<?>> captured = new ArrayList<>(keys.size());
+         for (ScopedValue<?> key : keys) {
+@@ -512,6 +633,18 @@ public final class TaskScope implements AutoCloseable {
+         }
+     }
+ 
++    /**
++     * Thrown when a scope is used outside its structure: forking under different {@code ScopedValue}
++     * bindings from those in force at open, or closing a scope while scopes opened inside it are still
++     * open. Mirrors {@code java.util.concurrent.StructureViolationException}, which is itself a preview
++     * API in JDK 27.
++     */
++    public static final class StructureViolationException extends RuntimeException {
++        public StructureViolationException(String message) {
++            super(message);
++        }
++    }
++
+     /** Thrown by {@link #join()} when the scope's deadline expires before all subtasks complete. */
+     public static final class TimeoutException extends RuntimeException {
+         public TimeoutException(String message) {
+diff --git a/quorus-core/src/test/java/dev/mars/quorus/concurrent/TaskScopeTest.java b/quorus-core/src/test/java/dev/mars/quorus/concurrent/TaskScopeTest.java
+index 03eec57..c3d2855 100644
+--- a/quorus-core/src/test/java/dev/mars/quorus/concurrent/TaskScopeTest.java
++++ b/quorus-core/src/test/java/dev/mars/quorus/concurrent/TaskScopeTest.java
+@@ -225,6 +225,9 @@ class TaskScopeTest {
+                 }
+             });
+             subtaskStarted.join();                   // close only once the subtask is running
++            // Interrupt the owner before close() waits, so its first wait is deterministically
++            // interrupted; interrupting from another thread races with the subtask ending.
++            Thread.currentThread().interrupt();
+             try {
+                 scope.close();                       // cancels, then waits for the subtask
+             } catch (IllegalStateException closedWithoutJoin) {
+@@ -232,8 +235,7 @@ class TaskScopeTest {
+                 interruptRestored.set(Thread.currentThread().isInterrupted());
+             }
+         });
+-        subtaskCancelled.join();
+-        owner.interrupt();                           // interrupt the owner while close() waits
++        subtaskCancelled.join();                     // close() has cancelled and is now waiting
+         release.complete(null);
+         owner.join();
+ 
+diff --git a/quorus-core/src/test/java/dev/mars/quorus/concurrent/TaskScopeStructureTest.java b/quorus-core/src/test/java/dev/mars/quorus/concurrent/TaskScopeStructureTest.java
+new file mode 100644
+index 0000000..cb4bca7
+--- /dev/null
++++ b/quorus-core/src/test/java/dev/mars/quorus/concurrent/TaskScopeStructureTest.java
+@@ -0,0 +1,153 @@
++/*
++ * Copyright 2026 Mark Andrew Ray-Smith Cityline Ltd
++ * Licensed under the Apache License, Version 2.0.
++ */
++package dev.mars.quorus.concurrent;
++
++import dev.mars.quorus.concurrent.TaskScope.Subtask;
++import org.junit.jupiter.api.Test;
++import org.junit.jupiter.api.Timeout;
++
++import java.time.Duration;
++import java.util.concurrent.CompletableFuture;
++import java.util.concurrent.ExecutionException;
++import java.util.concurrent.TimeUnit;
++import java.util.concurrent.atomic.AtomicBoolean;
++
++import static org.junit.jupiter.api.Assertions.assertEquals;
++import static org.junit.jupiter.api.Assertions.assertThrows;
++import static org.junit.jupiter.api.Assertions.assertTrue;
++
++/**
++ * Structure rules of the Quorus task scope (plan item RT-02d).
++ *
++ * <p>{@code StructuredTaskScope}, which {@link TaskScope} will delegate to once it is final, rejects
++ * two kinds of misuse with {@code StructureViolationException}: forking under different
++ * {@code ScopedValue} bindings from those in force when the scope was opened, and closing a scope
++ * while scopes opened inside it on the same thread are still open. {@link TaskScope} enforces the
++ * same rules now, so code that runs today keeps running after the switch.
++ */
++@Timeout(value = 10, unit = TimeUnit.SECONDS, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
++class TaskScopeStructureTest {
++
++    private static final Duration GENEROUS = Duration.ofSeconds(5);
++    private static final ScopedValue<String> TENANT = ScopedValue.newInstance();
++
++    @Test
++    void forkingUnderADifferentBindingOfADeclaredKeyIsAStructureViolation() throws Exception {
++        ScopedValue.where(TENANT, "tenant-a").call(() -> {
++            try (TaskScope scope = TaskScope.builder("rebound", GENEROUS).inherit(TENANT).open()) {
++                ScopedValue.where(TENANT, "tenant-b").run(() ->
++                        assertThrows(TaskScope.StructureViolationException.class, () -> scope.fork(() -> "x")));
++                scope.join();
++            }
++            return null;
++        });
++    }
++
++    @Test
++    void forkingAfterADeclaredKeyBecameBoundIsAStructureViolation() throws Exception {
++        try (TaskScope scope = TaskScope.builder("newly-bound", GENEROUS).inherit(TENANT).open()) {
++            ScopedValue.where(TENANT, "tenant-a").run(() ->
++                    assertThrows(TaskScope.StructureViolationException.class, () -> scope.fork(() -> "x")));
++            scope.join();
++        }
++    }
++
++    @Test
++    void forkingUnderTheBindingsInForceAtOpenIsAllowed() throws Exception {
++        String seen = ScopedValue.where(TENANT, "tenant-a").call(() -> {
++            try (TaskScope scope = TaskScope.builder("same-bindings", GENEROUS).inherit(TENANT).open()) {
++                Subtask<String> subtask = scope.fork(TENANT::get);
++                scope.join();
++                return subtask.get();
++            }
++        });
++
++        assertEquals("tenant-a", seen);
++    }
++
++    @Test
++    void closingAnOuterScopeWhileAnInnerScopeIsOpenClosesTheInnerFirstAndReportsAViolation() throws Exception {
++        CompletableFuture<Void> innerStarted = new CompletableFuture<>();
++        AtomicBoolean innerSubtaskEnded = new AtomicBoolean();
++        TaskScope outer = TaskScope.open("outer", GENEROUS);
++        TaskScope inner = TaskScope.open("inner", GENEROUS);
++        inner.fork(() -> {
++            innerStarted.complete(null);
++            try {
++                return blockUntilInterrupted();
++            } finally {
++                innerSubtaskEnded.set(true);
++            }
++        });
++        innerStarted.join();
++
++        assertThrows(TaskScope.StructureViolationException.class, outer::close);
++
++        assertTrue(innerSubtaskEnded.get(), "closing the outer scope must first close the inner scope and await its subtasks");
++        inner.close();                                  // already closed: a no-op
++    }
++
++    @Test
++    void properlyNestedScopesCloseNormally() throws Exception {
++        try (TaskScope outer = TaskScope.open("outer-ok", GENEROUS)) {
++            try (TaskScope inner = TaskScope.open("inner-ok", GENEROUS)) {
++                inner.fork(() -> "inner");
++                inner.join();
++            }
++            outer.fork(() -> "outer");
++            outer.join();
++        }
++    }
++
++    // ---- Retrospective characterization (plan §6.1): behaviour implemented during the RT-02d green
++    // ---- stage without a preceding failing test. Recorded as characterization, not TDD evidence.
++
++    @Test
++    void forkingAfterLeavingTheBindingInForceAtOpenIsAStructureViolation() throws Exception {
++        TaskScope escaped = ScopedValue.where(TENANT, "tenant-a").call(
++                () -> TaskScope.builder("escaped", GENEROUS).inherit(TENANT).open());
++
++        assertThrows(TaskScope.StructureViolationException.class, () -> escaped.fork(() -> "x"));
++        escaped.close();
++    }
++
++    @Test
++    void outOfOrderCloseOfACleanInnerScopeReportsOnlyTheViolation() throws Exception {
++        TaskScope outer = TaskScope.open("outer-clean", GENEROUS);
++        TaskScope inner = TaskScope.open("inner-clean", GENEROUS);
++        inner.fork(() -> "done");
++        inner.join();
++
++        TaskScope.StructureViolationException violation =
++                assertThrows(TaskScope.StructureViolationException.class, outer::close);
++
++        assertEquals(0, violation.getSuppressed().length, "a cleanly closed inner scope adds no suppressed exception");
++        inner.close();
++    }
++
++    @Test
++    void outOfOrderCloseAttachesTheOuterScopesMissingJoinAsSuppressed() throws Exception {
++        TaskScope outer = TaskScope.open("outer-unjoined", GENEROUS);
++        outer.fork(() -> "never joined");
++        TaskScope inner = TaskScope.open("inner-after-fork", GENEROUS);
++
++        TaskScope.StructureViolationException violation =
++                assertThrows(TaskScope.StructureViolationException.class, outer::close);
++
++        assertEquals(1, violation.getSuppressed().length);
++        assertTrue(violation.getSuppressed()[0] instanceof IllegalStateException,
++                "the outer scope's missing join() is reported as suppressed");
++        inner.close();
++    }
++
++    private static Void blockUntilInterrupted() throws InterruptedException {
++        try {
++            new CompletableFuture<Void>().get();
++            throw new AssertionError("an incomplete future cannot complete");
++        } catch (ExecutionException e) {
++            throw new AssertionError(e);
++        }
++    }
++}
