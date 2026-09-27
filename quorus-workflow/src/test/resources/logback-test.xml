@@ -25,7 +25,6 @@
     
     <!-- Reduce noise from third-party libraries -->
     <logger name="org.apache" level="WARN"/>
-    <logger name="io.vertx" level="WARN"/>
     <logger name="io.netty" level="WARN"/>
     
     <root level="INFO">

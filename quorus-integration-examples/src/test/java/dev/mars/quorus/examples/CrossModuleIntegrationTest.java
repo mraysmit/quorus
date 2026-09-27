@@ -27,8 +27,6 @@ import dev.mars.quorus.transfer.SimpleTransferEngine;
 import dev.mars.quorus.workflow.SimpleWorkflowEngine;
 import dev.mars.quorus.workflow.WorkflowDefinition;
 import dev.mars.quorus.workflow.YamlWorkflowDefinitionParser;
-import io.vertx.core.Vertx;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -41,35 +39,31 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Integration test suite that verifies end-to-end functionality across all modules.
+ *
+ * <p>Named IntegrationTestSuite until RT-04; that name did not match the test runner's class-name
+ * patterns, so these tests never ran in the build.
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @version 1.0
  * @since 2025-08-19
  */
-class IntegrationTestSuite {
+class CrossModuleIntegrationTest {
     
     private SimpleTransferEngine transferEngine;
     private SimpleTenantService tenantService;
     private SimpleWorkflowEngine workflowEngine;
     private ProtocolFactory protocolFactory;
     private YamlWorkflowDefinitionParser workflowParser;
-    private Vertx vertx;
     
     @TempDir
     Path tempDir;
     
     @BeforeEach
     void setUp() {
-        vertx = Vertx.vertx();
         transferEngine = new SimpleTransferEngine(10, 4, 1000);
         tenantService = new SimpleTenantService();
-        workflowEngine = new SimpleWorkflowEngine(vertx, transferEngine);
+        workflowEngine = new SimpleWorkflowEngine(transferEngine);
         protocolFactory = new ProtocolFactory();
         workflowParser = new YamlWorkflowDefinitionParser();
-    }
-
-    @AfterEach
-    void tearDown() {
-        vertx.close();
     }
     
     @Test

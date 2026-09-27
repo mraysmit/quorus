@@ -23,6 +23,7 @@ import dev.mars.quorus.core.TransferStatus;
 import dev.mars.quorus.core.exceptions.TransferException;
 import dev.mars.quorus.transfer.TransferEngine;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -41,8 +42,10 @@ class TestTransferEngine implements TransferEngine {
     private boolean shutdown = false;
     
     // Configuration for test behavior
-    private TransferBehavior behavior = TransferBehavior.SUCCESS;
-    private RuntimeException exceptionToThrow = null;
+    private volatile TransferBehavior behavior = TransferBehavior.SUCCESS;
+    private volatile RuntimeException exceptionToThrow = null;
+    private volatile Duration delay = Duration.ZERO;
+    private final AtomicInteger maxConcurrentTransfers = new AtomicInteger(0);
     
     /**
      * Defines the behavior of the test transfer engine.
@@ -77,16 +80,37 @@ class TestTransferEngine implements TransferEngine {
         this.exceptionToThrow = exception;
     }
     
+    /**
+     * Make every transfer take this long before it completes as configured. The wait responds to
+     * interruption, as a real transfer does.
+     */
+    public void simulateDelay(Duration delay) {
+        this.delay = delay;
+    }
+
+    /** The most transfers that were in progress at the same time. */
+    public int getMaxConcurrentTransfers() {
+        return maxConcurrentTransfers.get();
+    }
+
     @Override
     public TransferResult transfer(TransferRequest request) throws TransferException {
         if (shutdown) {
             throw new TransferException(request.getRequestId(), "Transfer engine is shutdown");
         }
 
-        activeTransferCount.incrementAndGet();
+        maxConcurrentTransfers.accumulateAndGet(activeTransferCount.incrementAndGet(), Math::max);
         TransferJob job = new TransferJob(request);
         jobs.put(job.getJobId(), job);
         try {
+            if (!delay.isZero()) {
+                try {
+                    Thread.sleep(delay);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new TransferException(request.getRequestId(), "Transfer interrupted");
+                }
+            }
             // Simulate transfer based on configured behavior
             return switch (behavior) {
                 case SUCCESS -> createSuccessResult(request.getRequestId());
