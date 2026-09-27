@@ -68,4 +68,4 @@ For emergency revocation, set the secret reference or service connection status 
 
 Export the redacted security events, transfer timeline, active attempt, agent identity, alias version, policy digest, validation stages, and upstream service incident reference. Secret values, Vault tokens, URI user-info, packet payloads, and private keys must never be collected. Escalate trust changes, DNS rebinding, repeated authentication failures, or unexpected revocation immediately to security operations and the service owner recorded on the alias.
 
-The canonical API definitions are in [Quorus REST API Specification](QUORUS_REST_API_SPECIFICATION.md), the active surface is in [Quorus HTTP API Reference](QUORUS_API_REFERENCE.md), and the architecture is in [Quorus Architecture Specification](QUORUS_ARCHITECTURE_SPECIFICATION.md).
+The canonical API definitions are in [Quorus REST API Specification](QUORUS_REST_API_SPECIFICATION.md), the current API is the [OpenAPI contract](../quorus-controller/src/main/resources/openapi/quorus-controller-v1.yaml), and the architecture is in [Quorus Architecture Specification](QUORUS_ARCHITECTURE_SPECIFICATION.md).

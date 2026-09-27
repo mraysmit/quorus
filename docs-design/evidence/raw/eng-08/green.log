@@ -1,0 +1,269 @@
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::staticFieldBase has been called by com.google.inject.internal.aop.HiddenClassDefiner (file:/C:/Users/mraysmit/scoop/apps/maven/current/lib/guice-5.1.0-classes.jar)
+WARNING: Please consider reporting this to the maintainers of class com.google.inject.internal.aop.HiddenClassDefiner
+WARNING: sun.misc.Unsafe::staticFieldBase will be removed in a future release
+WARNING: Final field _cipher in class org.sonatype.plexus.components.sec.dispatcher.DefaultSecDispatcher has been mutated reflectively by class org.eclipse.sisu.bean.BeanPropertyField in unnamed module @7f010382 (file:/C:/Users/mraysmit/scoop/apps/maven/current/lib/org.eclipse.sisu.inject-0.9.0.M4.jar)
+WARNING: Use --enable-final-field-mutation=ALL-UNNAMED to avoid a warning
+WARNING: Mutating final fields will be blocked in a future release unless final field mutation is enabled
+[INFO] Scanning for projects...
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Build Order:
+[INFO] 
+[INFO] Quorus File Transfer System                                        [pom]
+[INFO] Quorus Core                                                        [jar]
+[INFO] Quorus Workflow Engine                                             [jar]
+[INFO] Quorus Tenant Management                                           [jar]
+[INFO] Quorus Distributed Controller                                      [jar]
+[INFO] 
+[INFO] --------------------------< dev.mars:quorus >---------------------------
+[INFO] Building Quorus File Transfer System 1.0-SNAPSHOT                  [1/5]
+[INFO]   from pom.xml
+[INFO] --------------------------------[ pom ]---------------------------------
+[INFO] 
+[INFO] --- jacoco:0.8.15:prepare-agent (prepare-agent) @ quorus ---
+[INFO] Skipping JaCoCo execution because property jacoco.skip is set.
+[INFO] argLine set to empty
+[INFO] 
+[INFO] --- jacoco:0.8.15:report (report) @ quorus ---
+[INFO] Skipping JaCoCo execution because property jacoco.skip is set.
+[INFO] 
+[INFO] ------------------------< dev.mars:quorus-core >------------------------
+[INFO] Building Quorus Core 1.0-SNAPSHOT                                  [2/5]
+[INFO]   from quorus-core\pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- jacoco:0.8.15:prepare-agent (prepare-agent) @ quorus-core ---
+[INFO] Skipping JaCoCo execution because property jacoco.skip is set.
+[INFO] argLine set to empty
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ quorus-core ---
+[INFO] Copying 1 resource from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ quorus-core ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ quorus-core ---
+[INFO] Copying 16 resources from src\test\resources to target\test-classes
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ quorus-core ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- surefire:3.2.2:test (default-test) @ quorus-core ---
+[INFO] 
+[INFO] --- jacoco:0.8.15:report (report) @ quorus-core ---
+[INFO] Skipping JaCoCo execution because property jacoco.skip is set.
+[INFO] 
+[INFO] ----------------------< dev.mars:quorus-workflow >----------------------
+[INFO] Building Quorus Workflow Engine 1.0-SNAPSHOT                       [3/5]
+[INFO]   from quorus-workflow\pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- jacoco:0.8.15:prepare-agent (prepare-agent) @ quorus-workflow ---
+[INFO] Skipping JaCoCo execution because property jacoco.skip is set.
+[INFO] argLine set to empty
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ quorus-workflow ---
+[INFO] Copying 1 resource from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ quorus-workflow ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ quorus-workflow ---
+[INFO] Copying 2 resources from src\test\resources to target\test-classes
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ quorus-workflow ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- surefire:3.2.2:test (default-test) @ quorus-workflow ---
+[INFO] 
+[INFO] --- jacoco:0.8.15:report (report) @ quorus-workflow ---
+[INFO] Skipping JaCoCo execution because property jacoco.skip is set.
+[INFO] 
+[INFO] -----------------------< dev.mars:quorus-tenant >-----------------------
+[INFO] Building Quorus Tenant Management 1.0-SNAPSHOT                     [4/5]
+[INFO]   from quorus-tenant\pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- jacoco:0.8.15:prepare-agent (prepare-agent) @ quorus-tenant ---
+[INFO] Skipping JaCoCo execution because property jacoco.skip is set.
+[INFO] argLine set to empty
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ quorus-tenant ---
+[INFO] skip non existing resourceDirectory C:\Users\mraysmit\dev\idea-projects\quorus\quorus-tenant\src\main\resources
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ quorus-tenant ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ quorus-tenant ---
+[INFO] Copying 1 resource from src\test\resources to target\test-classes
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ quorus-tenant ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- surefire:3.2.2:test (default-test) @ quorus-tenant ---
+[INFO] 
+[INFO] --- jacoco:0.8.15:report (report) @ quorus-tenant ---
+[INFO] Skipping JaCoCo execution because property jacoco.skip is set.
+[INFO] 
+[INFO] ---------------------< dev.mars:quorus-controller >---------------------
+[INFO] Building Quorus Distributed Controller 1.0-SNAPSHOT                [5/5]
+[INFO]   from quorus-controller\pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- jacoco:0.8.15:prepare-agent (prepare-agent) @ quorus-controller ---
+[INFO] Skipping JaCoCo execution because property jacoco.skip is set.
+[INFO] argLine set to empty
+[INFO] 
+[INFO] --- protobuf:4.1.2:generate (default) @ quorus-controller ---
+[WARNING]  Parameter 'binaryMavenPlugins' is deprecated: Users should now use plugins instead. This option will be removed in v5.
+[INFO] Resolving artifact "com.google.protobuf:protoc:exe:windows-x86_64:3.25.5"
+[INFO] Resolving artifact "io.grpc:protoc-gen-grpc-java:exe:windows-x86_64:1.68.1"
+[INFO] Registering "C:\Users\mraysmit\dev\idea-projects\quorus\quorus-controller\target\generated-sources\protobuf" as a Maven main source root for compiler plugins
+[INFO] Registering "C:\Users\mraysmit\dev\idea-projects\quorus\quorus-controller\target\generated-sources\protobuf" as a Maven main source root for compiler plugins
+[INFO] Found 2 proto source files and 0 descriptor files to compile, but all are up-to-date so none will be built this time
+[INFO] NOTHING TO DO: There is nothing to do. If this is unexpected, review the above logs for more details.
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ quorus-controller ---
+[INFO] Copying 3 resources from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ quorus-controller ---
+[INFO] Recompiling the module because of changed source code.
+[INFO] Compiling 169 source files with javac [debug release 27] to target\classes
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ quorus-controller ---
+[INFO] Copying 12 resources from src\test\resources to target\test-classes
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ quorus-controller ---
+[INFO] Recompiling the module because of changed dependency.
+[INFO] Compiling 78 source files with javac [debug release 27] to target\test-classes
+[INFO] 
+[INFO] --- surefire:3.2.2:test (default-test) @ quorus-controller ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+09:40:23,714 |-INFO in ch.qos.logback.classic.LoggerContext[default] - Found logback-core version 1.5.32
+09:40:23,715 |-INFO in ch.qos.logback.classic.util.ContextInitializer@4cc3585 - No custom configurators were discovered as a service.
+09:40:23,715 |-INFO in ch.qos.logback.classic.util.ContextInitializer@4cc3585 - Trying to configure with ch.qos.logback.classic.util.DefaultJoranConfigurator
+09:40:23,715 |-INFO in ch.qos.logback.classic.util.ContextInitializer@4cc3585 - Constructed configurator of type class ch.qos.logback.classic.util.DefaultJoranConfigurator
+09:40:23,716 |-INFO in ch.qos.logback.classic.LoggerContext[default] - Found resource [logback-test.xml] at [file:/C:/Users/mraysmit/dev/idea-projects/quorus/quorus-controller/target/test-classes/logback-test.xml]
+09:40:23,717 |-WARN in ch.qos.logback.classic.util.DefaultJoranConfigurator@403884f - Resource [logback-test.xml] occurs multiple times on the classpath.
+09:40:23,717 |-WARN in ch.qos.logback.classic.util.DefaultJoranConfigurator@403884f - Resource [logback-test.xml] occurs at [file:/C:/Users/mraysmit/dev/idea-projects/quorus/quorus-core/target/test-classes/logback-test.xml]
+09:40:23,717 |-WARN in ch.qos.logback.classic.util.DefaultJoranConfigurator@403884f - Resource [logback-test.xml] occurs at [file:/C:/Users/mraysmit/dev/idea-projects/quorus/quorus-controller/target/test-classes/logback-test.xml]
+09:40:23,798 |-INFO in ch.qos.logback.classic.model.processor.ConfigurationModelHandlerFull - Scan attribute not set or set to unrecognized value.
+09:40:23,804 |-INFO in ch.qos.logback.core.model.processor.ModelInterpretationContext@4d2b8ac3 - value "../test-logs/quorus-test-2026-09-27_08-40-14.log" substituted for "../test-logs/quorus-test-${testRunTimestamp}.log"
+09:40:23,805 |-INFO in ch.qos.logback.core.model.processor.AppenderModelHandler - Processing appender named [CONSOLE]
+09:40:23,805 |-INFO in ch.qos.logback.core.model.processor.AppenderModelHandler - About to instantiate appender of type [ch.qos.logback.core.ConsoleAppender]
+09:40:23,813 |-INFO in ch.qos.logback.core.model.processor.ImplicitModelHandler - Assuming default type [ch.qos.logback.classic.encoder.PatternLayoutEncoder] for [encoder] property
+09:40:23,851 |-INFO in ch.qos.logback.core.ConsoleAppender[CONSOLE] - NOTE: Writing to the console can be slow. Try to avoid logging to the 
+09:40:23,851 |-INFO in ch.qos.logback.core.ConsoleAppender[CONSOLE] - console in production environments, especially in high volume systems.
+09:40:23,851 |-INFO in ch.qos.logback.core.ConsoleAppender[CONSOLE] - See also https://logback.qos.ch/codes.html#slowConsole
+09:40:23,852 |-INFO in ch.qos.logback.core.model.processor.AppenderModelHandler - Processing appender named [FILE]
+09:40:23,852 |-INFO in ch.qos.logback.core.model.processor.AppenderModelHandler - About to instantiate appender of type [ch.qos.logback.core.FileAppender]
+09:40:23,854 |-INFO in ch.qos.logback.core.model.processor.ModelInterpretationContext@4d2b8ac3 - value "../test-logs/quorus-test-2026-09-27_08-40-14.log" substituted for "../test-logs/quorus-test-${testRunTimestamp}.log"
+09:40:23,856 |-INFO in ch.qos.logback.core.model.processor.ImplicitModelHandler - Assuming default type [ch.qos.logback.classic.encoder.PatternLayoutEncoder] for [encoder] property
+09:40:23,856 |-INFO in ch.qos.logback.core.FileAppender[FILE] - File property is set to [../test-logs/quorus-test-2026-09-27_08-40-14.log]
+09:40:23,858 |-INFO in ch.qos.logback.classic.model.processor.LoggerModelHandler - Setting level of logger [dev.mars.quorus] to DEBUG
+09:40:23,859 |-INFO in ch.qos.logback.classic.model.processor.LoggerModelHandler - Setting level of logger [org.apache] to WARN
+09:40:23,859 |-INFO in ch.qos.logback.classic.model.processor.LoggerModelHandler - Setting level of logger [io.vertx] to WARN
+09:40:23,859 |-INFO in ch.qos.logback.classic.model.processor.LoggerModelHandler - Setting level of logger [io.netty] to WARN
+09:40:23,859 |-INFO in ch.qos.logback.classic.model.processor.LoggerModelHandler - Setting level of logger [io.grpc] to WARN
+09:40:23,859 |-INFO in ch.qos.logback.classic.model.processor.RootLoggerModelHandler - Setting level of ROOT logger to INFO
+09:40:23,859 |-INFO in ch.qos.logback.core.model.processor.AppenderRefModelHandler - Attaching appender named [CONSOLE] to Logger[ROOT]
+09:40:23,860 |-INFO in ch.qos.logback.core.model.processor.AppenderRefModelHandler - Attaching appender named [FILE] to Logger[ROOT]
+09:40:23,860 |-INFO in ch.qos.logback.core.model.processor.DefaultProcessor@6ce5ec20 - End of configuration.
+09:40:23,860 |-INFO in ch.qos.logback.classic.joran.JoranConfigurator@9e08c24 - Registering current configuration as safe fallback point
+09:40:23,863 |-INFO in ch.qos.logback.classic.util.ContextInitializer@4cc3585 - ch.qos.logback.classic.util.DefaultJoranConfigurator.configure() call lasted 145 milliseconds. ExecutionStatus=DO_NOT_INVOKE_NEXT_IF_ANY
+
+[INFO] Running dev.mars.quorus.controller.http.HttpApiServerHealthTest
+09:40:24.361 [ForkJoinPool-1-worker-1] DEBUG d.m.q.c.state.QuorusStateStore - Initializing default metadata: version=2.0
+09:40:24.392 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode - Starting Raft node: health-test-node
+09:40:24.393 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/0] - No storage configured, running in volatile mode
+09:40:24.395 [vert.x-eventloop-thread-0] INFO  d.m.q.c.r.InMemoryTransportSimulator [FOLLOWER/0] - Started in-memory transport for node: health-test-node
+09:40:24.395 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/0] - Raft node health-test-node started successfully (term=0, logSize=1)
+09:40:25.142 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/0] - Starting election for node: health-test-node
+09:40:25.142 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [CANDIDATE/1] - Persisting raft metadata: term=1, votedForPresent=true, votedFor=health-test-node
+09:40:25.151 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Node health-test-node became LEADER for term 1
+09:40:25.156 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Command submitted at index 1 term 1
+09:40:25.157 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [LEADER/1] - Committed leader no-op entry for term 1
+09:40:25.160 [ForkJoinPool-1-worker-1] INFO  d.m.q.controller.config.AppConfig - Loaded configuration from quorus-controller.properties
+09:40:25.160 [ForkJoinPool-1-worker-1] DEBUG d.m.q.controller.config.AppConfig - Optional configuration profile quorus-controller-test.properties not found
+09:40:25.161 [ForkJoinPool-1-worker-1] INFO  d.m.q.controller.config.AppConfig - === Quorus Controller Configuration ===
+09:40:25.161 [ForkJoinPool-1-worker-1] INFO  d.m.q.controller.config.AppConfig -   Node ID:              test-node
+09:40:25.161 [ForkJoinPool-1-worker-1] INFO  d.m.q.controller.config.AppConfig -   HTTP Host:            127.0.0.1
+09:40:25.161 [ForkJoinPool-1-worker-1] INFO  d.m.q.controller.config.AppConfig -   HTTP Port:            8080
+09:40:25.161 [ForkJoinPool-1-worker-1] INFO  d.m.q.controller.config.AppConfig -   Raft Port:            9080
+09:40:25.161 [ForkJoinPool-1-worker-1] INFO  d.m.q.controller.config.AppConfig -   Cluster Nodes:        test-node=localhost:9080
+09:40:25.161 [ForkJoinPool-1-worker-1] INFO  d.m.q.controller.config.AppConfig -   Service Name:         quorus-controller
+09:40:25.162 [ForkJoinPool-1-worker-1] INFO  d.m.q.controller.config.AppConfig -   Version:              2.0-ext
+09:40:25.162 [ForkJoinPool-1-worker-1] INFO  d.m.q.controller.config.AppConfig -   --- Thread Pools ---
+09:40:25.162 [ForkJoinPool-1-worker-1] INFO  d.m.q.controller.config.AppConfig -   Raft I/O Pool Size:   10
+09:40:25.162 [ForkJoinPool-1-worker-1] INFO  d.m.q.controller.config.AppConfig -   Raft I/O Queue Size:  1000
+09:40:25.162 [ForkJoinPool-1-worker-1] INFO  d.m.q.controller.config.AppConfig -   --- Job Assignment ---
+09:40:25.162 [ForkJoinPool-1-worker-1] INFO  d.m.q.controller.config.AppConfig -   Initial Delay:        5000ms
+09:40:25.162 [ForkJoinPool-1-worker-1] INFO  d.m.q.controller.config.AppConfig -   Assignment Interval:  10000ms
+09:40:25.162 [ForkJoinPool-1-worker-1] INFO  d.m.q.controller.config.AppConfig -   Timeout Initial:      30000ms
+09:40:25.162 [ForkJoinPool-1-worker-1] INFO  d.m.q.controller.config.AppConfig -   Timeout Interval:     30000ms
+09:40:25.162 [ForkJoinPool-1-worker-1] INFO  d.m.q.controller.config.AppConfig -   --- Snapshot ---
+09:40:25.163 [ForkJoinPool-1-worker-1] INFO  d.m.q.controller.config.AppConfig -   Enabled:              true
+09:40:25.163 [ForkJoinPool-1-worker-1] INFO  d.m.q.controller.config.AppConfig -   Threshold:            10000 entries
+09:40:25.163 [ForkJoinPool-1-worker-1] INFO  d.m.q.controller.config.AppConfig -   Check Interval:       60000ms
+09:40:25.163 [ForkJoinPool-1-worker-1] INFO  d.m.q.controller.config.AppConfig -   --- Telemetry ---
+09:40:25.163 [ForkJoinPool-1-worker-1] INFO  d.m.q.controller.config.AppConfig -   Enabled:              true
+09:40:25.163 [ForkJoinPool-1-worker-1] INFO  d.m.q.controller.config.AppConfig -   OTLP Endpoint:        http://localhost:4317
+09:40:25.164 [ForkJoinPool-1-worker-1] INFO  d.m.q.controller.config.AppConfig -   Prometheus Port:      9464
+09:40:25.164 [ForkJoinPool-1-worker-1] INFO  d.m.q.controller.config.AppConfig -   Transfer Freshness:   60000ms
+09:40:25.164 [ForkJoinPool-1-worker-1] INFO  d.m.q.controller.config.AppConfig -   Transfer Stall:       120000ms
+09:40:25.164 [ForkJoinPool-1-worker-1] INFO  d.m.q.controller.config.AppConfig - ========================================
+09:40:25.222 [ForkJoinPool-1-worker-1] WARN  d.m.q.controller.http.HttpApiServer - INSECURE DEVELOPMENT MODE: HTTP TLS and request authentication are not production-ready
+09:40:25.292 [vert.x-eventloop-thread-0] INFO  d.m.q.controller.http.HttpApiServer [LEADER/1] - HTTP API Server listening on 127.0.0.1:18096
+[INFO] Running dev.mars.quorus.controller.http.HttpApiServerHealthTest$ApiInfoTests
+09:40:25.493 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.http.handlers.InfoHandler [LEADER/1] [req-ae47174b-727f-4404-baa5-d312285100e8] - API info requested
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.265 s -- in dev.mars.quorus.controller.http.HttpApiServerHealthTest$ApiInfoTests
+[INFO] Running dev.mars.quorus.controller.http.HttpApiServerHealthTest$ErrorCorrelationTests
+09:40:25.569 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.h.handlers.TransferHandler [LEADER/1] [req-46542231-fb8d-4974-889d-e761b7aea211] - Getting transfer job: jobId=nonexistent-job-xyz
+09:40:25.573 [vert.x-eventloop-thread-0] WARN  d.m.q.c.http.GlobalErrorHandler [LEADER/1] [req-46542231-fb8d-4974-889d-e761b7aea211] - Client error [TRANSFER_NOT_FOUND] at /api/v1/transfers/nonexistent-job-xyz: Transfer job 'nonexistent-job-xyz' not found
+09:40:25.580 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.h.handlers.TransferHandler [LEADER/1] [req-3f5cf08e-10bf-4062-9714-8624ad43c304] - Getting transfer job: jobId=nonexistent-job-xyz
+09:40:25.580 [vert.x-eventloop-thread-0] WARN  d.m.q.c.http.GlobalErrorHandler [LEADER/1] [req-3f5cf08e-10bf-4062-9714-8624ad43c304] - Client error [TRANSFER_NOT_FOUND] at /api/v1/transfers/nonexistent-job-xyz: Transfer job 'nonexistent-job-xyz' not found
+09:40:25.585 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.h.handlers.TransferHandler [LEADER/1] [trace-error-abc123] - Getting transfer job: jobId=nonexistent-job-xyz
+09:40:25.586 [vert.x-eventloop-thread-0] WARN  d.m.q.c.http.GlobalErrorHandler [LEADER/1] [trace-error-abc123] - Client error [TRANSFER_NOT_FOUND] at /api/v1/transfers/nonexistent-job-xyz: Transfer job 'nonexistent-job-xyz' not found
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.036 s -- in dev.mars.quorus.controller.http.HttpApiServerHealthTest$ErrorCorrelationTests
+[INFO] Running dev.mars.quorus.controller.http.HttpApiServerHealthTest$FullHealthTests
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.015 s -- in dev.mars.quorus.controller.http.HttpApiServerHealthTest$FullHealthTests
+[INFO] Running dev.mars.quorus.controller.http.HttpApiServerHealthTest$ReadinessTests
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.010 s -- in dev.mars.quorus.controller.http.HttpApiServerHealthTest$ReadinessTests
+[INFO] Running dev.mars.quorus.controller.http.HttpApiServerHealthTest$LivenessTests
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.008 s -- in dev.mars.quorus.controller.http.HttpApiServerHealthTest$LivenessTests
+09:40:25.646 [vert.x-eventloop-thread-0] INFO  d.m.q.controller.http.HttpApiServer [LEADER/1] - HTTP API Server stopped
+09:40:25.647 [vert.x-eventloop-thread-0] INFO  d.m.q.c.r.InMemoryTransportSimulator [LEADER/1] - Stopped in-memory transport for node: health-test-node
+09:40:25.648 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [LEADER/1] - Raft node stopped: health-test-node
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.767 s -- in dev.mars.quorus.controller.http.HttpApiServerHealthTest
+[INFO] Running dev.mars.quorus.controller.http.OpenApiContractTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.073 s -- in dev.mars.quorus.controller.http.OpenApiContractTest
+[INFO] Running dev.mars.quorus.controller.http.OpenApiReferenceContractTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.031 s -- in dev.mars.quorus.controller.http.OpenApiReferenceContractTest
+[INFO] Running dev.mars.quorus.controller.http.Phase4OpenApiContractTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.020 s -- in dev.mars.quorus.controller.http.Phase4OpenApiContractTest
+[INFO] 
+[INFO] Results:
+[INFO] 
+[INFO] Tests run: 23, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] 
+[INFO] --- jacoco:0.8.15:report (report) @ quorus-controller ---
+[INFO] Skipping JaCoCo execution because property jacoco.skip is set.
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Summary for Quorus File Transfer System 1.0-SNAPSHOT:
+[INFO] 
+[INFO] Quorus File Transfer System ........................ SUCCESS [  0.177 s]
+[INFO] Quorus Core ........................................ SUCCESS [  0.787 s]
+[INFO] Quorus Workflow Engine ............................. SUCCESS [  0.098 s]
+[INFO] Quorus Tenant Management ........................... SUCCESS [  0.073 s]
+[INFO] Quorus Distributed Controller ...................... SUCCESS [ 10.140 s]
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  11.432 s
+[INFO] Finished at: 2026-09-27T09:40:26+01:00
+[INFO] ------------------------------------------------------------------------

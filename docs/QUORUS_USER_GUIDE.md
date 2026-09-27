@@ -222,7 +222,7 @@ When reading older Quorus material, keep these distinctions in mind:
 - `docs/QUORUS_ARCHITECTURE_SPECIFICATION.md` — canonical architecture and production requirements
 - `docs/QUORUS_REST_API_SPECIFICATION.md` — complete required REST control and operations contract
 - `docs/QUORUS_ARCHITECTURE_QUICKSTART.md`
-- `docs/QUORUS_API_REFERENCE.md` — current implemented endpoints
+- `quorus-controller/src/main/resources/openapi/quorus-controller-v1.yaml` — the OpenAPI contract for the current API, also served at `GET /api/v1/openapi.yaml`
 - `docs/QUORUS_WORKFLOWS_README.md`
 - `docs/QUORUS_YAML_SYNTAX_GUIDE.md`
 - `docs/QUORUS_CLUSTER_STARTUP_GUIDE.md`

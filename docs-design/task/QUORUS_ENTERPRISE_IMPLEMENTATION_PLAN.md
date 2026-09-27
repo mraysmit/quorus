@@ -2,7 +2,7 @@
 
 # Quorus Enterprise Implementation Plan
 
-**Version:** 1.34
+**Version:** 1.35
 **Date:** 2026-09-27
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
@@ -16,7 +16,7 @@ This plan defines the phased implementation path from the current Quorus alpha b
 - [Quorus Architecture Specification](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md)
 - [Quorus REST API Specification](../../docs/QUORUS_REST_API_SPECIFICATION.md)
 - [Quorus Comprehensive System Design](../design/QUORUS_SYSTEM_DESIGN.md) — non-normative and substantially stale (see the [2026-09-24 documentation review](../reviews/QUORUS_DOCUMENTATION_REVIEW_2026-09-24.md) §4.7); use it for target-state intent only
-- [Quorus HTTP API Reference](../../docs/QUORUS_API_REFERENCE.md)
+- [Quorus OpenAPI contract](../../quorus-controller/src/main/resources/openapi/quorus-controller-v1.yaml) — the current HTTP API
 
 The architecture and REST API specifications remain normative. This plan controls delivery order and exit evidence; it does not weaken a canonical requirement. Historical completion markers in older plans do not close current conformance gaps.
 
@@ -94,6 +94,22 @@ on 2026-09-26.
 
 `SEC-07` is assigned to Phase 4 as a hardening follow-up (Section 11). It must close before any
 production service connection relies on a private CA.
+
+**The OpenAPI contract is the only reference for the current API (`ENG-08`, decision `DR-Q7`).**
+The current HTTP API had been described by hand in four places, and the copies had drifted: the
+API Reference, the REST API Specification's Current rows and "current implementation" paragraphs,
+and the endpoint list returned by `/api/v1/info` (35 of 52 routes). The contract itself declared
+no per-operation scopes, an agent status enum matching none of the server's values, and no 504
+for DNS authorization. Delivered on 2026-09-27 under Section 6.1
+([evidence](../evidence/eng-08-openapi-reference-2026-09-27.json)):
+
+- The contract declares the scope of every operation, checked against the scope that
+  `AuthorizationPolicyEngine` enforces. It declares the correct agent statuses and the 409, 503
+  and 504 responses of DNS authorization, and describes the behaviour the API Reference used to.
+  This meets REST API Specification §19 item 4 for the current operations.
+- The API Reference is deleted. The REST API Specification holds requirements only, and a test
+  fails if its Current rows and the contract disagree.
+- `/api/v1/info` links to the contract instead of carrying its own endpoint list.
 
 ### Configuration and documentation remediation — 2026-09-25
 
@@ -1303,6 +1319,7 @@ The plan is revised when requirements or implementation evidence change. Revisio
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.35 | 2026-09-27 | Recorded `ENG-08` (decision `DR-Q7`): the OpenAPI contract is the only current-API reference, with per-operation scopes, agent statuses, DNS-authorization failure responses and the REST API Specification's Current rows verified by test; the API Reference is deleted and `/api/v1/info` links to the contract. §1 cites the contract in place of the API Reference |
 | 1.34 | 2026-09-27 | Recorded that CI has never passed and that its repair is deferred (`ENG-07`, decision `SEQ-01`), with the consequences for regression evidence, Phase 0 and phase closure. Assigned `SEC-07` (governed TLS trusts only the JVM default anchors) to Phase 4 as a hardening follow-up with acceptance criteria (decision `SEQ-02`). Section 20: corrected `RT-03` to Apache HttpClient 5 and listed its slices; added the `RT-Q5` decision row; corrected `RT-Q4` and `RT-01b` to single-stage images that copy host-built jars, runtime option A; the status now says in progress. §22 records `ARCH-09` as closed by `RT-03b`. §3 baseline is Java 27 |
 | 1.33 | 2026-09-26 | §6.1 evidence retention: keep raw red, green, mutation and characterization output; keep regression and discarded-attempt output as excerpts with the full log hash (DR-Q6 refined) |
 | 1.32 | 2026-09-26 | §6.1 points code that has left Vert.x to the concurrency conventions test standard (`RT-02c`) |

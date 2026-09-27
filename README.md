@@ -194,7 +194,7 @@ The architecture and REST API specifications are normative. The HTTP API referen
 - [Certificate and trust incident runbook](docs/QUORUS_CERTIFICATE_INCIDENT_RUNBOOK.md)
 - [Enterprise implementation plan](docs-design/task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md)
 - [docs/QUORUS_ARCHITECTURE_QUICKSTART.md](docs/QUORUS_ARCHITECTURE_QUICKSTART.md)
-- [Current HTTP API reference](docs/QUORUS_API_REFERENCE.md)
+- [Current HTTP API reference: the OpenAPI contract](quorus-controller/src/main/resources/openapi/quorus-controller-v1.yaml), also served at `GET /api/v1/openapi.yaml`
 - [docs/QUORUS_USER_GUIDE.md](docs/QUORUS_USER_GUIDE.md)
 - [docs/QUORUS_WORKFLOWS_README.md](docs/QUORUS_WORKFLOWS_README.md)
 - [docs/QUORUS_YAML_SYNTAX_GUIDE.md](docs/QUORUS_YAML_SYNTAX_GUIDE.md)

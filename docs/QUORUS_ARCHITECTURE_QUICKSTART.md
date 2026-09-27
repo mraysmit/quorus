@@ -183,7 +183,7 @@ Use JDK 25 for builds, tests, and IDE tooling in this repository.
 
 - `docs/QUORUS_ARCHITECTURE_SPECIFICATION.md` — canonical architecture, guarantees, and release requirements
 - `docs/QUORUS_REST_API_SPECIFICATION.md` — complete normative REST control and operations contract
-- `docs/QUORUS_API_REFERENCE.md` — endpoints implemented by the current controller
+- `quorus-controller/src/main/resources/openapi/quorus-controller-v1.yaml` — the OpenAPI contract for the current controller API, also served at `GET /api/v1/openapi.yaml`
 - `docs/QUORUS_USER_GUIDE.md`
 - `docs/QUORUS_WORKFLOWS_README.md`
 - `docs/QUORUS_YAML_SYNTAX_GUIDE.md`
