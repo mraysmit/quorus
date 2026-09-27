@@ -54,7 +54,7 @@ public final class AuthenticationHandler implements Handler<RoutingContext> {
 
     @Override
     public void handle(RoutingContext context) {
-        if (isPublic(context.request().path())) {
+        if (PublicEndpoints.isPublic(context.request().path())) {
             context.next();
             return;
         }
@@ -149,11 +149,6 @@ public final class AuthenticationHandler implements Handler<RoutingContext> {
                 identity == null ? null : identity.tenantId(), identity == null ? null : identity.environment(),
                 identity == null ? null : identity.certificateSubject(), context.request().method().name(),
                 context.request().path(), CorrelationIdHandler.getRequestId(context), null));
-    }
-
-    private static boolean isPublic(String path) {
-        return path.equals("/health/live") || path.equals("/health/ready")
-                || path.equals("/api/v1/openapi.yaml");
     }
 
     private static String required(RoutingContext context, String header) {

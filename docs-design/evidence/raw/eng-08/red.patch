@@ -1,0 +1,342 @@
+diff --git a/quorus-controller/src/main/java/dev/mars/quorus/controller/security/AuthenticationHandler.java b/quorus-controller/src/main/java/dev/mars/quorus/controller/security/AuthenticationHandler.java
+index f58058b..654b1e6 100644
+--- a/quorus-controller/src/main/java/dev/mars/quorus/controller/security/AuthenticationHandler.java
++++ b/quorus-controller/src/main/java/dev/mars/quorus/controller/security/AuthenticationHandler.java
+@@ -54,7 +54,7 @@ public final class AuthenticationHandler implements Handler<RoutingContext> {
+ 
+     @Override
+     public void handle(RoutingContext context) {
+-        if (isPublic(context.request().path())) {
++        if (PublicEndpoints.isPublic(context.request().path())) {
+             context.next();
+             return;
+         }
+@@ -151,11 +151,6 @@ public final class AuthenticationHandler implements Handler<RoutingContext> {
+                 context.request().path(), CorrelationIdHandler.getRequestId(context), null));
+     }
+ 
+-    private static boolean isPublic(String path) {
+-        return path.equals("/health/live") || path.equals("/health/ready")
+-                || path.equals("/api/v1/openapi.yaml");
+-    }
+-
+     private static String required(RoutingContext context, String header) {
+         String value = context.request().getHeader(header);
+         if (value == null || value.isBlank()) throw new IllegalArgumentException("Missing " + header);
+diff --git a/quorus-controller/src/main/java/dev/mars/quorus/controller/security/AuthorizationHandler.java b/quorus-controller/src/main/java/dev/mars/quorus/controller/security/AuthorizationHandler.java
+index 9def8c0..e941c38 100644
+--- a/quorus-controller/src/main/java/dev/mars/quorus/controller/security/AuthorizationHandler.java
++++ b/quorus-controller/src/main/java/dev/mars/quorus/controller/security/AuthorizationHandler.java
+@@ -28,7 +28,7 @@ public final class AuthorizationHandler implements Handler<RoutingContext> {
+ 
+     @Override
+     public void handle(RoutingContext context) {
+-        if (!config.enabled() || isPublic(context.request().path())) {
++        if (!config.enabled() || PublicEndpoints.isPublic(context.request().path())) {
+             context.next();
+             return;
+         }
+@@ -53,9 +53,4 @@ public final class AuthorizationHandler implements Handler<RoutingContext> {
+         }
+         context.next();
+     }
+-
+-    private static boolean isPublic(String path) {
+-        return path.equals("/health/live") || path.equals("/health/ready")
+-                || path.equals("/api/v1/openapi.yaml");
+-    }
+ }
+diff --git a/quorus-controller/src/test/java/dev/mars/quorus/controller/http/HttpApiServerHealthTest.java b/quorus-controller/src/test/java/dev/mars/quorus/controller/http/HttpApiServerHealthTest.java
+index 479effa..5e1b112 100644
+--- a/quorus-controller/src/test/java/dev/mars/quorus/controller/http/HttpApiServerHealthTest.java
++++ b/quorus-controller/src/test/java/dev/mars/quorus/controller/http/HttpApiServerHealthTest.java
+@@ -24,7 +24,6 @@ import dev.mars.quorus.controller.raft.RaftTransport;
+ import dev.mars.quorus.controller.state.QuorusStateStore;
+ import io.vertx.core.buffer.Buffer;
+ import io.vertx.core.Vertx;
+-import io.vertx.core.json.JsonArray;
+ import io.vertx.core.json.JsonObject;
+ import io.vertx.ext.web.client.WebClient;
+ import io.vertx.junit5.VertxExtension;
+@@ -378,45 +377,19 @@ class HttpApiServerHealthTest {
+         @DisplayName("GET /api/v1/info")
+         class ApiInfoTests {
+ 
++                // The endpoint inventory is the OpenAPI contract, whose route set OpenApiContractTest
++                // enforces. The info response points to it rather than carrying a second list.
+                 @Test
+-                @DisplayName("Should include all endpoint categories")
+-                void shouldIncludeAllEndpointCategories(VertxTestContext ctx) {
++                @DisplayName("Should point to the OpenAPI contract instead of listing endpoints")
++                void shouldPointToTheOpenApiContract(VertxTestContext ctx) {
+                         webClient.get(HTTP_PORT, "localhost", "/api/v1/info")
+                                         .send()
+                                         .onComplete(ctx.succeeding(response -> ctx.verify(() -> {
+                                                 assertEquals(200, response.statusCode());
+-                                                JsonObject endpoints = response.bodyAsJsonObject().getJsonObject("endpoints");
+-                                                assertNotNull(endpoints);
+-                                                assertNotNull(endpoints.getJsonArray("health"));
+-                                                assertNotNull(endpoints.getJsonArray("agents"));
+-                                                assertNotNull(endpoints.getJsonArray("transfers"));
+-                                                assertNotNull(endpoints.getJsonArray("jobs"));
+-                                                assertNotNull(endpoints.getJsonArray("assignments"));
+-                                                assertNotNull(endpoints.getJsonArray("routes"));
+-                                                assertNotNull(endpoints.getJsonArray("cluster"));
+-                                                assertNotNull(endpoints.getJsonArray("metrics"));
+-                                                assertNotNull(endpoints.getJsonArray("info"));
+-                                                ctx.completeNow();
+-                                        })));
+-                }
+-
+-                @Test
+-                @DisplayName("Should list expected assignment, route, and agent endpoint counts")
+-                void shouldListExpectedEndpointCounts(VertxTestContext ctx) {
+-                        webClient.get(HTTP_PORT, "localhost", "/api/v1/info")
+-                                        .send()
+-                                        .onComplete(ctx.succeeding(response -> ctx.verify(() -> {
+-                                                JsonObject endpoints = response.bodyAsJsonObject().getJsonObject("endpoints");
+-                                                JsonArray assignments = endpoints.getJsonArray("assignments");
+-                                                JsonArray routes = endpoints.getJsonArray("routes");
+-                                                JsonArray agents = endpoints.getJsonArray("agents");
+-                                                JsonArray jobs = endpoints.getJsonArray("jobs");
+-                                                assertEquals(8, assignments.size());
+-                                                assertEquals(7, routes.size());
+-                                                assertEquals(4, agents.size());
+-                                                assertEquals(1, jobs.size());
+-                                                assertEquals("POST", jobs.getJsonObject(0).getString("method"));
+-                                                assertTrue(jobs.getJsonObject(0).getString("path").contains("status"));
++                                                JsonObject info = response.bodyAsJsonObject();
++                                                assertEquals("/api/v1/openapi.yaml", info.getString("openApi"));
++                                                assertFalse(info.containsKey("endpoints"),
++                                                                "The info response must not carry its own endpoint list");
+                                                 ctx.completeNow();
+                                         })));
+                 }
+diff --git a/quorus-controller/src/main/java/dev/mars/quorus/controller/security/PublicEndpoints.java b/quorus-controller/src/main/java/dev/mars/quorus/controller/security/PublicEndpoints.java
+new file mode 100644
+index 0000000..be0cb2c
+--- /dev/null
++++ b/quorus-controller/src/main/java/dev/mars/quorus/controller/security/PublicEndpoints.java
+@@ -0,0 +1,32 @@
++/*
++ * Copyright 2026 Mark Andrew Ray-Smith Cityline Ltd
++ * Licensed under the Apache License, Version 2.0.
++ */
++package dev.mars.quorus.controller.security;
++
++import java.util.Set;
++
++/**
++ * The controller paths that are served without authentication or authorization.
++ *
++ * <p>This is the single definition used by {@link AuthenticationHandler} and
++ * {@link AuthorizationHandler}. The OpenAPI contract declares {@code security: []} for exactly
++ * these paths, which {@code OpenApiReferenceContractTest} verifies.
++ */
++public final class PublicEndpoints {
++
++    private static final Set<String> PATHS = Set.of("/health/live", "/health/ready", "/api/v1/openapi.yaml");
++
++    private PublicEndpoints() {
++    }
++
++    /** Returns whether {@code path} is served without authentication. The match is exact. */
++    public static boolean isPublic(String path) {
++        return PATHS.contains(path);
++    }
++
++    /** Returns the public paths. */
++    public static Set<String> paths() {
++        return PATHS;
++    }
++}
+diff --git a/quorus-controller/src/test/java/dev/mars/quorus/controller/http/OpenApiReferenceContractTest.java b/quorus-controller/src/test/java/dev/mars/quorus/controller/http/OpenApiReferenceContractTest.java
+new file mode 100644
+index 0000000..445c906
+--- /dev/null
++++ b/quorus-controller/src/test/java/dev/mars/quorus/controller/http/OpenApiReferenceContractTest.java
+@@ -0,0 +1,184 @@
++/*
++ * Copyright 2026 Mark Andrew Ray-Smith Cityline Ltd
++ * Licensed under the Apache License, Version 2.0.
++ */
++package dev.mars.quorus.controller.http;
++
++import dev.mars.quorus.agent.AgentStatus;
++import dev.mars.quorus.controller.security.AuthorizationPolicyEngine;
++import dev.mars.quorus.controller.security.PublicEndpoints;
++import org.junit.jupiter.api.BeforeAll;
++import org.junit.jupiter.api.DisplayName;
++import org.junit.jupiter.api.Test;
++import org.yaml.snakeyaml.Yaml;
++
++import java.io.InputStream;
++import java.nio.file.Files;
++import java.nio.file.Path;
++import java.util.ArrayList;
++import java.util.Arrays;
++import java.util.List;
++import java.util.Locale;
++import java.util.Map;
++import java.util.Set;
++import java.util.TreeSet;
++import java.util.regex.Matcher;
++import java.util.regex.Pattern;
++
++import static org.junit.jupiter.api.Assertions.assertEquals;
++import static org.junit.jupiter.api.Assertions.assertNotNull;
++import static org.junit.jupiter.api.Assertions.assertTrue;
++
++/**
++ * The bundled OpenAPI contract is the only reference for the current HTTP API (register decision
++ * DR-Q7), so it must state what the server enforces, not only which routes exist.
++ * {@link OpenApiContractTest} covers the route set. These tests cover the rest of the contract
++ * that clients rely on: the scope each operation requires, the agent status values, the failure
++ * responses of DNS-authorizing operations, and agreement with the REST API Specification's
++ * "Current" rows.
++ */
++@DisplayName("OpenAPI as the current API reference")
++class OpenApiReferenceContractTest {
++
++    private static final Set<String> HTTP_METHODS = Set.of("get", "post", "put", "delete", "patch");
++    private static final Pattern PATH_PARAMETER = Pattern.compile("\\{[^}]+}");
++    private static final Pattern SPEC_ENDPOINT_ROW = Pattern.compile(
++            "^\\| `(GET|POST|PUT|DELETE|PATCH)` \\| `([^`]+)` \\| (Current|Required|Planned) \\|");
++
++    private static Map<String, Object> document;
++
++    @BeforeAll
++    static void loadContract() throws Exception {
++        try (InputStream input = OpenApiReferenceContractTest.class
++                .getResourceAsStream("/openapi/quorus-controller-v1.yaml")) {
++            assertNotNull(input, "Bundled OpenAPI contract must exist");
++            document = new Yaml().load(input);
++        }
++    }
++
++    @Test
++    @DisplayName("Every protected operation declares the scope the policy engine enforces")
++    void everyOperationDeclaresTheScopeThePolicyEngineEnforces() {
++        AuthorizationPolicyEngine engine = new AuthorizationPolicyEngine();
++        List<String> mismatches = new ArrayList<>();
++        forEachOperation((method, path, operation) -> {
++            Object declared = operation.get("security");
++            Object expected = PublicEndpoints.isPublic(path)
++                    ? List.of()
++                    : List.of(Map.of("mutualTls", List.of(engine.requiredScope(method, samplePath(path)))));
++            if (!expected.equals(declared)) {
++                mismatches.add(method + " " + path + ": expected security " + expected + ", declared " + declared);
++            }
++        });
++        assertTrue(mismatches.isEmpty(), () -> String.join("\n", mismatches));
++    }
++
++    @Test
++    @DisplayName("Only the public endpoints are declared without security")
++    void onlyThePublicEndpointsAreDeclaredWithoutSecurity() {
++        Set<String> unsecured = new TreeSet<>();
++        forEachOperation((method, path, operation) -> {
++            if (List.of().equals(operation.get("security"))) {
++                unsecured.add(path);
++            }
++        });
++        assertEquals(new TreeSet<>(PublicEndpoints.paths()), unsecured);
++    }
++
++    @Test
++    @DisplayName("The agent status schema lists the values the server writes")
++    void agentStatusSchemaListsTheValuesTheServerWrites() {
++        List<String> serverValues = Arrays.stream(AgentStatus.values()).map(AgentStatus::getValue).toList();
++        assertEquals(serverValues, schema("AgentStatus").get("enum"));
++    }
++
++    @Test
++    @DisplayName("Operations that authorize DNS declare the conflict, capacity and deadline failures")
++    void dnsAuthorizingOperationsDeclareTheirFailureResponses() {
++        // Both operations call ControllerConnectionAuthorizer: 409 when the connection changes during
++        // resolution, 503 when admission capacity is exhausted, 504 when the deadline expires.
++        for (String[] operation : new String[][]{
++                {"/api/v1/transfers", "post"},
++                {"/api/v1/service-connections/{serviceConnectionId}/validate", "post"}}) {
++            Map<String, Object> responses = responses(operation[0], operation[1]);
++            for (String status : List.of("409", "503", "504")) {
++                assertEquals(Map.of("$ref", "#/components/responses/Problem"), responses.get(status),
++                        () -> operation[1] + " " + operation[0] + " must declare " + status + " as a problem response");
++            }
++        }
++    }
++
++    @Test
++    @DisplayName("The API information response points to the contract instead of listing endpoints")
++    void apiInfoResponsePointsToTheContract() {
++        Map<String, Object> content = map(map(responses("/api/v1/info", "get").get("200")).get("content"));
++        Map<String, Object> schema = map(map(content.get("application/json")).get("schema"));
++        Map<String, Object> properties = map(schema.get("properties"));
++        assertNotNull(properties.get("openApi"), "getApiInfo must declare the openApi link");
++        assertTrue(!properties.containsKey("endpoints"), "getApiInfo must not declare an endpoint inventory");
++    }
++
++    @Test
++    @DisplayName("REST API Specification rows marked Current are exactly the declared operations")
++    void restSpecificationCurrentRowsMatchTheContract() throws Exception {
++        Path specification = Path.of("../docs/QUORUS_REST_API_SPECIFICATION.md");
++        if (!Files.exists(specification)) {
++            specification = Path.of("docs/QUORUS_REST_API_SPECIFICATION.md");
++        }
++        Set<String> current = new TreeSet<>();
++        for (String line : Files.readAllLines(specification)) {
++            Matcher row = SPEC_ENDPOINT_ROW.matcher(line);
++            if (row.find() && row.group(3).equals("Current")) {
++                current.add(row.group(1) + " " + normalize(row.group(2)));
++            }
++        }
++        Set<String> declared = new TreeSet<>();
++        forEachOperation((method, path, operation) -> declared.add(method + " " + normalize(path)));
++
++        Set<String> notDeclared = new TreeSet<>(current);
++        notDeclared.removeAll(declared);
++        Set<String> notMarkedCurrent = new TreeSet<>(declared);
++        notMarkedCurrent.removeAll(current);
++        assertTrue(notDeclared.isEmpty() && notMarkedCurrent.isEmpty(),
++                () -> "Marked Current but not in the contract: " + notDeclared
++                        + "\nIn the contract but not marked Current: " + notMarkedCurrent);
++    }
++
++    private interface OperationVisitor {
++        void visit(String method, String path, Map<String, Object> operation);
++    }
++
++    private static void forEachOperation(OperationVisitor visitor) {
++        Map<String, Object> paths = map(document.get("paths"));
++        paths.forEach((path, item) -> map(item).forEach((method, operation) -> {
++            if (HTTP_METHODS.contains(method)) {
++                visitor.visit(method.toUpperCase(Locale.ROOT), path, map(operation));
++            }
++        }));
++    }
++
++    private static Map<String, Object> responses(String path, String method) {
++        Map<String, Object> operation = map(map(map(document.get("paths")).get(path)).get(method));
++        assertTrue(!operation.isEmpty(), () -> method + " " + path + " must be declared");
++        return map(operation.get("responses"));
++    }
++
++    private static Map<String, Object> schema(String name) {
++        return map(map(map(document.get("components")).get("schemas")).get(name));
++    }
++
++    /** A concrete path the policy engine can evaluate, with each parameter replaced by a sample value. */
++    private static String samplePath(String path) {
++        return PATH_PARAMETER.matcher(path).replaceAll("sample");
++    }
++
++    /** Parameter names differ between the specification and the contract; only their positions matter. */
++    private static String normalize(String path) {
++        return PATH_PARAMETER.matcher(path).replaceAll("{}");
++    }
++
++    @SuppressWarnings("unchecked")
++    private static Map<String, Object> map(Object value) {
++        return value == null ? Map.of() : (Map<String, Object>) value;
++    }
++}

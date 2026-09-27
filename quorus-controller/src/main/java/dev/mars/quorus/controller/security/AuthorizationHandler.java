@@ -28,7 +28,7 @@ public final class AuthorizationHandler implements Handler<RoutingContext> {
 
     @Override
     public void handle(RoutingContext context) {
-        if (!config.enabled() || isPublic(context.request().path())) {
+        if (!config.enabled() || PublicEndpoints.isPublic(context.request().path())) {
             context.next();
             return;
         }
@@ -52,10 +52,5 @@ public final class AuthorizationHandler implements Handler<RoutingContext> {
             return;
         }
         context.next();
-    }
-
-    private static boolean isPublic(String path) {
-        return path.equals("/health/live") || path.equals("/health/ready")
-                || path.equals("/api/v1/openapi.yaml");
     }
 }
