@@ -16,11 +16,9 @@
 
 package dev.mars.quorus.network;
 
-import io.vertx.core.Future;
-import io.vertx.core.Vertx;
+import dev.mars.quorus.concurrent.TaskScope;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.slf4j.MDC;
 
 import java.net.InetAddress;
 import java.time.Duration;
@@ -39,119 +37,98 @@ public class NetworkTopologyService {
     
     private static final Logger logger = LoggerFactory.getLogger(NetworkTopologyService.class);
     
-    private final Vertx vertx;
+    /** Deadline for discovering both ends of a path; one discovery takes at most about 6 seconds. */
+    private static final Duration PATH_DISCOVERY_DEADLINE = Duration.ofSeconds(30);
+
     private final Map<String, NetworkNode> networkNodes = new ConcurrentHashMap<>();
     private final Map<String, NetworkPath> networkPaths = new ConcurrentHashMap<>();
     private final NetworkMetrics networkMetrics = new NetworkMetrics();
 
-    public NetworkTopologyService(Vertx vertx) {
-        this.vertx = vertx;
+    public NetworkTopologyService() {
         logger.debug("NetworkTopologyService initialized");
     }
-    
-    public Future<NetworkNode> discoverNode(String hostname) {
+
+    /**
+     * Discovers a host on the calling thread, or returns fresh cached information. Discovery never
+     * fails: an unresolvable or unreachable host yields a node with conservative estimates. The call
+     * blocks for up to about 6 seconds (reachability and latency probes).
+     */
+    public NetworkNode discoverNode(String hostname) {
         logger.info("Discovering network topology for host: {}", hostname);
-        
-        // Check if we already have cached information
         NetworkNode cachedNode = networkNodes.get(hostname);
         if (cachedNode != null && !cachedNode.isStale()) {
-            logger.debug("Using cached network information for: {} (latency={}ms)", 
+            logger.debug("Using cached network information for: {} (latency={}ms)",
                         hostname, cachedNode.getLatency().toMillis());
-            return Future.succeededFuture(cachedNode);
+            return cachedNode;
         }
-        
-        // Perform network discovery (blocking, propagate MDC to worker thread)
-        logger.debug("Cache miss or stale for '{}', performing network discovery", hostname);
-        Map<String, String> mdcContext = MDC.getCopyOfContextMap();
-        return vertx.<NetworkNode>executeBlocking(() -> {
-            if (mdcContext != null) {
-                MDC.setContextMap(mdcContext);
-            }
-            try {
-                return performNetworkDiscovery(hostname);
-            } finally {
-                MDC.clear();
-            }
-        })
-            .onSuccess(node -> {
-                networkNodes.put(hostname, node);
-                logger.info("Network discovery completed for {} - Latency: {}ms, Bandwidth: {} MB/s, Type: {}",
-                           hostname, node.getLatency().toMillis(), 
-                           node.getEstimatedBandwidth() / (1024 * 1024), node.getNetworkType());
-            })
-            .onFailure(err -> {
-                logger.warn("Network discovery failed for {}: {}", hostname, err.getMessage());
-            })
-            .recover(err -> {
-                logger.debug("Returning default node with conservative estimates for {}", hostname);
-                // Return a default node with conservative estimates
-                return Future.succeededFuture(NetworkNode.builder()
-                        .hostname(hostname)
-                        .reachable(false)
-                        .latency(Duration.ofSeconds(1))
-                        .estimatedBandwidth(1024 * 1024) // 1 MB/s default
-                        .networkType(NetworkType.UNKNOWN)
-                        .lastUpdated(Instant.now())
-                        .build());
-            });
+        try {
+            NetworkNode node = performNetworkDiscovery(hostname);
+            networkNodes.put(hostname, node);
+            logger.info("Network discovery completed for {} - Latency: {}ms, Bandwidth: {} MB/s, Type: {}",
+                       hostname, node.getLatency().toMillis(),
+                       node.getEstimatedBandwidth() / (1024 * 1024), node.getNetworkType());
+            return node;
+        } catch (Exception err) {
+            logger.warn("Network discovery failed for {}: {}", hostname, err.getMessage());
+            return NetworkNode.builder()
+                    .hostname(hostname)
+                    .reachable(false)
+                    .latency(Duration.ofSeconds(1))
+                    .estimatedBandwidth(1024 * 1024) // 1 MB/s default
+                    .networkType(NetworkType.UNKNOWN)
+                    .lastUpdated(Instant.now())
+                    .build();
+        }
     }
-    
-    public Future<NetworkPath> findOptimalPath(String source, String destination) {
+
+    /**
+     * Returns the path between two hosts, discovering both ends in parallel when it is not cached.
+     *
+     * @throws InterruptedException          if the calling thread is interrupted while discovering
+     * @throws TaskScope.TimeoutException if discovery takes longer than 30 seconds
+     */
+    public NetworkPath findOptimalPath(String source, String destination) throws InterruptedException {
         String pathKey = source + "->" + destination;
-        logger.debug("Finding optimal path: {} -> {}", source, destination);
-        
-        // Check cached path
         NetworkPath cachedPath = networkPaths.get(pathKey);
         if (cachedPath != null && !cachedPath.isStale()) {
-            logger.debug("Using cached path for {} -> {} (quality={})", 
+            logger.debug("Using cached path for {} -> {} (quality={})",
                         source, destination, cachedPath.getQualityScore());
-            return Future.succeededFuture(cachedPath);
+            return cachedPath;
         }
-        
         logger.debug("Cache miss for path '{}', discovering both endpoints", pathKey);
-        // Discover both nodes
-        return Future.all(discoverNode(source), discoverNode(destination))
-            .map(composite -> {
-                NetworkNode sourceNode = composite.resultAt(0);
-                NetworkNode destNode = composite.resultAt(1);
-                
-                // Calculate optimal path
-                NetworkPath path = calculateOptimalPath(sourceNode, destNode);
-                networkPaths.put(pathKey, path);
-                
-                logger.info("Optimal path calculated: {} -> {} (Quality: {}, Strategy: {})", 
-                           source, destination, path.getQualityScore(), path.getTransferStrategy());
-                return path;
-            });
-    }
-    
-    public Future<NetworkRecommendations> getTransferRecommendations(String hostname, long transferSize) {
-        logger.debug("Getting transfer recommendations: hostname={}, transferSize={} bytes", hostname, transferSize);
-        NetworkNode node = networkNodes.get(hostname);
-        Future<NetworkNode> nodeFuture;
-        
-        if (node == null) {
-            logger.debug("No cached node for '{}', performing discovery", hostname);
-            nodeFuture = discoverNode(hostname);
-        } else {
-            nodeFuture = Future.succeededFuture(node);
+        NetworkNode sourceNode;
+        NetworkNode destNode;
+        try (TaskScope scope = TaskScope.open("network-path-discovery", PATH_DISCOVERY_DEADLINE)) {
+            TaskScope.Subtask<NetworkNode> sourceDiscovery = scope.fork(() -> discoverNode(source));
+            TaskScope.Subtask<NetworkNode> destDiscovery = scope.fork(() -> discoverNode(destination));
+            scope.join();
+            sourceNode = sourceDiscovery.get();
+            destNode = destDiscovery.get();
         }
-        
-        return nodeFuture.map(n -> {
-            NetworkRecommendations recommendations = NetworkRecommendations.builder()
-                .optimalBufferSize(calculateOptimalBufferSize(n, transferSize))
-                .recommendedConcurrency(calculateOptimalConcurrency(n, transferSize))
-                .estimatedTransferTime(estimateTransferTime(n, transferSize))
-                .networkQuality(assessNetworkQuality(n))
-                .useCompression(shouldUseCompression(n, transferSize))
-                .build();
-            logger.debug("Transfer recommendations for '{}': bufferSize={}, concurrency={}, quality={}",
-                        hostname, recommendations.getOptimalBufferSize(), 
-                        recommendations.getRecommendedConcurrency(), recommendations.getNetworkQuality());
-            return recommendations;
-        });
+        NetworkPath path = calculateOptimalPath(sourceNode, destNode);
+        networkPaths.put(pathKey, path);
+        logger.info("Optimal path calculated: {} -> {} (Quality: {}, Strategy: {})",
+                   source, destination, path.getQualityScore(), path.getTransferStrategy());
+        return path;
     }
-    
+
+    /** Returns transfer recommendations for a host, discovering it on the calling thread if it is not cached. */
+    public NetworkRecommendations getTransferRecommendations(String hostname, long transferSize) {
+        NetworkNode cached = networkNodes.get(hostname);
+        NetworkNode node = cached != null ? cached : discoverNode(hostname);
+        NetworkRecommendations recommendations = NetworkRecommendations.builder()
+            .optimalBufferSize(calculateOptimalBufferSize(node, transferSize))
+            .recommendedConcurrency(calculateOptimalConcurrency(node, transferSize))
+            .estimatedTransferTime(estimateTransferTime(node, transferSize))
+            .networkQuality(assessNetworkQuality(node))
+            .useCompression(shouldUseCompression(node, transferSize))
+            .build();
+        logger.debug("Transfer recommendations for '{}': bufferSize={}, concurrency={}, quality={}",
+                    hostname, recommendations.getOptimalBufferSize(),
+                    recommendations.getRecommendedConcurrency(), recommendations.getNetworkQuality());
+        return recommendations;
+    }
+
     public void updateMetrics(String hostname, long bytesTransferred, Duration actualTime, boolean successful) {
         logger.debug("Updating metrics: hostname={}, bytesTransferred={}, actualTime={}ms, successful={}",
                     hostname, bytesTransferred, actualTime.toMillis(), successful);

@@ -231,24 +231,25 @@ public final class ServiceConnectionRegistry {
                 .anyMatch(connection -> connection.secretReferenceId().equals(secretReferenceId));
     }
 
-    public static String encode(ServiceConnection value) { return connectionToJson(value).encode(); }
-    public static String encode(SecretReference value) { return secretToJson(value).encode(); }
+    public static String encode(ServiceConnection value) { return ServiceConnectionJsonCodec.encodeConnection(value); }
+    public static String encode(SecretReference value) { return ServiceConnectionJsonCodec.encodeSecret(value); }
     public static String encode(SecurityEvent value) { return eventToJson(value).encode(); }
 
+    // The codec's API is JSON text (RT-03e); these wrappers adapt it to Vert.x JsonObject until RT-06.
     public static JsonObject connectionToJson(ServiceConnection connection) {
-        return ServiceConnectionJsonCodec.connectionToJson(connection);
+        return new JsonObject(ServiceConnectionJsonCodec.encodeConnection(connection));
     }
 
     public static ServiceConnection connectionFromJson(JsonObject json) {
-        return ServiceConnectionJsonCodec.connectionFromJson(json);
+        return ServiceConnectionJsonCodec.decodeConnection(json.encode());
     }
 
     public static JsonObject secretToJson(SecretReference reference) {
-        return ServiceConnectionJsonCodec.secretToJson(reference);
+        return new JsonObject(ServiceConnectionJsonCodec.encodeSecret(reference));
     }
 
     public static SecretReference secretFromJson(JsonObject json) {
-        return ServiceConnectionJsonCodec.secretFromJson(json);
+        return ServiceConnectionJsonCodec.decodeSecret(json.encode());
     }
 
     public static JsonObject eventToJson(SecurityEvent event) {
