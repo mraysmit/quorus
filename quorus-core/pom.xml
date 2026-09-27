@@ -17,18 +17,6 @@
     <description>Core file transfer engine with HTTP/HTTPS support, progress tracking, and integrity verification</description>
 
     <dependencies>
-        <!-- Vert.x for reactive operations (Phase 1.5 - Dec 2025) -->
-        <dependency>
-            <groupId>io.vertx</groupId>
-            <artifactId>vertx-core</artifactId>
-        </dependency>
-
-        <!-- Vert.x Web Client for HTTP protocol (Phase 2 - Dec 2025) -->
-        <dependency>
-            <groupId>io.vertx</groupId>
-            <artifactId>vertx-web-client</artifactId>
-        </dependency>
-
         <!-- HTTP transfer adapter client: per-client DNS pinning with correct SNI, Host and
              hostname verification (ADR-0012 RT-Q5) -->
         <dependency>
@@ -79,11 +67,6 @@
         </dependency>
 
         <!-- Testing dependencies -->
-        <dependency>
-            <groupId>io.vertx</groupId>
-            <artifactId>vertx-junit5</artifactId>
-            <scope>test</scope>
-        </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>

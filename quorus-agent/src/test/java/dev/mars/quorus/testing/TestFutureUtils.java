@@ -31,6 +31,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Shared test utilities for observing Vert.x {@link Future} results using
  * Vert.x JUnit facilities rather than Java concurrency or polling libraries.
+ *
+ * <p>Moved here from quorus-core by RT-03f, when core stopped depending on Vert.x. The agent and
+ * the controller each keep a copy until their own migration removes it (RT-05 here, RT-06 in the controller).
  */
 public final class TestFutureUtils {
 

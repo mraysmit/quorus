@@ -3,40 +3,42 @@ package dev.mars.quorus.connection;
 
 import dev.mars.quorus.core.TransferJob;
 import dev.mars.quorus.core.TransferRequest;
+import dev.mars.quorus.core.exceptions.TransferException;
 import dev.mars.quorus.protocol.FtpTransferProtocol;
 import dev.mars.quorus.transfer.TransferContext;
-import io.vertx.core.Promise;
-import io.vertx.core.Vertx;
-import io.vertx.core.parsetools.RecordParser;
-import io.vertx.junit5.VertxExtension;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.net.InetAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
-import static dev.mars.quorus.testing.TestFutureUtils.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.jupiter.api.Assertions.*;
 
-@ExtendWith(VertxExtension.class)
+@Timeout(value = 30, unit = SECONDS, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
 class FtpsDefaultPortBoundaryTest {
     @TempDir Path directory;
 
     @Test
-    void policyApprovesTheExplicitTlsPortActuallyUsedByTheAdapter(Vertx vertx) throws Exception {
-        Promise<String> command = Promise.promise();
-        var server = awaitSuccess(vertx.createNetServer().connectHandler(socket -> {
-            socket.write("220 fixture ready\r\n");
-            socket.handler(RecordParser.newDelimited("\r\n", buffer -> {
-                command.tryComplete(buffer.toString());
-                socket.write("421 fixture stops before authentication\r\n").onComplete(done -> socket.close());
-            }));
-        }).listen(21, "127.0.0.1"), Duration.ofSeconds(5));
-        try {
+    void policyApprovesTheExplicitTlsPortActuallyUsedByTheAdapter() throws Exception {
+        // The fixture listens on port 21 because the claim under test is that an ftps:// URI without a
+        // port is approved, and connected, on the explicit-TLS default port.
+        try (ServerSocket server = new ServerSocket(21, 1, InetAddress.getByAddress(new byte[]{127, 0, 0, 1}))) {
+            CompletableFuture<String> command = CompletableFuture.supplyAsync(() -> firstCommand(server));
             var connection = new ServiceConnection("connection", "tenant", ServiceConnection.Protocol.FTPS,
                     URI.create("ftps://localhost"), "zone", Set.of("/approved"),
                     Set.of(ServiceConnection.Direction.DOWNLOAD), Set.of("pool"), "owner", "test", "internal",
@@ -52,15 +54,29 @@ class FtpsDefaultPortBoundaryTest {
                 var request = TransferRequest.builder().requestId("ftps-port")
                         .sourceUri(authorization.endpoint()).destinationPath(directory.resolve("file"))
                         .runtimeCredential(credential).build();
-                var result = vertx.executeBlocking(() -> new FtpTransferProtocol().transfer(request,
-                        new TransferContext(new TransferJob(request))), false);
-                result.onFailure(command::tryFail);
-                assertEquals("AUTH TLS", awaitSuccess(command.future(), Duration.ofSeconds(5)));
-                awaitFailure(result, Duration.ofSeconds(5));
-                assertFalse(java.nio.file.Files.exists(request.getDestinationPath()));
+
+                assertThrows(TransferException.class, () -> new FtpTransferProtocol().transfer(request,
+                        new TransferContext(new TransferJob(request))));
+
+                assertEquals("AUTH TLS", command.get(5, TimeUnit.SECONDS));
+                assertFalse(Files.exists(request.getDestinationPath()));
             }
-        } finally {
-            awaitSuccess(server.close(), Duration.ofSeconds(5));
+        }
+    }
+
+    /** Greets one client, returns its first command and refuses it, so the adapter stops before authenticating. */
+    private static String firstCommand(ServerSocket server) {
+        try (Socket socket = server.accept();
+             var in = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.US_ASCII))) {
+            OutputStream out = socket.getOutputStream();
+            out.write("220 fixture ready\r\n".getBytes(StandardCharsets.US_ASCII));
+            out.flush();
+            String command = in.readLine();
+            out.write("421 fixture stops before authentication\r\n".getBytes(StandardCharsets.US_ASCII));
+            out.flush();
+            return command;
+        } catch (Exception e) {
+            throw new IllegalStateException("FTPS fixture failed", e);
         }
     }
 }

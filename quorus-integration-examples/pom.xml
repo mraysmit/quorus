@@ -24,6 +24,13 @@
             <version>${project.version}</version>
         </dependency>
 
+        <!-- Vert.x, used directly by this module's main code until RT-04. It used to arrive only
+             through quorus-core, which no longer depends on Vert.x (RT-03f) -->
+        <dependency>
+            <groupId>io.vertx</groupId>
+            <artifactId>vertx-core</artifactId>
+        </dependency>
+
         <!-- Quorus Workflow dependency -->
         <dependency>
             <groupId>dev.mars</groupId>
