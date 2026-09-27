@@ -16,307 +16,263 @@
 
 package dev.mars.quorus.agent.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import dev.mars.quorus.agent.config.AgentConfiguration;
-import io.vertx.core.Vertx;
-import io.vertx.core.http.HttpServer;
-import io.vertx.core.json.JsonObject;
-import io.vertx.ext.web.Router;
-import io.vertx.ext.web.handler.BodyHandler;
-import io.vertx.junit5.VertxExtension;
-import io.vertx.junit5.VertxTestContext;
+import dev.mars.quorus.agent.testing.FakeController;
+import dev.mars.quorus.agent.testing.FakeController.Reply;
+import dev.mars.quorus.core.TransferAttemptStatus;
 import org.junit.jupiter.api.*;
-import org.junit.jupiter.api.extension.ExtendWith;
 
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Unit tests for JobStatusReportingService.
- * Uses real HTTP server (no mocking) following project testing principles.
- * 
+ * Unit tests for JobStatusReportingService, against a real HTTP controller stand-in (no mocking).
+ *
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @since 2026-02-05
- * @version 1.0
+ * @version 2.0
  */
-@ExtendWith(VertxExtension.class)
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@Timeout(value = 30, unit = SECONDS, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
 class JobStatusReportingServiceTest {
 
-    private HttpServer testServer;
-    private int serverPort;
+    private static final String STATUS = "/jobs/[^/]+/status";
+
+    private FakeController controller;
+    private ControllerClient client;
     private AgentConfiguration config;
-    
-    private AtomicInteger reportCount;
-    private AtomicReference<String> lastJobId;
-    private AtomicReference<JsonObject> lastRequest;
-    private AtomicInteger responseStatus;
-
-    @BeforeAll
-    void setUp(Vertx vertx, VertxTestContext testContext) {
-        reportCount = new AtomicInteger(0);
-        lastJobId = new AtomicReference<>();
-        lastRequest = new AtomicReference<>();
-        responseStatus = new AtomicInteger(200);
-
-        Router router = Router.router(vertx);
-        router.route().handler(BodyHandler.create());
-
-        // Status reporting endpoint
-        router.post("/jobs/:jobId/status").handler(ctx -> {
-            reportCount.incrementAndGet();
-            lastJobId.set(ctx.pathParam("jobId"));
-            lastRequest.set(ctx.body().asJsonObject());
-            
-            int status = responseStatus.get();
-            ctx.response()
-                .setStatusCode(status)
-                .putHeader("content-type", "application/json")
-                .end(new JsonObject().put("status", "received").encode());
-        });
-
-        vertx.createHttpServer()
-            .requestHandler(router)
-            .listen(0)
-            .onSuccess(server -> {
-                testServer = server;
-                serverPort = server.actualPort();
-                
-                config = new AgentConfiguration.Builder()
-                .securityProfile("development").allowInsecure(true).controllerTlsEnabled(false)
-                    .agentId("test-agent-status")
-                    .tenantId("test-tenant")
-                    .controllerUrl("http://localhost:" + serverPort)
-                    .region("test-region")
-                    .datacenter("test-dc")
-                    .build();
-                
-                testContext.completeNow();
-            })
-            .onFailure(testContext::failNow);
-    }
+    private final AtomicInteger responseStatus = new AtomicInteger(200);
 
     @BeforeEach
-    void resetCounters() {
-        reportCount.set(0);
-        lastJobId.set(null);
-        lastRequest.set(null);
-        responseStatus.set(200);
+    void setUp() throws Exception {
+        controller = FakeController.start()
+                .on("POST", STATUS, request -> Reply.json(responseStatus.get(), "{\"status\":\"received\"}"));
+        config = new AgentConfiguration.Builder()
+                .securityProfile("development").allowInsecure(true).controllerTlsEnabled(false)
+                .agentId("test-agent-status")
+                .tenantId("test-tenant")
+                .controllerUrl(controller.url())
+                .region("test-region")
+                .datacenter("test-dc")
+                .build();
+        client = ControllerClient.create(config);
     }
 
-    @AfterAll
-    void tearDown(VertxTestContext testContext) {
-        if (testServer != null) {
-            testServer.close().onComplete(ar -> testContext.completeNow());
-        } else {
-            testContext.completeNow();
-        }
+    @AfterEach
+    void tearDown() {
+        client.close();
+        controller.close();
     }
 
     @Test
     @DisplayName("Should report ACCEPTED status")
-    void testReportAccepted(Vertx vertx, VertxTestContext testContext) {
-        JobStatusReportingService service = new JobStatusReportingService(vertx, config);
-        
-        service.reportAccepted("job-123")
-            .onComplete(testContext.succeeding(v -> {
-                testContext.verify(() -> {
-                    assertEquals(1, reportCount.get(), "One report should be sent");
-                    assertEquals("job-123", lastJobId.get());
-                    
-                    JsonObject request = lastRequest.get();
-                    assertEquals("test-agent-status", request.getString("agentId"));
-                    assertEquals("ACCEPTED", request.getString("status"));
-                    assertNull(request.getLong("bytesTransferred"));
-                    assertNull(request.getString("errorMessage"));
-                });
-                testContext.completeNow();
-            }));
+    void testReportAccepted() throws Exception {
+        service().reportAccepted("job-123");
+
+        assertEquals(1, reports().size(), "One report should be sent");
+        assertEquals("/jobs/job-123/status", reports().getFirst().path());
+        JsonNode request = lastReport();
+        assertEquals("test-agent-status", request.get("agentId").asText());
+        assertEquals("ACCEPTED", request.get("status").asText());
+        assertFalse(request.has("bytesTransferred"));
+        assertFalse(request.has("errorMessage"));
     }
 
     @Test
     @DisplayName("Should report authoritative attempt identity, fence, and sequence")
-    void testReportAcceptedWithAttemptFence(Vertx vertx, VertxTestContext testContext) {
-        JobStatusReportingService service = new JobStatusReportingService(vertx, config);
+    void testReportAcceptedWithAttemptFence() throws Exception {
+        service().reportAccepted("job-fenced", "attempt-007", 7L, 4L);
 
-        service.reportAccepted("job-fenced", "attempt-007", 7L, 4L)
-            .onComplete(testContext.succeeding(v -> {
-                testContext.verify(() -> {
-                    JsonObject request = lastRequest.get();
-                    assertEquals("test-agent-status", request.getString("agentId"));
-                    assertEquals("ACCEPTED", request.getString("status"));
-                    assertEquals("attempt-007", request.getString("attemptId"));
-                    assertEquals("OFFERED", request.getString("expectedState"));
-                    assertEquals(7L, request.getLong("fencingGeneration"));
-                    assertEquals(4L, request.getLong("reportSequence"));
-                });
-                testContext.completeNow();
-            }));
+        JsonNode request = lastReport();
+        assertEquals("test-agent-status", request.get("agentId").asText());
+        assertEquals("ACCEPTED", request.get("status").asText());
+        assertEquals("attempt-007", request.get("attemptId").asText());
+        assertEquals("OFFERED", request.get("expectedState").asText());
+        assertEquals(7L, request.get("fencingGeneration").asLong());
+        assertEquals(4L, request.get("reportSequence").asLong());
     }
 
     @Test
     @DisplayName("Should report IN_PROGRESS status with bytes transferred")
-    void testReportInProgress(Vertx vertx, VertxTestContext testContext) {
-        JobStatusReportingService service = new JobStatusReportingService(vertx, config);
-        
-        service.reportInProgress("job-456", 512000L)
-            .onComplete(testContext.succeeding(v -> {
-                testContext.verify(() -> {
-                    assertEquals(1, reportCount.get());
-                    assertEquals("job-456", lastJobId.get());
-                    
-                    JsonObject request = lastRequest.get();
-                    assertEquals("IN_PROGRESS", request.getString("status"));
-                    assertEquals(512000L, request.getLong("bytesTransferred").longValue());
-                    assertNull(request.getString("errorMessage"));
-                });
-                testContext.completeNow();
-            }));
+    void testReportInProgress() throws Exception {
+        service().reportInProgress("job-456", 512000L);
+
+        assertEquals(1, reports().size());
+        assertEquals("/jobs/job-456/status", reports().getFirst().path());
+        JsonNode request = lastReport();
+        assertEquals("IN_PROGRESS", request.get("status").asText());
+        assertEquals(512000L, request.get("bytesTransferred").asLong());
+        assertFalse(request.has("errorMessage"));
+    }
+
+    @Test
+    @DisplayName("Should report progress as IN_PROGRESS expecting IN_PROGRESS")
+    void testReportProgress() throws Exception {
+        service().reportProgress("job-p", 2048L, "attempt-1", 3L, 6L);
+
+        JsonNode request = lastReport();
+        assertEquals("IN_PROGRESS", request.get("status").asText());
+        assertEquals("IN_PROGRESS", request.get("expectedState").asText());
+        assertEquals(2048L, request.get("bytesTransferred").asLong());
+        assertEquals(6L, request.get("reportSequence").asLong());
     }
 
     @Test
     @DisplayName("Should report COMPLETED status with bytes transferred")
-    void testReportCompleted(Vertx vertx, VertxTestContext testContext) {
-        JobStatusReportingService service = new JobStatusReportingService(vertx, config);
-        
-        service.reportCompleted("job-789", 1048576L)
-            .onComplete(testContext.succeeding(v -> {
-                testContext.verify(() -> {
-                    assertEquals(1, reportCount.get());
-                    assertEquals("job-789", lastJobId.get());
-                    
-                    JsonObject request = lastRequest.get();
-                    assertEquals("COMPLETED", request.getString("status"));
-                    assertEquals(1048576L, request.getLong("bytesTransferred").longValue());
-                    assertNull(request.getString("errorMessage"));
-                });
-                testContext.completeNow();
-            }));
+    void testReportCompleted() throws Exception {
+        service().reportCompleted("job-789", 1048576L);
+
+        assertEquals(1, reports().size());
+        JsonNode request = lastReport();
+        assertEquals("COMPLETED", request.get("status").asText());
+        assertEquals(1048576L, request.get("bytesTransferred").asLong());
+        assertFalse(request.has("errorMessage"));
     }
 
     @Test
     @DisplayName("Should report FAILED status with error message")
-    void testReportFailed(Vertx vertx, VertxTestContext testContext) {
-        JobStatusReportingService service = new JobStatusReportingService(vertx, config);
-        
-        service.reportFailed("job-err", "Connection timeout")
-            .onComplete(testContext.succeeding(v -> {
-                testContext.verify(() -> {
-                    assertEquals(1, reportCount.get());
-                    assertEquals("job-err", lastJobId.get());
-                    
-                    JsonObject request = lastRequest.get();
-                    assertEquals("FAILED", request.getString("status"));
-                    assertEquals("Connection timeout", request.getString("errorMessage"));
-                    assertNull(request.getLong("bytesTransferred"));
-                });
-                testContext.completeNow();
-            }));
+    void testReportFailed() throws Exception {
+        service().reportFailed("job-err", "Connection timeout");
+
+        assertEquals(1, reports().size());
+        JsonNode request = lastReport();
+        assertEquals("FAILED", request.get("status").asText());
+        assertEquals("Connection timeout", request.get("errorMessage").asText());
+        assertFalse(request.has("bytesTransferred"));
     }
 
     @Test
-    @DisplayName("Should fail on HTTP error response")
-    void testHttpErrorGraceful(Vertx vertx, VertxTestContext testContext) {
+    @DisplayName("Should refuse an attempt-aware FAILED report from an unacknowledged state")
+    void testReportFailedRequiresAnAcknowledgedState() {
+        assertThrows(IllegalArgumentException.class, () -> service().reportFailed("job", "reason", "attempt",
+                1L, 2L, TransferAttemptStatus.OFFERED));
+        assertTrue(reports().isEmpty());
+    }
+
+    @Test
+    @DisplayName("A legacy report is sent once, and an HTTP 500 is unresolved")
+    void testHttpErrorGraceful() {
         responseStatus.set(500);
-        
-        JobStatusReportingService service = new JobStatusReportingService(vertx, config);
-        
-        service.reportCompleted("job-fail", 1000L)
-            .onComplete(testContext.failing(err -> {
-                testContext.verify(() -> {
-                    assertEquals(1, reportCount.get(), "Request should still be made");
-                });
-                testContext.completeNow();
-            }));
+
+        JobStatusReportingService.StatusReportException failure = assertThrows(
+                JobStatusReportingService.StatusReportException.class,
+                () -> service().reportCompleted("job-fail", 1000L));
+
+        assertTrue(failure.getMessage().startsWith("Q-REPORT-UNRESOLVED"), failure.getMessage());
+        assertEquals(1, reports().size(), "a report without attempt identity is not idempotent, so not retried");
     }
 
     @Test
     @DisplayName("Should fail on HTTP 404 response")
-    void testHttp404Graceful(Vertx vertx, VertxTestContext testContext) {
+    void testHttp404Graceful() {
         responseStatus.set(404);
-        
-        JobStatusReportingService service = new JobStatusReportingService(vertx, config);
-        
-        service.reportFailed("nonexistent-job", "Some error")
-            .onComplete(testContext.failing(err -> {
-                testContext.verify(() -> {
-                    assertEquals(1, reportCount.get());
-                });
-                testContext.completeNow();
-            }));
+
+        assertThrows(JobStatusReportingService.StatusReportException.class,
+                () -> service().reportFailed("nonexistent-job", "Some error"));
+        assertEquals(1, reports().size());
     }
 
     @Test
     @DisplayName("Should fail on connection error")
-    void testConnectionErrorGraceful(Vertx vertx, VertxTestContext testContext) {
-        AgentConfiguration badConfig = new AgentConfiguration.Builder()
-                .securityProfile("development").allowInsecure(true).controllerTlsEnabled(false)
-            .agentId("test-agent-bad")
-            .tenantId("test-tenant")
-            .controllerUrl("http://localhost:59999") // Non-existent port
-            .region("test-region")
-            .datacenter("test-dc")
-            .httpConnectionTimeout(1000)
-            .build();
-        
-        JobStatusReportingService service = new JobStatusReportingService(vertx, badConfig);
-        
-        service.reportCompleted("job-conn-err", 500L)
-            .onComplete(testContext.failing(err -> {
-                testContext.completeNow();
-            }));
+    void testConnectionErrorGraceful() {
+        controller.close();
+
+        JobStatusReportingService.StatusReportException failure = assertThrows(
+                JobStatusReportingService.StatusReportException.class,
+                () -> service().reportCompleted("job-conn-err", 500L));
+
+        assertTrue(failure.getMessage().startsWith("Q-REPORT-UNRESOLVED"), failure.getMessage());
+    }
+
+    @Test
+    @DisplayName("An attempt-aware report is sent at most three times, as an exact replay")
+    void testAttemptReportRetriesExactly() {
+        responseStatus.set(503);
+
+        assertThrows(JobStatusReportingService.StatusReportException.class,
+                () -> service().reportCompleted("job-r", 10L, "attempt-r", 2L, 5L));
+
+        List<FakeController.Request> sends = reports();
+        assertEquals(3, sends.size());
+        assertEquals(sends.get(0).body(), sends.get(1).body(), "a retry replays the original payload");
+        assertEquals(sends.get(0).body(), sends.get(2).body());
+    }
+
+    @Test
+    @DisplayName("An attempt-aware report stops retrying once acknowledged")
+    void testAttemptReportRetriesUntilAcknowledged() throws Exception {
+        AtomicInteger sends = new AtomicInteger();
+        controller.on("POST", STATUS, request -> Reply.status(sends.incrementAndGet() == 1 ? 429 : 200));
+
+        service().reportAccepted("job-a", "attempt-a", 1L, 1L);
+
+        assertEquals(2, reports().size());
+    }
+
+    @Test
+    @DisplayName("A rejected attempt-aware report is not retried")
+    void testRejectedAttemptReportIsNotRetried() {
+        responseStatus.set(409);
+
+        JobStatusReportingService.StatusReportException failure = assertThrows(
+                JobStatusReportingService.StatusReportException.class,
+                () -> service().reportAccepted("job-x", "attempt-x", 1L, 1L));
+
+        assertTrue(failure.getMessage().startsWith("Q-REPORT-REJECTED"), failure.getMessage());
+        assertEquals(1, reports().size());
     }
 
     @Test
     @DisplayName("Should send multiple status reports for same job")
-    void testMultipleReportsForSameJob(Vertx vertx, VertxTestContext testContext) {
-        JobStatusReportingService service = new JobStatusReportingService(vertx, config);
-        
-        service.reportAccepted("job-multi")
-            .compose(v -> service.reportInProgress("job-multi", 500L))
-            .compose(v -> service.reportInProgress("job-multi", 1000L))
-            .compose(v -> service.reportCompleted("job-multi", 1500L))
-            .onComplete(testContext.succeeding(v -> {
-                testContext.verify(() -> {
-                    assertEquals(4, reportCount.get(), "Should send 4 status reports");
-                    assertEquals("job-multi", lastJobId.get());
-                    assertEquals("COMPLETED", lastRequest.get().getString("status"));
-                });
-                testContext.completeNow();
-            }));
+    void testMultipleReportsForSameJob() throws Exception {
+        JobStatusReportingService service = service();
+
+        service.reportAccepted("job-multi");
+        service.reportInProgress("job-multi", 500L);
+        service.reportInProgress("job-multi", 1000L);
+        service.reportCompleted("job-multi", 1500L);
+
+        assertEquals(4, reports().size(), "Should send 4 status reports");
+        assertEquals("COMPLETED", lastReport().get("status").asText());
     }
 
     @Test
     @DisplayName("Should include agent ID in all requests")
-    void testAgentIdIncluded(Vertx vertx, VertxTestContext testContext) {
-        JobStatusReportingService service = new JobStatusReportingService(vertx, config);
-        
-        service.reportAccepted("job-agent")
-            .compose(v -> {
-                assertEquals("test-agent-status", lastRequest.get().getString("agentId"));
-                return service.reportInProgress("job-agent", 100L);
-            })
-            .compose(v -> {
-                assertEquals("test-agent-status", lastRequest.get().getString("agentId"));
-                return service.reportFailed("job-agent", "error");
-            })
-            .onComplete(testContext.succeeding(v -> {
-                testContext.verify(() -> {
-                    assertEquals("test-agent-status", lastRequest.get().getString("agentId"));
-                });
-                testContext.completeNow();
-            }));
+    void testAgentIdIncluded() throws Exception {
+        JobStatusReportingService service = service();
+
+        service.reportAccepted("job-agent");
+        service.reportInProgress("job-agent", 100L);
+        service.reportFailed("job-agent", "error");
+
+        reports().forEach(report -> assertEquals("test-agent-status", report.json().get("agentId").asText()));
     }
 
     @Test
-    @DisplayName("Should shutdown gracefully")
-    void testShutdown(Vertx vertx, VertxTestContext testContext) {
-        JobStatusReportingService service = new JobStatusReportingService(vertx, config);
-        
-        service.shutdown()
-            .onComplete(testContext.succeeding(v -> {
-                testContext.completeNow();
-            }));
+    @DisplayName("After shutdown, reports fail without being sent")
+    void testShutdown() {
+        JobStatusReportingService service = service();
+
+        service.shutdown();
+
+        JobStatusReportingService.StatusReportException failure = assertThrows(
+                JobStatusReportingService.StatusReportException.class, () -> service.reportAccepted("job-closed"));
+        assertEquals("Q-REPORT-CLOSED", failure.getMessage());
+        assertTrue(reports().isEmpty());
+    }
+
+    private JobStatusReportingService service() {
+        return new JobStatusReportingService(client, config);
+    }
+
+    private List<FakeController.Request> reports() {
+        return controller.requests("POST", STATUS);
+    }
+
+    private JsonNode lastReport() {
+        return reports().getLast().json();
     }
 }

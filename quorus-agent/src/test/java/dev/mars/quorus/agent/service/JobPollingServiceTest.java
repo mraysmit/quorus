@@ -17,355 +17,207 @@
 package dev.mars.quorus.agent.service;
 
 import dev.mars.quorus.agent.config.AgentConfiguration;
-import io.vertx.core.Vertx;
-import io.vertx.core.http.HttpServer;
-import io.vertx.core.json.JsonArray;
-import io.vertx.core.json.JsonObject;
-import io.vertx.ext.web.Router;
-import io.vertx.junit5.VertxExtension;
-import io.vertx.junit5.VertxTestContext;
+import dev.mars.quorus.agent.testing.FakeController;
+import dev.mars.quorus.agent.testing.FakeController.Reply;
 import org.junit.jupiter.api.*;
-import org.junit.jupiter.api.extension.ExtendWith;
 
-import java.util.List;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Unit tests for JobPollingService.
- * Uses real HTTP server (no mocking) following project testing principles.
- * 
+ * Unit tests for JobPollingService, against a real HTTP controller stand-in (no mocking).
+ *
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @since 2026-02-05
- * @version 1.0
+ * @version 2.0
  */
-@ExtendWith(VertxExtension.class)
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@Timeout(value = 30, unit = SECONDS, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
 class JobPollingServiceTest {
 
-    private HttpServer testServer;
-    private int serverPort;
+    private static final String JOBS = "/agents/[^/]+/jobs";
+
+    private FakeController controller;
+    private ControllerClient client;
     private AgentConfiguration config;
-    
-    private AtomicInteger pollCount;
-    private AtomicReference<JsonObject> responseBody;
-    private AtomicInteger responseStatus;
-
-    @BeforeAll
-    void setUp(Vertx vertx, VertxTestContext testContext) {
-        pollCount = new AtomicInteger(0);
-        responseBody = new AtomicReference<>(new JsonObject().put("pendingJobs", new JsonArray()));
-        responseStatus = new AtomicInteger(200);
-
-        Router router = Router.router(vertx);
-
-        // Job polling endpoint
-        router.get("/agents/:agentId/jobs").handler(ctx -> {
-            pollCount.incrementAndGet();
-            
-            int status = responseStatus.get();
-            if (status == 200) {
-                ctx.response()
-                    .setStatusCode(200)
-                    .putHeader("content-type", "application/json")
-                    .end(responseBody.get().encode());
-            } else {
-                ctx.response()
-                    .setStatusCode(status)
-                    .end();
-            }
-        });
-
-        vertx.createHttpServer()
-            .requestHandler(router)
-            .listen(0)
-            .onSuccess(server -> {
-                testServer = server;
-                serverPort = server.actualPort();
-                
-                config = new AgentConfiguration.Builder()
-                .securityProfile("development").allowInsecure(true).controllerTlsEnabled(false)
-                    .agentId("test-agent-poll")
-                    .tenantId("test-tenant")
-                    .controllerUrl("http://localhost:" + serverPort)
-                    .region("test-region")
-                    .datacenter("test-dc")
-                    .build();
-                
-                testContext.completeNow();
-            })
-            .onFailure(testContext::failNow);
-    }
+    private final AtomicReference<Reply> reply = new AtomicReference<>(Reply.json(200, "{\"pendingJobs\":[]}"));
 
     @BeforeEach
-    void resetCounters() {
-        pollCount.set(0);
-        responseBody.set(new JsonObject().put("pendingJobs", new JsonArray()));
-        responseStatus.set(200);
+    void setUp() throws Exception {
+        controller = FakeController.start().on("GET", JOBS, request -> reply.get());
+        config = new AgentConfiguration.Builder()
+                .securityProfile("development").allowInsecure(true).controllerTlsEnabled(false)
+                .agentId("test-agent-poll")
+                .tenantId("test-tenant")
+                .controllerUrl(controller.url())
+                .region("test-region")
+                .datacenter("test-dc")
+                .build();
+        client = ControllerClient.create(config);
     }
 
-    @AfterAll
-    void tearDown(VertxTestContext testContext) {
-        if (testServer != null) {
-            testServer.close().onComplete(ar -> testContext.completeNow());
-        } else {
-            testContext.completeNow();
-        }
+    @AfterEach
+    void tearDown() {
+        client.close();
+        controller.close();
     }
 
     @Test
     @DisplayName("Should return empty list when no jobs pending")
-    void testPollNoJobs(Vertx vertx, VertxTestContext testContext) {
-        JobPollingService service = new JobPollingService(vertx, config);
-        
-        service.pollForJobs()
-            .onComplete(testContext.succeeding(jobs -> {
-                testContext.verify(() -> {
-                    assertNotNull(jobs);
-                    assertTrue(jobs.isEmpty(), "Should return empty list");
-                    assertEquals(1, pollCount.get(), "One poll request should be made");
-                });
-                testContext.completeNow();
-            }));
+    void testPollNoJobs() throws Exception {
+        List<JobPollingService.PendingJob> jobs = new JobPollingService(client, config).pollForJobs();
+
+        assertNotNull(jobs);
+        assertTrue(jobs.isEmpty(), "Should return empty list");
+        assertEquals(1, controller.requests("GET", JOBS).size(), "One poll request should be made");
+        assertEquals("/agents/test-agent-poll/jobs", controller.requests().getFirst().path());
     }
 
     @Test
     @DisplayName("Should parse single pending job correctly")
-    void testPollSingleJob(Vertx vertx, VertxTestContext testContext) {
-        JsonArray jobs = new JsonArray()
-            .add(new JsonObject()
-                .put("assignmentId", "assign-001")
-                .put("jobId", "job-001")
-                .put("agentId", "test-agent-poll")
-                .put("attemptId", "attempt-001")
-                .put("fencingGeneration", 7L)
-                .put("leaseExpiresAt", "2026-09-02T04:00:00Z")
-                .put("lastReportSequence", 3L)
-                .put("sourceUri", "https://example.com/file.txt")
-                .put("destinationPath", "/data/file.txt")
-                .put("totalBytes", 1024L)
-                .put("description", "Test transfer"));
-        
-        responseBody.set(new JsonObject().put("pendingJobs", jobs));
-        
-        JobPollingService service = new JobPollingService(vertx, config);
-        
-        service.pollForJobs()
-            .onComplete(testContext.succeeding(pendingJobs -> {
-                testContext.verify(() -> {
-                    assertEquals(1, pendingJobs.size(), "Should return one job");
-                    
-                    JobPollingService.PendingJob job = pendingJobs.get(0);
-                    assertEquals("assign-001", job.getAssignmentId());
-                    assertEquals("job-001", job.getJobId());
-                    assertEquals("test-agent-poll", job.getAgentId());
-                    assertEquals("attempt-001", job.getAttemptId());
-                    assertEquals(7L, job.getFencingGeneration());
-                    assertEquals("2026-09-02T04:00:00Z", job.getLeaseExpiresAt().toString());
-                    assertEquals(4L, job.nextReportSequence());
-                    assertEquals("https://example.com/file.txt", job.getSourceUri());
-                    assertEquals("/data/file.txt", job.getDestinationPath());
-                    assertEquals(1024L, job.getTotalBytes());
-                    assertEquals("Test transfer", job.getDescription());
-                });
-                testContext.completeNow();
-            }));
+    void testPollSingleJob() throws Exception {
+        pendingJobs("""
+                {"assignmentId":"assign-001","jobId":"job-001","agentId":"test-agent-poll",
+                 "attemptId":"attempt-001","fencingGeneration":7,"leaseExpiresAt":"2026-09-02T04:00:00Z",
+                 "lastReportSequence":3,"sourceUri":"https://example.com/file.txt",
+                 "destinationPath":"/data/file.txt","totalBytes":1024,"description":"Test transfer"}""");
+
+        List<JobPollingService.PendingJob> pendingJobs = new JobPollingService(client, config).pollForJobs();
+
+        assertEquals(1, pendingJobs.size(), "Should return one job");
+        JobPollingService.PendingJob job = pendingJobs.get(0);
+        assertEquals("assign-001", job.getAssignmentId());
+        assertEquals("job-001", job.getJobId());
+        assertEquals("test-agent-poll", job.getAgentId());
+        assertEquals("attempt-001", job.getAttemptId());
+        assertEquals(7L, job.getFencingGeneration());
+        assertEquals("2026-09-02T04:00:00Z", job.getLeaseExpiresAt().toString());
+        assertEquals(4L, job.nextReportSequence());
+        assertEquals("https://example.com/file.txt", job.getSourceUri());
+        assertEquals("/data/file.txt", job.getDestinationPath());
+        assertEquals(1024L, job.getTotalBytes());
+        assertEquals("Test transfer", job.getDescription());
+    }
+
+    @Test
+    @DisplayName("Should parse the governed fields of a job, keeping the connection as JSON text")
+    void testPollGovernedJob() throws Exception {
+        pendingJobs("""
+                {"jobId":"job-g","agentId":"test-agent-poll","sourceUri":"sftp://h/in/a.dat",
+                 "destinationUri":"file:///spool/a.dat","destinationPath":"/ignored",
+                 "tenantId":"bank-a","remotePath":"/in/a.dat","agentPool":"pool-a",
+                 "controllerResolvedAddresses":["10.0.0.5","10.0.0.6"],
+                 "serviceConnection":{"serviceConnectionId":"payments"},
+                 "secretReference":{"secretReferenceId":"key"},
+                 "connectionPolicyVersion":3,"connectionPolicyDigest":"sha256:abc"}""");
+
+        JobPollingService.PendingJob job = new JobPollingService(client, config).pollForJobs().getFirst();
+
+        assertEquals("file:///spool/a.dat", job.getDestinationPath(), "destinationUri wins over destinationPath");
+        assertEquals("bank-a", job.getTenantId());
+        assertEquals("/in/a.dat", job.getRemotePath());
+        assertEquals("pool-a", job.getAgentPool());
+        assertEquals(List.of("10.0.0.5", "10.0.0.6"), job.getControllerResolvedAddresses());
+        assertEquals("{\"serviceConnectionId\":\"payments\"}", job.getServiceConnection());
+        assertEquals("{\"secretReferenceId\":\"key\"}", job.getSecretReference());
+        assertTrue(job.isGoverned());
+        assertEquals(3, job.getConnectionPolicyVersion());
+        assertEquals("sha256:abc", job.getConnectionPolicyDigest());
     }
 
     @Test
     @DisplayName("Should parse multiple pending jobs correctly")
-    void testPollMultipleJobs(Vertx vertx, VertxTestContext testContext) {
-        JsonArray jobs = new JsonArray()
-            .add(new JsonObject()
-                .put("assignmentId", "assign-001")
-                .put("jobId", "job-001")
-                .put("agentId", "test-agent-poll")
-                .put("sourceUri", "https://example.com/file1.txt")
-                .put("destinationPath", "/data/file1.txt")
-                .put("totalBytes", 1024L))
-            .add(new JsonObject()
-                .put("assignmentId", "assign-002")
-                .put("jobId", "job-002")
-                .put("agentId", "test-agent-poll")
-                .put("sourceUri", "https://example.com/file2.txt")
-                .put("destinationPath", "/data/file2.txt")
-                .put("totalBytes", 2048L))
-            .add(new JsonObject()
-                .put("assignmentId", "assign-003")
-                .put("jobId", "job-003")
-                .put("agentId", "test-agent-poll")
-                .put("sourceUri", "https://example.com/file3.txt")
-                .put("destinationPath", "/data/file3.txt")
-                .put("totalBytes", 4096L));
-        
-        responseBody.set(new JsonObject().put("pendingJobs", jobs));
-        
-        JobPollingService service = new JobPollingService(vertx, config);
-        
-        service.pollForJobs()
-            .onComplete(testContext.succeeding(pendingJobs -> {
-                testContext.verify(() -> {
-                    assertEquals(3, pendingJobs.size(), "Should return three jobs");
-                    assertEquals("job-001", pendingJobs.get(0).getJobId());
-                    assertEquals("job-002", pendingJobs.get(1).getJobId());
-                    assertEquals("job-003", pendingJobs.get(2).getJobId());
-                });
-                testContext.completeNow();
-            }));
+    void testPollMultipleJobs() throws Exception {
+        pendingJobs(job("001", 1024), job("002", 2048), job("003", 4096));
+
+        List<JobPollingService.PendingJob> pendingJobs = new JobPollingService(client, config).pollForJobs();
+
+        assertEquals(3, pendingJobs.size(), "Should return three jobs");
+        assertEquals("job-001", pendingJobs.get(0).getJobId());
+        assertEquals("job-002", pendingJobs.get(1).getJobId());
+        assertEquals("job-003", pendingJobs.get(2).getJobId());
     }
 
     @Test
     @DisplayName("Should handle malformed job JSON gracefully")
-    void testPollMalformedJob(Vertx vertx, VertxTestContext testContext) {
-        // Mix of valid and invalid jobs
-        JsonArray jobs = new JsonArray()
-            .add(new JsonObject()
-                .put("assignmentId", "assign-001")
-                .put("jobId", "job-001")
-                .put("agentId", "test-agent-poll")
-                .put("sourceUri", "https://example.com/file1.txt")
-                .put("destinationPath", "/data/file1.txt"))
-            .add("not-a-json-object") // Malformed entry
-            .add(new JsonObject()
-                .put("assignmentId", "assign-003")
-                .put("jobId", "job-003")
-                .put("agentId", "test-agent-poll")
-                .put("sourceUri", "https://example.com/file3.txt")
-                .put("destinationPath", "/data/file3.txt"));
-        
-        responseBody.set(new JsonObject().put("pendingJobs", jobs));
-        
-        JobPollingService service = new JobPollingService(vertx, config);
-        
-        service.pollForJobs()
-            .onComplete(testContext.succeeding(pendingJobs -> {
-                testContext.verify(() -> {
-                    // Should skip malformed entry and return valid ones
-                    assertEquals(2, pendingJobs.size(), "Should return two valid jobs");
-                    assertEquals("job-001", pendingJobs.get(0).getJobId());
-                    assertEquals("job-003", pendingJobs.get(1).getJobId());
-                });
-                testContext.completeNow();
-            }));
+    void testPollMalformedJob() throws Exception {
+        pendingJobs(job("001", 1), "\"not-a-json-object\"", job("003", 3));
+
+        List<JobPollingService.PendingJob> pendingJobs = new JobPollingService(client, config).pollForJobs();
+
+        assertEquals(2, pendingJobs.size(), "Should return two valid jobs");
+        assertEquals("job-001", pendingJobs.get(0).getJobId());
+        assertEquals("job-003", pendingJobs.get(1).getJobId());
     }
 
     @Test
     @DisplayName("Should return empty list on HTTP error")
-    void testPollHttpError(Vertx vertx, VertxTestContext testContext) {
-        responseStatus.set(500);
-        
-        JobPollingService service = new JobPollingService(vertx, config);
-        
-        service.pollForJobs()
-            .onComplete(testContext.succeeding(jobs -> {
-                testContext.verify(() -> {
-                    assertNotNull(jobs);
-                    assertTrue(jobs.isEmpty(), "Should return empty list on error");
-                    assertEquals(1, pollCount.get(), "Request should still be made");
-                });
-                testContext.completeNow();
-            }));
+    void testPollHttpError() throws Exception {
+        reply.set(Reply.status(500));
+
+        List<JobPollingService.PendingJob> jobs = new JobPollingService(client, config).pollForJobs();
+
+        assertNotNull(jobs);
+        assertTrue(jobs.isEmpty(), "Should return empty list on error");
+        assertEquals(1, controller.requests("GET", JOBS).size(), "Request should still be made");
     }
 
     @Test
     @DisplayName("Should return empty list on HTTP 404")
-    void testPollNotFound(Vertx vertx, VertxTestContext testContext) {
-        responseStatus.set(404);
-        
-        JobPollingService service = new JobPollingService(vertx, config);
-        
-        service.pollForJobs()
-            .onComplete(testContext.succeeding(jobs -> {
-                testContext.verify(() -> {
-                    assertTrue(jobs.isEmpty(), "Should return empty list on 404");
-                });
-                testContext.completeNow();
-            }));
+    void testPollNotFound() throws Exception {
+        reply.set(Reply.status(404));
+
+        assertTrue(new JobPollingService(client, config).pollForJobs().isEmpty(), "Should return empty list on 404");
     }
 
     @Test
     @DisplayName("Should return empty list on connection error")
-    void testPollConnectionError(Vertx vertx, VertxTestContext testContext) {
-        AgentConfiguration badConfig = new AgentConfiguration.Builder()
-                .securityProfile("development").allowInsecure(true).controllerTlsEnabled(false)
-            .agentId("test-agent-bad")
-            .tenantId("test-tenant")
-            .controllerUrl("http://localhost:59999") // Non-existent port
-            .region("test-region")
-            .datacenter("test-dc")
-            .httpConnectionTimeout(1000)
-            .build();
-        
-        JobPollingService service = new JobPollingService(vertx, badConfig);
-        
-        service.pollForJobs()
-            .onComplete(testContext.succeeding(jobs -> {
-                testContext.verify(() -> {
-                    assertNotNull(jobs);
-                    assertTrue(jobs.isEmpty(), "Should return empty list on connection error");
-                });
-                testContext.completeNow();
-            }));
+    void testPollConnectionError() throws Exception {
+        controller.close();
+
+        List<JobPollingService.PendingJob> jobs = new JobPollingService(client, config).pollForJobs();
+
+        assertNotNull(jobs);
+        assertTrue(jobs.isEmpty(), "Should return empty list on connection error");
+    }
+
+    @Test
+    @DisplayName("Should return empty list on a body that is not JSON")
+    void testPollUnreadableBody() throws Exception {
+        reply.set(Reply.json(200, "not json"));
+
+        assertTrue(new JobPollingService(client, config).pollForJobs().isEmpty());
     }
 
     @Test
     @DisplayName("Should handle null pendingJobs array")
-    void testPollNullArray(Vertx vertx, VertxTestContext testContext) {
-        responseBody.set(new JsonObject()); // No pendingJobs field
-        
-        JobPollingService service = new JobPollingService(vertx, config);
-        
-        service.pollForJobs()
-            .onComplete(testContext.succeeding(jobs -> {
-                testContext.verify(() -> {
-                    assertTrue(jobs.isEmpty(), "Should return empty list when array is null");
-                });
-                testContext.completeNow();
-            }));
+    void testPollNullArray() throws Exception {
+        reply.set(Reply.json(200, "{}"));
+
+        assertTrue(new JobPollingService(client, config).pollForJobs().isEmpty(),
+                "Should return empty list when array is null");
     }
 
     @Test
     @DisplayName("Should handle job with missing optional fields")
-    void testPollJobWithMissingOptionalFields(Vertx vertx, VertxTestContext testContext) {
-        JsonArray jobs = new JsonArray()
-            .add(new JsonObject()
-                .put("assignmentId", "assign-001")
-                .put("jobId", "job-001")
-                .put("agentId", "test-agent-poll")
-                .put("sourceUri", "https://example.com/file.txt")
-                .put("destinationPath", "/data/file.txt"));
-                // Missing totalBytes and description
-        
-        responseBody.set(new JsonObject().put("pendingJobs", jobs));
-        
-        JobPollingService service = new JobPollingService(vertx, config);
-        
-        service.pollForJobs()
-            .onComplete(testContext.succeeding(pendingJobs -> {
-                testContext.verify(() -> {
-                    assertEquals(1, pendingJobs.size());
-                    JobPollingService.PendingJob job = pendingJobs.get(0);
-                    assertEquals(0L, job.getTotalBytes(), "Missing totalBytes should default to 0");
-                    assertNull(job.getDescription(), "Missing description should be null");
-                });
-                testContext.completeNow();
-            }));
-    }
+    void testPollJobWithMissingOptionalFields() throws Exception {
+        pendingJobs("""
+                {"assignmentId":"assign-001","jobId":"job-001","agentId":"test-agent-poll",
+                 "sourceUri":"https://example.com/file.txt","destinationPath":"/data/file.txt"}""");
 
-    @Test
-    @DisplayName("Should shutdown gracefully")
-    void testShutdown(Vertx vertx, VertxTestContext testContext) {
-        JobPollingService service = new JobPollingService(vertx, config);
-        
-        service.shutdown()
-            .onComplete(testContext.succeeding(v -> {
-                testContext.completeNow();
-            }));
+        List<JobPollingService.PendingJob> pendingJobs = new JobPollingService(client, config).pollForJobs();
+
+        assertEquals(1, pendingJobs.size());
+        JobPollingService.PendingJob job = pendingJobs.get(0);
+        assertEquals(0L, job.getTotalBytes(), "Missing totalBytes should default to 0");
+        assertNull(job.getDescription(), "Missing description should be null");
+        assertFalse(job.hasAttemptContext());
+        assertFalse(job.isGoverned());
     }
 
     @Test
@@ -384,5 +236,15 @@ class JobPollingServiceTest {
 
         assertEquals(URI.create("https://approved.example.com/approved/statement.dat"), request.getSourceUri());
         assertEquals(localDestination.toUri(), request.getDestinationUri());
+    }
+
+    private void pendingJobs(String... jobs) {
+        reply.set(Reply.json(200, "{\"pendingJobs\":[" + String.join(",", jobs) + "]}"));
+    }
+
+    private static String job(String number, long totalBytes) {
+        return "{\"assignmentId\":\"assign-" + number + "\",\"jobId\":\"job-" + number
+                + "\",\"agentId\":\"test-agent-poll\",\"sourceUri\":\"https://example.com/file" + number
+                + ".txt\",\"destinationPath\":\"/data/file" + number + ".txt\",\"totalBytes\":" + totalBytes + "}";
     }
 }

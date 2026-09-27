@@ -21,6 +21,7 @@ import dev.mars.quorus.agent.config.AgentConfiguration;
 import dev.mars.quorus.agent.observability.AgentMetrics;
 import dev.mars.quorus.agent.observability.AgentTelemetryConfig;
 import dev.mars.quorus.agent.service.AgentRegistrationService;
+import dev.mars.quorus.agent.service.ControllerClient;
 import dev.mars.quorus.agent.service.HeartbeatService;
 import dev.mars.quorus.agent.service.TransferExecutionService;
 import dev.mars.quorus.agent.service.HealthService;
@@ -62,8 +63,9 @@ public class QuorusAgent {
     private final Vertx vertx;
     private final boolean closeVertxOnShutdown;
     private final AgentConfiguration config;
+    private final ControllerClient controllerClient;
     private final AgentRegistrationService registrationService;
-    private final HeartbeatService heartbeatService;
+private final HeartbeatService heartbeatService;
     private final TransferExecutionService transferService;
     private final HealthService healthService;
     private final JobPollingService jobPollingService;
@@ -108,13 +110,15 @@ public class QuorusAgent {
         logger.info("Creating QuorusAgent with Vert.x instance: {} (using Vert.x timers, no ScheduledExecutorService)",
                     System.identityHashCode(vertx));
 
-        // Initialize services with Vert.x for non-blocking HTTP 
-        this.registrationService = new AgentRegistrationService(vertx, config);
-        this.heartbeatService = new HeartbeatService(vertx, config, registrationService);
+        // The controller services are blocking and share one JDK client (RT-05a). Until the agent leaves
+        // Vert.x (RT-05b), this class calls them on Vert.x workers through blocking(...).
+        this.controllerClient = ControllerClient.create(config);
+        this.registrationService = new AgentRegistrationService(controllerClient, config);
+        this.heartbeatService = new HeartbeatService(controllerClient, config, registrationService);
         this.transferService = new TransferExecutionService(vertx, config);  // Pass Vertx
         this.healthService = new HealthService(vertx, config);
-        this.jobPollingService = new JobPollingService(vertx, config);
-        this.jobStatusReportingService = new JobStatusReportingService(vertx, config);
+        this.jobPollingService = new JobPollingService(controllerClient, config);
+        this.jobStatusReportingService = new JobStatusReportingService(controllerClient, config);
 
         // Initialize OpenTelemetry metrics 
         this.metrics = new AgentMetrics(config.getAgentId(), System.currentTimeMillis());
@@ -223,7 +227,7 @@ public class QuorusAgent {
             });
 
         // Register with controller (reactive WebClient)
-        registrationService.register()
+        blocking(registrationService::register)
             .onSuccess(registered -> {
                 metrics.recordRegistration(registered);
                 if (!registered) {
@@ -254,8 +258,8 @@ public class QuorusAgent {
             config.getHeartbeatInterval(),
             id -> {
                 if (!closed.get() && running) {
-                    heartbeatService.sendHeartbeat()
-                        .onSuccess(success -> metrics.recordHeartbeat(success))
+                    blocking(heartbeatService::sendHeartbeat)
+.onSuccess(success -> metrics.recordHeartbeat(success))
                         .onFailure(err -> {
                             logger.error("Error sending heartbeat: {}", err.getMessage());
                             logger.debug("Stack trace for heartbeat send failure", err);
@@ -325,14 +329,12 @@ public class QuorusAgent {
             // Stop services
             transferService.shutdown()
                 .onFailure(err -> logger.warn("Error shutting down transfer service: {}", err.getMessage()));
-            heartbeatService.shutdown();
-            jobPollingService.shutdown();
             jobStatusReportingService.shutdown();
 
             // Shutdown health service (reactive) then deregister from controller
             healthService.shutdown()
-                .compose(v -> registrationService.deregister())
-                .recover(err -> {
+                .compose(v -> blocking(registrationService::deregister))
+.recover(err -> {
                     logger.warn("Failed during health shutdown/deregister sequence: {}", err.getMessage());
                     return io.vertx.core.Future.succeededFuture(Boolean.FALSE);
                 })
@@ -341,15 +343,17 @@ public class QuorusAgent {
                     if (ar.succeeded() && Boolean.TRUE.equals(ar.result())) {
                         logger.info("Agent deregistered from controller");
                     }
+                    controllerClient.close();
                     logger.info("Quorus Agent shutdown complete (0 threads to cleanup)");
-                    shutdownPromise.tryComplete();
+shutdownPromise.tryComplete();
                 });
             return; // Early return - promise will be completed in callback
 
         } catch (Exception e) {
             logger.error("Error during shutdown: {}", e.getMessage());
             logger.debug("Stack trace", e);
-            closeOwnedVertxIfNeeded()
+            controllerClient.close();
+closeOwnedVertxIfNeeded()
                     .onComplete(ar -> shutdownPromise.tryComplete());
         }
     }
@@ -378,8 +382,8 @@ public class QuorusAgent {
         }
 
         // Poll controller for new jobs (reactive migration)
-        jobPollingService.pollForJobs()
-            .onSuccess(pendingJobs -> {
+        blocking(jobPollingService::pollForJobs)
+.onSuccess(pendingJobs -> {
                 if (pendingJobs.isEmpty()) {
                     logger.debug("No pending jobs found");
                     return;
@@ -558,9 +562,9 @@ public class QuorusAgent {
         }
 
         private Future<Void> send(long bytes, long sequence) {
-            return jobStatusReportingService.reportProgress(job.getJobId(), bytes, job.getAttemptId(),
-                            job.getFencingGeneration(), sequence)
-                    .onSuccess(ignored -> unresolved = null)
+            return report(() -> jobStatusReportingService.reportProgress(job.getJobId(), bytes, job.getAttemptId(),
+                            job.getFencingGeneration(), sequence))
+.onSuccess(ignored -> unresolved = null)
                     .recover(err -> {
                         logger.warn("Progress report unresolved for job {} (sequence {}): {}",
                                 job.getJobId(), sequence, err.getMessage());
@@ -581,28 +585,49 @@ public class QuorusAgent {
         }
     }
 
+    /** Runs a blocking controller call on a Vert.x worker, until the agent leaves Vert.x (RT-05b). */
+    private <T> Future<T> blocking(java.util.concurrent.Callable<T> call) {
+        return vertx.executeBlocking(call, false);
+    }
+
+    @FunctionalInterface
+    private interface Report {
+        void send() throws InterruptedException;
+    }
+
+    private Future<Void> report(Report report) {
+        return blocking(() -> {
+            report.send();
+            return null;
+        });
+    }
+
     private Future<Void> reportAccepted(JobPollingService.PendingJob job) {
         if (!job.hasAttemptContext()) {
-            return jobStatusReportingService.reportAccepted(job.getJobId());
+            return report(() -> jobStatusReportingService.reportAccepted(job.getJobId()));
         }
-        return jobStatusReportingService.reportAccepted(job.getJobId(), job.getAttemptId(),
-                job.getFencingGeneration(), job.nextReportSequence());
+        // The sequence is taken on the calling thread, so reports keep the order they were made in.
+        long sequence = job.nextReportSequence();
+        return report(() -> jobStatusReportingService.reportAccepted(job.getJobId(), job.getAttemptId(),
+                job.getFencingGeneration(), sequence));
     }
 
     private Future<Void> reportInProgress(JobPollingService.PendingJob job, long bytesTransferred) {
         if (!job.hasAttemptContext()) {
-            return jobStatusReportingService.reportInProgress(job.getJobId(), bytesTransferred);
+            return report(() -> jobStatusReportingService.reportInProgress(job.getJobId(), bytesTransferred));
         }
-        return jobStatusReportingService.reportInProgress(job.getJobId(), bytesTransferred,
-                job.getAttemptId(), job.getFencingGeneration(), job.nextReportSequence());
+        long sequence = job.nextReportSequence();
+        return report(() -> jobStatusReportingService.reportInProgress(job.getJobId(), bytesTransferred,
+                job.getAttemptId(), job.getFencingGeneration(), sequence));
     }
 
     private Future<Void> reportCompleted(JobPollingService.PendingJob job, long bytesTransferred) {
         if (!job.hasAttemptContext()) {
-            return jobStatusReportingService.reportCompleted(job.getJobId(), bytesTransferred);
+            return report(() -> jobStatusReportingService.reportCompleted(job.getJobId(), bytesTransferred));
         }
-        return jobStatusReportingService.reportCompleted(job.getJobId(), bytesTransferred,
-                job.getAttemptId(), job.getFencingGeneration(), job.nextReportSequence());
+        long sequence = job.nextReportSequence();
+        return report(() -> jobStatusReportingService.reportCompleted(job.getJobId(), bytesTransferred,
+                job.getAttemptId(), job.getFencingGeneration(), sequence));
     }
 
     private Future<Void> reportFailed(JobPollingService.PendingJob job, String reason) {
@@ -611,10 +636,11 @@ public class QuorusAgent {
 
     private Future<Void> reportFailed(JobPollingService.PendingJob job, String reason, TransferAttemptStatus expectedState) {
         if (!job.hasAttemptContext()) {
-            return jobStatusReportingService.reportFailed(job.getJobId(), reason);
+            return report(() -> jobStatusReportingService.reportFailed(job.getJobId(), reason));
         }
-        return jobStatusReportingService.reportFailed(job.getJobId(), reason, job.getAttemptId(),
-                job.getFencingGeneration(), job.nextReportSequence(), expectedState);
+        long sequence = job.nextReportSequence();
+        return report(() -> jobStatusReportingService.reportFailed(job.getJobId(), reason, job.getAttemptId(),
+                job.getFencingGeneration(), sequence, expectedState));
     }
     
     public boolean isRunning() {
