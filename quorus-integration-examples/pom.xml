@@ -24,13 +24,6 @@
             <version>${project.version}</version>
         </dependency>
 
-        <!-- Vert.x, used directly by this module's main code until RT-04. It used to arrive only
-             through quorus-core, which no longer depends on Vert.x (RT-03f) -->
-        <dependency>
-            <groupId>io.vertx</groupId>
-            <artifactId>vertx-core</artifactId>
-        </dependency>
-
         <!-- Quorus Workflow dependency -->
         <dependency>
             <groupId>dev.mars</groupId>
@@ -61,6 +54,22 @@
 
     <build>
         <plugins>
+            <!-- No coverage gate here: the main code is runnable demo programs, not product code. The
+                 cross-module tests run, but the demos are not unit-tested, so the parent 60% line rule
+                 cannot apply. It never did: until RT-04 no test in this module ran, so there was no
+                 coverage data to check. -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>jacoco-check</id>
+                        <configuration>
+                            <skip>true</skip>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>

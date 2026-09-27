@@ -16,23 +16,23 @@
 
 package dev.mars.quorus.workflow;
 
-import io.vertx.core.Vertx;
-import io.vertx.junit5.VertxExtension;
-import io.vertx.junit5.VertxTestContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.Timeout;
 
 import dev.mars.quorus.testing.ExpectsError;
-import io.vertx.core.Future;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.stream.IntStream;
 
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Tests for SimpleWorkflowEngine functionality.
+ * Tests for SimpleWorkflowEngine functionality. The engine is blocking (RT-04): each call returns
+ * the finished execution on the test thread.
  *
  * NOTE: These tests have been updated to comply with the new YAML schema validation requirements.
  * All test workflows now include complete metadata with required fields:
@@ -46,10 +46,10 @@ import static org.junit.jupiter.api.Assertions.*;
  *
  * Tests that intentionally fail validation are clearly marked and documented.
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @version 1.0
+ * @version 2.0
  * @since 2025-08-18
  */
-@ExtendWith(VertxExtension.class)
+@Timeout(value = 30, unit = SECONDS, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
 class SimpleWorkflowEngineTest {
 
     private TestTransferEngine testTransferEngine;
@@ -62,7 +62,7 @@ class SimpleWorkflowEngineTest {
         testTransferEngine = new TestTransferEngine();
         testTransferEngine.simulateSuccess(); // Default to success behavior
         workflowEngine = new SimpleWorkflowEngine(testTransferEngine);
-        
+
         // Create a test workflow
         testWorkflow = createTestWorkflow();
         testContext = ExecutionContext.builder()
@@ -72,165 +72,272 @@ class SimpleWorkflowEngineTest {
                 .userId("test-user")
                 .build();
     }
-    
+
     @Test
-    void testNormalExecution(VertxTestContext testContext) {
+    void testNormalExecution() throws Exception {
         testTransferEngine.simulateSuccess();
 
-        workflowEngine.execute(testWorkflow, this.testContext).onComplete(testContext.succeeding(execution ->
-                testContext.verify(() -> {
-                    assertNotNull(execution);
-                    assertEquals("test-execution-123", execution.getExecutionId());
-                    assertEquals(WorkflowStatus.COMPLETED, execution.getStatus());
-                    assertTrue(execution.isSuccessful());
-                    assertEquals(1, execution.getGroupExecutions().size());
+        WorkflowExecution execution = workflowEngine.execute(testWorkflow, testContext);
 
-                    WorkflowExecution.GroupExecution groupExecution = execution.getGroupExecutions().get(0);
-                    assertEquals("test-group", groupExecution.getGroupName());
-                    assertEquals(WorkflowStatus.COMPLETED, groupExecution.getStatus());
-                    assertTrue(groupExecution.isSuccessful());
-                    assertEquals(1, groupExecution.getTransferResults().size());
-                    testContext.completeNow();
-                })));
+        assertNotNull(execution);
+        assertEquals("test-execution-123", execution.getExecutionId());
+        assertEquals(WorkflowStatus.COMPLETED, execution.getStatus());
+        assertTrue(execution.isSuccessful());
+        assertEquals(1, execution.getGroupExecutions().size());
+
+        WorkflowExecution.GroupExecution groupExecution = execution.getGroupExecutions().get(0);
+        assertEquals("test-group", groupExecution.getGroupName());
+        assertEquals(WorkflowStatus.COMPLETED, groupExecution.getStatus());
+        assertTrue(groupExecution.isSuccessful());
+        assertEquals(1, groupExecution.getTransferResults().size());
     }
-    
+
     @Test
-    void testDryRun(VertxTestContext testContext) {
-        workflowEngine.dryRun(testWorkflow, this.testContext).onComplete(testContext.succeeding(execution ->
-                testContext.verify(() -> {
-                    assertNotNull(execution);
-                    assertEquals(WorkflowStatus.COMPLETED, execution.getStatus());
-                    assertTrue(execution.isSuccessful());
-                    assertEquals(1, execution.getGroupExecutions().size());
-                    assertEquals(0, testTransferEngine.getActiveTransferCount());
-                    testContext.completeNow();
-                })));
+    void testDryRun() throws Exception {
+        WorkflowExecution execution = workflowEngine.dryRun(testWorkflow, testContext);
+
+        assertNotNull(execution);
+        assertEquals(WorkflowStatus.COMPLETED, execution.getStatus());
+        assertTrue(execution.isSuccessful());
+        assertEquals(1, execution.getGroupExecutions().size());
+        assertEquals(0, testTransferEngine.getMaxConcurrentTransfers(), "a dry run starts no transfer");
     }
-    
+
     @Test
-    void testVirtualRun(VertxTestContext testContext) {
-        workflowEngine.virtualRun(testWorkflow, this.testContext).onComplete(testContext.succeeding(execution ->
-                testContext.verify(() -> {
-                    assertNotNull(execution);
-                    assertEquals(WorkflowStatus.COMPLETED, execution.getStatus());
-                    assertTrue(execution.isSuccessful());
-                    assertEquals(1, execution.getGroupExecutions().size());
-                    assertEquals(0, testTransferEngine.getActiveTransferCount());
-                    assertTrue(execution.getDuration().isPresent());
-                    assertTrue(execution.getDuration().get().toMillis() >= 100);
-                    testContext.completeNow();
-                })));
+    void testVirtualRun() throws Exception {
+        WorkflowExecution execution = workflowEngine.virtualRun(testWorkflow, testContext);
+
+        assertNotNull(execution);
+        assertEquals(WorkflowStatus.COMPLETED, execution.getStatus());
+        assertTrue(execution.isSuccessful());
+        assertEquals(1, execution.getGroupExecutions().size());
+        assertEquals(0, testTransferEngine.getMaxConcurrentTransfers(), "a virtual run starts no transfer");
+        assertTrue(execution.getDuration().isPresent());
+        assertTrue(execution.getDuration().get().toMillis() >= 100);
     }
-    
+
     @Test
     @ExpectsError("Simulated transfer failure -- verifies workflow marks group as FAILED")
-    void testFailedTransfer(VertxTestContext testContext) {
+    void testFailedTransfer() throws Exception {
         testTransferEngine.simulateFailure();
 
-        workflowEngine.execute(testWorkflow, this.testContext).onComplete(testContext.succeeding(execution ->
-                testContext.verify(() -> {
-                    assertNotNull(execution);
-                    assertEquals(WorkflowStatus.FAILED, execution.getStatus());
-                    assertFalse(execution.isSuccessful());
+        WorkflowExecution execution = workflowEngine.execute(testWorkflow, testContext);
 
-                    WorkflowExecution.GroupExecution groupExecution = execution.getGroupExecutions().get(0);
-                    assertEquals(WorkflowStatus.FAILED, groupExecution.getStatus());
-                    assertFalse(groupExecution.isSuccessful());
-                    testContext.completeNow();
-                })));
+        assertNotNull(execution);
+        assertEquals(WorkflowStatus.FAILED, execution.getStatus());
+        assertFalse(execution.isSuccessful());
+
+        WorkflowExecution.GroupExecution groupExecution = execution.getGroupExecutions().get(0);
+        assertEquals(WorkflowStatus.FAILED, groupExecution.getStatus());
+        assertFalse(groupExecution.isSuccessful());
     }
-    
+
     @Test
     @ExpectsError("Simulated transfer exception -- verifies workflow catches and marks FAILED")
-    void testTransferException(VertxTestContext testContext) {
+    void testTransferException() throws Exception {
         testTransferEngine.simulateException(new RuntimeException("Transfer failed"));
 
-        workflowEngine.execute(testWorkflow, this.testContext).onComplete(testContext.succeeding(execution ->
-                testContext.verify(() -> {
-                    assertNotNull(execution);
-                    assertEquals(WorkflowStatus.FAILED, execution.getStatus());
-                    assertFalse(execution.isSuccessful());
-                    testContext.completeNow();
-                })));
-    }
-    
-    @Test
-    void testGetStatus(VertxTestContext testContext) {
-        testTransferEngine.simulateSuccess();
+        WorkflowExecution execution = workflowEngine.execute(testWorkflow, testContext);
 
-        Future<WorkflowExecution> future = workflowEngine.execute(testWorkflow, this.testContext);
+        assertNotNull(execution);
+        assertEquals(WorkflowStatus.FAILED, execution.getStatus());
+        assertFalse(execution.isSuccessful());
+    }
+
+    @Test
+    void testGetStatus() throws Exception {
+        testTransferEngine.simulateSuccess();
 
         // Status should be null for unknown execution
         assertNull(workflowEngine.getStatus("unknown-execution"));
 
-        future.onComplete(testContext.succeeding(execution -> testContext.verify(() -> {
-            assertNull(workflowEngine.getStatus("test-execution-123"));
-            testContext.completeNow();
-        })));
+        workflowEngine.execute(testWorkflow, testContext);
+
+        assertNull(workflowEngine.getStatus("test-execution-123"), "a finished execution is no longer active");
     }
-    
+
     @Test
     void testCancel() {
         // Cancel should return false for unknown execution
         assertFalse(workflowEngine.cancel("unknown-execution"));
     }
-    
+
     @Test
-    void testPauseAndResume() {
-        // Pause and resume are not supported in SimpleWorkflowEngine
-        assertFalse(workflowEngine.pause("test-execution-123"));
-        assertFalse(workflowEngine.resume("test-execution-123"));
+    void cancelStopsARunningWorkflowAndReportsItCancelled() throws Exception {
+        testTransferEngine.simulateDelay(Duration.ofSeconds(20));
+        CompletableFuture<WorkflowExecution> result = new CompletableFuture<>();
+        CompletableFuture<Boolean> interruptLeaked = new CompletableFuture<>();
+        Thread.ofVirtual().start(() -> {
+            try {
+                result.complete(workflowEngine.execute(testWorkflow, testContext));
+                interruptLeaked.complete(Thread.currentThread().isInterrupted());
+            } catch (Throwable e) {
+                result.completeExceptionally(e);
+            }
+        });
+        awaitTransfersInProgress(1);
+
+        assertTrue(workflowEngine.cancel("test-execution-123"));
+
+        WorkflowExecution execution = result.get(10, SECONDS);
+        assertEquals(WorkflowStatus.CANCELLED, execution.getStatus());
+        assertFalse(interruptLeaked.get(), "the caller's thread is not left interrupted");
+        assertEquals(0, testTransferEngine.getActiveTransferCount(), "the running transfer was stopped");
+        assertNull(workflowEngine.getStatus("test-execution-123"));
+        assertFalse(workflowEngine.cancel("test-execution-123"), "a finished execution cannot be cancelled");
     }
-    
+
     @Test
-    void testShutdown(VertxTestContext testContext) {
+    void independentGroupsRunUpToTheParallelismLimit() throws Exception {
+        testTransferEngine.simulateDelay(Duration.ofMillis(300));
+
+        WorkflowExecution execution = workflowEngine.execute(workflow(2,
+                group("a", List.of(), 1), group("b", List.of(), 1), group("c", List.of(), 1)), testContext);
+
+        assertTrue(execution.isSuccessful());
+        assertEquals(3, execution.getGroupExecutions().size());
+        assertEquals(2, testTransferEngine.getMaxConcurrentTransfers(), "two groups at a time, never three");
+    }
+
+    @Test
+    void parallelismOfOneRunsGroupsOneAtATime() throws Exception {
+        testTransferEngine.simulateDelay(Duration.ofMillis(100));
+
+        WorkflowExecution execution = workflowEngine.execute(workflow(1,
+                group("a", List.of(), 1), group("b", List.of(), 1), group("c", List.of(), 1)), testContext);
+
+        assertTrue(execution.isSuccessful());
+        assertEquals(1, testTransferEngine.getMaxConcurrentTransfers());
+    }
+
+    @Test
+    void aGroupStartsOnlyAfterTheGroupsItDependsOn() throws Exception {
+        testTransferEngine.simulateDelay(Duration.ofMillis(200));
+
+        WorkflowExecution execution = workflowEngine.execute(workflow(3,
+                group("a", List.of(), 1), group("b", List.of("a"), 1), group("c", List.of(), 1)), testContext);
+
+        assertTrue(execution.isSuccessful());
+        WorkflowExecution.GroupExecution a = groupExecution(execution, "a");
+        WorkflowExecution.GroupExecution b = groupExecution(execution, "b");
+        assertFalse(b.getStartTime().isBefore(a.getEndTime().orElseThrow()), "b waits for a");
+        assertEquals(2, testTransferEngine.getMaxConcurrentTransfers(), "a and c run together; b waits");
+    }
+
+    @Test
+    void testShutdown() {
         workflowEngine.shutdown();
-        
-        // After shutdown, new executions should fail
-        workflowEngine.execute(testWorkflow, this.testContext)
-                .onComplete(testContext.failing(error -> testContext.completeNow()));
+
+        // After shutdown, new executions are refused
+        assertThrows(IllegalStateException.class, () -> workflowEngine.execute(testWorkflow, testContext));
     }
 
     @Test
-    void testShutdownDoesNotCloseInjectedVertx(Vertx sharedVertx, VertxTestContext testContext) {
-        SimpleWorkflowEngine engineWithSharedVertx = new SimpleWorkflowEngine(sharedVertx, testTransferEngine);
+    void transfersInAGroupRunInParallel() throws Exception {
+        testTransferEngine.simulateDelay(Duration.ofMillis(300));
 
-        engineWithSharedVertx.shutdown();
+        WorkflowExecution execution = workflowEngine.execute(createWorkflow(Duration.ofHours(1), 3), testContext);
 
-        testContext.verify(() -> assertDoesNotThrow(() -> sharedVertx.setTimer(10, id -> {}),
-                "Shutdown should not close externally managed Vert.x"));
-        testContext.completeNow();
+        assertTrue(execution.isSuccessful());
+        assertEquals(3, execution.getGroupExecutions().get(0).getTransferResults().size());
+        assertEquals(3, testTransferEngine.getMaxConcurrentTransfers(), "all three transfers overlap");
     }
-    
+
     @Test
-    void testVariableResolution(VertxTestContext testContext) {
+    @ExpectsError("Workflow timeout -- verifies an overrunning workflow fails and its transfers are stopped")
+    void theWorkflowTimeoutFailsTheExecutionAndStopsItsTransfers() throws Exception {
+        testTransferEngine.simulateDelay(Duration.ofSeconds(20));
+        long started = System.nanoTime();
+
+        WorkflowExecution execution = workflowEngine.execute(createWorkflow(Duration.ofMillis(200), 1), testContext);
+
+        assertEquals(WorkflowStatus.FAILED, execution.getStatus());
+        String error = execution.getErrorMessage().orElse("");
+        assertTrue(error.contains("timed out"), error);
+        assertTrue(Duration.ofNanos(System.nanoTime() - started).toSeconds() < 10, "the transfer was not waited for");
+        assertEquals(0, testTransferEngine.getActiveTransferCount(), "the overrunning transfer was stopped");
+        assertNull(workflowEngine.getStatus("test-execution-123"));
+    }
+
+    @Test
+    void anInterruptedCallerStopsTheWorkflow() {
+        testTransferEngine.simulateDelay(Duration.ofSeconds(20));
+        Thread caller = Thread.currentThread();
+        Thread.ofVirtual().start(() -> {
+            try {
+                Thread.sleep(200);
+            } catch (InterruptedException e) {
+                return;
+            }
+            caller.interrupt();
+        });
+
+        assertThrows(InterruptedException.class, () -> workflowEngine.execute(testWorkflow, testContext));
+
+        assertEquals(0, testTransferEngine.getActiveTransferCount(), "the transfer was stopped");
+        assertNull(workflowEngine.getStatus("test-execution-123"));
+    }
+
+    @Test
+    void testVariableResolution() throws Exception {
         testTransferEngine.simulateSuccess();
 
         // Create workflow with variables
         WorkflowDefinition workflowWithVars = createWorkflowWithVariables();
 
-        workflowEngine.execute(workflowWithVars, this.testContext).onComplete(testContext.succeeding(execution ->
-                testContext.verify(() -> {
-                    assertTrue(execution.isSuccessful());
-                    testContext.completeNow();
-                })));
+        assertTrue(workflowEngine.execute(workflowWithVars, testContext).isSuccessful());
     }
-    
+
     @Test
     @ExpectsError("Empty workflow name -- verifies validation rejects and returns FAILED status")
-    void testInvalidWorkflow(VertxTestContext testContext) {
+    void testInvalidWorkflow() throws Exception {
         // Create invalid workflow (missing required fields)
         WorkflowDefinition invalidWorkflow = createInvalidWorkflow();
-        
-        workflowEngine.execute(invalidWorkflow, this.testContext).onComplete(testContext.succeeding(execution ->
-                testContext.verify(() -> {
-                    assertEquals(WorkflowStatus.FAILED, execution.getStatus());
-                    assertTrue(execution.getErrorMessage().isPresent());
-                    assertTrue(execution.getErrorMessage().get().contains("validation failed"));
-                    testContext.completeNow();
-                })));
+
+        WorkflowExecution execution = workflowEngine.execute(invalidWorkflow, testContext);
+
+        assertEquals(WorkflowStatus.FAILED, execution.getStatus());
+        assertTrue(execution.getErrorMessage().isPresent());
+        assertTrue(execution.getErrorMessage().get().contains("validation failed"));
     }
-    
+
+    /** A valid one-group workflow of {@code transfers} transfers with the given workflow timeout. */
+    private WorkflowDefinition createWorkflow(Duration timeout, int transfers) {
+        return workflow(timeout, 1, group("test-group", List.of(), transfers));
+    }
+
+    private WorkflowDefinition workflow(int parallelism, TransferGroup... groups) {
+        return workflow(Duration.ofHours(1), parallelism, groups);
+    }
+
+    private WorkflowDefinition workflow(Duration timeout, int parallelism, TransferGroup... groups) {
+        WorkflowDefinition base = createTestWorkflow();
+        return new WorkflowDefinition("v1", base.getMetadata(), new WorkflowDefinition.WorkflowSpec(Map.of(),
+                new WorkflowDefinition.ExecutionConfig(false, false, parallelism, timeout, "parallel"),
+                List.of(groups)));
+    }
+
+    private static TransferGroup group(String name, List<String> dependsOn, int transfers) {
+        List<TransferGroup.TransferDefinition> definitions = IntStream.rangeClosed(1, transfers)
+                .mapToObj(i -> new TransferGroup.TransferDefinition(name + "-transfer-" + i,
+                        "https://example.com/" + name + "-" + i + ".txt", "/tmp/" + name + "-" + i + ".txt",
+                        "http", Map.of(), null))
+                .toList();
+        return new TransferGroup(name, "Test group " + name, dependsOn, null, Map.of(), definitions, false, 0);
+    }
+
+    private static WorkflowExecution.GroupExecution groupExecution(WorkflowExecution execution, String name) {
+        return execution.getGroupExecutions().stream().filter(g -> g.getGroupName().equals(name))
+                .findFirst().orElseThrow(() -> new AssertionError("group " + name + " did not run"));
+    }
+
+    /** Waits, within the class timeout, until the test engine has this many transfers in progress. */
+    private void awaitTransfersInProgress(int count) throws InterruptedException {
+        while (testTransferEngine.getActiveTransferCount() < count) {
+            Thread.sleep(10);
+        }
+    }
+
     /**
      * Creates a test workflow with complete metadata that satisfies the new schema validation requirements.
      * All required metadata fields are included to ensure validation passes.

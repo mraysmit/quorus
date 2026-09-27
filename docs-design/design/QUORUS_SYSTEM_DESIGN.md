@@ -3091,15 +3091,15 @@ public interface WorkflowDefinitionParser {
 #### 2. Workflow Engine
 ```java
 public interface WorkflowEngine {
-    WorkflowExecution execute(WorkflowDefinition definition, ExecutionContext context);
-    WorkflowExecution dryRun(WorkflowDefinition definition, ExecutionContext context);
-    WorkflowExecution virtualRun(WorkflowDefinition definition, ExecutionContext context);
+    // Blocking: each returns the finished execution (RT-04)
+    WorkflowExecution execute(WorkflowDefinition definition, ExecutionContext context) throws InterruptedException;
+    WorkflowExecution dryRun(WorkflowDefinition definition, ExecutionContext context) throws InterruptedException;
+    WorkflowExecution virtualRun(WorkflowDefinition definition, ExecutionContext context) throws InterruptedException;
 
     // Monitoring and control
     WorkflowStatus getStatus(String executionId);
-    boolean pause(String executionId);
-    boolean resume(String executionId);
-    boolean cancel(String executionId);
+    boolean cancel(String executionId);   // stops a running execution; it ends CANCELLED
+    void shutdown();
 }
 ```
 
