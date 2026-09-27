@@ -28,8 +28,6 @@ import dev.mars.quorus.connection.RuntimeCredential;
 import dev.mars.quorus.connection.TlsPeerPolicy;
 
 import static dev.mars.quorus.core.exceptions.QuorusErrorCode.*;
-import io.vertx.core.Context;
-import io.vertx.core.Vertx;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -141,11 +139,6 @@ public class FtpTransferProtocol implements TransferProtocol {
 
     @Override
     public TransferResult transfer(TransferRequest request, TransferContext context) throws TransferException {
-        if (Context.isOnEventLoopThread()) {
-            throw new TransferException(context.getJobId(),
-                    "Blocking FTP transfer() invoked on event loop. Use transferReactive() instead.");
-        }
-
         logger.info("Starting FTP transfer: jobId={}, isUpload={}", context.getJobId(), request.isUpload());
         // Use destinationUri for logging to support both uploads and downloads
         logger.debug("Transfer details: sourceUri={}, destinationUri={}", 

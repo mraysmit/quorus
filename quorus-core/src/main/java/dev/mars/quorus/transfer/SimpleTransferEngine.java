@@ -340,7 +340,7 @@ public class SimpleTransferEngine implements TransferEngine {
                             "Protocol '" + protocolName + "' cannot handle request direction/URI combination"));
                 }
                 try {
-                    TransferResult result = runAttempt(protocol, request, transfer.context);
+                    TransferResult result = protocol.transfer(request, transfer.context);
                     if (!result.isSuccessful()) {
                         throw new TransferException(job.getJobId(),
                                 "Transfer failed: " + result.getErrorMessage().orElse("Unknown error"));
@@ -364,16 +364,6 @@ public class SimpleTransferEngine implements TransferEngine {
                 }
             }
         }
-    }
-
-    /**
-     * Runs one attempt through the adapter's blocking entry point. It is deprecated only in favour of
-     * the Vert.x {@code transferReactive}, which RT-03d removes together with the deprecation.
-     */
-    @SuppressWarnings("deprecation")
-    private static TransferResult runAttempt(TransferProtocol protocol, TransferRequest request,
-                                             TransferContext context) throws TransferException {
-        return protocol.transfer(request, context);
     }
 
     /** Waits before retry {@code retry}; returns {@code false} if interrupted, restoring the interrupt. */

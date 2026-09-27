@@ -29,8 +29,6 @@ import dev.mars.quorus.connection.ServiceConnection;
 import dev.mars.quorus.connection.SftpHostKeyPolicy;
 
 import static dev.mars.quorus.core.exceptions.QuorusErrorCode.*;
-import io.vertx.core.Context;
-import io.vertx.core.Vertx;
 
 import com.jcraft.jsch.*;
 
@@ -105,11 +103,6 @@ public class SftpTransferProtocol implements TransferProtocol {
 
     @Override
     public TransferResult transfer(TransferRequest request, TransferContext context) throws TransferException {
-        if (Context.isOnEventLoopThread()) {
-            throw new TransferException(context.getJobId(),
-                    "Blocking SFTP transfer() invoked on event loop. Use transferReactive() instead.");
-        }
-
         logger.info("Starting SFTP transfer for job: {}", context.getJobId());
         logger.debug("transfer: request={}, sourceUri={}, destinationUri={}, isUpload={}", 
             request.getRequestId(), SensitiveDataRedactor.redactUri(request.getSourceUri()),

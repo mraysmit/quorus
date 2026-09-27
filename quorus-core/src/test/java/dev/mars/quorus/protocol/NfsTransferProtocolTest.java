@@ -435,68 +435,48 @@ class NfsTransferProtocolTest {
 
         @Test
         void factoryRegistersNfsProtocol() {
-            io.vertx.core.Vertx vertx = io.vertx.core.Vertx.vertx();
-            try {
-                ProtocolFactory factory = new ProtocolFactory(vertx);
-                assertTrue(factory.isProtocolSupported("nfs"));
-                TransferProtocol nfs = factory.getProtocol("nfs");
-                assertNotNull(nfs);
-                assertInstanceOf(NfsTransferProtocol.class, nfs);
-            } finally {
-                vertx.close();
-            }
+            ProtocolFactory factory = new ProtocolFactory();
+            assertTrue(factory.isProtocolSupported("nfs"));
+            TransferProtocol nfs = factory.getProtocol("nfs");
+            assertNotNull(nfs);
+            assertInstanceOf(NfsTransferProtocol.class, nfs);
         }
 
         @Test
         void factoryInjectsExplicitNfsMountRoot() {
-            io.vertx.core.Vertx vertx = io.vertx.core.Vertx.vertx();
-            try {
-                ProtocolFactory factory = new ProtocolFactory(vertx, tempDir.toString(), true, true);
+            ProtocolFactory factory = new ProtocolFactory(tempDir.toString(), true, true);
 
-                NfsTransferProtocol nfs = assertInstanceOf(
-                        NfsTransferProtocol.class, factory.getProtocol("nfs"));
-                SmbTransferProtocol smb = assertInstanceOf(
-                        SmbTransferProtocol.class, factory.getProtocol("smb"));
-                assertEquals(tempDir.toString(), nfs.getMountRoot());
-                assertTrue(nfs.isMountSecurityVerified());
-                assertTrue(smb.isMountSecurityVerified());
-            } finally {
-                vertx.close();
-            }
+            NfsTransferProtocol nfs = assertInstanceOf(
+                    NfsTransferProtocol.class, factory.getProtocol("nfs"));
+            SmbTransferProtocol smb = assertInstanceOf(
+                    SmbTransferProtocol.class, factory.getProtocol("smb"));
+            assertEquals(tempDir.toString(), nfs.getMountRoot());
+            assertTrue(nfs.isMountSecurityVerified());
+            assertTrue(smb.isMountSecurityVerified());
         }
 
         @Test
         void factoryResolvesNfsForDownloadRequest() {
-            io.vertx.core.Vertx vertx = io.vertx.core.Vertx.vertx();
-            try {
-                ProtocolFactory factory = new ProtocolFactory(vertx);
-                TransferRequest request = TransferRequest.builder()
-                        .sourceUri(URI.create("nfs://server/export/file.txt"))
-                        .destinationPath(tempDir.resolve("file.txt"))
-                        .build();
-                TransferProtocol resolved = factory.getProtocol(request);
-                assertNotNull(resolved);
-                assertInstanceOf(NfsTransferProtocol.class, resolved);
-            } finally {
-                vertx.close();
-            }
+            ProtocolFactory factory = new ProtocolFactory();
+            TransferRequest request = TransferRequest.builder()
+                    .sourceUri(URI.create("nfs://server/export/file.txt"))
+                    .destinationPath(tempDir.resolve("file.txt"))
+                    .build();
+            TransferProtocol resolved = factory.getProtocol(request);
+            assertNotNull(resolved);
+            assertInstanceOf(NfsTransferProtocol.class, resolved);
         }
 
         @Test
         void factoryResolvesNfsForUploadRequest() {
-            io.vertx.core.Vertx vertx = io.vertx.core.Vertx.vertx();
-            try {
-                ProtocolFactory factory = new ProtocolFactory(vertx);
-                TransferRequest request = TransferRequest.builder()
-                        .sourceUri(tempDir.resolve("file.txt").toUri())
-                        .destinationUri(URI.create("nfs://server/export/file.txt"))
-                        .build();
-                TransferProtocol resolved = factory.getProtocol(request);
-                assertNotNull(resolved);
-                assertInstanceOf(NfsTransferProtocol.class, resolved);
-            } finally {
-                vertx.close();
-            }
+            ProtocolFactory factory = new ProtocolFactory();
+            TransferRequest request = TransferRequest.builder()
+                    .sourceUri(tempDir.resolve("file.txt").toUri())
+                    .destinationUri(URI.create("nfs://server/export/file.txt"))
+                    .build();
+            TransferProtocol resolved = factory.getProtocol(request);
+            assertNotNull(resolved);
+            assertInstanceOf(NfsTransferProtocol.class, resolved);
         }
     }
 }

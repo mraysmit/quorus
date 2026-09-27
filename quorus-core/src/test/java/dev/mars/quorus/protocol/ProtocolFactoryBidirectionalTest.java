@@ -17,8 +17,6 @@
 package dev.mars.quorus.protocol;
 
 import dev.mars.quorus.core.TransferRequest;
-import io.vertx.core.Vertx;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -39,20 +37,11 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class ProtocolFactoryBidirectionalTest {
 
-    private Vertx vertx;
     private ProtocolFactory factory;
 
     @BeforeEach
     void setUp() {
-        vertx = Vertx.vertx();
-        factory = new ProtocolFactory(vertx);
-    }
-
-    @AfterEach
-    void tearDown() {
-        if (vertx != null) {
-            vertx.close();
-        }
+        factory = new ProtocolFactory();
     }
 
     @Nested
