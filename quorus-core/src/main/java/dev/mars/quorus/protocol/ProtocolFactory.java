@@ -19,7 +19,6 @@ package dev.mars.quorus.protocol;
 import dev.mars.quorus.core.TransferDirection;
 import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.exceptions.QuorusErrorCode;
-import io.vertx.core.Vertx;
 
 import static dev.mars.quorus.core.exceptions.QuorusErrorCode.*;
 
@@ -63,29 +62,6 @@ public class ProtocolFactory {
         this.protocols = new HashMap<>();
         logger.debug("Initializing ProtocolFactory");
         registerDefaultProtocols();
-    }
-
-    /**
-     * No adapter needs Vert.x since RT-03b, so the instance is ignored.
-     *
-     * @deprecated use {@link #ProtocolFactory()}; removed by RT-03d
-     */
-    @Deprecated
-    public ProtocolFactory(Vertx vertx) {
-        this();
-        java.util.Objects.requireNonNull(vertx, "Vertx instance cannot be null");
-    }
-
-    /**
-     * No adapter needs Vert.x since RT-03b, so the instance is ignored.
-     *
-     * @deprecated use {@link #ProtocolFactory(String, boolean, boolean)}; removed by RT-03d
-     */
-    @Deprecated
-    public ProtocolFactory(Vertx vertx, String nfsMountRoot,
-                           boolean smbMountSecurityVerified, boolean nfsMountSecurityVerified) {
-        this(nfsMountRoot, smbMountSecurityVerified, nfsMountSecurityVerified);
-        java.util.Objects.requireNonNull(vertx, "Vertx instance cannot be null");
     }
 
     private void registerDefaultProtocols() {
