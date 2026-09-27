@@ -163,7 +163,7 @@ public class NfsTransferProtocol implements TransferProtocol {
                 SensitiveDataRedactor.redactUri(request.getSourceUri()),
                 SensitiveDataRedactor.redactUri(request.getDestinationUri()));
 
-        ProgressTracker progressTracker = new ProgressTracker(context.getJobId());
+        ProgressTracker progressTracker = new ProgressTracker(context);
         progressTracker.start();
 
         try {
@@ -193,13 +193,6 @@ public class NfsTransferProtocol implements TransferProtocol {
     @Override
     public long getMaxFileSize() {
         return -1; // No specific limit for NFS
-    }
-
-    @Override
-    public void abort() {
-        logger.debug("abort: NFS transfer abort requested");
-        // NFS transfers use Java NIO Files API — cancellation via thread interruption
-        logger.debug("abort: NFS abort relies on thread interruption");
     }
 
     private TransferResult performNfsTransfer(TransferRequest request, ProgressTracker progressTracker)
@@ -381,7 +374,7 @@ public class NfsTransferProtocol implements TransferProtocol {
                             totalBytes > 0 ? (bytesTransferred * 100) / totalBytes : 0);
                 }
 
-                if (Thread.currentThread().isInterrupted()) {
+                if (progressTracker.stopRequested()) {
                     logger.debug("transferFile: transfer cancelled via thread interruption");
                     throw new IOException("Transfer was cancelled");
                 }

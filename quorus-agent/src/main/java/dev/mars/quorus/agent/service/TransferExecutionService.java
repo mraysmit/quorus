@@ -27,7 +27,6 @@ import dev.mars.quorus.connection.SecretProvider;
 import dev.mars.quorus.connection.ServiceConnection;
 import dev.mars.quorus.connection.VaultKvV2SecretProvider;
 import io.vertx.core.Future;
-import io.vertx.core.Promise;
 import io.vertx.core.Vertx;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,7 +51,6 @@ public class TransferExecutionService {
     private static final Logger logger = LoggerFactory.getLogger(TransferExecutionService.class);
 
     private final Vertx vertx;
-    private final boolean closeVertxOnShutdown;
     private final AgentConfiguration config;
     private final TransferEngine transferEngine;
     private final AgentConnectionPolicyService connectionPolicyService;
@@ -68,12 +66,7 @@ public class TransferExecutionService {
      * @param config Agent configuration
      */
     public TransferExecutionService(Vertx vertx, AgentConfiguration config) {
-        this(vertx, config, false);
-    }
-
-    private TransferExecutionService(Vertx vertx, AgentConfiguration config, boolean closeVertxOnShutdown) {
         this.vertx = Objects.requireNonNull(vertx, "Vertx cannot be null");
-        this.closeVertxOnShutdown = closeVertxOnShutdown;
         this.config = Objects.requireNonNull(config, "AgentConfiguration cannot be null");
         this.transferEngine = new SimpleTransferEngine(
                 config.getMaxConcurrentTransfers(),
@@ -89,15 +82,6 @@ public class TransferExecutionService {
         logger.info("TransferExecutionService initialized (Vert.x reactive mode)");
     }
 
-    /**
-     * Legacy constructor for backward compatibility.
-     * @deprecated Use {@link #TransferExecutionService(Vertx, AgentConfiguration)} instead
-     */
-    @Deprecated
-    public TransferExecutionService(AgentConfiguration config) {
-        this(Vertx.vertx(), config, true);
-        logger.warn("Using deprecated constructor - Vert.x instance created internally");
-    }
     
     public void start() {
         if (closed.get()) {
@@ -211,6 +195,15 @@ public class TransferExecutionService {
         return new AgentConnectionPolicyService(HostResolver.system(), providers);
     }
     
+    /**
+     * Returns the bytes moved so far by the running transfer with this job ID, or -1 if no such
+     * transfer is running. Read by the agent's progress reports (ENG-10).
+     */
+    public long transferredBytes(String jobId) {
+        var job = transferEngine.getTransferJob(jobId);
+        return job == null ? -1 : job.getBytesTransferred();
+    }
+
     public boolean canAcceptTransfer() {
         // Check if we have capacity for more transfers
         // This is a simplified check - in reality, we'd track active transfers
@@ -234,33 +227,13 @@ public class TransferExecutionService {
         logger.info("Shutting down transfer execution service...");
         running = false;
 
-        if (!closeVertxOnShutdown) {
-            // The engine's shutdown blocks until running transfers end, so it runs on a worker.
-            return vertx.executeBlocking(() -> {
-                        stopTransferEngine();
-                        return null;
-                    }, false)
-                    .<Void>mapEmpty()
-                    .onComplete(ar -> logger.info("Transfer execution service shutdown complete"));
-        }
-
-        // Deprecated constructor: this service owns its Vert.x instance. The shutdown must not run on
-        // that instance, because a continuation bound to its context is never dispatched once it is
-        // closed. So the blocking engine shutdown and the close both run on one short-lived virtual
-        // thread, which completes a promise bound to no context. Removed with Vert.x (RT-05).
-        Promise<Void> done = Promise.promise();
-        Thread.ofVirtual().name("transfer-service-shutdown").start(() -> {
-            stopTransferEngine();
-            logger.info("Closing internally managed Vert.x instance for TransferExecutionService");
-            vertx.close().onComplete(ar -> {
-                if (ar.failed()) {
-                    logger.warn("Failed to close internally managed Vert.x instance: {}", ar.cause().getMessage());
-                }
-                logger.info("Transfer execution service shutdown complete");
-                done.complete();
-            });
-        });
-        return done.future();
+        // The engine's shutdown blocks until running transfers end, so it runs on a worker.
+        return vertx.executeBlocking(() -> {
+                    stopTransferEngine();
+                    return null;
+                }, false)
+                .<Void>mapEmpty()
+                .onComplete(ar -> logger.info("Transfer execution service shutdown complete"));
     }
 
     /** Stops the engine, waiting up to 30 seconds for running transfers to end. Never throws. */

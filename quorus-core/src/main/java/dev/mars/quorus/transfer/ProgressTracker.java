@@ -24,6 +24,10 @@ import java.util.concurrent.atomic.AtomicReference;
 /**
  * Tracks progress of a file transfer operation with rate calculation and ETA estimation.
  * Thread-safe implementation for concurrent access during transfers.
+ *
+ * <p>A tracker created from a {@link TransferContext} is bound to that transfer (ENG-10): the total
+ * and progress it records are also recorded on the context's job, which the engine and its callers
+ * read, and {@link #stopRequested()} tells the adapter's copy loop when to stop.
  * 
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @since 2025-08-17
@@ -37,9 +41,20 @@ public class ProgressTracker {
     private final AtomicReference<Instant> lastUpdateTime;
     private final AtomicLong lastTransferredBytes;
     private final AtomicReference<Double> currentRate; // bytes per second
-    
+    private final TransferContext context;               // null when not bound to a transfer
+
     public ProgressTracker(String jobId) {
+        this(jobId, null);
+    }
+
+    /** Creates a tracker bound to a transfer: progress is also recorded on its job. */
+    public ProgressTracker(TransferContext context) {
+        this(context.getJobId(), context);
+    }
+
+    private ProgressTracker(String jobId, TransferContext context) {
         this.jobId = jobId;
+        this.context = context;
         this.totalBytes = new AtomicLong(-1);
         this.transferredBytes = new AtomicLong(0);
         this.startTime = new AtomicReference<>();
@@ -60,6 +75,9 @@ public class ProgressTracker {
     
     public void setTotalBytes(long totalBytes) {
         this.totalBytes.set(totalBytes);
+        if (context != null && totalBytes >= 0) {
+            context.getJob().setTotalBytes(totalBytes);
+        }
     }
     
     public long getTotalBytes() {
@@ -69,7 +87,10 @@ public class ProgressTracker {
     public void updateProgress(long bytesTransferred) {
         Instant now = Instant.now();
         this.transferredBytes.set(bytesTransferred);
-        
+        if (context != null) {
+            context.getJob().updateProgress(bytesTransferred);
+        }
+
         // Update rate calculation
         updateTransferRate(bytesTransferred, now);
         
@@ -81,6 +102,14 @@ public class ProgressTracker {
         updateProgress(newTotal);
     }
     
+    /**
+     * Returns whether the copy loop should stop: the transfer was cancelled or paused, or the
+     * thread was interrupted. An adapter checks this between buffers.
+     */
+    public boolean stopRequested() {
+        return (context != null && !context.shouldContinue()) || Thread.currentThread().isInterrupted();
+    }
+
     public long getTransferredBytes() {
         return transferredBytes.get();
     }

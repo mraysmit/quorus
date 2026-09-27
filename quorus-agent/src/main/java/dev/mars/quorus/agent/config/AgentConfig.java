@@ -166,6 +166,11 @@ public final class AgentConfig {
         return getLong("quorus.agent.jobs.polling.interval-ms", 10000);
     }
 
+    /** Interval between progress reports for a running transfer; see quorus-agent.properties. */
+    public long getProgressReportIntervalMs() {
+        return getLong("quorus.agent.jobs.progress-report-interval-ms", 15000);
+    }
+
     /**
      * Number of foreign-assignment mismatches allowed before fail-fast shutdown.
      * Default is 3 to tolerate transient routing issues while still detecting persistent problems.
@@ -299,6 +304,10 @@ public final class AgentConfig {
             throw new IllegalStateException(
                     "Job polling interval must be positive, got: " + getJobPollingIntervalMs());
         }
+        if (getProgressReportIntervalMs() <= 0) {
+            throw new IllegalStateException(
+                    "Progress report interval must be positive, got: " + getProgressReportIntervalMs());
+        }
         if (getMaxConcurrentTransfers() <= 0) {
             throw new IllegalStateException(
                     "Max concurrent transfers must be positive, got: " + getMaxConcurrentTransfers());
@@ -367,6 +376,7 @@ public final class AgentConfig {
         logger.info("  --- Job Polling ---");
         logger.info("  Initial Delay:        {}ms", getJobPollingInitialDelayMs());
         logger.info("  Poll Interval:        {}ms", getJobPollingIntervalMs());
+        logger.info("  Progress Interval:    {}ms", getProgressReportIntervalMs());
         logger.info("  --- Security ---");
         logger.info("  Foreign Assignment Threshold: {}", getForeignAssignmentMismatchThreshold());
         logger.info("  --- Telemetry ---");

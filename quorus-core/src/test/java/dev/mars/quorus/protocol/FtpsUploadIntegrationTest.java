@@ -133,9 +133,8 @@ class FtpsUploadIntegrationTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        protocol = new FtpTransferProtocol();
-        // Configure trust-all SSL for self-signed container certificate
-        protocol.setSslSocketFactory(createTrustAllSslSocketFactory());
+        // Trust-all TLS for the container's self-signed certificate, fixed at construction (test-only)
+        protocol = new FtpTransferProtocol(createTrustAllSslSocketFactory());
 
         // Get FTPS container connection details from shared container
         ftpsHost = SharedTestContainers.getFtpsHost();

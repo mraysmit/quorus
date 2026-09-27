@@ -341,15 +341,6 @@ class HttpTransferProtocolBoundaryTest {
     class Characterization {
 
         @Test
-        void abortClosesInFlightConnectionsAndFailsTheTransfer() throws Exception {
-            InterruptedTransfer running = startHeldDownload();
-            running.protocol.abort();
-
-            assertThrows(TransferException.class, running::finish);
-            assertNoDestinationWritten();
-        }
-
-        @Test
         void cancellingTheContextStopsTheTransferBetweenBuffers() throws Exception {
             InterruptedTransfer running = startHeldDownload();
             running.context.cancel();

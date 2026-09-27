@@ -84,6 +84,16 @@ public class JobStatusReportingService {
     }
 
     /**
+     * Reports a running transfer's progress (ENG-10). It follows the start report, so the attempt is
+     * expected to be IN_PROGRESS already; the controller requires the byte count not to decrease.
+     */
+    public Future<Void> reportProgress(String jobId, long bytesTransferred, String attemptId,
+                                       long fencingGeneration, long reportSequence) {
+        return reportStatus(jobId, "IN_PROGRESS", bytesTransferred, null,
+                attemptId, fencingGeneration, reportSequence, "IN_PROGRESS");
+    }
+
+    /**
      * Report that a job has completed successfully.
      * 
      * @return Future that completes when the report is sent

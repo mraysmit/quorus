@@ -2,7 +2,7 @@
 
 # Quorus Enterprise Implementation Plan
 
-**Version:** 1.36
+**Version:** 1.37
 **Date:** 2026-09-27
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
@@ -115,8 +115,20 @@ for DNS authorization. Delivered on 2026-09-27 under Section 6.1
 keep a single `activeClient` for all their transfers, so `TransferProtocol.abort()` closes only the latest
 connection. Before `RT-03c` the engine called `abort()` on cancel and so could abort the wrong transfer,
 or, for HTTP, every in-flight transfer. The blocking engine cancels by interrupting only the named
-transfer, and `abort()` has no production caller. `RT-03d` decides whether to remove it or make it per
-transfer.
+transfer, and `abort()` has no production caller. Resolved the same day: `abort()` and the shared
+connection state are removed, and a contract test keeps them out.
+
+**Adapters and agent reported no in-flight progress (`ENG-10`), resolved 2026-09-27.** The FTP, SFTP,
+SMB and NFS adapters kept progress in a private tracker that nothing read, and ignored pause and
+cancel requests in the transfer context. The agent reported `IN_PROGRESS` once with 0 bytes and then
+only the final result, for every protocol. No test covered either. The adapters now record progress
+on the job and stop between buffers on request. The agent reports a running transfer's growing byte
+count every `quorus.agent.jobs.progress-report-interval-ms` (15 s, inside the controller's 60 s
+freshness window), one report at a time, resending an unresolved report exactly before the final
+one so that report sequences stay contiguous
+(recorded in the commit message). The same pass removed a public setter
+that could replace TLS verification on the shared FTP adapter (`SEC-08`), and recorded that
+`TransferTelemetryMetrics` is shared by every engine in a JVM (`ENG-11`).
 
 ### Configuration and documentation remediation — 2026-09-25
 
@@ -353,26 +365,26 @@ A capability is complete only when all applicable items are satisfied:
 
 ### 6.1 Mandatory TDD delivery protocol
 
-Every implementation slice MUST use and retain the following sequence:
+Every implementation slice MUST follow this sequence:
 
 1. **Specify:** identify one externally observable behavior, its security and tenant context, failure behavior, and acceptance boundary.
-2. **Red:** add the smallest unit, component, or external-path behavioral test that expresses the behavior; execute it before production implementation and retain output proving it failed for the intended missing behavior rather than environment or fixture failure.
-3. **Green:** implement the smallest coherent end-to-end change that makes the new test pass; retain the focused green output.
+2. **Red:** add the smallest unit, component, or external-path behavioral test that expresses the behavior, and run it before the production implementation. It must fail for the intended missing behavior, not because of the environment or the fixture.
+3. **Green:** implement the smallest coherent end-to-end change that makes the new test pass.
 4. **Refactor:** remove duplication and align architecture without changing behavior; rerun the focused test and affected module suite.
 5. **Regress:** run the applicable unit, integration, protocol, multi-node, security, contract, and documentation lanes. A phase cannot close with an unresolved failure or a green result inferred from an isolated retry.
 
-The mandatory evidence record for each slice contains:
+Where a test protects behavior that a small code change could silently break, a mutation check (apply the change, confirm the test fails, restore) shows that the test pins it.
 
-- stable slice identifier and linked requirement or gap;
-- acceptance statement written before implementation;
-- test file and external entry point exercised;
-- red command, timestamp, revision or patch identity, expected failure, and captured output;
-- green command, timestamp, revision or patch identity, and captured output;
-- refactor summary and focused plus affected-suite results;
-- test classification: unit, component, external-path behavioral, integration, protocol, multi-node, security, contract, or failure injection;
-- confirmation that request bodies, credentials, keys, and sensitive payloads were not captured in evidence.
+**The record of a slice is its commit message** (decided 2026-09-27, `DR-Q6` revised). It states:
 
-Captured output is retained, not just summarised. Every raw log that the record cites is written directly to `docs-design/evidence/raw/<slice-id>/`, committed with the record, and listed in the manifest with its SHA-256. The git-ignored `temp/` directory is scratch space and MUST NOT hold cited evidence; a citation of a `temp/` path does not satisfy this protocol. Retention: raw red, green, mutation and characterization output is committed in full, because it is the only proof that a test failed for the intended reason and cannot be recreated once the code moves on. Regression, full-build, repeat-run and discarded-attempt output is committed as a `*.excerpt.txt` (summary lines, per-module totals, coverage gates, build result and failure blocks) with the full log's SHA-256 in the manifest; the full log is not kept, because it can be reproduced from the recorded command and revision. `*.log` is otherwise git-ignored, so `.gitignore` re-admits `docs-design/evidence/raw/**`. Historical `temp/` citations are resolved through the [raw evidence index](../evidence/raw/INDEX.md).
+- the behavior delivered and the requirement, gap or register item it serves;
+- the tests added, their classification, and the external entry point they exercise;
+- the red result: which tests failed and why, and any test defect found on the way;
+- the green result, the mutation checks and whether each was detected;
+- the regression command and its per-module totals and coverage-gate result;
+- any test written after its code, labelled retrospective characterization.
+
+Raw logs, JSON manifests, hashes and patches are not kept: output is reproducible from the command and the commit, and the commit is the change. The evidence already committed under `docs-design/evidence/` remains the record of the slices that produced it.
 
 For asynchronous behavior, tests MUST use the project-standard asynchronous test facilities: Vert.x test facilities for code that is still on Vert.x, and, for code that has left Vert.x, the test standard in the [Quorus concurrency conventions](../dev/QUORUS_CONCURRENCY_CONVENTIONS.md#6-asynchronous-test-standard) §6 (ADR-0012, workstream `RT-02`): blocking APIs, preemptive timeouts, handshake and interruption synchronisation, the real OpenTelemetry SDK and frozen logback events, and repeated concurrency runs. Awaitility, Java executor/latch orchestration, sleeps used as synchronization, and equivalent non-Vert.x polling are not permitted in new or remediated tests. External-path tests MUST enter through the same HTTP, agent, protocol, or cluster boundary used by a real caller. Direct method tests remain useful but cannot independently satisfy the behavioral-test gate.
 
@@ -637,6 +649,8 @@ The final clean controller retry passed 495 tests with no failures, errors, or s
 The seventh red/green cycle proved the configured active-transfer stall boundary through the tenant-checked progress API. A stalled transfer now exposes a stable `conditionSince` derived from its last real byte advancement plus the governed stall window, together with `stallDurationSeconds` for operator triage (`temp/phase3-active-stall-red.txt`, `temp/phase3-active-stall-green.txt`; 7 focused tests passed).
 
 The clean controller gate after the stall slice passed all 496 tests with no failures, errors, or skips. JaCoCo reported 79.8% line and 60.2% branch coverage, and every configured coverage check passed (`temp/phase3-controller-clean-verify-stall.txt`).
+
+**Correction, 2026-09-27 (`ENG-10`).** The progress, freshness and stall behaviour above was proven with reports sent to the controller by the tests. Until 2026-09-27 no real agent sent in-flight progress: it reported `IN_PROGRESS` once with 0 bytes and then only the final result, and four of the five protocol adapters exposed no progress at all. In a real deployment the controller therefore saw no byte advancement between start and completion, and would have judged any transfer longer than the stall window as stalled. The agent now reports progress during the transfer; this does not change the controller evidence above.
 
 This checkpoint does not close Phase 3. The remaining lifecycle event vocabulary, durable stall detection/event emission, throughput windows, calibrated ETA confidence, configurable deadline-risk prediction, operational query collections, timelines, resumable streaming, alerts, retention, archival, and service-level reporting remain open.
 
@@ -1209,7 +1223,7 @@ Quorus stops owning a Raft engine and consumes QRaft's engine through a 100% gen
 | **RT-03** | `quorus-core` | Protocol adapters run blocking I/O on virtual threads with no `executeBlocking`. The HTTP adapter uses Apache HttpClient 5 (`RT-Q5`) and streams to and from files, closing `ARCH-09`. Delivered in slices: `RT-03a` removes dead connection-pool code; `RT-03b` rewrites the HTTP adapter; `RT-03c` makes the `TransferEngine` blocking on virtual threads and moves its agent, workflow and example callers to that API; `RT-03d` removes `transferReactive` and `Vertx` from the protocol contract and `ProtocolFactory`; `RT-03e` moves `NetworkTopologyService` and the codec off Vert.x, using Jackson for the codec; `RT-03f` leaves no `io.vertx` dependency in the `quorus-core` pom |
 | **RT-Q5** | Decision: HTTP client for the HTTP transfer adapter | ✅ Decided 2026-09-26: Apache HttpClient 5 (classic API). Measured on JDK 27 GA: `java.net.http` cannot connect to an approved address while keeping SNI, `Host` and hostname verification on the service's hostname (ADR-0012) |
 | **RT-04** | `quorus-workflow` and `quorus-integration-examples` | No Vert.x types. Workflow execution uses structured scopes |
-| **RT-05** | `quorus-agent` | Controller client on `java.net.http.HttpClient` with mutual TLS and hostname verification. Registration, heartbeat and polling run as structured loops with bounded shutdown. The Phase 1 agent trust tests and R3 reporting tests pass |
+| **RT-05** | `quorus-agent` | Transfers run on virtual threads, so cancellation interrupts blocked I/O at once. Controller client on `java.net.http.HttpClient` with mutual TLS and hostname verification. Registration, heartbeat and polling run as structured loops with bounded shutdown. The Phase 1 agent trust tests and R3 reporting tests pass |
 | **RT-06** | `quorus-controller` | HTTP API on the `RT-Q2` server with TLS 1.3 and required client certificates. Authentication, authorization and audit middleware preserved. `OpenApiContractTest` stays equal. The `CE-07` bridge is removed |
 | **RT-07** | Observability | OpenTelemetry traces, metrics and log correlation for the new HTTP server and client, replacing Vert.x tracing integration |
 | **RT-08** | Vert.x removal gate | No `io.vertx` artifact in any module. A build check fails if one is reintroduced |
@@ -1326,6 +1340,7 @@ The plan is revised when requirements or implementation evidence change. Revisio
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.37 | 2026-09-27 | §6.1: a slice's record is its commit message; raw logs, manifests, hashes and patches are no longer kept (`DR-Q6` revised). Recorded the `RT-03c` follow-up: `ENG-09` resolved; `ENG-10` found and resolved (adapter and agent in-flight progress), with a dated correction to the Phase 3 checkpoint; `SEC-08` resolved; `ENG-11` recorded. `RT-05` acceptance now includes running transfers on virtual threads |
 | 1.36 | 2026-09-27 | Recorded `ENG-09` (shared abort target in the FTP and SFTP adapters), found by `RT-03c`, for decision in `RT-03d` |
 | 1.35 | 2026-09-27 | Recorded `ENG-08` (decision `DR-Q7`): the OpenAPI contract is the only current-API reference, with per-operation scopes, agent statuses, DNS-authorization failure responses and the REST API Specification's Current rows verified by test; the API Reference is deleted and `/api/v1/info` links to the contract. §1 cites the contract in place of the API Reference |
 | 1.34 | 2026-09-27 | Recorded that CI has never passed and that its repair is deferred (`ENG-07`, decision `SEQ-01`), with the consequences for regression evidence, Phase 0 and phase closure. Assigned `SEC-07` (governed TLS trusts only the JVM default anchors) to Phase 4 as a hardening follow-up with acceptance criteria (decision `SEQ-02`). Section 20: corrected `RT-03` to Apache HttpClient 5 and listed its slices; added the `RT-Q5` decision row; corrected `RT-Q4` and `RT-01b` to single-stage images that copy host-built jars, runtime option A; the status now says in progress. §22 records `ARCH-09` as closed by `RT-03b`. §3 baseline is Java 27 |
