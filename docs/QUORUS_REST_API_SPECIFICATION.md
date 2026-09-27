@@ -3,10 +3,9 @@
 # Quorus REST API Specification
 
 **Version:** 2.5
-**Date:** 2026-09-25
+**Date:** 2026-09-25  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
-**Status:** Canonical and normative  
 **Scope:** Complete REST control, operations, security, and administration interface
 
 ## 1. Purpose
