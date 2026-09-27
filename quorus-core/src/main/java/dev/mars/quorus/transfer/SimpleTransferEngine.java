@@ -21,7 +21,6 @@ import dev.mars.quorus.core.TransferDirection;
 import dev.mars.quorus.core.TransferJob;
 import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferResult;
-import dev.mars.quorus.core.TransferStatus;
 import dev.mars.quorus.core.exceptions.TransferException;
 import dev.mars.quorus.monitoring.ProtocolHealthCheck;
 import dev.mars.quorus.monitoring.TransferEngineHealthCheck;
@@ -34,341 +33,198 @@ import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.api.trace.Tracer;
-import io.vertx.core.Future;
-import io.vertx.core.Promise;
-import io.vertx.core.Vertx;
+import io.opentelemetry.context.Scope;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.slf4j.MDC;
 
+import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Simple implementation of the TransferEngine interface.
- * Handles basic file transfers with retry logic and progress tracking.
- * Uses Vert.x Futures/timers for non-blocking execution.
+ * Blocking {@link TransferEngine} (ADR-0012, RT-03c).
+ *
+ * <p>{@link #transfer} runs on the caller's thread: it validates the request, takes one of
+ * {@code maxConcurrentTransfers} slots, runs the protocol adapter with retries, and returns the
+ * outcome. There is no event loop, executor or future. Concurrency between transfers is the
+ * caller's choice, made with a {@code TaskScope}.
+ *
+ * <h2>Cancellation</h2>
+ * {@link #cancelTransfer} marks the transfer's context cancelled and interrupts the thread running
+ * it. On a virtual thread, an interrupt also closes a socket the thread is blocked on, so the
+ * adapter's I/O ends at once. Only the named transfer is affected; protocol adapters are shared, so
+ * their adapter-wide {@code abort()} is deliberately not used. The engine consumes the interrupt it
+ * sent before {@code transfer} returns, so the caller's thread is not left interrupted. An interrupt
+ * from anywhere else also ends the transfer as {@code CANCELLED}, and stays set for the caller.
+ *
+ * <h2>Thread safety</h2>
+ * Running transfers are held in a concurrent map. Each {@link ActiveTransfer} guards the race
+ * between cancellation and completion with its own monitor, so an interrupt can never reach a
+ * thread after its transfer has finished.
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @since 2025-08-17
- * @version 1.0
+ * @version 3.0
  */
 public class SimpleTransferEngine implements TransferEngine {
     private static final Logger logger = LoggerFactory.getLogger(SimpleTransferEngine.class);
     private static final Tracer tracer = GlobalOpenTelemetry.getTracer("quorus-core");
 
-    private final Vertx vertx;
-    private final boolean closeVertxOnShutdown;
-    private final ConcurrentHashMap<String, TransferJob> activeJobs;
-    private final ConcurrentHashMap<String, TransferContext> activeContexts;
-    private final ConcurrentHashMap<String, Future<TransferResult>> activeFutures;
+    private final Map<String, ActiveTransfer> active = new ConcurrentHashMap<>();
+    private final Semaphore slots;
     private final ProtocolFactory protocolFactory;
-    private final AtomicBoolean shutdown;
+    private final AtomicBoolean shutdown = new AtomicBoolean(false);
 
-    // Configuration
     private final int maxConcurrentTransfers;
     private final int maxRetryAttempts;
     private final long retryDelayMs;
 
-    // Monitoring
-    private final Instant startTime;
-
-    // OpenTelemetry Metrics (Phase 8 - Jan 2026)
+    private final Instant startTime = Instant.now();
     private final TransferTelemetryMetrics telemetryMetrics;
 
     /**
-     * Constructor with Vert.x dependency injection (recommended).
+     * Creates an engine without mounted-filesystem security attestations.
      *
-     * @param vertx Vert.x instance for reactive operations
-     * @param maxConcurrentTransfers Maximum number of concurrent transfers
-     * @param maxRetryAttempts Maximum retry attempts per transfer
-     * @param retryDelayMs Base delay between retries in milliseconds
+     * @param maxConcurrentTransfers transfers that may run at once; further calls are rejected
+     * @param maxRetryAttempts       retries after the first attempt fails
+     * @param retryDelayMs           base retry delay; attempt {@code n} waits {@code n} times this
      */
-    public SimpleTransferEngine(Vertx vertx, int maxConcurrentTransfers, int maxRetryAttempts, long retryDelayMs) {
-        this(vertx, maxConcurrentTransfers, maxRetryAttempts, retryDelayMs,
-                null, false, false, false);
+    public SimpleTransferEngine(int maxConcurrentTransfers, int maxRetryAttempts, long retryDelayMs) {
+        this(maxConcurrentTransfers, maxRetryAttempts, retryDelayMs, null, false, false);
     }
 
     /** Creates an engine with explicit mounted-filesystem security attestations. */
-    public SimpleTransferEngine(Vertx vertx, int maxConcurrentTransfers, int maxRetryAttempts,
-                                long retryDelayMs, String nfsMountRoot,
-                                boolean smbMountSecurityVerified, boolean nfsMountSecurityVerified) {
-        this(vertx, maxConcurrentTransfers, maxRetryAttempts, retryDelayMs,
-                nfsMountRoot, smbMountSecurityVerified, nfsMountSecurityVerified, false);
-    }
-
-    private SimpleTransferEngine(Vertx vertx, int maxConcurrentTransfers, int maxRetryAttempts, long retryDelayMs,
-                                 String nfsMountRoot, boolean smbMountSecurityVerified,
-                                 boolean nfsMountSecurityVerified, boolean closeVertxOnShutdown) {
-        logger.debug("Initializing SimpleTransferEngine: maxConcurrent={}, maxRetries={}, retryDelay={}ms",
-            maxConcurrentTransfers, maxRetryAttempts, retryDelayMs);
-        
-        this.vertx = Objects.requireNonNull(vertx, "Vertx cannot be null");
-        this.closeVertxOnShutdown = closeVertxOnShutdown;
+    public SimpleTransferEngine(int maxConcurrentTransfers, int maxRetryAttempts, long retryDelayMs,
+                                String nfsMountRoot, boolean smbMountSecurityVerified,
+                                boolean nfsMountSecurityVerified) {
+        if (maxConcurrentTransfers < 1) {
+            throw new IllegalArgumentException("maxConcurrentTransfers must be at least 1");
+        }
         this.maxConcurrentTransfers = maxConcurrentTransfers;
         this.maxRetryAttempts = maxRetryAttempts;
         this.retryDelayMs = retryDelayMs;
+        this.slots = new Semaphore(maxConcurrentTransfers);
+        this.protocolFactory = new ProtocolFactory(nfsMountRoot, smbMountSecurityVerified, nfsMountSecurityVerified);
 
-        this.activeJobs = new ConcurrentHashMap<>();
-        this.activeContexts = new ConcurrentHashMap<>();
-        this.activeFutures = new ConcurrentHashMap<>();
-        this.protocolFactory = new ProtocolFactory(
-                vertx, nfsMountRoot, smbMountSecurityVerified, nfsMountSecurityVerified);
-        this.shutdown = new AtomicBoolean(false);
-
-        // Initialize monitoring
-        this.startTime = Instant.now();
-
-        // Initialize OpenTelemetry metrics
         this.telemetryMetrics = TransferTelemetryMetrics.getInstance();
         telemetryMetrics.registerProtocol("http");
         telemetryMetrics.registerProtocol("ftp");
         telemetryMetrics.registerProtocol("sftp");
         telemetryMetrics.registerProtocol("smb");
 
-        logger.info("SimpleTransferEngine initialized with {} max concurrent transfers (reactive mode, OpenTelemetry enabled)",
-            maxConcurrentTransfers);
-        logger.debug("SimpleTransferEngine initialization complete - startTime={}", startTime);
+        logger.info("SimpleTransferEngine initialized: maxConcurrent={}, maxRetries={}, retryDelay={}ms",
+                maxConcurrentTransfers, maxRetryAttempts, retryDelayMs);
     }
-    
+
     @Override
-    public Future<TransferResult> submitTransfer(TransferRequest request) throws TransferException {
-        TransferDirection direction = request.getDirection();
-        logger.debug("submitTransfer: request={}, protocol={}, direction={}", 
-            request.getRequestId(), request.getProtocol(), direction);
-        
+    public TransferResult transfer(TransferRequest request) throws TransferException {
         if (shutdown.get()) {
-            logger.debug("submitTransfer: rejected - engine is shutdown");
             throw new TransferException(request.getRequestId(), "Transfer engine is shutdown");
         }
-        
-        // Validate transfer request
         validateTransferRequest(request);
-        
-        if (activeJobs.size() >= maxConcurrentTransfers) {
-            logger.debug("submitTransfer: rejected - max concurrent transfers reached ({})", activeJobs.size());
+        if (!slots.tryAcquire()) {
             throw new TransferException(request.getRequestId(), "Maximum concurrent transfers reached");
         }
-        
-        // Create job and context
-        logger.debug("submitTransfer: creating job and context");
+
         TransferJob job = new TransferJob(request);
-        TransferContext context = new TransferContext(job);
-        
-        // Store in active collections
-        activeJobs.put(job.getJobId(), job);
-        activeContexts.put(job.getJobId(), context);
-        logger.debug("submitTransfer: job registered, activeJobs={}", activeJobs.size());
-        
-        // Record OpenTelemetry metric (Phase 8 - Jan 2026)
-        telemetryMetrics.recordTransferStarted(request.getProtocol(), direction.name());
-        
-        // Execute transfer reactively (no blocking waits)
-        logger.debug("submitTransfer: executing transfer via reactive pipeline");
-        Map<String, String> mdcContext = MDC.getCopyOfContextMap();
-        Promise<TransferResult> executionPromise = Promise.promise();
-        vertx.runOnContext(v -> {
-            if (mdcContext != null) {
-                MDC.setContextMap(mdcContext);
+        ActiveTransfer transfer = new ActiveTransfer(job, new TransferContext(job), Thread.currentThread());
+        if (active.putIfAbsent(job.getJobId(), transfer) != null) {
+            slots.release();
+            throw new TransferException(request.getRequestId(), "A transfer with this ID is already running");
+        }
+        try {
+            if (shutdown.get()) {
+                transfer.cancel();          // shutdown began after the first check; do not start work
             }
-            executeTransfer(context).onComplete(executionPromise);
-        });
-
-        Future<TransferResult> future = executionPromise.future()
-            .recover(err -> {
-                logger.error("Transfer execution failed for job {}: {} ({})",
-                        job.getJobId(), err.getMessage(), err.getClass().getSimpleName());
-                if (logger.isDebugEnabled()) {
-                    logger.debug("Transfer execution exception details for job: {}", job.getJobId(), err);
-                }
-                job.fail("Transfer execution failed: " + err.getMessage(), err);
-                return Future.succeededFuture(job.toResult());
-            })
-            .eventually(() -> {
-                logger.debug("submitTransfer: cleaning up job {} from active collections", job.getJobId());
-                activeJobs.remove(job.getJobId());
-                activeContexts.remove(job.getJobId());
-                activeFutures.remove(job.getJobId());
-                MDC.clear();
-                return Future.succeededFuture();
-            });
-
-        activeFutures.put(job.getJobId(), future);
-
-        logger.info("Transfer submitted: {}", job.getJobId());
-        logger.debug("submitTransfer: complete, future registered");
-        return future;
+            telemetryMetrics.recordTransferStarted(request.getProtocol(), request.getDirection().name());
+            logger.info("Transfer started: {}", job.getJobId());
+            return execute(transfer);
+        } finally {
+            if (transfer.finish()) {
+                Thread.interrupted();       // consume the interrupt cancelTransfer sent to this thread
+            }
+            active.remove(job.getJobId());
+            slots.release();
+            transfer.ended.complete(null);
+        }
     }
-    
+
     @Override
     public TransferJob getTransferJob(String jobId) {
-        logger.debug("getTransferJob: looking up jobId={}", jobId);
-        TransferJob job = activeJobs.get(jobId);
-        logger.debug("getTransferJob: found={}", job != null);
-        return job;
+        ActiveTransfer transfer = active.get(jobId);
+        return transfer == null ? null : transfer.job;
     }
-    
+
     @Override
     public boolean cancelTransfer(String jobId) {
-        logger.debug("cancelTransfer: attempting to cancel jobId={}", jobId);
-        TransferContext context = activeContexts.get(jobId);
-        Future<TransferResult> future = activeFutures.get(jobId);
-        
-        if (context != null) {
-            // Set cancellation flag
-            logger.debug("cancelTransfer: setting cancellation flag for jobId={}", jobId);
-            context.cancel();
-            TransferJob job = context.getJob();
-            if (job != null) {
-                job.cancel();
-                
-                // Get the protocol and call abort() for hard cancellation
-                TransferRequest request = job.getRequest();
-                if (request != null) {
-                    try {
-                        TransferProtocol protocol = protocolFactory.getProtocol(request.getProtocol());
-                        if (protocol != null) {
-                            logger.info("Aborting transfer {} via protocol.abort()", jobId);
-                            protocol.abort();
-                            logger.debug("cancelTransfer: protocol abort called successfully");
-                        }
-                    } catch (Exception e) {
-                        logger.warn("Error aborting protocol for job {}: {}", jobId, e.getMessage());
-                        logger.debug("Stack trace for abort error on job {}", jobId, e);
-                    }
-                }
-            }
-            logger.debug("cancelTransfer: cancellation complete for jobId={}", jobId);
-        } else {
-            logger.debug("cancelTransfer: no active context found for jobId={}", jobId);
+        ActiveTransfer transfer = active.get(jobId);
+        boolean cancelled = transfer != null && transfer.cancel();
+        if (cancelled) {
+            logger.info("Transfer cancellation requested: {}", jobId);
         }
-        
-        // Note: Vert.x Future doesn't have cancel() method, cancellation handled via context and abort()
-        
-        return context != null;
+        return cancelled;
     }
-    
+
     @Override
     public boolean pauseTransfer(String jobId) {
-        logger.debug("pauseTransfer: attempting to pause jobId={}", jobId);
-        TransferContext context = activeContexts.get(jobId);
-        if (context != null) {
-            context.pause();
-            TransferJob job = context.getJob();
-            if (job != null) {
-                job.pause();
-            }
-            logger.debug("pauseTransfer: paused successfully");
-            return true;
+        ActiveTransfer transfer = active.get(jobId);
+        if (transfer == null) {
+            return false;
         }
-        logger.debug("pauseTransfer: no active context found for jobId={}", jobId);
-        return false;
+        transfer.context.pause();
+        transfer.job.pause();
+        return true;
     }
-    
+
     @Override
     public boolean resumeTransfer(String jobId) {
-        logger.debug("resumeTransfer: attempting to resume jobId={}", jobId);
-        TransferContext context = activeContexts.get(jobId);
-        if (context != null) {
-            context.resume();
-            TransferJob job = context.getJob();
-            if (job != null) {
-                job.resume();
-            }
-            logger.debug("resumeTransfer: resumed successfully");
-            return true;
+        ActiveTransfer transfer = active.get(jobId);
+        if (transfer == null) {
+            return false;
         }
-        logger.debug("resumeTransfer: no active context found for jobId={}", jobId);
-        return false;
+        transfer.context.resume();
+        transfer.job.resume();
+        return true;
     }
-    
+
     @Override
     public int getActiveTransferCount() {
-        int count = activeJobs.size();
-        logger.debug("getActiveTransferCount: count={}", count);
-        return count;
+        return active.size();
     }
-    
+
     @Override
-    public Future<Void> shutdown(long timeoutSeconds) {
-        logger.debug("shutdown: initiating with timeout={}s", timeoutSeconds);
-
-        if (shutdown.getAndSet(true)) {
-            logger.debug("shutdown: already shutdown");
-            return Future.succeededFuture();
+    public boolean shutdown(Duration timeout) {
+        if (shutdown.compareAndSet(false, true)) {
+            logger.info("Shutting down transfer engine; cancelling {} running transfer(s)", active.size());
         }
-
-        logger.info("Shutting down transfer engine...");
-        logger.debug("shutdown: cancelling {} active transfers", activeContexts.size());
-
-        // Cancel all active transfers
-        activeContexts.values().forEach(TransferContext::cancel);
-
-        // Reactively wait for in-flight transfers to drain
-        return awaitActiveTransfers(timeoutSeconds * 1000)
-            .compose(v -> closeOwnedVertx())
-            .onSuccess(v -> logger.info("Transfer engine shutdown completed"));
+        List<ActiveTransfer> running = List.copyOf(active.values());
+        running.forEach(ActiveTransfer::cancel);
+        CompletableFuture<?>[] ended = running.stream().map(t -> t.ended).toArray(CompletableFuture[]::new);
+        try {
+            CompletableFuture.allOf(ended).get(timeout.toMillis(), TimeUnit.MILLISECONDS);
+            logger.info("Transfer engine shutdown completed");
+            return true;
+        } catch (TimeoutException e) {
+            logger.warn("Transfer engine shutdown timed out with {} transfer(s) still running", active.size());
+            return false;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return active.isEmpty();
+        } catch (ExecutionException e) {
+            throw new IllegalStateException("A transfer end signal failed", e);   // never completed exceptionally
+        }
     }
 
-    private Future<Void> closeOwnedVertx() {
-        if (!closeVertxOnShutdown) {
-            return Future.succeededFuture();
-        }
-
-        logger.info("Closing internally-managed Vert.x instance");
-        return vertx.close();
-    }
-    
-    /**
-     * Waits for all active transfers to complete or timeout.
-     * 
-     * <p>This method is useful for graceful shutdown where you want to allow
-     * in-flight transfers to finish before closing resources.
-     *
-     * @param timeoutMs maximum time to wait in milliseconds
-     * @return a Future that completes when all transfers are done or timeout expires
-     */
-    public Future<Void> awaitActiveTransfers(long timeoutMs) {
-        int activeCount = activeJobs.size();
-        if (activeCount == 0) {
-            logger.debug("awaitActiveTransfers: no active transfers");
-            return Future.succeededFuture();
-        }
-        
-        logger.info("Waiting for {} active transfers to complete (timeout={}ms)", activeCount, timeoutMs);
-        
-        // Collect all active transfer futures
-        List<Future<TransferResult>> futures = new ArrayList<>(activeFutures.values());
-        if (futures.isEmpty()) {
-            return Future.succeededFuture();
-        }
-        
-        // Wait for all with timeout
-        return Future.all(futures)
-                .timeout(timeoutMs, TimeUnit.MILLISECONDS)
-                .map(v -> {
-                    logger.info("All active transfers completed");
-                    return (Void) null;
-                })
-                .recover(err -> {
-                    int remaining = activeJobs.size();
-                    if (remaining > 0) {
-                        logger.warn("Timeout waiting for transfers, {} still active", remaining);
-                    } else {
-                        logger.info("All active transfers completed");
-                    }
-                    return Future.succeededFuture();
-                });
-    }
-    
     /**
      * Checks if the transfer engine is in shutdown state.
      *
@@ -376,10 +232,6 @@ public class SimpleTransferEngine implements TransferEngine {
      */
     public boolean isShutdown() {
         return shutdown.get();
-    }
-
-    boolean isClosingOwnedVertxOnShutdown() {
-        return closeVertxOnShutdown;
     }
 
     @Override
@@ -434,7 +286,7 @@ public class SimpleTransferEngine implements TransferEngine {
 
         // System metrics
         Runtime runtime = Runtime.getRuntime();
-        builder.systemMetric("activeTransfers", activeJobs.size())
+        builder.systemMetric("activeTransfers", active.size())
                 .systemMetric("maxConcurrentTransfers", maxConcurrentTransfers)
                 .systemMetric("uptime", Duration.between(startTime, Instant.now()).toString())
                 .systemMetric("memoryUsedMB", (runtime.totalMemory() - runtime.freeMemory()) / (1024 * 1024))
@@ -451,179 +303,182 @@ public class SimpleTransferEngine implements TransferEngine {
         return builder.build();
     }
 
-    private Future<TransferResult> executeTransfer(TransferContext context) {
-        TransferJob job = context.getJob();
+    /** Runs the attempts of one transfer on the current thread and returns its outcome. */
+    private TransferResult execute(ActiveTransfer transfer) {
+        TransferJob job = transfer.job;
         TransferRequest request = job.getRequest();
         TransferDirection direction = request.getDirection();
-
-        logger.info("Starting {} transfer: {}", direction, job.getJobId());
-        logger.debug("executeTransfer: starting for jobId={}, protocol={}, direction={}, sourceUri={}, destinationUri={}", 
-            job.getJobId(), request.getProtocol(), direction,
-            SensitiveDataRedactor.redactUri(request.getSourceUri()),
-            SensitiveDataRedactor.redactUri(request.getDestinationUri()));
+        String protocolName = request.getProtocol();
+        logger.debug("Executing {} transfer {}: protocol={}, source={}, destination={}", direction,
+                job.getJobId(), protocolName, SensitiveDataRedactor.redactUri(request.getSourceUri()),
+                SensitiveDataRedactor.redactUri(request.getDestinationUri()));
         job.start();
 
-        String protocolName = request.getProtocol();
-
-        // Create transfer tracing span (metrics already recorded in submitTransfer)
         Span span = tracer.spanBuilder("quorus.transfer")
                 .setSpanKind(SpanKind.INTERNAL)
                 .setAttribute("transfer.id", job.getJobId())
                 .setAttribute("transfer.protocol", protocolName)
                 .setAttribute("transfer.direction", direction.name())
                 .startSpan();
-
-        Instant transferStartTime = Instant.now();
-        return executeAttempt(context, request, direction, transferStartTime,
-                protocolName, span, 0, null);
-    }
-
-    private Future<TransferResult> executeAttempt(
-            TransferContext context,
-            TransferRequest request,
-            TransferDirection direction,
-            Instant transferStartTime,
-            String protocolName,
-            Span span,
-            int attempt,
-            Throwable lastError) {
-
-        TransferJob job = context.getJob();
-        if (!context.shouldContinue()) {
-            String message = "Transfer cancelled or paused before completion";
-            logger.warn("executeTransfer: {} for jobId={}", message, job.getJobId());
-            telemetryMetrics.recordTransferCancelled(protocolName, direction.name());
-            span.setStatus(StatusCode.ERROR, message);
-            span.end();
-            job.fail(message, lastError);
-            return Future.succeededFuture(job.toResult());
-        }
-
-        logger.debug("executeTransfer: attempt {} of {} for jobId={}",
-                attempt + 1, maxRetryAttempts + 1, job.getJobId());
-
-        TransferProtocol protocol = protocolFactory.getProtocol(protocolName);
-        if (protocol == null) {
-            TransferException error = new TransferException(job.getJobId(), "Unsupported protocol: " + protocolName);
-            return failTransfer(job, direction, protocolName, span, error);
-        }
-        if (!protocol.canHandle(request)) {
-            TransferException error = new TransferException(job.getJobId(),
-                    "Protocol '" + protocolName + "' cannot handle request direction/URI combination");
-            return failTransfer(job, direction, protocolName, span, error);
-        }
-
-        return protocol.transferReactive(request, context)
-                .compose(result -> {
+        Instant transferStart = Instant.now();
+        try (Scope ignored = span.makeCurrent()) {
+            Throwable lastError = null;
+            for (int attempt = 0; ; attempt++) {
+                if (stopRequested(transfer)) {
+                    return stopped(transfer, span, lastError);
+                }
+                TransferProtocol protocol = protocolFactory.getProtocol(protocolName);
+                if (protocol == null || !protocol.canHandle(request)) {
+                    return fail(job, span, new TransferException(job.getJobId(),
+                            "Protocol '" + protocolName + "' cannot handle request direction/URI combination"));
+                }
+                try {
+                    TransferResult result = runAttempt(protocol, request, transfer.context);
                     if (!result.isSuccessful()) {
-                        String errorMsg = result.getErrorMessage().orElse("Unknown error");
-                        return Future.failedFuture(new TransferException(job.getJobId(), "Transfer failed: " + errorMsg));
+                        throw new TransferException(job.getJobId(),
+                                "Transfer failed: " + result.getErrorMessage().orElse("Unknown error"));
                     }
-
-                    logger.info("{} transfer completed successfully: {}", direction, job.getJobId());
-                    Duration duration = Duration.between(transferStartTime, Instant.now());
-                    long bytesTransferred = result.getBytesTransferred();
-
-                    telemetryMetrics.recordTransferCompleted(protocolName, direction.name(),
-                            bytesTransferred, duration.toMillis() / 1000.0);
-
-                    span.setAttribute("transfer.bytes", bytesTransferred);
-                    span.setAttribute("transfer.duration_ms", duration.toMillis());
-                    span.setStatus(StatusCode.OK);
-                    span.end();
-
-                    return Future.succeededFuture(result);
-                })
-                .recover(err -> {
-                    int nextAttempt = attempt + 1;
-                    context.incrementRetryCount();
-
-                    logger.warn("Transfer attempt {} failed for job {}: {}",
-                            nextAttempt, job.getJobId(), err.getMessage());
-                    logger.debug("Stack trace for failed attempt {} on job {}", nextAttempt, job.getJobId(), err);
-
-                    if (nextAttempt <= maxRetryAttempts && context.shouldContinue()) {
-                        long delay = retryDelayMs * nextAttempt;
-                        logger.debug("executeTransfer: scheduling retry after {}ms", delay);
-                        telemetryMetrics.recordRetryAttempt(protocolName, direction.name(), nextAttempt);
-
-                        return delayFuture(delay)
-                                .compose(v -> executeAttempt(context, request, direction, transferStartTime,
-                                        protocolName, span, nextAttempt, err));
+                    return completed(job, span, result, transferStart);
+                } catch (Exception failure) {
+                    lastError = failure;
+                    transfer.context.incrementRetryCount();
+                    if (stopRequested(transfer)) {
+                        return stopped(transfer, span, lastError);
                     }
-
-                    return failTransfer(job, direction, protocolName, span, err);
-                });
-    }
-
-    private Future<Void> delayFuture(long delayMs) {
-        Promise<Void> delayPromise = Promise.promise();
-        vertx.setTimer(delayMs, id -> delayPromise.complete());
-        return delayPromise.future();
-    }
-
-    private Future<TransferResult> failTransfer(
-            TransferJob job,
-            TransferDirection direction,
-            String protocolName,
-            Span span,
-            Throwable error) {
-        String errorMessage = error != null ? error.getMessage() :
-                "Transfer failed after " + maxRetryAttempts + " attempts";
-        logger.debug("executeTransfer: all attempts exhausted for jobId={}, direction={}", job.getJobId(), direction);
-        job.fail(errorMessage, error);
-
-        String errorType = error != null ? error.getClass().getSimpleName() : "UnknownError";
-        telemetryMetrics.recordTransferFailed(protocolName, direction.name(), errorType);
-
-        span.setStatus(StatusCode.ERROR, errorMessage);
-        if (error != null) {
-            span.recordException(error);
+                    if (attempt >= maxRetryAttempts) {
+                        return fail(job, span, failure);
+                    }
+                    logger.warn("Transfer attempt {} of {} failed for job {}: {}", attempt + 1,
+                            maxRetryAttempts + 1, job.getJobId(), failure.getMessage());
+                    telemetryMetrics.recordRetryAttempt(protocolName, direction.name(), attempt + 1);
+                    if (!backOff(attempt + 1)) {
+                        return stopped(transfer, span, lastError);
+                    }
+                }
+            }
         }
+    }
+
+    /**
+     * Runs one attempt through the adapter's blocking entry point. It is deprecated only in favour of
+     * the Vert.x {@code transferReactive}, which RT-03d removes together with the deprecation.
+     */
+    @SuppressWarnings("deprecation")
+    private static TransferResult runAttempt(TransferProtocol protocol, TransferRequest request,
+                                             TransferContext context) throws TransferException {
+        return protocol.transfer(request, context);
+    }
+
+    /** Waits before retry {@code retry}; returns {@code false} if interrupted, restoring the interrupt. */
+    private boolean backOff(int retry) {
+        long delay = retryDelayMs * retry;
+        logger.debug("Retrying after {} ms", delay);
+        try {
+            Thread.sleep(delay);
+            return true;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
+    }
+
+    private static boolean stopRequested(ActiveTransfer transfer) {
+        return !transfer.context.shouldContinue() || Thread.currentThread().isInterrupted();
+    }
+
+    /** Ends a transfer that was cancelled, interrupted or paused. */
+    private TransferResult stopped(ActiveTransfer transfer, Span span, Throwable lastError) {
+        TransferJob job = transfer.job;
+        TransferRequest request = job.getRequest();
+        telemetryMetrics.recordTransferCancelled(request.getProtocol(), request.getDirection().name());
+        if (transfer.context.isCancelled() || Thread.currentThread().isInterrupted()) {
+            job.cancel();
+            logger.info("Transfer cancelled: {}", job.getJobId());
+        } else {
+            job.fail("Transfer paused before completion", lastError);
+            logger.warn("Transfer paused before completion and was stopped: {}", job.getJobId());
+        }
+        span.setStatus(StatusCode.ERROR, "Transfer stopped: " + job.getStatus());
         span.end();
-
-        logger.error("{} transfer failed permanently: {} - {}", direction, job.getJobId(), errorMessage);
-        if (logger.isTraceEnabled() && error != null) {
-            logger.debug("Full stack trace for failed transfer {}", job.getJobId(), error);
+        TransferResult result = job.toResult();
+        if (result.getErrorMessage().isPresent()) {
+            return result;
         }
-
-        return Future.succeededFuture(job.toResult());
+        // A cancelled job has no error message of its own, and consumers such as the agent report
+        // the message of any unsuccessful result, so the reason is stated here.
+        return TransferResult.builder()
+                .requestId(result.getRequestId())
+                .finalStatus(result.getFinalStatus())
+                .bytesTransferred(result.getBytesTransferred())
+                .startTime(result.getStartTime().orElse(null))
+                .endTime(result.getEndTime().orElse(null))
+                .actualChecksum(result.getActualChecksum().orElse(null))
+                .errorMessage("Transfer cancelled")
+                .cause(lastError)
+                .build();
     }
-    
+
+    private TransferResult completed(TransferJob job, Span span, TransferResult result, Instant transferStart) {
+        TransferRequest request = job.getRequest();
+        Duration duration = Duration.between(transferStart, Instant.now());
+        telemetryMetrics.recordTransferCompleted(request.getProtocol(), request.getDirection().name(),
+                result.getBytesTransferred(), duration.toMillis() / 1000.0);
+        span.setAttribute("transfer.bytes", result.getBytesTransferred());
+        span.setAttribute("transfer.duration_ms", duration.toMillis());
+        span.setStatus(StatusCode.OK);
+        span.end();
+        logger.info("{} transfer completed: {} ({} bytes in {} ms)", request.getDirection(), job.getJobId(),
+                result.getBytesTransferred(), duration.toMillis());
+        return result;
+    }
+
+    private TransferResult fail(TransferJob job, Span span, Throwable error) {
+        TransferRequest request = job.getRequest();
+        job.fail(error.getMessage(), error);
+        telemetryMetrics.recordTransferFailed(request.getProtocol(), request.getDirection().name(),
+                error.getClass().getSimpleName());
+        span.setStatus(StatusCode.ERROR, error.getMessage());
+        span.recordException(error);
+        span.end();
+        logger.error("{} transfer failed permanently: {} - {}", request.getDirection(), job.getJobId(),
+                error.getMessage());
+        logger.debug("Failure detail for transfer {}", job.getJobId(), error);
+        return job.toResult();
+    }
+
     /**
      * Validates that the transfer request is supported.
-     * 
+     *
      * @param request the transfer request to validate
      * @throws TransferException if the request is invalid
      */
     private void validateTransferRequest(TransferRequest request) throws TransferException {
-        java.net.URI source = request.getSourceUri();
-        java.net.URI dest = request.getDestinationUri();
-        
-        // Validate URIs are not null
+        URI source = request.getSourceUri();
+        URI dest = request.getDestinationUri();
+
         if (source == null) {
             throw new TransferException(request.getRequestId(), "Source URI cannot be null");
         }
         if (dest == null) {
             throw new TransferException(request.getRequestId(), "Destination URI cannot be null");
         }
-        
+
         boolean sourceIsFile = "file".equalsIgnoreCase(source.getScheme());
         boolean destIsFile = "file".equalsIgnoreCase(dest.getScheme());
-        
+
         // At least one must be file://
         if (!sourceIsFile && !destIsFile) {
             throw new TransferException(request.getRequestId(),
                 "At least one endpoint must be file:// (local filesystem). " +
                 "Remote-to-remote transfers not yet supported.");
         }
-        
+
         // Both can't be file:// (use Files.copy instead)
         if (sourceIsFile && destIsFile) {
             throw new TransferException(request.getRequestId(),
                 "Both source and destination are local files. Use Files.copy() for local file-to-file operations.");
         }
-        
+
         // Validate configured protocol (protocol is authoritative from job configuration)
         String configuredProtocol = request.getProtocol();
         if (!protocolFactory.isProtocolSupported(configuredProtocol)) {
@@ -637,8 +492,43 @@ public class SimpleTransferEngine implements TransferEngine {
             throw new TransferException(request.getRequestId(),
                 "Configured protocol '" + configuredProtocol + "' cannot handle this request direction or URIs");
         }
-        
-        logger.debug("validateTransferRequest: request {} validated successfully (direction={}, protocol={})",
-            request.getRequestId(), request.getDirection(), configuredProtocol);
+    }
+
+    /**
+     * One running transfer and the thread that runs it. Its monitor orders cancellation against
+     * completion: {@link #cancel()} interrupts only while the transfer has not finished, and
+     * {@link #finish()} reports whether an interrupt was sent, so the transfer can consume it.
+     */
+    private static final class ActiveTransfer {
+        final TransferJob job;
+        final TransferContext context;
+        final CompletableFuture<Void> ended = new CompletableFuture<>();
+        private final Thread thread;
+        private boolean finished;
+        private boolean interruptSent;
+
+        ActiveTransfer(TransferJob job, TransferContext context, Thread thread) {
+            this.job = job;
+            this.context = context;
+            this.thread = thread;
+        }
+
+        synchronized boolean cancel() {
+            if (finished) {
+                return false;
+            }
+            context.cancel();
+            if (!interruptSent) {
+                interruptSent = true;
+                thread.interrupt();
+            }
+            return true;
+        }
+
+        /** Marks the transfer finished; returns {@code true} if {@link #cancel()} interrupted its thread. */
+        synchronized boolean finish() {
+            finished = true;
+            return interruptSent;
+        }
     }
 }

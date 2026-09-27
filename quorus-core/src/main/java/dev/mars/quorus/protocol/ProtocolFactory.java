@@ -40,28 +40,52 @@ public class ProtocolFactory {
     private static final Logger logger = LoggerFactory.getLogger(ProtocolFactory.class);
 
     private final Map<String, TransferProtocol> protocols;
-    private final Vertx vertx;
     private final String nfsMountRoot;
     private final boolean smbMountSecurityVerified;
     private final boolean nfsMountSecurityVerified;
 
-    /**
-     * Constructor with Vert.x dependency injection (recommended).
-     * @param vertx Vert.x instance for reactive HTTP protocol
-     */
-    public ProtocolFactory(Vertx vertx) {
-        this(vertx, null, false, false);
+    /** Creates a factory with the default protocols and no mounted-filesystem attestations. */
+    public ProtocolFactory() {
+        this(null, false, false);
     }
 
-    public ProtocolFactory(Vertx vertx, String nfsMountRoot,
-                           boolean smbMountSecurityVerified, boolean nfsMountSecurityVerified) {
-        this.vertx = java.util.Objects.requireNonNull(vertx, "Vertx instance cannot be null");
+    /**
+     * Creates a factory with the default protocols.
+     *
+     * @param nfsMountRoot             root under which NFS paths are mounted, or {@code null}
+     * @param smbMountSecurityVerified whether the SMB mount's security has been attested
+     * @param nfsMountSecurityVerified whether the NFS mount's security has been attested
+     */
+    public ProtocolFactory(String nfsMountRoot, boolean smbMountSecurityVerified, boolean nfsMountSecurityVerified) {
         this.nfsMountRoot = nfsMountRoot;
         this.smbMountSecurityVerified = smbMountSecurityVerified;
         this.nfsMountSecurityVerified = nfsMountSecurityVerified;
         this.protocols = new HashMap<>();
-        logger.debug("Initializing ProtocolFactory with Vert.x instance");
+        logger.debug("Initializing ProtocolFactory");
         registerDefaultProtocols();
+    }
+
+    /**
+     * No adapter needs Vert.x since RT-03b, so the instance is ignored.
+     *
+     * @deprecated use {@link #ProtocolFactory()}; removed by RT-03d
+     */
+    @Deprecated
+    public ProtocolFactory(Vertx vertx) {
+        this();
+        java.util.Objects.requireNonNull(vertx, "Vertx instance cannot be null");
+    }
+
+    /**
+     * No adapter needs Vert.x since RT-03b, so the instance is ignored.
+     *
+     * @deprecated use {@link #ProtocolFactory(String, boolean, boolean)}; removed by RT-03d
+     */
+    @Deprecated
+    public ProtocolFactory(Vertx vertx, String nfsMountRoot,
+                           boolean smbMountSecurityVerified, boolean nfsMountSecurityVerified) {
+        this(nfsMountRoot, smbMountSecurityVerified, nfsMountSecurityVerified);
+        java.util.Objects.requireNonNull(vertx, "Vertx instance cannot be null");
     }
 
     private void registerDefaultProtocols() {

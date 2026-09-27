@@ -22,56 +22,44 @@ import dev.mars.quorus.core.TransferResult;
 import dev.mars.quorus.core.exceptions.TransferException;
 import dev.mars.quorus.monitoring.HealthStatus;
 import dev.mars.quorus.monitoring.TransferEngineHealthCheck;
-import io.vertx.core.Future;
-import io.vertx.core.Promise;
-import io.vertx.core.Vertx;
-import io.vertx.junit5.VertxExtension;
-import io.vertx.junit5.VertxTestContext;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.Timeout;
 
-import java.lang.reflect.Field;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
-
-import static dev.mars.quorus.testing.TestFutureUtils.awaitSuccess;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Comprehensive test suite for {@link SimpleTransferEngine}.
- * Tests transfer submission, cancellation, pause/resume, health checks, and metrics.
+ * Test suite for {@link SimpleTransferEngine}: lifecycle, rejection, health checks and retries.
+ * Blocking execution, concurrency and cancellation are covered by
+ * {@link SimpleTransferEngineBlockingTest}.
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @since 2025-08-27
- * @version 1.0
+ * @version 2.0
  */
-@ExtendWith(VertxExtension.class)
+@Timeout(value = 30, unit = SECONDS, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
 class SimpleTransferEngineTest {
 
     private SimpleTransferEngine engine;
 
     @BeforeEach
-    void setUp(Vertx vertx) {
-        engine = new SimpleTransferEngine(vertx, 5, 3, 100);
+    void setUp() {
+        engine = new SimpleTransferEngine(5, 3, 100);
     }
 
     @AfterEach
-    void tearDown(VertxTestContext testContext) {
-        if (engine != null) {
-            engine.shutdown(5)
-                    .onComplete(ar -> testContext.completeNow());
-        } else {
-            testContext.completeNow();
-        }
+    void tearDown() {
+        engine.shutdown(Duration.ofSeconds(5));
     }
 
     @Test
@@ -81,8 +69,8 @@ class SimpleTransferEngineTest {
     }
 
     @Test
-    void testInjectedVertxConstructorDoesNotOwnVertxLifecycle() {
-        assertFalse(engine.isClosingOwnedVertxOnShutdown());
+    void testConstructorRejectsANonPositiveConcurrencyLimit() {
+        assertThrows(IllegalArgumentException.class, () -> new SimpleTransferEngine(0, 3, 100));
     }
 
     @Test
@@ -91,21 +79,18 @@ class SimpleTransferEngineTest {
     }
 
     @Test
-    void testSubmitTransferThrowsWhenShutdown(VertxTestContext testContext) {
-        engine.shutdown(5);
-        
+    void testTransferThrowsWhenShutdown() {
+        engine.shutdown(Duration.ofSeconds(5));
+
         TransferRequest request = TransferRequest.builder()
             .requestId("test-job-1")
             .sourceUri(java.net.URI.create("http://example.com/file.txt"))
             .destinationPath("/tmp/file.txt")
             .protocol("http")
             .build();
-        
-        assertThrows(TransferException.class, () -> {
-            engine.submitTransfer(request);
-        });
-        
-        testContext.completeNow();
+
+        assertThrows(TransferException.class, () -> engine.transfer(request));
+        assertTrue(engine.isShutdown());
     }
 
     @Test
@@ -133,27 +118,26 @@ class SimpleTransferEngineTest {
     }
 
     @Test
-    void testShutdownIdempotent(VertxTestContext testContext) {
-        engine.shutdown(5)
-                .compose(v -> engine.shutdown(5))
-                .onComplete(testContext.succeedingThenComplete());
+    void testShutdownIdempotent() {
+        assertTrue(engine.shutdown(Duration.ofSeconds(5)));
+        assertTrue(engine.shutdown(Duration.ofSeconds(5)));
     }
 
     @Test
     void testGetHealthCheckWhenRunning() {
         TransferEngineHealthCheck healthCheck = engine.getHealthCheck();
-        
+
         assertNotNull(healthCheck);
-        assertTrue(healthCheck.getHealthStatus() == HealthStatus.UP || 
+        assertTrue(healthCheck.getHealthStatus() == HealthStatus.UP ||
                    healthCheck.getHealthStatus() == HealthStatus.DEGRADED);
     }
 
     @Test
     void testGetHealthCheckAfterShutdown() {
-        engine.shutdown(5);
-        
+        engine.shutdown(Duration.ofSeconds(5));
+
         TransferEngineHealthCheck healthCheck = engine.getHealthCheck();
-        
+
         assertNotNull(healthCheck);
         assertEquals(HealthStatus.DOWN, healthCheck.getHealthStatus());
     }
@@ -161,7 +145,7 @@ class SimpleTransferEngineTest {
     @Test
     void testHealthCheckIncludesProtocolChecks() {
         TransferEngineHealthCheck healthCheck = engine.getHealthCheck();
-        
+
         assertNotNull(healthCheck);
         assertNotNull(healthCheck.getProtocolHealthChecks());
         // 4 protocols: http, ftp, sftp, smb
@@ -171,10 +155,10 @@ class SimpleTransferEngineTest {
     @Test
     void testHealthCheckIncludesSystemMetrics() {
         TransferEngineHealthCheck healthCheck = engine.getHealthCheck();
-        
+
         assertNotNull(healthCheck);
         assertNotNull(healthCheck.getSystemMetrics());
-        
+
         Map<String, Object> systemMetrics = healthCheck.getSystemMetrics();
         assertTrue(systemMetrics.containsKey("activeTransfers"));
         assertTrue(systemMetrics.containsKey("maxConcurrentTransfers"));
@@ -182,13 +166,13 @@ class SimpleTransferEngineTest {
         assertTrue(systemMetrics.containsKey("memoryUsedMB"));
         assertTrue(systemMetrics.containsKey("memoryTotalMB"));
         assertTrue(systemMetrics.containsKey("memoryMaxMB"));
-        
+
         assertEquals(0, systemMetrics.get("activeTransfers"));
         assertEquals(5, systemMetrics.get("maxConcurrentTransfers"));
     }
 
-        @Test
-        void testSubmitTransferRetriesWithBackoffThenFails() throws Exception {
+    @Test
+    void testTransferRetriesWithBackoffThenFails() throws Exception {
         Path localFile = Files.createTempFile("retry-failure", ".txt");
         Files.writeString(localFile, "retry-me");
 
@@ -200,8 +184,8 @@ class SimpleTransferEngineTest {
             .build();
 
         Instant start = Instant.now();
-        TransferResult result = awaitSuccess(engine.submitTransfer(request), Duration.ofSeconds(10));
-        long elapsedMs = java.time.Duration.between(start, Instant.now()).toMillis();
+        TransferResult result = engine.transfer(request);
+        long elapsedMs = Duration.between(start, Instant.now()).toMillis();
 
         assertNotNull(result);
         assertFalse(result.isSuccessful());
@@ -211,45 +195,5 @@ class SimpleTransferEngineTest {
         // Retry delay is 100ms with linear backoff (100 + 200 + 300ms) before final failure.
         assertTrue(elapsedMs >= 500,
             "Expected retry backoff to delay completion; elapsed=" + elapsedMs + "ms");
-        }
-
-        @Test
-        void testAwaitActiveTransfersReturnsAfterTimeoutForStuckFuture() throws Exception {
-        TransferRequest request = TransferRequest.builder()
-            .requestId("stuck-future-test")
-            .sourceUri(URI.create("http://example.com/file.txt"))
-            .destinationPath("/tmp/file.txt")
-            .protocol("http")
-            .build();
-        TransferJob job = new TransferJob(request);
-        TransferContext context = new TransferContext(job);
-        Promise<TransferResult> neverCompletes = Promise.promise();
-
-        mapField("activeJobs").put(job.getJobId(), job);
-        mapField("activeContexts").put(job.getJobId(), context);
-        @SuppressWarnings("unchecked")
-        ConcurrentHashMap<String, Future<TransferResult>> activeFutures =
-            (ConcurrentHashMap<String, Future<TransferResult>>) getField("activeFutures");
-        activeFutures.put(job.getJobId(), neverCompletes.future());
-
-        Instant start = Instant.now();
-        awaitSuccess(engine.awaitActiveTransfers(150), Duration.ofSeconds(2));
-        long elapsedMs = java.time.Duration.between(start, Instant.now()).toMillis();
-
-        assertTrue(elapsedMs >= 120,
-            "awaitActiveTransfers should wait close to timeout before recovering; elapsed=" + elapsedMs + "ms");
-        }
-
-        @SuppressWarnings("unchecked")
-        private ConcurrentHashMap<String, Object> mapField(String fieldName) throws Exception {
-        return (ConcurrentHashMap<String, Object>) getField(fieldName);
-        }
-
-        private Object getField(String fieldName) throws Exception {
-        Field field = SimpleTransferEngine.class.getDeclaredField(fieldName);
-        field.setAccessible(true);
-        return field.get(engine);
-        }
-
+    }
 }
-

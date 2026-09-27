@@ -1,0 +1,306 @@
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::staticFieldBase has been called by com.google.inject.internal.aop.HiddenClassDefiner (file:/C:/Users/mraysmit/scoop/apps/maven/current/lib/guice-5.1.0-classes.jar)
+WARNING: Please consider reporting this to the maintainers of class com.google.inject.internal.aop.HiddenClassDefiner
+WARNING: sun.misc.Unsafe::staticFieldBase will be removed in a future release
+WARNING: Final field _cipher in class org.sonatype.plexus.components.sec.dispatcher.DefaultSecDispatcher has been mutated reflectively by class org.eclipse.sisu.bean.BeanPropertyField in unnamed module @1e802ef9 (file:/C:/Users/mraysmit/scoop/apps/maven/current/lib/org.eclipse.sisu.inject-0.9.0.M4.jar)
+WARNING: Use --enable-final-field-mutation=ALL-UNNAMED to avoid a warning
+WARNING: Mutating final fields will be blocked in a future release unless final field mutation is enabled
+[INFO] Scanning for projects...
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Build Order:
+[INFO] 
+[INFO] Quorus File Transfer System                                        [pom]
+[INFO] Quorus Core                                                        [jar]
+[INFO] Quorus Workflow Engine                                             [jar]
+[INFO] Quorus Agent                                                       [jar]
+[INFO] 
+[INFO] --------------------------< dev.mars:quorus >---------------------------
+[INFO] Building Quorus File Transfer System 1.0-SNAPSHOT                  [1/4]
+[INFO]   from pom.xml
+[INFO] --------------------------------[ pom ]---------------------------------
+[INFO] 
+[INFO] --- jacoco:0.8.15:prepare-agent (prepare-agent) @ quorus ---
+[INFO] Skipping JaCoCo execution because property jacoco.skip is set.
+[INFO] argLine set to empty
+[INFO] 
+[INFO] --- jacoco:0.8.15:report (report) @ quorus ---
+[INFO] Skipping JaCoCo execution because property jacoco.skip is set.
+[INFO] 
+[INFO] ------------------------< dev.mars:quorus-core >------------------------
+[INFO] Building Quorus Core 1.0-SNAPSHOT                                  [2/4]
+[INFO]   from quorus-core\pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- jacoco:0.8.15:prepare-agent (prepare-agent) @ quorus-core ---
+[INFO] Skipping JaCoCo execution because property jacoco.skip is set.
+[INFO] argLine set to empty
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ quorus-core ---
+[INFO] Copying 1 resource from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ quorus-core ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ quorus-core ---
+[INFO] Copying 16 resources from src\test\resources to target\test-classes
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ quorus-core ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- surefire:3.2.2:test (default-test) @ quorus-core ---
+[INFO] 
+[INFO] --- jacoco:0.8.15:report (report) @ quorus-core ---
+[INFO] Skipping JaCoCo execution because property jacoco.skip is set.
+[INFO] 
+[INFO] ----------------------< dev.mars:quorus-workflow >----------------------
+[INFO] Building Quorus Workflow Engine 1.0-SNAPSHOT                       [3/4]
+[INFO]   from quorus-workflow\pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- jacoco:0.8.15:prepare-agent (prepare-agent) @ quorus-workflow ---
+[INFO] Skipping JaCoCo execution because property jacoco.skip is set.
+[INFO] argLine set to empty
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ quorus-workflow ---
+[INFO] Copying 1 resource from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ quorus-workflow ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ quorus-workflow ---
+[INFO] Copying 2 resources from src\test\resources to target\test-classes
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ quorus-workflow ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- surefire:3.2.2:test (default-test) @ quorus-workflow ---
+[INFO] 
+[INFO] --- jacoco:0.8.15:report (report) @ quorus-workflow ---
+[INFO] Skipping JaCoCo execution because property jacoco.skip is set.
+[INFO] 
+[INFO] -----------------------< dev.mars:quorus-agent >------------------------
+[INFO] Building Quorus Agent 1.0-SNAPSHOT                                 [4/4]
+[INFO]   from quorus-agent\pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- jacoco:0.8.15:prepare-agent (prepare-agent) @ quorus-agent ---
+[INFO] Skipping JaCoCo execution because property jacoco.skip is set.
+[INFO] argLine set to empty
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ quorus-agent ---
+[INFO] Copying 2 resources from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ quorus-agent ---
+[INFO] Recompiling the module because of changed source code.
+[INFO] Compiling 14 source files with javac [debug release 27] to target\classes
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ quorus-agent ---
+[INFO] Copying 2 resources from src\test\resources to target\test-classes
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ quorus-agent ---
+[INFO] Recompiling the module because of changed dependency.
+[INFO] Compiling 14 source files with javac [debug release 27] to target\test-classes
+[WARNING] /C:/Users/mraysmit/dev/idea-projects/quorus/quorus-agent/src/test/java/dev/mars/quorus/agent/QuorusAgentTest.java:[221,29] QuorusAgent(dev.mars.quorus.agent.config.AgentConfiguration) in dev.mars.quorus.agent.QuorusAgent has been deprecated and marked for removal
+[INFO] 
+[INFO] --- surefire:3.2.2:test (default-test) @ quorus-agent ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+10:41:28,430 |-INFO in ch.qos.logback.classic.LoggerContext[default] - Found logback-core version 1.5.32
+10:41:28,431 |-INFO in ch.qos.logback.classic.util.ContextInitializer@651aed93 - No custom configurators were discovered as a service.
+10:41:28,431 |-INFO in ch.qos.logback.classic.util.ContextInitializer@651aed93 - Trying to configure with ch.qos.logback.classic.util.DefaultJoranConfigurator
+10:41:28,432 |-INFO in ch.qos.logback.classic.util.ContextInitializer@651aed93 - Constructed configurator of type class ch.qos.logback.classic.util.DefaultJoranConfigurator
+10:41:28,433 |-INFO in ch.qos.logback.classic.LoggerContext[default] - Found resource [logback-test.xml] at [file:/C:/Users/mraysmit/dev/idea-projects/quorus/quorus-agent/target/test-classes/logback-test.xml]
+10:41:28,433 |-WARN in ch.qos.logback.classic.util.DefaultJoranConfigurator@4dd6fd0a - Resource [logback-test.xml] occurs multiple times on the classpath.
+10:41:28,433 |-WARN in ch.qos.logback.classic.util.DefaultJoranConfigurator@4dd6fd0a - Resource [logback-test.xml] occurs at [file:/C:/Users/mraysmit/dev/idea-projects/quorus/quorus-core/target/test-classes/logback-test.xml]
+10:41:28,433 |-WARN in ch.qos.logback.classic.util.DefaultJoranConfigurator@4dd6fd0a - Resource [logback-test.xml] occurs at [file:/C:/Users/mraysmit/dev/idea-projects/quorus/quorus-agent/target/test-classes/logback-test.xml]
+10:41:28,521 |-INFO in ch.qos.logback.classic.model.processor.ConfigurationModelHandlerFull - Scan attribute not set or set to unrecognized value.
+10:41:28,528 |-INFO in ch.qos.logback.core.model.processor.ModelInterpretationContext@bb9e6dc - value "../test-logs/quorus-test-2026-09-27_09-41-23.log" substituted for "../test-logs/quorus-test-${testRunTimestamp}.log"
+10:41:28,530 |-INFO in ch.qos.logback.core.model.processor.AppenderModelHandler - Processing appender named [CONSOLE]
+10:41:28,530 |-INFO in ch.qos.logback.core.model.processor.AppenderModelHandler - About to instantiate appender of type [ch.qos.logback.core.ConsoleAppender]
+10:41:28,536 |-INFO in ch.qos.logback.core.model.processor.ImplicitModelHandler - Assuming default type [ch.qos.logback.classic.encoder.PatternLayoutEncoder] for [encoder] property
+10:41:28,574 |-INFO in ch.qos.logback.core.ConsoleAppender[CONSOLE] - NOTE: Writing to the console can be slow. Try to avoid logging to the 
+10:41:28,574 |-INFO in ch.qos.logback.core.ConsoleAppender[CONSOLE] - console in production environments, especially in high volume systems.
+10:41:28,574 |-INFO in ch.qos.logback.core.ConsoleAppender[CONSOLE] - See also https://logback.qos.ch/codes.html#slowConsole
+10:41:28,576 |-INFO in ch.qos.logback.core.model.processor.AppenderModelHandler - Processing appender named [FILE]
+10:41:28,576 |-INFO in ch.qos.logback.core.model.processor.AppenderModelHandler - About to instantiate appender of type [ch.qos.logback.core.FileAppender]
+10:41:28,577 |-INFO in ch.qos.logback.core.model.processor.ModelInterpretationContext@bb9e6dc - value "../test-logs/quorus-test-2026-09-27_09-41-23.log" substituted for "../test-logs/quorus-test-${testRunTimestamp}.log"
+10:41:28,580 |-INFO in ch.qos.logback.core.model.processor.ImplicitModelHandler - Assuming default type [ch.qos.logback.classic.encoder.PatternLayoutEncoder] for [encoder] property
+10:41:28,581 |-INFO in ch.qos.logback.core.FileAppender[FILE] - File property is set to [../test-logs/quorus-test-2026-09-27_09-41-23.log]
+10:41:28,583 |-INFO in ch.qos.logback.classic.model.processor.LoggerModelHandler - Setting level of logger [dev.mars.quorus] to DEBUG
+10:41:28,583 |-INFO in ch.qos.logback.classic.model.processor.LoggerModelHandler - Setting level of logger [org.apache] to WARN
+10:41:28,583 |-INFO in ch.qos.logback.classic.model.processor.LoggerModelHandler - Setting level of logger [io.vertx] to WARN
+10:41:28,583 |-INFO in ch.qos.logback.classic.model.processor.LoggerModelHandler - Setting level of logger [io.netty] to WARN
+10:41:28,583 |-INFO in ch.qos.logback.classic.model.processor.RootLoggerModelHandler - Setting level of ROOT logger to INFO
+10:41:28,583 |-INFO in ch.qos.logback.core.model.processor.AppenderRefModelHandler - Attaching appender named [CONSOLE] to Logger[ROOT]
+10:41:28,583 |-INFO in ch.qos.logback.core.model.processor.AppenderRefModelHandler - Attaching appender named [FILE] to Logger[ROOT]
+10:41:28,583 |-INFO in ch.qos.logback.core.model.processor.DefaultProcessor@5456afaa - End of configuration.
+10:41:28,584 |-INFO in ch.qos.logback.classic.joran.JoranConfigurator@6692b6c6 - Registering current configuration as safe fallback point
+10:41:28,586 |-INFO in ch.qos.logback.classic.util.ContextInitializer@651aed93 - ch.qos.logback.classic.util.DefaultJoranConfigurator.configure() call lasted 153 milliseconds. ExecutionStatus=DO_NOT_INVOKE_NEXT_IF_ANY
+
+[INFO] Running dev.mars.quorus.agent.service.TransferExecutionServiceTest
+10:41:28.644 [main] INFO  d.m.quorus.agent.config.AgentConfig - Loaded configuration from quorus-agent.properties
+10:41:28.648 [main] INFO  d.m.quorus.agent.config.AgentConfig - === Quorus Agent Configuration ===
+10:41:28.663 [main] WARN  d.m.quorus.agent.config.AgentConfig - Agent ID not configured, derived from hostname: agent-NUC10A
+10:41:28.663 [main] INFO  d.m.quorus.agent.config.AgentConfig -   Agent ID:             agent-NUC10A
+10:41:28.663 [main] WARN  d.m.quorus.agent.config.AgentConfig -   Tenant ID:            NOT CONFIGURED
+10:41:28.664 [main] INFO  d.m.quorus.agent.config.AgentConfig -   Agent Port:           8080
+10:41:28.664 [main] INFO  d.m.quorus.agent.config.AgentConfig -   Controller URL:       https://localhost:8080/api/v1
+10:41:28.664 [main] INFO  d.m.quorus.agent.config.AgentConfig -   Region:               default
+10:41:28.664 [main] INFO  d.m.quorus.agent.config.AgentConfig -   Datacenter:           default
+10:41:28.664 [main] INFO  d.m.quorus.agent.config.AgentConfig -   Supported Protocols:  HTTP,HTTPS
+10:41:28.664 [main] INFO  d.m.quorus.agent.config.AgentConfig -   Version:              1.0.0
+10:41:28.665 [main] INFO  d.m.quorus.agent.config.AgentConfig -   --- Transfer ---
+10:41:28.665 [main] INFO  d.m.quorus.agent.config.AgentConfig -   Max Concurrent:       5
+10:41:28.665 [main] INFO  d.m.quorus.agent.config.AgentConfig -   --- Heartbeat ---
+10:41:28.666 [main] INFO  d.m.quorus.agent.config.AgentConfig -   Interval:             30000ms
+10:41:28.666 [main] INFO  d.m.quorus.agent.config.AgentConfig -   --- Job Polling ---
+10:41:28.666 [main] INFO  d.m.quorus.agent.config.AgentConfig -   Initial Delay:        5000ms
+10:41:28.666 [main] INFO  d.m.quorus.agent.config.AgentConfig -   Poll Interval:        10000ms
+10:41:28.666 [main] INFO  d.m.quorus.agent.config.AgentConfig -   --- Security ---
+10:41:28.666 [main] INFO  d.m.quorus.agent.config.AgentConfig -   Foreign Assignment Threshold: 1
+10:41:28.666 [main] INFO  d.m.quorus.agent.config.AgentConfig -   --- Telemetry ---
+10:41:28.667 [main] INFO  d.m.quorus.agent.config.AgentConfig -   Enabled:              true
+10:41:28.667 [main] INFO  d.m.quorus.agent.config.AgentConfig -   Prometheus Port:      9465
+10:41:28.667 [main] INFO  d.m.quorus.agent.config.AgentConfig -   OTLP Endpoint:        http://localhost:4317
+10:41:28.667 [main] INFO  d.m.quorus.agent.config.AgentConfig - ==================================
+10:41:28.931 [main] DEBUG d.m.quorus.protocol.ProtocolFactory - Initializing ProtocolFactory
+10:41:28.931 [main] DEBUG d.m.quorus.protocol.ProtocolFactory - Registering default transfer protocols
+10:41:28.931 [main] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating HttpTransferProtocol instance
+10:41:28.934 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+10:41:28.935 [main] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: http
+10:41:28.935 [main] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=http, class=HttpTransferProtocol, supportsResume=false, supportsPause=true
+10:41:28.936 [main] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol alias: https -> http
+10:41:28.936 [main] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating SmbTransferProtocol instance
+10:41:28.937 [main] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: smb
+10:41:28.937 [main] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=smb, class=SmbTransferProtocol, supportsResume=false, supportsPause=false
+10:41:28.937 [main] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol alias: cifs -> smb
+10:41:28.938 [main] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating FtpTransferProtocol instance
+10:41:28.939 [main] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: ftp
+10:41:28.939 [main] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=ftp, class=FtpTransferProtocol, supportsResume=false, supportsPause=false
+10:41:28.939 [main] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol alias: ftps -> ftp
+10:41:28.939 [main] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating SftpTransferProtocol instance
+10:41:28.940 [main] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: sftp
+10:41:28.940 [main] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=sftp, class=SftpTransferProtocol, supportsResume=false, supportsPause=false
+10:41:28.940 [main] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating NfsTransferProtocol instance
+10:41:28.941 [main] DEBUG d.m.q.protocol.NfsTransferProtocol - NfsTransferProtocol initialized with mountRoot=C:\nfs
+10:41:28.942 [main] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: nfs
+10:41:28.942 [main] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=nfs, class=NfsTransferProtocol, supportsResume=false, supportsPause=false
+10:41:28.942 [main] INFO  d.m.quorus.protocol.ProtocolFactory - Registered default transfer protocols: count=8, schemes=ftps, ftp, http, smb, sftp, nfs, https, cifs
+10:41:28.953 [main] INFO  d.m.q.t.o.TransferTelemetryMetrics - TransferTelemetryMetrics initialized
+10:41:28.953 [main] INFO  d.m.q.transfer.SimpleTransferEngine - SimpleTransferEngine initialized: maxConcurrent=2, maxRetries=3, retryDelay=1000ms
+10:41:28.957 [main] INFO  d.m.q.a.s.TransferExecutionService - TransferExecutionService initialized (Vert.x reactive mode)
+10:41:28.957 [main] WARN  d.m.q.a.s.TransferExecutionService - Using deprecated constructor - Vert.x instance created internally
+10:41:28.958 [main] INFO  d.m.q.a.s.TransferExecutionService - Transfer execution service started with 2 max concurrent transfers
+10:41:28.958 [main] INFO  d.m.q.a.s.TransferExecutionService - Shutting down transfer execution service...
+10:41:28.967 [vert.x-worker-thread-0] INFO  d.m.q.transfer.SimpleTransferEngine - Shutting down transfer engine; cancelling 0 running transfer(s)
+10:41:28.969 [vert.x-worker-thread-0] INFO  d.m.q.transfer.SimpleTransferEngine - Transfer engine shutdown completed
+10:41:28.972 [vert.x-eventloop-thread-0] INFO  d.m.q.a.s.TransferExecutionService - Closing internally managed Vert.x instance for TransferExecutionService
+10:41:28.994 [vert.x-eventloop-thread-45] INFO  d.m.q.a.s.TransferExecutionService - Internally managed Vert.x instance closed for TransferExecutionService
+10:41:59.026 [main] INFO  d.m.quorus.agent.config.AgentConfig - Loaded configuration from quorus-agent.properties
+10:41:59.026 [main] INFO  d.m.quorus.agent.config.AgentConfig - === Quorus Agent Configuration ===
+10:41:59.028 [main] WARN  d.m.quorus.agent.config.AgentConfig - Agent ID not configured, derived from hostname: agent-NUC10A
+10:41:59.029 [main] INFO  d.m.quorus.agent.config.AgentConfig -   Agent ID:             agent-NUC10A
+10:41:59.029 [main] WARN  d.m.quorus.agent.config.AgentConfig -   Tenant ID:            NOT CONFIGURED
+10:41:59.029 [main] INFO  d.m.quorus.agent.config.AgentConfig -   Agent Port:           8080
+10:41:59.029 [main] INFO  d.m.quorus.agent.config.AgentConfig -   Controller URL:       https://localhost:8080/api/v1
+10:41:59.029 [main] INFO  d.m.quorus.agent.config.AgentConfig -   Region:               default
+10:41:59.029 [main] INFO  d.m.quorus.agent.config.AgentConfig -   Datacenter:           default
+10:41:59.029 [main] INFO  d.m.quorus.agent.config.AgentConfig -   Supported Protocols:  HTTP,HTTPS
+10:41:59.029 [main] INFO  d.m.quorus.agent.config.AgentConfig -   Version:              1.0.0
+10:41:59.029 [main] INFO  d.m.quorus.agent.config.AgentConfig -   --- Transfer ---
+10:41:59.029 [main] INFO  d.m.quorus.agent.config.AgentConfig -   Max Concurrent:       5
+10:41:59.029 [main] INFO  d.m.quorus.agent.config.AgentConfig -   --- Heartbeat ---
+10:41:59.029 [main] INFO  d.m.quorus.agent.config.AgentConfig -   Interval:             30000ms
+10:41:59.029 [main] INFO  d.m.quorus.agent.config.AgentConfig -   --- Job Polling ---
+10:41:59.029 [main] INFO  d.m.quorus.agent.config.AgentConfig -   Initial Delay:        5000ms
+10:41:59.029 [main] INFO  d.m.quorus.agent.config.AgentConfig -   Poll Interval:        10000ms
+10:41:59.029 [main] INFO  d.m.quorus.agent.config.AgentConfig -   --- Security ---
+10:41:59.030 [main] INFO  d.m.quorus.agent.config.AgentConfig -   Foreign Assignment Threshold: 1
+10:41:59.030 [main] INFO  d.m.quorus.agent.config.AgentConfig -   --- Telemetry ---
+10:41:59.030 [main] INFO  d.m.quorus.agent.config.AgentConfig -   Enabled:              true
+10:41:59.030 [main] INFO  d.m.quorus.agent.config.AgentConfig -   Prometheus Port:      9465
+10:41:59.030 [main] INFO  d.m.quorus.agent.config.AgentConfig -   OTLP Endpoint:        http://localhost:4317
+10:41:59.030 [main] INFO  d.m.quorus.agent.config.AgentConfig - ==================================
+10:41:59.030 [main] DEBUG d.m.quorus.protocol.ProtocolFactory - Initializing ProtocolFactory
+10:41:59.030 [main] DEBUG d.m.quorus.protocol.ProtocolFactory - Registering default transfer protocols
+10:41:59.030 [main] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating HttpTransferProtocol instance
+10:41:59.030 [main] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+10:41:59.030 [main] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: http
+10:41:59.030 [main] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=http, class=HttpTransferProtocol, supportsResume=false, supportsPause=true
+10:41:59.030 [main] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol alias: https -> http
+10:41:59.031 [main] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating SmbTransferProtocol instance
+10:41:59.031 [main] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: smb
+10:41:59.031 [main] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=smb, class=SmbTransferProtocol, supportsResume=false, supportsPause=false
+10:41:59.031 [main] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol alias: cifs -> smb
+10:41:59.031 [main] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating FtpTransferProtocol instance
+10:41:59.031 [main] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: ftp
+10:41:59.031 [main] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=ftp, class=FtpTransferProtocol, supportsResume=false, supportsPause=false
+10:41:59.031 [main] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol alias: ftps -> ftp
+10:41:59.031 [main] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating SftpTransferProtocol instance
+10:41:59.031 [main] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: sftp
+10:41:59.031 [main] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=sftp, class=SftpTransferProtocol, supportsResume=false, supportsPause=false
+10:41:59.031 [main] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating NfsTransferProtocol instance
+10:41:59.031 [main] DEBUG d.m.q.protocol.NfsTransferProtocol - NfsTransferProtocol initialized with mountRoot=C:\nfs
+10:41:59.031 [main] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: nfs
+10:41:59.031 [main] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=nfs, class=NfsTransferProtocol, supportsResume=false, supportsPause=false
+10:41:59.031 [main] INFO  d.m.quorus.protocol.ProtocolFactory - Registered default transfer protocols: count=8, schemes=ftps, ftp, http, smb, sftp, nfs, https, cifs
+10:41:59.032 [main] INFO  d.m.q.transfer.SimpleTransferEngine - SimpleTransferEngine initialized: maxConcurrent=2, maxRetries=3, retryDelay=1000ms
+10:41:59.032 [main] INFO  d.m.q.a.s.TransferExecutionService - TransferExecutionService initialized (Vert.x reactive mode)
+10:41:59.032 [main] INFO  d.m.q.a.s.TransferExecutionService - Transfer execution service started with 2 max concurrent transfers
+10:41:59.032 [main] INFO  d.m.q.a.s.TransferExecutionService - Shutting down transfer execution service...
+10:41:59.033 [vert.x-worker-thread-0] INFO  d.m.q.transfer.SimpleTransferEngine - Shutting down transfer engine; cancelling 0 running transfer(s)
+10:41:59.033 [vert.x-worker-thread-0] INFO  d.m.q.transfer.SimpleTransferEngine - Transfer engine shutdown completed
+10:41:59.033 [vert.x-eventloop-thread-0] INFO  d.m.q.a.s.TransferExecutionService - Transfer execution service shutdown complete
+[ERROR] Tests run: 2, Failures: 0, Errors: 1, Skipped: 0, Time elapsed: 30.45 s <<< FAILURE! -- in dev.mars.quorus.agent.service.TransferExecutionServiceTest
+[ERROR] dev.mars.quorus.agent.service.TransferExecutionServiceTest.testDeprecatedConstructorClosesOwnedVertx(VertxTestContext) -- Time elapsed: 30.37 s <<< ERROR!
+java.util.concurrent.TimeoutException: 
+The test execution timed out. Make sure your asynchronous code includes calls to either VertxTestContext#completeNow(), VertxTestContext#failNow() or Checkpoint#flag()
+
+Unsatisfied checkpoints diagnostics:
+
+	at io.vertx.junit5.VertxExtension.joinActiveTestContexts(VertxExtension.java:216)
+	at io.vertx.junit5.VertxExtension.interceptTestMethod(VertxExtension.java:143)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1612)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1612)
+
+[INFO] 
+[INFO] Results:
+[INFO] 
+[ERROR] Errors: 
+[ERROR]   TransferExecutionServiceTest.testDeprecatedConstructorClosesOwnedVertx(VertxTestContext) » Timeout The test execution timed out. Make sure your asynchronous code includes calls to either VertxTestContext#completeNow(), VertxTestContext#failNow() or Checkpoint#flag()
+
+Unsatisfied checkpoints diagnostics:
+
+[INFO] 
+[ERROR] Tests run: 2, Failures: 0, Errors: 1, Skipped: 0
+[INFO] 
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Summary for Quorus File Transfer System 1.0-SNAPSHOT:
+[INFO] 
+[INFO] Quorus File Transfer System ........................ SUCCESS [  0.199 s]
+[INFO] Quorus Core ........................................ SUCCESS [  0.819 s]
+[INFO] Quorus Workflow Engine ............................. SUCCESS [  0.103 s]
+[INFO] Quorus Agent ....................................... FAILURE [ 34.194 s]
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  35.480 s
+[INFO] Finished at: 2026-09-27T10:41:59+01:00
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.2.2:test (default-test) on project quorus-agent: 
+[ERROR] 
+[ERROR] Please refer to C:\Users\mraysmit\dev\idea-projects\quorus\quorus-agent\target\surefire-reports for the individual test results.
+[ERROR] Please refer to dump files (if any exist) [date].dump, [date]-jvmRun[N].dump and [date].dumpstream.
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+[ERROR] 
+[ERROR] After correcting the problems, you can resume the build with the command
+[ERROR]   mvn <args> -rf :quorus-agent

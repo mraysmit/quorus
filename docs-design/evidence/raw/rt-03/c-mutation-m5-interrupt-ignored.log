@@ -1,0 +1,405 @@
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::staticFieldBase has been called by com.google.inject.internal.aop.HiddenClassDefiner (file:/C:/Users/mraysmit/scoop/apps/maven/current/lib/guice-5.1.0-classes.jar)
+WARNING: Please consider reporting this to the maintainers of class com.google.inject.internal.aop.HiddenClassDefiner
+WARNING: sun.misc.Unsafe::staticFieldBase will be removed in a future release
+WARNING: Final field _cipher in class org.sonatype.plexus.components.sec.dispatcher.DefaultSecDispatcher has been mutated reflectively by class org.eclipse.sisu.bean.BeanPropertyField in unnamed module @7f010382 (file:/C:/Users/mraysmit/scoop/apps/maven/current/lib/org.eclipse.sisu.inject-0.9.0.M4.jar)
+WARNING: Use --enable-final-field-mutation=ALL-UNNAMED to avoid a warning
+WARNING: Mutating final fields will be blocked in a future release unless final field mutation is enabled
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] ------------------------< dev.mars:quorus-core >------------------------
+[INFO] Building Quorus Core 1.0-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- jacoco:0.8.15:prepare-agent (prepare-agent) @ quorus-core ---
+[INFO] Skipping JaCoCo execution because property jacoco.skip is set.
+[INFO] argLine set to empty
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ quorus-core ---
+[INFO] Copying 1 resource from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ quorus-core ---
+[INFO] Recompiling the module because of changed source code.
+[INFO] Compiling 73 source files with javac [debug release 27] to target\classes
+[INFO] /C:/Users/mraysmit/dev/idea-projects/quorus/quorus-core/src/main/java/dev/mars/quorus/protocol/FtpTransferProtocol.java: Some input files use or override a deprecated API.
+[INFO] /C:/Users/mraysmit/dev/idea-projects/quorus/quorus-core/src/main/java/dev/mars/quorus/protocol/FtpTransferProtocol.java: Recompile with -Xlint:deprecation for details.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ quorus-core ---
+[INFO] Copying 16 resources from src\test\resources to target\test-classes
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ quorus-core ---
+[INFO] Recompiling the module because of changed dependency.
+[INFO] Compiling 93 source files with javac [debug release 27] to target\test-classes
+[INFO] /C:/Users/mraysmit/dev/idea-projects/quorus/quorus-core/src/test/java/dev/mars/quorus/connection/TlsTrustAnchorPolicyTest.java: Some input files use or override a deprecated API.
+[INFO] /C:/Users/mraysmit/dev/idea-projects/quorus/quorus-core/src/test/java/dev/mars/quorus/connection/TlsTrustAnchorPolicyTest.java: Recompile with -Xlint:deprecation for details.
+[INFO] 
+[INFO] --- surefire:3.2.2:test (default-test) @ quorus-core ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running dev.mars.quorus.transfer.SimpleTransferEngineBlockingTest
+10:34:19.266 [junit-timeout-thread-1] DEBUG d.m.quorus.protocol.ProtocolFactory - Initializing ProtocolFactory
+10:34:19.270 [junit-timeout-thread-1] DEBUG d.m.quorus.protocol.ProtocolFactory - Registering default transfer protocols
+10:34:19.270 [junit-timeout-thread-1] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating HttpTransferProtocol instance
+10:34:19.274 [junit-timeout-thread-1] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+10:34:19.277 [junit-timeout-thread-1] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: http
+10:34:19.277 [junit-timeout-thread-1] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=http, class=HttpTransferProtocol, supportsResume=false, supportsPause=true
+10:34:19.277 [junit-timeout-thread-1] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol alias: https -> http
+10:34:19.277 [junit-timeout-thread-1] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating SmbTransferProtocol instance
+10:34:19.278 [junit-timeout-thread-1] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: smb
+10:34:19.278 [junit-timeout-thread-1] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=smb, class=SmbTransferProtocol, supportsResume=false, supportsPause=false
+10:34:19.278 [junit-timeout-thread-1] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol alias: cifs -> smb
+10:34:19.278 [junit-timeout-thread-1] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating FtpTransferProtocol instance
+10:34:19.279 [junit-timeout-thread-1] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: ftp
+10:34:19.279 [junit-timeout-thread-1] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=ftp, class=FtpTransferProtocol, supportsResume=false, supportsPause=false
+10:34:19.279 [junit-timeout-thread-1] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol alias: ftps -> ftp
+10:34:19.279 [junit-timeout-thread-1] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating SftpTransferProtocol instance
+10:34:19.280 [junit-timeout-thread-1] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: sftp
+10:34:19.280 [junit-timeout-thread-1] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=sftp, class=SftpTransferProtocol, supportsResume=false, supportsPause=false
+10:34:19.281 [junit-timeout-thread-1] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating NfsTransferProtocol instance
+10:34:19.282 [junit-timeout-thread-1] DEBUG d.m.q.protocol.NfsTransferProtocol - NfsTransferProtocol initialized with mountRoot=C:\nfs
+10:34:19.282 [junit-timeout-thread-1] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: nfs
+10:34:19.282 [junit-timeout-thread-1] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=nfs, class=NfsTransferProtocol, supportsResume=false, supportsPause=false
+10:34:19.282 [junit-timeout-thread-1] INFO  d.m.quorus.protocol.ProtocolFactory - Registered default transfer protocols: count=8, schemes=ftps, ftp, http, smb, sftp, nfs, https, cifs
+10:34:19.295 [junit-timeout-thread-1] INFO  d.m.q.t.o.TransferTelemetryMetrics - TransferTelemetryMetrics initialized
+10:34:19.296 [junit-timeout-thread-1] INFO  d.m.q.transfer.SimpleTransferEngine - SimpleTransferEngine initialized: maxConcurrent=1, maxRetries=2, retryDelay=1ms
+10:34:19.298 [junit-timeout-thread-1] DEBUG d.m.quorus.protocol.ProtocolFactory - isProtocolSupported: protocol=http, supported=true
+10:34:19.299 [junit-timeout-thread-1] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol found: name=http, implementation=HttpTransferProtocol
+10:34:19.305 [junit-timeout-thread-1] INFO  d.m.q.transfer.SimpleTransferEngine - Transfer started: retried
+10:34:19.307 [junit-timeout-thread-1] DEBUG d.m.q.transfer.SimpleTransferEngine - Executing DOWNLOAD (Remote -> Local) transfer retried: protocol=http, source=http://127.0.0.1:57343/retried, destination=file:///C:/Users/mraysmit/AppData/Local/Temp/junit12068774464463874226/retried.bin
+10:34:19.326 [junit-timeout-thread-1] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol found: name=http, implementation=HttpTransferProtocol
+10:34:19.328 [junit-timeout-thread-1] INFO  d.m.q.protocol.HttpTransferProtocol - Starting HTTP download from http://127.0.0.1:57343/retried
+10:34:19.582 [junit-timeout-thread-1] ERROR d.m.q.protocol.HttpTransferProtocol - [QUORUS-1203] HTTP request failed: statusCode=500, reason=Internal Server Error
+10:34:19.583 [junit-timeout-thread-1] WARN  d.m.q.transfer.SimpleTransferEngine - Transfer attempt 1 of 3 failed for job retried: Transfer retried failed: HTTP 500: Internal Server Error
+10:34:19.584 [junit-timeout-thread-1] DEBUG d.m.q.transfer.SimpleTransferEngine - Retrying after 1 ms
+10:34:19.587 [junit-timeout-thread-1] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol found: name=http, implementation=HttpTransferProtocol
+10:34:19.587 [junit-timeout-thread-1] INFO  d.m.q.protocol.HttpTransferProtocol - Starting HTTP download from http://127.0.0.1:57343/retried
+10:34:19.591 [junit-timeout-thread-1] ERROR d.m.q.protocol.HttpTransferProtocol - [QUORUS-1203] HTTP request failed: statusCode=500, reason=Internal Server Error
+10:34:19.592 [junit-timeout-thread-1] WARN  d.m.q.transfer.SimpleTransferEngine - Transfer attempt 2 of 3 failed for job retried: Transfer retried failed: HTTP 500: Internal Server Error
+10:34:19.592 [junit-timeout-thread-1] DEBUG d.m.q.transfer.SimpleTransferEngine - Retrying after 2 ms
+10:34:19.595 [junit-timeout-thread-1] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol found: name=http, implementation=HttpTransferProtocol
+10:34:19.595 [junit-timeout-thread-1] INFO  d.m.q.protocol.HttpTransferProtocol - Starting HTTP download from http://127.0.0.1:57343/retried
+10:34:19.604 [junit-timeout-thread-1] INFO  d.m.q.protocol.HttpTransferProtocol - HTTP download completed: jobId=retried, bytesTransferred=30, checksum=4807125757598c4f742d6a3615e1e60a59e001841574834ba43c9909e02babaf
+10:34:19.606 [junit-timeout-thread-1] INFO  d.m.q.transfer.SimpleTransferEngine - DOWNLOAD (Remote -> Local) transfer completed: retried (30 bytes in 283 ms)
+10:34:19.615 [main] INFO  d.m.q.transfer.SimpleTransferEngine - Shutting down transfer engine; cancelling 0 running transfer(s)
+10:34:19.617 [main] INFO  d.m.q.transfer.SimpleTransferEngine - Transfer engine shutdown completed
+10:34:19.639 [junit-timeout-thread-2] DEBUG d.m.quorus.protocol.ProtocolFactory - Initializing ProtocolFactory
+10:34:19.640 [junit-timeout-thread-2] DEBUG d.m.quorus.protocol.ProtocolFactory - Registering default transfer protocols
+10:34:19.640 [junit-timeout-thread-2] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating HttpTransferProtocol instance
+10:34:19.640 [junit-timeout-thread-2] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+10:34:19.640 [junit-timeout-thread-2] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: http
+10:34:19.640 [junit-timeout-thread-2] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=http, class=HttpTransferProtocol, supportsResume=false, supportsPause=true
+10:34:19.641 [junit-timeout-thread-2] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol alias: https -> http
+10:34:19.641 [junit-timeout-thread-2] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating SmbTransferProtocol instance
+10:34:19.642 [junit-timeout-thread-2] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: smb
+10:34:19.642 [junit-timeout-thread-2] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=smb, class=SmbTransferProtocol, supportsResume=false, supportsPause=false
+10:34:19.642 [junit-timeout-thread-2] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol alias: cifs -> smb
+10:34:19.642 [junit-timeout-thread-2] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating FtpTransferProtocol instance
+10:34:19.642 [junit-timeout-thread-2] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: ftp
+10:34:19.642 [junit-timeout-thread-2] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=ftp, class=FtpTransferProtocol, supportsResume=false, supportsPause=false
+10:34:19.643 [junit-timeout-thread-2] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol alias: ftps -> ftp
+10:34:19.643 [junit-timeout-thread-2] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating SftpTransferProtocol instance
+10:34:19.643 [junit-timeout-thread-2] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: sftp
+10:34:19.643 [junit-timeout-thread-2] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=sftp, class=SftpTransferProtocol, supportsResume=false, supportsPause=false
+10:34:19.644 [junit-timeout-thread-2] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating NfsTransferProtocol instance
+10:34:19.644 [junit-timeout-thread-2] DEBUG d.m.q.protocol.NfsTransferProtocol - NfsTransferProtocol initialized with mountRoot=C:\nfs
+10:34:19.644 [junit-timeout-thread-2] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: nfs
+10:34:19.644 [junit-timeout-thread-2] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=nfs, class=NfsTransferProtocol, supportsResume=false, supportsPause=false
+10:34:19.644 [junit-timeout-thread-2] INFO  d.m.quorus.protocol.ProtocolFactory - Registered default transfer protocols: count=8, schemes=ftps, ftp, http, smb, sftp, nfs, https, cifs
+10:34:19.644 [junit-timeout-thread-2] INFO  d.m.q.transfer.SimpleTransferEngine - SimpleTransferEngine initialized: maxConcurrent=2, maxRetries=3, retryDelay=1ms
+10:34:19.647 [transfer-held-cancel] DEBUG d.m.quorus.protocol.ProtocolFactory - isProtocolSupported: protocol=http, supported=true
+10:34:19.648 [transfer-held-cancel] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol found: name=http, implementation=HttpTransferProtocol
+10:34:19.648 [transfer-held-cancel] INFO  d.m.q.transfer.SimpleTransferEngine - Transfer started: held-cancel
+10:34:19.649 [transfer-held-cancel] DEBUG d.m.q.transfer.SimpleTransferEngine - Executing DOWNLOAD (Remote -> Local) transfer held-cancel: protocol=http, source=http://127.0.0.1:57347/held-cancel, destination=file:///C:/Users/mraysmit/AppData/Local/Temp/junit15614976983621578598/held-cancel.bin
+10:34:19.649 [transfer-held-cancel] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol found: name=http, implementation=HttpTransferProtocol
+10:34:19.649 [transfer-held-cancel] INFO  d.m.q.protocol.HttpTransferProtocol - Starting HTTP download from http://127.0.0.1:57347/held-cancel
+10:34:19.658 [junit-timeout-thread-2] INFO  d.m.q.transfer.SimpleTransferEngine - Transfer cancellation requested: held-cancel
+10:34:19.661 [transfer-held-cancel] INFO  d.m.q.transfer.SimpleTransferEngine - Transfer cancelled: held-cancel
+10:34:19.662 [main] INFO  d.m.q.transfer.SimpleTransferEngine - Shutting down transfer engine; cancelling 0 running transfer(s)
+10:34:19.662 [main] INFO  d.m.q.transfer.SimpleTransferEngine - Transfer engine shutdown completed
+10:34:19.669 [junit-timeout-thread-3] DEBUG d.m.quorus.protocol.ProtocolFactory - Initializing ProtocolFactory
+10:34:19.670 [junit-timeout-thread-3] DEBUG d.m.quorus.protocol.ProtocolFactory - Registering default transfer protocols
+10:34:19.670 [junit-timeout-thread-3] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating HttpTransferProtocol instance
+10:34:19.670 [junit-timeout-thread-3] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+10:34:19.671 [junit-timeout-thread-3] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: http
+10:34:19.671 [junit-timeout-thread-3] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=http, class=HttpTransferProtocol, supportsResume=false, supportsPause=true
+10:34:19.671 [junit-timeout-thread-3] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol alias: https -> http
+10:34:19.671 [junit-timeout-thread-3] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating SmbTransferProtocol instance
+10:34:19.671 [junit-timeout-thread-3] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: smb
+10:34:19.671 [junit-timeout-thread-3] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=smb, class=SmbTransferProtocol, supportsResume=false, supportsPause=false
+10:34:19.672 [junit-timeout-thread-3] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol alias: cifs -> smb
+10:34:19.672 [junit-timeout-thread-3] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating FtpTransferProtocol instance
+10:34:19.672 [junit-timeout-thread-3] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: ftp
+10:34:19.672 [junit-timeout-thread-3] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=ftp, class=FtpTransferProtocol, supportsResume=false, supportsPause=false
+10:34:19.672 [junit-timeout-thread-3] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol alias: ftps -> ftp
+10:34:19.672 [junit-timeout-thread-3] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating SftpTransferProtocol instance
+10:34:19.672 [junit-timeout-thread-3] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: sftp
+10:34:19.672 [junit-timeout-thread-3] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=sftp, class=SftpTransferProtocol, supportsResume=false, supportsPause=false
+10:34:19.672 [junit-timeout-thread-3] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating NfsTransferProtocol instance
+10:34:19.672 [junit-timeout-thread-3] DEBUG d.m.q.protocol.NfsTransferProtocol - NfsTransferProtocol initialized with mountRoot=C:\nfs
+10:34:19.672 [junit-timeout-thread-3] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: nfs
+10:34:19.672 [junit-timeout-thread-3] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=nfs, class=NfsTransferProtocol, supportsResume=false, supportsPause=false
+10:34:19.673 [junit-timeout-thread-3] INFO  d.m.quorus.protocol.ProtocolFactory - Registered default transfer protocols: count=8, schemes=ftps, ftp, http, smb, sftp, nfs, https, cifs
+10:34:19.673 [junit-timeout-thread-3] INFO  d.m.q.transfer.SimpleTransferEngine - SimpleTransferEngine initialized: maxConcurrent=1, maxRetries=2, retryDelay=1ms
+10:34:19.673 [junit-timeout-thread-3] DEBUG d.m.quorus.protocol.ProtocolFactory - isProtocolSupported: protocol=http, supported=true
+10:34:19.674 [junit-timeout-thread-3] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol found: name=http, implementation=HttpTransferProtocol
+10:34:19.674 [junit-timeout-thread-3] INFO  d.m.q.transfer.SimpleTransferEngine - Transfer started: exhausted
+10:34:19.674 [junit-timeout-thread-3] DEBUG d.m.q.transfer.SimpleTransferEngine - Executing DOWNLOAD (Remote -> Local) transfer exhausted: protocol=http, source=http://127.0.0.1:57349/exhausted, destination=file:///C:/Users/mraysmit/AppData/Local/Temp/junit10586928811060199821/exhausted.bin
+10:34:19.674 [junit-timeout-thread-3] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol found: name=http, implementation=HttpTransferProtocol
+10:34:19.675 [junit-timeout-thread-3] INFO  d.m.q.protocol.HttpTransferProtocol - Starting HTTP download from http://127.0.0.1:57349/exhausted
+10:34:19.680 [junit-timeout-thread-3] ERROR d.m.q.protocol.HttpTransferProtocol - [QUORUS-1203] HTTP request failed: statusCode=500, reason=Internal Server Error
+10:34:19.681 [junit-timeout-thread-3] WARN  d.m.q.transfer.SimpleTransferEngine - Transfer attempt 1 of 3 failed for job exhausted: Transfer exhausted failed: HTTP 500: Internal Server Error
+10:34:19.681 [junit-timeout-thread-3] DEBUG d.m.q.transfer.SimpleTransferEngine - Retrying after 1 ms
+10:34:19.683 [junit-timeout-thread-3] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol found: name=http, implementation=HttpTransferProtocol
+10:34:19.683 [junit-timeout-thread-3] INFO  d.m.q.protocol.HttpTransferProtocol - Starting HTTP download from http://127.0.0.1:57349/exhausted
+10:34:19.687 [junit-timeout-thread-3] ERROR d.m.q.protocol.HttpTransferProtocol - [QUORUS-1203] HTTP request failed: statusCode=500, reason=Internal Server Error
+10:34:19.688 [junit-timeout-thread-3] WARN  d.m.q.transfer.SimpleTransferEngine - Transfer attempt 2 of 3 failed for job exhausted: Transfer exhausted failed: HTTP 500: Internal Server Error
+10:34:19.688 [junit-timeout-thread-3] DEBUG d.m.q.transfer.SimpleTransferEngine - Retrying after 2 ms
+10:34:19.692 [junit-timeout-thread-3] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol found: name=http, implementation=HttpTransferProtocol
+10:34:19.692 [junit-timeout-thread-3] INFO  d.m.q.protocol.HttpTransferProtocol - Starting HTTP download from http://127.0.0.1:57349/exhausted
+10:34:19.695 [junit-timeout-thread-3] ERROR d.m.q.protocol.HttpTransferProtocol - [QUORUS-1203] HTTP request failed: statusCode=500, reason=Internal Server Error
+10:34:19.697 [junit-timeout-thread-3] ERROR d.m.q.transfer.SimpleTransferEngine - DOWNLOAD (Remote -> Local) transfer failed permanently: exhausted - Transfer exhausted failed: HTTP 500: Internal Server Error
+10:34:19.697 [junit-timeout-thread-3] DEBUG d.m.q.transfer.SimpleTransferEngine - Failure detail for transfer exhausted
+dev.mars.quorus.core.exceptions.TransferException: Transfer exhausted failed: HTTP 500: Internal Server Error
+	at dev.mars.quorus.protocol.HttpTransferProtocol.requireStatus(HttpTransferProtocol.java:484)
+10:34:19.700 [main] INFO  d.m.q.transfer.SimpleTransferEngine - Shutting down transfer engine; cancelling 0 running transfer(s)
+10:34:19.700 [main] INFO  d.m.q.transfer.SimpleTransferEngine - Transfer engine shutdown completed
+10:34:19.706 [junit-timeout-thread-4] DEBUG d.m.quorus.protocol.ProtocolFactory - Initializing ProtocolFactory
+10:34:19.706 [junit-timeout-thread-4] DEBUG d.m.quorus.protocol.ProtocolFactory - Registering default transfer protocols
+10:34:19.706 [junit-timeout-thread-4] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating HttpTransferProtocol instance
+10:34:19.706 [junit-timeout-thread-4] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+10:34:19.706 [junit-timeout-thread-4] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: http
+10:34:19.706 [junit-timeout-thread-4] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=http, class=HttpTransferProtocol, supportsResume=false, supportsPause=true
+10:34:19.706 [junit-timeout-thread-4] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol alias: https -> http
+10:34:19.706 [junit-timeout-thread-4] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating SmbTransferProtocol instance
+10:34:19.706 [junit-timeout-thread-4] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: smb
+10:34:19.708 [junit-timeout-thread-4] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=smb, class=SmbTransferProtocol, supportsResume=false, supportsPause=false
+10:34:19.708 [junit-timeout-thread-4] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol alias: cifs -> smb
+10:34:19.708 [junit-timeout-thread-4] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating FtpTransferProtocol instance
+10:34:19.708 [junit-timeout-thread-4] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: ftp
+10:34:19.708 [junit-timeout-thread-4] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=ftp, class=FtpTransferProtocol, supportsResume=false, supportsPause=false
+10:34:19.708 [junit-timeout-thread-4] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol alias: ftps -> ftp
+10:34:19.708 [junit-timeout-thread-4] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating SftpTransferProtocol instance
+10:34:19.708 [junit-timeout-thread-4] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: sftp
+10:34:19.708 [junit-timeout-thread-4] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=sftp, class=SftpTransferProtocol, supportsResume=false, supportsPause=false
+10:34:19.708 [junit-timeout-thread-4] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating NfsTransferProtocol instance
+10:34:19.708 [junit-timeout-thread-4] DEBUG d.m.q.protocol.NfsTransferProtocol - NfsTransferProtocol initialized with mountRoot=C:\nfs
+10:34:19.708 [junit-timeout-thread-4] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: nfs
+10:34:19.708 [junit-timeout-thread-4] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=nfs, class=NfsTransferProtocol, supportsResume=false, supportsPause=false
+10:34:19.708 [junit-timeout-thread-4] INFO  d.m.quorus.protocol.ProtocolFactory - Registered default transfer protocols: count=8, schemes=ftps, ftp, http, smb, sftp, nfs, https, cifs
+10:34:19.708 [junit-timeout-thread-4] INFO  d.m.q.transfer.SimpleTransferEngine - SimpleTransferEngine initialized: maxConcurrent=1, maxRetries=0, retryDelay=1ms
+10:34:19.709 [transfer-held-slow] DEBUG d.m.quorus.protocol.ProtocolFactory - isProtocolSupported: protocol=http, supported=true
+10:34:19.709 [transfer-held-slow] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol found: name=http, implementation=HttpTransferProtocol
+10:34:19.709 [transfer-held-slow] INFO  d.m.q.transfer.SimpleTransferEngine - Transfer started: held-slow
+10:34:19.709 [transfer-held-slow] DEBUG d.m.q.transfer.SimpleTransferEngine - Executing DOWNLOAD (Remote -> Local) transfer held-slow: protocol=http, source=http://127.0.0.1:57353/held-slow, destination=file:///C:/Users/mraysmit/AppData/Local/Temp/junit8020487575037903999/held-slow.bin
+10:34:19.709 [transfer-held-slow] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol found: name=http, implementation=HttpTransferProtocol
+10:34:19.709 [transfer-held-slow] INFO  d.m.q.protocol.HttpTransferProtocol - Starting HTTP download from http://127.0.0.1:57353/held-slow
+10:34:19.716 [junit-timeout-thread-4] DEBUG d.m.quorus.protocol.ProtocolFactory - isProtocolSupported: protocol=http, supported=true
+10:34:19.716 [junit-timeout-thread-4] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol found: name=http, implementation=HttpTransferProtocol
+10:34:19.719 [transfer-held-slow] INFO  d.m.q.protocol.HttpTransferProtocol - HTTP download completed: jobId=held-slow, bytesTransferred=30, checksum=4807125757598c4f742d6a3615e1e60a59e001841574834ba43c9909e02babaf
+10:34:19.719 [transfer-held-slow] INFO  d.m.q.transfer.SimpleTransferEngine - DOWNLOAD (Remote -> Local) transfer completed: held-slow (30 bytes in 9 ms)
+10:34:19.720 [junit-timeout-thread-4] DEBUG d.m.quorus.protocol.ProtocolFactory - isProtocolSupported: protocol=http, supported=true
+10:34:19.720 [junit-timeout-thread-4] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol found: name=http, implementation=HttpTransferProtocol
+10:34:19.720 [junit-timeout-thread-4] INFO  d.m.q.transfer.SimpleTransferEngine - Transfer started: fast
+10:34:19.720 [junit-timeout-thread-4] DEBUG d.m.q.transfer.SimpleTransferEngine - Executing DOWNLOAD (Remote -> Local) transfer fast: protocol=http, source=http://127.0.0.1:57353/fast, destination=file:///C:/Users/mraysmit/AppData/Local/Temp/junit8020487575037903999/fast.bin
+10:34:19.720 [junit-timeout-thread-4] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol found: name=http, implementation=HttpTransferProtocol
+10:34:19.721 [junit-timeout-thread-4] INFO  d.m.q.protocol.HttpTransferProtocol - Starting HTTP download from http://127.0.0.1:57353/fast
+10:34:19.726 [junit-timeout-thread-4] INFO  d.m.q.protocol.HttpTransferProtocol - HTTP download completed: jobId=fast, bytesTransferred=30, checksum=4807125757598c4f742d6a3615e1e60a59e001841574834ba43c9909e02babaf
+10:34:19.726 [junit-timeout-thread-4] INFO  d.m.q.transfer.SimpleTransferEngine - DOWNLOAD (Remote -> Local) transfer completed: fast (30 bytes in 6 ms)
+10:34:19.727 [main] INFO  d.m.q.transfer.SimpleTransferEngine - Shutting down transfer engine; cancelling 0 running transfer(s)
+10:34:19.727 [main] INFO  d.m.q.transfer.SimpleTransferEngine - Transfer engine shutdown completed
+10:34:19.735 [junit-timeout-thread-5] DEBUG d.m.quorus.protocol.ProtocolFactory - Initializing ProtocolFactory
+10:34:19.736 [junit-timeout-thread-5] DEBUG d.m.quorus.protocol.ProtocolFactory - Registering default transfer protocols
+10:34:19.736 [junit-timeout-thread-5] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating HttpTransferProtocol instance
+10:34:19.736 [junit-timeout-thread-5] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+10:34:19.736 [junit-timeout-thread-5] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: http
+10:34:19.736 [junit-timeout-thread-5] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=http, class=HttpTransferProtocol, supportsResume=false, supportsPause=true
+10:34:19.736 [junit-timeout-thread-5] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol alias: https -> http
+10:34:19.736 [junit-timeout-thread-5] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating SmbTransferProtocol instance
+10:34:19.736 [junit-timeout-thread-5] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: smb
+10:34:19.736 [junit-timeout-thread-5] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=smb, class=SmbTransferProtocol, supportsResume=false, supportsPause=false
+10:34:19.736 [junit-timeout-thread-5] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol alias: cifs -> smb
+10:34:19.736 [junit-timeout-thread-5] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating FtpTransferProtocol instance
+10:34:19.736 [junit-timeout-thread-5] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: ftp
+10:34:19.736 [junit-timeout-thread-5] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=ftp, class=FtpTransferProtocol, supportsResume=false, supportsPause=false
+10:34:19.736 [junit-timeout-thread-5] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol alias: ftps -> ftp
+10:34:19.736 [junit-timeout-thread-5] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating SftpTransferProtocol instance
+10:34:19.736 [junit-timeout-thread-5] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: sftp
+10:34:19.736 [junit-timeout-thread-5] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=sftp, class=SftpTransferProtocol, supportsResume=false, supportsPause=false
+10:34:19.736 [junit-timeout-thread-5] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating NfsTransferProtocol instance
+10:34:19.736 [junit-timeout-thread-5] DEBUG d.m.q.protocol.NfsTransferProtocol - NfsTransferProtocol initialized with mountRoot=C:\nfs
+10:34:19.736 [junit-timeout-thread-5] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: nfs
+10:34:19.737 [junit-timeout-thread-5] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=nfs, class=NfsTransferProtocol, supportsResume=false, supportsPause=false
+10:34:19.737 [junit-timeout-thread-5] INFO  d.m.quorus.protocol.ProtocolFactory - Registered default transfer protocols: count=8, schemes=ftps, ftp, http, smb, sftp, nfs, https, cifs
+10:34:19.737 [junit-timeout-thread-5] INFO  d.m.q.transfer.SimpleTransferEngine - SimpleTransferEngine initialized: maxConcurrent=2, maxRetries=0, retryDelay=1ms
+10:34:19.737 [transfer-held-interrupt] DEBUG d.m.quorus.protocol.ProtocolFactory - isProtocolSupported: protocol=http, supported=true
+10:34:19.737 [transfer-held-interrupt] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol found: name=http, implementation=HttpTransferProtocol
+10:34:19.738 [transfer-held-interrupt] INFO  d.m.q.transfer.SimpleTransferEngine - Transfer started: held-interrupt
+10:34:19.738 [transfer-held-interrupt] DEBUG d.m.q.transfer.SimpleTransferEngine - Executing DOWNLOAD (Remote -> Local) transfer held-interrupt: protocol=http, source=http://127.0.0.1:57356/held-interrupt, destination=file:///C:/Users/mraysmit/AppData/Local/Temp/junit5685489351790309574/held-interrupt.bin
+10:34:19.738 [transfer-held-interrupt] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol found: name=http, implementation=HttpTransferProtocol
+10:34:19.738 [transfer-held-interrupt] INFO  d.m.q.protocol.HttpTransferProtocol - Starting HTTP download from http://127.0.0.1:57356/held-interrupt
+10:34:19.742 [transfer-held-interrupt] ERROR d.m.q.transfer.SimpleTransferEngine - DOWNLOAD (Remote -> Local) transfer failed permanently: held-interrupt - null
+10:34:19.742 [transfer-held-interrupt] DEBUG d.m.q.transfer.SimpleTransferEngine - Failure detail for transfer held-interrupt
+java.util.concurrent.CancellationException
+	at org.apache.hc.core5.concurrent.BasicFuture.getResult(BasicFuture.java:87)
+10:34:19.746 [main] INFO  d.m.q.transfer.SimpleTransferEngine - Shutting down transfer engine; cancelling 0 running transfer(s)
+10:34:19.746 [main] INFO  d.m.q.transfer.SimpleTransferEngine - Transfer engine shutdown completed
+10:34:19.755 [junit-timeout-thread-6] DEBUG d.m.quorus.protocol.ProtocolFactory - Initializing ProtocolFactory
+10:34:19.755 [junit-timeout-thread-6] DEBUG d.m.quorus.protocol.ProtocolFactory - Registering default transfer protocols
+10:34:19.755 [junit-timeout-thread-6] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating HttpTransferProtocol instance
+10:34:19.755 [junit-timeout-thread-6] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+10:34:19.755 [junit-timeout-thread-6] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: http
+10:34:19.755 [junit-timeout-thread-6] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=http, class=HttpTransferProtocol, supportsResume=false, supportsPause=true
+10:34:19.755 [junit-timeout-thread-6] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol alias: https -> http
+10:34:19.755 [junit-timeout-thread-6] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating SmbTransferProtocol instance
+10:34:19.756 [junit-timeout-thread-6] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: smb
+10:34:19.756 [junit-timeout-thread-6] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=smb, class=SmbTransferProtocol, supportsResume=false, supportsPause=false
+10:34:19.756 [junit-timeout-thread-6] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol alias: cifs -> smb
+10:34:19.756 [junit-timeout-thread-6] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating FtpTransferProtocol instance
+10:34:19.756 [junit-timeout-thread-6] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: ftp
+10:34:19.756 [junit-timeout-thread-6] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=ftp, class=FtpTransferProtocol, supportsResume=false, supportsPause=false
+10:34:19.756 [junit-timeout-thread-6] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol alias: ftps -> ftp
+10:34:19.756 [junit-timeout-thread-6] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating SftpTransferProtocol instance
+10:34:19.756 [junit-timeout-thread-6] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: sftp
+10:34:19.756 [junit-timeout-thread-6] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=sftp, class=SftpTransferProtocol, supportsResume=false, supportsPause=false
+10:34:19.756 [junit-timeout-thread-6] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating NfsTransferProtocol instance
+10:34:19.756 [junit-timeout-thread-6] DEBUG d.m.q.protocol.NfsTransferProtocol - NfsTransferProtocol initialized with mountRoot=C:\nfs
+10:34:19.756 [junit-timeout-thread-6] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: nfs
+10:34:19.756 [junit-timeout-thread-6] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=nfs, class=NfsTransferProtocol, supportsResume=false, supportsPause=false
+10:34:19.756 [junit-timeout-thread-6] INFO  d.m.quorus.protocol.ProtocolFactory - Registered default transfer protocols: count=8, schemes=ftps, ftp, http, smb, sftp, nfs, https, cifs
+10:34:19.756 [junit-timeout-thread-6] INFO  d.m.q.transfer.SimpleTransferEngine - SimpleTransferEngine initialized: maxConcurrent=2, maxRetries=0, retryDelay=1ms
+10:34:19.756 [junit-timeout-thread-6] DEBUG d.m.quorus.protocol.ProtocolFactory - isProtocolSupported: protocol=http, supported=true
+10:34:19.756 [junit-timeout-thread-6] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol found: name=http, implementation=HttpTransferProtocol
+10:34:19.756 [junit-timeout-thread-6] INFO  d.m.q.transfer.SimpleTransferEngine - Transfer started: plain
+10:34:19.756 [junit-timeout-thread-6] DEBUG d.m.q.transfer.SimpleTransferEngine - Executing DOWNLOAD (Remote -> Local) transfer plain: protocol=http, source=http://127.0.0.1:57358/plain, destination=file:///C:/Users/mraysmit/AppData/Local/Temp/junit2672612749818738867/plain.bin
+10:34:19.756 [junit-timeout-thread-6] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol found: name=http, implementation=HttpTransferProtocol
+10:34:19.756 [junit-timeout-thread-6] INFO  d.m.q.protocol.HttpTransferProtocol - Starting HTTP download from http://127.0.0.1:57358/plain
+10:34:19.762 [junit-timeout-thread-6] INFO  d.m.q.protocol.HttpTransferProtocol - HTTP download completed: jobId=plain, bytesTransferred=30, checksum=4807125757598c4f742d6a3615e1e60a59e001841574834ba43c9909e02babaf
+10:34:19.762 [junit-timeout-thread-6] INFO  d.m.q.transfer.SimpleTransferEngine - DOWNLOAD (Remote -> Local) transfer completed: plain (30 bytes in 6 ms)
+10:34:19.766 [main] INFO  d.m.q.transfer.SimpleTransferEngine - Shutting down transfer engine; cancelling 0 running transfer(s)
+10:34:19.766 [main] INFO  d.m.q.transfer.SimpleTransferEngine - Transfer engine shutdown completed
+10:34:19.774 [junit-timeout-thread-7] DEBUG d.m.quorus.protocol.ProtocolFactory - Initializing ProtocolFactory
+10:34:19.774 [junit-timeout-thread-7] DEBUG d.m.quorus.protocol.ProtocolFactory - Registering default transfer protocols
+10:34:19.774 [junit-timeout-thread-7] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating HttpTransferProtocol instance
+10:34:19.774 [junit-timeout-thread-7] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+10:34:19.774 [junit-timeout-thread-7] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: http
+10:34:19.774 [junit-timeout-thread-7] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=http, class=HttpTransferProtocol, supportsResume=false, supportsPause=true
+10:34:19.775 [junit-timeout-thread-7] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol alias: https -> http
+10:34:19.775 [junit-timeout-thread-7] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating SmbTransferProtocol instance
+10:34:19.775 [junit-timeout-thread-7] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: smb
+10:34:19.775 [junit-timeout-thread-7] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=smb, class=SmbTransferProtocol, supportsResume=false, supportsPause=false
+10:34:19.775 [junit-timeout-thread-7] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol alias: cifs -> smb
+10:34:19.775 [junit-timeout-thread-7] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating FtpTransferProtocol instance
+10:34:19.775 [junit-timeout-thread-7] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: ftp
+10:34:19.775 [junit-timeout-thread-7] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=ftp, class=FtpTransferProtocol, supportsResume=false, supportsPause=false
+10:34:19.775 [junit-timeout-thread-7] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol alias: ftps -> ftp
+10:34:19.775 [junit-timeout-thread-7] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating SftpTransferProtocol instance
+10:34:19.775 [junit-timeout-thread-7] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: sftp
+10:34:19.775 [junit-timeout-thread-7] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=sftp, class=SftpTransferProtocol, supportsResume=false, supportsPause=false
+10:34:19.776 [junit-timeout-thread-7] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating NfsTransferProtocol instance
+10:34:19.776 [junit-timeout-thread-7] DEBUG d.m.q.protocol.NfsTransferProtocol - NfsTransferProtocol initialized with mountRoot=C:\nfs
+10:34:19.776 [junit-timeout-thread-7] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: nfs
+10:34:19.776 [junit-timeout-thread-7] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=nfs, class=NfsTransferProtocol, supportsResume=false, supportsPause=false
+10:34:19.776 [junit-timeout-thread-7] INFO  d.m.quorus.protocol.ProtocolFactory - Registered default transfer protocols: count=8, schemes=ftps, ftp, http, smb, sftp, nfs, https, cifs
+10:34:19.776 [junit-timeout-thread-7] INFO  d.m.q.transfer.SimpleTransferEngine - SimpleTransferEngine initialized: maxConcurrent=2, maxRetries=3, retryDelay=1ms
+10:34:19.776 [transfer-held-shutdown] DEBUG d.m.quorus.protocol.ProtocolFactory - isProtocolSupported: protocol=http, supported=true
+10:34:19.776 [transfer-held-shutdown] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol found: name=http, implementation=HttpTransferProtocol
+10:34:19.776 [transfer-held-shutdown] INFO  d.m.q.transfer.SimpleTransferEngine - Transfer started: held-shutdown
+10:34:19.778 [transfer-held-shutdown] DEBUG d.m.q.transfer.SimpleTransferEngine - Executing DOWNLOAD (Remote -> Local) transfer held-shutdown: protocol=http, source=http://127.0.0.1:57360/held-shutdown, destination=file:///C:/Users/mraysmit/AppData/Local/Temp/junit298947074650977480/held-shutdown.bin
+10:34:19.778 [transfer-held-shutdown] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol found: name=http, implementation=HttpTransferProtocol
+10:34:19.778 [transfer-held-shutdown] INFO  d.m.q.protocol.HttpTransferProtocol - Starting HTTP download from http://127.0.0.1:57360/held-shutdown
+10:34:19.782 [junit-timeout-thread-7] INFO  d.m.q.transfer.SimpleTransferEngine - Shutting down transfer engine; cancelling 1 running transfer(s)
+10:34:19.784 [transfer-held-shutdown] INFO  d.m.q.transfer.SimpleTransferEngine - Transfer cancelled: held-shutdown
+10:34:19.784 [junit-timeout-thread-7] INFO  d.m.q.transfer.SimpleTransferEngine - Transfer engine shutdown completed
+10:34:19.785 [main] INFO  d.m.q.transfer.SimpleTransferEngine - Transfer engine shutdown completed
+10:34:19.790 [junit-timeout-thread-8] DEBUG d.m.quorus.protocol.ProtocolFactory - Initializing ProtocolFactory
+10:34:19.790 [junit-timeout-thread-8] DEBUG d.m.quorus.protocol.ProtocolFactory - Registering default transfer protocols
+10:34:19.790 [junit-timeout-thread-8] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating HttpTransferProtocol instance
+10:34:19.790 [junit-timeout-thread-8] INFO  d.m.q.protocol.HttpTransferProtocol - HttpTransferProtocol initialized: connectTimeout=30 SECONDS, socketTimeout=60 SECONDS, maxFileSize=10737418240 bytes
+10:34:19.790 [junit-timeout-thread-8] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: http
+10:34:19.790 [junit-timeout-thread-8] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=http, class=HttpTransferProtocol, supportsResume=false, supportsPause=true
+10:34:19.790 [junit-timeout-thread-8] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol alias: https -> http
+10:34:19.791 [junit-timeout-thread-8] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating SmbTransferProtocol instance
+10:34:19.791 [junit-timeout-thread-8] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: smb
+10:34:19.791 [junit-timeout-thread-8] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=smb, class=SmbTransferProtocol, supportsResume=false, supportsPause=false
+10:34:19.791 [junit-timeout-thread-8] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol alias: cifs -> smb
+10:34:19.791 [junit-timeout-thread-8] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating FtpTransferProtocol instance
+10:34:19.791 [junit-timeout-thread-8] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: ftp
+10:34:19.791 [junit-timeout-thread-8] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=ftp, class=FtpTransferProtocol, supportsResume=false, supportsPause=false
+10:34:19.791 [junit-timeout-thread-8] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol alias: ftps -> ftp
+10:34:19.791 [junit-timeout-thread-8] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating SftpTransferProtocol instance
+10:34:19.791 [junit-timeout-thread-8] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: sftp
+10:34:19.791 [junit-timeout-thread-8] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=sftp, class=SftpTransferProtocol, supportsResume=false, supportsPause=false
+10:34:19.791 [junit-timeout-thread-8] DEBUG d.m.quorus.protocol.ProtocolFactory - Creating NfsTransferProtocol instance
+10:34:19.791 [junit-timeout-thread-8] DEBUG d.m.q.protocol.NfsTransferProtocol - NfsTransferProtocol initialized with mountRoot=C:\nfs
+10:34:19.791 [junit-timeout-thread-8] INFO  d.m.quorus.protocol.ProtocolFactory - Registered protocol: nfs
+10:34:19.791 [junit-timeout-thread-8] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol details: name=nfs, class=NfsTransferProtocol, supportsResume=false, supportsPause=false
+10:34:19.791 [junit-timeout-thread-8] INFO  d.m.quorus.protocol.ProtocolFactory - Registered default transfer protocols: count=8, schemes=ftps, ftp, http, smb, sftp, nfs, https, cifs
+10:34:19.791 [junit-timeout-thread-8] INFO  d.m.q.transfer.SimpleTransferEngine - SimpleTransferEngine initialized: maxConcurrent=2, maxRetries=0, retryDelay=1ms
+10:34:19.792 [transfer-held-a] DEBUG d.m.quorus.protocol.ProtocolFactory - isProtocolSupported: protocol=http, supported=true
+10:34:19.792 [transfer-held-b] DEBUG d.m.quorus.protocol.ProtocolFactory - isProtocolSupported: protocol=http, supported=true
+10:34:19.792 [transfer-held-a] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol found: name=http, implementation=HttpTransferProtocol
+10:34:19.792 [transfer-held-b] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol found: name=http, implementation=HttpTransferProtocol
+10:34:19.792 [transfer-held-a] INFO  d.m.q.transfer.SimpleTransferEngine - Transfer started: held-a
+10:34:19.792 [transfer-held-b] INFO  d.m.q.transfer.SimpleTransferEngine - Transfer started: held-b
+10:34:19.793 [transfer-held-b] DEBUG d.m.q.transfer.SimpleTransferEngine - Executing DOWNLOAD (Remote -> Local) transfer held-b: protocol=http, source=http://127.0.0.1:57362/held-b, destination=file:///C:/Users/mraysmit/AppData/Local/Temp/junit94474348568386729/held-b.bin
+10:34:19.793 [transfer-held-a] DEBUG d.m.q.transfer.SimpleTransferEngine - Executing DOWNLOAD (Remote -> Local) transfer held-a: protocol=http, source=http://127.0.0.1:57362/held-a, destination=file:///C:/Users/mraysmit/AppData/Local/Temp/junit94474348568386729/held-a.bin
+10:34:19.793 [transfer-held-b] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol found: name=http, implementation=HttpTransferProtocol
+10:34:19.793 [transfer-held-a] DEBUG d.m.quorus.protocol.ProtocolFactory - Protocol found: name=http, implementation=HttpTransferProtocol
+10:34:19.793 [transfer-held-b] INFO  d.m.q.protocol.HttpTransferProtocol - Starting HTTP download from http://127.0.0.1:57362/held-b
+10:34:19.793 [transfer-held-a] INFO  d.m.q.protocol.HttpTransferProtocol - Starting HTTP download from http://127.0.0.1:57362/held-a
+10:34:19.798 [junit-timeout-thread-8] INFO  d.m.q.transfer.SimpleTransferEngine - Transfer cancellation requested: held-a
+10:34:19.799 [transfer-held-a] INFO  d.m.q.transfer.SimpleTransferEngine - Transfer cancelled: held-a
+10:34:19.800 [transfer-held-b] INFO  d.m.q.protocol.HttpTransferProtocol - HTTP download completed: jobId=held-b, bytesTransferred=30, checksum=4807125757598c4f742d6a3615e1e60a59e001841574834ba43c9909e02babaf
+10:34:19.800 [transfer-held-b] INFO  d.m.q.transfer.SimpleTransferEngine - DOWNLOAD (Remote -> Local) transfer completed: held-b (30 bytes in 7 ms)
+10:34:19.802 [main] INFO  d.m.q.transfer.SimpleTransferEngine - Shutting down transfer engine; cancelling 0 running transfer(s)
+10:34:19.802 [main] INFO  d.m.q.transfer.SimpleTransferEngine - Transfer engine shutdown completed
+[ERROR] Tests run: 8, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 0.884 s <<< FAILURE! -- in dev.mars.quorus.transfer.SimpleTransferEngineBlockingTest
+[ERROR] dev.mars.quorus.transfer.SimpleTransferEngineBlockingTest.anOutsideInterruptEndsTheTransferAndIsPreserved -- Time elapsed: 0.016 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: expected: <CANCELLED> but was: <FAILED>
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+	at org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
+	at org.junit.jupiter.api.AssertEquals.failNotEqual(AssertEquals.java:197)
+	at org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:182)
+	at org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:177)
+	at org.junit.jupiter.api.Assertions.assertEquals(Assertions.java:1142)
+	at dev.mars.quorus.transfer.SimpleTransferEngineBlockingTest.anOutsideInterruptEndsTheTransferAndIsPreserved(SimpleTransferEngineBlockingTest.java:215)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:104)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:583)
+	at org.junit.platform.commons.util.ReflectionUtils.invokeMethod(ReflectionUtils.java:727)
+	at org.junit.jupiter.engine.execution.MethodInvocation.proceed(MethodInvocation.java:60)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$ValidatingInvocation.proceed(InvocationInterceptorChain.java:131)
+	at org.junit.jupiter.api.AssertTimeoutPreemptively.lambda$submitTask$3(AssertTimeoutPreemptively.java:95)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:330)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1090)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614)
+	at java.base/java.lang.Thread.run(Thread.java:1527)
+
+[INFO] 
+[INFO] Results:
+[INFO] 
+[ERROR] Failures: 
+[ERROR]   SimpleTransferEngineBlockingTest.anOutsideInterruptEndsTheTransferAndIsPreserved:215 expected: <CANCELLED> but was: <FAILED>
+[INFO] 
+[ERROR] Tests run: 8, Failures: 1, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  9.809 s
+[INFO] Finished at: 2026-09-27T10:34:20+01:00
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.2.2:test (default-test) on project quorus-core: There are test failures.
+[ERROR] 
+[ERROR] Please refer to C:\Users\mraysmit\dev\idea-projects\quorus\quorus-core\target\surefire-reports for the individual test results.
+[ERROR] Please refer to dump files (if any exist) [date].dump, [date]-jvmRun[N].dump and [date].dumpstream.
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException

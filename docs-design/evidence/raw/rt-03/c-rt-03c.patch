@@ -1,0 +1,2849 @@
+diff --git a/docs-design/task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md b/docs-design/task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md
+index 787780d..95d0b36 100644
+--- a/docs-design/task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md
++++ b/docs-design/task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md
+@@ -2,7 +2,7 @@
+ 
+ # Quorus Enterprise Implementation Plan
+ 
+-**Version:** 1.35
++**Version:** 1.36
+ **Date:** 2026-09-27
+ **Author:** Mark Ray-Smith — Cityline Ltd  
+ **License:** Apache 2.0  
+@@ -111,6 +111,13 @@ for DNS authorization. Delivered on 2026-09-27 under Section 6.1
+   fails if its Current rows and the contract disagree.
+ - `/api/v1/info` links to the contract instead of carrying its own endpoint list.
+ 
++**Protocol adapters share one abort target (`ENG-09`, found by `RT-03c`).** The FTP and SFTP adapters each
++keep a single `activeClient` for all their transfers, so `TransferProtocol.abort()` closes only the latest
++connection. Before `RT-03c` the engine called `abort()` on cancel and so could abort the wrong transfer,
++or, for HTTP, every in-flight transfer. The blocking engine cancels by interrupting only the named
++transfer, and `abort()` has no production caller. `RT-03d` decides whether to remove it or make it per
++transfer.
++
+ ### Configuration and documentation remediation — 2026-09-25
+ 
+ **CFG-01 container deployment configuration hygiene — 2026-09-25:** The repository Compose
+@@ -1319,6 +1326,7 @@ The plan is revised when requirements or implementation evidence change. Revisio
+ 
+ | Version | Date | Changes |
+ |---|---|---|
++| 1.36 | 2026-09-27 | Recorded `ENG-09` (shared abort target in the FTP and SFTP adapters), found by `RT-03c`, for decision in `RT-03d` |
+ | 1.35 | 2026-09-27 | Recorded `ENG-08` (decision `DR-Q7`): the OpenAPI contract is the only current-API reference, with per-operation scopes, agent statuses, DNS-authorization failure responses and the REST API Specification's Current rows verified by test; the API Reference is deleted and `/api/v1/info` links to the contract. §1 cites the contract in place of the API Reference |
+ | 1.34 | 2026-09-27 | Recorded that CI has never passed and that its repair is deferred (`ENG-07`, decision `SEQ-01`), with the consequences for regression evidence, Phase 0 and phase closure. Assigned `SEC-07` (governed TLS trusts only the JVM default anchors) to Phase 4 as a hardening follow-up with acceptance criteria (decision `SEQ-02`). Section 20: corrected `RT-03` to Apache HttpClient 5 and listed its slices; added the `RT-Q5` decision row; corrected `RT-Q4` and `RT-01b` to single-stage images that copy host-built jars, runtime option A; the status now says in progress. §22 records `ARCH-09` as closed by `RT-03b`. §3 baseline is Java 27 |
+ | 1.33 | 2026-09-26 | §6.1 evidence retention: keep raw red, green, mutation and characterization output; keep regression and discarded-attempt output as excerpts with the full log hash (DR-Q6 refined) |
+diff --git a/docs-design/task/QUORUS_OUTSTANDING_WORK_REGISTER.md b/docs-design/task/QUORUS_OUTSTANDING_WORK_REGISTER.md
+index 76f7dd6..277c85d 100644
+--- a/docs-design/task/QUORUS_OUTSTANDING_WORK_REGISTER.md
++++ b/docs-design/task/QUORUS_OUTSTANDING_WORK_REGISTER.md
+@@ -2,7 +2,7 @@
+ 
+ # Quorus Outstanding Work Register
+ 
+-**Version:** 1.10
++**Version:** 1.11
+ **Date:** 2026-09-27
+ **Author:** Mark Ray-Smith — Cityline Ltd
+ **License:** Apache 2.0
+@@ -50,7 +50,7 @@ Closing an item here does not close a phase exit gate. Phase closure follows
+ 
+ | Document | Role | Contribution to this register |
+ |---|---|---|
+-| [QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md](QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md) v1.35 | Controlling roadmap | Sections A–D, F, I, J |
++| [QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md](QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md) v1.36 | Controlling roadmap | Sections A–D, F, I, J |
+ | [QUORUS_DOCUMENTATION_REVIEW_TASKS.md](../archive/QUORUS_DOCUMENTATION_REVIEW_TASKS.md) v1.7 — archived 2026-09-26, merged here | Documentation review remediation | Sections H and I, §3 decision log |
+ | [ADR-0011](../architecture-decisions/ADR-0011-CONSENSUS-VIA-QRAFT-GENERIC-ENGINE.md), [ADR-0012](../architecture-decisions/ADR-0012-JAVA-RUNTIME-AND-STRUCTURED-CONCURRENCY.md) | Platform decisions | Section J, §3 decision log |
+ | [QUORUS_OPENTELEMETRY_INTEGRATION_TESTING_PLAN.md](../archive/QUORUS_OPENTELEMETRY_INTEGRATION_TESTING_PLAN.md) v2.6 — archived | Observability backlog and collector/test reference | Section E |
+@@ -91,11 +91,11 @@ full-reactor run.
+ | B | Phase 2 — attempts, integrity, reconciliation | 13 | 🟡 Phase blocker |
+ | C | Phase 3 — transfer operations telemetry | 12 | 🟡 Phase blocker |
+ | D | Phases 5–12 — not started | 8 phases | 🔴 / 🟡 by phase |
+-| E | Observability and logging backlog | 11 open (OBS-04, -05, -08, -14 closed) | 🟠 Backlog |
++| E | Observability and logging backlog | 10 open (OBS-04, -05, -07, -08, -14 closed) | 🟠 Backlog |
+ | F | Absorbed and superseded historical tasks | 10 | — reference only |
+ | G | Deferred and research | 8 deferred, 1 superseded | 🟢 Deferred |
+-| H | Documentation remediation (from the 2026-09-24 review) | 32 listed: 25 open, 6 in progress, 1 superseded. 15 more, done or superseded by v1.9, have moved to the revision history | 🔵 Documentation |
+-| I | Configuration and documentation-review delivery items | 18 open, 2 closed | 🟠 Backlog, one 🟡 (`ENG-07`) |
++| H | Documentation remediation (from the 2026-09-24 review) | 31 listed: 25 open, 6 in progress. 16 more, done or superseded by v1.10, have moved to the revision history | 🔵 Documentation |
++| I | Configuration and documentation-review delivery items | 19 open, 2 closed | 🟠 Backlog, one 🟡 (`ENG-07`) |
+ | J | Platform migration — QRaft consensus and Vert.x exit | 18 open (11 CE; 7 RT, of which `RT-03` is in progress), 3 RT done. Decisions `RT-Q1`–`RT-Q5` are in §3 | 🟡 / 🔴 by item |
+ 
+ **Phase position:** Phase 1 complete. Phase 0 is functionally complete, but its durability
+@@ -392,7 +392,6 @@ From [QUORUS_OPENTELEMETRY_INTEGRATION_TESTING_PLAN.md](../archive/QUORUS_OPENTE
+ | **OBS-02** | Test execution script with reproducible pass/fail reporting | scripts | 🟠 MEDIUM |
+ | **OBS-03** | Bridge `requestId` ↔ OTel `traceId` end to end | controller | 🟡 HIGH |
+ | **OBS-06** | Add INFO success log to `JobStatusReportingService` (re-verified open 2026-09-26: no INFO call) | agent | 🟠 MEDIUM |
+-| **OBS-07** | Audit the 37 DEBUG statements in `SimpleTransferEngine` — promote, demote to TRACE, or remove (count corrected from 53 on 2026-09-26, re-verified 2026-09-27). `RT-03c` rewrites this class, so do the audit in `RT-03c`'s refactor step | core | 🟠 MEDIUM |
+ | **OBS-15** | Await discarded `RaftNode.start()` / server `start()` futures in roughly twenty controller tests (`HttpApiServerHealthTest`, `JobAssignmentHandlerTest`, `StateTransitionIntegrationTest`, `GrpcRaftServerTest`, `RaftFailureTest` and others). Same latent race as the fixed `LeaderGuardHandlerTest` flake, but with no observed failures; needs a deliberate verified pass, not a blind sweep. Do not start before `CE-07`/`CE-10`: many of these tests exercise the in-repository engine that `CE-10` removes, so re-scope the list then | controller test | 🟠 MEDIUM |
+ | **OBS-09** | Per-protocol adapter metrics | core | 🟠 MEDIUM |
+ | **OBS-10** | Tracing for HTTP, SFTP, FTP and SMB protocol adapters | core | 🟠 MEDIUM |
+@@ -406,6 +405,8 @@ and `WorkflowSchemaValidator` all declare and use a logger. `RaftLogStorageAdapt
+ names its field `logger`, and `FileRaftStorage` is an external `raftlog-core` class. The
+ `MetricsHandler`, `ProtocolFactory` and `FileManager` loggers are all used.
+ 
++**OBS-07 — closed 2026-09-27 by `RT-03c`.** The engine rewrite reduced `SimpleTransferEngine` from 37 DEBUG statements to 3: the redacted execution detail, the retry delay, and the failure stack trace. Entry and exit tracing was removed; lifecycle events (start, completion, cancellation, shutdown) are INFO, failed attempts WARN and permanent failures ERROR.
++
+ **OBS-08 — closed 2026-09-07.** `TransferMetrics.java` and `TransferMetricsTest` are deleted.
+ The class had no remaining production caller; `NetworkTopologyService.getTransferMetrics()` is
+ an unrelated name collision and was left in place. `quorus-core` clean verify passes 1,517
+@@ -500,7 +501,7 @@ and DR-C10 is no longer blocked, because
+ 
+ Done and superseded tasks move to the revision history one revision after they are marked (§15.5): DR-A2,
+ DR-A3, DR-A5, DR-A6, DR-A7, DR-B7, DR-C3, DR-F07, DR-F08, DR-F13 and DR-F15 in v1.9, and DR-A1, DR-C11,
+-DR-F14 and DR-F17 in v1.10.
++DR-F14 and DR-F17 in v1.10, and DR-B3 in v1.11.
+ 
+ ### H.1 Phase A — Correctness and safety
+ 
+@@ -514,7 +515,6 @@ DR-F14 and DR-F17 in v1.10.
+ |---|---|---|---|
+ | **DR-B1** | **Architecture Spec.** Close or narrow ARCH-03, ARCH-06, ARCH-12 (only an escalation policy is missing) and ARCH-13. Fix the §3 telemetry row (five events and a `STALLED` boundary) and the §13 lifecycle gate (QR-01 is fixed). Define "durable default" using `quorus.raft.storage.path`. Move "Closed" out of the Priority column. ARCH-09 (HTTP buffering) is done: closed in spec v2.10 on 2026-09-27 after `RT-03b`, which also changed §2 to Java 27. Also: add the missing ARCH-01 or renumber, reorder the IDs, fix the §7 opening, make the untestable requirements in §7.1 measurable, and note that the SFTP direct-URI path does not meet §10.4's "visibly logged" rule (see DR-X06). | `docs/QUORUS_ARCHITECTURE_SPECIFICATION.md` | 🟨 |
+ | **DR-B2** | **REST Spec.** Label §3.2, §3.4, §3.5, §3.8, §4.2, §6.3 and §16 as Current, Required or Planned. Add mapping tables from `ErrorCode` Q-codes to target codes and from colon scopes to dotted scopes. Close API-01 by citing `OpenApiContractTest`, and rewrite API-02. List `GET /api/v1/openapi.yaml` as Current. Fix the `DELETE /transfers/{id}` purpose text (it returns `{jobId, message}`), the §6.1 events row, the path-parameter names, the agent "search" and route "conditional update" claims, and the §3.1 unknown-fields rule. Also: §3.2 names `X-Correlation-ID`, but the server and the OpenAPI contract use `X-Request-ID`. | `docs/QUORUS_REST_API_SPECIFICATION.md` | 🟨 Spec v2.6 (2026-09-27, DR-Q7): `/api/v1/openapi.yaml` is listed as Current; the "current implementation" paragraphs are replaced by pointers to the OpenAPI contract; API-12 is corrected to Partial; `OpenApiReferenceContractTest` now fails if a Current row and the contract disagree. API-01 and API-02 were already closed. Remaining: the labels, mapping tables, `DELETE` purpose text, path-parameter names, the search and conditional-update claims, the unknown-fields rule, and the correlation header |
+-| **DR-B3** | **API Reference.** Add the 13 missing routes, including the validate body and `probeTimeoutMillis`. Fix the heartbeat section: remove `BUSY`, use lowercase status output, say that an invalid status is ignored, and add the `message` field. Add `agentPool` and `networkZone`, and settle the `port` rule. Remove `AT_RISK`. Add an error-envelope and `ErrorCode` section. Fix the required-field markings, add transfer `metadata`, `runbook` and `labels`, document the assignment and route bodies, and note that `POST /security/authorization/check` is leader-only. Fix the OpenAPI `AgentStatus` enum (§6 #10). | `docs/QUORUS_API_REFERENCE.md`, `quorus-controller-v1.yaml:1105,1130-1132` | ➖ Superseded 2026-09-27 by DR-Q7: the API Reference is deleted. The fixes it asked for were made in the OpenAPI contract instead (`ENG-08`): the agent status enum, heartbeat status matching, the 409/503/504 responses, per-operation scopes, and the probe, paging, FTPS-port and resend notes |
+ | **DR-B4** | **YAML Syntax Guide** (⏸ DR-Q1). Add a "Validation requirements" section listing the seven metadata fields and `spec.execution`. Mark `execution.*` and `retryCount` "parsed, not applied", or implement them. Fix the options and nesting claims, advise quoting `created`, add runtime `ExecutionContext` variables to the precedence list, and fix the examples table (`batchSize` location, `ecommerce-order-processing.yaml`, the `file` protocol and the `mode` option). Merge the correct rules from `YAML-VALIDATION-GUIDE.md` (names cannot contain spaces; no `kind` warnings, JSON Schema or streaming validation), then delete that guide. Update the Workflows README to match. | `docs/QUORUS_YAML_SYNTAX_GUIDE.md`, `docs/QUORUS_WORKFLOWS_README.md`, `quorus-integration-examples/.../docs/YAML-VALIDATION-GUIDE.md` | ⬜ |
+ | **DR-B5** | **Security Guide** (⏸ DR-Q3). Move §11–14 into the Service Connection Runbook and a new `docs/QUORUS_UPGRADE_NOTES.md`. Document gateway-only elevation, that `/api/v1/openapi.yaml` is public, which headers are actually required (`X-Quorus-Roles` and `X-Quorus-Scopes` default to empty), and that Raft peers are not bound to node IDs. Update §11 for R1-1. Replace `CONTROLLER_URL` with the current name. Note that the "audit path configured" and "trust-bundle version" checks are always satisfied by the packaged defaults. | `docs/QUORUS_SECURITY_DEPLOYMENT_GUIDE.md`, `docs/QUORUS_SERVICE_CONNECTION_OPERATIONS_RUNBOOK.md` | ⬜ |
+ | **DR-B6** | **Versioning Policy** (⏸ DR-Q5). Record the command and snapshot schema as version 3, readable from 0. Record the configuration-contract break in `b35fb25`. Define one product version and use it in the pom, `HttpApiServer.VERSION`, OpenAPI `info.version`, `quorus.version` and `quorus.agent.version` (§6 #13). Also record the Java release policy (`RT-Q3`: follow each six-monthly release) and the rule that QRaft's minimum Java version must not exceed Quorus's. | `docs-design/reference/QUORUS_VERSIONING_AND_COMPATIBILITY_POLICY.md`, poms, `HttpApiServer.java`, `quorus-controller-v1.yaml`, properties files | ⬜ |
+@@ -609,6 +609,7 @@ no revision since has assigned any. The exceptions are:
+ | **ENG-06** | Small code-comment corrections: the `mvn test -Dgroups=docker,slow` pom comment, and Javadoc mentioning the removed `memory` storage type and "blocking mode" | `DR-X17`, `DR-X20` | Reported | 🟢 |
+ | **ENG-07** | CI has never passed: all 21 GitHub Actions runs from 2026-09-01 to 2026-09-26 failed. (1) Unit and clean-build lanes: `FtpsDefaultPortBoundaryTest` listens on port 21, which a non-root process cannot bind on the Linux runner (it passes on Windows). The build stops in `quorus-core`, so the other modules have never been tested in CI. (2) Documentation lane: `scripts/verify-phase0-docs.ps1` rejects 11 document headers that lack the two trailing spaces its pattern requires. Trailing spaces are easily stripped by editors, so decide whether to relax the check or add the spaces. The fix needs a test-first redesign of the FTPS default-port test | found 2026-09-27 during the register review | Verified 2026-09-27 from the logs of runs `36275459592` (Java 27) and `36192430573` (Java 25). **Repair deferred by `SEQ-01`.** Blocks every phase exit (plan §6.1 step 5), not current slices | 🟡 |
+ | **ENG-08** | The current HTTP API was described four times by hand, and the copies had drifted: the API Reference (dated 2026-09-05), the REST spec's Current rows and "current implementation" paragraphs, and the endpoint list in `/api/v1/info` (35 of 52 routes). The OpenAPI contract itself declared no per-operation scopes, a wholly wrong `AgentStatus` enum, and no 504 for DNS authorization | DR-Q7, DR-B3 | ✅ **Closed 2026-09-27** ([evidence](../evidence/eng-08-openapi-reference-2026-09-27.json)). The contract is the only current-API reference. `OpenApiReferenceContractTest` checks each operation's scope against `AuthorizationPolicyEngine`, the public operations against the new `PublicEndpoints`, `AgentStatus` against the server's values, the 409/503/504 responses of the two DNS-authorizing operations, and the REST spec's Current rows. `/api/v1/info` links to the contract. The API Reference is deleted | ✅ |
++| **ENG-09** | The FTP and SFTP adapters each keep one `activeClient` field shared by every transfer they run, so `TransferProtocol.abort()` closes only the most recently started connection, and one transfer finishing clears another's reference. Before RT-03c the engine called `abort()` on cancel, which aborted the wrong or every transfer of that protocol (for HTTP, every in-flight client). Since RT-03c cancellation interrupts only the named transfer and `abort()` has no production caller | found by `RT-03c` | Verified 2026-09-27 (`FtpTransferProtocol.java:89`, `SftpTransferProtocol` `abort`). Decide in `RT-03d`: remove `abort()` from `TransferProtocol`, since cancellation is interruption, or make it per transfer | 🟠 |
+ 
+ `DR-X05` (HTTP adapter buffering) is `ARCH-09`, closed by `RT-03b` on 2026-09-26, and is not duplicated here.
+ 
+@@ -639,7 +640,7 @@ plan holds the acceptance criteria; this section lists identity, owner and level
+ | **RT-01a** | Quorus | Java 27 compile and test baseline (root pom, `.java-version`), proven by `JavaPlatformBaselineTest` | ✅ 2026-09-26: red, green and a 2,387-test regression on JDK 27 ([evidence](../evidence/rt-01a-java27-baseline-2026-09-26.json)). Commit `a9b1ace`, with `RT-01b` |
+ | **RT-01b** | Quorus | Java 27 controller and agent images and CI toolchain on Amazon Corretto 27 | ✅ 2026-09-26: single-stage images packaging host-built jars on `amazoncorretto:27.0.0-alpine3.24`; no Java or Maven inside Docker. Red, green and a Docker+slow regression of 2,421 tests with 0 failures and 2 pre-existing skips ([evidence](../evidence/rt-01b-java27-images-2026-09-26.json)). Commit `a9b1ace`. CI now runs on Corretto 27, and its setup and Java 27 checks pass. CI has never passed as a whole, for reasons that predate this item (`ENG-07`) |
+ | **RT-02** | Quorus | Concurrency conventions, the task-scope abstraction and the post-Vert.x test standard | ✅ 2026-09-26: RT-02a TaskScope core ([evidence](../evidence/rt-02a-task-scope-2026-09-26.json)); RT-02b tracing, MDC and `ScopedValue` propagation ([evidence](../evidence/rt-02b-context-propagation-2026-09-26.json)); RT-02c [concurrency conventions](../dev/QUORUS_CONCURRENCY_CONVENTIONS.md) with the post-Vert.x test standard, referenced from plan §6.1 and the Copilot instructions; RT-02d StructuredTaskScope structure rules and migration mapping ([evidence](../evidence/rt-02d-structure-rules-2026-09-26.json)); TaskScope 163/163 lines and 70/70 branches. Commits `341a509` (a), `3e4ec99` (b), `95ed659` (c), `a39206e` (d); raw evidence committed in `d2514ec` |
+-| **RT-03** | Quorus | `quorus-core` off Vert.x; streaming HTTP adapter closes `ARCH-09` | 🟨 RT-03a done 2026-09-26: dead pool code removed (`5a4274f`). RT-03b done 2026-09-26: the HTTP adapter on Apache HttpClient 5 (`RT-Q5`), blocking and streaming, governed pinning with correct SNI, `Host` and hostname verification, closing `ARCH-09` (`fadbb29`, `336ec37`; [evidence](../evidence/rt-03b-http-adapter-2026-09-26.json)). Next: RT-03c, a blocking `TransferEngine` on virtual threads (option A), which also takes `OBS-07`; then RT-03d contract cleanup, RT-03e topology and codec, and RT-03f removing `io.vertx` from the core pom. Slices are defined in plan §20 |
++| **RT-03** | Quorus | `quorus-core` off Vert.x; streaming HTTP adapter closes `ARCH-09` | 🟨 RT-03a done 2026-09-26: dead pool code removed (`5a4274f`). RT-03b done 2026-09-26: the HTTP adapter on Apache HttpClient 5 (`RT-Q5`), blocking and streaming, governed pinning with correct SNI, `Host` and hostname verification, closing `ARCH-09` (`fadbb29`, `336ec37`; [evidence](../evidence/rt-03b-http-adapter-2026-09-26.json)). RT-03c done 2026-09-27 ([evidence](../evidence/rt-03c-blocking-engine-2026-09-27.json)): `TransferEngine` is blocking (`transfer`, `shutdown(Duration)`) with no Vert.x; the engine runs on the caller's thread with a semaphore limit, retries, and cancellation by interrupting only the named transfer; the agent, workflow and examples call it; `OBS-07` closed and `ENG-09` found. Next: RT-03d contract cleanup (with `ENG-09`), RT-03e topology and codec, and RT-03f removing `io.vertx` from the core pom. Slices are defined in plan §20 |
+ | **RT-04** | Quorus | `quorus-workflow` and `quorus-integration-examples` off Vert.x | 🟠 |
+ | **RT-05** | Quorus | `quorus-agent` off Vert.x | 🟡 |
+ | **RT-06** | Quorus | `quorus-controller` HTTP API off Vert.x; removes the `CE-07` bridge | 🟡 |
+@@ -715,6 +716,7 @@ the in-repository engine.
+ 
+ | Version | Date | Changes |
+ |---|---|---|
++| 1.11 | 2026-09-27 | `RT-03c` done: blocking `TransferEngine` on the caller's thread, with no Vert.x. `OBS-07` closed by the rewrite (37 DEBUG statements to 3). New `ENG-09`: the FTP and SFTP adapters share one abort target across transfers. Plan v1.36 is cited. **Moved from Section H under §15.5:** DR-B3 (superseded by DR-Q7; its fixes were made in the OpenAPI contract under `ENG-08`) |
+ | 1.10 | 2026-09-27 | API documentation consolidated (decision DR-Q7): the OpenAPI contract is the only current-API reference, and the API Reference is deleted. New and closed: `ENG-08`, with `OpenApiReferenceContractTest`. DR-B3 is superseded, DR-B2 has progressed, and DR-D1 and DR-F03 are updated. §14 now agrees with REST spec §20 for API-01, -04, -05, -10 and -13. Plan v1.35 is cited. **Moved from Section H under §15.5:** DR-A1 (R1-1 committed; raw logs unrecoverable, limitation recorded in the evidence record), DR-C11 (the `m2cache`/`M2_REPO`/`m2-repo` machinery removed by `RT-01b`), DR-F14 (personal paths removed from live documents; `QUORUS_LOG_STYLE.md` remains under DR-C8), all done; and DR-F17 (merged into DR-C10) |
+ | 1.9 | 2026-09-27 | Review of v1.8 against the repository and CI. **New:** `ENG-07`, because CI has never passed (FTPS test binds privileged port 21 on Linux; 11 document headers fail the documentation check). Decisions `SEQ-01` (defer the CI repair; local full-reactor runs are regression evidence meanwhile; no phase closes while `ENG-07` is open) and `SEQ-02` (`SEC-07` becomes a Phase 4 hardening follow-up). **Corrected:** `RT-Q4` (runtime option A, single-stage images, no builder or Maven; ADR-0012 v1.2); the Section G `ARCH-09` paragraph, which contradicted §14 (the Architecture Specification v2.10 now also closes it); RT-01b's "CI not yet executed"; DR-D2, re-scoped because the header and link checks already exist; DR-D4, whose ADR-0009 is no longer blocked; DR-F01, updated for `RT-03a`, `RT-03b` and `RT-01b`; the E.2 tenant-lock and WebClient rows; the Section I phase-assignment statement; the §1 test rule, which now points to plan §6.1; governance rule 1 and §1 precedence item 3, which now agree; §14 `ARCH-07`, which no longer lists the closed R1-1; DR-C4's DR-C11 wording; the plan version (v1.34) and §2 counts. **Closed:** DR-A1 (R1-1 raw logs are unrecoverable; evidence §3 and §10.4 annotated and §13 added) and DR-F14. DR-F17 merged into DR-C10. **Sequencing:** `OBS-07` goes into `RT-03c`; `OBS-15` waits for `CE-07`/`CE-10`. Section J cites commits for completed work, and its duplicate `RT-Q1`–`RT-Q3` rows are removed. **Moved from Section H under §15.5:** DR-A2 (orphaned SHAs preserved via the rewrite map), DR-A3 (prompt file removed, Copilot instructions reconciled), DR-A5 (explicit Compose development profile, mTLS example, health probe; `CFG-01`), DR-A6 (README quick start and HTTPie tenant fields), DR-A7 (authentication statements point to Architecture Spec §3), DR-B7 (register v1.5 / plan v1.28 pass), DR-F07 (reviews moved to `docs-design/reviews/`), DR-F08 (`docs-design/README.md` v1.1), DR-F13 (Configuration Handover link and path fixed, archived), all done; DR-C3 (superseded by `RT-02` conventions) and DR-F15 (superseded by ADR-0011 and `CE-10`). Also records changes made after v1.8 without a version: `RT-Q5`, `SEC-07`, the DR-Q6 refinement, DR-C11 done, DR-C9 in progress, and the `RT-01`–`RT-03` states |
+ | 1.8 | 2026-09-26 | Became the single task list: merged the documentation review task list (archived) as Section H and its code defects as aliases in Section I; added the §3 decision log with ADR-0011, ADR-0012, `RT-Q1`–`RT-Q3`, DR-Q1–DR-Q6 and the Phase 0/4 status decision; applied the decisions to tasks (DR-C3 and DR-F15 superseded, DR-C4, DR-C8, DR-B6 and DR-D4 updated, new DR-C11 to remove the `m2cache`/`M2_REPO`/`m2-repo` machinery); renumbered sections after §2; updated governance |
+diff --git a/quorus-agent/src/main/java/dev/mars/quorus/agent/service/TransferExecutionService.java b/quorus-agent/src/main/java/dev/mars/quorus/agent/service/TransferExecutionService.java
+index 994cd4f..016e1b5 100644
+--- a/quorus-agent/src/main/java/dev/mars/quorus/agent/service/TransferExecutionService.java
++++ b/quorus-agent/src/main/java/dev/mars/quorus/agent/service/TransferExecutionService.java
+@@ -27,6 +27,7 @@ import dev.mars.quorus.connection.SecretProvider;
+ import dev.mars.quorus.connection.ServiceConnection;
+ import dev.mars.quorus.connection.VaultKvV2SecretProvider;
+ import io.vertx.core.Future;
++import io.vertx.core.Promise;
+ import io.vertx.core.Vertx;
+ import org.slf4j.Logger;
+ import org.slf4j.LoggerFactory;
+@@ -75,7 +76,6 @@ public class TransferExecutionService {
+         this.closeVertxOnShutdown = closeVertxOnShutdown;
+         this.config = Objects.requireNonNull(config, "AgentConfiguration cannot be null");
+         this.transferEngine = new SimpleTransferEngine(
+-                vertx,  // Pass Vertx to SimpleTransferEngine
+                 config.getMaxConcurrentTransfers(),
+                 3,      // maxRetryAttempts
+                 1000,   // retryDelayMs
+@@ -119,7 +119,9 @@ public class TransferExecutionService {
+                    request.getSourceUri(), request.getDestinationUri());
+ 
+         try {
+-            return transferEngine.submitTransfer(request)
++            // The engine is blocking (RT-03c). Until this module leaves Vert.x (RT-05), the transfer
++            // runs on a Vert.x worker, as the engine's own executeBlocking did before.
++            return vertx.executeBlocking(() -> transferEngine.transfer(request), false)
+                 .onComplete(ar -> {
+                     if (ar.failed()) {
+                         logger.error("Transfer failed: {}", request.getRequestId());
+@@ -232,27 +234,43 @@ public class TransferExecutionService {
+         logger.info("Shutting down transfer execution service...");
+         running = false;
+ 
+-        // Reactively shutdown transfer engine (awaits in-flight transfers, then closes WorkerExecutor)
+-        return transferEngine.shutdown(30)
+-                .recover(err -> {
+-                    logger.warn("Error shutting down transfer engine: {}", err.getMessage());
+-                    return Future.succeededFuture();
+-                })
+-                .compose(v -> closeOwnedVertxIfNeeded())
+-                .onComplete(ar -> logger.info("Transfer execution service shutdown complete"));
+-    }
+-
+-    private Future<Void> closeOwnedVertxIfNeeded() {
+         if (!closeVertxOnShutdown) {
+-            return Future.succeededFuture();
++            // The engine's shutdown blocks until running transfers end, so it runs on a worker.
++            return vertx.executeBlocking(() -> {
++                        stopTransferEngine();
++                        return null;
++                    }, false)
++                    .<Void>mapEmpty()
++                    .onComplete(ar -> logger.info("Transfer execution service shutdown complete"));
+         }
+ 
+-        logger.info("Closing internally managed Vert.x instance for TransferExecutionService");
+-        return vertx.close()
+-                .onSuccess(v -> logger.info("Internally managed Vert.x instance closed for TransferExecutionService"))
+-                .recover(err -> {
+-                    logger.warn("Failed to close internally managed Vert.x instance: {}", err.getMessage());
+-                    return Future.succeededFuture();
+-                });
++        // Deprecated constructor: this service owns its Vert.x instance. The shutdown must not run on
++        // that instance, because a continuation bound to its context is never dispatched once it is
++        // closed. So the blocking engine shutdown and the close both run on one short-lived virtual
++        // thread, which completes a promise bound to no context. Removed with Vert.x (RT-05).
++        Promise<Void> done = Promise.promise();
++        Thread.ofVirtual().name("transfer-service-shutdown").start(() -> {
++            stopTransferEngine();
++            logger.info("Closing internally managed Vert.x instance for TransferExecutionService");
++            vertx.close().onComplete(ar -> {
++                if (ar.failed()) {
++                    logger.warn("Failed to close internally managed Vert.x instance: {}", ar.cause().getMessage());
++                }
++                logger.info("Transfer execution service shutdown complete");
++                done.complete();
++            });
++        });
++        return done.future();
++    }
++
++    /** Stops the engine, waiting up to 30 seconds for running transfers to end. Never throws. */
++    private void stopTransferEngine() {
++        try {
++            if (!transferEngine.shutdown(Duration.ofSeconds(30))) {
++                logger.warn("Transfer engine shutdown timed out with transfers still running");
++            }
++        } catch (RuntimeException e) {
++            logger.warn("Error shutting down transfer engine: {}", e.getMessage());
++        }
+     }
+ }
+diff --git a/quorus-core/src/main/java/dev/mars/quorus/protocol/ProtocolFactory.java b/quorus-core/src/main/java/dev/mars/quorus/protocol/ProtocolFactory.java
+index edb11ba..440d7b8 100644
+--- a/quorus-core/src/main/java/dev/mars/quorus/protocol/ProtocolFactory.java
++++ b/quorus-core/src/main/java/dev/mars/quorus/protocol/ProtocolFactory.java
+@@ -40,30 +40,54 @@ public class ProtocolFactory {
+     private static final Logger logger = LoggerFactory.getLogger(ProtocolFactory.class);
+ 
+     private final Map<String, TransferProtocol> protocols;
+-    private final Vertx vertx;
+     private final String nfsMountRoot;
+     private final boolean smbMountSecurityVerified;
+     private final boolean nfsMountSecurityVerified;
+ 
+-    /**
+-     * Constructor with Vert.x dependency injection (recommended).
+-     * @param vertx Vert.x instance for reactive HTTP protocol
+-     */
+-    public ProtocolFactory(Vertx vertx) {
+-        this(vertx, null, false, false);
++    /** Creates a factory with the default protocols and no mounted-filesystem attestations. */
++    public ProtocolFactory() {
++        this(null, false, false);
+     }
+ 
+-    public ProtocolFactory(Vertx vertx, String nfsMountRoot,
+-                           boolean smbMountSecurityVerified, boolean nfsMountSecurityVerified) {
+-        this.vertx = java.util.Objects.requireNonNull(vertx, "Vertx instance cannot be null");
++    /**
++     * Creates a factory with the default protocols.
++     *
++     * @param nfsMountRoot             root under which NFS paths are mounted, or {@code null}
++     * @param smbMountSecurityVerified whether the SMB mount's security has been attested
++     * @param nfsMountSecurityVerified whether the NFS mount's security has been attested
++     */
++    public ProtocolFactory(String nfsMountRoot, boolean smbMountSecurityVerified, boolean nfsMountSecurityVerified) {
+         this.nfsMountRoot = nfsMountRoot;
+         this.smbMountSecurityVerified = smbMountSecurityVerified;
+         this.nfsMountSecurityVerified = nfsMountSecurityVerified;
+         this.protocols = new HashMap<>();
+-        logger.debug("Initializing ProtocolFactory with Vert.x instance");
++        logger.debug("Initializing ProtocolFactory");
+         registerDefaultProtocols();
+     }
+ 
++    /**
++     * No adapter needs Vert.x since RT-03b, so the instance is ignored.
++     *
++     * @deprecated use {@link #ProtocolFactory()}; removed by RT-03d
++     */
++    @Deprecated
++    public ProtocolFactory(Vertx vertx) {
++        this();
++        java.util.Objects.requireNonNull(vertx, "Vertx instance cannot be null");
++    }
++
++    /**
++     * No adapter needs Vert.x since RT-03b, so the instance is ignored.
++     *
++     * @deprecated use {@link #ProtocolFactory(String, boolean, boolean)}; removed by RT-03d
++     */
++    @Deprecated
++    public ProtocolFactory(Vertx vertx, String nfsMountRoot,
++                           boolean smbMountSecurityVerified, boolean nfsMountSecurityVerified) {
++        this(nfsMountRoot, smbMountSecurityVerified, nfsMountSecurityVerified);
++        java.util.Objects.requireNonNull(vertx, "Vertx instance cannot be null");
++    }
++
+     private void registerDefaultProtocols() {
+         logger.debug("Registering default transfer protocols");
+         
+diff --git a/quorus-core/src/main/java/dev/mars/quorus/transfer/SimpleTransferEngine.java b/quorus-core/src/main/java/dev/mars/quorus/transfer/SimpleTransferEngine.java
+index e66a7dd..7689209 100644
+--- a/quorus-core/src/main/java/dev/mars/quorus/transfer/SimpleTransferEngine.java
++++ b/quorus-core/src/main/java/dev/mars/quorus/transfer/SimpleTransferEngine.java
+@@ -21,7 +21,6 @@ import dev.mars.quorus.core.TransferDirection;
+ import dev.mars.quorus.core.TransferJob;
+ import dev.mars.quorus.core.TransferRequest;
+ import dev.mars.quorus.core.TransferResult;
+-import dev.mars.quorus.core.TransferStatus;
+ import dev.mars.quorus.core.exceptions.TransferException;
+ import dev.mars.quorus.monitoring.ProtocolHealthCheck;
+ import dev.mars.quorus.monitoring.TransferEngineHealthCheck;
+@@ -34,341 +33,198 @@ import io.opentelemetry.api.trace.Span;
+ import io.opentelemetry.api.trace.SpanKind;
+ import io.opentelemetry.api.trace.StatusCode;
+ import io.opentelemetry.api.trace.Tracer;
+-import io.vertx.core.Future;
+-import io.vertx.core.Promise;
+-import io.vertx.core.Vertx;
++import io.opentelemetry.context.Scope;
+ 
+ import org.slf4j.Logger;
+ import org.slf4j.LoggerFactory;
+-import org.slf4j.MDC;
+ 
++import java.net.URI;
+ import java.time.Duration;
+ import java.time.Instant;
+-import java.util.ArrayList;
+ import java.util.List;
+ import java.util.Map;
+-import java.util.Objects;
++import java.util.concurrent.CompletableFuture;
+ import java.util.concurrent.ConcurrentHashMap;
++import java.util.concurrent.ExecutionException;
++import java.util.concurrent.Semaphore;
+ import java.util.concurrent.TimeUnit;
++import java.util.concurrent.TimeoutException;
+ import java.util.concurrent.atomic.AtomicBoolean;
+ 
+ /**
+- * Simple implementation of the TransferEngine interface.
+- * Handles basic file transfers with retry logic and progress tracking.
+- * Uses Vert.x Futures/timers for non-blocking execution.
++ * Blocking {@link TransferEngine} (ADR-0012, RT-03c).
++ *
++ * <p>{@link #transfer} runs on the caller's thread: it validates the request, takes one of
++ * {@code maxConcurrentTransfers} slots, runs the protocol adapter with retries, and returns the
++ * outcome. There is no event loop, executor or future. Concurrency between transfers is the
++ * caller's choice, made with a {@code TaskScope}.
++ *
++ * <h2>Cancellation</h2>
++ * {@link #cancelTransfer} marks the transfer's context cancelled and interrupts the thread running
++ * it. On a virtual thread, an interrupt also closes a socket the thread is blocked on, so the
++ * adapter's I/O ends at once. Only the named transfer is affected; protocol adapters are shared, so
++ * their adapter-wide {@code abort()} is deliberately not used. The engine consumes the interrupt it
++ * sent before {@code transfer} returns, so the caller's thread is not left interrupted. An interrupt
++ * from anywhere else also ends the transfer as {@code CANCELLED}, and stays set for the caller.
++ *
++ * <h2>Thread safety</h2>
++ * Running transfers are held in a concurrent map. Each {@link ActiveTransfer} guards the race
++ * between cancellation and completion with its own monitor, so an interrupt can never reach a
++ * thread after its transfer has finished.
+  *
+  * @author Mark Andrew Ray-Smith Cityline Ltd
+  * @since 2025-08-17
+- * @version 1.0
++ * @version 3.0
+  */
+ public class SimpleTransferEngine implements TransferEngine {
+     private static final Logger logger = LoggerFactory.getLogger(SimpleTransferEngine.class);
+     private static final Tracer tracer = GlobalOpenTelemetry.getTracer("quorus-core");
+ 
+-    private final Vertx vertx;
+-    private final boolean closeVertxOnShutdown;
+-    private final ConcurrentHashMap<String, TransferJob> activeJobs;
+-    private final ConcurrentHashMap<String, TransferContext> activeContexts;
+-    private final ConcurrentHashMap<String, Future<TransferResult>> activeFutures;
++    private final Map<String, ActiveTransfer> active = new ConcurrentHashMap<>();
++    private final Semaphore slots;
+     private final ProtocolFactory protocolFactory;
+-    private final AtomicBoolean shutdown;
++    private final AtomicBoolean shutdown = new AtomicBoolean(false);
+ 
+-    // Configuration
+     private final int maxConcurrentTransfers;
+     private final int maxRetryAttempts;
+     private final long retryDelayMs;
+ 
+-    // Monitoring
+-    private final Instant startTime;
+-
+-    // OpenTelemetry Metrics (Phase 8 - Jan 2026)
++    private final Instant startTime = Instant.now();
+     private final TransferTelemetryMetrics telemetryMetrics;
+ 
+     /**
+-     * Constructor with Vert.x dependency injection (recommended).
++     * Creates an engine without mounted-filesystem security attestations.
+      *
+-     * @param vertx Vert.x instance for reactive operations
+-     * @param maxConcurrentTransfers Maximum number of concurrent transfers
+-     * @param maxRetryAttempts Maximum retry attempts per transfer
+-     * @param retryDelayMs Base delay between retries in milliseconds
++     * @param maxConcurrentTransfers transfers that may run at once; further calls are rejected
++     * @param maxRetryAttempts       retries after the first attempt fails
++     * @param retryDelayMs           base retry delay; attempt {@code n} waits {@code n} times this
+      */
+-    public SimpleTransferEngine(Vertx vertx, int maxConcurrentTransfers, int maxRetryAttempts, long retryDelayMs) {
+-        this(vertx, maxConcurrentTransfers, maxRetryAttempts, retryDelayMs,
+-                null, false, false, false);
++    public SimpleTransferEngine(int maxConcurrentTransfers, int maxRetryAttempts, long retryDelayMs) {
++        this(maxConcurrentTransfers, maxRetryAttempts, retryDelayMs, null, false, false);
+     }
+ 
+     /** Creates an engine with explicit mounted-filesystem security attestations. */
+-    public SimpleTransferEngine(Vertx vertx, int maxConcurrentTransfers, int maxRetryAttempts,
+-                                long retryDelayMs, String nfsMountRoot,
+-                                boolean smbMountSecurityVerified, boolean nfsMountSecurityVerified) {
+-        this(vertx, maxConcurrentTransfers, maxRetryAttempts, retryDelayMs,
+-                nfsMountRoot, smbMountSecurityVerified, nfsMountSecurityVerified, false);
+-    }
+-
+-    private SimpleTransferEngine(Vertx vertx, int maxConcurrentTransfers, int maxRetryAttempts, long retryDelayMs,
+-                                 String nfsMountRoot, boolean smbMountSecurityVerified,
+-                                 boolean nfsMountSecurityVerified, boolean closeVertxOnShutdown) {
+-        logger.debug("Initializing SimpleTransferEngine: maxConcurrent={}, maxRetries={}, retryDelay={}ms",
+-            maxConcurrentTransfers, maxRetryAttempts, retryDelayMs);
+-        
+-        this.vertx = Objects.requireNonNull(vertx, "Vertx cannot be null");
+-        this.closeVertxOnShutdown = closeVertxOnShutdown;
++    public SimpleTransferEngine(int maxConcurrentTransfers, int maxRetryAttempts, long retryDelayMs,
++                                String nfsMountRoot, boolean smbMountSecurityVerified,
++                                boolean nfsMountSecurityVerified) {
++        if (maxConcurrentTransfers < 1) {
++            throw new IllegalArgumentException("maxConcurrentTransfers must be at least 1");
++        }
+         this.maxConcurrentTransfers = maxConcurrentTransfers;
+         this.maxRetryAttempts = maxRetryAttempts;
+         this.retryDelayMs = retryDelayMs;
++        this.slots = new Semaphore(maxConcurrentTransfers);
++        this.protocolFactory = new ProtocolFactory(nfsMountRoot, smbMountSecurityVerified, nfsMountSecurityVerified);
+ 
+-        this.activeJobs = new ConcurrentHashMap<>();
+-        this.activeContexts = new ConcurrentHashMap<>();
+-        this.activeFutures = new ConcurrentHashMap<>();
+-        this.protocolFactory = new ProtocolFactory(
+-                vertx, nfsMountRoot, smbMountSecurityVerified, nfsMountSecurityVerified);
+-        this.shutdown = new AtomicBoolean(false);
+-
+-        // Initialize monitoring
+-        this.startTime = Instant.now();
+-
+-        // Initialize OpenTelemetry metrics
+         this.telemetryMetrics = TransferTelemetryMetrics.getInstance();
+         telemetryMetrics.registerProtocol("http");
+         telemetryMetrics.registerProtocol("ftp");
+         telemetryMetrics.registerProtocol("sftp");
+         telemetryMetrics.registerProtocol("smb");
+ 
+-        logger.info("SimpleTransferEngine initialized with {} max concurrent transfers (reactive mode, OpenTelemetry enabled)",
+-            maxConcurrentTransfers);
+-        logger.debug("SimpleTransferEngine initialization complete - startTime={}", startTime);
++        logger.info("SimpleTransferEngine initialized: maxConcurrent={}, maxRetries={}, retryDelay={}ms",
++                maxConcurrentTransfers, maxRetryAttempts, retryDelayMs);
+     }
+-    
++
+     @Override
+-    public Future<TransferResult> submitTransfer(TransferRequest request) throws TransferException {
+-        TransferDirection direction = request.getDirection();
+-        logger.debug("submitTransfer: request={}, protocol={}, direction={}", 
+-            request.getRequestId(), request.getProtocol(), direction);
+-        
++    public TransferResult transfer(TransferRequest request) throws TransferException {
+         if (shutdown.get()) {
+-            logger.debug("submitTransfer: rejected - engine is shutdown");
+             throw new TransferException(request.getRequestId(), "Transfer engine is shutdown");
+         }
+-        
+-        // Validate transfer request
+         validateTransferRequest(request);
+-        
+-        if (activeJobs.size() >= maxConcurrentTransfers) {
+-            logger.debug("submitTransfer: rejected - max concurrent transfers reached ({})", activeJobs.size());
++        if (!slots.tryAcquire()) {
+             throw new TransferException(request.getRequestId(), "Maximum concurrent transfers reached");
+         }
+-        
+-        // Create job and context
+-        logger.debug("submitTransfer: creating job and context");
++
+         TransferJob job = new TransferJob(request);
+-        TransferContext context = new TransferContext(job);
+-        
+-        // Store in active collections
+-        activeJobs.put(job.getJobId(), job);
+-        activeContexts.put(job.getJobId(), context);
+-        logger.debug("submitTransfer: job registered, activeJobs={}", activeJobs.size());
+-        
+-        // Record OpenTelemetry metric (Phase 8 - Jan 2026)
+-        telemetryMetrics.recordTransferStarted(request.getProtocol(), direction.name());
+-        
+-        // Execute transfer reactively (no blocking waits)
+-        logger.debug("submitTransfer: executing transfer via reactive pipeline");
+-        Map<String, String> mdcContext = MDC.getCopyOfContextMap();
+-        Promise<TransferResult> executionPromise = Promise.promise();
+-        vertx.runOnContext(v -> {
+-            if (mdcContext != null) {
+-                MDC.setContextMap(mdcContext);
++        ActiveTransfer transfer = new ActiveTransfer(job, new TransferContext(job), Thread.currentThread());
++        if (active.putIfAbsent(job.getJobId(), transfer) != null) {
++            slots.release();
++            throw new TransferException(request.getRequestId(), "A transfer with this ID is already running");
++        }
++        try {
++            if (shutdown.get()) {
++                transfer.cancel();          // shutdown began after the first check; do not start work
+             }
+-            executeTransfer(context).onComplete(executionPromise);
+-        });
+-
+-        Future<TransferResult> future = executionPromise.future()
+-            .recover(err -> {
+-                logger.error("Transfer execution failed for job {}: {} ({})",
+-                        job.getJobId(), err.getMessage(), err.getClass().getSimpleName());
+-                if (logger.isDebugEnabled()) {
+-                    logger.debug("Transfer execution exception details for job: {}", job.getJobId(), err);
+-                }
+-                job.fail("Transfer execution failed: " + err.getMessage(), err);
+-                return Future.succeededFuture(job.toResult());
+-            })
+-            .eventually(() -> {
+-                logger.debug("submitTransfer: cleaning up job {} from active collections", job.getJobId());
+-                activeJobs.remove(job.getJobId());
+-                activeContexts.remove(job.getJobId());
+-                activeFutures.remove(job.getJobId());
+-                MDC.clear();
+-                return Future.succeededFuture();
+-            });
+-
+-        activeFutures.put(job.getJobId(), future);
+-
+-        logger.info("Transfer submitted: {}", job.getJobId());
+-        logger.debug("submitTransfer: complete, future registered");
+-        return future;
++            telemetryMetrics.recordTransferStarted(request.getProtocol(), request.getDirection().name());
++            logger.info("Transfer started: {}", job.getJobId());
++            return execute(transfer);
++        } finally {
++            if (transfer.finish()) {
++                Thread.interrupted();       // consume the interrupt cancelTransfer sent to this thread
++            }
++            active.remove(job.getJobId());
++            slots.release();
++            transfer.ended.complete(null);
++        }
+     }
+-    
++
+     @Override
+     public TransferJob getTransferJob(String jobId) {
+-        logger.debug("getTransferJob: looking up jobId={}", jobId);
+-        TransferJob job = activeJobs.get(jobId);
+-        logger.debug("getTransferJob: found={}", job != null);
+-        return job;
++        ActiveTransfer transfer = active.get(jobId);
++        return transfer == null ? null : transfer.job;
+     }
+-    
++
+     @Override
+     public boolean cancelTransfer(String jobId) {
+-        logger.debug("cancelTransfer: attempting to cancel jobId={}", jobId);
+-        TransferContext context = activeContexts.get(jobId);
+-        Future<TransferResult> future = activeFutures.get(jobId);
+-        
+-        if (context != null) {
+-            // Set cancellation flag
+-            logger.debug("cancelTransfer: setting cancellation flag for jobId={}", jobId);
+-            context.cancel();
+-            TransferJob job = context.getJob();
+-            if (job != null) {
+-                job.cancel();
+-                
+-                // Get the protocol and call abort() for hard cancellation
+-                TransferRequest request = job.getRequest();
+-                if (request != null) {
+-                    try {
+-                        TransferProtocol protocol = protocolFactory.getProtocol(request.getProtocol());
+-                        if (protocol != null) {
+-                            logger.info("Aborting transfer {} via protocol.abort()", jobId);
+-                            protocol.abort();
+-                            logger.debug("cancelTransfer: protocol abort called successfully");
+-                        }
+-                    } catch (Exception e) {
+-                        logger.warn("Error aborting protocol for job {}: {}", jobId, e.getMessage());
+-                        logger.debug("Stack trace for abort error on job {}", jobId, e);
+-                    }
+-                }
+-            }
+-            logger.debug("cancelTransfer: cancellation complete for jobId={}", jobId);
+-        } else {
+-            logger.debug("cancelTransfer: no active context found for jobId={}", jobId);
++        ActiveTransfer transfer = active.get(jobId);
++        boolean cancelled = transfer != null && transfer.cancel();
++        if (cancelled) {
++            logger.info("Transfer cancellation requested: {}", jobId);
+         }
+-        
+-        // Note: Vert.x Future doesn't have cancel() method, cancellation handled via context and abort()
+-        
+-        return context != null;
++        return cancelled;
+     }
+-    
++
+     @Override
+     public boolean pauseTransfer(String jobId) {
+-        logger.debug("pauseTransfer: attempting to pause jobId={}", jobId);
+-        TransferContext context = activeContexts.get(jobId);
+-        if (context != null) {
+-            context.pause();
+-            TransferJob job = context.getJob();
+-            if (job != null) {
+-                job.pause();
+-            }
+-            logger.debug("pauseTransfer: paused successfully");
+-            return true;
++        ActiveTransfer transfer = active.get(jobId);
++        if (transfer == null) {
++            return false;
+         }
+-        logger.debug("pauseTransfer: no active context found for jobId={}", jobId);
+-        return false;
++        transfer.context.pause();
++        transfer.job.pause();
++        return true;
+     }
+-    
++
+     @Override
+     public boolean resumeTransfer(String jobId) {
+-        logger.debug("resumeTransfer: attempting to resume jobId={}", jobId);
+-        TransferContext context = activeContexts.get(jobId);
+-        if (context != null) {
+-            context.resume();
+-            TransferJob job = context.getJob();
+-            if (job != null) {
+-                job.resume();
+-            }
+-            logger.debug("resumeTransfer: resumed successfully");
+-            return true;
++        ActiveTransfer transfer = active.get(jobId);
++        if (transfer == null) {
++            return false;
+         }
+-        logger.debug("resumeTransfer: no active context found for jobId={}", jobId);
+-        return false;
++        transfer.context.resume();
++        transfer.job.resume();
++        return true;
+     }
+-    
++
+     @Override
+     public int getActiveTransferCount() {
+-        int count = activeJobs.size();
+-        logger.debug("getActiveTransferCount: count={}", count);
+-        return count;
+-    }
+-    
+-    @Override
+-    public Future<Void> shutdown(long timeoutSeconds) {
+-        logger.debug("shutdown: initiating with timeout={}s", timeoutSeconds);
+-
+-        if (shutdown.getAndSet(true)) {
+-            logger.debug("shutdown: already shutdown");
+-            return Future.succeededFuture();
+-        }
+-
+-        logger.info("Shutting down transfer engine...");
+-        logger.debug("shutdown: cancelling {} active transfers", activeContexts.size());
+-
+-        // Cancel all active transfers
+-        activeContexts.values().forEach(TransferContext::cancel);
+-
+-        // Reactively wait for in-flight transfers to drain
+-        return awaitActiveTransfers(timeoutSeconds * 1000)
+-            .compose(v -> closeOwnedVertx())
+-            .onSuccess(v -> logger.info("Transfer engine shutdown completed"));
++        return active.size();
+     }
+ 
+-    private Future<Void> closeOwnedVertx() {
+-        if (!closeVertxOnShutdown) {
+-            return Future.succeededFuture();
+-        }
+-
+-        logger.info("Closing internally-managed Vert.x instance");
+-        return vertx.close();
+-    }
+-    
+-    /**
+-     * Waits for all active transfers to complete or timeout.
+-     * 
+-     * <p>This method is useful for graceful shutdown where you want to allow
+-     * in-flight transfers to finish before closing resources.
+-     *
+-     * @param timeoutMs maximum time to wait in milliseconds
+-     * @return a Future that completes when all transfers are done or timeout expires
+-     */
+-    public Future<Void> awaitActiveTransfers(long timeoutMs) {
+-        int activeCount = activeJobs.size();
+-        if (activeCount == 0) {
+-            logger.debug("awaitActiveTransfers: no active transfers");
+-            return Future.succeededFuture();
++    @Override
++    public boolean shutdown(Duration timeout) {
++        if (shutdown.compareAndSet(false, true)) {
++            logger.info("Shutting down transfer engine; cancelling {} running transfer(s)", active.size());
+         }
+-        
+-        logger.info("Waiting for {} active transfers to complete (timeout={}ms)", activeCount, timeoutMs);
+-        
+-        // Collect all active transfer futures
+-        List<Future<TransferResult>> futures = new ArrayList<>(activeFutures.values());
+-        if (futures.isEmpty()) {
+-            return Future.succeededFuture();
++        List<ActiveTransfer> running = List.copyOf(active.values());
++        running.forEach(ActiveTransfer::cancel);
++        CompletableFuture<?>[] ended = running.stream().map(t -> t.ended).toArray(CompletableFuture[]::new);
++        try {
++            CompletableFuture.allOf(ended).get(timeout.toMillis(), TimeUnit.MILLISECONDS);
++            logger.info("Transfer engine shutdown completed");
++            return true;
++        } catch (TimeoutException e) {
++            logger.warn("Transfer engine shutdown timed out with {} transfer(s) still running", active.size());
++            return false;
++        } catch (InterruptedException e) {
++            Thread.currentThread().interrupt();
++            return active.isEmpty();
++        } catch (ExecutionException e) {
++            throw new IllegalStateException("A transfer end signal failed", e);   // never completed exceptionally
+         }
+-        
+-        // Wait for all with timeout
+-        return Future.all(futures)
+-                .timeout(timeoutMs, TimeUnit.MILLISECONDS)
+-                .map(v -> {
+-                    logger.info("All active transfers completed");
+-                    return (Void) null;
+-                })
+-                .recover(err -> {
+-                    int remaining = activeJobs.size();
+-                    if (remaining > 0) {
+-                        logger.warn("Timeout waiting for transfers, {} still active", remaining);
+-                    } else {
+-                        logger.info("All active transfers completed");
+-                    }
+-                    return Future.succeededFuture();
+-                });
+     }
+-    
++
+     /**
+      * Checks if the transfer engine is in shutdown state.
+      *
+@@ -378,10 +234,6 @@ public class SimpleTransferEngine implements TransferEngine {
+         return shutdown.get();
+     }
+ 
+-    boolean isClosingOwnedVertxOnShutdown() {
+-        return closeVertxOnShutdown;
+-    }
+-
+     @Override
+     public TransferEngineHealthCheck getHealthCheck() {
+         TransferEngineHealthCheck.Builder builder = TransferEngineHealthCheck.builder();
+@@ -434,7 +286,7 @@ public class SimpleTransferEngine implements TransferEngine {
+ 
+         // System metrics
+         Runtime runtime = Runtime.getRuntime();
+-        builder.systemMetric("activeTransfers", activeJobs.size())
++        builder.systemMetric("activeTransfers", active.size())
+                 .systemMetric("maxConcurrentTransfers", maxConcurrentTransfers)
+                 .systemMetric("uptime", Duration.between(startTime, Instant.now()).toString())
+                 .systemMetric("memoryUsedMB", (runtime.totalMemory() - runtime.freeMemory()) / (1024 * 1024))
+@@ -451,179 +303,182 @@ public class SimpleTransferEngine implements TransferEngine {
+         return builder.build();
+     }
+ 
+-    private Future<TransferResult> executeTransfer(TransferContext context) {
+-        TransferJob job = context.getJob();
++    /** Runs the attempts of one transfer on the current thread and returns its outcome. */
++    private TransferResult execute(ActiveTransfer transfer) {
++        TransferJob job = transfer.job;
+         TransferRequest request = job.getRequest();
+         TransferDirection direction = request.getDirection();
+-
+-        logger.info("Starting {} transfer: {}", direction, job.getJobId());
+-        logger.debug("executeTransfer: starting for jobId={}, protocol={}, direction={}, sourceUri={}, destinationUri={}", 
+-            job.getJobId(), request.getProtocol(), direction,
+-            SensitiveDataRedactor.redactUri(request.getSourceUri()),
+-            SensitiveDataRedactor.redactUri(request.getDestinationUri()));
+-        job.start();
+-
+         String protocolName = request.getProtocol();
++        logger.debug("Executing {} transfer {}: protocol={}, source={}, destination={}", direction,
++                job.getJobId(), protocolName, SensitiveDataRedactor.redactUri(request.getSourceUri()),
++                SensitiveDataRedactor.redactUri(request.getDestinationUri()));
++        job.start();
+ 
+-        // Create transfer tracing span (metrics already recorded in submitTransfer)
+         Span span = tracer.spanBuilder("quorus.transfer")
+                 .setSpanKind(SpanKind.INTERNAL)
+                 .setAttribute("transfer.id", job.getJobId())
+                 .setAttribute("transfer.protocol", protocolName)
+                 .setAttribute("transfer.direction", direction.name())
+                 .startSpan();
++        Instant transferStart = Instant.now();
++        try (Scope ignored = span.makeCurrent()) {
++            Throwable lastError = null;
++            for (int attempt = 0; ; attempt++) {
++                if (stopRequested(transfer)) {
++                    return stopped(transfer, span, lastError);
++                }
++                TransferProtocol protocol = protocolFactory.getProtocol(protocolName);
++                if (protocol == null || !protocol.canHandle(request)) {
++                    return fail(job, span, new TransferException(job.getJobId(),
++                            "Protocol '" + protocolName + "' cannot handle request direction/URI combination"));
++                }
++                try {
++                    TransferResult result = runAttempt(protocol, request, transfer.context);
++                    if (!result.isSuccessful()) {
++                        throw new TransferException(job.getJobId(),
++                                "Transfer failed: " + result.getErrorMessage().orElse("Unknown error"));
++                    }
++                    return completed(job, span, result, transferStart);
++                } catch (Exception failure) {
++                    lastError = failure;
++                    transfer.context.incrementRetryCount();
++                    if (stopRequested(transfer)) {
++                        return stopped(transfer, span, lastError);
++                    }
++                    if (attempt >= maxRetryAttempts) {
++                        return fail(job, span, failure);
++                    }
++                    logger.warn("Transfer attempt {} of {} failed for job {}: {}", attempt + 1,
++                            maxRetryAttempts + 1, job.getJobId(), failure.getMessage());
++                    telemetryMetrics.recordRetryAttempt(protocolName, direction.name(), attempt + 1);
++                    if (!backOff(attempt + 1)) {
++                        return stopped(transfer, span, lastError);
++                    }
++                }
++            }
++        }
++    }
+ 
+-        Instant transferStartTime = Instant.now();
+-        return executeAttempt(context, request, direction, transferStartTime,
+-                protocolName, span, 0, null);
++    /**
++     * Runs one attempt through the adapter's blocking entry point. It is deprecated only in favour of
++     * the Vert.x {@code transferReactive}, which RT-03d removes together with the deprecation.
++     */
++    @SuppressWarnings("deprecation")
++    private static TransferResult runAttempt(TransferProtocol protocol, TransferRequest request,
++                                             TransferContext context) throws TransferException {
++        return protocol.transfer(request, context);
+     }
+ 
+-    private Future<TransferResult> executeAttempt(
+-            TransferContext context,
+-            TransferRequest request,
+-            TransferDirection direction,
+-            Instant transferStartTime,
+-            String protocolName,
+-            Span span,
+-            int attempt,
+-            Throwable lastError) {
+-
+-        TransferJob job = context.getJob();
+-        if (!context.shouldContinue()) {
+-            String message = "Transfer cancelled or paused before completion";
+-            logger.warn("executeTransfer: {} for jobId={}", message, job.getJobId());
+-            telemetryMetrics.recordTransferCancelled(protocolName, direction.name());
+-            span.setStatus(StatusCode.ERROR, message);
+-            span.end();
+-            job.fail(message, lastError);
+-            return Future.succeededFuture(job.toResult());
++    /** Waits before retry {@code retry}; returns {@code false} if interrupted, restoring the interrupt. */
++    private boolean backOff(int retry) {
++        long delay = retryDelayMs * retry;
++        logger.debug("Retrying after {} ms", delay);
++        try {
++            Thread.sleep(delay);
++            return true;
++        } catch (InterruptedException e) {
++            Thread.currentThread().interrupt();
++            return false;
+         }
++    }
+ 
+-        logger.debug("executeTransfer: attempt {} of {} for jobId={}",
+-                attempt + 1, maxRetryAttempts + 1, job.getJobId());
++    private static boolean stopRequested(ActiveTransfer transfer) {
++        return !transfer.context.shouldContinue() || Thread.currentThread().isInterrupted();
++    }
+ 
+-        TransferProtocol protocol = protocolFactory.getProtocol(protocolName);
+-        if (protocol == null) {
+-            TransferException error = new TransferException(job.getJobId(), "Unsupported protocol: " + protocolName);
+-            return failTransfer(job, direction, protocolName, span, error);
++    /** Ends a transfer that was cancelled, interrupted or paused. */
++    private TransferResult stopped(ActiveTransfer transfer, Span span, Throwable lastError) {
++        TransferJob job = transfer.job;
++        TransferRequest request = job.getRequest();
++        telemetryMetrics.recordTransferCancelled(request.getProtocol(), request.getDirection().name());
++        if (transfer.context.isCancelled() || Thread.currentThread().isInterrupted()) {
++            job.cancel();
++            logger.info("Transfer cancelled: {}", job.getJobId());
++        } else {
++            job.fail("Transfer paused before completion", lastError);
++            logger.warn("Transfer paused before completion and was stopped: {}", job.getJobId());
+         }
+-        if (!protocol.canHandle(request)) {
+-            TransferException error = new TransferException(job.getJobId(),
+-                    "Protocol '" + protocolName + "' cannot handle request direction/URI combination");
+-            return failTransfer(job, direction, protocolName, span, error);
++        span.setStatus(StatusCode.ERROR, "Transfer stopped: " + job.getStatus());
++        span.end();
++        TransferResult result = job.toResult();
++        if (result.getErrorMessage().isPresent()) {
++            return result;
+         }
+-
+-        return protocol.transferReactive(request, context)
+-                .compose(result -> {
+-                    if (!result.isSuccessful()) {
+-                        String errorMsg = result.getErrorMessage().orElse("Unknown error");
+-                        return Future.failedFuture(new TransferException(job.getJobId(), "Transfer failed: " + errorMsg));
+-                    }
+-
+-                    logger.info("{} transfer completed successfully: {}", direction, job.getJobId());
+-                    Duration duration = Duration.between(transferStartTime, Instant.now());
+-                    long bytesTransferred = result.getBytesTransferred();
+-
+-                    telemetryMetrics.recordTransferCompleted(protocolName, direction.name(),
+-                            bytesTransferred, duration.toMillis() / 1000.0);
+-
+-                    span.setAttribute("transfer.bytes", bytesTransferred);
+-                    span.setAttribute("transfer.duration_ms", duration.toMillis());
+-                    span.setStatus(StatusCode.OK);
+-                    span.end();
+-
+-                    return Future.succeededFuture(result);
+-                })
+-                .recover(err -> {
+-                    int nextAttempt = attempt + 1;
+-                    context.incrementRetryCount();
+-
+-                    logger.warn("Transfer attempt {} failed for job {}: {}",
+-                            nextAttempt, job.getJobId(), err.getMessage());
+-                    logger.debug("Stack trace for failed attempt {} on job {}", nextAttempt, job.getJobId(), err);
+-
+-                    if (nextAttempt <= maxRetryAttempts && context.shouldContinue()) {
+-                        long delay = retryDelayMs * nextAttempt;
+-                        logger.debug("executeTransfer: scheduling retry after {}ms", delay);
+-                        telemetryMetrics.recordRetryAttempt(protocolName, direction.name(), nextAttempt);
+-
+-                        return delayFuture(delay)
+-                                .compose(v -> executeAttempt(context, request, direction, transferStartTime,
+-                                        protocolName, span, nextAttempt, err));
+-                    }
+-
+-                    return failTransfer(job, direction, protocolName, span, err);
+-                });
++        // A cancelled job has no error message of its own, and consumers such as the agent report
++        // the message of any unsuccessful result, so the reason is stated here.
++        return TransferResult.builder()
++                .requestId(result.getRequestId())
++                .finalStatus(result.getFinalStatus())
++                .bytesTransferred(result.getBytesTransferred())
++                .startTime(result.getStartTime().orElse(null))
++                .endTime(result.getEndTime().orElse(null))
++                .actualChecksum(result.getActualChecksum().orElse(null))
++                .errorMessage("Transfer cancelled")
++                .cause(lastError)
++                .build();
+     }
+ 
+-    private Future<Void> delayFuture(long delayMs) {
+-        Promise<Void> delayPromise = Promise.promise();
+-        vertx.setTimer(delayMs, id -> delayPromise.complete());
+-        return delayPromise.future();
++    private TransferResult completed(TransferJob job, Span span, TransferResult result, Instant transferStart) {
++        TransferRequest request = job.getRequest();
++        Duration duration = Duration.between(transferStart, Instant.now());
++        telemetryMetrics.recordTransferCompleted(request.getProtocol(), request.getDirection().name(),
++                result.getBytesTransferred(), duration.toMillis() / 1000.0);
++        span.setAttribute("transfer.bytes", result.getBytesTransferred());
++        span.setAttribute("transfer.duration_ms", duration.toMillis());
++        span.setStatus(StatusCode.OK);
++        span.end();
++        logger.info("{} transfer completed: {} ({} bytes in {} ms)", request.getDirection(), job.getJobId(),
++                result.getBytesTransferred(), duration.toMillis());
++        return result;
+     }
+ 
+-    private Future<TransferResult> failTransfer(
+-            TransferJob job,
+-            TransferDirection direction,
+-            String protocolName,
+-            Span span,
+-            Throwable error) {
+-        String errorMessage = error != null ? error.getMessage() :
+-                "Transfer failed after " + maxRetryAttempts + " attempts";
+-        logger.debug("executeTransfer: all attempts exhausted for jobId={}, direction={}", job.getJobId(), direction);
+-        job.fail(errorMessage, error);
+-
+-        String errorType = error != null ? error.getClass().getSimpleName() : "UnknownError";
+-        telemetryMetrics.recordTransferFailed(protocolName, direction.name(), errorType);
+-
+-        span.setStatus(StatusCode.ERROR, errorMessage);
+-        if (error != null) {
+-            span.recordException(error);
+-        }
++    private TransferResult fail(TransferJob job, Span span, Throwable error) {
++        TransferRequest request = job.getRequest();
++        job.fail(error.getMessage(), error);
++        telemetryMetrics.recordTransferFailed(request.getProtocol(), request.getDirection().name(),
++                error.getClass().getSimpleName());
++        span.setStatus(StatusCode.ERROR, error.getMessage());
++        span.recordException(error);
+         span.end();
+-
+-        logger.error("{} transfer failed permanently: {} - {}", direction, job.getJobId(), errorMessage);
+-        if (logger.isTraceEnabled() && error != null) {
+-            logger.debug("Full stack trace for failed transfer {}", job.getJobId(), error);
+-        }
+-
+-        return Future.succeededFuture(job.toResult());
++        logger.error("{} transfer failed permanently: {} - {}", request.getDirection(), job.getJobId(),
++                error.getMessage());
++        logger.debug("Failure detail for transfer {}", job.getJobId(), error);
++        return job.toResult();
+     }
+-    
++
+     /**
+      * Validates that the transfer request is supported.
+-     * 
++     *
+      * @param request the transfer request to validate
+      * @throws TransferException if the request is invalid
+      */
+     private void validateTransferRequest(TransferRequest request) throws TransferException {
+-        java.net.URI source = request.getSourceUri();
+-        java.net.URI dest = request.getDestinationUri();
+-        
+-        // Validate URIs are not null
++        URI source = request.getSourceUri();
++        URI dest = request.getDestinationUri();
++
+         if (source == null) {
+             throw new TransferException(request.getRequestId(), "Source URI cannot be null");
+         }
+         if (dest == null) {
+             throw new TransferException(request.getRequestId(), "Destination URI cannot be null");
+         }
+-        
++
+         boolean sourceIsFile = "file".equalsIgnoreCase(source.getScheme());
+         boolean destIsFile = "file".equalsIgnoreCase(dest.getScheme());
+-        
++
+         // At least one must be file://
+         if (!sourceIsFile && !destIsFile) {
+             throw new TransferException(request.getRequestId(),
+                 "At least one endpoint must be file:// (local filesystem). " +
+                 "Remote-to-remote transfers not yet supported.");
+         }
+-        
++
+         // Both can't be file:// (use Files.copy instead)
+         if (sourceIsFile && destIsFile) {
+             throw new TransferException(request.getRequestId(),
+                 "Both source and destination are local files. Use Files.copy() for local file-to-file operations.");
+         }
+-        
++
+         // Validate configured protocol (protocol is authoritative from job configuration)
+         String configuredProtocol = request.getProtocol();
+         if (!protocolFactory.isProtocolSupported(configuredProtocol)) {
+@@ -637,8 +492,43 @@ public class SimpleTransferEngine implements TransferEngine {
+             throw new TransferException(request.getRequestId(),
+                 "Configured protocol '" + configuredProtocol + "' cannot handle this request direction or URIs");
+         }
+-        
+-        logger.debug("validateTransferRequest: request {} validated successfully (direction={}, protocol={})",
+-            request.getRequestId(), request.getDirection(), configuredProtocol);
++    }
++
++    /**
++     * One running transfer and the thread that runs it. Its monitor orders cancellation against
++     * completion: {@link #cancel()} interrupts only while the transfer has not finished, and
++     * {@link #finish()} reports whether an interrupt was sent, so the transfer can consume it.
++     */
++    private static final class ActiveTransfer {
++        final TransferJob job;
++        final TransferContext context;
++        final CompletableFuture<Void> ended = new CompletableFuture<>();
++        private final Thread thread;
++        private boolean finished;
++        private boolean interruptSent;
++
++        ActiveTransfer(TransferJob job, TransferContext context, Thread thread) {
++            this.job = job;
++            this.context = context;
++            this.thread = thread;
++        }
++
++        synchronized boolean cancel() {
++            if (finished) {
++                return false;
++            }
++            context.cancel();
++            if (!interruptSent) {
++                interruptSent = true;
++                thread.interrupt();
++            }
++            return true;
++        }
++
++        /** Marks the transfer finished; returns {@code true} if {@link #cancel()} interrupted its thread. */
++        synchronized boolean finish() {
++            finished = true;
++            return interruptSent;
++        }
+     }
+ }
+diff --git a/quorus-core/src/main/java/dev/mars/quorus/transfer/TransferEngine.java b/quorus-core/src/main/java/dev/mars/quorus/transfer/TransferEngine.java
+index eb404dc..de0566c 100644
+--- a/quorus-core/src/main/java/dev/mars/quorus/transfer/TransferEngine.java
++++ b/quorus-core/src/main/java/dev/mars/quorus/transfer/TransferEngine.java
+@@ -22,21 +22,47 @@ import dev.mars.quorus.core.TransferRequest;
+ import dev.mars.quorus.core.TransferResult;
+ import dev.mars.quorus.core.exceptions.TransferException;
+ import dev.mars.quorus.monitoring.TransferEngineHealthCheck;
+-import io.vertx.core.Future;
++
++import java.time.Duration;
+ 
+ /**
+- * Engine interface for managing file transfers.
++ * Runs file transfers.
++ *
++ * <p>The API is blocking (ADR-0012, plan item RT-03c). {@link #transfer} runs the transfer on the
++ * calling thread, which should be a virtual thread, and returns when it has ended. A caller that
++ * wants several transfers at once forks them in a {@code TaskScope}. Cancellation interrupts the
++ * thread running the named transfer and affects no other transfer.
+  *
+  * @author Mark Andrew Ray-Smith Cityline Ltd
+- * @version 2.0
++ * @version 3.0
+  * @since 2025-08-17
+  */
+ public interface TransferEngine {
+ 
+-    Future<TransferResult> submitTransfer(TransferRequest request) throws TransferException;
++    /**
++     * Runs a transfer on the calling thread and returns its outcome.
++     *
++     * <p>A transfer that fails, is cancelled, or runs out of retries still returns a result: its
++     * {@link TransferResult#getFinalStatus() final status} is {@code FAILED} or {@code CANCELLED}.
++     * If the calling thread is interrupted by anything other than {@link #cancelTransfer}, the
++     * transfer ends as {@code CANCELLED} and the thread's interrupt status is left set.
++     *
++     * @param request the transfer to run; its request ID is the job ID
++     * @return the outcome
++     * @throws TransferException if the request is invalid, the engine is shut down, the
++     *                           concurrency limit is reached, or a transfer with the same ID is running
++     */
++    TransferResult transfer(TransferRequest request) throws TransferException;
+ 
++    /** Returns the running transfer's job, or {@code null} if no transfer with that ID is running. */
+     TransferJob getTransferJob(String jobId);
+ 
++    /**
++     * Cancels a running transfer by interrupting the thread that runs it. Other transfers are not
++     * affected. The cancelled {@link #transfer} call returns promptly with status {@code CANCELLED}.
++     *
++     * @return {@code true} if a running transfer was cancelled
++     */
+     boolean cancelTransfer(String jobId);
+ 
+     boolean pauseTransfer(String jobId);
+@@ -46,13 +72,13 @@ public interface TransferEngine {
+     int getActiveTransferCount();
+ 
+     /**
+-     * Shut down the transfer engine, cancelling active transfers and waiting
+-     * up to {@code timeoutSeconds} for them to drain before closing resources.
++     * Stops accepting transfers, cancels the running ones, and waits for them to end.
++     * Calling it again is harmless.
+      *
+-     * @param timeoutSeconds maximum time to wait for active transfers to complete
+-     * @return a Future that completes when shutdown is finished
++     * @param timeout how long to wait for running transfers to end
++     * @return {@code true} if no transfer is still running when it returns
+      */
+-    Future<Void> shutdown(long timeoutSeconds);
++    boolean shutdown(Duration timeout);
+ 
+     /**
+      * Get comprehensive health check for the transfer engine.
+diff --git a/quorus-core/src/test/java/dev/mars/quorus/integration/BasicTransferIntegrationTest.java b/quorus-core/src/test/java/dev/mars/quorus/integration/BasicTransferIntegrationTest.java
+index a1df7ed..6ac0fdb 100644
+--- a/quorus-core/src/test/java/dev/mars/quorus/integration/BasicTransferIntegrationTest.java
++++ b/quorus-core/src/test/java/dev/mars/quorus/integration/BasicTransferIntegrationTest.java
+@@ -17,284 +17,178 @@ package dev.mars.quorus.integration;
+  */
+ 
+ 
++import dev.mars.quorus.concurrent.TaskScope;
+ import dev.mars.quorus.core.TransferRequest;
+ import dev.mars.quorus.core.TransferResult;
+ import dev.mars.quorus.core.TransferStatus;
+ import dev.mars.quorus.transfer.SimpleTransferEngine;
+ import dev.mars.quorus.transfer.TransferEngine;
+-import io.vertx.core.Vertx;
+-import io.vertx.junit5.VertxExtension;
+-import io.vertx.junit5.VertxTestContext;
+ import org.junit.jupiter.api.AfterEach;
+ import org.junit.jupiter.api.BeforeEach;
+ import org.junit.jupiter.api.Test;
+-import org.junit.jupiter.api.extension.ExtendWith;
++import org.junit.jupiter.api.Timeout;
+ import org.junit.jupiter.api.io.TempDir;
+ 
+ import java.net.URI;
+ import java.nio.file.Files;
+ import java.nio.file.Path;
+-import io.vertx.core.Future;
++import java.time.Duration;
++import java.util.ArrayList;
++import java.util.List;
++import java.util.concurrent.CompletableFuture;
+ 
++import static java.util.concurrent.TimeUnit.SECONDS;
+ import static org.junit.jupiter.api.Assertions.*;
+ 
+ /**
+  * Integration tests for the basic transfer engine functionality.
+  * Tests end-to-end file transfer scenarios using a local HTTP test server.
+  * @author Mark Andrew Ray-Smith Cityline Ltd
+- * @version 1.0
++ * @version 2.0
+  * @since 2025-08-17
+  */
+-@ExtendWith(VertxExtension.class)
++@Timeout(value = 60, unit = SECONDS, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
+ class BasicTransferIntegrationTest {
+ 
+     @TempDir
+     Path tempDir;
+ 
+     private TransferEngine transferEngine;
+-    private Vertx vertx;
+     private LocalHttpTestServer testServer;
+     private String baseUrl;
+ 
+     @BeforeEach
+-    void setUp(Vertx vertx) throws Exception {
+-        this.vertx = vertx;
+-        transferEngine = new SimpleTransferEngine(vertx, 5, 2, 500);
++    void setUp() throws Exception {
++        transferEngine = new SimpleTransferEngine(5, 2, 500);
+         testServer = new LocalHttpTestServer();
+         baseUrl = testServer.getBaseUrl();
+     }
+ 
+     @AfterEach
+-    void tearDown(VertxTestContext testContext) {
+-        if (transferEngine != null) {
+-            transferEngine.shutdown(5).onComplete(testContext.succeeding(v -> {
+-                if (testServer != null) {
+-                    testServer.stop();
+-                }
+-                testContext.completeNow();
+-            }));
+-            return;
+-        }
+-
+-        if (testServer != null) {
+-            testServer.stop();
+-        }
+-
+-        testContext.completeNow();
++    void tearDown() {
++        transferEngine.shutdown(Duration.ofSeconds(5));
++        testServer.stop();
+     }
+-    
+-    @Test
+-    void testBasicHttpTransfer(VertxTestContext testContext) throws Exception {
+-        // Use local test server instead of external httpbin.org
+-        URI sourceUri = URI.create(baseUrl + "/bytes/1024"); // 1KB test file
+-        Path destinationPath = tempDir.resolve("test-file.bin");
+ 
+-        TransferRequest request = TransferRequest.builder()
+-                .sourceUri(sourceUri)
+-                .destinationPath(destinationPath)
++    private TransferRequest request(String path, Path destination) {
++        return TransferRequest.builder()
++                .sourceUri(URI.create(baseUrl + path))
++                .destinationPath(destination)
+                 .protocol("http")
+                 .build();
++    }
+ 
+-        transferEngine.submitTransfer(request).onComplete(testContext.succeeding(result ->
+-                testContext.verify(() -> {
+-                    assertNotNull(result);
+-                    assertEquals(TransferStatus.COMPLETED, result.getFinalStatus());
+-                    assertTrue(result.isSuccessful());
+-                    assertEquals(1024, result.getBytesTransferred());
+-                    assertTrue(result.getActualChecksum().isPresent());
+-                    assertTrue(result.getDuration().isPresent());
+-                    assertTrue(result.getAverageRateBytesPerSecond().isPresent());
+-                    assertTrue(Files.exists(destinationPath));
+-                    assertEquals(1024, Files.size(destinationPath));
+-                    testContext.completeNow();
+-                })));
++    @Test
++    void testBasicHttpTransfer() throws Exception {
++        Path destinationPath = tempDir.resolve("test-file.bin");
++
++        TransferResult result = transferEngine.transfer(request("/bytes/1024", destinationPath));
++
++        assertNotNull(result);
++        assertEquals(TransferStatus.COMPLETED, result.getFinalStatus());
++        assertTrue(result.isSuccessful());
++        assertEquals(1024, result.getBytesTransferred());
++        assertTrue(result.getActualChecksum().isPresent());
++        assertTrue(result.getDuration().isPresent());
++        assertTrue(result.getAverageRateBytesPerSecond().isPresent());
++        assertTrue(Files.exists(destinationPath));
++        assertEquals(1024, Files.size(destinationPath));
+     }
+-    
++
+     @Test
+-    void testSmallFileTransfer(VertxTestContext testContext) throws Exception {
+-        URI sourceUri = URI.create(baseUrl + "/bytes/100"); // 100 bytes
++    void testSmallFileTransfer() throws Exception {
+         Path destinationPath = tempDir.resolve("small-file.bin");
+ 
+-        TransferRequest request = TransferRequest.builder()
+-                .sourceUri(sourceUri)
+-                .destinationPath(destinationPath)
+-                .protocol("http")
+-                .build();
++        TransferResult result = transferEngine.transfer(request("/bytes/100", destinationPath));
+ 
+-        transferEngine.submitTransfer(request).onComplete(testContext.succeeding(result ->
+-                testContext.verify(() -> {
+-                    assertTrue(result.isSuccessful());
+-                    assertEquals(100, result.getBytesTransferred());
+-                    assertTrue(Files.exists(destinationPath));
+-                    assertEquals(100, Files.size(destinationPath));
+-                    testContext.completeNow();
+-                })));
++        assertTrue(result.isSuccessful());
++        assertEquals(100, result.getBytesTransferred());
++        assertEquals(100, Files.size(destinationPath));
+     }
+ 
+     @Test
+-    void testLargerFileTransfer(VertxTestContext testContext) throws Exception {
+-        URI sourceUri = URI.create(baseUrl + "/bytes/10240"); // 10KB
++    void testLargerFileTransfer() throws Exception {
+         Path destinationPath = tempDir.resolve("larger-file.bin");
+ 
+-        TransferRequest request = TransferRequest.builder()
+-                .sourceUri(sourceUri)
+-                .destinationPath(destinationPath)
+-                .protocol("http")
+-                .build();
++        TransferResult result = transferEngine.transfer(request("/bytes/10240", destinationPath));
+ 
+-        transferEngine.submitTransfer(request).onComplete(testContext.succeeding(result ->
+-                testContext.verify(() -> {
+-                    assertTrue(result.isSuccessful());
+-                    assertEquals(10240, result.getBytesTransferred());
+-                    assertTrue(Files.exists(destinationPath));
+-                    assertEquals(10240, Files.size(destinationPath));
+-                    testContext.completeNow();
+-                })));
++        assertTrue(result.isSuccessful());
++        assertEquals(10240, result.getBytesTransferred());
++        assertEquals(10240, Files.size(destinationPath));
+     }
+ 
++    /**
++     * A one-megabyte transfer. Progress of a running job is asserted deterministically in
++     * SimpleTransferEngineBlockingTest, where the server holds the response; the former version
++     * of this test polled the job every 10 ms, which the concurrency conventions prohibit.
++     */
+     @Test
+-    void testTransferWithProgressTracking(VertxTestContext testContext) throws Exception {
+-        // Use a larger file to ensure we can observe IN_PROGRESS status
+-        URI sourceUri = URI.create(baseUrl + "/bytes/1048576"); // 1MB
++    void testOneMegabyteTransfer() throws Exception {
+         Path destinationPath = tempDir.resolve("progress-test.bin");
+ 
+-        TransferRequest request = TransferRequest.builder()
+-                .sourceUri(sourceUri)
+-                .destinationPath(destinationPath)
+-                .protocol("http")
+-                .build();
+-
+-        Future<TransferResult> future = transferEngine.submitTransfer(request);
+-
+-        // Monitor progress
+-        String jobId = request.getRequestId();
+-        boolean foundPending = false;
+-
+-        // Check immediately for PENDING status
+-        var initialJob = transferEngine.getTransferJob(jobId);
+-        if (initialJob != null && initialJob.getStatus() == TransferStatus.PENDING) {
+-            foundPending = true;
+-        }
++        TransferResult result = transferEngine.transfer(request("/bytes/1048576", destinationPath));
+ 
+-        final boolean[] observedPending = {foundPending};
+-        final boolean[] observedInProgress = {false};
+-
+-        long timerId = vertx.setPeriodic(10, id -> {
+-            var job = transferEngine.getTransferJob(jobId);
+-            if (job != null && job.getStatus() == TransferStatus.IN_PROGRESS) {
+-                observedInProgress[0] = true;
+-                testContext.verify(() -> {
+-                    assertTrue(job.getBytesTransferred() >= 0);
+-                    assertTrue(job.getProgressPercentage() >= 0.0);
+-                    assertTrue(job.getProgressPercentage() <= 1.0);
+-                });
+-            }
+-        });
+-
+-        future.onComplete(testContext.succeeding(result -> testContext.verify(() -> {
+-            vertx.cancelTimer(timerId);
+-            assertTrue(observedPending[0] || observedInProgress[0],
+-                    "Should have observed PENDING or IN_PROGRESS status");
+-            assertTrue(result.isSuccessful());
+-            assertEquals(1048576, result.getBytesTransferred());
+-            testContext.completeNow();
+-        })));
++        assertTrue(result.isSuccessful());
++        assertEquals(1048576, result.getBytesTransferred());
++        assertEquals(1048576, Files.size(destinationPath));
+     }
+ 
+     @Test
+-    void testInvalidUrlTransfer(VertxTestContext testContext) throws Exception {
+-        URI sourceUri = URI.create(baseUrl + "/status/404"); // Returns 404
++    void testInvalidUrlTransfer() throws Exception {
+         Path destinationPath = tempDir.resolve("invalid-file.bin");
+ 
+-        TransferRequest request = TransferRequest.builder()
+-                .sourceUri(sourceUri)
+-                .destinationPath(destinationPath)
+-                .protocol("http")
+-                .build();
++        TransferResult result = transferEngine.transfer(request("/status/404", destinationPath));
+ 
+-        transferEngine.submitTransfer(request).onComplete(testContext.succeeding(result ->
+-                testContext.verify(() -> {
+-                    assertFalse(result.isSuccessful());
+-                    assertEquals(TransferStatus.FAILED, result.getFinalStatus());
+-                    assertTrue(result.getErrorMessage().isPresent());
+-                    assertFalse(Files.exists(destinationPath));
+-                    testContext.completeNow();
+-                })));
++        assertFalse(result.isSuccessful());
++        assertEquals(TransferStatus.FAILED, result.getFinalStatus());
++        assertTrue(result.getErrorMessage().isPresent());
++        assertFalse(Files.exists(destinationPath));
+     }
+ 
++    /** Concurrent transfers are the caller's choice: here they are forked in a TaskScope. */
+     @Test
+-    void testConcurrentTransfers(VertxTestContext testContext) throws Exception {
++    void testConcurrentTransfers() throws Exception {
+         int numTransfers = 3;
+-        @SuppressWarnings("unchecked")
+-        Future<TransferResult>[] futures = new Future[numTransfers];
+-
+-        for (int i = 0; i < numTransfers; i++) {
+-            URI sourceUri = URI.create(baseUrl + "/bytes/512"); // 512 bytes each
+-            Path destinationPath = tempDir.resolve("concurrent-" + i + ".bin");
+-
+-            TransferRequest request = TransferRequest.builder()
+-                    .sourceUri(sourceUri)
+-                    .destinationPath(destinationPath)
+-                    .protocol("http")
+-                    .build();
+-
+-            futures[i] = transferEngine.submitTransfer(request);
++        List<TaskScope.Subtask<TransferResult>> transfers = new ArrayList<>();
++        try (TaskScope scope = TaskScope.open("concurrent-transfers", Duration.ofSeconds(30))) {
++            for (int i = 0; i < numTransfers; i++) {
++                TransferRequest request = request("/bytes/512", tempDir.resolve("concurrent-" + i + ".bin"));
++                transfers.add(scope.fork(() -> transferEngine.transfer(request)));
++            }
++            scope.join();
+         }
+ 
+-        final int[] completed = {0};
+-
+         for (int i = 0; i < numTransfers; i++) {
+-            Path expectedFile = tempDir.resolve("concurrent-" + i + ".bin");
+-            int transferIndex = i;
+-            futures[i].onComplete(testContext.succeeding(result -> testContext.verify(() -> {
+-                assertTrue(result.isSuccessful(), "Transfer " + transferIndex + " should succeed");
+-                assertEquals(512, result.getBytesTransferred());
+-                assertTrue(Files.exists(expectedFile));
+-                assertEquals(512, Files.size(expectedFile));
+-                completed[0]++;
+-                if (completed[0] == numTransfers) {
+-                    testContext.completeNow();
+-                }
+-            })));
++            TransferResult result = transfers.get(i).get();
++            assertTrue(result.isSuccessful(), "Transfer " + i + " should succeed");
++            assertEquals(512, result.getBytesTransferred());
++            assertEquals(512, Files.size(tempDir.resolve("concurrent-" + i + ".bin")));
+         }
+     }
+ 
+     @Test
+-    void testTransferEngineShutdown(VertxTestContext testContext) throws Exception {
++    void testTransferEngineShutdown() throws Exception {
+         assertEquals(0, transferEngine.getActiveTransferCount());
+-        final boolean[] transferCompleted = {false};
+-        final boolean[] shutdownCompleted = {false};
+-
+-        // Start a transfer
+-        URI sourceUri = URI.create(baseUrl + "/bytes/1024");
+-        Path destinationPath = tempDir.resolve("shutdown-test.bin");
+-
+-        TransferRequest request = TransferRequest.builder()
+-                .sourceUri(sourceUri)
+-                .destinationPath(destinationPath)
+-                .protocol("http")
+-                .build();
++        TransferRequest request = request("/bytes/1024", tempDir.resolve("shutdown-test.bin"));
++        CompletableFuture<TransferResult> outcome = new CompletableFuture<>();
++        Thread transfer = Thread.ofVirtual().start(() -> {
++            try {
++                outcome.complete(transferEngine.transfer(request));
++            } catch (Throwable failure) {
++                outcome.completeExceptionally(failure);
++            }
++        });
+ 
+-        transferEngine.submitTransfer(request).onComplete(testContext.succeeding(result ->
+-                testContext.verify(() -> {
+-                    assertNotNull(result);
+-                    assertTrue(result.getFinalStatus() == TransferStatus.COMPLETED
+-                                    || result.getFinalStatus() == TransferStatus.FAILED,
+-                            "Transfer should reach a terminal state during shutdown");
+-                    transferCompleted[0] = true;
+-                    if (shutdownCompleted[0]) {
+-                        assertEquals(0, transferEngine.getActiveTransferCount());
+-                        testContext.completeNow();
+-                    }
+-                })));
++        assertTrue(transferEngine.shutdown(Duration.ofSeconds(5)));
++        transfer.join();
+ 
+-        transferEngine.shutdown(5).onComplete(testContext.succeeding(v ->
+-                testContext.verify(() -> {
+-                    shutdownCompleted[0] = true;
+-                    if (transferCompleted[0]) {
+-                        assertEquals(0, transferEngine.getActiveTransferCount());
+-                        testContext.completeNow();
+-                    }
+-                })));
++        // The transfer either finished before shutdown began, was cancelled by it, or was
++        // rejected because shutdown had already begun.
++        if (!outcome.isCompletedExceptionally()) {
++            TransferStatus status = outcome.join().getFinalStatus();
++            assertTrue(status == TransferStatus.COMPLETED || status == TransferStatus.CANCELLED,
++                    "Transfer should reach a terminal state during shutdown: " + status);
++        }
++        assertEquals(0, transferEngine.getActiveTransferCount());
+     }
+ }
+diff --git a/quorus-core/src/test/java/dev/mars/quorus/protocol/SftpAbortIntegrationTest.java b/quorus-core/src/test/java/dev/mars/quorus/protocol/SftpAbortIntegrationTest.java
+index a156498..b348231 100644
+--- a/quorus-core/src/test/java/dev/mars/quorus/protocol/SftpAbortIntegrationTest.java
++++ b/quorus-core/src/test/java/dev/mars/quorus/protocol/SftpAbortIntegrationTest.java
+@@ -23,13 +23,10 @@ import dev.mars.quorus.core.TransferRequest;
+ import dev.mars.quorus.core.TransferResult;
+ import dev.mars.quorus.transfer.SimpleTransferEngine;
+ import dev.mars.quorus.transfer.TransferContext;
+-import io.vertx.core.Vertx;
+-import io.vertx.junit5.VertxExtension;
+ import org.junit.jupiter.api.AfterEach;
+ import org.junit.jupiter.api.BeforeAll;
+ import org.junit.jupiter.api.BeforeEach;
+ import org.junit.jupiter.api.Test;
+-import org.junit.jupiter.api.extension.ExtendWith;
+ import org.junit.jupiter.api.io.TempDir;
+ 
+ import java.io.IOException;
+@@ -68,7 +65,6 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
+  * @since 2026-01-26
+  * @version 1.0
+  */
+-@ExtendWith(VertxExtension.class)
+ class SftpAbortIntegrationTest {
+     
+     private static final Logger logger = LoggerFactory.getLogger(SftpAbortIntegrationTest.class);
+@@ -91,14 +87,14 @@ class SftpAbortIntegrationTest {
+     }
+ 
+     @BeforeEach
+-    void setUp(Vertx vertx) throws IOException {
++    void setUp() throws IOException {
+         this.protocol = new SftpTransferProtocol();
+         
+         // Create protocol factory with SFTP support
+-        ProtocolFactory protocolFactory = new ProtocolFactory(vertx);
++        ProtocolFactory protocolFactory = new ProtocolFactory();
+         protocolFactory.registerProtocol(protocol);
+         
+-        this.engine = new SimpleTransferEngine(vertx, 5, 3, 100);
++        this.engine = new SimpleTransferEngine(5, 3, 100);
+         
+         // Get SFTP container connection details from shared container
+         sftpHost = SharedTestContainers.getSftpHost();
+@@ -114,7 +110,7 @@ class SftpAbortIntegrationTest {
+     @AfterEach
+     void tearDown() {
+         if (engine != null) {
+-            engine.shutdown(5);
++            engine.shutdown(java.time.Duration.ofSeconds(5));
+         }
+     }
+ 
+diff --git a/quorus-core/src/test/java/dev/mars/quorus/transfer/SimpleTransferEngineBidirectionalTest.java b/quorus-core/src/test/java/dev/mars/quorus/transfer/SimpleTransferEngineBidirectionalTest.java
+index f53931f..ce49f2d 100644
+--- a/quorus-core/src/test/java/dev/mars/quorus/transfer/SimpleTransferEngineBidirectionalTest.java
++++ b/quorus-core/src/test/java/dev/mars/quorus/transfer/SimpleTransferEngineBidirectionalTest.java
+@@ -19,7 +19,6 @@ package dev.mars.quorus.transfer;
+ import dev.mars.quorus.core.TransferDirection;
+ import dev.mars.quorus.core.TransferRequest;
+ import dev.mars.quorus.core.exceptions.TransferException;
+-import io.vertx.core.Vertx;
+ import org.junit.jupiter.api.AfterEach;
+ import org.junit.jupiter.api.BeforeEach;
+ import org.junit.jupiter.api.DisplayName;
+@@ -40,22 +39,17 @@ import static org.junit.jupiter.api.Assertions.*;
+  */
+ class SimpleTransferEngineBidirectionalTest {
+ 
+-    private Vertx vertx;
+     private SimpleTransferEngine engine;
+ 
+     @BeforeEach
+     void setUp() {
+-        vertx = Vertx.vertx();
+-        engine = new SimpleTransferEngine(vertx, 5, 3, 1000);
++        engine = new SimpleTransferEngine(5, 3, 1000);
+     }
+ 
+     @AfterEach
+     void tearDown() {
+         if (engine != null) {
+-            engine.shutdown(5);
+-        }
+-        if (vertx != null) {
+-            vertx.close();
++            engine.shutdown(java.time.Duration.ofSeconds(5));
+         }
+     }
+ 
+diff --git a/quorus-core/src/test/java/dev/mars/quorus/transfer/SimpleTransferEngineTest.java b/quorus-core/src/test/java/dev/mars/quorus/transfer/SimpleTransferEngineTest.java
+index 5f7cce4..d0430e9 100644
+--- a/quorus-core/src/test/java/dev/mars/quorus/transfer/SimpleTransferEngineTest.java
++++ b/quorus-core/src/test/java/dev/mars/quorus/transfer/SimpleTransferEngineTest.java
+@@ -22,56 +22,44 @@ import dev.mars.quorus.core.TransferResult;
+ import dev.mars.quorus.core.exceptions.TransferException;
+ import dev.mars.quorus.monitoring.HealthStatus;
+ import dev.mars.quorus.monitoring.TransferEngineHealthCheck;
+-import io.vertx.core.Future;
+-import io.vertx.core.Promise;
+-import io.vertx.core.Vertx;
+-import io.vertx.junit5.VertxExtension;
+-import io.vertx.junit5.VertxTestContext;
+ 
+ import org.junit.jupiter.api.AfterEach;
+ import org.junit.jupiter.api.BeforeEach;
+ import org.junit.jupiter.api.Test;
+-import org.junit.jupiter.api.extension.ExtendWith;
++import org.junit.jupiter.api.Timeout;
+ 
+-import java.lang.reflect.Field;
+ import java.net.URI;
+ import java.nio.file.Files;
+ import java.nio.file.Path;
+ import java.time.Duration;
+ import java.time.Instant;
+ import java.util.Map;
+-import java.util.concurrent.ConcurrentHashMap;
+ 
+-
+-import static dev.mars.quorus.testing.TestFutureUtils.awaitSuccess;
++import static java.util.concurrent.TimeUnit.SECONDS;
+ import static org.junit.jupiter.api.Assertions.*;
+ 
+ /**
+- * Comprehensive test suite for {@link SimpleTransferEngine}.
+- * Tests transfer submission, cancellation, pause/resume, health checks, and metrics.
++ * Test suite for {@link SimpleTransferEngine}: lifecycle, rejection, health checks and retries.
++ * Blocking execution, concurrency and cancellation are covered by
++ * {@link SimpleTransferEngineBlockingTest}.
+  *
+  * @author Mark Andrew Ray-Smith Cityline Ltd
+  * @since 2025-08-27
+- * @version 1.0
++ * @version 2.0
+  */
+-@ExtendWith(VertxExtension.class)
++@Timeout(value = 30, unit = SECONDS, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
+ class SimpleTransferEngineTest {
+ 
+     private SimpleTransferEngine engine;
+ 
+     @BeforeEach
+-    void setUp(Vertx vertx) {
+-        engine = new SimpleTransferEngine(vertx, 5, 3, 100);
++    void setUp() {
++        engine = new SimpleTransferEngine(5, 3, 100);
+     }
+ 
+     @AfterEach
+-    void tearDown(VertxTestContext testContext) {
+-        if (engine != null) {
+-            engine.shutdown(5)
+-                    .onComplete(ar -> testContext.completeNow());
+-        } else {
+-            testContext.completeNow();
+-        }
++    void tearDown() {
++        engine.shutdown(Duration.ofSeconds(5));
+     }
+ 
+     @Test
+@@ -81,8 +69,8 @@ class SimpleTransferEngineTest {
+     }
+ 
+     @Test
+-    void testInjectedVertxConstructorDoesNotOwnVertxLifecycle() {
+-        assertFalse(engine.isClosingOwnedVertxOnShutdown());
++    void testConstructorRejectsANonPositiveConcurrencyLimit() {
++        assertThrows(IllegalArgumentException.class, () -> new SimpleTransferEngine(0, 3, 100));
+     }
+ 
+     @Test
+@@ -91,21 +79,18 @@ class SimpleTransferEngineTest {
+     }
+ 
+     @Test
+-    void testSubmitTransferThrowsWhenShutdown(VertxTestContext testContext) {
+-        engine.shutdown(5);
+-        
++    void testTransferThrowsWhenShutdown() {
++        engine.shutdown(Duration.ofSeconds(5));
++
+         TransferRequest request = TransferRequest.builder()
+             .requestId("test-job-1")
+             .sourceUri(java.net.URI.create("http://example.com/file.txt"))
+             .destinationPath("/tmp/file.txt")
+             .protocol("http")
+             .build();
+-        
+-        assertThrows(TransferException.class, () -> {
+-            engine.submitTransfer(request);
+-        });
+-        
+-        testContext.completeNow();
++
++        assertThrows(TransferException.class, () -> engine.transfer(request));
++        assertTrue(engine.isShutdown());
+     }
+ 
+     @Test
+@@ -133,27 +118,26 @@ class SimpleTransferEngineTest {
+     }
+ 
+     @Test
+-    void testShutdownIdempotent(VertxTestContext testContext) {
+-        engine.shutdown(5)
+-                .compose(v -> engine.shutdown(5))
+-                .onComplete(testContext.succeedingThenComplete());
++    void testShutdownIdempotent() {
++        assertTrue(engine.shutdown(Duration.ofSeconds(5)));
++        assertTrue(engine.shutdown(Duration.ofSeconds(5)));
+     }
+ 
+     @Test
+     void testGetHealthCheckWhenRunning() {
+         TransferEngineHealthCheck healthCheck = engine.getHealthCheck();
+-        
++
+         assertNotNull(healthCheck);
+-        assertTrue(healthCheck.getHealthStatus() == HealthStatus.UP || 
++        assertTrue(healthCheck.getHealthStatus() == HealthStatus.UP ||
+                    healthCheck.getHealthStatus() == HealthStatus.DEGRADED);
+     }
+ 
+     @Test
+     void testGetHealthCheckAfterShutdown() {
+-        engine.shutdown(5);
+-        
++        engine.shutdown(Duration.ofSeconds(5));
++
+         TransferEngineHealthCheck healthCheck = engine.getHealthCheck();
+-        
++
+         assertNotNull(healthCheck);
+         assertEquals(HealthStatus.DOWN, healthCheck.getHealthStatus());
+     }
+@@ -161,7 +145,7 @@ class SimpleTransferEngineTest {
+     @Test
+     void testHealthCheckIncludesProtocolChecks() {
+         TransferEngineHealthCheck healthCheck = engine.getHealthCheck();
+-        
++
+         assertNotNull(healthCheck);
+         assertNotNull(healthCheck.getProtocolHealthChecks());
+         // 4 protocols: http, ftp, sftp, smb
+@@ -171,10 +155,10 @@ class SimpleTransferEngineTest {
+     @Test
+     void testHealthCheckIncludesSystemMetrics() {
+         TransferEngineHealthCheck healthCheck = engine.getHealthCheck();
+-        
++
+         assertNotNull(healthCheck);
+         assertNotNull(healthCheck.getSystemMetrics());
+-        
++
+         Map<String, Object> systemMetrics = healthCheck.getSystemMetrics();
+         assertTrue(systemMetrics.containsKey("activeTransfers"));
+         assertTrue(systemMetrics.containsKey("maxConcurrentTransfers"));
+@@ -182,13 +166,13 @@ class SimpleTransferEngineTest {
+         assertTrue(systemMetrics.containsKey("memoryUsedMB"));
+         assertTrue(systemMetrics.containsKey("memoryTotalMB"));
+         assertTrue(systemMetrics.containsKey("memoryMaxMB"));
+-        
++
+         assertEquals(0, systemMetrics.get("activeTransfers"));
+         assertEquals(5, systemMetrics.get("maxConcurrentTransfers"));
+     }
+ 
+-        @Test
+-        void testSubmitTransferRetriesWithBackoffThenFails() throws Exception {
++    @Test
++    void testTransferRetriesWithBackoffThenFails() throws Exception {
+         Path localFile = Files.createTempFile("retry-failure", ".txt");
+         Files.writeString(localFile, "retry-me");
+ 
+@@ -200,8 +184,8 @@ class SimpleTransferEngineTest {
+             .build();
+ 
+         Instant start = Instant.now();
+-        TransferResult result = awaitSuccess(engine.submitTransfer(request), Duration.ofSeconds(10));
+-        long elapsedMs = java.time.Duration.between(start, Instant.now()).toMillis();
++        TransferResult result = engine.transfer(request);
++        long elapsedMs = Duration.between(start, Instant.now()).toMillis();
+ 
+         assertNotNull(result);
+         assertFalse(result.isSuccessful());
+@@ -211,45 +195,5 @@ class SimpleTransferEngineTest {
+         // Retry delay is 100ms with linear backoff (100 + 200 + 300ms) before final failure.
+         assertTrue(elapsedMs >= 500,
+             "Expected retry backoff to delay completion; elapsed=" + elapsedMs + "ms");
+-        }
+-
+-        @Test
+-        void testAwaitActiveTransfersReturnsAfterTimeoutForStuckFuture() throws Exception {
+-        TransferRequest request = TransferRequest.builder()
+-            .requestId("stuck-future-test")
+-            .sourceUri(URI.create("http://example.com/file.txt"))
+-            .destinationPath("/tmp/file.txt")
+-            .protocol("http")
+-            .build();
+-        TransferJob job = new TransferJob(request);
+-        TransferContext context = new TransferContext(job);
+-        Promise<TransferResult> neverCompletes = Promise.promise();
+-
+-        mapField("activeJobs").put(job.getJobId(), job);
+-        mapField("activeContexts").put(job.getJobId(), context);
+-        @SuppressWarnings("unchecked")
+-        ConcurrentHashMap<String, Future<TransferResult>> activeFutures =
+-            (ConcurrentHashMap<String, Future<TransferResult>>) getField("activeFutures");
+-        activeFutures.put(job.getJobId(), neverCompletes.future());
+-
+-        Instant start = Instant.now();
+-        awaitSuccess(engine.awaitActiveTransfers(150), Duration.ofSeconds(2));
+-        long elapsedMs = java.time.Duration.between(start, Instant.now()).toMillis();
+-
+-        assertTrue(elapsedMs >= 120,
+-            "awaitActiveTransfers should wait close to timeout before recovering; elapsed=" + elapsedMs + "ms");
+-        }
+-
+-        @SuppressWarnings("unchecked")
+-        private ConcurrentHashMap<String, Object> mapField(String fieldName) throws Exception {
+-        return (ConcurrentHashMap<String, Object>) getField(fieldName);
+-        }
+-
+-        private Object getField(String fieldName) throws Exception {
+-        Field field = SimpleTransferEngine.class.getDeclaredField(fieldName);
+-        field.setAccessible(true);
+-        return field.get(engine);
+-        }
+-
++    }
+ }
+-
+diff --git a/quorus-integration-examples/src/main/java/dev/mars/quorus/examples/BasicTransferExample.java b/quorus-integration-examples/src/main/java/dev/mars/quorus/examples/BasicTransferExample.java
+index 8f2eb6c..c821fb5 100644
+--- a/quorus-integration-examples/src/main/java/dev/mars/quorus/examples/BasicTransferExample.java
++++ b/quorus-integration-examples/src/main/java/dev/mars/quorus/examples/BasicTransferExample.java
+@@ -16,6 +16,7 @@
+ 
+ package dev.mars.quorus.examples;
+ 
++import dev.mars.quorus.concurrent.TaskScope;
+ import dev.mars.quorus.config.QuorusConfiguration;
+ import dev.mars.quorus.core.TransferRequest;
+ import dev.mars.quorus.core.TransferResult;
+@@ -24,14 +25,14 @@ import dev.mars.quorus.examples.util.TestResultLogger;
+ import dev.mars.quorus.transfer.SimpleTransferEngine;
+ import dev.mars.quorus.transfer.TransferEngine;
+ 
+-import io.vertx.core.Future;
+-import io.vertx.core.Vertx;
+ 
+ import java.net.URI;
+ import java.nio.file.Files;
+ import java.nio.file.Path;
+ import java.nio.file.Paths;
+ import java.time.Duration;
++import java.util.ArrayList;
++import java.util.List;
+ import java.util.Properties;
+ import java.util.logging.Logger;
+ 
+@@ -68,12 +69,8 @@ public class BasicTransferExample {
+         QuorusConfiguration config = new QuorusConfiguration("default", new Properties());
+         logger.info("Configuration loaded: " + config);
+ 
+-        // Create Vert.x instance for reactive operations
+-        Vertx vertx = Vertx.vertx();
+-        
+-        // Initialize transfer engine with Vert.x and configuration parameters
++        // Initialize the blocking transfer engine with configuration parameters
+         TransferEngine transferEngine = new SimpleTransferEngine(
+-                vertx,
+                 config.getMaxConcurrentTransfers(),  // Max concurrent transfers: 10
+                 config.getMaxRetryAttempts(),        // Max retry attempts: 3
+                 config.getRetryDelayMs()             // Initial retry delay: 1000ms
+@@ -100,8 +97,7 @@ public class BasicTransferExample {
+             // Always shutdown transfer engine gracefully
+             logger.info("");
+             logger.info("Shutting down transfer engine...");
+-            transferEngine.shutdown(10).toCompletionStage().toCompletableFuture().join();
+-            vertx.close();
++            transferEngine.shutdown(Duration.ofSeconds(10));
+             logger.info("=== Example completed successfully ===");
+         }
+     }
+@@ -120,14 +116,11 @@ public class BasicTransferExample {
+         logger.info("Transfer source: " + request.getSourceUri());
+         logger.info("Transfer destination: " + request.getDestinationPath());
+ 
+-        // Submit transfer and get future for result
+-        Future<TransferResult> future = transferEngine.submitTransfer(request);
+-
+         // Start real-time progress monitoring in background thread
+         monitorTransferProgress(transferEngine, request.getRequestId());
+ 
+-        // Wait for transfer completion and get results
+-        TransferResult result = future.toCompletionStage().toCompletableFuture().get();
++        // The engine is blocking: the transfer runs on this thread and returns its result
++        TransferResult result = transferEngine.transfer(request);
+         displayTransferResult(result);
+     }
+     
+@@ -136,25 +129,28 @@ public class BasicTransferExample {
+         logger.info("Downloading 3 files of different sizes concurrently");
+ 
+         String[] fileSizes = {"512", "1024", "4096"}; // Different file sizes in bytes
+-        Future<TransferResult>[] futures = new Future[fileSizes.length];
++        List<TaskScope.Subtask<TransferResult>> transfers = new ArrayList<>();
+ 
+-        // Submit all transfers simultaneously to demonstrate concurrency
+-        logger.info("Submitting all transfers simultaneously...");
+-        for (int i = 0; i < fileSizes.length; i++) {
++        // Fork all transfers in a task scope: each runs on its own virtual thread
++        logger.info("Starting all transfers simultaneously...");
++        try (TaskScope scope = TaskScope.open("multiple-files", Duration.ofMinutes(2))) {
++            for (int i = 0; i < fileSizes.length; i++) {
+             TransferRequest request = TransferRequest.builder()
+                     .sourceUri(URI.create("https://httpbin.org/bytes/" + fileSizes[i]))
+                     .destinationPath(Paths.get("downloads/multi-file-" + fileSizes[i] + "b.bin"))
+                     .protocol("http")
+                     .build();
+ 
+-            logger.info("  Submitting transfer " + (i + 1) + ": " + fileSizes[i] + " bytes");
+-            futures[i] = transferEngine.submitTransfer(request);
++            logger.info("  Starting transfer " + (i + 1) + ": " + fileSizes[i] + " bytes");
++            transfers.add(scope.fork(() -> transferEngine.transfer(request)));
++            }
++            logger.info("All transfers started. Waiting for completion...");
++            scope.join();
+         }
+ 
+-        // Wait for all transfers to complete and collect results
+-        logger.info("All transfers submitted. Waiting for completion...");
+-        for (int i = 0; i < futures.length; i++) {
+-            TransferResult result = futures[i].toCompletionStage().toCompletableFuture().get();
++        // Collect results
++        for (int i = 0; i < transfers.size(); i++) {
++            TransferResult result = transfers.get(i).get();
+             String status = result.isSuccessful() ? "SUCCESS [OK]" : "FAILED [FAIL]";
+             logger.info("  Transfer " + (i + 1) + " result: " + status +
+                        " (" + result.getBytesTransferred() + " bytes)");
+@@ -179,8 +175,7 @@ public class BasicTransferExample {
+         logger.info("This demonstrates how Quorus waits patiently for slow responses");
+ 
+         long startTime = System.currentTimeMillis();
+-        Future<TransferResult> future = transferEngine.submitTransfer(slowRequest);
+-        TransferResult result = future.toCompletionStage().toCompletableFuture().get();
++        TransferResult result = transferEngine.transfer(slowRequest);
+         long duration = System.currentTimeMillis() - startTime;
+ 
+         logger.info("");
+@@ -211,13 +206,18 @@ public class BasicTransferExample {
+         Thread monitorThread = new Thread(() -> {
+             try {
+                 logger.info("Starting real-time progress monitoring...");
++                boolean seen = false;
+                 while (true) {
+                     // Get current job status from transfer engine
+                     var job = transferEngine.getTransferJob(jobId);
+                     if (job == null) {
+-                        // Job no longer exists (completed or failed)
+-                        break;
++                        if (seen) {
++                            break;              // the transfer has ended and left the engine
++                        }
++                        Thread.sleep(50);       // the transfer has not started yet
++                        continue;
+                     }
++                    seen = true;
+ 
+                     // Display progress for active transfers
+                     if (job.getStatus() == TransferStatus.IN_PROGRESS) {
+diff --git a/quorus-integration-examples/src/main/java/dev/mars/quorus/examples/BasicWorkflowExample.java b/quorus-integration-examples/src/main/java/dev/mars/quorus/examples/BasicWorkflowExample.java
+index f9ee3d1..e66c062 100644
+--- a/quorus-integration-examples/src/main/java/dev/mars/quorus/examples/BasicWorkflowExample.java
++++ b/quorus-integration-examples/src/main/java/dev/mars/quorus/examples/BasicWorkflowExample.java
+@@ -68,7 +68,7 @@ public class BasicWorkflowExample {
+         try {
+             // 2. Create transfer engine with Vert.x
+             log.step(2, "Creating transfer engine...");
+-            TransferEngine transferEngine = new SimpleTransferEngine(vertx, 10, 3, 1024 * 1024);
++            TransferEngine transferEngine = new SimpleTransferEngine(10, 3, 1000); // 10 concurrent, 3 retries, 1 s retry delay
+             
+             // 3. Create workflow engine with Vert.x
+             log.step(3, "Creating workflow engine...");
+diff --git a/quorus-integration-examples/src/main/java/dev/mars/quorus/examples/ComplexWorkflowExample.java b/quorus-integration-examples/src/main/java/dev/mars/quorus/examples/ComplexWorkflowExample.java
+index 4597ce3..fc547fd 100644
+--- a/quorus-integration-examples/src/main/java/dev/mars/quorus/examples/ComplexWorkflowExample.java
++++ b/quorus-integration-examples/src/main/java/dev/mars/quorus/examples/ComplexWorkflowExample.java
+@@ -69,7 +69,7 @@ public class ComplexWorkflowExample {
+         Vertx vertx = Vertx.vertx();
+         
+         try {
+-            TransferEngine transferEngine = new SimpleTransferEngine(vertx, 10, 3, 1024 * 1024);
++            TransferEngine transferEngine = new SimpleTransferEngine(10, 3, 1000); // 10 concurrent, 3 retries, 1 s retry delay
+             SimpleWorkflowEngine workflowEngine = new SimpleWorkflowEngine(vertx, transferEngine);
+             
+             // 2. Create complex workflow
+diff --git a/quorus-integration-examples/src/main/java/dev/mars/quorus/examples/EnterpriseProtocolExample.java b/quorus-integration-examples/src/main/java/dev/mars/quorus/examples/EnterpriseProtocolExample.java
+index 97fdb18..5d0fcba 100644
+--- a/quorus-integration-examples/src/main/java/dev/mars/quorus/examples/EnterpriseProtocolExample.java
++++ b/quorus-integration-examples/src/main/java/dev/mars/quorus/examples/EnterpriseProtocolExample.java
+@@ -115,9 +115,9 @@ public class EnterpriseProtocolExample {
+         vertx = Vertx.vertx();
+ 
+         // Initialize services with enterprise-optimized settings
+-        transferEngine = new SimpleTransferEngine(vertx, 20, 4, 1024 * 1024); // 20 concurrent, 4 threads, 1MB chunks
++        transferEngine = new SimpleTransferEngine(20, 4, 1000); // 20 concurrent, 4 retries, 1 s retry delay
+         networkService = new NetworkTopologyService(vertx);
+-        protocolFactory = new ProtocolFactory(vertx);
++        protocolFactory = new ProtocolFactory();
+         
+         log.expectedSuccess("Enterprise services initialized");
+     }
+@@ -216,8 +216,7 @@ public class EnterpriseProtocolExample {
+                     .build();
+ 
+             // Execute transfer (simulation)
+-            Future<TransferResult> future = transferEngine.submitTransfer(request);
+-            TransferResult result = future.toCompletionStage().toCompletableFuture().get();
++            TransferResult result = transferEngine.transfer(request);
+             
+             if (result.isSuccessful()) {
+                 log.expectedSuccess("SFTP transfer completed successfully");
+diff --git a/quorus-integration-examples/src/main/java/dev/mars/quorus/examples/InternalNetworkTransferExample.java b/quorus-integration-examples/src/main/java/dev/mars/quorus/examples/InternalNetworkTransferExample.java
+index 3189c08..e80087f 100644
+--- a/quorus-integration-examples/src/main/java/dev/mars/quorus/examples/InternalNetworkTransferExample.java
++++ b/quorus-integration-examples/src/main/java/dev/mars/quorus/examples/InternalNetworkTransferExample.java
+@@ -16,6 +16,7 @@
+ 
+ package dev.mars.quorus.examples;
+ 
++import dev.mars.quorus.concurrent.TaskScope;
+ import dev.mars.quorus.config.QuorusConfiguration;
+ import dev.mars.quorus.core.TransferRequest;
+ import dev.mars.quorus.core.TransferResult;
+@@ -26,8 +27,6 @@ import dev.mars.quorus.transfer.TransferEngine;
+ 
+ import dev.mars.quorus.core.exceptions.TransferException;
+ 
+-import io.vertx.core.Future;
+-import io.vertx.core.Vertx;
+ 
+ import java.io.IOException;
+ import java.net.URI;
+@@ -38,9 +37,6 @@ import java.time.Duration;
+ import java.util.ArrayList;
+ import java.util.List;
+ import java.util.Properties;
+-import java.util.concurrent.ExecutionException;
+-import java.util.concurrent.TimeUnit;
+-import java.util.concurrent.TimeoutException;
+ 
+ /**
+  * Internal Network Transfer Example - Demonstrates Quorus capabilities for corporate network environments.
+@@ -93,12 +89,8 @@ public class InternalNetworkTransferExample {
+         QuorusConfiguration config = createCorporateNetworkConfiguration();
+         log.keyValue("Corporate network configuration loaded", config.toString());
+ 
+-        // Create Vert.x instance for reactive operations
+-        Vertx vertx = Vertx.vertx();
+-        
+-        // Initialize transfer engine with Vert.x and corporate network settings
++        // Initialize the blocking transfer engine with corporate network settings
+         TransferEngine transferEngine = new SimpleTransferEngine(
+-                vertx,
+                 config.getMaxConcurrentTransfers(),  // Higher concurrency for corporate networks
+                 config.getMaxRetryAttempts(),        // More retries for reliability
+                 config.getRetryDelayMs()             // Faster retry for internal networks
+@@ -134,11 +126,11 @@ public class InternalNetworkTransferExample {
+             Thread.currentThread().interrupt();
+             log.warning("Corporate network transfer example was interrupted: " + e.getMessage());
+             // No stack trace for interruption - this is expected behavior
+-        } catch (ExecutionException e) {
++        } catch (TaskScope.FailedException e) {
+             log.unexpectedError("Internal Network Transfer Example (Execution)", e);
+             log.error("This indicates a problem with the transfer execution.");
+             e.printStackTrace();
+-        } catch (TimeoutException e) {
++        } catch (TaskScope.TimeoutException e) {
+             log.warning("Corporate network transfer timed out: " + e.getMessage());
+             log.detail("This may indicate network issues or server overload.");
+             // No stack trace for timeout - this is expected behavior in some scenarios
+@@ -159,8 +151,7 @@ public class InternalNetworkTransferExample {
+             // Interrupt and cleanup monitoring threads
+             shutdownMonitoringThreads();
+ 
+-            transferEngine.shutdown(10).toCompletionStage().toCompletableFuture().join();
+-            vertx.close();
++            transferEngine.shutdown(Duration.ofSeconds(10));
+             log.exampleComplete("Corporate network transfer example");
+         }
+     }
+@@ -184,7 +175,7 @@ public class InternalNetworkTransferExample {
+     }
+     
+     private static void runCrmDataSynchronization(TransferEngine transferEngine, Path dataWarehouseDir)
+-            throws IOException, InterruptedException, ExecutionException, TimeoutException, TransferException {
++            throws IOException, InterruptedException, TransferException {
+         log.testSection("CRM Data Synchronization Example", false);
+         log.detail("Scenario: Nightly CRM data export to corporate data warehouse");
+         log.detail("Simulating: crm-internal.corp.local -> data-warehouse.corp.local");
+@@ -203,11 +194,10 @@ public class InternalNetworkTransferExample {
+         
+         // Monitor corporate network transfer
+         long startTime = System.currentTimeMillis();
+-        Future<TransferResult> future = transferEngine.submitTransfer(crmExportRequest);
+         monitorCorporateTransfer(transferEngine, crmExportRequest.getRequestId(), "CRM Data Sync");
+ 
+-        // Wait with timeout to prevent hanging
+-        TransferResult result = future.toCompletionStage().toCompletableFuture().get(TRANSFER_TIMEOUT_SECONDS, TimeUnit.SECONDS);
++        // Bounded by a deadline so the example cannot hang
++        TransferResult result = transferWithTimeout(transferEngine, crmExportRequest);
+         long duration = System.currentTimeMillis() - startTime;
+         
+         log.info("");
+@@ -222,18 +212,20 @@ public class InternalNetworkTransferExample {
+     }
+     
+     private static void runDepartmentFileDistribution(TransferEngine transferEngine, Path departmentSharesDir)
+-            throws InterruptedException, ExecutionException, TimeoutException, TransferException {
++            throws InterruptedException, TransferException {
+         log.testSection("Multi-Department File Distribution Example", false);
+         log.detail("Scenario: Monthly reports distribution to department shares");
+         log.detail("Simulating: fileserver.corp.local -> department network shares");
+         
+         // Define department transfer scenarios using constants
+-        @SuppressWarnings("unchecked") // Safe generic array creation
+-        Future<TransferResult>[] futures = new Future[DEPARTMENTS.length];
+-        
++        List<TaskScope.Subtask<TransferResult>> distributions = new ArrayList<>();
++
+         log.step("Distributing reports to departments simultaneously...");
+-        
+-        // Submit all department transfers concurrently
++        long startTime = System.currentTimeMillis();
++
++        // Fork every department transfer in one scope, bounded by one deadline
++        try (TaskScope scope = TaskScope.open("department-distribution",
++                Duration.ofSeconds(TRANSFER_TIMEOUT_SECONDS))) {
+         for (int i = 0; i < DEPARTMENTS.length; i++) {
+             TransferRequest departmentRequest = TransferRequest.builder()
+                     .sourceUri(URI.create("https://httpbin.org/bytes/" + REPORT_SIZES[i]))
+@@ -242,26 +234,27 @@ public class InternalNetworkTransferExample {
+                     .build();
+ 
+             log.bullet("Distributing to " + DEPARTMENTS[i].toUpperCase() + " department (" + REPORT_SIZES[i] + " bytes)");
+-            futures[i] = transferEngine.submitTransfer(departmentRequest);
++            distributions.add(scope.fork(() -> transferEngine.transfer(departmentRequest)));
+         }
+-        
++
+         // Wait for all department distributions to complete
+         log.step("Waiting for all department distributions to complete...");
+-        long startTime = System.currentTimeMillis();
+-        
+-        for (int i = 0; i < futures.length; i++) {
+-            try {
+-                TransferResult result = futures[i].toCompletionStage().toCompletableFuture()
+-                        .get(TRANSFER_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+-                if (result.isSuccessful()) {
+-                    log.success(DEPARTMENTS[i].toUpperCase() + " department: " + result.getBytesTransferred() + " bytes");
+-                } else {
+-                    log.failure(DEPARTMENTS[i].toUpperCase() + " department transfer failed");
+-                }
+-            } catch (TimeoutException e) {
+-                log.warning(DEPARTMENTS[i].toUpperCase() + " department: TIMEOUT (transfer exceeded " + TRANSFER_TIMEOUT_SECONDS + "s)");
+-            } catch (ExecutionException e) {
+-                log.error(DEPARTMENTS[i].toUpperCase() + " department: " + e.getCause().getMessage());
++            scope.join();
++        } catch (TaskScope.TimeoutException e) {
++            log.warning("Department distribution: TIMEOUT (exceeded " + TRANSFER_TIMEOUT_SECONDS + "s)");
++        } catch (TaskScope.FailedException e) {
++            log.error("Department distribution failed: " + e.getCause().getMessage());
++        }
++
++        for (int i = 0; i < distributions.size(); i++) {
++            TaskScope.Subtask<TransferResult> distribution = distributions.get(i);
++            if (distribution.state() != TaskScope.Subtask.State.SUCCESS) {
++                log.warning(DEPARTMENTS[i].toUpperCase() + " department: did not complete");
++            } else if (distribution.get().isSuccessful()) {
++                log.success(DEPARTMENTS[i].toUpperCase() + " department: "
++                        + distribution.get().getBytesTransferred() + " bytes");
++            } else {
++                log.failure(DEPARTMENTS[i].toUpperCase() + " department transfer failed");
+             }
+         }
+         
+@@ -276,7 +269,7 @@ public class InternalNetworkTransferExample {
+     }
+     
+     private static void runHighThroughputBackupOperation(TransferEngine transferEngine, Path backupDir)
+-            throws InterruptedException, ExecutionException, TimeoutException, TransferException {
++            throws InterruptedException, TransferException {
+         log.testSection("High-Throughput Backup Operation Example", false);
+         log.detail("Scenario: Critical data backup to corporate storage array");
+         log.detail("Simulating: production-db.corp.local -> backup-storage.corp.local");
+@@ -295,11 +288,10 @@ public class InternalNetworkTransferExample {
+         
+         // Monitor high-throughput transfer
+         long startTime = System.currentTimeMillis();
+-        Future<TransferResult> future = transferEngine.submitTransfer(backupRequest);
+         monitorCorporateTransfer(transferEngine, backupRequest.getRequestId(), "Backup Operation");
+ 
+-        // Wait with timeout to prevent hanging
+-        TransferResult result = future.toCompletionStage().toCompletableFuture().get(TRANSFER_TIMEOUT_SECONDS, TimeUnit.SECONDS);
++        // Bounded by a deadline so the example cannot hang
++        TransferResult result = transferWithTimeout(transferEngine, backupRequest);
+         long duration = System.currentTimeMillis() - startTime;
+         
+         log.info("");
+@@ -314,16 +306,35 @@ public class InternalNetworkTransferExample {
+         log.info("");
+     }
+     
++    /**
++     * Runs one transfer bounded by {@code TRANSFER_TIMEOUT_SECONDS}. On expiry the scope interrupts
++     * the transfer, the engine ends it as cancelled, and {@link TaskScope.TimeoutException} is thrown.
++     */
++    private static TransferResult transferWithTimeout(TransferEngine transferEngine, TransferRequest request)
++            throws InterruptedException {
++        try (TaskScope scope = TaskScope.open("transfer-" + request.getRequestId(),
++                Duration.ofSeconds(TRANSFER_TIMEOUT_SECONDS))) {
++            TaskScope.Subtask<TransferResult> transfer = scope.fork(() -> transferEngine.transfer(request));
++            scope.join();
++            return transfer.get();
++        }
++    }
++
+     private static void monitorCorporateTransfer(TransferEngine transferEngine, String jobId, String operationType) {
+         Thread monitorThread = new Thread(() -> {
+             try {
+                 log.detail("Starting corporate network monitoring for " + operationType + "...");
++                boolean seen = false;
+                 while (!Thread.currentThread().isInterrupted()) {
+                     var job = transferEngine.getTransferJob(jobId);
+                     if (job == null) {
+-                        log.warning("Transfer job not found for ID: " + jobId);
+-                        break;
++                        if (seen) {
++                            break;              // the transfer has ended and left the engine
++                        }
++                        Thread.sleep(50);       // the transfer has not started yet
++                        continue;
+                     }
++                    seen = true;
+ 
+                     if (job.getStatus() == TransferStatus.IN_PROGRESS) {
+                         long totalBytes = job.getTotalBytes();
+diff --git a/quorus-integration-examples/src/main/java/dev/mars/quorus/examples/WorkflowValidationExample.java b/quorus-integration-examples/src/main/java/dev/mars/quorus/examples/WorkflowValidationExample.java
+index e53f32a..6d25d61 100644
+--- a/quorus-integration-examples/src/main/java/dev/mars/quorus/examples/WorkflowValidationExample.java
++++ b/quorus-integration-examples/src/main/java/dev/mars/quorus/examples/WorkflowValidationExample.java
+@@ -72,7 +72,7 @@ public class WorkflowValidationExample {
+         Vertx vertx = Vertx.vertx();
+         
+         try {
+-            TransferEngine transferEngine = new SimpleTransferEngine(vertx, 10, 3, 1024 * 1024);
++            TransferEngine transferEngine = new SimpleTransferEngine(10, 3, 1000); // 10 concurrent, 3 retries, 1 s retry delay
+             SimpleWorkflowEngine workflowEngine = new SimpleWorkflowEngine(vertx, transferEngine);
+             WorkflowDefinitionParser parser = new YamlWorkflowDefinitionParser();
+             
+diff --git a/quorus-integration-examples/src/test/java/dev/mars/quorus/examples/IntegrationTestSuite.java b/quorus-integration-examples/src/test/java/dev/mars/quorus/examples/IntegrationTestSuite.java
+index f3a65d1..be6e913 100644
+--- a/quorus-integration-examples/src/test/java/dev/mars/quorus/examples/IntegrationTestSuite.java
++++ b/quorus-integration-examples/src/test/java/dev/mars/quorus/examples/IntegrationTestSuite.java
+@@ -60,10 +60,10 @@ class IntegrationTestSuite {
+     @BeforeEach
+     void setUp() {
+         vertx = Vertx.vertx();
+-        transferEngine = new SimpleTransferEngine(vertx, 10, 4, 1024 * 1024);
++        transferEngine = new SimpleTransferEngine(10, 4, 1000);
+         tenantService = new SimpleTenantService();
+         workflowEngine = new SimpleWorkflowEngine(vertx, transferEngine);
+-        protocolFactory = new ProtocolFactory(vertx);
++        protocolFactory = new ProtocolFactory();
+         workflowParser = new YamlWorkflowDefinitionParser();
+     }
+ 
+diff --git a/quorus-workflow/src/main/java/dev/mars/quorus/workflow/SimpleWorkflowEngine.java b/quorus-workflow/src/main/java/dev/mars/quorus/workflow/SimpleWorkflowEngine.java
+index d527ff0..a50bb62 100644
+--- a/quorus-workflow/src/main/java/dev/mars/quorus/workflow/SimpleWorkflowEngine.java
++++ b/quorus-workflow/src/main/java/dev/mars/quorus/workflow/SimpleWorkflowEngine.java
+@@ -421,7 +421,10 @@ public class SimpleWorkflowEngine implements WorkflowEngine {
+                 .map(transfer -> {
+                     try {
+                         TransferRequest request = transfer.toTransferRequest();
+-                        Future<TransferResult> transferFuture = transferEngine.submitTransfer(request);
++                        // The engine is blocking (RT-03c). Until this module leaves Vert.x (RT-04),
++                        // each transfer runs on a Vert.x worker so the group's transfers still overlap.
++                        Future<TransferResult> transferFuture =
++                                vertx.executeBlocking(() -> transferEngine.transfer(request), false);
+                         
+                         return transferFuture
+                                 .<TransferResult>recover(error -> {
+diff --git a/quorus-workflow/src/test/java/dev/mars/quorus/workflow/TestTransferEngine.java b/quorus-workflow/src/test/java/dev/mars/quorus/workflow/TestTransferEngine.java
+index 5c0d81d..e6b199a 100644
+--- a/quorus-workflow/src/test/java/dev/mars/quorus/workflow/TestTransferEngine.java
++++ b/quorus-workflow/src/test/java/dev/mars/quorus/workflow/TestTransferEngine.java
+@@ -23,8 +23,6 @@ import dev.mars.quorus.core.TransferStatus;
+ import dev.mars.quorus.core.exceptions.TransferException;
+ import dev.mars.quorus.transfer.TransferEngine;
+ 
+-import io.vertx.core.Future;
+-import io.vertx.core.Promise;
+ import java.time.Instant;
+ import java.util.concurrent.ConcurrentHashMap;
+ import java.util.concurrent.atomic.AtomicInteger;
+@@ -80,47 +78,27 @@ class TestTransferEngine implements TransferEngine {
+     }
+     
+     @Override
+-    public Future<TransferResult> submitTransfer(TransferRequest request) throws TransferException {
++    public TransferResult transfer(TransferRequest request) throws TransferException {
+         if (shutdown) {
+             throw new TransferException(request.getRequestId(), "Transfer engine is shutdown");
+         }
+-        
++
+         activeTransferCount.incrementAndGet();
+-        
+         TransferJob job = new TransferJob(request);
+         jobs.put(job.getJobId(), job);
+-        
+-        Promise<TransferResult> promise = Promise.promise();
+-        
+-        // Execute asynchronously
+-        new Thread(() -> {
+-            try {
+-                // Simulate transfer based on configured behavior
+-                TransferResult result;
+-                switch (behavior) {
+-                    case SUCCESS:
+-                        result = createSuccessResult(request.getRequestId());
+-                        break;
+-                    case FAILURE:
+-                        result = createFailureResult(request.getRequestId());
+-                        break;
+-                    case EXCEPTION:
+-                        promise.fail(exceptionToThrow != null ? exceptionToThrow : new RuntimeException("Transfer failed"));
+-                        return;
+-                    default:
+-                        result = createSuccessResult(request.getRequestId());
+-                        break;
+-                }
+-                promise.complete(result);
+-            } finally {
+-                activeTransferCount.decrementAndGet();
+-                jobs.remove(job.getJobId());
+-            }
+-        }).start();
+-        
+-        return promise.future();
++        try {
++            // Simulate transfer based on configured behavior
++            return switch (behavior) {
++                case SUCCESS -> createSuccessResult(request.getRequestId());
++                case FAILURE -> createFailureResult(request.getRequestId());
++                case EXCEPTION -> throw exceptionToThrow != null ? exceptionToThrow : new RuntimeException("Transfer failed");
++            };
++        } finally {
++            activeTransferCount.decrementAndGet();
++            jobs.remove(job.getJobId());
++        }
+     }
+-    
++
+     @Override
+     public TransferJob getTransferJob(String jobId) {
+         return jobs.get(jobId);
+@@ -164,11 +142,11 @@ class TestTransferEngine implements TransferEngine {
+     }
+     
+     @Override
+-    public Future<Void> shutdown(long timeoutSeconds) {
++    public boolean shutdown(java.time.Duration timeout) {
+         shutdown = true;
+         jobs.clear();
+         activeTransferCount.set(0);
+-        return Future.succeededFuture();
++        return true;
+     }
+ 
+     @Override
+diff --git a/quorus-core/src/test/java/dev/mars/quorus/transfer/SimpleTransferEngineBlockingTest.java b/quorus-core/src/test/java/dev/mars/quorus/transfer/SimpleTransferEngineBlockingTest.java
+new file mode 100644
+index 0000000..0f7a688
+--- /dev/null
++++ b/quorus-core/src/test/java/dev/mars/quorus/transfer/SimpleTransferEngineBlockingTest.java
+@@ -0,0 +1,362 @@
++/*
++ * Copyright 2026 Mark Andrew Ray-Smith Cityline Ltd
++ * Licensed under the Apache License, Version 2.0.
++ */
++package dev.mars.quorus.transfer;
++
++import com.sun.net.httpserver.HttpExchange;
++import com.sun.net.httpserver.HttpHandler;
++import com.sun.net.httpserver.HttpServer;
++import dev.mars.quorus.core.TransferRequest;
++import dev.mars.quorus.core.TransferResult;
++import dev.mars.quorus.core.TransferStatus;
++import dev.mars.quorus.core.exceptions.TransferException;
++import org.junit.jupiter.api.AfterEach;
++import org.junit.jupiter.api.DisplayName;
++import org.junit.jupiter.api.Test;
++import org.junit.jupiter.api.Timeout;
++import org.junit.jupiter.api.io.TempDir;
++
++import java.io.IOException;
++import java.io.OutputStream;
++import java.net.InetAddress;
++import java.net.InetSocketAddress;
++import java.net.URI;
++import java.nio.charset.StandardCharsets;
++import java.nio.file.Files;
++import java.nio.file.Path;
++import java.time.Duration;
++import java.util.ArrayList;
++import java.util.List;
++import java.util.Map;
++import java.util.concurrent.CompletableFuture;
++import java.util.concurrent.ConcurrentHashMap;
++import java.util.concurrent.Executors;
++import java.util.concurrent.TimeUnit;
++import java.util.concurrent.atomic.AtomicInteger;
++
++import static java.util.concurrent.TimeUnit.SECONDS;
++import static org.junit.jupiter.api.Assertions.assertArrayEquals;
++import static org.junit.jupiter.api.Assertions.assertEquals;
++import static org.junit.jupiter.api.Assertions.assertFalse;
++import static org.junit.jupiter.api.Assertions.assertThrows;
++import static org.junit.jupiter.api.Assertions.assertTrue;
++
++/**
++ * The blocking transfer engine (RT-03c, ADR-0012 option A): {@code transfer} runs on the caller's
++ * thread with no Vert.x, the engine enforces its concurrency limit and retries, and cancellation
++ * interrupts only the transfer it names.
++ *
++ * <p>Every transfer goes through a real HTTP server. Synchronisation uses handshakes only: the
++ * server completes {@code started} after flushing the first part of a body and then holds the
++ * response until the test releases it (concurrency conventions §6).
++ */
++@DisplayName("SimpleTransferEngine - blocking API")
++@Timeout(value = 30, unit = SECONDS, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
++class SimpleTransferEngineBlockingTest {
++
++    private static final byte[] BODY = "quorus blocking engine payload".getBytes(StandardCharsets.UTF_8);
++
++    @TempDir
++    Path directory;
++
++    private final List<HttpServer> servers = new ArrayList<>();
++    private final Map<String, Held> held = new ConcurrentHashMap<>();
++    private final AtomicInteger requests = new AtomicInteger();
++    private SimpleTransferEngine engine;
++
++    @AfterEach
++    void tearDown() {
++        held.values().forEach(h -> h.release.complete(null));
++        if (engine != null) {
++            engine.shutdown(Duration.ofSeconds(5));
++        }
++        servers.forEach(server -> server.stop(0));
++    }
++
++    @Test
++    @DisplayName("A transfer runs on the calling thread and needs no Vert.x instance")
++    void transfersOnTheCallingThreadWithoutVertx() throws Exception {
++        int port = server(this::respondWithBody);
++        engine = new SimpleTransferEngine(2, 0, 1);
++
++        TransferResult result = engine.transfer(request("plain", port));
++
++        assertTrue(result.isSuccessful(), () -> "transfer failed: " + result.getErrorMessage());
++        assertArrayEquals(BODY, Files.readAllBytes(destination("plain")));
++        assertEquals(0, engine.getActiveTransferCount());
++    }
++
++    @Test
++    @DisplayName("A transfer beyond the concurrency limit is rejected, and accepted once a slot frees")
++    void rejectsBeyondTheConcurrencyLimitAndAcceptsOnceASlotFrees() throws Exception {
++        int port = server(this::holdOrRespond);
++        engine = new SimpleTransferEngine(1, 0, 1);
++
++        Running slow = start(request("held-slow", port));
++        awaitStarted("held-slow");
++
++        TransferException rejected = assertThrows(TransferException.class, () -> engine.transfer(request("fast", port)));
++        assertTrue(rejected.getMessage().contains("Maximum concurrent transfers"), rejected.getMessage());
++
++        held("held-slow").release.complete(null);
++        assertTrue(slow.result.get(10, SECONDS).isSuccessful());
++        assertTrue(engine.transfer(request("fast", port)).isSuccessful(), "the freed slot must accept a new transfer");
++    }
++
++    @Test
++    @DisplayName("A failed attempt is retried and the transfer can still succeed")
++    void retriesAFailedAttemptAndSucceeds() throws Exception {
++        int port = server(exchange -> {
++            if (requests.incrementAndGet() <= 2) {
++                exchange.sendResponseHeaders(500, -1);
++                exchange.close();
++            } else {
++                respondWithBody(exchange);
++            }
++        });
++        engine = new SimpleTransferEngine(1, 2, 1);
++
++        TransferResult result = engine.transfer(request("retried", port));
++
++        assertTrue(result.isSuccessful(), () -> "transfer failed: " + result.getErrorMessage());
++        assertEquals(3, requests.get());
++    }
++
++    @Test
++    @DisplayName("A transfer fails after its retries are exhausted")
++    void failsAfterRetriesAreExhausted() throws Exception {
++        int port = server(exchange -> {
++            requests.incrementAndGet();
++            exchange.sendResponseHeaders(500, -1);
++            exchange.close();
++        });
++        engine = new SimpleTransferEngine(1, 2, 1);
++
++        TransferResult result = engine.transfer(request("exhausted", port));
++
++        assertFalse(result.isSuccessful());
++        assertEquals(TransferStatus.FAILED, result.getFinalStatus());
++        assertEquals(3, requests.get(), "one attempt plus two retries");
++    }
++
++    @Test
++    @DisplayName("Cancelling a running transfer ends it promptly as CANCELLED, without a retry")
++    void cancellingARunningTransferEndsItAsCancelled() throws Exception {
++        int port = server(this::holdOrRespond);
++        engine = new SimpleTransferEngine(2, 3, 1);
++
++        Running running = start(request("held-cancel", port));
++        awaitStarted("held-cancel");
++
++        var job = engine.getTransferJob("held-cancel");
++        assertEquals(TransferStatus.IN_PROGRESS, job.getStatus(), "the running job is visible while it runs");
++        assertEquals(1, engine.getActiveTransferCount());
++
++        assertTrue(engine.cancelTransfer("held-cancel"));
++
++        TransferResult result = running.result.get(10, SECONDS);
++        assertEquals(TransferStatus.CANCELLED, result.getFinalStatus());
++        assertEquals("Transfer cancelled", result.getErrorMessage().orElse(null),
++                "consumers such as the agent report the message when a transfer is not successful");
++        assertEquals(1, requests.get(), "a cancelled transfer must not be retried");
++        assertFalse(running.interruptedAfterReturn.join(),
++                "cancellation through the engine must not leave the caller's thread interrupted");
++        assertEquals(0, engine.getActiveTransferCount());
++    }
++
++    @Test
++    @DisplayName("Cancelling one transfer leaves another transfer of the same protocol running")
++    void cancellingOneTransferLeavesAnotherRunning() throws Exception {
++        int port = server(this::holdOrRespond);
++        engine = new SimpleTransferEngine(2, 0, 1);
++
++        Running cancelled = start(request("held-a", port));
++        Running survivor = start(request("held-b", port));
++        awaitStarted("held-a");
++        awaitStarted("held-b");
++
++        engine.cancelTransfer("held-a");
++        assertEquals(TransferStatus.CANCELLED, cancelled.result.get(10, SECONDS).getFinalStatus());
++
++        held("held-b").release.complete(null);
++        TransferResult result = survivor.result.get(10, SECONDS);
++        assertTrue(result.isSuccessful(), () -> "the other transfer was affected: " + result.getErrorMessage());
++        assertArrayEquals(BODY, Files.readAllBytes(destination("held-b")));
++    }
++
++    @Test
++    @DisplayName("Shutdown cancels running transfers, waits for them to end, then rejects new work")
++    void shutdownCancelsAndWaitsForRunningTransfers() throws Exception {
++        int port = server(this::holdOrRespond);
++        engine = new SimpleTransferEngine(2, 3, 1);
++
++        Running running = start(request("held-shutdown", port));
++        awaitStarted("held-shutdown");
++
++        assertTrue(engine.shutdown(Duration.ofSeconds(10)), "running transfers must end within the timeout");
++
++        assertTrue(running.result.isDone(), "shutdown returns only after the transfer has ended");
++        assertEquals(TransferStatus.CANCELLED, running.result.join().getFinalStatus());
++        assertThrows(TransferException.class, () -> engine.transfer(request("after", port)));
++    }
++
++    @Test
++    @DisplayName("An interrupt from outside the engine ends the transfer and stays set for the caller")
++    void anOutsideInterruptEndsTheTransferAndIsPreserved() throws Exception {
++        int port = server(this::holdOrRespond);
++        // No retries: the interrupt must be recognised when the attempt fails, not only by the
++        // retry back-off, which also stops on an interrupt (mutation m5).
++        engine = new SimpleTransferEngine(2, 0, 1);
++
++        Running running = start(request("held-interrupt", port));
++        awaitStarted("held-interrupt");
++
++        running.thread.interrupt();
++
++        assertEquals(TransferStatus.CANCELLED, running.result.get(10, SECONDS).getFinalStatus());
++        assertEquals(1, requests.get(), "an interrupted transfer must not be retried");
++        assertTrue(running.interruptedAfterReturn.join(),
++                "an interrupt the engine did not send belongs to the caller and must be restored");
++    }
++
++    // Retrospective characterization (plan §6.1): the two tests below were written after the code.
++
++    @Test
++    @DisplayName("A transfer whose ID is already running is rejected without disturbing the running one")
++    void aSecondTransferWithARunningIdIsRejected() throws Exception {
++        int port = server(this::holdOrRespond);
++        engine = new SimpleTransferEngine(2, 0, 1);
++
++        Running first = start(request("held-duplicate", port));
++        awaitStarted("held-duplicate");
++
++        TransferException rejected = assertThrows(TransferException.class,
++                () -> engine.transfer(request("held-duplicate", port)));
++        assertTrue(rejected.getMessage().contains("already running"), rejected.getMessage());
++        assertEquals(1, engine.getActiveTransferCount(), "the rejected call must not take or keep a slot");
++
++        held("held-duplicate").release.complete(null);
++        assertTrue(first.result.get(10, SECONDS).isSuccessful(), "the running transfer is unaffected");
++    }
++
++    @Test
++    @DisplayName("A paused transfer is stopped and reported as FAILED, as before RT-03c")
++    void aPausedTransferIsStoppedAsFailed() throws Exception {
++        int port = server(this::holdOrRespond);
++        engine = new SimpleTransferEngine(2, 3, 1);
++
++        Running running = start(request("held-pause", port));
++        awaitStarted("held-pause");
++
++        assertTrue(engine.pauseTransfer("held-pause"));
++        held("held-pause").release.complete(null);   // the adapter checks the context before its next buffer
++
++        TransferResult result = running.result.get(10, SECONDS);
++        assertEquals(TransferStatus.FAILED, result.getFinalStatus());
++        assertTrue(result.getErrorMessage().orElse("").contains("paused"), () -> "message: " + result.getErrorMessage());
++        assertEquals(1, requests.get(), "a paused transfer must not be retried");
++    }
++
++    // ------------------------------------------------------------------ fixtures
++
++    /** A transfer running on its own virtual thread, as a caller that wants concurrency would run it. */
++    private record Running(Thread thread, CompletableFuture<TransferResult> result,
++                           CompletableFuture<Boolean> interruptedAfterReturn) {
++    }
++
++    private final Map<String, Running> transfers = new ConcurrentHashMap<>();
++
++    /**
++     * Waits until the server has started the named response, or fails at once if the transfer
++     * ended first, so a transfer that never reaches the server cannot hang the test.
++     */
++    private void awaitStarted(String name) {
++        CompletableFuture.anyOf(held(name).started, transfers.get(name).result).join();
++        assertTrue(held(name).started.isDone(), () -> "the transfer ended before the server responded: "
++                + transfers.get(name).result.join().getErrorMessage());
++    }
++
++    private Running start(TransferRequest request) {
++        CompletableFuture<TransferResult> result = new CompletableFuture<>();
++        CompletableFuture<Boolean> interrupted = new CompletableFuture<>();
++        Thread thread = Thread.ofVirtual().name("transfer-" + request.getRequestId()).start(() -> {
++            try {
++                result.complete(engine.transfer(request));
++            } catch (Throwable failure) {
++                result.completeExceptionally(failure);
++            } finally {
++                interrupted.complete(Thread.currentThread().isInterrupted());
++            }
++        });
++        Running started = new Running(thread, result, interrupted);
++        transfers.put(request.getRequestId(), started);
++        return started;
++    }
++
++    /** A response that the test holds open after its first part, until released. */
++    private record Held(CompletableFuture<Void> started, CompletableFuture<Void> release) {
++    }
++
++    private Held held(String name) {
++        return held.computeIfAbsent(name, n -> new Held(new CompletableFuture<>(), new CompletableFuture<>()));
++    }
++
++    /** Paths named {@code held-*} send half the body, signal, and wait for release; others respond at once. */
++    private void holdOrRespond(HttpExchange exchange) throws IOException {
++        requests.incrementAndGet();
++        String name = exchange.getRequestURI().getPath().substring(1);
++        if (!name.startsWith("held-")) {
++            respondWithBody(exchange);
++            return;
++        }
++        Held h = held(name);
++        exchange.sendResponseHeaders(200, BODY.length);
++        try (OutputStream out = exchange.getResponseBody()) {
++            int half = BODY.length / 2;
++            out.write(BODY, 0, half);
++            out.flush();
++            h.started.complete(null);
++            awaitRelease(h.release);
++            out.write(BODY, half, BODY.length - half);
++        }
++    }
++
++    private void respondWithBody(HttpExchange exchange) throws IOException {
++        exchange.sendResponseHeaders(200, BODY.length);
++        try (OutputStream out = exchange.getResponseBody()) {
++            out.write(BODY);
++        }
++    }
++
++    /** Server-side wait with a bound, so a failing test can never leave a server thread blocked. */
++    private static void awaitRelease(CompletableFuture<Void> release) throws IOException {
++        try {
++            release.get(20, TimeUnit.SECONDS);
++        } catch (Exception e) {
++            throw new IOException("test did not release the response", e);
++        }
++    }
++
++    private int server(HttpHandler handler) throws IOException {
++        HttpServer server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
++        server.createContext("/", handler);
++        // One virtual thread per exchange, so a held response cannot block another request.
++        server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
++        server.start();
++        servers.add(server);
++        return server.getAddress().getPort();
++    }
++
++    private TransferRequest request(String name, int port) {
++        return TransferRequest.builder()
++                .requestId(name)
++                .sourceUri(URI.create("http://127.0.0.1:" + port + "/" + name))
++                .destinationPath(destination(name))
++                .build();
++    }
++
++    private Path destination(String name) {
++        return directory.resolve(name + ".bin");
++    }
++}

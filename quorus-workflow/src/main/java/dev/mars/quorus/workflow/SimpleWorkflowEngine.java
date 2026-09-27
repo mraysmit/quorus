@@ -421,7 +421,10 @@ public class SimpleWorkflowEngine implements WorkflowEngine {
                 .map(transfer -> {
                     try {
                         TransferRequest request = transfer.toTransferRequest();
-                        Future<TransferResult> transferFuture = transferEngine.submitTransfer(request);
+                        // The engine is blocking (RT-03c). Until this module leaves Vert.x (RT-04),
+                        // each transfer runs on a Vert.x worker so the group's transfers still overlap.
+                        Future<TransferResult> transferFuture =
+                                vertx.executeBlocking(() -> transferEngine.transfer(request), false);
                         
                         return transferFuture
                                 .<TransferResult>recover(error -> {

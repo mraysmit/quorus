@@ -23,13 +23,10 @@ import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferResult;
 import dev.mars.quorus.transfer.SimpleTransferEngine;
 import dev.mars.quorus.transfer.TransferContext;
-import io.vertx.core.Vertx;
-import io.vertx.junit5.VertxExtension;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
@@ -68,7 +65,6 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * @since 2026-01-26
  * @version 1.0
  */
-@ExtendWith(VertxExtension.class)
 class SftpAbortIntegrationTest {
     
     private static final Logger logger = LoggerFactory.getLogger(SftpAbortIntegrationTest.class);
@@ -91,14 +87,14 @@ class SftpAbortIntegrationTest {
     }
 
     @BeforeEach
-    void setUp(Vertx vertx) throws IOException {
+    void setUp() throws IOException {
         this.protocol = new SftpTransferProtocol();
         
         // Create protocol factory with SFTP support
-        ProtocolFactory protocolFactory = new ProtocolFactory(vertx);
+        ProtocolFactory protocolFactory = new ProtocolFactory();
         protocolFactory.registerProtocol(protocol);
         
-        this.engine = new SimpleTransferEngine(vertx, 5, 3, 100);
+        this.engine = new SimpleTransferEngine(5, 3, 100);
         
         // Get SFTP container connection details from shared container
         sftpHost = SharedTestContainers.getSftpHost();
@@ -114,7 +110,7 @@ class SftpAbortIntegrationTest {
     @AfterEach
     void tearDown() {
         if (engine != null) {
-            engine.shutdown(5);
+            engine.shutdown(java.time.Duration.ofSeconds(5));
         }
     }
 
