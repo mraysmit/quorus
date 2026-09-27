@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Plan item RT-03d: the protocol and engine contracts of {@code quorus-core} carry no Vert.x type, so
+ * Plan items RT-03d and RT-03e: the public contracts of {@code quorus-core} carry no Vert.x type, so
  * callers depend only on the JDK (ADR-0012 decision 6). The blocking {@code transfer} is the contract,
  * not a deprecated fallback.
  */
@@ -33,7 +33,10 @@ class ProtocolContractIsVertxFreeTest {
     private static final List<Class<?>> CONTRACT = List.of(
             TransferProtocol.class, TransferEngine.class, ProtocolFactory.class, SimpleTransferEngine.class,
             HttpTransferProtocol.class, FtpTransferProtocol.class, SftpTransferProtocol.class,
-            SmbTransferProtocol.class, NfsTransferProtocol.class);
+            SmbTransferProtocol.class, NfsTransferProtocol.class,
+            // RT-03e: the connection codec and the network topology service
+            dev.mars.quorus.connection.ServiceConnectionJsonCodec.class,
+            dev.mars.quorus.network.NetworkTopologyService.class, dev.mars.quorus.network.NetworkNode.class);
 
     @Test
     @DisplayName("No public or protected signature names an io.vertx type")

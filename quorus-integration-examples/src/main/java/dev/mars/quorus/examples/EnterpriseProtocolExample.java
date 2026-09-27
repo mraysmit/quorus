@@ -24,8 +24,6 @@ import dev.mars.quorus.protocol.ProtocolFactory;
 import dev.mars.quorus.protocol.TransferProtocol;
 import dev.mars.quorus.transfer.SimpleTransferEngine;
 import dev.mars.quorus.transfer.TransferEngine;
-import io.vertx.core.Vertx;
-import io.vertx.core.Future;
 
 import java.net.URI;
 import java.nio.file.Files;
@@ -62,7 +60,6 @@ public class EnterpriseProtocolExample {
     private TransferEngine transferEngine;
     private NetworkTopologyService networkService;
     private ProtocolFactory protocolFactory;
-    private Vertx vertx;
     
     public static void main(String[] args) {
         log.exampleStart("Quorus Enterprise Protocol Example",
@@ -112,11 +109,9 @@ public class EnterpriseProtocolExample {
     private void initializeServices() throws Exception {
         log.step("Initializing enterprise services...");
         
-        vertx = Vertx.vertx();
-
         // Initialize services with enterprise-optimized settings
         transferEngine = new SimpleTransferEngine(20, 4, 1000); // 20 concurrent, 4 retries, 1 s retry delay
-        networkService = new NetworkTopologyService(vertx);
+        networkService = new NetworkTopologyService();
         protocolFactory = new ProtocolFactory();
         
         log.expectedSuccess("Enterprise services initialized");
@@ -273,7 +268,7 @@ public class EnterpriseProtocolExample {
         
         for (String hostname : testHosts) {
             try {
-                var nodeInfo = networkService.discoverNode(hostname).toCompletionStage().toCompletableFuture().get();
+                var nodeInfo = networkService.discoverNode(hostname);
                 
                 log.expectedSuccess("Network discovery for " + hostname);
                 log.subDetail("Reachable: " + nodeInfo.isReachable());
@@ -317,8 +312,7 @@ public class EnterpriseProtocolExample {
         networkService.updateMetrics(hostname, bytesTransferred, transferTime, true);
         
         // Get transfer recommendations
-        var recommendations = networkService.getTransferRecommendations(hostname, bytesTransferred)
-                .toCompletionStage().toCompletableFuture().get();
+        var recommendations = networkService.getTransferRecommendations(hostname, bytesTransferred);
         
         log.expectedSuccess("Performance monitoring active");
         log.indentedKeyValue("Optimal buffer size", recommendations.getOptimalBufferSize() / 1024 + " KB");
@@ -339,10 +333,6 @@ public class EnterpriseProtocolExample {
         log.section("Cleaning up resources...");
         
         try {
-            if (vertx != null) {
-                vertx.close();
-            }
-            
             // Clean up temporary files
             Path tempDir = Paths.get("temp");
             if (Files.exists(tempDir)) {

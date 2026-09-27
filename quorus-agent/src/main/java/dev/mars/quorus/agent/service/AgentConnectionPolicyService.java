@@ -62,12 +62,13 @@ public final class AgentConnectionPolicyService {
         }
     }
 
+    // The codec's API is JSON text (RT-03e); the agent converts until it leaves Vert.x (RT-05).
     public static ServiceConnection parseConnection(JsonObject json) {
-        return ServiceConnectionJsonCodec.connectionFromJson(json);
+        return ServiceConnectionJsonCodec.decodeConnection(json.encode());
     }
 
     public static SecretReference parseSecret(JsonObject json) {
-        return ServiceConnectionJsonCodec.secretFromJson(json);
+        return ServiceConnectionJsonCodec.decodeSecret(json.encode());
     }
 
     private static Set<String> strings(JsonArray values) {
