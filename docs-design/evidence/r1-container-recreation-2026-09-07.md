@@ -7,7 +7,7 @@
 **License:** Apache 2.0
 **Slice:** `R1-1` — container-recreation acceptance
 **Revision:** `804e11d` — committed evidence, tests, durable fixture, plan/register reconciliation, and `LeaderGuardHandlerTest` correction
-**Register item:** [Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER.md) §3
+**Register item:** [Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER.md) §4 (Section A)
 **Classification:** external-path behavioral + **retrospective characterization** — see §2
 
 ---
@@ -54,6 +54,9 @@ A material gap was found in the existing fixtures during this work: the test com
 `docker-compose-3node-prebuilt.yml` declares **no volumes and no `QUORUS_RAFT_STORAGE_PATH`**.
 Every containerised test before this slice therefore ran with Raft state on the container's
 ephemeral layer. No existing test could have detected a container-level durability regression.
+
+> *Annotation 2026-09-27:* this describes the fixtures before the follow-up remediation. From
+> §12.1 (same day) onward, every containerised fixture mounts a named volume.
 
 ## 4. Red stage — retained
 
@@ -167,7 +170,8 @@ fixture uses synthetic hostnames under `example.test` and carries no secrets.
 4. **The default containerised test fixture is still non-durable.** Only the new
    `docker-compose-3node-durable.yml` mounts volumes. Other Docker tests continue to run on
    ephemeral storage, which is appropriate for their purpose but means they carry no
-   durability meaning.
+   durability meaning. *Superseded the same day by §12.1: every containerised fixture now
+   writes Raft state to a named volume (annotation 2026-09-27).*
 
 ## 11. Disposition
 
@@ -254,3 +258,11 @@ mvn.cmd -pl quorus-controller "-Dtest.excludedGroups=" clean verify
 **601 tests, 0 failures, 0 errors, 2 skipped. BUILD SUCCESS. JaCoCo check passed.** The two
 skips remain the pre-existing explicitly disabled network tests. `quorus-core` clean verify
 passes 1,517 tests with zero failures, errors or skips.
+
+## 13. Retention note — 2026-09-27
+
+The raw output of this slice was never committed. No copy survives: `docs-design/evidence/raw/`
+and the `temp/` scratch directory were both searched on 2026-09-27, and the only files there
+that mention `ContainerRecreationDurabilityTest` are git-status listings. Command timestamps were
+not recorded. The output quoted in §4 to §7 and §12.5 is the only remaining record, so it cannot
+be checked against a hash. This closes register task DR-A1 with that limitation recorded.

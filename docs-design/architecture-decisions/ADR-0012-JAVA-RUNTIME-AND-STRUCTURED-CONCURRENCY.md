@@ -2,8 +2,8 @@
 
 # ADR-0012: Leave Vert.x for Java 27 Structured Concurrency
 
-**Version:** 1.1  
-**Date:** 2026-09-26  
+**Version:** 1.2  
+**Date:** 2026-09-27  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0
 
@@ -42,10 +42,11 @@ Class files compiled with preview features only run on the exact Java feature re
    - request and security context is carried in `ScopedValue` rather than thread-locals or Vert.x context;
    - blocking protocol I/O runs directly on virtual threads, with no `executeBlocking` and no event-loop discipline.
 
-3. **The Java baseline moves to 27, then follows each six-monthly feature release (`RT-Q3`).** This covers the poms, `.java-version`, CI images, Docker build and runtime images, and documentation.
+3. **The Java baseline moves to 27, then follows each six-monthly feature release (`RT-Q3`).** This covers the poms, `.java-version`, the CI toolchain, the container runtime images (which package jars built on the host; nothing is compiled inside an image) and documentation.
 
 4. **Replacements follow QRaft's standard of JDK facilities first:**
-   - **Agent-to-controller and HTTP transfers:** `java.net.http.HttpClient`, which supports mutual TLS through `SSLContext` and HTTP/2. HTTP downloads stream to a file with a body handler, which also removes the whole-body buffering in `ARCH-09`.
+   - **Agent-to-controller client:** `java.net.http.HttpClient`, which supports mutual TLS through `SSLContext` and HTTP/2.
+   - **HTTP transfer adapter:** Apache HttpClient 5, a measured exception to this rule (`RT-Q5`), because governed transfers must connect to a pinned address. Downloads and uploads stream without buffering the payload, which closed `ARCH-09` in `RT-03b`.
    - **Controller HTTP API:** the JDK `HttpsServer` (`RT-Q2`).
    - **Timers and periodic work:** loops in structured scopes on virtual threads, with explicit shutdown.
    - **gRPC:** stays on grpc-java, as in QRaft.
@@ -95,10 +96,15 @@ Class files compiled with preview features only run on the exact Java feature re
 - **`RT-Q4` — Java 27 container images. Decided: Amazon Corretto 27.** Eclipse Temurin had
   published no Java 27 images, and the official `openjdk` image offers only non-production
   `27-rc` tags (both checked 2026-09-26). Corretto 27 images exist for amd64 and arm64 on
-  Amazon Linux 2023 and Alpine. No official `maven` image carries Java 27, so the builder stage
-  adds a pinned, checksum-verified Maven. Image tags pin an exact Corretto release (for example
-  `27.0.0-…`), and `RT-09` moves them with each Java release. The runtime variant (Alpine JDK,
-  Amazon Linux 2023 headless, or a jlink-built runtime) is confirmed before `RT-01b` starts.
+  Amazon Linux 2023 and Alpine. Image tags pin an exact Corretto release, and `RT-09` moves them
+  with each Java release.
+  - **Runtime variant, decided 2026-09-26: option A, `amazoncorretto:27.0.0-alpine3.24`.** Corretto
+    27 has no JRE-only Alpine image, so this is the Alpine JDK image.
+  - **Images are single-stage and copy the jars built on the host.** They contain no Maven and
+    compile nothing, so no builder stage or Maven image is needed. The Docker test lanes and the
+    `docker/build-runtime` scripts build the jars first, then the image.
+  - This entry was corrected on 2026-09-27 (version 1.2). Version 1.1 described a builder stage
+    that added Maven, and an undecided runtime variant. Neither matched what `RT-01b` delivered.
 
 - **`RT-Q5` — HTTP client for the HTTP transfer adapter. Decided: Apache HttpClient 5 (classic,
   blocking API), a demonstrated exception to "JDK facilities first".** Governed transfers must connect
@@ -127,3 +133,11 @@ Class files compiled with preview features only run on the exact Java feature re
 - Every existing Vert.x-based test must be rewritten for the modules that change. The rewritten tests are regression coverage, not TDD evidence, unless they express new behaviour.
 - The Copilot instructions, plan §6.1 and the testing documents describe Vert.x as the standard. They must be updated as each module moves, and they already note this ADR as the direction of travel.
 - Observability loses Vert.x's built-in tracing integration. OpenTelemetry instrumentation for the new HTTP server and client is part of `RT-07`.
+
+## Revision history
+
+| Version | Date | Changes |
+|---|---|---|
+| 1.2 | 2026-09-27 | Corrected `RT-Q4` to the delivered images: runtime option A (`amazoncorretto:27.0.0-alpine3.24`), single-stage images that copy host-built jars, and no builder stage or Maven in any image. Decision 4 names Apache HttpClient 5 for the HTTP transfer adapter (`RT-Q5`), and decision 3 no longer mentions Docker build images |
+
+Versions 1.0 and 1.1 (2026-09-26) are recorded only in git history.

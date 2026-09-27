@@ -2,11 +2,11 @@
 
 # Quorus Enterprise Implementation Plan
 
-**Version:** 1.33
-**Date:** 2026-09-26
+**Version:** 1.34
+**Date:** 2026-09-27
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
-**Status:** Active — remediation checkpoint open; R1-1 container-recreation acceptance closed 2026-09-07 while R1-2 and R1-3 remain open; Phase 0 functionally complete with M0 durability acceptance reopened until R1-2 and R1-3 close; Phase 1 complete; Phase 4 complete (the acceptance reopened on 2026-09-04 was restored by R2–R6 on 2026-09-05); Phases 2 and 3 in progress; Phases 5–12 not started  
+**Status:** Active — remediation checkpoint open; R1-1 container-recreation acceptance closed 2026-09-07 while R1-2 and R1-3 remain open; Phase 0 functionally complete with M0 durability acceptance reopened until R1-2 and R1-3 close; Phase 1 complete; Phase 4 complete (the acceptance reopened on 2026-09-04 was restored by R2–R6 on 2026-09-05), with hardening follow-up `SEC-07` open; Phases 2 and 3 in progress; Phases 5–12 not started; platform migration (Section 20) in progress. CI has never passed; its repair is deferred (`ENG-07`, `SEQ-01`, Section 4)  
 **Scope:** Enterprise control plane, transfer operations, security, governance, deployment, and user interfaces; platform migration to the generic QRaft consensus engine and to Java 27 structured concurrency (Section 20)
 
 ## 1. Purpose and Authority
@@ -49,7 +49,7 @@ Every phase follows these rules:
 
 The current baseline provides:
 
-- Java 25 and Vert.x 5 modules;
+- Java 27 (since `RT-01a`, 2026-09-26) and Vert.x 5 modules, which are moving off Vert.x under Section 20;
 - direct transfer execution through protocol adapters;
 - YAML workflow parsing and in-process workflow execution;
 - controller-local HTTP with Raft-replicated transfer, assignment, agent, and route commands;
@@ -60,6 +60,40 @@ The current baseline provides:
 The baseline does not yet justify protected enterprise production use. Phase 1 established the authenticated identity and TLS/mTLS foundation, and the completed Phase 2 slices established authoritative attempt fencing and atomic report application. Critical blockers still include certificate lifecycle automation, automatic lease expiry and safe reassignment, destination-side fencing and reconciliation, incomplete transfer operations telemetry, uncontrolled service connectivity, incomplete agent trust lifecycle, and incomplete REST coverage.
 
 ## 4. Target Release Milestones
+
+### Findings and sequencing decisions — 2026-09-27
+
+**CI has never passed; its repair is deferred (`ENG-07`, decision `SEQ-01`).** All 21 GitHub
+Actions runs between 2026-09-01 and 2026-09-26 failed:
+
+- **Unit and clean-build lanes.** `FtpsDefaultPortBoundaryTest` listens on port 21, which a
+  non-root process cannot bind on the Linux runner. It passes on Windows, where every local run
+  took place. The build stops in `quorus-core`, so the workflow, tenant, controller, agent and
+  example modules have never been tested in CI.
+- **Documentation lane.** `scripts/verify-phase0-docs.ps1` rejects 11 document headers that
+  lack the two trailing spaces its pattern requires.
+
+By project direction on 2026-09-27, the repair is deferred and platform work continues first.
+The consequences are:
+
+- CI gives no regression signal while `ENG-07` is open. Each slice's regression evidence is its
+  local full-reactor run, retained under Section 6.1, as it has been so far.
+- Phase 0's CI verification items have not been shown in CI: a clean checkout build that passes
+  twice, and documentation checks that run in CI.
+- No phase can close while `ENG-07` is open, because step 5 of Section 6.1 requires every
+  applicable lane to pass, including documentation.
+
+**Governed TLS trust anchors (`SEC-07`, decision `SEQ-02`).** This was found during `RT-03b`
+on 2026-09-26.
+
+- Governed HTTPS and FTPS validate server certificates only against the JVM default trust
+  store: `TlsPeerPolicy` initialises its trust manager without a key store.
+- A service connection's approved CA identifiers can narrow that set, but cannot add to it.
+- An endpoint whose certificate is issued by a private corporate CA therefore works only if
+  that CA is added to the runtime's `cacerts`. Quorus neither manages nor audits that file.
+
+`SEC-07` is assigned to Phase 4 as a hardening follow-up (Section 11). It must close before any
+production service connection relies on a private CA.
 
 ### Configuration and documentation remediation — 2026-09-25
 
@@ -325,7 +359,7 @@ Existing implementation for which no preserved red stage exists can only receive
 
 **Size:** L  
 **Milestone:** M0  
-**Status:** Functionally complete — functional verification and code-side TDD remediation passed; historical process deviation approved on 2026-09-02; durability acceptance reopened by the 2026-09-04 remediation checkpoint until R1-2 and R1-3 close  
+**Status:** Functionally complete — functional verification and code-side TDD remediation passed; historical process deviation approved on 2026-09-02; durability acceptance reopened by the 2026-09-04 remediation checkpoint until R1-2 and R1-3 close; the CI verification items have never passed in CI (`ENG-07`, repair deferred on 2026-09-27 by `SEQ-01`, Section 4)  
 **Primary gaps:** `ARCH-01`, `ARCH-05`, `ARCH-06`, `ARCH-07`, `API-01`, `API-12`
 
 ### Objective
@@ -626,7 +660,26 @@ Operations can detect, understand, own, and act on a critical transfer before it
 **Size:** XL  
 **Milestone:** contributes to M2  
 **Primary gaps:** `ARCH-08`, `ARCH-14`, `ARCH-17`, `API-06`  
-**Status:** Complete — delivered on 2026-09-03 under the mandatory TDD gate; acceptance reopened by the 2026-09-04 remediation checkpoint and restored when R2–R6 completed on 2026-09-05  
+**Status:** Complete — delivered on 2026-09-03 under the mandatory TDD gate; acceptance reopened by the 2026-09-04 remediation checkpoint and restored when R2–R6 completed on 2026-09-05. Hardening follow-up `SEC-07` open since 2026-09-27  
+
+### Hardening follow-up — `SEC-07` (open, assigned 2026-09-27)
+
+Governed TLS trusts only the JVM default trust anchors (Section 4, 2026-09-27). The exit gate
+below still holds: an endpoint issued by a private CA is verified once that CA is in the
+runtime trust store. But adding it there is an unmanaged, unaudited deployment step, which this
+item removes. It must close before any production service connection relies on a private CA.
+It is delivered test-first under Section 6.1, and it is accepted when:
+
+- operators configure the trust-anchor certificates for governed TLS as versioned, audited
+  Quorus configuration, wherever the protocol adapters run, without changing the runtime's
+  `cacerts`;
+- a governed HTTPS and FTPS transfer to an endpoint issued by a configured private CA succeeds,
+  and the same transfer fails closed when that CA is not configured;
+- approved CA identifiers and leaf pins still narrow the trusted set exactly as they do today;
+- whether the JVM default anchors stay trusted alongside the configured set is decided and
+  documented when the item is specified;
+- a trust-anchor change takes effect within the interval defined in the verification list
+  below, and emits a trust-change event.
 
 ### Implementation checkpoint — 2026-09-03
 
@@ -1096,7 +1149,7 @@ The enterprise release candidate is approved only when all critical canonical ga
 
 ## 20. Platform Migration Workstreams
 
-**Status:** Not started. Direction accepted on 2026-09-26
+**Status:** In progress. Direction accepted on 2026-09-26. `RT-01` and `RT-02` are complete and `RT-03` is under way; workstream `CE` has not started. Item status is kept in [register Section J](QUORUS_OUTSTANDING_WORK_REGISTER.md#13-section-j--platform-migration-workstreams)
 **Decisions:** [ADR-0011](../architecture-decisions/ADR-0011-CONSENSUS-VIA-QRAFT-GENERIC-ENGINE.md) (consensus through the generic QRaft engine) and [ADR-0012](../architecture-decisions/ADR-0012-JAVA-RUNTIME-AND-STRUCTURED-CONCURRENCY.md) (leave Vert.x for Java 27 structured concurrency)
 
 These two workstreams change the platform beneath the phases rather than adding enterprise capability. Each item is delivered under Section 6.1 and must keep every delivered phase's boundary tests green. Neither workstream may weaken a delivered exit gate. In particular, Phase 1's controller-to-controller mutual TLS, peer rejection and revocation behaviour must pass unchanged through the new engine.
@@ -1127,10 +1180,11 @@ Quorus stops owning a Raft engine and consumes QRaft's engine through a 100% gen
 | **RT-Q2** | Decision: controller HTTP server | ✅ Decided 2026-09-26: JDK `HttpsServer`. `RT-06` must prove required client certificates, middleware, request limits, SSE with backpressure and throughput, or reopen the decision with evidence |
 | **RT-Q3** | Decision: Java support policy | ✅ Decided 2026-09-26: follow each six-monthly feature release within its update window (`RT-09`) |
 | **RT-01a** | Java 27 compile and test baseline | The root pom and `.java-version` target 27. `JavaPlatformBaselineTest` proves production classes are class-file major version 71 and tests run on Java 27 or later. The full reactor and JaCoCo gates pass on 27 before any Vert.x removal |
-| **RT-01b** | Java 27 images and CI | Controller and agent builder and runtime images and the CI container move to Amazon Corretto 27 (`RT-Q4`), with image tags pinned to an exact Corretto release that `RT-09` updates. Docker-tagged lanes pass on the new images, starting from a fresh image build, because a cached `quorus-controller:test` image would hide the red stage |
-| **RT-Q4** | Decision: Java 27 container image vendor | ✅ Decided 2026-09-26: Amazon Corretto 27. The builder adds a pinned, checksum-verified Maven. The runtime variant (Alpine JDK, Amazon Linux 2023 headless, or a jlink-built runtime) is confirmed before `RT-01b` starts |
+| **RT-01b** | Java 27 images and CI | The controller and agent runtime images and the CI toolchain move to Amazon Corretto 27 (`RT-Q4`), with image tags pinned to an exact Corretto release that `RT-09` updates. The images are single-stage and copy jars built on the host; nothing is compiled inside an image. Docker-tagged lanes pass on the new images, starting from a fresh image build, because a cached `quorus-controller:test` image would hide the red stage |
+| **RT-Q4** | Decision: Java 27 container image vendor | ✅ Decided 2026-09-26: Amazon Corretto 27, runtime option A `amazoncorretto:27.0.0-alpine3.24` (Corretto 27 has no JRE-only Alpine image). No image contains Maven or a builder stage (ADR-0012 v1.2) |
 | **RT-02** | Concurrency conventions, task-scope abstraction and test standard | Written conventions for virtual threads, structured scopes, `ScopedValue` context, cancellation and deadlines. The Quorus task-scope abstraction (`RT-Q1`) is delivered test-first with ownership, cancellation, deadline and failure-propagation tests. §6.1 and the Copilot instructions are updated as modules move |
-| **RT-03** | `quorus-core` | Protocol adapters run blocking I/O on virtual threads with no `executeBlocking`. The HTTP adapter uses `java.net.http.HttpClient` and streams to file, closing `ARCH-09` |
+| **RT-03** | `quorus-core` | Protocol adapters run blocking I/O on virtual threads with no `executeBlocking`. The HTTP adapter uses Apache HttpClient 5 (`RT-Q5`) and streams to and from files, closing `ARCH-09`. Delivered in slices: `RT-03a` removes dead connection-pool code; `RT-03b` rewrites the HTTP adapter; `RT-03c` makes the `TransferEngine` blocking on virtual threads and moves its agent, workflow and example callers to that API; `RT-03d` removes `transferReactive` and `Vertx` from the protocol contract and `ProtocolFactory`; `RT-03e` moves `NetworkTopologyService` and the codec off Vert.x, using Jackson for the codec; `RT-03f` leaves no `io.vertx` dependency in the `quorus-core` pom |
+| **RT-Q5** | Decision: HTTP client for the HTTP transfer adapter | ✅ Decided 2026-09-26: Apache HttpClient 5 (classic API). Measured on JDK 27 GA: `java.net.http` cannot connect to an approved address while keeping SNI, `Host` and hostname verification on the service's hostname (ADR-0012) |
 | **RT-04** | `quorus-workflow` and `quorus-integration-examples` | No Vert.x types. Workflow execution uses structured scopes |
 | **RT-05** | `quorus-agent` | Controller client on `java.net.http.HttpClient` with mutual TLS and hostname verification. Registration, heartbeat and polling run as structured loops with bounded shutdown. The Phase 1 agent trust tests and R3 reporting tests pass |
 | **RT-06** | `quorus-controller` | HTTP API on the `RT-Q2` server with TLS 1.3 and required client certificates. Authentication, authorization and audit middleware preserved. `OpenApiContractTest` stays equal. The `CE-07` bridge is removed |
@@ -1183,7 +1237,7 @@ This table assigns each gap to its delivery phases. Current closure status is ma
 | `ARCH-06` Assignment reference and tenant invariants incomplete | Phases 0 and 1 |
 | `ARCH-07` Persistent controller path and volume not proven | Phases 0 and 8 |
 | `ARCH-08` SFTP host-key verification disabled | Closed in Phase 4, supported by Phase 1 trust foundations |
-| `ARCH-09` HTTP adapter buffers full payload | Phase 4 protocol hardening and Phase 12 scale validation |
+| `ARCH-09` HTTP adapter buffers full payload | Closed by `RT-03b` (Section 20) on 2026-09-26; Phase 12 scale validation still measures bounded memory |
 | `ARCH-10` Dynamic membership absent | Phase 8 decision or optional Phase 8B |
 | `ARCH-11` Transfer operations telemetry incomplete | Phase 3 |
 | `ARCH-12` Operational business context absent | Phase 3 |
@@ -1249,6 +1303,7 @@ The plan is revised when requirements or implementation evidence change. Revisio
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.34 | 2026-09-27 | Recorded that CI has never passed and that its repair is deferred (`ENG-07`, decision `SEQ-01`), with the consequences for regression evidence, Phase 0 and phase closure. Assigned `SEC-07` (governed TLS trusts only the JVM default anchors) to Phase 4 as a hardening follow-up with acceptance criteria (decision `SEQ-02`). Section 20: corrected `RT-03` to Apache HttpClient 5 and listed its slices; added the `RT-Q5` decision row; corrected `RT-Q4` and `RT-01b` to single-stage images that copy host-built jars, runtime option A; the status now says in progress. §22 records `ARCH-09` as closed by `RT-03b`. §3 baseline is Java 27 |
 | 1.33 | 2026-09-26 | §6.1 evidence retention: keep raw red, green, mutation and characterization output; keep regression and discarded-attempt output as excerpts with the full log hash (DR-Q6 refined) |
 | 1.32 | 2026-09-26 | §6.1 points code that has left Vert.x to the concurrency conventions test standard (`RT-02c`) |
 | 1.31 | 2026-09-26 | Pointed documentation-review references at register Section H and its §3 decision log, after the separate task list was merged into the register |
