@@ -60,6 +60,12 @@
             <groupId>io.vertx</groupId>
             <artifactId>vertx-web</artifactId>
         </dependency>
+        <!-- Used by MetricsHandler and the HTTP tests until RT-06. It used to arrive only through
+             quorus-core, which no longer depends on Vert.x (RT-03f) -->
+        <dependency>
+            <groupId>io.vertx</groupId>
+            <artifactId>vertx-web-client</artifactId>
+        </dependency>
         <dependency>
             <groupId>io.vertx</groupId>
             <artifactId>vertx-grpc-server</artifactId>

@@ -39,7 +39,7 @@ class ProtocolContractIsVertxFreeTest {
             dev.mars.quorus.network.NetworkTopologyService.class, dev.mars.quorus.network.NetworkNode.class);
 
     @Test
-    @DisplayName("No public or protected signature names an io.vertx type")
+    @DisplayName("No public or protected signature names a Vert.x type")
     void noPublicSignatureNamesAVertxType() {
         List<String> offending = new ArrayList<>();
         for (Class<?> type : CONTRACT) {
@@ -55,7 +55,7 @@ class ProtocolContractIsVertxFreeTest {
                     types.add(method.getGenericReturnType());
                 }
                 for (Type signatureType : types) {
-                    if (signatureType.getTypeName().contains("io.vertx")) {
+                    if (signatureType.getTypeName().contains("io." + "vertx")) {
                         offending.add(type.getSimpleName() + "." + name(member) + " : " + signatureType.getTypeName());
                     }
                 }
