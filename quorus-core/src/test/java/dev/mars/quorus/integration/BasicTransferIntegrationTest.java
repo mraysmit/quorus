@@ -17,284 +17,178 @@ package dev.mars.quorus.integration;
  */
 
 
+import dev.mars.quorus.concurrent.TaskScope;
 import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferResult;
 import dev.mars.quorus.core.TransferStatus;
 import dev.mars.quorus.transfer.SimpleTransferEngine;
 import dev.mars.quorus.transfer.TransferEngine;
-import io.vertx.core.Vertx;
-import io.vertx.junit5.VertxExtension;
-import io.vertx.junit5.VertxTestContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import io.vertx.core.Future;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Integration tests for the basic transfer engine functionality.
  * Tests end-to-end file transfer scenarios using a local HTTP test server.
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @version 1.0
+ * @version 2.0
  * @since 2025-08-17
  */
-@ExtendWith(VertxExtension.class)
+@Timeout(value = 60, unit = SECONDS, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
 class BasicTransferIntegrationTest {
 
     @TempDir
     Path tempDir;
 
     private TransferEngine transferEngine;
-    private Vertx vertx;
     private LocalHttpTestServer testServer;
     private String baseUrl;
 
     @BeforeEach
-    void setUp(Vertx vertx) throws Exception {
-        this.vertx = vertx;
-        transferEngine = new SimpleTransferEngine(vertx, 5, 2, 500);
+    void setUp() throws Exception {
+        transferEngine = new SimpleTransferEngine(5, 2, 500);
         testServer = new LocalHttpTestServer();
         baseUrl = testServer.getBaseUrl();
     }
 
     @AfterEach
-    void tearDown(VertxTestContext testContext) {
-        if (transferEngine != null) {
-            transferEngine.shutdown(5).onComplete(testContext.succeeding(v -> {
-                if (testServer != null) {
-                    testServer.stop();
-                }
-                testContext.completeNow();
-            }));
-            return;
-        }
-
-        if (testServer != null) {
-            testServer.stop();
-        }
-
-        testContext.completeNow();
+    void tearDown() {
+        transferEngine.shutdown(Duration.ofSeconds(5));
+        testServer.stop();
     }
-    
+
+    private TransferRequest request(String path, Path destination) {
+        return TransferRequest.builder()
+                .sourceUri(URI.create(baseUrl + path))
+                .destinationPath(destination)
+                .protocol("http")
+                .build();
+    }
+
     @Test
-    void testBasicHttpTransfer(VertxTestContext testContext) throws Exception {
-        // Use local test server instead of external httpbin.org
-        URI sourceUri = URI.create(baseUrl + "/bytes/1024"); // 1KB test file
+    void testBasicHttpTransfer() throws Exception {
         Path destinationPath = tempDir.resolve("test-file.bin");
 
-        TransferRequest request = TransferRequest.builder()
-                .sourceUri(sourceUri)
-                .destinationPath(destinationPath)
-                .protocol("http")
-                .build();
+        TransferResult result = transferEngine.transfer(request("/bytes/1024", destinationPath));
 
-        transferEngine.submitTransfer(request).onComplete(testContext.succeeding(result ->
-                testContext.verify(() -> {
-                    assertNotNull(result);
-                    assertEquals(TransferStatus.COMPLETED, result.getFinalStatus());
-                    assertTrue(result.isSuccessful());
-                    assertEquals(1024, result.getBytesTransferred());
-                    assertTrue(result.getActualChecksum().isPresent());
-                    assertTrue(result.getDuration().isPresent());
-                    assertTrue(result.getAverageRateBytesPerSecond().isPresent());
-                    assertTrue(Files.exists(destinationPath));
-                    assertEquals(1024, Files.size(destinationPath));
-                    testContext.completeNow();
-                })));
+        assertNotNull(result);
+        assertEquals(TransferStatus.COMPLETED, result.getFinalStatus());
+        assertTrue(result.isSuccessful());
+        assertEquals(1024, result.getBytesTransferred());
+        assertTrue(result.getActualChecksum().isPresent());
+        assertTrue(result.getDuration().isPresent());
+        assertTrue(result.getAverageRateBytesPerSecond().isPresent());
+        assertTrue(Files.exists(destinationPath));
+        assertEquals(1024, Files.size(destinationPath));
     }
-    
+
     @Test
-    void testSmallFileTransfer(VertxTestContext testContext) throws Exception {
-        URI sourceUri = URI.create(baseUrl + "/bytes/100"); // 100 bytes
+    void testSmallFileTransfer() throws Exception {
         Path destinationPath = tempDir.resolve("small-file.bin");
 
-        TransferRequest request = TransferRequest.builder()
-                .sourceUri(sourceUri)
-                .destinationPath(destinationPath)
-                .protocol("http")
-                .build();
+        TransferResult result = transferEngine.transfer(request("/bytes/100", destinationPath));
 
-        transferEngine.submitTransfer(request).onComplete(testContext.succeeding(result ->
-                testContext.verify(() -> {
-                    assertTrue(result.isSuccessful());
-                    assertEquals(100, result.getBytesTransferred());
-                    assertTrue(Files.exists(destinationPath));
-                    assertEquals(100, Files.size(destinationPath));
-                    testContext.completeNow();
-                })));
+        assertTrue(result.isSuccessful());
+        assertEquals(100, result.getBytesTransferred());
+        assertEquals(100, Files.size(destinationPath));
     }
 
     @Test
-    void testLargerFileTransfer(VertxTestContext testContext) throws Exception {
-        URI sourceUri = URI.create(baseUrl + "/bytes/10240"); // 10KB
+    void testLargerFileTransfer() throws Exception {
         Path destinationPath = tempDir.resolve("larger-file.bin");
 
-        TransferRequest request = TransferRequest.builder()
-                .sourceUri(sourceUri)
-                .destinationPath(destinationPath)
-                .protocol("http")
-                .build();
+        TransferResult result = transferEngine.transfer(request("/bytes/10240", destinationPath));
 
-        transferEngine.submitTransfer(request).onComplete(testContext.succeeding(result ->
-                testContext.verify(() -> {
-                    assertTrue(result.isSuccessful());
-                    assertEquals(10240, result.getBytesTransferred());
-                    assertTrue(Files.exists(destinationPath));
-                    assertEquals(10240, Files.size(destinationPath));
-                    testContext.completeNow();
-                })));
+        assertTrue(result.isSuccessful());
+        assertEquals(10240, result.getBytesTransferred());
+        assertEquals(10240, Files.size(destinationPath));
+    }
+
+    /**
+     * A one-megabyte transfer. Progress of a running job is asserted deterministically in
+     * SimpleTransferEngineBlockingTest, where the server holds the response; the former version
+     * of this test polled the job every 10 ms, which the concurrency conventions prohibit.
+     */
+    @Test
+    void testOneMegabyteTransfer() throws Exception {
+        Path destinationPath = tempDir.resolve("progress-test.bin");
+
+        TransferResult result = transferEngine.transfer(request("/bytes/1048576", destinationPath));
+
+        assertTrue(result.isSuccessful());
+        assertEquals(1048576, result.getBytesTransferred());
+        assertEquals(1048576, Files.size(destinationPath));
     }
 
     @Test
-    void testTransferWithProgressTracking(VertxTestContext testContext) throws Exception {
-        // Use a larger file to ensure we can observe IN_PROGRESS status
-        URI sourceUri = URI.create(baseUrl + "/bytes/1048576"); // 1MB
-        Path destinationPath = tempDir.resolve("progress-test.bin");
+    void testInvalidUrlTransfer() throws Exception {
+        Path destinationPath = tempDir.resolve("invalid-file.bin");
 
-        TransferRequest request = TransferRequest.builder()
-                .sourceUri(sourceUri)
-                .destinationPath(destinationPath)
-                .protocol("http")
-                .build();
+        TransferResult result = transferEngine.transfer(request("/status/404", destinationPath));
 
-        Future<TransferResult> future = transferEngine.submitTransfer(request);
+        assertFalse(result.isSuccessful());
+        assertEquals(TransferStatus.FAILED, result.getFinalStatus());
+        assertTrue(result.getErrorMessage().isPresent());
+        assertFalse(Files.exists(destinationPath));
+    }
 
-        // Monitor progress
-        String jobId = request.getRequestId();
-        boolean foundPending = false;
-
-        // Check immediately for PENDING status
-        var initialJob = transferEngine.getTransferJob(jobId);
-        if (initialJob != null && initialJob.getStatus() == TransferStatus.PENDING) {
-            foundPending = true;
+    /** Concurrent transfers are the caller's choice: here they are forked in a TaskScope. */
+    @Test
+    void testConcurrentTransfers() throws Exception {
+        int numTransfers = 3;
+        List<TaskScope.Subtask<TransferResult>> transfers = new ArrayList<>();
+        try (TaskScope scope = TaskScope.open("concurrent-transfers", Duration.ofSeconds(30))) {
+            for (int i = 0; i < numTransfers; i++) {
+                TransferRequest request = request("/bytes/512", tempDir.resolve("concurrent-" + i + ".bin"));
+                transfers.add(scope.fork(() -> transferEngine.transfer(request)));
+            }
+            scope.join();
         }
 
-        final boolean[] observedPending = {foundPending};
-        final boolean[] observedInProgress = {false};
+        for (int i = 0; i < numTransfers; i++) {
+            TransferResult result = transfers.get(i).get();
+            assertTrue(result.isSuccessful(), "Transfer " + i + " should succeed");
+            assertEquals(512, result.getBytesTransferred());
+            assertEquals(512, Files.size(tempDir.resolve("concurrent-" + i + ".bin")));
+        }
+    }
 
-        long timerId = vertx.setPeriodic(10, id -> {
-            var job = transferEngine.getTransferJob(jobId);
-            if (job != null && job.getStatus() == TransferStatus.IN_PROGRESS) {
-                observedInProgress[0] = true;
-                testContext.verify(() -> {
-                    assertTrue(job.getBytesTransferred() >= 0);
-                    assertTrue(job.getProgressPercentage() >= 0.0);
-                    assertTrue(job.getProgressPercentage() <= 1.0);
-                });
+    @Test
+    void testTransferEngineShutdown() throws Exception {
+        assertEquals(0, transferEngine.getActiveTransferCount());
+        TransferRequest request = request("/bytes/1024", tempDir.resolve("shutdown-test.bin"));
+        CompletableFuture<TransferResult> outcome = new CompletableFuture<>();
+        Thread transfer = Thread.ofVirtual().start(() -> {
+            try {
+                outcome.complete(transferEngine.transfer(request));
+            } catch (Throwable failure) {
+                outcome.completeExceptionally(failure);
             }
         });
 
-        future.onComplete(testContext.succeeding(result -> testContext.verify(() -> {
-            vertx.cancelTimer(timerId);
-            assertTrue(observedPending[0] || observedInProgress[0],
-                    "Should have observed PENDING or IN_PROGRESS status");
-            assertTrue(result.isSuccessful());
-            assertEquals(1048576, result.getBytesTransferred());
-            testContext.completeNow();
-        })));
-    }
+        assertTrue(transferEngine.shutdown(Duration.ofSeconds(5)));
+        transfer.join();
 
-    @Test
-    void testInvalidUrlTransfer(VertxTestContext testContext) throws Exception {
-        URI sourceUri = URI.create(baseUrl + "/status/404"); // Returns 404
-        Path destinationPath = tempDir.resolve("invalid-file.bin");
-
-        TransferRequest request = TransferRequest.builder()
-                .sourceUri(sourceUri)
-                .destinationPath(destinationPath)
-                .protocol("http")
-                .build();
-
-        transferEngine.submitTransfer(request).onComplete(testContext.succeeding(result ->
-                testContext.verify(() -> {
-                    assertFalse(result.isSuccessful());
-                    assertEquals(TransferStatus.FAILED, result.getFinalStatus());
-                    assertTrue(result.getErrorMessage().isPresent());
-                    assertFalse(Files.exists(destinationPath));
-                    testContext.completeNow();
-                })));
-    }
-
-    @Test
-    void testConcurrentTransfers(VertxTestContext testContext) throws Exception {
-        int numTransfers = 3;
-        @SuppressWarnings("unchecked")
-        Future<TransferResult>[] futures = new Future[numTransfers];
-
-        for (int i = 0; i < numTransfers; i++) {
-            URI sourceUri = URI.create(baseUrl + "/bytes/512"); // 512 bytes each
-            Path destinationPath = tempDir.resolve("concurrent-" + i + ".bin");
-
-            TransferRequest request = TransferRequest.builder()
-                    .sourceUri(sourceUri)
-                    .destinationPath(destinationPath)
-                    .protocol("http")
-                    .build();
-
-            futures[i] = transferEngine.submitTransfer(request);
+        // The transfer either finished before shutdown began, was cancelled by it, or was
+        // rejected because shutdown had already begun.
+        if (!outcome.isCompletedExceptionally()) {
+            TransferStatus status = outcome.join().getFinalStatus();
+            assertTrue(status == TransferStatus.COMPLETED || status == TransferStatus.CANCELLED,
+                    "Transfer should reach a terminal state during shutdown: " + status);
         }
-
-        final int[] completed = {0};
-
-        for (int i = 0; i < numTransfers; i++) {
-            Path expectedFile = tempDir.resolve("concurrent-" + i + ".bin");
-            int transferIndex = i;
-            futures[i].onComplete(testContext.succeeding(result -> testContext.verify(() -> {
-                assertTrue(result.isSuccessful(), "Transfer " + transferIndex + " should succeed");
-                assertEquals(512, result.getBytesTransferred());
-                assertTrue(Files.exists(expectedFile));
-                assertEquals(512, Files.size(expectedFile));
-                completed[0]++;
-                if (completed[0] == numTransfers) {
-                    testContext.completeNow();
-                }
-            })));
-        }
-    }
-
-    @Test
-    void testTransferEngineShutdown(VertxTestContext testContext) throws Exception {
         assertEquals(0, transferEngine.getActiveTransferCount());
-        final boolean[] transferCompleted = {false};
-        final boolean[] shutdownCompleted = {false};
-
-        // Start a transfer
-        URI sourceUri = URI.create(baseUrl + "/bytes/1024");
-        Path destinationPath = tempDir.resolve("shutdown-test.bin");
-
-        TransferRequest request = TransferRequest.builder()
-                .sourceUri(sourceUri)
-                .destinationPath(destinationPath)
-                .protocol("http")
-                .build();
-
-        transferEngine.submitTransfer(request).onComplete(testContext.succeeding(result ->
-                testContext.verify(() -> {
-                    assertNotNull(result);
-                    assertTrue(result.getFinalStatus() == TransferStatus.COMPLETED
-                                    || result.getFinalStatus() == TransferStatus.FAILED,
-                            "Transfer should reach a terminal state during shutdown");
-                    transferCompleted[0] = true;
-                    if (shutdownCompleted[0]) {
-                        assertEquals(0, transferEngine.getActiveTransferCount());
-                        testContext.completeNow();
-                    }
-                })));
-
-        transferEngine.shutdown(5).onComplete(testContext.succeeding(v ->
-                testContext.verify(() -> {
-                    shutdownCompleted[0] = true;
-                    if (transferCompleted[0]) {
-                        assertEquals(0, transferEngine.getActiveTransferCount());
-                        testContext.completeNow();
-                    }
-                })));
     }
 }

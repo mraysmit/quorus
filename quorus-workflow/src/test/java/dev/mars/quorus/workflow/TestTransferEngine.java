@@ -23,8 +23,6 @@ import dev.mars.quorus.core.TransferStatus;
 import dev.mars.quorus.core.exceptions.TransferException;
 import dev.mars.quorus.transfer.TransferEngine;
 
-import io.vertx.core.Future;
-import io.vertx.core.Promise;
 import java.time.Instant;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -80,47 +78,27 @@ class TestTransferEngine implements TransferEngine {
     }
     
     @Override
-    public Future<TransferResult> submitTransfer(TransferRequest request) throws TransferException {
+    public TransferResult transfer(TransferRequest request) throws TransferException {
         if (shutdown) {
             throw new TransferException(request.getRequestId(), "Transfer engine is shutdown");
         }
-        
+
         activeTransferCount.incrementAndGet();
-        
         TransferJob job = new TransferJob(request);
         jobs.put(job.getJobId(), job);
-        
-        Promise<TransferResult> promise = Promise.promise();
-        
-        // Execute asynchronously
-        new Thread(() -> {
-            try {
-                // Simulate transfer based on configured behavior
-                TransferResult result;
-                switch (behavior) {
-                    case SUCCESS:
-                        result = createSuccessResult(request.getRequestId());
-                        break;
-                    case FAILURE:
-                        result = createFailureResult(request.getRequestId());
-                        break;
-                    case EXCEPTION:
-                        promise.fail(exceptionToThrow != null ? exceptionToThrow : new RuntimeException("Transfer failed"));
-                        return;
-                    default:
-                        result = createSuccessResult(request.getRequestId());
-                        break;
-                }
-                promise.complete(result);
-            } finally {
-                activeTransferCount.decrementAndGet();
-                jobs.remove(job.getJobId());
-            }
-        }).start();
-        
-        return promise.future();
+        try {
+            // Simulate transfer based on configured behavior
+            return switch (behavior) {
+                case SUCCESS -> createSuccessResult(request.getRequestId());
+                case FAILURE -> createFailureResult(request.getRequestId());
+                case EXCEPTION -> throw exceptionToThrow != null ? exceptionToThrow : new RuntimeException("Transfer failed");
+            };
+        } finally {
+            activeTransferCount.decrementAndGet();
+            jobs.remove(job.getJobId());
+        }
     }
-    
+
     @Override
     public TransferJob getTransferJob(String jobId) {
         return jobs.get(jobId);
@@ -164,11 +142,11 @@ class TestTransferEngine implements TransferEngine {
     }
     
     @Override
-    public Future<Void> shutdown(long timeoutSeconds) {
+    public boolean shutdown(java.time.Duration timeout) {
         shutdown = true;
         jobs.clear();
         activeTransferCount.set(0);
-        return Future.succeededFuture();
+        return true;
     }
 
     @Override

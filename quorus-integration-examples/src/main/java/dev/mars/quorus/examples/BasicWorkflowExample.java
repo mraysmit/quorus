@@ -68,7 +68,7 @@ public class BasicWorkflowExample {
         try {
             // 2. Create transfer engine with Vert.x
             log.step(2, "Creating transfer engine...");
-            TransferEngine transferEngine = new SimpleTransferEngine(vertx, 10, 3, 1024 * 1024);
+            TransferEngine transferEngine = new SimpleTransferEngine(10, 3, 1000); // 10 concurrent, 3 retries, 1 s retry delay
             
             // 3. Create workflow engine with Vert.x
             log.step(3, "Creating workflow engine...");

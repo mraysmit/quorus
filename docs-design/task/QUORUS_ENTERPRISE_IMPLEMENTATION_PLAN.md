@@ -2,7 +2,7 @@
 
 # Quorus Enterprise Implementation Plan
 
-**Version:** 1.35
+**Version:** 1.36
 **Date:** 2026-09-27
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
@@ -110,6 +110,13 @@ for DNS authorization. Delivered on 2026-09-27 under Section 6.1
 - The API Reference is deleted. The REST API Specification holds requirements only, and a test
   fails if its Current rows and the contract disagree.
 - `/api/v1/info` links to the contract instead of carrying its own endpoint list.
+
+**Protocol adapters share one abort target (`ENG-09`, found by `RT-03c`).** The FTP and SFTP adapters each
+keep a single `activeClient` for all their transfers, so `TransferProtocol.abort()` closes only the latest
+connection. Before `RT-03c` the engine called `abort()` on cancel and so could abort the wrong transfer,
+or, for HTTP, every in-flight transfer. The blocking engine cancels by interrupting only the named
+transfer, and `abort()` has no production caller. `RT-03d` decides whether to remove it or make it per
+transfer.
 
 ### Configuration and documentation remediation — 2026-09-25
 
@@ -1319,6 +1326,7 @@ The plan is revised when requirements or implementation evidence change. Revisio
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.36 | 2026-09-27 | Recorded `ENG-09` (shared abort target in the FTP and SFTP adapters), found by `RT-03c`, for decision in `RT-03d` |
 | 1.35 | 2026-09-27 | Recorded `ENG-08` (decision `DR-Q7`): the OpenAPI contract is the only current-API reference, with per-operation scopes, agent statuses, DNS-authorization failure responses and the REST API Specification's Current rows verified by test; the API Reference is deleted and `/api/v1/info` links to the contract. §1 cites the contract in place of the API Reference |
 | 1.34 | 2026-09-27 | Recorded that CI has never passed and that its repair is deferred (`ENG-07`, decision `SEQ-01`), with the consequences for regression evidence, Phase 0 and phase closure. Assigned `SEC-07` (governed TLS trusts only the JVM default anchors) to Phase 4 as a hardening follow-up with acceptance criteria (decision `SEQ-02`). Section 20: corrected `RT-03` to Apache HttpClient 5 and listed its slices; added the `RT-Q5` decision row; corrected `RT-Q4` and `RT-01b` to single-stage images that copy host-built jars, runtime option A; the status now says in progress. §22 records `ARCH-09` as closed by `RT-03b`. §3 baseline is Java 27 |
 | 1.33 | 2026-09-26 | §6.1 evidence retention: keep raw red, green, mutation and characterization output; keep regression and discarded-attempt output as excerpts with the full log hash (DR-Q6 refined) |

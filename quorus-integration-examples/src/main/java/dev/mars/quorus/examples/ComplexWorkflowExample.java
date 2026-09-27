@@ -69,7 +69,7 @@ public class ComplexWorkflowExample {
         Vertx vertx = Vertx.vertx();
         
         try {
-            TransferEngine transferEngine = new SimpleTransferEngine(vertx, 10, 3, 1024 * 1024);
+            TransferEngine transferEngine = new SimpleTransferEngine(10, 3, 1000); // 10 concurrent, 3 retries, 1 s retry delay
             SimpleWorkflowEngine workflowEngine = new SimpleWorkflowEngine(vertx, transferEngine);
             
             // 2. Create complex workflow

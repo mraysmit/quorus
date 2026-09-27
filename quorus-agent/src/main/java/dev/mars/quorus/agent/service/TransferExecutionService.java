@@ -27,6 +27,7 @@ import dev.mars.quorus.connection.SecretProvider;
 import dev.mars.quorus.connection.ServiceConnection;
 import dev.mars.quorus.connection.VaultKvV2SecretProvider;
 import io.vertx.core.Future;
+import io.vertx.core.Promise;
 import io.vertx.core.Vertx;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -75,7 +76,6 @@ public class TransferExecutionService {
         this.closeVertxOnShutdown = closeVertxOnShutdown;
         this.config = Objects.requireNonNull(config, "AgentConfiguration cannot be null");
         this.transferEngine = new SimpleTransferEngine(
-                vertx,  // Pass Vertx to SimpleTransferEngine
                 config.getMaxConcurrentTransfers(),
                 3,      // maxRetryAttempts
                 1000,   // retryDelayMs
@@ -119,7 +119,9 @@ public class TransferExecutionService {
                    request.getSourceUri(), request.getDestinationUri());
 
         try {
-            return transferEngine.submitTransfer(request)
+            // The engine is blocking (RT-03c). Until this module leaves Vert.x (RT-05), the transfer
+            // runs on a Vert.x worker, as the engine's own executeBlocking did before.
+            return vertx.executeBlocking(() -> transferEngine.transfer(request), false)
                 .onComplete(ar -> {
                     if (ar.failed()) {
                         logger.error("Transfer failed: {}", request.getRequestId());
@@ -232,27 +234,43 @@ public class TransferExecutionService {
         logger.info("Shutting down transfer execution service...");
         running = false;
 
-        // Reactively shutdown transfer engine (awaits in-flight transfers, then closes WorkerExecutor)
-        return transferEngine.shutdown(30)
-                .recover(err -> {
-                    logger.warn("Error shutting down transfer engine: {}", err.getMessage());
-                    return Future.succeededFuture();
-                })
-                .compose(v -> closeOwnedVertxIfNeeded())
-                .onComplete(ar -> logger.info("Transfer execution service shutdown complete"));
-    }
-
-    private Future<Void> closeOwnedVertxIfNeeded() {
         if (!closeVertxOnShutdown) {
-            return Future.succeededFuture();
+            // The engine's shutdown blocks until running transfers end, so it runs on a worker.
+            return vertx.executeBlocking(() -> {
+                        stopTransferEngine();
+                        return null;
+                    }, false)
+                    .<Void>mapEmpty()
+                    .onComplete(ar -> logger.info("Transfer execution service shutdown complete"));
         }
 
-        logger.info("Closing internally managed Vert.x instance for TransferExecutionService");
-        return vertx.close()
-                .onSuccess(v -> logger.info("Internally managed Vert.x instance closed for TransferExecutionService"))
-                .recover(err -> {
-                    logger.warn("Failed to close internally managed Vert.x instance: {}", err.getMessage());
-                    return Future.succeededFuture();
-                });
+        // Deprecated constructor: this service owns its Vert.x instance. The shutdown must not run on
+        // that instance, because a continuation bound to its context is never dispatched once it is
+        // closed. So the blocking engine shutdown and the close both run on one short-lived virtual
+        // thread, which completes a promise bound to no context. Removed with Vert.x (RT-05).
+        Promise<Void> done = Promise.promise();
+        Thread.ofVirtual().name("transfer-service-shutdown").start(() -> {
+            stopTransferEngine();
+            logger.info("Closing internally managed Vert.x instance for TransferExecutionService");
+            vertx.close().onComplete(ar -> {
+                if (ar.failed()) {
+                    logger.warn("Failed to close internally managed Vert.x instance: {}", ar.cause().getMessage());
+                }
+                logger.info("Transfer execution service shutdown complete");
+                done.complete();
+            });
+        });
+        return done.future();
+    }
+
+    /** Stops the engine, waiting up to 30 seconds for running transfers to end. Never throws. */
+    private void stopTransferEngine() {
+        try {
+            if (!transferEngine.shutdown(Duration.ofSeconds(30))) {
+                logger.warn("Transfer engine shutdown timed out with transfers still running");
+            }
+        } catch (RuntimeException e) {
+            logger.warn("Error shutting down transfer engine: {}", e.getMessage());
+        }
     }
 }

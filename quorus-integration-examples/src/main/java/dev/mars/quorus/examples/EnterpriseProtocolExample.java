@@ -115,9 +115,9 @@ public class EnterpriseProtocolExample {
         vertx = Vertx.vertx();
 
         // Initialize services with enterprise-optimized settings
-        transferEngine = new SimpleTransferEngine(vertx, 20, 4, 1024 * 1024); // 20 concurrent, 4 threads, 1MB chunks
+        transferEngine = new SimpleTransferEngine(20, 4, 1000); // 20 concurrent, 4 retries, 1 s retry delay
         networkService = new NetworkTopologyService(vertx);
-        protocolFactory = new ProtocolFactory(vertx);
+        protocolFactory = new ProtocolFactory();
         
         log.expectedSuccess("Enterprise services initialized");
     }
@@ -216,8 +216,7 @@ public class EnterpriseProtocolExample {
                     .build();
 
             // Execute transfer (simulation)
-            Future<TransferResult> future = transferEngine.submitTransfer(request);
-            TransferResult result = future.toCompletionStage().toCompletableFuture().get();
+            TransferResult result = transferEngine.transfer(request);
             
             if (result.isSuccessful()) {
                 log.expectedSuccess("SFTP transfer completed successfully");

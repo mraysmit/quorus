@@ -16,6 +16,7 @@
 
 package dev.mars.quorus.examples;
 
+import dev.mars.quorus.concurrent.TaskScope;
 import dev.mars.quorus.config.QuorusConfiguration;
 import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferResult;
@@ -26,8 +27,6 @@ import dev.mars.quorus.transfer.TransferEngine;
 
 import dev.mars.quorus.core.exceptions.TransferException;
 
-import io.vertx.core.Future;
-import io.vertx.core.Vertx;
 
 import java.io.IOException;
 import java.net.URI;
@@ -38,9 +37,6 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 /**
  * Internal Network Transfer Example - Demonstrates Quorus capabilities for corporate network environments.
@@ -93,12 +89,8 @@ public class InternalNetworkTransferExample {
         QuorusConfiguration config = createCorporateNetworkConfiguration();
         log.keyValue("Corporate network configuration loaded", config.toString());
 
-        // Create Vert.x instance for reactive operations
-        Vertx vertx = Vertx.vertx();
-        
-        // Initialize transfer engine with Vert.x and corporate network settings
+        // Initialize the blocking transfer engine with corporate network settings
         TransferEngine transferEngine = new SimpleTransferEngine(
-                vertx,
                 config.getMaxConcurrentTransfers(),  // Higher concurrency for corporate networks
                 config.getMaxRetryAttempts(),        // More retries for reliability
                 config.getRetryDelayMs()             // Faster retry for internal networks
@@ -134,11 +126,11 @@ public class InternalNetworkTransferExample {
             Thread.currentThread().interrupt();
             log.warning("Corporate network transfer example was interrupted: " + e.getMessage());
             // No stack trace for interruption - this is expected behavior
-        } catch (ExecutionException e) {
+        } catch (TaskScope.FailedException e) {
             log.unexpectedError("Internal Network Transfer Example (Execution)", e);
             log.error("This indicates a problem with the transfer execution.");
             e.printStackTrace();
-        } catch (TimeoutException e) {
+        } catch (TaskScope.TimeoutException e) {
             log.warning("Corporate network transfer timed out: " + e.getMessage());
             log.detail("This may indicate network issues or server overload.");
             // No stack trace for timeout - this is expected behavior in some scenarios
@@ -159,8 +151,7 @@ public class InternalNetworkTransferExample {
             // Interrupt and cleanup monitoring threads
             shutdownMonitoringThreads();
 
-            transferEngine.shutdown(10).toCompletionStage().toCompletableFuture().join();
-            vertx.close();
+            transferEngine.shutdown(Duration.ofSeconds(10));
             log.exampleComplete("Corporate network transfer example");
         }
     }
@@ -184,7 +175,7 @@ public class InternalNetworkTransferExample {
     }
     
     private static void runCrmDataSynchronization(TransferEngine transferEngine, Path dataWarehouseDir)
-            throws IOException, InterruptedException, ExecutionException, TimeoutException, TransferException {
+            throws IOException, InterruptedException, TransferException {
         log.testSection("CRM Data Synchronization Example", false);
         log.detail("Scenario: Nightly CRM data export to corporate data warehouse");
         log.detail("Simulating: crm-internal.corp.local -> data-warehouse.corp.local");
@@ -203,11 +194,10 @@ public class InternalNetworkTransferExample {
         
         // Monitor corporate network transfer
         long startTime = System.currentTimeMillis();
-        Future<TransferResult> future = transferEngine.submitTransfer(crmExportRequest);
         monitorCorporateTransfer(transferEngine, crmExportRequest.getRequestId(), "CRM Data Sync");
 
-        // Wait with timeout to prevent hanging
-        TransferResult result = future.toCompletionStage().toCompletableFuture().get(TRANSFER_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        // Bounded by a deadline so the example cannot hang
+        TransferResult result = transferWithTimeout(transferEngine, crmExportRequest);
         long duration = System.currentTimeMillis() - startTime;
         
         log.info("");
@@ -222,18 +212,20 @@ public class InternalNetworkTransferExample {
     }
     
     private static void runDepartmentFileDistribution(TransferEngine transferEngine, Path departmentSharesDir)
-            throws InterruptedException, ExecutionException, TimeoutException, TransferException {
+            throws InterruptedException, TransferException {
         log.testSection("Multi-Department File Distribution Example", false);
         log.detail("Scenario: Monthly reports distribution to department shares");
         log.detail("Simulating: fileserver.corp.local -> department network shares");
         
         // Define department transfer scenarios using constants
-        @SuppressWarnings("unchecked") // Safe generic array creation
-        Future<TransferResult>[] futures = new Future[DEPARTMENTS.length];
-        
+        List<TaskScope.Subtask<TransferResult>> distributions = new ArrayList<>();
+
         log.step("Distributing reports to departments simultaneously...");
-        
-        // Submit all department transfers concurrently
+        long startTime = System.currentTimeMillis();
+
+        // Fork every department transfer in one scope, bounded by one deadline
+        try (TaskScope scope = TaskScope.open("department-distribution",
+                Duration.ofSeconds(TRANSFER_TIMEOUT_SECONDS))) {
         for (int i = 0; i < DEPARTMENTS.length; i++) {
             TransferRequest departmentRequest = TransferRequest.builder()
                     .sourceUri(URI.create("https://httpbin.org/bytes/" + REPORT_SIZES[i]))
@@ -242,26 +234,27 @@ public class InternalNetworkTransferExample {
                     .build();
 
             log.bullet("Distributing to " + DEPARTMENTS[i].toUpperCase() + " department (" + REPORT_SIZES[i] + " bytes)");
-            futures[i] = transferEngine.submitTransfer(departmentRequest);
+            distributions.add(scope.fork(() -> transferEngine.transfer(departmentRequest)));
         }
-        
+
         // Wait for all department distributions to complete
         log.step("Waiting for all department distributions to complete...");
-        long startTime = System.currentTimeMillis();
-        
-        for (int i = 0; i < futures.length; i++) {
-            try {
-                TransferResult result = futures[i].toCompletionStage().toCompletableFuture()
-                        .get(TRANSFER_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-                if (result.isSuccessful()) {
-                    log.success(DEPARTMENTS[i].toUpperCase() + " department: " + result.getBytesTransferred() + " bytes");
-                } else {
-                    log.failure(DEPARTMENTS[i].toUpperCase() + " department transfer failed");
-                }
-            } catch (TimeoutException e) {
-                log.warning(DEPARTMENTS[i].toUpperCase() + " department: TIMEOUT (transfer exceeded " + TRANSFER_TIMEOUT_SECONDS + "s)");
-            } catch (ExecutionException e) {
-                log.error(DEPARTMENTS[i].toUpperCase() + " department: " + e.getCause().getMessage());
+            scope.join();
+        } catch (TaskScope.TimeoutException e) {
+            log.warning("Department distribution: TIMEOUT (exceeded " + TRANSFER_TIMEOUT_SECONDS + "s)");
+        } catch (TaskScope.FailedException e) {
+            log.error("Department distribution failed: " + e.getCause().getMessage());
+        }
+
+        for (int i = 0; i < distributions.size(); i++) {
+            TaskScope.Subtask<TransferResult> distribution = distributions.get(i);
+            if (distribution.state() != TaskScope.Subtask.State.SUCCESS) {
+                log.warning(DEPARTMENTS[i].toUpperCase() + " department: did not complete");
+            } else if (distribution.get().isSuccessful()) {
+                log.success(DEPARTMENTS[i].toUpperCase() + " department: "
+                        + distribution.get().getBytesTransferred() + " bytes");
+            } else {
+                log.failure(DEPARTMENTS[i].toUpperCase() + " department transfer failed");
             }
         }
         
@@ -276,7 +269,7 @@ public class InternalNetworkTransferExample {
     }
     
     private static void runHighThroughputBackupOperation(TransferEngine transferEngine, Path backupDir)
-            throws InterruptedException, ExecutionException, TimeoutException, TransferException {
+            throws InterruptedException, TransferException {
         log.testSection("High-Throughput Backup Operation Example", false);
         log.detail("Scenario: Critical data backup to corporate storage array");
         log.detail("Simulating: production-db.corp.local -> backup-storage.corp.local");
@@ -295,11 +288,10 @@ public class InternalNetworkTransferExample {
         
         // Monitor high-throughput transfer
         long startTime = System.currentTimeMillis();
-        Future<TransferResult> future = transferEngine.submitTransfer(backupRequest);
         monitorCorporateTransfer(transferEngine, backupRequest.getRequestId(), "Backup Operation");
 
-        // Wait with timeout to prevent hanging
-        TransferResult result = future.toCompletionStage().toCompletableFuture().get(TRANSFER_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        // Bounded by a deadline so the example cannot hang
+        TransferResult result = transferWithTimeout(transferEngine, backupRequest);
         long duration = System.currentTimeMillis() - startTime;
         
         log.info("");
@@ -314,16 +306,35 @@ public class InternalNetworkTransferExample {
         log.info("");
     }
     
+    /**
+     * Runs one transfer bounded by {@code TRANSFER_TIMEOUT_SECONDS}. On expiry the scope interrupts
+     * the transfer, the engine ends it as cancelled, and {@link TaskScope.TimeoutException} is thrown.
+     */
+    private static TransferResult transferWithTimeout(TransferEngine transferEngine, TransferRequest request)
+            throws InterruptedException {
+        try (TaskScope scope = TaskScope.open("transfer-" + request.getRequestId(),
+                Duration.ofSeconds(TRANSFER_TIMEOUT_SECONDS))) {
+            TaskScope.Subtask<TransferResult> transfer = scope.fork(() -> transferEngine.transfer(request));
+            scope.join();
+            return transfer.get();
+        }
+    }
+
     private static void monitorCorporateTransfer(TransferEngine transferEngine, String jobId, String operationType) {
         Thread monitorThread = new Thread(() -> {
             try {
                 log.detail("Starting corporate network monitoring for " + operationType + "...");
+                boolean seen = false;
                 while (!Thread.currentThread().isInterrupted()) {
                     var job = transferEngine.getTransferJob(jobId);
                     if (job == null) {
-                        log.warning("Transfer job not found for ID: " + jobId);
-                        break;
+                        if (seen) {
+                            break;              // the transfer has ended and left the engine
+                        }
+                        Thread.sleep(50);       // the transfer has not started yet
+                        continue;
                     }
+                    seen = true;
 
                     if (job.getStatus() == TransferStatus.IN_PROGRESS) {
                         long totalBytes = job.getTotalBytes();

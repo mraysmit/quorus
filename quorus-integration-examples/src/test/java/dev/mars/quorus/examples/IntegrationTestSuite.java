@@ -60,10 +60,10 @@ class IntegrationTestSuite {
     @BeforeEach
     void setUp() {
         vertx = Vertx.vertx();
-        transferEngine = new SimpleTransferEngine(vertx, 10, 4, 1024 * 1024);
+        transferEngine = new SimpleTransferEngine(10, 4, 1000);
         tenantService = new SimpleTenantService();
         workflowEngine = new SimpleWorkflowEngine(vertx, transferEngine);
-        protocolFactory = new ProtocolFactory(vertx);
+        protocolFactory = new ProtocolFactory();
         workflowParser = new YamlWorkflowDefinitionParser();
     }
 
