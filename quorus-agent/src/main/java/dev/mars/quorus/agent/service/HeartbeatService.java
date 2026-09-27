@@ -16,105 +16,81 @@
 
 package dev.mars.quorus.agent.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.mars.quorus.agent.config.AgentConfiguration;
-import io.vertx.core.Future;
-import io.vertx.core.Vertx;
-import io.vertx.core.json.JsonObject;
-import io.vertx.ext.web.client.WebClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Service for sending heartbeats to the Quorus controller.
- * Uses Vert.x WebClient for non-blocking HTTP communication.
- * 
+ * Service for sending heartbeats to the Quorus controller. Calls block the calling thread (RT-05a).
+ *
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @since 2025-09-04
- * @version 2.0 (Migrated to Vert.x WebClient - T3.1)
+ * @version 3.0
  */
 public class HeartbeatService {
-    
+
     private static final Logger logger = LoggerFactory.getLogger(HeartbeatService.class);
-    
+    private static final ObjectMapper JSON = new ObjectMapper();
+
     private final AgentConfiguration config;
     private final AgentRegistrationService registrationService;
-    private final WebClient webClient;
+    private final ControllerClient client;
     private final AtomicLong sequenceNumber = new AtomicLong(0);
-    
-    public HeartbeatService(Vertx vertx, AgentConfiguration config, AgentRegistrationService registrationService) {
-        this.config = config;
-        this.registrationService = registrationService;
-        this.webClient = ControllerWebClientFactory.create(vertx, config);
-        logger.debug("HeartbeatService initialized with Vert.x WebClient (connectTimeout={}ms, idleTimeout={}ms)",
-            config.getHttpConnectionTimeout(), config.getHttpIdleTimeout());
+
+    public HeartbeatService(ControllerClient client, AgentConfiguration config,
+                            AgentRegistrationService registrationService) {
+        this.client = Objects.requireNonNull(client, "client");
+        this.config = Objects.requireNonNull(config, "config");
+        this.registrationService = Objects.requireNonNull(registrationService, "registrationService");
     }
-    
+
     /**
-     * Sends a heartbeat to the controller.
-     * 
-     * @return Future that completes with true if successful, false otherwise
+     * Sends a heartbeat to the controller. An agent that is not registered sends none.
+     *
+     * @return true if the controller acknowledged it; false if not registered, refused or unreachable
+     * @throws InterruptedException if the calling thread is interrupted
      */
-    public Future<Boolean> sendHeartbeat() {
+    public boolean sendHeartbeat() throws InterruptedException {
         if (!registrationService.isRegistered()) {
-            // TODO: so agent is lost if not registered? what does this evern mean?
             logger.debug("Agent not registered, skipping heartbeat");
-            return Future.succeededFuture(false);
+            return false;
         }
-        
-        JsonObject request = createHeartbeatRequest();
-        String url = config.getControllerUrl() + "/agents/heartbeat";
-        
-        return webClient.postAbs(url)
-            .putHeader("Content-Type", "application/json")
-            .sendJsonObject(request)
-            .map(response -> {
-                int statusCode = response.statusCode();
-                if (statusCode == 200) {
-                    logger.debug("Heartbeat sent successfully for agent {}", config.getAgentId());
-                    return true;
-                } else {
-                    logger.warn("Heartbeat failed for agent {}: HTTP {}", 
-                              config.getAgentId(), statusCode);
-                    return false;
-                }
-            })
-            .recover(err -> {
-                logger.error("Error sending heartbeat for agent {}: {}", 
-                           config.getAgentId(), err.getMessage());
-                return Future.succeededFuture(false);
-            });
+        try {
+            ControllerClient.Response response = client.postJson(config.getControllerUrl() + "/agents/heartbeat",
+                    JSON.writeValueAsString(createHeartbeatRequest()));
+            if (response.status() == 200) {
+                logger.debug("Heartbeat sent successfully for agent {}", config.getAgentId());
+                return true;
+            }
+            logger.warn("Heartbeat failed for agent {}: HTTP {}", config.getAgentId(), response.status());
+            return false;
+        } catch (IOException e) {
+            logger.error("Error sending heartbeat for agent {}: {}", config.getAgentId(), e.getMessage());
+            return false;
+        }
     }
-    
-    private JsonObject createHeartbeatRequest() {
+
+    private ObjectNode createHeartbeatRequest() {
         Runtime runtime = Runtime.getRuntime();
-        
-        JsonObject metrics = new JsonObject()
-            .put("memoryUsed", runtime.totalMemory() - runtime.freeMemory())
-            .put("memoryTotal", runtime.totalMemory())
-            .put("memoryMax", runtime.maxMemory())
-            .put("cpuCores", runtime.availableProcessors());
-        
-        return new JsonObject()
-            .put("agentId", config.getAgentId())
-            .put("timestamp", Instant.now().toString())
-            .put("sequenceNumber", sequenceNumber.incrementAndGet())
-            .put("status", "active")
-            .put("currentJobs", 0) // TODO: Get actual job count
-            .put("availableCapacity", config.getMaxConcurrentTransfers())
-            .put("metrics", metrics);
-    }
-    
-    /**
-     * Shuts down the WebClient.
-     * 
-     * @return Future that completes when shutdown is done
-     */
-    public Future<Void> shutdown() {
-        logger.debug("Shutting down HeartbeatService WebClient");
-        webClient.close();
-        return Future.succeededFuture();
+        ObjectNode request = JSON.createObjectNode()
+                .put("agentId", config.getAgentId())
+                .put("timestamp", Instant.now().toString())
+                .put("sequenceNumber", sequenceNumber.incrementAndGet())
+                .put("status", "active")
+                .put("currentJobs", 0) // TODO: Get actual job count
+                .put("availableCapacity", config.getMaxConcurrentTransfers());
+        request.putObject("metrics")
+                .put("memoryUsed", runtime.totalMemory() - runtime.freeMemory())
+                .put("memoryTotal", runtime.totalMemory())
+                .put("memoryMax", runtime.maxMemory())
+                .put("cpuCores", runtime.availableProcessors());
+        return request;
     }
 }

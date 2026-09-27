@@ -12,8 +12,6 @@ import dev.mars.quorus.connection.SecretProvider;
 import dev.mars.quorus.connection.SecretReference;
 import dev.mars.quorus.connection.ServiceConnection;
 import org.junit.jupiter.api.Test;
-import io.vertx.core.json.JsonArray;
-import io.vertx.core.json.JsonObject;
 
 import java.net.InetAddress;
 import java.net.URI;
@@ -29,23 +27,15 @@ class AgentGovernedConnectionTest {
     @Test
     void agentDecoderAcceptsControllerContractCaseAndDefaults() {
         Instant now = Instant.parse("2026-09-05T00:00:00Z");
-        JsonObject json = new JsonObject()
-                .put("serviceConnectionId", "codec-connection").put("tenantId", "bank-a")
-                .put("protocol", "sftp").put("endpoint", "sftp://192.0.2.10")
-                .put("networkZone", "restricted-egress")
-                .put("allowedPaths", new JsonArray().add("/in"))
-                .put("allowedDirections", new JsonArray().add("download"))
-                .put("allowedAgentPools", new JsonArray().add("payments"))
-                .put("owner", "payments-ops").put("environment", "production")
-                .put("classification", "confidential").put("secretReferenceId", "payments-key")
-                .put("serviceIdentity", "payments-batch").put("authenticationType", "password")
-                .put("trustPolicy", new JsonObject()
-                        .put("sshHostKeyFingerprints", new JsonArray().add("SHA256:known")))
-                .put("egressPolicy", new JsonObject()
-                        .put("allowedHostnames", new JsonArray().add("192.0.2.10"))
-                        .put("allowedCidrs", new JsonArray().add("192.0.2.0/24"))
-                        .put("allowedPorts", new JsonArray().add(22)))
-                .put("createdAt", now.toString()).put("updatedAt", now.toString());
+        String json = """
+                {"serviceConnectionId":"codec-connection","tenantId":"bank-a","protocol":"sftp",
+                 "endpoint":"sftp://192.0.2.10","networkZone":"restricted-egress","allowedPaths":["/in"],
+                 "allowedDirections":["download"],"allowedAgentPools":["payments"],"owner":"payments-ops",
+                 "environment":"production","classification":"confidential","secretReferenceId":"payments-key",
+                 "serviceIdentity":"payments-batch","authenticationType":"password",
+                 "trustPolicy":{"sshHostKeyFingerprints":["SHA256:known"]},
+                 "egressPolicy":{"allowedHostnames":["192.0.2.10"],"allowedCidrs":["192.0.2.0/24"],"allowedPorts":[22]},
+                 "createdAt":"%s","updatedAt":"%s"}""".formatted(now, now);
 
         ServiceConnection decoded = AgentConnectionPolicyService.parseConnection(json);
 

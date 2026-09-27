@@ -2,7 +2,7 @@
 
 # Quorus Enterprise Implementation Plan
 
-**Version:** 1.37
+**Version:** 1.38
 **Date:** 2026-09-27
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
@@ -1223,7 +1223,7 @@ Quorus stops owning a Raft engine and consumes QRaft's engine through a 100% gen
 | **RT-03** | `quorus-core` | Protocol adapters run blocking I/O on virtual threads with no `executeBlocking`. The HTTP adapter uses Apache HttpClient 5 (`RT-Q5`) and streams to and from files, closing `ARCH-09`. Delivered in slices: `RT-03a` removes dead connection-pool code; `RT-03b` rewrites the HTTP adapter; `RT-03c` makes the `TransferEngine` blocking on virtual threads and moves its agent, workflow and example callers to that API; `RT-03d` removes `transferReactive` and `Vertx` from the protocol contract and `ProtocolFactory`; `RT-03e` moves `NetworkTopologyService` and the codec off Vert.x, using Jackson for the codec; `RT-03f` leaves no `io.vertx` dependency in the `quorus-core` pom |
 | **RT-Q5** | Decision: HTTP client for the HTTP transfer adapter | ✅ Decided 2026-09-26: Apache HttpClient 5 (classic API). Measured on JDK 27 GA: `java.net.http` cannot connect to an approved address while keeping SNI, `Host` and hostname verification on the service's hostname (ADR-0012) |
 | **RT-04** | `quorus-workflow` and `quorus-integration-examples` | No Vert.x types. Workflow execution uses structured scopes |
-| **RT-05** | `quorus-agent` | Transfers run on virtual threads, so cancellation interrupts blocked I/O at once. Controller client on `java.net.http.HttpClient` with mutual TLS and hostname verification. Registration, heartbeat and polling run as structured loops with bounded shutdown. The Phase 1 agent trust tests and R3 reporting tests pass |
+| **RT-05** | `quorus-agent` | Transfers run on virtual threads, so cancellation interrupts blocked I/O at once. Controller client on `java.net.http.HttpClient` with mutual TLS and hostname verification. Registration, heartbeat and polling run as structured loops with bounded shutdown. The Phase 1 agent trust tests and R3 reporting tests pass. Delivered in slices: `RT-05a` moves the controller client to `java.net.http` (with a JDK PEM loader in core) and makes the registration, heartbeat, polling and status-reporting services blocking; `RT-05b` replaces the agent runtime (Vert.x timers, futures, the transfer service, the health endpoint and the tracing integration) and leaves no `io.vertx` dependency in the `quorus-agent` pom |
 | **RT-06** | `quorus-controller` | HTTP API on the `RT-Q2` server with TLS 1.3 and required client certificates. Authentication, authorization and audit middleware preserved. `OpenApiContractTest` stays equal. The `CE-07` bridge is removed |
 | **RT-07** | Observability | OpenTelemetry traces, metrics and log correlation for the new HTTP server and client, replacing Vert.x tracing integration |
 | **RT-08** | Vert.x removal gate | No `io.vertx` artifact in any module. A build check fails if one is reintroduced |
@@ -1234,7 +1234,7 @@ Quorus stops owning a Raft engine and consumes QRaft's engine through a 100% gen
 1. `RT-01` can start at once and has no dependency on QRaft. `RT-02` delivers the task-scope abstraction before any module migration uses it.
 2. `CE-01` to `CE-06` (QRaft) run in parallel with `RT-01` to `RT-04`.
 3. `CE-07` to `CE-11` follow `CE-06`. Adopting QRaft removes Quorus's largest Vert.x-coupled component, the Raft node and its gRPC transport, before the controller HTTP migration.
-4. `RT-05` and `RT-06` follow. `RT-06` should precede the bulk of Phase 6 so that new REST resources are written once.
+4. `RT-06` follows. It should precede the bulk of Phase 6 so that new REST resources are written once. `RT-05` does not wait for QRaft: the agent has no Raft code and depends on no `CE` item, so it follows `RT-04` directly (decided 2026-09-27).
 5. Phase 8 durability work and the R1-2 and R1-3 acceptance runs should follow `CE-11`, so that production-filesystem and power-loss evidence describes the engine that will ship.
 
 Phases 2 and 3 continue meanwhile. Their new code must avoid adding Vert.x coupling that `RT` would have to remove: new logic sits behind JDK-typed interfaces where practical.
@@ -1340,6 +1340,7 @@ The plan is revised when requirements or implementation evidence change. Revisio
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.38 | 2026-09-27 | §20: `RT-05` no longer waits for `CE-07` to `CE-11` (the agent has no Raft code) and follows `RT-04`; its slices `RT-05a` and `RT-05b` are defined |
 | 1.37 | 2026-09-27 | §6.1: a slice's record is its commit message; raw logs, manifests, hashes and patches are no longer kept (`DR-Q6` revised). Recorded the `RT-03c` follow-up: `ENG-09` resolved; `ENG-10` found and resolved (adapter and agent in-flight progress), with a dated correction to the Phase 3 checkpoint; `SEC-08` resolved; `ENG-11` recorded. `RT-05` acceptance now includes running transfers on virtual threads |
 | 1.36 | 2026-09-27 | Recorded `ENG-09` (shared abort target in the FTP and SFTP adapters), found by `RT-03c`, for decision in `RT-03d` |
 | 1.35 | 2026-09-27 | Recorded `ENG-08` (decision `DR-Q7`): the OpenAPI contract is the only current-API reference, with per-operation scopes, agent statuses, DNS-authorization failure responses and the REST API Specification's Current rows verified by test; the API Reference is deleted and `/api/v1/info` links to the contract. §1 cites the contract in place of the API Reference |

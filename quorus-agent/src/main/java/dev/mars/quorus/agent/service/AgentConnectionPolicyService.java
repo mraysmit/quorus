@@ -20,11 +20,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import io.vertx.core.json.JsonArray;
-import io.vertx.core.json.JsonObject;
-import java.net.URI;
-import java.time.Instant;
-import java.util.Set;
 
 /** Agent-side enforcement boundary. Policy is evaluated before any provider is called. */
 public final class AgentConnectionPolicyService {
@@ -62,24 +57,15 @@ public final class AgentConnectionPolicyService {
         }
     }
 
-    // The codec's API is JSON text (RT-03e); the agent converts until it leaves Vert.x (RT-05).
-    public static ServiceConnection parseConnection(JsonObject json) {
-        return ServiceConnectionJsonCodec.decodeConnection(json.encode());
+    /** Decodes the service connection of an assignment, sent as {@link ServiceConnectionJsonCodec} text. */
+    public static ServiceConnection parseConnection(String json) {
+        return ServiceConnectionJsonCodec.decodeConnection(json);
     }
 
-    public static SecretReference parseSecret(JsonObject json) {
-        return ServiceConnectionJsonCodec.decodeSecret(json.encode());
+    /** Decodes the secret reference of an assignment, sent as {@link ServiceConnectionJsonCodec} text. */
+    public static SecretReference parseSecret(String json) {
+        return ServiceConnectionJsonCodec.decodeSecret(json);
     }
-
-    private static Set<String> strings(JsonArray values) {
-        return values == null ? Set.of() : values.stream().map(String::valueOf)
-                .collect(Collectors.toUnmodifiableSet());
-    }
-    private static Set<Integer> integers(JsonArray values) {
-        return values == null ? Set.of() : values.stream().map(v -> ((Number) v).intValue())
-                .collect(Collectors.toUnmodifiableSet());
-    }
-    private static Instant instant(String value) { return value == null ? null : Instant.parse(value); }
 
     public record AuthorizedConnection(ResolvedConnection resolved, RuntimeCredential runtimeCredential)
             implements AutoCloseable {

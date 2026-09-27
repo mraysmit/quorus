@@ -2,8 +2,8 @@
 
 # Quorus Security Deployment Guide
 
-**Version:** 1.7
-**Date:** 2026-09-25
+**Version:** 1.8
+**Date:** 2026-09-27
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Status:** Phase 1 implementation guide  
@@ -134,6 +134,8 @@ QUORUS_AGENT_TLS_TRUST_BUNDLE=/run/secrets/controller-ca.crt
 ```
 
 Hostname verification and `trustAll=false` are enforced. A production build does not silently fall back to HTTP or an untrusted certificate.
+
+The agent's private key must be an unencrypted PKCS#8 PEM file (`-----BEGIN PRIVATE KEY-----`), which is what OpenSSL 3 writes by default; RSA, EC and EdDSA keys are accepted. The agent refuses to start with a PKCS#1 key (`-----BEGIN RSA PRIVATE KEY-----`) or an encrypted key, and names the file. Convert a PKCS#1 key with `openssl pkcs8 -topk8 -nocrypt -in agent-rsa.key -out agent.key`. The certificate file may hold the agent certificate followed by its intermediates, and the trust bundle may hold several certificates, for example during a controller CA rotation.
 
 ## 6. Authorization model
 
