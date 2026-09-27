@@ -2,8 +2,8 @@
 
 # Quorus Architecture Specification
 
-**Version:** 2.9
-**Date:** 2026-09-25
+**Version:** 2.10
+**Date:** 2026-09-27
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Status:** Canonical and normative  
@@ -27,7 +27,7 @@ The terms **MUST**, **MUST NOT**, **SHOULD**, **SHOULD NOT**, and **MAY** descri
 
 ## 2. Product Boundary
 
-Quorus is a Java 25 and Vert.x 5 file-transfer platform with two execution modes:
+Quorus is a Java 27 file-transfer platform, currently built on Vert.x 5 and moving off it module by module ([ADR-0012](../docs-design/architecture-decisions/ADR-0012-JAVA-RUNTIME-AND-STRUCTURED-CONCURRENCY.md)). It has two execution modes:
 
 1. **Direct execution:** an application invokes `quorus-core` or `quorus-workflow` in-process.
 2. **Distributed execution:** controller nodes coordinate work through Raft-replicated metadata and agents execute transfers.
@@ -761,7 +761,7 @@ These are acceptance gates, not claims about the current alpha. A gate must have
 | Agent drain and upgrade | In 100 induced upgrades, draining agents accept zero new jobs and publish zero unauthorized partial final files | Not yet evidenced |
 | Revocation | 100% of revoked agents are rejected within the configured revocation propagation limit and cannot publish a newly fenced attempt | Not implemented |
 | SFTP identity | Unknown and changed host keys fail in 100% of governed protocol tests | Achieved for governed production transfers with SHA-256 host-key pins; development-only direct URI compatibility remains explicitly outside the production authority |
-| Large HTTP transfer memory | Ten concurrent files larger than the agent heap complete with bounded streaming memory and no full-file buffering | Not achieved by the current HTTP adapter |
+| Large HTTP transfer memory | Ten concurrent files larger than the agent heap complete with bounded streaming memory and no full-file buffering | The HTTP adapter streams downloads and uploads without buffering the payload (`RT-03b`, 2026-09-26); the ten-file measurement has not been run |
 | Static three-node formation | 100 consecutive clean starts elect exactly one leader and agree on membership | Test evidence required |
 | Snapshot recovery | Restored state hash equals committed pre-restart state in 100 consecutive snapshot/replay tests | Test evidence required |
 
@@ -793,7 +793,7 @@ Capacity figures such as requests per second, heartbeats per second, concurrent 
 | ARCH-12 | Partial | High | The job model includes business service, owner, criticality, expected start, required completion time, runbook URL, and labels; escalation policy and full operational consumption remain incomplete | Blocks complete automated escalation, not capture of operational context |
 | ARCH-16 | Open | High | No canonical signed-artifact admission, hardened runtime, controlled drain, upgrade, rollback, and decommissioning process | Blocks governed enterprise agent deployment |
 | ARCH-17 | Closed | — | Production requires aliases and opaque references; direct URI compatibility is development-only and the redacted scanner inventories migration findings | Route/workflow adoption remains gated by their later activation phases rather than an active bypass |
-| ARCH-09 | Open | Medium | HTTP adapter buffers complete payloads | Blocks bounded-memory large-file claim |
+| ARCH-09 | Closed | — | The HTTP adapter streams downloads to a staged file that is moved into place, and streams uploads from the file, without buffering the payload ([RT-03b evidence](../docs-design/evidence/rt-03b-http-adapter-2026-09-26.json)) | The bounded-memory large-file claim still needs the Phase 12 measurement in §13 |
 | ARCH-10 | Open | Medium | Dynamic Raft membership is absent | Blocks live controller scale-out claims |
 
 This table SHOULD be updated whenever implementation changes. A gap is removed only when code, automated verification, and relevant operational documentation agree.

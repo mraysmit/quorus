@@ -2,8 +2,8 @@
 
 # Quorus Outstanding Work Register
 
-**Version:** 1.8
-**Date:** 2026-09-26
+**Version:** 1.9
+**Date:** 2026-09-27
 **Author:** Mark Ray-Smith — Cityline Ltd
 **License:** Apache 2.0
 **Status:** Active — the single task list: every open task and decision across the current and archived planning documents and reviews
@@ -28,7 +28,9 @@ configuration defects are Section I, and its decisions are in the §3 decision l
 now holds only the enterprise plan, which controls delivery, and this register. Do not start
 another task list: add work here, following §15.
 
-**This register is derivative, not normative.** Precedence is unchanged:
+**This register is not normative.** It owns the identity and status of every task, the Section H
+documentation tasks and the §3 decision log. It does not own requirements or acceptance
+criteria. Precedence is unchanged:
 
 1. [Quorus Architecture Specification](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md) and
    [Quorus REST API Specification](../../docs/QUORUS_REST_API_SPECIFICATION.md) remain the
@@ -38,7 +40,8 @@ another task list: add work here, following §15.
    Done, and the §6.1 mandatory TDD protocol are defined there and are **not** restated or
    weakened here.
 3. This register lists and identifies the open items. Where it disagrees with a source
-   document, the source document's requirement wins and this register is corrected.
+   document's requirement, the requirement wins and this register is corrected. Where a source's
+   status statement is out of date, the source is corrected (§15.1).
 
 Closing an item here does not close a phase exit gate. Phase closure follows
 [§24 Plan Governance](QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md) of the enterprise plan.
@@ -47,7 +50,7 @@ Closing an item here does not close a phase exit gate. Phase closure follows
 
 | Document | Role | Contribution to this register |
 |---|---|---|
-| [QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md](QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md) v1.30 | Controlling roadmap | Sections A–D, F, I, J |
+| [QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md](QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md) v1.34 | Controlling roadmap | Sections A–D, F, I, J |
 | [QUORUS_DOCUMENTATION_REVIEW_TASKS.md](../archive/QUORUS_DOCUMENTATION_REVIEW_TASKS.md) v1.7 — archived 2026-09-26, merged here | Documentation review remediation | Sections H and I, §3 decision log |
 | [ADR-0011](../architecture-decisions/ADR-0011-CONSENSUS-VIA-QRAFT-GENERIC-ENGINE.md), [ADR-0012](../architecture-decisions/ADR-0012-JAVA-RUNTIME-AND-STRUCTURED-CONCURRENCY.md) | Platform decisions | Section J, §3 decision log |
 | [QUORUS_OPENTELEMETRY_INTEGRATION_TESTING_PLAN.md](../archive/QUORUS_OPENTELEMETRY_INTEGRATION_TESTING_PLAN.md) v2.6 — archived | Observability backlog and collector/test reference | Section E |
@@ -71,8 +74,11 @@ or, for telemetry items, directly into Section E here.
 
 Every implementation item below is delivered under the §6.1 mandatory TDD protocol:
 preserved behavioral red through a real HTTP, agent, protocol, or cluster boundary before
-implementation, then green, refactor, and regression, with retained evidence. Awaitility,
-sleeps as synchronization, and non-Vert.x polling are not permitted in new or remediated tests.
+implementation, then green, refactor, and regression, with retained evidence. Asynchronous
+tests follow the rules in plan §6.1. Code that has left Vert.x uses the test standard in
+[concurrency conventions §6](../dev/QUORUS_CONCURRENCY_CONVENTIONS.md#6-asynchronous-test-standard).
+While CI is red (`ENG-07`, deferred by `SEQ-01`), a slice's regression evidence is its local
+full-reactor run.
 
 ---
 
@@ -80,7 +86,7 @@ sleeps as synchronization, and non-Vert.x polling are not permitted in new or re
 
 | Section | Area | Open items | Blocking level |
 |---|---|---|---|
-| §3 | Decision log | 10 taken, 4 open (DR-Q1, DR-Q3, DR-Q4, DR-Q5) | Open decisions block named tasks |
+| §3 | Decision log | 12 taken, 4 open (DR-Q1, DR-Q3, DR-Q4, DR-Q5) | Open decisions block named tasks |
 | A | R1 durability acceptance and related process items | 4 open (R1-2, R1-3, R1-4, PROC-01), 1 closed | 🔴 Release blocker |
 | B | Phase 2 — attempts, integrity, reconciliation | 13 | 🟡 Phase blocker |
 | C | Phase 3 — transfer operations telemetry | 12 | 🟡 Phase blocker |
@@ -88,16 +94,18 @@ sleeps as synchronization, and non-Vert.x polling are not permitted in new or re
 | E | Observability and logging backlog | 11 open (OBS-04, -05, -08, -14 closed) | 🟠 Backlog |
 | F | Absorbed and superseded historical tasks | 10 | — reference only |
 | G | Deferred and research | 8 deferred, 1 superseded | 🟢 Deferred |
-| H | Documentation remediation (from the 2026-09-24 review) | 47 tasks: 9 done, 7 in progress, 29 open, 2 superseded | 🔵 Documentation |
-| I | Configuration and documentation-review delivery items | 17 open, 1 closed | 🟠 Backlog |
-| J | Platform migration — QRaft consensus and Vert.x exit | 21 open (11 CE, 10 RT), 4 decisions taken | 🟡 / 🔴 by item |
+| H | Documentation remediation (from the 2026-09-24 review) | 36 listed: 26 open, 6 in progress, 3 done, 1 superseded. 11 more, done or superseded by v1.8, moved to the revision history in v1.9 | 🔵 Documentation |
+| I | Configuration and documentation-review delivery items | 18 open, 1 closed | 🟠 Backlog, one 🟡 (`ENG-07`) |
+| J | Platform migration — QRaft consensus and Vert.x exit | 18 open (11 CE; 7 RT, of which `RT-03` is in progress), 3 RT done. Decisions `RT-Q1`–`RT-Q5` are in §3 | 🟡 / 🔴 by item |
 
 **Phase position:** Phase 1 complete. Phase 0 is functionally complete, but its durability
 acceptance stays reopened until `R1-2` and `R1-3` close. Phase 4 is complete: the acceptance
 reopened by the 2026-09-04 remediation checkpoint was restored when R2–R6 completed on
 2026-09-05. Phases 2 and 3 in progress. Phases 5–12 not started. The R1 remediation slice is
 complete in code; `R1-1` container-recreation acceptance closed on 2026-09-07, and `R1-2` and
-`R1-3` remain open and still block the release claim.
+`R1-3` remain open and still block the release claim. Phase 4 has one hardening follow-up open
+(`SEC-07`). The platform migration (Section J) is in progress. CI has never passed, and its
+repair is deferred (`ENG-07`, `SEQ-01`); no phase can close until it is fixed.
 
 ---
 
@@ -117,8 +125,10 @@ An open decision names the work it blocks.
 | **DR-Q2** | Runtime revocation scope | Node-local and volatile: send the full set to every controller and persist it in configuration before restart | ADR-0009 (to be written, DR-D4) | `SEC-02`, DR-A4 | ✅ 2026-09-25 |
 | **DR-Q6** | Raw evidence retention | Cited evidence lives under `docs-design/evidence/raw/<slice-id>/`, never `temp/`. Refined 2026-09-26: raw red, green, mutation and characterization output is committed in full; regression, repeat and discarded-attempt output is committed as an excerpt with the full log's SHA-256. `.gitignore` re-admits `docs-design/evidence/raw/**`, because the `*.log` rule had kept every evidence log out of git until then | Plan §6.1; [raw evidence index](../evidence/raw/INDEX.md) | DR-C10, DR-A1 | ✅ 2026-09-26 |
 | **STATUS-01** | Phase 0 and Phase 4 status wording | Phase 0 functionally complete, with durability acceptance reopened until R1-2 and R1-3; Phase 4 complete, its 2026-09-04 reopening restored by R2–R6 | Plan header, §7, §11 | Section 2 phase position | ✅ 2026-09-26 |
-| **RT-Q4** | Java 27 container image vendor | **Amazon Corretto 27** (`amazoncorretto:27*`, amd64 and arm64, published 2026-09-18). Temurin had no Java 27 images and the official `openjdk` image offers only non-production `27-rc` tags (checked 2026-09-26). No official `maven` image carries Java 27, so the builder adds a pinned, checksum-verified Maven. Runtime image variant still to confirm: Corretto 27 has no JRE-only Alpine image | ADR-0012 | `RT-01b`, Docker-tagged lanes, DR-C11 verification | ✅ 2026-09-26 (vendor); variant open |
+| **RT-Q4** | Java 27 container images | **Amazon Corretto 27** (amd64 and arm64, published 2026-09-18). Temurin had no Java 27 images, and the official `openjdk` image offers only non-production `27-rc` tags (checked 2026-09-26). Runtime variant: option A, `amazoncorretto:27.0.0-alpine3.24`, because Corretto 27 has no JRE-only Alpine image. The images are single-stage and copy jars built on the host. No image contains Maven or a builder stage | ADR-0012 v1.2 | `RT-01b`, Docker-tagged lanes, `RT-09` | ✅ 2026-09-26 |
 | **RT-Q5** | HTTP client for the HTTP transfer adapter | Apache HttpClient 5 (classic API). `java.net.http` cannot connect to a pinned IP while enforcing hostname verification and sending the correct `Host` (measured 2026-09-26) | ADR-0012 | `RT-03b` | ✅ 2026-09-26 |
+| **SEQ-01** | When to repair CI, which has never passed (`ENG-07`) | Defer the repair and continue platform work first. Until then, each slice's regression evidence is its local full-reactor run. No phase can close while `ENG-07` is open, because plan §6.1 step 5 requires every applicable lane to pass | Plan §4 (2026-09-27), Phase 0 status | `ENG-07`, DR-D2 | ✅ 2026-09-27 |
+| **SEQ-02** | Where the governed TLS trust-anchor gap (`SEC-07`) is delivered | A Phase 4 hardening follow-up: trust-anchor certificates configured and audited by Quorus, narrowed by the existing approved-CA fingerprints. It must close before any production service connection relies on a private CA | Plan §4 and §11 (2026-09-27) | `SEC-07` | ✅ 2026-09-27 |
 | **DR-Q1** | Workflow YAML semantics (review §4.3) | (a) Change the guides to match the parser and engine; (b) implement `execution.dryRun`, `parallelism`, `timeout` and `strategy`, group `retryCount`, `options` pass-through and recursive variable substitution | ADR-0010 when decided | DR-B4, DR-D4 | ⬜ |
 | **DR-Q3** | Elevation for direct mTLS identities (review §6 #8) | (a) Document that only gateway-asserted identities can hold elevation; (b) add a direct-binding elevation mechanism | — | DR-B5, `SEC-06` | ⬜ |
 | **DR-Q4** | How `*IT` and `*Benchmark` classes run (review §6 #18) | (a) Add the Failsafe plugin; (b) rename the classes and tag them | — | `ENG-02`, DR-F16 | ⬜ |
@@ -381,8 +391,8 @@ From [QUORUS_OPENTELEMETRY_INTEGRATION_TESTING_PLAN.md](../archive/QUORUS_OPENTE
 | **OBS-02** | Test execution script with reproducible pass/fail reporting | scripts | 🟠 MEDIUM |
 | **OBS-03** | Bridge `requestId` ↔ OTel `traceId` end to end | controller | 🟡 HIGH |
 | **OBS-06** | Add INFO success log to `JobStatusReportingService` (re-verified open 2026-09-26: no INFO call) | agent | 🟠 MEDIUM |
-| **OBS-07** | Audit the 37 DEBUG statements in `SimpleTransferEngine` — promote, demote to TRACE, or remove (count corrected from 53 on 2026-09-26) | core | 🟠 MEDIUM |
-| **OBS-15** | Await discarded `RaftNode.start()` / server `start()` futures in roughly twenty controller tests (`HttpApiServerHealthTest`, `JobAssignmentHandlerTest`, `StateTransitionIntegrationTest`, `GrpcRaftServerTest`, `RaftFailureTest` and others). Same latent race as the fixed `LeaderGuardHandlerTest` flake, but with no observed failures; needs a deliberate verified pass, not a blind sweep | controller test | 🟠 MEDIUM |
+| **OBS-07** | Audit the 37 DEBUG statements in `SimpleTransferEngine` — promote, demote to TRACE, or remove (count corrected from 53 on 2026-09-26, re-verified 2026-09-27). `RT-03c` rewrites this class, so do the audit in `RT-03c`'s refactor step | core | 🟠 MEDIUM |
+| **OBS-15** | Await discarded `RaftNode.start()` / server `start()` futures in roughly twenty controller tests (`HttpApiServerHealthTest`, `JobAssignmentHandlerTest`, `StateTransitionIntegrationTest`, `GrpcRaftServerTest`, `RaftFailureTest` and others). Same latent race as the fixed `LeaderGuardHandlerTest` flake, but with no observed failures; needs a deliberate verified pass, not a blind sweep. Do not start before `CE-07`/`CE-10`: many of these tests exercise the in-repository engine that `CE-10` removes, so re-scope the list then | controller test | 🟠 MEDIUM |
 | **OBS-09** | Per-protocol adapter metrics | core | 🟠 MEDIUM |
 | **OBS-10** | Tracing for HTTP, SFTP, FTP and SMB protocol adapters | core | 🟠 MEDIUM |
 | **OBS-11** | Service-level tracing for `AgentRegistrationService`, `HeartbeatService`, `JobPollingService` | agent | 🟢 LOW |
@@ -418,11 +428,11 @@ Verified against live source on 2026-09-07. The corresponding OTel plan correcti
 | Implement Raft persistence (custom WAL) | Complete — now the external `raftlog-core` WAL, per enterprise plan §4 |
 | Add Raft log compaction / snapshotting | Complete — RaftLog 1.2.0 prefix compaction after caller-owned durable snapshots |
 | Implement InstallSnapshot RPC | Complete — alpha plan T5.3, chunked with `SnapshotChunkAssembler` |
-| Replace Apache HttpClient with Vert.x WebClient (agent) | Complete — alpha plan T3.1 |
+| Replace Apache HttpClient with Vert.x WebClient (agent) | Complete — alpha plan T3.1. The direction has since been reversed by ADR-0012: `RT-05` replaces the agent's `WebClient` with `java.net.http`, and the HTTP transfer adapter now uses Apache HttpClient 5 (`RT-Q5`) |
 | Replace Java Serialization with Protobuf | Complete — alpha plan T5.4, now at version 2 command/snapshot contracts |
 | Add gRPC TLS encryption | Complete — Phase 1 delivered TLS 1.3 mutual authentication for Raft server and peer clients |
 | Add `TransferProtocol.abort()` | Present at `quorus-core/.../protocol/TransferProtocol.java:87` as a default method |
-| Fix tenant module synchronized bottleneck | Substantially resolved — one `synchronized` occurrence remains in `SimpleTenantService`; re-scope as 🟢 LOW rather than 🟠 MEDIUM |
+| Fix tenant module synchronized bottleneck | Resolved. The one remaining `synchronized` in `SimpleTenantService` is in a Javadoc comment recording its removal (re-verified 2026-09-27); no action |
 
 ---
 
@@ -462,9 +472,8 @@ Deferral is explicit. Documentation MUST NOT imply any of these is current
 | **DEF-08** | Advanced chargeback and cost optimization | Enterprise follow-on |
 | **DEF-09** | Admin UI build/buy decision as framed in the OTel plan (six months of operational feedback, then decide) | **Superseded** — Phase 11 makes the operator and administration interfaces a required M4 deliverable. The OTel plan's deferral framing was removed on 2026-09-07 (`DOC-06`). |
 
-`ARCH-09` (HTTP adapter buffers the full payload) is not deferred: it is assigned to Phase 4
-protocol hardening and Phase 12 scale validation. It remains open and unlisted in Phase 4's
-completion checkpoint; confirm its disposition during Phase 6 or Phase 12 planning.
+`ARCH-09` (HTTP adapter buffers the full payload) was never deferred. It was closed on
+2026-09-26 by `RT-03b` (§14), and Phase 12 scale validation still measures bounded memory.
 
 ---
 
@@ -483,48 +492,45 @@ against the current tree before acting on it.
 State: ✅ done · 🟨 in progress · ⬜ open · ⏸ blocked (the dependency is named) · ➖ superseded.
 Severity (**H**, **M**, **L**) is the review's own rating.
 
-**Recommended order:** finish DR-A1 and DR-A4; then take the open decisions DR-Q1, DR-Q3, DR-Q4
-and DR-Q5; then Phases B and C. Phase D can start at any time, and DR-D1 is best done before DR-B3.
-Commit `docs-design/evidence/raw/` before the `temp/` deletion in DR-C10.
+**Recommended order:** finish DR-A4, whose ADR-0009 is no longer blocked; then take the open
+decisions DR-Q1, DR-Q3, DR-Q4 and DR-Q5; then Phases B and C. Phase D can start at any time,
+and DR-D1 is best done before DR-B3. DR-C10 is no longer blocked, because
+`docs-design/evidence/raw/` was committed in `d2514ec`.
+
+Tasks marked done or superseded in v1.8 or earlier were moved to the revision history in v1.9
+(§15.5): DR-A2, DR-A3, DR-A5, DR-A6, DR-A7, DR-B7, DR-C3, DR-F07, DR-F08, DR-F13 and DR-F15.
 
 ### H.1 Phase A — Correctness and safety
 
 | ID | Sev. | Task | Files | Done when | State |
 |---|---|---|---|---|---|
-| **DR-A1** | H | Commit the 2026-09-07 work: R1-1 tests (`ContainerRecreationDurabilityTest`, `DockerComposeCluster`) and evidence, `docker-compose-3node-durable.yml` and the other hardened fixtures, the `LeaderGuardHandlerTest` fix, the staged `TransferMetrics` deletion, plan v1.26 and register v1.3. Then add the commit SHA, timestamps and log hashes to the r1 evidence, and resolve its fixture-durability contradiction (§3 and §10.4 against §12.1). | `docs-design/task/`, `docs-design/evidence/r1-container-recreation-2026-09-07.md`, `quorus-controller/src/test/` | Committed as `804e11d` (R1-1, evidence, fixtures, plan/register and test correction) and `3343785` (`TransferMetrics` removal); the R1 evidence cites the reachable revision. Retained raw-log hashes remain to be recorded if available. Surviving logs are in `evidence/raw/` with their hashes checked (DR-Q6); record the R1-1 log hashes there if they can be found. | 🟨 |
-| **DR-A2** | H | Preserve the eight orphaned SHAs (Appendix A). Either add refs such as `refs/evidence/r6-b604505` and push them, or annotate every citation with its master equivalent. Fix the `.json` manifests in the same pass as the `.md` files. **Do this before any `git gc`.** | plan, register, Configuration Handover, `evidence/*.md` and `*.json` | Live citations use reachable replacements and `reference/QUORUS_COMMIT_HISTORY_REWRITE_MAP.md` preserves all eight old-to-new mappings. | ✅ |
-| **DR-A3** | H | Move `docs-design/dev/prompts.txt` out of the repository (APEX material; nothing sensitive, so no history rewrite). In `.github/copilot-instructions.md`, point "Key Files" at the Architecture Specification, replace `QuorusStateMachine` with `QuorusStateStore`, fix the module table (remove `quorus-api`, add `quorus-integration-examples`, add FTPS and NFS), fix the `WorkerExecutor` claim, the agent lifecycle routes, the registration fields (add `tenantId`), the workflow example, and the Docker commands. Restate the test-concurrency rules as a target, or finish the migration. | `docs-design/dev/prompts.txt`, `.github/copilot-instructions.md` | Unrelated prompt file removed; every §7.2 Copilot-instructions issue is reconciled with the current source, schema and Compose files. | ✅ |
+| **DR-A1** | H | Commit the 2026-09-07 work: R1-1 tests (`ContainerRecreationDurabilityTest`, `DockerComposeCluster`) and evidence, `docker-compose-3node-durable.yml` and the other hardened fixtures, the `LeaderGuardHandlerTest` fix, the staged `TransferMetrics` deletion, plan v1.26 and register v1.3. Then add the commit SHA, timestamps and log hashes to the r1 evidence, and resolve its fixture-durability contradiction (§3 and §10.4 against §12.1). | `docs-design/task/`, `docs-design/evidence/r1-container-recreation-2026-09-07.md`, `quorus-controller/src/test/` | Committed as `804e11d` (R1-1, evidence, fixtures, plan/register and test correction) and `3343785` (`TransferMetrics` removal); the R1 evidence cites the reachable revision. The fixture-durability contradiction is resolved by dated annotations to §3 and §10.4 that point to §12.1. The R1-1 raw logs and command timestamps cannot be recovered: `evidence/raw/` and `temp/` were searched on 2026-09-27. The evidence record's new §13 states this. | ✅ 2026-09-27 |
 | **DR-A4** | H | Fix revocation-serial normalisation in `CertificateTrustState` (compare `BigInteger` values, or strip leading zeros on both sides) and add a test that uses an openssl-formatted, zero-padded serial. Update Security Guide §4.2 and Certificate Incident Runbook §4.1, §4.2 and §4.4: send the revocation to every controller, add it to configuration before any restart, and state that Raft has no CRL. | `CertificateTrustState.java:78,127`, `docs/QUORUS_SECURITY_DEPLOYMENT_GUIDE.md`, `docs/QUORUS_CERTIFICATE_INCIDENT_RUNBOOK.md` | Code, test and operating guidance complete; 17/17 focused tests pass. Register entries `SEC-01` and `SEC-02` added 2026-09-26. ADR-0009 remains (DR-D4). | 🟨 |
-| **DR-A5** | H | Give every `docker/compose/*.yml` service an explicit, clearly labelled development profile (`QUORUS_SECURITY_PROFILE=development`, `QUORUS_SECURITY_ALLOW_INSECURE=true`, TLS off, and the agent equivalents plus `QUORUS_AGENT_TENANT_ID`). Add one TLS example that uses generated certificates. Fix the Dockerfile `HEALTHCHECK` (use `/health/live` with the configured scheme). Replace `OTEL_EXPORTER_OTLP_ENDPOINT` with `QUORUS_TELEMETRY_OTLP_ENDPOINT`, remove `QUORUS_RAFT_HOST`, and document or default `M2_REPO`. Delete `docker-compose-corrected.yml`, and resolve the loki / observability container-name and port clash. | `docker/compose/`, `quorus-controller/Dockerfile:99-100` | Explicit development settings, generated-certificate mTLS example, scheme-aware `/health/live` image probe, configuration cleanup, distinct logging topology, `M2_REPO` guidance (since found unnecessary; reversed by DR-C11) and `CFG-01` plan/register entry complete. All 14 Compose models validate and the live TLS positive/negative checks pass. | ✅ |
-| **DR-A6** | H | Fix the README quick start: use a development topology, use `mvn install` before `exec:java`, remove the personal `JAVA_HOME`, and give a bash equivalent. Make the example workflow pass validation. Add `tenantId` to `10-register-agent.httpie`, `payloads/agent-register.json` and `20-create-transfer.httpie`, add development-profile setup, give the runbook a header, and reference `32-update-assignment-status.httpie`. | `README.md`, `scripts/httpie/` | README workflow validation passes (its `M2_REPO` step is reversed by DR-C11); HTTPie agent and transfer requests match the live tenant, status and attempt/fencing contracts; clean Compose build plus the documented lifecycle smoke test completed successfully. | ✅ |
-| **DR-A7** | H | Replace every "no authentication" statement with a one-line pointer to Architecture Spec §3 and the Security Guide. Remove "service-connection governance" from Security Guide §1. | Arch Spec ARCH-03 and §13; REST API-02; User Guide; Architecture Quickstart; Cluster Startup Guide; `docker/README.md`; System Design capability table and Network Architecture; Security Guide §1 | All named documents describe the implemented production mTLS/trusted-gateway boundary, distinguish intentionally insecure development profiles, and point to Architecture Specification §3 and the Security Deployment Guide. | ✅ |
 
 ### H.2 Phase B — Reconcile the canonical set
 
 | ID | Task | Files | State |
 |---|---|---|---|
-| **DR-B1** | **Architecture Spec.** Close or narrow ARCH-03, ARCH-06, ARCH-12 (only an escalation policy is missing) and ARCH-13. Fix the §3 telemetry row (five events and a `STALLED` boundary) and the §13 lifecycle gate (QR-01 is fixed). Define "durable default" using `quorus.raft.storage.path`. Move "Closed" out of the Priority column. Keep ARCH-09 (HTTP buffering) open. Also: add the missing ARCH-01 or renumber, reorder the IDs, fix the §7 opening, make the untestable requirements in §7.1 measurable, and note that the SFTP direct-URI path does not meet §10.4's "visibly logged" rule (see DR-X06). | `docs/QUORUS_ARCHITECTURE_SPECIFICATION.md` | 🟨 |
+| **DR-B1** | **Architecture Spec.** Close or narrow ARCH-03, ARCH-06, ARCH-12 (only an escalation policy is missing) and ARCH-13. Fix the §3 telemetry row (five events and a `STALLED` boundary) and the §13 lifecycle gate (QR-01 is fixed). Define "durable default" using `quorus.raft.storage.path`. Move "Closed" out of the Priority column. ARCH-09 (HTTP buffering) is done: closed in spec v2.10 on 2026-09-27 after `RT-03b`, which also changed §2 to Java 27. Also: add the missing ARCH-01 or renumber, reorder the IDs, fix the §7 opening, make the untestable requirements in §7.1 measurable, and note that the SFTP direct-URI path does not meet §10.4's "visibly logged" rule (see DR-X06). | `docs/QUORUS_ARCHITECTURE_SPECIFICATION.md` | 🟨 |
 | **DR-B2** | **REST Spec.** Label §3.2, §3.4, §3.5, §3.8, §4.2, §6.3 and §16 as Current, Required or Planned. Add mapping tables from `ErrorCode` Q-codes to target codes and from colon scopes to dotted scopes. Close API-01 by citing `OpenApiContractTest`, and rewrite API-02. List `GET /api/v1/openapi.yaml` as Current. Fix the `DELETE /transfers/{id}` purpose text (it returns `{jobId, message}`), the §6.1 events row, the path-parameter names, the agent "search" and route "conditional update" claims, and the §3.1 unknown-fields rule. | `docs/QUORUS_REST_API_SPECIFICATION.md` | 🟨 |
 | **DR-B3** | **API Reference.** Add the 13 missing routes, including the validate body and `probeTimeoutMillis`. Fix the heartbeat section: remove `BUSY`, use lowercase status output, say that an invalid status is ignored, and add the `message` field. Add `agentPool` and `networkZone`, and settle the `port` rule. Remove `AT_RISK`. Add an error-envelope and `ErrorCode` section. Fix the required-field markings, add transfer `metadata`, `runbook` and `labels`, document the assignment and route bodies, and note that `POST /security/authorization/check` is leader-only. Fix the OpenAPI `AgentStatus` enum (§6 #10). | `docs/QUORUS_API_REFERENCE.md`, `quorus-controller-v1.yaml:1105,1130-1132` | ⬜ |
 | **DR-B4** | **YAML Syntax Guide** (⏸ DR-Q1). Add a "Validation requirements" section listing the seven metadata fields and `spec.execution`. Mark `execution.*` and `retryCount` "parsed, not applied", or implement them. Fix the options and nesting claims, advise quoting `created`, add runtime `ExecutionContext` variables to the precedence list, and fix the examples table (`batchSize` location, `ecommerce-order-processing.yaml`, the `file` protocol and the `mode` option). Merge the correct rules from `YAML-VALIDATION-GUIDE.md` (names cannot contain spaces; no `kind` warnings, JSON Schema or streaming validation), then delete that guide. Update the Workflows README to match. | `docs/QUORUS_YAML_SYNTAX_GUIDE.md`, `docs/QUORUS_WORKFLOWS_README.md`, `quorus-integration-examples/.../docs/YAML-VALIDATION-GUIDE.md` | ⬜ |
 | **DR-B5** | **Security Guide** (⏸ DR-Q3). Move §11–14 into the Service Connection Runbook and a new `docs/QUORUS_UPGRADE_NOTES.md`. Document gateway-only elevation, that `/api/v1/openapi.yaml` is public, which headers are actually required (`X-Quorus-Roles` and `X-Quorus-Scopes` default to empty), and that Raft peers are not bound to node IDs. Update §11 for R1-1. Replace `CONTROLLER_URL` with the current name. Note that the "audit path configured" and "trust-bundle version" checks are always satisfied by the packaged defaults. | `docs/QUORUS_SECURITY_DEPLOYMENT_GUIDE.md`, `docs/QUORUS_SERVICE_CONNECTION_OPERATIONS_RUNBOOK.md` | ⬜ |
 | **DR-B6** | **Versioning Policy** (⏸ DR-Q5). Record the command and snapshot schema as version 3, readable from 0. Record the configuration-contract break in `b35fb25`. Define one product version and use it in the pom, `HttpApiServer.VERSION`, OpenAPI `info.version`, `quorus.version` and `quorus.agent.version` (§6 #13). Also record the Java release policy (`RT-Q3`: follow each six-monthly release) and the rule that QRaft's minimum Java version must not exceed Quorus's. | `docs-design/reference/QUORUS_VERSIONING_AND_COMPATIBILITY_POLICY.md`, poms, `HttpApiServer.java`, `quorus-controller-v1.yaml`, properties files | ⬜ |
-| **DR-B7** | **Plan and register.** Settle the Phase 0 and Phase 4 status, correct the present-tense fixture statements, re-verify OBS-04/05/07/14, fix counts and revision order, cite the current plan, add IDs for the orphan plan items and the four configuration residuals, add the plan revision history and Phase 5–12 status lines, remove the machine path, handle the RocksDB coverage claim, and reconcile DEF-09/DOC-06, the OTel version and OBS-08. | `docs-design/task/` | ✅ Register v1.5, plan v1.28 (2026-09-26). The plan's revision history before v1.26 is noted as unrecorded rather than reconstructed. |
 
 ### H.3 Phase C — Consolidate and archive
 
 | ID | Task | State |
 |---|---|---|
 | **DR-C1** | Move the 12 `docs-design/dev/vertx5-advice/` files to the PeeGeeQ repository. Delete `performance/CRITICAL_PERFORMANCE_REFACTORING_GUIDELINES.md` (APEX). | ⬜ |
-| **DR-C2** | Move to `docs-design/archive/`, each with a one-line "why archived" banner: the three `CONNECTION_POOL_*` documents; `VERTX5_PERFORMANCE_BENCHMARKS.md`; all six `vertx-migration/` files (keep SUMMARY as the one migration record); `testing/FTPS_INTEGRATION_TEST_INVESTIGATION.md` (mark it resolved first); `evidence/remediation-r4-r6-2026-09-05.md`; and the Configuration Handover (⏸ extract §2.1 and §8 into the configuration reference first, see DR-D1). | 🟨 Configuration Handover archived 2026-09-26 (extraction still pending under DR-D1); the rest remain. |
-| **DR-C3** | Write `docs-design/dev/QUORUS_VERTX5_CONVENTIONS.md` based on what the code actually does, and link it from `.github/copilot-instructions.md`. | ➖ Superseded 2026-09-26 by `RT-02`, delivered as [QUORUS_CONCURRENCY_CONVENTIONS.md](../dev/QUORUS_CONCURRENCY_CONVENTIONS.md) for the post-Vert.x runtime (ADR-0012) |
-| **DR-C4** | Merge `docs/QUORUS_CLUSTER_STARTUP_GUIDE.md`, `docs/QUORUS-DOCKER-TESTING-README.md` and `quorus-controller/DOCKER_BUILD_OPTIMIZATION.md` into `docker/README.md`. The result has one table giving each Compose file's topology, host ports, required environment and status, and it states that no `m2cache` build context or `M2_REPO` is needed once DR-C11 lands. Fix the Quick Start port (8080 is not mapped), use `docker compose` throughout, and fix the last link label. | ⬜ |
+| **DR-C2** | Move to `docs-design/archive/`, each with a one-line "why archived" banner: the three `CONNECTION_POOL_*` documents; `VERTX5_PERFORMANCE_BENCHMARKS.md`; all six `vertx-migration/` files (keep SUMMARY as the one migration record); `testing/FTPS_INTEGRATION_TEST_INVESTIGATION.md` (mark it resolved first); `evidence/remediation-r4-r6-2026-09-05.md`; and the Configuration Handover (⏸ extract §2.1 and §8 into the configuration reference first, see DR-D1). | 🟨 Configuration Handover archived 2026-09-26 (extraction still pending under DR-D1); the rest remain. Since `RT-03a` (2026-09-26), the three `CONNECTION_POOL_*` documents describe code that no longer exists. |
+| **DR-C4** | Merge `docs/QUORUS_CLUSTER_STARTUP_GUIDE.md`, `docs/QUORUS-DOCKER-TESTING-README.md` and `quorus-controller/DOCKER_BUILD_OPTIMIZATION.md` into `docker/README.md`. The result has one table giving each Compose file's topology, host ports, required environment and status, and it states that no `m2cache` build context or `M2_REPO` is needed (DR-C11 is done) and that images package host-built jars. Fix the Quick Start port (8080 is not mapped), use `docker compose` throughout, and fix the last link label. | ⬜ |
 | **DR-C5** | Split `QUORUS_SYSTEM_DESIGN.md`. Move the enterprise requirements to the Architecture Spec (or delete them and link). Archive the PostgreSQL/Redis/etcd, Kubernetes, SQL, changelog, duplicated and file-organisation sections. Badge what remains. Rename `QuorusStateMachine` to `QuorusStateStore` throughout. Fix the environment names (`QUORUS_RAFT_*`), the `AppConfig` loading description, the tech-stack versions, the health JSON and the metric names. | ⬜ |
 | **DR-C6** | Extract `docs-design/reference/QUORUS_RAFT_STORAGE_REFERENCE.md` from the Raft WAL design, with the contents listed in review §10: coordinates, layering, method contract, on-disk layout, every storage and snapshot key, recovery order, InstallSnapshot, operator rules, test map, and the unproven power-loss case. Archive the remainder. | ⬜ Scope narrowed on 2026-09-26: under ADR-0011 the in-repository engine and sidecar are replaced by QRaft (`CE-10`), so the reference should cover the current design briefly and link to QRaft's storage documentation rather than duplicate it |
 | **DR-C7** | Trim the Simulators design. Rewrite §1 against current code. Relabel §2–7 as standalone test doubles. Restore the links to `RaftChaosTest`, `RaftFailureTest` and `InfrastructureSmokeTest`. Delete Appendix C. Document `MockRaftTransport`, update the `RaftTransport` listing, mark the DSL and full-stack examples as proposals, and tick the delivered Appendix D items. | ⬜ |
 | **DR-C8** | Rewrite `QUORUS_NEGATIVE_TESTING_STRATEGY.md` around `@ExpectsError` / `ExpectsErrorExtension` (negative tests have run by default since `8864c2f`). Align `QUORUS_LOG_STYLE.md` with the code: ASCII markers, the TRACE levels, the real `logback-test.xml`, no `-Dtest.loglevel`, and no personal hostname, username or IP. Update `QUORUS_PROTOCOL_SERVERS_TESTING.md` (images, environment, the Testcontainers tests, `*IT` never runs) and `QUORUS_RAFT_CLUSTER_TESTING.md` (no `m2cache` context after DR-C11, `QUORUS_RAFT_*`, 5000/1000, raftlog 1.2.0, `quorus-loadbalancer`, `raft` read from the top level of `/health` rather than `checks.raft.state`, the JUnit Docker suites, the header). Add `ContainerRecreationDurabilityTest` to `DOCKER_TEST_PERFORMANCE.md` and record CPU and RAM. Have LOG_STYLE and NEGATIVE_TESTING link to the Testing README instead of carrying their own logback samples. | ⬜ The testing documents also move from the Vert.x test standard to the `RT-02` standard as each module migrates. |
 | **DR-C9** | Scrub the PeeGeeQ references from `QuorusConfiguration.java:30`, `AppConfigNodeIdentityTest.java:82`, `VertxPerformanceBenchmark.java:45`, `scripts/add-license-headers.sh` and `scripts/setup-git-hooks.sh` (the hook checks `peegeeq-*` paths, so it does nothing in Quorus). Remove `vertx-pg-client` and `ConnectionPoolService`, and the unused `vertx-grpc-*` dependencies, or document why they stay (§6 #15, #22). | 🟨 `ConnectionPoolService` and `vertx-pg-client` removed by `RT-03a` on 2026-09-26 ([evidence](../evidence/rt-03a-remove-dead-pool-2026-09-26.json)). Remaining: PeeGeeQ references in code and scripts, and the unused `vertx-grpc-*` dependencies |
-| **DR-C10** | Clean the working copy: delete the local `temp/` worktrees, `.history/` and `hs_err_pid*.log`, and untrack the five `temp/*.txt` files still in git. Normalise line endings with a `* text=auto` rule, committed on its own. Merge NOTICE and OPEN_SOURCE_USAGE into one generated inventory (see DR-F01). | ⬜ DR-Q6 is decided. Delete `temp/` only after `docs-design/evidence/raw/` is committed, because until then the rescued copies are the only other copies. |
+| **DR-C10** | Clean the working copy: delete the local `temp/` worktrees, `.history/` and `hs_err_pid*.log`, and untrack the five `temp/*.txt` files still in git. Normalise line endings with a `* text=auto` rule, committed on its own. Merge NOTICE and OPEN_SOURCE_USAGE into one generated inventory (see DR-F01). | ⬜ Unblocked 2026-09-27: `docs-design/evidence/raw/` is committed (`d2514ec`, 146 files). Still present on 2026-09-27: three full source-tree worktrees under `temp/` (they clutter every repository-wide search), the five tracked `temp/*.txt` files, `.history/` and two `hs_err_pid*.log` files. When adding `* text=auto`, keep the `docs-design/evidence/raw/** -text` rule after it. Otherwise git normalises line endings in evidence whose SHA-256 is recorded. Absorbs DR-F17. |
 | **DR-C11** | Remove the `m2cache` / `M2_REPO` / `m2-repo` machinery. Its premise is false: `io.github.mraysmit:raftlog-core` 1.2.0 is on Maven Central (verified 2026-09-26), and the `m2cache` context copies the host's whole `~/.m2/repository/dev/mars` namespace, including unrelated PeeGeeQ and QRaft artifacts, into the build. Remove the `COPY --from=m2cache` step and its comments from the controller Dockerfile, the `m2cache` context from `docker/compose/*.yml` and the test Compose files, `M2_REPO` from `docker/compose/.env` and the README, the `m2-repo` block in `scripts/start-cluster-with-observability.ps1` (and add nothing in its place), the local `m2-repo/` folder and its `.gitignore` line. Done when the controller image builds from a clean checkout with no build context and no host Maven cache. When `CE-06` introduces QRaft artifacts, they must resolve from a repository the same way. | ✅ Delivered by `RT-01b` on 2026-09-26: images package host-built jars; `m2cache`, `M2_REPO`, the builder stages and the `m2-repo` script block are removed; the README, runbook, `.env` and CI are updated. The local `m2-repo/` folder and its `.gitignore` line were removed the same day. Testing documents that still mention `M2_REPO` are under DR-C8 |
 
 ### H.4 Phase D — Keep it accurate
@@ -532,32 +538,28 @@ Commit `docs-design/evidence/raw/` before the `temp/` deletion in DR-C10.
 | ID | Task | State |
 |---|---|---|
 | **DR-D1** | **Generate, don't copy.** Generate the "Current" endpoint table (REST §5–15, the API Reference skeleton and `InfoHandler`, §6 #14) from `quorus-controller-v1.yaml`. Generate `docs/QUORUS_CONFIGURATION_REFERENCE.md` from the properties files and the `AppConfig` / `AgentConfig` key constants, seeded from Configuration Handover §2.1 and §8. | ⬜ |
-| **DR-D2** | **CI documentation checks:** relative-link checker; header linter for Version, Date and Status; ban on `C:\Users\` and similar personal paths; `docker compose config` on every `docker/compose/*.yml`; and a smoke job that starts the single-controller topology. | ⬜ |
+| **DR-D2** | **CI documentation checks:** a ban on personal Windows user-profile paths; `docker compose config` on every `docker/compose/*.yml`; and a smoke job that starts the single-controller topology. The relative-link checker and header linter this task first asked for already exist in `scripts/verify-phase0-docs.ps1` and run in CI. They fail, and making them pass is part of `ENG-07`. | ⬜ Re-scoped 2026-09-27; follows `ENG-07` (deferred, `SEQ-01`) |
 | **DR-D3** | **One status vocabulary.** Implemented / Partial / Planned for capabilities; Current / Required / Planned for API items. Remove the seven ad-hoc values in Arch Spec §13. | ⬜ |
-| **DR-D4** | **ADR hygiene** (⏸ DR-Q1, DR-Q2). Add ADR-0006 (raftlog-core WAL and snapshot sidecar), ADR-0007 (layered configuration, no system properties), ADR-0008 (schema-3 coordinated upgrade), ADR-0009 (trust-state scope), ADR-0010 (YAML semantics), and consider one for Raft over grpc-java rather than Vert.x gRPC. Add an index, Supersedes / Superseded-by fields and an Alternatives section. Fix ADR-0002's fencing statement, which is now out of date. | 🟨 ADR-0011 and ADR-0012 added 2026-09-26, including the ADR-0012 decisions `RT-Q1` to `RT-Q3`. ADR-0006 should record only the current raftlog-and-sidecar design and name ADR-0011 as its planned successor. ADR-0009 and ADR-0010 remain |
+| **DR-D4** | **ADR hygiene** (ADR-0010 ⏸ DR-Q1; ADR-0009 is no longer blocked, because DR-Q2 was decided on 2026-09-25). Add ADR-0006 (raftlog-core WAL and snapshot sidecar), ADR-0007 (layered configuration, no system properties), ADR-0008 (schema-3 coordinated upgrade), ADR-0009 (trust-state scope), ADR-0010 (YAML semantics), and consider one for Raft over grpc-java rather than Vert.x gRPC. Add an index, Supersedes / Superseded-by fields and an Alternatives section. Fix ADR-0002's fencing statement, which is now out of date. | 🟨 ADR-0011 and ADR-0012 added 2026-09-26. ADR-0012 holds decisions `RT-Q1` to `RT-Q5`; v1.2 (2026-09-27) corrects `RT-Q4` and adds a revision history. ADR-0006 should record only the current raftlog-and-sidecar design and name ADR-0011 as its planned successor. ADR-0009 and ADR-0010 remain |
 | **DR-D5** | **Definition of done:** any change to a public contract (endpoint, key, environment variable, Compose file or status) updates its canonical document in the same commit, and plans and registers cite a SHA only after the commit exists. Add this to plan §6 and to `.github/copilot-instructions.md`. | ⬜ |
 
 ### H.5 Document fixes outside Phases A–D
 
 | ID | Document | Fix | State |
 |---|---|---|---|
-| **DR-F01** | `NOTICE`, `OPEN_SOURCE_USAGE.md` | Until DR-C10 merges them: list only shipped runtime components in NOTICE, and add `vertx-pg-client`, Netty, `jackson-dataformat-yaml` and `javax.annotation-api` (CDDL). In OPEN_SOURCE_USAGE, correct RaftLog Core to 1.2.0, remove RocksDB JNI, add `javax.annotation-api`, and fix the `LICENSE-HEADER.txt` reference. Confirm that the "licenses directory" exists. | ⬜ |
+| **DR-F01** | `NOTICE`, `OPEN_SOURCE_USAGE.md` | Until DR-C10 merges them: list only shipped runtime components in NOTICE, and add Netty, `jackson-dataformat-yaml`, `javax.annotation-api` (CDDL) and Apache HttpClient 5 with HttpCore 5 (shipped since `RT-03b`; Apache 2.0, which carries its own NOTICE). Do not add `vertx-pg-client`, which `RT-03a` removed. State that the container images ship Amazon Corretto (GPLv2 with the Classpath Exception) as their base. In OPEN_SOURCE_USAGE, correct RaftLog Core to 1.2.0, remove RocksDB JNI, add `javax.annotation-api` and Apache HttpClient 5, and fix the `LICENSE-HEADER.txt` reference. Confirm that the "licenses directory" exists. | ⬜ Updated 2026-09-27 for `RT-03a`, `RT-03b` and `RT-01b` |
 | **DR-F02** | `docs/QUORUS_USER_GUIDE.md` | Remove progress, events and attempts from the gaps list. `QUORUS_AGENT_TENANT_ID` takes priority over the legacy `AGENT_TENANT_ID`. State that the agent defaults to the production profile with TLS. Add an NFS section. (DR-A7 covers the authentication statement.) | ⬜ |
 | **DR-F03** | `docs/QUORUS_ARCHITECTURE_QUICKSTART.md` | Link to the API Reference instead of listing endpoints. State the packaged `127.0.0.1` and production-profile defaults. Use `maven.compiler.release`. | ⬜ |
 | **DR-F04** | `docs/QUORUS_INTEGRATION_EXAMPLES_README.md` | Add an `mvn install` step, mention the default `mainClass` (`SftpFtpRealImplementationDemo`), and add `IntegrationTestSuite`. | ⬜ |
 | **DR-F05** | `docs/QUORUS_SERVICE_CONNECTION_OPERATIONS_RUNBOOK.md` | Add the R4 and R5 behaviour (DNS 503/504/409, FTPS 21 vs 990, partial updates, event paging) and the elevation requirement. Correct the "must set" statement for agent pool and roots, which are not enforced. Coordinate with DR-B5. | ⬜ |
 | **DR-F06** | `docs/QUORUS_CERTIFICATE_INCIDENT_RUNBOOK.md` | Add an example request body and elevation header, and explain how to start a new audit chain by repointing `quorus.security.audit.evidence-path`. | ⬜ |
-| **DR-F07** | `docs/QUORUS_CODEBASE_AND_DOCUMENTATION_REVIEW_2026-08-31.md` | Append the QR-01 to QR-11 status table from review §5. Create `docs-design/reviews/` and move this review and the 2026-09-24 review into it. Fix the GitHub line anchors, which do not resolve in rendered Markdown. | ✅ 2026-09-26 — moved to `docs-design/reviews/`, status annex appended, Markdown line anchors removed. |
-| **DR-F08** | `docs-design/README.md` | Bump the header date to match the body, add `evidence/`, `architecture-decisions/`, `reference/` and `reviews/` to the directory table, and add this task list. | ✅ 2026-09-26 — header v1.1; directory table and task list added. |
 | **DR-F09** | `reference/QUORUS_REPRODUCIBLE_BUILD_AND_EVIDENCE.md` | Add `project.build.outputTimestamp` to the poms, or say the build is repeatable rather than byte-reproducible. Update the evidence figures from M0 (2,212) to R6 (2,437). | ⬜ |
 | **DR-F10** | `evidence/` small fixes | `full-suite-error-remediation`: cite `a0103a0`. `r4-dns-remediation`: replace "changes are uncommitted" with `8b3cf5c`. `r5-closure`: add the closure commit. `r6-final-acceptance`: map `b604505` to `dc447d4` and correct the "transport failure retained" claim (`RaftNode.java:602-616`). `raftlog-validation-handover`: add a supersession pointer to R1-1. Add header blocks to the 2026-09-05 files. | ⬜ |
 | **DR-F11** | `performance/QUORUS_PERFORMANCE_VALIDATION_RESULTS.md` | Relabel it as a Vert.x `executeBlocking` micro-benchmark. Remove the "Phase 4 PostgreSQL" and "quorus-api 7 tests" claims, and align its targets with the test's assertions. | ⬜ |
 | **DR-F12** | `testing/QUORUS_TESTING_README.md` | Remove `quorus-api` from the quick-build `-pl` list and the consolidated-log module list. Remove `-Dgroups='!flaky'`. Say that `*IT` classes do not run in a default build (see DR-Q4). Describe the Testcontainers-based upload tests. | ⬜ |
-| **DR-F13** | `QUORUS_CONFIGURATION_ISOLATION_HANDOVER_2026-09-03.md` | Before archiving (DR-C2): fix the broken `../../raftlog/pom.xml` link and remove the personal path. The six orphaned SHAs are covered by DR-A2. | ✅ 2026-09-26 — link replaced with plain text, personal path removed, archived with a banner. |
-| **DR-F14** | All live documents | Remove `C:\Users\mraysmit\…` paths (README, plan, Configuration Handover, Raft Cluster Testing). | 🟨 Removed from the plan and the Configuration Handover on 2026-09-26; README and Raft Cluster Testing remain. |
-| **DR-F15** | `docs-design/design/QUORUS_RAFT_WAL_DESIGN.md` (if not fully archived by DR-C6) | Replace the stale method names with `updateMetadata`, `appendEntries`, `truncateSuffix` and `sync`. Mark §13.9's soft limit as not implemented. Replace the Vert.x 4 `executeBlocking` listings. Cite raftlog 1.2.0, and fix the "JRE 21" comment. | ➖ Superseded 2026-09-26: the in-repository engine is replaced by QRaft (ADR-0011, `CE-10`), so archive the design under DR-C6 rather than correct it |
+| **DR-F14** | All live documents | Remove personal Windows user-profile paths (README, plan, Configuration Handover, Raft Cluster Testing). | ✅ 2026-09-27. Removed from the plan and the Configuration Handover on 2026-09-26. On 2026-09-27 the README and Raft Cluster Testing were found to contain none. The only remaining occurrence, a different user's paths in `QUORUS_LOG_STYLE.md`, is covered by DR-C8. |
 | **DR-F16** | Test classification | Record in the Testing README that six Testcontainers tests run in default builds without a `docker` tag, and add `ContainerRecreationDurabilityTest` and `docker-compose-3node-durable.yml` to the testing documents. | ⬜ |
-| **DR-F17** | `.gitattributes` / working tree | Covered by DR-C10: about 600 files show as modified only because of CRLF churn. Commit the `* text=auto` normalisation on its own so that it does not hide real changes. | ⬜ |
+| **DR-F17** | `.gitattributes` / working tree | Covered by DR-C10: about 600 files show as modified only because of CRLF churn. Commit the `* text=auto` normalisation on its own so that it does not hide real changes. | ➖ Merged into DR-C10 on 2026-09-27 |
 
 **Out of scope:** evidence held in the separate raftlog repository (library SHAs and the "41
 storage tests / 319 library tests" claims), which the review did not verify; and the review's
@@ -573,11 +575,19 @@ storage tests / 319 library tests" claims), which the review did not verify; and
 Delivery work identified by the configuration baseline remediation and by the
 [2026-09-24 documentation review](../reviews/QUORUS_DOCUMENTATION_REVIEW_2026-09-24.md). The
 Task column gives the review's original ID; `DR-X*` IDs from the former task list are aliases
-for these rows (`DR-X05` is `ARCH-09`, now `RT-03`; `DR-X07` is `SEC-04`, which will close through
+for these rows (`DR-X05` is `ARCH-09`, closed by `RT-03b`; `DR-X07` is `SEC-04`, which will close through
 `CE-08`; `DR-X19` is `ENG-04`, which `RT-04` subsumes; `DR-X24` is `ENG-03`, which `RT-05` subsumes). Rows marked *reported* were confirmed by the
 review on 2026-09-25 but have not been re-checked since; re-verify each against the current tree
-before implementation. None has been assigned to a phase yet; assign each during the next plan
-revision.
+before implementation.
+
+Phase assignment is still outstanding for most rows. Plan v1.28 added them without phases, and
+no revision since has assigned any. The exceptions are:
+
+- `SEC-07` is a Phase 4 hardening follow-up (`SEQ-02`).
+- `ENG-07` belongs to Phase 0's CI controls, and its repair is deferred (`SEQ-01`).
+- `ENG-01` goes with `P2-01`.
+- `SEC-04` closes through `CE-08`.
+- `ENG-03` and `ENG-04` are subsumed by `RT-05` and `RT-04`.
 
 | ID | Item | Task | Evidence state | Level |
 |---|---|---|---|---|
@@ -592,15 +602,16 @@ revision.
 | **SEC-04** | Raft peer certificates are not bound to the `QUORUS_CLUSTER_NODES` identity; any cluster-CA certificate can make Raft RPCs | `DR-X07` | Reported (`RaftPeerAuthorizationInterceptor`) | 🟠 |
 | **SEC-05** | `roleAllows` returns on the first matching role, so multi-role identities can be denied scopes another role grants | `DR-X09` | Verified still present 2026-09-26 (`AuthorizationPolicyEngine.java:78-107`) | 🟠 |
 | **SEC-06** | Direct mTLS identities cannot hold elevation; only gateway-asserted identities can perform elevated operations | `DR-Q3`, `DR-B5` | Reported; decision pending | 🟠 |
-| **SEC-07** | Governed TLS trusts only the JVM default trust store (`TlsPeerPolicy` uses `TrustManagerFactory.init(null)`), so endpoints issued by a private corporate CA work only if that CA is added to the JVM `cacerts`; there is no Quorus configuration for trust anchors | found by `RT-03b` | Verified 2026-09-26 (`TlsPeerPolicy.createTrustManager`). The rewritten HTTP adapter accepts an injected base trust for tests; production still uses the JVM default | 🟠 |
+| **SEC-07** | Governed TLS trusts only the JVM default trust store (`TlsPeerPolicy` uses `TrustManagerFactory.init(null)`), so endpoints issued by a private corporate CA work only if that CA is added to the JVM `cacerts`; there is no Quorus configuration for trust anchors | found by `RT-03b` | Verified 2026-09-26 (`TlsPeerPolicy.createTrustManager`). The rewritten HTTP adapter accepts an injected base trust for tests; production still uses the JVM default. Assigned 2026-09-27 to Phase 4 as a hardening follow-up with acceptance criteria (plan §11, `SEQ-02`); must close before any production service connection relies on a private CA | 🟠 |
 | **ENG-01** | `JobAssignmentService`, which owns the assignment timeout monitor, is constructed only by its test | `DR-X11` | Reported; settle with `P2-01` | 🟡 |
 | **ENG-02** | `*IT` and `*Benchmark` classes never run: no Failsafe plugin and no Surefire includes | `DR-Q4`, `DR-X18` | Reported; decision pending | 🟠 |
 | **ENG-03** | `QuorusAgent.java:372` calls `.join()`; whether it can run on an event loop is untraced | `DR-X24` | Reported, not traced | 🟠 |
 | **ENG-04** | `SimpleWorkflowEngine` public constructor calls `Vertx.vertx()` | `DR-X19` | Reported | 🟢 |
 | **ENG-05** | `workflow-schema.json` is never loaded although `json-schema-validator` is a dependency | `DR-X21` | Reported | 🟢 |
 | **ENG-06** | Small code-comment corrections: the `mvn test -Dgroups=docker,slow` pom comment, and Javadoc mentioning the removed `memory` storage type and "blocking mode" | `DR-X17`, `DR-X20` | Reported | 🟢 |
+| **ENG-07** | CI has never passed: all 21 GitHub Actions runs from 2026-09-01 to 2026-09-26 failed. (1) Unit and clean-build lanes: `FtpsDefaultPortBoundaryTest` listens on port 21, which a non-root process cannot bind on the Linux runner (it passes on Windows). The build stops in `quorus-core`, so the other modules have never been tested in CI. (2) Documentation lane: `scripts/verify-phase0-docs.ps1` rejects 11 document headers that lack the two trailing spaces its pattern requires. Trailing spaces are easily stripped by editors, so decide whether to relax the check or add the spaces. The fix needs a test-first redesign of the FTPS default-port test | found 2026-09-27 during the register review | Verified 2026-09-27 from the logs of runs `36275459592` (Java 27) and `36192430573` (Java 25). **Repair deferred by `SEQ-01`.** Blocks every phase exit (plan §6.1 step 5), not current slices | 🟡 |
 
-`DR-X05` (HTTP adapter buffering) is the existing `ARCH-09` and is not duplicated here.
+`DR-X05` (HTTP adapter buffering) is `ARCH-09`, closed by `RT-03b` on 2026-09-26, and is not duplicated here.
 
 ---
 
@@ -610,7 +621,8 @@ From enterprise plan [§20](QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md#20-platform
 [ADR-0011](../architecture-decisions/ADR-0011-CONSENSUS-VIA-QRAFT-GENERIC-ENGINE.md) and
 [ADR-0012](../architecture-decisions/ADR-0012-JAVA-RUNTIME-AND-STRUCTURED-CONCURRENCY.md). The
 plan holds the acceptance criteria; this section lists identity, owner and level. `CE-01` to
-`CE-06` are QRaft-project deliverables that Quorus depends on.
+`CE-06` are QRaft-project deliverables that Quorus depends on. The workstream decisions
+`RT-Q1` to `RT-Q5` are in the §3 decision log only (§15.4).
 
 | ID | Owner | Item | Level |
 |---|---|---|---|
@@ -625,13 +637,10 @@ plan holds the acceptance criteria; this section lists identity, owner and level
 | **CE-09** | Quorus | Raft state migration and rollback (raftlog 1.2.0 → QRaft's version; snapshot formats) | 🔴 |
 | **CE-10** | Quorus | Remove the in-repository engine and the direct `raftlog-core` dependency | 🟡 |
 | **CE-11** | Quorus | Re-establish durability evidence on the QRaft build; R1-2 and R1-3 run against it | 🔴 |
-| **RT-Q1** | Quorus | Decision: preview `StructuredTaskScope` in production | ✅ Decided 2026-09-26: no preview; Quorus task-scope abstraction on final APIs |
-| **RT-Q2** | Quorus | Decision: controller HTTP server | ✅ Decided 2026-09-26: JDK `HttpsServer`, proven in `RT-06` |
-| **RT-Q3** | Quorus | Decision: Java support policy | ✅ Decided 2026-09-26: follow six-monthly releases |
-| **RT-01a** | Quorus | Java 27 compile and test baseline (root pom, `.java-version`), proven by `JavaPlatformBaselineTest` | ✅ 2026-09-26: red, green and a 2,387-test regression on JDK 27 ([evidence](../evidence/rt-01a-java27-baseline-2026-09-26.json)). Commit together with `RT-01b` |
-| **RT-01b** | Quorus | Java 27 controller and agent images and CI container on Amazon Corretto 27 | ✅ 2026-09-26: single-stage images packaging host-built jars on `amazoncorretto:27.0.0-alpine3.24`; no Java or Maven inside Docker. Red, green and a Docker+slow regression of 2,421 tests with 0 failures and 2 pre-existing skips ([evidence](../evidence/rt-01b-java27-images-2026-09-26.json)). CI change not yet executed |
-| **RT-02** | Quorus | Concurrency conventions, the task-scope abstraction and the post-Vert.x test standard | ✅ 2026-09-26: RT-02a TaskScope core ([evidence](../evidence/rt-02a-task-scope-2026-09-26.json)); RT-02b tracing, MDC and `ScopedValue` propagation ([evidence](../evidence/rt-02b-context-propagation-2026-09-26.json)); RT-02c [concurrency conventions](../dev/QUORUS_CONCURRENCY_CONVENTIONS.md) with the post-Vert.x test standard, referenced from plan §6.1 and the Copilot instructions; RT-02d StructuredTaskScope structure rules and migration mapping ([evidence](../evidence/rt-02d-structure-rules-2026-09-26.json)); TaskScope 163/163 lines and 70/70 branches |
-| **RT-03** | Quorus | `quorus-core` off Vert.x; streaming HTTP adapter closes `ARCH-09` | 🟨 RT-03a done (dead pool code). RT-03b done 2026-09-26: HTTP adapter on Apache HttpClient 5, blocking and streaming, governed pinning with correct SNI, Host and hostname verification, closing `ARCH-09` ([evidence](../evidence/rt-03b-http-adapter-2026-09-26.json)). Next: RT-03c blocking `TransferEngine` (option A), RT-03d contract cleanup, RT-03e topology and codec, RT-03f remove `io.vertx` from the core pom |
+| **RT-01a** | Quorus | Java 27 compile and test baseline (root pom, `.java-version`), proven by `JavaPlatformBaselineTest` | ✅ 2026-09-26: red, green and a 2,387-test regression on JDK 27 ([evidence](../evidence/rt-01a-java27-baseline-2026-09-26.json)). Commit `a9b1ace`, with `RT-01b` |
+| **RT-01b** | Quorus | Java 27 controller and agent images and CI toolchain on Amazon Corretto 27 | ✅ 2026-09-26: single-stage images packaging host-built jars on `amazoncorretto:27.0.0-alpine3.24`; no Java or Maven inside Docker. Red, green and a Docker+slow regression of 2,421 tests with 0 failures and 2 pre-existing skips ([evidence](../evidence/rt-01b-java27-images-2026-09-26.json)). Commit `a9b1ace`. CI now runs on Corretto 27, and its setup and Java 27 checks pass. CI has never passed as a whole, for reasons that predate this item (`ENG-07`) |
+| **RT-02** | Quorus | Concurrency conventions, the task-scope abstraction and the post-Vert.x test standard | ✅ 2026-09-26: RT-02a TaskScope core ([evidence](../evidence/rt-02a-task-scope-2026-09-26.json)); RT-02b tracing, MDC and `ScopedValue` propagation ([evidence](../evidence/rt-02b-context-propagation-2026-09-26.json)); RT-02c [concurrency conventions](../dev/QUORUS_CONCURRENCY_CONVENTIONS.md) with the post-Vert.x test standard, referenced from plan §6.1 and the Copilot instructions; RT-02d StructuredTaskScope structure rules and migration mapping ([evidence](../evidence/rt-02d-structure-rules-2026-09-26.json)); TaskScope 163/163 lines and 70/70 branches. Commits `341a509` (a), `3e4ec99` (b), `95ed659` (c), `a39206e` (d); raw evidence committed in `d2514ec` |
+| **RT-03** | Quorus | `quorus-core` off Vert.x; streaming HTTP adapter closes `ARCH-09` | 🟨 RT-03a done 2026-09-26: dead pool code removed (`5a4274f`). RT-03b done 2026-09-26: the HTTP adapter on Apache HttpClient 5 (`RT-Q5`), blocking and streaming, governed pinning with correct SNI, `Host` and hostname verification, closing `ARCH-09` (`fadbb29`, `336ec37`; [evidence](../evidence/rt-03b-http-adapter-2026-09-26.json)). Next: RT-03c, a blocking `TransferEngine` on virtual threads (option A), which also takes `OBS-07`; then RT-03d contract cleanup, RT-03e topology and codec, and RT-03f removing `io.vertx` from the core pom. Slices are defined in plan §20 |
 | **RT-04** | Quorus | `quorus-workflow` and `quorus-integration-examples` off Vert.x | 🟠 |
 | **RT-05** | Quorus | `quorus-agent` off Vert.x | 🟡 |
 | **RT-06** | Quorus | `quorus-controller` HTTP API off Vert.x; removes the `CE-07` bridge | 🟡 |
@@ -656,9 +665,9 @@ the in-repository engine.
 | `ARCH-04` Route trigger evaluator not wired | Open | Phase 7 (§7 D.3) |
 | `ARCH-05` Retriable writes lack idempotency and leader discovery | Open | P2-04, Phase 6 |
 | `ARCH-06` Assignment reference and tenant invariants incomplete | Closed | Phases 0, 1, R2 |
-| `ARCH-07` Persistent controller path and volume not proven | Open | **R1-1, R1-2, R1-3**, `CE-11`, Phase 8 |
+| `ARCH-07` Persistent controller path and volume not proven | Open | **R1-2, R1-3** (R1-1 closed 2026-09-07), `CE-11`, Phase 8 |
 | `ARCH-08` SFTP host-key verification disabled | Closed | Phase 4 |
-| `ARCH-09` HTTP adapter buffers full payload | Closed 2026-09-26 by `RT-03b` (streaming download and upload) | Phase 12 scale validation still measures it |
+| `ARCH-09` HTTP adapter buffers full payload | Closed 2026-09-26 by `RT-03b` (streaming download and upload); Architecture Specification v2.10 updated 2026-09-27 | Phase 12 scale validation still measures it |
 | `ARCH-10` Dynamic membership absent | Deferred | DEF-01 |
 | `ARCH-11` Transfer operations telemetry incomplete | Partly open | P3-01 … P3-12 |
 | `ARCH-12` Operational business context absent | Closed | Phase 3 first slice |
@@ -687,7 +696,9 @@ the in-repository engine.
 
 ## 15. Register Governance
 
-1. This register is regenerated from its source documents, never edited to disagree with them.
+1. This register is edited directly as the single task list, but it must never disagree with the
+   canonical specifications or the plan's acceptance criteria. When a disagreement is found,
+   correct whichever document is wrong in the same commit.
 2. An item is removed only when the source plan's exit criterion is met with retained evidence
    under §6.1 — not when the code merely exists.
 3. New delivery work is added to the enterprise plan first, then reflected here. Documentation
@@ -705,6 +716,7 @@ the in-repository engine.
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.9 | 2026-09-27 | Review of v1.8 against the repository and CI. **New:** `ENG-07`, because CI has never passed (FTPS test binds privileged port 21 on Linux; 11 document headers fail the documentation check). Decisions `SEQ-01` (defer the CI repair; local full-reactor runs are regression evidence meanwhile; no phase closes while `ENG-07` is open) and `SEQ-02` (`SEC-07` becomes a Phase 4 hardening follow-up). **Corrected:** `RT-Q4` (runtime option A, single-stage images, no builder or Maven; ADR-0012 v1.2); the Section G `ARCH-09` paragraph, which contradicted §14 (the Architecture Specification v2.10 now also closes it); RT-01b's "CI not yet executed"; DR-D2, re-scoped because the header and link checks already exist; DR-D4, whose ADR-0009 is no longer blocked; DR-F01, updated for `RT-03a`, `RT-03b` and `RT-01b`; the E.2 tenant-lock and WebClient rows; the Section I phase-assignment statement; the §1 test rule, which now points to plan §6.1; governance rule 1 and §1 precedence item 3, which now agree; §14 `ARCH-07`, which no longer lists the closed R1-1; DR-C4's DR-C11 wording; the plan version (v1.34) and §2 counts. **Closed:** DR-A1 (R1-1 raw logs are unrecoverable; evidence §3 and §10.4 annotated and §13 added) and DR-F14. DR-F17 merged into DR-C10. **Sequencing:** `OBS-07` goes into `RT-03c`; `OBS-15` waits for `CE-07`/`CE-10`. Section J cites commits for completed work, and its duplicate `RT-Q1`–`RT-Q3` rows are removed. **Moved from Section H under §15.5:** DR-A2 (orphaned SHAs preserved via the rewrite map), DR-A3 (prompt file removed, Copilot instructions reconciled), DR-A5 (explicit Compose development profile, mTLS example, health probe; `CFG-01`), DR-A6 (README quick start and HTTPie tenant fields), DR-A7 (authentication statements point to Architecture Spec §3), DR-B7 (register v1.5 / plan v1.28 pass), DR-F07 (reviews moved to `docs-design/reviews/`), DR-F08 (`docs-design/README.md` v1.1), DR-F13 (Configuration Handover link and path fixed, archived), all done; DR-C3 (superseded by `RT-02` conventions) and DR-F15 (superseded by ADR-0011 and `CE-10`). Also records changes made after v1.8 without a version: `RT-Q5`, `SEC-07`, the DR-Q6 refinement, DR-C11 done, DR-C9 in progress, and the `RT-01`–`RT-03` states |
 | 1.8 | 2026-09-26 | Became the single task list: merged the documentation review task list (archived) as Section H and its code defects as aliases in Section I; added the §3 decision log with ADR-0011, ADR-0012, `RT-Q1`–`RT-Q3`, DR-Q1–DR-Q6 and the Phase 0/4 status decision; applied the decisions to tasks (DR-C3 and DR-F15 superseded, DR-C4, DR-C8, DR-B6 and DR-D4 updated, new DR-C11 to remove the `m2cache`/`M2_REPO`/`m2-repo` machinery); renumbered sections after §2; updated governance |
 | 1.7 | 2026-09-26 | Recorded decisions `RT-Q1` (no preview; task-scope abstraction), `RT-Q2` (JDK `HttpsServer`) and `RT-Q3` (six-monthly Java releases); added recurring `RT-09`; cites plan v1.30 |
 | 1.6 | 2026-09-26 | Added Section J for plan §20 platform migration workstreams (`CE-01`–`CE-11`, `RT-Q1`–`RT-Q3`, `RT-01`–`RT-08`) under ADR-0011 and ADR-0012; updated the raftlog constraint (Maven Central coordinates, reached through QRaft after `CE-10`); routed `ARCH-09` to `RT-03` and `ARCH-07` through `CE-11`; renumbered traceability and governance to §13 and §14; updated plan section references |
