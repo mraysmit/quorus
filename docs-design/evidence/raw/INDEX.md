@@ -6,8 +6,13 @@
 **Date:** 2026-09-26  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
-**Status:** Active — raw command output retained as evidence (decision `DR-Q6`)  
+**Status:** Historical — raw output of slices up to 2026-09-26; nothing is added from 2026-09-27 (`DR-Q6` revised)  
 **Scope:** Raw logs cited by the evidence manifests and the enterprise plan
+
+> **No longer written, 2026-09-27.** From this date a slice's record is its commit message
+> (plan §6.1, `DR-Q6` revised). The files indexed here remain the record of the slices
+> that produced them.
+
 
 ## Rule
 

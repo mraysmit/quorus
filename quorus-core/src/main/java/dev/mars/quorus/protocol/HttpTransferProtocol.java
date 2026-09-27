@@ -43,7 +43,6 @@ import org.apache.hc.core5.http.ContentType;
 import org.apache.hc.core5.http.HttpEntity;
 import org.apache.hc.core5.http.io.entity.FileEntity;
 import org.apache.hc.core5.http.io.support.ClassicRequestBuilder;
-import org.apache.hc.core5.io.CloseMode;
 import org.apache.hc.core5.util.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -67,8 +66,6 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 import static dev.mars.quorus.core.exceptions.QuorusErrorCode.QUORUS_1201;
 import static dev.mars.quorus.core.exceptions.QuorusErrorCode.QUORUS_1202;
@@ -120,13 +117,14 @@ import static dev.mars.quorus.core.exceptions.QuorusErrorCode.QUORUS_1216;
  * The base trust defaults to the JVM default trust store. A base trust can be injected for tests;
  * making production trust anchors configurable is register item SEC-07.
  *
- * <h2>Files, cancellation and abort</h2>
+ * <h2>Files and cancellation</h2>
  * A download writes to {@code <destination>.tmp} and moves it onto the destination only after the
  * whole body has arrived and the checksum matched. On any failure the partial file is deleted, and no
  * destination file is created. Between buffers the adapter checks {@link TransferContext#shouldContinue()}
  * and the thread's interrupt status, so cancelled transfers stop promptly. Socket reads are not
- * interruptible, so a stalled server is bounded by the socket timeout. {@link #abort()} closes every
- * in-flight connection of this adapter immediately.
+ * interruptible on a platform thread, so there a stalled server is bounded by the socket timeout. On a
+ * virtual thread, which the engine uses, an interrupt closes the socket at once. Cancellation is
+ * interruption of the transfer's own thread; the adapter keeps no connection state between transfers.
  */
 public class HttpTransferProtocol implements TransferProtocol {
     private static final Logger logger = LoggerFactory.getLogger(HttpTransferProtocol.class);
@@ -138,7 +136,6 @@ public class HttpTransferProtocol implements TransferProtocol {
     private static final String USER_AGENT = "Quorus/1.0";
 
     private final X509TrustManager baseTrust;
-    private final Set<CloseableHttpClient> inFlight = ConcurrentHashMap.newKeySet();
 
     /** Creates an adapter that validates TLS peers against the JVM default trust store. */
     public HttpTransferProtocol() {
@@ -215,15 +212,6 @@ public class HttpTransferProtocol implements TransferProtocol {
     @Override
     public long getMaxFileSize() {
         return MAX_FILE_SIZE;
-    }
-
-    /** Immediately closes every in-flight connection of this adapter; their transfers fail. */
-    @Override
-    public void abort() {
-        logger.debug("HTTP abort: closing {} in-flight client(s)", inFlight.size());
-        for (CloseableHttpClient client : inFlight) {
-            client.close(CloseMode.IMMEDIATE);
-        }
     }
 
     // ------------------------------------------------------------------ download
@@ -440,12 +428,11 @@ public class HttpTransferProtocol implements TransferProtocol {
     }
 
     /**
-     * Executes the request with this adapter's abort registration. A {@link TransferException} thrown
-     * inside the handler is unwrapped and rethrown as is.
+     * Executes the request. A {@link TransferException} thrown inside the handler is unwrapped and
+     * rethrown as is.
      */
     private <T> T execute(CloseableHttpClient client, ClassicHttpRequest request, TransferContext context,
                           ResponseHandler<T> handler) throws IOException, TransferException {
-        inFlight.add(client);
         try {
             return client.execute(request, response -> {
                 try {
@@ -456,8 +443,6 @@ public class HttpTransferProtocol implements TransferProtocol {
             });
         } catch (HandlerFailure e) {
             throw e.transferException;
-        } finally {
-            inFlight.remove(client);
         }
     }
 

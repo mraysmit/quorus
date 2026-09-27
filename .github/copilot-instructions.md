@@ -65,13 +65,10 @@ JVM system properties (`-Dquorus.*`) are **not** a configuration source. Config 
 
 **MANDATORY: When running Maven or any test commands in the terminal, ALWAYS use `Tee-Object` so output is visible in the console AND saved to a file. NEVER use `Out-File` or `>` redirection alone — this hides output from the user.**
 
-**Where the file goes depends on whether it is evidence.** `temp/` is git-ignored scratch space and may be deleted at any time, so it MUST NOT hold anything a plan, register or evidence record will cite. Red, green, regression and verification output that will be cited goes directly to `docs-design/evidence/raw/<slice-id>/`, and its SHA-256 is recorded in the slice's JSON manifest (see `docs-design/evidence/raw/INDEX.md`). Never cite a `temp/` path as evidence.
+Test output is working output: write it to git-ignored `temp/`. A slice's red and green results, mutation checks and regression totals are recorded in its commit message (plan §6.1); no logs, manifests or patches are committed.
 
 ```powershell
-# CORRECT — evidence cited by a plan or manifest:
-mvn test -pl quorus-core 2>&1 | Tee-Object -FilePath docs-design\evidence\raw\p2-01\lease-expiry-red.log
-
-# CORRECT — throwaway output that nothing will cite:
+# CORRECT:
 mvn test -pl quorus-core 2>&1 | Tee-Object -FilePath temp\test-output.txt
 
 # WRONG — output hidden from user (NEVER DO THIS):

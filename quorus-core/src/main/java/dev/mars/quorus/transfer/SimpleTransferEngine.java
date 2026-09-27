@@ -107,6 +107,13 @@ public class SimpleTransferEngine implements TransferEngine {
     public SimpleTransferEngine(int maxConcurrentTransfers, int maxRetryAttempts, long retryDelayMs,
                                 String nfsMountRoot, boolean smbMountSecurityVerified,
                                 boolean nfsMountSecurityVerified) {
+        this(maxConcurrentTransfers, maxRetryAttempts, retryDelayMs,
+                new ProtocolFactory(nfsMountRoot, smbMountSecurityVerified, nfsMountSecurityVerified));
+    }
+
+    /** Creates an engine over the given protocols. Package-private so tests can supply adapters. */
+    SimpleTransferEngine(int maxConcurrentTransfers, int maxRetryAttempts, long retryDelayMs,
+                         ProtocolFactory protocolFactory) {
         if (maxConcurrentTransfers < 1) {
             throw new IllegalArgumentException("maxConcurrentTransfers must be at least 1");
         }
@@ -114,7 +121,7 @@ public class SimpleTransferEngine implements TransferEngine {
         this.maxRetryAttempts = maxRetryAttempts;
         this.retryDelayMs = retryDelayMs;
         this.slots = new Semaphore(maxConcurrentTransfers);
-        this.protocolFactory = new ProtocolFactory(nfsMountRoot, smbMountSecurityVerified, nfsMountSecurityVerified);
+        this.protocolFactory = protocolFactory;
 
         this.telemetryMetrics = TransferTelemetryMetrics.getInstance();
         telemetryMetrics.registerProtocol("http");

@@ -67,6 +67,7 @@ public class AgentConfiguration {
     private final String networkZone;
     private final long jobPollingInitialDelayMs;
     private final long jobPollingIntervalMs;
+    private final long progressReportIntervalMs;
     private final int foreignAssignmentMismatchThreshold;
     private final boolean telemetryEnabled;
     private final int prometheusPort;
@@ -104,6 +105,7 @@ public class AgentConfiguration {
         this.networkZone = builder.networkZone;
         this.jobPollingInitialDelayMs = builder.jobPollingInitialDelayMs;
         this.jobPollingIntervalMs = builder.jobPollingIntervalMs;
+        this.progressReportIntervalMs = builder.progressReportIntervalMs;
         this.foreignAssignmentMismatchThreshold = builder.foreignAssignmentMismatchThreshold;
         this.telemetryEnabled = builder.telemetryEnabled;
         this.prometheusPort = builder.prometheusPort;
@@ -186,6 +188,7 @@ public class AgentConfiguration {
     public String getNetworkZone() { return networkZone; }
     public long getJobPollingInitialDelayMs() { return jobPollingInitialDelayMs; }
     public long getJobPollingIntervalMs() { return jobPollingIntervalMs; }
+    public long getProgressReportIntervalMs() { return progressReportIntervalMs; }
     public int getForeignAssignmentMismatchThreshold() { return foreignAssignmentMismatchThreshold; }
     public boolean isTelemetryEnabled() { return telemetryEnabled; }
     public int getPrometheusPort() { return prometheusPort; }
@@ -223,6 +226,7 @@ public class AgentConfiguration {
         private String networkZone;
         private long jobPollingInitialDelayMs;
         private long jobPollingIntervalMs;
+        private long progressReportIntervalMs = 15000;
         private int foreignAssignmentMismatchThreshold;
         private boolean telemetryEnabled;
         private int prometheusPort;
@@ -260,6 +264,7 @@ public class AgentConfiguration {
             this.networkZone(config.getNetworkZone());
             this.jobPollingInitialDelayMs(config.getJobPollingInitialDelayMs());
             this.jobPollingIntervalMs(config.getJobPollingIntervalMs());
+            this.progressReportIntervalMs(config.getProgressReportIntervalMs());
             this.foreignAssignmentMismatchThreshold(config.getForeignAssignmentMismatchThreshold());
             this.telemetryEnabled(config.isTelemetryEnabled());
             this.prometheusPort(config.getPrometheusPort());
@@ -302,6 +307,7 @@ public class AgentConfiguration {
         public Builder networkZone(String value) { this.networkZone = value; return this; }
         public Builder jobPollingInitialDelayMs(long value) { this.jobPollingInitialDelayMs = value; return this; }
         public Builder jobPollingIntervalMs(long value) { this.jobPollingIntervalMs = value; return this; }
+        public Builder progressReportIntervalMs(long value) { this.progressReportIntervalMs = value; return this; }
         public Builder foreignAssignmentMismatchThreshold(int value) { this.foreignAssignmentMismatchThreshold = value; return this; }
         public Builder telemetryEnabled(boolean value) { this.telemetryEnabled = value; return this; }
         public Builder prometheusPort(int value) { this.prometheusPort = value; return this; }
@@ -320,6 +326,7 @@ public class AgentConfiguration {
             if (networkZone == null || networkZone.isBlank()) throw new IllegalArgumentException("networkZone is required");
             if (jobPollingInitialDelayMs < 0) throw new IllegalArgumentException("jobPollingInitialDelayMs must not be negative");
             if (jobPollingIntervalMs <= 0) throw new IllegalArgumentException("jobPollingIntervalMs must be positive");
+            if (progressReportIntervalMs <= 0) throw new IllegalArgumentException("progressReportIntervalMs must be positive");
             if (foreignAssignmentMismatchThreshold <= 0) {
                 throw new IllegalArgumentException("foreignAssignmentMismatchThreshold must be positive");
             }

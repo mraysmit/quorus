@@ -438,10 +438,17 @@ public class QuorusAgent {
                 // Resolve policy and credentials first; IN_PROGRESS is the durable
                 // evidence that the governed connection was actually used.
                 AtomicBoolean started = new AtomicBoolean();
+                ProgressReporter progress = new ProgressReporter(pendingJob);
                 transferService.executeTransfer(pendingJob, () -> reportInProgress(pendingJob, 0L)
-                                .onSuccess(ignored -> started.set(true)))
-                    .onSuccess(result -> handleTransferComplete(pendingJob, result))
-                    .onFailure(throwable -> handleTransferError(pendingJob, throwable, started.get()));
+                                .onSuccess(ignored -> {
+                                    started.set(true);
+                                    progress.start();
+                                }))
+                    // The final report is sent only after any progress report has settled, so
+                    // report sequences reach the controller in order.
+                    .onSuccess(result -> progress.stop().onComplete(ignored -> handleTransferComplete(pendingJob, result)))
+                    .onFailure(throwable -> progress.stop()
+                            .onComplete(ignored -> handleTransferError(pendingJob, throwable, started.get())));
             })
             .onFailure(err -> {
                 logger.error("Refusing to execute job {} because its start lifecycle was not acknowledged: {}",
@@ -508,6 +515,70 @@ public class QuorusAgent {
     private JobPollingService.PendingJob legacyPendingJob(String jobId) {
         return new JobPollingService.PendingJob(null, jobId, config.getAgentId(),
                 null, null, 0, null);
+    }
+
+    /**
+     * Reports a running transfer's growing byte count to the controller (ENG-10), so progress,
+     * freshness and stall detection see the transfer between its start and final reports.
+     *
+     * <p>Runs on this agent's event loop: a periodic timer reads the engine job's byte count and sends
+     * a report only when it has grown and no earlier report is still being sent. Each report takes
+     * the next sequence number. A report that stays unresolved after its bounded retries may or may
+     * not have been applied, so {@link #stop()} resends it exactly before the final report: an exact
+     * resend is idempotent if it was applied, and closes the sequence gap if it was not. Legacy jobs
+     * without an attempt context get no progress reports.
+     */
+    private final class ProgressReporter {
+        private final JobPollingService.PendingJob job;
+        private long timerId = -1;
+        private long lastReportedBytes;
+        private Future<Void> inFlight = Future.succeededFuture();
+        private long[] unresolved;                     // {bytes, sequence} of a report not yet settled
+
+        ProgressReporter(JobPollingService.PendingJob job) {
+            this.job = job;
+        }
+
+        void start() {
+            if (job.hasAttemptContext()) {
+                timerId = vertx.setPeriodic(config.getProgressReportIntervalMs(), id -> reportIfGrown());
+            }
+        }
+
+        private void reportIfGrown() {
+            if (!inFlight.isComplete() || unresolved != null) {
+                return;
+            }
+            long bytes = transferService.transferredBytes(job.getJobId());
+            if (bytes <= lastReportedBytes) {
+                return;
+            }
+            lastReportedBytes = bytes;
+            inFlight = send(bytes, job.nextReportSequence());
+        }
+
+        private Future<Void> send(long bytes, long sequence) {
+            return jobStatusReportingService.reportProgress(job.getJobId(), bytes, job.getAttemptId(),
+                            job.getFencingGeneration(), sequence)
+                    .onSuccess(ignored -> unresolved = null)
+                    .recover(err -> {
+                        logger.warn("Progress report unresolved for job {} (sequence {}): {}",
+                                job.getJobId(), sequence, err.getMessage());
+                        unresolved = new long[]{bytes, sequence};
+                        return Future.succeededFuture();
+                    });
+        }
+
+        /** Stops reporting; completes once any report in flight has settled and any unresolved one was resent. */
+        Future<Void> stop() {
+            if (timerId >= 0) {
+                vertx.cancelTimer(timerId);
+                timerId = -1;
+            }
+            return inFlight.compose(ignored -> unresolved == null
+                    ? Future.succeededFuture()
+                    : send(unresolved[0], unresolved[1]));
+        }
     }
 
     private Future<Void> reportAccepted(JobPollingService.PendingJob job) {

@@ -127,7 +127,7 @@ public class SmbTransferProtocol implements TransferProtocol {
             SensitiveDataRedactor.redactUri(request.getSourceUri()),
             SensitiveDataRedactor.redactUri(request.getDestinationUri()));
 
-        ProgressTracker progressTracker = new ProgressTracker(context.getJobId());
+        ProgressTracker progressTracker = new ProgressTracker(context);
         progressTracker.start();
         logger.debug("transfer: progress tracker initialized");
 
@@ -157,15 +157,6 @@ public class SmbTransferProtocol implements TransferProtocol {
     @Override
     public long getMaxFileSize() {
         return -1; // No specific limit for SMB
-    }
-    
-    @Override
-    public void abort() {
-        logger.debug("abort: SMB transfer abort requested");
-        // SMB transfers use Java NIO Files API which doesn't expose
-        // interruptible resources. Cancellation handled via thread interruption.
-        // Future enhancement: track active FileChannel for force close
-        logger.debug("abort: SMB abort relies on thread interruption");
     }
     
     private TransferResult performSmbTransfer(TransferRequest request, ProgressTracker progressTracker) 
@@ -358,7 +349,7 @@ public class SmbTransferProtocol implements TransferProtocol {
                 }
                 
                 // Check for cancellation
-                if (Thread.currentThread().isInterrupted()) {
+                if (progressTracker.stopRequested()) {
                     logger.debug("transferFile: transfer cancelled via thread interruption");
                     throw new IOException("Transfer was cancelled");
                 }

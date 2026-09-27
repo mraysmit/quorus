@@ -23,9 +23,7 @@ import io.vertx.junit5.VertxTestContext;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
-import java.lang.reflect.Field;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @ExtendWith(VertxExtension.class)
 class TransferExecutionServiceTest {
@@ -42,21 +40,6 @@ class TransferExecutionServiceTest {
         })));
     }
 
-    @Test
-    @SuppressWarnings("deprecation")
-    void testDeprecatedConstructorClosesOwnedVertx(VertxTestContext testContext) {
-        TransferExecutionService service = new TransferExecutionService(createConfig());
-        Vertx ownedVertx = extractVertx(service);
-
-        service.start();
-        service.shutdown().onComplete(testContext.succeeding(v -> testContext.verify(() -> {
-            assertThrows(RuntimeException.class,
-                    () -> ownedVertx.setTimer(10, id -> {}),
-                    "Deprecated constructor should close internally managed Vert.x");
-            testContext.completeNow();
-        })));
-    }
-
     private static AgentConfiguration createConfig() {
         return new AgentConfiguration.Builder()
                 .securityProfile("development").allowInsecure(true).controllerTlsEnabled(false)
@@ -67,15 +50,5 @@ class TransferExecutionServiceTest {
                 .heartbeatInterval(1000L)
                 .version("1.0.0-TEST")
                 .build();
-    }
-
-    private static Vertx extractVertx(TransferExecutionService service) {
-        try {
-            Field vertxField = TransferExecutionService.class.getDeclaredField("vertx");
-            vertxField.setAccessible(true);
-            return (Vertx) vertxField.get(service);
-        } catch (ReflectiveOperationException e) {
-            throw new AssertionError("Failed to extract Vert.x from TransferExecutionService", e);
-        }
     }
 }

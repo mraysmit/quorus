@@ -2,8 +2,8 @@
 
 # Quorus Concurrency Conventions
 
-**Version:** 1.1  
-**Date:** 2026-09-26  
+**Version:** 1.2  
+**Date:** 2026-09-27  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Status:** Active. Applies to all code that has left Vert.x, and to all new code that does not need Vert.x types  
@@ -138,12 +138,11 @@ This standard replaces the Vert.x test facilities for code that has left Vert.x 
   event. Otherwise the assertion reads the MDC of whichever thread inspects the event, and can pass
   falsely (seen in RT-02b).
 - **Guard tests are expected to pass before the change.** Tests that assert something is *not*
-  propagated or does *not* leak hold before and after an implementation. Record them as guards, not as
-  red evidence.
+  propagated or does *not* leak hold before and after an implementation. Report them as guards, not as
+  red results.
 - **Repeat concurrency tests** as part of regression, 30–50 runs of the affected test classes, and
-  retain the result as evidence: the pass and fail count in full, the run output as an excerpt.
-- **Evidence retention** (plan §6.1): commit raw red, green, mutation and characterization logs in full;
-  commit regression, repeat and discarded-attempt output only as a `*.excerpt.txt`, with the full log's
-  SHA-256 in the manifest.
+  state the pass and fail count in the commit message.
+- **Record in the commit message** (plan §6.1): the red and green results, mutation checks and regression
+  totals. No logs, manifests or patches are kept.
 - **Label honestly.** Tests added after the code they cover are retrospective characterization under
-  plan §6.1 and must be recorded as such.
+  plan §6.1 and must be stated as such.

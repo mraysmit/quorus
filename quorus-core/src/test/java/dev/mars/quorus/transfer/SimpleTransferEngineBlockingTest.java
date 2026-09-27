@@ -11,6 +11,8 @@ import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferResult;
 import dev.mars.quorus.core.TransferStatus;
 import dev.mars.quorus.core.exceptions.TransferException;
+import dev.mars.quorus.protocol.ProtocolFactory;
+import dev.mars.quorus.protocol.TransferProtocol;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -256,6 +258,53 @@ class SimpleTransferEngineBlockingTest {
         assertEquals(TransferStatus.FAILED, result.getFinalStatus());
         assertTrue(result.getErrorMessage().orElse("").contains("paused"), () -> "message: " + result.getErrorMessage());
         assertEquals(1, requests.get(), "a paused transfer must not be retried");
+    }
+
+    @Test
+    @DisplayName("Shutdown reports false when a transfer does not end within the timeout")
+    void shutdownReportsATransferThatOutlivesTheTimeout() throws Exception {
+        CompletableFuture<Void> entered = new CompletableFuture<>();
+        CompletableFuture<Void> release = new CompletableFuture<>();
+        ProtocolFactory protocols = new ProtocolFactory();
+        protocols.registerProtocol(new InterruptIgnoringProtocol(entered, release));
+        engine = new SimpleTransferEngine(1, 0, 1, protocols);
+        TransferRequest request = TransferRequest.builder()
+                .requestId("ignores-interrupt")
+                .sourceUri(URI.create("stubborn://service/file"))
+                .destinationPath(destination("ignores-interrupt"))
+                .protocol("stubborn")
+                .build();
+
+        Running running = start(request);
+        CompletableFuture.anyOf(entered, running.result).join();
+        assertTrue(entered.isDone(), "the transfer must reach the adapter");
+
+        assertFalse(engine.shutdown(Duration.ofMillis(200)),
+                "the adapter ignores the interrupt, so the transfer is still running when the timeout expires");
+        assertEquals(1, engine.getActiveTransferCount());
+
+        release.complete(null);
+        running.result.get(10, SECONDS);
+        assertTrue(engine.shutdown(Duration.ofSeconds(5)), "nothing is running once the transfer has ended");
+        assertEquals(0, engine.getActiveTransferCount());
+    }
+
+    /** An adapter that blocks in a join, which ignores interruption, until the test releases it. */
+    private record InterruptIgnoringProtocol(CompletableFuture<Void> entered, CompletableFuture<Void> release)
+            implements TransferProtocol {
+        @Override public String getProtocolName() { return "stubborn"; }
+        @Override public boolean canHandle(TransferRequest request) { return "stubborn".equals(request.getProtocol()); }
+        @Override public boolean supportsResume() { return false; }
+        @Override public boolean supportsPause() { return false; }
+        @Override public long getMaxFileSize() { return -1; }
+
+        @Override
+        public TransferResult transfer(TransferRequest request, TransferContext context) {
+            entered.complete(null);
+            release.join();
+            return TransferResult.builder().requestId(request.getRequestId())
+                    .finalStatus(TransferStatus.COMPLETED).bytesTransferred(0).build();
+        }
     }
 
     // ------------------------------------------------------------------ fixtures

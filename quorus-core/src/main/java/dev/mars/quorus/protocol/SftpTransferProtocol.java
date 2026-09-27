@@ -66,7 +66,6 @@ public class SftpTransferProtocol implements TransferProtocol {
     private static final Duration CONNECTION_TIMEOUT = Duration.ofSeconds(30);
 
     // Track active SFTP client for abort capability
-    private volatile SftpClient activeClient;
     
     @Override
     public String getProtocolName() {
@@ -116,7 +115,7 @@ public class SftpTransferProtocol implements TransferProtocol {
             request.getRequestId(), SensitiveDataRedactor.redactUri(request.getSourceUri()),
             SensitiveDataRedactor.redactUri(request.getDestinationUri()), request.isUpload());
 
-        ProgressTracker progressTracker = new ProgressTracker(context.getJobId());
+        ProgressTracker progressTracker = new ProgressTracker(context);
         progressTracker.start();
         logger.debug("transfer: progress tracker initialized for job={}", context.getJobId());
 
@@ -146,20 +145,6 @@ public class SftpTransferProtocol implements TransferProtocol {
     @Override
     public long getMaxFileSize() {
         return -1; // No specific limit for SFTP
-    }
-    
-    @Override
-    public void abort() {
-        logger.debug("abort: attempting to abort SFTP transfer");
-        SftpClient client = activeClient;
-        if (client != null) {
-            logger.info("Aborting SFTP transfer - forcibly closing session");
-            client.forceDisconnect();
-            activeClient = null;
-            logger.debug("abort: SFTP session forcibly closed");
-        } else {
-            logger.debug("abort: no active client to abort");
-        }
     }
     
     private TransferResult performSftpTransfer(TransferRequest request, ProgressTracker progressTracker)
@@ -207,7 +192,6 @@ public class SftpTransferProtocol implements TransferProtocol {
             // Create SFTP client and perform transfer
             logger.debug("performSftpDownload: creating SFTP client");
             SftpClient sftpClient = new SftpClient(connectionInfo);
-            activeClient = sftpClient; // Track for abort capability
 
             try {
                 logger.debug("performSftpDownload: establishing connection");
@@ -253,7 +237,6 @@ public class SftpTransferProtocol implements TransferProtocol {
                         .build();
 
             } finally {
-                activeClient = null;
                 logger.debug("performSftpDownload: disconnecting SFTP client");
                 sftpClient.disconnect();
             }
@@ -308,7 +291,6 @@ public class SftpTransferProtocol implements TransferProtocol {
             // Create SFTP client and perform upload
             logger.debug("performSftpUpload: creating SFTP client");
             SftpClient sftpClient = new SftpClient(connectionInfo);
-            activeClient = sftpClient;
 
             try {
                 logger.debug("performSftpUpload: establishing connection");
@@ -350,7 +332,6 @@ public class SftpTransferProtocol implements TransferProtocol {
                         .build();
 
             } finally {
-                activeClient = null;
                 logger.debug("performSftpUpload: disconnecting SFTP client");
                 sftpClient.disconnect();
             }
@@ -442,6 +423,9 @@ public class SftpTransferProtocol implements TransferProtocol {
 
         long downloadFile(String remotePath, java.nio.file.Path localPath,
                          ProgressTracker progressTracker, long fileSize) throws SftpException, IOException {
+            if (fileSize >= 0) {
+                progressTracker.setTotalBytes(fileSize);
+            }
 
             long bytesTransferred = 0;
 
@@ -463,8 +447,8 @@ public class SftpTransferProtocol implements TransferProtocol {
                         transferred += count;
                         progressTracker.updateProgress(transferred);
 
-                        // Check for cancellation
-                        return !Thread.currentThread().isInterrupted();
+                        // Returning false makes JSch stop the transfer
+                        return !progressTracker.stopRequested();
                     }
 
                     @Override
@@ -475,6 +459,10 @@ public class SftpTransferProtocol implements TransferProtocol {
 
                 // Download file with progress monitoring
                 sftpChannel.get(remotePath, bufferedOutput, progressMonitor);
+                // JSch returns normally when the monitor stops it, so a stopped transfer must fail here
+                if (progressTracker.stopRequested()) {
+                    throw new IOException("Transfer was cancelled");
+                }
                 bufferedOutput.flush();
 
                 bytesTransferred = Files.size(localPath);
@@ -488,6 +476,9 @@ public class SftpTransferProtocol implements TransferProtocol {
          */
         long uploadFile(java.nio.file.Path localPath, String remotePath,
                        ProgressTracker progressTracker, long fileSize) throws SftpException, IOException {
+            if (fileSize >= 0) {
+                progressTracker.setTotalBytes(fileSize);
+            }
 
             long bytesTransferred = 0;
 
@@ -508,8 +499,8 @@ public class SftpTransferProtocol implements TransferProtocol {
                         transferred += count;
                         progressTracker.updateProgress(transferred);
 
-                        // Check for cancellation
-                        return !Thread.currentThread().isInterrupted();
+                        // Returning false makes JSch stop the transfer
+                        return !progressTracker.stopRequested();
                     }
 
                     @Override
@@ -526,6 +517,10 @@ public class SftpTransferProtocol implements TransferProtocol {
 
                 // Upload file with progress monitoring
                 sftpChannel.put(bufferedInput, remotePath, progressMonitor, ChannelSftp.OVERWRITE);
+                // JSch returns normally when the monitor stops it, so a stopped transfer must fail here
+                if (progressTracker.stopRequested()) {
+                    throw new IOException("Transfer was cancelled");
+                }
 
                 bytesTransferred = fileSize;
             }
@@ -592,34 +587,6 @@ public class SftpTransferProtocol implements TransferProtocol {
             clearIdentities();
         }
         
-        /**
-         * Force disconnect without graceful shutdown.
-         * Used for aborting transfers - immediately closes the session.
-         */
-        void forceDisconnect() {
-            logger.debug("SftpClient.forceDisconnect: force closing all connections");
-            try {
-                if (sftpChannel != null && sftpChannel.isConnected()) {
-                    logger.info("Force closing SFTP channel");
-                    sftpChannel.disconnect();
-                    logger.debug("SftpClient.forceDisconnect: SFTP channel force closed");
-                }
-            } catch (Exception e) {
-                logger.warn("Error during SFTP channel force disconnect: {}", e.getMessage());
-            }
-            
-            try {
-                if (session != null && session.isConnected()) {
-                    logger.info("Force closing SFTP session");
-                    session.disconnect();
-                    logger.debug("SftpClient.forceDisconnect: SSH session force closed");
-                }
-            } catch (Exception e) {
-                logger.warn("Error during SFTP session force disconnect: {}", e.getMessage());
-            }
-            clearIdentities();
-        }
-
         private void clearIdentities() {
             try {
                 jsch.removeAllIdentity();

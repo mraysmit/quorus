@@ -83,11 +83,6 @@ class NfsTransferProtocolTest {
         }
 
         @Test
-        void abortDoesNotThrow() {
-            assertDoesNotThrow(() -> protocol.abort());
-        }
-
-        @Test
         void getMountRoot() {
             assertEquals(tempDir.toString(), protocol.getMountRoot());
         }
