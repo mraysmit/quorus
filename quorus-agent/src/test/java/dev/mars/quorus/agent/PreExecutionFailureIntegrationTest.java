@@ -35,6 +35,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @Timeout(value = 60, unit = SECONDS, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
 class PreExecutionFailureIntegrationTest {
     private static final String STATUS = "/api/v1/jobs/.+/status";
+    private static final String JOBS = "/api/v1/agents/.+/jobs";
 
     @TempDir Path root;
     private QuorusAgent agent;
@@ -156,24 +157,13 @@ class PreExecutionFailureIntegrationTest {
                 + "\"destinationUri\":\"" + destination.toUri() + "\",\"totalBytes\":7}";
         controller.on("POST", "/api/v1/agents/register", Reply.json(200, "{\"status\":\"registered\"}").always())
                 .on("DELETE", "/api/v1/agents/.+", Reply.status(204).always())
-                .on("GET", "/api/v1/agents/.+/jobs", request -> Reply.json(200, "{\"pendingJobs\":["
+                .on("GET", JOBS, request -> Reply.json(200, "{\"pendingJobs\":["
                         + (offered.getAndSet(true) && !repeatedPoll ? "" : job) + "]}"))
                 .on("POST", STATUS, request -> {
                     JsonNode report = request.json();
                     reports.add(report);
                     if (!repeatedPoll && uncertainStatus.equals(report.get("status").asText())
                             && (unresolved || !dropped.getAndSet(true))) {
-                        if (unresolved && !dropped.getAndSet(true)) {
-                            // Wait long enough for any further report to have been sent, then take the record.
-                            Thread.ofVirtual().start(() -> {
-                                try {
-                                    Thread.sleep(1500);
-                                } catch (InterruptedException ignored) {
-                                    return;
-                                }
-                                terminal.complete(List.copyOf(reports));
-                            });
-                        }
                         return responseCode == 0 ? Reply.drop() : Reply.status(Math.abs(responseCode));
                     }
                     if ("COMPLETED".equals(report.get("status").asText())) terminal.complete(List.copyOf(reports));
@@ -183,8 +173,10 @@ class PreExecutionFailureIntegrationTest {
                     fileRequests.incrementAndGet();
                     try (exchange) {
                         if (repeatedPoll) {
+                            // Hold the transfer until three more polls have offered the same attempt.
+                            int polls = controller.requests("GET", JOBS).size();
                             try {
-                                Thread.sleep(200);          // let further polls offer the same attempt meanwhile
+                                controller.awaitRequests("GET", JOBS, polls + 3, java.time.Duration.ofSeconds(10));
                             } catch (InterruptedException e) {
                                 return;
                             }
@@ -203,7 +195,16 @@ class PreExecutionFailureIntegrationTest {
                 .jobPollingInitialDelayMs(1).jobPollingIntervalMs(20).httpIdleTimeout(500)
                 .build());
         agent.start();
-        List<JsonNode> observed = terminal.get(10, TimeUnit.SECONDS);
+        List<JsonNode> observed;
+        if (unresolved) {
+            // ACCEPTED, then one rejected start report or three unresolved sends; once they have arrived,
+            // the job thread's end shows that nothing more will be reported.
+            controller.awaitRequests("POST", STATUS, responseCode < 0 ? 4 : 2, java.time.Duration.ofSeconds(10));
+            assertTrue(agent.awaitJobs(java.time.Duration.ofSeconds(10)), "the job should end");
+            observed = List.copyOf(reports);
+        } else {
+            observed = terminal.get(10, TimeUnit.SECONDS);
+        }
         if (unresolved) {
             assertEquals(responseCode < 0 ? 4 : 2, observed.size(), "Only ACCEPTED and the rejected/unresolved start report(s)");
             assertTrue(observed.stream().noneMatch(r -> "FAILED".equals(r.get("status").asText())),

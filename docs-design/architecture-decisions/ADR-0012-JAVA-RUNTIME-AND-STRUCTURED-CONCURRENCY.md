@@ -2,8 +2,8 @@
 
 # ADR-0012: Leave Vert.x for Java 27 Structured Concurrency
 
-**Version:** 1.2  
-**Date:** 2026-09-27  
+**Version:** 1.3  
+**Date:** 2026-09-28  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0
 
@@ -48,7 +48,10 @@ Class files compiled with preview features only run on the exact Java feature re
    - **Agent-to-controller client:** `java.net.http.HttpClient`, which supports mutual TLS through `SSLContext` and HTTP/2.
    - **HTTP transfer adapter:** Apache HttpClient 5, a measured exception to this rule (`RT-Q5`), because governed transfers must connect to a pinned address. Downloads and uploads stream without buffering the payload, which closed `ARCH-09` in `RT-03b`.
    - **Controller HTTP API:** the JDK `HttpsServer` (`RT-Q2`).
-   - **Timers and periodic work:** loops in structured scopes on virtual threads, with explicit shutdown.
+   - **Timers and periodic work:** loops on virtual threads with explicit shutdown. Work with a deadline
+     runs in structured scopes. Service loops and per-job work have no deadline, so they run on
+     lifecycle-owned virtual threads under the rules in the concurrency conventions §1 (clarified
+     2026-09-28, after `RT-05` delivered the agent this way).
    - **gRPC:** stays on grpc-java, as in QRaft.
 
 5. **Asynchronous test standard.** Tests exercise blocking APIs on virtual threads, with explicit preemptive timeouts and real HTTP, agent, protocol and cluster boundaries. Awaitility, sleeps used for synchronization, and non-deterministic polling remain prohibited. Plan §6.1's requirement for "Vert.x test facilities" applies only to code that is still on Vert.x, and is retired as each module leaves.
@@ -138,6 +141,7 @@ Class files compiled with preview features only run on the exact Java feature re
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.3 | 2026-09-28 | Decision 4 clarified: a `TaskScope` needs a deadline, so service loops and per-job work with no deadline run on lifecycle-owned virtual threads (concurrency conventions v1.3 §1), as the agent does since `RT-05` |
 | 1.2 | 2026-09-27 | Corrected `RT-Q4` to the delivered images: runtime option A (`amazoncorretto:27.0.0-alpine3.24`), single-stage images that copy host-built jars, and no builder stage or Maven in any image. Decision 4 names Apache HttpClient 5 for the HTTP transfer adapter (`RT-Q5`), and decision 3 no longer mentions Docker build images |
 
 Versions 1.0 and 1.1 (2026-09-26) are recorded only in git history.

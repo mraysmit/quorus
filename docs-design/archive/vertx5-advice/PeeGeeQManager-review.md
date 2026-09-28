@@ -1,3 +1,5 @@
+> **Archived 2026-09-28.** Vert.x 5 advice written for another project (PeeGeeQ); kept for reference only, not Quorus guidance.
+
 Alright Mark — here’s the straight talk. You’ve got a solid skeleton and you’re pointed in the right direction (Vert.x 5 pool, no JDBC, nice separation of concerns). But there are several foot-guns and “works in dev, bites in prod” issues. I’ll group them by priority and give concrete fixes.
 
 ---

@@ -83,9 +83,12 @@ class TransferProgressReportingIntegrationTest {
 
         assertEquals("IN_PROGRESS", progress.get("expectedState").asText(),
                 "a progress report follows the start report, so it expects IN_PROGRESS");
-        assertTrue(progress.get("bytesTransferred").asLong() >= SIZE / 2 - 64 * 1024,
-                () -> "the report carries the bytes already moved: " + progress);
-        assertTrue(progress.get("bytesTransferred").asLong() < SIZE, "reported while the transfer was still running");
+        // The file handler withholds the second half until this report arrives, so any report with bytes
+        // moved was made mid-transfer and cannot exceed the first half. No lower bound beyond "some bytes":
+        // the first report may come while the first half is still being read.
+        long reported = progress.get("bytesTransferred").asLong();
+        assertTrue(reported > 0 && reported <= SIZE / 2,
+                () -> "the report carries the bytes moved so far, mid-transfer: " + progress);
 
         List<String> statuses = reports.stream().map(r -> r.get("status").asText()).toList();
         assertEquals("ACCEPTED", statuses.getFirst());

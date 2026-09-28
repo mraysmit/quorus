@@ -1,3 +1,5 @@
+> **Archived 2026-09-28.** Vert.x 5 advice written for another project (PeeGeeQ); kept for reference only, not Quorus guidance.
+
 Alright — this is **mostly solid** for a Vert.x 5 connection manager, but there are a few *serious design flaws* hidden under the surface that will cause resource leaks, non-deterministic shutdown, and concurrency issues once this runs under load or during redeploys.
 
 Let’s break it down like a pro — straight, no sugar.

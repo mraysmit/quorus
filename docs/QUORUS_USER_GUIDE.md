@@ -2,7 +2,7 @@
 
 # Quorus User Guide
 
-**Version:** 2.4
+**Version:** 2.5
 **Date:** 2026-09-28
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
@@ -90,7 +90,7 @@ What is **not** currently wired by controller startup is an always-on background
 
 ### Java Baseline
 
-This repository builds with Java 25. The root Maven build sets source and target to 25.
+This repository builds with Java 27. The root Maven build sets `java.version` to 27 and `maven.compiler.release` to `${java.version}`.
 
 ### Direct Execution Path
 

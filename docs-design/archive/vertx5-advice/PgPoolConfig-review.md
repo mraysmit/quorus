@@ -1,3 +1,5 @@
+> **Archived 2026-09-28.** Vert.x 5 advice written for another project (PeeGeeQ); kept for reference only, not Quorus guidance.
+
 Alright — this one’s cleanly written, but you’re carrying **HikariCP-era baggage** into a **Vert.x reactive pool**, and it matters. Let’s be very clear:
 
 Vert.x 5’s `PoolOptions` **does not** use (or even recognize) `minimumIdle`, `maxLifetime`, `connectionTimeout`, or `autoCommit`. Those are JDBC relics. If you keep them here, you’re fooling future readers and possibly yourself about what’s actually enforced.

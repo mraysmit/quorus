@@ -1,13 +1,13 @@
 # Quorus Copilot Instructions
 
 ## Project Overview
-Quorus is an enterprise-grade distributed file transfer system built with **Java 25** and **Vert.x 5.0.8**. It uses a **controller-first architecture** with Raft consensus for distributed state management.
+Quorus is an enterprise-grade distributed file transfer system built with **Java 27**. Only `quorus-controller` still uses **Vert.x 5**, until plan item `RT-06` moves it; every other module is plain Java on virtual threads. It uses a **controller-first architecture** with Raft consensus for distributed state management.
 
 **Direction of travel (accepted 2026-09-26; see plan §20):**
 - Quorus will consume consensus through the generic QRaft engine (`../qraft`), not through its own `RaftNode` or a direct `raftlog-core` dependency ([ADR-0011](../docs-design/architecture-decisions/ADR-0011-CONSENSUS-VIA-QRAFT-GENERIC-ENGINE.md)). The Quorus–QRaft interface must stay 100% generic: never add a Quorus concept (transfer, job, agent, tenant, route, role, HTTP resource) to QRaft.
 - Quorus will leave Vert.x for Java 27 virtual threads, `ScopedValue` and structured concurrency ([ADR-0012](../docs-design/architecture-decisions/ADR-0012-JAVA-RUNTIME-AND-STRUCTURED-CONCURRENCY.md)). `StructuredTaskScope` is still a preview API in JDK 27. Never compile with `--enable-preview`: write structured code against the Quorus task-scope abstraction (`RT-02`), which moves to `StructuredTaskScope` once it is final. The controller HTTP server will be the JDK `HttpsServer`, and Quorus follows each six-monthly Java release.
 
-The conventions below describe the current Vert.x code. Follow them for existing modules until their `RT` migration item lands. Do not add new Vert.x coupling where a JDK-typed interface would do.
+The Vert.x conventions below apply to `quorus-controller` only. `quorus-core`, `quorus-workflow`, `quorus-tenant`, `quorus-agent` and `quorus-integration-examples` have no Vert.x and follow [docs-design/dev/QUORUS_CONCURRENCY_CONVENTIONS.md](../docs-design/dev/QUORUS_CONCURRENCY_CONVENTIONS.md). Do not add new Vert.x coupling where a JDK-typed interface would do.
 
 ## Architecture (Controller-First Pattern)
 
@@ -30,12 +30,12 @@ Agents poll controller for jobs, execute transfers via protocol adapters
 
 ## Key Conventions
 
-### Reactive Patterns
-**Code that has left Vert.x, and new code that needs no Vert.x types, follows [docs-design/dev/QUORUS_CONCURRENCY_CONVENTIONS.md](../docs-design/dev/QUORUS_CONCURRENCY_CONVENTIONS.md):** blocking code on virtual threads, `dev.mars.quorus.concurrent.TaskScope` for concurrent work, and request context in declared `ScopedValue`s. The rules below apply only to modules still on Vert.x.
+### Concurrency Patterns
+**All modules except `quorus-controller`, and new code that needs no Vert.x types, follow [docs-design/dev/QUORUS_CONCURRENCY_CONVENTIONS.md](../docs-design/dev/QUORUS_CONCURRENCY_CONVENTIONS.md):** blocking code on virtual threads, `dev.mars.quorus.concurrent.TaskScope` for concurrent work, and request context in declared `ScopedValue`s. The first two rules below are Vert.x rules and apply only to `quorus-controller`.
 
-- All async operations use **`io.vertx.core.Future<T>`** (not CompletableFuture)
-- Controllers run on Vert.x event loop — avoid blocking operations
-- Protocol adapters: use `transferReactive()` over deprecated `transfer()`
+- Controller async operations use **`io.vertx.core.Future<T>`** (not CompletableFuture)
+- The controller runs on the Vert.x event loop — avoid blocking operations there
+- Protocol adapters are blocking: implement `transfer(TransferRequest, TransferContext)`. `TransferEngine` is blocking too (`TransferResult transfer(TransferRequest)`, `boolean shutdown(Duration)`)
 
 ### Interface Implementation Pattern
 ```java
@@ -87,7 +87,7 @@ mvn compile -pl quorus-core
 mvn test jacoco:report
 
 # Start controller via the current controller-first runtime
-# Prefer Docker compose or launch QuorusControllerVerticle from the IDE.
+# Prefer Docker compose or launch QuorusControllerApplication (the jar main class) from the IDE.
 ```
 
 ### Docker testing
@@ -116,24 +116,30 @@ mvn verify '-Dtest.excludedGroups='
 
 ## Testing Patterns
 
-- Use **JUnit 5** with `@ExtendWith(VertxExtension.class)` for async tests
-- Use `VertxTestContext` for Future assertions
+- Use **JUnit 5**. The default is the test standard in [docs-design/dev/QUORUS_CONCURRENCY_CONVENTIONS.md §6](../docs-design/dev/QUORUS_CONCURRENCY_CONVENTIONS.md#6-asynchronous-test-standard): call blocking APIs directly, bound each test with `@Timeout(threadMode = SEPARATE_THREAD)`, synchronise with handshakes, and never use sleeps or Awaitility
+- `@ExtendWith(VertxExtension.class)` and `VertxTestContext` are for `quorus-controller` tests only
 - TestContainers for integration tests requiring Docker
+
+Controller-only Vert.x test shape (from `HttpApiServerHealthTest`):
 
 ```java
 @ExtendWith(VertxExtension.class)
-class MyTest {
+class HttpApiServerHealthTest {
     @Test
-    void testAsync(Vertx vertx, VertxTestContext ctx) {
-        engine.submitTransfer(request)
-            .onComplete(ctx.succeedingThenComplete());
+    void shouldReturnUp(VertxTestContext ctx) {
+        webClient.get(HTTP_PORT, "localhost", "/health/live")
+            .send()
+            .onComplete(ctx.succeeding(response -> ctx.verify(() -> {
+                assertEquals(200, response.statusCode());
+                ctx.completeNow();
+            })));
     }
 }
 ```
 
 ### Test-concurrency direction
 
-For code that has left Vert.x, use the asynchronous test standard in [docs-design/dev/QUORUS_CONCURRENCY_CONVENTIONS.md §6](../docs-design/dev/QUORUS_CONCURRENCY_CONVENTIONS.md#6-asynchronous-test-standard). It requires preemptive `@Timeout(threadMode = SEPARATE_THREAD)`, `CompletableFuture` handshakes and interruption for synchronisation, and no sleeps, Awaitility or polling. Spans are asserted through the real OpenTelemetry SDK with `InMemorySpanExporter`, MDC through logback events frozen with `prepareForDeferredProcessing()`, and concurrency tests are repeated as regression evidence. The paragraph below applies to modules still on Vert.x.
+For every module except `quorus-controller`, use the asynchronous test standard in [docs-design/dev/QUORUS_CONCURRENCY_CONVENTIONS.md §6](../docs-design/dev/QUORUS_CONCURRENCY_CONVENTIONS.md#6-asynchronous-test-standard). It requires preemptive `@Timeout(threadMode = SEPARATE_THREAD)`, `CompletableFuture` handshakes and interruption for synchronisation, and no sleeps, Awaitility or polling. Spans are asserted through the real OpenTelemetry SDK with `InMemorySpanExporter`, MDC through logback events frozen with `prepareForDeferredProcessing()`, and concurrency tests are repeated as regression evidence. The paragraph below applies to `quorus-controller` tests only.
 
 The migration target for Vert.x asynchronous tests is to use Vert.x `Future`, `Promise`, timers,
 and `VertxTestContext`, with blocking work isolated through `executeBlocking`. Prefer these patterns
@@ -143,7 +149,7 @@ patterns into new tests. Purpose-built thread-safety tests may use Java concurre
 when concurrency itself is the behavior under test.
 
 #### Shared test utility
-`TestFutureUtils` in `quorus-core/src/test/java/dev/mars/quorus/testing/TestFutureUtils.java`:
+`TestFutureUtils` in `quorus-controller/src/test/java/dev/mars/quorus/testing/TestFutureUtils.java` (controller tests only):
 - `awaitSuccess(Future<T>, Duration)` — blocks test thread until future completes or times out
 - `awaitFailure(Future<?>, Duration)` — blocks until future fails, returns the cause
 
@@ -189,10 +195,11 @@ Variable substitution uses `{{variable}}` syntax. Parser: `YamlWorkflowDefinitio
 
 ## Protocol Adapters (quorus-core/protocol/)
 Implement `TransferProtocol` interface:
-- `HttpTransferProtocol` — reactive, non-blocking
+- Every adapter is blocking and implements `transfer(TransferRequest, TransferContext)`; there is no
+  `transferReactive()` wrapper and no Vert.x `executeBlocking` in `quorus-core`
+- `HttpTransferProtocol` — blocking, streaming adapter on Apache HttpClient 5
 - `FtpTransferProtocol` (FTP/FTPS), `SftpTransferProtocol`, `SmbTransferProtocol`, and
-  `NfsTransferProtocol` perform blocking I/O; the default `TransferProtocol.transferReactive()`
-  wrapper isolates it with Vert.x `executeBlocking`
+  `NfsTransferProtocol` perform blocking I/O on the calling thread
 
 ## Agent-Controller Communication
 
@@ -212,6 +219,7 @@ There is currently no agent deregistration route exposed by the controller.
 ### Key Services (quorus-agent/service/)
 | Service | Responsibility | Interval |
 |---------|----------------|----------|
+| `ControllerClient` | `java.net.http` transport shared by the services below: TLS 1.3, mutual TLS, PKCS#8 keys via core `dev.mars.quorus.security.PemTls` | Per request |
 | `AgentRegistrationService` | Initial registration with capabilities | Once at startup |
 | `HeartbeatService` | Keep-alive with capacity updates | `quorus.agent.heartbeat.interval-ms` (30s default) |
 | `JobPollingService` | Fetch pending job assignments | `quorus.agent.jobs.polling.interval-ms` (10s default) |
@@ -231,6 +239,7 @@ There is currently no agent deregistration route exposed by the controller.
 ```
 
 ## Key Files
+- [QuorusControllerApplication.java](../quorus-controller/src/main/java/dev/mars/quorus/controller/QuorusControllerApplication.java) — Controller entry point (jar main class); deploys the verticle
 - [QuorusControllerVerticle.java](../quorus-controller/src/main/java/dev/mars/quorus/controller/QuorusControllerVerticle.java) — Controller startup sequence
 - [RaftNode.java](../quorus-controller/src/main/java/dev/mars/quorus/controller/raft/RaftNode.java) — Raft consensus implementation
 - [SimpleTransferEngine.java](../quorus-core/src/main/java/dev/mars/quorus/transfer/SimpleTransferEngine.java) — Transfer execution
@@ -286,7 +295,6 @@ mvn compile -pl quorus-controller  # protobuf-maven-plugin auto-generates
 ### JUnit 5 + Testcontainers Pattern
 ```java
 @Testcontainers
-@ExtendWith(VertxExtension.class)
 class IntegrationTest {
     static Network network = Network.newNetwork();
     

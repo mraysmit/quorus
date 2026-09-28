@@ -1,3 +1,5 @@
+> **Archived 2026-09-28.** Vert.x 5 advice written for another project (PeeGeeQ); kept for reference only, not Quorus guidance.
+
 Perfect — this one’s much tighter than the pool config, but it’s still carrying a few **JDBC-era assumptions** that are going to bite you in a Vert.x 5 reactive world (especially once you start wiring multi-tenant or SSL-enabled connections). Let’s go line by line like a proper review.
 
 ---

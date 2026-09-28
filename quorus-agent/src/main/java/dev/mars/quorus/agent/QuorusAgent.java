@@ -336,6 +336,21 @@ public class QuorusAgent {
         stopped.await();
     }
 
+    /**
+     * Waits for the job threads running now to end, without stopping anything: a handshake for tests
+     * that must see every report a job makes. Returns false if one did not end within {@code timeout}.
+     */
+    boolean awaitJobs(Duration timeout) throws InterruptedException {
+        long deadline = System.nanoTime() + timeout.toNanos();
+        for (Thread job : List.copyOf(jobThreads)) {
+            long remaining = deadline - System.nanoTime();
+            if (remaining <= 0 || !job.join(Duration.ofNanos(remaining))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     /** Waits until the agent has shut down, for at most {@code timeout}; returns whether it has. */
     public boolean awaitShutdown(Duration timeout) throws InterruptedException {
         return stopped.await(timeout.toNanos(), TimeUnit.NANOSECONDS);

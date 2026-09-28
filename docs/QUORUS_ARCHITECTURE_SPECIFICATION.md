@@ -2,7 +2,7 @@
 
 # Quorus Architecture Specification
 
-**Version:** 2.11
+**Version:** 2.12
 **Date:** 2026-09-28
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
@@ -27,7 +27,7 @@ The terms **MUST**, **MUST NOT**, **SHOULD**, **SHOULD NOT**, and **MAY** descri
 
 ## 2. Product Boundary
 
-Quorus is a Java 27 file-transfer platform, currently built on Vert.x 5 and moving off it module by module ([ADR-0012](../docs-design/architecture-decisions/ADR-0012-JAVA-RUNTIME-AND-STRUCTURED-CONCURRENCY.md)). It has two execution modes:
+Quorus is a Java 27 file-transfer platform. It is moving off Vert.x 5 module by module ([ADR-0012](../docs-design/architecture-decisions/ADR-0012-JAVA-RUNTIME-AND-STRUCTURED-CONCURRENCY.md)): `quorus-core`, `quorus-workflow`, `quorus-tenant`, `quorus-agent` and `quorus-integration-examples` no longer use Vert.x, and only `quorus-controller` still does, until plan item RT-06 moves it. It has two execution modes:
 
 1. **Direct execution:** an application invokes `quorus-core` or `quorus-workflow` in-process.
 2. **Distributed execution:** controller nodes coordinate work through Raft-replicated metadata and agents execute transfers.
@@ -65,7 +65,7 @@ The status values in this table are normative:
 
 | Capability | Status | Current boundary |
 |---|---|---|
-| Core transfer engine | Implemented | Reactive execution through `SimpleTransferEngine` |
+| Core transfer engine | Implemented | Blocking execution through `SimpleTransferEngine`: each transfer runs on the calling thread under a concurrency limit, with retries |
 | HTTP/HTTPS, FTP/FTPS, SFTP, SMB/CIFS, NFS adapters | Implemented | Adapter features differ; resume is not generally available |
 | YAML workflow parsing and dependency execution | Implemented | Conditions are carried as resolved strings; there is no general condition engine |
 | Controller HTTP API | Implemented | Production profile requires TLS 1.3 client certificates, trusted identity resolution, policy middleware, and audit decisions; writes remain leader-only |

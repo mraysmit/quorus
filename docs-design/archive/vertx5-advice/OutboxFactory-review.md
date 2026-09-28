@@ -1,3 +1,5 @@
+> **Archived 2026-09-28.** Vert.x 5 advice written for another project (PeeGeeQ); kept for reference only, not Quorus guidance.
+
 Mark, solid scaffolding — but there are a few landmines here that will hurt you in prod. I’ll keep it blunt and practical.
 
 # What needs fixing (by priority)

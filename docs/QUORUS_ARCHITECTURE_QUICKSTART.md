@@ -2,7 +2,7 @@
 
 # Quorus Architecture Quickstart
 
-**Version:** 2.5
+**Version:** 2.6
 **Date:** 2026-09-28
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
@@ -10,10 +10,12 @@
 
 ## What Quorus Is
 
-Quorus is a Java 25, Vert.x 5 based file transfer platform with two practical execution modes:
+Quorus is a Java 27 file transfer platform with two practical execution modes:
 
 - **Direct execution** via `quorus-core`, where an application or workflow runs transfers in-process through `SimpleTransferEngine`
 - **Distributed execution** via `quorus-controller` and `quorus-agent`, where controller nodes replicate cluster state with Raft and agents execute transfer work
+
+Only `quorus-controller` still uses Vert.x 5, while it migrates to plain Java under [ADR-0012](../docs-design/architecture-decisions/ADR-0012-JAVA-RUNTIME-AND-STRUCTURED-CONCURRENCY.md). The other modules use blocking APIs and virtual threads and have no Vert.x dependency.
 
 The core implementation anchors are:
 
@@ -174,10 +176,10 @@ In the production profile, the API derives tenant authority from an authenticate
 
 The repository root `pom.xml` sets:
 
-- `maven.compiler.source = 25`
-- `maven.compiler.target = 25`
+- `java.version = 27`
+- `maven.compiler.release = ${java.version}`
 
-Use JDK 25 for builds, tests, and IDE tooling in this repository.
+`.java-version` also names 27. Use JDK 27 for builds, tests, and IDE tooling in this repository.
 
 ## Recommended Reading
 

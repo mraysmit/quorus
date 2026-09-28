@@ -29,6 +29,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.testcontainers.containers.BindMode;
+import org.testcontainers.containers.output.WaitingConsumer;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.junit.jupiter.Container;
@@ -42,8 +43,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.concurrent.TimeUnit;
 
-import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -155,13 +156,14 @@ class AgentTelemetryIntegrationTest {
 
     @Test
     @DisplayName("OTel collector receives emitted startup span")
-    void testCollectorReceivesEmittedSpan() {
+    void testCollectorReceivesEmittedSpan() throws Exception {
         String spanName = "agent.telemetry.integration.startup";
+        // Follows the collector's log stream from its start and blocks until the span name appears:
+        // woken by each log line, no polling.
+        WaitingConsumer logs = new WaitingConsumer();
+        otelCollector.followOutput(logs);
 
-        await().atMost(Duration.ofSeconds(10))
-            .pollInterval(Duration.ofMillis(200))
-            .alias("Collector logs did not contain expected span name: " + spanName)
-            .until(() -> otelCollector.getLogs().contains(spanName));
+        logs.waitUntil(frame -> frame.getUtf8String().contains(spanName), 10, TimeUnit.SECONDS);
     }
 
     private static int findAvailablePort() {

@@ -1,3 +1,5 @@
+> **Archived 2026-09-28.** Vert.x 5 migration notes; Quorus is leaving Vert.x (ADR-0012), so these describe a superseded direction.
+
 # Vert.x 5.x Migration - Lessons Learned and Best Practices
 
 **Project**: Quorus Distributed File Transfer System  

@@ -2,8 +2,8 @@
 
 # Quorus Concurrency Conventions
 
-**Version:** 1.2  
-**Date:** 2026-09-27  
+**Version:** 1.3  
+**Date:** 2026-09-28  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Status:** Active. Applies to all code that has left Vert.x, and to all new code that does not need Vert.x types  
@@ -22,7 +22,22 @@ must not gain new Vert.x coupling where a JDK-typed interface would do.
   that needs the result.
 - Do not create raw threads, `ExecutorService` pools or `CompletableFuture` chains to run a unit of work
   concurrently. Use a `TaskScope`. An explicitly bounded resource, such as a `Semaphore` capping
-  concurrent transfers, is a limit on concurrency, not a separate model.
+  concurrent transfers, is a limit on concurrency, not a separate model. The one exception is
+  lifecycle-owned threads, below.
+- **Lifecycle-owned threads (added 1.3).** A `TaskScope` needs a deadline, so it cannot hold work that
+  lives as long as its component or has no natural bound. A component with an explicit start and stop
+  (the agent, the controller, a server) may run such work on virtual threads it creates itself:
+  service loops (heartbeat, polling), and one thread per unit of work that has no deadline (an agent
+  job: a transfer and its reports). Every such thread must be:
+  - named after its work (`quorus-agent-heartbeat`, `quorus-agent-job-<id>`);
+  - tracked by its owner, which knows every thread it started;
+  - stopped by an explicit signal and interruption, never left to run after its owner has stopped;
+  - joined by the owner's stop within a stated bound, logging any thread that did not end.
+
+  A thread that pairs with one piece of work, such as a transfer's progress reporter, is started,
+  stopped and joined by that work's thread on every path. A server whose API requires an `Executor`
+  (the JDK HTTP server) gets a virtual-thread-per-task executor that the server's owner closes.
+  Bounded fan-out inside such work still uses a `TaskScope`.
 - `StructuredTaskScope` is a preview API in Java 27. Never compile Quorus with `--enable-preview`
   (decision RT-Q1). `TaskScope` mirrors its API, so the switch is mechanical once it is final in an
   adopted release.

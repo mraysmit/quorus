@@ -2,8 +2,8 @@
 
 # Quorus YAML Syntax Guide
 
-**Version:** 2.2  
-**Date:** 2026-09-01  
+**Version:** 2.3  
+**Date:** 2026-09-28  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0
 
@@ -152,11 +152,11 @@ Controls how the workflow engine runs transfer groups.
 
 | Field | Required | Default | Type | Description |
 |-------|----------|---------|------|-------------|
-| `dryRun` | No | `false` | boolean | When `true`, workflow runs without performing actual transfers. |
-| `virtualRun` | No | `false` | boolean | Virtual run mode for testing. |
+| `dryRun` | No | `false` | boolean | When `true`, every run of this workflow is a dry run: it is validated and planned, and no transfer starts, even when it is started as a normal execution. Wins over `virtualRun`. |
+| `virtualRun` | No | `false` | boolean | When `true`, every run of this workflow is a virtual run: each transfer is simulated (about 100 ms each, in parallel within a group), and no transfer starts. |
 | `parallelism` | No | `1` | integer | Maximum concurrent transfer groups. Minimum is 1 (enforced by `Math.max(1, parallelism)`). |
-| `timeout` | No | `"3600s"` (1 hour) | duration | Overall workflow timeout. |
-| `strategy` | No | `"sequential"` | string | Execution strategy. Values seen in real YAML: `"sequential"`, `"parallel"`. |
+| `timeout` | No | `"3600s"` (1 hour) | duration | Overall workflow timeout. When it expires, running transfers are stopped and the run fails. |
+| `strategy` | No | `"sequential"` | string | `"sequential"` or `"parallel"`; any other value fails validation. It is recorded with the workflow but does not change scheduling: groups run in dependency order, up to `parallelism` at a time, and the transfers of a group always run in parallel. |
 
 **Duration format:**
 
@@ -211,7 +211,7 @@ An ordered list of transfer groups. Each group contains transfers and can declar
 | `condition` | No | `null` | string | Condition expression. Parsed and variable-resolved, but the current engine does not evaluate conditions — it carries the resolved string through execution. |
 | `variables` | No | `null` | map | Group-scoped variables. These are merged on top of global variables during resolution (group variables take precedence). |
 | `continueOnError` | No | `false` | boolean | When `true`, workflow continues to dependent groups even if this group fails. |
-| `retryCount` | No | `0` | integer | Number of retry attempts for the group. |
+| `retryCount` | No | `0` | integer | How many more times each failed transfer of the group is run before it counts as failed (0 to 10). Each run is a full transfer, with the transfer engine's own retries inside it. |
 | `transfers` | No | `[]` | list | List of transfer definitions within this group. |
 
 ### Dependency Graph
