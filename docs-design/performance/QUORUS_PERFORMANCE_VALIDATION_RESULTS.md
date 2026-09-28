@@ -2,7 +2,7 @@
 
 # Quorus Performance Validation Results
 
-**Version:** 2.2  
+**Version:** 2.3  
 **Date:** 2026-09-28  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
@@ -35,6 +35,7 @@ of it is not recorded.
 |---|---|---|---|---|
 | B-09 (commit latency) | `8946faa` plus the uncommitted `quorus-benchmarks` module; engine code unchanged | 2026-09-28 | About 270 commits/s at every concurrency; p50 3.7 ms at 1 client (§2.1) | No gate; baseline for `CE-07` |
 | B-08 (controller API) | `23bcb6f` plus the uncommitted B-08 harness; controller code unchanged | 2026-09-28 | About 100 requests/s for reads and 70 for writes at every concurrency, no errors (§2.2) | No gate; baseline for `RT-06` (`RT-Q2`). Found `ENG-16` |
+| B-08 (controller API) | `d3ceb67` plus the uncommitted `ENG-16` fix | 2026-09-28 | Reads 530 requests/s at 10 clients to about 8,000 at 500; writes about 170 at every concurrency; no errors (§2.3) | No gate; the `RT-06` comparison baseline, with `ENG-16` fixed |
 
 ### 2.1 B-09 baseline: in-repository Vert.x engine, 2026-09-28
 
@@ -94,10 +95,40 @@ request performs at least four disk syncs on the thread that serves every reques
 again because the Raft commit follows. Recorded as `ENG-16`. This baseline measures the controller as it
 is; the comparison after `RT-06` has to state whether `ENG-16` was fixed in between.
 
+### 2.3 B-08 after `ENG-16`: Vert.x controller with group-committed audit, 2026-09-28
+
+Same invocation, environment, storage, network, cluster, security and workload as §2.2. The only change is
+`ENG-16`: each audit log syncs in groups (one sync covers every record written before it began), and the
+request handlers wait for their audit records without blocking the event loop. A request still continues
+only after its authentication and authorization records are durable. 0 errors in every scenario.
+
+| Scenario | Clients | Requests/s | p50 | p95 | p99 | Max |
+|---|---|---|---|---|---|---|
+| submit | 10 | 147 | 67 ms | 86 ms | 97 ms | 161 ms |
+| submit | 100 | 171 | 582 ms | 632 ms | 670 ms | 703 ms |
+| submit | 500 | 166 | 2.94 s | 3.17 s | 3.26 s | 3.29 s |
+| heartbeat | 10 | 174 | 57 ms | 70 ms | 78 ms | 137 ms |
+| heartbeat | 100 | 171 | 578 ms | 634 ms | 671 ms | 694 ms |
+| heartbeat | 500 | 171 | 2.89 s | 3.05 s | 3.10 s | 3.11 s |
+| poll | 10 | 555 | 18 ms | 24 ms | 29 ms | 80 ms |
+| poll | 100 | 3,735 | 26 ms | 39 ms | 47 ms | 88 ms |
+| poll | 500 | 8,324 | 58 ms | 83 ms | 109 ms | 157 ms |
+| read | 10 | 527 | 18 ms | 27 ms | 34 ms | 87 ms |
+| read | 100 | 3,335 | 28 ms | 48 ms | 65 ms | 104 ms |
+| read | 500 | 7,906 | 62 ms | 88 ms | 108 ms | 170 ms |
+
+**Reading.** Reads now scale with concurrency, about 80 times the §2.2 figure at 500 clients, because
+concurrent requests share audit syncs instead of queuing for one each on the event loop. At 10 clients a
+read waits for two audit groups in turn (authentication, then authorization), which sets its 18 ms p50.
+Writes rose from about 70 to about 170 requests per second but are still flat across concurrency, so a
+serial step remains on the write path: the Raft engine commits one command at a time (B-09, §2.1, about
+270 commits per second with no HTTP or audit). That is `CE-07`'s concern, not the audit's.
+
 ## 3. Revision history
 
 | Version | Date | Change |
 |---|---|---|
+| 2.3 | 2026-09-28 | B-08 after `ENG-16` (§2.3): reads scale to about 8,000 requests/s; writes about 170, bounded by the serial Raft commit |
 | 2.2 | 2026-09-28 | B-08 baseline on the Vert.x controller (§2.2); the audit write path found to cap the API (`ENG-16`) |
 | 2.1 | 2026-09-28 | First baseline: B-09 commit latency on the in-repository Vert.x engine (§2.1) |
 | 2.0 | 2026-09-28 | Rewritten as the results log for the benchmark specification. The January 2026 and December 2025 Vert.x migration figures moved to Appendices A and B as history, with the reasons they do not describe the current code |

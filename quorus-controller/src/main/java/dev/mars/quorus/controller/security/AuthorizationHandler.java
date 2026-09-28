@@ -7,12 +7,14 @@ package dev.mars.quorus.controller.security;
 import dev.mars.quorus.controller.http.CorrelationIdHandler;
 import dev.mars.quorus.controller.http.ErrorCode;
 import dev.mars.quorus.controller.http.QuorusApiException;
+import dev.mars.quorus.controller.security.audit.AuditContinuation;
 import dev.mars.quorus.controller.security.audit.AuditEvent;
 import dev.mars.quorus.controller.security.audit.AuditSink;
 import io.vertx.core.Handler;
 import io.vertx.ext.web.RoutingContext;
 
 import java.time.Instant;
+import java.util.concurrent.CompletableFuture;
 
 /** Applies the canonical policy engine to every protected HTTP request. */
 public final class AuthorizationHandler implements Handler<RoutingContext> {
@@ -41,16 +43,18 @@ public final class AuthorizationHandler implements Handler<RoutingContext> {
         AuthorizationDecision decision = policyEngine.evaluate(identity,
                 new AuthorizationRequest(context.request().method().name(), context.request().path(), scope,
                         null, null, null, null));
-        auditSink.append(new AuditEvent(Instant.now(), "AUTHORIZATION",
+        CompletableFuture<Void> durable = auditSink.appendAsync(new AuditEvent(Instant.now(), "AUTHORIZATION",
                 decision.allowed() ? "ALLOW" : "DENY", decision.code(), identity.principalId(),
                 identity.type().name(), identity.tenantId(), identity.environment(), identity.certificateSubject(),
                 context.request().method().name(), context.request().path(),
                 CorrelationIdHandler.getRequestId(context), java.util.Map.of("requiredScope", scope)));
-        if (!decision.allowed()) {
-            context.fail(new QuorusApiException(ErrorCode.FORBIDDEN,
-                    decision.reason() + " [" + decision.code() + "]"));
-            return;
-        }
-        context.next();
+        AuditContinuation.afterDurable(context, durable, () -> {
+            if (!decision.allowed()) {
+                context.fail(new QuorusApiException(ErrorCode.FORBIDDEN,
+                        decision.reason() + " [" + decision.code() + "]"));
+                return;
+            }
+            context.next();
+        });
     }
 }

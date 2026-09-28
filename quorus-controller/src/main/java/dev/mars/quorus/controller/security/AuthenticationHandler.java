@@ -7,6 +7,7 @@ package dev.mars.quorus.controller.security;
 import dev.mars.quorus.controller.http.CorrelationIdHandler;
 import dev.mars.quorus.controller.http.ErrorCode;
 import dev.mars.quorus.controller.http.QuorusApiException;
+import dev.mars.quorus.controller.security.audit.AuditContinuation;
 import dev.mars.quorus.controller.security.audit.AuditEvent;
 import dev.mars.quorus.controller.security.audit.AuditSink;
 import io.vertx.core.Handler;
@@ -23,6 +24,7 @@ import java.time.format.DateTimeParseException;
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 /** Authenticates a trusted gateway assertion or a directly bound mTLS identity. */
@@ -91,17 +93,18 @@ public final class AuthenticationHandler implements Handler<RoutingContext> {
                 return;
             }
             SecurityContext.setIdentity(context, identity);
-            audit(context, identity, "AUTHENTICATION", "ALLOW", "Q-AUTHN-VERIFIED");
+            CompletableFuture<Void> durable = audit(context, identity, "AUTHENTICATION", "ALLOW", "Q-AUTHN-VERIFIED");
             if (certificateEvaluation.expiryAlertState() == CertificateTrustState.ExpiryAlertState.WARNING) {
-                auditSink.append(new AuditEvent(Instant.now(), "CERTIFICATE_EXPIRY_WARNING", "WARNING",
+                AuditEvent warning = new AuditEvent(Instant.now(), "CERTIFICATE_EXPIRY_WARNING", "WARNING",
                         "Q-CERT-EXPIRY-WARNING", identity.principalId(), identity.type().name(), identity.tenantId(),
                         identity.environment(), identity.certificateSubject(), context.request().method().name(),
                         context.request().path(), CorrelationIdHandler.getRequestId(context),
                         java.util.Map.of("trustBundleVersion", certificateEvaluation.trustBundleVersion(),
                                 "certificateSecondsRemaining",
-                                Long.toString(certificateEvaluation.certificateSecondsRemaining()))));
+                                Long.toString(certificateEvaluation.certificateSecondsRemaining())));
+                durable = durable.thenCompose(ignored -> auditSink.appendAsync(warning));
             }
-            context.next();
+            AuditContinuation.afterDurable(context, durable, context::next);
         } catch (SSLPeerUnverifiedException exception) {
             deny(context, "Q-AUTHN-CERTIFICATE-MISSING", "A verified client certificate is required");
         } catch (CertificateException exception) {
@@ -136,15 +139,16 @@ public final class AuthenticationHandler implements Handler<RoutingContext> {
     }
 
     private void deny(RoutingContext context, String code, String reason) {
-        audit(context, null, "AUTHENTICATION", "DENY", code);
+        CompletableFuture<Void> durable = audit(context, null, "AUTHENTICATION", "DENY", code);
         logger.warn("Authentication denied: code={}, method={}, path={}", code,
                 context.request().method(), context.request().path());
-        context.fail(new QuorusApiException(ErrorCode.UNAUTHORIZED, reason));
+        AuditContinuation.afterDurable(context, durable,
+                () -> context.fail(new QuorusApiException(ErrorCode.UNAUTHORIZED, reason)));
     }
 
-    private void audit(RoutingContext context, SecurityIdentity identity, String eventType,
-                       String outcome, String code) {
-        auditSink.append(new AuditEvent(Instant.now(), eventType, outcome, code,
+    private CompletableFuture<Void> audit(RoutingContext context, SecurityIdentity identity, String eventType,
+                                          String outcome, String code) {
+        return auditSink.appendAsync(new AuditEvent(Instant.now(), eventType, outcome, code,
                 identity == null ? null : identity.principalId(), identity == null ? null : identity.type().name(),
                 identity == null ? null : identity.tenantId(), identity == null ? null : identity.environment(),
                 identity == null ? null : identity.certificateSubject(), context.request().method().name(),
