@@ -16,519 +16,274 @@
 
 package dev.mars.quorus.agent;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.mars.quorus.agent.config.AgentConfiguration;
-import dev.mars.quorus.agent.service.JobPollingService;
-import dev.mars.quorus.core.TransferResult;
-import dev.mars.quorus.core.TransferStatus;
-import io.vertx.core.Vertx;
-import io.vertx.core.http.HttpServer;
-import io.vertx.core.json.JsonObject;
-import io.vertx.ext.web.Router;
-import io.vertx.ext.web.handler.BodyHandler;
-import io.vertx.junit5.VertxExtension;
-import io.vertx.junit5.VertxTestContext;
+import dev.mars.quorus.agent.testing.FakeController;
+import dev.mars.quorus.agent.testing.FakeController.Reply;
 import org.junit.jupiter.api.*;
-import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.io.TempDir;
 
-import java.lang.reflect.Field;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
-import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicBoolean;
 
-import static dev.mars.quorus.testing.TestFutureUtils.awaitSuccess;
-import static dev.mars.quorus.testing.TestFutureUtils.eventually;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Integration tests for QuorusAgent.
- * Tests Vert.x integration and reactive patterns using real HTTP server (no mocks).
+ * Integration tests for QuorusAgent against a real HTTP controller stand-in (no mocks). The agent is
+ * driven only through its controller and its health port.
  *
- * Following coding principles:
- * - No mocking (uses real Vert.x HTTP server)
- * - Real implementations only
- * - Integration testing with actual HTTP communication
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @version 1.0
+ * @version 2.0
  * @since 2025-12-16
  */
-@ExtendWith(VertxExtension.class)
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@Timeout(value = 60, unit = SECONDS, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
 class QuorusAgentTest {
 
-    private AgentConfiguration config;
-    private HttpServer mockControllerServer;
-    private int controllerPort;
-    private AtomicInteger registrationCount;
-    private AtomicInteger heartbeatCount;
-    private AtomicInteger statusReportCount;
-    private List<String> reportedStatuses;
+    private static final Duration WAIT = Duration.ofSeconds(10);
+    private static final String REGISTER = "/api/v1/agents/register";
+    private static final String DEREGISTER = "/api/v1/agents/test-agent-001";
+    private static final String HEARTBEAT = "/api/v1/agents/heartbeat";
+    private static final String JOBS = "/api/v1/agents/test-agent-001/jobs";
+    private static final String STATUS = "/api/v1/jobs/.+/status";
+    private static final ObjectMapper JSON = new ObjectMapper();
 
-    @BeforeAll
-    void setUp(Vertx vertx, VertxTestContext testContext) {
-        registrationCount = new AtomicInteger(0);
-        heartbeatCount = new AtomicInteger(0);
-        statusReportCount = new AtomicInteger(0);
-        reportedStatuses = new ArrayList<>();
-
-        // Create a real HTTP server to simulate the controller (no mocking!)
-        Router router = Router.router(vertx);
-        router.route().handler(BodyHandler.create());
-
-        // Agent registration endpoint
-        router.post("/api/v1/agents/register").handler(ctx -> {
-            registrationCount.incrementAndGet();
-            JsonObject response = new JsonObject()
-                    .put("status", "registered")
-                    .put("agentId", "test-agent-001");
-            ctx.response()
-                    .putHeader("content-type", "application/json")
-                    .end(response.encode());
-        });
-
-        // Heartbeat endpoint
-        router.post("/api/v1/agents/:agentId/heartbeat").handler(ctx -> {
-            heartbeatCount.incrementAndGet();
-            JsonObject response = new JsonObject()
-                    .put("status", "ok")
-                    .put("timestamp", System.currentTimeMillis());
-            ctx.response()
-                    .putHeader("content-type", "application/json")
-                    .end(response.encode());
-        });
-
-        // Job polling endpoint
-        router.get("/api/v1/agents/:agentId/jobs").handler(ctx -> {
-            JsonObject response = new JsonObject()
-                .put("jobs", new io.vertx.core.json.JsonArray())
-                .put("pendingJobs", new io.vertx.core.json.JsonArray());
-            ctx.response()
-                    .putHeader("content-type", "application/json")
-                    .end(response.encode());
-        });
-
-        // Job status endpoint
-        router.post("/api/v1/jobs/:jobId/status").handler(ctx -> {
-            statusReportCount.incrementAndGet();
-            reportedStatuses.add(ctx.body().asJsonObject().getString("status"));
-            ctx.response()
-                .setStatusCode(200)
-                .putHeader("content-type", "application/json")
-                .end(new JsonObject().put("status", "ok").encode());
-        });
-
-        router.get("/files/lifecycle-test.txt").handler(ctx -> ctx.response()
-                .putHeader("content-type", "text/plain")
-                .end("phase-0-lifecycle"));
-
-        // Start the mock controller server
-        vertx.createHttpServer()
-                .requestHandler(router)
-                .listen(0) // Random port
-                .onComplete(testContext.succeeding(server -> {
-                    mockControllerServer = server;
-                    controllerPort = server.actualPort();
-
-                    // Create agent configuration pointing to our real test server
-                    config = new AgentConfiguration.Builder()
-                .securityProfile("development").allowInsecure(true).controllerTlsEnabled(false)
-                .foreignAssignmentMismatchThreshold(3)
-                            .agentId("test-agent-001")
-                            .tenantId("test-tenant")
-                            .controllerUrl("http://localhost:" + controllerPort + "/api/v1")
-                            .region("test-region")
-                            .datacenter("test-dc")
-                            .agentPort(9090)
-                            .maxConcurrentTransfers(5)
-                            .heartbeatInterval(30000L)
-                            .version("1.0.0-TEST")
-                            .build();
-
-                    testContext.completeNow();
-                }));
-    }
+    @TempDir
+    Path root;
+    private FakeController controller;
+    private QuorusAgent agent;
 
     @BeforeEach
-    void resetRequestCounts() {
-        registrationCount.set(0);
-        heartbeatCount.set(0);
-        statusReportCount.set(0);
-        reportedStatuses.clear();
+    void startController() throws Exception {
+        controller = FakeController.start()
+                .on("POST", REGISTER, Reply.json(201, "{\"status\":\"registered\"}").always())
+                .on("DELETE", DEREGISTER, Reply.status(204).always())
+                .on("POST", HEARTBEAT, Reply.json(200, "{\"status\":\"ok\"}").always())
+                .on("GET", JOBS, Reply.json(200, "{\"pendingJobs\":[]}").always())
+                .on("POST", STATUS, Reply.json(200, "{\"status\":\"ok\"}").always())
+                .on("GET", "/files/lifecycle-test.txt", Reply.json(200, "phase-0-lifecycle").always());
     }
 
-    @AfterAll
-    void tearDown(VertxTestContext testContext) {
-        if (mockControllerServer != null) {
-            mockControllerServer.close()
-                    .onComplete(ar -> testContext.completeNow());
-        } else {
-            testContext.completeNow();
+    @AfterEach
+    void stop() throws Exception {
+        if (agent != null) {
+            agent.shutdown();
+            agent.awaitShutdown();
         }
+        controller.close();
     }
 
     @Test
-    @DisplayName("Should create QuorusAgent with Vertx instance")
-    void testCreateAgentWithVertx(Vertx vertx, VertxTestContext testContext) {
-        assertNotNull(vertx, "Vertx instance should not be null");
-        assertNotNull(config, "Config should not be null");
+    @DisplayName("Creates an agent with its configuration")
+    void testCreateAgent() {
+        AgentConfiguration config = config(3);
+        agent = new QuorusAgent(config);
 
-        // Create agent with Vertx instance (real implementation, no mocks)
-        QuorusAgent agent = new QuorusAgent(vertx, config);
-
-        assertNotNull(agent, "Agent should be created");
-        assertEquals(config, agent.getConfiguration(), "Configuration should match");
-
-        testContext.completeNow();
+        assertEquals(config, agent.getConfiguration());
+        assertFalse(agent.isRunning(), "nothing runs before start()");
     }
 
     @Test
-    @DisplayName("Should validate configuration points to real test server")
-    void testConfigurationValidation() {
-        assertNotNull(config.getAgentId());
-        assertEquals("test-agent-001", config.getAgentId());
-        assertTrue(config.getControllerUrl().contains("localhost:" + controllerPort),
-                   "Should point to real test server");
-        assertEquals(30000L, config.getHeartbeatInterval());
+    @DisplayName("Rejects a null configuration")
+    void testNullConfigHandling() {
+        assertThrows(NullPointerException.class, () -> new QuorusAgent(null));
     }
 
     @Test
-    @DisplayName("Should reject null Vertx instance")
-    void testNullVertxHandling() {
-        // Should throw NullPointerException when Vertx is null
-        assertThrows(NullPointerException.class, () -> {
-            new QuorusAgent(null, config);
-        }, "Should throw NullPointerException for null Vertx");
-    }
-
-    @Test
-    @DisplayName("Should reject null configuration")
-    void testNullConfigHandling(Vertx vertx) {
-        // Should throw NullPointerException when config is null
-        assertThrows(NullPointerException.class, () -> {
-            new QuorusAgent(vertx, null);
-        }, "Should throw NullPointerException for null config");
-    }
-
-    @Test
-    @DisplayName("Should support legacy constructor (deprecated)")
-    void testLegacyConstructor() {
-        // Legacy constructor should still work but log warning
-        @SuppressWarnings("deprecation")
-        QuorusAgent agent = new QuorusAgent(config);
-
-        assertNotNull(agent, "Agent should be created with legacy constructor");
-        assertEquals(config, agent.getConfiguration(), "Configuration should match");
-
-        agent.shutdown();
-        assertDoesNotThrow(() -> agent.awaitShutdown(), "Shutdown should complete cleanly");
-
-        Vertx ownedVertx = extractVertx(agent);
-        assertThrows(RejectedExecutionException.class,
-                () -> ownedVertx.setTimer(10, id -> {}),
-                "Legacy constructor should close internally managed Vert.x");
-    }
-
-    @Test
-    @DisplayName("Should not close externally managed Vert.x on shutdown")
-    void testShutdownDoesNotCloseExternallyManagedVertx(Vertx vertx, VertxTestContext testContext) {
-        QuorusAgent agent = new QuorusAgent(vertx, config);
-
-        agent.shutdown();
-        assertDoesNotThrow(() -> agent.awaitShutdown(), "Shutdown should complete cleanly");
-
-        assertDoesNotThrow(() -> vertx.setTimer(10, id -> {}),
-                "Shutdown should not close externally managed Vert.x");
-        testContext.completeNow();
-    }
-
-    @Test
-    @DisplayName("Should communicate with real HTTP server (no mocks)")
-    void testRealHttpCommunication(Vertx vertx, VertxTestContext testContext) {
-        // This test verifies we're using a REAL HTTP server, not mocks
-        // Server is already started in @BeforeAll — no timer delay needed
-
-        var httpClient = vertx.createHttpClient();
-        httpClient
-                .request(io.vertx.core.http.HttpMethod.POST, controllerPort, "localhost", "/api/v1/agents/register")
-                .compose(req -> req.send()
-                        .compose(io.vertx.core.http.HttpClientResponse::body))
-                .onComplete(ar -> {
-                    // Close the client before completing test to prevent Pool closed errors
-                    httpClient.close().onComplete(v -> {
-                        if (ar.succeeded()) {
-                            testContext.verify(() -> {
-                                JsonObject response = ar.result().toJsonObject();
-                                assertEquals("registered", response.getString("status"));
-                                assertEquals("test-agent-001", response.getString("agentId"));
-                            });
-                            testContext.completeNow();
-                        } else {
-                            testContext.failNow(ar.cause());
-                        }
-                    });
-                });
-    }
-
-    @Test
-    @DisplayName("Should verify test server is real Vert.x HTTP server")
-    void testServerIsReal(VertxTestContext testContext) {
-        assertNotNull(mockControllerServer, "Server should be a real HttpServer instance");
-        assertTrue(mockControllerServer.actualPort() > 0, "Server should have real port");
-        assertEquals(controllerPort, mockControllerServer.actualPort(), "Port should match");
-        testContext.completeNow();
-    }
-
-    @Test
-    @DisplayName("Should use Vert.x timers (verify timer IDs logged)")
-    void testVertxTimersUsed(Vertx vertx, VertxTestContext testContext) throws Exception {
-        QuorusAgent agent = new QuorusAgent(vertx, config);
+    @DisplayName("Registers, then heartbeats and polls until shut down, then deregisters")
+    void testStartedAgentLifecycle() throws Exception {
+        agent = new QuorusAgent(config(3));
 
         agent.start();
 
-        awaitSuccess(eventually(vertx, () -> extractLongField(agent, "heartbeatTimerId") != 0L,
-                Duration.ofSeconds(5)), Duration.ofSeconds(6));
-
-        assertTrue(agent.isRunning(), "Agent should be running after registration");
-        assertNotEquals(0L, extractLongField(agent, "heartbeatTimerId"),
-                "Background startup should install the heartbeat timer");
-
+        assertTrue(agent.isRunning());
+        controller.awaitRequests("POST", REGISTER, 1, WAIT);
+        controller.awaitRequests("POST", HEARTBEAT, 2, WAIT);
+        controller.awaitRequests("GET", JOBS, 2, WAIT);
         agent.shutdown();
-        assertDoesNotThrow(agent::awaitShutdown, "Started agent should shut down cleanly");
-        assertFalse(agent.isRunning(), "Agent should no longer be running after shutdown");
-        testContext.completeNow();
+        assertTrue(agent.awaitShutdown(WAIT), "a started agent should shut down cleanly");
+        assertFalse(agent.isRunning());
+        assertEquals(1, controller.requests("DELETE", DEREGISTER).size(), "the agent deregisters on shutdown");
     }
 
     @Test
-    @DisplayName("Should handle idempotent shutdown")
-    void testIdempotentShutdown(Vertx vertx, VertxTestContext testContext) {
-        QuorusAgent agent = new QuorusAgent(vertx, config);
+    @DisplayName("Shutdown is idempotent and works before start")
+    void testIdempotentShutdown() throws Exception {
+        agent = new QuorusAgent(config(3));
 
-        // Multiple shutdowns should be safe (idempotent)
         agent.shutdown();
         agent.shutdown();
         agent.shutdown();
 
-        testContext.completeNow();
+        assertTrue(agent.awaitShutdown(WAIT));
+        assertTrue(controller.requests().isEmpty(), "an agent that never started never calls its controller");
     }
 
     @Test
-    @DisplayName("Should reject operations after shutdown")
-    void testOperationsAfterShutdown(Vertx vertx, VertxTestContext testContext) throws Exception {
-        QuorusAgent agent = new QuorusAgent(vertx, config);
+    @DisplayName("Rejects start after shutdown")
+    void testOperationsAfterShutdown() throws Exception {
+        agent = new QuorusAgent(config(3));
         agent.start();
         agent.shutdown();
 
-        // Attempting to start again should fail
-        assertThrows(IllegalStateException.class, () -> {
-            agent.start();
-        }, "Should reject start() after shutdown");
-
-        testContext.completeNow();
+        assertThrows(IllegalStateException.class, agent::start);
+        assertTrue(agent.awaitShutdown(WAIT));
     }
 
     @Test
-    @DisplayName("Should verify Vert.x reactive mode (no ScheduledExecutorService)")
-    void testReactiveMode(Vertx vertx, VertxTestContext testContext) {
-        QuorusAgent agent = new QuorusAgent(vertx, config);
-
-        // Agent should be created in reactive mode
-        // Logs should show "reactive mode" and "0 extra threads"
-        assertNotNull(agent);
-
-        testContext.completeNow();
-    }
-
-    @Test
-    @DisplayName("Should refuse job assigned to different agent")
-    void testRefuseForeignAssignedJob(Vertx vertx, VertxTestContext testContext) {
-        QuorusAgent agent = new QuorusAgent(vertx, config);
-
-        JobPollingService.PendingJob foreignJob = new JobPollingService.PendingJob(
-                "assign-foreign-1",
-                "job-foreign-1",
-                "another-agent",
-                "https://example.com/file.txt",
-                "C:/tmp/file.txt",
-                128L,
-                "foreign assignment"
-        );
-
-        invokeProcessJob(agent, foreignJob);
-
-        vertx.setTimer(200, id -> {
-            testContext.verify(() -> assertEquals(0, statusReportCount.get(),
-                    "Foreign-assigned job must not trigger any status reporting"));
-            testContext.completeNow();
-        });
-    }
-
-    @Test
-    @DisplayName("Should fail fast after repeated foreign assignments")
-    void testFailFastAfterRepeatedForeignAssignments(Vertx vertx, VertxTestContext testContext) {
-        QuorusAgent agent = new QuorusAgent(vertx, config);
-
-        JobPollingService.PendingJob foreignJob = new JobPollingService.PendingJob(
-                "assign-foreign-failfast",
-                "job-foreign-failfast",
-                "wrong-agent",
-                "https://example.com/file.txt",
-                "C:/tmp/file.txt",
-                256L,
-                "foreign assignment"
-        );
-
-        invokeProcessJob(agent, foreignJob);
-        invokeProcessJob(agent, foreignJob);
-        invokeProcessJob(agent, foreignJob);
-
-        assertDoesNotThrow(agent::awaitShutdown, "Agent should shutdown after mismatch threshold is reached");
-        assertThrows(IllegalStateException.class, agent::start,
-                "Agent should be closed after fail-fast shutdown");
-
-        testContext.completeNow();
-    }
-
-    @Test
-    @DisplayName("Should shut down when controller registration fails")
-    void testShutdownOnRegistrationFailure(Vertx vertx) throws Exception {
-        AgentConfiguration unreachableControllerConfig = new AgentConfiguration.Builder()
+    @DisplayName("Shuts down when controller registration fails")
+    void testShutdownOnRegistrationFailure() throws Exception {
+        agent = new QuorusAgent(new AgentConfiguration.Builder()
                 .securityProfile("development").allowInsecure(true).controllerTlsEnabled(false)
                 .foreignAssignmentMismatchThreshold(3)
                 .agentId("test-agent-unreachable")
                 .tenantId("test-tenant")
                 .controllerUrl("http://localhost:1/api/v1")
-                .region("test-region")
-                .datacenter("test-dc")
-                .agentPort(9091)
+                .agentPort(0)
                 .httpConnectionTimeout(250)
-                .build();
-        QuorusAgent agent = new QuorusAgent(vertx, unreachableControllerConfig);
+                .build());
 
         agent.start();
-        assertDoesNotThrow(agent::awaitShutdown,
-                "A registration failure should trigger a clean fail-fast shutdown");
+
+        assertTrue(agent.awaitShutdown(WAIT), "A registration failure should trigger a clean fail-fast shutdown");
         assertFalse(agent.isRunning(), "Agent should stop after registration fails");
     }
 
     @Test
-    @DisplayName("Should acknowledge ACCEPTED and IN_PROGRESS before completing a transfer")
-    void testDistributedTransferLifecycle(Vertx vertx) throws Exception {
-        QuorusAgent agent = new QuorusAgent(vertx, config);
-        Path destination = Files.createTempFile("quorus-phase-0-", ".txt");
-        Files.delete(destination);
+    @DisplayName("Refuses a job assigned to a different agent, without reporting it")
+    void testRefuseForeignAssignedJob() throws Exception {
+        AtomicBoolean offered = new AtomicBoolean();
+        controller.on("GET", JOBS, request -> Reply.json(200, "{\"pendingJobs\":["
+                + (offered.getAndSet(true) ? "" : foreignJob()) + "]}"));
+        agent = new QuorusAgent(config(3));
 
-        try {
-            agent.start();
-            awaitSuccess(eventually(vertx, agent::isRunning, Duration.ofSeconds(5)), Duration.ofSeconds(6));
+        agent.start();
+        controller.awaitRequests("GET", JOBS, 5, WAIT);             // several polls after the foreign offer
 
-            JobPollingService.PendingJob pendingJob = new JobPollingService.PendingJob(
-                    "assign-lifecycle",
-                    "job-lifecycle",
-                    config.getAgentId(),
-                    "http://localhost:" + controllerPort + "/files/lifecycle-test.txt",
-                    destination.toString(),
-                    17L,
-                    "phase 0 lifecycle"
-            );
-
-            invokeProcessJob(agent, pendingJob);
-
-            awaitSuccess(eventually(vertx, () -> reportedStatuses.contains("COMPLETED"), Duration.ofSeconds(10)),
-                    Duration.ofSeconds(11));
-            assertEquals(List.of("ACCEPTED", "IN_PROGRESS", "COMPLETED"), reportedStatuses,
-                    "The controller must observe the legal lifecycle in order");
-            assertEquals("phase-0-lifecycle", Files.readString(destination));
-        } finally {
-            agent.shutdown();
-            assertDoesNotThrow(agent::awaitShutdown);
-            Files.deleteIfExists(destination);
-        }
+        assertTrue(controller.requests("POST", STATUS).isEmpty(),
+                "Foreign-assigned job must not trigger any status reporting");
+        assertTrue(agent.isRunning(), "one mismatch is below the threshold of three");
     }
 
     @Test
-    @DisplayName("Should report successful, failed, and exceptional transfer outcomes")
-    void testTransferOutcomeReporting(Vertx vertx) {
-        QuorusAgent agent = new QuorusAgent(vertx, config);
-        Instant start = Instant.now().minusSeconds(2);
-        Instant end = Instant.now();
+    @DisplayName("Fails fast after repeated foreign assignments")
+    void testFailFastAfterRepeatedForeignAssignments() throws Exception {
+        controller.on("GET", JOBS, Reply.json(200, "{\"pendingJobs\":[" + foreignJob() + "]}").always());
+        agent = new QuorusAgent(config(3));
 
-        TransferResult successful = TransferResult.builder()
-                .requestId("job-success")
-                .finalStatus(TransferStatus.COMPLETED)
-                .bytesTransferred(1024L)
-                .startTime(start)
-                .endTime(end)
+        agent.start();
+
+        assertTrue(agent.awaitShutdown(WAIT), "Agent should shut down once the mismatch threshold is reached");
+        assertEquals(3, controller.requests("GET", JOBS).size(), "the third mismatch stops the polling");
+        assertThrows(IllegalStateException.class, agent::start, "Agent should be closed after fail-fast shutdown");
+        assertTrue(controller.requests("POST", STATUS).isEmpty());
+    }
+
+    @Test
+    @DisplayName("Acknowledges ACCEPTED and IN_PROGRESS before completing a transfer")
+    void testDistributedTransferLifecycle() throws Exception {
+        Path destination = root.resolve("lifecycle.txt");
+        offerOnce("{\"assignmentId\":\"assign-lifecycle\",\"jobId\":\"job-lifecycle\","
+                + "\"agentId\":\"test-agent-001\",\"sourceUri\":\"" + controller.url() + "/files/lifecycle-test.txt\","
+                + "\"destinationPath\":" + JSON.writeValueAsString(destination.toString()) + ",\"totalBytes\":17}");
+        agent = new QuorusAgent(config(3));
+
+        agent.start();
+
+        List<String> statuses = statusesAfter(3);
+        assertEquals(List.of("ACCEPTED", "IN_PROGRESS", "COMPLETED"), statuses,
+                "The controller must observe the legal lifecycle in order");
+        assertEquals("phase-0-lifecycle", Files.readString(destination));
+        assertTrue(controller.requests("POST", STATUS).stream().allMatch(r -> r.path().equals("/api/v1/jobs/job-lifecycle/status")));
+    }
+
+    @Test
+    @DisplayName("Reports a failed transfer as FAILED")
+    void testFailedTransferReporting() throws Exception {
+        offerOnce("{\"assignmentId\":\"assign-missing\",\"jobId\":\"job-missing\","
+                + "\"agentId\":\"test-agent-001\",\"sourceUri\":\"" + controller.url() + "/files/missing.txt\","
+                + "\"destinationPath\":" + JSON.writeValueAsString(root.resolve("missing.txt").toString()) + "}");
+        agent = new QuorusAgent(config(3));
+
+        agent.start();
+
+        List<FakeController.Request> reports = controller.awaitRequests("POST", STATUS, 3, Duration.ofSeconds(30));
+        assertEquals(List.of("ACCEPTED", "IN_PROGRESS", "FAILED"),
+                reports.stream().map(r -> r.json().get("status").asText()).toList());
+        assertFalse(reports.getLast().json().path("errorMessage").asText().isBlank(), "the failure says why");
+    }
+
+    @Test
+    @DisplayName("Serves /health and /status on the agent port")
+    void testHealthEndpoints() throws Exception {
+        agent = new QuorusAgent(config(3));
+        agent.start();
+        String base = "http://localhost:" + agent.healthPort();
+
+        try (HttpClient client = HttpClient.newHttpClient()) {
+            HttpResponse<String> health = get(client, base + "/health");
+            HttpResponse<String> status = get(client, base + "/status");
+            HttpResponse<String> unknown = get(client, base + "/unknown");
+            HttpResponse<String> post = client.send(HttpRequest.newBuilder(URI.create(base + "/health"))
+                    .POST(HttpRequest.BodyPublishers.noBody()).build(), HttpResponse.BodyHandlers.ofString());
+
+            assertEquals(200, health.statusCode());
+            JsonNode healthJson = JSON.readTree(health.body());
+            assertEquals("UP", healthJson.get("status").asText());
+            assertEquals("test-agent-001", healthJson.get("metadata").get("agentId").asText());
+            assertEquals(200, status.statusCode());
+            JsonNode statusJson = JSON.readTree(status.body());
+            assertEquals("test-agent-001", statusJson.get("agentId").asText());
+            assertEquals(5, statusJson.get("maxConcurrentTransfers").asInt());
+            assertTrue(statusJson.get("runtime").get("availableProcessors").asInt() > 0);
+            assertEquals(404, unknown.statusCode());
+            assertEquals(405, post.statusCode());
+        }
+    }
+
+    private AgentConfiguration config(int foreignAssignmentMismatchThreshold) {
+        return new AgentConfiguration.Builder()
+                .securityProfile("development").allowInsecure(true).controllerTlsEnabled(false)
+                .foreignAssignmentMismatchThreshold(foreignAssignmentMismatchThreshold)
+                .agentId("test-agent-001")
+                .tenantId("test-tenant")
+                .controllerUrl(controller.url() + "/api/v1")
+                .region("test-region")
+                .datacenter("test-dc")
+                .agentPort(0)
+                .maxConcurrentTransfers(5)
+                .heartbeatInterval(50L)
+                .jobPollingInitialDelayMs(1)
+                .jobPollingIntervalMs(20)
+                .version("1.0.0-TEST")
                 .build();
-        TransferResult failed = TransferResult.builder()
-                .requestId("job-failed")
-                .finalStatus(TransferStatus.FAILED)
-                .errorMessage("simulated transfer failure")
-                .startTime(start)
-                .endTime(end)
-                .build();
-
-        invokeHandleTransferComplete(agent, "job-success", successful);
-        invokeHandleTransferComplete(agent, "job-failed", failed);
-        invokeHandleTransferError(agent, "job-error", new IllegalStateException("simulated error"));
-
-        awaitSuccess(eventually(vertx, () -> statusReportCount.get() == 3, Duration.ofSeconds(5)),
-                Duration.ofSeconds(6));
-        assertEquals(3, statusReportCount.get(), "Every terminal outcome should be reported");
     }
 
-    private static Vertx extractVertx(QuorusAgent agent) {
-        try {
-            Field vertxField = QuorusAgent.class.getDeclaredField("vertx");
-            vertxField.setAccessible(true);
-            return (Vertx) vertxField.get(agent);
-        } catch (ReflectiveOperationException e) {
-            throw new AssertionError("Failed to extract Vert.x from QuorusAgent", e);
-        }
+    private void offerOnce(String job) {
+        AtomicBoolean offered = new AtomicBoolean();
+        controller.on("GET", JOBS, request -> Reply.json(200,
+                "{\"pendingJobs\":[" + (offered.getAndSet(true) ? "" : job) + "]}"));
     }
 
-    private static long extractLongField(QuorusAgent agent, String fieldName) {
-        try {
-            Field field = QuorusAgent.class.getDeclaredField(fieldName);
-            field.setAccessible(true);
-            return field.getLong(agent);
-        } catch (ReflectiveOperationException e) {
-            throw new AssertionError("Failed to extract " + fieldName + " from QuorusAgent", e);
-        }
+    private static String foreignJob() {
+        return "{\"assignmentId\":\"assign-foreign\",\"jobId\":\"job-foreign\",\"agentId\":\"another-agent\","
+                + "\"sourceUri\":\"https://example.com/file.txt\",\"destinationPath\":\"/tmp/file.txt\",\"totalBytes\":128}";
     }
 
-    private static void invokeProcessJob(QuorusAgent agent, JobPollingService.PendingJob pendingJob) {
-        try {
-            var method = QuorusAgent.class.getDeclaredMethod("processJob", JobPollingService.PendingJob.class);
-            method.setAccessible(true);
-            method.invoke(agent, pendingJob);
-        } catch (ReflectiveOperationException e) {
-            throw new AssertionError("Failed to invoke processJob on QuorusAgent", e);
-        }
+    private List<String> statusesAfter(int count) throws InterruptedException {
+        return controller.awaitRequests("POST", STATUS, count, WAIT).stream()
+                .map(r -> r.json().get("status").asText()).toList();
     }
 
-    private static void invokeHandleTransferComplete(QuorusAgent agent, String jobId, TransferResult result) {
-        invokePrivate(agent, "handleTransferComplete",
-                new Class<?>[]{String.class, TransferResult.class}, jobId, result);
-    }
-
-    private static void invokeHandleTransferError(QuorusAgent agent, String jobId, Throwable throwable) {
-        invokePrivate(agent, "handleTransferError",
-                new Class<?>[]{String.class, Throwable.class}, jobId, throwable);
-    }
-
-    private static void invokePrivate(QuorusAgent agent, String methodName, Class<?>[] parameterTypes,
-            Object... arguments) {
-        try {
-            var method = QuorusAgent.class.getDeclaredMethod(methodName, parameterTypes);
-            method.setAccessible(true);
-            method.invoke(agent, arguments);
-        } catch (ReflectiveOperationException e) {
-            throw new AssertionError("Failed to invoke " + methodName + " on QuorusAgent", e);
-        }
+    private static HttpResponse<String> get(HttpClient client, String url) throws Exception {
+        return client.send(HttpRequest.newBuilder(URI.create(url)).GET().build(), HttpResponse.BodyHandlers.ofString());
     }
 }
-

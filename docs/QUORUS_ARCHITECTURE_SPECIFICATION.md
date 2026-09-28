@@ -2,8 +2,8 @@
 
 # Quorus Architecture Specification
 
-**Version:** 2.10
-**Date:** 2026-09-27
+**Version:** 2.11
+**Date:** 2026-09-28
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Status:** Canonical and normative  
@@ -433,8 +433,9 @@ while traversal segments and backslashes are rejected. Portless FTPS uses explic
 `AUTH TLS` on port 21; implicit TLS requires an explicit port 990. Policy approval and
 adapter socket selection MUST use the same effective port.
 
-Blocking adapters execute through Vert.x workers. Their direct blocking methods reject
-event-loop threads, not worker threads that retain an event-loop context. Agent builder
+Adapters are blocking and run on the calling thread. In the agent that is a virtual thread
+per job (RT-05), so the cancellation interrupt breaks a transfer blocked in socket I/O at
+once. Agent builder
 defaults come from packaged configuration and preserve the production TLS baseline;
 development transport requires explicit opt-in.
 

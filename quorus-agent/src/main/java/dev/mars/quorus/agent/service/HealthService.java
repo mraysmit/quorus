@@ -16,108 +16,127 @@
 
 package dev.mars.quorus.agent.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpServer;
 import dev.mars.quorus.agent.config.AgentConfiguration;
 import dev.mars.quorus.monitoring.HealthDetail;
 import dev.mars.quorus.monitoring.HealthStatus;
-import io.vertx.core.Future;
-import io.vertx.core.Vertx;
-import io.vertx.core.http.HttpServer;
-import io.vertx.core.json.JsonObject;
-import io.vertx.ext.web.Router;
-import io.vertx.ext.web.RoutingContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
- * Reactive HTTP health check service for the agent using Vert.x HTTP server.
- * 
+ * The agent's local health endpoints, {@code GET /health} and {@code GET /status}, on the JDK HTTP
+ * server (RT-05b). Each request is handled on its own virtual thread.
+ *
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @since 2025-09-04
- * @version 1.0
+ * @version 2.0
  */
 public class HealthService {
-    
+
     private static final Logger logger = LoggerFactory.getLogger(HealthService.class);
-    
-    private final Vertx vertx;
+    private static final ObjectMapper JSON = new ObjectMapper();
+
     private final AgentConfiguration config;
-    private HttpServer server;
     private final Instant startTime;
-    
-    public HealthService(Vertx vertx, AgentConfiguration config) {
-        this.vertx = vertx;
+    private HttpServer server;
+    private ExecutorService executor;
+
+    public HealthService(AgentConfiguration config) {
         this.config = config;
         this.startTime = Instant.now();
     }
-    
-    public Future<Void> start() {
-        Router router = Router.router(vertx);
-        router.get("/health").handler(this::handleHealth);
-        router.get("/status").handler(this::handleStatus);
 
-        return vertx.createHttpServer()
-            .requestHandler(router)
-            .listen(config.getAgentPort())
-            .onSuccess(s -> {
-                this.server = s;
-                logger.info("Health service started on port {}", s.actualPort());
-            })
-            .onFailure(err -> {
-                logger.error("Failed to start health service on port {}: {}", config.getAgentPort(), err.getMessage());
-                logger.debug("Stack trace for health service start failure on port {}", config.getAgentPort(), err);
-            })
-            .mapEmpty();
+    /**
+     * Starts serving on the configured agent port (0 picks a free port).
+     *
+     * @throws IOException if the port cannot be bound
+     */
+    public synchronized void start() throws IOException {
+        server = HttpServer.create(new InetSocketAddress(config.getAgentPort()), 0);
+        server.createContext("/", this::handle);
+        executor = Executors.newVirtualThreadPerTaskExecutor();
+        server.setExecutor(executor);
+        server.start();
+        logger.info("Health service started on port {}", server.getAddress().getPort());
     }
-    
-    public Future<Void> shutdown() {
+
+    /** The bound port, or -1 if the service is not running. */
+    public synchronized int port() {
+        return server == null ? -1 : server.getAddress().getPort();
+    }
+
+    /** Stops serving; does nothing if not started. */
+    public synchronized void shutdown() {
         if (server != null) {
-            return server.close()
-                .onSuccess(v -> logger.info("Health service stopped"))
-                .onFailure(err -> {
-                    logger.warn("Error stopping health service: {}", err.getMessage());
-                    logger.debug("Stack trace for health service shutdown failure", err);
-                });
+            server.stop(0);
+            executor.close();
+            server = null;
+            logger.info("Health service stopped");
         }
-        return Future.succeededFuture();
     }
-    
-    private void handleHealth(RoutingContext ctx) {
+
+    private void handle(HttpExchange exchange) throws IOException {
+        try (exchange) {
+            String path = exchange.getRequestURI().getPath();
+            if (!"GET".equals(exchange.getRequestMethod())) {
+                exchange.sendResponseHeaders(405, -1);
+            } else if ("/health".equals(path)) {
+                respond(exchange, health());
+            } else if ("/status".equals(path)) {
+                respond(exchange, status());
+            } else {
+                exchange.sendResponseHeaders(404, -1);
+            }
+        }
+    }
+
+    private String health() throws IOException {
         HealthDetail health = HealthDetail.builder("agent")
             .status(HealthStatus.UP)
             .timestamp(Instant.now())
             .metadata("agentId", config.getAgentId())
             .metadata("uptime", Instant.now().toEpochMilli() - startTime.toEpochMilli())
             .build();
-
-        ctx.response()
-            .putHeader("Content-Type", "application/json")
-            .end(JsonObject.mapFrom(health.toMap()).encode());
+        return JSON.writeValueAsString(health.toMap());
     }
-    
-    private void handleStatus(RoutingContext ctx) {
-        Runtime runtime = Runtime.getRuntime();
 
-        JsonObject status = new JsonObject()
+    private String status() throws IOException {
+        Runtime runtime = Runtime.getRuntime();
+        ObjectNode status = JSON.createObjectNode()
             .put("agentId", config.getAgentId())
             .put("hostname", config.getHostname())
             .put("region", config.getRegion())
             .put("datacenter", config.getDatacenter())
-            .put("version", config.getVersion())
-            .put("supportedProtocols", JsonObject.mapFrom(Map.of("protocols", config.getSupportedProtocols())).getJsonArray("protocols"))
-            .put("maxConcurrentTransfers", config.getMaxConcurrentTransfers())
+            .put("version", config.getVersion());
+        config.getSupportedProtocols().forEach(status.putArray("supportedProtocols")::add);
+        status.put("maxConcurrentTransfers", config.getMaxConcurrentTransfers())
             .put("startTime", startTime.toString())
-            .put("currentTime", Instant.now().toString())
-            .put("runtime", new JsonObject()
-                .put("totalMemory", runtime.totalMemory())
-                .put("freeMemory", runtime.freeMemory())
-                .put("maxMemory", runtime.maxMemory())
-                .put("availableProcessors", runtime.availableProcessors()));
+            .put("currentTime", Instant.now().toString());
+        status.putObject("runtime")
+            .put("totalMemory", runtime.totalMemory())
+            .put("freeMemory", runtime.freeMemory())
+            .put("maxMemory", runtime.maxMemory())
+            .put("availableProcessors", runtime.availableProcessors());
+        return JSON.writeValueAsString(status);
+    }
 
-        ctx.response()
-            .putHeader("Content-Type", "application/json")
-            .end(status.encode());
+    private static void respond(HttpExchange exchange, String json) throws IOException {
+        byte[] body = json.getBytes(StandardCharsets.UTF_8);
+        exchange.getResponseHeaders().add("Content-Type", "application/json");
+        exchange.sendResponseHeaders(200, body.length);
+        try (OutputStream out = exchange.getResponseBody()) {
+            out.write(body);
+        }
     }
 }
