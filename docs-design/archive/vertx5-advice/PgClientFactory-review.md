@@ -1,3 +1,5 @@
+> **Archived 2026-09-28.** Vert.x 5 advice written for another project (PeeGeeQ); kept for reference only, not Quorus guidance.
+
 Nice—concise class, sensible responsibilities. But there are a few traps here that will hurt under load and during lifecycle changes. I’ll be blunt and give you concrete fixes + a cleaned-up version.
 
 ## What’s off (and why)

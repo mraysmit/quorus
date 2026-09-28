@@ -2,8 +2,8 @@
 
 # Quorus Enterprise Implementation Plan
 
-**Version:** 1.38
-**Date:** 2026-09-27
+**Version:** 1.39
+**Date:** 2026-09-28
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Status:** Active — remediation checkpoint open; R1-1 container-recreation acceptance closed 2026-09-07 while R1-2 and R1-3 remain open; Phase 0 functionally complete with M0 durability acceptance reopened until R1-2 and R1-3 close; Phase 1 complete; Phase 4 complete (the acceptance reopened on 2026-09-04 was restored by R2–R6 on 2026-09-05), with hardening follow-up `SEC-07` open; Phases 2 and 3 in progress; Phases 5–12 not started; platform migration (Section 20) in progress. CI has never passed; its repair is deferred (`ENG-07`, `SEQ-01`, Section 4)  
@@ -49,7 +49,7 @@ Every phase follows these rules:
 
 The current baseline provides:
 
-- Java 27 (since `RT-01a`, 2026-09-26) and Vert.x 5 modules, which are moving off Vert.x under Section 20;
+- Java 27 (since `RT-01a`, 2026-09-26). Only `quorus-controller` still uses Vert.x 5; core, workflow, tenant, the examples and the agent left it in `RT-03` to `RT-05` (Section 20);
 - direct transfer execution through protocol adapters;
 - YAML workflow parsing and in-process workflow execution;
 - controller-local HTTP with Raft-replicated transfer, assignment, agent, and route commands;
@@ -77,7 +77,7 @@ By project direction on 2026-09-27, the repair is deferred and platform work con
 The consequences are:
 
 - CI gives no regression signal while `ENG-07` is open. Each slice's regression evidence is its
-  local full-reactor run, retained under Section 6.1, as it has been so far.
+  local full-reactor run, recorded in the slice's commit message under Section 6.1.
 - Phase 0's CI verification items have not been shown in CI: a clean checkout build that passes
   twice, and documentation checks that run in CI.
 - No phase can close while `ENG-07` is open, because step 5 of Section 6.1 requires every
@@ -165,8 +165,8 @@ copied unchanged to `docs-design/evidence/raw/`. 47 of them match the SHA-256 re
 they were captured and 15 had no recorded hash. The
 [raw evidence index](../evidence/raw/INDEX.md) maps each old path to its copy and lists what
 is missing. Statements that cite missing logs stay as historical records, but their raw output
-cannot be re-inspected. From now on the Section 6.1 rule applies: cited output goes directly
-to `docs-design/evidence/raw/<slice-id>/`.
+cannot be re-inspected. Superseded on 2026-09-27 (v1.37, `DR-Q6` revised): a slice's record is its
+commit message, and no raw output is kept (Section 6.1).
 
 ### Remediation checkpoint — 2026-09-04
 
@@ -403,7 +403,7 @@ Create one reproducible, durable, end-to-end distributed transfer path and the e
 
 ### Scope
 
-1. Establish a clean Java 25 build and test baseline across all active modules.
+1. Establish a clean Java 25 build and test baseline across all active modules. (Historical: the baseline has been Java 27 since `RT-01a`.)
 2. Correct the agent success lifecycle so `ACCEPTED -> IN_PROGRESS -> COMPLETED` is observable and legal.
 3. Enforce transfer, agent, assignment, route, and tenant referential invariants inside state-machine application.
 4. Resolve and test the controller data path and container volume alignment.
@@ -882,7 +882,7 @@ Turn route and workflow definitions into validated, versioned, governed, observa
 3. Add idempotent trigger identity and duplicate-event suppression.
 4. Validate service connections, agent capabilities, policies, variables, dependencies, and evaluator readiness before activation.
 5. Persist immutable route and workflow versions and pin executions to exact versions.
-6. Implement workflow execution records, step dependencies, linked transfers, pause, cancel, retry, and reconciliation.
+6. Implement workflow execution records, step dependencies, linked transfers, pause, cancel, retry, and reconciliation. (Since `RT-04`, the engine cancels runs, limits concurrent groups and retries a group's failed transfers; `pause` and `resume` were removed from `WorkflowEngine` under `ENG-12` and return only with a real implementation.)
 7. Add dry-run and virtual-plan behavior without external side effects.
 8. Implement processing dates, market holidays, time zones, daylight-saving rules, cut-offs, blackout windows, maintenance windows, and exception calendars.
 9. Implement controlled backfill and reprocessing with approval and publication protection.
@@ -1186,7 +1186,7 @@ The enterprise release candidate is approved only when all critical canonical ga
 
 ## 20. Platform Migration Workstreams
 
-**Status:** In progress. Direction accepted on 2026-09-26. `RT-01` and `RT-02` are complete and `RT-03` is under way; workstream `CE` has not started. Item status is kept in [register Section J](QUORUS_OUTSTANDING_WORK_REGISTER.md#13-section-j--platform-migration-workstreams)
+**Status:** In progress. Direction accepted on 2026-09-26. `RT-01` to `RT-05` are complete, so only `quorus-controller` still uses Vert.x; `RT-06` waits for `CE-07` to `CE-11`, and workstream `CE` has not started. Item status is kept in [register Section J](QUORUS_OUTSTANDING_WORK_REGISTER.md#13-section-j--platform-migration-workstreams)
 **Decisions:** [ADR-0011](../architecture-decisions/ADR-0011-CONSENSUS-VIA-QRAFT-GENERIC-ENGINE.md) (consensus through the generic QRaft engine) and [ADR-0012](../architecture-decisions/ADR-0012-JAVA-RUNTIME-AND-STRUCTURED-CONCURRENCY.md) (leave Vert.x for Java 27 structured concurrency)
 
 These two workstreams change the platform beneath the phases rather than adding enterprise capability. Each item is delivered under Section 6.1 and must keep every delivered phase's boundary tests green. Neither workstream may weaken a delivered exit gate. In particular, Phase 1's controller-to-controller mutual TLS, peer rejection and revocation behaviour must pass unchanged through the new engine.
@@ -1225,14 +1225,14 @@ Quorus stops owning a Raft engine and consumes QRaft's engine through a 100% gen
 | **RT-04** | `quorus-workflow` and `quorus-integration-examples` | No Vert.x types. Workflow execution uses structured scopes |
 | **RT-05** | `quorus-agent` | Transfers run on virtual threads, so cancellation interrupts blocked I/O at once. Controller client on `java.net.http.HttpClient` with mutual TLS and hostname verification. Registration, heartbeat and polling run as structured loops with bounded shutdown. The Phase 1 agent trust tests and R3 reporting tests pass. Delivered in slices: `RT-05a` moves the controller client to `java.net.http` (with a JDK PEM loader in core) and makes the registration, heartbeat, polling and status-reporting services blocking; `RT-05b` replaces the agent runtime (Vert.x timers, futures, the transfer service, the health endpoint and the tracing integration) and leaves no `io.vertx` dependency in the `quorus-agent` pom |
 | **RT-06** | `quorus-controller` | HTTP API on the `RT-Q2` server with TLS 1.3 and required client certificates. Authentication, authorization and audit middleware preserved. `OpenApiContractTest` stays equal. The `CE-07` bridge is removed |
-| **RT-07** | Observability | OpenTelemetry traces, metrics and log correlation for the new HTTP server and client, replacing Vert.x tracing integration |
-| **RT-08** | Vert.x removal gate | No `io.vertx` artifact in any module. A build check fails if one is reintroduced |
+| **RT-07** | Observability | OpenTelemetry traces, metrics and log correlation for the new HTTP server and client, replacing Vert.x tracing integration. The agent's part was delivered in `RT-05b`: its controller client makes client spans and sends W3C trace context. What remains is the controller's HTTP server and outbound clients, and log correlation |
+| **RT-08** | Vert.x removal gate | No `io.vertx` artifact in any module. A build check fails if one is reintroduced. Per-module guard tests already enforce this for core, workflow, tenant, the examples and the agent (`CoreIsVertxFreeTest` and its siblings); `RT-08` adds the controller once `RT-06` lands and removes the `vertx-dependencies` BOM import from the root pom |
 | **RT-09** | Java release cadence (recurring) | Each Java GA feature release is adopted within its update window: toolchain, CI and images; full reactor and coverage gates; Docker, slow, Raft durability and restart lanes on the new runtime. When `StructuredTaskScope` is final in an adopted release, the task-scope implementation switches to it with its tests as the gate |
 
 ### Sequencing
 
 1. `RT-01` can start at once and has no dependency on QRaft. `RT-02` delivers the task-scope abstraction before any module migration uses it.
-2. `CE-01` to `CE-06` (QRaft) run in parallel with `RT-01` to `RT-04`.
+2. `CE-01` to `CE-06` (QRaft) run in parallel with `RT-01` to `RT-05`.
 3. `CE-07` to `CE-11` follow `CE-06`. Adopting QRaft removes Quorus's largest Vert.x-coupled component, the Raft node and its gRPC transport, before the controller HTTP migration.
 4. `RT-06` follows. It should precede the bulk of Phase 6 so that new REST resources are written once. `RT-05` does not wait for QRaft: the agent has no Raft code and depends on no `CE` item, so it follows `RT-04` directly (decided 2026-09-27).
 5. Phase 8 durability work and the R1-2 and R1-3 acceptance runs should follow `CE-11`, so that production-filesystem and power-loss evidence describes the engine that will ship.
@@ -1340,6 +1340,7 @@ The plan is revised when requirements or implementation evidence change. Revisio
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.39 | 2026-09-28 | Review after `RT-05`: §20 status (RT-01 to RT-05 complete), `RT-07` and `RT-08` show what is already delivered, sequencing step 2 includes `RT-05`; §3 baseline and §4 evidence wording follow `RT-05` and the revised `DR-Q6`; Phase 0 and Phase 7 notes for Java 27 and `ENG-12` |
 | 1.38 | 2026-09-27 | §20: `RT-05` no longer waits for `CE-07` to `CE-11` (the agent has no Raft code) and follows `RT-04`; its slices `RT-05a` and `RT-05b` are defined |
 | 1.37 | 2026-09-27 | §6.1: a slice's record is its commit message; raw logs, manifests, hashes and patches are no longer kept (`DR-Q6` revised). Recorded the `RT-03c` follow-up: `ENG-09` resolved; `ENG-10` found and resolved (adapter and agent in-flight progress), with a dated correction to the Phase 3 checkpoint; `SEC-08` resolved; `ENG-11` recorded. `RT-05` acceptance now includes running transfers on virtual threads |
 | 1.36 | 2026-09-27 | Recorded `ENG-09` (shared abort target in the FTP and SFTP adapters), found by `RT-03c`, for decision in `RT-03d` |

@@ -1,3 +1,5 @@
+> **Archived 2026-09-28.** Vert.x 5 advice written for another project (PeeGeeQ); kept for reference only, not Quorus guidance.
+
 # peegeeq-db review (Vert.x 5.x patterns compliance)
 
 Scope: Review of peegeeq-db against Vertx-5x-Patterns-Guide. Verified current code in:

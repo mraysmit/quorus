@@ -2,8 +2,8 @@
 
 # Quorus Integration Examples
 
-**Version:** 2.1  
-**Date:** 2026-09-01  
+**Version:** 2.2  
+**Date:** 2026-09-28  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Scope:** Current direct-execution and model examples
@@ -60,7 +60,7 @@ Replace the class name with any of the example entry points listed above.
 
 ## Java Baseline
 
-Use JDK 25 for this repository.
+Use JDK 27 for this repository. The root Maven build compiles with `maven.compiler.release` 27.
 
 ## Important Corrections from Older Docs
 

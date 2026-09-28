@@ -1,3 +1,5 @@
+> **Archived 2026-09-28.** Vert.x 5 migration notes; Quorus is leaving Vert.x (ADR-0012), so these describe a superseded direction.
+
 # Quorus Vert.x 5.x Anti-Pattern Audit Report
 
 **Author**: Augment Agent  

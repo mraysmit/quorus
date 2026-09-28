@@ -175,7 +175,7 @@ class SimpleWorkflowEngineTest {
                 result.completeExceptionally(e);
             }
         });
-        awaitTransfersInProgress(1);
+        assertTrue(testTransferEngine.awaitStarted(1, Duration.ofSeconds(10)), "the transfer should start");
 
         assertTrue(workflowEngine.cancel("test-execution-123"));
 
@@ -263,19 +263,84 @@ class SimpleWorkflowEngineTest {
     void anInterruptedCallerStopsTheWorkflow() {
         testTransferEngine.simulateDelay(Duration.ofSeconds(20));
         Thread caller = Thread.currentThread();
+        // Interrupt the caller once its transfer has started (a handshake, not a timed sleep).
         Thread.ofVirtual().start(() -> {
             try {
-                Thread.sleep(200);
-            } catch (InterruptedException e) {
-                return;
+                if (testTransferEngine.awaitStarted(1, Duration.ofSeconds(10))) {
+                    caller.interrupt();
+                }
+            } catch (InterruptedException ignored) {
+                // Test ended.
             }
-            caller.interrupt();
         });
 
         assertThrows(InterruptedException.class, () -> workflowEngine.execute(testWorkflow, testContext));
 
         assertEquals(0, testTransferEngine.getActiveTransferCount(), "the transfer was stopped");
         assertNull(workflowEngine.getStatus("test-execution-123"));
+    }
+
+    @Test
+    void theDefinitionsDryRunFlagMakesExecuteADryRun() throws Exception {
+        WorkflowExecution execution = workflowEngine.execute(workflow(
+                new WorkflowDefinition.ExecutionConfig(true, false, 1, Duration.ofHours(1), "sequential"),
+                group("g", List.of(), 2)), testContext);
+
+        assertEquals(WorkflowStatus.COMPLETED, execution.getStatus());
+        assertEquals(ExecutionContext.ExecutionMode.DRY_RUN, execution.getContext().getMode());
+        assertEquals(0, testTransferEngine.getAttempts(), "a workflow declared dryRun must start no transfer");
+    }
+
+    @Test
+    void theDefinitionsVirtualRunFlagMakesExecuteAVirtualRun() throws Exception {
+        WorkflowExecution execution = workflowEngine.execute(workflow(
+                new WorkflowDefinition.ExecutionConfig(false, true, 1, Duration.ofHours(1), "sequential"),
+                group("g", List.of(), 2)), testContext);
+
+        assertEquals(WorkflowStatus.COMPLETED, execution.getStatus());
+        assertEquals(ExecutionContext.ExecutionMode.VIRTUAL_RUN, execution.getContext().getMode());
+        assertEquals(0, testTransferEngine.getAttempts(), "a workflow declared virtualRun must start no transfer");
+    }
+
+    @Test
+    void dryRunWinsWhenBothFlagsAreSet() throws Exception {
+        WorkflowExecution execution = workflowEngine.virtualRun(workflow(
+                new WorkflowDefinition.ExecutionConfig(true, true, 1, Duration.ofHours(1), "sequential"),
+                group("g", List.of(), 1)), testContext);
+
+        assertEquals(ExecutionContext.ExecutionMode.DRY_RUN, execution.getContext().getMode());
+    }
+
+    @Test
+    void aGroupsRetryCountRetriesAFailedTransfer() throws Exception {
+        testTransferEngine.simulateFailuresBeforeSuccess(2);
+
+        WorkflowExecution execution = workflowEngine.execute(workflow(1, group("g", List.of(), 1, 2)), testContext);
+
+        assertEquals(WorkflowStatus.COMPLETED, execution.getStatus());
+        assertEquals(3, testTransferEngine.getAttempts(), "two failures, then the third attempt succeeds");
+    }
+
+    @Test
+    @ExpectsError("Retries exhausted -- verifies the group fails after 1 + retryCount attempts")
+    void aTransferFailsOnceItsRetriesAreSpent() throws Exception {
+        testTransferEngine.simulateFailure();
+
+        WorkflowExecution execution = workflowEngine.execute(workflow(1, group("g", List.of(), 1, 2)), testContext);
+
+        assertEquals(WorkflowStatus.FAILED, execution.getStatus());
+        assertEquals(3, testTransferEngine.getAttempts(), "one attempt and two retries");
+    }
+
+    @Test
+    @ExpectsError("No retries -- verifies a retryCount of 0 means a single attempt")
+    void aRetryCountOfZeroMeansOneAttempt() throws Exception {
+        testTransferEngine.simulateFailuresBeforeSuccess(1);
+
+        WorkflowExecution execution = workflowEngine.execute(workflow(1, group("g", List.of(), 1, 0)), testContext);
+
+        assertEquals(WorkflowStatus.FAILED, execution.getStatus());
+        assertEquals(1, testTransferEngine.getAttempts());
     }
 
     @Test
@@ -311,19 +376,26 @@ class SimpleWorkflowEngineTest {
     }
 
     private WorkflowDefinition workflow(Duration timeout, int parallelism, TransferGroup... groups) {
+        return workflow(new WorkflowDefinition.ExecutionConfig(false, false, parallelism, timeout, "parallel"), groups);
+    }
+
+    private WorkflowDefinition workflow(WorkflowDefinition.ExecutionConfig execution, TransferGroup... groups) {
         WorkflowDefinition base = createTestWorkflow();
-        return new WorkflowDefinition("v1", base.getMetadata(), new WorkflowDefinition.WorkflowSpec(Map.of(),
-                new WorkflowDefinition.ExecutionConfig(false, false, parallelism, timeout, "parallel"),
-                List.of(groups)));
+        return new WorkflowDefinition("v1", base.getMetadata(),
+                new WorkflowDefinition.WorkflowSpec(Map.of(), execution, List.of(groups)));
     }
 
     private static TransferGroup group(String name, List<String> dependsOn, int transfers) {
+        return group(name, dependsOn, transfers, 0);
+    }
+
+    private static TransferGroup group(String name, List<String> dependsOn, int transfers, int retryCount) {
         List<TransferGroup.TransferDefinition> definitions = IntStream.rangeClosed(1, transfers)
                 .mapToObj(i -> new TransferGroup.TransferDefinition(name + "-transfer-" + i,
                         "https://example.com/" + name + "-" + i + ".txt", "/tmp/" + name + "-" + i + ".txt",
                         "http", Map.of(), null))
                 .toList();
-        return new TransferGroup(name, "Test group " + name, dependsOn, null, Map.of(), definitions, false, 0);
+        return new TransferGroup(name, "Test group " + name, dependsOn, null, Map.of(), definitions, false, retryCount);
     }
 
     private static WorkflowExecution.GroupExecution groupExecution(WorkflowExecution execution, String name) {
@@ -331,12 +403,6 @@ class SimpleWorkflowEngineTest {
                 .findFirst().orElseThrow(() -> new AssertionError("group " + name + " did not run"));
     }
 
-    /** Waits, within the class timeout, until the test engine has this many transfers in progress. */
-    private void awaitTransfersInProgress(int count) throws InterruptedException {
-        while (testTransferEngine.getActiveTransferCount() < count) {
-            Thread.sleep(10);
-        }
-    }
 
     /**
      * Creates a test workflow with complete metadata that satisfies the new schema validation requirements.

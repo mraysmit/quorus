@@ -3,18 +3,19 @@
 
 # Quorus File Transfer System
 
-  [![Java](https://img.shields.io/badge/Java-25-orange.svg)](https://openjdk.org/projects/jdk/25/)
-  [![Vert.x](https://img.shields.io/badge/Vert.x-5.0.8-purple.svg)](https://vertx.io/)
+  [![Java](https://img.shields.io/badge/Java-27-orange.svg)](https://openjdk.org/projects/jdk/27/)
   [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com/)
   [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 </div>
 
-Quorus is a Java 25 and Vert.x 5 based file transfer platform with two practical execution modes:
+Quorus is a Java 27 file transfer platform with two practical execution modes:
 
 - direct execution with `quorus-core` and `quorus-workflow`
 - distributed execution with `quorus-controller` and `quorus-agent`
 
-The current implementation centers on a controller-first architecture with embedded HTTP, Raft-backed replicated state, reactive transfer execution, and YAML workflow parsing and execution.
+Only `quorus-controller` still uses Vert.x 5, while it migrates to plain Java under ADR-0012. The other modules use blocking APIs and virtual threads and have no Vert.x dependency.
+
+The current implementation centers on a controller-first architecture with embedded HTTP, Raft-backed replicated state, blocking transfer execution on the calling thread (virtual threads in the agent), and YAML workflow parsing and execution.
 
 The machine-readable contract for every currently registered controller endpoint is bundled at
 `quorus-controller/src/main/resources/openapi/quorus-controller-v1.yaml` and is served by a running
@@ -46,7 +47,7 @@ controller from `GET /api/v1/openapi.yaml`.
 
 ## Important Implementation Boundaries
 
-- The repository build targets Java 25.
+- The repository build targets Java 27 (`maven.compiler.release`).
 - The active controller runtime is the embedded Vert.x HTTP server in `quorus-controller`, not the deprecated `quorus-api` Quarkus path.
 - Route CRUD and route lifecycle endpoints are implemented, but controller startup does not currently show an autonomous route trigger evaluator being wired in.
 - Adapter-level resume support should be treated as not implemented in the current protocol adapters.
@@ -65,7 +66,7 @@ controller from `GET /api/v1/openapi.yaml`.
 
 ## Build
 
-Use JDK 25 for all builds and tests.
+Use JDK 27 for all builds and tests.
 
 ```powershell
 java -version
@@ -77,7 +78,7 @@ java -version
 mvn clean verify 2>&1 | tee temp/build-output.txt
 ```
 
-Both commands must report JDK 25. Configure `JAVA_HOME` for your own JDK installation if they do not.
+Both commands must report JDK 27. Configure `JAVA_HOME` for your own JDK installation if they do not.
 
 ## Quick Start
 
@@ -113,7 +114,7 @@ docker compose -f docker/compose/docker-compose-single-controller.yml up -d --bu
 For a multi-node setup:
 
 ```powershell
-docker compose -f docker/compose/docker-compose-controller-first.yml up -d
+docker compose -f docker/compose/docker-compose-controller-first.yml up -d --build
 ```
 
 Then verify:

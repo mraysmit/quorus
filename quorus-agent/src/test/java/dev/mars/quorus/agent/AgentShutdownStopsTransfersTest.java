@@ -4,6 +4,7 @@
  */
 package dev.mars.quorus.agent;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import dev.mars.quorus.agent.config.AgentConfiguration;
 import dev.mars.quorus.agent.testing.FakeController;
 import dev.mars.quorus.agent.testing.FakeController.Reply;
@@ -15,20 +16,25 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
+import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Stream;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Plan item RT-05: agent transfers run on virtual threads, so stopping the agent interrupts a transfer
  * blocked in a socket read at once. On a platform thread the interrupt cannot break the read, and the
  * transfer ran on after the agent reported itself stopped.
+ *
+ * <p>Order comes from handshakes: the file handler sends half the file and blocks until the test
+ * releases it; a progress report with bytes moved shows the transfer is in its read.
  */
 @Timeout(value = 90, unit = SECONDS, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
 class AgentShutdownStopsTransfersTest {
@@ -42,41 +48,46 @@ class AgentShutdownStopsTransfersTest {
     @Test
     void shutdownStopsATransferBlockedInASocketReadAtOnce() throws Exception {
         Path downloadRoot = Files.createDirectory(root.resolve("downloads"));
-        CountDownLatch streaming = new CountDownLatch(1);
-        CountDownLatch release = new CountDownLatch(1);
+        CompletableFuture<Void> release = new CompletableFuture<>();
+        CompletableFuture<Void> reading = new CompletableFuture<>();
         AtomicBoolean offered = new AtomicBoolean();
         try (FakeController controller = FakeController.start()) {
-            String job = "{\"jobId\":\"stalled\",\"agentId\":\"stall-agent\",\"sourceUri\":\"" + controller.url()
-                    + "/files/stalled.dat\",\"destinationPath\":\"" + downloadRoot.resolve("stalled.dat").toUri()
-                    + "\",\"totalBytes\":" + SIZE + "}";
+            String job = "{\"jobId\":\"stalled\",\"agentId\":\"stall-agent\",\"attemptId\":\"stalled-1\","
+                    + "\"fencingGeneration\":1,\"leaseExpiresAt\":\"" + Instant.now().plusSeconds(120) + "\","
+                    + "\"sourceUri\":\"" + controller.url() + "/files/stalled.dat\",\"destinationUri\":\""
+                    + downloadRoot.resolve("stalled.dat").toUri() + "\",\"totalBytes\":" + SIZE + "}";
             controller.on("POST", "/api/v1/agents/register", Reply.json(201, "{}").always())
                     .on("DELETE", "/api/v1/agents/.+", Reply.status(204).always())
-                    .on("POST", "/api/v1/jobs/.+/status", Reply.json(200, "{}").always())
+                    .on("POST", "/api/v1/jobs/.+/status", request -> {
+                        JsonNode report = request.json();
+                        if ("IN_PROGRESS".equals(report.path("status").asText())
+                                && report.path("bytesTransferred").asLong(0) > 0) {
+                            reading.complete(null);
+                        }
+                        return Reply.json(200, "{}");
+                    })
                     .on("GET", "/api/v1/agents/.+/jobs", request -> Reply.json(200,
                             "{\"pendingJobs\":[" + (offered.getAndSet(true) ? "" : job) + "]}"))
-                    // Sends half the file, then holds the connection open without sending more.
+                    // Sends half the file, then holds the connection open until the test releases it.
                     .onExchange("GET", "/files/stalled.dat", exchange -> {
-                        exchange.sendResponseHeaders(200, SIZE);
-                        OutputStream out = exchange.getResponseBody();
-                        out.write(new byte[SIZE / 2]);
-                        out.flush();
-                        streaming.countDown();
-                        try {
-                            release.await(60, TimeUnit.SECONDS);
-                        } catch (InterruptedException ignored) {
-                            Thread.currentThread().interrupt();
-                        } finally {
-                            exchange.close();
+                        try (exchange) {
+                            exchange.sendResponseHeaders(200, SIZE);
+                            OutputStream out = exchange.getResponseBody();
+                            out.write(new byte[SIZE / 2]);
+                            out.flush();
+                            release.get(60, TimeUnit.SECONDS);
+                        } catch (Exception ignored) {
+                            // Released, or the test ended.
                         }
                     });
             QuorusAgent agent = new QuorusAgent(new AgentConfiguration.Builder()
                     .securityProfile("development").allowInsecure(true).controllerTlsEnabled(false)
                     .agentId("stall-agent").tenantId("bank-a").agentPort(0)
                     .controllerUrl(controller.url() + "/api/v1").downloadRoot(downloadRoot).uploadRoot(root)
-                    .jobPollingInitialDelayMs(1).jobPollingIntervalMs(20).build());
+                    .jobPollingInitialDelayMs(1).jobPollingIntervalMs(20).progressReportIntervalMs(20).build());
             agent.start();
-            assertTrue(streaming.await(10, TimeUnit.SECONDS), "the transfer should have started");
-            awaitPartialFile(downloadRoot);
+            reading.get(10, TimeUnit.SECONDS);
+            assertFalse(filesIn(downloadRoot).isEmpty(), "the running transfer has written a partial file");
 
             agent.shutdown();
 
@@ -84,14 +95,7 @@ class AgentShutdownStopsTransfersTest {
             assertEquals(List.of(), filesIn(downloadRoot),
                     "shutdown returns only after the stopped transfer has removed its partial file");
         } finally {
-            release.countDown();
-        }
-    }
-
-    /** Waits, within the class timeout, for the running transfer to write its partial file. */
-    private static void awaitPartialFile(Path directory) throws Exception {
-        while (filesIn(directory).isEmpty()) {
-            Thread.sleep(10);
+            release.complete(null);
         }
     }
 

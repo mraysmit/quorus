@@ -2,8 +2,8 @@
 
 # Quorus Cluster Startup Guide
 
-**Version:** 2.3
-**Date:** 2026-09-25
+**Version:** 2.4
+**Date:** 2026-09-28
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Scope:** Current repository-local deployment guide
@@ -14,7 +14,7 @@ The production controller profile implements TLS 1.3 mutual authentication for H
 
 ## Prerequisites
 
-- JDK 25
+- JDK 27
 - Maven 3.9+
 - Docker Desktop
 - PowerShell 7 on Windows
@@ -37,22 +37,30 @@ The repository currently ships these relevant compose files in `docker/compose`:
 
 ## Build the Project
 
-Build with JDK 25 before starting containers.
+Images package jars built on the host; nothing is compiled inside Docker. Build the controller and agent jars with JDK 27 before starting containers:
 
 ```powershell
-mvn clean package 2>&1 | Tee-Object -FilePath temp\cluster-build.txt
+./docker/build-runtime.ps1
 ```
+
+On bash-compatible shells:
+
+```bash
+sh docker/build-runtime.sh
+```
+
+Start each topology that builds a Quorus image with `--build` so the image picks up the jar you just built rather than reusing a stale image.
 
 ## Start a Single Controller
 
 ```powershell
-docker compose -f docker/compose/docker-compose-single-controller.yml up -d
+docker compose -f docker/compose/docker-compose-single-controller.yml up -d --build
 ```
 
 ## Start a Multi-Node Controller Cluster
 
 ```powershell
-docker compose -f docker/compose/docker-compose-controller-first.yml up -d
+docker compose -f docker/compose/docker-compose-controller-first.yml up -d --build
 ```
 
 Alternative cluster definitions are available in `docker/compose` when you need a different topology.
@@ -68,7 +76,7 @@ docker compose -f docker/compose/docker-compose-observability.yml up -d
 For cluster-focused observability:
 
 ```powershell
-docker compose -f docker/compose/docker-compose-observability-cluster.yml up -d
+docker compose -f docker/compose/docker-compose-observability-cluster.yml up -d --build
 ```
 
 ## Verify the Controller API

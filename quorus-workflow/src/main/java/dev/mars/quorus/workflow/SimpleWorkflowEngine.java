@@ -38,7 +38,10 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Blocking (RT-04): each call runs the workflow on the calling thread and returns the finished
  * execution. Groups run in dependency order, up to {@code execution.parallelism} groups at a time; the
- * transfers of one group run in parallel, each on its own virtual thread inside a {@link TaskScope}.
+ * transfers of one group run in parallel, each on its own virtual thread inside a {@link TaskScope}; a
+ * failed transfer is run again up to the group's {@code retryCount} times. A definition that declares
+ * {@code execution.dryRun} or {@code execution.virtualRun} never starts a transfer, whichever method
+ * runs it.
  * The workflow's {@code execution.timeout} bounds the whole run: when it expires, the running
  * transfers are interrupted and the execution fails. {@link #cancel} stops a run the same way and it
  * ends {@code CANCELLED}. Interrupting the caller also stops the run, and {@link InterruptedException}
@@ -170,16 +173,34 @@ public class SimpleWorkflowEngine implements WorkflowEngine {
             throw new IllegalStateException("Workflow engine is shutdown");
         }
 
-        // Create execution context with the specified mode
+        // Create execution context with the effective mode
         ExecutionContext executionContext = ExecutionContext.builder()
                 .executionId(context.getExecutionId())
-                .mode(mode)
+                .mode(effectiveMode(definition, mode))
                 .variables(context.getVariables())
                 .userId(context.getUserId())
                 .metadata(context.getMetadata())
                 .build();
 
         return executeWorkflowInternal(definition, executionContext);
+    }
+
+    /**
+     * The mode a run actually uses: the definition's {@code execution.dryRun} or
+     * {@code execution.virtualRun} flag can only make a run safer, never start transfers. A dry run
+     * wins over a virtual run, and both over a normal run.
+     */
+    static ExecutionContext.ExecutionMode effectiveMode(WorkflowDefinition definition,
+                                                        ExecutionContext.ExecutionMode requested) {
+        WorkflowDefinition.ExecutionConfig config = definition.getSpec() != null
+                ? definition.getSpec().getExecution() : null;
+        if (requested == ExecutionContext.ExecutionMode.DRY_RUN || (config != null && config.isDryRun())) {
+            return ExecutionContext.ExecutionMode.DRY_RUN;
+        }
+        if (requested == ExecutionContext.ExecutionMode.VIRTUAL_RUN || (config != null && config.isVirtualRun())) {
+            return ExecutionContext.ExecutionMode.VIRTUAL_RUN;
+        }
+        return requested;
     }
 
     private WorkflowExecution executeWorkflowInternal(WorkflowDefinition definition, ExecutionContext context)
@@ -454,7 +475,7 @@ public class SimpleWorkflowEngine implements WorkflowEngine {
             for (TransferGroup.TransferDefinition transfer : group.getTransfers()) {
                 subtasks.put(transfer.getName(), scope.fork(virtualRun
                         ? () -> simulateTransfer(transfer)
-                        : () -> runTransfer(transfer)));
+                        : () -> runTransfer(transfer, group.getRetryCount())));
             }
             scope.join();
         }
@@ -494,6 +515,21 @@ public class SimpleWorkflowEngine implements WorkflowEngine {
         logger.info("Executed group: {} with status: {} (parallel execution)", group.getName(), groupStatus);
         return new WorkflowExecution.GroupExecution(group.getName(), groupStatus, groupStart, Instant.now(),
                 transferResults, groupError);
+    }
+
+    /**
+     * Runs one transfer on the current (virtual) thread, and runs it again up to {@code retries} more
+     * times while it fails (the group's {@code retryCount}). Each run is a separate engine transfer,
+     * which applies its own retries inside. Any failure becomes a failed result.
+     */
+    private TransferResult runTransfer(TransferGroup.TransferDefinition transfer, int retries)
+            throws InterruptedException {
+        TransferResult result = runTransfer(transfer);
+        for (int retry = 1; retry <= retries && !result.isSuccessful(); retry++) {
+            logger.warn("Transfer {} failed; group retry {} of {}", transfer.getName(), retry, retries);
+            result = runTransfer(transfer);
+        }
+        return result;
     }
 
     /** Runs one transfer on the current (virtual) thread; any failure becomes a failed result. */
