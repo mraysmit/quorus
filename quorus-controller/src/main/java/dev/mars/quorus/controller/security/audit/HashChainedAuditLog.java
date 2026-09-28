@@ -15,16 +15,52 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Deque;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 
-/** Append-only, fsync'd JSONL audit log whose records form a SHA-256 hash chain. */
+/**
+ * Append-only, fsync'd JSONL audit log whose records form a SHA-256 hash chain.
+ *
+ * <p>Group commit (register item ENG-16): {@link #appendAsync} writes the record in chain order at once
+ * and completes only after a disk sync that covers it. A single sync thread, started when records are
+ * waiting and ending when none are, syncs everything written before each sync began, so records that
+ * arrive during a sync share the next one instead of each paying a sync in series. A failed write or sync
+ * fails every waiting record and every later append: the log fails closed. {@link #append} waits for the
+ * sync, so blocking callers keep "durable before return".
+ */
 public final class HashChainedAuditLog implements AuditSink {
+
+    /** Makes written records durable. Replaceable in tests to control the order of syncs. */
+    @FunctionalInterface
+    interface Sync {
+        void sync(FileChannel channel) throws IOException;
+    }
+
+    private record Waiter(long sequence, CompletableFuture<Void> durable) { }
+
     private final FileChannel channel;
+    private final Sync sync;
+    private final Object lock = new Object();
+    private final Deque<Waiter> waiting = new ArrayDeque<>();
     private String previousHash;
+    private long written;
+    private boolean syncing;
+    private IllegalStateException failure;
+    private Thread syncThread;
 
     public HashChainedAuditLog(Path path) {
+        this(path, channel -> channel.force(true));
+    }
+
+    HashChainedAuditLog(Path path, Sync sync) {
+        this.sync = sync;
         try {
             Path parent = path.toAbsolutePath().getParent();
             if (parent != null) Files.createDirectories(parent);
@@ -61,8 +97,82 @@ public final class HashChainedAuditLog implements AuditSink {
         }
     }
 
+    /** Appends and waits until the record is durable. */
     @Override
-    public synchronized void append(AuditEvent event) {
+    public void append(AuditEvent event) {
+        try {
+            appendAsync(event).join();
+        } catch (CompletionException exception) {
+            throw exception.getCause() instanceof RuntimeException runtime ? runtime
+                    : new IllegalStateException("Security audit record could not be persisted", exception.getCause());
+        }
+    }
+
+    /** Writes the record in chain order now; the future completes once a sync covers it. */
+    @Override
+    public CompletableFuture<Void> appendAsync(AuditEvent event) {
+        CompletableFuture<Void> durable = new CompletableFuture<>();
+        synchronized (lock) {
+            if (failure != null) {
+                durable.completeExceptionally(failure);
+                return durable;
+            }
+            try {
+                write(event);
+            } catch (IOException exception) {
+                fail(new IllegalStateException("Security audit record could not be persisted", exception));
+                durable.completeExceptionally(failure);
+                return durable;
+            }
+            waiting.addLast(new Waiter(++written, durable));
+            if (!syncing) {
+                syncing = true;
+                syncThread = Thread.ofVirtual().name("security-audit-sync").start(this::syncWhileWaiting);
+            }
+        }
+        return durable;
+    }
+
+    /** Syncs until no record is waiting; each sync covers every record written before it began. */
+    private void syncWhileWaiting() {
+        while (true) {
+            long covered;
+            synchronized (lock) {
+                if (waiting.isEmpty() || failure != null) {
+                    syncing = false;
+                    return;
+                }
+                covered = written;
+            }
+            try {
+                sync.sync(channel);
+            } catch (IOException | RuntimeException exception) {
+                synchronized (lock) {
+                    fail(new IllegalStateException("Security audit record could not be persisted", exception));
+                    syncing = false;
+                }
+                return;
+            }
+            List<CompletableFuture<Void>> durable = new ArrayList<>();
+            synchronized (lock) {
+                while (!waiting.isEmpty() && waiting.peekFirst().sequence() <= covered) {
+                    durable.add(waiting.removeFirst().durable());
+                }
+            }
+            durable.forEach(future -> future.complete(null));
+        }
+    }
+
+    /** Records the failure and fails every waiting record. Call holding the lock. */
+    private void fail(IllegalStateException cause) {
+        failure = cause;
+        while (!waiting.isEmpty()) {
+            waiting.removeFirst().durable().completeExceptionally(cause);
+        }
+    }
+
+    /** Builds, chains and writes one record. Call holding the lock. */
+    private void write(AuditEvent event) throws IOException {
         Map<String, Object> record = new LinkedHashMap<>();
         record.put("timestamp", event.timestamp().toString());
         record.put("eventType", event.eventType());
@@ -82,17 +192,27 @@ public final class HashChainedAuditLog implements AuditSink {
         String hash = sha256(canonical);
         record.put("hash", hash);
         byte[] bytes = (new JsonObject(record).encode() + System.lineSeparator()).getBytes(StandardCharsets.UTF_8);
-        try {
-            channel.write(ByteBuffer.wrap(bytes));
-            channel.force(true);
-            previousHash = hash;
-        } catch (IOException exception) {
-            throw new IllegalStateException("Security audit record could not be persisted", exception);
+        ByteBuffer buffer = ByteBuffer.wrap(bytes);
+        while (buffer.hasRemaining()) {
+            channel.write(buffer);
         }
+        previousHash = hash;
     }
 
+    /** Waits for the sync thread to finish the records already written, then closes the file. */
     @Override
-    public synchronized void close() {
+    public void close() {
+        Thread pending;
+        synchronized (lock) {
+            pending = syncing ? syncThread : null;
+        }
+        if (pending != null) {
+            try {
+                pending.join();
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+            }
+        }
         try {
             channel.close();
         } catch (IOException exception) {

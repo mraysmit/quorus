@@ -2,7 +2,7 @@
 
 # Quorus Outstanding Work Register
 
-**Version:** 1.24
+**Version:** 1.25
 **Date:** 2026-09-28
 **Author:** Mark Ray-Smith — Cityline Ltd
 **License:** Apache 2.0
@@ -95,7 +95,7 @@ full-reactor run.
 | F | Absorbed and superseded historical tasks | 10 | — reference only |
 | G | Deferred and research | 8 deferred, 1 superseded | 🟢 Deferred |
 | H | Documentation remediation (from the 2026-09-24 review) | 31 listed: 24 open, 6 in progress, 1 done. 16 more, done or superseded by v1.10, have moved to the revision history | 🔵 Documentation |
-| I | Configuration and documentation-review delivery items | 20 open, 9 closed | 🟠 Backlog, one 🟡 (`ENG-07`) |
+| I | Configuration and documentation-review delivery items | 19 open, 10 closed | 🟠 Backlog, one 🟡 (`ENG-07`) |
 | J | Platform migration — QRaft consensus and Vert.x exit | 15 open (11 CE; 4 RT), 6 RT done. Decisions `RT-Q1`–`RT-Q5` are in §3 | 🟡 / 🔴 by item |
 
 **Phase position:** Phase 1 complete. Phase 0 is functionally complete, but its durability
@@ -622,7 +622,7 @@ no revision since has assigned any. The exceptions are:
 | **ENG-13** | The workflow engine ignored the definition's `execution.dryRun` and `execution.virtualRun`, so a workflow declared `dryRun: true` ran real transfers when executed; it also ignored the group `retryCount` and accepted any `strategy` value, while the YAML guide described all four as working | found by the review of 2026-09-28 | ✅ **Closed 2026-09-28**: the declared flags now make every run of the workflow a dry or virtual run (a dry run wins); each failed transfer of a group runs again up to `retryCount` times; `strategy` must be `sequential` or `parallel` and is documented as not changing scheduling (YAML Syntax Guide v2.3). Tests first: five `SimpleWorkflowEngineTest` cases and one `YamlWorkflowDefinitionParserTest` case failed before the change | ✅ |
 | **ENG-14** | Group and transfer `condition` expressions are parsed and variable-resolved but never evaluated, so a transfer guarded by, for example, `success(download-base-files)` runs regardless. The YAML Syntax Guide states this | found by the review of 2026-09-28 | Verified 2026-09-28 (`VariableResolver.java:93-114` is the only reader). Needs a decision: evaluate conditions, or reject workflows that declare one | 🟠 |
 | **ENG-15** | Quorus has no benchmark or performance test: the only benchmark class (`VertxPerformanceBenchmark`, which timed an empty Vert.x task) was deleted in `RT-03f`. A `quorus-benchmarks` module is needed, outside the default build, implementing the catalogue in [QUORUS_PERFORMANCE_BENCHMARKS.md](../performance/QUORUS_PERFORMANCE_BENCHMARKS.md) (B-01 micro to B-11 soak) under the Architecture Specification §13 publication rules | decided 2026-09-28 (keep and adapt the benchmark documents; build a complete benchmark module) | Specified 2026-09-28. Sequencing: the controller baselines B-08 (HTTP API) and B-09 (Raft) must be measured on the Vert.x controller before `RT-06` and `CE-07`, whose acceptance compares against them (`RT-Q2`); B-02, B-10 and B-11 serve Phase 12. **Slice ENG-15a done 2026-09-28:** the `quorus-benchmarks` module (root profile `benchmarks`, outside the default build) with B-09 commit latency; baseline recorded (about 270 commits/s at every concurrency: the engine commits one command at a time). **Slice ENG-15b done 2026-09-28:** B-08 for submit, heartbeat, poll and read, with real controller processes under the production TLS and request-security configuration; baseline recorded (about 100 requests/s for reads and 70 for writes at every concurrency, found `ENG-16`). Next: B-09 leader failover, B-08 status reports | 🟨 |
-| **ENG-16** | The security audit write path caps the controller API at about 100 requests per second: each request records at least two audit events, each written to two hash-chained logs, and `HashChainedAuditLog.append` is `synchronized` and calls `FileChannel.force(true)` per write, on the Vert.x event loop. So every request performs at least four disk syncs on the thread serving all requests | found by benchmark B-08 on 2026-09-28 (results §2.2) | Verified 2026-09-28 (`HashChainedAuditLog.java:65-91`, `HttpApiServer.java:295-298`, `AuthenticationHandler`). Proposed: keep the rule that an event is durable before the response, but commit in groups (one sync for all events waiting at that moment, with each request waiting for its group), and take the write off the event loop; `RT-06` removes the event loop itself. Decide whether this lands before `RT-06b` (so the HTTP comparison isolates the server) or with it | 🟠 |
+| **ENG-16** | The security audit write path caps the controller API at about 100 requests per second: each request records at least two audit events, each written to two hash-chained logs, and `HashChainedAuditLog.append` is `synchronized` and calls `FileChannel.force(true)` per write, on the Vert.x event loop. So every request performs at least four disk syncs on the thread serving all requests | found by benchmark B-08 on 2026-09-28 (results §2.2) | Verified 2026-09-28 (`HashChainedAuditLog.java:65-91`, `HttpApiServer.java:295-298`, `AuthenticationHandler`). ✅ **Closed 2026-09-28** (decided to land before `RT-06b`): `HashChainedAuditLog` group-commits (records are written in chain order at once; one sync thread syncs everything written before each sync began; a failed write or sync fails every waiting record and every later append). `AuditSink.appendAsync` added; the authentication, authorization and revocation-update handlers continue only after their records are durable, without blocking the event loop, pausing the request so a body that arrives meanwhile is kept; the completion audit is written after the response, as before. B-08 (results §2.3): reads from about 100 to about 8,000 requests/s at 500 clients; writes from about 70 to about 170, now bounded by the serial Raft commit (`CE-07`) | ✅ |
 
 `DR-X05` (HTTP adapter buffering) is `ARCH-09`, closed by `RT-03b` on 2026-09-26, and is not duplicated here.
 
@@ -729,6 +729,7 @@ the in-repository engine.
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.25 | 2026-09-28 | `ENG-16` closed: group-committed audit, handlers off the event loop; B-08 re-measured (results §2.3) |
 | 1.24 | 2026-09-28 | `ENG-15b`: B-08 baseline on the Vert.x controller; new `ENG-16` (the audit write path caps the API at about 100 requests/s) |
 | 1.23 | 2026-09-28 | `ENG-15a`: benchmark module and the B-09 commit-latency baseline on the in-repository engine |
 | 1.22 | 2026-09-28 | `RT-06` re-sequenced to proceed before QRaft (slices `RT-06a` to `RT-06d`), after the `ENG-15` baselines. Plan v1.42 cited |
