@@ -2,7 +2,7 @@
 
 # Quorus Enterprise Implementation Plan
 
-**Version:** 1.39
+**Version:** 1.42
 **Date:** 2026-09-28
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
@@ -1131,7 +1131,7 @@ Prove the complete platform in a representative enterprise environment and produ
 ### Scope
 
 1. Freeze release-candidate APIs, schemas, configuration, artifact versions, and compatibility matrix.
-2. Execute end-to-end functional, security, isolation, performance, scale, soak, recovery, upgrade, rollback, and disaster tests.
+2. Execute end-to-end functional, security, isolation, performance, scale, soak, recovery, upgrade, rollback, and disaster tests. Performance, scale and soak use the benchmark module (`ENG-15`, benchmarks B-02, B-10 and B-11 in `docs-design/performance/QUORUS_PERFORMANCE_BENCHMARKS.md`).
 3. Run threat-model review, dependency and container scanning, penetration testing, and remediation.
 4. Execute financial-services pilot scenarios with critical deadlines, business calendars, retries, failures, and incident response.
 5. Validate service connections across every supported protocol and trust mode.
@@ -1186,7 +1186,7 @@ The enterprise release candidate is approved only when all critical canonical ga
 
 ## 20. Platform Migration Workstreams
 
-**Status:** In progress. Direction accepted on 2026-09-26. `RT-01` to `RT-05` are complete, so only `quorus-controller` still uses Vert.x; `RT-06` waits for `CE-07` to `CE-11`, and workstream `CE` has not started. Item status is kept in [register Section J](QUORUS_OUTSTANDING_WORK_REGISTER.md#13-section-j--platform-migration-workstreams)
+**Status:** In progress. Direction accepted on 2026-09-26. `RT-01` to `RT-05` are complete, so only `quorus-controller` still uses Vert.x; `RT-06` waits for `CE-07` to `CE-11`, and workstream `CE` has not started. The state of both engines and the work per `CE` item are assessed in the [QRaft integration assessment](../design/QUORUS_QRAFT_INTEGRATION_ASSESSMENT.md) (2026-09-28), with open decisions `CE-Q1` to `CE-Q5`. Item status is kept in [register Section J](QUORUS_OUTSTANDING_WORK_REGISTER.md#13-section-j--platform-migration-workstreams)
 **Decisions:** [ADR-0011](../architecture-decisions/ADR-0011-CONSENSUS-VIA-QRAFT-GENERIC-ENGINE.md) (consensus through the generic QRaft engine) and [ADR-0012](../architecture-decisions/ADR-0012-JAVA-RUNTIME-AND-STRUCTURED-CONCURRENCY.md) (leave Vert.x for Java 27 structured concurrency)
 
 These two workstreams change the platform beneath the phases rather than adding enterprise capability. Each item is delivered under Section 6.1 and must keep every delivered phase's boundary tests green. Neither workstream may weaken a delivered exit gate. In particular, Phase 1's controller-to-controller mutual TLS, peer rejection and revocation behaviour must pass unchanged through the new engine.
@@ -1224,7 +1224,7 @@ Quorus stops owning a Raft engine and consumes QRaft's engine through a 100% gen
 | **RT-Q5** | Decision: HTTP client for the HTTP transfer adapter | ✅ Decided 2026-09-26: Apache HttpClient 5 (classic API). Measured on JDK 27 GA: `java.net.http` cannot connect to an approved address while keeping SNI, `Host` and hostname verification on the service's hostname (ADR-0012) |
 | **RT-04** | `quorus-workflow` and `quorus-integration-examples` | No Vert.x types. Workflow execution uses structured scopes |
 | **RT-05** | `quorus-agent` | Transfers run on virtual threads, so cancellation interrupts blocked I/O at once. Controller client on `java.net.http.HttpClient` with mutual TLS and hostname verification. Registration, heartbeat and polling run as structured loops with bounded shutdown. The Phase 1 agent trust tests and R3 reporting tests pass. Delivered in slices: `RT-05a` moves the controller client to `java.net.http` (with a JDK PEM loader in core) and makes the registration, heartbeat, polling and status-reporting services blocking; `RT-05b` replaces the agent runtime (Vert.x timers, futures, the transfer service, the health endpoint and the tracing integration) and leaves no `io.vertx` dependency in the `quorus-agent` pom |
-| **RT-06** | `quorus-controller` | HTTP API on the `RT-Q2` server with TLS 1.3 and required client certificates. Authentication, authorization and audit middleware preserved. `OpenApiContractTest` stays equal. The `CE-07` bridge is removed |
+| **RT-06** | `quorus-controller` | HTTP API on the `RT-Q2` server with TLS 1.3 and required client certificates. Authentication, authorization and audit middleware preserved. `OpenApiContractTest` stays equal. The `CE-07` bridge is removed. Throughput is compared with benchmark B-08 measured on the Vert.x controller first (`ENG-15`). Delivered in slices, re-sequenced on 2026-09-28 so that it no longer waits for QRaft: `RT-06a` puts the controller's consensus calls (the 30 `submitCommand` sites and the leadership queries) behind one Quorus-owned interface with JDK types, backed by today's `RaftNode` (the single bridge class ADR-0011 allows; `CE-07` later replaces its implementation); `RT-06b` moves the HTTP API to the JDK `HttpsServer`; `RT-06c` moves the controller's services and timers to virtual threads; `RT-06d` removes the remaining Vert.x other than the in-repository Raft engine, which `CE-10` deletes. Before `RT-06b`, `ENG-15` measures B-08 on the Vert.x controller |
 | **RT-07** | Observability | OpenTelemetry traces, metrics and log correlation for the new HTTP server and client, replacing Vert.x tracing integration. The agent's part was delivered in `RT-05b`: its controller client makes client spans and sends W3C trace context. What remains is the controller's HTTP server and outbound clients, and log correlation |
 | **RT-08** | Vert.x removal gate | No `io.vertx` artifact in any module. A build check fails if one is reintroduced. Per-module guard tests already enforce this for core, workflow, tenant, the examples and the agent (`CoreIsVertxFreeTest` and its siblings); `RT-08` adds the controller once `RT-06` lands and removes the `vertx-dependencies` BOM import from the root pom |
 | **RT-09** | Java release cadence (recurring) | Each Java GA feature release is adopted within its update window: toolchain, CI and images; full reactor and coverage gates; Docker, slow, Raft durability and restart lanes on the new runtime. When `StructuredTaskScope` is final in an adopted release, the task-scope implementation switches to it with its tests as the gate |
@@ -1234,7 +1234,7 @@ Quorus stops owning a Raft engine and consumes QRaft's engine through a 100% gen
 1. `RT-01` can start at once and has no dependency on QRaft. `RT-02` delivers the task-scope abstraction before any module migration uses it.
 2. `CE-01` to `CE-06` (QRaft) run in parallel with `RT-01` to `RT-05`.
 3. `CE-07` to `CE-11` follow `CE-06`. Adopting QRaft removes Quorus's largest Vert.x-coupled component, the Raft node and its gRPC transport, before the controller HTTP migration.
-4. `RT-06` follows. It should precede the bulk of Phase 6 so that new REST resources are written once. `RT-05` does not wait for QRaft: the agent has no Raft code and depends on no `CE` item, so it follows `RT-04` directly (decided 2026-09-27).
+4. `RT-06` no longer waits for `CE-07` to `CE-11` (decided 2026-09-28): the consensus interface of `RT-06a` separates the HTTP and service migration from the engine, so only the in-repository Raft engine stays on Vert.x until `CE-10` removes it. `RT-06` should still precede the bulk of Phase 6 so that new REST resources are written once. Before it, and before `CE-07`, the benchmark module (`ENG-15`) measures the Vert.x controller's HTTP API (B-08) and Raft commit latency (B-09), because `RT-Q2` and the QRaft adoption are judged against them. `RT-05` does not wait for QRaft: the agent has no Raft code and depends on no `CE` item, so it follows `RT-04` directly (decided 2026-09-27).
 5. Phase 8 durability work and the R1-2 and R1-3 acceptance runs should follow `CE-11`, so that production-filesystem and power-loss evidence describes the engine that will ship.
 
 Phases 2 and 3 continue meanwhile. Their new code must avoid adding Vert.x coupling that `RT` would have to remove: new logic sits behind JDK-typed interfaces where practical.
@@ -1340,6 +1340,9 @@ The plan is revised when requirements or implementation evidence change. Revisio
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.42 | 2026-09-28 | §20: `RT-06` re-sequenced to proceed before QRaft, in slices `RT-06a` (consensus interface) to `RT-06d`; only the in-repository Raft engine stays on Vert.x until `CE-10` |
+| 1.41 | 2026-09-28 | §20 links the QRaft integration assessment and its open decisions `CE-Q1` to `CE-Q5` |
+| 1.40 | 2026-09-28 | Benchmarking: `RT-06`, §20 sequencing and Phase 12 reference the benchmark module (`ENG-15`); the controller baselines (B-08, B-09) come before `RT-06` and `CE-07` |
 | 1.39 | 2026-09-28 | Review after `RT-05`: §20 status (RT-01 to RT-05 complete), `RT-07` and `RT-08` show what is already delivered, sequencing step 2 includes `RT-05`; §3 baseline and §4 evidence wording follow `RT-05` and the revised `DR-Q6`; Phase 0 and Phase 7 notes for Java 27 and `ENG-12` |
 | 1.38 | 2026-09-27 | §20: `RT-05` no longer waits for `CE-07` to `CE-11` (the agent has no Raft code) and follows `RT-04`; its slices `RT-05a` and `RT-05b` are defined |
 | 1.37 | 2026-09-27 | §6.1: a slice's record is its commit message; raw logs, manifests, hashes and patches are no longer kept (`DR-Q6` revised). Recorded the `RT-03c` follow-up: `ENG-09` resolved; `ENG-10` found and resolved (adapter and agent in-flight progress), with a dated correction to the Phase 3 checkpoint; `SEC-08` resolved; `ENG-11` recorded. `RT-05` acceptance now includes running transfers on virtual threads |

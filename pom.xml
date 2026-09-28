@@ -176,4 +176,15 @@
         </plugins>
     </build>
 
+    <profiles>
+        <!-- ENG-15: the benchmark module is built and run only on request, so that the default
+             build stays a correctness build. mvn -Pbenchmarks ... -->
+        <profile>
+            <id>benchmarks</id>
+            <modules>
+                <module>quorus-benchmarks</module>
+            </modules>
+        </profile>
+    </profiles>
+
 </project>

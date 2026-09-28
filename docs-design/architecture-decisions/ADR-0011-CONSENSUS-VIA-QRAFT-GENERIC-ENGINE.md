@@ -2,8 +2,8 @@
 
 # ADR-0011: Consensus Through the Generic QRaft Engine
 
-**Version:** 1.0  
-**Date:** 2026-09-26  
+**Version:** 1.1  
+**Date:** 2026-09-28  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0
 
@@ -26,6 +26,8 @@ As observed on 2026-09-26:
 | Transport security | Raft gRPC is plaintext (`usePlaintext()`); there is no TLS and no peer authorization |
 | Distribution | Not published. The local Maven copies of most modules date from 2026-03 |
 | Quorus coupling | None. Neither project references the other |
+
+Re-assessed on 2026-09-28 in the [QRaft integration assessment](../design/QUORUS_QRAFT_INTEGRATION_ASSESSMENT.md): QRaft is now on Java 27, its engine module still holds only the four contracts, `RaftNode` (3,183 lines) is still in `qraft-controller`, and the Raft transport is still plaintext. The assessment maps each `CE` item and records five open questions (`CE-Q1` to `CE-Q5`).
 
 The controller calls a narrow part of Quorus's own engine: `submitCommand` (30 call sites) and a few leadership and state queries (`isLeader`, `getLeaderId`, `getState`, `getCurrentTerm`, `getNodeId`, `getCommitIndex`, `isRunning`), plus lifecycle and the inbound RPC handlers.
 
@@ -66,3 +68,10 @@ The controller calls a narrow part of Quorus's own engine: `submitCommand` (30 c
 - raftlog moves from 1.2.0 to QRaft's version (1.4.0 at this date). On-disk compatibility between the two raftlog versions, and between Quorus's snapshot sidecar and QRaft's `SnapshotStore` format, has not been established. It must be proven or migrated before cutover.
 - The R1 durability evidence was gathered against Quorus's own engine. R1-2 (production filesystem) and R1-3 (power loss) should be run once, against the QRaft-based build. R1-1 must be repeated after the cutover.
 - The controller's Raft integration becomes a thin adapter. Until the Vert.x exit ([ADR-0012](ADR-0012-JAVA-RUNTIME-AND-STRUCTURED-CONCURRENCY.md)) reaches the controller, one Quorus-side class may convert JDK futures to Vert.x futures. That class is removed when the controller leaves Vert.x, and no such bridge may exist in QRaft.
+
+## Revision history
+
+| Version | Date | Change |
+|---|---|---|
+| 1.1 | 2026-09-28 | Context links the integration assessment of 2026-09-28 and its open questions `CE-Q1` to `CE-Q5` |
+| 1.0 | 2026-09-26 | Accepted as direction |

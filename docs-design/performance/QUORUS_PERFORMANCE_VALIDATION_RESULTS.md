@@ -1,260 +1,117 @@
-# Vert.x 5.x Migration - Performance Validation Results
+<img src="../../docs/quorus-logo.png" alt="Quorus" width="120"/>
 
-> [!IMPORTANT]
-> This is a point-in-time migration benchmark, not evidence that the Quorus product is production ready. Results apply only to the recorded workloads and environment. Current measurable release gates and unresolved production gaps are defined in [QUORUS_ARCHITECTURE_SPECIFICATION.md](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md).
+# Quorus Performance Validation Results
 
-## Date: January 5, 2026
-
-## Executive Summary
-
-The Vert.x 5.x migration has been successfully completed and validated with comprehensive performance testing. All metrics exceed target goals based on the PeeGeeQ migration case study.
-
----
-
-## Performance Metrics
-
-### 1. Thread Count Efficiency ✅
-
-**Test**: 100 concurrent async operations
-
-**Results**:
-- **Initial threads**: 12
-- **Peak threads**: 33
-- **Current threads**: 33
-- **Test duration**: 109ms
-
-**Analysis**:
-- ✅ Peak thread count under 50 (Target: < 50 for 100 operations)
-- **Thread efficiency**: Vert.x event loop model uses 33 threads for 100 concurrent operations
-- **Improvement**: ~70% reduction compared to traditional thread-per-request model (would use 100+ threads)
+**Version:** 2.1  
+**Date:** 2026-09-28  
+**Author:** Mark Ray-Smith — Cityline Ltd  
+**License:** Apache 2.0  
+**Status:** Results log. One baseline is recorded for the current code (B-09, commit latency). The benchmarks are defined in
+[QUORUS_PERFORMANCE_BENCHMARKS.md](QUORUS_PERFORMANCE_BENCHMARKS.md) and delivered by register item
+`ENG-15`. Appendices A and B keep the earlier Vert.x migration figures as history; they do not describe
+the current code and must not be quoted as Quorus performance.
 
 ---
 
-### 2. Throughput Performance ✅
+## 1. How a result is recorded
 
-**Test**: 10,000 async operations with warmup
+One row per run, added in the same commit as the benchmark source or configuration it used. The row
+carries everything the Architecture Specification §13 publication rule requires; a figure without all
+of it is not recorded.
 
-**Results**:
-- **Throughput**: **670,322 operations/second**
-- **Duration**: 14ms for 10,000 operations
-- **Average latency**: < 0.01ms per operation
+| Field | Content |
+|---|---|
+| Benchmark | ID from the benchmark specification (B-01 to B-11) |
+| Commit | The commit measured (and, for a comparison, the other side's commit) |
+| Invocation | The exact command that reproduces the run |
+| Environment | CPU, memory, storage, network, OS, JDK build and flags, container runtime |
+| Workload | File sizes and distribution, protocol mix, concurrency, duration |
+| Results | Throughput; p50, p95 and p99 latency; error and retry rates; memory and threads where measured |
+| Gate | The gate or decision the result serves, and whether it passes |
 
-**Analysis**:
-- ✅ **Exceeds target** of > 1,000 ops/sec by **670x**
-- **Improvement**: 400%+ throughput compared to traditional approaches (estimated)
-- Demonstrates exceptional performance of Vert.x reactive model
+## 2. Results
 
----
+| Benchmark | Commit | Date | Result | Gate outcome |
+|---|---|---|---|---|
+| B-09 (commit latency) | `8946faa` plus the uncommitted `quorus-benchmarks` module; engine code unchanged | 2026-09-28 | About 270 commits/s at every concurrency; p50 3.7 ms at 1 client (§2.1) | No gate; baseline for `CE-07` |
 
-### 3. Latency Percentiles ✅
+### 2.1 B-09 baseline: in-repository Vert.x engine, 2026-09-28
 
-**Test**: 1,000 operations measuring distribution
+| Field | Value |
+|---|---|
+| Invocation | `mvn -B -Pbenchmarks -pl quorus-benchmarks exec:java -Dexec.args="B-09 --storage local-disk-of-development-workstation --network loopback"` (after `mvn -B -Pbenchmarks -pl quorus-benchmarks -am install -DskipTests`) |
+| Environment | Intel Core Ultra 9 185H (22 logical processors), 95 GB RAM, Windows 11 (10.0, amd64); OpenJDK 27+35, default heap limit (24 GB), run inside Maven `exec:java` |
+| Storage and network | Each node's WAL in the system temporary directory on a Samsung SSD 990 PRO (NVMe); fsync on. Loopback; gRPC with TLS 1.3 mutual authentication |
+| Workload | Three engine nodes in one JVM with the controller's state machine and the packaged Raft settings (election timeout 5,000 ms, heartbeat 1,000 ms). 128-byte `SystemMetadataCommand.Set` commands; 500 warm-up commands; 2,000 commands per concurrency level, closed loop |
+| Errors and retries | 0 errors at every level; the harness does not retry |
 
-**Results**:
-```
-P50: 28μs   (median)
-P95: 80μs   (95th percentile)
-P99: 218μs  (99th percentile)
-Max: 1432μs (worst case)
-```
+| Concurrent clients | Commits/s | p50 | p95 | p99 | Max |
+|---|---|---|---|---|---|
+| 1 | 252 | 3.7 ms | 4.9 ms | 5.5 ms | 18.3 ms |
+| 10 | 269 | 37.7 ms | 38.7 ms | 42.0 ms | 44.1 ms |
+| 50 | 270 | 186.8 ms | 191.7 ms | 193.2 ms | 196.1 ms |
 
-**Analysis**:
-- ✅ P95 latency of 80μs is **well under** target of 100μs
-- ✅ P99 latency of 218μs shows excellent consistency
-- **Latency reduction**: ~90% compared to traditional blocking approaches (estimated P95: 800-1000μs)
-- Sub-millisecond response times across all percentiles
+**Reading.** Throughput does not rise with concurrency and latency grows in proportion to the queue:
+the engine replicates and syncs one command at a time, with no batching of concurrent commands. This is
+the engine's own ceiling on this machine, before HTTP. The commit is recorded with an uncommitted working
+tree (the benchmark module itself), so the measurement should be repeated from a clean commit before it is
+used in a published comparison.
 
----
+## 3. Revision history
 
-### 4. Memory Efficiency ✅
-
-**Test**: 1,000 concurrent futures
-
-**Results**:
-- **Baseline memory**: 7MB
-- **After 1,000 operations**: 7MB
-- **Memory increase**: 0MB
-
-**Analysis**:
-- ✅ **Zero memory increase** demonstrates excellent garbage collection
-- Vert.x Future objects are efficiently managed
-- **Memory efficiency**: < 50MB increase for 1,000 operations (Target: < 50MB)
-
----
-
-### 5. Graceful Shutdown ✅
-
-**Test**: Shutdown with 50 active long-running operations
-
-**Results**:
-- **Shutdown duration**: 21ms
-- **Active operations**: 50 (2-second operations)
-- **Status**: Successful
-
-**Analysis**:
-- ✅ Clean shutdown with no resource leaks
-- ✅ No "Pool is closed" errors
-- All timers and connections properly closed
-- Vertx handles in-flight operations gracefully
+| Version | Date | Change |
+|---|---|---|
+| 2.1 | 2026-09-28 | First baseline: B-09 commit latency on the in-repository Vert.x engine (§2.1) |
+| 2.0 | 2026-09-28 | Rewritten as the results log for the benchmark specification. The January 2026 and December 2025 Vert.x migration figures moved to Appendices A and B as history, with the reasons they do not describe the current code |
+| 1.0 | 2026-01-05 | *Vert.x 5.x Migration — Performance Validation Results* |
 
 ---
 
-## Test Coverage Summary
+## Appendix A. Vert.x migration validation, 2026-01-05 (historical)
 
-### Performance Tests (5 tests - ALL PASSING ✅)
-1. ✅ Thread count efficiency - Validates event loop model
-2. ✅ Async throughput - Measures operations/second
-3. ✅ Latency percentiles - Validates response time consistency
-4. ✅ Memory efficiency - Ensures no memory leaks
-5. ✅ Graceful shutdown - Validates clean resource cleanup
+> **Not a Quorus performance result.** The figures below came from `VertxPerformanceBenchmark`, which
+> the documentation review of 2026-09-24 found timed `vertx.executeBlocking(() -> "result")`, a call
+> that does no Quorus work. The class was deleted in `RT-03f` (2026-09-27). The Vert.x runtime it
+> exercised is no longer used by any module except the controller. The document's claims of a
+> "Phase 4 PostgreSQL" connection-pool migration and of `quorus-api` tests also do not describe this
+> repository. Kept unchanged below for the record.
 
-### Existing Integration Tests (ALL PASSING ✅)
-- **quorus-core**: 47 tests passing
-- **quorus-workflow**: All tests passing
-- **quorus-tenant**: All tests passing
-- **quorus-controller**: 68 tests passing
-  - Raft consensus tests
-  - Network chaos tests
-  - Metadata persistence tests
-  - Agent job management tests
-- **quorus-api**: 7 tests passing
-- **Total**: 140+ tests passing
+### Recorded figures
 
----
+| Test | Recorded result |
+|---|---|
+| Thread count, 100 concurrent operations | 12 initial, 33 peak threads; 109 ms |
+| Throughput, 10,000 operations after warm-up | 670,322 operations/s; 14 ms in total |
+| Latency, 1,000 operations | p50 28 µs, p95 80 µs, p99 218 µs, max 1,432 µs |
+| Memory, 1,000 concurrent futures | 7 MB before and after |
+| Shutdown with 50 two-second operations | 21 ms |
 
-## Migration Goals vs Actual Results
+The original document compared these with targets (for example "exceeds 1,000 ops/sec by 670x") and
+with estimated "traditional" figures that were never measured.
 
-| Metric | Target | Actual | Status |
-|--------|--------|--------|--------|
-| Thread count reduction | 70% | ~70% | ✅ ACHIEVED |
-| Throughput improvement | 400%+ | 670x | ✅ EXCEEDED |
-| Latency reduction | 90% | ~90% | ✅ ACHIEVED |
-| Memory efficiency | < 50MB for 1K ops | 0MB | ✅ EXCEEDED |
-| Clean shutdown | No errors | Clean | ✅ ACHIEVED |
-| Test coverage | All tests pass | 140+ passing | ✅ ACHIEVED |
+## Appendix B. Vert.x migration benchmarks, 2025-12-17 (historical)
 
----
+> **Not a Quorus performance result.** The document said its benchmark code was in
+> `quorus-integration-examples/benchmarks/`; that directory has never existed in this repository, so
+> no figure below can be reproduced. The connection pool it measured was removed in `RT-03a`, the
+> Vert.x WebClient HTTP adapter was replaced in `RT-03b`, and the reactive engine and workflow engine
+> were replaced in `RT-03c` and `RT-04`. The documentation review of 2026-09-24 also found that its
+> "before (blocking)" and "after (reactive)" connection-pool figures were the default-versus-production
+> pool preset comparison from `CONNECTION_POOL_BENCHMARK_RESULTS.md`, relabelled. Recorded environment:
+> Windows 11, Java 24, Intel i7 with 24 cores and 32 GB. Kept below for the record.
 
-## Migration Phases Summary
+### Recorded figures
 
-### ✅ Phase 1: Foundation & Infrastructure (COMPLETE)
-- Event loop initialization
-- HTTP server/client migration
-- Service registry updates
+| Area | Before | After |
+|---|---|---|
+| HTTP connection pool, 100 concurrent requests for 60 s | 642 req/s; p95 280 ms; p99 350 ms | 3,136 req/s; p95 58 ms; p99 85 ms |
+| Threads | 7 pools, about 50 to 70 threads | 2 pools, about 25 to 40 threads |
+| Workflow, 10 groups × 5 transfers of 1 MB | 25.3 s | 5.8 s |
+| HTTP transfers, 20 × 10 MB | 45 MB/s; 20 threads | 180 MB/s; 1 event-loop thread |
+| REST API, `POST /api/v1/transfers`, 100 concurrent for 60 s | 1,250 req/s; p95 150 ms; p99 220 ms | 4,800 req/s; p95 42 ms; p99 68 ms |
+| Steady-state heap | 245 MB | 160 MB |
+| Startup to first request | 3.8 s | 2.4 s |
 
-### ✅ Phase 2: Service Layer Conversion (COMPLETE)
-- TransferEngine reactive conversion
-- Service implementations updated
-- All service tests passing
-
-### ✅ Phase 3: HTTP Client/Server Migration (COMPLETE)
-- HTTP API Server with Vert.x Web
-- Protocol clients migrated
-- REST API tests passing
-
-### ✅ Phase 4: Database Connection Pool Migration (COMPLETE)
-- PostgreSQL reactive client integration
-- Connection pooling optimized
-- All database tests passing
-
-### ✅ Phase 5: Testing & Validation (COMPLETE)
-- Comprehensive performance benchmarks
-- Shutdown validation
-- Metrics documented
-
----
-
-## Key Achievements
-
-### 1. Performance
-- **670,322 ops/sec** throughput (670x target)
-- **80μs P95 latency** (20% below target)
-- **0MB memory increase** for 1K operations
-
-### 2. Reliability
-- Clean shutdown with active operations
-- No resource leaks
-- Proper error handling
-
-### 3. Code Quality
-- 140+ tests passing
-- Comprehensive test coverage
-- Well-documented codebase
-
-### 4. Architecture
-- Event loop model properly implemented
-- Reactive programming patterns throughout
-- Scalable, non-blocking design
-
----
-
-## Recommendations
-
-### For Production Deployment
-
-1. **Monitoring**: 
-   - Track thread count in production
-   - Monitor P95/P99 latencies
-   - Set up alerts for thread pool exhaustion
-
-2. **Configuration**:
-   - Event loop threads: 2x CPU cores (current default)
-   - Worker pool size: 20 (for blocking operations)
-   - Database connection pool: 100 (configured)
-
-3. **Load Testing**:
-   - Run load tests with production-like traffic
-   - Measure sustained throughput under load
-   - Test failover scenarios
-
-4. **Gradual Rollout**:
-   - Deploy to staging first
-   - Monitor metrics closely
-   - Gradual traffic shift to new version
-
----
-
-## Technical Highlights
-
-### Vert.x Features Utilized
-
-1. **Event Loop Architecture**:
-   - Non-blocking I/O throughout
-   - Minimal thread creation
-   - Efficient resource utilization
-
-2. **Reactive Streams**:
-   - Future/Promise-based async programming
-   - Composable operations
-   - Back-pressure support
-
-3. **Connection Pooling**:
-   - Shared PostgreSQL pools
-   - Pipelining (256 concurrent requests)
-   - Health checking
-
-4. **HTTP Server**:
-   - Vert.x Web router
-   - Async request handling
-   - WebSocket support (if needed)
-
----
-
-## Conclusion
-
-The Vert.x 5.x migration has been **successfully completed** with all phases finished and validated. Performance metrics **exceed all targets**, demonstrating significant improvements in:
-
-- **Throughput**: 670x improvement
-- **Latency**: 90% reduction
-- **Resource efficiency**: 70% fewer threads
-- **Memory**: Zero increase for 1K operations
-
-The recorded migration benchmark met its scoped performance and shutdown objectives with the stated test count. This does not establish Quorus product readiness or close the canonical security, durability, API, transfer-operations, and agent-lifecycle gaps.
-
-**Status**: ✅ **MIGRATION PERFORMANCE VALIDATION COMPLETE FOR THE RECORDED SCOPE**
-
----
-
-**Generated**: January 5, 2026
-**Version**: 1.0
-**Test Suite**: VertxPerformanceBenchmark.java
+Two of these areas remain worth measuring on the current code: the workflow run (benchmark B-05) and the
+REST API (B-08, which is needed as the baseline for `RT-06`). The earlier figures are not a baseline for
+either, because their source does not exist.
