@@ -2,11 +2,11 @@
 
 # Quorus Performance Benchmarks
 
-**Version:** 2.1  
+**Version:** 2.2  
 **Date:** 2026-09-28  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
-**Status:** Specification. B-09 (commit latency) is implemented and has a recorded baseline; the other benchmarks are not yet implemented. Results are
+**Status:** Specification. B-08 (four scenarios) and B-09 (commit latency) are implemented and have recorded baselines; the other benchmarks are not yet implemented. Results are
 recorded in [QUORUS_PERFORMANCE_VALIDATION_RESULTS.md](QUORUS_PERFORMANCE_VALIDATION_RESULTS.md).  
 **Delivery:** register item `ENG-15` (benchmark module). Supersedes version 1.0, *Vert.x 5.x Migration —
 Performance Benchmarks* (December 2025), whose figures are kept as history in the results document.
@@ -68,7 +68,7 @@ Levels: **micro** (one method, JMH), **component** (one module against real loca
 | **B-05** | component | Workflow scheduling and control latency | `SimpleWorkflowEngine` against a local HTTP server | 10 groups × 5 transfers of 1 MB; `parallelism` 1, 2, 5; dependency chains | wall time; transfers/s; cancel and timeout latency | Baseline for `RT-04`; Phase 7 |
 | **B-06** | component | Agent cancellation and shutdown latency | `QuorusAgent` shutdown with transfers blocked in socket reads | 1, 10, 50 stalled transfers | time from shutdown to last transfer ended | The `RT-05` claim that a blocked transfer stops at once |
 | **B-07** | process | Agent footprint | Agent process | idle; 10 and 50 concurrent 100 MB transfers | platform and virtual thread counts; heap; RSS; CPU | Baseline; capacity planning |
-| **B-08** | process | Controller HTTP API throughput and latency | Controller `POST /api/v1/transfers`, agent job polling, status reports and heartbeats, over mutual TLS | 10, 100, 500 concurrent clients; 60 s steady state | requests/s; p50, p95, p99; error rate | `RT-Q2`: `RT-06` must prove the JDK `HttpsServer` on throughput. Run on the Vert.x controller **before** `RT-06`, then after |
+| **B-08** | process | Controller HTTP API throughput and latency | Controller processes from the host-built jar: `POST /api/v1/transfers`, heartbeats, agent job polling, transfer reads and (later) status reports, over TLS 1.3 with required client certificates, authentication, authorization and audit | 10, 100, 500 concurrent clients; 60 s steady state | requests/s; p50, p95, p99; error rate | `RT-Q2`: `RT-06` must prove the JDK `HttpsServer` on throughput. Run on the Vert.x controller **before** `RT-06`, then after |
 | **B-09** | component | Raft command commit latency and failover | Three engine nodes in one JVM over real gRPC with TLS 1.3 mutual authentication on loopback, durable raftlog WALs, the controller's state machine | 2,000 small commands per concurrency level (1, 10, 50); 100 induced leader failures | submit-to-commit p50, p95, p99; write-resume time | Architecture Specification §13 *Leader failover*; baseline for `CE-07` to `CE-11` (QRaft) |
 | **B-10** | process | End-to-end transfer throughput and correctness | Controller cluster, N agents, file servers | 1,000 consecutive assigned transfers; mixed sizes and protocols | transfers/s; submit-to-terminal p50, p95, p99; terminal-state correctness; progress freshness | Architecture Specification §13 *End-to-end lifecycle* and *Progress freshness*; Phase 12 |
 | **B-11** | process | Soak | As B-10 | 24 hours at 50% of the B-10 peak | throughput drift; heap, RSS and thread trends; error rate | Phase 12 soak report |
@@ -108,12 +108,14 @@ their acceptance compares against it. B-02, B-10 and B-11 serve the Phase 12 gat
 | ID | Status |
 |---|---|
 | B-09 | Commit latency implemented (`RaftCommitBenchmark`); baseline recorded 2026-09-28. Leader failover not yet implemented |
-| B-01 to B-08, B-10, B-11 | Not implemented |
+| B-08 | Submit, heartbeat, poll and read implemented (`ControllerApiBenchmark`); baseline recorded 2026-09-28. Agent status reports not yet implemented: they need the assignment and attempt lifecycle first |
+| B-01 to B-07, B-10, B-11 | Not implemented |
 
 ## 7. Revision history
 
 | Version | Date | Change |
 |---|---|---|
+| 2.2 | 2026-09-28 | B-08 implemented for four scenarios (real controller processes under the production TLS and request-security configuration, `development` profile for ungoverned submissions) |
 | 2.1 | 2026-09-28 | B-09 moved to the component level (engine nodes in one JVM over real gRPC and TLS, so the engine can be compared without HTTP and process start-up); its commit-latency part is implemented in `quorus-benchmarks` |
 | 2.0 | 2026-09-28 | Rewritten as the benchmark specification for the code after `RT-03` to `RT-05`: the catalogue (B-01 to B-11), the method, the publication rules and the benchmark module. Renamed from `VERTX5_PERFORMANCE_BENCHMARKS.md`. The version 1.0 figures moved to the results document as history |
 | 1.0 | 2025-12-17 | *Vert.x 5.x Migration — Performance Benchmarks*: before-and-after figures for the Vert.x migration |

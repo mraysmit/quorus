@@ -2,11 +2,11 @@
 
 # Quorus Performance Validation Results
 
-**Version:** 2.1  
+**Version:** 2.2  
 **Date:** 2026-09-28  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
-**Status:** Results log. One baseline is recorded for the current code (B-09, commit latency). The benchmarks are defined in
+**Status:** Results log. Baselines are recorded for the current code: B-09 (commit latency) and B-08 (controller API). The benchmarks are defined in
 [QUORUS_PERFORMANCE_BENCHMARKS.md](QUORUS_PERFORMANCE_BENCHMARKS.md) and delivered by register item
 `ENG-15`. Appendices A and B keep the earlier Vert.x migration figures as history; they do not describe
 the current code and must not be quoted as Quorus performance.
@@ -34,6 +34,7 @@ of it is not recorded.
 | Benchmark | Commit | Date | Result | Gate outcome |
 |---|---|---|---|---|
 | B-09 (commit latency) | `8946faa` plus the uncommitted `quorus-benchmarks` module; engine code unchanged | 2026-09-28 | About 270 commits/s at every concurrency; p50 3.7 ms at 1 client (§2.1) | No gate; baseline for `CE-07` |
+| B-08 (controller API) | `23bcb6f` plus the uncommitted B-08 harness; controller code unchanged | 2026-09-28 | About 100 requests/s for reads and 70 for writes at every concurrency, no errors (§2.2) | No gate; baseline for `RT-06` (`RT-Q2`). Found `ENG-16` |
 
 ### 2.1 B-09 baseline: in-repository Vert.x engine, 2026-09-28
 
@@ -57,10 +58,47 @@ the engine's own ceiling on this machine, before HTTP. The commit is recorded wi
 tree (the benchmark module itself), so the measurement should be repeated from a clean commit before it is
 used in a published comparison.
 
+### 2.2 B-08 baseline: Vert.x controller, 2026-09-28
+
+| Field | Value |
+|---|---|
+| Invocation | `mvn -B -Pbenchmarks -pl quorus-benchmarks exec:java -Dexec.args="B-08 --storage local-disk-of-development-workstation --network loopback"` |
+| Environment | As §2.1 (Intel Core Ultra 9 185H, 22 logical processors, 95 GB RAM, Windows 11, OpenJDK 27+35). The client runs in the Maven JVM; each controller is a separate JVM with `-Xmx1g` from the host-built shaded jar |
+| Storage and network | Each controller's raftlog WAL and audit logs in the system temporary directory on a Samsung SSD 990 PRO (NVMe); fsync on. Loopback |
+| Cluster and security | Three controller processes. HTTP and Raft over TLS 1.3 with required client certificates; request authentication, authorization and hash-chained audit on. `development` security profile, so transfers are submitted without a governed service connection (the measured path is the HTTP stack and the Raft write). The client is a trusted gateway asserting an operator or agent identity |
+| Workload | Closed loop against the leader, each scenario at 10, 100 and 500 clients for 30 s after a 5 s warm-up. `submit`: `POST /api/v1/transfers`; `heartbeat`: `POST /api/v1/agents/heartbeat` from 500 registered agents; `poll`: `GET /api/v1/agents/{id}/jobs`; `read`: `GET /api/v1/transfers/{id}` over 100 jobs |
+| Errors and retries | 0 errors in every scenario; the harness does not retry |
+
+| Scenario | Clients | Requests/s | p50 | p95 | p99 | Max |
+|---|---|---|---|---|---|---|
+| submit | 10 | 70 | 142 ms | 161 ms | 179 ms | 225 ms |
+| submit | 100 | 67 | 1.42 s | 1.60 s | 2.00 s | 2.29 s |
+| submit | 500 | 66 | 6.65 s | 9.13 s | 10.25 s | 10.50 s |
+| heartbeat | 10 | 76 | 130 ms | 146 ms | 154 ms | 209 ms |
+| heartbeat | 100 | 79 | 1.21 s | 1.49 s | 1.64 s | 1.92 s |
+| heartbeat | 500 | 72 | 6.40 s | 7.74 s | 8.86 s | 9.21 s |
+| poll | 10 | 107 | 92 ms | 126 ms | 143 ms | 167 ms |
+| poll | 100 | 103 | 944 ms | 1.06 s | 1.91 s | 2.01 s |
+| poll | 500 | 99 | 5.12 s | 5.77 s | 5.83 s | 5.85 s |
+| read | 10 | 101 | 96 ms | 141 ms | 159 ms | 200 ms |
+| read | 100 | 106 | 920 ms | 1.29 s | 1.90 s | 2.00 s |
+| read | 500 | 100 | 5.03 s | 5.30 s | 5.35 s | 5.39 s |
+
+**Reading.** Reads that never touch Raft are capped at about 100 requests per second, and latency grows in
+proportion to the queue, so the ceiling is a serial step in the HTTP path, not consensus (B-09 shows the
+engine alone commits about 270 commands per second). The step is the security audit: every request
+records at least two audit events (authentication and authorization); each event is written to two
+hash-chained logs (retained evidence and operational), and `HashChainedAuditLog.append` is `synchronized`
+and calls `FileChannel.force(true)` per write. The handlers call it on the Vert.x event loop, so each
+request performs at least four disk syncs on the thread that serves every request. Writes are slower
+again because the Raft commit follows. Recorded as `ENG-16`. This baseline measures the controller as it
+is; the comparison after `RT-06` has to state whether `ENG-16` was fixed in between.
+
 ## 3. Revision history
 
 | Version | Date | Change |
 |---|---|---|
+| 2.2 | 2026-09-28 | B-08 baseline on the Vert.x controller (§2.2); the audit write path found to cap the API (`ENG-16`) |
 | 2.1 | 2026-09-28 | First baseline: B-09 commit latency on the in-repository Vert.x engine (§2.1) |
 | 2.0 | 2026-09-28 | Rewritten as the results log for the benchmark specification. The January 2026 and December 2025 Vert.x migration figures moved to Appendices A and B as history, with the reasons they do not describe the current code |
 | 1.0 | 2026-01-05 | *Vert.x 5.x Migration — Performance Validation Results* |
