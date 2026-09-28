@@ -23,16 +23,11 @@ import io.opentelemetry.api.GlobalOpenTelemetry;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
-import io.vertx.core.Vertx;
-import io.vertx.core.VertxOptions;
-import io.vertx.junit5.VertxExtension;
-import io.vertx.junit5.VertxTestContext;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.testcontainers.containers.BindMode;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
@@ -59,7 +54,6 @@ import static org.junit.jupiter.api.Assertions.*;
  * - Agent metrics are exported in Prometheus format
  * - OTLP collector is reachable and healthy while traces are emitted
  */
-@ExtendWith(VertxExtension.class)
 @Testcontainers
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @DisplayName("Agent Telemetry Integration")
@@ -79,7 +73,7 @@ class AgentTelemetryIntegrationTest {
             .forPort(13133)
             .forStatusCode(200));
 
-    private Vertx vertx;
+    private OpenTelemetrySdk sdk;
     private HttpClient httpClient;
     private int prometheusPort;
 
@@ -99,8 +93,7 @@ class AgentTelemetryIntegrationTest {
                 .prometheusPort(prometheusPort)
                 .otlpEndpoint(otlpEndpoint)
                 .build();
-        VertxOptions options = AgentTelemetryConfig.configure(new VertxOptions(), config);
-        vertx = Vertx.vertx(options);
+        sdk = AgentTelemetryConfig.configure(config).orElseThrow();
         httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
 
         AgentMetrics metrics = new AgentMetrics("agent-telemetry-test", System.currentTimeMillis());
@@ -117,25 +110,11 @@ class AgentTelemetryIntegrationTest {
     }
 
     @AfterAll
-    void tearDown(VertxTestContext testContext) {
-        if (vertx != null) {
-            vertx.close().onComplete(testContext.succeeding(v -> {
-                cleanupTelemetryState();
-                testContext.completeNow();
-            }));
-            return;
-        }
-
-        cleanupTelemetryState();
-        testContext.completeNow();
-    }
-
-    private void cleanupTelemetryState() {
-        if (GlobalOpenTelemetry.get() instanceof OpenTelemetrySdk sdk) {
+    void tearDown() {
+        if (sdk != null) {
             sdk.close();
         }
         GlobalOpenTelemetry.resetForTest();
-
     }
 
     @Test

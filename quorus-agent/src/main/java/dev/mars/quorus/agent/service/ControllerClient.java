@@ -6,6 +6,12 @@ package dev.mars.quorus.agent.service;
 
 import dev.mars.quorus.agent.config.AgentConfiguration;
 import dev.mars.quorus.security.PemTls;
+import io.opentelemetry.api.GlobalOpenTelemetry;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.api.trace.StatusCode;
+import io.opentelemetry.context.Context;
+import io.opentelemetry.context.Scope;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,10 +37,15 @@ import java.time.Duration;
  * HTTP/1.1 is used so that a plaintext request is never an HTTP/2 upgrade attempt. Every request has
  * the agent's HTTP idle timeout as its response deadline, as documented in the Security Deployment
  * Guide. Calls block the calling thread; the agent calls them from virtual threads.
+ *
+ * <p>Each request is an OpenTelemetry client span, and the current trace context is sent in the
+ * request headers using the globally registered propagators. This replaces the Vert.x tracing
+ * integration the agent had before RT-05b.
  */
 public final class ControllerClient implements AutoCloseable {
     private static final Logger logger = LoggerFactory.getLogger(ControllerClient.class);
     private static final String USER_AGENT = "Quorus-Agent/1.0";
+    private static final String INSTRUMENTATION = "dev.mars.quorus.agent.controller-client";
 
     private final HttpClient client;
     private final Duration responseDeadline;
@@ -72,26 +83,49 @@ public final class ControllerClient implements AutoCloseable {
     }
 
     public Response get(String url) throws IOException, InterruptedException {
-        return send(request(url).header("Accept", "application/json").GET());
+        return send("GET", url, request(url).header("Accept", "application/json").GET());
     }
 
     public Response postJson(String url, String json) throws IOException, InterruptedException {
-        return send(request(url).header("Content-Type", "application/json")
+        return send("POST", url, request(url).header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(json, StandardCharsets.UTF_8)));
     }
 
     public Response delete(String url) throws IOException, InterruptedException {
-        return send(request(url).DELETE());
+        return send("DELETE", url, request(url).DELETE());
     }
 
     private HttpRequest.Builder request(String url) {
         return HttpRequest.newBuilder(URI.create(url)).timeout(responseDeadline).header("User-Agent", USER_AGENT);
     }
 
-    private Response send(HttpRequest.Builder request) throws IOException, InterruptedException {
-        HttpResponse<String> response = client.send(request.build(),
-                HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-        return new Response(response.statusCode(), response.body());
+    private Response send(String method, String url, HttpRequest.Builder request)
+            throws IOException, InterruptedException {
+        URI uri = URI.create(url);
+        Span span = GlobalOpenTelemetry.getTracer(INSTRUMENTATION).spanBuilder(method)
+                .setSpanKind(SpanKind.CLIENT)
+                .setAttribute("http.request.method", method)
+                .setAttribute("url.full", url)
+                .setAttribute("server.address", uri.getHost())
+                .setAttribute("server.port", (long) uri.getPort())
+                .startSpan();
+        try (Scope ignored = span.makeCurrent()) {
+            GlobalOpenTelemetry.getPropagators().getTextMapPropagator()
+                    .inject(Context.current(), request, (builder, name, value) -> builder.setHeader(name, value));
+            HttpResponse<String> response = client.send(request.build(),
+                    HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            span.setAttribute("http.response.status_code", (long) response.statusCode());
+            if (response.statusCode() >= 500) {
+                span.setStatus(StatusCode.ERROR);
+            }
+            return new Response(response.statusCode(), response.body());
+        } catch (IOException | RuntimeException e) {
+            span.recordException(e);
+            span.setStatus(StatusCode.ERROR);
+            throw e;
+        } finally {
+            span.end();
+        }
     }
 
     @Override

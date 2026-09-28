@@ -2,8 +2,8 @@
 
 # Quorus User Guide
 
-**Version:** 2.3
-**Date:** 2026-09-25
+**Version:** 2.4
+**Date:** 2026-09-28
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Scope:** Current implementation guide
@@ -23,7 +23,7 @@ The direct path is the most complete end-user path today for executing transfer 
 
 `SimpleTransferEngine` is the live transfer execution component. It supports:
 
-- transfer submission through Vert.x futures
+- blocking transfer execution on the calling thread, with a concurrency limit
 - retry handling
 - progress tracking
 - metrics and health reporting
@@ -121,7 +121,7 @@ Current implementation supports:
 
 - direct HTTP download and upload paths
 - custom request options carried through transfer definitions
-- reactive execution through Vert.x Web Client
+- streaming execution on Apache HttpClient 5, with governed address pinning
 
 Do **not** assume the current implementation provides:
 
@@ -145,7 +145,7 @@ Do **not** assume adapter-level resume support. The current adapter reports `sup
 Current implementation supports:
 
 - upload and download routing based on transfer direction
-- blocking transfer execution offloaded away from the Vert.x event loop
+- blocking transfer execution on the calling thread (in the agent, a virtual thread per job)
 
 Do **not** assume adapter-level resume support. The current adapter reports `supportsResume() == false`.
 

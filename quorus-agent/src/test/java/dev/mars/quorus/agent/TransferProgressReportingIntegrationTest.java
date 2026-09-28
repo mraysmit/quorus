@@ -4,30 +4,27 @@
  */
 package dev.mars.quorus.agent;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import dev.mars.quorus.agent.config.AgentConfiguration;
-import io.vertx.core.Promise;
-import io.vertx.core.Vertx;
-import io.vertx.core.buffer.Buffer;
-import io.vertx.core.http.HttpServer;
-import io.vertx.core.json.JsonArray;
-import io.vertx.core.json.JsonObject;
-import io.vertx.ext.web.Router;
-import io.vertx.ext.web.handler.BodyHandler;
-import io.vertx.junit5.VertxExtension;
+import dev.mars.quorus.agent.testing.FakeController;
+import dev.mars.quorus.agent.testing.FakeController.Reply;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
-import static dev.mars.quorus.testing.TestFutureUtils.awaitSuccess;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -35,18 +32,19 @@ import static org.junit.jupiter.api.Assertions.*;
  * controller, so progress, freshness and stall detection see the transfer between start and end.
  * Before ENG-10 the agent sent IN_PROGRESS with 0 bytes once and then only the final report.
  *
- * <p>Real agent against a fake controller and a file server. The file server sends half the file and
- * holds the rest until the fake controller has received a progress report, so the order is
+ * <p>Real agent against a fake controller that also serves the file. The file handler sends half the
+ * file and holds the rest until the controller has received a progress report, so the order is
  * established by handshakes; nothing sleeps or polls.
  */
-@ExtendWith(VertxExtension.class)
+@Timeout(value = 60, unit = SECONDS, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
 class TransferProgressReportingIntegrationTest {
 
     private static final int SIZE = 512 * 1024;
+    private static final String STATUS = "/api/v1/jobs/.+/status";
 
     @TempDir Path root;
     private QuorusAgent agent;
-    private HttpServer server;
+    private FakeController controller;
 
     @AfterEach
     void stop() throws Exception {
@@ -54,81 +52,54 @@ class TransferProgressReportingIntegrationTest {
             agent.shutdown();
             agent.awaitShutdown();
         }
-        if (server != null) awaitSuccess(server.close(), Duration.ofSeconds(5));
+        if (controller != null) controller.close();
     }
 
     @Test
-    void aRunningTransferReportsItsProgressBeforeItCompletes(Vertx vertx) throws Exception {
+    void aRunningTransferReportsItsProgressBeforeItCompletes() throws Exception {
         Path downloadRoot = Files.createDirectory(root.resolve("downloads"));
         Path destination = downloadRoot.resolve("settlement.dat");
-        List<JsonObject> reports = new CopyOnWriteArrayList<>();
-        Promise<JsonObject> progressed = Promise.promise();
-        Promise<Void> completed = Promise.promise();
-        AtomicBoolean offered = new AtomicBoolean();
+        List<JsonNode> reports = new CopyOnWriteArrayList<>();
+        CompletableFuture<JsonNode> progressed = new CompletableFuture<>();
+        CompletableFuture<Void> completed = new CompletableFuture<>();
 
-        Router router = Router.router(vertx);
-        router.route().handler(BodyHandler.create());
-        router.post("/api/v1/agents/register").handler(ctx -> ctx.json(new JsonObject().put("status", "registered")));
-        router.delete("/api/v1/agents/:id").handler(ctx -> ctx.response().setStatusCode(204).end());
-        router.post("/api/v1/jobs/:id/status").handler(ctx -> {
-            JsonObject report = ctx.body().asJsonObject();
-            reports.add(report.copy());
-            ctx.json(new JsonObject().put("success", true));
-            if ("IN_PROGRESS".equals(report.getString("status")) && report.getLong("bytesTransferred", 0L) > 0) {
-                progressed.tryComplete(report);
+        controller = controller(destination);
+        controller.on("POST", STATUS, request -> {
+            JsonNode report = request.json();
+            reports.add(report);
+            if ("IN_PROGRESS".equals(report.path("status").asText()) && report.path("bytesTransferred").asLong(0) > 0) {
+                progressed.complete(report);
             }
-            if ("COMPLETED".equals(report.getString("status"))) completed.tryComplete();
+            if ("COMPLETED".equals(report.path("status").asText())) completed.complete(null);
+            return Reply.json(200, "{\"success\":true}");
         });
-        byte[] body = new byte[SIZE];
-        router.get("/files/settlement.dat").handler(ctx -> {
-            ctx.response().putHeader("Content-Length", String.valueOf(SIZE));
-            ctx.response().write(Buffer.buffer(body).slice(0, SIZE / 2));
-            // Hold the second half until the controller has seen progress for the first.
-            progressed.future().onComplete(ignored -> ctx.response().end(Buffer.buffer(body).slice(SIZE / 2, SIZE)));
-        });
-        server = awaitSuccess(vertx.createHttpServer().requestHandler(router).listen(0), Duration.ofSeconds(5));
-        int port = server.actualPort();
-        JsonObject job = new JsonObject()
-                .put("assignmentId", "settlement:payments-agent")
-                .put("jobId", "settlement").put("agentId", "payments-agent")
-                .put("tenantId", "bank-a").put("attemptId", "settlement-attempt-1")
-                .put("fencingGeneration", 1L).put("lastReportSequence", 0L)
-                .put("leaseExpiresAt", Instant.now().plusSeconds(60).toString())
-                .put("sourceUri", "http://localhost:" + port + "/files/settlement.dat")
-                .put("destinationUri", destination.toUri().toString());
-        router.get("/api/v1/agents/:id/jobs").handler(ctx -> ctx.json(new JsonObject()
-                .put("pendingJobs", offered.getAndSet(true) ? new JsonArray() : new JsonArray().add(job))));
+        serveHalfUntil(progressed);
 
-        agent = new QuorusAgent(vertx, new AgentConfiguration.Builder()
-                .securityProfile("development").allowInsecure(true).controllerTlsEnabled(false)
-                .agentId("payments-agent").tenantId("bank-a").agentPort(0)
-                .controllerUrl("http://localhost:" + port + "/api/v1")
-                .downloadRoot(downloadRoot).uploadRoot(root).agentPool("payments").networkZone("restricted")
-                .jobPollingInitialDelayMs(1).jobPollingIntervalMs(20).progressReportIntervalMs(20).build());
+        agent = agent(downloadRoot);
         agent.start();
 
-        JsonObject progress = awaitSuccess(progressed.future(), Duration.ofSeconds(10));
-        awaitSuccess(completed.future(), Duration.ofSeconds(10));
+        JsonNode progress = progressed.get(10, TimeUnit.SECONDS);
+        completed.get(10, TimeUnit.SECONDS);
 
-        assertEquals("IN_PROGRESS", progress.getString("expectedState"),
+        assertEquals("IN_PROGRESS", progress.get("expectedState").asText(),
                 "a progress report follows the start report, so it expects IN_PROGRESS");
-        assertTrue(progress.getLong("bytesTransferred") >= SIZE / 2 - 64 * 1024,
+        assertTrue(progress.get("bytesTransferred").asLong() >= SIZE / 2 - 64 * 1024,
                 () -> "the report carries the bytes already moved: " + progress);
-        assertTrue(progress.getLong("bytesTransferred") < SIZE, "reported while the transfer was still running");
+        assertTrue(progress.get("bytesTransferred").asLong() < SIZE, "reported while the transfer was still running");
 
-        List<String> statuses = reports.stream().map(r -> r.getString("status")).toList();
+        List<String> statuses = reports.stream().map(r -> r.get("status").asText()).toList();
         assertEquals("ACCEPTED", statuses.getFirst());
         assertEquals("COMPLETED", statuses.getLast());
-        assertEquals(SIZE, reports.getLast().getLong("bytesTransferred"));
+        assertEquals(SIZE, reports.getLast().get("bytesTransferred").asLong());
         long previousSequence = 0;
         long previousBytes = -1;
-        for (JsonObject report : reports) {
-            long sequence = report.getLong("reportSequence");
+        for (JsonNode report : reports) {
+            long sequence = report.get("reportSequence").asLong();
             assertEquals(previousSequence + 1, sequence, () -> "report sequences must be contiguous: " + reports);
             previousSequence = sequence;
-            if (report.containsKey("bytesTransferred")) {
-                assertTrue(report.getLong("bytesTransferred") >= previousBytes, () -> "bytes must not go back: " + reports);
-                previousBytes = report.getLong("bytesTransferred");
+            if (report.has("bytesTransferred")) {
+                assertTrue(report.get("bytesTransferred").asLong() >= previousBytes, () -> "bytes must not go back: " + reports);
+                previousBytes = report.get("bytesTransferred").asLong();
             }
         }
         assertEquals(SIZE, Files.size(destination));
@@ -140,72 +111,88 @@ class TransferProgressReportingIntegrationTest {
      * otherwise a successful transfer's COMPLETED report could meet a sequence gap and be rejected.
      */
     @Test
-    void anUnresolvedProgressReportIsResentExactlyBeforeTheFinalReport(Vertx vertx) throws Exception {
+    void anUnresolvedProgressReportIsResentExactlyBeforeTheFinalReport() throws Exception {
         Path downloadRoot = Files.createDirectory(root.resolve("downloads"));
         Path destination = downloadRoot.resolve("settlement.dat");
-        List<JsonObject> reports = new CopyOnWriteArrayList<>();
-        Promise<Void> progressSeen = Promise.promise();
-        Promise<Void> completed = Promise.promise();
-        AtomicBoolean offered = new AtomicBoolean();
-        java.util.concurrent.atomic.AtomicInteger dropped = new java.util.concurrent.atomic.AtomicInteger();
+        List<JsonNode> reports = new CopyOnWriteArrayList<>();
+        CompletableFuture<Void> progressSeen = new CompletableFuture<>();
+        CompletableFuture<Void> completed = new CompletableFuture<>();
+        AtomicInteger dropped = new AtomicInteger();
 
-        Router router = Router.router(vertx);
-        router.route().handler(BodyHandler.create());
-        router.post("/api/v1/agents/register").handler(ctx -> ctx.json(new JsonObject().put("status", "registered")));
-        router.delete("/api/v1/agents/:id").handler(ctx -> ctx.response().setStatusCode(204).end());
-        router.post("/api/v1/jobs/:id/status").handler(ctx -> {
-            JsonObject report = ctx.body().asJsonObject();
-            reports.add(report.copy());
-            boolean progress = "IN_PROGRESS".equals(report.getString("status"))
-                    && report.getLong("bytesTransferred", 0L) > 0;
-            if (progress) {
-                progressSeen.tryComplete();
-                if (dropped.getAndIncrement() < 3) {        // every send of the first attempt is lost
-                    ctx.request().connection().close();
-                    return;
+        controller = controller(destination);
+        controller.on("POST", STATUS, request -> {
+            JsonNode report = request.json();
+            reports.add(report);
+            if ("IN_PROGRESS".equals(report.path("status").asText()) && report.path("bytesTransferred").asLong(0) > 0) {
+                progressSeen.complete(null);
+                if (dropped.getAndIncrement() < 3) {        // every send of the first attempt is unresolved
+                    return Reply.status(503);
                 }
             }
-            ctx.json(new JsonObject().put("success", true));
-            if ("COMPLETED".equals(report.getString("status"))) completed.tryComplete();
+            if ("COMPLETED".equals(report.path("status").asText())) completed.complete(null);
+            return Reply.json(200, "{\"success\":true}");
         });
-        byte[] body = new byte[SIZE];
-        router.get("/files/settlement.dat").handler(ctx -> {
-            ctx.response().putHeader("Content-Length", String.valueOf(SIZE));
-            ctx.response().write(Buffer.buffer(body).slice(0, SIZE / 2));
-            progressSeen.future().onComplete(ignored -> ctx.response().end(Buffer.buffer(body).slice(SIZE / 2, SIZE)));
-        });
-        server = awaitSuccess(vertx.createHttpServer().requestHandler(router).listen(0), Duration.ofSeconds(5));
-        int port = server.actualPort();
-        JsonObject job = new JsonObject()
-                .put("assignmentId", "settlement:payments-agent")
-                .put("jobId", "settlement").put("agentId", "payments-agent")
-                .put("tenantId", "bank-a").put("attemptId", "settlement-attempt-1")
-                .put("fencingGeneration", 1L).put("lastReportSequence", 0L)
-                .put("leaseExpiresAt", Instant.now().plusSeconds(60).toString())
-                .put("sourceUri", "http://localhost:" + port + "/files/settlement.dat")
-                .put("destinationUri", destination.toUri().toString());
-        router.get("/api/v1/agents/:id/jobs").handler(ctx -> ctx.json(new JsonObject()
-                .put("pendingJobs", offered.getAndSet(true) ? new JsonArray() : new JsonArray().add(job))));
+        serveHalfUntil(progressSeen);
 
-        agent = new QuorusAgent(vertx, new AgentConfiguration.Builder()
-                .securityProfile("development").allowInsecure(true).controllerTlsEnabled(false)
-                .agentId("payments-agent").tenantId("bank-a").agentPort(0)
-                .controllerUrl("http://localhost:" + port + "/api/v1")
-                .downloadRoot(downloadRoot).uploadRoot(root).agentPool("payments").networkZone("restricted")
-                .jobPollingInitialDelayMs(1).jobPollingIntervalMs(20).progressReportIntervalMs(20).build());
+        agent = agent(downloadRoot);
         agent.start();
 
-        awaitSuccess(completed.future(), Duration.ofSeconds(15));
+        completed.get(15, TimeUnit.SECONDS);
 
-        List<JsonObject> progress = reports.stream()
-                .filter(r -> "IN_PROGRESS".equals(r.getString("status")) && r.getLong("bytesTransferred", 0L) > 0)
+        List<JsonNode> progress = reports.stream()
+                .filter(r -> "IN_PROGRESS".equals(r.get("status").asText()) && r.path("bytesTransferred").asLong(0) > 0)
                 .toList();
-        assertTrue(progress.size() >= 4, () -> "three lost sends and at least one resend: " + reports);
+        assertTrue(progress.size() >= 4, () -> "three unresolved sends and at least one resend: " + reports);
         assertTrue(progress.stream().allMatch(r -> r.equals(progress.getFirst())),
                 () -> "every send and the resend carry the identical report: " + progress);
-        JsonObject completedReport = reports.getLast();
-        assertEquals("COMPLETED", completedReport.getString("status"));
-        assertEquals(progress.getFirst().getLong("reportSequence") + 1, completedReport.getLong("reportSequence"),
+        JsonNode completedReport = reports.getLast();
+        assertEquals("COMPLETED", completedReport.get("status").asText());
+        assertEquals(progress.getFirst().get("reportSequence").asLong() + 1, completedReport.get("reportSequence").asLong(),
                 "the final report follows the resent report without a gap");
+    }
+
+    /** A controller that offers one attempt-aware job for {@code /files/settlement.dat}, once. */
+    private static FakeController controller(Path destination) throws Exception {
+        FakeController controller = FakeController.start();
+        AtomicBoolean offered = new AtomicBoolean();
+        String job = "{\"assignmentId\":\"settlement:payments-agent\",\"jobId\":\"settlement\","
+                + "\"agentId\":\"payments-agent\",\"tenantId\":\"bank-a\",\"attemptId\":\"settlement-attempt-1\","
+                + "\"fencingGeneration\":1,\"lastReportSequence\":0,\"leaseExpiresAt\":\""
+                + Instant.now().plusSeconds(60) + "\",\"sourceUri\":\"" + controller.url()
+                + "/files/settlement.dat\",\"destinationUri\":\"" + destination.toUri() + "\"}";
+        return controller
+                .on("POST", "/api/v1/agents/register", Reply.json(200, "{\"status\":\"registered\"}").always())
+                .on("DELETE", "/api/v1/agents/.+", Reply.status(204).always())
+                .on("GET", "/api/v1/agents/.+/jobs", request -> Reply.json(200,
+                        "{\"pendingJobs\":[" + (offered.getAndSet(true) ? "" : job) + "]}"));
+    }
+
+    /** Serves the file's first half, and the rest only once {@code release} completes. */
+    private void serveHalfUntil(CompletableFuture<?> release) {
+        byte[] body = new byte[SIZE];
+        controller.onExchange("GET", "/files/settlement.dat", exchange -> {
+            try (exchange) {
+                exchange.sendResponseHeaders(200, SIZE);
+                OutputStream out = exchange.getResponseBody();
+                out.write(body, 0, SIZE / 2);
+                out.flush();
+                try {
+                    release.get(30, TimeUnit.SECONDS);
+                } catch (Exception e) {
+                    return;
+                }
+                out.write(body, SIZE / 2, SIZE / 2);
+                out.close();
+            }
+        });
+    }
+
+    private QuorusAgent agent(Path downloadRoot) {
+        return new QuorusAgent(new AgentConfiguration.Builder()
+                .securityProfile("development").allowInsecure(true).controllerTlsEnabled(false)
+                .agentId("payments-agent").tenantId("bank-a").agentPort(0)
+                .controllerUrl(controller.url() + "/api/v1")
+                .downloadRoot(downloadRoot).uploadRoot(root).agentPool("payments").networkZone("restricted")
+                .jobPollingInitialDelayMs(1).jobPollingIntervalMs(20).progressReportIntervalMs(20).build());
     }
 }

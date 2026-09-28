@@ -2,47 +2,44 @@
 package dev.mars.quorus.agent;
 
 import dev.mars.quorus.agent.config.AgentConfiguration;
-import io.vertx.core.Vertx;
-import io.vertx.core.json.JsonArray;
-import io.vertx.core.json.JsonObject;
-import io.vertx.ext.web.Router;
-import io.vertx.ext.web.handler.BodyHandler;
-import io.vertx.junit5.VertxExtension;
+import dev.mars.quorus.agent.testing.FakeController;
+import dev.mars.quorus.agent.testing.FakeController.Reply;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.Timeout;
+
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicBoolean;
-import static dev.mars.quorus.testing.TestFutureUtils.*;
+
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.jupiter.api.Assertions.*;
 
-@ExtendWith(VertxExtension.class)
+@Timeout(value = 30, unit = SECONDS, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
 class AgentDefaultIsolationBoundaryTest {
     @Test
-    void defaultAgentStopsAfterOneForeignAssignment(Vertx vertx) throws Exception {
+    void defaultAgentStopsAfterOneForeignAssignment() throws Exception {
         AtomicBoolean offered = new AtomicBoolean();
-        Router router = Router.router(vertx);
-        router.route().handler(BodyHandler.create());
-        router.post("/api/v1/agents/register").handler(ctx -> ctx.json(new JsonObject().put("status", "registered")));
-        router.delete("/api/v1/agents/:id").handler(ctx -> ctx.response().setStatusCode(204).end());
-        router.get("/api/v1/agents/:id/jobs").handler(ctx -> ctx.json(new JsonObject().put("pendingJobs",
-                offered.getAndSet(true) ? new JsonArray() : new JsonArray().add(new JsonObject()
-                        .put("assignmentId", "foreign:other").put("jobId", "foreign").put("agentId", "other")
-                        .put("sourceUri", "https://example.test/file").put("destinationUri", "file:///unused")))));
-        var server = awaitSuccess(vertx.createHttpServer().requestHandler(router).listen(0), Duration.ofSeconds(5));
-        var agent = new QuorusAgent(vertx, new AgentConfiguration.Builder()
-                .securityProfile("development").allowInsecure(true).controllerTlsEnabled(false)
-                .agentId("local").tenantId("tenant").agentPort(0).telemetryEnabled(false)
-                .controllerUrl("http://localhost:" + server.actualPort() + "/api/v1")
-                .jobPollingInitialDelayMs(1).jobPollingIntervalMs(20).build());
-        try {
-            agent.start();
-            awaitSuccess(eventually(vertx, () -> offered.get() && !agent.isRunning(), Duration.ofSeconds(2)),
-                    Duration.ofSeconds(3));
-            assertFalse(agent.isRunning(), "Packaged default is fail-fast on the first foreign assignment");
-        } finally {
-            agent.shutdown();
-            agent.awaitShutdown();
-            awaitSuccess(server.close(), Duration.ofSeconds(5));
+        try (FakeController controller = FakeController.start()
+                .on("POST", "/api/v1/agents/register", Reply.json(200, "{\"status\":\"registered\"}").always())
+                .on("DELETE", "/api/v1/agents/.+", Reply.status(204).always())
+                .on("GET", "/api/v1/agents/.+/jobs", request -> Reply.json(200, "{\"pendingJobs\":["
+                        + (offered.getAndSet(true) ? "" : "{\"assignmentId\":\"foreign:other\",\"jobId\":\"foreign\","
+                        + "\"agentId\":\"other\",\"sourceUri\":\"https://example.test/file\","
+                        + "\"destinationUri\":\"file:///unused\"}") + "]}"))) {
+            var agent = new QuorusAgent(new AgentConfiguration.Builder()
+                    .securityProfile("development").allowInsecure(true).controllerTlsEnabled(false)
+                    .agentId("local").tenantId("tenant").agentPort(0).telemetryEnabled(false)
+                    .controllerUrl(controller.url() + "/api/v1")
+                    .jobPollingInitialDelayMs(1).jobPollingIntervalMs(20).build());
+            try {
+                agent.start();
+                assertTrue(agent.awaitShutdown(Duration.ofSeconds(5)),
+                        "Packaged default is fail-fast on the first foreign assignment");
+                assertTrue(offered.get());
+                assertFalse(agent.isRunning());
+            } finally {
+                agent.shutdown();
+                agent.awaitShutdown();
+            }
         }
     }
 }

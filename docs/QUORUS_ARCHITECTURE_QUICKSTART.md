@@ -2,8 +2,8 @@
 
 # Quorus Architecture Quickstart
 
-**Version:** 2.4
-**Date:** 2026-09-25
+**Version:** 2.5
+**Date:** 2026-09-28
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Scope:** Current implementation snapshot
@@ -59,7 +59,7 @@ These values are sourced from `quorus-controller/src/main/java/dev/mars/quorus/c
 
 - validates requests
 - routes work to protocol adapters through `ProtocolFactory`
-- executes reactively with Vert.x futures
+- runs each transfer on the calling thread (blocking), with retries and a concurrency limit
 - tracks direction-aware metrics
 - exposes shutdown, cancellation, pause, and resume operations at engine level
 
