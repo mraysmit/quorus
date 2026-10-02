@@ -289,22 +289,17 @@ class FtpsTransferProtocolTest {
     @Test
     void testProtocolFactoryRegistersFtpsAlias() {
         log("testProtocolFactoryRegistersFtpsAlias", "Testing ProtocolFactory registers 'ftps' as alias for 'ftp'");
-        io.vertx.core.Vertx vertx = io.vertx.core.Vertx.vertx();
-        try {
-            ProtocolFactory factory = new ProtocolFactory(vertx);
+        ProtocolFactory factory = new ProtocolFactory();
 
-            TransferProtocol ftpProto = factory.getProtocol("ftp");
-            TransferProtocol ftpsProto = factory.getProtocol("ftps");
+        TransferProtocol ftpProto = factory.getProtocol("ftp");
+        TransferProtocol ftpsProto = factory.getProtocol("ftps");
 
-            assertNotNull(ftpProto, "ProtocolFactory should have 'ftp' registered");
-            assertNotNull(ftpsProto, "ProtocolFactory should have 'ftps' registered as alias");
-            assertSame(ftpProto, ftpsProto,
-                    "Both 'ftp' and 'ftps' should resolve to the same FtpTransferProtocol instance");
-            assertTrue(factory.isProtocolSupported("ftps"), "ftps should be listed as supported");
-            log("testProtocolFactoryRegistersFtpsAlias", "[PASS] 'ftps' alias resolves to same FtpTransferProtocol instance");
-        } finally {
-            vertx.close();
-        }
+        assertNotNull(ftpProto, "ProtocolFactory should have 'ftp' registered");
+        assertNotNull(ftpsProto, "ProtocolFactory should have 'ftps' registered as alias");
+        assertSame(ftpProto, ftpsProto,
+                "Both 'ftp' and 'ftps' should resolve to the same FtpTransferProtocol instance");
+        assertTrue(factory.isProtocolSupported("ftps"), "ftps should be listed as supported");
+        log("testProtocolFactoryRegistersFtpsAlias", "[PASS] 'ftps' alias resolves to same FtpTransferProtocol instance");
     }
 
     // ========================================================================

@@ -1,0 +1,11 @@
+diff --git a/quorus-agent/Dockerfile b/quorus-agent/Dockerfile
+index 363a20e..0a0c2c1 100644
+--- a/quorus-agent/Dockerfile
++++ b/quorus-agent/Dockerfile
+@@ -1,5 +1,5 @@
+ # Multi-stage build for Quorus Agent
+-FROM maven:3.9.9-eclipse-temurin-25 AS builder
++FROM maven:3.9.11-eclipse-temurin-25 AS builder
+ 
+ # Set working directory
+ WORKDIR /app

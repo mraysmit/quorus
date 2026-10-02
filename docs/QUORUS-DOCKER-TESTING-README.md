@@ -2,8 +2,8 @@
 
 # Quorus Docker Testing README
 
-**Version:** 2.1  
-**Date:** 2026-09-01  
+**Version:** 2.2  
+**Date:** 2026-09-28  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Scope:** Current development and verification assets
@@ -38,6 +38,7 @@ These environments are development and test assets. They do not by themselves sa
 - `docker-compose-loki.yml`
 - `docker-compose-observability.yml`
 - `docker-compose-observability-cluster.yml`
+- `docker-compose-tls-example.yml`
 - `docker-compose-elk.yml`
 - `docker-compose-fluentd.yml`
 
@@ -75,15 +76,15 @@ Use `docker-compose-full-network.yml` when you need a larger end-to-end environm
 
 ## Important Corrections from Older Docs
 
-- The repository is on **Java 25**.
+- The repository is on **Java 27** (`maven.compiler.release` 27).
 - The active controller transport is gRPC/Raft as wired by `GrpcRaftTransport`, not an `HttpRaftTransport` class.
 - Older references to broad trigger-mechanism Docker tests should not be read as proof that route-trigger execution is fully wired in the controller runtime. Route API and route state replication are implemented; autonomous trigger evaluation is a separate concern.
 - Adapter-level resume capability should not be advertised as implemented.
 
 ## Recommended Validation Pattern
 
-1. Build the project on JDK 25.
-2. Start the compose environment you need.
+1. Build the jars on the host with JDK 27 (`docker/build-runtime.ps1` or `docker/build-runtime.sh`); nothing is compiled inside Docker.
+2. Start the compose environment you need with `up -d --build`, so the images pick up the jars you just built.
 3. Verify controller health and Raft state first.
 4. Run the matching Maven tests or PowerShell helper scripts.
 5. Inspect logs and metrics through the observability stack if enabled.
@@ -93,4 +94,5 @@ Use `docker-compose-full-network.yml` when you need a larger end-to-end environm
 - `docker/compose/`
 - `docker/scripts/`
 - `quorus-controller/src/main/java/dev/mars/quorus/controller/http/HttpApiServer.java`
+- `quorus-controller/src/main/java/dev/mars/quorus/controller/QuorusControllerApplication.java` (entry point)
 - `quorus-controller/src/main/java/dev/mars/quorus/controller/QuorusControllerVerticle.java`

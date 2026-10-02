@@ -1,0 +1,29 @@
+Excerpt of: docs-design/evidence/raw/rt-03/http-b-red-attempt2-weak-rejections.log
+Original SHA-256: 3a50050bd1d56466adc54156a86f7805f3a883651776f988390aa668c22f53a1
+Original size: 29951 bytes
+Full log not retained under the evidence retention rule (plan §6.1): regression and discarded-attempt output is kept as this excerpt. Reproduce by re-running the recorded command at the recorded revision.
+
+     47: [ERROR] Tests run: 5, Failures: 1, Errors: 3, Skipped: 0, Time elapsed: 30.57 s <<< FAILURE! -- in dev.mars.quorus.protocol.HttpTransferProtocolBoundaryTest$Ungoverned
+     48: [ERROR] dev.mars.quorus.protocol.HttpTransferProtocolBoundaryTest$Ungoverned.aNonSuccessStatusFailsTheTransferWithoutWritingTheDestination -- Time elapsed: 0.493 s <<< FAILURE!
+     49: org.opentest4j.AssertionFailedError: Transfer download failed: Synchronous HTTP transfer() is disabled in reactive-only mode. Use transferReactive(). ==> expected: <true> but was: <false>
+     67: [ERROR] dev.mars.quorus.protocol.HttpTransferProtocolBoundaryTest$Ungoverned.uploadStreamsTheFileWithPut -- Time elapsed: 0.012 s <<< ERROR!
+     68: dev.mars.quorus.core.exceptions.TransferException: Transfer upload failed: Synchronous HTTP transfer() is disabled in reactive-only mode. Use transferReactive().
+     82: [ERROR] dev.mars.quorus.protocol.HttpTransferProtocolBoundaryTest$Ungoverned.redirectsAreFollowed -- Time elapsed: 0.008 s <<< ERROR!
+     83: dev.mars.quorus.core.exceptions.TransferException: Transfer download failed: Synchronous HTTP transfer() is disabled in reactive-only mode. Use transferReactive().
+     98: [ERROR] dev.mars.quorus.protocol.HttpTransferProtocolBoundaryTest$Ungoverned.downloadsStreamToDiskBeforeTheResponseCompletes -- Time elapsed: 30.01 s <<< ERROR!
+     99: java.util.concurrent.TimeoutException: downloadsStreamToDiskBeforeTheResponseCompletes() timed out after 30 seconds
+    180: Caused by: org.junit.jupiter.api.AssertTimeoutPreemptively$ExecutionTimeoutException: Execution timed out in thread junit-timeout-thread-5
+    203: [ERROR] Tests run: 8, Failures: 1, Errors: 3, Skipped: 0, Time elapsed: 0.307 s <<< FAILURE! -- in dev.mars.quorus.protocol.HttpTransferProtocolBoundaryTest$GovernedHttps
+    204: [ERROR] dev.mars.quorus.protocol.HttpTransferProtocolBoundaryTest$GovernedHttps.aMatchingLeafPinIsAccepted -- Time elapsed: 0.023 s <<< ERROR!
+    220: [ERROR] dev.mars.quorus.protocol.HttpTransferProtocolBoundaryTest$GovernedHttps.basicAuthenticationSendsTheIdentityAndSecret -- Time elapsed: 0.013 s <<< ERROR!
+    236: [ERROR] dev.mars.quorus.protocol.HttpTransferProtocolBoundaryTest$GovernedHttps.downloadReachesTheApprovedAddressUsingTheServiceHostnameForSniAndHost -- Time elapsed: 0.012 s <<< ERROR!
+    252: [ERROR] dev.mars.quorus.protocol.HttpTransferProtocolBoundaryTest$GovernedHttps.redirectsAreNotFollowed -- Time elapsed: 0.011 s <<< FAILURE!
+    276: [ERROR]   HttpTransferProtocolBoundaryTest$GovernedHttps.redirectsAreNotFollowed:189 Transfer download failed: Synchronous HTTP transfer() is disabled in reactive-only mode. Use transferReactive(). ==> expected: <true> but was: <false>
+    277: [ERROR]   HttpTransferProtocolBoundaryTest$Ungoverned.aNonSuccessStatusFailsTheTransferWithoutWritingTheDestination:228 Transfer download failed: Synchronous HTTP transfer() is disabled in reactive-only mode. Use transferReactive(). ==> expected: <true> but was: <false>
+    282: [ERROR]   HttpTransferProtocolBoundaryTest$Ungoverned.downloadsStreamToDiskBeforeTheResponseCompletes � Timeout downloadsStreamToDiskBeforeTheResponseCompletes() timed out after 30 seconds
+    286: [ERROR] Tests run: 13, Failures: 2, Errors: 6, Skipped: 0
+    289: [INFO] BUILD FAILURE
+    291: [INFO] Total time:  38.579 s
+    292: [INFO] Finished at: 2026-09-26T15:53:40+01:00
+    294: [ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.2.2:test (default-test) on project quorus-core: There are test failures.
+    304: [ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException

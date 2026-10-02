@@ -19,7 +19,6 @@ package dev.mars.quorus.protocol;
 import dev.mars.quorus.core.TransferDirection;
 import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.exceptions.QuorusErrorCode;
-import io.vertx.core.Vertx;
 
 import static dev.mars.quorus.core.exceptions.QuorusErrorCode.*;
 
@@ -40,37 +39,28 @@ public class ProtocolFactory {
     private static final Logger logger = LoggerFactory.getLogger(ProtocolFactory.class);
 
     private final Map<String, TransferProtocol> protocols;
-    private final Vertx vertx;
     private final String nfsMountRoot;
     private final boolean smbMountSecurityVerified;
     private final boolean nfsMountSecurityVerified;
 
-    /**
-     * Constructor with Vert.x dependency injection (recommended).
-     * @param vertx Vert.x instance for reactive HTTP protocol
-     */
-    public ProtocolFactory(Vertx vertx) {
-        this(vertx, null, false, false);
+    /** Creates a factory with the default protocols and no mounted-filesystem attestations. */
+    public ProtocolFactory() {
+        this(null, false, false);
     }
 
     /**
-     * Creates a protocol factory with an explicitly injected NFS mount root.
+     * Creates a factory with the default protocols.
      *
-     * @param vertx Vert.x instance for reactive HTTP protocol
-     * @param nfsMountRoot NFS mount root, or {@code null}/blank for the platform default
+     * @param nfsMountRoot             root under which NFS paths are mounted, or {@code null}
+     * @param smbMountSecurityVerified whether the SMB mount's security has been attested
+     * @param nfsMountSecurityVerified whether the NFS mount's security has been attested
      */
-    public ProtocolFactory(Vertx vertx, String nfsMountRoot) {
-        this(vertx, nfsMountRoot, false, false);
-    }
-
-    public ProtocolFactory(Vertx vertx, String nfsMountRoot,
-                           boolean smbMountSecurityVerified, boolean nfsMountSecurityVerified) {
-        this.vertx = java.util.Objects.requireNonNull(vertx, "Vertx instance cannot be null");
+    public ProtocolFactory(String nfsMountRoot, boolean smbMountSecurityVerified, boolean nfsMountSecurityVerified) {
         this.nfsMountRoot = nfsMountRoot;
         this.smbMountSecurityVerified = smbMountSecurityVerified;
         this.nfsMountSecurityVerified = nfsMountSecurityVerified;
         this.protocols = new HashMap<>();
-        logger.debug("Initializing ProtocolFactory with Vert.x instance");
+        logger.debug("Initializing ProtocolFactory");
         registerDefaultProtocols();
     }
 
@@ -79,7 +69,7 @@ public class ProtocolFactory {
         
         // Register HTTP protocol for both http and https schemes
         logger.debug("Creating HttpTransferProtocol instance");
-        HttpTransferProtocol httpProtocol = new HttpTransferProtocol(vertx);
+        HttpTransferProtocol httpProtocol = new HttpTransferProtocol();
         registerProtocol(httpProtocol);
         registerProtocolAlias("https", httpProtocol);
 
@@ -101,9 +91,7 @@ public class ProtocolFactory {
 
         // Register NFS protocol
         logger.debug("Creating NfsTransferProtocol instance");
-        registerProtocol(nfsMountRoot == null || nfsMountRoot.isBlank()
-                ? new NfsTransferProtocol(nfsMountSecurityVerified)
-                : new NfsTransferProtocol(nfsMountRoot, nfsMountSecurityVerified));
+        registerProtocol(new NfsTransferProtocol(nfsMountRoot, nfsMountSecurityVerified));
 
         logger.info("Registered default transfer protocols: count={}, schemes={}", 
                    protocols.size(), String.join(", ", protocols.keySet()));

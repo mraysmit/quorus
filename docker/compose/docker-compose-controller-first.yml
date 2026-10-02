@@ -1,11 +1,11 @@
+# DEVELOPMENT-ONLY topology. Security and TLS are explicitly disabled below.
+# Do not use this file as a production deployment template.
 # Quorus Controller-First Architecture
 # Each controller is a self-contained node with embedded HTTP API
 # This provides natural scaling and fault tolerance
 #
-# Maven Repository for BuildKit:
-#   Set M2_REPO in .env file or environment before running docker-compose.
-#   Windows:   $env:M2_REPO = "$env:USERPROFILE/.m2/repository"
-#   Linux/Mac: export M2_REPO="$HOME/.m2/repository"
+# Images package host-built jars. Build them first:
+#   docker/build-runtime.sh   (or docker/build-runtime.ps1)
 
 services:
   # Controller Node 1
@@ -13,18 +13,17 @@ services:
     build:
       context: ../..
       dockerfile: quorus-controller/Dockerfile
-      args:
-        BUILDER_IMAGE: maven:3.9.11-eclipse-temurin-25
-        RUNTIME_IMAGE: eclipse-temurin:25-jre-alpine
-      additional_contexts:
-        m2cache: ${M2_REPO}/dev/mars
     container_name: quorus-controller1
     hostname: controller1
     environment:
       - QUORUS_NODE_ID=controller1
-      - QUORUS_RAFT_HOST=0.0.0.0
       - QUORUS_RAFT_PORT=9080
       - QUORUS_HTTP_PORT=8080
+      - QUORUS_SECURITY_PROFILE=development
+      - QUORUS_SECURITY_ENABLED=false
+      - QUORUS_SECURITY_ALLOW_INSECURE=true
+      - QUORUS_SECURITY_HTTP_TLS_ENABLED=false
+      - QUORUS_SECURITY_RAFT_TLS_ENABLED=false
       - QUORUS_RAFT_STORAGE_PATH=/app/data/raft
       - QUORUS_CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080
       - QUORUS_RAFT_ELECTION_TIMEOUT_MS=3000
@@ -47,7 +46,7 @@ services:
         max-size: "10m"
         max-file: "3"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health/live"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -59,18 +58,17 @@ services:
     build:
       context: ../..
       dockerfile: quorus-controller/Dockerfile
-      args:
-        BUILDER_IMAGE: maven:3.9.11-eclipse-temurin-25
-        RUNTIME_IMAGE: eclipse-temurin:25-jre-alpine
-      additional_contexts:
-        m2cache: ${M2_REPO}/dev/mars
     container_name: quorus-controller2
     hostname: controller2
     environment:
       - QUORUS_NODE_ID=controller2
-      - QUORUS_RAFT_HOST=0.0.0.0
       - QUORUS_RAFT_PORT=9080
       - QUORUS_HTTP_PORT=8080
+      - QUORUS_SECURITY_PROFILE=development
+      - QUORUS_SECURITY_ENABLED=false
+      - QUORUS_SECURITY_ALLOW_INSECURE=true
+      - QUORUS_SECURITY_HTTP_TLS_ENABLED=false
+      - QUORUS_SECURITY_RAFT_TLS_ENABLED=false
       - QUORUS_RAFT_STORAGE_PATH=/app/data/raft
       - QUORUS_CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080
       - QUORUS_RAFT_ELECTION_TIMEOUT_MS=3000
@@ -93,7 +91,7 @@ services:
         max-size: "10m"
         max-file: "3"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health/live"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -107,18 +105,17 @@ services:
     build:
       context: ../..
       dockerfile: quorus-controller/Dockerfile
-      args:
-        BUILDER_IMAGE: maven:3.9.11-eclipse-temurin-25
-        RUNTIME_IMAGE: eclipse-temurin:25-jre-alpine
-      additional_contexts:
-        m2cache: ${M2_REPO}/dev/mars
     container_name: quorus-controller3
     hostname: controller3
     environment:
       - QUORUS_NODE_ID=controller3
-      - QUORUS_RAFT_HOST=0.0.0.0
       - QUORUS_RAFT_PORT=9080
       - QUORUS_HTTP_PORT=8080
+      - QUORUS_SECURITY_PROFILE=development
+      - QUORUS_SECURITY_ENABLED=false
+      - QUORUS_SECURITY_ALLOW_INSECURE=true
+      - QUORUS_SECURITY_HTTP_TLS_ENABLED=false
+      - QUORUS_SECURITY_RAFT_TLS_ENABLED=false
       - QUORUS_RAFT_STORAGE_PATH=/app/data/raft
       - QUORUS_CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080
       - QUORUS_RAFT_ELECTION_TIMEOUT_MS=3000
@@ -141,7 +138,7 @@ services:
         max-size: "10m"
         max-file: "3"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health/live"]
       interval: 10s
       timeout: 5s
       retries: 3

@@ -18,18 +18,6 @@
     <description>Standalone Quorus Agent for file transfer operations</description>
 
     <dependencies>
-        <!-- Vert.x Core (version from parent BOM) -->
-        <dependency>
-            <groupId>io.vertx</groupId>
-            <artifactId>vertx-core</artifactId>
-        </dependency>
-
-        <!-- Vert.x OpenTelemetry Integration -->
-        <dependency>
-            <groupId>io.vertx</groupId>
-            <artifactId>vertx-opentelemetry</artifactId>
-        </dependency>
-
         <!-- OpenTelemetry Dependencies -->
         <dependency>
             <groupId>io.opentelemetry</groupId>
@@ -71,12 +59,6 @@
             <version>${project.version}</version>
         </dependency>
 
-        <!-- Vert.x WebClient for non-blocking HTTP (replaces Apache HttpClient 5) -->
-        <dependency>
-            <groupId>io.vertx</groupId>
-            <artifactId>vertx-web-client</artifactId>
-        </dependency>
-
         <!-- JSON Processing -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
@@ -114,19 +96,10 @@
             <artifactId>junit-jupiter</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- In-memory span exporter for ControllerClientTracingTest (version from the parent BOM) -->
         <dependency>
-            <groupId>io.vertx</groupId>
-            <artifactId>vertx-junit5</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>io.vertx</groupId>
-            <artifactId>vertx-web</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.awaitility</groupId>
-            <artifactId>awaitility</artifactId>
-            <version>4.3.0</version>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-sdk-testing</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>

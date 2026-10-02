@@ -110,13 +110,6 @@ public class HttpApiServer {
 
     public HttpApiServer(Vertx vertx, String host, int port, RaftNode raftNode,
                          QuorusStateStore stateStore, int prometheusPort, AppConfig appConfig,
-                         SecurityConfig securityConfig) {
-        this(vertx, host, port, raftNode, stateStore, prometheusPort, appConfig, securityConfig,
-                CertificateTrustState.from(securityConfig));
-    }
-
-    public HttpApiServer(Vertx vertx, String host, int port, RaftNode raftNode,
-                         QuorusStateStore stateStore, int prometheusPort, AppConfig appConfig,
                          SecurityConfig securityConfig,
                          CertificateTrustState trustState) {
         this(vertx, host, port, raftNode, stateStore, prometheusPort, appConfig, securityConfig,
@@ -189,7 +182,11 @@ public class HttpApiServer {
         router.put("/api/v1/security/trust/revocations").handler(securityHandler.handleRevocationUpdate());
 
         // ==================== Governed Service Connection Endpoints ====================
-        ServiceConnectionHandler serviceConnectionHandler = new ServiceConnectionHandler(raftNode, stateStore);
+        ControllerConnectionAuthorizer connectionAuthorizer = new ControllerConnectionAuthorizer(
+                dev.mars.quorus.connection.HostResolver.system(),
+                appConfig.getInt("quorus.http.dns.max-concurrent", 8),
+                appConfig.getLong("quorus.http.dns.timeout-ms", 5_000));
+        ServiceConnectionHandler serviceConnectionHandler = new ServiceConnectionHandler(raftNode, stateStore, connectionAuthorizer);
         router.post("/api/v1/secret-references").handler(serviceConnectionHandler.createSecret());
         router.get("/api/v1/secret-references").handler(serviceConnectionHandler.listSecrets());
         router.get("/api/v1/secret-references/:secretReferenceId").handler(serviceConnectionHandler.getSecret());
@@ -211,7 +208,7 @@ public class HttpApiServer {
         router.get("/api/v1/agents/:agentId/jobs").handler(new AgentJobsHandler(stateStore));
 
         // ==================== Transfer Endpoints ====================
-        TransferHandler transferHandler = new TransferHandler(raftNode, stateStore, securityConfig.profile());
+        TransferHandler transferHandler = new TransferHandler(raftNode, stateStore, securityConfig.profile(), connectionAuthorizer);
         router.post("/api/v1/transfers").handler(transferHandler.handleCreate());
         router.get("/api/v1/transfers/:jobId").handler(transferHandler.handleGet());
         router.get("/api/v1/transfers/:jobId/progress").handler(new TransferProgressHandler(

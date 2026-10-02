@@ -2,8 +2,8 @@
 
 # Quorus User Guide
 
-**Version:** 2.2  
-**Date:** 2026-09-01  
+**Version:** 2.5
+**Date:** 2026-09-28
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Scope:** Current implementation guide
@@ -23,7 +23,7 @@ The direct path is the most complete end-user path today for executing transfer 
 
 `SimpleTransferEngine` is the live transfer execution component. It supports:
 
-- transfer submission through Vert.x futures
+- blocking transfer execution on the calling thread, with a concurrency limit
 - retry handling
 - progress tracking
 - metrics and health reporting
@@ -90,7 +90,7 @@ What is **not** currently wired by controller startup is an always-on background
 
 ### Java Baseline
 
-This repository builds with Java 25. The root Maven build sets source and target to 25.
+This repository builds with Java 27. The root Maven build sets `java.version` to 27 and `maven.compiler.release` to `${java.version}`.
 
 ### Direct Execution Path
 
@@ -121,7 +121,7 @@ Current implementation supports:
 
 - direct HTTP download and upload paths
 - custom request options carried through transfer definitions
-- reactive execution through Vert.x Web Client
+- streaming execution on Apache HttpClient 5, with governed address pinning
 
 Do **not** assume the current implementation provides:
 
@@ -145,7 +145,7 @@ Do **not** assume adapter-level resume support. The current adapter reports `sup
 Current implementation supports:
 
 - upload and download routing based on transfer direction
-- blocking transfer execution offloaded away from the Vert.x event loop
+- blocking transfer execution on the calling thread (in the agent, a virtual thread per job)
 
 Do **not** assume adapter-level resume support. The current adapter reports `supportsResume() == false`.
 
@@ -175,7 +175,7 @@ These endpoints and aggregate metrics provide infrastructure evidence, but they 
 
 Quorus currently enforces selected tenant checks between registered agents and transfer jobs. Every agent declares one tenant, and polling and selected status paths filter or reject mismatched tenant fields.
 
-This is not yet a strict authenticated tenant security boundary. The controller does not authenticate the caller, a supplied `tenantId` is not proof of identity, and direct assignment creation does not uniformly enforce every reference and tenant invariant inside state-machine application.
+The production controller authenticates callers through mTLS or a trusted gateway, derives tenant authority from the verified identity, and enforces assignment references and tenant invariants at both the HTTP and replicated state boundaries. A supplied `tenantId` is not proof of identity by itself, and the development Compose profiles deliberately disable request authentication. See [Architecture Specification §3](QUORUS_ARCHITECTURE_SPECIFICATION.md#3-capability-status) and the [Security Deployment Guide](QUORUS_SECURITY_DEPLOYMENT_GUIDE.md).
 
 ### Agent Configuration
 
@@ -197,7 +197,7 @@ If `tenantId` is absent from the agent registration payload, the controller retu
 
 ### Transfer Job Tenant Field
 
-Every transfer job must declare a `tenantId` at creation time. The implemented polling path filters jobs to the registered agent's declared tenant, and selected update paths reject mismatches. Protected multi-tenant operation still requires authenticated identity, authorization, and uniform state-machine invariants.
+Every transfer job must declare a `tenantId` at creation time. Polling filters jobs to the authenticated agent's tenant, update paths reject mismatches, and replicated commands enforce reference and ownership invariants. Broader tenant hierarchy, quota, usage, and inherited-policy management remains incomplete.
 
 ### Enforcement Points
 
@@ -222,7 +222,7 @@ When reading older Quorus material, keep these distinctions in mind:
 - `docs/QUORUS_ARCHITECTURE_SPECIFICATION.md` — canonical architecture and production requirements
 - `docs/QUORUS_REST_API_SPECIFICATION.md` — complete required REST control and operations contract
 - `docs/QUORUS_ARCHITECTURE_QUICKSTART.md`
-- `docs/QUORUS_API_REFERENCE.md` — current implemented endpoints
+- `quorus-controller/src/main/resources/openapi/quorus-controller-v1.yaml` — the OpenAPI contract for the current API, also served at `GET /api/v1/openapi.yaml`
 - `docs/QUORUS_WORKFLOWS_README.md`
 - `docs/QUORUS_YAML_SYNTAX_GUIDE.md`
 - `docs/QUORUS_CLUSTER_STARTUP_GUIDE.md`

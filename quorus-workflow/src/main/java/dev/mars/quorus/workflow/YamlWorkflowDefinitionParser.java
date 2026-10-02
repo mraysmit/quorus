@@ -451,6 +451,14 @@ public class YamlWorkflowDefinitionParser implements WorkflowDefinitionParser {
             result.addWarning("spec.transferGroups", "No transfer groups defined");
         }
 
+        // Only the documented strategies are accepted; group concurrency is set by parallelism
+        WorkflowDefinition.ExecutionConfig execution = spec.getExecution();
+        if (execution != null && execution.getStrategy() != null
+                && !Set.of("sequential", "parallel").contains(execution.getStrategy())) {
+            result.addError("spec.execution.strategy", "Unknown execution strategy '" + execution.getStrategy()
+                    + "'; expected sequential or parallel");
+        }
+
         // Validate transfer group names are unique
         Set<String> groupNames = new HashSet<>();
         for (TransferGroup group : spec.getTransferGroups()) {

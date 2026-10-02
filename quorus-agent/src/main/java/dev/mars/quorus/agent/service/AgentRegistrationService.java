@@ -16,147 +16,112 @@
 
 package dev.mars.quorus.agent.service;
 
-import dev.mars.quorus.agent.config.AgentConfiguration;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.mars.quorus.agent.AgentCapabilities;
-import io.vertx.core.Future;
-import io.vertx.core.Vertx;
-import io.vertx.core.json.JsonArray;
-import io.vertx.core.json.JsonObject;
-import io.vertx.ext.web.client.WebClient;
+import dev.mars.quorus.agent.config.AgentConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.util.Objects;
+
 /**
- * Service for registering and deregistering the agent with the Quorus controller.
- * Uses Vert.x WebClient for non-blocking HTTP communication.
- * 
+ * Service for registering and deregistering the agent with the Quorus controller. Calls block the
+ * calling thread (RT-05a).
+ *
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @since 2025-09-04
- * @version 2.0 (Migrated to Vert.x WebClient - T3.1)
+ * @version 3.0
  */
 public class AgentRegistrationService {
-    
+
     private static final Logger logger = LoggerFactory.getLogger(AgentRegistrationService.class);
-    
+    private static final ObjectMapper JSON = new ObjectMapper();
+
     private final AgentConfiguration config;
-    private final WebClient webClient;
-    
+    private final ControllerClient client;
+
     private volatile boolean registered = false;
-    
-    public AgentRegistrationService(Vertx vertx, AgentConfiguration config) {
-        this.config = config;
-        this.webClient = ControllerWebClientFactory.create(vertx, config);
-        logger.debug("AgentRegistrationService initialized with Vert.x WebClient (connectTimeout={}ms, idleTimeout={}ms)",
-            config.getHttpConnectionTimeout(), config.getHttpIdleTimeout());
+
+    public AgentRegistrationService(ControllerClient client, AgentConfiguration config) {
+        this.client = Objects.requireNonNull(client, "client");
+        this.config = Objects.requireNonNull(config, "config");
     }
-    
+
     /**
      * Registers the agent with the controller.
-     * 
-     * @return Future that completes with true if registration succeeded, false otherwise
+     *
+     * @return true if the controller accepted the registration; false on a refusal or a transport failure
+     * @throws InterruptedException if the calling thread is interrupted
      */
-    public Future<Boolean> register() {
-        logger.info("Registering agent {} with controller at {}", 
-                   config.getAgentId(), config.getControllerUrl());
-        
-        JsonObject request = createRegistrationRequest();
-        String url = config.getControllerUrl() + "/agents/register";
-        
-        return webClient.postAbs(url)
-            .putHeader("Content-Type", "application/json")
-            .sendJsonObject(request)
-            .map(response -> {
-                int statusCode = response.statusCode();
-                if (statusCode == 201 || statusCode == 200) {
-                    registered = true;
-                    logger.info("Agent {} registered successfully", config.getAgentId());
-                    return true;
-                } else {
-                    logger.error("Failed to register agent {}: HTTP {}", 
-                               config.getAgentId(), statusCode);
-                    return false;
-                }
-            })
-            .recover(err -> {
-                logger.error("Error registering agent {}: {}", config.getAgentId(), err.getMessage());
-                return Future.succeededFuture(false);
-            });
-    }
-    
-    /**
-     * Deregisters the agent from the controller.
-     * 
-     * @return Future that completes with true if deregistration succeeded, false otherwise
-     */
-    public Future<Boolean> deregister() {
-        if (!registered) {
-            return Future.succeededFuture(true);
+    public boolean register() throws InterruptedException {
+        logger.info("Registering agent {} with controller at {}", config.getAgentId(), config.getControllerUrl());
+        try {
+            ControllerClient.Response response = client.postJson(config.getControllerUrl() + "/agents/register",
+                    JSON.writeValueAsString(createRegistrationRequest()));
+            if (response.status() == 201 || response.status() == 200) {
+                registered = true;
+                logger.info("Agent {} registered successfully", config.getAgentId());
+                return true;
+            }
+            logger.error("Failed to register agent {}: HTTP {}", config.getAgentId(), response.status());
+            return false;
+        } catch (IOException e) {
+            logger.error("Error registering agent {}: {}", config.getAgentId(), e.getMessage());
+            return false;
         }
-        
-        logger.info("Deregistering agent {} from controller", config.getAgentId());
-        String url = config.getControllerUrl() + "/agents/" + config.getAgentId();
-        
-        return webClient.deleteAbs(url)
-            .send()
-            .map(response -> {
-                int statusCode = response.statusCode();
-                if (statusCode == 200 || statusCode == 204 || statusCode == 404) {
-                    registered = false;
-                    logger.info("Agent {} deregistered successfully", config.getAgentId());
-                    return true;
-                } else {
-                    logger.error("Failed to deregister agent {}: HTTP {}", 
-                               config.getAgentId(), statusCode);
-                    return false;
-                }
-            })
-            .recover(err -> {
-                logger.error("Error deregistering agent {}: {}", config.getAgentId(), err.getMessage());
-                return Future.succeededFuture(false);
-            });
     }
-    
-    private JsonObject createRegistrationRequest() {
+
+    /**
+     * Deregisters the agent from the controller. Does nothing, successfully, if it is not registered.
+     *
+     * @return true if the agent is no longer registered (a 404 counts: already gone)
+     * @throws InterruptedException if the calling thread is interrupted
+     */
+    public boolean deregister() throws InterruptedException {
+        if (!registered) {
+            return true;
+        }
+        logger.info("Deregistering agent {} from controller", config.getAgentId());
+        try {
+            ControllerClient.Response response = client.delete(
+                    config.getControllerUrl() + "/agents/" + config.getAgentId());
+            int statusCode = response.status();
+            if (statusCode == 200 || statusCode == 204 || statusCode == 404) {
+                registered = false;
+                logger.info("Agent {} deregistered successfully", config.getAgentId());
+                return true;
+            }
+            logger.error("Failed to deregister agent {}: HTTP {}", config.getAgentId(), statusCode);
+            return false;
+        } catch (IOException e) {
+            logger.error("Error deregistering agent {}: {}", config.getAgentId(), e.getMessage());
+            return false;
+        }
+    }
+
+    private ObjectNode createRegistrationRequest() {
         AgentCapabilities capabilities = config.createCapabilities();
-        
-        JsonObject request = new JsonObject()
-            .put("agentId", config.getAgentId())
-            .put("tenantId", config.getTenantId())
-            .put("hostname", config.getHostname())
-            .put("address", config.getAddress())
-            .put("port", config.getAgentPort())
-            .put("version", config.getVersion())
-            .put("region", config.getRegion())
-            .put("datacenter", config.getDatacenter())
-            .put("agentPool", config.getAgentPool())
-            .put("networkZone", config.getNetworkZone())
-            .put("capabilities", capabilitiesToJson(capabilities));
-        
+        ObjectNode request = JSON.createObjectNode()
+                .put("agentId", config.getAgentId())
+                .put("tenantId", config.getTenantId())
+                .put("hostname", config.getHostname())
+                .put("address", config.getAddress())
+                .put("port", config.getAgentPort())
+                .put("version", config.getVersion())
+                .put("region", config.getRegion())
+                .put("datacenter", config.getDatacenter())
+                .put("agentPool", config.getAgentPool())
+                .put("networkZone", config.getNetworkZone());
+        ObjectNode capabilitiesJson = request.putObject("capabilities");
+        capabilities.getSupportedProtocols().forEach(capabilitiesJson.putArray("supportedProtocols")::add);
+        capabilitiesJson.put("maxConcurrentTransfers", capabilities.getMaxConcurrentTransfers())
+                .put("maxTransferSize", capabilities.getMaxTransferSize());
         return request;
     }
-    
-    private JsonObject capabilitiesToJson(AgentCapabilities capabilities) {
-        JsonArray protocols = new JsonArray();
-        capabilities.getSupportedProtocols().forEach(protocols::add);
-        
-        return new JsonObject()
-            .put("supportedProtocols", protocols)
-            .put("maxConcurrentTransfers", capabilities.getMaxConcurrentTransfers())
-            .put("maxTransferSize", capabilities.getMaxTransferSize());
-    }
-    
+
     public boolean isRegistered() {
         return registered;
-    }
-    
-    /**
-     * Shuts down the WebClient.
-     * 
-     * @return Future that completes when shutdown is done
-     */
-    public Future<Void> shutdown() {
-        logger.debug("Shutting down AgentRegistrationService WebClient");
-        webClient.close();
-        return Future.succeededFuture();
     }
 }

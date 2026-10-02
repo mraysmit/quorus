@@ -1,0 +1,470 @@
+time="2026-09-05T15:36:00+08:00" level=warning msg="C:\\Users\\mraysmit\\dev\\idea-projects\\quorus\\quorus-controller\\src\\test\\resources\\docker-compose-build-image.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Image quorus-controller:test Building 
+#1 [internal] load local bake definitions
+#1 reading from stdin 686B done
+#1 DONE 0.0s
+
+#2 [internal] load build definition from Dockerfile
+#2 transferring dockerfile: 5.28kB done
+#2 DONE 0.0s
+
+#3 resolve image config for docker-image://docker.io/docker/dockerfile:1.4
+#3 ...
+
+#4 [auth] docker/dockerfile:pull token for registry-1.docker.io
+#4 DONE 0.0s
+
+#3 resolve image config for docker-image://docker.io/docker/dockerfile:1.4
+#3 DONE 2.7s
+
+#5 docker-image://docker.io/docker/dockerfile:1.4@sha256:9ba7531bd80fb0a858632727cf7a112fbfd19b17e94c4e84ced81e24ef1a0dbc
+#5 CACHED
+
+#6 [internal] load .dockerignore
+#6 transferring context: 801B done
+#6 DONE 0.0s
+
+#7 [context m2cache] load .dockerignore
+#7 transferring m2cache: 2B done
+#7 DONE 0.0s
+
+#8 [internal] load metadata for docker.io/library/eclipse-temurin:25-jre-alpine
+#8 ...
+
+#9 [auth] library/eclipse-temurin:pull token for registry-1.docker.io
+#9 DONE 0.0s
+
+#10 [auth] library/maven:pull token for registry-1.docker.io
+#10 DONE 0.0s
+
+#11 [internal] load metadata for docker.io/library/maven:3.9.11-eclipse-temurin-25
+#11 DONE 1.6s
+
+#8 [internal] load metadata for docker.io/library/eclipse-temurin:25-jre-alpine
+#8 DONE 1.6s
+
+#12 [stage-1 1/6] FROM docker.io/library/eclipse-temurin:25-jre-alpine@sha256:3137541deb3cac6626b5d9a4a2187bc0d6a34312f858bd2c67dd01e732e6b682
+#12 DONE 0.0s
+
+#13 [builder  1/17] FROM docker.io/library/maven:3.9.11-eclipse-temurin-25@sha256:407c4423cec0cf2981055bc2c6c0dc211d9605b6669279b95997f2d1c7e91e2c
+#13 DONE 0.0s
+
+#14 [context m2cache] load from client
+#14 transferring m2cache: 26.55kB 0.1s done
+#14 DONE 0.1s
+
+#15 [internal] load build context
+#15 transferring context: 155.54kB 0.1s done
+#15 DONE 0.1s
+
+#16 [builder  7/17] COPY quorus-controller/pom.xml quorus-controller/
+#16 CACHED
+
+#17 [builder  6/17] COPY quorus-tenant/pom.xml quorus-tenant/
+#17 CACHED
+
+#18 [builder 11/17] COPY --from=m2cache / /root/.m2/repository/dev/mars
+#18 CACHED
+
+#19 [builder  2/17] WORKDIR /app
+#19 CACHED
+
+#20 [builder  8/17] RUN mkdir -p quorus-integration-examples && echo '<?xml version="1.0" encoding="UTF-8"?><project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"><modelVersion>4.0.0</modelVersion><parent><groupId>dev.mars</groupId><artifactId>quorus</artifactId><version>1.0-SNAPSHOT</version></parent><artifactId>quorus-integration-examples</artifactId><packaging>pom</packaging></project>' > quorus-integration-examples/pom.xml
+#20 CACHED
+
+#21 [builder 10/17] RUN mkdir -p quorus-api && echo '<?xml version="1.0" encoding="UTF-8"?><project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"><modelVersion>4.0.0</modelVersion><parent><groupId>dev.mars</groupId><artifactId>quorus</artifactId><version>1.0-SNAPSHOT</version></parent><artifactId>quorus-api</artifactId><packaging>pom</packaging></project>' > quorus-api/pom.xml
+#21 CACHED
+
+#22 [builder 14/17] COPY quorus-workflow/src quorus-workflow/src
+#22 CACHED
+
+#23 [builder  4/17] COPY quorus-core/pom.xml quorus-core/
+#23 CACHED
+
+#24 [builder  5/17] COPY quorus-workflow/pom.xml quorus-workflow/
+#24 CACHED
+
+#25 [builder  3/17] COPY pom.xml .
+#25 CACHED
+
+#26 [builder 12/17] RUN --mount=type=cache,target=/root/.m2/repository/org     --mount=type=cache,target=/root/.m2/repository/io     --mount=type=cache,target=/root/.m2/repository/com     --mount=type=cache,target=/root/.m2/repository/net     mvn dependency:go-offline -pl quorus-controller -am -Dsilent=true || true
+#26 CACHED
+
+#27 [builder 13/17] COPY quorus-core/src quorus-core/src
+#27 CACHED
+
+#28 [builder  9/17] RUN mkdir -p quorus-agent && echo '<?xml version="1.0" encoding="UTF-8"?><project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"><modelVersion>4.0.0</modelVersion><parent><groupId>dev.mars</groupId><artifactId>quorus</artifactId><version>1.0-SNAPSHOT</version></parent><artifactId>quorus-agent</artifactId><packaging>pom</packaging></project>' > quorus-agent/pom.xml
+#28 CACHED
+
+#29 [builder 15/17] COPY quorus-tenant/src quorus-tenant/src
+#29 CACHED
+
+#30 [builder 16/17] COPY quorus-controller/src quorus-controller/src
+#30 DONE 0.3s
+
+#31 [builder 17/17] RUN --mount=type=cache,target=/root/.m2/repository/org     --mount=type=cache,target=/root/.m2/repository/io     --mount=type=cache,target=/root/.m2/repository/com     --mount=type=cache,target=/root/.m2/repository/net     mvn package -pl quorus-controller -am -DskipTests
+#31 1.669 WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+#31 1.669 WARNING: sun.misc.Unsafe::staticFieldBase has been called by com.google.inject.internal.aop.HiddenClassDefiner (file:/usr/share/maven/lib/guice-5.1.0-classes.jar)
+#31 1.669 WARNING: Please consider reporting this to the maintainers of class com.google.inject.internal.aop.HiddenClassDefiner
+#31 1.669 WARNING: sun.misc.Unsafe::staticFieldBase will be removed in a future release
+#31 2.045 [INFO] Scanning for projects...
+#31 2.216 [INFO] ------------------------------------------------------------------------
+#31 2.216 [INFO] Reactor Build Order:
+#31 2.216 [INFO] 
+#31 2.218 [INFO] Quorus File Transfer System                                        [pom]
+#31 2.218 [INFO] Quorus Core                                                        [jar]
+#31 2.218 [INFO] Quorus Workflow Engine                                             [jar]
+#31 2.218 [INFO] Quorus Tenant Management                                           [jar]
+#31 2.218 [INFO] Quorus Distributed Controller                                      [jar]
+#31 2.228 [INFO] 
+#31 2.228 [INFO] --------------------------< dev.mars:quorus >---------------------------
+#31 2.228 [INFO] Building Quorus File Transfer System 1.0-SNAPSHOT                  [1/5]
+#31 2.228 [INFO]   from pom.xml
+#31 2.228 [INFO] --------------------------------[ pom ]---------------------------------
+#31 2.292 [INFO] 
+#31 2.293 [INFO] --- jacoco:0.8.15:prepare-agent (prepare-agent) @ quorus ---
+#31 2.551 [INFO] argLine set to -javaagent:/root/.m2/repository/org/jacoco/org.jacoco.agent/0.8.15/org.jacoco.agent-0.8.15-runtime.jar=destfile=/app/target/jacoco.exec,excludes=sun/**:jdk/**:java/**:com/sun/**:org/jcp/**
+#31 2.551 [INFO] 
+#31 2.551 [INFO] --- jacoco:0.8.15:report (report) @ quorus ---
+#31 2.559 [INFO] Skipping JaCoCo execution due to missing execution data file.
+#31 2.560 [INFO] 
+#31 2.560 [INFO] ------------------------< dev.mars:quorus-core >------------------------
+#31 2.560 [INFO] Building Quorus Core 1.0-SNAPSHOT                                  [2/5]
+#31 2.560 [INFO]   from quorus-core/pom.xml
+#31 2.560 [INFO] --------------------------------[ jar ]---------------------------------
+#31 3.235 [INFO] 
+#31 3.235 [INFO] --- jacoco:0.8.15:prepare-agent (prepare-agent) @ quorus-core ---
+#31 3.239 [INFO] argLine set to -javaagent:/root/.m2/repository/org/jacoco/org.jacoco.agent/0.8.15/org.jacoco.agent-0.8.15-runtime.jar=destfile=/app/quorus-core/target/jacoco.exec,excludes=sun/**:jdk/**:java/**:com/sun/**:org/jcp/**
+#31 3.239 [INFO] 
+#31 3.239 [INFO] --- resources:3.3.1:resources (default-resources) @ quorus-core ---
+#31 3.394 [INFO] Copying 1 resource from src/main/resources to target/classes
+#31 3.404 [INFO] 
+#31 3.404 [INFO] --- compiler:3.13.0:compile (default-compile) @ quorus-core ---
+#31 3.611 [INFO] Recompiling the module because of changed source code.
+#31 3.626 [INFO] Compiling 72 source files with javac [debug release 25] to target/classes
+#31 6.544 [INFO] /app/quorus-core/src/main/java/dev/mars/quorus/protocol/FtpTransferProtocol.java: Some input files use or override a deprecated API.
+#31 6.544 [INFO] /app/quorus-core/src/main/java/dev/mars/quorus/protocol/FtpTransferProtocol.java: Recompile with -Xlint:deprecation for details.
+#31 6.544 [INFO] 
+#31 6.544 [INFO] --- resources:3.3.1:testResources (default-testResources) @ quorus-core ---
+#31 6.558 [INFO] Copying 11 resources from src/test/resources to target/test-classes
+#31 6.566 [INFO] 
+#31 6.566 [INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ quorus-core ---
+#31 6.598 [INFO] Recompiling the module because of changed dependency.
+#31 6.601 [INFO] Compiling 89 source files with javac [debug release 25] to target/test-classes
+#31 10.63 [INFO] /app/quorus-core/src/test/java/dev/mars/quorus/connection/TlsTrustAnchorPolicyTest.java: Some input files use or override a deprecated API.
+#31 10.63 [INFO] /app/quorus-core/src/test/java/dev/mars/quorus/connection/TlsTrustAnchorPolicyTest.java: Recompile with -Xlint:deprecation for details.
+#31 10.63 [INFO] 
+#31 10.63 [INFO] --- surefire:3.2.2:test (default-test) @ quorus-core ---
+#31 10.90 [INFO] Tests are skipped.
+#31 10.90 [INFO] 
+#31 10.90 [INFO] --- jacoco:0.8.15:report (report) @ quorus-core ---
+#31 10.90 [INFO] Skipping JaCoCo execution due to missing execution data file.
+#31 10.90 [INFO] 
+#31 10.90 [INFO] --- jar:3.3.0:jar (default-jar) @ quorus-core ---
+#31 11.11 [INFO] Building jar: /app/quorus-core/target/quorus-core-1.0-SNAPSHOT.jar
+#31 11.18 [INFO] 
+#31 11.18 [INFO] --- jar:3.3.0:test-jar (default) @ quorus-core ---
+#31 11.20 [INFO] Building jar: /app/quorus-core/target/quorus-core-1.0-SNAPSHOT-tests.jar
+#31 11.24 [INFO] 
+#31 11.24 [INFO] ----------------------< dev.mars:quorus-workflow >----------------------
+#31 11.24 [INFO] Building Quorus Workflow Engine 1.0-SNAPSHOT                       [3/5]
+#31 11.24 [INFO]   from quorus-workflow/pom.xml
+#31 11.24 [INFO] --------------------------------[ jar ]---------------------------------
+#31 11.30 [INFO] 
+#31 11.30 [INFO] --- jacoco:0.8.15:prepare-agent (prepare-agent) @ quorus-workflow ---
+#31 11.30 [INFO] argLine set to -javaagent:/root/.m2/repository/org/jacoco/org.jacoco.agent/0.8.15/org.jacoco.agent-0.8.15-runtime.jar=destfile=/app/quorus-workflow/target/jacoco.exec,excludes=sun/**:jdk/**:java/**:com/sun/**:org/jcp/**
+#31 11.30 [INFO] 
+#31 11.30 [INFO] --- resources:3.3.1:resources (default-resources) @ quorus-workflow ---
+#31 11.30 [INFO] Copying 1 resource from src/main/resources to target/classes
+#31 11.30 [INFO] 
+#31 11.30 [INFO] --- compiler:3.13.0:compile (default-compile) @ quorus-workflow ---
+#31 11.31 [INFO] Recompiling the module because of changed dependency.
+#31 11.31 [INFO] Compiling 15 source files with javac [debug release 25] to target/classes
+#31 11.57 [INFO] 
+#31 11.57 [INFO] --- resources:3.3.1:testResources (default-testResources) @ quorus-workflow ---
+#31 11.58 [INFO] Copying 2 resources from src/test/resources to target/test-classes
+#31 11.58 [INFO] 
+#31 11.58 [INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ quorus-workflow ---
+#31 11.58 [INFO] Recompiling the module because of changed dependency.
+#31 11.58 [INFO] Compiling 11 source files with javac [debug release 25] to target/test-classes
+#31 11.97 [INFO] 
+#31 11.97 [INFO] --- surefire:3.2.2:test (default-test) @ quorus-workflow ---
+#31 11.98 [INFO] Tests are skipped.
+#31 11.98 [INFO] 
+#31 11.98 [INFO] --- jacoco:0.8.15:report (report) @ quorus-workflow ---
+#31 11.98 [INFO] Skipping JaCoCo execution due to missing execution data file.
+#31 11.98 [INFO] 
+#31 11.98 [INFO] --- jar:3.4.1:jar (default-jar) @ quorus-workflow ---
+#31 12.28 [INFO] Building jar: /app/quorus-workflow/target/quorus-workflow-1.0-SNAPSHOT.jar
+#31 12.32 [INFO] 
+#31 12.32 [INFO] -----------------------< dev.mars:quorus-tenant >-----------------------
+#31 12.32 [INFO] Building Quorus Tenant Management 1.0-SNAPSHOT                     [4/5]
+#31 12.32 [INFO]   from quorus-tenant/pom.xml
+#31 12.32 [INFO] --------------------------------[ jar ]---------------------------------
+#31 12.35 [INFO] 
+#31 12.35 [INFO] --- jacoco:0.8.15:prepare-agent (prepare-agent) @ quorus-tenant ---
+#31 12.35 [INFO] argLine set to -javaagent:/root/.m2/repository/org/jacoco/org.jacoco.agent/0.8.15/org.jacoco.agent-0.8.15-runtime.jar=destfile=/app/quorus-tenant/target/jacoco.exec,excludes=sun/**:jdk/**:java/**:com/sun/**:org/jcp/**
+#31 12.35 [INFO] 
+#31 12.35 [INFO] --- resources:3.3.1:resources (default-resources) @ quorus-tenant ---
+#31 12.35 [INFO] skip non existing resourceDirectory /app/quorus-tenant/src/main/resources
+#31 12.35 [INFO] 
+#31 12.35 [INFO] --- compiler:3.13.0:compile (default-compile) @ quorus-tenant ---
+#31 12.36 [INFO] Recompiling the module because of changed dependency.
+#31 12.36 [INFO] Compiling 8 source files with javac [debug release 25] to target/classes
+#31 12.64 [INFO] 
+#31 12.64 [INFO] --- resources:3.3.1:testResources (default-testResources) @ quorus-tenant ---
+#31 12.65 [INFO] Copying 1 resource from src/test/resources to target/test-classes
+#31 12.65 [INFO] 
+#31 12.65 [INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ quorus-tenant ---
+#31 12.67 [INFO] Recompiling the module because of changed dependency.
+#31 12.67 [INFO] Compiling 5 source files with javac [debug release 25] to target/test-classes
+#31 12.97 [INFO] 
+#31 12.97 [INFO] --- surefire:3.2.2:test (default-test) @ quorus-tenant ---
+#31 12.98 [INFO] Tests are skipped.
+#31 12.98 [INFO] 
+#31 12.98 [INFO] --- jacoco:0.8.15:report (report) @ quorus-tenant ---
+#31 12.99 [INFO] Skipping JaCoCo execution due to missing execution data file.
+#31 12.99 [INFO] 
+#31 12.99 [INFO] --- jar:3.4.1:jar (default-jar) @ quorus-tenant ---
+#31 13.00 [INFO] Building jar: /app/quorus-tenant/target/quorus-tenant-1.0-SNAPSHOT.jar
+#31 13.01 [INFO] 
+#31 13.01 [INFO] ---------------------< dev.mars:quorus-controller >---------------------
+#31 13.01 [INFO] Building Quorus Distributed Controller 1.0-SNAPSHOT                [5/5]
+#31 13.01 [INFO]   from quorus-controller/pom.xml
+#31 13.01 [INFO] --------------------------------[ jar ]---------------------------------
+#31 13.39 [INFO] 
+#31 13.39 [INFO] --- jacoco:0.8.15:prepare-agent (prepare-agent) @ quorus-controller ---
+#31 13.39 [INFO] argLine set to -javaagent:/root/.m2/repository/org/jacoco/org.jacoco.agent/0.8.15/org.jacoco.agent-0.8.15-runtime.jar=destfile=/app/quorus-controller/target/jacoco.exec,excludes=sun/**:jdk/**:java/**:com/sun/**:org/jcp/**:dev/mars/quorus/controller/raft/grpc/**
+#31 13.39 [INFO] 
+#31 13.39 [INFO] --- protobuf:4.1.2:generate (default) @ quorus-controller ---
+#31 13.80 [WARNING]  Parameter 'binaryMavenPlugins' is deprecated: Users should now use plugins instead. This option will be removed in v5.
+#31 13.81 [INFO] Resolving artifact "com.google.protobuf:protoc:exe:linux-x86_64:3.25.5"
+#31 13.83 [INFO] Resolving artifact "io.grpc:protoc-gen-grpc-java:exe:linux-x86_64:1.68.1"
+#31 13.96 [INFO] Registering "/app/quorus-controller/target/generated-sources/protobuf" as a Maven main source root for compiler plugins
+#31 13.96 [INFO] Registering "/app/quorus-controller/target/generated-sources/protobuf" as a Maven main source root for compiler plugins
+#31 14.05 [INFO] All sources will be compiled, as no previous build data was detected
+#31 14.05 [INFO] Generating source code from 2 proto source files and 0 descriptor files (discovered a total of 2 proto source files and 0 descriptor files)
+#31 14.07 [INFO] Invoking protoc. Enable debug logs (--debug --errors) for more details
+#31 14.13 [INFO] protoc (pid 173) returned exit code 0 (success) after 58ms
+#31 14.13 [INFO] Embedding sources from "/app/quorus-controller/src/main/proto" in Maven main class outputs
+#31 14.13 [INFO] PROTOC SUCCEEDED: Protoc invocation succeeded.
+#31 14.13 [INFO] 
+#31 14.13 [INFO] --- resources:3.3.1:resources (default-resources) @ quorus-controller ---
+#31 14.13 [INFO] Copying 3 resources from src/main/resources to target/classes
+#31 14.14 [INFO] 
+#31 14.14 [INFO] --- compiler:3.13.0:compile (default-compile) @ quorus-controller ---
+#31 14.15 [INFO] Recompiling the module because of changed dependency.
+#31 14.15 [INFO] Compiling 167 source files with javac [debug release 25] to target/classes
+#31 16.63 [INFO] 
+#31 16.63 [INFO] --- resources:3.3.1:testResources (default-testResources) @ quorus-controller ---
+#31 16.63 [INFO] Copying 11 resources from src/test/resources to target/test-classes
+#31 16.64 [INFO] 
+#31 16.64 [INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ quorus-controller ---
+#31 16.65 [INFO] Recompiling the module because of changed dependency.
+#31 16.65 [INFO] Compiling 73 source files with javac [debug release 25] to target/test-classes
+#31 18.14 [INFO] 
+#31 18.14 [INFO] --- surefire:3.2.2:test (default-test) @ quorus-controller ---
+#31 18.14 [INFO] Tests are skipped.
+#31 18.14 [INFO] 
+#31 18.14 [INFO] --- jacoco:0.8.15:report (report) @ quorus-controller ---
+#31 18.14 [INFO] Skipping JaCoCo execution due to missing execution data file.
+#31 18.14 [INFO] 
+#31 18.14 [INFO] --- jar:3.4.1:jar (default-jar) @ quorus-controller ---
+#31 18.17 [INFO] Building jar: /app/quorus-controller/target/quorus-controller-1.0-SNAPSHOT.jar
+#31 18.20 [INFO] 
+#31 18.20 [INFO] --- shade:3.4.1:shade (default) @ quorus-controller ---
+#31 18.45 [INFO] Including dev.mars:quorus-core:jar:1.0-SNAPSHOT in the shaded jar.
+#31 18.45 [INFO] Including io.vertx:vertx-web-client:jar:5.0.8 in the shaded jar.
+#31 18.45 [INFO] Including io.vertx:vertx-uri-template:jar:5.0.8 in the shaded jar.
+#31 18.45 [INFO] Including io.vertx:vertx-pg-client:jar:5.0.8 in the shaded jar.
+#31 18.45 [INFO] Including io.vertx:vertx-sql-client:jar:5.0.8 in the shaded jar.
+#31 18.45 [INFO] Including com.ongres.scram:scram-client:jar:3.2 in the shaded jar.
+#31 18.45 [INFO] Including com.ongres.scram:scram-common:jar:3.2 in the shaded jar.
+#31 18.45 [INFO] Including com.ongres.stringprep:saslprep:jar:2.2 in the shaded jar.
+#31 18.45 [INFO] Including com.ongres.stringprep:stringprep:jar:2.2 in the shaded jar.
+#31 18.45 [INFO] Including io.opentelemetry:opentelemetry-api:jar:1.59.0 in the shaded jar.
+#31 18.45 [INFO] Including io.opentelemetry:opentelemetry-context:jar:1.59.0 in the shaded jar.
+#31 18.45 [INFO] Including io.opentelemetry:opentelemetry-common:jar:1.59.0 in the shaded jar.
+#31 18.45 [INFO] Including com.fasterxml.jackson.core:jackson-annotations:jar:2.18.2 in the shaded jar.
+#31 18.45 [INFO] Including com.fasterxml.jackson.core:jackson-core:jar:2.18.2 in the shaded jar.
+#31 18.45 [INFO] Including com.github.mwiede:jsch:jar:0.2.26 in the shaded jar.
+#31 18.45 [INFO] Including dev.mars:quorus-workflow:jar:1.0-SNAPSHOT in the shaded jar.
+#31 18.45 [INFO] Including org.yaml:snakeyaml:jar:2.0 in the shaded jar.
+#31 18.45 [INFO] Including com.networknt:json-schema-validator:jar:1.5.9 in the shaded jar.
+#31 18.45 [INFO] Including com.ethlo.time:itu:jar:1.14.0 in the shaded jar.
+#31 18.45 [INFO] Including org.springframework:spring-expression:jar:6.2.16 in the shaded jar.
+#31 18.45 [INFO] Including org.springframework:spring-core:jar:6.2.16 in the shaded jar.
+#31 18.45 [INFO] Including org.springframework:spring-jcl:jar:6.2.16 in the shaded jar.
+#31 18.45 [INFO] Including dev.mars:quorus-tenant:jar:1.0-SNAPSHOT in the shaded jar.
+#31 18.45 [INFO] Including com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:jar:2.18.2 in the shaded jar.
+#31 18.45 [INFO] Including jakarta.validation:jakarta.validation-api:jar:3.0.2 in the shaded jar.
+#31 18.45 [INFO] Including io.vertx:vertx-opentelemetry:jar:5.0.8 in the shaded jar.
+#31 18.45 [INFO] Including io.opentelemetry:opentelemetry-sdk-trace:jar:1.59.0 in the shaded jar.
+#31 18.45 [INFO] Including io.vertx:vertx-core:jar:5.0.8 in the shaded jar.
+#31 18.45 [INFO] Including io.vertx:vertx-core-logging:jar:5.0.8 in the shaded jar.
+#31 18.45 [INFO] Including io.netty:netty-common:jar:4.2.10.Final in the shaded jar.
+#31 18.45 [INFO] Including io.netty:netty-buffer:jar:4.2.10.Final in the shaded jar.
+#31 18.45 [INFO] Including io.netty:netty-transport:jar:4.2.10.Final in the shaded jar.
+#31 18.45 [INFO] Including io.netty:netty-handler:jar:4.2.10.Final in the shaded jar.
+#31 18.45 [INFO] Including io.netty:netty-codec-base:jar:4.2.10.Final in the shaded jar.
+#31 18.45 [INFO] Including io.netty:netty-handler-proxy:jar:4.2.10.Final in the shaded jar.
+#31 18.45 [INFO] Including io.netty:netty-codec-socks:jar:4.2.10.Final in the shaded jar.
+#31 18.45 [INFO] Including io.netty:netty-codec-http:jar:4.2.10.Final in the shaded jar.
+#31 18.45 [INFO] Including io.netty:netty-codec-compression:jar:4.2.10.Final in the shaded jar.
+#31 18.45 [INFO] Including io.netty:netty-codec-http2:jar:4.2.10.Final in the shaded jar.
+#31 18.45 [INFO] Including io.netty:netty-resolver:jar:4.2.10.Final in the shaded jar.
+#31 18.45 [INFO] Including io.netty:netty-resolver-dns:jar:4.2.10.Final in the shaded jar.
+#31 18.45 [INFO] Including io.netty:netty-codec-dns:jar:4.2.10.Final in the shaded jar.
+#31 18.45 [INFO] Including io.vertx:vertx-web:jar:5.0.8 in the shaded jar.
+#31 18.45 [INFO] Including io.vertx:vertx-web-common:jar:5.0.8 in the shaded jar.
+#31 18.45 [INFO] Including io.vertx:vertx-auth-common:jar:5.0.8 in the shaded jar.
+#31 18.45 [INFO] Including io.vertx:vertx-bridge-common:jar:5.0.8 in the shaded jar.
+#31 18.45 [INFO] Including io.vertx:vertx-grpc-server:jar:5.0.8 in the shaded jar.
+#31 18.45 [INFO] Including io.vertx:vertx-grpc-common:jar:5.0.8 in the shaded jar.
+#31 18.45 [INFO] Including io.vertx:vertx-grpc-client:jar:5.0.8 in the shaded jar.
+#31 18.45 [INFO] Including io.github.mraysmit:raftlog-core:jar:1.2.0 in the shaded jar.
+#31 18.45 [INFO] Including io.opentelemetry:opentelemetry-sdk:jar:1.59.0 in the shaded jar.
+#31 18.45 [INFO] Including io.opentelemetry:opentelemetry-sdk-common:jar:1.59.0 in the shaded jar.
+#31 18.45 [INFO] Including io.opentelemetry:opentelemetry-sdk-metrics:jar:1.59.0 in the shaded jar.
+#31 18.45 [INFO] Including io.opentelemetry:opentelemetry-sdk-logs:jar:1.59.0 in the shaded jar.
+#31 18.45 [INFO] Including io.opentelemetry:opentelemetry-exporter-otlp:jar:1.59.0 in the shaded jar.
+#31 18.45 [INFO] Including io.opentelemetry:opentelemetry-exporter-otlp-common:jar:1.59.0 in the shaded jar.
+#31 18.45 [INFO] Including io.opentelemetry:opentelemetry-exporter-sender-okhttp:jar:1.59.0 in the shaded jar.
+#31 18.45 [INFO] Including com.squareup.okhttp3:okhttp-jvm:jar:5.3.2 in the shaded jar.
+#31 18.45 [INFO] Including com.squareup.okio:okio-jvm:jar:3.16.4 in the shaded jar.
+#31 18.45 [INFO] Including org.jetbrains.kotlin:kotlin-stdlib:jar:2.2.21 in the shaded jar.
+#31 18.45 [INFO] Including io.opentelemetry:opentelemetry-sdk-extension-autoconfigure-spi:jar:1.59.0 in the shaded jar.
+#31 18.45 [INFO] Including io.opentelemetry:opentelemetry-exporter-prometheus:jar:1.59.0-alpha in the shaded jar.
+#31 18.45 [INFO] Including io.opentelemetry:opentelemetry-exporter-common:jar:1.59.0 in the shaded jar.
+#31 18.45 [INFO] Including io.prometheus:prometheus-metrics-exporter-httpserver:jar:1.3.10 in the shaded jar.
+#31 18.45 [INFO] Including io.prometheus:prometheus-metrics-exporter-common:jar:1.3.10 in the shaded jar.
+#31 18.45 [INFO] Including io.prometheus:prometheus-metrics-model:jar:1.3.10 in the shaded jar.
+#31 18.45 [INFO] Including io.prometheus:prometheus-metrics-exposition-formats-no-protobuf:jar:1.3.10 in the shaded jar.
+#31 18.45 [INFO] Including io.prometheus:prometheus-metrics-exposition-textformats:jar:1.3.10 in the shaded jar.
+#31 18.45 [INFO] Including io.prometheus:prometheus-metrics-config:jar:1.3.10 in the shaded jar.
+#31 18.45 [INFO] Including io.opentelemetry.instrumentation:opentelemetry-logback-appender-1.0:jar:2.14.0-alpha in the shaded jar.
+#31 18.45 [INFO] Including io.opentelemetry.instrumentation:opentelemetry-instrumentation-api:jar:2.14.0 in the shaded jar.
+#31 18.45 [INFO] Including io.opentelemetry:opentelemetry-api-incubator:jar:1.48.0-alpha in the shaded jar.
+#31 18.45 [INFO] Including io.opentelemetry.semconv:opentelemetry-semconv:jar:1.30.0 in the shaded jar.
+#31 18.45 [INFO] Including io.opentelemetry.instrumentation:opentelemetry-instrumentation-api-incubator:jar:2.14.0-alpha in the shaded jar.
+#31 18.45 [INFO] Including com.fasterxml.jackson.core:jackson-databind:jar:2.18.2 in the shaded jar.
+#31 18.45 [INFO] Including com.fasterxml.jackson.datatype:jackson-datatype-jsr310:jar:2.19.4 in the shaded jar.
+#31 18.45 [INFO] Including io.grpc:grpc-protobuf:jar:1.68.1 in the shaded jar.
+#31 18.45 [INFO] Including io.grpc:grpc-api:jar:1.68.1 in the shaded jar.
+#31 18.45 [INFO] Including com.google.code.findbugs:jsr305:jar:3.0.2 in the shaded jar.
+#31 18.45 [INFO] Including com.google.api.grpc:proto-google-common-protos:jar:2.41.0 in the shaded jar.
+#31 18.45 [INFO] Including io.grpc:grpc-protobuf-lite:jar:1.68.1 in the shaded jar.
+#31 18.45 [INFO] Including io.grpc:grpc-stub:jar:1.68.1 in the shaded jar.
+#31 18.45 [INFO] Including com.google.errorprone:error_prone_annotations:jar:2.28.0 in the shaded jar.
+#31 18.45 [INFO] Including io.grpc:grpc-netty:jar:1.68.1 in the shaded jar.
+#31 18.45 [INFO] Including io.grpc:grpc-core:jar:1.68.1 in the shaded jar.
+#31 18.45 [INFO] Including com.google.android:annotations:jar:4.1.1.4 in the shaded jar.
+#31 18.45 [INFO] Including org.codehaus.mojo:animal-sniffer-annotations:jar:1.24 in the shaded jar.
+#31 18.45 [INFO] Including io.grpc:grpc-context:jar:1.68.1 in the shaded jar.
+#31 18.45 [INFO] Including io.perfmark:perfmark-api:jar:0.27.0 in the shaded jar.
+#31 18.45 [INFO] Including io.netty:netty-transport-native-unix-common:jar:4.2.10.Final in the shaded jar.
+#31 18.45 [INFO] Including io.grpc:grpc-util:jar:1.68.1 in the shaded jar.
+#31 18.45 [INFO] Including com.google.guava:guava:jar:33.5.0-jre in the shaded jar.
+#31 18.45 [INFO] Including com.google.guava:failureaccess:jar:1.0.3 in the shaded jar.
+#31 18.45 [INFO] Including com.google.guava:listenablefuture:jar:9999.0-empty-to-avoid-conflict-with-guava in the shaded jar.
+#31 18.45 [INFO] Including org.jspecify:jspecify:jar:1.0.0 in the shaded jar.
+#31 18.45 [INFO] Including com.google.j2objc:j2objc-annotations:jar:3.1 in the shaded jar.
+#31 18.45 [INFO] Including com.google.protobuf:protobuf-java:jar:3.25.5 in the shaded jar.
+#31 18.45 [INFO] Including com.google.protobuf:protobuf-java-util:jar:3.25.5 in the shaded jar.
+#31 18.45 [INFO] Including com.google.code.gson:gson:jar:2.8.9 in the shaded jar.
+#31 18.45 [INFO] Including org.slf4j:slf4j-api:jar:2.0.17 in the shaded jar.
+#31 18.45 [INFO] Including org.slf4j:jul-to-slf4j:jar:2.0.17 in the shaded jar.
+#31 18.45 [INFO] Including javax.annotation:javax.annotation-api:jar:1.3.2 in the shaded jar.
+#31 18.46 [INFO] Including ch.qos.logback:logback-classic:jar:1.5.32 in the shaded jar.
+#31 18.46 [INFO] Including ch.qos.logback:logback-core:jar:1.5.32 in the shaded jar.
+#31 18.46 [INFO] Including org.jetbrains:annotations:jar:17.0.0 in the shaded jar.
+#31 18.64 [WARNING] Discovered module-info.class. Shading will break its strong encapsulation.
+#31 18.64 [WARNING] Discovered module-info.class. Shading will break its strong encapsulation.
+#31 18.68 [WARNING] Discovered module-info.class. Shading will break its strong encapsulation.
+#31 18.71 [WARNING] Discovered module-info.class. Shading will break its strong encapsulation.
+#31 18.76 [WARNING] Discovered module-info.class. Shading will break its strong encapsulation.
+#31 19.21 [WARNING] Discovered module-info.class. Shading will break its strong encapsulation.
+#31 19.22 [WARNING] Discovered module-info.class. Shading will break its strong encapsulation.
+#31 19.38 [WARNING] Discovered module-info.class. Shading will break its strong encapsulation.
+#31 19.38 [WARNING] Discovered module-info.class. Shading will break its strong encapsulation.
+#31 19.80 [WARNING] Discovered module-info.class. Shading will break its strong encapsulation.
+#31 19.81 [WARNING] Discovered module-info.class. Shading will break its strong encapsulation.
+#31 19.82 [WARNING] Discovered module-info.class. Shading will break its strong encapsulation.
+#31 19.82 [WARNING] Discovered module-info.class. Shading will break its strong encapsulation.
+#31 19.83 [WARNING] Discovered module-info.class. Shading will break its strong encapsulation.
+#31 19.84 [WARNING] Discovered module-info.class. Shading will break its strong encapsulation.
+#31 19.84 [WARNING] Discovered module-info.class. Shading will break its strong encapsulation.
+#31 20.18 [WARNING] Discovered module-info.class. Shading will break its strong encapsulation.
+#31 21.30 [WARNING] Discovered module-info.class. Shading will break its strong encapsulation.
+#31 21.34 [WARNING] Discovered module-info.class. Shading will break its strong encapsulation.
+#31 21.39 [WARNING] Discovered module-info.class. Shading will break its strong encapsulation.
+#31 21.41 [WARNING] spring-core-6.2.16.jar, spring-expression-6.2.16.jar, spring-jcl-6.2.16.jar define 2 overlapping resources: 
+#31 21.41 [WARNING]   - META-INF/license.txt
+#31 21.41 [WARNING]   - META-INF/notice.txt
+#31 21.41 [WARNING] animal-sniffer-annotations-1.24.jar, annotations-17.0.0.jar, annotations-4.1.1.4.jar, error_prone_annotations-2.28.0.jar, failureaccess-1.0.3.jar, grpc-api-1.68.1.jar, grpc-context-1.68.1.jar, grpc-core-1.68.1.jar, grpc-netty-1.68.1.jar, grpc-protobuf-1.68.1.jar, grpc-protobuf-lite-1.68.1.jar, grpc-stub-1.68.1.jar, grpc-util-1.68.1.jar, gson-2.8.9.jar, guava-33.5.0-jre.jar, itu-1.14.0.jar, j2objc-annotations-3.1.jar, jackson-annotations-2.18.2.jar, jackson-core-2.18.2.jar, jackson-databind-2.18.2.jar, jackson-dataformat-yaml-2.18.2.jar, jackson-datatype-jsr310-2.19.4.jar, jakarta.validation-api-3.0.2.jar, javax.annotation-api-1.3.2.jar, jsch-0.2.26.jar, json-schema-validator-1.5.9.jar, jspecify-1.0.0.jar, jsr305-3.0.2.jar, jul-to-slf4j-2.0.17.jar, kotlin-stdlib-2.2.21.jar, listenablefuture-9999.0-empty-to-avoid-conflict-with-guava.jar, logback-classic-1.5.32.jar, logback-core-1.5.32.jar, netty-buffer-4.2.10.Final.jar, netty-codec-base-4.2.10.Final.jar, netty-codec-compression-4.2.10.Final.jar, netty-codec-dns-4.2.10.Final.jar, netty-codec-http-4.2.10.Final.jar, netty-codec-http2-4.2.10.Final.jar, netty-codec-socks-4.2.10.Final.jar, netty-common-4.2.10.Final.jar, netty-handler-4.2.10.Final.jar, netty-handler-proxy-4.2.10.Final.jar, netty-resolver-4.2.10.Final.jar, netty-resolver-dns-4.2.10.Final.jar, netty-transport-4.2.10.Final.jar, netty-transport-native-unix-common-4.2.10.Final.jar, okhttp-jvm-5.3.2.jar, okio-jvm-3.16.4.jar, opentelemetry-api-1.59.0.jar, opentelemetry-api-incubator-1.48.0-alpha.jar, opentelemetry-common-1.59.0.jar, opentelemetry-context-1.59.0.jar, opentelemetry-exporter-common-1.59.0.jar, opentelemetry-exporter-otlp-1.59.0.jar, opentelemetry-exporter-otlp-common-1.59.0.jar, opentelemetry-exporter-prometheus-1.59.0-alpha.jar, opentelemetry-exporter-sender-okhttp-1.59.0.jar, opentelemetry-instrumentation-api-2.14.0.jar, opentelemetry-instrumentation-api-incubator-2.14.0-alpha.jar, opentelemetry-logback-appender-1.0-2.14.0-alpha.jar, opentelemetry-sdk-1.59.0.jar, opentelemetry-sdk-common-1.59.0.jar, opentelemetry-sdk-extension-autoconfigure-spi-1.59.0.jar, opentelemetry-sdk-logs-1.59.0.jar, opentelemetry-sdk-metrics-1.59.0.jar, opentelemetry-sdk-trace-1.59.0.jar, opentelemetry-semconv-1.30.0.jar, perfmark-api-0.27.0.jar, prometheus-metrics-config-1.3.10.jar, prometheus-metrics-exporter-common-1.3.10.jar, prometheus-metrics-exporter-httpserver-1.3.10.jar, prometheus-metrics-exposition-formats-no-protobuf-1.3.10.jar, prometheus-metrics-exposition-textformats-1.3.10.jar, prometheus-metrics-model-1.3.10.jar, proto-google-common-protos-2.41.0.jar, protobuf-java-3.25.5.jar, protobuf-java-util-3.25.5.jar, quorus-controller-1.0-SNAPSHOT.jar, quorus-core-1.0-SNAPSHOT.jar, quorus-tenant-1.0-SNAPSHOT.jar, quorus-workflow-1.0-SNAPSHOT.jar, raftlog-core-1.2.0.jar, saslprep-2.2.jar, scram-client-3.2.jar, scram-common-3.2.jar, slf4j-api-2.0.17.jar, snakeyaml-2.0.jar, spring-core-6.2.16.jar, spring-expression-6.2.16.jar, spring-jcl-6.2.16.jar, stringprep-2.2.jar, vertx-auth-common-5.0.8.jar, vertx-bridge-common-5.0.8.jar, vertx-core-5.0.8.jar, vertx-core-logging-5.0.8.jar, vertx-grpc-client-5.0.8.jar, vertx-grpc-common-5.0.8.jar, vertx-grpc-server-5.0.8.jar, vertx-opentelemetry-5.0.8.jar, vertx-pg-client-5.0.8.jar, vertx-sql-client-5.0.8.jar, vertx-uri-template-5.0.8.jar, vertx-web-5.0.8.jar, vertx-web-client-5.0.8.jar, vertx-web-common-5.0.8.jar define 1 overlapping resource: 
+#31 21.41 [WARNING]   - META-INF/MANIFEST.MF
+#31 21.41 [WARNING] failureaccess-1.0.3.jar, guava-33.5.0-jre.jar, jackson-annotations-2.18.2.jar, jackson-core-2.18.2.jar, jackson-databind-2.18.2.jar, jackson-dataformat-yaml-2.18.2.jar, jackson-datatype-jsr310-2.19.4.jar, saslprep-2.2.jar, scram-client-3.2.jar, scram-common-3.2.jar, stringprep-2.2.jar define 1 overlapping resource: 
+#31 21.41 [WARNING]   - META-INF/LICENSE
+#31 21.41 [WARNING] jsch-0.2.26.jar, jspecify-1.0.0.jar, okhttp-jvm-5.3.2.jar define 1 overlapping resource: 
+#31 21.41 [WARNING]   - META-INF/versions/9/OSGI-INF/MANIFEST.MF
+#31 21.41 [WARNING] jackson-annotations-2.18.2.jar, jackson-core-2.18.2.jar, jackson-databind-2.18.2.jar, jackson-dataformat-yaml-2.18.2.jar, jackson-datatype-jsr310-2.19.4.jar define 1 overlapping resource: 
+#31 21.41 [WARNING]   - META-INF/NOTICE
+#31 21.41 [WARNING] error_prone_annotations-2.28.0.jar, failureaccess-1.0.3.jar, guava-33.5.0-jre.jar, itu-1.14.0.jar, j2objc-annotations-3.1.jar, jackson-core-2.18.2.jar, jackson-databind-2.18.2.jar, jackson-dataformat-yaml-2.18.2.jar, jackson-datatype-jsr310-2.19.4.jar, jsch-0.2.26.jar, json-schema-validator-1.5.9.jar, jspecify-1.0.0.jar, jul-to-slf4j-2.0.17.jar, kotlin-stdlib-2.2.21.jar, okhttp-jvm-5.3.2.jar, saslprep-2.2.jar, scram-client-3.2.jar, scram-common-3.2.jar, slf4j-api-2.0.17.jar, snakeyaml-2.0.jar, stringprep-2.2.jar define 1 overlapping classes: 
+#31 21.41 [WARNING]   - META-INF.versions.9.module-info
+#31 21.41 [WARNING] javax.annotation-api-1.3.2.jar, jsch-0.2.26.jar, jul-to-slf4j-2.0.17.jar, slf4j-api-2.0.17.jar define 1 overlapping resource: 
+#31 21.41 [WARNING]   - META-INF/LICENSE.txt
+#31 21.41 [WARNING] netty-common-4.2.10.Final.jar, opentelemetry-sdk-trace-1.59.0.jar define 2 overlapping resources: 
+#31 21.41 [WARNING]   - META-INF/maven/org.jctools/jctools-core/pom.properties
+#31 21.41 [WARNING]   - META-INF/maven/org.jctools/jctools-core/pom.xml
+#31 21.41 [WARNING] netty-buffer-4.2.10.Final.jar, netty-codec-base-4.2.10.Final.jar, netty-codec-compression-4.2.10.Final.jar, netty-codec-dns-4.2.10.Final.jar, netty-codec-http-4.2.10.Final.jar, netty-codec-http2-4.2.10.Final.jar, netty-codec-socks-4.2.10.Final.jar, netty-common-4.2.10.Final.jar, netty-handler-4.2.10.Final.jar, netty-handler-proxy-4.2.10.Final.jar, netty-resolver-4.2.10.Final.jar, netty-resolver-dns-4.2.10.Final.jar, netty-transport-4.2.10.Final.jar, netty-transport-native-unix-common-4.2.10.Final.jar define 2 overlapping class and resource: 
+#31 21.41 [WARNING]   - META-INF.versions.11.module-info
+#31 21.41 [WARNING]   - META-INF/io.netty.versions.properties
+#31 21.41 [WARNING] maven-shade-plugin has detected that some class files are
+#31 21.41 [WARNING] present in two or more JARs. When this happens, only one
+#31 21.41 [WARNING] single version of the class is copied to the uber jar.
+#31 21.41 [WARNING] Usually this is not harmful and you can skip these warnings,
+#31 21.41 [WARNING] otherwise try to manually exclude artifacts based on
+#31 21.41 [WARNING] mvn dependency:tree -Ddetail=true and the above output.
+#31 21.41 [WARNING] See https://maven.apache.org/plugins/maven-shade-plugin/
+#31 21.43 [INFO] Replacing original artifact with shaded artifact.
+#31 21.43 [INFO] Replacing /app/quorus-controller/target/quorus-controller-1.0-SNAPSHOT.jar with /app/quorus-controller/target/quorus-controller-1.0-SNAPSHOT-shaded.jar
+#31 21.43 [INFO] ------------------------------------------------------------------------
+#31 21.43 [INFO] Reactor Summary for Quorus File Transfer System 1.0-SNAPSHOT:
+#31 21.43 [INFO] 
+#31 21.43 [INFO] Quorus File Transfer System ........................ SUCCESS [  0.332 s]
+#31 21.43 [INFO] Quorus Core ........................................ SUCCESS [  8.676 s]
+#31 21.43 [INFO] Quorus Workflow Engine ............................. SUCCESS [  1.085 s]
+#31 21.43 [INFO] Quorus Tenant Management ........................... SUCCESS [  0.687 s]
+#31 21.43 [INFO] Quorus Distributed Controller ...................... SUCCESS [  8.421 s]
+#31 21.43 [INFO] ------------------------------------------------------------------------
+#31 21.43 [INFO] BUILD SUCCESS
+#31 21.43 [INFO] ------------------------------------------------------------------------
+#31 21.43 [INFO] Total time:  19.417 s
+#31 21.43 [INFO] Finished at: 2026-09-05T07:36:27Z
+#31 21.43 [INFO] ------------------------------------------------------------------------
+#31 DONE 21.6s
+
+#32 [stage-1 3/6] RUN addgroup -g 1001 quorus &&     adduser -D -s /bin/sh -u 1001 -G quorus quorus
+#32 CACHED
+
+#33 [stage-1 2/6] RUN apk add --no-cache curl
+#33 CACHED
+
+#34 [stage-1 4/6] WORKDIR /app
+#34 CACHED
+
+#35 [stage-1 5/6] COPY --from=builder /app/quorus-controller/target/quorus-controller-*.jar app.jar
+#35 DONE 0.1s
+
+#36 [stage-1 6/6] RUN mkdir -p /app/logs /app/data &&     chown -R quorus:quorus /app
+#36 DONE 0.4s
+
+#37 exporting to image
+#37 exporting layers 0.1s done
+#37 writing image sha256:11709c3f98ecb62a6324e3a497b084eb82e58aa482c63eece91e4f0c81f353de done
+#37 naming to docker.io/library/quorus-controller:test 0.0s done
+#37 DONE 0.2s
+
+#38 resolving provenance for metadata file
+#38 DONE 0.0s
+ Image quorus-controller:test Built 

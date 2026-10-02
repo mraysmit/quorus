@@ -2,11 +2,11 @@
 
 # Quorus Comprehensive System Design
 
-**Version:** 3.6  
-**Date:** 2025-08-26  
+**Version:** 3.8
+**Date:** 2026-09-28  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
-**Updated:** 2026-09-04  
+**Updated:** 2026-09-28
 **Status:** Non-normative target-state vision  
 **Scope:** Historical design material, current concepts, and future architecture
 
@@ -29,8 +29,8 @@
 
 | Technology | Version | Purpose |
 |------------|---------|---------|
-| **Java** | 25 | Runtime platform and repository build baseline |
-| **Vert.x** | 5.0.8 | Reactive toolkit for HTTP server, event bus, and async operations |
+| **Java** | 27 | Runtime platform and repository build baseline (`maven.compiler.release` 27) |
+| **Vert.x** | 5.0.8 | `quorus-controller` only: HTTP server and async operations, until plan item RT-06 moves the controller off it ([ADR-0012](../architecture-decisions/ADR-0012-JAVA-RUNTIME-AND-STRUCTURED-CONCURRENCY.md)); no other module uses Vert.x |
 | **gRPC** | 1.68.1 | High-performance RPC for Raft consensus transport |
 | **Protocol Buffers** | 3.25.5 | Binary serialization for Raft messages |
 | **Jackson** | 2.18.2 | JSON serialization for REST API |
@@ -51,7 +51,7 @@ This document describes a target-state enterprise file-transfer system designed 
 
   | Module | Purpose | Key Classes |
   |--------|---------|-------------|
-  | `quorus-core` | Transfer primitives, protocol adapters (`HttpTransferProtocol`, `SftpTransferProtocol`, `FtpTransferProtocol`, `SmbTransferProtocol`), `SimpleTransferEngine` with Vert.x `WorkerExecutor` | `TransferEngine`, `ProtocolFactory`, `TransferJob`, `TransferRequest` |
+  | `quorus-core` | Transfer primitives, protocol adapters (`HttpTransferProtocol`, `SftpTransferProtocol`, `FtpTransferProtocol`, `SmbTransferProtocol`), blocking `SimpleTransferEngine` that runs each transfer on the calling thread under a concurrency limit, with retries | `TransferEngine`, `ProtocolFactory`, `TransferJob`, `TransferRequest` |
   | `quorus-workflow` | YAML parsing via `YamlWorkflowDefinitionParser`, validation with `WorkflowSchemaValidator`, dependency resolution via `DependencyGraph` | `WorkflowEngine`, `SimpleWorkflowEngine`, `WorkflowDefinition`, `TransferGroup` |
   | `quorus-tenant` | Tenant registry, quotas via `ResourceManagementService`, hierarchical tenant model | `TenantService`, `SimpleTenantService`, `Tenant`, `TenantConfiguration` |
   | `quorus-controller` | Vert.x 5 verticle runtime with gRPC Raft transport, `RaftNode` consensus, embedded `HttpApiServer` | `QuorusControllerVerticle`, `GrpcRaftTransport`, `GrpcRaftServer`, `QuorusStateMachine` |
@@ -81,7 +81,7 @@ An administration or operations user interface is only a presentation and contro
 
 | Capability | Target outcome | Current design position |
 |---|---|---|
-| Identity, access, and separation of duties | Authenticated human and workload identities with scoped authorization and controlled privileged actions | Required; current controller has no built-in authenticated identity boundary |
+| Identity, access, and separation of duties | Authenticated human and workload identities with scoped authorization and controlled privileged actions | Partial; production HTTP and Raft use mTLS, trusted identities, scoped policy and audit, while corporate SSO, fleet identity lifecycle and complete enterprise evidence remain open |
 | Agent trust and deployment lifecycle | Every agent is enrolled, identifiable, attestable, upgradeable, revocable, and auditable | Required; current alpha registration is incomplete |
 | Governed service connectivity | Agents connect only to approved services, paths, protocols, and network zones using verified peers and secret references | Implemented for the Phase 4 production transfer path; broader route/workflow adoption follows their activation phases |
 | Transfer correctness and recovery | Attempts, leases, fencing, integrity, atomic publication, retry, and reconciliation produce explainable outcomes | Required; duplicate-safe reassignment is not available |
@@ -1286,7 +1286,7 @@ graph TB
 
 ### Raft Transport Layer (v2.3)
 
-> **Updated in v2.3**: The Raft transport layer uses type-safe sealed interfaces with pattern matching under the current Java 25 baseline.
+> **Updated in v2.3**: The Raft transport layer uses type-safe sealed interfaces with pattern matching under the current Java 27 baseline.
 
 The `RaftTransport` interface defines the communication layer for Raft consensus messages between controller nodes:
 
@@ -1314,7 +1314,7 @@ public sealed interface RaftMessage {
 **Benefits of Sealed Interfaces:**
 - **Exhaustive pattern matching**: Compiler ensures all message types are handled
 - **Type safety**: No runtime `instanceof` checks needed
-- **Modern Java idiom**: Leverages sealed types and pattern matching under the Java 25 baseline
+- **Modern Java idiom**: Leverages sealed types and pattern matching under the Java 27 baseline
 
 **Usage in RaftNode:**
 ```java
@@ -2427,9 +2427,9 @@ The figures below are target workloads that require reproducible benchmark and f
 
 **Security and Isolation:**
 - **Network Segmentation**: Isolated Docker networks for different tenants
-- **Target-State Encryption**: TLS/mTLS with verified identities at every applicable communication boundary; this is not complete in the current runtime
-- **Authentication**: Mutual TLS authentication between Quorus Controllers and Quorus Agents
-- **Authorization**: Fine-grained access control and permissions
+- **Implemented control-plane encryption**: the production profile requires TLS 1.3 mutual authentication for controller HTTP and Raft, and agents support certificate-authenticated HTTPS
+- **Implemented identity boundary**: trusted gateway subjects and direct certificate bindings resolve callers before tenant, role, and scope policy is evaluated
+- **Remaining deployment boundary**: corporate PKI accreditation, agent enrollment and rotation, peer-to-node binding, and complete telemetry/evidence transport validation remain open; see [Architecture Specification §3](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md#3-capability-status) and the [Security Deployment Guide](../../docs/QUORUS_SECURITY_DEPLOYMENT_GUIDE.md)
 
 ## Core Components
 
@@ -3091,15 +3091,15 @@ public interface WorkflowDefinitionParser {
 #### 2. Workflow Engine
 ```java
 public interface WorkflowEngine {
-    WorkflowExecution execute(WorkflowDefinition definition, ExecutionContext context);
-    WorkflowExecution dryRun(WorkflowDefinition definition, ExecutionContext context);
-    WorkflowExecution virtualRun(WorkflowDefinition definition, ExecutionContext context);
+    // Blocking: each returns the finished execution (RT-04)
+    WorkflowExecution execute(WorkflowDefinition definition, ExecutionContext context) throws InterruptedException;
+    WorkflowExecution dryRun(WorkflowDefinition definition, ExecutionContext context) throws InterruptedException;
+    WorkflowExecution virtualRun(WorkflowDefinition definition, ExecutionContext context) throws InterruptedException;
 
     // Monitoring and control
     WorkflowStatus getStatus(String executionId);
-    boolean pause(String executionId);
-    boolean resume(String executionId);
-    boolean cancel(String executionId);
+    boolean cancel(String executionId);   // stops a running execution; it ends CANCELLED
+    void shutdown();
 }
 ```
 
@@ -4343,16 +4343,38 @@ source:
 - **Shade Plugin**: Creates executable JAR with all dependencies
 - **Main Class**: `dev.mars.quorus.controller.QuorusControllerApplication`
 - **Health Checks**: Integrated Docker health monitoring
-- **Multi-Stage Build**: Optimized Docker images
+- **Single-Stage Image**: The image copies the jar built on the host; Java and Maven never run inside Docker
 
 **Docker Configuration:**
 ```dockerfile
-# Runtime image matching the repository's Java 25 bytecode baseline
-FROM eclipse-temurin:25-jre-alpine
-COPY target/quorus-controller-*.jar app.jar
-HEALTHCHECK CMD curl -f http://localhost:${HTTP_PORT}/health
+# Single-stage runtime image. It copies the controller jar built and tested on the host;
+# Maven and javac never run inside Docker. Build the jar first with docker/build-runtime.*.
+ARG RUNTIME_IMAGE=amazoncorretto:27.0.0-alpine3.24
+FROM ${RUNTIME_IMAGE}
+RUN apk add --no-cache curl
+RUN addgroup -g 1001 quorus && \
+    adduser -D -s /bin/sh -u 1001 -G quorus quorus
+WORKDIR /app
+COPY quorus-controller/target/quorus-controller-*.jar app.jar
+RUN mkdir -p /app/logs /app/data && \
+    chown -R quorus:quorus /app
+USER quorus
+EXPOSE 8080 9080
+# Health check follows the configured HTTP transport; the HTTPS probe presents a client
+# certificate because production HTTP requires mutual TLS.
+HEALTHCHECK --interval=10s --timeout=5s --start-period=15s --retries=3 \
+    CMD if [ "${QUORUS_SECURITY_HTTP_TLS_ENABLED:-true}" = "true" ]; then \
+      curl --fail --silent --show-error --insecure \
+        --cert "${QUORUS_HEALTHCHECK_CLIENT_CERTIFICATE:-$QUORUS_SECURITY_HTTP_TLS_CERTIFICATE}" \
+        --key "${QUORUS_HEALTHCHECK_CLIENT_PRIVATE_KEY:-$QUORUS_SECURITY_HTTP_TLS_PRIVATE_KEY}" \
+        "https://localhost:${QUORUS_HTTP_PORT}/health/live"; \
+      else \
+        curl --fail --silent --show-error "http://localhost:${QUORUS_HTTP_PORT}/health/live"; \
+      fi
 CMD ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
 ```
+
+The full file, including the environment defaults, is `quorus-controller/Dockerfile`.
 
 ### Configuration Management
 
@@ -4618,7 +4640,7 @@ docs/                           # Documentation
 - **[Canonical Architecture Specification](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md)** - Current guarantees, boundaries, and release requirements
 - **[Canonical REST API Specification](../../docs/QUORUS_REST_API_SPECIFICATION.md)** - Complete control, operations, security, and administration API contract
 - **[Enterprise Implementation Plan](../task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md)** - Phased delivery, dependencies, verification, and exit gates
-- **[HTTP API Reference](../../docs/QUORUS_API_REFERENCE.md)** - Endpoints registered by the active controller runtime
+- **[OpenAPI contract](../../quorus-controller/src/main/resources/openapi/quorus-controller-v1.yaml)** - The current HTTP API, also served at `GET /api/v1/openapi.yaml`
 
 ## Conclusion
 

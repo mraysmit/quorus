@@ -1,0 +1,214 @@
+{
+  "slice": "RT-03c",
+  "title": "Blocking TransferEngine on the caller's thread, without Vert.x (ADR-0012 option A)",
+  "requirement": "Plan §20 RT-03 (slice RT-03c); ADR-0012 decisions 2 and 6; concurrency conventions §1 and §2; register OBS-07",
+  "acceptance": [
+    "transfer(TransferRequest) runs on the calling thread and needs no Vert.x instance",
+    "A transfer beyond maxConcurrentTransfers is rejected with TransferException; a freed slot is reused",
+    "A failed attempt is retried up to maxRetryAttempts; exhausting retries returns FAILED",
+    "cancelTransfer(jobId) ends that transfer promptly as CANCELLED, without a retry, with the message \"Transfer cancelled\", and without leaving the caller's thread interrupted",
+    "Cancelling one transfer does not affect another transfer of the same protocol",
+    "shutdown(Duration) cancels running transfers, returns once they have ended, and rejects new transfers",
+    "An interrupt the engine did not send ends the transfer as CANCELLED without a retry and stays set"
+  ],
+  "acceptanceWrittenBeforeImplementation": true,
+  "classification": "external-path behavioral (every transfer goes through a real local HTTP server)",
+  "baseRevision": "6a2864c",
+  "patch": {
+    "path": "docs-design/evidence/raw/rt-03/c-rt-03c.patch",
+    "sha256": "91290936ffb9e5f8fcf40eda5625205ddde150ed53e89a051aa417224f6ed699"
+  },
+  "environment": {
+    "jdk": "OpenJDK 27 GA, build 27+35-2325",
+    "maven": "Apache Maven 3.9.11",
+    "os": "Windows 11 Pro N 10.0.26340"
+  },
+  "test": {
+    "file": "quorus-core/src/test/java/dev/mars/quorus/transfer/SimpleTransferEngineBlockingTest.java"
+  },
+  "preparatoryRefactor": {
+    "command": "mvn -B test -pl quorus-core -Dtest=ProtocolFactory*Test,SimpleTransferEngine*Test,FtpsTransferProtocolTest,NfsTransferProtocolTest -Dsurefire.failIfNoSpecifiedTests=false -Djacoco.skip=true",
+    "started": "2026-09-27T10:21:46+01:00",
+    "finished": "2026-09-27T10:22:03+01:00",
+    "result": "104 tests, 0 failures (the new test class was held out of this run)",
+    "change": "ProtocolFactory gained constructors without Vert.x; the Vert.x constructors are deprecated and ignore the instance, which no adapter has needed since RT-03b. Behaviour-preserving.",
+    "log": {
+      "path": "docs-design/evidence/raw/rt-03/c-prep-refactor.log",
+      "sha256": "3a17d8acbbdd9ac5633d942552b3c34070439fbf4ce6bf748d80a36a388152b4"
+    }
+  },
+  "discardedAttempts": [
+    {
+      "name": "red attempt 1",
+      "reason": "Test defect: five tests waited on the server handshake with an unbounded join. The red-stage stub throws before any request, so each hung until the 30-second preemptive timeout. The wait now completes when either the server signals or the transfer ends.",
+      "log": {
+        "path": "docs-design/evidence/raw/rt-03/c-red-attempt1-hanging-handshake.log",
+        "sha256": "78e51cc05ffd7773865e850b25dac9266fb2c812acb1352ff92b5648545fa94e"
+      }
+    },
+    {
+      "name": "affected-modules attempt 1",
+      "reason": "TransferExecutionServiceTest.testDeprecatedConstructorClosesOwnedVertx timed out. The shutdown chain was composed on a future bound to the service's own Vert.x context, so its continuation was never dispatched once that instance closed.",
+      "log": {
+        "path": "docs-design/evidence/raw/rt-03/c-affected-attempt1-owned-vertx-close.log",
+        "sha256": "47ae64b6e6a0d55fe69fa074f2bd4767d3303560c2ac2e4debb60c8a9eca3015"
+      }
+    },
+    {
+      "name": "agent attempt 1",
+      "reason": "First fix moved only the close to a virtual thread; the continuation was still bound to the closed context. Fixed by running the whole owned-instance shutdown on one virtual thread and completing a promise bound to no context.",
+      "log": {
+        "path": "docs-design/evidence/raw/rt-03/c-agent-attempt1-close-on-dead-context.log",
+        "sha256": "9cddedc715bf6571958e1860055e43fab719c4f20e70c444e232a376716d0beb"
+      }
+    },
+    {
+      "name": "first full regression",
+      "reason": "Stopped deliberately after a reporting gap was found (below); its processes were verified by command line and parent chain before being stopped. No log retained."
+    }
+  ],
+  "red": {
+    "command": "mvn -B test -pl quorus-core -Dtest=SimpleTransferEngineBlockingTest -Dsurefire.failIfNoSpecifiedTests=false -Djacoco.skip=true",
+    "started": "2026-09-27T10:25:17+01:00",
+    "finished": "2026-09-27T10:25:26+01:00",
+    "result": "8 tests, 8 errors, each on the RT-03c stub (UnsupportedOperationException), within 9 seconds",
+    "revision": "6a2864c plus the preparatory refactor, the stub constructor and methods, and the tests",
+    "patch": {
+      "path": "docs-design/evidence/raw/rt-03/c-red.patch",
+      "sha256": "a449158007952230d5868c89de8d00fd19d17be276ee254f850cc9fa70a8e783"
+    },
+    "log": {
+      "path": "docs-design/evidence/raw/rt-03/c-red.log",
+      "sha256": "a30a255af57bcd64e1375da4f205b8f339d0a893b54f6c1579696ad1b30b7579"
+    }
+  },
+  "green": {
+    "command": "mvn -B test -pl quorus-core -Dtest=SimpleTransferEngineBlockingTest -Dsurefire.failIfNoSpecifiedTests=false -Djacoco.skip=true",
+    "started": "2026-09-27T10:33:57+01:00",
+    "finished": "2026-09-27T10:34:08+01:00",
+    "result": "8 tests, 0 failures",
+    "change": "SimpleTransferEngine rewritten: blocking transfer on the caller's thread, a semaphore for the limit, retries with interruptible back-off, per-transfer cancellation by interrupt guarded against the completion race, and shutdown(Duration). TransferEngine has no Vert.x types.",
+    "log": {
+      "path": "docs-design/evidence/raw/rt-03/c-green.log",
+      "sha256": "d8308009a1324df3eed64b162417187ffe839e1d5288170618ab5db28cecee2f"
+    }
+  },
+  "secondCycle": {
+    "reason": "Found during regression: the agent reports the message of any unsuccessful result, and a cancelled job carried none, so a transfer cancelled at agent shutdown would have been reported as \"Unknown error\".",
+    "red": {
+      "command": "mvn -B test -pl quorus-core -Dtest=SimpleTransferEngineBlockingTest -Dsurefire.failIfNoSpecifiedTests=false -Djacoco.skip=true",
+      "started": "2026-09-27T10:44:11+01:00",
+      "finished": "2026-09-27T10:44:20+01:00",
+      "result": "8 tests, 1 failure: the cancelled result had no error message",
+      "log": {
+        "path": "docs-design/evidence/raw/rt-03/c-red-message.log",
+        "sha256": "5598064d1defc43821982aaff471f6001be0f70039ce03d6dbe677354199f320"
+      }
+    },
+    "green": {
+      "command": "mvn -B test -pl quorus-core -Dtest=SimpleTransferEngine*Test -Dsurefire.failIfNoSpecifiedTests=false -Djacoco.skip=true",
+      "started": "2026-09-27T10:44:35+01:00",
+      "finished": "2026-09-27T10:44:45+01:00",
+      "result": "27 tests, 0 failures",
+      "log": {
+        "path": "docs-design/evidence/raw/rt-03/c-green-message.log",
+        "sha256": "ff4fd983a886ce22accd8fd572c06c946cc274415744918896a850ca19768ab2"
+      }
+    }
+  },
+  "mutationCheck": {
+    "command": "mvn -B test -pl quorus-core -Dtest=SimpleTransferEngineBlockingTest -Dsurefire.failIfNoSpecifiedTests=false -Djacoco.skip=true (per mutant)",
+    "mutants": [
+      {
+        "name": "m1-no-interrupt",
+        "result": "detected by three cancellation and shutdown tests",
+        "log": {
+          "path": "docs-design/evidence/raw/rt-03/c-mutation-m1-no-interrupt.log",
+          "sha256": "cd32e9510fbbc3e971f994faa85c65ec1c6df6b1fcf192a3e9f6d975673c58d4"
+        }
+      },
+      {
+        "name": "m2-shared-abort (the pre-RT-03c behaviour)",
+        "result": "detected by cancellingOneTransferLeavesAnotherRunning",
+        "log": {
+          "path": "docs-design/evidence/raw/rt-03/c-mutation-m2-shared-abort.log",
+          "sha256": "9203e8f3dc546d9bbfe12299c56062640db80f13d8fefd63df043fe548ef393d"
+        }
+      },
+      {
+        "name": "m3-slot-leak",
+        "result": "detected by rejectsBeyondTheConcurrencyLimitAndAcceptsOnceASlotFrees",
+        "log": {
+          "path": "docs-design/evidence/raw/rt-03/c-mutation-m3-slot-leak.log",
+          "sha256": "fdba6d0ac3cf5238fa48942aad3ff04515366c9deb9f6a7bbd6f986b72773290"
+        }
+      },
+      {
+        "name": "m4-interrupt-not-consumed",
+        "result": "detected by cancellingARunningTransferEndsItAsCancelled",
+        "log": {
+          "path": "docs-design/evidence/raw/rt-03/c-mutation-m4-interrupt-not-consumed.log",
+          "sha256": "aa89760ea665252bdb45b68970a39d99f04f0b31c3b35120e3b97f3aa1593602"
+        }
+      },
+      {
+        "name": "m5-interrupt-ignored",
+        "result": "survived the first run: with retries allowed, the interruptible back-off also ends the transfer as CANCELLED. The outside-interrupt test was changed to use no retries, and the mutant is then detected. The first, surviving run's log was overwritten by the rerun.",
+        "log": {
+          "path": "docs-design/evidence/raw/rt-03/c-mutation-m5-interrupt-ignored.log",
+          "sha256": "73ad4637728c9c09958f2b24692a6a1e8d722db452031490161beca31805eb6c"
+        }
+      }
+    ]
+  },
+  "refactor": "OBS-07: DEBUG statements in SimpleTransferEngine reduced from 37 to 3. Callers moved: the agent and workflow call the blocking engine through their own vertx.executeBlocking until RT-05 and RT-04; the examples fork concurrent transfers in a TaskScope and bound them with its deadline. Tests moved: SimpleTransferEngineTest, SimpleTransferEngineBidirectionalTest, BasicTransferIntegrationTest (its 10 ms polling loop replaced by a deterministic check in the blocking test), SftpAbortIntegrationTest, the workflow TestTransferEngine, and the examples IntegrationTestSuite.",
+  "behaviourChanges": [
+    "A cancelled transfer ends as CANCELLED with the message \"Transfer cancelled\"; it previously ended as FAILED",
+    "Cancelling a transfer no longer calls the shared adapter abort(), which affected other transfers (ENG-09)",
+    "A second transfer with the ID of a running one is rejected instead of silently replacing its tracking",
+    "The engine no longer clears the caller's MDC when a transfer ends",
+    "The examples passed 1,048,576 as the retry delay in milliseconds (about 17 minutes), believing it was a chunk size; they now pass 1,000"
+  ],
+  "characterization": {
+    "command": "mvn -B test -pl quorus-core -Dtest=SimpleTransferEngineBlockingTest -Dsurefire.failIfNoSpecifiedTests=false -Djacoco.skip=true",
+    "started": "2026-09-27T10:51:04+01:00",
+    "finished": "2026-09-27T10:51:13+01:00",
+    "result": "10 tests, 0 failures",
+    "tests": [
+      "aSecondTransferWithARunningIdIsRejected",
+      "aPausedTransferIsStoppedAsFailed"
+    ],
+    "classification": "retrospective characterization: written after the code, once coverage showed the duplicate-ID rejection (new in this slice) and the pause path had no test. Test-only; the regression below ran on the same production code.",
+    "log": {
+      "path": "docs-design/evidence/raw/rt-03/c-characterization.log",
+      "sha256": "a792dcb188b0837d59370b23109f536ed8169dcea8f1d1d0816ebe7a687fc98a"
+    }
+  },
+  "coverageAfterRegression": {
+    "SimpleTransferEngine": "lines 202/240, branches 63/90 (before the two characterization tests)",
+    "SimpleTransferEngine.ActiveTransfer": "lines 14/15, branches 2/4"
+  },
+  "regression": [
+    {
+      "command": "mvn -B --fail-at-end clean verify",
+      "started": "2026-09-27T10:44:53+01:00",
+      "finished": "2026-09-27T10:50:26+01:00",
+      "result": "per-module totals (core, workflow, tenant, controller, agent): 1582 run, 0 failures, 0 errors, 0 skipped; 134 run, 0 failures, 0 errors, 0 skipped; 64 run, 0 failures, 0 errors, 0 skipped; 574 run, 0 failures, 0 errors, 0 skipped; 101 run, 0 failures, 0 errors, 0 skipped",
+      "log": {
+        "path": "docs-design/evidence/raw/rt-03/c-regression.log",
+        "sha256": "bddbd29788327629d068158f32fc374541ef82872e42c10cc76ec89e88f585a2",
+        "retained": "excerpt only (retention rule, plan §6.1)",
+        "excerpt": {
+          "path": "docs-design/evidence/raw/rt-03/c-regression.log.excerpt.txt",
+          "sha256": "acf47b8017b77a7da716f5d00370eff6f92c2dabeaf50e834ea5f854eea10491"
+        }
+      }
+    }
+  ],
+  "limitations": [
+    "On a platform thread, such as the Vert.x worker the agent still uses, an interrupt does not close a blocked socket, so cancellation waits for the adapter's next interrupt check or socket timeout. The agent does not cancel transfers today; RT-05 moves it to virtual threads.",
+    "shutdown(Duration) returning false (a transfer that ignores cancellation) is not exercised by a test.",
+    "CI has never passed (ENG-07, deferred by SEQ-01); the regression evidence is the local run above."
+  ],
+  "sensitiveDataCheck": "Logs contain Maven and test output only; no request bodies, credentials, keys or sensitive payloads."
+}

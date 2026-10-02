@@ -1,5 +1,12 @@
 {
+  "prefixCompactionRelease20260905": {"status":"New capability implemented and published; historical db59859 claims remain unsubstantiated","version":"1.2.0","revision":"1c5af80f13a149663926c01eb15f88c14c4f2d25","tag":"v1.2.0","coreJarSha256":"7BB73A0F588FC8C5534296D4F0860F890A7D15789145DB742C2A4E3C8D75C426","deploymentId":"5d8e4410-c07d-4bb4-bb7e-b3846bee91cd","behavioralRed":23,"behavioralGreen":23,"windowsTests":319,"windowsSkipped":3,"linuxTests":319,"linuxSkipped":0,"quorusFocusedTests":41,"handover":"docs-design/evidence/raftlog-validation-handover-2026-09-05.md#implemented-capability-and-release--2026-09-05"},
   "schemaVersion": 1,
+  "validationCorrection20260905": {
+    "status": "Historical assertions retained; external RaftLog 1.1.0 defect allegations and the claimed 1.2.0/db59859 validation are unsubstantiated",
+    "scope": "Do not use those claims as acceptance evidence for the independently externalised sister project. The earlier integrated implementation may be their source, but that provenance is unconfirmed.",
+    "confirmedMismatch": "Quorus requests 1.2.0 and invokes truncatePrefix; the inspected sister project declares 1.1.0 and its storage interface has no truncatePrefix method.",
+    "handover": "docs-design/evidence/raftlog-validation-handover-2026-09-05.md"
+  },
   "phase": "M0 durability remediation",
   "recordedAt": "2026-09-04T13:36:00+08:00",
   "baseRevision": "219e307",
@@ -209,7 +216,7 @@
   "phaseStatus": "Historical slices retained; durable snapshot remediation and release checkpoint reopened on 2026-09-04",
   "remediationR1": {
     "sliceId": "R1-DURABLE-SNAPSHOT-RECOVERY",
-    "baseRevision": "ffc3e64",
+    "baseRevision": "db532fb",
     "status": "R1 code remediation implemented; final clean controller verification and explicit slow-cluster regression pass; deployment acceptance and R2-R6 remain open",
     "acceptance": "Durable snapshot publication precedes prefix deletion; fresh-instance and three-controller recovery preserve committed state, coordinates and valid tails. Corrupt/missing required snapshots fail closed; append/snapshot/install mutations are serialized.",
     "entryPoints": [
@@ -231,7 +238,7 @@
       {
         "stage": "restart",
         "red": {
-          "patchIdentity": "ffc3e64 plus test-only changes",
+          "patchIdentity": "db532fb plus test-only changes",
           "command": "mvn.cmd -q clean test -pl quorus-controller '-Dtest=RaftStorageContractTest#snapshotAndTail_surviveCompactionAndFreshInstance,ThreeControllerDurableRestartTest#fullClusterRestartAfterSnapshotCompaction' '-Dsurefire.failIfNoSpecifiedTests=false' -f ../quorus-remediation-20260904/pom.xml 2>&1 | Tee-Object -FilePath temp/remediation-r1-red.log; exit $LASTEXITCODE",
           "name": "remediation-r1-red.log",
           "sha256": "FE8BA7843251D0DC68D9F5D41D2BDB994338C926F3078C37D08742472C8E5C2F",
@@ -534,7 +541,7 @@
       "skipped": 0,
       "exitCode": 0,
       "duration": "03:34 min",
-      "patchIdentity": "ffc3e64 plus final R1 source files identified by finalSourceSha256",
+      "patchIdentity": "db532fb plus final R1 source files identified by finalSourceSha256",
       "scope": "Final controller source verified clean against installed unchanged sibling dependencies; the intermediate full reactor predates the last interruption-recovery fixes and is not claimed as a final-revision reactor run."
     },
     "coverage": {
@@ -575,12 +582,12 @@
   },
   "externalLibraryOnly": {
     "sliceId": "RAFT-STORAGE-EXTERNAL-ONLY-002",
-    "baseRevision": "038da9f",
+    "baseRevision": "e7c9dbc",
     "status": "Implemented; focused and clean controller verification passed; packaged artifact confirms external-library-only WAL",
     "acceptance": "RaftLogStorageAdapter is the only production RaftStorage implementation. Removed internal memory/RocksDB backend names fail explicitly, controller configuration accepts only raftlog, and storage-dependent tests use the external library with per-test temporary directories.",
     "scope": "Remove remaining internal storage alternatives and RocksDB JNI dependency. Retain the Vert.x RaftStorage boundary and durable FileSnapshotStore sidecar: raftlog-core 1.2.0 has no snapshot API; the sidecar is not a second WAL.",
     "red": {
-      "patchIdentity": "038da9f plus only the two test-file changes, before production removal, in an isolated worktree",
+      "patchIdentity": "e7c9dbc plus only the two test-file changes, before production removal, in an isolated worktree",
       "command": "mvn.cmd -q test -pl quorus-controller '-Dtest=RaftStorageFactoryTest#internalBackendsAreRejectedBeforeOpeningStorage,AppConfigNodeIdentityTest#validationRejectsInternalMemoryStorage' -f ../quorus-core-tests-20260904/pom.xml 2>&1 | Tee-Object -FilePath temp/raftlog-only-red.log; exit $LASTEXITCODE",
       "log": "temp/raftlog-only-red.log",
       "sha256": "3DAA835AF4B80E0B473E65BA7D63348529D5F2F1081F6E2122BD1D2A4486EF5F",
@@ -624,7 +631,7 @@
         "[INFO] All coverage checks have been met.",
         "[INFO] BUILD SUCCESS"
       ],
-      "patchIdentity": "038da9f plus this removal patch; all changed controller sources, resources and POM byte-hash matched the isolated build"
+      "patchIdentity": "e7c9dbc plus this removal patch; all changed controller sources, resources and POM byte-hash matched the isolated build"
     },
     "artifactAudit": {
       "artifact": "../quorus-core-tests-20260904/quorus-controller/target/quorus-controller-1.0-SNAPSHOT.jar",

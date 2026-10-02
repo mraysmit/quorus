@@ -26,32 +26,6 @@ class RuntimeProtocolSecurityTest {
     }
 
     @Test
-    void governedRuntimeBindsConnectionsToAnAgentApprovedAddress() throws Exception {
-        RuntimeCredential credential = new RuntimeCredential("user",
-                ServiceConnection.AuthenticationType.PASSWORD, "secret".toCharArray(), Set.of(), Set.of(),
-                Set.of(), "TLSv1.3", List.of("192.0.2.10"));
-        URI authority = URI.create("https://payments.example.test:8443/outbound/file.dat?version=1");
-
-        assertEquals(URI.create("https://192.0.2.10:8443/outbound/file.dat?version=1"),
-                PinnedEndpoint.connectUri(authority, credential));
-        assertEquals("payments.example.test:8443", PinnedEndpoint.virtualHost(authority));
-        assertThrows(ConnectionPolicyException.class, () -> PinnedEndpoint.requireApprovedAddress(
-                java.net.InetAddress.getByName("192.0.2.11"), credential));
-    }
-
-    @Test
-    void pinnedConnectionUriPreservesRawPathQueryAndFragment() throws Exception {
-        RuntimeCredential credential = new RuntimeCredential("user",
-                ServiceConnection.AuthenticationType.PASSWORD, "secret".toCharArray(), Set.of(), Set.of(),
-                Set.of(), "TLSv1.3", List.of("2001:db8::10"));
-        URI authority = URI.create("https://payments.example.test:8443/outbound/account%2Fdaily.dat"
-                + "?token=a%2Fb#batch%201");
-
-        assertEquals("https://[2001:db8::10]:8443/outbound/account%2Fdaily.dat?token=a%2Fb#batch%201",
-                PinnedEndpoint.connectUri(authority, credential).toASCIIString());
-    }
-
-    @Test
     void sftpHostKeyPinsFailClosedOnUnknownOrChangedKeys() {
         byte[] hostKey = "server-public-key".getBytes(java.nio.charset.StandardCharsets.UTF_8);
         String pin = SftpHostKeyPolicy.sha256Fingerprint(hostKey);

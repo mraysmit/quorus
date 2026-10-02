@@ -28,8 +28,6 @@ import dev.mars.quorus.util.SensitiveDataRedactor;
 import dev.mars.quorus.connection.MountedFileSystemSecurity;
 
 import static dev.mars.quorus.core.exceptions.QuorusErrorCode.*;
-import io.vertx.core.Context;
-import io.vertx.core.Vertx;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -88,10 +86,6 @@ public class NfsTransferProtocol implements TransferProtocol {
         this(getDefaultMountRoot(), false);
     }
 
-    public NfsTransferProtocol(boolean mountSecurityVerified) {
-        this(getDefaultMountRoot(), mountSecurityVerified);
-    }
-
     /**
      * Creates an NFS protocol adapter with an explicit mount root.
      *
@@ -102,7 +96,7 @@ public class NfsTransferProtocol implements TransferProtocol {
     }
 
     public NfsTransferProtocol(String mountRoot, boolean mountSecurityVerified) {
-        this.mountRoot = mountRoot;
+        this.mountRoot = mountRoot == null || mountRoot.isBlank() ? getDefaultMountRoot() : mountRoot;
         this.mountSecurityVerified = mountSecurityVerified;
         logger.debug("NfsTransferProtocol initialized with mountRoot={}", this.mountRoot);
     }
@@ -153,12 +147,6 @@ public class NfsTransferProtocol implements TransferProtocol {
 
     @Override
     public TransferResult transfer(TransferRequest request, TransferContext context) throws TransferException {
-        Context vertxContext = Vertx.currentContext();
-        if (vertxContext != null && vertxContext.isEventLoopContext()) {
-            throw new TransferException(context.getJobId(),
-                    "Blocking NFS transfer() invoked on event loop. Use transferReactive() instead.");
-        }
-
         logger.info("Starting NFS transfer: jobId={}, isUpload={}", context.getJobId(), request.isUpload());
         if (request.getRuntimeCredential() != null) {
             try { MountedFileSystemSecurity.requireVerified("NFS", mountSecurityVerified); }
@@ -168,7 +156,7 @@ public class NfsTransferProtocol implements TransferProtocol {
                 SensitiveDataRedactor.redactUri(request.getSourceUri()),
                 SensitiveDataRedactor.redactUri(request.getDestinationUri()));
 
-        ProgressTracker progressTracker = new ProgressTracker(context.getJobId());
+        ProgressTracker progressTracker = new ProgressTracker(context);
         progressTracker.start();
 
         try {
@@ -198,13 +186,6 @@ public class NfsTransferProtocol implements TransferProtocol {
     @Override
     public long getMaxFileSize() {
         return -1; // No specific limit for NFS
-    }
-
-    @Override
-    public void abort() {
-        logger.debug("abort: NFS transfer abort requested");
-        // NFS transfers use Java NIO Files API — cancellation via thread interruption
-        logger.debug("abort: NFS abort relies on thread interruption");
     }
 
     private TransferResult performNfsTransfer(TransferRequest request, ProgressTracker progressTracker)
@@ -386,7 +367,7 @@ public class NfsTransferProtocol implements TransferProtocol {
                             totalBytes > 0 ? (bytesTransferred * 100) / totalBytes : 0);
                 }
 
-                if (Thread.currentThread().isInterrupted()) {
+                if (progressTracker.stopRequested()) {
                     logger.debug("transferFile: transfer cancelled via thread interruption");
                     throw new IOException("Transfer was cancelled");
                 }

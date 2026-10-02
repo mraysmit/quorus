@@ -1,0 +1,78 @@
+Excerpt of: docs-design/evidence/raw/rt-02/core-verify.log
+Original SHA-256: bc39269efc7c4f5e496702c07294f8906d3b6c1d0f74eebaac396609fad56d6c
+Original size: 1274425 bytes
+Full log not retained under the evidence retention rule (plan §6.1): regression and discarded-attempt output is kept as this excerpt. Reproduce by re-running the recorded command at the recorded revision.
+
+    663: 13:36:42.677 [vert.x-worker-thread-0] ERROR d.m.q.protocol.FtpTransferProtocol - [QUORUS-1009] FTP server closed connection unexpectedly (EOF)
+    664: 13:36:42.677 [vert.x-worker-thread-0] WARN  d.m.q.protocol.FtpTransferProtocol - Error during FTP disconnect: FTP server closed connection unexpectedly
+    668: java.io.IOException: Server rejected AUTH TLS: 421 fixture stops before authentication
+    681: [INFO] Running dev.mars.quorus.core.exceptions.InvalidTransitionExceptionTest
+    682: [INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.004 s -- in dev.mars.quorus.core.exceptions.InvalidTransitionExceptionTest
+   1160: dev.mars.quorus.core.exceptions.TransferException: Transfer 0587afce-e8fa-4d88-a23c-f469c5180021 failed: HTTP 404: Not Found
+   1671: com.jcraft.jsch.JSchException: connection is closed by foreign host
+   1675: dev.mars.quorus.core.exceptions.TransferException: Transfer worker-boundary failed: SFTP download failed
+   1677: Caused by: com.jcraft.jsch.JSchException: connection is closed by foreign host
+   1695: dev.mars.quorus.core.exceptions.TransferException: Transfer unknown failed: FTP URI must specify a host
+   1713: dev.mars.quorus.core.exceptions.TransferException: Transfer unknown failed: FTP URI must specify a path
+   1728: 13:36:49.549 [main] ERROR d.m.q.protocol.FtpTransferProtocol - [QUORUS-1003] FTP upload source file not found: C:\Users\mraysmit\AppData\Local\Temp\junit17836667103970967373\does-not-exist.txt
+   1731: java.io.IOException: Source file does not exist: C:\Users\mraysmit\AppData\Local\Temp\junit17836667103970967373\does-not-exist.txt
+   1777: java.net.ConnectException: Connection refused
+   1850: dev.mars.quorus.core.exceptions.TransferException: Transfer unknown failed: SFTP URI must specify a host
+   1854: dev.mars.quorus.core.exceptions.TransferException: Transfer test-upload-no-host failed: SFTP upload failed
+   1856: Caused by: dev.mars.quorus.core.exceptions.TransferException: Transfer unknown failed: SFTP URI must specify a host
+   1867: dev.mars.quorus.core.exceptions.TransferException: Transfer unknown failed: SFTP URI must specify a path
+   1871: dev.mars.quorus.core.exceptions.TransferException: Transfer test-upload-no-path failed: SFTP upload failed
+   1873: Caused by: dev.mars.quorus.core.exceptions.TransferException: Transfer unknown failed: SFTP URI must specify a path
+   1887: dev.mars.quorus.core.exceptions.TransferException: Transfer test-upload-missing-source failed: Source file does not exist: C:\Users\mraysmit\AppData\Local\Temp\junit17344466707524736646\does-not-exist.txt
+   1891: dev.mars.quorus.core.exceptions.TransferException: Transfer test-upload-missing-source failed: SFTP upload failed
+   1893: Caused by: dev.mars.quorus.core.exceptions.TransferException: Transfer test-upload-missing-source failed: Source file does not exist: C:\Users\mraysmit\AppData\Local\Temp\junit17344466707524736646\does-not-exist.txt
+   1908: dev.mars.quorus.core.exceptions.TransferException: Transfer test-upload-exception-id failed: SFTP upload failed
+   1931: dev.mars.quorus.core.exceptions.TransferException: Transfer test-invalid-sftp failed: SFTP download failed
+   1948: dev.mars.quorus.core.exceptions.TransferException: Transfer test-exception-id failed: SFTP download failed
+   1965: dev.mars.quorus.core.exceptions.TransferException: Transfer test-missing-host failed: SFTP download failed
+   1982: dev.mars.quorus.core.exceptions.TransferException: Transfer test-missing-path failed: SFTP download failed
+   2005: dev.mars.quorus.core.exceptions.TransferException: Transfer unknown failed: SMB URI must specify a host
+   2026: dev.mars.quorus.core.exceptions.TransferException: Transfer unknown failed: SMB URI must specify a path
+   2042: 13:36:49.630 [main] ERROR d.m.q.protocol.SmbTransferProtocol - [QUORUS-1303] SMB upload source file not found: C:\Users\mraysmit\AppData\Local\Temp\junit4653407931331951875\does-not-exist.txt
+   2045: java.io.IOException: Source file does not exist: C:\Users\mraysmit\AppData\Local\Temp\junit4653407931331951875\does-not-exist.txt
+   2081:   Reason: UNC path not found -- verifies SMB context in exception message
+   2103: java.nio.file.FileSystemException: \\127.0.0.1\share\file.txt: The network name cannot be found
+   2189:   Reason: Connection refused to unreachable server -- verifies TransferException
+   2224:   Reason: Connection refused on custom FTPS port -- verifies TransferException
+   2258:   Reason: Upload with missing source file -- verifies TransferException
+   2266: 13:36:49.720 [main] ERROR d.m.q.protocol.FtpTransferProtocol - [QUORUS-1003] FTP upload source file not found: C:\Users\mraysmit\AppData\Local\Temp\junit17321782238199913063\nonexistent-file.txt
+   2269: java.io.IOException: Source file does not exist: C:\Users\mraysmit\AppData\Local\Temp\junit17321782238199913063\nonexistent-file.txt
+   2279:   Reason: Connection refused on default FTPS port -- verifies TransferException
+   2309:   Reason: Connection refused on implicit FTPS port 990 -- verifies TransferException
+   2460: 13:37:02.182 [main] ERROR d.m.q.protocol.FtpTransferProtocol - [QUORUS-1003] FTP upload source file not found: C:\Users\mraysmit\AppData\Local\Temp\junit16576605551081966537\does-not-exist.txt
+   2463: java.io.IOException: Source file does not exist: C:\Users\mraysmit\AppData\Local\Temp\junit16576605551081966537\does-not-exist.txt
+   3425: dev.mars.quorus.core.exceptions.TransferException: Transfer redirect failed: HTTP 302: Found
+   3474: io.netty.channel.AbstractChannel$AnnotatedConnectException: Connection refused: /127.0.0.1:1
+   3475: Caused by: java.net.ConnectException: Connection refused
+   3642:   Reason: Source file missing -- verifies TransferException before connect
+   3653: 13:37:09.623 [main] ERROR d.m.q.protocol.HttpTransferProtocol - [QUORUS-1208] HTTP upload source file not found: C:\Users\mraysmit\AppData\Local\Temp\junit11246367365734299154\does-not-exist.txt
+   3904: 13:37:10.190 [main] ERROR d.m.q.protocol.NfsTransferProtocol - [QUORUS-1403] NFS upload source file not found: C:\Users\mraysmit\AppData\Local\Temp\junit134595369059322221\does-not-exist.txt
+   4088: 13:37:10.388 [main] ERROR d.m.q.protocol.NfsTransferProtocol - [QUORUS-1403] NFS upload source file not found: C:\Users\mraysmit\AppData\Local\Temp\junit4195862926064706243\missing-source.txt
+   5113: 13:37:15.018 [Thread-271] ERROR d.m.q.protocol.SftpTransferProtocol - [QUORUS-1102] SFTP download failed: requestId=test-cross-thread-abort, error=Session.connect: java.net.SocketException: Socket closed
+   5115: com.jcraft.jsch.JSchException: Session.connect: java.net.SocketException: Socket closed
+   5117: Caused by: java.net.SocketException: Socket closed
+   5121: dev.mars.quorus.core.exceptions.TransferException: Transfer test-cross-thread-abort failed: SFTP download failed
+   5123: Caused by: com.jcraft.jsch.JSchException: Session.connect: java.net.SocketException: Socket closed
+   5218: com.jcraft.jsch.JSchException: session is down
+   5222: dev.mars.quorus.core.exceptions.TransferException: Transfer test-abort-download failed: SFTP download failed
+   5224: Caused by: com.jcraft.jsch.JSchException: session is down
+   5509: java.nio.file.FileSystemException: \\127.0.0.1\share\dir1\dir2\dir3\file.txt: The network name cannot be found
+   5564:   EXPECTED ERROR TEST: testTransferExceptionContainsRequestId
+   5565:   Reason: UNC path not found -- verifies exception contains SMB context
+   5591:   END EXPECTED ERROR TEST: testTransferExceptionContainsRequestId -- PASSED
+   5626: java.nio.file.FileSystemException: \\127.0.0.1\share\folder name\file name.txt: The network name cannot be found
+   5661: java.nio.file.FileSystemException: \\127.0.0.1\share\testfile.txt: The network name cannot be found
+   5726: 13:37:20.315 [main] ERROR d.m.q.protocol.SmbTransferProtocol - [QUORUS-1303] SMB upload source file not found: C:\Users\mraysmit\AppData\Local\Temp\junit9944633807552955542\nonexistent.txt
+   5729: java.io.IOException: Source file does not exist: C:\Users\mraysmit\AppData\Local\Temp\junit9944633807552955542\nonexistent.txt
+   8860: 13:38:20.571 [main] WARN  d.m.q.s.t.InMemoryTransferEngineSimulator - cancelTransfer: Job not found jobId=non-existent-job-id
+  10522: dev.mars.quorus.core.exceptions.TransferException: Transfer retry-backoff-test failed: FTP upload failed
+  10753: [INFO] Tests run: 1525, Failures: 0, Errors: 0, Skipped: 0
+  10769: [INFO] All coverage checks have been met.
+  10771: [INFO] BUILD SUCCESS
+  10773: [INFO] Total time:  02:55 min
+  10774: [INFO] Finished at: 2026-09-26T13:39:27+01:00

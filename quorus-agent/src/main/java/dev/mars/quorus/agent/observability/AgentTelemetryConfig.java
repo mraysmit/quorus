@@ -17,6 +17,8 @@
 package dev.mars.quorus.agent.observability;
 
 import dev.mars.quorus.agent.config.AgentConfiguration;
+import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator;
+import io.opentelemetry.context.propagation.ContextPropagators;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
 import io.opentelemetry.sdk.metrics.SdkMeterProvider;
 import io.opentelemetry.sdk.resources.Resource;
@@ -24,8 +26,8 @@ import io.opentelemetry.sdk.trace.SdkTracerProvider;
 import io.opentelemetry.sdk.trace.export.BatchSpanProcessor;
 import io.opentelemetry.exporter.otlp.trace.OtlpGrpcSpanExporter;
 import io.opentelemetry.exporter.prometheus.PrometheusHttpServer;
-import io.vertx.core.VertxOptions;
-import io.vertx.tracing.opentelemetry.OpenTelemetryOptions;
+
+import java.util.Optional;
 
 /**
  * OpenTelemetry configuration for Quorus Agent.
@@ -34,7 +36,9 @@ import io.vertx.tracing.opentelemetry.OpenTelemetryOptions;
  * Provides:
  * - OTLP trace export for distributed tracing
  * - Prometheus metrics export (configurable port, default 9465)
- * - Vert.x tracing integration
+ *
+ * Since RT-05b the agent has no Vert.x, so there is no framework tracing integration: the agent's
+ * controller client creates its own client spans and propagates the trace context.
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @since 2026-01-27
@@ -43,15 +47,15 @@ import io.vertx.tracing.opentelemetry.OpenTelemetryOptions;
 public class AgentTelemetryConfig {
 
     /**
-     * Configure Vert.x options with OpenTelemetry tracing.
+     * Configures and globally registers the OpenTelemetry SDK for this agent, unless telemetry is
+     * disabled. The caller closes the returned SDK at shutdown so buffered spans are exported.
      *
-     * @param options the VertxOptions to configure
      * @param config the isolated agent configuration
-     * @return configured VertxOptions
+     * @return the registered SDK, or empty when telemetry is disabled
      */
-    public static VertxOptions configure(VertxOptions options, AgentConfiguration config) {
+    public static Optional<OpenTelemetrySdk> configure(AgentConfiguration config) {
         if (!config.isTelemetryEnabled()) {
-            return options;
+            return Optional.empty();
         }
         // 1. Configure Resource with agent-specific attributes
         Resource resource = Resource.getDefault().toBuilder()
@@ -79,14 +83,12 @@ public class AgentTelemetryConfig {
                 .registerMetricReader(prometheusReader)
                 .build();
 
-        // 4. Initialize OpenTelemetry SDK (registered globally)
-        OpenTelemetrySdk.builder()
+        // 4. Initialize OpenTelemetry SDK (registered globally), with W3C trace-context propagation
+        return Optional.of(OpenTelemetrySdk.builder()
                 .setTracerProvider(tracerProvider)
                 .setMeterProvider(meterProvider)
-                .buildAndRegisterGlobal();
-
-        // 5. Configure Vert.x Options (picks up globally registered SDK)
-        return options.setTracingOptions(new OpenTelemetryOptions());
+                .setPropagators(ContextPropagators.create(W3CTraceContextPropagator.getInstance()))
+                .buildAndRegisterGlobal());
     }
 
 }

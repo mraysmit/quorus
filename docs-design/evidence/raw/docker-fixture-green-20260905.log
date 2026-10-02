@@ -1,0 +1,633 @@
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::staticFieldBase has been called by com.google.inject.internal.aop.HiddenClassDefiner (file:/C:/Users/mraysmit/scoop/apps/maven/current/lib/guice-5.1.0-classes.jar)
+WARNING: Please consider reporting this to the maintainers of class com.google.inject.internal.aop.HiddenClassDefiner
+WARNING: sun.misc.Unsafe::staticFieldBase will be removed in a future release
+[INFO] Scanning for projects...
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Build Order:
+[INFO] 
+[INFO] Quorus File Transfer System                                        [pom]
+[INFO] Quorus Core                                                        [jar]
+[INFO] Quorus Workflow Engine                                             [jar]
+[INFO] Quorus Tenant Management                                           [jar]
+[INFO] Quorus Distributed Controller                                      [jar]
+[INFO] 
+[INFO] --------------------------< dev.mars:quorus >---------------------------
+[INFO] Building Quorus File Transfer System 1.0-SNAPSHOT                  [1/5]
+[INFO]   from pom.xml
+[INFO] --------------------------------[ pom ]---------------------------------
+[INFO] 
+[INFO] --- jacoco:0.8.15:prepare-agent (prepare-agent) @ quorus ---
+[INFO] argLine set to -javaagent:C:\\Users\\mraysmit\\.m2\\repository\\org\\jacoco\\org.jacoco.agent\\0.8.15\\org.jacoco.agent-0.8.15-runtime.jar=destfile=C:\\Users\\mraysmit\\dev\\idea-projects\\quorus\\target\\jacoco.exec,excludes=sun/**:jdk/**:java/**:com/sun/**:org/jcp/**
+[INFO] 
+[INFO] --- jacoco:0.8.15:report (report) @ quorus ---
+[INFO] Skipping JaCoCo execution due to missing execution data file.
+[INFO] 
+[INFO] ------------------------< dev.mars:quorus-core >------------------------
+[INFO] Building Quorus Core 1.0-SNAPSHOT                                  [2/5]
+[INFO]   from quorus-core\pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- jacoco:0.8.15:prepare-agent (prepare-agent) @ quorus-core ---
+[INFO] argLine set to -javaagent:C:\\Users\\mraysmit\\.m2\\repository\\org\\jacoco\\org.jacoco.agent\\0.8.15\\org.jacoco.agent-0.8.15-runtime.jar=destfile=C:\\Users\\mraysmit\\dev\\idea-projects\\quorus\\quorus-core\\target\\jacoco.exec,excludes=sun/**:jdk/**:java/**:com/sun/**:org/jcp/**
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ quorus-core ---
+[INFO] Copying 1 resource from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ quorus-core ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ quorus-core ---
+[INFO] Copying 11 resources from src\test\resources to target\test-classes
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ quorus-core ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- surefire:3.2.2:test (default-test) @ quorus-core ---
+[INFO] 
+[INFO] --- jacoco:0.8.15:report (report) @ quorus-core ---
+[INFO] Loading execution data file C:\Users\mraysmit\dev\idea-projects\quorus\quorus-core\target\jacoco.exec
+[INFO] Analyzed bundle 'Quorus Core' with 124 classes
+[INFO] 
+[INFO] ----------------------< dev.mars:quorus-workflow >----------------------
+[INFO] Building Quorus Workflow Engine 1.0-SNAPSHOT                       [3/5]
+[INFO]   from quorus-workflow\pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- jacoco:0.8.15:prepare-agent (prepare-agent) @ quorus-workflow ---
+[INFO] argLine set to -javaagent:C:\\Users\\mraysmit\\.m2\\repository\\org\\jacoco\\org.jacoco.agent\\0.8.15\\org.jacoco.agent-0.8.15-runtime.jar=destfile=C:\\Users\\mraysmit\\dev\\idea-projects\\quorus\\quorus-workflow\\target\\jacoco.exec,excludes=sun/**:jdk/**:java/**:com/sun/**:org/jcp/**
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ quorus-workflow ---
+[INFO] Copying 1 resource from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ quorus-workflow ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ quorus-workflow ---
+[INFO] Copying 2 resources from src\test\resources to target\test-classes
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ quorus-workflow ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- surefire:3.2.2:test (default-test) @ quorus-workflow ---
+[INFO] 
+[INFO] --- jacoco:0.8.15:report (report) @ quorus-workflow ---
+[INFO] Loading execution data file C:\Users\mraysmit\dev\idea-projects\quorus\quorus-workflow\target\jacoco.exec
+[INFO] Analyzed bundle 'Quorus Workflow Engine' with 24 classes
+[INFO] 
+[INFO] -----------------------< dev.mars:quorus-tenant >-----------------------
+[INFO] Building Quorus Tenant Management 1.0-SNAPSHOT                     [4/5]
+[INFO]   from quorus-tenant\pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- jacoco:0.8.15:prepare-agent (prepare-agent) @ quorus-tenant ---
+[INFO] argLine set to -javaagent:C:\\Users\\mraysmit\\.m2\\repository\\org\\jacoco\\org.jacoco.agent\\0.8.15\\org.jacoco.agent-0.8.15-runtime.jar=destfile=C:\\Users\\mraysmit\\dev\\idea-projects\\quorus\\quorus-tenant\\target\\jacoco.exec,excludes=sun/**:jdk/**:java/**:com/sun/**:org/jcp/**
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ quorus-tenant ---
+[INFO] skip non existing resourceDirectory C:\Users\mraysmit\dev\idea-projects\quorus\quorus-tenant\src\main\resources
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ quorus-tenant ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ quorus-tenant ---
+[INFO] Copying 1 resource from src\test\resources to target\test-classes
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ quorus-tenant ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- surefire:3.2.2:test (default-test) @ quorus-tenant ---
+[INFO] 
+[INFO] --- jacoco:0.8.15:report (report) @ quorus-tenant ---
+[INFO] Loading execution data file C:\Users\mraysmit\dev\idea-projects\quorus\quorus-tenant\target\jacoco.exec
+[INFO] Analyzed bundle 'Quorus Tenant Management' with 25 classes
+[INFO] 
+[INFO] ---------------------< dev.mars:quorus-controller >---------------------
+[INFO] Building Quorus Distributed Controller 1.0-SNAPSHOT                [5/5]
+[INFO]   from quorus-controller\pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- jacoco:0.8.15:prepare-agent (prepare-agent) @ quorus-controller ---
+[INFO] argLine set to -javaagent:C:\\Users\\mraysmit\\.m2\\repository\\org\\jacoco\\org.jacoco.agent\\0.8.15\\org.jacoco.agent-0.8.15-runtime.jar=destfile=C:\\Users\\mraysmit\\dev\\idea-projects\\quorus\\quorus-controller\\target\\jacoco.exec,excludes=sun/**:jdk/**:java/**:com/sun/**:org/jcp/**:dev/mars/quorus/controller/raft/grpc/**
+[INFO] 
+[INFO] --- protobuf:4.1.2:generate (default) @ quorus-controller ---
+[WARNING]  Parameter 'binaryMavenPlugins' is deprecated: Users should now use plugins instead. This option will be removed in v5.
+[INFO] Resolving artifact "com.google.protobuf:protoc:exe:windows-x86_64:3.25.5"
+[INFO] Resolving artifact "io.grpc:protoc-gen-grpc-java:exe:windows-x86_64:1.68.1"
+[INFO] Registering "C:\Users\mraysmit\dev\idea-projects\quorus\quorus-controller\target\generated-sources\protobuf" as a Maven main source root for compiler plugins
+[INFO] Registering "C:\Users\mraysmit\dev\idea-projects\quorus\quorus-controller\target\generated-sources\protobuf" as a Maven main source root for compiler plugins
+[INFO] Found 2 proto source files and 0 descriptor files to compile, but all are up-to-date so none will be built this time
+[INFO] NOTHING TO DO: There is nothing to do. If this is unexpected, review the above logs for more details.
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ quorus-controller ---
+[INFO] Copying 3 resources from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ quorus-controller ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ quorus-controller ---
+[INFO] Copying 11 resources from src\test\resources to target\test-classes
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ quorus-controller ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- surefire:3.2.2:test (default-test) @ quorus-controller ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running dev.mars.quorus.controller.raft.DockerRaftClusterTest
+[INFO] Running dev.mars.quorus.controller.raft.NetworkPartitionTest
+[INFO] Running dev.mars.quorus.controller.raft.ConfigurableRaftClusterTest
+Sept 05, 2026 3:36:49 PM dev.mars.quorus.controller.raft.ConfigurableRaftClusterTest setupWithConfiguration
+INFO: Starting test: [2] TestClusterConfiguration{nodeCount=3, electionTimeout=PT3S, heartbeatInterval=PT0.5S, startupTimeout=PT5M, testTimeout=PT10M, composeFile='src/test/resources/docker-compose-test.yml', environmentVariables={JAVA_OPTS=-Xmx256m -Xms128m}, networkConfig=dev.mars.quorus.controller.raft.TestClusterConfiguration$NetworkConfiguration@1af211bd} with config: TestClusterConfiguration{nodeCount=3, electionTimeout=PT3S, heartbeatInterval=PT0.5S, startupTimeout=PT5M, testTimeout=PT10M, composeFile='src/test/resources/docker-compose-test.yml', environmentVariables={JAVA_OPTS=-Xmx256m -Xms128m}, networkConfig=dev.mars.quorus.controller.raft.TestClusterConfiguration$NetworkConfiguration@1af211bd}
+Sept 05, 2026 3:36:49 PM dev.mars.quorus.controller.raft.ConfigurableRaftClusterTest setupWithConfiguration
+INFO: Starting test: testWithStandardConfiguration(TestInfo) with config: TestClusterConfiguration{nodeCount=3, electionTimeout=PT3S, heartbeatInterval=PT0.5S, startupTimeout=PT5M, testTimeout=PT10M, composeFile='src/test/resources/docker-compose-test.yml', environmentVariables={JAVA_OPTS=-Xmx256m -Xms128m}, networkConfig=dev.mars.quorus.controller.raft.TestClusterConfiguration$NetworkConfiguration@5bc624bf}
+Sept 05, 2026 3:36:49 PM dev.mars.quorus.controller.raft.ConfigurableRaftClusterTest setupWithConfiguration
+INFO: Starting test: [2] TestClusterConfiguration{nodeCount=5, electionTimeout=PT5S, heartbeatInterval=PT1S, startupTimeout=PT8M, testTimeout=PT15M, composeFile='src/test/resources/docker-compose-5node-test.yml', environmentVariables={JAVA_OPTS=-Xmx256m -Xms128m}, networkConfig=dev.mars.quorus.controller.raft.TestClusterConfiguration$NetworkConfiguration@6bb88ea8} with config: TestClusterConfiguration{nodeCount=5, electionTimeout=PT5S, heartbeatInterval=PT1S, startupTimeout=PT8M, testTimeout=PT15M, composeFile='src/test/resources/docker-compose-5node-test.yml', environmentVariables={JAVA_OPTS=-Xmx256m -Xms128m}, networkConfig=dev.mars.quorus.controller.raft.TestClusterConfiguration$NetworkConfiguration@6bb88ea8}
+Sept 05, 2026 3:36:49 PM dev.mars.quorus.controller.raft.ConfigurableRaftClusterTest setupWithConfiguration
+INFO: Starting test: [1] TestClusterConfiguration{nodeCount=3, electionTimeout=PT1S, heartbeatInterval=PT0.2S, startupTimeout=PT2M, testTimeout=PT3M, composeFile='src/test/resources/docker-compose-test.yml', environmentVariables={JAVA_OPTS=-Xmx128m -Xms64m}, networkConfig=dev.mars.quorus.controller.raft.TestClusterConfiguration$NetworkConfiguration@6293b068} with config: TestClusterConfiguration{nodeCount=3, electionTimeout=PT1S, heartbeatInterval=PT0.2S, startupTimeout=PT2M, testTimeout=PT3M, composeFile='src/test/resources/docker-compose-test.yml', environmentVariables={JAVA_OPTS=-Xmx128m -Xms64m}, networkConfig=dev.mars.quorus.controller.raft.TestClusterConfiguration$NetworkConfiguration@6293b068}
+Sept 05, 2026 3:36:49 PM dev.mars.quorus.controller.raft.ConfigurableRaftClusterTest setupWithConfiguration
+INFO: Starting test: testStressConfiguration(TestInfo) with config: TestClusterConfiguration{nodeCount=5, electionTimeout=PT8S, heartbeatInterval=PT2S, startupTimeout=PT10M, testTimeout=PT30M, composeFile='src/test/resources/docker-compose-5node-test.yml', environmentVariables={JAVA_OPTS=-Xmx512m -Xms256m}, networkConfig=dev.mars.quorus.controller.raft.TestClusterConfiguration$NetworkConfiguration@1ac0e0f6}
+Sept 05, 2026 3:36:49 PM dev.mars.quorus.controller.raft.ConfigurableRaftClusterTest setupWithConfiguration
+INFO: Starting test: [1] TestClusterConfiguration{nodeCount=5, electionTimeout=PT4S, heartbeatInterval=PT0.8S, startupTimeout=PT6M, testTimeout=PT20M, composeFile='src/test/resources/docker-compose-5node-test.yml', environmentVariables={JAVA_OPTS=-Xmx256m -Xms128m}, networkConfig=dev.mars.quorus.controller.raft.TestClusterConfiguration$NetworkConfiguration@52da5e4a} with config: TestClusterConfiguration{nodeCount=5, electionTimeout=PT4S, heartbeatInterval=PT0.8S, startupTimeout=PT6M, testTimeout=PT20M, composeFile='src/test/resources/docker-compose-5node-test.yml', environmentVariables={JAVA_OPTS=-Xmx256m -Xms128m}, networkConfig=dev.mars.quorus.controller.raft.TestClusterConfiguration$NetworkConfiguration@52da5e4a}
+Sept 05, 2026 3:36:49 PM dev.mars.quorus.controller.raft.ConfigurableRaftClusterTest setupWithConfiguration
+INFO: Starting test: [3] TestClusterConfiguration{nodeCount=3, electionTimeout=PT3S, heartbeatInterval=PT0.6S, startupTimeout=PT4M, testTimeout=PT8M, composeFile='src/test/resources/docker-compose-test.yml', environmentVariables={LOG_LEVEL=DEBUG, JAVA_OPTS=-Xmx256m -Xms128m}, networkConfig=dev.mars.quorus.controller.raft.TestClusterConfiguration$NetworkConfiguration@4d1f722d} with config: TestClusterConfiguration{nodeCount=3, electionTimeout=PT3S, heartbeatInterval=PT0.6S, startupTimeout=PT4M, testTimeout=PT8M, composeFile='src/test/resources/docker-compose-test.yml', environmentVariables={LOG_LEVEL=DEBUG, JAVA_OPTS=-Xmx256m -Xms128m}, networkConfig=dev.mars.quorus.controller.raft.TestClusterConfiguration$NetworkConfiguration@4d1f722d}
+Sept 05, 2026 3:36:49 PM dev.mars.quorus.controller.raft.ConfigurableRaftClusterTest setupWithConfiguration
+INFO: Starting test: testWithFastConfiguration(TestInfo) with config: TestClusterConfiguration{nodeCount=3, electionTimeout=PT1S, heartbeatInterval=PT0.2S, startupTimeout=PT2M, testTimeout=PT3M, composeFile='src/test/resources/docker-compose-test.yml', environmentVariables={JAVA_OPTS=-Xmx128m -Xms64m}, networkConfig=dev.mars.quorus.controller.raft.TestClusterConfiguration$NetworkConfiguration@350ce4ba}
+Sept 05, 2026 3:36:50 PM dev.mars.quorus.controller.raft.SharedDockerCluster ensureImageBuilt
+INFO: Docker image quorus-controller:test already exists -- skipping build
+Sept 05, 2026 3:36:50 PM dev.mars.quorus.controller.raft.SharedDockerCluster getThreeNodeCluster
+INFO: Starting shared 3-node cluster...
+15:36:50,063 |-INFO in ch.qos.logback.classic.LoggerContext[default] - Found logback-core version 1.5.32
+15:36:50,064 |-INFO in ch.qos.logback.classic.util.ContextInitializer@362a2cc6 - No custom configurators were discovered as a service.
+15:36:50,064 |-INFO in ch.qos.logback.classic.util.ContextInitializer@362a2cc6 - Trying to configure with ch.qos.logback.classic.util.DefaultJoranConfigurator
+15:36:50,066 |-INFO in ch.qos.logback.classic.util.ContextInitializer@362a2cc6 - Constructed configurator of type class ch.qos.logback.classic.util.DefaultJoranConfigurator
+15:36:50,066 |-INFO in ch.qos.logback.classic.LoggerContext[default] - Found resource [logback-test.xml] at [file:/C:/Users/mraysmit/dev/idea-projects/quorus/quorus-controller/target/test-classes/logback-test.xml]
+15:36:50,067 |-WARN in ch.qos.logback.classic.util.DefaultJoranConfigurator@413c0a9b - Resource [logback-test.xml] occurs multiple times on the classpath.
+15:36:50,067 |-WARN in ch.qos.logback.classic.util.DefaultJoranConfigurator@413c0a9b - Resource [logback-test.xml] occurs at [file:/C:/Users/mraysmit/dev/idea-projects/quorus/quorus-core/target/test-classes/logback-test.xml]
+15:36:50,067 |-WARN in ch.qos.logback.classic.util.DefaultJoranConfigurator@413c0a9b - Resource [logback-test.xml] occurs at [file:/C:/Users/mraysmit/dev/idea-projects/quorus/quorus-controller/target/test-classes/logback-test.xml]
+15:36:50,193 |-INFO in ch.qos.logback.classic.model.processor.ConfigurationModelHandlerFull - Scan attribute not set or set to unrecognized value.
+15:36:50,205 |-INFO in ch.qos.logback.core.model.processor.ModelInterpretationContext@1481af13 - value "../test-logs/quorus-test-2026-09-05_07-36-43.log" substituted for "../test-logs/quorus-test-${testRunTimestamp}.log"
+15:36:50,207 |-INFO in ch.qos.logback.core.model.processor.AppenderModelHandler - Processing appender named [CONSOLE]
+15:36:50,207 |-INFO in ch.qos.logback.core.model.processor.AppenderModelHandler - About to instantiate appender of type [ch.qos.logback.core.ConsoleAppender]
+15:36:50,217 |-INFO in ch.qos.logback.core.model.processor.ImplicitModelHandler - Assuming default type [ch.qos.logback.classic.encoder.PatternLayoutEncoder] for [encoder] property
+15:36:50,281 |-INFO in ch.qos.logback.core.ConsoleAppender[CONSOLE] - NOTE: Writing to the console can be slow. Try to avoid logging to the 
+15:36:50,281 |-INFO in ch.qos.logback.core.ConsoleAppender[CONSOLE] - console in production environments, especially in high volume systems.
+15:36:50,281 |-INFO in ch.qos.logback.core.ConsoleAppender[CONSOLE] - See also https://logback.qos.ch/codes.html#slowConsole
+15:36:50,284 |-INFO in ch.qos.logback.core.model.processor.AppenderModelHandler - Processing appender named [FILE]
+15:36:50,284 |-INFO in ch.qos.logback.core.model.processor.AppenderModelHandler - About to instantiate appender of type [ch.qos.logback.core.FileAppender]
+15:36:50,286 |-INFO in ch.qos.logback.core.model.processor.ModelInterpretationContext@1481af13 - value "../test-logs/quorus-test-2026-09-05_07-36-43.log" substituted for "../test-logs/quorus-test-${testRunTimestamp}.log"
+15:36:50,289 |-INFO in ch.qos.logback.core.model.processor.ImplicitModelHandler - Assuming default type [ch.qos.logback.classic.encoder.PatternLayoutEncoder] for [encoder] property
+15:36:50,290 |-INFO in ch.qos.logback.core.FileAppender[FILE] - File property is set to [../test-logs/quorus-test-2026-09-05_07-36-43.log]
+15:36:50,293 |-INFO in ch.qos.logback.classic.model.processor.LoggerModelHandler - Setting level of logger [dev.mars.quorus] to DEBUG
+15:36:50,293 |-INFO in ch.qos.logback.classic.model.processor.LoggerModelHandler - Setting level of logger [org.apache] to WARN
+15:36:50,293 |-INFO in ch.qos.logback.classic.model.processor.LoggerModelHandler - Setting level of logger [io.vertx] to WARN
+15:36:50,293 |-INFO in ch.qos.logback.classic.model.processor.LoggerModelHandler - Setting level of logger [io.netty] to WARN
+15:36:50,293 |-INFO in ch.qos.logback.classic.model.processor.LoggerModelHandler - Setting level of logger [io.grpc] to WARN
+15:36:50,294 |-INFO in ch.qos.logback.classic.model.processor.RootLoggerModelHandler - Setting level of ROOT logger to INFO
+15:36:50,294 |-INFO in ch.qos.logback.core.model.processor.AppenderRefModelHandler - Attaching appender named [CONSOLE] to Logger[ROOT]
+15:36:50,294 |-INFO in ch.qos.logback.core.model.processor.AppenderRefModelHandler - Attaching appender named [FILE] to Logger[ROOT]
+15:36:50,294 |-INFO in ch.qos.logback.core.model.processor.DefaultProcessor@3e69912 - End of configuration.
+15:36:50,295 |-INFO in ch.qos.logback.classic.joran.JoranConfigurator@64cdc9b4 - Registering current configuration as safe fallback point
+15:36:50,297 |-INFO in ch.qos.logback.classic.util.ContextInitializer@362a2cc6 - ch.qos.logback.classic.util.DefaultJoranConfigurator.configure() call lasted 230 milliseconds. ExecutionStatus=DO_NOT_INVOKE_NEXT_IF_ANY
+
+15:36:50.400 [ForkJoinPool-1-worker-3] INFO  o.testcontainers.images.PullPolicy - Image pull policy will be performed by: DefaultPullPolicy()
+15:36:50.412 [ForkJoinPool-1-worker-3] INFO  o.t.utility.ImageNameSubstitutor - Image name substitution will be performed by: DefaultImageNameSubstitutor (composite of 'ConfigurationFileImageNameSubstitutor' and 'PrefixingImageNameSubstitutor')
+15:36:50.608 [ForkJoinPool-1-worker-3] INFO  o.testcontainers.DockerClientFactory - Testcontainers version: 2.0.3
+15:36:51.115 [ForkJoinPool-1-worker-3] INFO  o.t.d.DockerClientProviderStrategy - Loaded org.testcontainers.dockerclient.NpipeSocketClientProviderStrategy from ~/.testcontainers.properties, will try it first
+15:36:51.728 [ForkJoinPool-1-worker-3] INFO  o.t.d.DockerClientProviderStrategy - Found Docker environment with local Npipe socket (npipe:////./pipe/docker_engine)
+15:36:51.732 [ForkJoinPool-1-worker-3] INFO  o.testcontainers.DockerClientFactory - Docker host IP address is localhost
+15:36:51.762 [ForkJoinPool-1-worker-3] INFO  o.testcontainers.DockerClientFactory - Connected to docker: 
+  Server Version: 29.7.2
+  API Version: 1.55
+  Operating System: Docker Desktop (containerized)
+  Total Memory: 47834 MB
+  Labels: 
+    com.docker.desktop.address=npipe://\\.\pipe\docker_cli
+15:36:51.763 [ForkJoinPool-1-worker-3] INFO  o.testcontainers.DockerClientFactory - Checking the system...
+15:36:51.765 [ForkJoinPool-1-worker-3] INFO  o.testcontainers.DockerClientFactory - ?? Docker server version should be at least 1.6.0
+15:36:51.855 [ForkJoinPool-1-worker-3] INFO  tc.testcontainers/ryuk:0.13.0 - Creating container for image: testcontainers/ryuk:0.13.0
+15:36:52.213 [ForkJoinPool-1-worker-3] INFO  tc.testcontainers/ryuk:0.13.0 - Container testcontainers/ryuk:0.13.0 is starting: d4e251fface3c9866c954c880b2669399053fc20952c35657fd306906a937838
+15:36:52.702 [ForkJoinPool-1-worker-3] INFO  tc.testcontainers/ryuk:0.13.0 - Container testcontainers/ryuk:0.13.0 started in PT0.8468048S
+15:36:52.714 [ForkJoinPool-1-worker-3] INFO  o.t.containers.ComposeDelegate - Preemptively checking local images for 'quorus-controller:test', referenced via a compose file or transitive Dockerfile. If not available, it will be pulled.
+15:36:52.723 [ForkJoinPool-1-worker-3] INFO  tc.docker.exe - Local Docker Compose is running command: compose up -d
+15:36:52.952 [Thread-6] INFO  tc.docker.exe - time="2026-09-05T15:36:52+08:00" level=warning msg="C:\\Users\\mraysmit\\dev\\idea-projects\\quorus\\quorus-controller\\src\\test\\resources\\docker-compose-3node-prebuilt.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+15:36:52.975 [Thread-6] INFO  tc.docker.exe -  Network 4zrxfpj5vsns_raft-cluster Creating 
+15:36:52.976 [Thread-6] INFO  tc.docker.exe -  Network 4zrxfpj5vsns_raft-cluster Creating 
+15:36:53.013 [Thread-6] INFO  tc.docker.exe -  Network 4zrxfpj5vsns_raft-cluster Created 
+15:36:53.014 [Thread-6] INFO  tc.docker.exe -  Network 4zrxfpj5vsns_raft-cluster Created 
+15:36:53.014 [Thread-6] INFO  tc.docker.exe -  Container 4zrxfpj5vsns-controller3-1 Creating 
+15:36:53.014 [Thread-6] INFO  tc.docker.exe -  Container 4zrxfpj5vsns-controller2-1 Creating 
+15:36:53.014 [Thread-6] INFO  tc.docker.exe -  Container 4zrxfpj5vsns-controller1-1 Creating 
+15:36:53.096 [Thread-6] INFO  tc.docker.exe -  Container 4zrxfpj5vsns-controller2-1 Created 
+15:36:53.098 [Thread-6] INFO  tc.docker.exe -  Container 4zrxfpj5vsns-controller3-1 Created 
+15:36:53.107 [Thread-6] INFO  tc.docker.exe -  Container 4zrxfpj5vsns-controller1-1 Created 
+15:36:53.112 [Thread-6] INFO  tc.docker.exe -  Container 4zrxfpj5vsns-controller1-1 Starting 
+15:36:53.113 [Thread-6] INFO  tc.docker.exe -  Container 4zrxfpj5vsns-controller3-1 Starting 
+15:36:53.113 [Thread-6] INFO  tc.docker.exe -  Container 4zrxfpj5vsns-controller2-1 Starting 
+15:36:53.393 [Thread-6] INFO  tc.docker.exe -  Container 4zrxfpj5vsns-controller2-1 Started 
+15:36:53.510 [Thread-6] INFO  tc.docker.exe -  Container 4zrxfpj5vsns-controller3-1 Started 
+15:36:53.570 [Thread-6] INFO  tc.docker.exe -  Container 4zrxfpj5vsns-controller1-1 Started 
+15:36:53.586 [ForkJoinPool-1-worker-3] INFO  tc.docker.exe - Docker Compose has finished running
+15:36:53.587 [ForkJoinPool-1-worker-3] INFO  tc.alpine/socat:1.7.4.3-r0 - Creating container for image: alpine/socat:1.7.4.3-r0
+15:36:53.795 [ForkJoinPool-1-worker-3] INFO  tc.alpine/socat:1.7.4.3-r0 - Container alpine/socat:1.7.4.3-r0 is starting: 3aa475d2a67817ae80b8241346b0c11336461754f150d6472947844418fc6300
+15:36:54.383 [ForkJoinPool-1-worker-3] INFO  tc.alpine/socat:1.7.4.3-r0 - Container alpine/socat:1.7.4.3-r0 started in PT0.7958014S
+15:36:54.419 [ducttape-0] INFO  o.t.c.wait.strategy.HttpWaitStrategy - /4zrxfpj5vsns-controller2-1: Waiting for 60 seconds for URL: http://localhost:50883/health (where port 50883 maps to container port 8080)
+15:36:55.695 [ducttape-0] INFO  o.t.c.wait.strategy.HttpWaitStrategy - /4zrxfpj5vsns-controller3-1: Waiting for 60 seconds for URL: http://localhost:50884/health (where port 50884 maps to container port 8080)
+15:36:56.905 [ducttape-0] INFO  o.t.c.wait.strategy.HttpWaitStrategy - /4zrxfpj5vsns-controller1-1: Waiting for 60 seconds for URL: http://localhost:50882/health (where port 50882 maps to container port 8080)
+Sept 05, 2026 3:36:58 PM dev.mars.quorus.controller.raft.SharedDockerCluster getThreeNodeCluster
+INFO: Shared 3-node cluster started successfully
+Sept 05, 2026 3:36:58 PM dev.mars.quorus.controller.raft.SharedDockerCluster getFiveNodeCluster
+INFO: Starting shared 5-node cluster...
+Sept 05, 2026 3:36:58 PM dev.mars.quorus.controller.raft.DockerRaftClusterTest setUp
+INFO: Starting test: testLeaderElection()
+Sept 05, 2026 3:36:58 PM dev.mars.quorus.controller.raft.DockerRaftClusterTest setUp
+INFO: Starting test: testLeaderFailureAndReelection()
+Sept 05, 2026 3:36:58 PM dev.mars.quorus.controller.raft.DockerRaftClusterTest setUp
+INFO: Starting test: testNetworkPartitionRecovery()
+Sept 05, 2026 3:36:58 PM dev.mars.quorus.controller.raft.DockerRaftClusterTest setUp
+INFO: Starting test: testClusterStartupAndHealthCheck()
+Sept 05, 2026 3:36:58 PM dev.mars.quorus.controller.raft.DockerRaftClusterTest setUp
+INFO: All nodes are healthy and ready for testing
+Sept 05, 2026 3:36:58 PM dev.mars.quorus.controller.raft.DockerRaftClusterTest setUp
+INFO: All nodes are healthy and ready for testing
+Sept 05, 2026 3:36:58 PM dev.mars.quorus.controller.raft.DockerRaftClusterTest setUp
+INFO: All nodes are healthy and ready for testing
+Sept 05, 2026 3:36:58 PM dev.mars.quorus.controller.raft.DockerRaftClusterTest setUp
+INFO: All nodes are healthy and ready for testing
+15:36:58.017 [ForkJoinPool-1-worker-9] INFO  o.t.containers.ComposeDelegate - Preemptively checking local images for 'quorus-controller:test', referenced via a compose file or transitive Dockerfile. If not available, it will be pulled.
+15:36:58.020 [ForkJoinPool-1-worker-9] INFO  tc.docker.exe - Local Docker Compose is running command: compose up -d
+Sept 05, 2026 3:36:58 PM dev.mars.quorus.controller.raft.DockerRaftClusterTest lambda$testClusterStartupAndHealthCheck$0
+INFO: Node 1 health check passed
+Sept 05, 2026 3:36:58 PM dev.mars.quorus.controller.raft.DockerRaftClusterTest lambda$testClusterStartupAndHealthCheck$0
+INFO: Node 2 health check passed
+15:36:58.228 [Thread-8] INFO  tc.docker.exe - time="2026-09-05T15:36:58+08:00" level=warning msg="C:\\Users\\mraysmit\\dev\\idea-projects\\quorus\\quorus-controller\\src\\test\\resources\\docker-compose-5node-prebuilt.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+Sept 05, 2026 3:36:58 PM dev.mars.quorus.controller.raft.DockerRaftClusterTest lambda$testClusterStartupAndHealthCheck$0
+INFO: Node 3 health check passed
+Sept 05, 2026 3:36:58 PM dev.mars.quorus.controller.raft.DockerRaftClusterTest tearDown
+INFO: Completed test: testClusterStartupAndHealthCheck()
+15:36:58.262 [Thread-8] INFO  tc.docker.exe -  Network jdabv1o3h26p_raft-cluster Creating 
+15:36:58.262 [Thread-8] INFO  tc.docker.exe -  Network jdabv1o3h26p_raft-cluster Creating 
+15:36:58.320 [Thread-8] INFO  tc.docker.exe -  Network jdabv1o3h26p_raft-cluster Created 
+15:36:58.320 [Thread-8] INFO  tc.docker.exe -  Network jdabv1o3h26p_raft-cluster Created 
+15:36:58.320 [Thread-8] INFO  tc.docker.exe -  Container jdabv1o3h26p-controller5-1 Creating 
+15:36:58.320 [Thread-8] INFO  tc.docker.exe -  Container jdabv1o3h26p-controller3-1 Creating 
+15:36:58.320 [Thread-8] INFO  tc.docker.exe -  Container jdabv1o3h26p-controller4-1 Creating 
+15:36:58.321 [Thread-8] INFO  tc.docker.exe -  Container jdabv1o3h26p-controller1-1 Creating 
+15:36:58.321 [Thread-8] INFO  tc.docker.exe -  Container jdabv1o3h26p-controller2-1 Creating 
+15:36:58.448 [Thread-8] INFO  tc.docker.exe -  Container jdabv1o3h26p-controller2-1 Created 
+15:36:58.449 [Thread-8] INFO  tc.docker.exe -  Container jdabv1o3h26p-controller1-1 Created 
+15:36:58.449 [Thread-8] INFO  tc.docker.exe -  Container jdabv1o3h26p-controller3-1 Created 
+15:36:58.463 [Thread-8] INFO  tc.docker.exe -  Container jdabv1o3h26p-controller5-1 Created 
+15:36:58.476 [Thread-8] INFO  tc.docker.exe -  Container jdabv1o3h26p-controller4-1 Created 
+15:36:58.485 [Thread-8] INFO  tc.docker.exe -  Container jdabv1o3h26p-controller1-1 Starting 
+15:36:58.485 [Thread-8] INFO  tc.docker.exe -  Container jdabv1o3h26p-controller3-1 Starting 
+15:36:58.485 [Thread-8] INFO  tc.docker.exe -  Container jdabv1o3h26p-controller5-1 Starting 
+15:36:58.486 [Thread-8] INFO  tc.docker.exe -  Container jdabv1o3h26p-controller2-1 Starting 
+15:36:58.486 [Thread-8] INFO  tc.docker.exe -  Container jdabv1o3h26p-controller4-1 Starting 
+15:36:58.858 [Thread-8] INFO  tc.docker.exe -  Container jdabv1o3h26p-controller5-1 Started 
+15:36:58.927 [Thread-8] INFO  tc.docker.exe -  Container jdabv1o3h26p-controller4-1 Started 
+15:36:59.001 [Thread-8] INFO  tc.docker.exe -  Container jdabv1o3h26p-controller2-1 Started 
+15:36:59.073 [Thread-8] INFO  tc.docker.exe -  Container jdabv1o3h26p-controller1-1 Started 
+15:36:59.141 [Thread-8] INFO  tc.docker.exe -  Container jdabv1o3h26p-controller3-1 Started 
+15:36:59.156 [ForkJoinPool-1-worker-9] INFO  tc.docker.exe - Docker Compose has finished running
+15:36:59.157 [ForkJoinPool-1-worker-9] INFO  tc.alpine/socat:1.7.4.3-r0 - Creating container for image: alpine/socat:1.7.4.3-r0
+15:36:59.438 [ForkJoinPool-1-worker-9] INFO  tc.alpine/socat:1.7.4.3-r0 - Container alpine/socat:1.7.4.3-r0 is starting: 76b9286737331d867c3d78902898c9d10e82ef8d6baae926dcbaecdfa3361e1d
+Sept 05, 2026 3:37:00 PM dev.mars.quorus.controller.raft.DockerRaftClusterTest hasExactlyOneLeader
+INFO: Cluster state: controller1=FOLLOWER controller2=FOLLOWER controller3=LEADER | leaders=1 | result=true
+Sept 05, 2026 3:37:00 PM dev.mars.quorus.controller.raft.DockerRaftClusterTest hasExactlyOneLeader
+INFO: Cluster state: controller1=FOLLOWER controller2=FOLLOWER controller3=LEADER | leaders=1 | result=true
+Sept 05, 2026 3:37:00 PM dev.mars.quorus.controller.raft.DockerRaftClusterTest hasExactlyOneLeader
+INFO: Cluster state: controller1=FOLLOWER controller2=FOLLOWER controller3=LEADER | leaders=1 | result=true
+Sept 05, 2026 3:37:00 PM dev.mars.quorus.controller.raft.DockerRaftClusterTest testLeaderElection
+INFO: Leader elected: controller3
+Sept 05, 2026 3:37:00 PM dev.mars.quorus.controller.raft.DockerRaftClusterTest tearDown
+INFO: Completed test: testLeaderElection()
+Sept 05, 2026 3:37:00 PM dev.mars.quorus.controller.raft.DockerRaftClusterTest testNetworkPartitionRecovery
+INFO: Original leader: controller3
+Sept 05, 2026 3:37:00 PM dev.mars.quorus.controller.raft.DockerRaftClusterTest testNetworkPartitionRecovery
+INFO: Simulating network partition...
+Sept 05, 2026 3:37:00 PM dev.mars.quorus.controller.raft.DockerRaftClusterTest testLeaderFailureAndReelection
+INFO: Original leader: controller3
+Sept 05, 2026 3:37:00 PM dev.mars.quorus.controller.raft.DockerRaftClusterTest testLeaderFailureAndReelection
+INFO: Leader election verified - leader failover test requires Docker API integration
+Sept 05, 2026 3:37:00 PM dev.mars.quorus.controller.raft.DockerRaftClusterTest tearDown
+INFO: Completed test: testLeaderFailureAndReelection()
+15:37:00.315 [ForkJoinPool-1-worker-9] INFO  tc.alpine/socat:1.7.4.3-r0 - Container alpine/socat:1.7.4.3-r0 started in PT1.1582678S
+15:37:00.355 [ducttape-0] INFO  o.t.c.wait.strategy.HttpWaitStrategy - /jdabv1o3h26p-controller2-1: Waiting for 60 seconds for URL: http://localhost:65122/health (where port 65122 maps to container port 8080)
+15:37:01.587 [ducttape-1] INFO  o.t.c.wait.strategy.HttpWaitStrategy - /jdabv1o3h26p-controller3-1: Waiting for 60 seconds for URL: http://localhost:65123/health (where port 65123 maps to container port 8080)
+Sept 05, 2026 3:37:02 PM dev.mars.quorus.controller.raft.DockerRaftClusterTest hasExactlyOneLeader
+INFO: Cluster state: controller1=FOLLOWER controller2=FOLLOWER controller3=LEADER | leaders=1 | result=true
+Sept 05, 2026 3:37:02 PM dev.mars.quorus.controller.raft.DockerRaftClusterTest testNetworkPartitionRecovery
+INFO: Cluster maintained quorum during partition
+Sept 05, 2026 3:37:02 PM dev.mars.quorus.controller.raft.DockerRaftClusterTest hasExactlyOneLeader
+INFO: Cluster state: controller1=FOLLOWER controller2=FOLLOWER controller3=LEADER | leaders=1 | result=true
+Sept 05, 2026 3:37:02 PM dev.mars.quorus.controller.raft.DockerRaftClusterTest tearDown
+INFO: Completed test: testNetworkPartitionRecovery()
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 12.85 s -- in dev.mars.quorus.controller.raft.DockerRaftClusterTest
+15:37:03.068 [ducttape-1] INFO  o.t.c.wait.strategy.HttpWaitStrategy - /jdabv1o3h26p-controller1-1: Waiting for 60 seconds for URL: http://localhost:65120/health (where port 65120 maps to container port 8080)
+15:37:04.082 [ducttape-1] INFO  o.t.c.wait.strategy.HttpWaitStrategy - /jdabv1o3h26p-controller4-1: Waiting for 60 seconds for URL: http://localhost:65124/health (where port 65124 maps to container port 8080)
+15:37:05.105 [ducttape-1] INFO  o.t.c.wait.strategy.HttpWaitStrategy - /jdabv1o3h26p-controller5-1: Waiting for 60 seconds for URL: http://localhost:65121/health (where port 65121 maps to container port 8080)
+Sept 05, 2026 3:37:06 PM dev.mars.quorus.controller.raft.SharedDockerCluster getFiveNodeCluster
+INFO: Shared 5-node cluster started successfully
+Sept 05, 2026 3:37:06 PM dev.mars.quorus.controller.raft.ConfigurableRaftClusterTest setupWithConfiguration
+INFO: Partition testing enabled for this configuration
+Sept 05, 2026 3:37:06 PM dev.mars.quorus.controller.raft.ConfigurableRaftClusterTest setupWithConfiguration
+INFO: Partition testing enabled for this configuration
+Sept 05, 2026 3:37:06 PM dev.mars.quorus.controller.raft.NetworkPartitionTest setUp
+INFO: Starting network partition test: testSplitBrainPrevention()
+Sept 05, 2026 3:37:06 PM dev.mars.quorus.controller.raft.NetworkPartitionTest setUp
+INFO: Starting network partition test: testNetworkRecovery()
+Sept 05, 2026 3:37:06 PM dev.mars.quorus.controller.raft.NetworkPartitionTest restoreNetworkConnectivity
+INFO: Restoring network connectivity...
+Sept 05, 2026 3:37:06 PM dev.mars.quorus.controller.raft.NetworkPartitionTest restoreNetworkConnectivity
+INFO: Restoring network connectivity...
+Sept 05, 2026 3:37:08 PM dev.mars.quorus.controller.raft.ConfigurableRaftClusterTest setupWithConfiguration
+INFO: All 3 nodes are healthy and ready for testing
+Sept 05, 2026 3:37:08 PM dev.mars.quorus.controller.raft.ConfigurableRaftClusterTest setupWithConfiguration
+INFO: All 3 nodes are healthy and ready for testing
+Sept 05, 2026 3:37:08 PM dev.mars.quorus.controller.raft.ConfigurableRaftClusterTest setupWithConfiguration
+INFO: All 3 nodes are healthy and ready for testing
+Sept 05, 2026 3:37:08 PM dev.mars.quorus.controller.raft.ConfigurableRaftClusterTest setupWithConfiguration
+INFO: All 3 nodes are healthy and ready for testing
+Sept 05, 2026 3:37:08 PM dev.mars.quorus.controller.raft.ConfigurableRaftClusterTest setupWithConfiguration
+INFO: All 3 nodes are healthy and ready for testing
+Sept 05, 2026 3:37:08 PM dev.mars.quorus.controller.raft.ConfigurableRaftClusterTest setupWithConfiguration
+INFO: All 5 nodes are healthy and ready for testing
+Sept 05, 2026 3:37:08 PM dev.mars.quorus.controller.raft.ConfigurableRaftClusterTest testPartitionToleranceWithDifferentConfigs
+INFO: Skipping partition test - not enabled for this configuration
+Sept 05, 2026 3:37:08 PM dev.mars.quorus.controller.raft.NetworkPartitionTest setUp
+INFO: All 5 nodes are healthy and ready for partition testing
+Sept 05, 2026 3:37:08 PM dev.mars.quorus.controller.raft.ConfigurableRaftClusterTest tearDown
+INFO: Completed test: [2] TestClusterConfiguration{nodeCount=5, electionTimeout=PT5S, heartbeatInterval=PT1S, startupTimeout=PT8M, testTimeout=PT15M, composeFile='src/test/resources/docker-compose-5node-test.yml', environmentVariables={JAVA_OPTS=-Xmx256m -Xms128m}, networkConfig=dev.mars.quorus.controller.raft.TestClusterConfiguration$NetworkConfiguration@6bb88ea8}
+Sept 05, 2026 3:37:08 PM dev.mars.quorus.controller.raft.ConfigurableRaftClusterTest setupWithConfiguration
+INFO: All 5 nodes are healthy and ready for testing
+Sept 05, 2026 3:37:08 PM dev.mars.quorus.controller.raft.NetworkPartitionTest setUp
+INFO: All 5 nodes are healthy and ready for partition testing
+Sept 05, 2026 3:37:08 PM dev.mars.quorus.controller.raft.ConfigurableRaftClusterTest setupWithConfiguration
+INFO: All 5 nodes are healthy and ready for testing
+Sept 05, 2026 3:37:08 PM dev.mars.quorus.controller.raft.ConfigurableRaftClusterTest applyNetworkStress
+INFO: Applying high network latency: PT0.2S
+Sept 05, 2026 3:37:08 PM dev.mars.quorus.controller.raft.ConfigurableRaftClusterTest applyNetworkStress
+INFO: Applying packet loss: 5%
+Sept 05, 2026 3:37:08 PM dev.mars.quorus.controller.raft.ConfigurableRaftClusterTest tearDown
+INFO: Completed test: testWithFastConfiguration(TestInfo)
+Sept 05, 2026 3:37:09 PM dev.mars.quorus.controller.raft.ConfigurableRaftClusterTest testLeaderElectionWithDifferentConfigs
+INFO: Leader elected: controller3 with config: 3 nodes
+Sept 05, 2026 3:37:09 PM dev.mars.quorus.controller.raft.ConfigurableRaftClusterTest testLeaderElectionWithDifferentConfigs
+INFO: Leader elected: controller3 with config: 3 nodes
+Sept 05, 2026 3:37:09 PM dev.mars.quorus.controller.raft.ConfigurableRaftClusterTest tearDown
+INFO: Completed test: [1] TestClusterConfiguration{nodeCount=3, electionTimeout=PT1S, heartbeatInterval=PT0.2S, startupTimeout=PT2M, testTimeout=PT3M, composeFile='src/test/resources/docker-compose-test.yml', environmentVariables={JAVA_OPTS=-Xmx128m -Xms64m}, networkConfig=dev.mars.quorus.controller.raft.TestClusterConfiguration$NetworkConfiguration@6293b068}
+Sept 05, 2026 3:37:09 PM dev.mars.quorus.controller.raft.ConfigurableRaftClusterTest tearDown
+INFO: Completed test: [3] TestClusterConfiguration{nodeCount=3, electionTimeout=PT3S, heartbeatInterval=PT0.6S, startupTimeout=PT4M, testTimeout=PT8M, composeFile='src/test/resources/docker-compose-test.yml', environmentVariables={LOG_LEVEL=DEBUG, JAVA_OPTS=-Xmx256m -Xms128m}, networkConfig=dev.mars.quorus.controller.raft.TestClusterConfiguration$NetworkConfiguration@4d1f722d}
+Sept 05, 2026 3:37:09 PM dev.mars.quorus.controller.raft.ConfigurableRaftClusterTest tearDown
+INFO: Completed test: testWithStandardConfiguration(TestInfo)
+Sept 05, 2026 3:37:09 PM dev.mars.quorus.controller.raft.ConfigurableRaftClusterTest testLeaderElectionWithDifferentConfigs
+INFO: Leader elected: controller3 with config: 3 nodes
+Sept 05, 2026 3:37:09 PM dev.mars.quorus.controller.raft.ConfigurableRaftClusterTest tearDown
+INFO: Completed test: [2] TestClusterConfiguration{nodeCount=3, electionTimeout=PT3S, heartbeatInterval=PT0.5S, startupTimeout=PT5M, testTimeout=PT10M, composeFile='src/test/resources/docker-compose-test.yml', environmentVariables={JAVA_OPTS=-Xmx256m -Xms128m}, networkConfig=dev.mars.quorus.controller.raft.TestClusterConfiguration$NetworkConfiguration@1af211bd}
+Sept 05, 2026 3:37:09 PM dev.mars.quorus.controller.raft.ConfigurableRaftClusterTest testPartitionToleranceWithDifferentConfigs
+INFO: Original leader: controller2
+Sept 05, 2026 3:37:09 PM dev.mars.quorus.controller.raft.ConfigurableRaftClusterTest testMajorityPartitionTolerance
+INFO: Testing majority partition tolerance (3-2 split)
+Sept 05, 2026 3:37:10 PM dev.mars.quorus.controller.raft.NetworkPartitionTest testNetworkRecovery
+INFO: Testing network recovery after partition
+Sept 05, 2026 3:37:10 PM dev.mars.quorus.controller.raft.NetworkPartitionTest simulateNetworkLatency
+INFO: Simulating network latency...
+Sept 05, 2026 3:37:10 PM dev.mars.quorus.controller.raft.NetworkPartitionTest testSplitBrainPrevention
+INFO: Testing split-brain prevention with 2-2-1 partition
+Sept 05, 2026 3:37:10 PM dev.mars.quorus.controller.raft.NetworkPartitionTest testSplitBrainPrevention
+INFO: Simulating 2-2-1 network partition...
+Sept 05, 2026 3:37:10 PM dev.mars.quorus.controller.raft.NetworkPartitionTest testSplitBrainPrevention
+INFO: Split-brain prevention test structure verified
+Sept 05, 2026 3:37:10 PM dev.mars.quorus.controller.raft.NetworkPartitionTest restoreNetworkConnectivity
+INFO: Restoring network connectivity...
+Sept 05, 2026 3:37:10 PM dev.mars.quorus.controller.raft.NetworkPartitionTest tearDown
+INFO: Completed network partition test: testSplitBrainPrevention()
+Sept 05, 2026 3:37:10 PM dev.mars.quorus.controller.raft.ConfigurableRaftClusterTest tearDown
+INFO: Completed test: [1] TestClusterConfiguration{nodeCount=5, electionTimeout=PT4S, heartbeatInterval=PT0.8S, startupTimeout=PT6M, testTimeout=PT20M, composeFile='src/test/resources/docker-compose-5node-test.yml', environmentVariables={JAVA_OPTS=-Xmx256m -Xms128m}, networkConfig=dev.mars.quorus.controller.raft.TestClusterConfiguration$NetworkConfiguration@52da5e4a}
+Sept 05, 2026 3:37:11 PM dev.mars.quorus.controller.raft.ConfigurableRaftClusterTest testStressConfiguration
+INFO: Cluster maintained stability under stress conditions
+Sept 05, 2026 3:37:11 PM dev.mars.quorus.controller.raft.ConfigurableRaftClusterTest tearDown
+INFO: Completed test: testStressConfiguration(TestInfo)
+[WARNING] Tests run: 10, Failures: 0, Errors: 0, Skipped: 1, Time elapsed: 21.99 s -- in dev.mars.quorus.controller.raft.ConfigurableRaftClusterTest
+Sept 05, 2026 3:37:13 PM dev.mars.quorus.controller.raft.NetworkPartitionTest testNetworkRecovery
+INFO: Cluster successfully recovered from network issues
+Sept 05, 2026 3:37:13 PM dev.mars.quorus.controller.raft.NetworkPartitionTest restoreNetworkConnectivity
+INFO: Restoring network connectivity...
+Sept 05, 2026 3:37:13 PM dev.mars.quorus.controller.raft.NetworkPartitionTest tearDown
+INFO: Completed network partition test: testNetworkRecovery()
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 24.04 s -- in dev.mars.quorus.controller.raft.NetworkPartitionTest
+[INFO] Running dev.mars.quorus.controller.raft.AdvancedNetworkTest
+15:37:13.412 [ForkJoinPool-1-worker-1] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  EXPECTED ERROR TEST: testNetworkRecoveryScenarios
+  Reason: Container image lacks iptables/iproute2 -- isolation and latency commands fail with SEVERE
+  Errors below are INTENTIONAL -- testing error handling paths
+========================================================================
+Sept 05, 2026 3:37:13 PM dev.mars.quorus.controller.raft.AdvancedNetworkTest setUp
+INFO: Starting advanced network test: testNetworkRecoveryScenarios()
+Sept 05, 2026 3:37:13 PM dev.mars.quorus.controller.raft.NetworkTestUtils restoreDockerNetworkPartition
+INFO: Restoring Docker network partition for nodes: [controller1, controller2, controller3, controller4, controller5]
+Sept 05, 2026 3:37:14 PM dev.mars.quorus.controller.raft.NetworkTestUtils restoreDockerNetworkPartition
+INFO: Docker network partition restored successfully
+Sept 05, 2026 3:37:16 PM dev.mars.quorus.controller.raft.AdvancedNetworkTest setUp
+INFO: All 5 nodes are healthy and ready for advanced network testing
+Sept 05, 2026 3:37:19 PM dev.mars.quorus.controller.raft.AdvancedNetworkTest testNetworkRecoveryScenarios
+INFO: Testing various network recovery scenarios
+Sept 05, 2026 3:37:19 PM dev.mars.quorus.controller.raft.NetworkTestUtils isolateNode
+INFO: Isolating node from network: controller5
+Sept 05, 2026 3:37:19 PM dev.mars.quorus.controller.raft.NetworkTestUtils isolateNode
+SEVERE: Failed to isolate node controller5 (is 'iptables' installed in the container image?)
+Sept 05, 2026 3:37:22 PM dev.mars.quorus.controller.raft.NetworkTestUtils restoreNode
+INFO: Restoring network connectivity for node: controller5
+Sept 05, 2026 3:37:23 PM dev.mars.quorus.controller.raft.NetworkTestUtils restoreNode
+INFO: Node controller5 connectivity restored
+Sept 05, 2026 3:37:26 PM dev.mars.quorus.controller.raft.AdvancedNetworkTest testNetworkRecoveryScenarios
+INFO: Successfully tested network isolation and recovery
+Sept 05, 2026 3:37:26 PM dev.mars.quorus.controller.raft.NetworkTestUtils addNetworkLatency
+INFO: Adding 50ms network latency to controller1
+Sept 05, 2026 3:37:26 PM dev.mars.quorus.controller.raft.NetworkTestUtils addNetworkLatency
+SEVERE: Failed to add latency to controller1:  (is 'iproute2' installed in the container image?)
+Sept 05, 2026 3:37:27 PM dev.mars.quorus.controller.raft.NetworkTestUtils addNetworkLatency
+INFO: Adding 100ms network latency to controller1
+Sept 05, 2026 3:37:27 PM dev.mars.quorus.controller.raft.NetworkTestUtils addNetworkLatency
+SEVERE: Failed to add latency to controller1:  (is 'iproute2' installed in the container image?)
+Sept 05, 2026 3:37:28 PM dev.mars.quorus.controller.raft.NetworkTestUtils addNetworkLatency
+INFO: Adding 150ms network latency to controller1
+Sept 05, 2026 3:37:28 PM dev.mars.quorus.controller.raft.NetworkTestUtils addNetworkLatency
+SEVERE: Failed to add latency to controller1:  (is 'iproute2' installed in the container image?)
+Sept 05, 2026 3:37:29 PM dev.mars.quorus.controller.raft.NetworkTestUtils addNetworkLatency
+INFO: Adding 200ms network latency to controller1
+Sept 05, 2026 3:37:29 PM dev.mars.quorus.controller.raft.NetworkTestUtils addNetworkLatency
+SEVERE: Failed to add latency to controller1:  (is 'iproute2' installed in the container image?)
+Sept 05, 2026 3:37:30 PM dev.mars.quorus.controller.raft.NetworkTestUtils removeNetworkLatency
+INFO: Removing network latency from controller1
+Sept 05, 2026 3:37:30 PM dev.mars.quorus.controller.raft.NetworkTestUtils removeNetworkLatency
+SEVERE: Failed to remove latency from controller1: 
+Sept 05, 2026 3:37:33 PM dev.mars.quorus.controller.raft.AdvancedNetworkTest testNetworkRecoveryScenarios
+INFO: Successfully tested gradual network degradation and recovery
+Sept 05, 2026 3:37:33 PM dev.mars.quorus.controller.raft.NetworkTestUtils restoreDockerNetworkPartition
+INFO: Restoring Docker network partition for nodes: [controller1, controller2, controller3, controller4, controller5]
+Sept 05, 2026 3:37:34 PM dev.mars.quorus.controller.raft.NetworkTestUtils restoreDockerNetworkPartition
+INFO: Docker network partition restored successfully
+15:37:34.837 [ForkJoinPool-1-worker-1] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  END EXPECTED ERROR TEST: testNetworkRecoveryScenarios -- PASSED
+========================================================================
+Sept 05, 2026 3:37:34 PM dev.mars.quorus.controller.raft.AdvancedNetworkTest tearDown
+INFO: Completed advanced network test: testNetworkRecoveryScenarios()
+15:37:34.841 [ForkJoinPool-1-worker-1] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  EXPECTED ERROR TEST: testComplexNetworkScenario
+  Reason: Container image lacks iproute2 -- tc latency/packet-loss commands fail with SEVERE
+  Errors below are INTENTIONAL -- testing error handling paths
+========================================================================
+Sept 05, 2026 3:37:34 PM dev.mars.quorus.controller.raft.AdvancedNetworkTest setUp
+INFO: Starting advanced network test: testComplexNetworkScenario()
+Sept 05, 2026 3:37:34 PM dev.mars.quorus.controller.raft.NetworkTestUtils restoreDockerNetworkPartition
+INFO: Restoring Docker network partition for nodes: [controller1, controller2, controller3, controller4, controller5]
+Sept 05, 2026 3:37:36 PM dev.mars.quorus.controller.raft.NetworkTestUtils restoreDockerNetworkPartition
+INFO: Docker network partition restored successfully
+Sept 05, 2026 3:37:38 PM dev.mars.quorus.controller.raft.AdvancedNetworkTest setUp
+INFO: All 5 nodes are healthy and ready for advanced network testing
+Sept 05, 2026 3:37:41 PM dev.mars.quorus.controller.raft.AdvancedNetworkTest testComplexNetworkScenario
+INFO: Testing complex network scenario with multiple conditions
+Sept 05, 2026 3:37:41 PM dev.mars.quorus.controller.raft.NetworkTestUtils createComplexNetworkScenario
+INFO: Creating complex network scenario with multiple conditions
+Sept 05, 2026 3:37:41 PM dev.mars.quorus.controller.raft.NetworkTestUtils addNetworkLatency
+INFO: Adding 200ms network latency to controller1
+Sept 05, 2026 3:37:41 PM dev.mars.quorus.controller.raft.NetworkTestUtils addNetworkLatency
+SEVERE: Failed to add latency to controller1:  (is 'iproute2' installed in the container image?)
+Sept 05, 2026 3:37:41 PM dev.mars.quorus.controller.raft.NetworkTestUtils addPacketLoss
+INFO: Adding 3% packet loss to controller2
+Sept 05, 2026 3:37:41 PM dev.mars.quorus.controller.raft.NetworkTestUtils addPacketLoss
+SEVERE: Failed to add packet loss to controller2:  (is 'iproute2' installed in the container image?)
+Sept 05, 2026 3:37:41 PM dev.mars.quorus.controller.raft.NetworkTestUtils simulateSlowNetwork
+INFO: Simulating slow network for controller3 (delay: 100ms, loss: 2%)
+Sept 05, 2026 3:37:41 PM dev.mars.quorus.controller.raft.NetworkTestUtils simulateSlowNetwork
+SEVERE: Failed to simulate slow network for controller3:  (is 'iproute2' installed in the container image?)
+Sept 05, 2026 3:37:41 PM dev.mars.quorus.controller.raft.NetworkTestUtils createComplexNetworkScenario
+INFO: Applied complex network conditions to simulate real-world scenarios
+Sept 05, 2026 3:38:04 PM dev.mars.quorus.controller.raft.AdvancedNetworkTest testComplexNetworkScenario
+INFO: Leader stability check: controller2 -> controller2
+Sept 05, 2026 3:38:04 PM dev.mars.quorus.controller.raft.AdvancedNetworkTest testComplexNetworkScenario
+INFO: Cluster maintained stability under complex network conditions
+Sept 05, 2026 3:38:04 PM dev.mars.quorus.controller.raft.NetworkTestUtils restoreDockerNetworkPartition
+INFO: Restoring Docker network partition for nodes: [controller1, controller2, controller3, controller4, controller5]
+Sept 05, 2026 3:38:05 PM dev.mars.quorus.controller.raft.NetworkTestUtils restoreDockerNetworkPartition
+INFO: Docker network partition restored successfully
+15:38:05.891 [ForkJoinPool-1-worker-1] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  END EXPECTED ERROR TEST: testComplexNetworkScenario -- PASSED
+========================================================================
+Sept 05, 2026 3:38:05 PM dev.mars.quorus.controller.raft.AdvancedNetworkTest tearDown
+INFO: Completed advanced network test: testComplexNetworkScenario()
+15:38:05.893 [ForkJoinPool-1-worker-1] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  EXPECTED ERROR TEST: testGeographicDistribution
+  Reason: Container image lacks iproute2 -- tc latency commands fail with SEVERE
+  Errors below are INTENTIONAL -- testing error handling paths
+========================================================================
+Sept 05, 2026 3:38:05 PM dev.mars.quorus.controller.raft.AdvancedNetworkTest setUp
+INFO: Starting advanced network test: testGeographicDistribution()
+Sept 05, 2026 3:38:05 PM dev.mars.quorus.controller.raft.NetworkTestUtils restoreDockerNetworkPartition
+INFO: Restoring Docker network partition for nodes: [controller1, controller2, controller3, controller4, controller5]
+Sept 05, 2026 3:38:07 PM dev.mars.quorus.controller.raft.NetworkTestUtils restoreDockerNetworkPartition
+INFO: Docker network partition restored successfully
+Sept 05, 2026 3:38:09 PM dev.mars.quorus.controller.raft.AdvancedNetworkTest setUp
+INFO: All 5 nodes are healthy and ready for advanced network testing
+Sept 05, 2026 3:38:12 PM dev.mars.quorus.controller.raft.AdvancedNetworkTest testGeographicDistribution
+INFO: Testing geographic distribution simulation
+Sept 05, 2026 3:38:12 PM dev.mars.quorus.controller.raft.NetworkTestUtils simulateGeographicDistribution
+INFO: Simulating geographic distribution with varying latencies
+Sept 05, 2026 3:38:12 PM dev.mars.quorus.controller.raft.NetworkTestUtils addNetworkLatency
+INFO: Adding 20ms network latency to controller1
+Sept 05, 2026 3:38:12 PM dev.mars.quorus.controller.raft.NetworkTestUtils addNetworkLatency
+SEVERE: Failed to add latency to controller1:  (is 'iproute2' installed in the container image?)
+Sept 05, 2026 3:38:12 PM dev.mars.quorus.controller.raft.NetworkTestUtils simulateGeographicDistribution
+INFO: Added 20ms latency to controller1 (simulating region 1)
+Sept 05, 2026 3:38:12 PM dev.mars.quorus.controller.raft.NetworkTestUtils addNetworkLatency
+INFO: Adding 50ms network latency to controller2
+Sept 05, 2026 3:38:12 PM dev.mars.quorus.controller.raft.NetworkTestUtils addNetworkLatency
+SEVERE: Failed to add latency to controller2:  (is 'iproute2' installed in the container image?)
+Sept 05, 2026 3:38:12 PM dev.mars.quorus.controller.raft.NetworkTestUtils simulateGeographicDistribution
+INFO: Added 50ms latency to controller2 (simulating region 2)
+Sept 05, 2026 3:38:12 PM dev.mars.quorus.controller.raft.NetworkTestUtils addNetworkLatency
+INFO: Adding 80ms network latency to controller3
+Sept 05, 2026 3:38:12 PM dev.mars.quorus.controller.raft.NetworkTestUtils addNetworkLatency
+SEVERE: Failed to add latency to controller3:  (is 'iproute2' installed in the container image?)
+Sept 05, 2026 3:38:12 PM dev.mars.quorus.controller.raft.NetworkTestUtils simulateGeographicDistribution
+INFO: Added 80ms latency to controller3 (simulating region 3)
+Sept 05, 2026 3:38:12 PM dev.mars.quorus.controller.raft.NetworkTestUtils addNetworkLatency
+INFO: Adding 110ms network latency to controller4
+Sept 05, 2026 3:38:12 PM dev.mars.quorus.controller.raft.NetworkTestUtils addNetworkLatency
+SEVERE: Failed to add latency to controller4:  (is 'iproute2' installed in the container image?)
+Sept 05, 2026 3:38:12 PM dev.mars.quorus.controller.raft.NetworkTestUtils simulateGeographicDistribution
+INFO: Added 110ms latency to controller4 (simulating region 4)
+Sept 05, 2026 3:38:12 PM dev.mars.quorus.controller.raft.NetworkTestUtils addNetworkLatency
+INFO: Adding 140ms network latency to controller5
+Sept 05, 2026 3:38:12 PM dev.mars.quorus.controller.raft.NetworkTestUtils addNetworkLatency
+SEVERE: Failed to add latency to controller5:  (is 'iproute2' installed in the container image?)
+Sept 05, 2026 3:38:12 PM dev.mars.quorus.controller.raft.NetworkTestUtils simulateGeographicDistribution
+INFO: Added 140ms latency to controller5 (simulating region 5)
+Sept 05, 2026 3:38:17 PM dev.mars.quorus.controller.raft.AdvancedNetworkTest testGeographicDistribution
+INFO: Leader under geographic distribution: controller2
+Sept 05, 2026 3:38:17 PM dev.mars.quorus.controller.raft.AdvancedNetworkTest testGeographicDistribution
+INFO: Cluster successfully operates under geographic distribution
+Sept 05, 2026 3:38:17 PM dev.mars.quorus.controller.raft.NetworkTestUtils restoreDockerNetworkPartition
+INFO: Restoring Docker network partition for nodes: [controller1, controller2, controller3, controller4, controller5]
+Sept 05, 2026 3:38:18 PM dev.mars.quorus.controller.raft.NetworkTestUtils restoreDockerNetworkPartition
+INFO: Docker network partition restored successfully
+15:38:18.815 [ForkJoinPool-1-worker-1] WARN  d.m.q.testing.ExpectsErrorExtension - 
+========================================================================
+  END EXPECTED ERROR TEST: testGeographicDistribution -- PASSED
+========================================================================
+Sept 05, 2026 3:38:18 PM dev.mars.quorus.controller.raft.AdvancedNetworkTest tearDown
+INFO: Completed advanced network test: testGeographicDistribution()
+[WARNING] Tests run: 4, Failures: 0, Errors: 0, Skipped: 1, Time elapsed: 65.41 s -- in dev.mars.quorus.controller.raft.AdvancedNetworkTest
+[INFO] 
+[INFO] Results:
+[INFO] 
+[WARNING] Tests run: 19, Failures: 0, Errors: 0, Skipped: 2
+[INFO] 
+[INFO] 
+[INFO] --- jacoco:0.8.15:report (report) @ quorus-controller ---
+[INFO] Loading execution data file C:\Users\mraysmit\dev\idea-projects\quorus\quorus-controller\target\jacoco.exec
+[INFO] Analyzed bundle 'Quorus Distributed Controller' with 157 classes
+[WARNING] Classes in bundle 'Quorus Distributed Controller' do not match with execution data. For report generation the same class files must be used as at runtime.
+[WARNING] Execution data for class dev/mars/quorus/controller/service/JobAssignmentService does not match.
+[WARNING] Execution data for class dev/mars/quorus/controller/raft/GrpcRaftServer does not match.
+[WARNING] Execution data for class dev/mars/quorus/controller/http/handlers/AgentRegistrationHandler does not match.
+[WARNING] Execution data for class dev/mars/quorus/controller/http/handlers/ClusterHandler does not match.
+[WARNING] Execution data for class dev/mars/quorus/controller/QuorusControllerVerticle does not match.
+[WARNING] Execution data for class dev/mars/quorus/controller/http/handlers/TransferHandler does not match.
+[WARNING] Execution data for class dev/mars/quorus/controller/raft/GrpcRaftTransport$1 does not match.
+[WARNING] Execution data for class dev/mars/quorus/controller/http/LeaderGuardHandler does not match.
+[WARNING] Execution data for class dev/mars/quorus/controller/raft/GrpcRaftServer$RaftServiceImpl does not match.
+[WARNING] Execution data for class dev/mars/quorus/controller/http/handlers/HealthHandler does not match.
+[WARNING] Execution data for class dev/mars/quorus/controller/http/handlers/ServiceConnectionHandler does not match.
+[WARNING] Execution data for class dev/mars/quorus/controller/http/handlers/HeartbeatHandler does not match.
+[WARNING] Execution data for class dev/mars/quorus/controller/http/handlers/RouteHandler does not match.
+[WARNING] Execution data for class dev/mars/quorus/controller/http/handlers/StatusHandler does not match.
+[WARNING] Execution data for class dev/mars/quorus/controller/http/handlers/JobStatusHandler does not match.
+[WARNING] Execution data for class dev/mars/quorus/controller/raft/GrpcRaftTransport does not match.
+[WARNING] Execution data for class dev/mars/quorus/controller/http/handlers/ReadinessHandler does not match.
+[WARNING] Execution data for class dev/mars/quorus/controller/http/handlers/JobAssignmentHandler does not match.
+[WARNING] Execution data for class dev/mars/quorus/controller/http/HttpApiServer does not match.
+[WARNING] Execution data for class dev/mars/quorus/controller/http/handlers/InfoHandler does not match.
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Summary for Quorus File Transfer System 1.0-SNAPSHOT:
+[INFO] 
+[INFO] Quorus File Transfer System ........................ SUCCESS [  0.301 s]
+[INFO] Quorus Core ........................................ SUCCESS [  1.782 s]
+[INFO] Quorus Workflow Engine ............................. SUCCESS [  0.339 s]
+[INFO] Quorus Tenant Management ........................... SUCCESS [  0.233 s]
+[INFO] Quorus Distributed Controller ...................... SUCCESS [01:37 min]
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  01:39 min
+[INFO] Finished at: 2026-09-05T15:38:23+08:00
+[INFO] ------------------------------------------------------------------------

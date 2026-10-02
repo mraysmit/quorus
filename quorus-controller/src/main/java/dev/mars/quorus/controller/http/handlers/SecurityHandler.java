@@ -11,6 +11,7 @@ import dev.mars.quorus.controller.security.CertificateTrustState;
 import dev.mars.quorus.controller.security.SecurityContext;
 import dev.mars.quorus.controller.security.SecurityIdentity;
 import dev.mars.quorus.controller.http.CorrelationIdHandler;
+import dev.mars.quorus.controller.security.audit.AuditContinuation;
 import dev.mars.quorus.controller.security.audit.AuditEvent;
 import dev.mars.quorus.controller.security.audit.AuditSink;
 import io.vertx.core.Handler;
@@ -23,6 +24,7 @@ import java.security.cert.X509Certificate;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 /** REST representation of the effective identity and explainable authorization decisions. */
@@ -104,7 +106,8 @@ public final class SecurityHandler {
             CertificateTrustState.Snapshot previous = trustState.snapshot();
             CertificateTrustState.Snapshot updated = trustState.update(version, revoked);
             SecurityIdentity identity = SecurityContext.identity(context);
-            auditSink.append(new AuditEvent(Instant.now(), "SECURITY_CONFIGURATION_CHANGE", "SUCCESS",
+            CompletableFuture<Void> durable = auditSink.appendAsync(new AuditEvent(Instant.now(),
+                    "SECURITY_CONFIGURATION_CHANGE", "SUCCESS",
                     "Q-TRUST-REVOCATIONS-UPDATED", identity.principalId(), identity.type().name(),
                     identity.tenantId(), identity.environment(), identity.certificateSubject(),
                     context.request().method().name(), context.request().path(),
@@ -115,10 +118,10 @@ public final class SecurityHandler {
                             Integer.toString(previous.revokedCertificateSerials().size()),
                             "revokedCertificateCount",
                             Integer.toString(updated.revokedCertificateSerials().size()))));
-            context.json(new JsonObject()
+            AuditContinuation.afterDurable(context, durable, () -> context.json(new JsonObject()
                     .put("trustBundleVersion", updated.trustBundleVersion())
                     .put("loadedAt", updated.loadedAt().toString())
-                    .put("revokedCertificateCount", updated.revokedCertificateSerials().size()));
+                    .put("revokedCertificateCount", updated.revokedCertificateSerials().size())));
         };
     }
 

@@ -2,8 +2,8 @@
 
 # Quorus Certificate and Trust Incident Runbook
 
-**Version:** 1.1  
-**Date:** 2026-09-01  
+**Version:** 1.2
+**Date:** 2026-09-25
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Status:** Phase 1 operational runbook  
@@ -44,20 +44,21 @@ Do not infer that a transfer failed merely because its agent lost control connec
 
 ### 4.1 Gateway certificate
 
-1. Use a separately authenticated, actively elevated `SECURITY` identity to replace the runtime revocation set through `PUT /api/v1/security/trust/revocations`, retaining all earlier serials and adding the compromised serial under a new trust-policy version.
-2. Confirm the old certificate is rejected on its next request, including over an existing TLS connection, and preserve the `SECURITY_CONFIGURATION_CHANGE` audit event.
-3. Remove the compromised subject from the configured trusted gateway list and revoke the certificate in PKI.
-4. Deploy a trust bundle or CRL that rejects it, then rolling-restart controllers so the subject and PEM/CRL changes take effect.
-5. Confirm requests using the old certificate fail before identity headers are evaluated.
-6. Confirm the replacement gateway presents the intended subject and `security/me` output.
+1. Use a separately authenticated, actively elevated `SECURITY` identity to replace the runtime revocation set through `PUT /api/v1/security/trust/revocations` on **every controller**, retaining all earlier serials and adding the compromised serial under a new trust-policy version. Runtime revocation is node-local, in-memory state: it is not replicated and is lost on restart. Leading zeroes and colon separators in certificate serials are ignored.
+2. Add the complete revoked-serial set to `quorus.security.revoked-certificate-serials` in the configuration supplied to every controller before restarting any controller.
+3. Confirm the old certificate is rejected on its next request to every controller, including over existing TLS connections, and preserve each `SECURITY_CONFIGURATION_CHANGE` audit event.
+4. Remove the compromised subject from the configured trusted gateway list and revoke the certificate in PKI.
+5. Deploy a trust bundle or CRL that rejects it, then rolling-restart controllers so the subject and PEM/CRL changes take effect.
+6. Confirm requests using the old certificate fail before identity headers are evaluated.
+7. Confirm the replacement gateway presents the intended subject and `security/me` output.
 
 ### 4.2 Agent certificate
 
 1. Identify all active and recently completed assignments for the bound agent and tenant.
 2. Drain or stop the agent. Preserve local transfer and publication evidence.
-3. Add its serial through `PUT /api/v1/security/trust/revocations`, retaining every existing revoked serial, and confirm the old agent is refused on its next controller request.
+3. Add its serial through `PUT /api/v1/security/trust/revocations` on every controller, retaining every existing revoked serial, add the same complete set to controller configuration, and confirm the old agent is refused by each controller on its next request.
 4. Remove its exact direct identity binding, revoke the certificate in PKI, and distribute updated trust material.
-5. Rolling-restart controllers for the identity-binding and PEM/CRL changes; runtime serial revocation itself is already active without restart.
+5. Rolling-restart controllers for the identity-binding and PEM/CRL changes. Runtime serial revocation is already active without restart only on controllers that received the PUT; the configured serial set preserves it through each restart. Raft transport has no separate CRL setting.
 6. Issue a distinct replacement key and certificate. Never reuse the compromised private key.
 7. Restore the binding, start the agent as a canary, and verify self-binding, tenant, polling, and status authorization.
 8. Reconcile uncertain transfers before resuming normal assignment.

@@ -1,0 +1,193 @@
+Excerpt of: docs-design/evidence/raw/full-suite-20260905.log
+Original SHA-256: 3178d907496d40d3f25ac25121c7f4610475dad1c1de00295f8de4bd12303e3b
+Original size: 6599126 bytes
+Full log not retained under the evidence retention rule (plan §6.1): regression and discarded-attempt output is kept as this excerpt. Reproduce by re-running the recorded command at the recorded revision.
+
+    684: 14:52:42.192 [vert.x-worker-thread-0] ERROR d.m.q.protocol.FtpTransferProtocol - [QUORUS-1009] FTP server closed connection unexpectedly (EOF)
+    685: 14:52:42.192 [vert.x-worker-thread-0] WARN  d.m.q.protocol.FtpTransferProtocol - Error during FTP disconnect: FTP server closed connection unexpectedly
+    689: java.io.IOException: Server rejected AUTH TLS: 421 fixture stops before authentication
+    702: [INFO] Running dev.mars.quorus.core.exceptions.InvalidTransitionExceptionTest
+    703: [INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.003 s -- in dev.mars.quorus.core.exceptions.InvalidTransitionExceptionTest
+   1185: dev.mars.quorus.core.exceptions.TransferException: Transfer 800d73a3-de85-454e-8e89-89c6306f5e53 failed: HTTP 404: Not Found
+   1696: com.jcraft.jsch.JSchException: connection is closed by foreign host
+   1700: dev.mars.quorus.core.exceptions.TransferException: Transfer worker-boundary failed: SFTP download failed
+   1702: Caused by: com.jcraft.jsch.JSchException: connection is closed by foreign host
+   1720: dev.mars.quorus.core.exceptions.TransferException: Transfer unknown failed: FTP URI must specify a host
+   1738: dev.mars.quorus.core.exceptions.TransferException: Transfer unknown failed: FTP URI must specify a path
+   1753: 14:53:19.322 [main] ERROR d.m.q.protocol.FtpTransferProtocol - [QUORUS-1003] FTP upload source file not found: C:\Users\mraysmit\AppData\Local\Temp\junit9331343587320430180\does-not-exist.txt
+   1756: java.io.IOException: Source file does not exist: C:\Users\mraysmit\AppData\Local\Temp\junit9331343587320430180\does-not-exist.txt
+   1802: java.net.ConnectException: Connection refused: getsockopt
+   1875: dev.mars.quorus.core.exceptions.TransferException: Transfer unknown failed: SFTP URI must specify a host
+   1879: dev.mars.quorus.core.exceptions.TransferException: Transfer test-upload-no-host failed: SFTP upload failed
+   1881: Caused by: dev.mars.quorus.core.exceptions.TransferException: Transfer unknown failed: SFTP URI must specify a host
+   1892: dev.mars.quorus.core.exceptions.TransferException: Transfer unknown failed: SFTP URI must specify a path
+   1896: dev.mars.quorus.core.exceptions.TransferException: Transfer test-upload-no-path failed: SFTP upload failed
+   1898: Caused by: dev.mars.quorus.core.exceptions.TransferException: Transfer unknown failed: SFTP URI must specify a path
+   1912: dev.mars.quorus.core.exceptions.TransferException: Transfer test-upload-missing-source failed: Source file does not exist: C:\Users\mraysmit\AppData\Local\Temp\junit5367658868652086616\does-not-exist.txt
+   1916: dev.mars.quorus.core.exceptions.TransferException: Transfer test-upload-missing-source failed: SFTP upload failed
+   1918: Caused by: dev.mars.quorus.core.exceptions.TransferException: Transfer test-upload-missing-source failed: Source file does not exist: C:\Users\mraysmit\AppData\Local\Temp\junit5367658868652086616\does-not-exist.txt
+   1933: dev.mars.quorus.core.exceptions.TransferException: Transfer test-upload-exception-id failed: SFTP upload failed
+   1956: dev.mars.quorus.core.exceptions.TransferException: Transfer test-invalid-sftp failed: SFTP download failed
+   1973: dev.mars.quorus.core.exceptions.TransferException: Transfer test-exception-id failed: SFTP download failed
+   1990: dev.mars.quorus.core.exceptions.TransferException: Transfer test-missing-host failed: SFTP download failed
+   2007: dev.mars.quorus.core.exceptions.TransferException: Transfer test-missing-path failed: SFTP download failed
+   2030: dev.mars.quorus.core.exceptions.TransferException: Transfer unknown failed: SMB URI must specify a host
+   2051: dev.mars.quorus.core.exceptions.TransferException: Transfer unknown failed: SMB URI must specify a path
+   2067: 14:53:19.412 [main] ERROR d.m.q.protocol.SmbTransferProtocol - [QUORUS-1303] SMB upload source file not found: C:\Users\mraysmit\AppData\Local\Temp\junit13186330669107875853\does-not-exist.txt
+   2070: java.io.IOException: Source file does not exist: C:\Users\mraysmit\AppData\Local\Temp\junit13186330669107875853\does-not-exist.txt
+   2106:   Reason: UNC path not found -- verifies SMB context in exception message
+   2128: java.nio.file.FileSystemException: \\127.0.0.1\share\file.txt: The network name cannot be found
+   2214:   Reason: Connection refused to unreachable server -- verifies TransferException
+   2249:   Reason: Connection refused on custom FTPS port -- verifies TransferException
+   2283:   Reason: Upload with missing source file -- verifies TransferException
+   2291: 14:53:19.517 [main] ERROR d.m.q.protocol.FtpTransferProtocol - [QUORUS-1003] FTP upload source file not found: C:\Users\mraysmit\AppData\Local\Temp\junit553734396581425523\nonexistent-file.txt
+   2294: java.io.IOException: Source file does not exist: C:\Users\mraysmit\AppData\Local\Temp\junit553734396581425523\nonexistent-file.txt
+   2304:   Reason: Connection refused on default FTPS port -- verifies TransferException
+   2334:   Reason: Connection refused on implicit FTPS port 990 -- verifies TransferException
+   2484: 14:53:42.789 [main] ERROR d.m.q.protocol.FtpTransferProtocol - [QUORUS-1003] FTP upload source file not found: C:\Users\mraysmit\AppData\Local\Temp\junit7145646721384682367\does-not-exist.txt
+   2487: java.io.IOException: Source file does not exist: C:\Users\mraysmit\AppData\Local\Temp\junit7145646721384682367\does-not-exist.txt
+   3449: dev.mars.quorus.core.exceptions.TransferException: Transfer redirect failed: HTTP 302: Found
+   3498: io.netty.channel.AbstractChannel$AnnotatedConnectException: Connection refused: getsockopt: /127.0.0.1:1
+   3499: Caused by: java.net.ConnectException: Connection refused: getsockopt
+   3666:   Reason: Source file missing -- verifies TransferException before connect
+   3677: 14:53:50.874 [main] ERROR d.m.q.protocol.HttpTransferProtocol - [QUORUS-1208] HTTP upload source file not found: C:\Users\mraysmit\AppData\Local\Temp\junit15849496299807210895\does-not-exist.txt
+   3928: 14:53:51.596 [main] ERROR d.m.q.protocol.NfsTransferProtocol - [QUORUS-1403] NFS upload source file not found: C:\Users\mraysmit\AppData\Local\Temp\junit9621335986852299895\does-not-exist.txt
+   4112: 14:53:51.820 [main] ERROR d.m.q.protocol.NfsTransferProtocol - [QUORUS-1403] NFS upload source file not found: C:\Users\mraysmit\AppData\Local\Temp\junit12739925520520932497\missing-source.txt
+   5139: java.lang.NullPointerException: Cannot invoke "com.jcraft.jsch.IO.getByte(byte[], int, int)" because "this.io" is null
+   5143: dev.mars.quorus.core.exceptions.TransferException: Transfer test-cross-thread-abort failed: SFTP download failed
+   5145: Caused by: java.lang.NullPointerException: Cannot invoke "com.jcraft.jsch.IO.getByte(byte[], int, int)" because "this.io" is null
+   5236: com.jcraft.jsch.JSchException: Auth fail for methods 'publickey,password,keyboard-interactive'
+   5240: dev.mars.quorus.core.exceptions.TransferException: Transfer test-abort-download failed: SFTP download failed
+   5242: Caused by: com.jcraft.jsch.JSchException: Auth fail for methods 'publickey,password,keyboard-interactive'
+   5527: java.nio.file.FileSystemException: \\127.0.0.1\share\dir1\dir2\dir3\file.txt: The network name cannot be found
+   5582:   EXPECTED ERROR TEST: testTransferExceptionContainsRequestId
+   5583:   Reason: UNC path not found -- verifies exception contains SMB context
+   5609:   END EXPECTED ERROR TEST: testTransferExceptionContainsRequestId -- PASSED
+   5644: java.nio.file.FileSystemException: \\127.0.0.1\share\folder name\file name.txt: The network name cannot be found
+   5679: java.nio.file.FileSystemException: \\127.0.0.1\share\testfile.txt: The network name cannot be found
+   5744: 14:54:04.161 [main] ERROR d.m.q.protocol.SmbTransferProtocol - [QUORUS-1303] SMB upload source file not found: C:\Users\mraysmit\AppData\Local\Temp\junit5777173279026002885\nonexistent.txt
+   5747: java.io.IOException: Source file does not exist: C:\Users\mraysmit\AppData\Local\Temp\junit5777173279026002885\nonexistent.txt
+   8878: 14:55:07.752 [main] WARN  d.m.q.s.t.InMemoryTransferEngineSimulator - cancelTransfer: Job not found jobId=non-existent-job-id
+  10540: dev.mars.quorus.core.exceptions.TransferException: Transfer retry-backoff-test failed: FTP upload failed
+  10773: [INFO] Tests run: 1540, Failures: 0, Errors: 0, Skipped: 0
+  10789: [INFO] All coverage checks have been met.
+  10860: expected ',' or ']', but got :
+  10949:   EXPECTED ERROR TEST: testTransferException
+  10958: java.lang.RuntimeException: Transfer failed
+  11037:   END EXPECTED ERROR TEST: testTransferException -- PASSED
+  11073: [INFO] Running dev.mars.quorus.workflow.WorkflowParseExceptionTest
+  11074: [INFO] Tests run: 15, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.008 s -- in dev.mars.quorus.workflow.WorkflowParseExceptionTest
+  11091: expected ',' or ']', but got <stream end>
+  11100: [INFO] Tests run: 134, Failures: 0, Errors: 0, Skipped: 0
+  23674: [INFO] Tests run: 64, Failures: 0, Errors: 0, Skipped: 0
+  24415: java.lang.IllegalArgumentException: Source URI must not contain user-info; use a governed service connection and secret reference
+  24482: [INFO] Running dev.mars.quorus.controller.http.ErrorResponseTest$QuorusApiExceptionTests
+  24483: [INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.007 s -- in dev.mars.quorus.controller.http.ErrorResponseTest$QuorusApiExceptionTests
+  24595: 14:56:37.535 [vert.x-eventloop-thread-0] WARN  d.m.q.c.http.GlobalErrorHandler [LEADER/1] [req-c53e02a4-13d3-4c29-95b5-9cd89f87b324] - Client error [TRANSFER_NOT_FOUND] at /api/v1/transfers/nonexistent-job-xyz: Transfer job 'nonexistent-job-xyz' not found
+  24597: 14:56:37.543 [vert.x-eventloop-thread-0] WARN  d.m.q.c.http.GlobalErrorHandler [LEADER/1] [req-9020c269-b1ea-4cdc-a245-aecbae4979f5] - Client error [TRANSFER_NOT_FOUND] at /api/v1/transfers/nonexistent-job-xyz: Transfer job 'nonexistent-job-xyz' not found
+  24599: 14:56:37.551 [vert.x-eventloop-thread-0] WARN  d.m.q.c.http.GlobalErrorHandler [LEADER/1] [trace-error-abc123] - Client error [TRANSFER_NOT_FOUND] at /api/v1/transfers/nonexistent-job-xyz: Transfer job 'nonexistent-job-xyz' not found
+  24787: 14:56:38.553 [vert.x-eventloop-thread-0] WARN  d.m.q.c.h.handlers.JobStatusHandler [LEADER/1] [req-d1e65410-a0da-4dbf-b44b-90c5890bc0f1] - Failed to update status: Transfer job 'no-such-job' not found
+  24789: dev.mars.quorus.controller.http.QuorusApiException: Transfer job 'no-such-job' not found
+  24850: 14:56:38.554 [vert.x-eventloop-thread-0] WARN  d.m.q.c.http.GlobalErrorHandler [LEADER/1] [req-d1e65410-a0da-4dbf-b44b-90c5890bc0f1] - Client error [TRANSFER_NOT_FOUND] at /api/v1/jobs/no-such-job/status: Transfer job 'no-such-job' not found
+  24974: 14:56:38.675 [vert.x-eventloop-thread-0] WARN  d.m.q.c.http.GlobalErrorHandler [LEADER/1] [req-bc8fa298-08cc-47d4-b809-bba8cbe511eb] - Client error [ASSIGNMENT_NOT_FOUND] at /api/v1/assignments/nonexistent: Job assignment 'nonexistent' not found
+  25092: 14:56:38.765 [vert.x-eventloop-thread-0] WARN  d.m.q.c.http.GlobalErrorHandler [LEADER/1] [req-528bb63c-69e4-4101-9b18-9528727d7d38] - Client error [ASSIGNMENT_NOT_FOUND] at /api/v1/assignments/nonexistent/accept: Job assignment 'nonexistent' not found
+  25103: 14:56:38.781 [vert.x-eventloop-thread-0] WARN  d.m.q.c.http.GlobalErrorHandler [LEADER/1] [req-3df4271a-7cb0-4733-a912-ea69cc7884ab] - Client error [ASSIGNMENT_NOT_FOUND] at /api/v1/assignments/nonexistent-id: Job assignment 'nonexistent-id' not found
+  25126: dev.mars.quorus.controller.http.QuorusApiException: Invalid request: Request body is required
+  25203: java.lang.IllegalArgumentException: Cannot construct instance of `dev.mars.quorus.core.JobAssignment$Builder`, problem: Job ID cannot be null
+  25265: Caused by: com.fasterxml.jackson.databind.exc.ValueInstantiationException: Cannot construct instance of `dev.mars.quorus.core.JobAssignment$Builder`, problem: Job ID cannot be null
+  25275: Caused by: java.lang.NullPointerException: Job ID cannot be null
+  25447: dev.mars.quorus.controller.http.QuorusApiException: Not the cluster leader. Current leader: guard-node-1
+  25698: 14:56:41.523 [vert.x-eventloop-thread-0] WARN  d.m.q.c.http.GlobalErrorHandler [LEADER/1] [req-0f84260b-c38c-4888-abf0-f47c2fbad3ad] - Client error [NOT_FOUND] at /api/v1/secret-references/branch.ledger: Secret reference not found
+  25868: 14:56:43.233 [vert.x-eventloop-thread-0] WARN  d.m.q.c.http.GlobalErrorHandler [LEADER/1] [req-f8cf2ade-0c8e-45cd-ade9-a95894dd8f15] - Client error [NOT_FOUND] at /api/v1/secret-references/branch.ledger: Secret reference not found
+  25922: 14:56:43.819 [vert.x-eventloop-thread-0] WARN  d.m.q.c.http.GlobalErrorHandler [LEADER/1] [req-da9128bb-d8b7-42da-a868-a11d10dfeb4f] - Client error [NOT_FOUND] at /api/v1/secret-references/branch.ledger: Secret reference not found
+  25996: 14:56:44.599 [vert.x-eventloop-thread-0] WARN  d.m.q.c.http.GlobalErrorHandler [LEADER/1] [req-5b4eecb4-1079-4073-9226-2f2225526f3b] - Client error [NOT_FOUND] at /api/v1/service-connections/branch.ledger: Service connection not found
+  26226: 14:56:46.546 [vert.x-eventloop-thread-0] WARN  d.m.q.c.http.GlobalErrorHandler [LEADER/1] [req-2cdcd492-ce76-4e52-a111-2805f0ff433b] - Client error [NOT_FOUND] at /api/v1/service-connections/branch.ledger: Service connection not found
+  26300: 14:56:47.155 [vert.x-eventloop-thread-0] WARN  d.m.q.c.http.GlobalErrorHandler [LEADER/1] [req-e4d8d460-0437-456d-9767-38e796ad2863] - Client error [NOT_FOUND] at /api/v1/service-connections/branch.ledger: Service connection not found
+  26586: 14:56:51.189 [vert.x-eventloop-thread-0] ERROR i.vertx.core.net.impl.ConnectionBase [LEADER/1] - javax.net.ssl.SSLHandshakeException: (certificate_required) Received fatal alert: certificate_required
+  26845: 14:56:52.245 [vert.x-eventloop-thread-0] WARN  d.m.q.c.http.GlobalErrorHandler [LEADER/1] [req-a00784b5-9454-48f4-9dfd-709650383e14] - Client error [VALIDATION_ERROR] at /api/v1/jobs/attempt-agent-protocol-job/status: Missing required attempt fields: attemptId, expectedState, fencingGeneration, reportSequence
+  27534: INFO: [PASS] No pending jobs found (as expected)
+  27647: io.netty.channel.AbstractChannel$AnnotatedConnectException: Connection refused: getsockopt: localhost/127.0.0.1:9464
+  27668: dev.mars.quorus.controller.http.QuorusApiException: Metrics unavailable: Connection refused: getsockopt: localhost/127.0.0.1:9464
+  27754: INFO: [OK] Metrics endpoint responds with expected error (OTel exporter not running in test)
+  28351: 14:57:05.235 [vert.x-eventloop-thread-0] WARN  d.m.q.c.http.GlobalErrorHandler [LEADER/1] [req-52abc7c8-1f49-40d5-98bd-5fb008d158d3] - Client error [ROUTE_NOT_FOUND] at /api/v1/routes/does-not-exist/resume: Route 'does-not-exist' not found
+  28353: 14:57:05.240 [vert.x-eventloop-thread-0] WARN  d.m.q.c.http.GlobalErrorHandler [LEADER/1] [req-dcbd9c93-d224-4485-9ad6-d522f0386caa] - Client error [ASSIGNMENT_NOT_FOUND] at /api/v1/assignments/does-not-exist/accept: Job assignment 'does-not-exist' not found
+  28354: 14:57:05.244 [vert.x-eventloop-thread-0] WARN  d.m.q.c.http.GlobalErrorHandler [LEADER/1] [req-ed15e292-5fcf-4ce7-a077-e7924d838496] - Client error [ROUTE_NOT_FOUND] at /api/v1/routes/does-not-exist/suspend: Route 'does-not-exist' not found
+  28374: 14:57:05.274 [vert.x-eventloop-thread-0] WARN  d.m.q.c.http.GlobalErrorHandler [LEADER/1] [req-a8b8cc4d-e218-48af-acc7-a4f6f04c174e] - Client error [ROUTE_NOT_FOUND] at /api/v1/routes/route-del-resume-1/resume: Route 'route-del-resume-1' not found
+  28392: 14:57:05.286 [vert.x-eventloop-thread-0] WARN  d.m.q.c.http.GlobalErrorHandler [LEADER/1] [req-de78c95c-4cf1-4411-9001-584a3244274a] - Client error [ROUTE_NOT_FOUND] at /api/v1/routes/route-del-404-2/suspend: Route 'route-del-404-2' not found
+  29495: java.lang.IllegalArgumentException: attemptLeaseDurationMs must be positive
+  29580: [ERROR] Tests run: 3, Failures: 0, Errors: 3, Skipped: 0, Time elapsed: 333.5 s <<< FAILURE! -- in dev.mars.quorus.controller.raft.NetworkPartitionTest
+  29581: [ERROR] dev.mars.quorus.controller.raft.NetworkPartitionTest.testMajorityPartition -- Time elapsed: 0 s <<< ERROR!
+  29624: Caused by: java.lang.ExceptionInInitializerError: Exception java.lang.RuntimeException: org.testcontainers.containers.ContainerLaunchException: Timed out waiting for URL to be accessible (http://localhost:55563/health should return HTTP [200]) [in thread "ForkJoinPool-1-worker-4"]
+  29688: [ERROR] dev.mars.quorus.controller.raft.NetworkPartitionTest.testSplitBrainPrevention -- Time elapsed: 0 s <<< ERROR!
+  29795: [ERROR] dev.mars.quorus.controller.raft.NetworkPartitionTest.testNetworkRecovery -- Time elapsed: 0 s <<< ERROR!
+  29796: java.lang.ExceptionInInitializerError
+  29855: Caused by: java.lang.RuntimeException: org.testcontainers.containers.ContainerLaunchException: Timed out waiting for URL to be accessible (http://localhost:55563/health should return HTTP [200])
+  29866: Caused by: org.testcontainers.containers.ContainerLaunchException: Timed out waiting for URL to be accessible (http://localhost:55563/health should return HTTP [200])
+  29876: Caused by: org.rnorth.ducttape.TimeoutException: Timeout waiting for result with exception
+  29880: Caused by: java.lang.RuntimeException: java.net.SocketTimeoutException: Read timed out
+  29886: Caused by: java.net.SocketTimeoutException: Read timed out
+  29931: [ERROR] Tests run: 4, Failures: 0, Errors: 4, Skipped: 0, Time elapsed: 395.2 s <<< FAILURE! -- in dev.mars.quorus.controller.raft.DockerRaftClusterTest
+  29932: [ERROR] dev.mars.quorus.controller.raft.DockerRaftClusterTest.testLeaderElection -- Time elapsed: 0 s <<< ERROR!
+  29975: Caused by: java.lang.ExceptionInInitializerError: Exception java.lang.RuntimeException: org.testcontainers.containers.ContainerLaunchException: Timed out waiting for URL to be accessible (http://localhost:59232/health should return HTTP [200]) [in thread "ForkJoinPool-1-worker-12"]
+  29987: [ERROR] dev.mars.quorus.controller.raft.DockerRaftClusterTest.testLeaderFailureAndReelection -- Time elapsed: 0 s <<< ERROR!
+  30042: [ERROR] dev.mars.quorus.controller.raft.DockerRaftClusterTest.testNetworkPartitionRecovery -- Time elapsed: 0 s <<< ERROR!
+  30149: [ERROR] dev.mars.quorus.controller.raft.DockerRaftClusterTest.testClusterStartupAndHealthCheck -- Time elapsed: 0 s <<< ERROR!
+  30192: Caused by: java.lang.RuntimeException: org.testcontainers.containers.ContainerLaunchException: Timed out waiting for URL to be accessible (http://localhost:59232/health should return HTTP [200])
+  30203: Caused by: org.testcontainers.containers.ContainerLaunchException: Timed out waiting for URL to be accessible (http://localhost:59232/health should return HTTP [200])
+  30257: [ERROR] Tests run: 8, Failures: 0, Errors: 8, Skipped: 0, Time elapsed: 411.3 s <<< FAILURE! -- in dev.mars.quorus.controller.raft.ConfigurableRaftClusterTest
+  30258: [ERROR] dev.mars.quorus.controller.raft.ConfigurableRaftClusterTest.testLeaderElectionWithDifferentConfigs(TestClusterConfiguration, TestInfo)[1] -- Time elapsed: 410.7 s <<< ERROR!
+  30259: org.awaitility.core.ConditionTimeoutException: Condition with Lambda expression in dev.mars.quorus.controller.raft.ConfigurableRaftClusterTest was not fulfilled within 15 seconds.
+  30303: [ERROR] dev.mars.quorus.controller.raft.ConfigurableRaftClusterTest.testWithStandardConfiguration(TestInfo) -- Time elapsed: 410.7 s <<< ERROR!
+  30348: [ERROR] dev.mars.quorus.controller.raft.ConfigurableRaftClusterTest.testWithFastConfiguration(TestInfo) -- Time elapsed: 410.7 s <<< ERROR!
+  30393: [ERROR] dev.mars.quorus.controller.raft.ConfigurableRaftClusterTest.testPartitionToleranceWithDifferentConfigs(TestClusterConfiguration, TestInfo)[1] -- Time elapsed: 410.7 s <<< ERROR!
+  30438: [ERROR] dev.mars.quorus.controller.raft.ConfigurableRaftClusterTest.testLeaderElectionWithDifferentConfigs(TestClusterConfiguration, TestInfo)[3] -- Time elapsed: 410.7 s <<< ERROR!
+  30500: [ERROR] dev.mars.quorus.controller.raft.ConfigurableRaftClusterTest.testStressConfiguration(TestInfo) -- Time elapsed: 410.7 s <<< ERROR!
+  30562: [ERROR] dev.mars.quorus.controller.raft.ConfigurableRaftClusterTest.testPartitionToleranceWithDifferentConfigs(TestClusterConfiguration, TestInfo)[2] -- Time elapsed: 410.7 s <<< ERROR!
+  30607: [ERROR] dev.mars.quorus.controller.raft.ConfigurableRaftClusterTest.testLeaderElectionWithDifferentConfigs(TestClusterConfiguration, TestInfo)[2] -- Time elapsed: 410.7 s <<< ERROR!
+  30719: [ERROR] Tests run: 4, Failures: 0, Errors: 3, Skipped: 1, Time elapsed: 52.22 s <<< FAILURE! -- in dev.mars.quorus.controller.raft.AdvancedNetworkTest
+  30720: [ERROR] dev.mars.quorus.controller.raft.AdvancedNetworkTest.testNetworkRecoveryScenarios -- Time elapsed: 17.45 s <<< ERROR!
+  30721: org.awaitility.core.ConditionTimeoutException: Condition with Lambda expression in dev.mars.quorus.controller.raft.AdvancedNetworkTest was not fulfilled within 15 seconds.
+  30789: Caused by: java.util.concurrent.TimeoutException
+  30796: [ERROR] dev.mars.quorus.controller.raft.AdvancedNetworkTest.testComplexNetworkScenario -- Time elapsed: 17.37 s <<< ERROR!
+  30872: [ERROR] dev.mars.quorus.controller.raft.AdvancedNetworkTest.testGeographicDistribution -- Time elapsed: 17.39 s <<< ERROR!
+  31981: [ERROR] Tests run: 8, Failures: 0, Errors: 1, Skipped: 0, Time elapsed: 17.52 s <<< FAILURE! -- in dev.mars.quorus.controller.raft.EnhancedInMemoryTransportTest
+  31982: [ERROR] dev.mars.quorus.controller.raft.EnhancedInMemoryTransportTest.testCrashFailureMode -- Time elapsed: 10.13 s <<< ERROR!
+  31983: org.awaitility.core.ConditionTimeoutException: Condition with Lambda expression in dev.mars.quorus.controller.raft.EnhancedInMemoryTransportTest was not fulfilled within 10 seconds.
+  34252: java.lang.RuntimeException: Failed to deserialize Protobuf command
+  34272: Caused by: com.google.protobuf.InvalidProtocolBufferException: Protocol message end-group tag did not match expected tag.
+  38820: Caused by: com.google.protobuf.InvalidProtocolBufferException$InvalidWireTypeException: Protocol message tag had invalid wire type.
+  42283: java.lang.RuntimeException: Transport failed to start
+  43704: java.lang.IllegalStateException: Simulated one-shot metadata failure
+  43724: [EXPECTED-TEST-FAILURE] Scenario=append-entries higher-term metadata persistence message=Injected one-shot metadata failure expected by test
+  44035: java.lang.IllegalStateException: Simulated targeted metadata failure
+  44323: [EXPECTED-TEST-FAILURE] Scenario=install-snapshot higher-term metadata persistence message=Injected one-shot metadata failure expected by test
+  46101: java.util.concurrent.RejectedExecutionException: Task java.util.concurrent.CompletableFuture$AsyncRun@767b7f36 rejected from java.util.concurrent.ThreadPoolExecutor@19e47d62[Terminated, pool size = 0, active threads = 0, queued tasks = 0, completed tasks = 5]
+  46133: java.util.concurrent.RejectedExecutionException: Task java.util.concurrent.CompletableFuture$AsyncRun@250f2683 rejected from java.util.concurrent.ThreadPoolExecutor@1e688220[Terminated, pool size = 0, active threads = 0, queued tasks = 0, completed tasks = 5]
+  47306: 15:06:31.071 [vert.x-eventloop-thread-0] DEBUG d.m.q.controller.config.AppConfig [LEADER/1] - Optional configuration profile quorus-controller-test.properties not found
+  47338: 15:06:31.074 [ForkJoinPool-1-worker-1] WARN  d.m.q.c.service.JobAssignmentService - Job not found in queue: jobId=missing-job
+  47340: 15:06:31.075 [ForkJoinPool-1-worker-1] WARN  d.m.q.c.service.JobAssignmentService - Assignment not found for status update: jobId=missing-job
+  47380: 15:06:31.241 [vert.x-eventloop-thread-0] DEBUG d.m.q.controller.config.AppConfig [LEADER/1] - Optional configuration profile quorus-controller-test.properties not found
+  47748: 15:06:31.289 [ForkJoinPool-1-worker-1] WARN  d.m.q.c.state.QuorusStateStore - Transfer job not found for status update: id=ghost
+  47891: 15:06:31.428 [ForkJoinPool-1-worker-1] WARN  d.m.q.c.state.QuorusStateStore - System metadata not found for deletion: key=nonExistent
+  47898: 15:06:31.430 [ForkJoinPool-1-worker-1] WARN  d.m.q.c.state.QuorusStateStore - Transfer job not found for status update: id=non-existent
+  47902: 15:06:31.430 [ForkJoinPool-1-worker-1] WARN  d.m.q.c.state.QuorusStateStore - Transfer job not found for deletion: id=non-existent
+  48182: 15:06:31.518 [ForkJoinPool-1-worker-1] WARN  d.m.q.c.state.QuorusStateStore - Route not found for status update: id=ghost
+  48264: 15:06:31.524 [ForkJoinPool-1-worker-1] WARN  d.m.q.c.state.QuorusStateStore - Route not found for resume: id=ghost
+  48270: 15:06:31.524 [ForkJoinPool-1-worker-1] WARN  d.m.q.c.state.QuorusStateStore - Route not found for suspend: id=ghost
+  48314: 15:06:31.526 [ForkJoinPool-1-worker-1] WARN  d.m.q.c.state.QuorusStateStore - Route not found for deletion: id=no-such-route
+  48333: 15:06:31.528 [ForkJoinPool-1-worker-1] WARN  d.m.q.c.state.QuorusStateStore - Route not found for update: id=ghost-route
+  48414: 15:06:31.542 [ForkJoinPool-1-worker-1] WARN  d.m.q.c.state.QuorusStateStore - System metadata not found for deletion: key=phase4.v2.secret-reference.bank:absent
+  48633: [ERROR]   DockerRaftClusterTest.testClusterStartupAndHealthCheck � ExceptionInInitializer
+  48639: [ERROR]   NetworkPartitionTest.testNetworkRecovery � ExceptionInInitializer
+  48642: [ERROR] Tests run: 576, Failures: 0, Errors: 19, Skipped: 1
+  48645: [INFO] Reactor Summary for Quorus File Transfer System 1.0-SNAPSHOT:
+  48647: [INFO] Quorus File Transfer System ........................ SUCCESS [  0.280 s]
+  48648: [INFO] Quorus Core ........................................ SUCCESS [03:45 min]
+  48649: [INFO] Quorus Workflow Engine ............................. SUCCESS [  4.696 s]
+  48650: [INFO] Quorus Tenant Management ........................... SUCCESS [  3.294 s]
+  48651: [INFO] Quorus Distributed Controller ...................... FAILURE [10:10 min]
+  48655: [INFO] BUILD FAILURE
+  48657: [INFO] Total time:  14:03 min
+  48658: [INFO] Finished at: 2026-09-05T15:06:34+08:00
+  48660: [ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.2.2:test (default-test) on project quorus-controller: 
+  48670: [ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException

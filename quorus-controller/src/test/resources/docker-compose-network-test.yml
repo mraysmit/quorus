@@ -1,4 +1,3 @@
-version: '3.8'
 
 # Quorus 5-Node Controller Cluster for Advanced Network Testing with Testcontainers
 # NOTE: container_name removed for Testcontainers compatibility
@@ -8,8 +7,6 @@ services:
     build:
       context: ../../../..
       dockerfile: quorus-controller/Dockerfile
-      additional_contexts:
-        m2cache: ${M2_REPO:-~/.m2/repository}/dev/mars
     hostname: controller1
     environment:
       - QUORUS_NODE_ID=controller1
@@ -35,8 +32,6 @@ services:
     build:
       context: ../../../..
       dockerfile: quorus-controller/Dockerfile
-      additional_contexts:
-        m2cache: ${M2_REPO:-~/.m2/repository}/dev/mars
     hostname: controller2
     environment:
       - QUORUS_NODE_ID=controller2
@@ -62,8 +57,6 @@ services:
     build:
       context: ../../../..
       dockerfile: quorus-controller/Dockerfile
-      additional_contexts:
-        m2cache: ${M2_REPO:-~/.m2/repository}/dev/mars
     hostname: controller3
     environment:
       - QUORUS_NODE_ID=controller3
@@ -89,8 +82,6 @@ services:
     build:
       context: ../../../..
       dockerfile: quorus-controller/Dockerfile
-      additional_contexts:
-        m2cache: ${M2_REPO:-~/.m2/repository}/dev/mars
     hostname: controller4
     environment:
       - QUORUS_NODE_ID=controller4
@@ -116,8 +107,6 @@ services:
     build:
       context: ../../../..
       dockerfile: quorus-controller/Dockerfile
-      additional_contexts:
-        m2cache: ${M2_REPO:-~/.m2/repository}/dev/mars
     hostname: controller5
     environment:
       - QUORUS_NODE_ID=controller5

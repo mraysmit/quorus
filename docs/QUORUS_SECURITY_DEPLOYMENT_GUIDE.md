@@ -2,8 +2,8 @@
 
 # Quorus Security Deployment Guide
 
-**Version:** 1.3  
-**Date:** 2026-09-04  
+**Version:** 1.8
+**Date:** 2026-09-27
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Status:** Phase 1 implementation guide  
@@ -11,7 +11,7 @@
 
 ## 1. Purpose and release boundary
 
-This guide configures the Phase 1 authenticated control-plane foundation. It does not make Quorus production-ready by itself. Runtime revocation, expiry observation, trust-version telemetry, controlled certificate-overlap tests, security-configuration audit, and retained local evidence are implemented. Corporate PKI and gateway accreditation, automatic certificate issuance, agent enrollment, service-connection governance, enterprise evidence-platform integration, and enterprise validation remain release work in the [Enterprise Implementation Plan](../docs-design/task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md).
+This guide configures the Phase 1 authenticated control-plane foundation. It does not make Quorus production-ready by itself. Runtime revocation, expiry observation, trust-version telemetry, controlled certificate-overlap tests, security-configuration audit, retained local evidence, and governed service connections are implemented. Corporate PKI and gateway accreditation, automatic certificate issuance, agent enrollment, enterprise evidence-platform integration, and enterprise validation remain release work in the [Enterprise Implementation Plan](../docs-design/task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md).
 
 Production configuration fails closed. Quorus will not start a production controller unless HTTP and Raft mutual TLS, at least one trusted identity source, and the audit path are configured. A production agent rejects plaintext controller URLs and missing client or trust material.
 
@@ -115,7 +115,9 @@ Certificate serials that must be refused before a replacement trust bundle or CR
 quorus.security.revoked-certificate-serials=01AF44,09BC20
 ```
 
-An actively elevated `SECURITY` identity can atomically replace the runtime serial set with `PUT /api/v1/security/trust/revocations`. The request includes a new `trustBundleVersion` and the complete replacement `revokedCertificateSerials` array. The new state is shared by controller HTTP and Raft enforcement and applies to subsequent requests or RPCs on already-established TLS connections. Because this is replacement rather than merge behavior, operators must supply every serial that must remain revoked.
+Leading zeroes and colon separators are ignored when serials are compared, so OpenSSL forms such as `01:AF:44` match the certificate serial `1AF44`.
+
+An actively elevated `SECURITY` identity can atomically replace the runtime serial set with `PUT /api/v1/security/trust/revocations`. The request includes a new `trustBundleVersion` and the complete replacement `revokedCertificateSerials` array. The new state applies only to the controller that receives the request, where it is shared by that process's HTTP and Raft enforcement and applies to subsequent requests or RPCs on already-established TLS connections. It is held in memory, is not replicated, and is lost when that controller restarts. Send the complete replacement set to every controller and also add it to configuration before any restart. Because this is replacement rather than merge behavior, operators must supply every serial that must remain revoked.
 
 ## 5. Agent production configuration
 
@@ -132,6 +134,8 @@ QUORUS_AGENT_TLS_TRUST_BUNDLE=/run/secrets/controller-ca.crt
 ```
 
 Hostname verification and `trustAll=false` are enforced. A production build does not silently fall back to HTTP or an untrusted certificate.
+
+The agent's private key must be an unencrypted PKCS#8 PEM file (`-----BEGIN PRIVATE KEY-----`), which is what OpenSSL 3 writes by default; RSA, EC and EdDSA keys are accepted. The agent refuses to start with a PKCS#1 key (`-----BEGIN RSA PRIVATE KEY-----`) or an encrypted key, and names the file. Convert a PKCS#1 key with `openssl pkcs8 -topk8 -nocrypt -in agent-rsa.key -out agent.key`. The certificate file may hold the agent certificate followed by its intermediates, and the trust bundle may hold several certificates, for example during a controller CA rotation.
 
 ## 6. Authorization model
 
@@ -184,7 +188,7 @@ The release evidence must show rejection of:
 
 ## 10. Current operational limitations
 
-Certificate files and PEM trust bundles are loaded at process start; Quorus does not hot-reload their key or CA material. The validated overlap process therefore deploys trust overlap first and uses a controlled rolling restart while preserving Raft quorum and active control. Runtime serial revocations are the exception: the REST update takes effect without restart for subsequent HTTP requests and Raft RPCs, including established TLS connections. Follow the [Certificate Incident Runbook](QUORUS_CERTIFICATE_INCIDENT_RUNBOOK.md), drain affected agents when required, and preserve the change evidence.
+Certificate files and PEM trust bundles are loaded at process start; Quorus does not hot-reload their key or CA material. The validated overlap process therefore deploys trust overlap first and uses a controlled rolling restart while preserving Raft quorum and active control. A runtime serial-revocation update takes effect without restart only on the receiving controller, including for established HTTP and Raft TLS connections. It is not replicated or persisted. Apply the complete set to every controller and add it to configuration before any restart. Follow the [Certificate Incident Runbook](QUORUS_CERTIFICATE_INCIDENT_RUNBOOK.md), drain affected agents when required, and preserve the change evidence.
 
 The built-in audit provides complete Phase 1 security-boundary evidence and a second retained local chain. Searchable enterprise audit queries, WORM storage, evidence-collector delivery state, signed export, and broader resource-version detail remain part of the complete enterprise audit target.
 
@@ -215,8 +219,9 @@ This is a coordinated upgrade, not a mixed-version rolling upgrade.
    of every subsequent operation; it is not a lossless rollback. A record already
    overwritten by a legacy key collision cannot be reconstructed from its surviving row.
 
-The local test results do not accredit a production deployment. R1 production-filesystem,
-container-recreation and power-loss gates and the R6 release acceptance remain required.
+The local test results do not accredit a production deployment. R6 local final-source
+acceptance is complete; R1 production-filesystem, container-recreation and power-loss
+gates remain required.
 
 ## 12. Pre-execution failure and acknowledgement reconciliation
 
@@ -249,3 +254,78 @@ On `Q-REPORT-UNRESOLVED` after those retries:
 Durable agent report-outbox recovery, automatic lease-expiry/reassignment and
 destination reconciliation remain open Phase 2 deliverables. Bounded replay is not
 a claim of automatic recovery across agent restarts or prolonged controller outages.
+
+## 13. Handover remediation compatibility — 2026-09-05
+
+The agent configuration builder now derives defaults from packaged configuration.
+It requires production TLS by default and stops after the first foreign assignment.
+Applications using a plaintext development fixture must explicitly select
+`securityProfile("development")`, `allowInsecure(true)` and `controllerTlsEnabled(false)`.
+Explicit builder values still override defaults. Environment values are applied through
+`AgentConfig` at the application boundary, not implicitly by the builder.
+
+Controller entrypoint `QUORUS_*` values take precedence over legacy unprefixed names.
+Shell files require LF line endings, enforced by `.gitattributes` for future checkouts.
+
+Remote paths are literal filename data. Supply `/out/report#1?.dat` for that filename;
+do not pre-encode it as a URL. Root scope `/` permits descendants; traversal segments
+remain denied. Pinned HTTPS retains the original hostname for TLS verification and the
+port in the HTTP Host authority. Ordinary development HTTP transfers may follow
+redirects; governed clients continue to reject them.
+
+Portless `ftps://` uses explicit TLS on port 21. To use implicit TLS, specify `:990`
+and allow 990 in egress policy. Review portless FTPS aliases whose policies only allowed
+990: those policies did not match the adapter's existing connection behavior. No registry
+record or deployed data is migrated automatically by these corrections.
+
+The external dependency is available; full release acceptance still requires the
+remaining remediation and deployment gates. Consult the
+[current evidence record](../docs-design/evidence/remediation-r4-r6-2026-09-05.md).
+
+Portless validation probes use the service protocol default. Partial connection updates
+retain omitted CA, SSH and TLS pin fields and the existing minimum TLS version. Review
+the complete returned redacted connection after every trust change.
+
+Security-event collection reads are bounded: request `limit=1..1000` and follow the
+opaque `nextCursor` until it is absent. The returned `total` is the page row count.
+Quorus does not currently prune these authoritative events. Preserve snapshots and use
+an approved external evidence process until Phase 9 implements archive, legal hold and
+retention controls.
+
+Governed HTTP clients are closed after each transfer. Trust managers are reused through
+a bounded cache of 64 immutable policies; any CA or peer-pin rotation creates a distinct
+policy entry. Operators should expect the old entry to remain only until normal cache
+eviction and must validate the new policy before use.
+
+New transfer requests containing URI user-info are rejected. During compatibility
+replay, a legacy protobuf command containing user-info is stripped and its job is made
+terminal with a redacted resubmission message before authoritative state or snapshots
+are written. Never restore the removed credential from logs or backups; create an
+external secret reference and resubmit through a governed service connection.
+
+## 14. Bounded controller DNS authorization
+
+Transfer submission and service-connection validation share one DNS authorization
+budget per HTTP server. Native DNS and policy checks run on the Vert.x worker pool;
+registry checks, responses and Raft submission resume on the HTTP request context.
+
+| Property | Environment override | Default |
+|---|---|---|
+| `quorus.http.dns.max-concurrent` | `QUORUS_HTTP_DNS_MAX_CONCURRENT` | `8` |
+| `quorus.http.dns.timeout-ms` | `QUORUS_HTTP_DNS_TIMEOUT_MS` | `5000` |
+
+Both settings must be positive. The admission limit includes queued and running work;
+the deadline includes time awaiting a worker. These operations use the existing
+Vert.x worker pool and do not create an independent executor or DNS cache.
+
+`503 SERVICE_UNAVAILABLE` means the budget is occupied. `504 TIMEOUT` means the DNS
+authorization deadline expired. A native lookup may outlive that response: its slot
+remains occupied until the lookup ends, preventing retries from accumulating unbounded
+work. Expired queued tasks do not start another native lookup. Late results do not
+create a transfer or record approval. Investigate resolver availability when capacity
+stays occupied; increasing the request deadline does not cancel an OS lookup.
+
+`409 CONFLICT` requires a fresh request against the current connection/secret state
+when it changes during DNS resolution. Tenant isolation, allowed CIDRs, port/path/pool
+policy and the exact resolved address set remain enforced. The optional TCP route
+probe retains its separate timeout; DNS authorization does not prove service readiness.

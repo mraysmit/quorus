@@ -21,9 +21,7 @@ import dev.mars.quorus.transfer.TransferEngine;
 import dev.mars.quorus.transfer.SimpleTransferEngine;
 import dev.mars.quorus.workflow.*;
 
-import io.vertx.core.Future;
-import io.vertx.core.Vertx;
-
+import java.time.Duration;
 import java.util.Map;
 
 /**
@@ -68,12 +66,10 @@ public class WorkflowValidationExample {
     }
     
     public void runExample() throws Exception {
-        // Setup with Vert.x
-        Vertx vertx = Vertx.vertx();
+        TransferEngine transferEngine = new SimpleTransferEngine(10, 3, 1000); // 10 concurrent, 3 retries, 1 s retry delay
         
         try {
-            TransferEngine transferEngine = new SimpleTransferEngine(vertx, 10, 3, 1024 * 1024);
-            SimpleWorkflowEngine workflowEngine = new SimpleWorkflowEngine(vertx, transferEngine);
+            SimpleWorkflowEngine workflowEngine = new SimpleWorkflowEngine(transferEngine);
             WorkflowDefinitionParser parser = new YamlWorkflowDefinitionParser();
             
             log.testSection("1. Testing valid workflow validation", false);
@@ -100,7 +96,7 @@ public class WorkflowValidationExample {
             // Cleanup
             workflowEngine.shutdown();
         } finally {
-            vertx.close();
+            transferEngine.shutdown(Duration.ofSeconds(10));
         }
     }
     
@@ -312,8 +308,7 @@ public class WorkflowValidationExample {
                     .variables(Map.of()) // Empty variables - should cause resolution errors
                     .build();
 
-            Future<WorkflowExecution> future = workflowEngine.dryRun(workflow, context);
-            WorkflowExecution execution = future.toCompletionStage().toCompletableFuture().get();
+            WorkflowExecution execution = workflowEngine.dryRun(workflow, context);
 
             if (execution.getStatus() == WorkflowStatus.FAILED) {
                 log.expectedFailure("Correctly detected variable resolution issues");
@@ -378,8 +373,7 @@ public class WorkflowValidationExample {
                     .build();
             
             log.detail("Performing dry run validation...");
-            Future<WorkflowExecution> future = workflowEngine.dryRun(workflow, context);
-            WorkflowExecution execution = future.toCompletionStage().toCompletableFuture().get();
+            WorkflowExecution execution = workflowEngine.dryRun(workflow, context);
             
             log.keyValue("Dry run status", execution.getStatus());
             log.keyValue("Groups validated", execution.getGroupExecutions().size());

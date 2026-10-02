@@ -21,12 +21,11 @@ import dev.mars.quorus.transfer.TransferEngine;
 import dev.mars.quorus.transfer.SimpleTransferEngine;
 import dev.mars.quorus.workflow.*;
 
-import io.vertx.core.Future;
-import io.vertx.core.Vertx;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.Map;
 
 /**
@@ -61,25 +60,21 @@ public class BasicWorkflowExample {
     }
     
     public void runExample() throws Exception {
-        // 1. Create Vert.x instance (shared across engines)
-        log.step(1, "Creating Vert.x instance...");
-        Vertx vertx = Vertx.vertx();
-        
+        // 1. Create transfer engine
+        log.step(1, "Creating transfer engine...");
+        TransferEngine transferEngine = new SimpleTransferEngine(10, 3, 1000); // 10 concurrent, 3 retries, 1 s retry delay
+
         try {
-            // 2. Create transfer engine with Vert.x
-            log.step(2, "Creating transfer engine...");
-            TransferEngine transferEngine = new SimpleTransferEngine(vertx, 10, 3, 1024 * 1024);
+            // 2. Create workflow engine
+            log.step(2, "Creating workflow engine...");
+            SimpleWorkflowEngine workflowEngine = new SimpleWorkflowEngine(transferEngine);
             
-            // 3. Create workflow engine with Vert.x
-            log.step(3, "Creating workflow engine...");
-            SimpleWorkflowEngine workflowEngine = new SimpleWorkflowEngine(vertx, transferEngine);
-            
-            // 4. Create YAML workflow definition
-            log.step(4, "Creating workflow definition...");
+            // 3. Create YAML workflow definition
+            log.step(3, "Creating workflow definition...");
             String yamlWorkflow = createSampleWorkflow();
         
-            // 5. Parse the workflow
-            log.step(5, "Parsing workflow...");
+            // 4. Parse the workflow
+            log.step(4, "Parsing workflow...");
             WorkflowDefinitionParser parser = new YamlWorkflowDefinitionParser();
             WorkflowDefinition workflow = parser.parseFromString(yamlWorkflow);
             
@@ -87,8 +82,8 @@ public class BasicWorkflowExample {
             log.keyValue("Description", workflow.getMetadata().getDescription());
             log.keyValue("Transfer Groups", workflow.getSpec().getTransferGroups().size());
         
-            // 6. Validate the workflow
-            log.step(6, "Validating workflow...");
+            // 5. Validate the workflow
+            log.step(5, "Validating workflow...");
             ValidationResult validation = parser.validate(workflow);
             if (!validation.isValid()) {
                 log.error("Workflow validation failed:");
@@ -98,8 +93,8 @@ public class BasicWorkflowExample {
             }
             log.success("Workflow is valid!");
         
-            // 7. Create execution context with variables
-            log.step(7, "Creating execution context...");
+            // 6. Create execution context with variables
+            log.step(6, "Creating execution context...");
             ExecutionContext context = ExecutionContext.builder()
                     .executionId("basic-example-" + System.currentTimeMillis())
                     .mode(ExecutionContext.ExecutionMode.VIRTUAL_RUN) // Use virtual run for demo
@@ -116,24 +111,20 @@ public class BasicWorkflowExample {
             log.keyValue("Mode", context.getMode());
             log.keyValue("Variables", context.getVariables());
         
-            // 8. Execute the workflow
-            log.step(8, "Executing workflow...");
-            Future<WorkflowExecution> future = workflowEngine.execute(workflow, context);
-            
-            // 9. Wait for completion and display results
-            log.step(9, "Waiting for completion...");
-            WorkflowExecution execution = future.toCompletionStage().toCompletableFuture().get();
+            // 7. Execute the workflow; the call returns when it has finished
+            log.step(7, "Executing workflow...");
+            WorkflowExecution execution = workflowEngine.execute(workflow, context);
             
             displayResults(execution);
             
-            // 10. Cleanup
-            log.step(10, "Cleaning up...");
+            // 8. Cleanup
+            log.step(8, "Cleaning up...");
             workflowEngine.shutdown();
             
             log.exampleComplete("Basic Workflow Example");
         } finally {
-            vertx.close();
-        }
+            transferEngine.shutdown(Duration.ofSeconds(10));
+}
     }
     
     private String createSampleWorkflow() {

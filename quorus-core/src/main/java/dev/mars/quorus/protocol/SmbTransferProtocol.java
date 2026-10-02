@@ -29,8 +29,6 @@ import dev.mars.quorus.util.SensitiveDataRedactor;
 import dev.mars.quorus.connection.MountedFileSystemSecurity;
 
 import static dev.mars.quorus.core.exceptions.QuorusErrorCode.*;
-import io.vertx.core.Context;
-import io.vertx.core.Vertx;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -112,12 +110,6 @@ public class SmbTransferProtocol implements TransferProtocol {
 
     @Override
     public TransferResult transfer(TransferRequest request, TransferContext context) throws TransferException {
-        Context vertxContext = Vertx.currentContext();
-        if (vertxContext != null && vertxContext.isEventLoopContext()) {
-            throw new TransferException(context.getJobId(),
-                    "Blocking SMB transfer() invoked on event loop. Use transferReactive() instead.");
-        }
-
         logger.info("Starting SMB transfer: jobId={}, isUpload={}", context.getJobId(), request.isUpload());
         if (request.getRuntimeCredential() != null) {
             try { MountedFileSystemSecurity.requireVerified("SMB", mountSecurityVerified); }
@@ -128,7 +120,7 @@ public class SmbTransferProtocol implements TransferProtocol {
             SensitiveDataRedactor.redactUri(request.getSourceUri()),
             SensitiveDataRedactor.redactUri(request.getDestinationUri()));
 
-        ProgressTracker progressTracker = new ProgressTracker(context.getJobId());
+        ProgressTracker progressTracker = new ProgressTracker(context);
         progressTracker.start();
         logger.debug("transfer: progress tracker initialized");
 
@@ -158,15 +150,6 @@ public class SmbTransferProtocol implements TransferProtocol {
     @Override
     public long getMaxFileSize() {
         return -1; // No specific limit for SMB
-    }
-    
-    @Override
-    public void abort() {
-        logger.debug("abort: SMB transfer abort requested");
-        // SMB transfers use Java NIO Files API which doesn't expose
-        // interruptible resources. Cancellation handled via thread interruption.
-        // Future enhancement: track active FileChannel for force close
-        logger.debug("abort: SMB abort relies on thread interruption");
     }
     
     private TransferResult performSmbTransfer(TransferRequest request, ProgressTracker progressTracker) 
@@ -359,7 +342,7 @@ public class SmbTransferProtocol implements TransferProtocol {
                 }
                 
                 // Check for cancellation
-                if (Thread.currentThread().isInterrupted()) {
+                if (progressTracker.stopRequested()) {
                     logger.debug("transferFile: transfer cancelled via thread interruption");
                     throw new IOException("Transfer was cancelled");
                 }

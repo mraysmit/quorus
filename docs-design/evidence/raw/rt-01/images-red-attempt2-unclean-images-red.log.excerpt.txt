@@ -1,0 +1,27 @@
+Excerpt of: docs-design/evidence/raw/rt-01/images-red-attempt2-unclean-images-red.log
+Original SHA-256: c2270fd5aa78e2b73bf85add224978705c783a37e9ce7d808784dab9513afac7
+Original size: 32831 bytes
+Full log not retained under the evidence retention rule (plan §6.1): regression and discarded-attempt output is kept as this excerpt. Reproduce by re-running the recorded command at the recorded revision.
+
+    122: [INFO] NOTHING TO DO: There is nothing to do. If this is unexpected, review the above logs for more details.
+    143: [docker build -f C:\Users\mraysmit\dev\idea-projects\quorus\quorus-agent\Dockerfile -t quorus-agent:rt01 C:\Users\mraysmit\dev\idea-projects\quorus] exit 1
+    166: #4 ERROR: docker.io/library/maven:3.9.9-eclipse-temurin-25: not found
+    180: ERROR: failed to build: failed to solve: maven:3.9.9-eclipse-temurin-25: failed to resolve source metadata for docker.io/library/maven:3.9.9-eclipse-temurin-25: docker.io/library/maven:3.9.9-eclipse-temurin-25: not found
+    183: [ERROR] Tests run: 2, Failures: 2, Errors: 0, Skipped: 0, Time elapsed: 4.964 s <<< FAILURE! -- in dev.mars.quorus.controller.deployment.ContainerImageBaselineTest
+    184: [ERROR] dev.mars.quorus.controller.deployment.ContainerImageBaselineTest.agentImagePackagesHostBuiltJarOnCorrettoBaseline -- Time elapsed: 4.917 s <<< FAILURE!
+    225: View build details: docker-desktop://dashboard/build/desktop-linux/desktop-linux/dd1cwjogi7vrcnomryo4lir6y ==> expected: <0> but was: <1>
+    292: [ERROR] dev.mars.quorus.controller.deployment.ContainerImageBaselineTest.controllerImagePackagesHostBuiltJarOnCorrettoBaseline -- Time elapsed: 0.003 s <<< FAILURE!
+    293: org.opentest4j.AssertionFailedError: expected exactly one host-built quorus-controller jar in C:\Users\mraysmit\dev\idea-projects\quorus\quorus-controller\target but found [C:\Users\mraysmit\dev\idea-projects\quorus\quorus-controller\target\quorus-controller-1.0-SNAPSHOT-shaded.jar, C:\Users\mraysmit\dev\idea-projects\quorus\quorus-controller\target\quorus-controller-1.0-SNAPSHOT.jar]. Build it on
+    404: [ERROR]   ContainerImageBaselineTest.controllerImagePackagesHostBuiltJarOnCorrettoBaseline:54->verifyImage:65->hostBuiltJar:84 expected exactly one host-built quorus-controller jar in C:\Users\mraysmit\dev\idea-projects\quorus\quorus-controller\target but found [C:\Users\mraysmit\dev\idea-projects\quorus\quorus-controller\target\quorus-controller-1.0-SNAPSHOT-shaded.jar, C:\Users\mraysmit\dev\idea
+    406: [ERROR] Tests run: 2, Failures: 2, Errors: 0, Skipped: 0
+    409: [INFO] Reactor Summary for Quorus File Transfer System 1.0-SNAPSHOT:
+    411: [INFO] Quorus File Transfer System ........................ SUCCESS [  0.312 s]
+    412: [INFO] Quorus Core ........................................ SUCCESS [  1.963 s]
+    413: [INFO] Quorus Workflow Engine ............................. SUCCESS [  0.370 s]
+    414: [INFO] Quorus Tenant Management ........................... SUCCESS [  0.238 s]
+    415: [INFO] Quorus Distributed Controller ...................... FAILURE [  7.605 s]
+    417: [INFO] BUILD FAILURE
+    419: [INFO] Total time:  10.801 s
+    420: [INFO] Finished at: 2026-09-26T13:02:38+01:00
+    422: [ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.2.2:test (default-test) on project quorus-controller: There are test failures.
+    432: [ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
