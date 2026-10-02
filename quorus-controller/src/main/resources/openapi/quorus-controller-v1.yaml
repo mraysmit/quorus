@@ -2,7 +2,7 @@ openapi: 3.1.0
 jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
 info:
   title: Quorus Controller REST API
-  version: 1.3.1-alpha
+  version: 1.3.2-alpha
   summary: Phase 2 authenticated controller API contract with fenced agent reports
   description: >-
     Machine-readable contract for every HTTP route registered by the current Quorus
@@ -14,6 +14,8 @@ info:
     identifiers, including dots. Foreign item identifiers return 404 within the caller's
     namespace; collection reads filter exact ownership. Ambiguous legacy registry
     ownership fails closed with a redacted problem response and no partial migration.
+    This contract is the reference for the current API. The REST API Specification defines
+    the required production contract, and marks which of its endpoints are current.
   license:
     name: Apache 2.0
     identifier: Apache-2.0
@@ -30,6 +32,8 @@ tags:
   - name: Assignments
   - name: Routes
   - name: Security
+  - name: Service Connections
+  - name: Security Events
 x-assignment-mutation-responses: &AssignmentMutationResponses
   '200':
     description: Assignment state changed
@@ -55,6 +59,7 @@ x-route-mutation-responses: &RouteMutationResponses
 paths:
   /metrics:
     get:
+      security: [{mutualTls: ['telemetry:read']}]
       tags: [Operations]
       operationId: getMetrics
       summary: Export controller metrics
@@ -94,6 +99,7 @@ paths:
         default: {$ref: '#/components/responses/Problem'}
   /health:
     get:
+      security: [{mutualTls: ['api:access']}]
       tags: [Operations]
       operationId: getHealth
       summary: Report detailed controller health
@@ -107,6 +113,7 @@ paths:
         default: {$ref: '#/components/responses/Problem'}
   /status:
     get:
+      security: [{mutualTls: ['system:read']}]
       tags: [Operations]
       operationId: getStatus
       summary: Report basic controller status
@@ -124,6 +131,7 @@ paths:
         default: {$ref: '#/components/responses/Problem'}
   /raft/status:
     get:
+      security: [{mutualTls: ['cluster:read']}]
       tags: [Cluster]
       operationId: getRaftStatus
       summary: Report local Raft state
@@ -136,15 +144,27 @@ paths:
         default: {$ref: '#/components/responses/Problem'}
   /api/v1/info:
     get:
+      security: [{mutualTls: ['system:read']}]
       tags: [Operations]
       operationId: getApiInfo
-      summary: Discover API capabilities and endpoint inventory
+      summary: Report the API version, controller state and capabilities
+      description: >-
+        The endpoint inventory is this contract, linked from `openApi`; the response does not
+        repeat it.
       responses:
         '200':
           description: API and controller information
           content:
             application/json:
-              schema: {type: object, additionalProperties: true}
+              schema:
+                type: object
+                required: [api, controller, openApi, capabilities, timestamp]
+                properties:
+                  api: {type: object, additionalProperties: true}
+                  controller: {type: object, additionalProperties: true}
+                  openApi: {type: string, const: /api/v1/openapi.yaml}
+                  capabilities: {type: object, additionalProperties: {type: boolean}}
+                  timestamp: {type: string, format: date-time}
         default: {$ref: '#/components/responses/Problem'}
   /api/v1/openapi.yaml:
     get:
@@ -161,6 +181,7 @@ paths:
         default: {$ref: '#/components/responses/Problem'}
   /api/v1/security/me:
     get:
+      security: [{mutualTls: ['security:self:read']}]
       tags: [Security]
       operationId: getEffectiveSecurityIdentity
       summary: Return the verified effective identity and policy attributes
@@ -175,6 +196,7 @@ paths:
         default: {$ref: '#/components/responses/Problem'}
   /api/v1/security/authorization/explain:
     get:
+      security: [{mutualTls: ['security:explain']}]
       tags: [Security]
       operationId: explainAuthorization
       summary: Explain whether the caller may perform a proposed API operation
@@ -195,6 +217,7 @@ paths:
         default: {$ref: '#/components/responses/Problem'}
   /api/v1/security/authorization/check:
     post:
+      security: [{mutualTls: ['security:explain']}]
       tags: [Security]
       operationId: checkAuthorization
       summary: Evaluate the effective policy without performing the proposed operation
@@ -214,6 +237,7 @@ paths:
         default: {$ref: '#/components/responses/Problem'}
   /api/v1/security/trust:
     get:
+      security: [{mutualTls: ['security:trust:read']}]
       tags: [Security]
       operationId: getSecurityTrustStatus
       summary: Observe the active trust-bundle version and caller certificate expiry posture
@@ -228,6 +252,7 @@ paths:
         default: {$ref: '#/components/responses/Problem'}
   /api/v1/security/trust/revocations:
     put:
+      security: [{mutualTls: ['security:trust:write']}]
       tags: [Security]
       operationId: replaceCertificateRevocations
       summary: Atomically replace runtime certificate revocations and advance the trust version
@@ -249,6 +274,7 @@ paths:
         default: {$ref: '#/components/responses/Problem'}
   /api/v1/agents/register:
     post:
+      security: [{mutualTls: ['agents:register']}]
       tags: [Agents]
       operationId: registerAgent
       summary: Register an agent in authoritative state
@@ -269,6 +295,7 @@ paths:
         default: {$ref: '#/components/responses/Problem'}
   /api/v1/agents/heartbeat:
     post:
+      security: [{mutualTls: ['agents:heartbeat']}]
       tags: [Agents]
       operationId: recordAgentHeartbeat
       summary: Record agent health and optional sequence acknowledgement
@@ -290,6 +317,7 @@ paths:
         default: {$ref: '#/components/responses/Problem'}
   /api/v1/agents:
     get:
+      security: [{mutualTls: ['agents:read']}]
       tags: [Agents]
       operationId: listAgents
       summary: List registered agents
@@ -309,6 +337,7 @@ paths:
     parameters:
       - {$ref: '#/components/parameters/AgentId'}
     get:
+      security: [{mutualTls: ['agents:jobs:read']}]
       tags: [Agents, Assignments]
       operationId: listAgentJobs
       summary: Poll assignments awaiting processing by an agent
@@ -327,9 +356,19 @@ paths:
         default: {$ref: '#/components/responses/Problem'}
   /api/v1/transfers:
     post:
+      security: [{mutualTls: ['transfers:write']}]
       tags: [Transfers]
       operationId: createTransfer
       summary: Submit a tenant-scoped transfer
+      description: >-
+        Production submissions name a service connection alias, a literal remote path and an agent
+        pool. The controller authorizes the alias, including DNS, without retrieving credentials, and
+        records SERVICE_CONNECTION_AUTHORIZED. A URI containing user information is rejected with 400
+        before the request is mapped or submitted to Raft. Direct URIs are accepted only in the
+        development profile. DNS authorization returns 503 when its admission capacity is exhausted,
+        504 when its deadline expires, and 409 when the connection or its secret reference changes
+        during resolution. A secret reference past its expiry is marked EXPIRED and audited, and the
+        request returns 409.
       requestBody:
         required: true
         content:
@@ -344,11 +383,13 @@ paths:
         '400': {$ref: '#/components/responses/Problem'}
         '409': {$ref: '#/components/responses/Problem'}
         '503': {$ref: '#/components/responses/Problem'}
+        '504': {$ref: '#/components/responses/Problem'}
         default: {$ref: '#/components/responses/Problem'}
   /api/v1/transfers/{jobId}:
     parameters:
       - {$ref: '#/components/parameters/JobId'}
     get:
+      security: [{mutualTls: ['transfers:read']}]
       tags: [Transfers]
       operationId: getTransfer
       summary: Query transfer lifecycle and progress
@@ -361,6 +402,7 @@ paths:
         '404': {$ref: '#/components/responses/Problem'}
         default: {$ref: '#/components/responses/Problem'}
     delete:
+      security: [{mutualTls: ['transfers:delete']}]
       tags: [Transfers]
       operationId: deleteTransfer
       summary: Delete a transfer without dependent assignments
@@ -378,6 +420,7 @@ paths:
     parameters:
       - {$ref: '#/components/parameters/JobId'}
     get:
+      security: [{mutualTls: ['transfers:read']}]
       tags: [Transfers, Operations]
       operationId: getTransferProgress
       summary: Query operational progress, telemetry freshness, and deadline condition
@@ -398,9 +441,17 @@ paths:
     parameters:
       - {$ref: '#/components/parameters/JobId'}
     get:
+      security: [{mutualTls: ['transfers:read']}]
       tags: [Transfers, Operations]
       operationId: listTransferEvents
       summary: List durable ordered transfer events
+      description: >-
+        The controller currently records TRANSFER_SUBMITTED, TRANSFER_ASSIGNED, TRANSFER_ACCEPTED,
+        TRANSFER_STARTED and TRANSFER_PROGRESS, each with a deterministic per-transfer sequence and
+        identity. Assignment and lifecycle events carry attempt and agent identity; progress events
+        also carry bytes, total size and the agent report sequence. The ledger is part of controller
+        snapshots. Terminal and exceptional events, pagination, replay and streaming are not yet
+        implemented.
       responses:
         '200':
           description: Ordered transfer event history
@@ -414,6 +465,7 @@ paths:
     parameters:
       - {$ref: '#/components/parameters/JobId'}
     post:
+      security: [{mutualTls: ['transfers:status:update']}]
       tags: [Transfers, Assignments]
       operationId: updateJobStatus
       summary: Record agent assignment state and transfer progress
@@ -421,6 +473,13 @@ paths:
         Enforces assignment lifecycle, tenant ownership, active attempt identity,
         expected state, lease, fencing generation, ordered reports, monotonic byte
         progress, and mirrors IN_PROGRESS/COMPLETED/FAILED/CANCELLED into transfer state.
+        The attempt, assignment, transfer status and progress are applied as one atomic
+        replicated command; a rejected report changes nothing. Resending a report that was
+        already accepted, byte for byte, returns 200 without advancing the sequence or reopening
+        the fence, including a terminal report whose response was lost. A preparation failure
+        (authorization, secret resolution or local path) is reported as FAILED with expectedState
+        ACCEPTED, zero bytes and the next sequence; it fails the pending transfer without an
+        IN_PROGRESS report.
       requestBody:
         required: true
         content:
@@ -442,6 +501,7 @@ paths:
     parameters:
       - {$ref: '#/components/parameters/JobId'}
     get:
+      security: [{mutualTls: ['transfers:read']}]
       tags: [Transfers]
       operationId: listTransferAttempts
       summary: List immutable execution attempts and identify the active fencing generation
@@ -461,6 +521,7 @@ paths:
         required: true
         schema: {type: string, minLength: 1}
     get:
+      security: [{mutualTls: ['transfers:read']}]
       tags: [Transfers]
       operationId: getTransferAttempt
       summary: Get immutable execution-attempt, lease, ordering, and fencing evidence
@@ -474,6 +535,7 @@ paths:
         default: {$ref: '#/components/responses/Problem'}
   /api/v1/assignments:
     get:
+      security: [{mutualTls: ['assignments:read']}]
       tags: [Assignments]
       operationId: listAssignments
       summary: List assignments
@@ -490,6 +552,7 @@ paths:
                   total: {type: integer, minimum: 0}
         default: {$ref: '#/components/responses/Problem'}
     post:
+      security: [{mutualTls: ['assignments:write']}]
       tags: [Assignments]
       operationId: createAssignment
       summary: Assign an existing transfer to an existing same-tenant agent
@@ -513,6 +576,7 @@ paths:
     parameters:
       - {$ref: '#/components/parameters/AssignmentId'}
     get:
+      security: [{mutualTls: ['assignments:read']}]
       tags: [Assignments]
       operationId: getAssignment
       summary: Query one assignment
@@ -525,6 +589,7 @@ paths:
         '404': {$ref: '#/components/responses/Problem'}
         default: {$ref: '#/components/responses/Problem'}
     delete:
+      security: [{mutualTls: ['assignments:delete']}]
       tags: [Assignments]
       operationId: deleteAssignment
       summary: Remove a terminal assignment
@@ -541,6 +606,7 @@ paths:
   /api/v1/assignments/{assignmentId}/accept:
     parameters: [{$ref: '#/components/parameters/AssignmentId'}]
     put:
+      security: [{mutualTls: ['assignments:write']}]
       tags: [Assignments]
       operationId: acceptAssignment
       summary: Move ASSIGNED to ACCEPTED
@@ -548,6 +614,7 @@ paths:
   /api/v1/assignments/{assignmentId}/reject:
     parameters: [{$ref: '#/components/parameters/AssignmentId'}]
     put:
+      security: [{mutualTls: ['assignments:write']}]
       tags: [Assignments]
       operationId: rejectAssignment
       summary: Move ASSIGNED to REJECTED
@@ -555,6 +622,7 @@ paths:
   /api/v1/assignments/{assignmentId}/status:
     parameters: [{$ref: '#/components/parameters/AssignmentId'}]
     put:
+      security: [{mutualTls: ['assignments:write']}]
       tags: [Assignments]
       operationId: updateAssignmentStatus
       summary: Apply a legal assignment transition
@@ -571,12 +639,14 @@ paths:
   /api/v1/assignments/{assignmentId}/cancel:
     parameters: [{$ref: '#/components/parameters/AssignmentId'}]
     put:
+      security: [{mutualTls: ['assignments:write']}]
       tags: [Assignments]
       operationId: cancelAssignment
       summary: Cancel a non-terminal assignment
       responses: *AssignmentMutationResponses
   /api/v1/routes:
     get:
+      security: [{mutualTls: ['routes:read']}]
       tags: [Routes]
       operationId: listRoutes
       summary: List routes
@@ -593,6 +663,7 @@ paths:
                   total: {type: integer, minimum: 0}
         default: {$ref: '#/components/responses/Problem'}
     post:
+      security: [{mutualTls: ['routes:write']}]
       tags: [Routes]
       operationId: createRoute
       summary: Create a route in CONFIGURED state
@@ -614,6 +685,7 @@ paths:
   /api/v1/routes/{routeId}:
     parameters: [{$ref: '#/components/parameters/RouteId'}]
     get:
+      security: [{mutualTls: ['routes:read']}]
       tags: [Routes]
       operationId: getRoute
       summary: Query one route
@@ -626,6 +698,7 @@ paths:
         '404': {$ref: '#/components/responses/Problem'}
         default: {$ref: '#/components/responses/Problem'}
     put:
+      security: [{mutualTls: ['routes:write']}]
       tags: [Routes]
       operationId: updateRoute
       summary: Update route fields while preserving identifier and state
@@ -636,6 +709,7 @@ paths:
             schema: {$ref: '#/components/schemas/Route'}
       responses: *RouteMutationResponses
     delete:
+      security: [{mutualTls: ['routes:delete']}]
       tags: [Routes]
       operationId: deleteRoute
       summary: Delete a route
@@ -643,6 +717,7 @@ paths:
   /api/v1/routes/{routeId}/suspend:
     parameters: [{$ref: '#/components/parameters/RouteId'}]
     put:
+      security: [{mutualTls: ['routes:write']}]
       tags: [Routes]
       operationId: suspendRoute
       summary: Suspend a configured or active route
@@ -650,12 +725,14 @@ paths:
   /api/v1/routes/{routeId}/resume:
     parameters: [{$ref: '#/components/parameters/RouteId'}]
     put:
+      security: [{mutualTls: ['routes:write']}]
       tags: [Routes]
       operationId: resumeRoute
       summary: Resume a suspended route
       responses: *RouteMutationResponses
   /api/v1/service-connections:
     get:
+      security: [{mutualTls: ['service-connections:read']}]
       tags: [Service Connections]
       operationId: listServiceConnections
       summary: List tenant-scoped governed service connections
@@ -664,6 +741,7 @@ paths:
         '200': {description: Service connections, content: {application/json: {schema: {$ref: '#/components/schemas/ServiceConnectionList'}}}}
         default: {$ref: '#/components/responses/Problem'}
     post:
+      security: [{mutualTls: ['service-connections:write']}]
       tags: [Service Connections]
       operationId: createServiceConnection
       summary: Create a governed service connection
@@ -676,6 +754,7 @@ paths:
   /api/v1/service-connections/{serviceConnectionId}:
     parameters: [{$ref: '#/components/parameters/ServiceConnectionId'}]
     get:
+      security: [{mutualTls: ['service-connections:read']}]
       tags: [Service Connections]
       operationId: getServiceConnection
       parameters: [{$ref: '#/components/parameters/TenantIdQuery'}]
@@ -684,13 +763,19 @@ paths:
         '404': {$ref: '#/components/responses/Problem'}
         default: {$ref: '#/components/responses/Problem'}
     put:
+      security: [{mutualTls: ['service-connections:write']}]
       tags: [Service Connections]
       operationId: updateServiceConnection
+      description: >-
+        Increments the policy version. A partial update keeps every omitted trust field (approved CA
+        identifiers, SSH host-key pins, TLS peer pins and minimum TLS version); a supplied field
+        replaces the stored one.
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ServiceConnectionWrite'}}}}
       responses:
         '200': {description: Updated, content: {application/json: {schema: {$ref: '#/components/schemas/ServiceConnection'}}}}
         default: {$ref: '#/components/responses/Problem'}
     delete:
+      security: [{mutualTls: ['service-connections:delete']}]
       tags: [Service Connections]
       operationId: deleteServiceConnection
       parameters: [{$ref: '#/components/parameters/TenantIdQuery'}]
@@ -700,15 +785,27 @@ paths:
   /api/v1/service-connections/{serviceConnectionId}/validate:
     parameters: [{$ref: '#/components/parameters/ServiceConnectionId'}]
     post:
+      security: [{mutualTls: ['service-connections:write']}]
       tags: [Service Connections]
       operationId: validateServiceConnection
       summary: Perform a redacted staged policy validation
+      description: >-
+        Policy-only unless probeNetwork is true. The probe opens a TCP connection to a
+        controller-approved address within probeTimeoutMillis and may return ROUTE_VERIFIED. It does
+        not retrieve a secret, negotiate TLS or SSH, or authenticate, so a verified route says nothing
+        about those stages. When the endpoint omits a port, the probe uses the protocol default
+        (21 FTP and FTPS, 22 SFTP, 80 HTTP, 443 HTTPS). DNS authorization fails with 503, 504 or 409
+        as for transfer submission.
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ConnectionValidationRequest'}}}}
       responses:
         '200': {description: Validation result, content: {application/json: {schema: {$ref: '#/components/schemas/ConnectionValidation'}}}}
+        '409': {$ref: '#/components/responses/Problem'}
+        '503': {$ref: '#/components/responses/Problem'}
+        '504': {$ref: '#/components/responses/Problem'}
         default: {$ref: '#/components/responses/Problem'}
   /api/v1/secret-references:
     get:
+      security: [{mutualTls: ['secret-references:read']}]
       tags: [Secret References]
       operationId: listSecretReferences
       parameters: [{$ref: '#/components/parameters/TenantIdQuery'}]
@@ -716,6 +813,7 @@ paths:
         '200': {description: Opaque references, content: {application/json: {schema: {$ref: '#/components/schemas/SecretReferenceList'}}}}
         default: {$ref: '#/components/responses/Problem'}
     post:
+      security: [{mutualTls: ['secret-references:write']}]
       tags: [Secret References]
       operationId: createSecretReference
       summary: Register an opaque reference; secret values are forbidden
@@ -726,6 +824,7 @@ paths:
   /api/v1/secret-references/{secretReferenceId}:
     parameters: [{$ref: '#/components/parameters/SecretReferenceId'}]
     get:
+      security: [{mutualTls: ['secret-references:read']}]
       tags: [Secret References]
       operationId: getSecretReference
       parameters: [{$ref: '#/components/parameters/TenantIdQuery'}]
@@ -733,6 +832,7 @@ paths:
         '200': {description: Opaque reference, content: {application/json: {schema: {$ref: '#/components/schemas/SecretReference'}}}}
         default: {$ref: '#/components/responses/Problem'}
     put:
+      security: [{mutualTls: ['secret-references:write']}]
       tags: [Secret References]
       operationId: updateSecretReference
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/SecretReferenceWrite'}}}}
@@ -740,6 +840,7 @@ paths:
         '200': {description: Updated, content: {application/json: {schema: {$ref: '#/components/schemas/SecretReference'}}}}
         default: {$ref: '#/components/responses/Problem'}
     delete:
+      security: [{mutualTls: ['secret-references:delete']}]
       tags: [Secret References]
       operationId: deleteSecretReference
       parameters: [{$ref: '#/components/parameters/TenantIdQuery'}]
@@ -749,9 +850,23 @@ paths:
         default: {$ref: '#/components/responses/Problem'}
   /api/v1/security-events:
     get:
+      security: [{mutualTls: ['security-events:read']}]
       tags: [Security Events]
       operationId: listSecurityEvents
-      parameters: [{$ref: '#/components/parameters/TenantIdQuery'}]
+      description: >-
+        Events are ordered by timestamp and event ID; the response holds one page in events, its row
+        count in total, and nextCursor when another page exists. SERVICE_CONNECTION_LAST_USED is
+        recorded only after the executing agent has passed its policy checks and resolved secret
+        authority. Events are authoritative snapshot state and are not pruned automatically.
+        Archive, retention and legal hold are Phase 9 work.
+      parameters:
+        - {$ref: '#/components/parameters/TenantIdQuery'}
+        - name: limit
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 1000, default: 100}
+        - name: cursor
+          in: query
+          schema: {type: string}
       responses:
         '200': {description: Redacted security events, content: {application/json: {schema: {$ref: '#/components/schemas/SecurityEventList'}}}}
         default: {$ref: '#/components/responses/Problem'}
@@ -930,7 +1045,13 @@ components:
         serviceConnectionId: {type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$'}
         tenantId: {type: string, minLength: 1}
         protocol: {type: string, enum: [SFTP, HTTPS, FTPS, SMB, NFS]}
-        endpoint: {type: string, format: uri, description: Credential-free service endpoint origin.}
+        endpoint:
+          type: string
+          format: uri
+          description: >-
+            Credential-free service endpoint origin. A portless FTPS endpoint uses explicit TLS
+            (AUTH TLS) on port 21. Implicit TLS needs an explicit port 990 and an egress
+            allowlist that permits it.
         networkZone: {type: string, minLength: 1}
         allowedPaths: {type: array, minItems: 1, uniqueItems: true, items: {type: string, pattern: '^/'}}
         allowedDirections: {type: array, minItems: 1, uniqueItems: true, items: {type: string, enum: [DOWNLOAD, UPLOAD]}}
@@ -1046,6 +1167,7 @@ components:
       properties:
         events: {type: array, items: {$ref: '#/components/schemas/SecurityEvent'}}
         total: {type: integer, minimum: 0}
+        nextCursor: {type: [string, 'null']}
     Liveness:
       type: object
       required: [status, timestamp]
@@ -1121,14 +1243,19 @@ components:
             available: {type: boolean}
     AgentStatus:
       type: string
-      enum: [REGISTERED, ONLINE, BUSY, OFFLINE, UNHEALTHY, DRAINING, DEREGISTERED]
+      description: Agent lifecycle status as written by the server, in lowercase.
+      enum: [registering, healthy, active, idle, degraded, overloaded, maintenance, draining, unreachable, failed, deregistered]
     AgentHeartbeat:
       type: object
       required: [agentId]
       properties:
         agentId: {type: string, minLength: 1}
         tenantId: {type: string}
-        status: {$ref: '#/components/schemas/AgentStatus'}
+        status:
+          $ref: '#/components/schemas/AgentStatus'
+          description: >-
+            Matched case-insensitively. An unrecognised value is ignored and logged, and the
+            heartbeat is still recorded.
         sequenceNumber: {type: integer, minimum: 0}
     CreatedAgent:
       type: object
@@ -1143,7 +1270,7 @@ components:
         success: {type: boolean, const: true}
         agentId: {type: string}
         message: {type: string}
-        status: {type: string}
+        status: {$ref: '#/components/schemas/AgentStatus'}
         lastHeartbeat: {type: string, format: date-time}
         acknowledgedSequenceNumber: {type: integer}
     CreateTransfer:

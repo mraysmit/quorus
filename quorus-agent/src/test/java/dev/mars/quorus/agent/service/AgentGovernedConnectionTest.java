@@ -25,6 +25,30 @@ import static org.junit.jupiter.api.Assertions.*;
 class AgentGovernedConnectionTest {
 
     @Test
+    void agentDecoderAcceptsControllerContractCaseAndDefaults() {
+        Instant now = Instant.parse("2026-09-05T00:00:00Z");
+        String json = """
+                {"serviceConnectionId":"codec-connection","tenantId":"bank-a","protocol":"sftp",
+                 "endpoint":"sftp://192.0.2.10","networkZone":"restricted-egress","allowedPaths":["/in"],
+                 "allowedDirections":["download"],"allowedAgentPools":["payments"],"owner":"payments-ops",
+                 "environment":"production","classification":"confidential","secretReferenceId":"payments-key",
+                 "serviceIdentity":"payments-batch","authenticationType":"password",
+                 "trustPolicy":{"sshHostKeyFingerprints":["SHA256:known"]},
+                 "egressPolicy":{"allowedHostnames":["192.0.2.10"],"allowedCidrs":["192.0.2.0/24"],"allowedPorts":[22]},
+                 "createdAt":"%s","updatedAt":"%s"}""".formatted(now, now);
+
+        ServiceConnection decoded = AgentConnectionPolicyService.parseConnection(json);
+
+        assertEquals(ServiceConnection.Protocol.SFTP, decoded.protocol());
+        assertEquals(Set.of(ServiceConnection.Direction.DOWNLOAD), decoded.allowedDirections());
+        assertEquals(ServiceConnection.AuthenticationType.PASSWORD, decoded.authenticationType());
+        assertEquals(ServiceConnection.Status.ACTIVE, decoded.status());
+        assertEquals(1, decoded.policyVersion());
+        assertTrue(decoded.egressPolicy().pinResolvedAddresses());
+        assertEquals("TLSv1.3", decoded.trustPolicy().minimumTlsVersion());
+    }
+
+    @Test
     void agentRepeatsPolicyBeforeSecretResolutionAndReturnsCloseableRuntimeCredential() throws Exception {
         AtomicInteger resolutions = new AtomicInteger();
         SecretProvider vault = new SecretProvider() {

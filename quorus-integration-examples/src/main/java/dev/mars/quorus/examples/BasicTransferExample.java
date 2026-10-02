@@ -16,6 +16,7 @@
 
 package dev.mars.quorus.examples;
 
+import dev.mars.quorus.concurrent.TaskScope;
 import dev.mars.quorus.config.QuorusConfiguration;
 import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferResult;
@@ -24,14 +25,14 @@ import dev.mars.quorus.examples.util.TestResultLogger;
 import dev.mars.quorus.transfer.SimpleTransferEngine;
 import dev.mars.quorus.transfer.TransferEngine;
 
-import io.vertx.core.Future;
-import io.vertx.core.Vertx;
 
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
 import java.util.logging.Logger;
 
@@ -68,12 +69,8 @@ public class BasicTransferExample {
         QuorusConfiguration config = new QuorusConfiguration("default", new Properties());
         logger.info("Configuration loaded: " + config);
 
-        // Create Vert.x instance for reactive operations
-        Vertx vertx = Vertx.vertx();
-        
-        // Initialize transfer engine with Vert.x and configuration parameters
+        // Initialize the blocking transfer engine with configuration parameters
         TransferEngine transferEngine = new SimpleTransferEngine(
-                vertx,
                 config.getMaxConcurrentTransfers(),  // Max concurrent transfers: 10
                 config.getMaxRetryAttempts(),        // Max retry attempts: 3
                 config.getRetryDelayMs()             // Initial retry delay: 1000ms
@@ -100,8 +97,7 @@ public class BasicTransferExample {
             // Always shutdown transfer engine gracefully
             logger.info("");
             logger.info("Shutting down transfer engine...");
-            transferEngine.shutdown(10).toCompletionStage().toCompletableFuture().join();
-            vertx.close();
+            transferEngine.shutdown(Duration.ofSeconds(10));
             logger.info("=== Example completed successfully ===");
         }
     }
@@ -120,14 +116,11 @@ public class BasicTransferExample {
         logger.info("Transfer source: " + request.getSourceUri());
         logger.info("Transfer destination: " + request.getDestinationPath());
 
-        // Submit transfer and get future for result
-        Future<TransferResult> future = transferEngine.submitTransfer(request);
-
         // Start real-time progress monitoring in background thread
         monitorTransferProgress(transferEngine, request.getRequestId());
 
-        // Wait for transfer completion and get results
-        TransferResult result = future.toCompletionStage().toCompletableFuture().get();
+        // The engine is blocking: the transfer runs on this thread and returns its result
+        TransferResult result = transferEngine.transfer(request);
         displayTransferResult(result);
     }
     
@@ -136,25 +129,28 @@ public class BasicTransferExample {
         logger.info("Downloading 3 files of different sizes concurrently");
 
         String[] fileSizes = {"512", "1024", "4096"}; // Different file sizes in bytes
-        Future<TransferResult>[] futures = new Future[fileSizes.length];
+        List<TaskScope.Subtask<TransferResult>> transfers = new ArrayList<>();
 
-        // Submit all transfers simultaneously to demonstrate concurrency
-        logger.info("Submitting all transfers simultaneously...");
-        for (int i = 0; i < fileSizes.length; i++) {
+        // Fork all transfers in a task scope: each runs on its own virtual thread
+        logger.info("Starting all transfers simultaneously...");
+        try (TaskScope scope = TaskScope.open("multiple-files", Duration.ofMinutes(2))) {
+            for (int i = 0; i < fileSizes.length; i++) {
             TransferRequest request = TransferRequest.builder()
                     .sourceUri(URI.create("https://httpbin.org/bytes/" + fileSizes[i]))
                     .destinationPath(Paths.get("downloads/multi-file-" + fileSizes[i] + "b.bin"))
                     .protocol("http")
                     .build();
 
-            logger.info("  Submitting transfer " + (i + 1) + ": " + fileSizes[i] + " bytes");
-            futures[i] = transferEngine.submitTransfer(request);
+            logger.info("  Starting transfer " + (i + 1) + ": " + fileSizes[i] + " bytes");
+            transfers.add(scope.fork(() -> transferEngine.transfer(request)));
+            }
+            logger.info("All transfers started. Waiting for completion...");
+            scope.join();
         }
 
-        // Wait for all transfers to complete and collect results
-        logger.info("All transfers submitted. Waiting for completion...");
-        for (int i = 0; i < futures.length; i++) {
-            TransferResult result = futures[i].toCompletionStage().toCompletableFuture().get();
+        // Collect results
+        for (int i = 0; i < transfers.size(); i++) {
+            TransferResult result = transfers.get(i).get();
             String status = result.isSuccessful() ? "SUCCESS [OK]" : "FAILED [FAIL]";
             logger.info("  Transfer " + (i + 1) + " result: " + status +
                        " (" + result.getBytesTransferred() + " bytes)");
@@ -179,8 +175,7 @@ public class BasicTransferExample {
         logger.info("This demonstrates how Quorus waits patiently for slow responses");
 
         long startTime = System.currentTimeMillis();
-        Future<TransferResult> future = transferEngine.submitTransfer(slowRequest);
-        TransferResult result = future.toCompletionStage().toCompletableFuture().get();
+        TransferResult result = transferEngine.transfer(slowRequest);
         long duration = System.currentTimeMillis() - startTime;
 
         logger.info("");
@@ -211,13 +206,18 @@ public class BasicTransferExample {
         Thread monitorThread = new Thread(() -> {
             try {
                 logger.info("Starting real-time progress monitoring...");
+                boolean seen = false;
                 while (true) {
                     // Get current job status from transfer engine
                     var job = transferEngine.getTransferJob(jobId);
                     if (job == null) {
-                        // Job no longer exists (completed or failed)
-                        break;
+                        if (seen) {
+                            break;              // the transfer has ended and left the engine
+                        }
+                        Thread.sleep(50);       // the transfer has not started yet
+                        continue;
                     }
+                    seen = true;
 
                     // Display progress for active transfers
                     if (job.getStatus() == TransferStatus.IN_PROGRESS) {

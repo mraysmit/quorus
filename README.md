@@ -3,18 +3,19 @@
 
 # Quorus File Transfer System
 
-  [![Java](https://img.shields.io/badge/Java-25-orange.svg)](https://openjdk.org/projects/jdk/25/)
-  [![Vert.x](https://img.shields.io/badge/Vert.x-5.0.8-purple.svg)](https://vertx.io/)
+  [![Java](https://img.shields.io/badge/Java-27-orange.svg)](https://openjdk.org/projects/jdk/27/)
   [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com/)
   [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 </div>
 
-Quorus is a Java 25 and Vert.x 5 based file transfer platform with two practical execution modes:
+Quorus is a Java 27 file transfer platform with two practical execution modes:
 
 - direct execution with `quorus-core` and `quorus-workflow`
 - distributed execution with `quorus-controller` and `quorus-agent`
 
-The current implementation centers on a controller-first architecture with embedded HTTP, Raft-backed replicated state, reactive transfer execution, and YAML workflow parsing and execution.
+Only `quorus-controller` still uses Vert.x 5, while it migrates to plain Java under ADR-0012. The other modules use blocking APIs and virtual threads and have no Vert.x dependency.
+
+The current implementation centers on a controller-first architecture with embedded HTTP, Raft-backed replicated state, blocking transfer execution on the calling thread (virtual threads in the agent), and YAML workflow parsing and execution.
 
 The machine-readable contract for every currently registered controller endpoint is bundled at
 `quorus-controller/src/main/resources/openapi/quorus-controller-v1.yaml` and is served by a running
@@ -46,7 +47,7 @@ controller from `GET /api/v1/openapi.yaml`.
 
 ## Important Implementation Boundaries
 
-- The repository build targets Java 25.
+- The repository build targets Java 27 (`maven.compiler.release`).
 - The active controller runtime is the embedded Vert.x HTTP server in `quorus-controller`, not the deprecated `quorus-api` Quarkus path.
 - Route CRUD and route lifecycle endpoints are implemented, but controller startup does not currently show an autonomous route trigger evaluator being wired in.
 - Adapter-level resume support should be treated as not implemented in the current protocol adapters.
@@ -65,21 +66,28 @@ controller from `GET /api/v1/openapi.yaml`.
 
 ## Build
 
-Use JDK 25 for all builds and tests.
+Use JDK 27 for all builds and tests.
 
 ```powershell
-$env:JAVA_HOME = "C:\Users\mraysmit\.jdks\openjdk-25"
-$env:Path = "$env:JAVA_HOME\bin;$env:Path"
+java -version
 mvn clean verify 2>&1 | Tee-Object -FilePath temp\build-output.txt
 ```
+
+```bash
+java -version
+mvn clean verify 2>&1 | tee temp/build-output.txt
+```
+
+Both commands must report JDK 27. Configure `JAVA_HOME` for your own JDK installation if they do not.
 
 ## Quick Start
 
 ### Direct Usage
 
-Build the project, then run an example from `quorus-integration-examples`:
+Install the reactor artifacts, then run an example from `quorus-integration-examples`:
 
 ```powershell
+mvn clean install
 mvn compile exec:java -pl quorus-integration-examples -Dexec.mainClass="dev.mars.quorus.examples.BasicTransferExample"
 ```
 
@@ -87,16 +95,26 @@ Workflow-focused entry points are also available, including `BasicWorkflowExampl
 
 ### Controller Cluster
 
-Start a controller environment with the compose files in `docker/compose`:
+The Compose topologies are explicitly labelled development-only: request security and HTTP/Raft TLS are disabled with the required insecure-development opt-in. They are not production deployment templates.
+
+Images package jars built on the host; nothing is compiled inside Docker. Build the controller and agent jars (Java 27), then start the single-controller topology. `--build` makes the image pick up the jar you just built:
 
 ```powershell
-docker compose -f docker/compose/docker-compose-single-controller.yml up -d
+./docker/build-runtime.ps1
+docker compose -f docker/compose/docker-compose-single-controller.yml up -d --build
+```
+
+On bash-compatible shells:
+
+```bash
+sh docker/build-runtime.sh
+docker compose -f docker/compose/docker-compose-single-controller.yml up -d --build
 ```
 
 For a multi-node setup:
 
 ```powershell
-docker compose -f docker/compose/docker-compose-controller-first.yml up -d
+docker compose -f docker/compose/docker-compose-controller-first.yml up -d --build
 ```
 
 Then verify:
@@ -109,6 +127,29 @@ curl http://localhost:8080/api/v1/info
 curl http://localhost:8080/metrics
 ```
 
+### Local mutual-TLS example
+
+The repository also includes a separate, local-only topology that generates a short-lived CA,
+controller certificate, and gateway client certificate, then starts the controller with the
+production fail-closed HTTP and Raft mutual-TLS settings:
+
+```powershell
+./docker/build-runtime.ps1
+docker compose -f docker/compose/docker-compose-tls-example.yml up -d --build
+docker compose -f docker/compose/docker-compose-tls-example.yml exec controller-tls `
+  curl --fail --cacert /run/quorus-tls/ca.crt `
+  --cert /run/quorus-tls/gateway.crt --key /run/quorus-tls/gateway.key `
+  https://localhost:8080/health/ready
+```
+
+On bash-compatible shells, run `sh docker/build-runtime.sh` first and replace the PowerShell
+backticks with backslashes. The generated certificates are demonstration material, not production
+PKI. Remove the container and the volume holding its private keys when finished:
+
+```powershell
+docker compose -f docker/compose/docker-compose-tls-example.yml down -v
+```
+
 ## Example Workflow
 
 ```yaml
@@ -116,11 +157,22 @@ metadata:
   name: "daily-sync"
   version: "1.0.0"
   description: "Download and stage a daily dataset"
+  type: "download-workflow"
+  author: "Quorus Development"
+  created: "2026-09-25"
+  tags: ["example", "http"]
 
 spec:
   variables:
     sourceBase: "https://example.com"
     outputDir: "/data/out"
+
+  execution:
+    dryRun: false
+    virtualRun: false
+    parallelism: 1
+    timeout: 300s
+    strategy: sequential
 
   transferGroups:
     - name: fetch
@@ -143,7 +195,7 @@ The architecture and REST API specifications are normative. The HTTP API referen
 - [Certificate and trust incident runbook](docs/QUORUS_CERTIFICATE_INCIDENT_RUNBOOK.md)
 - [Enterprise implementation plan](docs-design/task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md)
 - [docs/QUORUS_ARCHITECTURE_QUICKSTART.md](docs/QUORUS_ARCHITECTURE_QUICKSTART.md)
-- [Current HTTP API reference](docs/QUORUS_API_REFERENCE.md)
+- [Current HTTP API reference: the OpenAPI contract](quorus-controller/src/main/resources/openapi/quorus-controller-v1.yaml), also served at `GET /api/v1/openapi.yaml`
 - [docs/QUORUS_USER_GUIDE.md](docs/QUORUS_USER_GUIDE.md)
 - [docs/QUORUS_WORKFLOWS_README.md](docs/QUORUS_WORKFLOWS_README.md)
 - [docs/QUORUS_YAML_SYNTAX_GUIDE.md](docs/QUORUS_YAML_SYNTAX_GUIDE.md)

@@ -121,12 +121,109 @@ class SecurityBoundaryIntegrationTest {
         }
     }
 
+    /**
+     * Register item ENG-16: a request waiting for its audit record to become durable must not hold the
+     * event loop, or every other request waits behind that disk sync.
+     */
+    @Test
+    void aRequestWaitingForItsAuditSyncDoesNotBlockOtherRequests(Vertx vertx) throws Exception {
+        TlsMaterial tls = TlsMaterial.create(tempDir.resolve("tls"));
+        SecurityIdentity identity = directIdentity(tls.clientSubject());
+        SecurityConfig config = tls.config(Set.of(), Set.of(), Map.of(tls.clientSubject(), identity),
+                tempDir.resolve("held-audit.jsonl"));
+        java.util.concurrent.CompletableFuture<Void> auditWaiting = new java.util.concurrent.CompletableFuture<>();
+        java.util.concurrent.CompletableFuture<Void> auditHeld = new java.util.concurrent.CompletableFuture<>();
+        AuditSink held = new AuditSink() {
+            @Override
+            public void append(AuditEvent event) {
+                appendAsync(event).join();
+            }
+
+            @Override
+            public java.util.concurrent.CompletableFuture<Void> appendAsync(AuditEvent event) {
+                auditWaiting.complete(null);
+                return auditHeld;                          // durable only when the test releases it
+            }
+        };
+        RunningServer running = startServer(vertx, config, held);
+        WebClient client = tls.authenticatedClient(vertx);
+        try {
+            int port = running.server().actualPort();
+            var info = client.get(port, "localhost", "/api/v1/info").send();
+            auditWaiting.get(10, java.util.concurrent.TimeUnit.SECONDS);
+
+            HttpResponse<Buffer> live = awaitSuccess(client.get(port, "localhost", "/health/live").send(), TIMEOUT);
+
+            assertEquals(200, live.statusCode(), "another request is served while the first waits for its audit");
+            assertTrue(!info.isComplete(), "the audited request is not answered before its record is durable");
+            auditHeld.complete(null);
+            assertEquals(200, awaitSuccess(info, TIMEOUT).statusCode());
+        } finally {
+            auditHeld.complete(null);
+            client.close();
+            running.close();
+        }
+    }
+
+    /**
+     * Register item ENG-16: the request body is read after authentication and authorization. While those
+     * wait for their audit records, the body that has already arrived must be kept for the body handler.
+     */
+    @Test
+    void aRequestBodyArrivingWhileItsAuditIsPendingIsStillRead(Vertx vertx) throws Exception {
+        TlsMaterial tls = TlsMaterial.create(tempDir.resolve("tls"));
+        SecurityIdentity identity = new SecurityIdentity("security-reviewer", IdentityType.HUMAN,
+                "regulated-bank-a", "production", Set.of(SecurityRole.SECURITY), Set.of("security:explain"),
+                tls.clientSubject(), Instant.now(), Instant.now().plusSeconds(300), null);
+        SecurityConfig config = tls.config(Set.of(), Set.of(), Map.of(tls.clientSubject(), identity),
+                tempDir.resolve("body-audit.jsonl"));
+        java.util.concurrent.CompletableFuture<Void> auditWaiting = new java.util.concurrent.CompletableFuture<>();
+        java.util.concurrent.CompletableFuture<Void> auditHeld = new java.util.concurrent.CompletableFuture<>();
+        AuditSink heldFirst = new AuditSink() {
+            @Override
+            public void append(AuditEvent event) {
+                appendAsync(event).join();
+            }
+
+            @Override
+            public java.util.concurrent.CompletableFuture<Void> appendAsync(AuditEvent event) {
+                auditWaiting.complete(null);
+                return auditHeld;                          // every record waits until the test releases the first
+            }
+        };
+        RunningServer running = startServer(vertx, config, heldFirst);
+        WebClient client = tls.authenticatedClient(vertx);
+        try {
+            var check = client.post(running.server().actualPort(), "localhost", "/api/v1/security/authorization/check")
+                    .sendJsonObject(new JsonObject()
+                            .put("method", "GET")
+                            .put("path", "/api/v1/info")
+                            .put("environment", "development"));
+            auditWaiting.get(10, java.util.concurrent.TimeUnit.SECONDS);
+            // A full round trip after the POST was written, so its small body has reached the server's event
+            // loop before the audit is released (the body always arrives while the audit is still held).
+            awaitSuccess(client.get(running.server().actualPort(), "localhost", "/health/live").send(), TIMEOUT);
+
+            auditHeld.complete(null);
+            HttpResponse<Buffer> response = awaitSuccess(check, TIMEOUT);
+
+            assertEquals(200, response.statusCode(), () -> response.bodyAsString());
+            assertEquals("Q-AUTHZ-ENVIRONMENT-MISMATCH", response.bodyAsJsonObject().getString("decisionCode"));
+        } finally {
+            auditHeld.complete(null);
+            client.close();
+            running.close();
+        }
+    }
+
     @Test
     void revokedCertificateIsRejectedAfterSuccessfulTlsAuthentication(Vertx vertx) throws Exception {
         {
             TlsMaterial tls = TlsMaterial.create(tempDir.resolve("tls"));
             SecurityIdentity identity = directIdentity(tls.clientSubject());
-            SecurityConfig config = tls.config(Set.of(), Set.of(tls.clientSerial()),
+            // OpenSSL commonly prints serials with leading zero octets. Configuration and
+            // certificate-derived values must compare as the same positive integer.
+            SecurityConfig config = tls.config(Set.of(), Set.of("00:" + tls.clientSerial()),
                     Map.of(tls.clientSubject(), identity), tempDir.resolve("revoked-audit.jsonl"));
             RunningServer running = startServer(vertx, config, AuditSink.noOp());
             WebClient client = tls.authenticatedClient(vertx);

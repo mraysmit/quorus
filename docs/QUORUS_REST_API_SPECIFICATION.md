@@ -2,11 +2,10 @@
 
 # Quorus REST API Specification
 
-**Version:** 2.2  
-**Date:** 2026-09-04  
+**Version:** 2.6
+**Date:** 2026-09-27  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
-**Status:** Canonical and normative  
 **Scope:** Complete REST control, operations, security, and administration interface
 
 ## 1. Purpose
@@ -17,11 +16,11 @@ The API MUST expose the state and controls required by technology operations tea
 
 The terms **MUST**, **MUST NOT**, **SHOULD**, **SHOULD NOT**, and **MAY** are normative. Endpoint rows use these implementation states:
 
-- **Current:** registered by the active controller HTTP server.
+- **Current:** declared in the bundled OpenAPI contract and registered by the controller. `OpenApiReferenceContractTest` fails when a Current row and the contract disagree.
 - **Required:** part of this production API contract but not necessarily implemented.
 - **Planned:** dependent on a planned platform capability and unavailable until that capability is implemented.
 
-The current endpoint reference is [QUORUS_API_REFERENCE.md](QUORUS_API_REFERENCE.md). Where that reference and this specification differ, it describes the implementation and this document defines the required contract. The architecture and security requirements in [QUORUS_ARCHITECTURE_SPECIFICATION.md](QUORUS_ARCHITECTURE_SPECIFICATION.md) also apply.
+The reference for the current API is the bundled [OpenAPI contract](../quorus-controller/src/main/resources/openapi/quorus-controller-v1.yaml), served at `GET /api/v1/openapi.yaml`. It documents each current operation, its required scope, its schemas and its failure responses. This specification defines the required contract and does not repeat current behaviour; where the two differ, the OpenAPI contract describes the implementation. The architecture and security requirements in [QUORUS_ARCHITECTURE_SPECIFICATION.md](QUORUS_ARCHITECTURE_SPECIFICATION.md) also apply.
 
 ## 2. API Boundary and Principles
 
@@ -146,20 +145,7 @@ The default and maximum limits MUST be documented in OpenAPI. Collections SHOULD
 - Mutable resources MUST return an `ETag`. Mutation without the required `If-Match` returns `428`; a stale value returns `412`.
 - Agent assignment transitions additionally require `expectedState`, `attemptId`, and the active lease or fencing token.
 
-The implemented agent status contract permits `ACCEPTED → FAILED` for preparation
-rejections (authorization, secret resolution, or local-path validation). The same
-committed lifecycle command sets the assignment and transfer to `FAILED`; a transfer
-can therefore move directly from `PENDING` to `FAILED`, without an `IN_PROGRESS` report
-or a transfer-start event. Cancellation, lease, fencing and sequence checks still apply.
-
-For attempt-aware status reports, the agent retries transport failures, HTTP 408/429
-and 5xx responses using the **identical payload and report sequence** (three sends
-maximum, with 100 ms then 200 ms delays). Each send uses the configured
-`quorus.agent.http.idle-timeout-ms` as its response deadline. Other non-2xx responses,
-including 403 and 409, are not retried. An unresolved start acknowledgement never
-authorizes file I/O or a guessed terminal transition. Legacy reports without attempt
-identity are not automatically replayed. See the security/deployment guide for
-operator reconciliation after the bounded retry budget is exhausted.
+The current agent report contract, including preparation failures and idempotent resends, is the `updateJobStatus` operation in the OpenAPI contract. The agent's bounded retry of reports and operator reconciliation are described in the [Security Deployment Guide](QUORUS_SECURITY_DEPLOYMENT_GUIDE.md).
 
 ### 3.7 Asynchronous operations
 
@@ -185,7 +171,7 @@ The response reports the applied consistency and commit index. The default for s
 
 Production deployments MUST authenticate human and workload callers through enterprise identity. Agent-only endpoints require the enrolled agent identity and mutual TLS. A gateway MAY validate external credentials, but Quorus MUST receive cryptographically protected identity, tenant, role, and correlation claims from a trusted boundary.
 
-The Phase 1 controller implements this boundary with TLS 1.3 mutual authentication. Exact trusted gateway certificate subjects may supply `X-Quorus-*` assertions; direct workloads are resolved from exact certificate-subject bindings. The production profile cannot disable authentication or TLS and refuses incomplete trust configuration. Legacy plaintext constructors exist only for explicitly insecure development and existing test fixtures.
+The current implementation of this boundary is described in the [Security Deployment Guide](QUORUS_SECURITY_DEPLOYMENT_GUIDE.md).
 
 The API MUST distinguish:
 
@@ -230,7 +216,7 @@ Every authentication decision, authorization denial, mutation, privileged read, 
 | `GET` | `/metrics` | Current | Prometheus metrics under protected operational access |
 | `GET` | `/api/v1/info` | Current | Version and controller information |
 | `GET` | `/api/v1/capabilities` | Required | Protocol, feature, API, and compatibility capabilities |
-| `GET` | `/api/v1/openapi` | Required | Canonical OpenAPI 3.1 document |
+| `GET` | `/api/v1/openapi.yaml` | Current | Canonical OpenAPI 3.1 document: the reference for the current API |
 | `GET` | `/api/v1/operations` | Required | Search caller-visible asynchronous operations |
 | `GET` | `/api/v1/operations/{operationId}` | Required | Read operation status and result |
 | `DELETE` | `/api/v1/operations/{operationId}` | Required | Cancel a cancellable operation |
@@ -286,7 +272,7 @@ A production transfer submission MUST support:
 
 Raw credentials and credential-bearing URIs are rejected. `serviceConnectionId` resolves an authorized endpoint, trust policy, network policy, and secret reference without exposing the secret.
 
-**Current implementation boundary:** production transfer submission uses a tenant-scoped service connection alias, remote path, and agent pool. The controller resolves and authorizes the alias without retrieving credentials, and the executing agent repeats the committed policy version and digest, pool, network zone, path, direction, host, port, CIDR, DNS, trust, and local-root checks before resolving the opaque secret reference. The governed endpoint is constructed from that authorization, and HTTPS, FTPS, and SFTP sockets connect to an approved resolved address while preserving the original hostname for peer verification. Direct URI submission is development-only; URI user-info is rejected before request mapping or Raft command submission. A redacted scanner supports legacy migration without returning credential contents.
+The current submission contract is the `createTransfer` operation in the OpenAPI contract. Agent-side re-authorization of the committed policy is described in the [Service Connection Operations Runbook](QUORUS_SERVICE_CONNECTION_OPERATIONS_RUNBOOK.md).
 
 ### 6.3 Transfer states
 
@@ -310,7 +296,7 @@ Every event contains `eventId`, `sequence`, `eventType`, `occurredAt`, `recorded
 
 At minimum, the event vocabulary covers submission, validation, queueing, assignment, acceptance, rejection, start, progress, pause, resume, retry scheduling, lease expiry, reassignment, cancellation, source connection, destination connection, integrity verification, staging, publication, completion, failure, deadline-risk change, stall detection, reconciliation, and operator acknowledgement.
 
-**Current implementation boundary:** the controller currently emits the canonical submission, assignment, acceptance, start, and progress events from replicated state-machine commands. It exposes them through the tenant-checked per-transfer event resource and persists them in controller snapshots. This partial implementation does not reduce the complete required vocabulary or the pagination, replay, retention, and streaming requirements.
+The events recorded today are listed on the `listTransferEvents` operation in the OpenAPI contract. That partial implementation does not reduce the complete required vocabulary or the pagination, replay, retention, and streaming requirements.
 
 ## 7. Assignment Resources and Agent Protocol
 
@@ -330,7 +316,7 @@ At minimum, the event vocabulary covers submission, validation, queueing, assign
 | `POST` | `/api/v1/assignments/{assignmentId}:fail` | Required | Report classified failure and retry evidence |
 | `POST` | `/api/v1/assignments/{assignmentId}/lease:renew` | Required | Renew the active attempt lease |
 
-Agent transitions require the authenticated agent ID, assignment ID, transfer ID, attempt ID, expected state, monotonically increasing report sequence, and current lease/fencing token. The current attempt-aware status resource applies attempt, assignment, transfer status, and progress atomically. Duplicate reports, including terminal retries after a lost response, are idempotent; stale or cross-tenant reports return `409` or `403` without changing state.
+Agent transitions require the authenticated agent ID, assignment ID, transfer ID, attempt ID, expected state, monotonically increasing report sequence, and current lease/fencing token. Duplicate reports, including terminal retries after a lost response, are idempotent; stale or cross-tenant reports return `409` or `403` without changing state.
 
 ## 8. Agent and Deployment Resources
 
@@ -371,18 +357,6 @@ Deployment representations MUST include artifact digest, signature verification,
 
 ## 9. Service Connectivity and Secret References
 
-The current registry isolates complete tenant/resource pairs, including identifiers that
-contain dots. HTTP CRUD, validation and collection reads use the authenticated tenant;
-secret-reference and security-event lists obey the same boundary. A colliding identifier
-owned by another tenant is not an existing resource in the caller's namespace: item
-reads/updates/deletes return `404`, and independent creates may coexist. Conflicting
-caller-supplied tenant claims remain forbidden.
-
-Ownership is checked again during replicated state application. Malformed ownership or
-ambiguous legacy migration is rejected with a redacted problem response; records are not
-silently reassigned or partially migrated. This correction does not add linearizable
-follower reads, pagination or the later-phase API features below.
-
 | Method | Path | State | Purpose |
 |---|---|---|---|
 | `POST` | `/api/v1/service-connections` | Current | Create a tenant-scoped service alias |
@@ -399,14 +373,28 @@ follower reads, pagination or the later-phase API features below.
 | `GET` | `/api/v1/secret-references/{secretReferenceId}` | Current | Read redacted reference metadata |
 | `PUT` | `/api/v1/secret-references/{secretReferenceId}` | Current | Rotate, expire, or revoke a reference |
 | `DELETE` | `/api/v1/secret-references/{secretReferenceId}` | Current | Delete only when no alias references it |
-| `GET` | `/api/v1/security-events` | Current | Tenant-scoped connection and secret lifecycle evidence |
+| `GET` | `/api/v1/security-events` | Current | Tenant-scoped connection and secret lifecycle evidence, bounded by `limit` and opaque `cursor` |
 | `POST` | `/api/v1/secret-references:validate` | Required | Validate reference existence and access without returning a value |
 
 Service connections MUST define protocol, endpoint, permitted path or bucket scope, tenant, business owner, allowed agent pools, environment, service identity verification, encryption minimum, egress rule, timeout, and a secret reference where needed. SFTP host-key verification and TLS certificate verification are mandatory and cannot be silently disabled in production. Authentication types are protocol constrained. TLS approved-CA identifiers are SHA-256 certificate fingerprints that restrict an otherwise valid PKIX chain; optional peer fingerprints pin the leaf certificate.
 
 Connection tests MUST return redacted stage results for DNS, route/egress policy, network connection, TLS or SSH negotiation, peer identity, authentication, authorization, and optional read/write capability. They MUST NOT upload production-like data unless an explicitly approved test path and operation are configured.
 
-The current validation resource is policy-only unless `probeNetwork` is true. An active probe connects only to a controller-approved address within the bounded `probeTimeoutMillis` and may return `ROUTE_VERIFIED`; negotiation, peer identity, authentication, authorization, and read/write capability remain unexecuted and MUST NOT be inferred from a successful TCP route. Submission records `SERVICE_CONNECTION_AUTHORIZED`, while `SERVICE_CONNECTION_LAST_USED` is recorded only after agent-side policy enforcement and secret-authority resolution. A reference past `expiresAt` is durably transitioned to `EXPIRED` and audited before transfer denial.
+A successful route probe MUST NOT be taken as evidence of negotiation, peer identity, authentication, authorization, or read/write capability. Route probes MUST apply the same protocol default-port contract as transfer policy when an endpoint omits its port. A partial connection update MUST retain every omitted trust field, including approved CA identifiers, SSH host-key pins, TLS peer pins and minimum TLS version.
+
+Controller DNS authorization for validation and transfer submission MUST run off the
+HTTP event loop with shared bounded admission and a deadline that includes worker
+queue time. Capacity exhaustion returns HTTP 503; deadline expiry returns HTTP 504.
+A timed-out native lookup retains its slot until completion, and its late result
+MUST NOT authorize a transfer or initiate a validation probe. Changed registry
+authority during resolution returns HTTP 409. Defaults and configuration are documented
+in the [deployment guide](QUORUS_SECURITY_DEPLOYMENT_GUIDE.md#14-bounded-controller-dns-authorization).
+
+The service-connection `remotePath` field is a literal absolute path, not a pre-encoded
+URI. Root scope `/` permits descendants. Filename punctuation (`#`, `?`, `%`, spaces)
+and Unicode MUST survive endpoint encoding; traversal segments and backslashes are
+rejected. Portless FTPS uses explicit `AUTH TLS` on port 21. Implicit TLS requires an
+explicit port 990 and an egress allowlist containing that port.
 
 ## 10. Route Resources
 
@@ -592,22 +580,22 @@ Release documentation MUST publish a generated endpoint coverage report with `Cu
 
 ## 20. Current Conformance Gaps
 
-| ID | Severity | Gap | Production impact |
-|---|---|---|---|
-| API-01 | Critical | No canonical OpenAPI 3.1 contract and automated registered-path coverage | Integrations cannot rely on a complete machine-verifiable contract |
-| API-02 | Critical | No built-in authenticated identity, tenant derivation, or scope enforcement | Caller and tenant claims cannot be trusted at the controller boundary |
-| API-03 | Critical | Transfer API exposes attempt history and an initial dedicated progress view but lacks collection search, timeline, integrity, publication, retry, pause, resume, and reconciliation resources | Technology operations cannot fully run or investigate critical transfers through the API |
-| API-04 | Critical | Per-transfer progress applies configured freshness/stall windows and distinguishes missing and stale telemetry, but the active stall boundary, configurable deadline-risk policy, operational queries, alerts, durable events, timelines, and streaming are incomplete | Time-sensitive transfer failures cannot yet be detected, distributed, and actioned reliably at fleet scale |
-| API-05 | Critical | Agent registration is not a complete enrollment, rotation, quarantine, revocation, and decommissioning API | Enterprise agent trust lifecycle is incomplete |
-| API-06 | Closed in Phase 4 | Service-connection, trust, egress, opaque-secret-reference, validation, and security-event APIs are active and represented in OpenAPI | Remaining asynchronous active test and per-resource projections are additive API work, not a production-transfer bypass |
-| API-07 | High | The attempt-aware status resource enforces attempt, lease, fencing, expected-state, sequence, monotonic progress, and atomic lifecycle rules, but specialized assignment actions, lease renewal, and integrity/publication completion evidence remain incomplete | Retry and reassignment remain unsafe until every mutation and destination commit uses the full contract |
-| API-08 | High | Workflow functionality has no controller REST resources | Workflow definitions and executions cannot be governed or observed consistently |
-| API-09 | High | Tenant, hierarchy, quota, usage, and policy services have no controller REST resources | Administrative behavior requires internal integration rather than a supported contract |
-| API-10 | High | Route API exposes configuration without validation, trigger execution, or execution history | Route CRUD can be mistaken for an operating route service |
-| API-11 | High | No immutable audit query and evidence-export API | Security and operational investigations lack supported evidence access |
-| API-12 | High | No general idempotency, ETag/precondition, asynchronous-operation, pagination, or standard problem contract | Client retry and concurrent administration behavior is unsafe or inconsistent |
-| API-13 | High | Cluster and configuration endpoints do not expose complete consistency, replication, snapshot, and redacted effective-configuration state | Operators lack a supported administrative view of controller health and configuration |
-| API-14 | Medium | API/agent compatibility, deprecation, retention, export, and event-stream replay contracts are not implemented | Long-lived integrations and evidence handling remain fragile |
+| ID | Status | Severity | Gap or delivered boundary | Production impact |
+|---|---|---|---|---|
+| API-01 | Closed | — | The canonical OpenAPI 3.1 contract is served at `GET /api/v1/openapi.yaml`; `OpenApiContractTest` verifies equality between declared operations and registered routes | No remaining impact under this gap; schema and example conformance remain part of the broader release gates |
+| API-02 | Closed | — | Protected routes use mTLS or trusted-gateway authentication, derive tenant identity, enforce role/scope policy, and write hash-chained audit records; production startup fails closed without trust configuration | No remaining impact under this gap; enrollment and identity lifecycle remain API-05 |
+| API-03 | Partial | Critical | Transfer API exposes attempt history and an initial dedicated progress view but lacks collection search, timeline, integrity, publication, retry, pause, resume, and reconciliation resources | Technology operations cannot fully run or investigate critical transfers through the API |
+| API-04 | Partial | Critical | Per-transfer progress applies configured freshness/stall windows and distinguishes missing and stale telemetry, but the active stall boundary, configurable deadline-risk policy, operational queries, alerts, durable events, timelines, and streaming are incomplete | Time-sensitive transfer failures cannot yet be detected, distributed, and actioned reliably at fleet scale |
+| API-05 | Partial | Critical | Agent registration is not a complete enrollment, rotation, quarantine, revocation, and decommissioning API | Enterprise agent trust lifecycle is incomplete |
+| API-06 | Closed | — | Service-connection, trust, egress, opaque-secret-reference, validation, and security-event APIs are active and represented in OpenAPI | Remaining asynchronous active test and per-resource projections are additive API work, not a production-transfer bypass |
+| API-07 | Partial | High | The attempt-aware status resource enforces attempt, lease, fencing, expected-state, sequence, monotonic progress, and atomic lifecycle rules, but specialized assignment actions, lease renewal, and integrity/publication completion evidence remain incomplete | Retry and reassignment remain unsafe until every mutation and destination commit uses the full contract |
+| API-08 | Open | High | Workflow functionality has no controller REST resources | Workflow definitions and executions cannot be governed or observed consistently |
+| API-09 | Open | High | Tenant, hierarchy, quota, usage, and policy services have no controller REST resources | Administrative behavior requires internal integration rather than a supported contract |
+| API-10 | Partial | High | Route API exposes configuration without validation, trigger execution, or execution history | Route CRUD can be mistaken for an operating route service |
+| API-11 | Open | High | No immutable audit query and evidence-export API | Security and operational investigations lack supported evidence access |
+| API-12 | Partial | High | Errors use an RFC 9457 problem format and the security-event collection has bounded cursor pagination. Idempotency keys, ETag/preconditions, asynchronous operations, and general pagination and filtering are absent | Client retry and concurrent administration behavior is unsafe or inconsistent |
+| API-13 | Partial | High | Cluster and configuration endpoints do not expose complete consistency, replication, snapshot, and redacted effective-configuration state | Operators lack a supported administrative view of controller health and configuration |
+| API-14 | Open | Medium | API/agent compatibility, deprecation, retention, export, and event-stream replay contracts are not implemented | Long-lived integrations and evidence handling remain fragile |
 
 Critical gaps block protected production use. High gaps block the affected production capability. A gap is closed only when implementation, OpenAPI, authorization, audit, persistence, and conformance tests are present.
 
@@ -636,7 +624,7 @@ An API release is complete only when every implemented system capability is mapp
 ## 22. Related Documents
 
 - [Quorus Architecture Specification](QUORUS_ARCHITECTURE_SPECIFICATION.md)
-- [Quorus HTTP API Reference](QUORUS_API_REFERENCE.md)
+- [OpenAPI contract](../quorus-controller/src/main/resources/openapi/quorus-controller-v1.yaml), served at `GET /api/v1/openapi.yaml`: the reference for the current API
 - [Quorus Architecture Quickstart](QUORUS_ARCHITECTURE_QUICKSTART.md)
 - [Quorus YAML Syntax Guide](QUORUS_YAML_SYNTAX_GUIDE.md)
 - [Quorus Enterprise Implementation Plan](../docs-design/task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md)

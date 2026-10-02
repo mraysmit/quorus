@@ -1,0 +1,69 @@
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::staticFieldBase has been called by com.google.inject.internal.aop.HiddenClassDefiner (file:/C:/Users/mraysmit/scoop/apps/maven/current/lib/guice-5.1.0-classes.jar)
+WARNING: Please consider reporting this to the maintainers of class com.google.inject.internal.aop.HiddenClassDefiner
+WARNING: sun.misc.Unsafe::staticFieldBase will be removed in a future release
+WARNING: Final field _cipher in class org.sonatype.plexus.components.sec.dispatcher.DefaultSecDispatcher has been mutated reflectively by class org.eclipse.sisu.bean.BeanPropertyField in unnamed module @794cb805 (file:/C:/Users/mraysmit/scoop/apps/maven/current/lib/org.eclipse.sisu.inject-0.9.0.M4.jar)
+WARNING: Use --enable-final-field-mutation=ALL-UNNAMED to avoid a warning
+WARNING: Mutating final fields will be blocked in a future release unless final field mutation is enabled
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] ------------------------< dev.mars:quorus-core >------------------------
+[INFO] Building Quorus Core 1.0-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- clean:3.2.0:clean (default-clean) @ quorus-core ---
+[INFO] Deleting C:\Users\mraysmit\dev\idea-projects\quorus\quorus-core\target
+[INFO] 
+[INFO] --- jacoco:0.8.15:prepare-agent (prepare-agent) @ quorus-core ---
+[INFO] argLine set to -javaagent:C:\\Users\\mraysmit\\.m2\\repository\\org\\jacoco\\org.jacoco.agent\\0.8.15\\org.jacoco.agent-0.8.15-runtime.jar=destfile=C:\\Users\\mraysmit\\dev\\idea-projects\\quorus\\quorus-core\\target\\jacoco.exec,excludes=sun/**:jdk/**:java/**:com/sun/**:org/jcp/**
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ quorus-core ---
+[INFO] Copying 1 resource from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ quorus-core ---
+[INFO] Recompiling the module because of changed source code.
+[INFO] Compiling 74 source files with javac [debug release 27] to target\classes
+[INFO] /C:/Users/mraysmit/dev/idea-projects/quorus/quorus-core/src/main/java/dev/mars/quorus/protocol/FtpTransferProtocol.java: Some input files use or override a deprecated API.
+[INFO] /C:/Users/mraysmit/dev/idea-projects/quorus/quorus-core/src/main/java/dev/mars/quorus/protocol/FtpTransferProtocol.java: Recompile with -Xlint:deprecation for details.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ quorus-core ---
+[INFO] Copying 11 resources from src\test\resources to target\test-classes
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ quorus-core ---
+[INFO] Recompiling the module because of changed dependency.
+[INFO] Compiling 91 source files with javac [debug release 27] to target\test-classes
+[INFO] /C:/Users/mraysmit/dev/idea-projects/quorus/quorus-core/src/test/java/dev/mars/quorus/connection/TlsTrustAnchorPolicyTest.java: Some input files use or override a deprecated API.
+[INFO] /C:/Users/mraysmit/dev/idea-projects/quorus/quorus-core/src/test/java/dev/mars/quorus/connection/TlsTrustAnchorPolicyTest.java: Recompile with -Xlint:deprecation for details.
+[INFO] 
+[INFO] --- surefire:3.2.2:test (default-test) @ quorus-core ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running dev.mars.quorus.concurrent.TaskScopeContextPropagationTest
+[INFO] Running dev.mars.quorus.concurrent.TaskScopeContextPropagationTest$ScopedValues
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.434 s -- in dev.mars.quorus.concurrent.TaskScopeContextPropagationTest$ScopedValues
+[INFO] Running dev.mars.quorus.concurrent.TaskScopeContextPropagationTest$MappedDiagnosticContext
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.051 s -- in dev.mars.quorus.concurrent.TaskScopeContextPropagationTest$MappedDiagnosticContext
+[INFO] Running dev.mars.quorus.concurrent.TaskScopeContextPropagationTest$StructuredTracing
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.225 s -- in dev.mars.quorus.concurrent.TaskScopeContextPropagationTest$StructuredTracing
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.726 s -- in dev.mars.quorus.concurrent.TaskScopeContextPropagationTest
+[INFO] Running dev.mars.quorus.concurrent.TaskScopeTest
+[INFO] Tests run: 10, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.229 s -- in dev.mars.quorus.concurrent.TaskScopeTest
+[INFO] 
+[INFO] Results:
+[INFO] 
+[INFO] Tests run: 21, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] 
+[INFO] --- jacoco:0.8.15:report (report) @ quorus-core ---
+[INFO] Loading execution data file C:\Users\mraysmit\dev\idea-projects\quorus\quorus-core\target\jacoco.exec
+[INFO] Analyzed bundle 'Quorus Core' with 135 classes
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  9.016 s
+[INFO] Finished at: 2026-09-26T14:13:43+01:00
+[INFO] ------------------------------------------------------------------------

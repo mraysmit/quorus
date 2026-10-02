@@ -20,12 +20,16 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Set;
 
 import static dev.mars.quorus.testing.TestFutureUtils.awaitSuccess;
 import static dev.mars.quorus.testing.TestFutureUtils.eventually;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Phase 4 authoritative service-connection and opaque-secret HTTP contract. */
@@ -66,6 +70,86 @@ class ServiceConnectionHttpIntegrationTest {
         if (server != null) awaitSuccess(server.stop(), TIMEOUT);
         if (raftNode != null) awaitSuccess(raftNode.stop(), TIMEOUT);
         if (vertx != null) awaitSuccess(vertx.close(), TIMEOUT);
+    }
+
+    @Test
+    void securityEventListingIsBoundedAndCursorPaged() throws Exception {
+        String tenant = "paging-tenant";
+        var registry = new dev.mars.quorus.controller.state.ServiceConnectionRegistry(stateStore);
+        Instant base = Instant.parse("2026-09-05T01:00:00Z");
+        for (int index = 0; index < 3; index++) {
+            Instant timestamp = base.plusSeconds(index);
+            var event = new dev.mars.quorus.controller.state.ServiceConnectionRegistry.SecurityEvent(
+                    "page-event-" + index, tenant, "TEST_EVENT", "TEST", "page-" + index,
+                    "SUCCESS", "Q-TEST", null, timestamp);
+            assertInstanceOf(dev.mars.quorus.controller.state.CommandResult.Success.class,
+                    stateStore.apply(new dev.mars.quorus.controller.state.SystemMetadataCommand.Set(
+                            registry.eventKey(tenant, timestamp),
+                            dev.mars.quorus.controller.state.ServiceConnectionRegistry.encode(event))));
+        }
+
+        HttpResponse<Buffer> first = awaitSuccess(client.get(server.actualPort(), "localhost",
+                "/api/v1/security-events").addQueryParam("tenantId", tenant)
+                .addQueryParam("limit", "2").send(), TIMEOUT);
+        assertEquals(200, first.statusCode(), first.bodyAsString());
+        assertEquals(2, first.bodyAsJsonObject().getJsonArray("events").size());
+        assertEquals(2, first.bodyAsJsonObject().getInteger("total"));
+        String cursor = first.bodyAsJsonObject().getString("nextCursor");
+        assertNotNull(cursor);
+
+        HttpResponse<Buffer> second = awaitSuccess(client.get(server.actualPort(), "localhost",
+                "/api/v1/security-events").addQueryParam("tenantId", tenant)
+                .addQueryParam("limit", "2").addQueryParam("cursor", cursor).send(), TIMEOUT);
+        assertEquals(1, second.bodyAsJsonObject().getJsonArray("events").size());
+        assertNull(second.bodyAsJsonObject().getString("nextCursor"));
+    }
+
+    @Test
+    void partialTrustPolicyUpdateRetainsOmittedAuthority() throws Exception {
+        String secretId = "partial-trust-secret";
+        String connectionId = "partial-trust-https";
+        JsonObject secret = new JsonObject()
+                .put("secretReferenceId", secretId).put("tenantId", TENANT)
+                .put("provider", "VAULT_KV_V2").put("path", "quorus/data/partial")
+                .put("key", "token").put("version", "1").put("status", "ACTIVE");
+        assertEquals(201, awaitSuccess(client.post(server.actualPort(), "localhost",
+                "/api/v1/secret-references").sendJsonObject(secret), TIMEOUT).statusCode());
+
+        JsonObject trust = new JsonObject()
+                .put("tlsRequired", true)
+                .put("hostnameVerification", true)
+                .put("approvedCaIds", new JsonArray().add("enterprise-root"))
+                .put("tlsPeerFingerprints", new JsonArray().add("SHA256:peer-pin"))
+                .put("minimumTlsVersion", "TLSv1.2");
+        JsonObject connection = new JsonObject()
+                .put("serviceConnectionId", connectionId).put("tenantId", TENANT)
+                .put("protocol", "HTTPS").put("endpoint", "https://192.0.2.11")
+                .put("networkZone", "payments-dmz").put("allowedPaths", new JsonArray().add("/"))
+                .put("allowedDirections", new JsonArray().add("DOWNLOAD"))
+                .put("allowedAgentPools", new JsonArray().add("payments-agents"))
+                .put("owner", "payments-platform").put("environment", "PRODUCTION")
+                .put("classification", "CONFIDENTIAL").put("secretReferenceId", secretId)
+                .put("serviceIdentity", "partial-client").put("authenticationType", "BEARER")
+                .put("trustPolicy", trust)
+                .put("egressPolicy", new JsonObject()
+                        .put("allowedHostnames", new JsonArray().add("192.0.2.11"))
+                        .put("allowedCidrs", new JsonArray().add("192.0.2.0/24"))
+                        .put("allowedPorts", new JsonArray().add(443)));
+        assertEquals(201, awaitSuccess(client.post(server.actualPort(), "localhost",
+                "/api/v1/service-connections").sendJsonObject(connection), TIMEOUT).statusCode());
+
+        HttpResponse<Buffer> update = awaitSuccess(client.put(server.actualPort(), "localhost",
+                "/api/v1/service-connections/" + connectionId).sendJsonObject(new JsonObject()
+                .put("tenantId", TENANT).put("trustPolicy", new JsonObject()
+                        .put("minimumTlsVersion", "TLSv1.3"))), TIMEOUT);
+        assertEquals(200, update.statusCode(), update.bodyAsString());
+
+        JsonObject retained = update.bodyAsJsonObject().getJsonObject("trustPolicy");
+        assertEquals(new JsonArray().add("enterprise-root"), retained.getJsonArray("approvedCaIds"));
+        assertEquals(new JsonArray().add("SHA256:peer-pin"), retained.getJsonArray("tlsPeerFingerprints"));
+        assertTrue(retained.getBoolean("tlsRequired"));
+        assertTrue(retained.getBoolean("hostnameVerification"));
+        assertEquals("TLSv1.3", retained.getString("minimumTlsVersion"));
     }
 
     @Test

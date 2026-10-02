@@ -2,8 +2,8 @@
 
 # Quorus Architecture Specification
 
-**Version:** 2.7  
-**Date:** 2026-09-04  
+**Version:** 2.12
+**Date:** 2026-09-28
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Status:** Canonical and normative  
@@ -27,7 +27,7 @@ The terms **MUST**, **MUST NOT**, **SHOULD**, **SHOULD NOT**, and **MAY** descri
 
 ## 2. Product Boundary
 
-Quorus is a Java 25 and Vert.x 5 file-transfer platform with two execution modes:
+Quorus is a Java 27 file-transfer platform. It is moving off Vert.x 5 module by module ([ADR-0012](../docs-design/architecture-decisions/ADR-0012-JAVA-RUNTIME-AND-STRUCTURED-CONCURRENCY.md)): `quorus-core`, `quorus-workflow`, `quorus-tenant`, `quorus-agent` and `quorus-integration-examples` no longer use Vert.x, and only `quorus-controller` still does, until plan item RT-06 moves it. It has two execution modes:
 
 1. **Direct execution:** an application invokes `quorus-core` or `quorus-workflow` in-process.
 2. **Distributed execution:** controller nodes coordinate work through Raft-replicated metadata and agents execute transfers.
@@ -65,7 +65,7 @@ The status values in this table are normative:
 
 | Capability | Status | Current boundary |
 |---|---|---|
-| Core transfer engine | Implemented | Reactive execution through `SimpleTransferEngine` |
+| Core transfer engine | Implemented | Blocking execution through `SimpleTransferEngine`: each transfer runs on the calling thread under a concurrency limit, with retries |
 | HTTP/HTTPS, FTP/FTPS, SFTP, SMB/CIFS, NFS adapters | Implemented | Adapter features differ; resume is not generally available |
 | YAML workflow parsing and dependency execution | Implemented | Conditions are carried as resolved strings; there is no general condition engine |
 | Controller HTTP API | Implemented | Production profile requires TLS 1.3 client certificates, trusted identity resolution, policy middleware, and audit decisions; writes remain leader-only |
@@ -77,7 +77,7 @@ The status values in this table are normative:
 | Per-transfer operational telemetry and alerting | Partial | Submission persists operational ownership and deadline context; progress is governed and the first ordered submission event is queryable; the remaining lifecycle vocabulary, active stall boundary, queries, streaming, alert lifecycle, retention, and service reporting remain required |
 | Enterprise service connectivity controls | Implemented for production transfer submission | Tenant aliases, opaque Vault references, controller/agent default-deny enforcement, peer verification, and protocol-specific controls are active; later route/workflow activation must adopt the same authority |
 | Secure agent provisioning and deployment lifecycle | Planned | Unique identity enrollment, image signing, attestation, rotation, revocation, and controlled upgrade are required |
-| Authenticated tenant derivation and tenant checks | Partial | HTTP transfer, agent, assignment, and route access is constrained by the verified identity; uniform state-machine enforcement remains incomplete |
+| Authenticated tenant derivation and tenant checks | Partial | HTTP transfer, agent, assignment, and route access is constrained by the verified identity, and replicated mutations enforce reference and tenant invariants; tenant hierarchy, quotas, usage, and inherited policy remain incomplete |
 | Distributed assignment lifecycle | Partial | The agent obtains acknowledged `ACCEPTED` and `IN_PROGRESS` transitions before completion; each attempt-aware report atomically updates attempt, assignment, transfer status, and progress in one replicated transition; lease automation and specialized assignment actions remain incomplete |
 | Automatic route trigger evaluation | Planned | Route configuration and lifecycle state exist; no trigger service is wired into controller startup |
 | Agent-to-agent file streaming | Planned | No protocol or endpoints are defined in the active runtime |
@@ -211,8 +211,10 @@ Committed Raft writes are strongly ordered. This does not make every HTTP read l
 - A blank storage path MUST be treated as invalid or replaced with the documented durable default.
 - The external `raftlog-core` library is the only WAL and Raft metadata storage implementation. Internal file, RocksDB and memory storage backends are not supported, including in storage-dependent tests; tests use the external adapter with isolated temporary directories.
 - A controller MUST recover its term, vote, log, snapshot, and applied state after container recreation.
-- WAL prefix deletion MUST follow durable publication of a covering snapshot. Recovery MUST reject a missing or invalid snapshot when durable compaction evidence requires it. Snapshot installation MUST preserve only a matching log suffix, including after restart. The R1 remediation implements these storage boundaries; release remains subject to the reopened enterprise remediation checkpoint and deployment-specific durability validation.
+- WAL prefix deletion MUST follow durable publication of a covering snapshot. Recovery MUST reject a missing or invalid snapshot when durable compaction evidence requires it. Snapshot installation MUST preserve only a matching log suffix, including after restart. The Quorus R1 sidecar implements snapshot coordination. RaftLog 1.2.0 from commit `1c5af80` now supplies verified prefix compaction; all 41 selected Quorus storage/snapshot/restart tests passed against it. Release remains subject to the reopened enterprise remediation checkpoint and deployment-specific durability validation, including actual power-loss behavior.
 - Backups MUST be validated by restore tests; copying a live directory without a storage-specific consistency procedure is not sufficient.
+
+The verified append semantics, snapshot ownership, and verified dependency are recorded in [External RaftLog Integration Contract, Appendix F.5](../docs-design/design/QUORUS_RAFT_WAL_DESIGN.md#f5-independently-verified-contract-and-dependency-requirements--2026-09-05). Quorus must not rely on automatic index deduplication during replay or treat a successful no-op as prefix compaction.
 
 ### 5.6 Membership
 
@@ -367,7 +369,7 @@ Phase 1 now provides the active security foundation:
 - controller-to-controller Raft uses TLS 1.3 mutual authentication, and agent clients use certificate-authenticated HTTPS with hostname verification;
 - authorization middleware applies stable scope and tenant/environment decisions to every protected controller route;
 - transfer, agent, assignment, and route handlers derive or validate tenant ownership against the verified identity, including collection filtering and agent self-binding;
-- a shared runtime trust state re-evaluates certificate serial revocation on every controller HTTP request and Raft RPC, including established TLS connections;
+- each controller has a process-local runtime trust state shared by its HTTP and Raft boundaries; it re-evaluates certificate serial revocation on every request or RPC, including established TLS connections, but runtime updates are not replicated or persisted and must be sent to every controller and added to configuration before restart;
 - certificate lifetime and trust-policy version are observable through REST and OpenTelemetry, and controlled old/new certificate overlap is covered for HTTP, Raft, and agent clients;
 - authentication, authorization, protected completion, certificate-lifecycle, and security-configuration events are written to separate operational and retained append-only, fsync'd, SHA-256 hash chains whose existing records are verified at startup;
 - `/api/v1/security/me`, `/api/v1/security/authorization/explain`, `/api/v1/security/authorization/check`, `/api/v1/security/trust`, and `/api/v1/security/trust/revocations` expose the implemented identity, policy, and runtime trust controls.
@@ -388,9 +390,9 @@ Every connection crossing a process, host, cluster, tenant, or network-zone boun
 | Connection | Current alpha behavior | Production requirement |
 |---|---|---|
 | User/application → gateway | External to Quorus | Enterprise authentication, TLS, authorization, request limits, audit, and tenant derivation |
-| Gateway/load balancer → controller HTTP | TLS 1.3 mTLS; assertion headers accepted only from exact trusted gateway subjects; runtime serial revocation and overlap tests | Validate the selected gateway, PKI, rotation process, and assertion policy in the deployment environment |
-| Controller → controller Raft gRPC | TLS 1.3 mTLS with hostname verification, configured controller trust bundle, per-RPC runtime revocation, and overlap tests | Validate no-quorum-loss rotation and revocation against the deployed topology and cluster PKI |
-| Agent → controller | HTTPS mTLS client support, exact certificate-subject identity binding, agent/tenant self-authorization, controller-side runtime serial revocation, and overlap/hostname tests | Add constrained enrollment, short-lived identity, replay controls, managed renewal, and posture lifecycle |
+| Gateway/load balancer → controller HTTP | TLS 1.3 mTLS; assertion headers accepted only from exact trusted gateway subjects; node-local runtime serial revocation and overlap tests | Validate the selected gateway, PKI, rotation process, and assertion policy in the deployment environment |
+| Controller → controller Raft gRPC | TLS 1.3 mTLS with hostname verification, configured controller trust bundle, node-local per-RPC runtime revocation, and overlap tests | Validate no-quorum-loss rotation and revocation against the deployed topology and cluster PKI |
+| Agent → controller | HTTPS mTLS client support, exact certificate-subject identity binding, agent/tenant self-authorization, node-local controller revocation, and overlap/hostname tests | Add constrained enrollment, short-lived identity, replay controls, managed renewal, and posture lifecycle |
 | Controller → agent | No production job-push or data-plane connection | No inbound agent control path is assumed; any future push protocol requires a separate authenticated specification |
 | Agent → source/destination service | Production transfers require a Raft-backed tenant alias; controller and agent independently enforce path, direction, pool, endpoint, port, DNS/CIDR pins, policy version/digest, trust, and opaque Vault reference before connection. Direct credential-free URIs are development-only; URI user-info is rejected. | Policy-approved endpoint, least-privilege service identity, encrypted protocol, remote identity verification, and auditable short-lived secret retrieval |
 | Agent → secret manager | Vault KV v2 provider resolves opaque versioned references only after agent authorization; values are memory-only and wiped after use | Deploy with workload-injected Vault token, least-privilege policy, rotation, availability, and audit integration |
@@ -424,6 +426,18 @@ Default-deny egress is the production baseline. A transfer to an unapproved endp
 **Current Phase 4 boundary:** governed transfers are authorized twice: first by the controller and again by the executing agent against the committed policy version and digest. Agent selection and execution require the configured pool and network zone; local upload and download paths are confined to deployment-configured roots after canonical and symbolic-link checks. HTTPS, FTPS, and SFTP sockets connect to an agent-approved resolved address rather than re-resolving the service name; TLS retains the original hostname for SNI and hostname verification, and SFTP retains it for host-key verification. The optional validation route probe opens a bounded TCP connection to an approved address but deliberately does not retrieve a secret or claim service authentication. Submission records authorization; last-use evidence is recorded only after the agent has repeated policy checks and resolved secret authority. Time-expired secret references are durably transitioned to `EXPIRED` and audited before transfer denial.
 
 ### 10.4 Protocol security requirements
+
+Remote paths are literal absolute filename data, not URI strings. Root policy scope
+`/` includes descendants; filename punctuation and Unicode survive endpoint encoding,
+while traversal segments and backslashes are rejected. Portless FTPS uses explicit
+`AUTH TLS` on port 21; implicit TLS requires an explicit port 990. Policy approval and
+adapter socket selection MUST use the same effective port.
+
+Adapters are blocking and run on the calling thread. In the agent that is a virtual thread
+per job (RT-05), so the cancellation interrupt breaks a transfer blocked in socket I/O at
+once. Agent builder
+defaults come from packaged configuration and preserve the production TLS baseline;
+development transport requires explicit opt-in.
 
 Protocol adapters MUST declare their security capabilities and fail closed when a route requires a control they cannot provide.
 
@@ -738,7 +752,7 @@ These are acceptance gates, not claims about the current alpha. A gate must have
 | Leader failover | Write service resumes within `2 × configured election timeout + client retry interval` in 99% of 100 induced leader failures | Not yet evidenced |
 | Duplicate-safe publication | Zero duplicate final publications across 1,000 induced agent/controller failure windows | Blocked by incomplete agent lease/fencing and destination-publication enforcement |
 | Tenant isolation | 100% of cross-tenant registration, assignment, polling, status, route, and transfer mutation tests are rejected | Partial |
-| Authentication boundary | 100% of protected API and agent requests without valid identity are rejected | Blocked by external/built-in authentication integration |
+| Authentication boundary | 100% of protected API and agent requests without valid identity are rejected | Implemented and covered at representative HTTP and agent boundaries; deployment-specific gateway, PKI, and fleet accreditation remains a Phase 12 gate |
 | Encrypted trust flows | 100% of production gateway, controller, Raft, agent, service, secret-manager, and telemetry connections satisfy their configured encryption and peer-verification policy | Not implemented end to end |
 | Agent identity lifecycle | 100% of production agents use a unique approved identity; expired, revoked, cloned, or incorrectly bound identities receive no assignments | Not implemented |
 | Service egress policy | 100% of unapproved service aliases, DNS/IP targets, ports, protocols, paths, redirects, and network zones are denied before secret retrieval | Achieved for governed Phase 4 transfers; fleet identity enrollment and broader end-to-end environment evidence remain Phase 5 and Phase 12 work |
@@ -748,7 +762,7 @@ These are acceptance gates, not claims about the current alpha. A gate must have
 | Agent drain and upgrade | In 100 induced upgrades, draining agents accept zero new jobs and publish zero unauthorized partial final files | Not yet evidenced |
 | Revocation | 100% of revoked agents are rejected within the configured revocation propagation limit and cannot publish a newly fenced attempt | Not implemented |
 | SFTP identity | Unknown and changed host keys fail in 100% of governed protocol tests | Achieved for governed production transfers with SHA-256 host-key pins; development-only direct URI compatibility remains explicitly outside the production authority |
-| Large HTTP transfer memory | Ten concurrent files larger than the agent heap complete with bounded streaming memory and no full-file buffering | Not achieved by the current HTTP adapter |
+| Large HTTP transfer memory | Ten concurrent files larger than the agent heap complete with bounded streaming memory and no full-file buffering | The HTTP adapter streams downloads and uploads without buffering the payload (`RT-03b`, 2026-09-26); the ten-file measurement has not been run |
 | Static three-node formation | 100 consecutive clean starts elect exactly one leader and agree on membership | Test evidence required |
 | Snapshot recovery | Restored state hash equals committed pre-restart state in 100 consecutive snapshot/replay tests | Test evidence required |
 
@@ -763,25 +777,25 @@ Capacity figures such as requests per second, heartbeats per second, concurrent 
 
 ## 14. Known Conformance Gaps
 
-| ID | Priority | Gap | Release consequence |
-|---|---|---|---|
-| ARCH-02 | Critical | Attempt leases, fencing, and atomic multi-entity lifecycle application exist, but automatic expiry/reassignment, destination enforcement, and reconciliation are incomplete | Blocks duplicate-safe automatic reassignment and publication |
-| ARCH-03 | Critical | No authenticated API/agent identity boundary | Blocks untrusted or production multi-tenant exposure |
-| ARCH-11 | Critical | No complete per-transfer operational event, progress, deadline, stall, and alerting model | Blocks use for critical, highly time-sensitive production transfers |
-| ARCH-13 | Critical | Controller HTTP, Raft, and agent control connections lack a complete production TLS/mTLS identity boundary | Blocks secure enterprise deployment |
-| ARCH-14 | Closed in Phase 4 | Tenant service aliases, default-deny egress, endpoint trust, opaque references, and controller/agent enforcement are implemented | Production transfers fail closed outside the approved service policy |
-| ARCH-15 | Critical | No complete agent enrollment, identity rotation, revocation, attestation, and quarantine lifecycle | Blocks trusted fleet operation and incident response |
-| ARCH-18 | Critical | The live REST API covers only a subset of the canonical control, transfer-operations, security, connectivity, agent-lifecycle, and administration contract | Blocks supported enterprise operation and complete external integration |
-| ARCH-04 | High | Route trigger evaluator is not wired | Route trigger types remain planned |
-| ARCH-05 | High | Retriable writes lack idempotency keys and leader discovery | Blocks transparent HA write routing |
-| ARCH-06 | High | Assignment referential/tenant invariants are not uniformly enforced in state application | Blocks strong tenant-isolation claim |
-| ARCH-07 | High | Persistent controller path and deployment volume must be proven aligned | Blocks durability claim for container recreation |
-| ARCH-08 | Closed in Phase 4 | Governed SFTP uses managed SHA-256 host-key pins with strict checking | Unknown or changed host keys fail closed |
-| ARCH-12 | High | Job model lacks business service, operational owner, expected start, required completion time, and runbook context | Blocks actionable operations monitoring and escalation |
-| ARCH-16 | High | No canonical signed-artifact admission, hardened runtime, controlled drain, upgrade, rollback, and decommissioning process | Blocks governed enterprise agent deployment |
-| ARCH-17 | Closed for production transfer paths in Phase 4 | Production requires aliases and opaque references; direct URI compatibility is development-only and the redacted scanner inventories migration findings | Route/workflow adoption remains gated by their later activation phases rather than an active bypass |
-| ARCH-09 | Medium | HTTP adapter buffers complete payloads | Blocks bounded-memory large-file claim |
-| ARCH-10 | Medium | Dynamic Raft membership is absent | Blocks live controller scale-out claims |
+| ID | Status | Priority | Gap or delivered boundary | Release consequence |
+|---|---|---|---|---|
+| ARCH-02 | Partial | Critical | Attempt leases, fencing, and atomic multi-entity lifecycle application exist, but automatic expiry/reassignment, destination enforcement, and reconciliation are incomplete | Blocks duplicate-safe automatic reassignment and publication |
+| ARCH-03 | Closed | — | HTTP requests have an mTLS or trusted-gateway identity boundary, tenant derivation, scope/role authorization, and hash-chained audit; production startup fails closed without trust material | No remaining consequence under this gap; fleet identity lifecycle remains ARCH-15 |
+| ARCH-11 | Partial | Critical | No complete per-transfer operational event, progress, deadline, stall, and alerting model | Blocks use for critical, highly time-sensitive production transfers |
+| ARCH-13 | Partial | Critical | HTTP and Raft require TLS 1.3/mTLS in production and agents require HTTPS mTLS; end-to-end enrollment, rotation, deployment evidence, telemetry transport policy, and peer-to-node binding remain incomplete | Blocks a complete secure-enterprise-deployment claim, not use of the implemented transport boundary |
+| ARCH-14 | Closed | — | Tenant service aliases, default-deny egress, endpoint trust, opaque references, and controller/agent enforcement are implemented | Production transfers fail closed outside the approved service policy |
+| ARCH-15 | Open | Critical | No complete agent enrollment, identity rotation, revocation, attestation, and quarantine lifecycle | Blocks trusted fleet operation and incident response |
+| ARCH-18 | Partial | Critical | The live REST API covers only a subset of the canonical control, transfer-operations, security, connectivity, agent-lifecycle, and administration contract | Blocks supported enterprise operation and complete external integration |
+| ARCH-04 | Open | High | Route trigger evaluator is not wired | Route trigger types remain planned |
+| ARCH-05 | Open | High | Retriable writes lack idempotency keys and leader discovery | Blocks transparent HA write routing |
+| ARCH-06 | Closed | — | Assignment references and tenant invariants are validated by handlers and again during replicated state application, including transitions | No remaining consequence under this gap |
+| ARCH-07 | Partial | High | The container path and volume are aligned and container recreation is tested; production filesystem/storage-class and machine-power-loss evidence remain open | Blocks the complete production durability claim |
+| ARCH-08 | Closed | — | Governed SFTP uses managed SHA-256 host-key pins with strict checking | Unknown or changed host keys fail closed |
+| ARCH-12 | Partial | High | The job model includes business service, owner, criticality, expected start, required completion time, runbook URL, and labels; escalation policy and full operational consumption remain incomplete | Blocks complete automated escalation, not capture of operational context |
+| ARCH-16 | Open | High | No canonical signed-artifact admission, hardened runtime, controlled drain, upgrade, rollback, and decommissioning process | Blocks governed enterprise agent deployment |
+| ARCH-17 | Closed | — | Production requires aliases and opaque references; direct URI compatibility is development-only and the redacted scanner inventories migration findings | Route/workflow adoption remains gated by their later activation phases rather than an active bypass |
+| ARCH-09 | Closed | — | The HTTP adapter streams downloads to a staged file that is moved into place, and streams uploads from the file, without buffering the payload ([RT-03b evidence](../docs-design/evidence/rt-03b-http-adapter-2026-09-26.json)) | The bounded-memory large-file claim still needs the Phase 12 measurement in §13 |
+| ARCH-10 | Open | Medium | Dynamic Raft membership is absent | Blocks live controller scale-out claims |
 
 This table SHOULD be updated whenever implementation changes. A gap is removed only when code, automated verification, and relevant operational documentation agree.
 
@@ -816,7 +830,8 @@ The following decisions are effective with this specification:
 - [Architecture quickstart](QUORUS_ARCHITECTURE_QUICKSTART.md) — concise implementation snapshot
 - [REST API specification](QUORUS_REST_API_SPECIFICATION.md) — complete normative control, operations, security, and administration contract
 - [Enterprise implementation plan](../docs-design/task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md) — phased delivery, verification, and exit gates
-- [HTTP API reference](QUORUS_API_REFERENCE.md) — active HTTP endpoints and payloads
+- [OpenAPI contract](../quorus-controller/src/main/resources/openapi/quorus-controller-v1.yaml) — the current HTTP API, also served at `GET /api/v1/openapi.yaml`
 - [Cluster startup guide](QUORUS_CLUSTER_STARTUP_GUIDE.md) — supported startup and deployment guidance
-- [Codebase and documentation review, 2026-08-31](QUORUS_CODEBASE_AND_DOCUMENTATION_REVIEW_2026-08-31.md) — point-in-time implementation review
+- [Codebase and documentation review, 2026-08-31](../docs-design/archive/QUORUS_CODEBASE_AND_DOCUMENTATION_REVIEW_2026-08-31.md) — point-in-time implementation review, with a finding-status annex
+- [Documentation review, 2026-09-24](../docs-design/reviews/QUORUS_DOCUMENTATION_REVIEW_2026-09-24.md) — point-in-time documentation and code cross-check
 - [Comprehensive system design](../docs-design/design/QUORUS_SYSTEM_DESIGN.md) — non-normative target-state vision

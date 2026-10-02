@@ -16,10 +16,12 @@
 
 package dev.mars.quorus.workflow;
 
-import io.vertx.core.Future;
-
 /**
  * Engine interface for workflow execution.
+ *
+ * <p>Blocking (RT-04): {@code execute}, {@code dryRun} and {@code virtualRun} run the workflow on the
+ * calling thread and return the finished execution. A workflow that fails, including by exceeding its
+ * timeout, is returned with status {@code FAILED}; nothing is thrown for it.
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @version 2.0
@@ -27,18 +29,28 @@ import io.vertx.core.Future;
  */
 public interface WorkflowEngine {
     
-    Future<WorkflowExecution> execute(WorkflowDefinition definition, ExecutionContext context);
+    /**
+     * Runs the workflow's transfers.
+     *
+     * @throws InterruptedException  if the calling thread is interrupted; running transfers are stopped
+     * @throws IllegalStateException if the engine has been shut down
+     */
+    WorkflowExecution execute(WorkflowDefinition definition, ExecutionContext context) throws InterruptedException;
     
-    Future<WorkflowExecution> dryRun(WorkflowDefinition definition, ExecutionContext context);
+    /** Validates the workflow and plans it without starting any transfer. */
+    WorkflowExecution dryRun(WorkflowDefinition definition, ExecutionContext context) throws InterruptedException;
     
-    Future<WorkflowExecution> virtualRun(WorkflowDefinition definition, ExecutionContext context);
+    /** Simulates the workflow, taking time per transfer, without starting any transfer. */
+    WorkflowExecution virtualRun(WorkflowDefinition definition, ExecutionContext context) throws InterruptedException;
     
     WorkflowStatus getStatus(String executionId);
     
-    boolean pause(String executionId);
-    
-    boolean resume(String executionId);
-    
+    /**
+     * Stops a running execution: its transfers are interrupted and the call running it returns the
+     * execution with status {@code CANCELLED}.
+     *
+     * @return {@code false} if no execution with this id is running
+     */
     boolean cancel(String executionId);
     
     /**

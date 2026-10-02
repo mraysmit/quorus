@@ -46,17 +46,20 @@ public final class AuditCompletionHandler implements Handler<RoutingContext> {
         context.addEndHandler(ignored -> {
             int statusCode = context.response().getStatusCode();
             String outcome = statusCode < 400 ? "SUCCESS" : "FAILURE";
-            try {
-                auditSink.append(new AuditEvent(Instant.now(), eventType, outcome,
-                        statusCode < 400 ? "Q-AUDIT-HTTP-COMPLETED" : "Q-AUDIT-HTTP-FAILED",
-                        identity.principalId(), identity.type().name(), identity.tenantId(), identity.environment(),
-                        identity.certificateSubject(), method, path, CorrelationIdHandler.getRequestId(context),
-                        Map.of("statusCode", Integer.toString(statusCode), "requiredScope", requiredScope)));
-            } catch (RuntimeException exception) {
-                // The response has already completed. Preserve the failure in the operational log so it is alertable.
-                logger.error("Failed to persist HTTP completion audit: requestId={}, method={}, path={}",
-                        CorrelationIdHandler.getRequestId(context), method, path, exception);
-            }
+            String requestId = CorrelationIdHandler.getRequestId(context);
+            // The response has already completed, so nothing waits for this record (ENG-16). A failure is
+            // preserved in the operational log so it is alertable.
+            auditSink.appendAsync(new AuditEvent(Instant.now(), eventType, outcome,
+                            statusCode < 400 ? "Q-AUDIT-HTTP-COMPLETED" : "Q-AUDIT-HTTP-FAILED",
+                            identity.principalId(), identity.type().name(), identity.tenantId(), identity.environment(),
+                            identity.certificateSubject(), method, path, requestId,
+                            Map.of("statusCode", Integer.toString(statusCode), "requiredScope", requiredScope)))
+                    .whenComplete((durable, failure) -> {
+                        if (failure != null) {
+                            logger.error("Failed to persist HTTP completion audit: requestId={}, method={}, path={}",
+                                    requestId, method, path, failure);
+                        }
+                    });
         });
         context.next();
     }

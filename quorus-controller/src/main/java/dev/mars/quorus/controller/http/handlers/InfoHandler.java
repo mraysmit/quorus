@@ -18,7 +18,6 @@ package dev.mars.quorus.controller.http.handlers;
 
 import dev.mars.quorus.controller.raft.RaftNode;
 import io.vertx.core.Handler;
-import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.RoutingContext;
 import org.slf4j.Logger;
@@ -31,8 +30,9 @@ import java.time.Instant;
  *
  * <p>Endpoint: {@code GET /api/v1/info}
  *
- * <p>Provides information about the Quorus controller API including:
- * API version, available endpoints, controller information, and system capabilities.
+ * <p>Provides the API version, controller information and system capabilities, and the
+ * location of the OpenAPI contract. The contract is the only endpoint inventory: its route set
+ * is verified against the registered routes, so this handler does not keep a second list.
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @version 2.0 (Vert.x reactive)
@@ -42,6 +42,7 @@ public class InfoHandler implements Handler<RoutingContext> {
 
     private static final Logger logger = LoggerFactory.getLogger(InfoHandler.class);
     private static final String API_VERSION = "v1";
+    private static final String OPENAPI_PATH = "/api/v1/openapi.yaml";
 
     private final RaftNode raftNode;
     private final String quorusVersion;
@@ -64,7 +65,7 @@ public class InfoHandler implements Handler<RoutingContext> {
                         .put("state", raftNode.getState().toString())
                         .put("isLeader", raftNode.isLeader())
                         .put("currentTerm", raftNode.getCurrentTerm()))
-                .put("endpoints", buildEndpoints())
+                .put("openApi", OPENAPI_PATH)
                 .put("capabilities", new JsonObject()
                         .put("raftConsensus", true)
                         .put("distributedState", true)
@@ -75,61 +76,6 @@ public class InfoHandler implements Handler<RoutingContext> {
                 .put("timestamp", Instant.now().toString());
 
         ctx.json(info);
-    }
-
-    private JsonObject buildEndpoints() {
-        return new JsonObject()
-                .put("health", new JsonArray()
-                        .add(endpoint("GET", "/health", "Overall system health"))
-                        .add(endpoint("GET", "/health/ready", "Readiness probe"))
-                        .add(endpoint("GET", "/health/live", "Liveness probe"))
-                        .add(endpoint("GET", "/status", "Simple status check")))
-                .put("agents", new JsonArray()
-                        .add(endpoint("POST", "/api/v1/agents/register", "Register new agent"))
-                        .add(endpoint("POST", "/api/v1/agents/heartbeat", "Send agent heartbeat"))
-                        .add(endpoint("GET", "/api/v1/agents", "List all registered agents"))
-                        .add(endpoint("GET", "/api/v1/agents/:agentId/jobs", "Get pending jobs for agent")))
-                .put("transfers", new JsonArray()
-                        .add(endpoint("POST", "/api/v1/transfers", "Create new transfer job"))
-                        .add(endpoint("GET", "/api/v1/transfers/:jobId", "Get transfer job status"))
-                        .add(endpoint("GET", "/api/v1/transfers/:jobId/progress", "Get operational progress, freshness, and deadline condition"))
-                        .add(endpoint("GET", "/api/v1/transfers/:jobId/events", "Get ordered transfer event history"))
-                        .add(endpoint("GET", "/api/v1/transfers/:jobId/attempts", "List immutable transfer attempt history"))
-                        .add(endpoint("GET", "/api/v1/transfers/:jobId/attempts/:attemptId", "Get transfer attempt and fencing evidence"))
-                        .add(endpoint("DELETE", "/api/v1/transfers/:jobId", "Cancel transfer job")))
-                .put("jobs", new JsonArray()
-                        .add(endpoint("POST", "/api/v1/jobs/:jobId/status", "Update job status from agent")))
-                .put("assignments", new JsonArray()
-                        .add(endpoint("POST", "/api/v1/assignments", "Assign a job to an agent"))
-                        .add(endpoint("GET", "/api/v1/assignments", "List all assignments"))
-                        .add(endpoint("GET", "/api/v1/assignments/:assignmentId", "Get a specific assignment"))
-                        .add(endpoint("PUT", "/api/v1/assignments/:assignmentId/accept", "Accept an assignment"))
-                        .add(endpoint("PUT", "/api/v1/assignments/:assignmentId/reject", "Reject an assignment"))
-                        .add(endpoint("PUT", "/api/v1/assignments/:assignmentId/status", "Update assignment status"))
-                        .add(endpoint("PUT", "/api/v1/assignments/:assignmentId/cancel", "Cancel an assignment"))
-                        .add(endpoint("DELETE", "/api/v1/assignments/:assignmentId", "Remove an assignment")))
-                .put("routes", new JsonArray()
-                        .add(endpoint("POST", "/api/v1/routes", "Create a new route"))
-                        .add(endpoint("GET", "/api/v1/routes", "List all routes"))
-                        .add(endpoint("GET", "/api/v1/routes/:routeId", "Get a specific route"))
-                        .add(endpoint("PUT", "/api/v1/routes/:routeId", "Update a route"))
-                        .add(endpoint("DELETE", "/api/v1/routes/:routeId", "Delete a route"))
-                        .add(endpoint("PUT", "/api/v1/routes/:routeId/suspend", "Suspend a route"))
-                        .add(endpoint("PUT", "/api/v1/routes/:routeId/resume", "Resume a suspended route")))
-                .put("cluster", new JsonArray()
-                        .add(endpoint("GET", "/raft/status", "Get cluster status")))
-                .put("metrics", new JsonArray()
-                        .add(endpoint("GET", "/metrics", "Prometheus metrics")))
-                .put("info", new JsonArray()
-                        .add(endpoint("GET", "/api/v1/info", "API information and available endpoints"))
-                        .add(endpoint("GET", "/api/v1/openapi.yaml", "OpenAPI 3.1 contract")));
-    }
-
-    private static JsonObject endpoint(String method, String path, String description) {
-        return new JsonObject()
-                .put("method", method)
-                .put("path", path)
-                .put("description", description);
     }
 }
 

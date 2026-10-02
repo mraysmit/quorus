@@ -17,22 +17,11 @@
     <description>Core file transfer engine with HTTP/HTTPS support, progress tracking, and integrity verification</description>
 
     <dependencies>
-        <!-- Vert.x for reactive operations (Phase 1.5 - Dec 2025) -->
+        <!-- HTTP transfer adapter client: per-client DNS pinning with correct SNI, Host and
+             hostname verification (ADR-0012 RT-Q5) -->
         <dependency>
-            <groupId>io.vertx</groupId>
-            <artifactId>vertx-core</artifactId>
-        </dependency>
-
-        <!-- Vert.x Web Client for HTTP protocol (Phase 2 - Dec 2025) -->
-        <dependency>
-            <groupId>io.vertx</groupId>
-            <artifactId>vertx-web-client</artifactId>
-        </dependency>
-
-        <!-- Vert.x PostgreSQL Client (Phase 4 - Jan 2026) -->
-        <dependency>
-            <groupId>io.vertx</groupId>
-            <artifactId>vertx-pg-client</artifactId>
+            <groupId>org.apache.httpcomponents.client5</groupId>
+            <artifactId>httpclient5</artifactId>
         </dependency>
 
         <!-- OpenTelemetry API (Phase 8 - Jan 2026) -->
@@ -78,11 +67,6 @@
         </dependency>
 
         <!-- Testing dependencies -->
-        <dependency>
-            <groupId>io.vertx</groupId>
-            <artifactId>vertx-junit5</artifactId>
-            <scope>test</scope>
-        </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
@@ -140,6 +124,13 @@
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
             <version>1.5.32</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Real OpenTelemetry SDK with an in-memory exporter, for asserting spans in tests -->
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-sdk-testing</artifactId>
             <scope>test</scope>
         </dependency>
 

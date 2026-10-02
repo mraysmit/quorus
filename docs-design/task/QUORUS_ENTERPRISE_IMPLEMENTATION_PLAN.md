@@ -2,12 +2,12 @@
 
 # Quorus Enterprise Implementation Plan
 
-**Version:** 1.21  
-**Date:** 2026-09-04  
+**Version:** 1.42
+**Date:** 2026-09-28
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
-**Status:** Active — remediation checkpoint open; M0 durability and Phase 4 acceptance reopened; Phase 1 complete; Phases 2 and 3 in progress  
-**Scope:** Enterprise control plane, transfer operations, security, governance, deployment, and user interfaces
+**Status:** Active — remediation checkpoint open; R1-1 container-recreation acceptance closed 2026-09-07 while R1-2 and R1-3 remain open; Phase 0 functionally complete with M0 durability acceptance reopened until R1-2 and R1-3 close; Phase 1 complete; Phase 4 complete (the acceptance reopened on 2026-09-04 was restored by R2–R6 on 2026-09-05), with hardening follow-up `SEC-07` open; Phases 2 and 3 in progress; Phases 5–12 not started; platform migration (Section 20) in progress. CI has never passed; its repair is deferred (`ENG-07`, `SEQ-01`, Section 4)  
+**Scope:** Enterprise control plane, transfer operations, security, governance, deployment, and user interfaces; platform migration to the generic QRaft consensus engine and to Java 27 structured concurrency (Section 20)
 
 ## 1. Purpose and Authority
 
@@ -15,10 +15,12 @@ This plan defines the phased implementation path from the current Quorus alpha b
 
 - [Quorus Architecture Specification](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md)
 - [Quorus REST API Specification](../../docs/QUORUS_REST_API_SPECIFICATION.md)
-- [Quorus Comprehensive System Design](../design/QUORUS_SYSTEM_DESIGN.md)
-- [Quorus HTTP API Reference](../../docs/QUORUS_API_REFERENCE.md)
+- [Quorus Comprehensive System Design](../design/QUORUS_SYSTEM_DESIGN.md) — non-normative and substantially stale (see the [2026-09-24 documentation review](../reviews/QUORUS_DOCUMENTATION_REVIEW_2026-09-24.md) §4.7); use it for target-state intent only
+- [Quorus OpenAPI contract](../../quorus-controller/src/main/resources/openapi/quorus-controller-v1.yaml) — the current HTTP API
 
 The architecture and REST API specifications remain normative. This plan controls delivery order and exit evidence; it does not weaken a canonical requirement. Historical completion markers in older plans do not close current conformance gaps.
+
+Commit identities changed during a history rewrite. Live evidence uses the reachable IDs recorded in the [commit history rewrite map](../reference/QUORUS_COMMIT_HISTORY_REWRITE_MAP.md); use that map when reconciling older external records.
 
 Calendar dates are deliberately not assigned until team size, deployment platform, enterprise identity provider, secrets provider, evidence-retention platform, and pilot scope are agreed. Relative size indicates expected breadth, not a commitment:
 
@@ -47,7 +49,7 @@ Every phase follows these rules:
 
 The current baseline provides:
 
-- Java 25 and Vert.x 5 modules;
+- Java 27 (since `RT-01a`, 2026-09-26). Only `quorus-controller` still uses Vert.x 5; core, workflow, tenant, the examples and the agent left it in `RT-03` to `RT-05` (Section 20);
 - direct transfer execution through protocol adapters;
 - YAML workflow parsing and in-process workflow execution;
 - controller-local HTTP with Raft-replicated transfer, assignment, agent, and route commands;
@@ -59,26 +61,210 @@ The baseline does not yet justify protected enterprise production use. Phase 1 e
 
 ## 4. Target Release Milestones
 
+### Findings and sequencing decisions — 2026-09-27
+
+**CI has never passed; its repair is deferred (`ENG-07`, decision `SEQ-01`).** All 21 GitHub
+Actions runs between 2026-09-01 and 2026-09-26 failed:
+
+- **Unit and clean-build lanes.** `FtpsDefaultPortBoundaryTest` listens on port 21, which a
+  non-root process cannot bind on the Linux runner. It passes on Windows, where every local run
+  took place. The build stops in `quorus-core`, so the workflow, tenant, controller, agent and
+  example modules have never been tested in CI.
+- **Documentation lane.** `scripts/verify-phase0-docs.ps1` rejects 11 document headers that
+  lack the two trailing spaces its pattern requires.
+
+By project direction on 2026-09-27, the repair is deferred and platform work continues first.
+The consequences are:
+
+- CI gives no regression signal while `ENG-07` is open. Each slice's regression evidence is its
+  local full-reactor run, recorded in the slice's commit message under Section 6.1.
+- Phase 0's CI verification items have not been shown in CI: a clean checkout build that passes
+  twice, and documentation checks that run in CI.
+- No phase can close while `ENG-07` is open, because step 5 of Section 6.1 requires every
+  applicable lane to pass, including documentation.
+
+**Governed TLS trust anchors (`SEC-07`, decision `SEQ-02`).** This was found during `RT-03b`
+on 2026-09-26.
+
+- Governed HTTPS and FTPS validate server certificates only against the JVM default trust
+  store: `TlsPeerPolicy` initialises its trust manager without a key store.
+- A service connection's approved CA identifiers can narrow that set, but cannot add to it.
+- An endpoint whose certificate is issued by a private corporate CA therefore works only if
+  that CA is added to the runtime's `cacerts`. Quorus neither manages nor audits that file.
+
+`SEC-07` is assigned to Phase 4 as a hardening follow-up (Section 11). It must close before any
+production service connection relies on a private CA.
+
+**The OpenAPI contract is the only reference for the current API (`ENG-08`, decision `DR-Q7`).**
+The current HTTP API had been described by hand in four places, and the copies had drifted: the
+API Reference, the REST API Specification's Current rows and "current implementation" paragraphs,
+and the endpoint list returned by `/api/v1/info` (35 of 52 routes). The contract itself declared
+no per-operation scopes, an agent status enum matching none of the server's values, and no 504
+for DNS authorization. Delivered on 2026-09-27 under Section 6.1
+([evidence](../evidence/eng-08-openapi-reference-2026-09-27.json)):
+
+- The contract declares the scope of every operation, checked against the scope that
+  `AuthorizationPolicyEngine` enforces. It declares the correct agent statuses and the 409, 503
+  and 504 responses of DNS authorization, and describes the behaviour the API Reference used to.
+  This meets REST API Specification §19 item 4 for the current operations.
+- The API Reference is deleted. The REST API Specification holds requirements only, and a test
+  fails if its Current rows and the contract disagree.
+- `/api/v1/info` links to the contract instead of carrying its own endpoint list.
+
+**Protocol adapters share one abort target (`ENG-09`, found by `RT-03c`).** The FTP and SFTP adapters each
+keep a single `activeClient` for all their transfers, so `TransferProtocol.abort()` closes only the latest
+connection. Before `RT-03c` the engine called `abort()` on cancel and so could abort the wrong transfer,
+or, for HTTP, every in-flight transfer. The blocking engine cancels by interrupting only the named
+transfer, and `abort()` has no production caller. Resolved the same day: `abort()` and the shared
+connection state are removed, and a contract test keeps them out.
+
+**Adapters and agent reported no in-flight progress (`ENG-10`), resolved 2026-09-27.** The FTP, SFTP,
+SMB and NFS adapters kept progress in a private tracker that nothing read, and ignored pause and
+cancel requests in the transfer context. The agent reported `IN_PROGRESS` once with 0 bytes and then
+only the final result, for every protocol. No test covered either. The adapters now record progress
+on the job and stop between buffers on request. The agent reports a running transfer's growing byte
+count every `quorus.agent.jobs.progress-report-interval-ms` (15 s, inside the controller's 60 s
+freshness window), one report at a time, resending an unresolved report exactly before the final
+one so that report sequences stay contiguous
+(recorded in the commit message). The same pass removed a public setter
+that could replace TLS verification on the shared FTP adapter (`SEC-08`), and recorded that
+`TransferTelemetryMetrics` is shared by every engine in a JVM (`ENG-11`).
+
+### Configuration and documentation remediation — 2026-09-25
+
+**CFG-01 container deployment configuration hygiene — 2026-09-25:** The repository Compose
+topologies now state their development-only security posture explicitly, use supported controller
+configuration names, and have validated non-conflicting standalone logging ports. A separate
+local-only topology generates short-lived certificates and proves production-profile HTTP and
+Raft mutual TLS: the controller becomes healthy, a certificate-authenticated readiness request
+succeeds, and a request without a client certificate is rejected during the TLS handshake. The
+image health check now follows the configured HTTP scheme and uses `/health/live`. This closes
+the repository configuration defect; it is not production PKI or deployment accreditation. Tracked as `CFG-01` in the
+[Outstanding Work Register](QUORUS_OUTSTANDING_WORK_REGISTER.md) Section I.
+
+**Documentation review delivery items — 2026-09-26:** The
+[2026-09-24 documentation review](../reviews/QUORUS_DOCUMENTATION_REVIEW_2026-09-24.md) found
+code and configuration defects alongside its documentation findings. The documentation work is
+[register Section H](QUORUS_OUTSTANDING_WORK_REGISTER.md#11-section-h--documentation-remediation), and its decisions are in the register's §3 decision log. The delivery work
+is added to this plan and carried in register Section I: revocation-serial normalisation
+(`SEC-01`, code fixed, ADR-0009 outstanding) and node-local revocation scope (`SEC-02`); silent
+direct-URI SFTP host-key bypass (`SEC-03`); unbound Raft peer identity (`SEC-04`); first-match
+role evaluation (`SEC-05`); direct-mTLS elevation (`SEC-06`); four configuration residuals
+(`CFG-02` to `CFG-05`); and engineering items `ENG-01` to `ENG-06`, of which `ENG-01` (the
+uninstantiated assignment timeout monitor) belongs with Phase 2 lease automation. Each is
+delivered under Section 6.1; none is assigned to a phase yet. Three existing plan obligations
+also received register IDs: the durable agent-report outbox (`P2-13`), the persistent-environment
+storage inventory (`R1-4`), and disposition of the two Raft regression cases without preserved
+red evidence (`PROC-01`).
+
+**Raw evidence retention — decided 2026-09-26 (`DR-Q6`):** earlier checkpoints and the JSON
+evidence manifests cite raw logs under the git-ignored `temp/` directory, a scratch location
+that could never have been a place to keep evidence. Of 220 cited paths, 153 were already
+gone, including every `temp/phase3-*.txt` file in Section 10. The 62 surviving logs were
+copied unchanged to `docs-design/evidence/raw/`. 47 of them match the SHA-256 recorded when
+they were captured and 15 had no recorded hash. The
+[raw evidence index](../evidence/raw/INDEX.md) maps each old path to its copy and lists what
+is missing. Statements that cite missing logs stay as historical records, but their raw output
+cannot be re-inspected. Superseded on 2026-09-27 (v1.37, `DR-Q6` revised): a slice's record is its
+commit message, and no raw output is kept (Section 6.1).
+
 ### Remediation checkpoint — 2026-09-04
 
-**External-library-only correction:** the remaining internal RocksDB and memory storage implementations, backend factory branches, convenience API and RocksDB JNI dependency have been removed. Configuration now accepts only `raftlog`; storage-dependent tests use the external adapter and isolated temporary paths. Seven behavioral tests first proved that the old factory/configuration still admitted internal backends, then passed after removal. The 93-test focused regression and final clean controller verification (520 tests, no failures/errors/skips, JaCoCo gate passed) are green. The shaded JAR contains the external library WAL and no removed internal storage classes or RocksDB JNI. Commands, hashes and test-count accounting are recorded in the existing [Raft evidence record](../evidence/raft-log-tdd-evidence-2026-09-04.json). This corrects the incomplete earlier removal without closing R2–R6 or the outstanding R1 production durability gates.
+**R4 DNS follow-up — 2026-09-05:** Shared bounded worker execution now keeps
+controller DNS authorization off HTTP event loops. Capacity exhaustion returns 503;
+deadline expiry returns 504 without releasing still-running native lookups. Registry
+authority is rechecked before approval, expiring secrets retain their durable expiry
+event, and address pins and default-deny egress remain enforced. Ten cases retain
+behavioral red and five are characterization/regression; 47 focused tests pass.
+Full clean reactor verification with Docker/slow groups enabled passes: 2,429 passed,
+zero failures/errors, two existing disabled network tests, all seven reactor entries
+and five configured JaCoCo gates. R4 implementation is complete. See
+[R4 evidence](../evidence/r4-dns-remediation-2026-09-05.md).
+This supersedes earlier R4 draft/next-step statements below.
 
-The historical results below are retained, but do not authorize release of the snapshot-compaction behavior at `ffc3e64`: WAL prefix deletion is durable while adapter snapshots are only in memory at that revision. R1 replaces that behavior with durable snapshots and recovery checks; implementation evidence and outstanding deployment gates are recorded below. Existing persistent environments have not been inventoried; preserve their storage before recovery or rollback. Code rollback cannot recover already deleted WAL records.
+**R5 closure — 2026-09-05:** The remaining handover items are implemented and
+dispositioned. Behavioral tests cover route-probe defaults, partial trust updates,
+controller/agent JSON compatibility, bounded cursor-paged security-event reads,
+trust-manager reuse and rotation, and safe replay of legacy credential-bearing commands.
+Shared layered configuration and dead-constructor cleanup are verified refactors.
+New credential-bearing requests remain rejected; replayed legacy URIs are redacted and
+made terminal. Security events are not automatically pruned, so enterprise archive,
+legal hold and retention remain Phase 9 work. See the
+[R5 evidence](../evidence/r5-closure-2026-09-05.md). R6 isolated final-tree acceptance
+is complete; R1 deployment and power-loss gates remain separate.
+
+**R6 final acceptance — 2026-09-05:** Revision `dc447d4` was verified from a clean
+detached worktree after rebuilding the controller image from that exact tree. The JDK 25
+command `mvn.cmd --fail-at-end clean verify '-Dtest.excludedGroups='` passed all seven
+reactor entries, 2,437 tests with zero failures/errors and two existing explicit skips,
+and all five configured JaCoCo gates. The first isolated run exposed a storage-cleanup
+failure and a test observation race; both were corrected and the six-test focused
+context/restart lane passed before the definitive full rerun. See
+[R6 evidence](../evidence/r6-final-acceptance-2026-09-05.md). R6 local final-source
+acceptance is complete. R1 container-recreation, selected production-filesystem and
+machine power-loss gates remain open and still prevent an enterprise release claim.
+
+**Full-suite verification follow-up — 2026-09-05:** The reported Docker startup
+errors were fixed by explicit development settings in the plaintext test fixtures.
+The election timeout exposed concurrent same-term vote grants in Quorus: retain the
+node's owning Vert.x context and serialize vote decisions through metadata persistence.
+Two new tests retain intended behavioral red; the focused vote/transport/restart
+regression passes 19 tests. The rebuilt Docker fixtures also pass their focused run.
+The complete JDK 25 working-tree command
+`mvn.cmd --fail-at-end clean verify '-Dtest.excludedGroups='` now passes all seven
+reactor entries and five JaCoCo gates: 2,414 passed, zero failures/errors, two existing
+explicitly disabled network tests. Integration Examples has no tests. See
+[the full-suite remediation evidence](../evidence/full-suite-error-remediation-2026-09-05.md).
+This historical run advanced local verification. The later R4, R5 and R6 entries above
+supersede its open-work statement; R1 deployment acceptance remains open.
+
+**2026-09-05 execution update:** R2/R3 are committed in `1a8f2b3`. The current environment
+contains RaftLog as a sister project at `../raftlog` relative to the Quorus root, with its
+own Maven reactor. Quorus
+consumes its `raftlog-core` artifact; the sister project must be built/installed separately.
+The external dependency/API gap is now resolved by the newly implemented and published RaftLog 1.2.0 from `1c5af80` (`v1.2.0`): it supplies prefix compaction after caller-owned durable snapshots. All 41 selected Quorus storage/snapshot/restart tests passed against the new artifact. RaftLog's full Windows and Linux reactors passed 319 cases (three Windows skips; no Linux skips). This is separate evidence from the unsubstantiated historical `db59859` build. See the [release handover](../evidence/raftlog-validation-handover-2026-09-05.md#implemented-capability-and-release--2026-09-05). R4 and R5 are now complete; R6 final-tree verification is recorded by the later acceptance entry. Neither local acceptance nor the RaftLog result implies R1 deployment or power-loss durability.
+Independent R5 path, TLS,
+redirect, entrypoint, builder-default, FTPS-policy and worker-thread fixes retain TDD
+evidence in [the current execution record](../evidence/remediation-r4-r6-2026-09-05.md).
+The earlier R5 work is now supplemented by the closure slice above. Deployment and
+power-loss acceptance are not implied by local tests.
+
+**External-library-only correction:** the remaining internal RocksDB and memory storage implementations, backend factory branches, convenience API and RocksDB JNI dependency have been removed. Configuration now accepts only `raftlog`; storage-dependent tests use the external adapter and isolated temporary paths. Seven behavioral tests first proved that the old factory/configuration still admitted internal backends, then passed after removal. The 93-test focused regression and final clean controller verification (520 tests, no failures/errors/skips, JaCoCo gate passed) are green. The shaded JAR contains the external library WAL and no removed internal storage classes or RocksDB JNI. Commands, hashes and test-count accounting are recorded in the existing [Raft evidence record](../evidence/raft-log-tdd-evidence-2026-09-04.json). At that checkpoint this correction did not close R2–R6; the later entries above supersede that status. The R1 production durability gates remain outstanding.
+
+The historical results below are retained, but do not authorize release of the snapshot-compaction behavior at `db532fb`: WAL prefix deletion is durable while adapter snapshots are only in memory at that revision. R1 replaces that behavior with durable snapshots and recovery checks; implementation evidence and outstanding deployment gates are recorded below. Existing persistent environments have not been inventoried; preserve their storage before recovery or rollback. Code rollback cannot recover already deleted WAL records.
 
 Execute the following slices in order under Section 6.1, retaining intended behavioral red failures before production changes:
 
 | Slice | Scope and acceptance gate | Status |
 |---|---|---|
-| R1 — Durable snapshots | Snapshot, compact, close, construct fresh storage, and recover state and coordinates; three-controller restart; interrupted publication, corruption, retained tails, and concurrent log mutations. Keep raftlog-core as the only WAL. | Code remediation verified on Windows; container-recreation, production-filesystem and power-loss acceptance remain open |
-| R2 — Tenant isolation | Collision-free versioned registry keys, ownership validation, HTTP CRUD/list boundaries, replicated migration and restart; ambiguous legacy ownership fails closed. | Implementation complete — 546 tests pass in final clean controller verify, no failures/errors/skips; JaCoCo gate passed; deployment acceptance remains under R1/R6 |
+| R1 — Durable snapshots | Snapshot, compact, close, construct fresh storage, and recover state and coordinates; three-controller restart; interrupted publication, corruption, retained tails, and concurrent log mutations. Keep raftlog-core as the only WAL. | Code remediation verified on Windows; container-recreation acceptance closed 2026-09-07; production-filesystem and power-loss acceptance remain open |
+| R2 — Tenant isolation | Collision-free versioned registry keys, ownership validation, HTTP CRUD/list boundaries, replicated migration and restart; ambiguous legacy ownership fails closed. | Implementation complete — 546 tests pass in final clean controller verify, no failures/errors/skips; JaCoCo gate passed; deployment acceptance remains under R1 |
 | R3 — Pre-execution failures | Authorization/secret/path rejection reaches the correct terminal attempt state without artificial IN_PROGRESS; preserve sequencing/fencing and reconcile uncertain acknowledgements. | Implementation complete — clean affected-reactor verify and JaCoCo gates pass; Windows symlink skip covered by passing Linux path-policy tests |
-| R4 — Non-blocking DNS | Slow DNS cannot block unrelated HTTP requests; bounded resolution, overload/timeout handling, default-deny egress and address pinning remain enforced. | Pending |
-| R5 — Handover closure | Confirm and disposition every remaining handover item, including entrypoints, defaults, path/port/TLS behavior, trust updates, codecs, compatibility, and retention. | Pending |
-| R6 — Final acceptance | Clean isolated-worktree reactor verify at the final revision, configured JaCoCo gates, protocol/security/restart tests, migration/runbook/specification alignment and retained evidence. | Pending |
+| R4 — Non-blocking DNS | Slow DNS cannot block unrelated HTTP requests; bounded resolution, overload/timeout handling, default-deny egress and address pinning remain enforced. | Implementation complete — ten behavioral-red cases, five characterization cases; 47 focused tests and full Docker/slow reactor pass; see R4 evidence |
+| R5 — Handover closure | Confirm and disposition every remaining handover item, including entrypoints, defaults, path/port/TLS behavior, trust updates, codecs, compatibility, and retention. | Implementation complete — behavioral red/green and focused regression retained; enterprise retention remains Phase 9 and deployment durability remains R1 |
+| R6 — Final acceptance | Clean isolated-worktree reactor verify at the final revision, configured JaCoCo gates, protocol/security/restart tests, migration/runbook/specification alignment and retained evidence. | Complete for local final-source acceptance at `dc447d4`: clean detached reactor passes 2,437 tests with zero failures/errors, two existing skips and five coverage gates; R1 deployment durability gates remain open |
+
+**R1-1 container-recreation acceptance — 2026-09-07:** Durable snapshot recovery is now proven
+across destruction and recreation of the controller containers against persistent named volumes,
+using the shipped image. Four tests pass through the real cluster boundary: full-cluster
+recreate, recovery from a durable snapshot after the WAL is compacted to zero bytes, rolling
+single-node recreation under retained quorum, and a negative control proving the gate is not
+vacuous. Controller regression with Docker and slow groups enabled passes 601 tests with zero
+failures or errors, two pre-existing explicit skips and the JaCoCo gate. No product defect was
+found: both retained red failures were incorrect assertions in the new test, so the two recovery
+tests are recorded as retrospective characterization under Section 6.1 rather than as historical
+TDD. Docker is a confirmed production target, so the deployment shape is representative; the
+engine was Docker Desktop on Windows, so the storage class and host kernel are not, and R1-2
+still requires a repeat on the intended Linux engine and storage class. The work also exposed
+that the containerised test fixture then declared no volumes and no Raft storage path, so no
+earlier Docker test could have detected a container-level durability regression; the fixtures
+were corrected in the same slice (register v1.3) to use named volumes at the deployed path. See the
+[R1-1 evidence](../evidence/r1-container-recreation-2026-09-07.md). R1-2 production-filesystem
+and R1-3 machine power-loss acceptance remain open and still prevent an enterprise release claim.
 
 **R1 implementation evidence:** 14 new tests: 11 exposed missing behavior before their fixes, and three are explicitly recorded as characterization. Seven red/green stages cover recovery and mutation ordering, including interrupted installation followed by a second restart. The final clean controller run passes 530 tests with no failures, errors or skips and meets its JaCoCo gate; the separately enabled slow cluster suite passes four tests. An earlier seven-module clean reactor passed before the last interruption-recovery fixes; it is not represented as a final-revision reactor result. Commands, failure excerpts, timestamps, log hashes, source hashes and limitations are retained in [Raft TDD evidence](../evidence/raft-log-tdd-evidence-2026-09-04.json). R2 progress is recorded below; no remaining slice or production acceptance gate is closed by the R1 result.
 
-The two Raft regression cases without preserved red evidence remain historical process deviations requiring explicit disposition, not historical TDD. The earlier raftlog prefix API's compile-only red also does not satisfy the behavioral-red mandate; its historical record is preserved, not retroactively relabelled. No waiver is inferred from earlier Phase 0/1 approvals. The later full-reactor result recorded by `ffc3e64` corrects the earlier review's verification chronology, but does not cover the missing snapshot/restart behavior. Completion of this checkpoint requires all applicable gates, not a green build alone.
+The two Raft regression cases without preserved red evidence remain historical process deviations requiring explicit disposition, not historical TDD. The earlier raftlog prefix API's compile-only red also does not satisfy the behavioral-red mandate; its historical record is preserved, not retroactively relabelled. No waiver is inferred from earlier Phase 0/1 approvals. The later full-reactor result recorded by `db532fb` corrects the earlier review's verification chronology, but does not cover the missing snapshot/restart behavior. Completion of this checkpoint requires all applicable gates, not a green build alone.
 
 **R2 implementation evidence:** versioned tenant/resource keys, exact-owner reads and
 authoritative writes replace the ambiguous legacy namespace. The first successful v2
@@ -110,8 +296,9 @@ Commands, initial assertion corrections, hashes and limitations are retained und
 `remediationR3` in the existing [Phase 4 evidence](../evidence/phase4-tdd-evidence-2026-09-03.json).
 The [reconciliation procedure](../../docs/QUORUS_SECURITY_DEPLOYMENT_GUIDE.md#12-pre-execution-failure-and-acknowledgement-reconciliation)
 distinguishes bounded replay from outstanding durable outbox, automatic lease recovery
-and destination reconciliation work in Phase 2. R4 is the next remediation slice; the
-remaining release gates are not waived.
+and destination reconciliation work in Phase 2. At that checkpoint R4 was the next
+remediation slice; the R4–R6 completion entries above supersede that sequence. The
+remaining R1 release gates are not waived.
 
 | Milestone | Completed phases | Release meaning |
 |---|---|---|
@@ -178,26 +365,28 @@ A capability is complete only when all applicable items are satisfied:
 
 ### 6.1 Mandatory TDD delivery protocol
 
-Every implementation slice MUST use and retain the following sequence:
+Every implementation slice MUST follow this sequence:
 
 1. **Specify:** identify one externally observable behavior, its security and tenant context, failure behavior, and acceptance boundary.
-2. **Red:** add the smallest unit, component, or external-path behavioral test that expresses the behavior; execute it before production implementation and retain output proving it failed for the intended missing behavior rather than environment or fixture failure.
-3. **Green:** implement the smallest coherent end-to-end change that makes the new test pass; retain the focused green output.
+2. **Red:** add the smallest unit, component, or external-path behavioral test that expresses the behavior, and run it before the production implementation. It must fail for the intended missing behavior, not because of the environment or the fixture.
+3. **Green:** implement the smallest coherent end-to-end change that makes the new test pass.
 4. **Refactor:** remove duplication and align architecture without changing behavior; rerun the focused test and affected module suite.
 5. **Regress:** run the applicable unit, integration, protocol, multi-node, security, contract, and documentation lanes. A phase cannot close with an unresolved failure or a green result inferred from an isolated retry.
 
-The mandatory evidence record for each slice contains:
+Where a test protects behavior that a small code change could silently break, a mutation check (apply the change, confirm the test fails, restore) shows that the test pins it.
 
-- stable slice identifier and linked requirement or gap;
-- acceptance statement written before implementation;
-- test file and external entry point exercised;
-- red command, timestamp, revision or patch identity, expected failure, and captured output;
-- green command, timestamp, revision or patch identity, and captured output;
-- refactor summary and focused plus affected-suite results;
-- test classification: unit, component, external-path behavioral, integration, protocol, multi-node, security, contract, or failure injection;
-- confirmation that request bodies, credentials, keys, and sensitive payloads were not captured in evidence.
+**The record of a slice is its commit message** (decided 2026-09-27, `DR-Q6` revised). It states:
 
-For asynchronous behavior, tests MUST use the project-standard Vert.x test facilities. Awaitility, Java executor/latch orchestration, sleeps used as synchronization, and equivalent non-Vert.x polling are not permitted in new or remediated tests. External-path tests MUST enter through the same HTTP, agent, protocol, or cluster boundary used by a real caller. Direct method tests remain useful but cannot independently satisfy the behavioral-test gate.
+- the behavior delivered and the requirement, gap or register item it serves;
+- the tests added, their classification, and the external entry point they exercise;
+- the red result: which tests failed and why, and any test defect found on the way;
+- the green result, the mutation checks and whether each was detected;
+- the regression command and its per-module totals and coverage-gate result;
+- any test written after its code, labelled retrospective characterization.
+
+Raw logs, JSON manifests, hashes and patches are not kept: output is reproducible from the command and the commit, and the commit is the change. The evidence already committed under `docs-design/evidence/` remains the record of the slices that produced it.
+
+For asynchronous behavior, tests MUST use the project-standard asynchronous test facilities: Vert.x test facilities for code that is still on Vert.x, and, for code that has left Vert.x, the test standard in the [Quorus concurrency conventions](../dev/QUORUS_CONCURRENCY_CONVENTIONS.md#6-asynchronous-test-standard) §6 (ADR-0012, workstream `RT-02`): blocking APIs, preemptive timeouts, handshake and interruption synchronisation, the real OpenTelemetry SDK and frozen logback events, and repeated concurrency runs. Awaitility, Java executor/latch orchestration, sleeps used as synchronization, and equivalent non-Vert.x polling are not permitted in new or remediated tests. External-path tests MUST enter through the same HTTP, agent, protocol, or cluster boundary used by a real caller. Direct method tests remain useful but cannot independently satisfy the behavioral-test gate.
 
 Existing implementation for which no preserved red stage exists can only receive **retrospective characterization**. It requires an explicit process-deviation record and cannot be relabelled as historical TDD. All subsequent changes to that behavior return to the mandatory red-green-refactor protocol.
 
@@ -205,7 +394,7 @@ Existing implementation for which no preserved red stage exists can only receive
 
 **Size:** L  
 **Milestone:** M0  
-**Status:** Complete — functional verification and code-side TDD remediation passed; historical process deviation approved on 2026-09-02  
+**Status:** Functionally complete — functional verification and code-side TDD remediation passed; historical process deviation approved on 2026-09-02; durability acceptance reopened by the 2026-09-04 remediation checkpoint until R1-2 and R1-3 close; the CI verification items have never passed in CI (`ENG-07`, repair deferred on 2026-09-27 by `SEQ-01`, Section 4)  
 **Primary gaps:** `ARCH-01`, `ARCH-05`, `ARCH-06`, `ARCH-07`, `API-01`, `API-12`
 
 ### Objective
@@ -214,7 +403,7 @@ Create one reproducible, durable, end-to-end distributed transfer path and the e
 
 ### Scope
 
-1. Establish a clean Java 25 build and test baseline across all active modules.
+1. Establish a clean Java 25 build and test baseline across all active modules. (Historical: the baseline has been Java 27 since `RT-01a`.)
 2. Correct the agent success lifecycle so `ACCEPTED -> IN_PROGRESS -> COMPLETED` is observable and legal.
 3. Enforce transfer, agent, assignment, route, and tenant referential invariants inside state-machine application.
 4. Resolve and test the controller data path and container volume alignment.
@@ -304,7 +493,7 @@ Coverage-gate remediation completed on 2026-09-02:
 - controller Surefire now preserves the JaCoCo agent argument while adding the required Java modules; the prior configuration silently replaced the agent argument and therefore produced no controller execution data;
 - the existing 60% line-coverage minimum remains unchanged and applies to every authored controller package;
 - only protoc-generated Java and gRPC bindings are excluded from coverage accounting, while live gRPC transport tests continue to exercise that boundary;
-- retrospective Vert.x behavioral coverage now exercises controller deployment, packaged configuration, telemetry bootstrap, assignment lifecycle through Raft, file storage, and RocksDB storage; these tests characterize existing production behavior and are not presented as historical TDD evidence;
+- retrospective Vert.x behavioral coverage now exercises controller deployment, packaged configuration, telemetry bootstrap, assignment lifecycle through Raft, file storage, and RocksDB storage (both internal storage backends were later removed by the external-library-only correction); these tests characterize existing production behavior and are not presented as historical TDD evidence;
 - the authoritative five-module clean verification passed 2,163 tests with zero failures, errors, or skips (core 1,491; workflow 134; tenant 64; controller 474);
 - JaCoCo analyzed 143 authored controller classes and reported 79.0% line coverage and 60.2% branch coverage; the lowest authored package is 60.1%, above the unchanged 60.0% package gate;
 - two existing asynchronous tests exposed instrumented-suite timing assumptions; their assertions and production behavior were retained while their setup/convergence deadlines were aligned to the established 15-second integration-test window, followed by a 17-test focused green run and the clean reactor pass.
@@ -461,6 +650,8 @@ The seventh red/green cycle proved the configured active-transfer stall boundary
 
 The clean controller gate after the stall slice passed all 496 tests with no failures, errors, or skips. JaCoCo reported 79.8% line and 60.2% branch coverage, and every configured coverage check passed (`temp/phase3-controller-clean-verify-stall.txt`).
 
+**Correction, 2026-09-27 (`ENG-10`).** The progress, freshness and stall behaviour above was proven with reports sent to the controller by the tests. Until 2026-09-27 no real agent sent in-flight progress: it reported `IN_PROGRESS` once with 0 bytes and then only the final result, and four of the five protocol adapters exposed no progress at all. In a real deployment the controller therefore saw no byte advancement between start and completion, and would have judged any transfer longer than the stall window as stalled. The agent now reports progress during the transfer; this does not change the controller evidence above.
+
 This checkpoint does not close Phase 3. The remaining lifecycle event vocabulary, durable stall detection/event emission, throughput windows, calibrated ETA confidence, configurable deadline-risk prediction, operational query collections, timelines, resumable streaming, alerts, retention, archival, and service-level reporting remain open.
 
 ### Scope
@@ -506,7 +697,26 @@ Operations can detect, understand, own, and act on a critical transfer before it
 **Size:** XL  
 **Milestone:** contributes to M2  
 **Primary gaps:** `ARCH-08`, `ARCH-14`, `ARCH-17`, `API-06`  
-**Status:** Complete — delivered on 2026-09-03 under the mandatory TDD gate  
+**Status:** Complete — delivered on 2026-09-03 under the mandatory TDD gate; acceptance reopened by the 2026-09-04 remediation checkpoint and restored when R2–R6 completed on 2026-09-05. Hardening follow-up `SEC-07` open since 2026-09-27  
+
+### Hardening follow-up — `SEC-07` (open, assigned 2026-09-27)
+
+Governed TLS trusts only the JVM default trust anchors (Section 4, 2026-09-27). The exit gate
+below still holds: an endpoint issued by a private CA is verified once that CA is in the
+runtime trust store. But adding it there is an unmanaged, unaudited deployment step, which this
+item removes. It must close before any production service connection relies on a private CA.
+It is delivered test-first under Section 6.1, and it is accepted when:
+
+- operators configure the trust-anchor certificates for governed TLS as versioned, audited
+  Quorus configuration, wherever the protocol adapters run, without changing the runtime's
+  `cacerts`;
+- a governed HTTPS and FTPS transfer to an endpoint issued by a configured private CA succeeds,
+  and the same transfer fails closed when that CA is not configured;
+- approved CA identifiers and leaf pins still narrow the trusted set exactly as they do today;
+- whether the JVM default anchors stay trusted alongside the configured set is decided and
+  documented when the item is specified;
+- a trust-anchor change takes effect within the interval defined in the verification list
+  below, and emits a trust-change event.
 
 ### Implementation checkpoint — 2026-09-03
 
@@ -563,7 +773,8 @@ Every production service connection has explicit ownership, identity verificatio
 
 **Size:** XL  
 **Milestone:** M2  
-**Primary gaps:** `ARCH-15`, `ARCH-16`, `API-05`
+**Primary gaps:** `ARCH-15`, `ARCH-16`, `API-05`  
+**Status:** Not started
 
 ### Objective
 
@@ -610,7 +821,8 @@ The fleet can be securely admitted, operated, upgraded, rolled back, isolated, a
 
 **Size:** XL  
 **Milestone:** contributes to M3  
-**Primary gaps:** `ARCH-18`, `API-01`, `API-03`, `API-08`, `API-09`, `API-11`, `API-12`, `API-13`, `API-14`
+**Primary gaps:** `ARCH-18`, `API-01`, `API-03`, `API-08`, `API-09`, `API-11`, `API-12`, `API-13`, `API-14`  
+**Status:** Not started
 
 ### Objective
 
@@ -656,7 +868,8 @@ The REST and event contracts are sufficient to operate and integrate the platfor
 
 **Size:** L  
 **Milestone:** contributes to M3  
-**Primary gaps:** `ARCH-04`, `API-08`, `API-10`
+**Primary gaps:** `ARCH-04`, `API-08`, `API-10`  
+**Status:** Not started
 
 ### Objective
 
@@ -669,7 +882,7 @@ Turn route and workflow definitions into validated, versioned, governed, observa
 3. Add idempotent trigger identity and duplicate-event suppression.
 4. Validate service connections, agent capabilities, policies, variables, dependencies, and evaluator readiness before activation.
 5. Persist immutable route and workflow versions and pin executions to exact versions.
-6. Implement workflow execution records, step dependencies, linked transfers, pause, cancel, retry, and reconciliation.
+6. Implement workflow execution records, step dependencies, linked transfers, pause, cancel, retry, and reconciliation. (Since `RT-04`, the engine cancels runs, limits concurrent groups and retries a group's failed transfers; `pause` and `resume` were removed from `WorkflowEngine` under `ENG-12` and return only with a real implementation.)
 7. Add dry-run and virtual-plan behavior without external side effects.
 8. Implement processing dates, market holidays, time zones, daylight-saving rules, cut-offs, blackout windows, maintenance windows, and exception calendars.
 9. Implement controlled backfill and reprocessing with approval and publication protection.
@@ -702,7 +915,8 @@ Routes and workflows execute autonomously and predictably under governed schedul
 
 **Size:** XL  
 **Milestone:** M3  
-**Primary gaps:** `ARCH-07`, `ARCH-10`, `API-13`, `API-14`
+**Primary gaps:** `ARCH-07`, `ARCH-10`, `API-13`, `API-14`  
+**Status:** Not started
 
 ### Objective
 
@@ -754,7 +968,8 @@ Availability and durability claims are supported by repeatable failure and resto
 
 **Size:** XL  
 **Milestone:** contributes to M4  
-**Primary gaps:** `API-11` plus governance requirements in the main design
+**Primary gaps:** `API-11` plus governance requirements in the main design  
+**Status:** Not started
 
 ### Objective
 
@@ -800,7 +1015,8 @@ Security, operational, change, and transfer evidence is searchable, exportable, 
 ## 17. Phase 10 — Configuration, Supportability, Capacity, and Service Management
 
 **Size:** L  
-**Milestone:** contributes to M4
+**Milestone:** contributes to M4  
+**Status:** Not started
 
 ### Objective
 
@@ -847,7 +1063,8 @@ Operations and support can reproduce configuration, diagnose incidents, forecast
 ## 18. Phase 11 — Administration and Operations User Interfaces
 
 **Size:** XL  
-**Milestone:** M4
+**Milestone:** M4  
+**Status:** Not started
 
 ### Objective
 
@@ -904,7 +1121,8 @@ Representative operators, security administrators, auditors, application owners,
 ## 19. Phase 12 — Enterprise Validation, Pilot, and Release Candidate
 
 **Size:** XL  
-**Milestone:** M5
+**Milestone:** M5  
+**Status:** Not started
 
 ### Objective
 
@@ -913,7 +1131,7 @@ Prove the complete platform in a representative enterprise environment and produ
 ### Scope
 
 1. Freeze release-candidate APIs, schemas, configuration, artifact versions, and compatibility matrix.
-2. Execute end-to-end functional, security, isolation, performance, scale, soak, recovery, upgrade, rollback, and disaster tests.
+2. Execute end-to-end functional, security, isolation, performance, scale, soak, recovery, upgrade, rollback, and disaster tests. Performance, scale and soak use the benchmark module (`ENG-15`, benchmarks B-02, B-10 and B-11 in `docs-design/performance/QUORUS_PERFORMANCE_BENCHMARKS.md`).
 3. Run threat-model review, dependency and container scanning, penetration testing, and remediation.
 4. Execute financial-services pilot scenarios with critical deadlines, business calendars, retries, failures, and incident response.
 5. Validate service connections across every supported protocol and trust mode.
@@ -966,7 +1184,62 @@ Prove the complete platform in a representative enterprise environment and produ
 
 The enterprise release candidate is approved only when all critical canonical gaps are closed, applicable high gaps are closed or explicitly release-blocking, measurable release gates pass, pilot stakeholders accept the operating model, and no undocumented privileged procedure is required.
 
-## 20. Workstreams and Ownership Model
+## 20. Platform Migration Workstreams
+
+**Status:** In progress. Direction accepted on 2026-09-26. `RT-01` to `RT-05` are complete, so only `quorus-controller` still uses Vert.x; `RT-06` waits for `CE-07` to `CE-11`, and workstream `CE` has not started. The state of both engines and the work per `CE` item are assessed in the [QRaft integration assessment](../design/QUORUS_QRAFT_INTEGRATION_ASSESSMENT.md) (2026-09-28), with open decisions `CE-Q1` to `CE-Q5`. Item status is kept in [register Section J](QUORUS_OUTSTANDING_WORK_REGISTER.md#13-section-j--platform-migration-workstreams)
+**Decisions:** [ADR-0011](../architecture-decisions/ADR-0011-CONSENSUS-VIA-QRAFT-GENERIC-ENGINE.md) (consensus through the generic QRaft engine) and [ADR-0012](../architecture-decisions/ADR-0012-JAVA-RUNTIME-AND-STRUCTURED-CONCURRENCY.md) (leave Vert.x for Java 27 structured concurrency)
+
+These two workstreams change the platform beneath the phases rather than adding enterprise capability. Each item is delivered under Section 6.1 and must keep every delivered phase's boundary tests green. Neither workstream may weaken a delivered exit gate. In particular, Phase 1's controller-to-controller mutual TLS, peer rejection and revocation behaviour must pass unchanged through the new engine.
+
+### Workstream CE — Consensus through QRaft
+
+Quorus stops owning a Raft engine and consumes QRaft's engine through a 100% generic, JDK-typed API. QRaft must never name a Quorus concept. Items `CE-01` to `CE-06` are deliverables of the QRaft project and are prerequisites for Quorus; they are tracked here because Quorus depends on them.
+
+| ID | Owner | Item | Acceptance |
+|---|---|---|---|
+| **CE-01** | QRaft | Extract the reusable engine | `RaftNode`, Raft transport, storage wiring and snapshot store move from `qraft-controller` into the engine artifacts. The engine has no dependency on catalog, tenancy, HTTP or runtime modes |
+| **CE-02** | QRaft | Generic public API | Node lifecycle, command submission, and read-only leadership, term, commit and state views. Static membership and storage configuration. Typed generic errors (not-leader with hint, outcome unknown, timeout, shutting down, storage failure). JDK types only. `ReplicatedCommand` no longer requires `Serializable` |
+| **CE-03** | QRaft | Transport security interfaces | TLS 1.3 mutual authentication on Raft gRPC from supplied key and trust material; a peer authorizer consulted on connection and on every RPC with the verified chain and the claimed node ID; fail-closed unless an explicit, warned development mode is selected |
+| **CE-04** | QRaft | Observability interface | Generic metrics and event listener with no application names |
+| **CE-05** | QRaft | Genericity enforcement | QRaft's catalog and key/value state use only the public engine API. A build check fails if the engine dependency tree contains `dev.mars:quorus*` or `io.vertx` |
+| **CE-06** | QRaft | Versioned artifacts | Engine artifacts published to a repository Quorus builds can resolve, with a compatibility and deprecation policy |
+| **CE-07** | Quorus | Engine adapter | `QuorusStateStore` implements the state-machine contract; the versioned protobuf command codec implements `CommandCodec`; engine errors map to the existing HTTP leader and conflict behaviour. At most one temporary class converts JDK futures to Vert.x futures, and it is removed by `RT-06` |
+| **CE-08** | Quorus | Security wiring | `CertificateTrustState` and the Phase 1 trust configuration supply the TLS material and peer authorizer. Every Phase 1 Raft trust test passes through QRaft, and certificate-to-node-ID binding closes register item `SEC-04` |
+| **CE-09** | Quorus | Raft state migration | Establish on-disk compatibility between raftlog 1.2.0 and QRaft's raftlog version, and between Quorus's snapshot sidecar and QRaft's `SnapshotStore`. Deliver a tested coordinated cutover with rollback; no mixed-engine cluster |
+| **CE-10** | Quorus | Remove the in-repository engine | Delete Quorus's `RaftNode`, Raft gRPC server and transport, `RaftLogStorageAdapter`, the snapshot sidecar and the direct `raftlog-core` dependency. Keep the command protobuf schemas |
+| **CE-11** | Quorus | Re-establish durability evidence | Repeat R1-1 and the Raft failure, restart and snapshot lanes on the QRaft-based build. R1-2 and R1-3 are run once, against this build |
+
+### Workstream RT — Leave Vert.x for Java 27 structured concurrency
+
+| ID | Item | Acceptance |
+|---|---|---|
+| **RT-Q1** | Decision: preview `StructuredTaskScope` in production | ✅ Decided 2026-09-26: no preview in production. Structured code uses a Quorus-owned task-scope abstraction on final APIs, switched to `StructuredTaskScope` when it is final in an adopted release (ADR-0012) |
+| **RT-Q2** | Decision: controller HTTP server | ✅ Decided 2026-09-26: JDK `HttpsServer`. `RT-06` must prove required client certificates, middleware, request limits, SSE with backpressure and throughput, or reopen the decision with evidence |
+| **RT-Q3** | Decision: Java support policy | ✅ Decided 2026-09-26: follow each six-monthly feature release within its update window (`RT-09`) |
+| **RT-01a** | Java 27 compile and test baseline | The root pom and `.java-version` target 27. `JavaPlatformBaselineTest` proves production classes are class-file major version 71 and tests run on Java 27 or later. The full reactor and JaCoCo gates pass on 27 before any Vert.x removal |
+| **RT-01b** | Java 27 images and CI | The controller and agent runtime images and the CI toolchain move to Amazon Corretto 27 (`RT-Q4`), with image tags pinned to an exact Corretto release that `RT-09` updates. The images are single-stage and copy jars built on the host; nothing is compiled inside an image. Docker-tagged lanes pass on the new images, starting from a fresh image build, because a cached `quorus-controller:test` image would hide the red stage |
+| **RT-Q4** | Decision: Java 27 container image vendor | ✅ Decided 2026-09-26: Amazon Corretto 27, runtime option A `amazoncorretto:27.0.0-alpine3.24` (Corretto 27 has no JRE-only Alpine image). No image contains Maven or a builder stage (ADR-0012 v1.2) |
+| **RT-02** | Concurrency conventions, task-scope abstraction and test standard | Written conventions for virtual threads, structured scopes, `ScopedValue` context, cancellation and deadlines. The Quorus task-scope abstraction (`RT-Q1`) is delivered test-first with ownership, cancellation, deadline and failure-propagation tests. §6.1 and the Copilot instructions are updated as modules move |
+| **RT-03** | `quorus-core` | Protocol adapters run blocking I/O on virtual threads with no `executeBlocking`. The HTTP adapter uses Apache HttpClient 5 (`RT-Q5`) and streams to and from files, closing `ARCH-09`. Delivered in slices: `RT-03a` removes dead connection-pool code; `RT-03b` rewrites the HTTP adapter; `RT-03c` makes the `TransferEngine` blocking on virtual threads and moves its agent, workflow and example callers to that API; `RT-03d` removes `transferReactive` and `Vertx` from the protocol contract and `ProtocolFactory`; `RT-03e` moves `NetworkTopologyService` and the codec off Vert.x, using Jackson for the codec; `RT-03f` leaves no `io.vertx` dependency in the `quorus-core` pom |
+| **RT-Q5** | Decision: HTTP client for the HTTP transfer adapter | ✅ Decided 2026-09-26: Apache HttpClient 5 (classic API). Measured on JDK 27 GA: `java.net.http` cannot connect to an approved address while keeping SNI, `Host` and hostname verification on the service's hostname (ADR-0012) |
+| **RT-04** | `quorus-workflow` and `quorus-integration-examples` | No Vert.x types. Workflow execution uses structured scopes |
+| **RT-05** | `quorus-agent` | Transfers run on virtual threads, so cancellation interrupts blocked I/O at once. Controller client on `java.net.http.HttpClient` with mutual TLS and hostname verification. Registration, heartbeat and polling run as structured loops with bounded shutdown. The Phase 1 agent trust tests and R3 reporting tests pass. Delivered in slices: `RT-05a` moves the controller client to `java.net.http` (with a JDK PEM loader in core) and makes the registration, heartbeat, polling and status-reporting services blocking; `RT-05b` replaces the agent runtime (Vert.x timers, futures, the transfer service, the health endpoint and the tracing integration) and leaves no `io.vertx` dependency in the `quorus-agent` pom |
+| **RT-06** | `quorus-controller` | HTTP API on the `RT-Q2` server with TLS 1.3 and required client certificates. Authentication, authorization and audit middleware preserved. `OpenApiContractTest` stays equal. The `CE-07` bridge is removed. Throughput is compared with benchmark B-08 measured on the Vert.x controller first (`ENG-15`). Delivered in slices, re-sequenced on 2026-09-28 so that it no longer waits for QRaft: `RT-06a` puts the controller's consensus calls (the 30 `submitCommand` sites and the leadership queries) behind one Quorus-owned interface with JDK types, backed by today's `RaftNode` (the single bridge class ADR-0011 allows; `CE-07` later replaces its implementation); `RT-06b` moves the HTTP API to the JDK `HttpsServer`; `RT-06c` moves the controller's services and timers to virtual threads; `RT-06d` removes the remaining Vert.x other than the in-repository Raft engine, which `CE-10` deletes. Before `RT-06b`, `ENG-15` measures B-08 on the Vert.x controller |
+| **RT-07** | Observability | OpenTelemetry traces, metrics and log correlation for the new HTTP server and client, replacing Vert.x tracing integration. The agent's part was delivered in `RT-05b`: its controller client makes client spans and sends W3C trace context. What remains is the controller's HTTP server and outbound clients, and log correlation |
+| **RT-08** | Vert.x removal gate | No `io.vertx` artifact in any module. A build check fails if one is reintroduced. Per-module guard tests already enforce this for core, workflow, tenant, the examples and the agent (`CoreIsVertxFreeTest` and its siblings); `RT-08` adds the controller once `RT-06` lands and removes the `vertx-dependencies` BOM import from the root pom |
+| **RT-09** | Java release cadence (recurring) | Each Java GA feature release is adopted within its update window: toolchain, CI and images; full reactor and coverage gates; Docker, slow, Raft durability and restart lanes on the new runtime. When `StructuredTaskScope` is final in an adopted release, the task-scope implementation switches to it with its tests as the gate |
+
+### Sequencing
+
+1. `RT-01` can start at once and has no dependency on QRaft. `RT-02` delivers the task-scope abstraction before any module migration uses it.
+2. `CE-01` to `CE-06` (QRaft) run in parallel with `RT-01` to `RT-05`.
+3. `CE-07` to `CE-11` follow `CE-06`. Adopting QRaft removes Quorus's largest Vert.x-coupled component, the Raft node and its gRPC transport, before the controller HTTP migration.
+4. `RT-06` no longer waits for `CE-07` to `CE-11` (decided 2026-09-28): the consensus interface of `RT-06a` separates the HTTP and service migration from the engine, so only the in-repository Raft engine stays on Vert.x until `CE-10` removes it. `RT-06` should still precede the bulk of Phase 6 so that new REST resources are written once. Before it, and before `CE-07`, the benchmark module (`ENG-15`) measures the Vert.x controller's HTTP API (B-08) and Raft commit latency (B-09), because `RT-Q2` and the QRaft adoption are judged against them. `RT-05` does not wait for QRaft: the agent has no Raft code and depends on no `CE` item, so it follows `RT-04` directly (decided 2026-09-27).
+5. Phase 8 durability work and the R1-2 and R1-3 acceptance runs should follow `CE-11`, so that production-filesystem and power-loss evidence describes the engine that will ship.
+
+Phases 2 and 3 continue meanwhile. Their new code must avoid adding Vert.x coupling that `RT` would have to remove: new logic sits behind JDK-typed interfaces where practical.
+
+## 21. Workstreams and Ownership Model
 
 Named individuals are assigned during delivery planning. At minimum, each phase requires accountable ownership for:
 
@@ -987,7 +1260,9 @@ Named individuals are assigned during delivery planning. At minimum, each phase 
 
 Architecture, security, operations, quality, and product/domain owners participate in every phase gate; they are not final-phase reviewers.
 
-## 21. Gap-to-Phase Traceability
+## 22. Gap-to-Phase Traceability
+
+This table assigns each gap to its delivery phases. Current closure status is maintained in [register §14](QUORUS_OUTSTANDING_WORK_REGISTER.md#14-gap-to-section-traceability), not here.
 
 | Gap | Delivery phase |
 |---|---|
@@ -999,7 +1274,7 @@ Architecture, security, operations, quality, and product/domain owners participa
 | `ARCH-06` Assignment reference and tenant invariants incomplete | Phases 0 and 1 |
 | `ARCH-07` Persistent controller path and volume not proven | Phases 0 and 8 |
 | `ARCH-08` SFTP host-key verification disabled | Closed in Phase 4, supported by Phase 1 trust foundations |
-| `ARCH-09` HTTP adapter buffers full payload | Phase 4 protocol hardening and Phase 12 scale validation |
+| `ARCH-09` HTTP adapter buffers full payload | Closed by `RT-03b` (Section 20) on 2026-09-26; Phase 12 scale validation still measures bounded memory |
 | `ARCH-10` Dynamic membership absent | Phase 8 decision or optional Phase 8B |
 | `ARCH-11` Transfer operations telemetry incomplete | Phase 3 |
 | `ARCH-12` Operational business context absent | Phase 3 |
@@ -1024,7 +1299,7 @@ Architecture, security, operations, quality, and product/domain owners participa
 | `API-13` Cluster and configuration administration incomplete | Phases 6, 8, and 10 |
 | `API-14` Compatibility, retention, export, and replay incomplete | Phases 3, 6, 8, and 9 |
 
-## 22. Backlog Classification
+## 23. Backlog Classification
 
 Every implementation item is classified as one of:
 
@@ -1046,7 +1321,7 @@ The following should default to enterprise follow-on unless the pilot requires t
 
 Deferral MUST be explicit and must not leave documentation implying that the feature is current.
 
-## 23. Plan Governance
+## 24. Plan Governance
 
 At the end of each phase:
 
@@ -1060,3 +1335,27 @@ At the end of each phase:
 8. obtain architecture, security, operations, quality, and product/domain sign-off.
 
 The plan is revised when requirements or implementation evidence change. Revision history MUST describe changes to sequencing, scope, exit gates, or release meaning.
+
+### Revision history
+
+| Version | Date | Changes |
+|---|---|---|
+| 1.42 | 2026-09-28 | §20: `RT-06` re-sequenced to proceed before QRaft, in slices `RT-06a` (consensus interface) to `RT-06d`; only the in-repository Raft engine stays on Vert.x until `CE-10` |
+| 1.41 | 2026-09-28 | §20 links the QRaft integration assessment and its open decisions `CE-Q1` to `CE-Q5` |
+| 1.40 | 2026-09-28 | Benchmarking: `RT-06`, §20 sequencing and Phase 12 reference the benchmark module (`ENG-15`); the controller baselines (B-08, B-09) come before `RT-06` and `CE-07` |
+| 1.39 | 2026-09-28 | Review after `RT-05`: §20 status (RT-01 to RT-05 complete), `RT-07` and `RT-08` show what is already delivered, sequencing step 2 includes `RT-05`; §3 baseline and §4 evidence wording follow `RT-05` and the revised `DR-Q6`; Phase 0 and Phase 7 notes for Java 27 and `ENG-12` |
+| 1.38 | 2026-09-27 | §20: `RT-05` no longer waits for `CE-07` to `CE-11` (the agent has no Raft code) and follows `RT-04`; its slices `RT-05a` and `RT-05b` are defined |
+| 1.37 | 2026-09-27 | §6.1: a slice's record is its commit message; raw logs, manifests, hashes and patches are no longer kept (`DR-Q6` revised). Recorded the `RT-03c` follow-up: `ENG-09` resolved; `ENG-10` found and resolved (adapter and agent in-flight progress), with a dated correction to the Phase 3 checkpoint; `SEC-08` resolved; `ENG-11` recorded. `RT-05` acceptance now includes running transfers on virtual threads |
+| 1.36 | 2026-09-27 | Recorded `ENG-09` (shared abort target in the FTP and SFTP adapters), found by `RT-03c`, for decision in `RT-03d` |
+| 1.35 | 2026-09-27 | Recorded `ENG-08` (decision `DR-Q7`): the OpenAPI contract is the only current-API reference, with per-operation scopes, agent statuses, DNS-authorization failure responses and the REST API Specification's Current rows verified by test; the API Reference is deleted and `/api/v1/info` links to the contract. §1 cites the contract in place of the API Reference |
+| 1.34 | 2026-09-27 | Recorded that CI has never passed and that its repair is deferred (`ENG-07`, decision `SEQ-01`), with the consequences for regression evidence, Phase 0 and phase closure. Assigned `SEC-07` (governed TLS trusts only the JVM default anchors) to Phase 4 as a hardening follow-up with acceptance criteria (decision `SEQ-02`). Section 20: corrected `RT-03` to Apache HttpClient 5 and listed its slices; added the `RT-Q5` decision row; corrected `RT-Q4` and `RT-01b` to single-stage images that copy host-built jars, runtime option A; the status now says in progress. §22 records `ARCH-09` as closed by `RT-03b`. §3 baseline is Java 27 |
+| 1.33 | 2026-09-26 | §6.1 evidence retention: keep raw red, green, mutation and characterization output; keep regression and discarded-attempt output as excerpts with the full log hash (DR-Q6 refined) |
+| 1.32 | 2026-09-26 | §6.1 points code that has left Vert.x to the concurrency conventions test standard (`RT-02c`) |
+| 1.31 | 2026-09-26 | Pointed documentation-review references at register Section H and its §3 decision log, after the separate task list was merged into the register |
+| 1.30 | 2026-09-26 | Recorded ADR-0012 decisions: no preview in production, using a Quorus task-scope abstraction (`RT-Q1`); JDK `HttpsServer` (`RT-Q2`); follow six-monthly Java releases (`RT-Q3`), adding the recurring `RT-09` |
+| 1.29 | 2026-09-26 | Added Section 20, Platform Migration Workstreams: `CE` (consensus through the generic QRaft engine, ADR-0011) and `RT` (leave Vert.x for Java 27 structured concurrency, ADR-0012), with sequencing against Phases 6 and 8 and R1-2/R1-3; renumbered former Sections 20–23 to 21–24; made the §6.1 asynchronous-test rule depend on the module's runtime |
+| 1.28 | 2026-09-26 | Added the documentation-review delivery items (`SEC-01`–`SEC-06`, `CFG-02`–`CFG-05`, `ENG-01`–`ENG-06`) and IDs for three unnumbered obligations (`P2-13`, `R1-4`, `PROC-01`); moved `CFG-01` into its own dated section; settled the Phase 0 and Phase 4 status wording; added Status lines for Phases 5–12; decided raw-evidence retention (`DR-Q6`): cited output goes to `docs-design/evidence/raw/`, never `temp/`, added to the §6.1 protocol, and surviving historical logs rescued; removed a machine-specific path; annotated the historical RocksDB coverage statement; qualified the System Design as a non-normative input |
+| 1.27 | 2026-09-25 | Recorded closed `CFG-01` container configuration hygiene and the generated-certificate mutual-TLS validation boundary |
+| 1.26 | 2026-09-07 | Recorded the R1-1 container-recreation acceptance checkpoint and retained R1-2/R1-3 as release blockers |
+
+Revision history was not recorded before v1.26. Earlier changes are visible only in git history and in the dated checkpoints above.

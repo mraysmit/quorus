@@ -2,18 +2,20 @@
 
 # Quorus Architecture Quickstart
 
-**Version:** 2.3  
-**Date:** 2026-09-04  
+**Version:** 2.6
+**Date:** 2026-09-28
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Scope:** Current implementation snapshot
 
 ## What Quorus Is
 
-Quorus is a Java 25, Vert.x 5 based file transfer platform with two practical execution modes:
+Quorus is a Java 27 file transfer platform with two practical execution modes:
 
 - **Direct execution** via `quorus-core`, where an application or workflow runs transfers in-process through `SimpleTransferEngine`
 - **Distributed execution** via `quorus-controller` and `quorus-agent`, where controller nodes replicate cluster state with Raft and agents execute transfer work
+
+Only `quorus-controller` still uses Vert.x 5, while it migrates to plain Java under [ADR-0012](../docs-design/architecture-decisions/ADR-0012-JAVA-RUNTIME-AND-STRUCTURED-CONCURRENCY.md). The other modules use blocking APIs and virtual threads and have no Vert.x dependency.
 
 The core implementation anchors are:
 
@@ -59,7 +61,7 @@ These values are sourced from `quorus-controller/src/main/java/dev/mars/quorus/c
 
 - validates requests
 - routes work to protocol adapters through `ProtocolFactory`
-- executes reactively with Vert.x futures
+- runs each transfer on the calling thread (blocking), with retries and a concurrency limit
 - tracks direction-aware metrics
 - exposes shutdown, cancellation, pause, and resume operations at engine level
 
@@ -168,23 +170,23 @@ The enforcement path is:
 
 These checks run inside the Vert.x controller against Raft-replicated state. The tenant model is stored as a field on `AgentInfo` and `TransferJobSnapshot` in `QuorusStateStore`.
 
-This is not an authenticated tenant security boundary: the API has no built-in authentication, and direct assignment creation does not yet uniformly enforce referential and tenant invariants during state-machine application. See `ARCH-03` and `ARCH-06` in `docs/QUORUS_ARCHITECTURE_SPECIFICATION.md`.
+In the production profile, the API derives tenant authority from an authenticated mTLS or trusted-gateway identity, and assignment references and tenant invariants are enforced both at the handler boundary and during replicated state application. A supplied `tenantId` is not identity by itself, and the development Compose profiles intentionally disable this boundary. See [Architecture Specification §3](QUORUS_ARCHITECTURE_SPECIFICATION.md#3-capability-status) and the [Security Deployment Guide](QUORUS_SECURITY_DEPLOYMENT_GUIDE.md).
 
 ## Java Baseline
 
 The repository root `pom.xml` sets:
 
-- `maven.compiler.source = 25`
-- `maven.compiler.target = 25`
+- `java.version = 27`
+- `maven.compiler.release = ${java.version}`
 
-Use JDK 25 for builds, tests, and IDE tooling in this repository.
+`.java-version` also names 27. Use JDK 27 for builds, tests, and IDE tooling in this repository.
 
 ## Recommended Reading
 
 - `docs/QUORUS_ARCHITECTURE_SPECIFICATION.md` — canonical architecture, guarantees, and release requirements
 - `docs/QUORUS_REST_API_SPECIFICATION.md` — complete normative REST control and operations contract
-- `docs/QUORUS_API_REFERENCE.md` — endpoints implemented by the current controller
+- `quorus-controller/src/main/resources/openapi/quorus-controller-v1.yaml` — the OpenAPI contract for the current controller API, also served at `GET /api/v1/openapi.yaml`
 - `docs/QUORUS_USER_GUIDE.md`
 - `docs/QUORUS_WORKFLOWS_README.md`
 - `docs/QUORUS_YAML_SYNTAX_GUIDE.md`
-- `docs-design/task/QUORUS_ALPHA_IMPLEMENTATION_PLAN.md`
+- `docs-design/archive/QUORUS_ALPHA_IMPLEMENTATION_PLAN.md`

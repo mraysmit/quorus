@@ -1,0 +1,621 @@
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::staticFieldBase has been called by com.google.inject.internal.aop.HiddenClassDefiner (file:/C:/Users/mraysmit/scoop/apps/maven/current/lib/guice-5.1.0-classes.jar)
+WARNING: Please consider reporting this to the maintainers of class com.google.inject.internal.aop.HiddenClassDefiner
+WARNING: sun.misc.Unsafe::staticFieldBase will be removed in a future release
+[INFO] Scanning for projects...
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Build Order:
+[INFO] 
+[INFO] Quorus File Transfer System                                        [pom]
+[INFO] Quorus Core                                                        [jar]
+[INFO] Quorus Workflow Engine                                             [jar]
+[INFO] Quorus Tenant Management                                           [jar]
+[INFO] Quorus Distributed Controller                                      [jar]
+[INFO] 
+[INFO] --------------------------< dev.mars:quorus >---------------------------
+[INFO] Building Quorus File Transfer System 1.0-SNAPSHOT                  [1/5]
+[INFO]   from pom.xml
+[INFO] --------------------------------[ pom ]---------------------------------
+[INFO] 
+[INFO] --- jacoco:0.8.15:prepare-agent (prepare-agent) @ quorus ---
+[INFO] argLine set to -javaagent:C:\\Users\\mraysmit\\.m2\\repository\\org\\jacoco\\org.jacoco.agent\\0.8.15\\org.jacoco.agent-0.8.15-runtime.jar=destfile=C:\\Users\\mraysmit\\dev\\idea-projects\\quorus\\target\\jacoco.exec,excludes=sun/**:jdk/**:java/**:com/sun/**:org/jcp/**
+[INFO] 
+[INFO] --- jacoco:0.8.15:report (report) @ quorus ---
+[INFO] Skipping JaCoCo execution due to missing execution data file.
+[INFO] 
+[INFO] ------------------------< dev.mars:quorus-core >------------------------
+[INFO] Building Quorus Core 1.0-SNAPSHOT                                  [2/5]
+[INFO]   from quorus-core\pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- jacoco:0.8.15:prepare-agent (prepare-agent) @ quorus-core ---
+[INFO] argLine set to -javaagent:C:\\Users\\mraysmit\\.m2\\repository\\org\\jacoco\\org.jacoco.agent\\0.8.15\\org.jacoco.agent-0.8.15-runtime.jar=destfile=C:\\Users\\mraysmit\\dev\\idea-projects\\quorus\\quorus-core\\target\\jacoco.exec,excludes=sun/**:jdk/**:java/**:com/sun/**:org/jcp/**
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ quorus-core ---
+[INFO] Copying 1 resource from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ quorus-core ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ quorus-core ---
+[INFO] Copying 11 resources from src\test\resources to target\test-classes
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ quorus-core ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- surefire:3.2.2:test (default-test) @ quorus-core ---
+[INFO] 
+[INFO] --- jacoco:0.8.15:report (report) @ quorus-core ---
+[INFO] Loading execution data file C:\Users\mraysmit\dev\idea-projects\quorus\quorus-core\target\jacoco.exec
+[INFO] Analyzed bundle 'Quorus Core' with 124 classes
+[INFO] 
+[INFO] ----------------------< dev.mars:quorus-workflow >----------------------
+[INFO] Building Quorus Workflow Engine 1.0-SNAPSHOT                       [3/5]
+[INFO]   from quorus-workflow\pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- jacoco:0.8.15:prepare-agent (prepare-agent) @ quorus-workflow ---
+[INFO] argLine set to -javaagent:C:\\Users\\mraysmit\\.m2\\repository\\org\\jacoco\\org.jacoco.agent\\0.8.15\\org.jacoco.agent-0.8.15-runtime.jar=destfile=C:\\Users\\mraysmit\\dev\\idea-projects\\quorus\\quorus-workflow\\target\\jacoco.exec,excludes=sun/**:jdk/**:java/**:com/sun/**:org/jcp/**
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ quorus-workflow ---
+[INFO] Copying 1 resource from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ quorus-workflow ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ quorus-workflow ---
+[INFO] Copying 2 resources from src\test\resources to target\test-classes
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ quorus-workflow ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- surefire:3.2.2:test (default-test) @ quorus-workflow ---
+[INFO] 
+[INFO] --- jacoco:0.8.15:report (report) @ quorus-workflow ---
+[INFO] Loading execution data file C:\Users\mraysmit\dev\idea-projects\quorus\quorus-workflow\target\jacoco.exec
+[INFO] Analyzed bundle 'Quorus Workflow Engine' with 24 classes
+[INFO] 
+[INFO] -----------------------< dev.mars:quorus-tenant >-----------------------
+[INFO] Building Quorus Tenant Management 1.0-SNAPSHOT                     [4/5]
+[INFO]   from quorus-tenant\pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- jacoco:0.8.15:prepare-agent (prepare-agent) @ quorus-tenant ---
+[INFO] argLine set to -javaagent:C:\\Users\\mraysmit\\.m2\\repository\\org\\jacoco\\org.jacoco.agent\\0.8.15\\org.jacoco.agent-0.8.15-runtime.jar=destfile=C:\\Users\\mraysmit\\dev\\idea-projects\\quorus\\quorus-tenant\\target\\jacoco.exec,excludes=sun/**:jdk/**:java/**:com/sun/**:org/jcp/**
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ quorus-tenant ---
+[INFO] skip non existing resourceDirectory C:\Users\mraysmit\dev\idea-projects\quorus\quorus-tenant\src\main\resources
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ quorus-tenant ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ quorus-tenant ---
+[INFO] Copying 1 resource from src\test\resources to target\test-classes
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ quorus-tenant ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- surefire:3.2.2:test (default-test) @ quorus-tenant ---
+[INFO] 
+[INFO] --- jacoco:0.8.15:report (report) @ quorus-tenant ---
+[INFO] Loading execution data file C:\Users\mraysmit\dev\idea-projects\quorus\quorus-tenant\target\jacoco.exec
+[INFO] Analyzed bundle 'Quorus Tenant Management' with 25 classes
+[INFO] 
+[INFO] ---------------------< dev.mars:quorus-controller >---------------------
+[INFO] Building Quorus Distributed Controller 1.0-SNAPSHOT                [5/5]
+[INFO]   from quorus-controller\pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- jacoco:0.8.15:prepare-agent (prepare-agent) @ quorus-controller ---
+[INFO] argLine set to -javaagent:C:\\Users\\mraysmit\\.m2\\repository\\org\\jacoco\\org.jacoco.agent\\0.8.15\\org.jacoco.agent-0.8.15-runtime.jar=destfile=C:\\Users\\mraysmit\\dev\\idea-projects\\quorus\\quorus-controller\\target\\jacoco.exec,excludes=sun/**:jdk/**:java/**:com/sun/**:org/jcp/**:dev/mars/quorus/controller/raft/grpc/**
+[INFO] 
+[INFO] --- protobuf:4.1.2:generate (default) @ quorus-controller ---
+[WARNING]  Parameter 'binaryMavenPlugins' is deprecated: Users should now use plugins instead. This option will be removed in v5.
+[INFO] Resolving artifact "com.google.protobuf:protoc:exe:windows-x86_64:3.25.5"
+[INFO] Resolving artifact "io.grpc:protoc-gen-grpc-java:exe:windows-x86_64:1.68.1"
+[INFO] Registering "C:\Users\mraysmit\dev\idea-projects\quorus\quorus-controller\target\generated-sources\protobuf" as a Maven main source root for compiler plugins
+[INFO] Registering "C:\Users\mraysmit\dev\idea-projects\quorus\quorus-controller\target\generated-sources\protobuf" as a Maven main source root for compiler plugins
+[INFO] Found 2 proto source files and 0 descriptor files to compile, but all are up-to-date so none will be built this time
+[INFO] NOTHING TO DO: There is nothing to do. If this is unexpected, review the above logs for more details.
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ quorus-controller ---
+[INFO] Copying 3 resources from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ quorus-controller ---
+[INFO] Recompiling the module because of changed source code.
+[INFO] Compiling 167 source files with javac [debug release 25] to target\classes
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ quorus-controller ---
+[INFO] Copying 11 resources from src\test\resources to target\test-classes
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ quorus-controller ---
+[INFO] Recompiling the module because of changed dependency.
+[INFO] Compiling 73 source files with javac [debug release 25] to target\test-classes
+[INFO] 
+[INFO] --- surefire:3.2.2:test (default-test) @ quorus-controller ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+15:35:12,213 |-INFO in ch.qos.logback.classic.LoggerContext[default] - Found logback-core version 1.5.32
+15:35:12,214 |-INFO in ch.qos.logback.classic.util.ContextInitializer@75abe255 - No custom configurators were discovered as a service.
+15:35:12,214 |-INFO in ch.qos.logback.classic.util.ContextInitializer@75abe255 - Trying to configure with ch.qos.logback.classic.util.DefaultJoranConfigurator
+15:35:12,216 |-INFO in ch.qos.logback.classic.util.ContextInitializer@75abe255 - Constructed configurator of type class ch.qos.logback.classic.util.DefaultJoranConfigurator
+15:35:12,218 |-INFO in ch.qos.logback.classic.LoggerContext[default] - Found resource [logback-test.xml] at [file:/C:/Users/mraysmit/dev/idea-projects/quorus/quorus-controller/target/test-classes/logback-test.xml]
+15:35:12,219 |-WARN in ch.qos.logback.classic.util.DefaultJoranConfigurator@5010d999 - Resource [logback-test.xml] occurs multiple times on the classpath.
+15:35:12,219 |-WARN in ch.qos.logback.classic.util.DefaultJoranConfigurator@5010d999 - Resource [logback-test.xml] occurs at [file:/C:/Users/mraysmit/dev/idea-projects/quorus/quorus-core/target/test-classes/logback-test.xml]
+15:35:12,219 |-WARN in ch.qos.logback.classic.util.DefaultJoranConfigurator@5010d999 - Resource [logback-test.xml] occurs at [file:/C:/Users/mraysmit/dev/idea-projects/quorus/quorus-controller/target/test-classes/logback-test.xml]
+15:35:12,396 |-INFO in ch.qos.logback.classic.model.processor.ConfigurationModelHandlerFull - Scan attribute not set or set to unrecognized value.
+15:35:12,410 |-INFO in ch.qos.logback.core.model.processor.ModelInterpretationContext@6512cf8d - value "../test-logs/quorus-test-2026-09-05_07-34-55.log" substituted for "../test-logs/quorus-test-${testRunTimestamp}.log"
+15:35:12,412 |-INFO in ch.qos.logback.core.model.processor.AppenderModelHandler - Processing appender named [CONSOLE]
+15:35:12,412 |-INFO in ch.qos.logback.core.model.processor.AppenderModelHandler - About to instantiate appender of type [ch.qos.logback.core.ConsoleAppender]
+15:35:12,432 |-INFO in ch.qos.logback.core.model.processor.ImplicitModelHandler - Assuming default type [ch.qos.logback.classic.encoder.PatternLayoutEncoder] for [encoder] property
+15:35:12,509 |-INFO in ch.qos.logback.core.ConsoleAppender[CONSOLE] - NOTE: Writing to the console can be slow. Try to avoid logging to the 
+15:35:12,509 |-INFO in ch.qos.logback.core.ConsoleAppender[CONSOLE] - console in production environments, especially in high volume systems.
+15:35:12,509 |-INFO in ch.qos.logback.core.ConsoleAppender[CONSOLE] - See also https://logback.qos.ch/codes.html#slowConsole
+15:35:12,513 |-INFO in ch.qos.logback.core.model.processor.AppenderModelHandler - Processing appender named [FILE]
+15:35:12,513 |-INFO in ch.qos.logback.core.model.processor.AppenderModelHandler - About to instantiate appender of type [ch.qos.logback.core.FileAppender]
+15:35:12,515 |-INFO in ch.qos.logback.core.model.processor.ModelInterpretationContext@6512cf8d - value "../test-logs/quorus-test-2026-09-05_07-34-55.log" substituted for "../test-logs/quorus-test-${testRunTimestamp}.log"
+15:35:12,517 |-INFO in ch.qos.logback.core.model.processor.ImplicitModelHandler - Assuming default type [ch.qos.logback.classic.encoder.PatternLayoutEncoder] for [encoder] property
+15:35:12,518 |-INFO in ch.qos.logback.core.FileAppender[FILE] - File property is set to [../test-logs/quorus-test-2026-09-05_07-34-55.log]
+15:35:12,523 |-INFO in ch.qos.logback.classic.model.processor.LoggerModelHandler - Setting level of logger [dev.mars.quorus] to DEBUG
+15:35:12,523 |-INFO in ch.qos.logback.classic.model.processor.LoggerModelHandler - Setting level of logger [org.apache] to WARN
+15:35:12,523 |-INFO in ch.qos.logback.classic.model.processor.LoggerModelHandler - Setting level of logger [io.vertx] to WARN
+15:35:12,523 |-INFO in ch.qos.logback.classic.model.processor.LoggerModelHandler - Setting level of logger [io.netty] to WARN
+15:35:12,523 |-INFO in ch.qos.logback.classic.model.processor.LoggerModelHandler - Setting level of logger [io.grpc] to WARN
+15:35:12,523 |-INFO in ch.qos.logback.classic.model.processor.RootLoggerModelHandler - Setting level of ROOT logger to INFO
+15:35:12,524 |-INFO in ch.qos.logback.core.model.processor.AppenderRefModelHandler - Attaching appender named [CONSOLE] to Logger[ROOT]
+15:35:12,525 |-INFO in ch.qos.logback.core.model.processor.AppenderRefModelHandler - Attaching appender named [FILE] to Logger[ROOT]
+15:35:12,525 |-INFO in ch.qos.logback.core.model.processor.DefaultProcessor@307e2822 - End of configuration.
+15:35:12,526 |-INFO in ch.qos.logback.classic.joran.JoranConfigurator@1a6dcd32 - Registering current configuration as safe fallback point
+15:35:12,529 |-INFO in ch.qos.logback.classic.util.ContextInitializer@75abe255 - ch.qos.logback.classic.util.DefaultJoranConfigurator.configure() call lasted 311 milliseconds. ExecutionStatus=DO_NOT_INVOKE_NEXT_IF_ANY
+
+[INFO] Running dev.mars.quorus.controller.raft.ConcurrentVoteBoundaryTest
+15:35:13.550 [ForkJoinPool-1-worker-1] DEBUG d.m.q.c.state.QuorusStateStore - Initializing default metadata: version=2.0
+15:35:13.598 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode - Starting Raft node: voter
+15:35:13.599 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/0] - No storage configured, running in volatile mode
+15:35:13.601 [vert.x-eventloop-thread-0] INFO  d.m.q.c.r.InMemoryTransportSimulator [FOLLOWER/0] - Started in-memory transport for node: voter
+15:35:13.603 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/0] - Raft node voter started successfully (term=0, logSize=1)
+15:35:13.626 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/0] - Handling vote request: candidateId=candidate-a, requestTerm=1, localTerm=0, localVotedFor=null, candidateLastLogTerm=0, candidateLastLogIndex=0
+15:35:13.627 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/0] - Higher term observed in vote request: requestTerm=1 > localTerm=0. Stepping down without immediate metadata persistence.
+15:35:13.628 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Stepped down to FOLLOWER. Term: 1
+15:35:13.628 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote decision inputs: canGrantVoteForCandidate=true, candidateLogUpToDate=true, canGrant=true, effectiveLocalTerm=1
+15:35:13.628 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting granted vote metadata: term=1, candidateId=candidate-a
+15:35:13.628 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting raft metadata: term=1, votedForPresent=true, votedFor=candidate-a
+15:35:13.631 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote granted to candidate-a for term 1
+15:35:13.650 [vert.x-eventloop-thread-0] INFO  d.m.q.c.r.InMemoryTransportSimulator [FOLLOWER/1] - Stopped in-memory transport for node: voter
+15:35:13.653 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Raft node stopped: voter
+15:35:13.654 [ForkJoinPool-1-worker-1] INFO  d.m.q.c.r.InMemoryTransportSimulator - Healed all network partitions
+15:35:13.745 [ForkJoinPool-1-worker-1] INFO  d.m.raftlog.storage.FileRaftStorage - FileRaftStorage initialized: syncEnabled=true, verifyWrites=false, maxPayloadSize=16 MB, minFreeSpace=64 MB
+15:35:13.746 [ForkJoinPool-1-worker-1] INFO  d.m.q.c.r.s.RaftLogStorageAdapter - RaftLogStorageAdapter created with delegate: FileRaftStorage
+15:35:13.746 [ForkJoinPool-1-worker-1] INFO  d.m.q.c.r.s.RaftLogStorageAdapter - Opening RaftLog storage at: C:\Users\mraysmit\AppData\Local\Temp\junit3474770759213973829
+15:35:13.748 [wal-executor] INFO  d.m.raftlog.storage.FileRaftStorage - Opening WAL storage at: C:\Users\mraysmit\AppData\Local\Temp\junit3474770759213973829
+15:35:13.749 [wal-executor] INFO  d.m.raftlog.storage.FileRaftStorage - Exclusive lock acquired: C:\Users\mraysmit\AppData\Local\Temp\junit3474770759213973829\raft.lock
+15:35:13.751 [wal-executor] INFO  d.m.raftlog.storage.FileRaftStorage - WAL opened successfully: path=C:\Users\mraysmit\AppData\Local\Temp\junit3474770759213973829\raft.log, size=0 bytes
+15:35:13.755 [ForkJoinPool-1-worker-1] DEBUG d.m.q.c.state.QuorusStateStore - Initializing default metadata: version=2.0
+15:35:13.755 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode - Starting Raft node: voter
+15:35:13.756 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/0] - Recovering Raft state from storage...
+15:35:13.756 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.r.s.RaftLogStorageAdapter [FOLLOWER/0] - Loading metadata
+15:35:13.759 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/0] - Recovered metadata: term=0, votedFor=null
+15:35:13.763 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/0] - No snapshot found, will rebuild from full log replay
+15:35:13.765 [vert.x-eventloop-thread-0] INFO  d.m.q.c.r.s.RaftLogStorageAdapter [FOLLOWER/0] - Replaying WAL
+15:35:13.765 [wal-executor] INFO  d.m.raftlog.storage.FileRaftStorage - Replaying WAL from: C:\Users\mraysmit\AppData\Local\Temp\junit3474770759213973829\raft.log
+15:35:13.766 [wal-executor] INFO  d.m.raftlog.storage.FileRaftStorage - WAL replay complete: 0 entries recovered, 0 appends, 0 truncates, 1 ms
+15:35:13.769 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/0] - Recovered 0 log entries from 0 storage records
+15:35:13.769 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/0] - Rebuilding state machine from 0 entries...
+15:35:13.769 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [FOLLOWER/0] - Resetting state machine: jobs=0, agents=0, metadata=1
+15:35:13.769 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.state.QuorusStateStore [FOLLOWER/0] - Initializing default metadata: version=2.0
+15:35:13.769 [vert.x-eventloop-thread-0] INFO  d.m.q.c.state.QuorusStateStore [FOLLOWER/0] - State machine reset completed: version=2.0
+15:35:13.769 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/0] - Multi-node recovery: deferring log application until leader commit advances
+15:35:13.770 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/0] - Recovery complete: term=0, logSize=1, lastApplied=0, snapshotLastIndex=0
+15:35:13.770 [vert.x-eventloop-thread-0] INFO  d.m.q.c.r.InMemoryTransportSimulator [FOLLOWER/0] - Started in-memory transport for node: voter
+15:35:13.770 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/0] - Raft node voter started successfully (term=0, logSize=1)
+15:35:13.771 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/0] - Handling vote request: candidateId=candidate-0, requestTerm=1, localTerm=0, localVotedFor=null, candidateLastLogTerm=0, candidateLastLogIndex=0
+15:35:13.771 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/0] - Higher term observed in vote request: requestTerm=1 > localTerm=0. Stepping down without immediate metadata persistence.
+15:35:13.771 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Stepped down to FOLLOWER. Term: 1
+15:35:13.771 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote decision inputs: canGrantVoteForCandidate=true, candidateLogUpToDate=true, canGrant=true, effectiveLocalTerm=1
+15:35:13.772 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting granted vote metadata: term=1, candidateId=candidate-0
+15:35:13.772 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting raft metadata: term=1, votedForPresent=true, votedFor=candidate-0
+15:35:13.772 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.r.s.RaftLogStorageAdapter [FOLLOWER/1] - Updating metadata: term=1, votedFor=candidate-0
+15:35:13.773 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Handling vote request: candidateId=candidate-1, requestTerm=1, localTerm=1, localVotedFor=null, candidateLastLogTerm=0, candidateLastLogIndex=0
+15:35:13.773 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote decision inputs: canGrantVoteForCandidate=true, candidateLogUpToDate=true, canGrant=true, effectiveLocalTerm=1
+15:35:13.774 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting granted vote metadata: term=1, candidateId=candidate-1
+15:35:13.774 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting raft metadata: term=1, votedForPresent=true, votedFor=candidate-1
+15:35:13.774 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.r.s.RaftLogStorageAdapter [FOLLOWER/1] - Updating metadata: term=1, votedFor=candidate-1
+15:35:13.774 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Handling vote request: candidateId=candidate-2, requestTerm=1, localTerm=1, localVotedFor=null, candidateLastLogTerm=0, candidateLastLogIndex=0
+15:35:13.775 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote decision inputs: canGrantVoteForCandidate=true, candidateLogUpToDate=true, canGrant=true, effectiveLocalTerm=1
+15:35:13.775 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting granted vote metadata: term=1, candidateId=candidate-2
+15:35:13.775 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting raft metadata: term=1, votedForPresent=true, votedFor=candidate-2
+15:35:13.775 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.r.s.RaftLogStorageAdapter [FOLLOWER/1] - Updating metadata: term=1, votedFor=candidate-2
+15:35:13.775 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Handling vote request: candidateId=candidate-3, requestTerm=1, localTerm=1, localVotedFor=null, candidateLastLogTerm=0, candidateLastLogIndex=0
+15:35:13.775 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote decision inputs: canGrantVoteForCandidate=true, candidateLogUpToDate=true, canGrant=true, effectiveLocalTerm=1
+15:35:13.775 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting granted vote metadata: term=1, candidateId=candidate-3
+15:35:13.776 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting raft metadata: term=1, votedForPresent=true, votedFor=candidate-3
+15:35:13.776 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.r.s.RaftLogStorageAdapter [FOLLOWER/1] - Updating metadata: term=1, votedFor=candidate-3
+15:35:13.776 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Handling vote request: candidateId=candidate-4, requestTerm=1, localTerm=1, localVotedFor=null, candidateLastLogTerm=0, candidateLastLogIndex=0
+15:35:13.776 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote decision inputs: canGrantVoteForCandidate=true, candidateLogUpToDate=true, canGrant=true, effectiveLocalTerm=1
+15:35:13.776 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting granted vote metadata: term=1, candidateId=candidate-4
+15:35:13.777 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting raft metadata: term=1, votedForPresent=true, votedFor=candidate-4
+15:35:13.777 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.r.s.RaftLogStorageAdapter [FOLLOWER/1] - Updating metadata: term=1, votedFor=candidate-4
+15:35:13.777 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Handling vote request: candidateId=candidate-5, requestTerm=1, localTerm=1, localVotedFor=null, candidateLastLogTerm=0, candidateLastLogIndex=0
+15:35:13.777 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote decision inputs: canGrantVoteForCandidate=true, candidateLogUpToDate=true, canGrant=true, effectiveLocalTerm=1
+15:35:13.777 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting granted vote metadata: term=1, candidateId=candidate-5
+15:35:13.778 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting raft metadata: term=1, votedForPresent=true, votedFor=candidate-5
+15:35:13.778 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.r.s.RaftLogStorageAdapter [FOLLOWER/1] - Updating metadata: term=1, votedFor=candidate-5
+15:35:13.778 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Handling vote request: candidateId=candidate-6, requestTerm=1, localTerm=1, localVotedFor=null, candidateLastLogTerm=0, candidateLastLogIndex=0
+15:35:13.778 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote decision inputs: canGrantVoteForCandidate=true, candidateLogUpToDate=true, canGrant=true, effectiveLocalTerm=1
+15:35:13.778 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting granted vote metadata: term=1, candidateId=candidate-6
+15:35:13.779 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting raft metadata: term=1, votedForPresent=true, votedFor=candidate-6
+15:35:13.779 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.r.s.RaftLogStorageAdapter [FOLLOWER/1] - Updating metadata: term=1, votedFor=candidate-6
+15:35:13.779 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Handling vote request: candidateId=candidate-7, requestTerm=1, localTerm=1, localVotedFor=null, candidateLastLogTerm=0, candidateLastLogIndex=0
+15:35:13.779 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote decision inputs: canGrantVoteForCandidate=true, candidateLogUpToDate=true, canGrant=true, effectiveLocalTerm=1
+15:35:13.779 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting granted vote metadata: term=1, candidateId=candidate-7
+15:35:13.779 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting raft metadata: term=1, votedForPresent=true, votedFor=candidate-7
+15:35:13.780 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.r.s.RaftLogStorageAdapter [FOLLOWER/1] - Updating metadata: term=1, votedFor=candidate-7
+15:35:13.780 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Handling vote request: candidateId=candidate-8, requestTerm=1, localTerm=1, localVotedFor=null, candidateLastLogTerm=0, candidateLastLogIndex=0
+15:35:13.780 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote decision inputs: canGrantVoteForCandidate=true, candidateLogUpToDate=true, canGrant=true, effectiveLocalTerm=1
+15:35:13.780 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting granted vote metadata: term=1, candidateId=candidate-8
+15:35:13.780 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting raft metadata: term=1, votedForPresent=true, votedFor=candidate-8
+15:35:13.780 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.r.s.RaftLogStorageAdapter [FOLLOWER/1] - Updating metadata: term=1, votedFor=candidate-8
+15:35:13.781 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Handling vote request: candidateId=candidate-9, requestTerm=1, localTerm=1, localVotedFor=null, candidateLastLogTerm=0, candidateLastLogIndex=0
+15:35:13.781 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote decision inputs: canGrantVoteForCandidate=true, candidateLogUpToDate=true, canGrant=true, effectiveLocalTerm=1
+15:35:13.781 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting granted vote metadata: term=1, candidateId=candidate-9
+15:35:13.781 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting raft metadata: term=1, votedForPresent=true, votedFor=candidate-9
+15:35:13.781 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.r.s.RaftLogStorageAdapter [FOLLOWER/1] - Updating metadata: term=1, votedFor=candidate-9
+15:35:13.782 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Handling vote request: candidateId=candidate-10, requestTerm=1, localTerm=1, localVotedFor=null, candidateLastLogTerm=0, candidateLastLogIndex=0
+15:35:13.782 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote decision inputs: canGrantVoteForCandidate=true, candidateLogUpToDate=true, canGrant=true, effectiveLocalTerm=1
+15:35:13.782 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting granted vote metadata: term=1, candidateId=candidate-10
+15:35:13.783 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting raft metadata: term=1, votedForPresent=true, votedFor=candidate-10
+15:35:13.783 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.r.s.RaftLogStorageAdapter [FOLLOWER/1] - Updating metadata: term=1, votedFor=candidate-10
+15:35:13.783 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Handling vote request: candidateId=candidate-11, requestTerm=1, localTerm=1, localVotedFor=null, candidateLastLogTerm=0, candidateLastLogIndex=0
+15:35:13.783 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote decision inputs: canGrantVoteForCandidate=true, candidateLogUpToDate=true, canGrant=true, effectiveLocalTerm=1
+15:35:13.783 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting granted vote metadata: term=1, candidateId=candidate-11
+15:35:13.784 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting raft metadata: term=1, votedForPresent=true, votedFor=candidate-11
+15:35:13.784 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.r.s.RaftLogStorageAdapter [FOLLOWER/1] - Updating metadata: term=1, votedFor=candidate-11
+15:35:13.784 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Handling vote request: candidateId=candidate-12, requestTerm=1, localTerm=1, localVotedFor=null, candidateLastLogTerm=0, candidateLastLogIndex=0
+15:35:13.784 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote decision inputs: canGrantVoteForCandidate=true, candidateLogUpToDate=true, canGrant=true, effectiveLocalTerm=1
+15:35:13.784 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting granted vote metadata: term=1, candidateId=candidate-12
+15:35:13.784 [wal-executor] INFO  d.m.raftlog.storage.FileRaftStorage - Metadata updated: term=1, votedFor=candidate-0
+15:35:13.784 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting raft metadata: term=1, votedForPresent=true, votedFor=candidate-12
+15:35:13.785 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.r.s.RaftLogStorageAdapter [FOLLOWER/1] - Updating metadata: term=1, votedFor=candidate-12
+15:35:13.785 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Handling vote request: candidateId=candidate-13, requestTerm=1, localTerm=1, localVotedFor=null, candidateLastLogTerm=0, candidateLastLogIndex=0
+15:35:13.785 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote decision inputs: canGrantVoteForCandidate=true, candidateLogUpToDate=true, canGrant=true, effectiveLocalTerm=1
+15:35:13.785 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting granted vote metadata: term=1, candidateId=candidate-13
+15:35:13.785 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting raft metadata: term=1, votedForPresent=true, votedFor=candidate-13
+15:35:13.786 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.r.s.RaftLogStorageAdapter [FOLLOWER/1] - Updating metadata: term=1, votedFor=candidate-13
+15:35:13.786 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Handling vote request: candidateId=candidate-14, requestTerm=1, localTerm=1, localVotedFor=null, candidateLastLogTerm=0, candidateLastLogIndex=0
+15:35:13.786 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote decision inputs: canGrantVoteForCandidate=true, candidateLogUpToDate=true, canGrant=true, effectiveLocalTerm=1
+15:35:13.786 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting granted vote metadata: term=1, candidateId=candidate-14
+15:35:13.787 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting raft metadata: term=1, votedForPresent=true, votedFor=candidate-14
+15:35:13.787 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.r.s.RaftLogStorageAdapter [FOLLOWER/1] - Updating metadata: term=1, votedFor=candidate-14
+15:35:13.787 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Handling vote request: candidateId=candidate-15, requestTerm=1, localTerm=1, localVotedFor=null, candidateLastLogTerm=0, candidateLastLogIndex=0
+15:35:13.787 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote decision inputs: canGrantVoteForCandidate=true, candidateLogUpToDate=true, canGrant=true, effectiveLocalTerm=1
+15:35:13.787 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting granted vote metadata: term=1, candidateId=candidate-15
+15:35:13.788 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting raft metadata: term=1, votedForPresent=true, votedFor=candidate-15
+15:35:13.788 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.r.s.RaftLogStorageAdapter [FOLLOWER/1] - Updating metadata: term=1, votedFor=candidate-15
+15:35:13.788 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Handling vote request: candidateId=candidate-16, requestTerm=1, localTerm=1, localVotedFor=null, candidateLastLogTerm=0, candidateLastLogIndex=0
+15:35:13.788 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote decision inputs: canGrantVoteForCandidate=true, candidateLogUpToDate=true, canGrant=true, effectiveLocalTerm=1
+15:35:13.788 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting granted vote metadata: term=1, candidateId=candidate-16
+15:35:13.789 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting raft metadata: term=1, votedForPresent=true, votedFor=candidate-16
+15:35:13.789 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.r.s.RaftLogStorageAdapter [FOLLOWER/1] - Updating metadata: term=1, votedFor=candidate-16
+15:35:13.789 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Handling vote request: candidateId=candidate-17, requestTerm=1, localTerm=1, localVotedFor=null, candidateLastLogTerm=0, candidateLastLogIndex=0
+15:35:13.789 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote decision inputs: canGrantVoteForCandidate=true, candidateLogUpToDate=true, canGrant=true, effectiveLocalTerm=1
+15:35:13.789 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting granted vote metadata: term=1, candidateId=candidate-17
+15:35:13.790 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting raft metadata: term=1, votedForPresent=true, votedFor=candidate-17
+15:35:13.790 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.r.s.RaftLogStorageAdapter [FOLLOWER/1] - Updating metadata: term=1, votedFor=candidate-17
+15:35:13.791 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Handling vote request: candidateId=candidate-18, requestTerm=1, localTerm=1, localVotedFor=null, candidateLastLogTerm=0, candidateLastLogIndex=0
+15:35:13.791 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote decision inputs: canGrantVoteForCandidate=true, candidateLogUpToDate=true, canGrant=true, effectiveLocalTerm=1
+15:35:13.792 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting granted vote metadata: term=1, candidateId=candidate-18
+15:35:13.792 [wal-executor] INFO  d.m.raftlog.storage.FileRaftStorage - Metadata updated: term=1, votedFor=candidate-1
+15:35:13.793 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting raft metadata: term=1, votedForPresent=true, votedFor=candidate-18
+15:35:13.793 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.r.s.RaftLogStorageAdapter [FOLLOWER/1] - Updating metadata: term=1, votedFor=candidate-18
+15:35:13.793 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Handling vote request: candidateId=candidate-19, requestTerm=1, localTerm=1, localVotedFor=null, candidateLastLogTerm=0, candidateLastLogIndex=0
+15:35:13.794 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote decision inputs: canGrantVoteForCandidate=true, candidateLogUpToDate=true, canGrant=true, effectiveLocalTerm=1
+15:35:13.794 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting granted vote metadata: term=1, candidateId=candidate-19
+15:35:13.794 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting raft metadata: term=1, votedForPresent=true, votedFor=candidate-19
+15:35:13.794 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.r.s.RaftLogStorageAdapter [FOLLOWER/1] - Updating metadata: term=1, votedFor=candidate-19
+15:35:13.794 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Handling vote request: candidateId=candidate-20, requestTerm=1, localTerm=1, localVotedFor=null, candidateLastLogTerm=0, candidateLastLogIndex=0
+15:35:13.794 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote decision inputs: canGrantVoteForCandidate=true, candidateLogUpToDate=true, canGrant=true, effectiveLocalTerm=1
+15:35:13.795 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting granted vote metadata: term=1, candidateId=candidate-20
+15:35:13.795 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting raft metadata: term=1, votedForPresent=true, votedFor=candidate-20
+15:35:13.795 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.r.s.RaftLogStorageAdapter [FOLLOWER/1] - Updating metadata: term=1, votedFor=candidate-20
+15:35:13.795 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Handling vote request: candidateId=candidate-21, requestTerm=1, localTerm=1, localVotedFor=null, candidateLastLogTerm=0, candidateLastLogIndex=0
+15:35:13.795 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote decision inputs: canGrantVoteForCandidate=true, candidateLogUpToDate=true, canGrant=true, effectiveLocalTerm=1
+15:35:13.795 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting granted vote metadata: term=1, candidateId=candidate-21
+15:35:13.795 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting raft metadata: term=1, votedForPresent=true, votedFor=candidate-21
+15:35:13.796 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.r.s.RaftLogStorageAdapter [FOLLOWER/1] - Updating metadata: term=1, votedFor=candidate-21
+15:35:13.796 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Handling vote request: candidateId=candidate-22, requestTerm=1, localTerm=1, localVotedFor=null, candidateLastLogTerm=0, candidateLastLogIndex=0
+15:35:13.796 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote decision inputs: canGrantVoteForCandidate=true, candidateLogUpToDate=true, canGrant=true, effectiveLocalTerm=1
+15:35:13.796 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting granted vote metadata: term=1, candidateId=candidate-22
+15:35:13.796 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting raft metadata: term=1, votedForPresent=true, votedFor=candidate-22
+15:35:13.796 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.r.s.RaftLogStorageAdapter [FOLLOWER/1] - Updating metadata: term=1, votedFor=candidate-22
+15:35:13.797 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Handling vote request: candidateId=candidate-23, requestTerm=1, localTerm=1, localVotedFor=null, candidateLastLogTerm=0, candidateLastLogIndex=0
+15:35:13.797 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote decision inputs: canGrantVoteForCandidate=true, candidateLogUpToDate=true, canGrant=true, effectiveLocalTerm=1
+15:35:13.797 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting granted vote metadata: term=1, candidateId=candidate-23
+15:35:13.797 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting raft metadata: term=1, votedForPresent=true, votedFor=candidate-23
+15:35:13.797 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.r.s.RaftLogStorageAdapter [FOLLOWER/1] - Updating metadata: term=1, votedFor=candidate-23
+15:35:13.797 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Handling vote request: candidateId=candidate-24, requestTerm=1, localTerm=1, localVotedFor=null, candidateLastLogTerm=0, candidateLastLogIndex=0
+15:35:13.798 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote decision inputs: canGrantVoteForCandidate=true, candidateLogUpToDate=true, canGrant=true, effectiveLocalTerm=1
+15:35:13.798 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting granted vote metadata: term=1, candidateId=candidate-24
+15:35:13.798 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting raft metadata: term=1, votedForPresent=true, votedFor=candidate-24
+15:35:13.798 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.r.s.RaftLogStorageAdapter [FOLLOWER/1] - Updating metadata: term=1, votedFor=candidate-24
+15:35:13.798 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Handling vote request: candidateId=candidate-25, requestTerm=1, localTerm=1, localVotedFor=null, candidateLastLogTerm=0, candidateLastLogIndex=0
+15:35:13.798 [wal-executor] INFO  d.m.raftlog.storage.FileRaftStorage - Metadata updated: term=1, votedFor=candidate-2
+15:35:13.799 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote decision inputs: canGrantVoteForCandidate=true, candidateLogUpToDate=true, canGrant=true, effectiveLocalTerm=1
+15:35:13.799 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting granted vote metadata: term=1, candidateId=candidate-25
+15:35:13.799 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting raft metadata: term=1, votedForPresent=true, votedFor=candidate-25
+15:35:13.799 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.r.s.RaftLogStorageAdapter [FOLLOWER/1] - Updating metadata: term=1, votedFor=candidate-25
+15:35:13.799 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Handling vote request: candidateId=candidate-26, requestTerm=1, localTerm=1, localVotedFor=null, candidateLastLogTerm=0, candidateLastLogIndex=0
+15:35:13.799 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote decision inputs: canGrantVoteForCandidate=true, candidateLogUpToDate=true, canGrant=true, effectiveLocalTerm=1
+15:35:13.800 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting granted vote metadata: term=1, candidateId=candidate-26
+15:35:13.800 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting raft metadata: term=1, votedForPresent=true, votedFor=candidate-26
+15:35:13.800 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.r.s.RaftLogStorageAdapter [FOLLOWER/1] - Updating metadata: term=1, votedFor=candidate-26
+15:35:13.800 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Handling vote request: candidateId=candidate-27, requestTerm=1, localTerm=1, localVotedFor=null, candidateLastLogTerm=0, candidateLastLogIndex=0
+15:35:13.800 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote decision inputs: canGrantVoteForCandidate=true, candidateLogUpToDate=true, canGrant=true, effectiveLocalTerm=1
+15:35:13.800 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting granted vote metadata: term=1, candidateId=candidate-27
+15:35:13.801 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting raft metadata: term=1, votedForPresent=true, votedFor=candidate-27
+15:35:13.801 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.r.s.RaftLogStorageAdapter [FOLLOWER/1] - Updating metadata: term=1, votedFor=candidate-27
+15:35:13.801 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Handling vote request: candidateId=candidate-28, requestTerm=1, localTerm=1, localVotedFor=null, candidateLastLogTerm=0, candidateLastLogIndex=0
+15:35:13.801 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote decision inputs: canGrantVoteForCandidate=true, candidateLogUpToDate=true, canGrant=true, effectiveLocalTerm=1
+15:35:13.801 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting granted vote metadata: term=1, candidateId=candidate-28
+15:35:13.801 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting raft metadata: term=1, votedForPresent=true, votedFor=candidate-28
+15:35:13.801 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.r.s.RaftLogStorageAdapter [FOLLOWER/1] - Updating metadata: term=1, votedFor=candidate-28
+15:35:13.802 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Handling vote request: candidateId=candidate-29, requestTerm=1, localTerm=1, localVotedFor=null, candidateLastLogTerm=0, candidateLastLogIndex=0
+15:35:13.802 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote decision inputs: canGrantVoteForCandidate=true, candidateLogUpToDate=true, canGrant=true, effectiveLocalTerm=1
+15:35:13.802 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting granted vote metadata: term=1, candidateId=candidate-29
+15:35:13.802 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting raft metadata: term=1, votedForPresent=true, votedFor=candidate-29
+15:35:13.802 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.r.s.RaftLogStorageAdapter [FOLLOWER/1] - Updating metadata: term=1, votedFor=candidate-29
+15:35:13.802 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Handling vote request: candidateId=candidate-30, requestTerm=1, localTerm=1, localVotedFor=null, candidateLastLogTerm=0, candidateLastLogIndex=0
+15:35:13.803 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote decision inputs: canGrantVoteForCandidate=true, candidateLogUpToDate=true, canGrant=true, effectiveLocalTerm=1
+15:35:13.803 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting granted vote metadata: term=1, candidateId=candidate-30
+15:35:13.803 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting raft metadata: term=1, votedForPresent=true, votedFor=candidate-30
+15:35:13.803 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.r.s.RaftLogStorageAdapter [FOLLOWER/1] - Updating metadata: term=1, votedFor=candidate-30
+15:35:13.803 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Handling vote request: candidateId=candidate-31, requestTerm=1, localTerm=1, localVotedFor=null, candidateLastLogTerm=0, candidateLastLogIndex=0
+15:35:13.803 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote decision inputs: canGrantVoteForCandidate=true, candidateLogUpToDate=true, canGrant=true, effectiveLocalTerm=1
+15:35:13.803 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting granted vote metadata: term=1, candidateId=candidate-31
+15:35:13.804 [vert.x-eventloop-thread-0] DEBUG d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Persisting raft metadata: term=1, votedForPresent=true, votedFor=candidate-31
+15:35:13.804 [vert.x-eventloop-thread-0] DEBUG d.m.q.c.r.s.RaftLogStorageAdapter [FOLLOWER/1] - Updating metadata: term=1, votedFor=candidate-31
+15:35:13.804 [wal-executor] INFO  d.m.raftlog.storage.FileRaftStorage - Metadata updated: term=1, votedFor=candidate-3
+15:35:13.804 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote granted to candidate-0 for term 1
+15:35:13.804 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote granted to candidate-1 for term 1
+15:35:13.805 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote granted to candidate-2 for term 1
+15:35:13.805 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote granted to candidate-3 for term 1
+15:35:13.809 [wal-executor] INFO  d.m.raftlog.storage.FileRaftStorage - Metadata updated: term=1, votedFor=candidate-4
+15:35:13.810 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote granted to candidate-4 for term 1
+15:35:13.816 [wal-executor] INFO  d.m.raftlog.storage.FileRaftStorage - Metadata updated: term=1, votedFor=candidate-5
+15:35:13.816 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote granted to candidate-5 for term 1
+15:35:13.821 [wal-executor] INFO  d.m.raftlog.storage.FileRaftStorage - Metadata updated: term=1, votedFor=candidate-6
+15:35:13.822 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote granted to candidate-6 for term 1
+15:35:13.826 [wal-executor] INFO  d.m.raftlog.storage.FileRaftStorage - Metadata updated: term=1, votedFor=candidate-7
+15:35:13.827 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote granted to candidate-7 for term 1
+15:35:13.832 [wal-executor] INFO  d.m.raftlog.storage.FileRaftStorage - Metadata updated: term=1, votedFor=candidate-8
+15:35:13.832 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote granted to candidate-8 for term 1
+15:35:13.838 [wal-executor] INFO  d.m.raftlog.storage.FileRaftStorage - Metadata updated: term=1, votedFor=candidate-9
+15:35:13.838 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote granted to candidate-9 for term 1
+15:35:13.843 [wal-executor] INFO  d.m.raftlog.storage.FileRaftStorage - Metadata updated: term=1, votedFor=candidate-10
+15:35:13.844 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote granted to candidate-10 for term 1
+15:35:13.848 [wal-executor] INFO  d.m.raftlog.storage.FileRaftStorage - Metadata updated: term=1, votedFor=candidate-11
+15:35:13.849 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote granted to candidate-11 for term 1
+15:35:13.853 [wal-executor] INFO  d.m.raftlog.storage.FileRaftStorage - Metadata updated: term=1, votedFor=candidate-12
+15:35:13.853 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote granted to candidate-12 for term 1
+15:35:13.858 [wal-executor] INFO  d.m.raftlog.storage.FileRaftStorage - Metadata updated: term=1, votedFor=candidate-13
+15:35:13.859 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote granted to candidate-13 for term 1
+15:35:13.864 [wal-executor] INFO  d.m.raftlog.storage.FileRaftStorage - Metadata updated: term=1, votedFor=candidate-14
+15:35:13.865 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote granted to candidate-14 for term 1
+15:35:13.869 [wal-executor] INFO  d.m.raftlog.storage.FileRaftStorage - Metadata updated: term=1, votedFor=candidate-15
+15:35:13.870 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote granted to candidate-15 for term 1
+15:35:13.875 [wal-executor] INFO  d.m.raftlog.storage.FileRaftStorage - Metadata updated: term=1, votedFor=candidate-16
+15:35:13.875 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote granted to candidate-16 for term 1
+15:35:13.880 [wal-executor] INFO  d.m.raftlog.storage.FileRaftStorage - Metadata updated: term=1, votedFor=candidate-17
+15:35:13.880 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote granted to candidate-17 for term 1
+15:35:13.884 [wal-executor] INFO  d.m.raftlog.storage.FileRaftStorage - Metadata updated: term=1, votedFor=candidate-18
+15:35:13.885 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote granted to candidate-18 for term 1
+15:35:13.889 [wal-executor] INFO  d.m.raftlog.storage.FileRaftStorage - Metadata updated: term=1, votedFor=candidate-19
+15:35:13.892 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote granted to candidate-19 for term 1
+15:35:13.897 [wal-executor] INFO  d.m.raftlog.storage.FileRaftStorage - Metadata updated: term=1, votedFor=candidate-20
+15:35:13.899 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote granted to candidate-20 for term 1
+15:35:13.904 [wal-executor] INFO  d.m.raftlog.storage.FileRaftStorage - Metadata updated: term=1, votedFor=candidate-21
+15:35:13.905 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote granted to candidate-21 for term 1
+15:35:13.911 [wal-executor] INFO  d.m.raftlog.storage.FileRaftStorage - Metadata updated: term=1, votedFor=candidate-22
+15:35:13.912 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote granted to candidate-22 for term 1
+15:35:13.917 [wal-executor] INFO  d.m.raftlog.storage.FileRaftStorage - Metadata updated: term=1, votedFor=candidate-23
+15:35:13.918 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote granted to candidate-23 for term 1
+15:35:13.923 [wal-executor] INFO  d.m.raftlog.storage.FileRaftStorage - Metadata updated: term=1, votedFor=candidate-24
+15:35:13.924 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote granted to candidate-24 for term 1
+15:35:13.929 [wal-executor] INFO  d.m.raftlog.storage.FileRaftStorage - Metadata updated: term=1, votedFor=candidate-25
+15:35:13.930 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote granted to candidate-25 for term 1
+15:35:13.934 [wal-executor] INFO  d.m.raftlog.storage.FileRaftStorage - Metadata updated: term=1, votedFor=candidate-26
+15:35:13.935 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote granted to candidate-26 for term 1
+15:35:13.941 [wal-executor] INFO  d.m.raftlog.storage.FileRaftStorage - Metadata updated: term=1, votedFor=candidate-27
+15:35:13.944 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote granted to candidate-27 for term 1
+15:35:13.949 [wal-executor] INFO  d.m.raftlog.storage.FileRaftStorage - Metadata updated: term=1, votedFor=candidate-28
+15:35:13.950 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote granted to candidate-28 for term 1
+15:35:13.954 [wal-executor] INFO  d.m.raftlog.storage.FileRaftStorage - Metadata updated: term=1, votedFor=candidate-29
+15:35:13.954 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote granted to candidate-29 for term 1
+15:35:13.959 [wal-executor] INFO  d.m.raftlog.storage.FileRaftStorage - Metadata updated: term=1, votedFor=candidate-30
+15:35:13.959 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote granted to candidate-30 for term 1
+15:35:13.964 [wal-executor] INFO  d.m.raftlog.storage.FileRaftStorage - Metadata updated: term=1, votedFor=candidate-31
+15:35:13.965 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Vote granted to candidate-31 for term 1
+15:35:13.969 [vert.x-eventloop-thread-0] INFO  d.m.q.c.r.InMemoryTransportSimulator [FOLLOWER/1] - Stopped in-memory transport for node: voter
+15:35:13.969 [vert.x-eventloop-thread-0] INFO  d.m.q.c.r.s.RaftLogStorageAdapter [FOLLOWER/1] - Closing RaftLog storage
+15:35:13.972 [vert.x-worker-thread-1] INFO  d.m.raftlog.storage.FileRaftStorage - Closing WAL storage at: C:\Users\mraysmit\AppData\Local\Temp\junit3474770759213973829
+15:35:13.973 [vert.x-worker-thread-1] INFO  d.m.raftlog.storage.FileRaftStorage - WAL storage closed
+15:35:13.974 [vert.x-eventloop-thread-0] INFO  d.m.quorus.controller.raft.RaftNode [FOLLOWER/1] - Raft node stopped: voter
+15:35:13.974 [ForkJoinPool-1-worker-1] INFO  d.m.q.c.r.InMemoryTransportSimulator - Healed all network partitions
+[ERROR] Tests run: 2, Failures: 2, Errors: 0, Skipped: 0, Time elapsed: 1.410 s <<< FAILURE! -- in dev.mars.quorus.controller.raft.ConcurrentVoteBoundaryTest
+[ERROR] dev.mars.quorus.controller.raft.ConcurrentVoteBoundaryTest.incomingVotesUseTheNodeContext(Vertx) -- Time elapsed: 1.052 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: External RPC callers must enter the node's owning context ==> expected: <io.vertx.core.impl.ContextImpl@55f56870> but was: <io.vertx.core.impl.ContextImpl@e59ef5b>
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+	at org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
+	at org.junit.jupiter.api.AssertSame.failNotSame(AssertSame.java:50)
+	at org.junit.jupiter.api.AssertSame.assertSame(AssertSame.java:35)
+	at org.junit.jupiter.api.Assertions.assertSame(Assertions.java:2860)
+	at dev.mars.quorus.controller.raft.ConcurrentVoteBoundaryTest.incomingVotesUseTheNodeContext(ConcurrentVoteBoundaryTest.java:42)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:104)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at org.junit.platform.commons.util.ReflectionUtils.invokeMethod(ReflectionUtils.java:727)
+	at org.junit.jupiter.engine.execution.MethodInvocation.proceed(MethodInvocation.java:60)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$ValidatingInvocation.proceed(InvocationInterceptorChain.java:131)
+	at io.vertx.junit5.VertxExtension.interceptTestMethod(VertxExtension.java:142)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker$ReflectiveInterceptorCall.lambda$ofVoidMethod$0(InterceptingExecutableInvoker.java:103)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.lambda$invoke$0(InterceptingExecutableInvoker.java:93)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$InterceptedInvocation.proceed(InvocationInterceptorChain.java:106)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.intercept(TimeoutExtension.java:156)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.interceptTestableMethod(TimeoutExtension.java:147)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.interceptTestMethod(TimeoutExtension.java:86)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker$ReflectiveInterceptorCall.lambda$ofVoidMethod$0(InterceptingExecutableInvoker.java:103)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.lambda$invoke$0(InterceptingExecutableInvoker.java:93)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$InterceptedInvocation.proceed(InvocationInterceptorChain.java:106)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.proceed(InvocationInterceptorChain.java:64)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.chainAndInvoke(InvocationInterceptorChain.java:45)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.invoke(InvocationInterceptorChain.java:37)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:92)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:86)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.lambda$invokeTestMethod$7(TestMethodTestDescriptor.java:217)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.invokeTestMethod(TestMethodTestDescriptor.java:213)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.execute(TestMethodTestDescriptor.java:138)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.execute(TestMethodTestDescriptor.java:68)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:151)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:141)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:139)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:138)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:95)
+	at org.junit.platform.engine.support.hierarchical.ForkJoinPoolHierarchicalTestExecutorService$ExclusiveTask.compute(ForkJoinPoolHierarchicalTestExecutorService.java:202)
+	at org.junit.platform.engine.support.hierarchical.ForkJoinPoolHierarchicalTestExecutorService.executeNonConcurrentTasks(ForkJoinPoolHierarchicalTestExecutorService.java:172)
+	at org.junit.platform.engine.support.hierarchical.ForkJoinPoolHierarchicalTestExecutorService.invokeAll(ForkJoinPoolHierarchicalTestExecutorService.java:152)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:155)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:141)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:139)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:138)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:95)
+	at org.junit.platform.engine.support.hierarchical.ForkJoinPoolHierarchicalTestExecutorService$ExclusiveTask.compute(ForkJoinPoolHierarchicalTestExecutorService.java:202)
+	at org.junit.platform.engine.support.hierarchical.ForkJoinPoolHierarchicalTestExecutorService.invokeAll(ForkJoinPoolHierarchicalTestExecutorService.java:146)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:155)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:141)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:139)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:138)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:95)
+	at org.junit.platform.engine.support.hierarchical.ForkJoinPoolHierarchicalTestExecutorService$ExclusiveTask.compute(ForkJoinPoolHierarchicalTestExecutorService.java:202)
+	at java.base/java.util.concurrent.RecursiveAction.exec(RecursiveAction.java:194)
+	at java.base/java.util.concurrent.ForkJoinTask.doExec(ForkJoinTask.java:511)
+	at java.base/java.util.concurrent.ForkJoinPool$WorkQueue.topLevelExec(ForkJoinPool.java:1450)
+	at java.base/java.util.concurrent.ForkJoinPool.runWorker(ForkJoinPool.java:2019)
+	at java.base/java.util.concurrent.ForkJoinWorkerThread.run(ForkJoinWorkerThread.java:187)
+
+[ERROR] dev.mars.quorus.controller.raft.ConcurrentVoteBoundaryTest.overlappingDurableVotesGrantOnlyOneCandidateAndSurviveReopen(Vertx) -- Time elapsed: 0.299 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: A pending fsync must not allow another candidate to receive the same-term vote ==> expected: <1> but was: <32>
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+	at org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
+	at org.junit.jupiter.api.AssertEquals.failNotEqual(AssertEquals.java:197)
+	at org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:166)
+	at org.junit.jupiter.api.Assertions.assertEquals(Assertions.java:661)
+	at dev.mars.quorus.controller.raft.ConcurrentVoteBoundaryTest.overlappingDurableVotesGrantOnlyOneCandidateAndSurviveReopen(ConcurrentVoteBoundaryTest.java:54)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:104)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at org.junit.platform.commons.util.ReflectionUtils.invokeMethod(ReflectionUtils.java:727)
+	at org.junit.jupiter.engine.execution.MethodInvocation.proceed(MethodInvocation.java:60)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$ValidatingInvocation.proceed(InvocationInterceptorChain.java:131)
+	at io.vertx.junit5.VertxExtension.interceptTestMethod(VertxExtension.java:142)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker$ReflectiveInterceptorCall.lambda$ofVoidMethod$0(InterceptingExecutableInvoker.java:103)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.lambda$invoke$0(InterceptingExecutableInvoker.java:93)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$InterceptedInvocation.proceed(InvocationInterceptorChain.java:106)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.intercept(TimeoutExtension.java:156)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.interceptTestableMethod(TimeoutExtension.java:147)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.interceptTestMethod(TimeoutExtension.java:86)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker$ReflectiveInterceptorCall.lambda$ofVoidMethod$0(InterceptingExecutableInvoker.java:103)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.lambda$invoke$0(InterceptingExecutableInvoker.java:93)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$InterceptedInvocation.proceed(InvocationInterceptorChain.java:106)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.proceed(InvocationInterceptorChain.java:64)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.chainAndInvoke(InvocationInterceptorChain.java:45)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.invoke(InvocationInterceptorChain.java:37)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:92)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:86)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.lambda$invokeTestMethod$7(TestMethodTestDescriptor.java:217)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.invokeTestMethod(TestMethodTestDescriptor.java:213)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.execute(TestMethodTestDescriptor.java:138)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.execute(TestMethodTestDescriptor.java:68)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:151)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:141)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:139)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:138)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:95)
+	at org.junit.platform.engine.support.hierarchical.ForkJoinPoolHierarchicalTestExecutorService$ExclusiveTask.compute(ForkJoinPoolHierarchicalTestExecutorService.java:202)
+	at org.junit.platform.engine.support.hierarchical.ForkJoinPoolHierarchicalTestExecutorService.executeNonConcurrentTasks(ForkJoinPoolHierarchicalTestExecutorService.java:172)
+	at org.junit.platform.engine.support.hierarchical.ForkJoinPoolHierarchicalTestExecutorService.invokeAll(ForkJoinPoolHierarchicalTestExecutorService.java:152)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:155)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:141)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:139)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:138)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:95)
+	at org.junit.platform.engine.support.hierarchical.ForkJoinPoolHierarchicalTestExecutorService$ExclusiveTask.compute(ForkJoinPoolHierarchicalTestExecutorService.java:202)
+	at org.junit.platform.engine.support.hierarchical.ForkJoinPoolHierarchicalTestExecutorService.invokeAll(ForkJoinPoolHierarchicalTestExecutorService.java:146)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:155)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:141)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:139)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:138)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:95)
+	at org.junit.platform.engine.support.hierarchical.ForkJoinPoolHierarchicalTestExecutorService$ExclusiveTask.compute(ForkJoinPoolHierarchicalTestExecutorService.java:202)
+	at java.base/java.util.concurrent.RecursiveAction.exec(RecursiveAction.java:194)
+	at java.base/java.util.concurrent.ForkJoinTask.doExec(ForkJoinTask.java:511)
+	at java.base/java.util.concurrent.ForkJoinPool$WorkQueue.topLevelExec(ForkJoinPool.java:1450)
+	at java.base/java.util.concurrent.ForkJoinPool.runWorker(ForkJoinPool.java:2019)
+	at java.base/java.util.concurrent.ForkJoinWorkerThread.run(ForkJoinWorkerThread.java:187)
+
+[INFO] 
+[INFO] Results:
+[INFO] 
+[ERROR] Failures: 
+[ERROR]   ConcurrentVoteBoundaryTest.incomingVotesUseTheNodeContext:42 External RPC callers must enter the node's owning context ==> expected: <io.vertx.core.impl.ContextImpl@55f56870> but was: <io.vertx.core.impl.ContextImpl@e59ef5b>
+[ERROR]   ConcurrentVoteBoundaryTest.overlappingDurableVotesGrantOnlyOneCandidateAndSurviveReopen:54 A pending fsync must not allow another candidate to receive the same-term vote ==> expected: <1> but was: <32>
+[INFO] 
+[ERROR] Tests run: 2, Failures: 2, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Summary for Quorus File Transfer System 1.0-SNAPSHOT:
+[INFO] 
+[INFO] Quorus File Transfer System ........................ SUCCESS [  0.274 s]
+[INFO] Quorus Core ........................................ SUCCESS [  1.879 s]
+[INFO] Quorus Workflow Engine ............................. SUCCESS [  0.380 s]
+[INFO] Quorus Tenant Management ........................... SUCCESS [  0.264 s]
+[INFO] Quorus Distributed Controller ...................... FAILURE [ 15.912 s]
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  18.937 s
+[INFO] Finished at: 2026-09-05T15:35:14+08:00
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.2.2:test (default-test) on project quorus-controller: There are test failures.
+[ERROR] 
+[ERROR] Please refer to C:\Users\mraysmit\dev\idea-projects\quorus\quorus-controller\target\surefire-reports for the individual test results.
+[ERROR] Please refer to dump files (if any exist) [date].dump, [date]-jvmRun[N].dump and [date].dumpstream.
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+[ERROR] 
+[ERROR] After correcting the problems, you can resume the build with the command
+[ERROR]   mvn <args> -rf :quorus-controller

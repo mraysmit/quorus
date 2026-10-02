@@ -12,7 +12,7 @@
 #   - OTel Collector: receives OTLP gRPC on 4317, HTTP on 4318
 #
 # For Quorus Integration Tests:
-#   - Configure OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
+#   - Configure QUORUS_TELEMETRY_OTLP_ENDPOINT=http://localhost:4317
 #   - Prometheus scrapes :9464 (controller), :9465 (agent)
 
 services:

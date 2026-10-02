@@ -13,17 +13,13 @@ import dev.mars.quorus.connection.RuntimeCredential;
 import dev.mars.quorus.connection.SecretProvider;
 import dev.mars.quorus.connection.SecretReference;
 import dev.mars.quorus.connection.ServiceConnection;
+import dev.mars.quorus.connection.ServiceConnectionJsonCodec;
 
 import java.util.Collection;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import io.vertx.core.json.JsonArray;
-import io.vertx.core.json.JsonObject;
-import java.net.URI;
-import java.time.Instant;
-import java.util.Set;
 
 /** Agent-side enforcement boundary. Policy is evaluated before any provider is called. */
 public final class AgentConnectionPolicyService {
@@ -61,46 +57,15 @@ public final class AgentConnectionPolicyService {
         }
     }
 
-    public static ServiceConnection parseConnection(JsonObject json) {
-        JsonObject trust = json.getJsonObject("trustPolicy");
-        JsonObject egress = json.getJsonObject("egressPolicy");
-        return new ServiceConnection(json.getString("serviceConnectionId"), json.getString("tenantId"),
-                ServiceConnection.Protocol.valueOf(json.getString("protocol")), URI.create(json.getString("endpoint")),
-                json.getString("networkZone"), strings(json.getJsonArray("allowedPaths")),
-                strings(json.getJsonArray("allowedDirections")).stream().map(ServiceConnection.Direction::valueOf)
-                        .collect(Collectors.toUnmodifiableSet()),
-                strings(json.getJsonArray("allowedAgentPools")), json.getString("owner"),
-                json.getString("environment"), json.getString("classification"),
-                json.getString("secretReferenceId"), json.getString("serviceIdentity"),
-                ServiceConnection.AuthenticationType.valueOf(json.getString("authenticationType")),
-                new ServiceConnection.TrustPolicy(trust.getBoolean("tlsRequired"),
-                        trust.getBoolean("hostnameVerification"), strings(trust.getJsonArray("approvedCaIds")),
-                        strings(trust.getJsonArray("sshHostKeyFingerprints")), trust.getString("minimumTlsVersion"),
-                        strings(trust.getJsonArray("tlsPeerFingerprints")),
-                        trust.getBoolean("transportEncryptionRequired")),
-                new ServiceConnection.EgressPolicy(strings(egress.getJsonArray("allowedHostnames")),
-                        strings(egress.getJsonArray("allowedCidrs")), integers(egress.getJsonArray("allowedPorts")),
-                        egress.getBoolean("allowRedirects"), egress.getBoolean("pinResolvedAddresses")),
-                json.getInteger("policyVersion"), ServiceConnection.Status.valueOf(json.getString("status")),
-                Instant.parse(json.getString("createdAt")), Instant.parse(json.getString("updatedAt")));
+    /** Decodes the service connection of an assignment, sent as {@link ServiceConnectionJsonCodec} text. */
+    public static ServiceConnection parseConnection(String json) {
+        return ServiceConnectionJsonCodec.decodeConnection(json);
     }
 
-    public static SecretReference parseSecret(JsonObject json) {
-        return new SecretReference(json.getString("secretReferenceId"), json.getString("tenantId"),
-                json.getString("provider"), json.getString("path"), json.getString("key"), json.getString("version"),
-                SecretReference.Status.valueOf(json.getString("status")), instant(json.getString("expiresAt")),
-                instant(json.getString("lastRotatedAt")));
+    /** Decodes the secret reference of an assignment, sent as {@link ServiceConnectionJsonCodec} text. */
+    public static SecretReference parseSecret(String json) {
+        return ServiceConnectionJsonCodec.decodeSecret(json);
     }
-
-    private static Set<String> strings(JsonArray values) {
-        return values == null ? Set.of() : values.stream().map(String::valueOf)
-                .collect(Collectors.toUnmodifiableSet());
-    }
-    private static Set<Integer> integers(JsonArray values) {
-        return values == null ? Set.of() : values.stream().map(v -> ((Number) v).intValue())
-                .collect(Collectors.toUnmodifiableSet());
-    }
-    private static Instant instant(String value) { return value == null ? null : Instant.parse(value); }
 
     public record AuthorizedConnection(ResolvedConnection resolved, RuntimeCredential runtimeCredential)
             implements AutoCloseable {

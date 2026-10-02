@@ -28,8 +28,6 @@ import dev.mars.quorus.connection.RuntimeCredential;
 import dev.mars.quorus.connection.TlsPeerPolicy;
 
 import static dev.mars.quorus.core.exceptions.QuorusErrorCode.*;
-import io.vertx.core.Context;
-import io.vertx.core.Vertx;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -85,22 +83,19 @@ public class FtpTransferProtocol implements TransferProtocol {
         IMPLICIT
     }
     
-    // Track active FTP client for abort capability
-    private volatile FtpClient activeClient;
-    
-    // Custom SSL socket factory (for testing with self-signed certificates)
-    private volatile SSLSocketFactory customSslSocketFactory;
-    
+    /** Test-only FTPS socket factory; {@code null} in production, which uses the governed trust path. */
+    private final SSLSocketFactory customSslSocketFactory;
+
+    public FtpTransferProtocol() {
+        this(null);
+    }
+
     /**
-     * Sets a custom SSLSocketFactory for FTPS connections.
-     * <p>
-     * This is primarily intended for integration testing against FTPS servers
-     * with self-signed certificates. In production, the default trust store
-     * (JVM cacerts) is used.
-     *
-     * @param sslSocketFactory the custom SSLSocketFactory to use, or null to use defaults
+     * Creates an adapter whose FTPS connections use the given socket factory, for integration tests
+     * against servers with self-signed certificates. Package-private and fixed at construction, so
+     * production code cannot replace the TLS verification of the shared adapter.
      */
-    public void setSslSocketFactory(SSLSocketFactory sslSocketFactory) {
+    FtpTransferProtocol(SSLSocketFactory sslSocketFactory) {
         this.customSslSocketFactory = sslSocketFactory;
     }
     
@@ -144,19 +139,13 @@ public class FtpTransferProtocol implements TransferProtocol {
 
     @Override
     public TransferResult transfer(TransferRequest request, TransferContext context) throws TransferException {
-        Context vertxContext = Vertx.currentContext();
-        if (vertxContext != null && vertxContext.isEventLoopContext()) {
-            throw new TransferException(context.getJobId(),
-                    "Blocking FTP transfer() invoked on event loop. Use transferReactive() instead.");
-        }
-
         logger.info("Starting FTP transfer: jobId={}, isUpload={}", context.getJobId(), request.isUpload());
         // Use destinationUri for logging to support both uploads and downloads
         logger.debug("Transfer details: sourceUri={}, destinationUri={}", 
                     SensitiveDataRedactor.redactUri(request.getSourceUri()),
                     SensitiveDataRedactor.redactUri(request.getDestinationUri()));
 
-        ProgressTracker progressTracker = new ProgressTracker(context.getJobId());
+        ProgressTracker progressTracker = new ProgressTracker(context);
         progressTracker.start();
 
         try {
@@ -183,16 +172,6 @@ public class FtpTransferProtocol implements TransferProtocol {
     @Override
     public long getMaxFileSize() {
         return -1; // No specific limit for FTP
-    }
-    
-    @Override
-    public void abort() {
-        FtpClient client = activeClient;
-        if (client != null) {
-            logger.info("Aborting FTP transfer - forcibly closing connection");
-            client.forceDisconnect();
-            activeClient = null;
-        }
     }
     
     private TransferResult performFtpTransfer(TransferRequest request, ProgressTracker progressTracker) 
@@ -226,7 +205,6 @@ public class FtpTransferProtocol implements TransferProtocol {
             // Establish FTP connection
             logger.debug("Establishing FTP connection to {}:{}", connectionInfo.host, connectionInfo.port);
             FtpClient ftpClient = new FtpClient(connectionInfo, customSslSocketFactory);
-            activeClient = ftpClient; // Track for abort capability
             
             try {
                 ftpClient.connect();
@@ -270,7 +248,6 @@ public class FtpTransferProtocol implements TransferProtocol {
                         .build();
                 
             } finally {
-                activeClient = null; // Clear reference
                 logger.debug("Disconnecting FTP client");
                 ftpClient.disconnect();
             }
@@ -313,7 +290,6 @@ public class FtpTransferProtocol implements TransferProtocol {
             // Establish FTP connection
             logger.debug("Establishing FTP connection to {}:{}", connectionInfo.host, connectionInfo.port);
             FtpClient ftpClient = new FtpClient(connectionInfo, customSslSocketFactory);
-            activeClient = ftpClient; // Track for abort capability
             
             try {
                 ftpClient.connect();
@@ -357,7 +333,6 @@ public class FtpTransferProtocol implements TransferProtocol {
                         .build();
                 
             } finally {
-                activeClient = null; // Clear reference
                 logger.debug("Disconnecting FTP client");
                 ftpClient.disconnect();
             }
@@ -638,6 +613,9 @@ public class FtpTransferProtocol implements TransferProtocol {
         
         long downloadFile(String remotePath, java.nio.file.Path localPath, 
                          ProgressTracker progressTracker, long fileSize) throws IOException {
+            if (fileSize >= 0) {
+                progressTracker.setTotalBytes(fileSize);
+            }
             
             // Enter passive mode and get data connection info
             sendCommand("PASV");
@@ -680,13 +658,10 @@ public class FtpTransferProtocol implements TransferProtocol {
                         bufferedOutput.write(buffer, 0, bytesRead);
                         bytesTransferred += bytesRead;
                         
-                        // Update progress
-                        if (fileSize > 0) {
-                            progressTracker.updateProgress(bytesTransferred);
-                        }
+                        progressTracker.updateProgress(bytesTransferred);
                         
-                        // Check for cancellation
-                        if (Thread.currentThread().isInterrupted()) {
+                        // Stop if the transfer was cancelled, paused or interrupted
+                        if (progressTracker.stopRequested()) {
                             throw new IOException("Transfer was cancelled");
                         }
                     }
@@ -709,6 +684,9 @@ public class FtpTransferProtocol implements TransferProtocol {
         
         long uploadFile(java.nio.file.Path localPath, String remotePath,
                        ProgressTracker progressTracker, long fileSize) throws IOException {
+            if (fileSize >= 0) {
+                progressTracker.setTotalBytes(fileSize);
+            }
             
             // Enter passive mode and get data connection info
             sendCommand("PASV");
@@ -750,13 +728,10 @@ public class FtpTransferProtocol implements TransferProtocol {
                         bufferedOutput.write(buffer, 0, bytesRead);
                         bytesTransferred += bytesRead;
                         
-                        // Update progress
-                        if (fileSize > 0) {
-                            progressTracker.updateProgress(bytesTransferred);
-                        }
+                        progressTracker.updateProgress(bytesTransferred);
                         
-                        // Check for cancellation
-                        if (Thread.currentThread().isInterrupted()) {
+                        // Stop if the transfer was cancelled, paused or interrupted
+                        if (progressTracker.stopRequested()) {
                             throw new IOException("Transfer was cancelled");
                         }
                     }
@@ -825,21 +800,6 @@ public class FtpTransferProtocol implements TransferProtocol {
                 }
             }
             logger.debug("FTP disconnection complete");
-        }
-        
-        /**
-         * Force disconnect without graceful QUIT command.
-         * Used for aborting transfers - immediately closes the socket.
-         */
-        void forceDisconnect() {
-            try {
-                if (controlSocket != null && !controlSocket.isClosed()) {
-                    logger.info("Force closing FTP control socket");
-                    controlSocket.close();
-                }
-            } catch (IOException e) {
-                logger.warn("Error during force disconnect: {}", e.getMessage());
-            }
         }
         
         private void sendCommand(String command) {

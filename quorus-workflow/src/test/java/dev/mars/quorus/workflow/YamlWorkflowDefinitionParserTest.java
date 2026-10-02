@@ -19,6 +19,9 @@ package dev.mars.quorus.workflow;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+import java.util.Map;
+
 import static org.junit.jupiter.api.Assertions.*;
 /**
  * Description for YamlWorkflowDefinitionParserTest
@@ -37,6 +40,24 @@ class YamlWorkflowDefinitionParserTest {
         parser = new YamlWorkflowDefinitionParser();
     }
     
+    @Test
+    void validationRejectsAnUnknownExecutionStrategy() {
+        WorkflowDefinition definition = new WorkflowDefinition("v1",
+                new WorkflowDefinition.WorkflowMetadata("strategy-test", "1.0.0", "Strategy validation test",
+                        "validation-test-workflow", "test@quorus.dev", "2026-09-28", List.of("test"), Map.of()),
+                new WorkflowDefinition.WorkflowSpec(Map.of(),
+                        new WorkflowDefinition.ExecutionConfig(false, false, 1, java.time.Duration.ofHours(1), "diagonal"),
+                        List.of(new TransferGroup("g", "group", List.of(), null, Map.of(),
+                                List.of(new TransferGroup.TransferDefinition("t", "http://example.com/a", "/tmp/a",
+                                        "http", Map.of(), null)), false, 0))));
+
+        ValidationResult result = parser.validate(definition);
+
+        assertFalse(result.isValid());
+        assertTrue(result.getErrors().stream().anyMatch(e -> e.getMessage().contains("diagonal")),
+                () -> "expected a strategy error: " + result.getErrors());
+    }
+
     @Test
     void testParseSimpleWorkflow() throws WorkflowParseException {
         String yaml = """

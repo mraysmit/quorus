@@ -16,11 +16,10 @@
 
 package dev.mars.quorus.agent.config;
 
+import dev.mars.quorus.config.LayeredProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.Locale;
@@ -167,6 +166,11 @@ public final class AgentConfig {
         return getLong("quorus.agent.jobs.polling.interval-ms", 10000);
     }
 
+    /** Interval between progress reports for a running transfer; see quorus-agent.properties. */
+    public long getProgressReportIntervalMs() {
+        return getLong("quorus.agent.jobs.progress-report-interval-ms", 15000);
+    }
+
     /**
      * Number of foreign-assignment mismatches allowed before fail-fast shutdown.
      * Default is 3 to tolerate transient routing issues while still detecting persistent problems.
@@ -267,11 +271,7 @@ public final class AgentConfig {
      * from the key, so that it stays reachable through its {@code QUORUS_*} variable.
      */
     public String getString(String key, String defaultValue) {
-        String value = properties.getProperty(key);
-        if (value == null) {
-            value = environment.get(environmentKey(key));
-        }
-        return value == null || value.isBlank() ? defaultValue : value;
+        return LayeredProperties.getString(properties, environment, key, defaultValue);
     }
 
     /**
@@ -304,6 +304,10 @@ public final class AgentConfig {
             throw new IllegalStateException(
                     "Job polling interval must be positive, got: " + getJobPollingIntervalMs());
         }
+        if (getProgressReportIntervalMs() <= 0) {
+            throw new IllegalStateException(
+                    "Progress report interval must be positive, got: " + getProgressReportIntervalMs());
+        }
         if (getMaxConcurrentTransfers() <= 0) {
             throw new IllegalStateException(
                     "Max concurrent transfers must be positive, got: " + getMaxConcurrentTransfers());
@@ -317,73 +321,32 @@ public final class AgentConfig {
     }
 
     public int getInt(String key, int defaultValue) {
-        String value = getString(key, null);
-        if (value == null) {
-            return defaultValue;
-        }
-        try {
-            return Integer.parseInt(value.trim());
-        } catch (NumberFormatException e) {
-            logger.warn("Invalid integer value for {}: '{}', using default {}", key, value, defaultValue);
-            return defaultValue;
-        }
+        return LayeredProperties.getInt(properties, environment, key, defaultValue, logger);
     }
 
     public long getLong(String key, long defaultValue) {
-        String value = getString(key, null);
-        if (value == null) {
-            return defaultValue;
-        }
-        try {
-            return Long.parseLong(value.trim());
-        } catch (NumberFormatException e) {
-            logger.warn("Invalid long value for {}: '{}', using default {}", key, value, defaultValue);
-            return defaultValue;
-        }
+        return LayeredProperties.getLong(properties, environment, key, defaultValue, logger);
     }
 
     public boolean getBoolean(String key, boolean defaultValue) {
-        String value = getString(key, null);
-        if (value == null) {
-            return defaultValue;
-        }
-        return Boolean.parseBoolean(value.trim());
+        return LayeredProperties.getBoolean(properties, environment, key, defaultValue);
     }
 
     // ==================== Private Helpers ====================
 
     private void loadResource(String resourceName, boolean required) {
-        try (InputStream input = getClass().getClassLoader().getResourceAsStream(resourceName)) {
-            if (input != null) {
-                properties.load(input);
-                logger.info("Loaded configuration from {}", resourceName);
-            } else if (required) {
-                logger.warn("Configuration resource {} not found, using accessor defaults", resourceName);
-            } else {
-                logger.debug("Optional configuration profile {} not found", resourceName);
-            }
-        } catch (IOException e) {
-            throw new IllegalStateException("Unable to load configuration resource " + resourceName, e);
-        }
+        if (LayeredProperties.loadResource(properties, getClass().getClassLoader(), resourceName))
+            logger.info("Loaded configuration from {}", resourceName);
+        else if (required) logger.warn("Configuration resource {} not found, using accessor defaults", resourceName);
+        else logger.debug("Optional configuration profile {} not found", resourceName);
     }
 
     private void applyEnvironmentOverrides() {
-        // Legacy names first, as a fallback; the documented QUORUS_AGENT_* names then take precedence.
-        LEGACY_ENVIRONMENT_NAMES.forEach(this::applyEnvironmentValue);
-        for (String key : properties.stringPropertyNames()) {
-            applyEnvironmentValue(key, environmentKey(key));
-        }
-    }
-
-    private void applyEnvironmentValue(String propertyKey, String environmentKey) {
-        String value = environment.get(environmentKey);
-        if (value != null && !value.isBlank()) {
-            properties.setProperty(propertyKey, value.trim());
-        }
+        LayeredProperties.applyEnvironment(properties, environment, LEGACY_ENVIRONMENT_NAMES);
     }
 
     static String environmentKey(String propertyKey) {
-        return propertyKey.toUpperCase(Locale.ROOT).replace('.', '_').replace('-', '_');
+        return LayeredProperties.environmentKey(propertyKey);
     }
 
     private String deriveAgentIdFromHostname() {
@@ -413,6 +376,7 @@ public final class AgentConfig {
         logger.info("  --- Job Polling ---");
         logger.info("  Initial Delay:        {}ms", getJobPollingInitialDelayMs());
         logger.info("  Poll Interval:        {}ms", getJobPollingIntervalMs());
+        logger.info("  Progress Interval:    {}ms", getProgressReportIntervalMs());
         logger.info("  --- Security ---");
         logger.info("  Foreign Assignment Threshold: {}", getForeignAssignmentMismatchThreshold());
         logger.info("  --- Telemetry ---");

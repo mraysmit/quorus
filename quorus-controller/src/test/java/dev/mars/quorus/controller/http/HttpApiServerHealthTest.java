@@ -24,7 +24,6 @@ import dev.mars.quorus.controller.raft.RaftTransport;
 import dev.mars.quorus.controller.state.QuorusStateStore;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.Vertx;
-import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.client.WebClient;
 import io.vertx.junit5.VertxExtension;
@@ -378,45 +377,19 @@ class HttpApiServerHealthTest {
         @DisplayName("GET /api/v1/info")
         class ApiInfoTests {
 
+                // The endpoint inventory is the OpenAPI contract, whose route set OpenApiContractTest
+                // enforces. The info response points to it rather than carrying a second list.
                 @Test
-                @DisplayName("Should include all endpoint categories")
-                void shouldIncludeAllEndpointCategories(VertxTestContext ctx) {
+                @DisplayName("Should point to the OpenAPI contract instead of listing endpoints")
+                void shouldPointToTheOpenApiContract(VertxTestContext ctx) {
                         webClient.get(HTTP_PORT, "localhost", "/api/v1/info")
                                         .send()
                                         .onComplete(ctx.succeeding(response -> ctx.verify(() -> {
                                                 assertEquals(200, response.statusCode());
-                                                JsonObject endpoints = response.bodyAsJsonObject().getJsonObject("endpoints");
-                                                assertNotNull(endpoints);
-                                                assertNotNull(endpoints.getJsonArray("health"));
-                                                assertNotNull(endpoints.getJsonArray("agents"));
-                                                assertNotNull(endpoints.getJsonArray("transfers"));
-                                                assertNotNull(endpoints.getJsonArray("jobs"));
-                                                assertNotNull(endpoints.getJsonArray("assignments"));
-                                                assertNotNull(endpoints.getJsonArray("routes"));
-                                                assertNotNull(endpoints.getJsonArray("cluster"));
-                                                assertNotNull(endpoints.getJsonArray("metrics"));
-                                                assertNotNull(endpoints.getJsonArray("info"));
-                                                ctx.completeNow();
-                                        })));
-                }
-
-                @Test
-                @DisplayName("Should list expected assignment, route, and agent endpoint counts")
-                void shouldListExpectedEndpointCounts(VertxTestContext ctx) {
-                        webClient.get(HTTP_PORT, "localhost", "/api/v1/info")
-                                        .send()
-                                        .onComplete(ctx.succeeding(response -> ctx.verify(() -> {
-                                                JsonObject endpoints = response.bodyAsJsonObject().getJsonObject("endpoints");
-                                                JsonArray assignments = endpoints.getJsonArray("assignments");
-                                                JsonArray routes = endpoints.getJsonArray("routes");
-                                                JsonArray agents = endpoints.getJsonArray("agents");
-                                                JsonArray jobs = endpoints.getJsonArray("jobs");
-                                                assertEquals(8, assignments.size());
-                                                assertEquals(7, routes.size());
-                                                assertEquals(4, agents.size());
-                                                assertEquals(1, jobs.size());
-                                                assertEquals("POST", jobs.getJsonObject(0).getString("method"));
-                                                assertTrue(jobs.getJsonObject(0).getString("path").contains("status"));
+                                                JsonObject info = response.bodyAsJsonObject();
+                                                assertEquals("/api/v1/openapi.yaml", info.getString("openApi"));
+                                                assertFalse(info.containsKey("endpoints"),
+                                                                "The info response must not carry its own endpoint list");
                                                 ctx.completeNow();
                                         })));
                 }

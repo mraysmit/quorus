@@ -19,7 +19,6 @@ package dev.mars.quorus.transfer;
 import dev.mars.quorus.core.TransferDirection;
 import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.exceptions.TransferException;
-import io.vertx.core.Vertx;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -40,22 +39,17 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class SimpleTransferEngineBidirectionalTest {
 
-    private Vertx vertx;
     private SimpleTransferEngine engine;
 
     @BeforeEach
     void setUp() {
-        vertx = Vertx.vertx();
-        engine = new SimpleTransferEngine(vertx, 5, 3, 1000);
+        engine = new SimpleTransferEngine(5, 3, 1000);
     }
 
     @AfterEach
     void tearDown() {
         if (engine != null) {
-            engine.shutdown(5);
-        }
-        if (vertx != null) {
-            vertx.close();
+            engine.shutdown(java.time.Duration.ofSeconds(5));
         }
     }
 

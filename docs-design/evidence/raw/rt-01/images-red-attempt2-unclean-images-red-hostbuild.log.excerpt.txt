@@ -1,0 +1,41 @@
+Excerpt of: docs-design/evidence/raw/rt-01/images-red-attempt2-unclean-images-red-hostbuild.log
+Original SHA-256: 603e136e8d8e7a9c7f122c8eb7c929a09c2e2f275422ef4e086882fcb8d22baf
+Original size: 118028 bytes
+Full log not retained under the evidence retention rule (plan §6.1): regression and discarded-attempt output is kept as this excerpt. Reproduce by re-running the recorded command at the recorded revision.
+
+    134: [INFO] NOTHING TO DO: There is nothing to do. If this is unexpected, review the above logs for more details.
+    316: [WARNING]   - io.vertx.pgclient.PgException
+    368: [WARNING]   - io.opentelemetry.sdk.autoconfigure.spi.ConfigurationException
+    440: [WARNING]   - io.vertx.grpc.common.CodecException
+    442: [WARNING]   - io.vertx.grpc.common.GrpcErrorException
+    500: [WARNING]   - io.vertx.grpc.client.InvalidStatusException
+    550: [WARNING]   - io.vertx.sqlclient.ClosedConnectionException
+    552: [WARNING]   - io.vertx.sqlclient.DatabaseException
+    564: [WARNING]   - jakarta.validation.ConstraintDeclarationException
+    565: [WARNING]   - jakarta.validation.ConstraintDefinitionException
+    636: [WARNING]   - dev.mars.raftlog.storage.FileRaftStorage$CorruptLogException
+    638: [WARNING]   - dev.mars.raftlog.storage.FileRaftStorage$StorageException
+    694: [WARNING]   - com.fasterxml.jackson.dataformat.yaml.JacksonYAMLParseException
+    815: [WARNING]   - io.netty.handler.proxy.HttpProxyHandler$HttpProxyConnectException
+    816: [WARNING]   - io.netty.handler.proxy.ProxyConnectException
+    862: [WARNING]   - io.opentelemetry.api.incubator.config.DeclarativeConfigException
+    951: [WARNING]   - io.opentelemetry.exporter.internal.FailedExportException
+    952: [WARNING]   - io.opentelemetry.exporter.internal.FailedExportException$1
+    953: [WARNING]   - io.opentelemetry.exporter.internal.FailedExportException$GrpcExportException
+    954: [WARNING]   - io.opentelemetry.exporter.internal.FailedExportException$HttpExportException
+   1012: [WARNING]   - io.opentelemetry.semconv.ExceptionAttributes
+   1139: [WARNING]   - io.vertx.ext.auth.NoSuchKeyIdException
+   1453: [WARNING]   - org.springframework.expression.AccessException
+   1458: [WARNING]   - org.springframework.expression.EvaluationException
+   1460: [WARNING]   - org.springframework.expression.ExpressionException
+   1461: [WARNING]   - org.springframework.expression.ExpressionInvocationTargetException
+   1604: [INFO] Reactor Summary for Quorus File Transfer System 1.0-SNAPSHOT:
+   1606: [INFO] Quorus File Transfer System ........................ SUCCESS [  0.239 s]
+   1607: [INFO] Quorus Core ........................................ SUCCESS [  2.576 s]
+   1608: [INFO] Quorus Workflow Engine ............................. SUCCESS [  0.564 s]
+   1609: [INFO] Quorus Tenant Management ........................... SUCCESS [  0.241 s]
+   1610: [INFO] Quorus Distributed Controller ...................... SUCCESS [ 12.251 s]
+   1611: [INFO] Quorus Agent ....................................... SUCCESS [  4.968 s]
+   1613: [INFO] BUILD SUCCESS
+   1615: [INFO] Total time:  21.014 s
+   1616: [INFO] Finished at: 2026-09-26T13:02:25+01:00

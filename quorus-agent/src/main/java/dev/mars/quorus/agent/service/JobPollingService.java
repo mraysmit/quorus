@@ -16,126 +16,104 @@
 
 package dev.mars.quorus.agent.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.mars.quorus.agent.config.AgentConfiguration;
 import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.connection.RuntimeCredential;
-import io.vertx.core.Future;
-import io.vertx.core.Vertx;
-import io.vertx.core.json.JsonArray;
-import io.vertx.core.json.JsonObject;
-import io.vertx.ext.web.client.WebClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Service for polling the controller for new job assignments.
- * Uses Vert.x WebClient for non-blocking HTTP communication.
- * 
+ * Service for polling the controller for new job assignments. Calls block the calling thread (RT-05a).
+ *
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @since 2025-12-11
- * @version 2.0 (Migrated to Vert.x WebClient - T3.1)
+ * @version 3.0
  */
 public class JobPollingService {
 
     private static final Logger logger = LoggerFactory.getLogger(JobPollingService.class);
-    
+    private static final ObjectMapper JSON = new ObjectMapper();
+
     private final AgentConfiguration config;
-    private final WebClient webClient;
+    private final ControllerClient client;
 
-    public JobPollingService(Vertx vertx, AgentConfiguration config) {
-        this.config = config;
-        this.webClient = ControllerWebClientFactory.create(vertx, config);
-        logger.debug("JobPollingService initialized with Vert.x WebClient (connectTimeout={}ms, idleTimeout={}ms)",
-            config.getHttpConnectionTimeout(), config.getHttpIdleTimeout());
+    public JobPollingService(ControllerClient client, AgentConfiguration config) {
+        this.client = Objects.requireNonNull(client, "client");
+        this.config = Objects.requireNonNull(config, "config");
     }
 
     /**
-     * Poll the controller for pending job assignments.
-     * 
-     * @return Future containing list of pending jobs (empty list on failure)
+     * Polls the controller for pending job assignments. An entry that cannot be parsed is skipped.
+     *
+     * @return the pending jobs; empty on an HTTP error or a transport failure
+     * @throws InterruptedException if the calling thread is interrupted
      */
-    public Future<List<PendingJob>> pollForJobs() {
+    public List<PendingJob> pollForJobs() throws InterruptedException {
         String url = config.getControllerUrl() + "/agents/" + config.getAgentId() + "/jobs";
-        
-        return webClient.getAbs(url)
-            .putHeader("Accept", "application/json")
-            .send()
-            .map(response -> {
-                int statusCode = response.statusCode();
-                if (statusCode == 200) {
-                    List<PendingJob> pendingJobs = new ArrayList<>();
-                    JsonObject responseBody = response.bodyAsJsonObject();
-                    
-                    JsonArray jobs = responseBody.getJsonArray("pendingJobs");
-                    if (jobs != null) {
-                        for (int i = 0; i < jobs.size(); i++) {
-                            try {
-                                JsonObject jobData = jobs.getJsonObject(i);
-                                PendingJob job = parsePendingJob(jobData);
-                                pendingJobs.add(job);
-                            } catch (Exception e) {
-                                logger.warn("Failed to parse pending job: {}", e.getMessage());
-                            }
-                        }
-                    }
-                    
-                    logger.debug("Polled for jobs: found {} pending jobs", pendingJobs.size());
-                    return pendingJobs;
-                } else {
-                    logger.warn("Failed to poll for jobs: HTTP {}", statusCode);
-                    return Collections.<PendingJob>emptyList();
+        try {
+            ControllerClient.Response response = client.get(url);
+            if (response.status() != 200) {
+                logger.warn("Failed to poll for jobs: HTTP {}", response.status());
+                return List.of();
+            }
+            List<PendingJob> pendingJobs = new ArrayList<>();
+            JsonNode jobs = JSON.readTree(response.body()).path("pendingJobs");
+            for (JsonNode jobData : jobs) {
+                try {
+                    pendingJobs.add(parsePendingJob(jobData));
+                } catch (RuntimeException e) {
+                    logger.warn("Failed to parse pending job: {}", e.getMessage());
                 }
-            })
-            .recover(err -> {
-                logger.error("Error polling for jobs: {}", err.getMessage());
-                return Future.succeededFuture(Collections.emptyList());
-            });
+            }
+            logger.debug("Polled for jobs: found {} pending jobs", pendingJobs.size());
+            return pendingJobs;
+        } catch (IOException e) {
+            logger.error("Error polling for jobs: {}", e.getMessage());
+            return List.of();
+        }
     }
 
-    private PendingJob parsePendingJob(JsonObject jobData) {
-        String assignmentId = jobData.getString("assignmentId");
-        String jobId = jobData.getString("jobId");
-        String agentId = jobData.getString("agentId");
-        String attemptId = jobData.getString("attemptId");
-        Long fencingGeneration = jobData.getLong("fencingGeneration");
-        String leaseExpiresAt = jobData.getString("leaseExpiresAt");
-        Long lastReportSequence = jobData.getLong("lastReportSequence");
-        String sourceUri = jobData.getString("sourceUri");
-        String destinationPath = jobData.getString("destinationUri", jobData.getString("destinationPath"));
-        Long totalBytes = jobData.getLong("totalBytes", 0L);
-        String description = jobData.getString("description");
-        JsonObject serviceConnection = jobData.getJsonObject("serviceConnection");
-        JsonObject secretReference = jobData.getJsonObject("secretReference");
-        
-        return new PendingJob(assignmentId, jobId, agentId, sourceUri, destinationPath, totalBytes, description,
-                attemptId, fencingGeneration == null ? 0 : fencingGeneration,
+    private static PendingJob parsePendingJob(JsonNode jobData) {
+        if (!jobData.isObject()) {
+            throw new IllegalArgumentException("pending job entry is not an object");
+        }
+        String leaseExpiresAt = text(jobData, "leaseExpiresAt");
+        String destinationPath = text(jobData, "destinationUri");
+        List<String> controllerResolvedAddresses = new ArrayList<>();
+        jobData.path("controllerResolvedAddresses").forEach(address -> controllerResolvedAddresses.add(address.asText()));
+        return new PendingJob(text(jobData, "assignmentId"), text(jobData, "jobId"), text(jobData, "agentId"),
+                text(jobData, "sourceUri"), destinationPath != null ? destinationPath : text(jobData, "destinationPath"),
+                jobData.path("totalBytes").asLong(0L), text(jobData, "description"),
+                text(jobData, "attemptId"), jobData.path("fencingGeneration").asLong(0L),
                 leaseExpiresAt == null ? null : Instant.parse(leaseExpiresAt),
-                lastReportSequence == null ? 0 : lastReportSequence,
-                jobData.getString("tenantId"), jobData.getString("remotePath"), jobData.getString("agentPool"),
-                jobData.getJsonArray("controllerResolvedAddresses", new JsonArray()).stream()
-                        .map(String::valueOf).toList(), serviceConnection, secretReference,
-                jobData.getInteger("connectionPolicyVersion"), jobData.getString("connectionPolicyDigest"));
+                jobData.path("lastReportSequence").asLong(0L),
+                text(jobData, "tenantId"), text(jobData, "remotePath"), text(jobData, "agentPool"),
+                controllerResolvedAddresses, json(jobData, "serviceConnection"), json(jobData, "secretReference"),
+                jobData.hasNonNull("connectionPolicyVersion") ? jobData.get("connectionPolicyVersion").asInt() : null,
+                text(jobData, "connectionPolicyDigest"));
     }
 
-    /**
-     * Shuts down the WebClient.
-     * 
-     * @return Future that completes when shutdown is done
-     */
-    public Future<Void> shutdown() {
-        logger.debug("Shutting down JobPollingService WebClient");
-        webClient.close();
-        return Future.succeededFuture();
+    private static String text(JsonNode json, String field) {
+        JsonNode value = json.get(field);
+        return value == null || value.isNull() ? null : value.asText();
+    }
+
+    /** A nested object as JSON text, or null when absent. */
+    private static String json(JsonNode json, String field) {
+        JsonNode value = json.get(field);
+        return value == null || !value.isObject() ? null : value.toString();
     }
 
     /**
@@ -157,8 +135,8 @@ public class JobPollingService {
         private final String remotePath;
         private final String agentPool;
         private final List<String> controllerResolvedAddresses;
-        private final JsonObject serviceConnection;
-        private final JsonObject secretReference;
+        private final String serviceConnection;
+        private final String secretReference;
         private final Integer connectionPolicyVersion;
         private final String connectionPolicyDigest;
 
@@ -181,8 +159,8 @@ public class JobPollingService {
                           String destinationPath, long totalBytes, String description,
                           String attemptId, long fencingGeneration, Instant leaseExpiresAt,
                           long lastReportSequence, String tenantId, String remotePath, String agentPool,
-                          List<String> controllerResolvedAddresses, JsonObject serviceConnection,
-                          JsonObject secretReference, Integer connectionPolicyVersion,
+                          List<String> controllerResolvedAddresses, String serviceConnection,
+                          String secretReference, Integer connectionPolicyVersion,
                           String connectionPolicyDigest) {
             this.assignmentId = assignmentId;
             this.jobId = jobId;
@@ -199,8 +177,8 @@ public class JobPollingService {
             this.remotePath = remotePath;
             this.agentPool = agentPool;
             this.controllerResolvedAddresses = List.copyOf(controllerResolvedAddresses);
-            this.serviceConnection = serviceConnection == null ? null : serviceConnection.copy();
-            this.secretReference = secretReference == null ? null : secretReference.copy();
+            this.serviceConnection = serviceConnection;
+            this.secretReference = secretReference;
             this.connectionPolicyVersion = connectionPolicyVersion;
             this.connectionPolicyDigest = connectionPolicyDigest;
         }
@@ -224,8 +202,10 @@ public class JobPollingService {
         public String getRemotePath() { return remotePath; }
         public String getAgentPool() { return agentPool; }
         public List<String> getControllerResolvedAddresses() { return controllerResolvedAddresses; }
-        public JsonObject getServiceConnection() { return serviceConnection == null ? null : serviceConnection.copy(); }
-        public JsonObject getSecretReference() { return secretReference == null ? null : secretReference.copy(); }
+        /** The governed service connection as JSON text ({@code ServiceConnectionJsonCodec}), or null. */
+        public String getServiceConnection() { return serviceConnection; }
+        /** The secret reference as JSON text ({@code ServiceConnectionJsonCodec}), or null. */
+        public String getSecretReference() { return secretReference; }
         public Integer getConnectionPolicyVersion() { return connectionPolicyVersion; }
         public String getConnectionPolicyDigest() { return connectionPolicyDigest; }
 

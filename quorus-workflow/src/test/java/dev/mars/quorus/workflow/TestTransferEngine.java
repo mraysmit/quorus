@@ -23,10 +23,10 @@ import dev.mars.quorus.core.TransferStatus;
 import dev.mars.quorus.core.exceptions.TransferException;
 import dev.mars.quorus.transfer.TransferEngine;
 
-import io.vertx.core.Future;
-import io.vertx.core.Promise;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -43,8 +43,14 @@ class TestTransferEngine implements TransferEngine {
     private boolean shutdown = false;
     
     // Configuration for test behavior
-    private TransferBehavior behavior = TransferBehavior.SUCCESS;
-    private RuntimeException exceptionToThrow = null;
+    private volatile TransferBehavior behavior = TransferBehavior.SUCCESS;
+    private volatile RuntimeException exceptionToThrow = null;
+    private volatile Duration delay = Duration.ZERO;
+    private final AtomicInteger maxConcurrentTransfers = new AtomicInteger(0);
+    private final AtomicInteger attempts = new AtomicInteger(0);
+    private final AtomicInteger failuresBeforeSuccess = new AtomicInteger(0);
+    /** One permit per transfer started; tests acquire permits to wait for starts without polling. */
+    private final Semaphore started = new Semaphore(0);
     
     /**
      * Defines the behavior of the test transfer engine.
@@ -79,48 +85,73 @@ class TestTransferEngine implements TransferEngine {
         this.exceptionToThrow = exception;
     }
     
+    /**
+     * Make every transfer take this long before it completes as configured. The wait responds to
+     * interruption, as a real transfer does.
+     */
+    public void simulateDelay(Duration delay) {
+        this.delay = delay;
+    }
+
+    /** The next {@code failures} transfers fail; later ones follow the configured behavior. */
+    public void simulateFailuresBeforeSuccess(int failures) {
+        this.failuresBeforeSuccess.set(failures);
+    }
+
+    /** How many transfers were attempted. */
+    public int getAttempts() {
+        return attempts.get();
+    }
+
+    /**
+     * Waits until {@code count} more transfers have started (a handshake: woken by each start).
+     *
+     * @return false if they did not start within {@code timeout}
+     */
+    public boolean awaitStarted(int count, Duration timeout) throws InterruptedException {
+        return started.tryAcquire(count, timeout.toMillis(), java.util.concurrent.TimeUnit.MILLISECONDS);
+    }
+
+    /** The most transfers that were in progress at the same time. */
+    public int getMaxConcurrentTransfers() {
+        return maxConcurrentTransfers.get();
+    }
+
     @Override
-    public Future<TransferResult> submitTransfer(TransferRequest request) throws TransferException {
+    public TransferResult transfer(TransferRequest request) throws TransferException {
         if (shutdown) {
             throw new TransferException(request.getRequestId(), "Transfer engine is shutdown");
         }
-        
-        activeTransferCount.incrementAndGet();
-        
+
+        maxConcurrentTransfers.accumulateAndGet(activeTransferCount.incrementAndGet(), Math::max);
+        attempts.incrementAndGet();
         TransferJob job = new TransferJob(request);
         jobs.put(job.getJobId(), job);
-        
-        Promise<TransferResult> promise = Promise.promise();
-        
-        // Execute asynchronously
-        new Thread(() -> {
-            try {
-                // Simulate transfer based on configured behavior
-                TransferResult result;
-                switch (behavior) {
-                    case SUCCESS:
-                        result = createSuccessResult(request.getRequestId());
-                        break;
-                    case FAILURE:
-                        result = createFailureResult(request.getRequestId());
-                        break;
-                    case EXCEPTION:
-                        promise.fail(exceptionToThrow != null ? exceptionToThrow : new RuntimeException("Transfer failed"));
-                        return;
-                    default:
-                        result = createSuccessResult(request.getRequestId());
-                        break;
+        started.release();
+        try {
+            if (!delay.isZero()) {
+                try {
+                    Thread.sleep(delay);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new TransferException(request.getRequestId(), "Transfer interrupted");
                 }
-                promise.complete(result);
-            } finally {
-                activeTransferCount.decrementAndGet();
-                jobs.remove(job.getJobId());
             }
-        }).start();
-        
-        return promise.future();
+            if (failuresBeforeSuccess.getAndUpdate(n -> Math.max(0, n - 1)) > 0) {
+                return createFailureResult(request.getRequestId());
+            }
+            // Simulate transfer based on configured behavior
+            return switch (behavior) {
+                case SUCCESS -> createSuccessResult(request.getRequestId());
+                case FAILURE -> createFailureResult(request.getRequestId());
+                case EXCEPTION -> throw exceptionToThrow != null ? exceptionToThrow : new RuntimeException("Transfer failed");
+            };
+        } finally {
+            activeTransferCount.decrementAndGet();
+            jobs.remove(job.getJobId());
+        }
     }
-    
+
     @Override
     public TransferJob getTransferJob(String jobId) {
         return jobs.get(jobId);
@@ -164,11 +195,11 @@ class TestTransferEngine implements TransferEngine {
     }
     
     @Override
-    public Future<Void> shutdown(long timeoutSeconds) {
+    public boolean shutdown(java.time.Duration timeout) {
         shutdown = true;
         jobs.clear();
         activeTransferCount.set(0);
-        return Future.succeededFuture();
+        return true;
     }
 
     @Override

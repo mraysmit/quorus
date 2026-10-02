@@ -17,48 +17,63 @@
 package dev.mars.quorus.agent.service;
 
 import dev.mars.quorus.agent.config.AgentConfiguration;
-import io.vertx.core.Vertx;
-import io.vertx.junit5.VertxExtension;
-import io.vertx.junit5.VertxTestContext;
+import dev.mars.quorus.core.TransferRequest;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 
-import java.lang.reflect.Field;
+import java.net.URI;
+import java.nio.file.Path;
+
+import static dev.mars.quorus.testing.TestResourceUtils.copyResource;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-@ExtendWith(VertxExtension.class)
+@Timeout(value = 30, unit = SECONDS, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
 class TransferExecutionServiceTest {
 
     @Test
-    void testShutdownDoesNotCloseInjectedVertx(Vertx sharedVertx, VertxTestContext testContext) {
-        TransferExecutionService service = new TransferExecutionService(sharedVertx, createConfig());
+    void refusesTransfersBeforeStartAndAfterShutdown() {
+        TransferExecutionService service = new TransferExecutionService(createConfig());
+        TransferRequest request = TransferRequest.builder().requestId("r")
+                .sourceUri(URI.create("http://localhost:1/file")).destinationPath(Path.of("unused")).build();
 
+        assertThrows(IllegalStateException.class, () -> service.executeTransfer(request), "not started");
         service.start();
-        service.shutdown().onComplete(testContext.succeeding(v -> testContext.verify(() -> {
-            assertDoesNotThrow(() -> sharedVertx.setTimer(10, id -> {}),
-                    "Shutdown should not close externally managed Vert.x");
-            testContext.completeNow();
-        })));
+        service.shutdown();
+
+        assertThrows(IllegalStateException.class, () -> service.executeTransfer(request), "shut down");
+        assertThrows(IllegalStateException.class, service::start, "a closed service cannot restart");
+        assertDoesNotThrow(service::shutdown, "shutdown is idempotent");
     }
 
-    @Test
-    @SuppressWarnings("deprecation")
-    void testDeprecatedConstructorClosesOwnedVertx(VertxTestContext testContext) {
-        TransferExecutionService service = new TransferExecutionService(createConfig());
-        Vertx ownedVertx = extractVertx(service);
+    @TempDir
+    Path tls;
 
+    @Test
+    void productionAgentRejectsAnUngovernedAssignment() throws Exception {
+        TransferExecutionService service = new TransferExecutionService(new AgentConfiguration.Builder()
+                .agentId("test-agent").tenantId("test-tenant").controllerUrl("https://localhost:8080/api/v1")
+                .securityProfile("production").allowInsecure(false).controllerTlsEnabled(true)
+                .tlsCertificatePath(copyResource(getClass(), "/security/client-cert.pem", tls).toString())
+                .tlsPrivateKeyPath(copyResource(getClass(), "/security/client-key.pem", tls).toString())
+                .tlsTrustBundlePath(copyResource(getClass(), "/security/server-cert.pem", tls).toString())
+                .build());
         service.start();
-        service.shutdown().onComplete(testContext.succeeding(v -> testContext.verify(() -> {
-            assertThrows(RuntimeException.class,
-                    () -> ownedVertx.setTimer(10, id -> {}),
-                    "Deprecated constructor should close internally managed Vert.x");
-            testContext.completeNow();
-        })));
+        try {
+            JobPollingService.PendingJob ungoverned = new JobPollingService.PendingJob("a", "job", "test-agent",
+                    "https://example.test/file", "/tmp/file", 1, "ungoverned");
+
+            assertThrows(SecurityException.class, () -> service.executeTransfer(ungoverned));
+        } finally {
+            service.shutdown();
+        }
     }
 
     private static AgentConfiguration createConfig() {
         return new AgentConfiguration.Builder()
+                .securityProfile("development").allowInsecure(true).controllerTlsEnabled(false)
                 .agentId("test-agent")
                 .tenantId("test-tenant")
                 .controllerUrl("http://localhost:8080/api/v1")
@@ -66,15 +81,5 @@ class TransferExecutionServiceTest {
                 .heartbeatInterval(1000L)
                 .version("1.0.0-TEST")
                 .build();
-    }
-
-    private static Vertx extractVertx(TransferExecutionService service) {
-        try {
-            Field vertxField = TransferExecutionService.class.getDeclaredField("vertx");
-            vertxField.setAccessible(true);
-            return (Vertx) vertxField.get(service);
-        } catch (ReflectiveOperationException e) {
-            throw new AssertionError("Failed to extract Vert.x from TransferExecutionService", e);
-        }
     }
 }

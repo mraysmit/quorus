@@ -14,18 +14,16 @@ Write-Host ""
 # Test configuration
 $apiUrl = "http://localhost:8080/api/v1"
 $httpServerUrl = "http://localhost:8090"
-$ftpServerUrl = "ftp://localhost:21"
-$sftpServerUrl = "sftp://localhost:2222"
 
 function Test-ServiceHealth {
     param([string]$Url, [string]$Name)
     
     try {
         $response = Invoke-RestMethod -Uri "$Url/health" -TimeoutSec 5
-        Write-Host "  ✓ $Name: Healthy" -ForegroundColor Green
+        Write-Host "  ✓ ${Name}: Healthy" -ForegroundColor Green
         return $true
     } catch {
-        Write-Host "  ✗ $Name: Not responding" -ForegroundColor Red
+        Write-Host "  ✗ ${Name}: Not responding" -ForegroundColor Red
         return $false
     }
 }
@@ -104,9 +102,11 @@ function Submit-TransferRequest {
     Write-Host "    Protocol: $Protocol" -ForegroundColor Gray
     
     $transferRequest = @{
+        jobId = "network-test-$([guid]::NewGuid().ToString('N'))"
+        tenantId = "network-test"
         sourceUri = $SourceUri
         destinationPath = $DestinationPath
-        protocol = $Protocol
+        totalBytes = 1
         metadata = @{
             testType = "automated"
             description = $Description
@@ -117,8 +117,8 @@ function Submit-TransferRequest {
         $response = Invoke-RestMethod -Uri "$apiUrl/transfers" -Method POST -Body $transferRequest -ContentType "application/json" -TimeoutSec 10
         
         if ($response.success) {
-            Write-Host "    ✓ Transfer submitted: $($response.transferId)" -ForegroundColor Green
-            return $response.transferId
+            Write-Host "    ✓ Transfer submitted: $($response.jobId)" -ForegroundColor Green
+            return $response.jobId
         } else {
             Write-Host "    ✗ Transfer failed: $($response.message)" -ForegroundColor Red
             return $null
@@ -144,20 +144,10 @@ function Test-TransferScenarios {
             Destination = "/tmp/downloads/http-1mb.bin"
             Protocol = "http"
             Description = "HTTP 1MB file transfer"
-        },
-        @{
-            Source = "ftp://testuser:testpass@ftp-server/shared/timestamp.txt"
-            Destination = "/tmp/downloads/ftp-timestamp.txt"
-            Protocol = "ftp"
-            Description = "FTP small file transfer"
-        },
-        @{
-            Source = "sftp://testuser:testpass@sftp-server/shared/timestamp.txt"
-            Destination = "/tmp/downloads/sftp-timestamp.txt"
-            Protocol = "sftp"
-            Description = "SFTP small file transfer"
         }
     )
+
+    Write-Host "  Governed FTP/SFTP scenarios require a service connection and an external secret-provider reference; credentials are never embedded in URIs." -ForegroundColor Gray
     
     $transferIds = @()
     
@@ -186,26 +176,26 @@ function Test-TransferScenarios {
                     
                     switch ($status.status) {
                         "COMPLETED" { 
-                            Write-Host "    ✓ $transferId: Completed" -ForegroundColor Green 
+                            Write-Host "    ✓ ${transferId}: Completed" -ForegroundColor Green
                         }
                         "FAILED" { 
-                            Write-Host "    ✗ $transferId: Failed - $($status.errorMessage)" -ForegroundColor Red 
+                            Write-Host "    ✗ ${transferId}: Failed - $($status.errorMessage)" -ForegroundColor Red
                         }
                         "IN_PROGRESS" { 
-                            Write-Host "    ⏳ $transferId: In Progress ($($status.progress)%)" -ForegroundColor Yellow
+                            Write-Host "    ⏳ ${transferId}: In Progress ($($status.progress)%)" -ForegroundColor Yellow
                             $allComplete = $false
                         }
                         "PENDING" { 
-                            Write-Host "    ⏳ $transferId: Pending" -ForegroundColor Yellow
+                            Write-Host "    ⏳ ${transferId}: Pending" -ForegroundColor Yellow
                             $allComplete = $false
                         }
                         default { 
-                            Write-Host "    ? $transferId: $($status.status)" -ForegroundColor Gray
+                            Write-Host "    ? ${transferId}: $($status.status)" -ForegroundColor Gray
                             $allComplete = $false
                         }
                     }
                 } catch {
-                    Write-Host "    ⚠ $transferId: Status check failed" -ForegroundColor Yellow
+                    Write-Host "    ⚠ ${transferId}: Status check failed" -ForegroundColor Yellow
                 }
             }
             

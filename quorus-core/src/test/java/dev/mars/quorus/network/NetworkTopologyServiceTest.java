@@ -16,363 +16,235 @@
 
 package dev.mars.quorus.network;
 
-import io.vertx.core.Vertx;
-import io.vertx.junit5.VertxExtension;
-import io.vertx.junit5.VertxTestContext;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.Timeout;
 
 import java.time.Duration;
 
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.jupiter.api.Assertions.*;
+
 /**
- * Description for NetworkTopologyServiceTest
+ * Tests for {@link NetworkTopologyService}, called the way callers use it since RT-03e: blocking, on
+ * the test thread. Discovery probes real hosts (localhost, loopback, private and invalid addresses).
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
- * @version 1.0
+ * @version 2.0
  * @since 2025-08-18
  */
-
-@ExtendWith(VertxExtension.class)
+@Timeout(value = 60, unit = SECONDS, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
 class NetworkTopologyServiceTest {
-    
+
     private NetworkTopologyService service;
-    
+
     @BeforeEach
-    void setUp(Vertx vertx) {
-        service = new NetworkTopologyService(vertx);
+    void setUp() {
+        service = new NetworkTopologyService();
     }
 
-    @AfterEach
-    void tearDown(Vertx vertx) {
-        // Vertx is managed by the extension
-    }
-    
     @Test
-    void testDiscoverLocalhost(VertxTestContext testContext) {
-        service.discoverNode("localhost")
-            .onComplete(testContext.succeeding(node -> {
-                testContext.verify(() -> {
-                    assertNotNull(node);
-                    assertEquals("localhost", node.getHostname());
-                    assertTrue(node.isReachable());
-                    assertNotNull(node.getLatency());
-                    assertTrue(node.getLatency().toMillis() >= 0);
-                    assertTrue(node.getEstimatedBandwidth() > 0);
-                    assertEquals(NetworkTopologyService.NetworkType.LOCAL_NETWORK, node.getNetworkType());
-                    assertNotNull(node.getLastUpdated());
-                });
-                testContext.completeNow();
-            }));
+    void testDiscoverLocalhost() {
+        NetworkNode node = service.discoverNode("localhost");
+
+        assertNotNull(node);
+        assertEquals("localhost", node.getHostname());
+        assertTrue(node.isReachable());
+        assertNotNull(node.getLatency());
+        assertTrue(node.getLatency().toMillis() >= 0);
+        assertTrue(node.getEstimatedBandwidth() > 0);
+        assertEquals(NetworkTopologyService.NetworkType.LOCAL_NETWORK, node.getNetworkType());
+        assertNotNull(node.getLastUpdated());
     }
-    
+
     @Test
-    void testDiscoverNonExistentHost(VertxTestContext testContext) {
-        service.discoverNode("nonexistent.invalid.host")
-            .onComplete(testContext.succeeding(node -> {
-                testContext.verify(() -> {
-                    assertNotNull(node);
-                    assertEquals("nonexistent.invalid.host", node.getHostname());
-                    // May or may not be reachable depending on network configuration
-                    assertNotNull(node.getLatency());
-                    assertTrue(node.getEstimatedBandwidth() > 0);
-                    assertNotNull(node.getNetworkType());
-                    assertNotNull(node.getLastUpdated());
-                });
-                testContext.completeNow();
-            }));
+    void testDiscoverNonExistentHost() {
+        NetworkNode node = service.discoverNode("nonexistent.invalid.host");
+
+        assertNotNull(node);
+        assertEquals("nonexistent.invalid.host", node.getHostname());
+        // May or may not be reachable depending on network configuration
+        assertNotNull(node.getLatency());
+        assertTrue(node.getEstimatedBandwidth() > 0);
+        assertNotNull(node.getNetworkType());
+        assertNotNull(node.getLastUpdated());
     }
-    
+
     @Test
-    void testDiscoverCorporateHost(VertxTestContext testContext) {
+    void testDiscoverCorporateHost() {
         // Test with a typical corporate network IP
-        service.discoverNode("192.168.1.1")
-            .onComplete(testContext.succeeding(node -> {
-                testContext.verify(() -> {
-                    assertNotNull(node);
-                    assertEquals("192.168.1.1", node.getHostname());
-                    assertNotNull(node.getLatency());
-                    assertTrue(node.getEstimatedBandwidth() > 0);
-                    // Should be detected as corporate network for private IP
-                    assertTrue(node.getNetworkType() == NetworkTopologyService.NetworkType.CORPORATE_NETWORK ||
-                              node.getNetworkType() == NetworkTopologyService.NetworkType.LOCAL_NETWORK);
-                    assertNotNull(node.getLastUpdated());
-                });
-                testContext.completeNow();
-            }));
+        NetworkNode node = service.discoverNode("192.168.1.1");
+
+        assertNotNull(node);
+        assertEquals("192.168.1.1", node.getHostname());
+        assertNotNull(node.getLatency());
+        assertTrue(node.getEstimatedBandwidth() > 0);
+        // Should be detected as corporate network for private IP
+        assertTrue(node.getNetworkType() == NetworkTopologyService.NetworkType.CORPORATE_NETWORK ||
+                  node.getNetworkType() == NetworkTopologyService.NetworkType.LOCAL_NETWORK);
+        assertNotNull(node.getLastUpdated());
     }
-    
+
     @Test
-    void testNodeCaching(VertxTestContext testContext) {
-        // First discovery
-        service.discoverNode("localhost")
-            .<NetworkNode[]>compose(node1 -> {
-                // Second discovery should use cache
-                return service.discoverNode("localhost")
-                    .<NetworkNode[]>map(node2 -> new NetworkNode[]{node1, node2});
-            })
-            .onComplete(testContext.succeeding(nodes -> {
-                testContext.verify(() -> {
-                    NetworkNode node1 = nodes[0];
-                    NetworkNode node2 = nodes[1];
-                    assertNotNull(node1);
-                    assertNotNull(node2);
-                    assertEquals(node1.getHostname(), node2.getHostname());
-                    // Cache should return the same or updated node
-                    assertTrue(node2.getLastUpdated().equals(node1.getLastUpdated()) ||
-                              node2.getLastUpdated().isAfter(node1.getLastUpdated()));
-                });
-                testContext.completeNow();
-            }));
+    void testNodeCaching() {
+        NetworkNode first = service.discoverNode("localhost");
+        NetworkNode second = service.discoverNode("localhost");
+
+        assertSame(first, second, "a fresh cached node is returned as is");
     }
-    
+
     @Test
-    void testFindOptimalPath(VertxTestContext testContext) {
-        service.findOptimalPath("localhost", "127.0.0.1")
-            .onComplete(testContext.succeeding(path -> {
-                testContext.verify(() -> {
-                    assertNotNull(path);
-                    assertEquals("localhost", path.getSource());
-                    assertEquals("127.0.0.1", path.getDestination());
-                    assertTrue(path.getQualityScore() >= 0.0 && path.getQualityScore() <= 1.0);
-                    assertNotNull(path.getEstimatedLatency());
-                    assertTrue(path.getEstimatedBandwidth() > 0);
-                    assertNotNull(path.getTransferStrategy());
-                    assertNotNull(path.getLastUpdated());
-                });
-                testContext.completeNow();
-            }));
+    void testFindOptimalPath() throws Exception {
+        NetworkTopologyService.NetworkPath path = service.findOptimalPath("localhost", "127.0.0.1");
+
+        assertNotNull(path);
+        assertEquals("localhost", path.getSource());
+        assertEquals("127.0.0.1", path.getDestination());
+        assertTrue(path.getQualityScore() >= 0.0 && path.getQualityScore() <= 1.0);
+        assertNotNull(path.getEstimatedLatency());
+        assertTrue(path.getEstimatedBandwidth() > 0);
+        assertNotNull(path.getTransferStrategy());
+        assertNotNull(path.getLastUpdated());
     }
-    
+
     @Test
-    void testPathCaching(VertxTestContext testContext) {
-        // First path calculation
-        service.findOptimalPath("localhost", "127.0.0.1")
-            .<NetworkTopologyService.NetworkPath[]>compose(path1 -> {
-                // Second path calculation should use cache
-                return service.findOptimalPath("localhost", "127.0.0.1")
-                    .<NetworkTopologyService.NetworkPath[]>map(path2 -> new NetworkTopologyService.NetworkPath[]{path1, path2});
-            })
-            .onComplete(testContext.succeeding(paths -> {
-                testContext.verify(() -> {
-                    NetworkTopologyService.NetworkPath path1 = paths[0];
-                    NetworkTopologyService.NetworkPath path2 = paths[1];
-                    assertNotNull(path1);
-                    assertNotNull(path2);
-                    assertEquals(path1.getSource(), path2.getSource());
-                    assertEquals(path1.getDestination(), path2.getDestination());
-                });
-                testContext.completeNow();
-            }));
+    void testPathCaching() throws Exception {
+        NetworkTopologyService.NetworkPath first = service.findOptimalPath("localhost", "127.0.0.1");
+        NetworkTopologyService.NetworkPath second = service.findOptimalPath("localhost", "127.0.0.1");
+
+        assertSame(first, second, "a fresh cached path is returned as is");
     }
-    
+
     @Test
-    void testGetTransferRecommendations(VertxTestContext testContext) {
-        String hostname = "localhost";
+    void testGetTransferRecommendations() {
         long transferSize = 100 * 1024 * 1024; // 100MB
-        
-        service.getTransferRecommendations(hostname, transferSize)
-            .onComplete(testContext.succeeding(recommendations -> {
-                testContext.verify(() -> {
-                    assertNotNull(recommendations);
-                    assertTrue(recommendations.getOptimalBufferSize() > 0);
-                    assertTrue(recommendations.getRecommendedConcurrency() > 0);
-                    assertNotNull(recommendations.getEstimatedTransferTime());
-                    assertNotNull(recommendations.getNetworkQuality());
-                });
-                testContext.completeNow();
-            }));
+
+        NetworkTopologyService.NetworkRecommendations recommendations =
+                service.getTransferRecommendations("localhost", transferSize);
+
+        assertNotNull(recommendations);
+        assertTrue(recommendations.getOptimalBufferSize() > 0);
+        assertTrue(recommendations.getRecommendedConcurrency() > 0);
+        assertNotNull(recommendations.getEstimatedTransferTime());
+        assertNotNull(recommendations.getNetworkQuality());
     }
-    
+
     @Test
-    void testGetTransferRecommendationsSmallFile(VertxTestContext testContext) {
-        String hostname = "localhost";
-        long transferSize = 1024; // 1KB
-        
-        service.getTransferRecommendations(hostname, transferSize)
-            .onComplete(testContext.succeeding(recommendations -> {
-                testContext.verify(() -> {
-                    assertNotNull(recommendations);
-                    assertTrue(recommendations.getOptimalBufferSize() > 0);
-                    assertEquals(1, recommendations.getRecommendedConcurrency()); // Small files should use single connection
-                    assertNotNull(recommendations.getEstimatedTransferTime());
-                    assertNotNull(recommendations.getNetworkQuality());
-                });
-                testContext.completeNow();
-            }));
+    void testGetTransferRecommendationsSmallFile() {
+        NetworkTopologyService.NetworkRecommendations recommendations =
+                service.getTransferRecommendations("localhost", 1024);
+
+        assertNotNull(recommendations);
+        assertTrue(recommendations.getOptimalBufferSize() > 0);
+        assertEquals(1, recommendations.getRecommendedConcurrency()); // Small files should use single connection
+        assertNotNull(recommendations.getEstimatedTransferTime());
+        assertNotNull(recommendations.getNetworkQuality());
     }
-    
+
     @Test
-    void testGetTransferRecommendationsLargeFile(VertxTestContext testContext) {
-        String hostname = "localhost";
-        long transferSize = 1024L * 1024 * 1024; // 1GB
-        
-        service.getTransferRecommendations(hostname, transferSize)
-            .onComplete(testContext.succeeding(recommendations -> {
-                testContext.verify(() -> {
-                    assertNotNull(recommendations);
-                    assertTrue(recommendations.getOptimalBufferSize() > 0);
-                    assertTrue(recommendations.getRecommendedConcurrency() >= 1);
-                    assertNotNull(recommendations.getEstimatedTransferTime());
-                    assertNotNull(recommendations.getNetworkQuality());
-                });
-                testContext.completeNow();
-            }));
+    void testGetTransferRecommendationsLargeFile() {
+        NetworkTopologyService.NetworkRecommendations recommendations =
+                service.getTransferRecommendations("localhost", 1024L * 1024 * 1024);
+
+        assertNotNull(recommendations);
+        assertTrue(recommendations.getOptimalBufferSize() > 0);
+        assertTrue(recommendations.getRecommendedConcurrency() >= 1);
+        assertNotNull(recommendations.getEstimatedTransferTime());
+        assertNotNull(recommendations.getNetworkQuality());
     }
-    
+
     @Test
-    void testUpdateMetrics(VertxTestContext testContext) {
+    void testUpdateMetrics() {
         String hostname = "localhost";
         long bytesTransferred = 50 * 1024 * 1024; // 50MB
-        Duration actualTime = Duration.ofSeconds(5);
-        
-        // First discover the node
-        service.discoverNode(hostname)
-            .<NetworkTopologyService.NetworkRecommendations>compose(v -> {
-                // Update metrics
-                service.updateMetrics(hostname, bytesTransferred, actualTime, true);
-                
-                // Get updated recommendations
-                return service.getTransferRecommendations(hostname, bytesTransferred);
-            })
-            .onComplete(testContext.succeeding(recommendations -> {
-                testContext.verify(() -> {
-                    assertNotNull(recommendations);
-                    // Metrics should influence recommendations
-                    assertTrue(recommendations.getOptimalBufferSize() > 0);
-                    assertTrue(recommendations.getRecommendedConcurrency() > 0);
-                });
-                testContext.completeNow();
-            }));
+
+        service.discoverNode(hostname);
+        service.updateMetrics(hostname, bytesTransferred, Duration.ofSeconds(5), true);
+        NetworkTopologyService.NetworkRecommendations recommendations =
+                service.getTransferRecommendations(hostname, bytesTransferred);
+
+        assertNotNull(recommendations);
+        assertTrue(recommendations.getOptimalBufferSize() > 0);
+        assertTrue(recommendations.getRecommendedConcurrency() > 0);
     }
-    
+
     @Test
-    void testGetNetworkStatistics(VertxTestContext testContext) {
-        // Discover a few nodes to populate statistics
-        service.discoverNode("localhost")
-            .<NetworkNode>compose(v -> service.discoverNode("127.0.0.1"))
-            .onComplete(testContext.succeeding(v -> {
-                testContext.verify(() -> {
-                    NetworkTopologyService.NetworkStatistics stats = service.getNetworkStatistics();
-                    
-                    assertNotNull(stats);
-                    assertTrue(stats.getTotalNodes() >= 2);
-                    assertTrue(stats.getReachableNodes() >= 0);
-                    assertTrue(stats.getReachableNodes() <= stats.getTotalNodes());
-                    assertNotNull(stats.getAverageLatency());
-                    assertTrue(stats.getTotalBandwidth() >= 0);
-                    assertTrue(stats.getNetworkPaths() >= 0);
-                    assertNotNull(stats.getTransferMetrics());
-                });
-                testContext.completeNow();
-            }));
+    void testGetNetworkStatistics() {
+        service.discoverNode("localhost");
+        service.discoverNode("127.0.0.1");
+
+        NetworkTopologyService.NetworkStatistics stats = service.getNetworkStatistics();
+
+        assertNotNull(stats);
+        assertTrue(stats.getTotalNodes() >= 2);
+        assertTrue(stats.getReachableNodes() >= 0);
+        assertTrue(stats.getReachableNodes() <= stats.getTotalNodes());
+        assertNotNull(stats.getAverageLatency());
+        assertTrue(stats.getTotalBandwidth() >= 0);
+        assertTrue(stats.getNetworkPaths() >= 0);
+        assertNotNull(stats.getTransferMetrics());
     }
-    
+
     @Test
-    void testNetworkTypeDetection(VertxTestContext testContext) {
-        // Test localhost detection
-        service.discoverNode("localhost")
-            .<NetworkNode>compose(localhostNode -> {
-                testContext.verify(() -> assertEquals(NetworkTopologyService.NetworkType.LOCAL_NETWORK, localhostNode.getNetworkType()));
-                return service.discoverNode("127.0.0.1");
-            })
-            .onComplete(testContext.succeeding(loopbackNode -> {
-                testContext.verify(() -> assertEquals(NetworkTopologyService.NetworkType.LOCAL_NETWORK, loopbackNode.getNetworkType()));
-                testContext.completeNow();
-            }));
+    void testNetworkTypeDetection() {
+        assertEquals(NetworkTopologyService.NetworkType.LOCAL_NETWORK, service.discoverNode("localhost").getNetworkType());
+        assertEquals(NetworkTopologyService.NetworkType.LOCAL_NETWORK, service.discoverNode("127.0.0.1").getNetworkType());
     }
-    
+
     @Test
-    void testBandwidthEstimation(VertxTestContext testContext) {
-        service.discoverNode("localhost")
-            .onComplete(testContext.succeeding(localNode -> {
-                testContext.verify(() -> {
-                    // Local network should have high bandwidth
-                    assertTrue(localNode.getEstimatedBandwidth() >= 100 * 1024 * 1024); // At least 100MB/s for local
-                });
-                testContext.completeNow();
-            }));
+    void testBandwidthEstimation() {
+        // Local network should have high bandwidth
+        assertTrue(service.discoverNode("localhost").getEstimatedBandwidth() >= 100 * 1024 * 1024);
     }
-    
+
     @Test
-    void testLatencyMeasurement(VertxTestContext testContext) {
-        service.discoverNode("localhost")
-            .onComplete(testContext.succeeding(localNode -> {
-                testContext.verify(() -> {
-                    // Local network should have low latency
-                    assertTrue(localNode.getLatency().toMillis() < 1000); // Less than 1 second for local
-                });
-                testContext.completeNow();
-            }));
+    void testLatencyMeasurement() {
+        // Local network should have low latency
+        assertTrue(service.discoverNode("localhost").getLatency().toMillis() < 1000);
     }
-    
+
     @Test
-    void testPerformanceScore(VertxTestContext testContext) {
-        service.discoverNode("localhost")
-            .onComplete(testContext.succeeding(localNode -> {
-                testContext.verify(() -> {
-                    double score = localNode.getPerformanceScore();
-                    assertTrue(score >= 0.0 && score <= 1.0);
-                    
-                    // Local network should have good performance score
-                    if (localNode.isReachable()) {
-                        assertTrue(score > 0.5); // Should be better than average
-                    }
-                });
-                testContext.completeNow();
-            }));
+    void testPerformanceScore() {
+        NetworkNode localNode = service.discoverNode("localhost");
+
+        double score = localNode.getPerformanceScore();
+        assertTrue(score >= 0.0 && score <= 1.0);
+        if (localNode.isReachable()) {
+            assertTrue(score > 0.5); // Should be better than average
+        }
     }
-    
+
     @Test
-    void testTransferStrategySelection(VertxTestContext testContext) {
-        service.findOptimalPath("localhost", "127.0.0.1")
-            .onComplete(testContext.succeeding(path -> {
-                testContext.verify(() -> {
-                    NetworkTopologyService.TransferStrategy strategy = path.getTransferStrategy();
-                    assertNotNull(strategy);
-                    
-                    // Should be one of the defined strategies
-                    assertTrue(strategy == NetworkTopologyService.TransferStrategy.HIGH_THROUGHPUT ||
-                              strategy == NetworkTopologyService.TransferStrategy.HIGH_LATENCY_OPTIMIZED ||
-                              strategy == NetworkTopologyService.TransferStrategy.BALANCED);
-                });
-                testContext.completeNow();
-            }));
+    void testTransferStrategySelection() throws Exception {
+        NetworkTopologyService.TransferStrategy strategy =
+                service.findOptimalPath("localhost", "127.0.0.1").getTransferStrategy();
+
+        assertNotNull(strategy);
+        assertTrue(strategy == NetworkTopologyService.TransferStrategy.HIGH_THROUGHPUT ||
+                  strategy == NetworkTopologyService.TransferStrategy.HIGH_LATENCY_OPTIMIZED ||
+                  strategy == NetworkTopologyService.TransferStrategy.BALANCED);
     }
-    
+
     @Test
-    void testNetworkQualityAssessment(VertxTestContext testContext) {
-        service.getTransferRecommendations("localhost", 1024 * 1024)
-            .onComplete(testContext.succeeding(recommendations -> {
-                testContext.verify(() -> {
-                    NetworkTopologyService.NetworkQuality quality = recommendations.getNetworkQuality();
-                    assertNotNull(quality);
-                    
-                    // Should be one of the defined quality levels
-                    assertTrue(quality == NetworkTopologyService.NetworkQuality.EXCELLENT ||
-                              quality == NetworkTopologyService.NetworkQuality.GOOD ||
-                              quality == NetworkTopologyService.NetworkQuality.FAIR ||
-                              quality == NetworkTopologyService.NetworkQuality.POOR);
-                });
-                testContext.completeNow();
-            }));
+    void testNetworkQualityAssessment() {
+        NetworkTopologyService.NetworkQuality quality =
+                service.getTransferRecommendations("localhost", 1024 * 1024).getNetworkQuality();
+
+        assertNotNull(quality);
+        assertTrue(quality == NetworkTopologyService.NetworkQuality.EXCELLENT ||
+                  quality == NetworkTopologyService.NetworkQuality.GOOD ||
+                  quality == NetworkTopologyService.NetworkQuality.FAIR ||
+                  quality == NetworkTopologyService.NetworkQuality.POOR);
     }
-    
+
     @Test
-    void testCompressionRecommendation(VertxTestContext testContext) {
-        // Test with slow network simulation
-        service.getTransferRecommendations("slow.network.test", 100 * 1024 * 1024)
-            .onComplete(testContext.succeeding(recommendations -> {
-                testContext.verify(() -> {
-                    assertNotNull(recommendations);
-                    // Compression recommendation can be true or false depending on network conditions
-                    // Just verify it's a valid boolean
-                    boolean useCompression = recommendations.isUseCompression();
-                    assertTrue(useCompression || !useCompression); // Always true, but validates the method works
-                });
-                testContext.completeNow();
-            }));
+    void testRecommendationsForAnUndiscoverableHost() {
+        // The former version asserted "useCompression || !useCompression", which is always true.
+        NetworkTopologyService.NetworkRecommendations recommendations =
+                service.getTransferRecommendations("slow.network.test", 100 * 1024 * 1024);
+
+        assertNotNull(recommendations);
+        assertTrue(recommendations.getOptimalBufferSize() > 0);
+        assertNotNull(recommendations.getNetworkQuality());
     }
 }

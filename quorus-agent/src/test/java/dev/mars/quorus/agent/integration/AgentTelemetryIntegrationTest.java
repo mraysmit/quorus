@@ -23,17 +23,13 @@ import io.opentelemetry.api.GlobalOpenTelemetry;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
-import io.vertx.core.Vertx;
-import io.vertx.core.VertxOptions;
-import io.vertx.junit5.VertxExtension;
-import io.vertx.junit5.VertxTestContext;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.testcontainers.containers.BindMode;
+import org.testcontainers.containers.output.WaitingConsumer;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.junit.jupiter.Container;
@@ -47,8 +43,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.concurrent.TimeUnit;
 
-import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -59,7 +55,6 @@ import static org.junit.jupiter.api.Assertions.*;
  * - Agent metrics are exported in Prometheus format
  * - OTLP collector is reachable and healthy while traces are emitted
  */
-@ExtendWith(VertxExtension.class)
 @Testcontainers
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @DisplayName("Agent Telemetry Integration")
@@ -79,7 +74,7 @@ class AgentTelemetryIntegrationTest {
             .forPort(13133)
             .forStatusCode(200));
 
-    private Vertx vertx;
+    private OpenTelemetrySdk sdk;
     private HttpClient httpClient;
     private int prometheusPort;
 
@@ -91,6 +86,7 @@ class AgentTelemetryIntegrationTest {
         String otlpEndpoint = "http://localhost:" + otelCollector.getMappedPort(4317);
 
         AgentConfiguration config = new AgentConfiguration.Builder()
+                .securityProfile("development").allowInsecure(true).controllerTlsEnabled(false)
                 .agentId("agent-telemetry-test")
                 .tenantId("telemetry-test")
                 .controllerUrl("http://127.0.0.1:8080/api/v1")
@@ -98,8 +94,7 @@ class AgentTelemetryIntegrationTest {
                 .prometheusPort(prometheusPort)
                 .otlpEndpoint(otlpEndpoint)
                 .build();
-        VertxOptions options = AgentTelemetryConfig.configure(new VertxOptions(), config);
-        vertx = Vertx.vertx(options);
+        sdk = AgentTelemetryConfig.configure(config).orElseThrow();
         httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
 
         AgentMetrics metrics = new AgentMetrics("agent-telemetry-test", System.currentTimeMillis());
@@ -116,25 +111,11 @@ class AgentTelemetryIntegrationTest {
     }
 
     @AfterAll
-    void tearDown(VertxTestContext testContext) {
-        if (vertx != null) {
-            vertx.close().onComplete(testContext.succeeding(v -> {
-                cleanupTelemetryState();
-                testContext.completeNow();
-            }));
-            return;
-        }
-
-        cleanupTelemetryState();
-        testContext.completeNow();
-    }
-
-    private void cleanupTelemetryState() {
-        if (GlobalOpenTelemetry.get() instanceof OpenTelemetrySdk sdk) {
+    void tearDown() {
+        if (sdk != null) {
             sdk.close();
         }
         GlobalOpenTelemetry.resetForTest();
-
     }
 
     @Test
@@ -175,13 +156,14 @@ class AgentTelemetryIntegrationTest {
 
     @Test
     @DisplayName("OTel collector receives emitted startup span")
-    void testCollectorReceivesEmittedSpan() {
+    void testCollectorReceivesEmittedSpan() throws Exception {
         String spanName = "agent.telemetry.integration.startup";
+        // Follows the collector's log stream from its start and blocks until the span name appears:
+        // woken by each log line, no polling.
+        WaitingConsumer logs = new WaitingConsumer();
+        otelCollector.followOutput(logs);
 
-        await().atMost(Duration.ofSeconds(10))
-            .pollInterval(Duration.ofMillis(200))
-            .alias("Collector logs did not contain expected span name: " + spanName)
-            .until(() -> otelCollector.getLogs().contains(spanName));
+        logs.waitUntil(frame -> frame.getUtf8String().contains(spanName), 10, TimeUnit.SECONDS);
     }
 
     private static int findAvailablePort() {

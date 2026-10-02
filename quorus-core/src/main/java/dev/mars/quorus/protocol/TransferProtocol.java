@@ -21,12 +21,14 @@ import dev.mars.quorus.core.TransferRequest;
 import dev.mars.quorus.core.TransferResult;
 import dev.mars.quorus.core.exceptions.TransferException;
 import dev.mars.quorus.transfer.TransferContext;
-import io.vertx.core.Context;
-import io.vertx.core.Future;
-import io.vertx.core.Vertx;
 
 /**
  * Protocol interface for file transfers.
+ *
+ * <p>An adapter is one shared instance that serves every transfer of its protocol, so it keeps no
+ * per-transfer state. {@link #transfer} is blocking and runs on the caller's thread, normally a
+ * virtual thread. It reports progress through the {@link TransferContext} and stops between buffers
+ * when the context asks it to or the thread is interrupted (ADR-0012, RT-03c, RT-03d).
  *
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @version 2.0
@@ -38,27 +40,8 @@ public interface TransferProtocol {
     
     boolean canHandle(TransferRequest request);
     
-    /**
-     * Execute transfer synchronously (blocking).
-     * @deprecated Use {@link #transferReactive(TransferRequest, TransferContext)} instead.
-     */
-    @Deprecated
+    /** Runs the transfer on the calling thread and returns its result; see the class description. */
     TransferResult transfer(TransferRequest request, TransferContext context) throws TransferException;
-
-    /**
-     * Execute transfer asynchronously (reactive).
-     * Default implementation offloads the deprecated blocking transfer method to
-     * a Vert.x worker thread, preserving event-loop non-blocking behavior.
-     */
-    default Future<TransferResult> transferReactive(TransferRequest request, TransferContext context) {
-        Context vertxContext = Vertx.currentContext();
-        if (vertxContext == null) {
-            return Future.failedFuture(new TransferException(context.getJobId(),
-                    "No Vert.x context available for reactive protocol execution"));
-        }
-
-        return vertxContext.owner().executeBlocking(() -> transfer(request, context), false);
-    }
     
     boolean supportsResume();
     
@@ -69,22 +52,4 @@ public interface TransferProtocol {
      */
     long getMaxFileSize();
     
-    /**
-     * Abort an in-progress transfer immediately by closing underlying resources.
-     * This method should forcibly terminate any active connections, sockets, or streams.
-     * <p>
-     * For blocking protocols (FTP, SFTP, SMB), this will close the socket, causing
-     * the blocking read/write to throw an exception.
-     * <p>
-     * For reactive protocols (HTTP), this is typically a no-op as cancellation is
-     * handled through the Future cancellation mechanism.
-     * <p>
-     * Default implementation does nothing (no resources to abort).
-     * Protocol implementations with active resources should override this method.
-     *
-     * @since 2.1
-     */
-    default void abort() {
-        // Default: no-op (no resources to abort)
-    }
 }

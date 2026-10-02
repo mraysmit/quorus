@@ -1,0 +1,1136 @@
+diff --git a/.dockerignore b/.dockerignore
+index f06a857..0113b7f 100644
+--- a/.dockerignore
++++ b/.dockerignore
+@@ -3,8 +3,16 @@
+ # Reduces context transfer from ~100MB to ~10MB per build.
+ # =============================================================================
+ 
+-# Build outputs (55MB+ waste — rebuilt inside Docker anyway)
++# Build outputs. Images package host-built artifacts only; nothing is compiled inside Docker.
++# Everything under target/ is excluded except the runtime jars the Dockerfiles copy.
+ **/target/
++!quorus-controller/target/
++quorus-controller/target/*
++!quorus-controller/target/quorus-controller-*.jar
++!quorus-agent/target/
++quorus-agent/target/*
++!quorus-agent/target/quorus-agent-*.jar
++!quorus-agent/target/lib/
+ 
+ # Version control
+ .git/
+diff --git a/.github/workflows/quorus-ci.yml b/.github/workflows/quorus-ci.yml
+index 32ba7e9..0c28bd0 100644
+--- a/.github/workflows/quorus-ci.yml
++++ b/.github/workflows/quorus-ci.yml
+@@ -11,7 +11,6 @@ jobs:
+   java-checks:
+     name: ${{ matrix.lane }}
+     runs-on: ubuntu-latest
+-    container: maven:3.9.11-eclipse-temurin-25
+     strategy:
+       fail-fast: false
+       matrix:
+@@ -30,8 +29,14 @@ jobs:
+             command: mvn -B -pl quorus-controller -am -Dtest=OpenApiContractTest,SchemaCompatibilityTest -Dsurefire.failIfNoSpecifiedTests=false test
+     steps:
+       - uses: actions/checkout@v4
+-      - name: Verify Java 25 toolchain
+-        run: java -version
++      - name: Set up Amazon Corretto 27 (ADR-0012 RT-Q4)
++        uses: actions/setup-java@v4
++        with:
++          distribution: corretto
++          java-version: '27'
++          cache: maven
++      - name: Verify Java 27 toolchain
++        run: java -version && mvn -v
+       - name: Run ${{ matrix.lane }} lane
+         run: ${{ matrix.command }}
+ 
+@@ -47,9 +52,14 @@ jobs:
+   clean-build:
+     name: clean reproducible build
+     runs-on: ubuntu-latest
+-    container: maven:3.9.11-eclipse-temurin-25
+     steps:
+       - uses: actions/checkout@v4
++      - name: Set up Amazon Corretto 27 (ADR-0012 RT-Q4)
++        uses: actions/setup-java@v4
++        with:
++          distribution: corretto
++          java-version: '27'
++          cache: maven
+       - name: Clean build one
+         run: mvn -B clean verify
+       - name: Clean build two
+diff --git a/README.md b/README.md
+index 30f1ab3..d0f5447 100644
+--- a/README.md
++++ b/README.md
+@@ -96,20 +96,18 @@ Workflow-focused entry points are also available, including `BasicWorkflowExampl
+ 
+ The Compose topologies are explicitly labelled development-only: request security and HTTP/Raft TLS are disabled with the required insecure-development opt-in. They are not production deployment templates.
+ 
+-Build and install the project, point the Docker build at the local Maven group cache, and start the single-controller topology:
++Images package jars built on the host; nothing is compiled inside Docker. Build the controller and agent jars (Java 27), then start the single-controller topology. `--build` makes the image pick up the jar you just built:
+ 
+ ```powershell
+-$env:M2_REPO = "$env:USERPROFILE/.m2/repository"
+-mvn clean install
+-docker compose -f docker/compose/docker-compose-single-controller.yml up -d
++./docker/build-runtime.ps1
++docker compose -f docker/compose/docker-compose-single-controller.yml up -d --build
+ ```
+ 
+ On bash-compatible shells:
+ 
+ ```bash
+-export M2_REPO="$HOME/.m2/repository"
+-mvn clean install
+-docker compose -f docker/compose/docker-compose-single-controller.yml up -d
++sh docker/build-runtime.sh
++docker compose -f docker/compose/docker-compose-single-controller.yml up -d --build
+ ```
+ 
+ For a multi-node setup:
+@@ -135,7 +133,7 @@ controller certificate, and gateway client certificate, then starts the controll
+ production fail-closed HTTP and Raft mutual-TLS settings:
+ 
+ ```powershell
+-$env:M2_REPO = "$env:USERPROFILE/.m2/repository"
++./docker/build-runtime.ps1
+ docker compose -f docker/compose/docker-compose-tls-example.yml up -d --build
+ docker compose -f docker/compose/docker-compose-tls-example.yml exec controller-tls `
+   curl --fail --cacert /run/quorus-tls/ca.crt `
+@@ -143,7 +141,7 @@ docker compose -f docker/compose/docker-compose-tls-example.yml exec controller-
+   https://localhost:8080/health/ready
+ ```
+ 
+-On bash-compatible shells, use `export M2_REPO="$HOME/.m2/repository"` and replace the PowerShell
++On bash-compatible shells, run `sh docker/build-runtime.sh` first and replace the PowerShell
+ backticks with backslashes. The generated certificates are demonstration material, not production
+ PKI. Remove the container and the volume holding its private keys when finished:
+ 
+diff --git a/docker/compose/.env b/docker/compose/.env
+index 680140d..0a41b66 100644
+--- a/docker/compose/.env
++++ b/docker/compose/.env
+@@ -1,12 +1,6 @@
+ # Docker Compose environment variables
+-# This file is automatically loaded by docker-compose
+-
+-# Maven local repository path for BuildKit additional contexts
+-# Windows: Use forward slashes, e.g., C:/Users/yourname/.m2/repository
+-# Linux/Mac: /home/yourname/.m2/repository or /Users/yourname/.m2/repository
++# This file is automatically loaded by docker compose.
+ #
+-# If M2_HOME is set (Maven installation dir), we append /repository
+-# Otherwise, defaults to USERPROFILE/.m2/repository (Windows) or HOME/.m2/repository (Unix)
+-
+-# Uncomment and set explicitly if needed:
+-# M2_REPO=C:/Users/yourname/.m2/repository
++# Images package host-built jars; nothing is compiled inside Docker, so no Maven repository
++# or build context is needed. Build the jars first:
++#   docker/build-runtime.sh   (or docker/build-runtime.ps1)
+diff --git a/docker/compose/docker-compose-5node.yml b/docker/compose/docker-compose-5node.yml
+index 3f9fb51..be27f05 100644
+--- a/docker/compose/docker-compose-5node.yml
++++ b/docker/compose/docker-compose-5node.yml
+@@ -8,8 +8,6 @@ services:
+     build:
+       context: ../..
+       dockerfile: quorus-controller/Dockerfile
+-      additional_contexts:
+-        m2cache: ${M2_REPO}/dev/mars
+     container_name: quorus-controller1
+     hostname: controller1
+     environment:
+@@ -44,8 +42,6 @@ services:
+     build:
+       context: ../..
+       dockerfile: quorus-controller/Dockerfile
+-      additional_contexts:
+-        m2cache: ${M2_REPO}/dev/mars
+     container_name: quorus-controller2
+     hostname: controller2
+     environment:
+@@ -80,8 +76,6 @@ services:
+     build:
+       context: ../..
+       dockerfile: quorus-controller/Dockerfile
+-      additional_contexts:
+-        m2cache: ${M2_REPO}/dev/mars
+     container_name: quorus-controller3
+     hostname: controller3
+     environment:
+@@ -116,8 +110,6 @@ services:
+     build:
+       context: ../..
+       dockerfile: quorus-controller/Dockerfile
+-      additional_contexts:
+-        m2cache: ${M2_REPO}/dev/mars
+     container_name: quorus-controller4
+     hostname: controller4
+     environment:
+@@ -152,8 +144,6 @@ services:
+     build:
+       context: ../..
+       dockerfile: quorus-controller/Dockerfile
+-      additional_contexts:
+-        m2cache: ${M2_REPO}/dev/mars
+     container_name: quorus-controller5
+     hostname: controller5
+     environment:
+diff --git a/docker/compose/docker-compose-cluster.yml b/docker/compose/docker-compose-cluster.yml
+index 122ee14..8464ced 100644
+--- a/docker/compose/docker-compose-cluster.yml
++++ b/docker/compose/docker-compose-cluster.yml
+@@ -8,8 +8,6 @@ services:
+     build:
+       context: ../..
+       dockerfile: quorus-controller/Dockerfile
+-      additional_contexts:
+-        m2cache: ${M2_REPO}/dev/mars
+     container_name: quorus-controller1
+     hostname: controller1
+     environment:
+@@ -54,8 +52,6 @@ services:
+     build:
+       context: ../..
+       dockerfile: quorus-controller/Dockerfile
+-      additional_contexts:
+-        m2cache: ${M2_REPO}/dev/mars
+     container_name: quorus-controller2
+     hostname: controller2
+     environment:
+@@ -102,8 +98,6 @@ services:
+     build:
+       context: ../..
+       dockerfile: quorus-controller/Dockerfile
+-      additional_contexts:
+-        m2cache: ${M2_REPO}/dev/mars
+     container_name: quorus-controller3
+     hostname: controller3
+     environment:
+diff --git a/docker/compose/docker-compose-controller-first.yml b/docker/compose/docker-compose-controller-first.yml
+index 130bc30..62ec61d 100644
+--- a/docker/compose/docker-compose-controller-first.yml
++++ b/docker/compose/docker-compose-controller-first.yml
+@@ -4,10 +4,8 @@
+ # Each controller is a self-contained node with embedded HTTP API
+ # This provides natural scaling and fault tolerance
+ #
+-# Maven Repository for BuildKit:
+-#   Set M2_REPO in .env file or environment before running docker-compose.
+-#   Windows:   $env:M2_REPO = "$env:USERPROFILE/.m2/repository"
+-#   Linux/Mac: export M2_REPO="$HOME/.m2/repository"
++# Images package host-built jars. Build them first:
++#   docker/build-runtime.sh   (or docker/build-runtime.ps1)
+ 
+ services:
+   # Controller Node 1
+@@ -15,11 +13,6 @@ services:
+     build:
+       context: ../..
+       dockerfile: quorus-controller/Dockerfile
+-      args:
+-        BUILDER_IMAGE: maven:3.9.11-eclipse-temurin-25
+-        RUNTIME_IMAGE: eclipse-temurin:25-jre-alpine
+-      additional_contexts:
+-        m2cache: ${M2_REPO}/dev/mars
+     container_name: quorus-controller1
+     hostname: controller1
+     environment:
+@@ -65,11 +58,6 @@ services:
+     build:
+       context: ../..
+       dockerfile: quorus-controller/Dockerfile
+-      args:
+-        BUILDER_IMAGE: maven:3.9.11-eclipse-temurin-25
+-        RUNTIME_IMAGE: eclipse-temurin:25-jre-alpine
+-      additional_contexts:
+-        m2cache: ${M2_REPO}/dev/mars
+     container_name: quorus-controller2
+     hostname: controller2
+     environment:
+@@ -117,11 +105,6 @@ services:
+     build:
+       context: ../..
+       dockerfile: quorus-controller/Dockerfile
+-      args:
+-        BUILDER_IMAGE: maven:3.9.11-eclipse-temurin-25
+-        RUNTIME_IMAGE: eclipse-temurin:25-jre-alpine
+-      additional_contexts:
+-        m2cache: ${M2_REPO}/dev/mars
+     container_name: quorus-controller3
+     hostname: controller3
+     environment:
+diff --git a/docker/compose/docker-compose-full-network.yml b/docker/compose/docker-compose-full-network.yml
+index 2f40ef7..6e5ff6b 100644
+--- a/docker/compose/docker-compose-full-network.yml
++++ b/docker/compose/docker-compose-full-network.yml
+@@ -15,8 +15,6 @@ services:
+     build:
+       context: ../..
+       dockerfile: quorus-controller/Dockerfile
+-      additional_contexts:
+-        m2cache: ${M2_REPO}/dev/mars
+     container_name: quorus-controller1
+     hostname: controller1
+     environment:
+@@ -55,8 +53,6 @@ services:
+     build:
+       context: ../..
+       dockerfile: quorus-controller/Dockerfile
+-      additional_contexts:
+-        m2cache: ${M2_REPO}/dev/mars
+     container_name: quorus-controller2
+     hostname: controller2
+     environment:
+@@ -95,8 +91,6 @@ services:
+     build:
+       context: ../..
+       dockerfile: quorus-controller/Dockerfile
+-      additional_contexts:
+-        m2cache: ${M2_REPO}/dev/mars
+     container_name: quorus-controller3
+     hostname: controller3
+     environment:
+diff --git a/docker/compose/docker-compose-network-test.yml b/docker/compose/docker-compose-network-test.yml
+index 3ac07a5..65dc8b7 100644
+--- a/docker/compose/docker-compose-network-test.yml
++++ b/docker/compose/docker-compose-network-test.yml
+@@ -8,8 +8,6 @@ services:
+     build:
+       context: ../..
+       dockerfile: quorus-controller/Dockerfile
+-      additional_contexts:
+-        m2cache: ${M2_REPO}/dev/mars
+     container_name: quorus-controller1
+     hostname: controller1
+     environment:
+@@ -47,8 +45,6 @@ services:
+     build:
+       context: ../..
+       dockerfile: quorus-controller/Dockerfile
+-      additional_contexts:
+-        m2cache: ${M2_REPO}/dev/mars
+     container_name: quorus-controller2
+     hostname: controller2
+     environment:
+@@ -86,8 +82,6 @@ services:
+     build:
+       context: ../..
+       dockerfile: quorus-controller/Dockerfile
+-      additional_contexts:
+-        m2cache: ${M2_REPO}/dev/mars
+     container_name: quorus-controller3
+     hostname: controller3
+     environment:
+@@ -125,8 +119,6 @@ services:
+     build:
+       context: ../..
+       dockerfile: quorus-controller/Dockerfile
+-      additional_contexts:
+-        m2cache: ${M2_REPO}/dev/mars
+     container_name: quorus-controller4
+     hostname: controller4
+     environment:
+@@ -164,8 +156,6 @@ services:
+     build:
+       context: ../..
+       dockerfile: quorus-controller/Dockerfile
+-      additional_contexts:
+-        m2cache: ${M2_REPO}/dev/mars
+     container_name: quorus-controller5
+     hostname: controller5
+     environment:
+diff --git a/docker/compose/docker-compose-observability-cluster.yml b/docker/compose/docker-compose-observability-cluster.yml
+index 1eb3c48..86d30eb 100644
+--- a/docker/compose/docker-compose-observability-cluster.yml
++++ b/docker/compose/docker-compose-observability-cluster.yml
+@@ -146,8 +146,6 @@ services:
+     build:
+       context: ../..
+       dockerfile: quorus-controller/Dockerfile
+-      additional_contexts:
+-        m2cache: ${M2_REPO}/dev/mars
+     container_name: quorus-controller1
+     hostname: controller1
+     environment:
+@@ -195,8 +193,6 @@ services:
+     build:
+       context: ../..
+       dockerfile: quorus-controller/Dockerfile
+-      additional_contexts:
+-        m2cache: ${M2_REPO}/dev/mars
+     container_name: quorus-controller2
+     hostname: controller2
+     environment:
+@@ -246,8 +242,6 @@ services:
+     build:
+       context: ../..
+       dockerfile: quorus-controller/Dockerfile
+-      additional_contexts:
+-        m2cache: ${M2_REPO}/dev/mars
+     container_name: quorus-controller3
+     hostname: controller3
+     environment:
+diff --git a/docker/compose/docker-compose-single-controller.yml b/docker/compose/docker-compose-single-controller.yml
+index 7eb49c0..a73fca1 100644
+--- a/docker/compose/docker-compose-single-controller.yml
++++ b/docker/compose/docker-compose-single-controller.yml
+@@ -9,8 +9,6 @@ services:
+     build:
+       context: ../..
+       dockerfile: quorus-controller/Dockerfile
+-      additional_contexts:
+-        m2cache: ${M2_REPO}/dev/mars
+     container_name: quorus-controller-dev
+     environment:
+       - QUORUS_NODE_ID=controller-dev
+diff --git a/docker/compose/docker-compose-tls-example.yml b/docker/compose/docker-compose-tls-example.yml
+index 4e34713..6fa9973 100644
+--- a/docker/compose/docker-compose-tls-example.yml
++++ b/docker/compose/docker-compose-tls-example.yml
+@@ -50,8 +50,6 @@ services:
+     build:
+       context: ../..
+       dockerfile: quorus-controller/Dockerfile
+-      additional_contexts:
+-        m2cache: ${M2_REPO}/dev/mars
+     container_name: quorus-controller-tls-example
+     hostname: controller-tls
+     depends_on:
+diff --git a/docker/compose/docker-compose.yml b/docker/compose/docker-compose.yml
+index 6a92309..8db2a96 100644
+--- a/docker/compose/docker-compose.yml
++++ b/docker/compose/docker-compose.yml
+@@ -10,8 +10,6 @@ services:
+     build:
+       context: ../..
+       dockerfile: quorus-controller/Dockerfile
+-      additional_contexts:
+-        m2cache: ${M2_REPO}/dev/mars
+     container_name: quorus-controller1
+     hostname: controller1
+     environment:
+@@ -56,8 +54,6 @@ services:
+     build:
+       context: ../..
+       dockerfile: quorus-controller/Dockerfile
+-      additional_contexts:
+-        m2cache: ${M2_REPO}/dev/mars
+     container_name: quorus-controller2
+     hostname: controller2
+     environment:
+@@ -99,8 +95,6 @@ services:
+     build:
+       context: ../..
+       dockerfile: quorus-controller/Dockerfile
+-      additional_contexts:
+-        m2cache: ${M2_REPO}/dev/mars
+     container_name: quorus-controller3
+     hostname: controller3
+     environment:
+@@ -143,8 +137,6 @@ services:
+     build:
+       context: ../..
+       dockerfile: quorus-controller/Dockerfile
+-      additional_contexts:
+-        m2cache: ${M2_REPO}/dev/mars
+     container_name: quorus-controller4
+     hostname: controller4
+     environment:
+@@ -188,8 +180,6 @@ services:
+     build:
+       context: ../..
+       dockerfile: quorus-controller/Dockerfile
+-      additional_contexts:
+-        m2cache: ${M2_REPO}/dev/mars
+     container_name: quorus-controller5
+     hostname: controller5
+     environment:
+diff --git a/quorus-agent/Dockerfile b/quorus-agent/Dockerfile
+index 363a20e..a88e098 100644
+--- a/quorus-agent/Dockerfile
++++ b/quorus-agent/Dockerfile
+@@ -1,29 +1,15 @@
+-# Multi-stage build for Quorus Agent
+-FROM maven:3.9.9-eclipse-temurin-25 AS builder
+-
+-# Set working directory
+-WORKDIR /app
+-
+-# Copy parent POM and module POMs first for better layer caching
+-COPY pom.xml .
+-COPY quorus-core/pom.xml quorus-core/
+-COPY quorus-workflow/pom.xml quorus-workflow/
+-COPY quorus-agent/pom.xml quorus-agent/
+-
+-# Download dependencies
+-RUN mvn dependency:go-offline -pl quorus-core,quorus-workflow,quorus-agent -am
+-
+-# Copy source code
+-COPY quorus-core/src quorus-core/src
+-COPY quorus-workflow/src quorus-workflow/src
+-COPY quorus-agent/src quorus-agent/src
+-
+-# Build the agent and dependencies
+-RUN mvn clean package -pl quorus-agent -am -DskipTests
+-
+-# ============================================================================
+-# Runtime stage
+-FROM eclipse-temurin:25-jre-alpine
++# Quorus Agent runtime image.
++#
++# The image packages the agent jar and its dependency jars built and tested on the host; it never
++# runs Maven or compiles Java. Build them first, then the image:
++#
++#   docker/build-runtime.sh            (or docker/build-runtime.ps1)
++#   docker build -f quorus-agent/Dockerfile -t quorus-agent .
++#
++# Runtime: Amazon Corretto 27 on Alpine (ADR-0012, decision RT-Q4), pinned to an exact release.
++
++ARG RUNTIME_IMAGE=amazoncorretto:27.0.0-alpine3.24
++FROM ${RUNTIME_IMAGE}
+ 
+ # Install required packages
+ RUN apk add --no-cache \
+@@ -40,8 +26,8 @@ RUN addgroup -g 1001 quorus && \
+ WORKDIR /app
+ 
+ # Copy the built JAR and dependencies
+-COPY --from=builder /app/quorus-agent/target/quorus-agent-*.jar app.jar
+-COPY --from=builder /app/quorus-agent/target/lib/ lib/
++COPY quorus-agent/target/quorus-agent-*.jar app.jar
++COPY quorus-agent/target/lib/ lib/
+ 
+ # Copy configuration files from resources
+ COPY quorus-agent/src/main/resources/logback.xml config/logback.xml
+diff --git a/quorus-controller/Dockerfile b/quorus-controller/Dockerfile
+index 60d0196..08d9730 100644
+--- a/quorus-controller/Dockerfile
++++ b/quorus-controller/Dockerfile
+@@ -1,64 +1,15 @@
+-# syntax=docker/dockerfile:1.4
+-# Multi-stage build for Quorus Controller
+-# Requires Docker BuildKit (DOCKER_BUILDKIT=1)
++# Quorus Controller runtime image.
+ #
+-# BUILD COMMAND (uses additional build context for local Maven artifacts):
+-#   docker build --build-context m2cache=$HOME/.m2/repository \
+-#                -f quorus-controller/Dockerfile -t quorus-controller .
++# The image packages the controller jar built and tested on the host; it never runs Maven or
++# compiles Java. Build the jar first, then the image:
+ #
+-# This eliminates the need for an m2-repo directory in the build context.
+-# The raftlog-core dependency (not on Maven Central) is pulled from your
+-# local Maven cache via BuildKit's named context feature.
+-
+-ARG BUILDER_IMAGE=maven:3.9.11-eclipse-temurin-25
+-ARG RUNTIME_IMAGE=eclipse-temurin:25-jre-alpine
+-
+-FROM ${BUILDER_IMAGE} AS builder
+-
+-# Set working directory
+-WORKDIR /app
+-
+-# Copy parent pom and module poms first for better layer caching
+-COPY pom.xml .
+-COPY quorus-core/pom.xml quorus-core/
+-COPY quorus-workflow/pom.xml quorus-workflow/
+-COPY quorus-tenant/pom.xml quorus-tenant/
+-COPY quorus-controller/pom.xml quorus-controller/
+-
+-# Create empty stub poms for modules not needed for controller build
+-RUN mkdir -p quorus-integration-examples && echo '<?xml version="1.0" encoding="UTF-8"?><project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"><modelVersion>4.0.0</modelVersion><parent><groupId>dev.mars</groupId><artifactId>quorus</artifactId><version>1.0-SNAPSHOT</version></parent><artifactId>quorus-integration-examples</artifactId><packaging>pom</packaging></project>' > quorus-integration-examples/pom.xml
+-
+-RUN mkdir -p quorus-agent && echo '<?xml version="1.0" encoding="UTF-8"?><project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"><modelVersion>4.0.0</modelVersion><parent><groupId>dev.mars</groupId><artifactId>quorus</artifactId><version>1.0-SNAPSHOT</version></parent><artifactId>quorus-agent</artifactId><packaging>pom</packaging></project>' > quorus-agent/pom.xml
+-
+-RUN mkdir -p quorus-api && echo '<?xml version="1.0" encoding="UTF-8"?><project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"><modelVersion>4.0.0</modelVersion><parent><groupId>dev.mars</groupId><artifactId>quorus</artifactId><version>1.0-SNAPSHOT</version></parent><artifactId>quorus-api</artifactId><packaging>pom</packaging></project>' > quorus-api/pom.xml
+-
+-# Copy local Maven artifacts from named build context (raftlog-core not on Maven Central)
+-# BuildKit pulls these from host's ~/.m2/repository/dev/mars via --build-context m2cache=...
+-# Context is pointed directly at dev/mars to avoid transferring the entire Maven cache
+-COPY --from=m2cache / /root/.m2/repository/dev/mars
+-
+-# Download dependencies (cached via Docker BuildKit cache mount)
+-RUN --mount=type=cache,target=/root/.m2/repository/org \
+-    --mount=type=cache,target=/root/.m2/repository/io \
+-    --mount=type=cache,target=/root/.m2/repository/com \
+-    --mount=type=cache,target=/root/.m2/repository/net \
+-    mvn dependency:go-offline -pl quorus-controller -am -Dsilent=true || true
+-
+-# Copy source code (changes here don't invalidate dependency layer)
+-COPY quorus-core/src quorus-core/src
+-COPY quorus-workflow/src quorus-workflow/src
+-COPY quorus-tenant/src quorus-tenant/src
+-COPY quorus-controller/src quorus-controller/src
+-
+-# Build the application
+-# -U flag removed: no longer needed since raftlog is properly available
+-RUN --mount=type=cache,target=/root/.m2/repository/org \
+-    --mount=type=cache,target=/root/.m2/repository/io \
+-    --mount=type=cache,target=/root/.m2/repository/com \
+-    --mount=type=cache,target=/root/.m2/repository/net \
+-    mvn package -pl quorus-controller -am -DskipTests
++#   docker/build-runtime.sh            (or docker/build-runtime.ps1)
++#   docker build -f quorus-controller/Dockerfile -t quorus-controller .
++#
++# Runtime: Amazon Corretto 27 on Alpine (ADR-0012, decision RT-Q4). The tag is pinned to an exact
++# Corretto release; plan item RT-09 moves it with each Java release.
+ 
+-# Runtime stage
++ARG RUNTIME_IMAGE=amazoncorretto:27.0.0-alpine3.24
+ FROM ${RUNTIME_IMAGE}
+ 
+ # Install curl for health checks
+@@ -72,7 +23,7 @@ RUN addgroup -g 1001 quorus && \
+ WORKDIR /app
+ 
+ # Copy the built JAR
+-COPY --from=builder /app/quorus-controller/target/quorus-controller-*.jar app.jar
++COPY quorus-controller/target/quorus-controller-*.jar app.jar
+ 
+ # Create directories for logs and data
+ RUN mkdir -p /app/logs /app/data && \
+diff --git a/quorus-controller/src/test/java/dev/mars/quorus/controller/raft/SharedDockerCluster.java b/quorus-controller/src/test/java/dev/mars/quorus/controller/raft/SharedDockerCluster.java
+index 6691c77..08e93d7 100644
+--- a/quorus-controller/src/test/java/dev/mars/quorus/controller/raft/SharedDockerCluster.java
++++ b/quorus-controller/src/test/java/dev/mars/quorus/controller/raft/SharedDockerCluster.java
+@@ -120,38 +120,41 @@ public final class SharedDockerCluster {
+     }
+ 
+     /**
+-     * Builds the shared {@code quorus-controller:test} image if it is not already cached,
+-     * without starting either shared cluster. Tests that manage their own container
+-     * lifecycle — such as the R1-1 container-recreation acceptance — use this so they
+-     * reuse the same image without paying for a cluster they will not use.
++     * Builds the shared {@code quorus-controller:test} image once per test JVM, without starting
++     * either shared cluster. Tests that manage their own container lifecycle, such as the R1-1
++     * container-recreation acceptance, use this so they reuse the same image without paying for a
++     * cluster they will not use.
+      */
+     public static synchronized void buildImageIfAbsent() {
+         ensureImageBuilt();
+     }
+ 
+     /**
+-     * Builds the quorus-controller:test Docker image using the build compose file,
+-     * unless the image already exists locally. On a local Docker Desktop, skipping
+-     * a redundant build saves 30–120 seconds.
++     * Packages the host-built controller jar into the {@code quorus-controller:test} image using
++     * the build compose file. The image is rebuilt once per test JVM rather than reused from an
++     * earlier run: packaging a host-built jar takes seconds, and a cached image could be stale
++     * (for example built for an older Java baseline) and silently hide a regression.
+      */
+     private static synchronized void ensureImageBuilt() {
+         if (imageBuilt) return;
+ 
+-        // Fast path: skip the build entirely if the image is already cached
+-        if (isImageCached("quorus-controller:test")) {
+-            logger.info("Docker image quorus-controller:test already exists -- skipping build");
+-            imageBuilt = true;
+-            return;
++        File hostJar = new File("target/quorus-controller-1.0-SNAPSHOT.jar");
++        if (!hostJar.isFile()) {
++            throw new IllegalStateException(
++                    "Host-built controller jar not found: " + hostJar.getAbsolutePath()
++                    + " -- images package host-built jars only; run docker/build-runtime.sh"
++                    + " (or mvn package -pl quorus-controller -am -DskipTests) before the Docker tests");
+         }
+ 
+         File buildComposeFile = new File("src/test/resources/docker-compose-build-image.yml");
+         if (!buildComposeFile.exists()) {
+-            throw new RuntimeException(
++            throw new IllegalStateException(
+                     "Build compose file not found: " + buildComposeFile.getAbsolutePath()
+                     + " -- ensure working directory is the quorus-controller module root");
+         }
+ 
+-        logger.info("Building Docker image via: " + buildComposeFile.getAbsolutePath());
++        logger.info("Packaging host-built controller jar into quorus-controller:test via: "
++                + buildComposeFile.getAbsolutePath());
+         try {
+             ProcessBuilder pb = new ProcessBuilder(
+                     "docker", "compose",
+@@ -161,20 +164,17 @@ public final class SharedDockerCluster {
+             pb.redirectErrorStream(true);
+ 
+             Process process = pb.start();
+-
+-            // Drain output to prevent blocking
++            String output;
+             try (BufferedReader reader = new BufferedReader(
+                     new InputStreamReader(process.getInputStream()))) {
+-                String line;
+-                while ((line = reader.readLine()) != null) {
+-                    logger.fine("[Docker Build] " + line);
+-                }
++                output = reader.lines().collect(java.util.stream.Collectors.joining("\n"));
+             }
++            logger.fine("[Docker Build]\n" + output);
+ 
+             int exitCode = process.waitFor();
+             if (exitCode != 0) {
+-                throw new RuntimeException(
+-                        "Docker image build failed with exit code: " + exitCode);
++                throw new IllegalStateException(
++                        "Docker image build failed with exit code " + exitCode + ":\n" + output);
+             }
+ 
+             imageBuilt = true;
+@@ -182,25 +182,7 @@ public final class SharedDockerCluster {
+         } catch (RuntimeException e) {
+             throw e;
+         } catch (Exception e) {
+-            throw new RuntimeException("Failed to build Docker image", e);
+-        }
+-    }
+-
+-    /**
+-     * Returns {@code true} if the named Docker image exists in the local cache.
+-     * Uses {@code docker image inspect} which returns exit code 0 when found.
+-     */
+-    private static boolean isImageCached(String imageName) {
+-        try {
+-            Process process = new ProcessBuilder("docker", "image", "inspect", imageName)
+-                    .redirectErrorStream(true)
+-                    .start();
+-            // Drain output to prevent blocking
+-            process.getInputStream().readAllBytes();
+-            return process.waitFor() == 0;
+-        } catch (Exception e) {
+-            logger.fine("Could not check for cached image: " + e.getMessage());
+-            return false;
++            throw new IllegalStateException("Failed to build Docker image", e);
+         }
+     }
+ 
+diff --git a/quorus-controller/src/test/resources/docker-compose-5node-test.yml b/quorus-controller/src/test/resources/docker-compose-5node-test.yml
+index 92c80ff..3dbcc1b 100644
+--- a/quorus-controller/src/test/resources/docker-compose-5node-test.yml
++++ b/quorus-controller/src/test/resources/docker-compose-5node-test.yml
+@@ -14,8 +14,6 @@ services:
+     build:
+       context: ../../../..
+       dockerfile: quorus-controller/Dockerfile
+-      additional_contexts:
+-        m2cache: ${M2_REPO:-~/.m2/repository}/dev/mars
+       args:
+         BUILDKIT_INLINE_CACHE: 1
+     hostname: controller1
+@@ -46,8 +44,6 @@ services:
+     build:
+       context: ../../../..
+       dockerfile: quorus-controller/Dockerfile
+-      additional_contexts:
+-        m2cache: ${M2_REPO:-~/.m2/repository}/dev/mars
+       args:
+         BUILDKIT_INLINE_CACHE: 1
+     hostname: controller2
+@@ -78,8 +74,6 @@ services:
+     build:
+       context: ../../../..
+       dockerfile: quorus-controller/Dockerfile
+-      additional_contexts:
+-        m2cache: ${M2_REPO:-~/.m2/repository}/dev/mars
+       args:
+         BUILDKIT_INLINE_CACHE: 1
+     hostname: controller3
+@@ -110,8 +104,6 @@ services:
+     build:
+       context: ../../../..
+       dockerfile: quorus-controller/Dockerfile
+-      additional_contexts:
+-        m2cache: ${M2_REPO:-~/.m2/repository}/dev/mars
+       args:
+         BUILDKIT_INLINE_CACHE: 1
+     hostname: controller4
+@@ -142,8 +134,6 @@ services:
+     build:
+       context: ../../../..
+       dockerfile: quorus-controller/Dockerfile
+-      additional_contexts:
+-        m2cache: ${M2_REPO:-~/.m2/repository}/dev/mars
+       args:
+         BUILDKIT_INLINE_CACHE: 1
+     hostname: controller5
+diff --git a/quorus-controller/src/test/resources/docker-compose-build-image.yml b/quorus-controller/src/test/resources/docker-compose-build-image.yml
+index 1754d39..0ae9519 100644
+--- a/quorus-controller/src/test/resources/docker-compose-build-image.yml
++++ b/quorus-controller/src/test/resources/docker-compose-build-image.yml
+@@ -9,6 +9,4 @@ services:
+     build:
+       context: ../../../..
+       dockerfile: quorus-controller/Dockerfile
+-      additional_contexts:
+-        m2cache: ${M2_REPO:-~/.m2/repository}/dev/mars
+     image: quorus-controller:test
+diff --git a/quorus-controller/src/test/resources/docker-compose-network-test.yml b/quorus-controller/src/test/resources/docker-compose-network-test.yml
+index 5ca3447..d8d0831 100644
+--- a/quorus-controller/src/test/resources/docker-compose-network-test.yml
++++ b/quorus-controller/src/test/resources/docker-compose-network-test.yml
+@@ -7,8 +7,6 @@ services:
+     build:
+       context: ../../../..
+       dockerfile: quorus-controller/Dockerfile
+-      additional_contexts:
+-        m2cache: ${M2_REPO:-~/.m2/repository}/dev/mars
+     hostname: controller1
+     environment:
+       - QUORUS_NODE_ID=controller1
+@@ -34,8 +32,6 @@ services:
+     build:
+       context: ../../../..
+       dockerfile: quorus-controller/Dockerfile
+-      additional_contexts:
+-        m2cache: ${M2_REPO:-~/.m2/repository}/dev/mars
+     hostname: controller2
+     environment:
+       - QUORUS_NODE_ID=controller2
+@@ -61,8 +57,6 @@ services:
+     build:
+       context: ../../../..
+       dockerfile: quorus-controller/Dockerfile
+-      additional_contexts:
+-        m2cache: ${M2_REPO:-~/.m2/repository}/dev/mars
+     hostname: controller3
+     environment:
+       - QUORUS_NODE_ID=controller3
+@@ -88,8 +82,6 @@ services:
+     build:
+       context: ../../../..
+       dockerfile: quorus-controller/Dockerfile
+-      additional_contexts:
+-        m2cache: ${M2_REPO:-~/.m2/repository}/dev/mars
+     hostname: controller4
+     environment:
+       - QUORUS_NODE_ID=controller4
+@@ -115,8 +107,6 @@ services:
+     build:
+       context: ../../../..
+       dockerfile: quorus-controller/Dockerfile
+-      additional_contexts:
+-        m2cache: ${M2_REPO:-~/.m2/repository}/dev/mars
+     hostname: controller5
+     environment:
+       - QUORUS_NODE_ID=controller5
+diff --git a/quorus-controller/src/test/resources/docker-compose-test.yml b/quorus-controller/src/test/resources/docker-compose-test.yml
+index abdd160..77ac284 100644
+--- a/quorus-controller/src/test/resources/docker-compose-test.yml
++++ b/quorus-controller/src/test/resources/docker-compose-test.yml
+@@ -13,8 +13,6 @@ services:
+     build:
+       context: ../../../..
+       dockerfile: quorus-controller/Dockerfile
+-      additional_contexts:
+-        m2cache: ${M2_REPO:-~/.m2/repository}/dev/mars
+     hostname: controller1
+     environment:
+       - QUORUS_NODE_ID=controller1
+@@ -43,8 +41,6 @@ services:
+     build:
+       context: ../../../..
+       dockerfile: quorus-controller/Dockerfile
+-      additional_contexts:
+-        m2cache: ${M2_REPO:-~/.m2/repository}/dev/mars
+     hostname: controller2
+     environment:
+       - QUORUS_NODE_ID=controller2
+@@ -73,8 +69,6 @@ services:
+     build:
+       context: ../../../..
+       dockerfile: quorus-controller/Dockerfile
+-      additional_contexts:
+-        m2cache: ${M2_REPO:-~/.m2/repository}/dev/mars
+     hostname: controller3
+     environment:
+       - QUORUS_NODE_ID=controller3
+diff --git a/scripts/httpie/RUNBOOK.txt b/scripts/httpie/RUNBOOK.txt
+index 0ffe069..d2a05b6 100644
+--- a/scripts/httpie/RUNBOOK.txt
++++ b/scripts/httpie/RUNBOOK.txt
+@@ -7,21 +7,19 @@ Status: Development-only smoke path; request security and TLS are disabled expli
+ 
+ Prerequisites
+ 
+-- JDK 25, Maven, Docker with Compose, HTTPie, and a bash-compatible shell.
++- JDK 27, Maven, Docker with Compose, HTTPie, and a bash-compatible shell.
+ - Run commands from the repository root.
+ - Do not use this development topology as a production deployment template.
+ 
+ 1) Build and start the development controller
+ 
+    PowerShell:
+-     $env:M2_REPO = "$env:USERPROFILE/.m2/repository"
+-     mvn clean install
+-     docker compose -f docker/compose/docker-compose-single-controller.yml up -d
++     ./docker/build-runtime.ps1
++     docker compose -f docker/compose/docker-compose-single-controller.yml up -d --build
+ 
+    Linux/macOS:
+-     export M2_REPO="$HOME/.m2/repository"
+-     mvn clean install
+-     docker compose -f docker/compose/docker-compose-single-controller.yml up -d
++     sh docker/build-runtime.sh
++     docker compose -f docker/compose/docker-compose-single-controller.yml up -d --build
+ 
+    The Compose file explicitly selects the development security profile, allows insecure
+    transport, and disables HTTP and Raft TLS. Wait until this succeeds:
+diff --git a/scripts/start-cluster-with-observability.ps1 b/scripts/start-cluster-with-observability.ps1
+index 78b90a3..74bca53 100644
+--- a/scripts/start-cluster-with-observability.ps1
++++ b/scripts/start-cluster-with-observability.ps1
+@@ -147,24 +147,15 @@ if ($blockedPorts.Count -gt 0) {
+     }
+ }
+ 
+-# Check m2-repo exists
+-$m2RepoPath = Join-Path $ProjectRoot "m2-repo\raftlog\raftlog-core\1.0"
+-if (-not (Test-Path $m2RepoPath)) {
+-    Write-Warning "m2-repo directory not found. Creating from local Maven repository..."
+-    
+-    $sourceRepo = "$env:USERPROFILE\.m2\repository\dev\mars\raftlog"
+-    if (Test-Path $sourceRepo) {
+-        New-Item -ItemType Directory -Force -Path "m2-repo" | Out-Null
+-        Copy-Item -Recurse "$sourceRepo\*" "m2-repo\" -Force
+-        Write-Success "Copied raftlog artifacts to m2-repo"
+-    } else {
+-        Write-Error "raftlog-core not found in local Maven repository. Please build raftlog first."
+-        exit 1
+-    }
+-}
+-
+ Write-Success "Prerequisites check complete"
+ 
++# Images package host-built jars; nothing is compiled inside Docker. Build them first.
++& (Join-Path $ProjectRoot "docker\build-runtime.ps1")
++if ($LASTEXITCODE -ne 0) {
++    Write-Error "Host build of the runtime jars failed"
++    exit 1
++}
++
+ # -----------------------------------------------------------------------------
+ # Step 2: Rebuild Images (optional)
+ # -----------------------------------------------------------------------------
+diff --git a/docker/build-runtime.sh b/docker/build-runtime.sh
+new file mode 100644
+index 0000000..43d7c46
+--- /dev/null
++++ b/docker/build-runtime.sh
+@@ -0,0 +1,20 @@
++#!/usr/bin/env sh
++# Builds the Quorus runtime jars on the host. Container images only package these artifacts;
++# nothing is compiled inside Docker.
++set -eu
++
++SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
++REPOSITORY_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
++
++echo "Building the Quorus controller and agent jars on the host with Maven..."
++mvn -B -f "$REPOSITORY_ROOT/pom.xml" clean package -pl quorus-controller,quorus-agent -am -DskipTests
++
++for artifact in \
++    "$REPOSITORY_ROOT/quorus-controller/target/quorus-controller-1.0-SNAPSHOT.jar" \
++    "$REPOSITORY_ROOT/quorus-agent/target/quorus-agent-1.0-SNAPSHOT.jar"; do
++  if [ ! -f "$artifact" ]; then
++    echo "Expected host-built artifact was not created: $artifact" >&2
++    exit 1
++  fi
++  echo "Host-built artifact: $artifact"
++done
+diff --git a/docker/build-runtime.ps1 b/docker/build-runtime.ps1
+new file mode 100644
+index 0000000..77c3787
+--- /dev/null
++++ b/docker/build-runtime.ps1
+@@ -0,0 +1,19 @@
++# Builds the Quorus runtime jars on the host. Container images only package these artifacts;
++# nothing is compiled inside Docker.
++$ErrorActionPreference = 'Stop'
++
++$repositoryRoot = Resolve-Path (Join-Path $PSScriptRoot '..')
++
++Write-Host 'Building the Quorus controller and agent jars on the host with Maven...'
++mvn -B -f (Join-Path $repositoryRoot 'pom.xml') clean package -pl quorus-controller,quorus-agent -am -DskipTests
++if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
++
++foreach ($artifact in @(
++        (Join-Path $repositoryRoot 'quorus-controller/target/quorus-controller-1.0-SNAPSHOT.jar'),
++        (Join-Path $repositoryRoot 'quorus-agent/target/quorus-agent-1.0-SNAPSHOT.jar'))) {
++    if (-not (Test-Path $artifact)) {
++        Write-Error "Expected host-built artifact was not created: $artifact"
++        exit 1
++    }
++    Write-Host "Host-built artifact: $artifact"
++}
+diff --git a/quorus-controller/src/test/java/dev/mars/quorus/controller/deployment/ContainerImageBaselineTest.java b/quorus-controller/src/test/java/dev/mars/quorus/controller/deployment/ContainerImageBaselineTest.java
+new file mode 100644
+index 0000000..a5b4708
+--- /dev/null
++++ b/quorus-controller/src/test/java/dev/mars/quorus/controller/deployment/ContainerImageBaselineTest.java
+@@ -0,0 +1,160 @@
++/*
++ * Copyright 2026 Mark Andrew Ray-Smith Cityline Ltd
++ * Licensed under the Apache License, Version 2.0.
++ */
++package dev.mars.quorus.controller.deployment;
++
++import org.junit.jupiter.api.Tag;
++import org.junit.jupiter.api.Test;
++import org.junit.jupiter.api.Timeout;
++
++import java.io.IOException;
++import java.io.InputStream;
++import java.nio.charset.StandardCharsets;
++import java.nio.file.Files;
++import java.nio.file.Path;
++import java.security.MessageDigest;
++import java.security.NoSuchAlgorithmException;
++import java.util.ArrayList;
++import java.util.Arrays;
++import java.util.HexFormat;
++import java.util.List;
++import java.util.concurrent.TimeUnit;
++import java.util.regex.Matcher;
++import java.util.regex.Pattern;
++import java.util.stream.Stream;
++
++import static org.junit.jupiter.api.Assertions.assertEquals;
++import static org.junit.jupiter.api.Assertions.assertTrue;
++
++/**
++ * Container image baseline contract (plan workstream RT-01b; ADR-0012 decisions RT-Q3 and RT-Q4).
++ *
++ * <p>Images package the jar that the host built and tested; they never compile Java. Each image
++ * is built fresh under a dedicated tag, so a cached image can never satisfy the test. It must run
++ * the Amazon Corretto 27 JVM and ship byte-for-byte the host-built jar, whose classes target
++ * Java 27.
++ *
++ * <p>Prerequisite: the host-built jars, for example
++ * {@code mvn package -pl quorus-controller,quorus-agent -am -DskipTests}.
++ */
++@Tag("docker")
++class ContainerImageBaselineTest {
++
++    private static final int JAVA_BASELINE = 27;
++    private static final int EXPECTED_CLASS_MAJOR = 44 + JAVA_BASELINE;
++    private static final Path REPOSITORY_ROOT = Path.of("..").toAbsolutePath().normalize();
++    private static final String SHIPPED_JAR = "/app/app.jar";
++    private static final Pattern JAVA_VERSION = Pattern.compile("version \"(\\d+)");
++    private static final Pattern CLASS_MAJOR = Pattern.compile("major version: (\\d+)");
++
++    @Test
++    @Timeout(value = 10, unit = TimeUnit.MINUTES)
++    void controllerImagePackagesHostBuiltJarOnCorrettoBaseline() throws Exception {
++        verifyImage("quorus-controller", "quorus-controller:rt01",
++                "dev.mars.quorus.controller.QuorusControllerApplication");
++    }
++
++    @Test
++    @Timeout(value = 10, unit = TimeUnit.MINUTES)
++    void agentImagePackagesHostBuiltJarOnCorrettoBaseline() throws Exception {
++        verifyImage("quorus-agent", "quorus-agent:rt01", "dev.mars.quorus.agent.QuorusAgent");
++    }
++
++    private static void verifyImage(String module, String image, String mainClass) throws Exception {
++        Path hostJar = hostBuiltJar(module);
++
++        build(image, REPOSITORY_ROOT.resolve(module).resolve("Dockerfile"));
++
++        assertCorrettoBaselineRuntime(image);
++        assertShipsHostBuiltJar(image, hostJar);
++        assertShippedClassMajor(image, mainClass);
++    }
++
++    private static Path hostBuiltJar(String module) throws IOException {
++        Path target = REPOSITORY_ROOT.resolve(module).resolve("target");
++        List<Path> jars;
++        try (Stream<Path> files = Files.exists(target) ? Files.list(target) : Stream.empty()) {
++            jars = files.filter(path -> {
++                String name = path.getFileName().toString();
++                return name.startsWith(module + "-") && name.endsWith(".jar")
++                        && !name.endsWith("-tests.jar") && !name.endsWith("-sources.jar");
++            }).toList();
++        }
++        assertEquals(1, jars.size(), "expected exactly one host-built " + module + " jar in " + target
++                + " but found " + jars + ". Build it on the host first, for example "
++                + "mvn package -pl quorus-controller,quorus-agent -am -DskipTests");
++        return jars.getFirst();
++    }
++
++    private static void build(String image, Path dockerfile) throws Exception {
++        assertTrue(Files.isRegularFile(dockerfile), "Dockerfile not found: " + dockerfile);
++        ProcessResult result = run(List.of("docker", "build", "-f", dockerfile.toString(),
++                "-t", image, REPOSITORY_ROOT.toString()));
++
++        assertEquals(0, result.exitCode(),
++                "image " + image + " failed to build; last output:\n" + tail(result.output(), 40));
++    }
++
++    private static void assertCorrettoBaselineRuntime(String image) throws Exception {
++        ProcessResult result = run(List.of("docker", "run", "--rm", "--entrypoint", "java", image, "-version"));
++
++        assertEquals(0, result.exitCode(), "java -version failed in " + image + ":\n" + result.output());
++        assertTrue(result.output().contains("Corretto"),
++                image + " must run the Amazon Corretto JVM, but reported:\n" + result.output());
++        Matcher version = JAVA_VERSION.matcher(result.output());
++        assertTrue(version.find(), "no Java version reported by " + image + ":\n" + result.output());
++        assertEquals(JAVA_BASELINE, Integer.parseInt(version.group(1)),
++                image + " must run Java " + JAVA_BASELINE + ", but reported:\n" + result.output());
++    }
++
++    private static void assertShipsHostBuiltJar(String image, Path hostJar) throws Exception {
++        ProcessResult result = run(List.of("docker", "run", "--rm", "--entrypoint", "sha256sum", image, SHIPPED_JAR));
++
++        assertEquals(0, result.exitCode(), "cannot hash " + SHIPPED_JAR + " in " + image + ":\n" + result.output());
++        String shipped = result.output().trim().split("\\s+")[0];
++        assertEquals(sha256(hostJar), shipped,
++                image + " must ship the host-built " + hostJar.getFileName() + " unchanged");
++    }
++
++    private static void assertShippedClassMajor(String image, String className) throws Exception {
++        ProcessResult result = run(List.of("docker", "run", "--rm", "--entrypoint", "javap", image,
++                "-cp", SHIPPED_JAR, "-v", className));
++
++        assertEquals(0, result.exitCode(), "javap failed for " + className + " in " + image + ":\n"
++                + tail(result.output(), 20));
++        Matcher major = CLASS_MAJOR.matcher(result.output());
++        assertTrue(major.find(), "no class-file version reported for " + className + " in " + image);
++        assertEquals(EXPECTED_CLASS_MAJOR, Integer.parseInt(major.group(1)),
++                className + " in " + image + " must be compiled for Java " + JAVA_BASELINE);
++    }
++
++    private static String sha256(Path file) throws IOException, NoSuchAlgorithmException {
++        MessageDigest digest = MessageDigest.getInstance("SHA-256");
++        try (InputStream in = Files.newInputStream(file)) {
++            byte[] buffer = new byte[64 * 1024];
++            for (int read; (read = in.read(buffer)) != -1; ) {
++                digest.update(buffer, 0, read);
++            }
++        }
++        return HexFormat.of().formatHex(digest.digest());
++    }
++
++    private static ProcessResult run(List<String> command) throws IOException, InterruptedException {
++        ProcessBuilder builder = new ProcessBuilder(new ArrayList<>(command)).redirectErrorStream(true);
++        builder.environment().put("DOCKER_BUILDKIT", "1");
++        Process process = builder.start();
++        String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
++        int exitCode = process.waitFor();
++        System.out.println("[" + String.join(" ", command) + "] exit " + exitCode + "\n" + tail(output, 60));
++        return new ProcessResult(exitCode, output);
++    }
++
++    private static String tail(String text, int lines) {
++        String[] all = text.split("\\R");
++        return String.join("\n", Arrays.copyOfRange(all, Math.max(0, all.length - lines), all.length));
++    }
++
++    private record ProcessResult(int exitCode, String output) {
++    }
++}

@@ -21,12 +21,11 @@ import dev.mars.quorus.transfer.TransferEngine;
 import dev.mars.quorus.transfer.SimpleTransferEngine;
 import dev.mars.quorus.workflow.*;
 
-import io.vertx.core.Future;
-import io.vertx.core.Vertx;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
@@ -64,13 +63,12 @@ public class ComplexWorkflowExample {
     }
     
     public void runExample() throws Exception {
-        // 1. Setup with Vert.x
-        log.step(1, "Creating Vert.x instance and engines...");
-        Vertx vertx = Vertx.vertx();
-        
+        // 1. Setup
+        log.step(1, "Creating engines...");
+        TransferEngine transferEngine = new SimpleTransferEngine(10, 3, 1000); // 10 concurrent, 3 retries, 1 s retry delay
+
         try {
-            TransferEngine transferEngine = new SimpleTransferEngine(vertx, 10, 3, 1024 * 1024);
-            SimpleWorkflowEngine workflowEngine = new SimpleWorkflowEngine(vertx, transferEngine);
+            SimpleWorkflowEngine workflowEngine = new SimpleWorkflowEngine(transferEngine);
             
             // 2. Create complex workflow
             log.step(2, "Creating complex workflow definition...");
@@ -116,8 +114,7 @@ public class ComplexWorkflowExample {
                     .userId(baseContext.getUserId())
                     .build();
             
-            Future<WorkflowExecution> dryRunFuture = workflowEngine.dryRun(workflow, dryRunContext);
-            WorkflowExecution dryRunResult = dryRunFuture.toCompletionStage().toCompletableFuture().get();
+            WorkflowExecution dryRunResult = workflowEngine.dryRun(workflow, dryRunContext);
             
             log.keyValue("Dry run completed", dryRunResult.getStatus());
             log.keyValue("Groups validated", dryRunResult.getGroupExecutions().size());
@@ -131,8 +128,7 @@ public class ComplexWorkflowExample {
                     .userId(baseContext.getUserId())
                     .build();
             
-            Future<WorkflowExecution> virtualRunFuture = workflowEngine.virtualRun(workflow, virtualRunContext);
-            WorkflowExecution virtualRunResult = virtualRunFuture.toCompletionStage().toCompletableFuture().get();
+            WorkflowExecution virtualRunResult = workflowEngine.virtualRun(workflow, virtualRunContext);
             
             log.keyValue("Virtual run completed", virtualRunResult.getStatus());
             displayDetailedResults(virtualRunResult);
@@ -143,8 +139,8 @@ public class ComplexWorkflowExample {
             
             log.exampleComplete("Complex Workflow Example");
         } finally {
-            vertx.close();
-        }
+            transferEngine.shutdown(Duration.ofSeconds(10));
+}
     }
     
     private String createComplexWorkflow() {
