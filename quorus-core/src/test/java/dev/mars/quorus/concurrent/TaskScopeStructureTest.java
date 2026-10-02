@@ -102,7 +102,7 @@ class TaskScopeStructureTest {
     }
 
     // ---- Retrospective characterization (plan §6.1): behaviour implemented during the RT-02d green
-    // ---- stage without a preceding failing test. Recorded as characterization, not TDD evidence.
+    // ---- stage without a preceding failing test. Recorded as characterization, not TDD.
 
     @Test
     void forkingAfterLeavingTheBindingInForceAtOpenIsAStructureViolation() throws Exception {

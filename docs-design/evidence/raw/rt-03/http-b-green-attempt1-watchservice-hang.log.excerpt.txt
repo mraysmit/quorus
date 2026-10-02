@@ -1,7 +1,0 @@
-Excerpt of: docs-design/evidence/raw/rt-03/http-b-green-attempt1-watchservice-hang.log
-Original SHA-256: 01aaa33892b87edc5272ae0be65196641dcee102808aed6a561e96d0e7d1bae0
-Original size: 7595 bytes
-Full log not retained under the evidence retention rule (plan §6.1): regression and discarded-attempt output is kept as this excerpt. Reproduce by re-running the recorded command at the recorded revision.
-
-     66: 15:59:10.403 [junit-timeout-thread-4] ERROR d.m.q.protocol.HttpTransferProtocol - [QUORUS-1205] HTTP checksum mismatch: expected=0000000000000000000000000000000000000000000000000000000000000000, actual=ed7002b439e9ac845f22357d822bac1444730fbdb6016d3ec9432297b9ec9f73
-     69: 15:59:40.410 [virtual-77] ERROR d.m.q.protocol.HttpTransferProtocol - [QUORUS-1206] HTTP download failed: jobId=download, error=Premature end of Content-Length delimited message body (expected: 2097152; received: 1048576)

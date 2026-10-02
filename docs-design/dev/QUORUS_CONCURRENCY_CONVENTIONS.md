@@ -158,6 +158,6 @@ This standard replaces the Vert.x test facilities for code that has left Vert.x 
 - **Repeat concurrency tests** as part of regression, 30–50 runs of the affected test classes, and
   state the pass and fail count in the commit message.
 - **Record in the commit message** (plan §6.1): the red and green results, mutation checks and regression
-  totals. No logs, manifests or patches are kept.
+  totals.
 - **Label honestly.** Tests added after the code they cover are retrospective characterization under
   plan §6.1 and must be stated as such.

@@ -136,7 +136,7 @@ class TaskScopeTest {
     }
 
     // ---- Retrospective characterization (plan §6.1): behaviour added during the green stage
-    // ---- without a preceding failing test. Recorded as characterization, not TDD evidence.
+    // ---- without a preceding failing test. Recorded as characterization, not TDD.
 
     @Test
     void openRejectsMissingNameAndNonPositiveTimeout() {

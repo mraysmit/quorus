@@ -335,7 +335,7 @@ class HttpTransferProtocolBoundaryTest {
 
     /**
      * Retrospective characterization (plan §6.1): behaviour implemented during the RT-03b green stage
-     * without a preceding failing test. Recorded as characterization, not TDD evidence.
+     * without a preceding failing test. Recorded as characterization, not TDD.
      */
     @Nested
     class Characterization {

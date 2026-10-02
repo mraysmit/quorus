@@ -794,7 +794,7 @@ Capacity figures such as requests per second, heartbeats per second, concurrent 
 | ARCH-12 | Partial | High | The job model includes business service, owner, criticality, expected start, required completion time, runbook URL, and labels; escalation policy and full operational consumption remain incomplete | Blocks complete automated escalation, not capture of operational context |
 | ARCH-16 | Open | High | No canonical signed-artifact admission, hardened runtime, controlled drain, upgrade, rollback, and decommissioning process | Blocks governed enterprise agent deployment |
 | ARCH-17 | Closed | — | Production requires aliases and opaque references; direct URI compatibility is development-only and the redacted scanner inventories migration findings | Route/workflow adoption remains gated by their later activation phases rather than an active bypass |
-| ARCH-09 | Closed | — | The HTTP adapter streams downloads to a staged file that is moved into place, and streams uploads from the file, without buffering the payload ([RT-03b evidence](../docs-design/evidence/rt-03b-http-adapter-2026-09-26.json)) | The bounded-memory large-file claim still needs the Phase 12 measurement in §13 |
+| ARCH-09 | Closed | — | The HTTP adapter streams downloads to a staged file that is moved into place, and streams uploads from the file, without buffering the payload (`RT-03b`, commits `fadbb29` and `336ec37`) | The bounded-memory large-file claim still needs the Phase 12 measurement in §13 |
 | ARCH-10 | Open | Medium | Dynamic Raft membership is absent | Blocks live controller scale-out claims |
 
 This table SHOULD be updated whenever implementation changes. A gap is removed only when code, automated verification, and relevant operational documentation agree.

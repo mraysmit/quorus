@@ -65,7 +65,7 @@ JVM system properties (`-Dquorus.*`) are **not** a configuration source. Config 
 
 **MANDATORY: When running Maven or any test commands in the terminal, ALWAYS use `Tee-Object` so output is visible in the console AND saved to a file. NEVER use `Out-File` or `>` redirection alone — this hides output from the user.**
 
-Test output is working output: write it to git-ignored `temp/`. A slice's red and green results, mutation checks and regression totals are recorded in its commit message (plan §6.1); no logs, manifests or patches are committed.
+Test output is working output: write it to git-ignored `temp/`. A slice's red and green results, mutation checks and regression totals are recorded in its commit message (plan §6.1).
 
 ```powershell
 # CORRECT:

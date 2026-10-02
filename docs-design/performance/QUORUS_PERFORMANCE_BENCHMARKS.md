@@ -86,7 +86,7 @@ Levels: **micro** (one method, JMH), **component** (one module against real loca
   network and container runtime, as §13 requires.
 - **Comparisons:** both sides run in the same session on the same machine, each at a named commit.
 - **Recording:** a run's figures and environment go into the results document and the commit message
-  that adds them (plan §6.1). Raw output is not kept in the repository.
+  that adds them (plan §6.1).
 
 ## 5. The benchmark module (`ENG-15`)
 

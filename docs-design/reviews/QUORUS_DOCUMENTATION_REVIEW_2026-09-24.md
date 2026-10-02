@@ -56,7 +56,7 @@ This review answers three questions about the Quorus documentation:
 
 **Method.**
 
-- **Reading.** Each document was read in full by one of eight parallel reviewers, grouped by area: canonical API/architecture, user and operator guides, security/configuration/ADRs, planning and evidence, system design, Raft/simulator design, `dev/`, and performance/testing.
+- **Reading.** Each document was read in full by one of eight parallel reviewers, grouped by area: canonical API/architecture, user and operator guides, security/configuration/ADRs, planning, system design, Raft/simulator design, `dev/`, and performance/testing.
 - **Links.** A script checked every relative Markdown link in the 71 Markdown files in scope (§4.11).
 - **Checking.** About 260 specific claims were checked against source at HEAD and in the working tree. Priority went to claims a reader would act on: endpoints, configuration keys, environment variables, commands, file paths, class names, versions and "implemented/closed" status. About half were confirmed; the rest were contradicted, only partly true, or stale. The checks deliberately targeted places where drift was likely, so this is not a random-sample accuracy rate.
 - **Safety.** All access was read-only. Git was used only through `--no-optional-locks` log/show/cat-file commands after an early `git status` left a lock file, which has since been removed.
@@ -78,7 +78,7 @@ The best parts of the documentation set are unusually disciplined:
 
 - the precedence model in `docs-design/README.md`;
 - the Security Deployment Guide;
-- the dated evidence records with reconciled test counts;
+- the dated checkpoints with reconciled test counts;
 - the Outstanding Work Register with stable IDs.
 
 The set has not kept pace with the pace of change in September 2026. In the space of a week the code gained:
@@ -131,8 +131,8 @@ As a result, the canonical documents now contradict the code, and each other, in
    - **Revocation serials:** matching compares against `BigInteger.toString(16)`, which drops leading zeros. The documented example `01AF44`, and any openssl-formatted serial with a leading zero, therefore never matches.
    - **Revocation scope:** runtime revocation is held in memory per controller. It is not replicated and is lost on restart, yet three documents describe it as cluster-wide. The certificate incident runbook relies on both behaviours.
 
-6. **A history rewrite broke evidence traceability.**
-   - Eight commit SHAs cited in the plan, register, configuration handover and evidence records are no longer reachable from any ref. One of them is `b604505`, the R6 acceptance revision.
+6. **A history rewrite broke commit traceability.**
+   - Eight commit SHAs cited in the plan, register and configuration handover are no longer reachable from any ref. One of them is `b604505`, the R6 acceptance revision.
    - Each has a tree-identical replacement on master (see Appendix A). All eight were confirmed.
    - No branch or tag names the originals, so clones from `origin` cannot resolve them. The local copies should not be relied on either.
 
@@ -235,28 +235,21 @@ Sizes are on-disk sizes. "Header" gives the version and date in the document's o
 
 | Document | Size | Header | Grade | Currency | Action and main reason |
 |---|---|---|---|---|---|
-| `docs-design/README.md` | 4.0 KB | v1.0, 09-01 | B | Current | **Fix.** The precedence rules are accurate. Bump the header, which is still 09-01 although the body says 09-07. Add `evidence/`, `architecture-decisions/` and `reference/` to the directory table. |
+| `docs-design/README.md` | 4.0 KB | v1.0, 09-01 | B | Current | **Fix.** The precedence rules are accurate. Bump the header, which is still 09-01 although the body says 09-07. Add `architecture-decisions/` and `reference/` to the directory table. |
 | `ADR-0001-EVENT-STORAGE.md` | 1.5 KB | v1.0, 09-01 | C | Current | **Keep.** Add an Alternatives section. |
 | `ADR-0002-PROGRESS-CHECKPOINTING.md` | 1.4 KB | v1.0, 09-01 | C | Partly stale | **Fix.** It still says "Phase 2 adds … fencing. Until then …", but fencing is implemented. |
 | `ADR-0003-IDENTITY-BOUNDARY.md` | 2.1 KB | v1.0, 09-01 | C | Partly stale | **Fix.** Its note that "revocation propagation remains required" is the only accurate statement of the node-local limitation anywhere in the set, so keep it and update the rest. |
 | `ADR-0004-SECRET-PROVIDERS.md` | 1.9 KB | v1.1, 09-03 | C | Current | **Keep.** |
 | `ADR-0005-DEPLOYMENT-OWNERSHIP.md` | 1.2 KB | v1.0, 09-01 | C | Current | **Keep.** The whole ADR set has no index, no supersession fields, and no ADRs for raftlog-core, configuration isolation, schema 3 or revocation scope. |
-| `reference/QUORUS_REPRODUCIBLE_BUILD_AND_EVIDENCE.md` | 2.1 KB | v1.0, 09-01 | C | Partly stale | **Fix.** There is no `project.build.outputTimestamp`, so the build is repeatable but not byte-reproducible. Its evidence figures are frozen at M0. |
+| `reference/QUORUS_REPRODUCIBLE_BUILD.md` | 2.1 KB | v1.0, 09-01 | C | Partly stale | **Fix.** There is no `project.build.outputTimestamp`, so the build is repeatable but not byte-reproducible. Its figures are frozen at M0. |
 | `reference/QUORUS_VERSIONING_AND_COMPATIBILITY_POLICY.md` | 2.7 KB | v1.0, 09-01 | D | Stale | **Fix.** It says the command and snapshot schema is version 1; the code is `VersionRange(0, 3)`. It does not record the configuration-contract break from `b35fb25`, and it has no product-version rule. |
 
-### 3.5 `docs-design/task/` and `evidence/`
+### 3.5 `docs-design/task/`
 
 | Document | Size | Header | Grade | Currency | Action and main reason |
 |---|---|---|---|---|---|
 | `task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md` | 89.6 KB | v1.26, 09-07 (uncommitted) | C+ | Partly stale | **Fix.** The header says Phase 4 is "reopened" while §11 says Complete. It cites five orphaned SHAs, lacks the revision history that its §23 requires, and presents a present-tense "no volumes" statement that has since been fixed. |
 | `task/QUORUS_OUTSTANDING_WORK_REGISTER.md` | 39.2 KB | v1.3, 09-07 (uncommitted) | B− | Partly stale | **Fix.** OBS-04, OBS-05, OBS-07 and OBS-14 are stale against the code. The section counts are wrong (F: 8 vs 10 rows; H: 6 open vs 0 open). It cites plan v1.25 instead of v1.26. Three plan items have no ID. |
-| `evidence/full-suite-error-remediation-2026-09-05.md` | 4.0 KB | none | B+ | Historical | **Fix (small).** Cite the fix commit (`a0103a0`). |
-| `evidence/r1-container-recreation-2026-09-07.md` | 13.2 KB | 09-07, **untracked** | B− | Current (uncommitted) | **Commit it**, then add revision identity, timestamps and log hashes. It contradicts itself on fixture durability (§3 and §10.4 vs §12.1). |
-| `evidence/r4-dns-remediation-2026-09-05.md` | 6.1 KB | none | A− | Historical | **Fix (small).** "Changes are uncommitted" should now read `8b3cf5c`. |
-| `evidence/r5-closure-2026-09-05.md` | 3.9 KB | none | B+ | Historical | **Fix (small).** Add the closure commit. |
-| `evidence/r6-final-acceptance-2026-09-05.md` | 4.0 KB | none | B+ | Historical | **Fix.** Map `b604505` to `dc447d4`. The claim that the transport failure is "retained" is inaccurate (`RaftNode.java:602-616`). |
-| `evidence/raftlog-validation-handover-2026-09-05.md` | 9.4 KB | none | B− | Historical | **Fix.** Add a supersession pointer to R1-1. It is written as instructions for a session that has already taken place. |
-| `evidence/remediation-r4-r6-2026-09-05.md` | 16.4 KB | none | C | Superseded | **Archive.** Only the banner reflects later events; the body still says "R4 is temporarily blocked". |
 
 ### 3.6 `docs-design/design/`
 
@@ -456,16 +449,16 @@ Related limits that no document states:
 - Raft peer authorisation does not bind a certificate subject to a node ID (`RaftPeerAuthorizationInterceptor`). Any certificate issued by the cluster CA can make Raft RPCs.
 - Direct mTLS bindings are created with `elevationExpiresAt=null`. Only gateway-asserted identities can therefore perform elevated operations (revocation, service-connection writes, secret-reference writes).
 
-### 4.6 Planning and evidence integrity
+### 4.6 Planning integrity
 
 1. **History rewrite.**
-   - Eight SHAs cited in the plan, register, handover and evidence records (Markdown and JSON manifests) are not ancestors of HEAD or `origin/master`, and no branch or tag names them (`git name-rev` gives `undefined`). The objects still exist locally.
+   - Eight SHAs cited in the plan, register and handover are not ancestors of HEAD or `origin/master`, and no branch or tag names them (`git name-rev` gives `undefined`). The objects still exist locally.
    - Each has a tree-identical commit on master; the mapping is in Appendix A. All eight tree matches were re-checked on 2026-09-25.
    - `temp/pre-claude-rewrite-status.txt` and `temp/post-claude-rewrite-status.txt` (2026-09-11) suggest a rewrite that removed commit trailers.
    - Until refs are added or the citations are updated, clones from `origin` cannot resolve these SHAs.
 2. **Uncommitted closures.** These exist only in the working tree:
    - the plan v1.26 and register v1.3 edits;
-   - the untracked R1-1 evidence file and its two new test classes;
+   - the two new, untracked R1-1 test classes;
    - the durable Compose fixture;
    - the `LeaderGuardHandlerTest` fix;
    - the staged `TransferMetrics` deletion.
@@ -477,14 +470,14 @@ Related limits that no document states:
    - The register says "Phases 0, 1 and 4 complete".
    - The reopening is never explained.
 4. **Present-tense statements already out of date.**
-   - Plan line 150, register lines 119–122 and r1 §3/§10.4 say the container fixture "declares no volumes".
-   - r1 §12.1 and the working tree show that it now does.
+   - Plan line 150 and register lines 119–122 say the container fixture "declares no volumes".
+   - The working tree shows that it now does.
 5. **Stale backlog items.**
    - OBS-04 and OBS-05: the handlers, parser and validator already declare and use loggers.
    - OBS-07: the backlog says 53 DEBUG statements; there are 37.
    - OBS-14: `RaftLogStorageAdapter` already uses `logger`, and `FileRaftStorage` is an external class.
 
-Where a result was checked, it held up. The test counts reconcile between plan and evidence (2,414 → 2,429 → 2,437; controller 597 + 4 = 601; core 1,541 − 24 = 1,517). All 38 cited test classes exist.
+Where a result was checked, it held up. The test counts reconcile across the plan's checkpoints (2,414 → 2,429 → 2,437; controller 597 + 4 = 601; core 1,541 − 24 = 1,517). All 38 cited test classes exist.
 
 ### 4.7 Design documents present superseded or target-state material as current
 
@@ -563,7 +556,6 @@ Also missing from these documents:
 - `docs-design/README.md` says 09-01 but its body says 09-07.
 - `docker/README.md` says 09-01, but it was last committed 09-05.
 - `QUORUS_RAFT_CLUSTER_TESTING.md` says v1.0 / 2026-02-01 but has been edited since.
-- The six 2026-09-05 evidence files have no header block.
 
 **Product version numbers disagree:**
 
@@ -616,7 +608,7 @@ Some documents mention stale paths as plain text rather than links, for example 
 | ID | Finding | Status | Evidence |
 |---|---|---|---|
 | QR-01 | Agent skips the `IN_PROGRESS` transition | **Fixed** | `QuorusAgent.java:433-441` reports `ACCEPTED`, then `IN_PROGRESS`, before executing. Arch Spec §13 still lists this as a gap. |
-| QR-02 | Default Raft storage path is outside the persisted volume | **Fixed for containers** | The Dockerfile and Compose files set `QUORUS_RAFT_STORAGE_PATH=/app/data/raft`, and a blank value now means "use the default". The code default is still the relative `./data/raft/{nodeId}`. The R1-1 container evidence has not been committed. |
+| QR-02 | Default Raft storage path is outside the persisted volume | **Fixed for containers** | The Dockerfile and Compose files set `QUORUS_RAFT_STORAGE_PATH=/app/data/raft`, and a blank value now means "use the default". The code default is still the relative `./data/raft/{nodeId}`. The R1-1 container tests have not been committed. |
 | QR-03 | SFTP host-key verification disabled | **Partly fixed** | Governed SFTP requires SHA-256 pins, and production rejects non-governed jobs. Direct URIs (library and development use) still set `StrictHostKeyChecking=no` silently (`SftpTransferProtocol.java:406-408`). |
 | QR-04 | Advertised Compose deployments are obsolete or incomplete | **Open, changed form** | Controller variables now use `QUORUS_*` names. However, the Compose files now fail production security validation, and the full-network agents have no tenant (§4.2). |
 | QR-05 | Agent tests do not compile | **Fixed** | `failMessage` is no longer present in `quorus-agent/src/test`. |
@@ -846,22 +838,22 @@ Issues:
   - runtime trust-state scope;
   - Raft transport over grpc-java rather than Vert.x gRPC.
 
-**Reproducible Build and Evidence.**
+**Reproducible Build.**
 - Confirmed: `.java-version` 25, CI on `maven:3.9.11-eclipse-temurin-25`, two clean `verify` builds in `quorus-ci.yml`.
 - There is no `project.build.outputTimestamp`, so artifacts are not byte-reproducible (**M**).
-- The evidence figures are frozen at M0 (2,212 tests); R6 had 2,437 (**L**).
+- The figures are frozen at M0 (2,212 tests); R6 had 2,437 (**L**).
 
 **Versioning and Compatibility Policy.**
 - Schema versions are wrong: it says 1, the code says 3 (**H**).
 - It does not record the configuration-contract break (**M**).
 - It has no product-version rule (**M**).
 
-### 7.4 Plan, register and evidence
+### 7.4 Plan and register
 
 See §4.6 for the cross-document problems. Additional points:
 
 - **Plan.**
-  - The §6.1 TDD protocol is rigorous, and every checkpoint cites evidence with reconciled counts.
+  - The §6.1 TDD protocol is rigorous, and every checkpoint gives reconciled counts.
   - The remediation checkpoint (lines 62–191) is a reverse-chronological append log that keeps superseding itself. Line 116 is a single line of about 900 characters and includes a machine path (**M**).
   - Line 384 still says coverage "exercises … RocksDB storage" (**L**).
   - Phases 5–12 have no `**Status:**` line (**L**).
@@ -873,12 +865,6 @@ See §4.6 for the cross-document problems. Additional points:
   - OBS-08 is marked closed on the strength of a deletion that is only staged (**L**).
   - The OTel plan is cited as both v2.5 and v2.6 (**L**).
   - Three plan items have no register ID (**M**): the durable agent-report outbox (plan line 188), two Raft regression cases needing disposition (line 157), and the persistent-environment inventory (line 125).
-- **Evidence.**
-  - **r4** is the strongest record: reconciled counts, and code claims that check out.
-  - **r6** has an exact command, log SHA-256, image digest and an isolated worktree, but its revision is orphaned.
-  - **r1** is honest (a negative-control test, and "no product defect found"), but it is untracked and has no revision identity, which the plan's §6.1 requires (**H**).
-  - **remediation-r4-r6** and the **raftlog handover** need supersession pointers.
-  - The 2026-09-05 files have no header block (**L**).
 
 ### 7.5 Design documents
 
@@ -996,8 +982,8 @@ The plan is ordered by risk to readers and operators. Effort estimates are rough
 
 | # | Action | Documents or code | Closes |
 |---|---|---|---|
-| A1 | Commit the 2026-09-07 work: R1-1 tests and evidence, the durable fixture, the `LeaderGuardHandlerTest` fix, the `TransferMetrics` deletion, and plan v1.26 / register v1.3. Then add the commit SHA, timestamps and log hashes to the r1 evidence. | task/, evidence/, controller tests | §4.6 (2) |
-| A2 | Preserve the orphaned SHAs. Either add refs such as `refs/evidence/r6-b604505`, or annotate every citation with its master equivalent (Appendix A). Do this before any `git gc`. | plan, register, handover, evidence (`.md` and `.json`) | §4.6 (1) |
+| A1 | Commit the 2026-09-07 work: the R1-1 tests, the durable fixture, the `LeaderGuardHandlerTest` fix, the `TransferMetrics` deletion, and plan v1.26 / register v1.3. | task/, controller tests | §4.6 (2) |
+| A2 | Preserve the orphaned SHAs. Either add refs that name them, or annotate every citation with its master equivalent (Appendix A). Do this before any `git gc`. | plan, register, handover | §4.6 (1) |
 | A3 | Move `docs-design/dev/prompts.txt` out of the repository (APEX prompts; nothing sensitive found, so no history rewrite is needed). Point `.github/copilot-instructions.md` at the canonical Architecture Specification, and fix its stale module, class, route and example content. | dev/, .github/ | §7.2, §7.6 |
 | A4 | Fix revocation-serial normalisation and add an openssl-format test. Update Security Guide §4.2 and Runbook §4.1, §4.2 and §4.4 so that revocation is sent to every controller and added to configuration before any restart. | `CertificateTrustState`, SDG, runbook | §4.5, §6 #1–2 |
 | A5 | Give every `docker/compose/*.yml` service an explicit development profile, and add `QUORUS_AGENT_TENANT_ID` for agents. Fix the Dockerfile `HEALTHCHECK`, the OTel variable and `M2_REPO`. Delete `-corrected.yml`. | docker/, controller Dockerfile | §4.2, QR-04 |
@@ -1021,7 +1007,7 @@ The plan is ordered by risk to readers and operators. Effort estimates are rough
 | # | Action |
 |---|---|
 | C1 | Move the 12 `dev/vertx5-advice/` files to the PeeGeeQ repository. Delete `performance/CRITICAL_PERFORMANCE_REFACTORING_GUIDELINES.md`. |
-| C2 | Move these documents to `docs-design/archive/`, each with a one-line "why archived" banner: the three `CONNECTION_POOL_*` documents, `VERTX5_PERFORMANCE_BENCHMARKS.md`, all six `vertx-migration/` files (keep SUMMARY as the record), `FTPS_INTEGRATION_TEST_INVESTIGATION.md` (after marking it resolved), `evidence/remediation-r4-r6-2026-09-05.md`, and the Configuration Handover (after extracting the configuration reference). |
+| C2 | Move these documents to `docs-design/archive/`, each with a one-line "why archived" banner: the three `CONNECTION_POOL_*` documents, `VERTX5_PERFORMANCE_BENCHMARKS.md`, all six `vertx-migration/` files (keep SUMMARY as the record), `FTPS_INTEGRATION_TEST_INVESTIGATION.md` (after marking it resolved), and the Configuration Handover (after extracting the configuration reference). |
 | C3 | Write one short `docs-design/dev/QUORUS_VERTX5_CONVENTIONS.md` based on what the code actually does. Link it from `.github/copilot-instructions.md`. |
 | C4 | Merge the Cluster Startup Guide, the Docker Testing README and DOCKER_BUILD_OPTIMIZATION into `docker/README.md`. |
 | C5 | Split `QUORUS_SYSTEM_DESIGN.md`. Move the enterprise requirements to the Architecture Spec (or delete them and link). Archive the PostgreSQL/Redis/etcd, Kubernetes, SQL, changelog, duplicated and file-organisation sections. Badge what remains. Globally rename `QuorusStateMachine` to `QuorusStateStore`. |
@@ -1067,7 +1053,6 @@ docs-design/
   README.md                             precedence + full directory table
   architecture-decisions/               ADR-0001…0010 + index ★
   task/                                 plan + register
-  evidence/                             dated records with revision identity
   reference/                            versioning, reproducible build, QUORUS_RAFT_STORAGE_REFERENCE.md ★
   design/                               trimmed, section-badged SYSTEM_DESIGN; SIMULATORS
   testing/                              testing README, log style, negative testing, protocol servers, Raft cluster
@@ -1114,7 +1099,7 @@ docs-design/
   - the `.gitignore` coverage.
 - **Static analysis only.** No builds, tests or containers were run. "Fails at startup" findings (§4.2) come from reading the configuration and the validation code, not from running them.
 - **Working-tree dependence.** Several statements describe uncommitted changes as observed on 2026-09-24. If those changes are discarded rather than committed, §4.6 and §8 change.
-- **Evidence outside the repository.** RaftLog library SHAs (`1c5af80`, `7a3bd3a`, `872a8c0`, `db59859`) and the "41 storage tests / 319 library tests" claims belong to the separate raftlog repository and were not verified.
+- **Claims about another repository.** RaftLog library SHAs (`1c5af80`, `7a3bd3a`, `872a8c0`, `db59859`) and the "41 storage tests / 319 library tests" claims belong to the separate raftlog repository and were not verified.
 
 ---
 
@@ -1124,16 +1109,16 @@ These SHAs are cited in live documents. Each exists locally as a commit object, 
 
 | Cited SHA | Master equivalent (same tree) | Where cited |
 |---|---|---|
-| `b604505` | `dc447d4` fix(raft): always release storage after transport shutdown | Plan; register; Configuration Handover; r5-closure; r6-final-acceptance (`.md` and `.json`); raftlog-validation-handover; remediation-r4-r6 |
-| `0fefecb` | `8b3cf5c` fix(security): complete R4 and R5 handover remediation | r6-final-acceptance (`.md` and `.json`) |
-| `f8fb15e` | `a0103a0` fix(raft): serialize vote decisions and repair Docker test startup | r4-dns-remediation (`.md` and `.json`), as the "base revision" |
-| `28f0530` | `1a8f2b3` (R2 + R3 changes) | Plan; Configuration Handover; remediation-r4-r6 (`.md` and `.json`) |
-| `ffc3e64` | `db532fb` docs(evidence): record the full reactor verify with raftlog-core 1.2.0 | Plan; Configuration Handover; `raft-log-tdd-evidence-2026-09-04.json` |
-| `038da9f` | `e7c9dbc` fix(raft): persist snapshots and recover safely after compaction | Configuration Handover; `raft-log-tdd-evidence-2026-09-04.json` |
-| `2d8ed83` | `7b07825` refactor(raft): enforce external raftlog-only storage | Configuration Handover; `phase4-tdd-evidence-2026-09-03.json` |
+| `b604505` | `dc447d4` fix(raft): always release storage after transport shutdown | Plan; register; Configuration Handover |
+| `0fefecb` | `8b3cf5c` fix(security): complete R4 and R5 handover remediation | — |
+| `f8fb15e` | `a0103a0` fix(raft): serialize vote decisions and repair Docker test startup | — |
+| `28f0530` | `1a8f2b3` (R2 + R3 changes) | Plan; Configuration Handover |
+| `ffc3e64` | `db532fb` record the full reactor verify with raftlog-core 1.2.0 | Plan; Configuration Handover |
+| `038da9f` | `e7c9dbc` fix(raft): persist snapshots and recover safely after compaction | Configuration Handover |
+| `2d8ed83` | `7b07825` refactor(raft): enforce external raftlog-only storage | Configuration Handover |
 | `43cdd20` | `067bb45` fix(raft): RaftLogStorageAdapter prefix truncation | Configuration Handover |
 
-The rewrite starts at `6942fc5`, which became `381a242`; the only difference in the commit object is a removed trailer. Because the JSON evidence manifests also cite these SHAs, fix them in the same pass as the Markdown.
+The rewrite starts at `6942fc5`, which became `381a242`; the only difference in the commit object is a removed trailer.
 
 ---
 

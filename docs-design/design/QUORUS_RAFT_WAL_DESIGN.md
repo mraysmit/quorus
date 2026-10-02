@@ -965,7 +965,7 @@ The current adapter uses `FileSnapshotStore` for a snapshot sidecar; raftlog-cor
 
 **Operator recovery requirements:** preserve the whole stopped-node data directory, including snapshot, dependency marker and raftlog files. Do not back up or restore these files independently, delete the marker to bypass recovery validation, or treat an empty WAL from a previously compacted release as proof of an empty application state. On recovery failure preserve the evidence and restore from a verified backup/healthy authoritative replica under the existing recovery procedure. Rolling back the binary does not restore deleted WAL entries; pre-R1 adapters do not understand the new snapshot recovery contract. Keep release blocked until the remediation checkpoint's acceptance gates pass.
 
-Focused red/green results and limitations are retained in [Raft TDD evidence](../evidence/raft-log-tdd-evidence-2026-09-04.json). The fresh-instance and three-controller tests exercise process-local object replacement, not an OS power interruption.
+The fresh-instance and three-controller tests exercise process-local object replacement, not an OS power interruption.
 
 **Review Date:** 2026-01-28
 
@@ -2801,7 +2801,7 @@ The R1 snapshot dependency and backup requirements in Section 19 still apply. Re
 
 ### F.5 Independently Verified Contract and Dependency Requirements — 2026-09-05
 
-Quorus consumes `io.github.mraysmit:raftlog-core:1.2.0`, newly implemented and published from RaftLog commit `1c5af80f13a149663926c01eb15f88c14c4f2d25` (tag `v1.2.0`). The former missing prefix capability is now supplied. This release does not substantiate the earlier `db59859` history. See the [release handover](../evidence/raftlog-validation-handover-2026-09-05.md#implemented-capability-and-release--2026-09-05).
+Quorus consumes `io.github.mraysmit:raftlog-core:1.2.0`, newly implemented and published from RaftLog commit `1c5af80f13a149663926c01eb15f88c14c4f2d25` (tag `v1.2.0`). The former missing prefix capability is now supplied. This release does not substantiate the earlier `db59859` history.
 
 - **Append semantics remain unchanged:** Raw append/replay does not deduplicate indexes. Quorus must serialize planning and persistence, skip matching retries, truncate the entire conflicting suffix, append the incoming remainder, then sync before acknowledgment and memory mutation. A matching short request preserves the follower tail. After the first conflict, append later incoming entries even if their terms matched the old suffix. The library's `AppendPlan` assumes a memory log starting at index 1; Quorus owns snapshot-offset-aware planning.
 - **Prefix compaction:** `truncatePrefix(toIndex)` removes indexes less than or equal to its boundary, resolves existing suffix markers and physically rewrites retained entries with unchanged terms, payloads, indexes and order. Metadata is preserved. Zero is a no-op; negatives fail; repeated compaction is safe. Suffix truncation alone still adds a marker and does not reclaim bytes. The former adapter no-op was a Quorus contract defect, not a pre-existing RaftLog compaction promise.
@@ -2810,4 +2810,4 @@ Quorus consumes `io.github.mraysmit:raftlog-core:1.2.0`, newly implemented and p
 - **Compatibility and operations:** WAL format remains version 1; the API default fails explicitly for implementations without compaction. An older reader can decode retained records, but binary rollback cannot restore deleted history and requires snapshot-aware recovery. Back up and restore the whole stopped-node directory consistently. Compaction scans/materializes the logical log and rewrites the retained tail, requiring memory and temporary disk space. There is no automatic/background compaction.
 - **Verification scope:** Strict behavioral red preceded implementation: 23 contract/failure cases failed, then passed. Windows/JDK 25 ran 319 tests with three platform skips; Linux/JDK 21 ran all 319 with no skips, including actual directory force and four abrupt child-process rewrite interruptions. Quorus's five selected storage/snapshot/restart suites passed all 41 tests against the new local artifact. These results establish the capability and integration boundary; they do not close Quorus full-reactor or deployment power-loss acceptance.
 
-Keep historical evidence and its correction notice intact. The earlier missing-method compilation failure is not behavioral red. The new implementation and release have separate provenance in the handover; no internal WAL backend is introduced.
+The earlier missing-method compilation failure is not behavioral red. The new implementation and release have separate provenance; no internal WAL backend is introduced.
