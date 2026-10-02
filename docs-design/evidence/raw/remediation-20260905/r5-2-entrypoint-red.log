@@ -1,5 +1,0 @@
-/workspace/quorus-controller/docker-entrypoint.sh: line 2: 
-: not found
-/workspace/quorus-controller/docker-entrypoint.sh: line 5: 
-: not found
-/workspace/quorus-controller/docker-entrypoint.sh: set: line 6: illegal option -

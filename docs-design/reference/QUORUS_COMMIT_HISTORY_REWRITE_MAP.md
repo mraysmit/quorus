@@ -4,7 +4,7 @@
 **Date:** 2026-09-25  
 **Status:** Current
 
-The repository history rewrite beginning at historical commit `6942fc5` changed commit identities while preserving the trees listed below. Live plans and evidence cite the reachable replacement IDs. This table preserves the old-to-new mapping for audit interpretation.
+The repository history rewrite beginning at historical commit `6942fc5` changed commit identities while preserving the trees listed below. Live plans cite the reachable replacement IDs. This table preserves the old-to-new mapping for audit interpretation.
 
 | Historical ID | Reachable replacement | Description |
 |---|---|---|

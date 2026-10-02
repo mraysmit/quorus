@@ -2,8 +2,8 @@
 
 # Quorus Versioning and Compatibility Policy
 
-**Version:** 1.0  
-**Date:** 2026-09-01  
+**Version:** 1.1  
+**Date:** 2026-10-02  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0
 
@@ -35,4 +35,4 @@ This policy governs every contract that can outlive one process or be consumed b
 
 ## Ownership
 
-The control-plane maintainers own the registry. Protocol, workflow, agent and deployment owners approve changes to their contracts. Release approval must record all registry changes in the evidence manifest.
+The control-plane maintainers own the registry. Protocol, workflow, agent and deployment owners approve changes to their contracts. Release approval must record all registry changes in the release notes.

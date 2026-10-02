@@ -304,7 +304,7 @@ class TaskScopeContextPropagationTest {
 
     /**
      * Retrospective characterization (plan §6.1): behaviour implemented during the RT-02b green
-     * stage without a preceding failing test. Recorded as characterization, not TDD evidence.
+     * stage without a preceding failing test. Recorded as characterization, not TDD.
      */
     @Nested
     class Characterization {

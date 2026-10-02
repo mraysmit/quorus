@@ -58,6 +58,3 @@ ehthumbs.db
 Desktop.ini
 .history/** 
 temp/**
-
-# Raw evidence is retained, including logs (DR-Q6); the *.log rule above must not apply here.
-!docs-design/evidence/raw/**

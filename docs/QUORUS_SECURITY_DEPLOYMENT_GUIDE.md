@@ -279,8 +279,7 @@ and allow 990 in egress policy. Review portless FTPS aliases whose policies only
 record or deployed data is migrated automatically by these corrections.
 
 The external dependency is available; full release acceptance still requires the
-remaining remediation and deployment gates. Consult the
-[current evidence record](../docs-design/evidence/remediation-r4-r6-2026-09-05.md).
+remaining remediation and deployment gates.
 
 Portless validation probes use the service protocol default. Partial connection updates
 retain omitted CA, SSH and TLS pin fields and the existing minimum TLS version. Review

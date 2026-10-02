@@ -133,7 +133,7 @@ Class files compiled with preview features only run on the exact Java feature re
 ## Consequences
 
 - This is a whole-codebase migration. Plan workstream `RT` sequences it by module (core, workflow and examples, agent, controller) and places the controller step before the bulk of Phase 6 REST work, so that new endpoints are not written twice.
-- Every existing Vert.x-based test must be rewritten for the modules that change. The rewritten tests are regression coverage, not TDD evidence, unless they express new behaviour.
+- Every existing Vert.x-based test must be rewritten for the modules that change. The rewritten tests are regression coverage, not test-first work, unless they express new behaviour.
 - The Copilot instructions, plan §6.1 and the testing documents describe Vert.x as the standard. They must be updated as each module moves, and they already note this ADR as the direction of travel.
 - Observability loses Vert.x's built-in tracing integration. OpenTelemetry instrumentation for the new HTTP server and client is part of `RT-07`.
 
