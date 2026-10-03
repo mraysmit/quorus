@@ -126,6 +126,14 @@ public class RaftNode {
     private final Object logWriteLock = new Object();
     private Future<Void> logWriteChain = Future.succeededFuture();
 
+    /**
+     * Completes when the persisted term, vote and log have first been recovered from storage.
+     * Peer RPCs wait for it: the controller starts its Raft server before {@link #start()}, and a
+     * vote judged against the not-yet-recovered term could grant a second vote in a term this node
+     * had already voted in (register item ENG-21). A volatile node has nothing to recover.
+     */
+    private final Promise<Void> firstRecovery = Promise.promise();
+
     // ========== STATE CHANGE LISTENERS ==========
     private final List<io.vertx.core.Handler<State>> stateChangeListeners = new CopyOnWriteArrayList<>();
 
@@ -292,6 +300,9 @@ public class RaftNode {
         this.transport = transport;
         this.stateMachine = stateMachine;
         this.storage = requireNonNull(mode, "mode").storage();
+        if (this.storage.isEmpty()) {
+            firstRecovery.complete();
+        }
         this.electionTimeoutMs = electionTimeoutMs;
         this.heartbeatIntervalMs = heartbeatIntervalMs;
         this.snapshotEnabled = snapshotEnabled && this.storage.isPresent();
@@ -394,6 +405,8 @@ public class RaftNode {
 
                 // Recover state from WAL if storage is configured
                 recoverFromStorage()
+                    .onSuccess(v2 -> firstRecovery.tryComplete())
+                    .onFailure(firstRecovery::tryFail)
                     .onSuccess(v2 -> {
                         // Start transport listener
                         transport.start(this::handleMessage);
@@ -1183,7 +1196,12 @@ public class RaftNode {
      */
     public Future<VoteResponse> handleVoteRequest(VoteRequest request) {
         // A vote remains exclusive while its durability barrier is pending.
-        return serializeLogMutation(() -> processVoteRequest(request));
+        return afterFirstRecovery(() -> serializeLogMutation(() -> processVoteRequest(request)));
+    }
+
+    /** Runs a peer RPC only once the persisted Raft state has been recovered (ENG-21). */
+    private <T> Future<T> afterFirstRecovery(Supplier<Future<T>> rpc) {
+        return firstRecovery.future().compose(v -> rpc.get());
     }
 
     private Future<VoteResponse> processVoteRequest(VoteRequest request) {
@@ -1340,7 +1358,7 @@ public class RaftNode {
         // continueAppendEntriesAfterTermCheck consults the in-memory log, which only reflects
         // an entry once its WAL write has completed, so two overlapping requests carrying the
         // same index would otherwise both persist it.
-        return serializeLogMutation(() -> processAppendEntriesRequest(request));
+        return afterFirstRecovery(() -> serializeLogMutation(() -> processAppendEntriesRequest(request)));
     }
 
     private Future<AppendEntriesResponse> processAppendEntriesRequest(AppendEntriesRequest request) {
@@ -1887,7 +1905,7 @@ public class RaftNode {
      * @return Future containing the response
      */
     public Future<InstallSnapshotResponse> handleInstallSnapshot(InstallSnapshotRequest request) {
-        return serializeLogMutation(() -> processInstallSnapshot(request));
+        return afterFirstRecovery(() -> serializeLogMutation(() -> processInstallSnapshot(request)));
     }
 
     private Future<InstallSnapshotResponse> processInstallSnapshot(InstallSnapshotRequest request) {
