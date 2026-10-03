@@ -7,6 +7,7 @@ import dev.mars.quorus.controller.raft.storage.RaftStorageFactory;
 import dev.mars.quorus.controller.state.QuorusStateStore;
 import io.vertx.core.Context;
 import io.vertx.core.Future;
+import io.vertx.core.Promise;
 import io.vertx.core.Vertx;
 import io.vertx.junit5.VertxExtension;
 import org.junit.jupiter.api.AfterEach;
@@ -72,6 +73,37 @@ class ConcurrentVoteBoundaryTest {
         }
     }
 
+    /**
+     * Register item ENG-21: the controller starts its Raft gRPC server before {@link RaftNode#start()}
+     * has recovered the persisted term and vote. A vote request handled in that window must not be
+     * judged against the pre-recovery state. This node voted for candidate-a in term 3 before it
+     * restarted; candidate-b's term-3 request must not be granted.
+     */
+    @Test
+    void aVoteArrivingDuringRecoveryCannotGrantASecondVoteInARecoveredTerm(Vertx vertx) {
+        RaftStorage seed = awaitSuccess(RaftStorageFactory.create(vertx, "raftlog", directory, true), TIMEOUT);
+        awaitSuccess(seed.updateMetadata(3, Optional.of("candidate-a")), TIMEOUT);
+        awaitSuccess(seed.close(), TIMEOUT);
+
+        RaftStorage delegate = awaitSuccess(RaftStorageFactory.create(vertx, "raftlog", directory, true), TIMEOUT);
+        Promise<Void> releaseRecovery = Promise.promise();
+        RaftStorage held = holdingMetadataLoad(delegate, releaseRecovery.future(), releaseRecovery);
+        node = builder(vertx).mode(RaftNodeMode.durable(held)).build();
+
+        Future<Void> started = node.start();
+        Future<VoteResponse> secondVote = node.handleVoteRequest(VoteRequest.newBuilder()
+                .setTerm(3).setCandidateId("candidate-b").build());
+        // A vote handled during recovery persists its decision, which releases recovery at once;
+        // a correct node defers or rejects it, so recovery is released by the timer instead.
+        vertx.setTimer(500, id -> releaseRecovery.tryComplete());
+
+        awaitSuccess(started, TIMEOUT);
+        VoteResponse response = awaitSuccess(secondVote, TIMEOUT);
+        assertFalse(response.getVoteGranted(),
+                "A node that voted for candidate-a in term 3 must not vote for candidate-b in term 3");
+        assertEquals("candidate-a", node.getVotedFor(), "The recovered vote must stand");
+    }
+
     private RaftNode.Builder builder(Vertx vertx) {
         return RaftNode.builder().vertx(vertx).nodeId("voter")
                 .clusterNodes(Set.of("voter", "candidate-a", "candidate-b"))
@@ -81,6 +113,35 @@ class ConcurrentVoteBoundaryTest {
 
     private VoteRequest vote(String candidate) {
         return VoteRequest.newBuilder().setTerm(1).setCandidateId(candidate).build();
+    }
+
+    /**
+     * Wraps real storage so that {@code loadMetadata} completes only once {@code release} completes,
+     * and so that a metadata write made while it is held completes {@code onWrite}.
+     */
+    private static RaftStorage holdingMetadataLoad(RaftStorage delegate, Future<Void> release,
+                                                   Promise<Void> onWrite) {
+        return new RaftStorage() {
+            @Override public Future<Void> open(Path path) { return delegate.open(path); }
+            @Override public Future<Void> close() { return delegate.close(); }
+            @Override public Future<Void> updateMetadata(long term, Optional<String> votedFor) {
+                return delegate.updateMetadata(term, votedFor).onComplete(r -> onWrite.tryComplete());
+            }
+            @Override public Future<PersistentMeta> loadMetadata() {
+                return release.compose(v -> delegate.loadMetadata());
+            }
+            @Override public Future<Void> appendEntries(List<LogEntryData> entries) {
+                return delegate.appendEntries(entries);
+            }
+            @Override public Future<Void> truncateSuffix(long index) { return delegate.truncateSuffix(index); }
+            @Override public Future<Void> sync() { return delegate.sync(); }
+            @Override public Future<List<LogEntryData>> replayLog() { return delegate.replayLog(); }
+            @Override public Future<Void> saveSnapshot(byte[] data, long index, long term) {
+                return delegate.saveSnapshot(data, index, term);
+            }
+            @Override public Future<Optional<SnapshotData>> loadSnapshot() { return delegate.loadSnapshot(); }
+            @Override public Future<Void> truncatePrefix(long index) { return delegate.truncatePrefix(index); }
+        };
     }
 
     private static RaftStorage observingMetadataContext(RaftStorage delegate,

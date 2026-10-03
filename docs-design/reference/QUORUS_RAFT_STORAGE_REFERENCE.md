@@ -2,7 +2,7 @@
 
 # Quorus Raft Storage Reference
 
-**Version:** 1.0  
+**Version:** 1.1  
 **Date:** 2026-10-03  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
@@ -92,9 +92,9 @@ Sources: `RaftStorage.java:51-222`; `RaftLogStorageAdapter.java:106-207`; `FileS
 
 `RaftNode` applies the contract as follows:
 
-- **Persist before responding.** A follower persists the truncation and appends of an `AppendEntries` request, calls `sync()`, and only then changes its in-memory log and replies success (`RaftNode.java:1426-1462`, `:1467-1495`). A leader persists and syncs each new entry before adding it to its in-memory log (`RaftNode.java:657-661`, `:712-719`).
-- **Persist before granting.** A vote is granted only after `updateMetadata` succeeds (`RaftNode.java:1227-1240`). A candidate persists its new term and self-vote before sending vote requests (`RaftNode.java:988-996`). A higher term seen in a rejected vote request, or in `AppendEntries` or `InstallSnapshot`, is persisted before the reply (`RaftNode.java:1269-1284`, `:1360-1373`, `:1912-1925`).
-- **One log mutation at a time.** Leader submits, `AppendEntries`, vote requests, snapshot capture and snapshot installation are queued behind each other (`serializeLogMutation`, `RaftNode.java:691-707`). The follower decides what is new by reading its in-memory log, which reflects an entry only after the WAL write completes; without the queue, two overlapping requests could persist the same index twice.
+- **Persist before responding.** A follower persists the truncation and appends of an `AppendEntries` request, calls `sync()`, and only then changes its in-memory log and replies success (`RaftNode.java:1444-1480`, `:1485-1513`). A leader persists and syncs each new entry before adding it to its in-memory log (`RaftNode.java:670-674`, `:725-732`).
+- **Persist before granting.** A vote is granted only after `updateMetadata` succeeds (`RaftNode.java:1245-1258`). A candidate persists its new term and self-vote before sending vote requests (`RaftNode.java:1001-1009`). A higher term seen in a rejected vote request, or in `AppendEntries` or `InstallSnapshot`, is persisted before the reply (`RaftNode.java:1287-1302`, `:1378-1391`, `:1930-1943`).
+- **One log mutation at a time.** Leader submits, `AppendEntries`, vote requests, snapshot capture and snapshot installation are queued behind each other (`serializeLogMutation`, `RaftNode.java:704-720`). The follower decides what is new by reading its in-memory log, which reflects an entry only after the WAL write completes; without the queue, two overlapping requests could persist the same index twice.
 - **`lastApplied` is not persisted.** `meta.dat` holds only term and vote. Recovery derives `lastApplied` from the snapshot or by re-applying the log (§8).
 
 Log payloads are Protobuf `RaftCommandMessage` bytes (`ProtobufCommandCodec.java`); snapshot payloads are Jackson JSON of `QuorusSnapshot` (`QuorusStateStore.java:1140-1165`). Both carry a schema version. The current version of both contracts is 3 and versions 0 to 3 are readable (`SchemaVersionRegistry.java:40-41`); a newer version is rejected before it is applied (`ProtobufCommandCodec.java:94-96`, `QuorusStateStore.java:1172-1174`).
@@ -103,9 +103,9 @@ Log payloads are Protobuf `RaftCommandMessage` bytes (`ProtobufCommandCodec.java
 
 This section carries forward the integration contract recorded on 2026-09-05 as Appendix F.5 of the archived WAL design. Each point was re-checked against the 1.2.0 sources and the Quorus code on 2026-10-03.
 
-- **Append and replay do not deduplicate.** Replay returns every APPEND record and applies each TRUNCATE marker by removing indexes at or above it; it does not reject duplicate indexes or gaps (`FileRaftStorage.java`, `readLog`). Quorus therefore owns the append plan: the follower skips incoming entries whose index and term already match, truncates from the first conflicting index, persists, then syncs before replying and before changing memory (`RaftNode.java:1401-1462`). A matching shorter request leaves the follower's tail in place. On recovery Quorus places each record at its own index: a repeat with the same term is ignored, a different term supersedes the tail from that index, and a gap fails recovery (`RaftNode.java:538-561`). The library's `AppendPlan` assumes a log starting at index 1 and is not used, because Quorus's in-memory log starts at the snapshot boundary.
+- **Append and replay do not deduplicate.** Replay returns every APPEND record and applies each TRUNCATE marker by removing indexes at or above it; it does not reject duplicate indexes or gaps (`FileRaftStorage.java`, `readLog`). Quorus therefore owns the append plan: the follower skips incoming entries whose index and term already match, truncates from the first conflicting index, persists, then syncs before replying and before changing memory (`RaftNode.java:1419-1480`). A matching shorter request leaves the follower's tail in place. On recovery Quorus places each record at its own index: a repeat with the same term is ignored, a different term supersedes the tail from that index, and a gap fails recovery (`RaftNode.java:551-574`). The library's `AppendPlan` assumes a log starting at index 1 and is not used, because Quorus's in-memory log starts at the snapshot boundary.
 - **Prefix compaction.** `truncatePrefix(toIndex)` resolves existing TRUNCATE markers, keeps entries with index greater than `toIndex`, and rewrites them with their index, term, payload and order unchanged. `meta.dat` is not touched. Zero is a no-op and a negative boundary fails. Suffix truncation alone only appends a marker and reclaims no space (`FileRaftStorage.java:484-497`, `:523-566`).
-- **Snapshot ownership.** Quorus owns the application snapshot, its last-included index and term, and the dependency marker. A covering snapshot is published before prefix compaction is requested, and memory is trimmed only after compaction succeeds (`RaftNode.java:1708-1722`; `RaftLogStorageAdapter.java:203-207`). The library records no minimum append index, so Quorus must never re-append a compacted index.
+- **Snapshot ownership.** Quorus owns the application snapshot, its last-included index and term, and the dependency marker. A covering snapshot is published before prefix compaction is requested, and memory is trimmed only after compaction succeeds (`RaftNode.java:1726-1740`; `RaftLogStorageAdapter.java:203-207`). The library records no minimum append index, so Quorus must never re-append a compacted index.
 - **Compaction durability and failure.** On its single executor the library writes `raft.log.tmp`, forces it, atomically replaces `raft.log`, forces the directory except on Windows, and reopens the WAL before completing; no extra `sync()` is needed (`FileRaftStorage.java:523-566`, `CompactionIo.java:19-30`). A failure before replacement deletes the temporary file and keeps the old WAL. A failure after replacement has started fences the instance: every later operation fails until the storage is closed and reopened, and the snapshot and marker must be kept. Compaction refuses a WAL with a corrupt or incomplete tail; that tail must first be repaired by replay. On open, a leftover `raft.log.tmp` is deleted when `raft.log` exists, and opening fails when only the temporary file exists (`FileRaftStorage.java:263-266`).
 - **Compatibility.** The WAL record format is version 1. The library interface's default `truncatePrefix` fails explicitly for an implementation without compaction (library `RaftStorage.java:145-147`). Compaction reads the whole logical log into memory and writes the retained tail to a temporary file, so it needs memory and free disk space; the library itself never compacts in the background.
 - **What this does not establish.** The library's own test results and the earlier "41 selected Quorus tests" figure were reported on 2026-09-05 and are not re-verified here. None of this closes production-filesystem or power-loss acceptance (§13).
@@ -138,10 +138,10 @@ Each key can be set in `quorus-controller.properties`, a profile file, or an env
 | `quorus.raft.storage.type` | `QUORUS_RAFT_STORAGE_TYPE` | `raftlog` | `AppConfig.validate()` rejects anything else. The factory alone also accepts blank and `wal`, for direct callers | `quorus-controller.properties:93`; `AppConfig.java:162-164`, `:410-415`; `RaftStorageFactory.java:35-40` |
 | `quorus.raft.storage.path` | `QUORUS_RAFT_STORAGE_PATH` | `./data/raft/{nodeId}` when blank | Must differ for each node. Images set `/app/data/raft` | `quorus-controller.properties:99`; `AppConfig.java:170-173` |
 | `quorus.raft.storage.fsync` | `QUORUS_RAFT_STORAGE_FSYNC` | `true` | When `false`, `sync()` does nothing and `meta.dat` is not forced; snapshot files and compaction are still forced | `quorus-controller.properties:103`; `AppConfig.java:179-181` |
-| `quorus.raft.snapshot.enabled` | `QUORUS_RAFT_SNAPSHOT_ENABLED` | `true` | Ignored (off) in volatile mode | `AppConfig.java:189-191`; `RaftNode.java:297` |
+| `quorus.raft.snapshot.enabled` | `QUORUS_RAFT_SNAPSHOT_ENABLED` | `true` | Ignored (off) in volatile mode | `AppConfig.java:189-191`; `RaftNode.java:308` |
 | `quorus.raft.snapshot.threshold` | `QUORUS_RAFT_SNAPSHOT_THRESHOLD` | `10000` | Applied entries since the last snapshot that trigger a new one. Must be at least 1 | `AppConfig.java:198-200`, `:401-404` |
 | `quorus.raft.snapshot.check-interval-ms` | `QUORUS_RAFT_SNAPSHOT_CHECK_INTERVAL_MS` | `60000` | How often the leader checks the threshold. Must be at least 1000 | `AppConfig.java:207-209`, `:405-408` |
-| `quorus.raft.log.hard-limit` | `QUORUS_RAFT_LOG_HARD_LIMIT` | `100000` | The leader rejects a new command with "Raft log at capacity" when its in-memory log holds this many entries. Not validated; followers and replay do not apply it | `quorus-controller.properties:111`; `AppConfig.java:218-220`; `RaftNode.java:141`, `:645-651` |
+| `quorus.raft.log.hard-limit` | `QUORUS_RAFT_LOG_HARD_LIMIT` | `100000` | The leader rejects a new command with "Raft log at capacity" when its in-memory log holds this many entries. Not validated; followers and replay do not apply it | `quorus-controller.properties:111`; `AppConfig.java:218-220`; `RaftNode.java:149`, `:658-664` |
 
 The snapshot keys are not in the packaged properties file; their defaults come from `AppConfig`. There is no soft limit, no `LogCapacityExceededException` and no log-utilisation metric. The test classpath's `quorus-controller.properties` sets `quorus.raft.storage.fsync=false` (`quorus-controller/src/test/resources/quorus-controller.properties:13`).
 
@@ -162,34 +162,36 @@ No Quorus file or image sets these, so the defaults apply.
 1. `QuorusControllerApplication` validates `AppConfig`, including the storage type and snapshot settings (`QuorusControllerApplication.java:64`).
 2. The verticle opens storage through the factory (`QuorusControllerVerticle.java:115-133`). The library creates the directory, takes `raft.lock` (failing if another process or the same JVM holds it), refuses a directory holding `raft.log.tmp` without `raft.log`, deletes a stale `raft.log.tmp`, checks free space and opens `raft.log` (`FileRaftStorage.java:250-288`).
 3. The verticle builds `RaftNode`, starts the gRPC server, then calls `RaftNode.start()` (`QuorusControllerVerticle.java:156-182`).
-4. `RaftNode.start()` recovers before it starts its transport listener and election timer (`RaftNode.java:395-407`). Recovery runs in this order (`RaftNode.java:428-528`):
+4. `RaftNode.start()` recovers before it starts its transport listener and election timer (`RaftNode.java:406-420`). Recovery runs in this order (`RaftNode.java:441-541`):
    1. Load metadata: term and vote.
    2. Load the snapshot. Recovery fails if the snapshot or marker is corrupt, or if the marker requires a snapshot that is missing or older than the marker (`FileSnapshotStore.java:94-141`). If a snapshot exists, the state machine is restored from it, and `lastApplied` and `commitIndex` are set to its index.
    3. Replay the WAL. The library stops at the first record with a bad header, length or CRC, and truncates the file there.
-   4. If the WAL still holds the snapshot's boundary index with a different term (an installation interrupted after publishing the snapshot), the suffix after the boundary is truncated and prefix compaction is completed before anything else (`RaftNode.java:471-485`).
+   4. If the WAL still holds the snapshot's boundary index with a different term (an installation interrupted after publishing the snapshot), the suffix after the boundary is truncated and prefix compaction is completed before anything else (`RaftNode.java:484-498`).
    5. Place each record by index (§5). Records at or below the snapshot boundary are skipped.
-   6. Commit: a single-node cluster treats its whole local log as committed and applies it. A multi-node cluster applies nothing beyond the snapshot until a leader's commit index arrives (`RaftNode.java:500-508`, `:567-586`). Without a snapshot, the state machine is reset before re-application.
+   6. Commit: a single-node cluster treats its whole local log as committed and applies it. A multi-node cluster applies nothing beyond the snapshot until a leader's commit index arrives (`RaftNode.java:513-521`, `:580-599`). Without a snapshot, the state machine is reset before re-application.
 
 A failure at any step fails `RaftNode.start()` and the controller does not start.
+
+Because the gRPC server is already accepting peer RPCs during recovery, `RaftNode` holds every vote, `AppendEntries` and `InstallSnapshot` request until its first recovery has completed, and fails them if recovery fails (`RaftNode.java:129-135`, `:1202-1205`; register `ENG-21`). Otherwise a vote judged against the not-yet-loaded term could grant a second vote in a term this node had already voted in. A node without storage has nothing to recover and does not wait.
 
 ## 9. Snapshots, Compaction and InstallSnapshot
 
 ### 9.1 Taking a snapshot
 
-- Only the leader schedules snapshots. The check timer starts when a node becomes leader (`RaftNode.java:1088`, `:1625-1635`) and does nothing on a non-leader (`RaftNode.java:1641-1656`).
-- A snapshot is taken when `lastApplied − snapshotLastIndex >= threshold` (`RaftNode.java:1646-1655`). `takeSnapshot()` is queued behind pending log mutations (`RaftNode.java:1666-1667`).
-- Order: capture state on the event loop → `saveSnapshot` → `truncatePrefix` (marker, then WAL rewrite) → trim the in-memory log and update the boundary (`RaftNode.java:1670-1749`).
+- Only the leader schedules snapshots. The check timer starts when a node becomes leader (`RaftNode.java:1101`, `:1643-1653`) and does nothing on a non-leader (`RaftNode.java:1659-1674`).
+- A snapshot is taken when `lastApplied − snapshotLastIndex >= threshold` (`RaftNode.java:1664-1673`). `takeSnapshot()` is queued behind pending log mutations (`RaftNode.java:1684-1685`).
+- Order: capture state on the event loop → `saveSnapshot` → `truncatePrefix` (marker, then WAL rewrite) → trim the in-memory log and update the boundary (`RaftNode.java:1688-1767`).
 - A follower never compacts its own WAL. Its WAL and in-memory log shrink only when it installs a snapshot from the leader (§9.2).
 
 ### 9.2 InstallSnapshot
 
-Leader side (`RaftNode.java:1497-1504`, `:1770-1877`):
+Leader side (`RaftNode.java:1515-1522`, `:1788-1895`):
 
-- When a follower's `nextIndex` is at or below the leader's snapshot boundary, the leader loads its snapshot from storage and sends it in chunks of 1 MiB (`SNAPSHOT_CHUNK_SIZE`, `RaftNode.java:145`), one chunk at a time, with at most one installation per follower.
+- When a follower's `nextIndex` is at or below the leader's snapshot boundary, the leader loads its snapshot from storage and sends it in chunks of 1 MiB (`SNAPSHOT_CHUNK_SIZE`, `RaftNode.java:153`), one chunk at a time, with at most one installation per follower.
 - A rejected chunk is resent from the chunk the follower asks for. A higher term in the reply makes the leader step down. Losing leadership aborts the send.
 - After the last chunk is acknowledged, the leader sets the follower's `nextIndex` and `matchIndex` from the snapshot index.
 
-Follower side (`RaftNode.java:1889-2055`), queued with the other log mutations:
+Follower side (`RaftNode.java:1907-2073`), queued with the other log mutations:
 
 1. Reject a stale term. Persist a higher term before continuing.
 2. Collect chunks per leader in memory. A different chunk count or snapshot index starts a new collection; an out-of-order chunk is rejected with the expected chunk number. Partial transfers are not persisted.
@@ -240,7 +242,7 @@ Tests are under `quorus-controller/src/test/java/dev/mars/quorus/controller/`. "
 | `raft/RaftSnapshotTest` | Threshold trigger, manual compaction, commands after a snapshot, assignments and queue preserved, snapshots disabled, save and load through storage, snapshot metrics | Default |
 | `raft/InstallSnapshotTest` | Leader sends to a lagging follower; follower state restored; leader indexes updated; stale term rejected; chunk reassembly; follower persists the installed snapshot | Default |
 | `raft/FollowerRestartConsistencyTest` | Overlapping `AppendEntries` and leader submits do not duplicate indexes; recovery places repeated records by index; snapshot and installation queue behind appends; matching and conflicting suffixes across restart; interrupted installation does not resurrect a conflicting suffix | Default |
-| `raft/ConcurrentVoteBoundaryTest` | Overlapping durable votes grant only one candidate and survive reopen | Default |
+| `raft/ConcurrentVoteBoundaryTest` | Overlapping durable votes grant only one candidate and survive reopen; a vote arriving during recovery is judged against the recovered term and vote | Default |
 | `raft/RaftNodeTest` (durable cases) | Election persists term and vote; multi-node recovery does not apply an uncommitted tail; single-node recovery re-applies; higher term persisted when vote persistence fails; `AppendEntries` and `InstallSnapshot` fail when higher-term persistence fails, using failure-injecting `RaftStorage` decorators | Default |
 | `raft/DurableTransferRestartTest` | A committed transfer survives a single-controller restart and is visible through REST | Default |
 | `raft/ThreeControllerDurableRestartTest` | Full three-controller restart, with and without snapshot compaction of the whole WAL; registry migration survives restart | Default |
@@ -259,7 +261,6 @@ Storage-dependent tests use the real adapter on temporary directories. The volat
 | Production file system (register R1-2) | **Not proven.** The recovery, retained-tail, corruption and concurrent-mutation cases have not been repeated on the supported production file system and storage class |
 | Follower compaction | Followers do not take snapshots (§9.1). A follower's WAL and in-memory log grow until it installs a leader snapshot |
 | Log hard limit | Applies only to leader submits; not to followers or replay; untested |
-| RPCs during recovery | The gRPC server starts before `RaftNode.start()`, and its handlers call `RaftNode` without waiting for recovery (`QuorusControllerVerticle.java:175-182`; `GrpcRaftServer.java:180`, `:218`, `:256`). Whether a peer RPC can be handled before recovery completes has not been assessed |
 
 R1-2 and R1-3 are release blockers in [register §4](../task/QUORUS_OUTSTANDING_WORK_REGISTER.md#4-section-a--r1-durability-acceptance-release-blockers).
 
@@ -273,4 +274,5 @@ R1-2 and R1-3 are release blockers in [register §4](../task/QUORUS_OUTSTANDING_
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.1 | 2026-10-03 | Register `ENG-21` fixed: §8 states that peer RPCs wait for the first recovery, and the "RPCs during recovery" gap is removed from §13; the §12 test map gains the recovery-vote test. `RaftNode.java` line citations updated for the change |
 | 1.0 | 2026-10-03 | Extracted from the Raft WAL design (now archived) under register item DR-C6, and verified against the source tree and the `raftlog-core` 1.2.0 sources. Carries forward the Status block, §14, the §16.1 serialisation rule, the snapshot checkpoint and operator text of §19, Appendix A and Appendix F (F.5 in §5) |

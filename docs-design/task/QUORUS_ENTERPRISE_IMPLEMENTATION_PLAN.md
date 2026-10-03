@@ -95,9 +95,10 @@ documentation work is in register Section H.
 - **The load balancer answers controller health checks itself (`ENG-18`).**
 - **The Docker helper scripts do not work (`ENG-19`), and the controller's entrypoint script is
   never run (`ENG-20`).**
-- **Raft peer RPCs may be served before recovery completes (`ENG-21`, reported, to be verified
-  first).** If confirmed, a node could grant a second vote in a term, which breaks election
-  safety.
+- **Raft peer RPCs were served before recovery completed (`ENG-21`, confirmed and fixed
+  2026-10-03).** A node could grant a second vote in a term it had already voted in, which breaks
+  election safety. `RaftNode` now defers peer RPCs until its first recovery has completed;
+  `CE-07` must keep this property.
 - **Raft engine gaps (`ENG-22`), test-double defects and a licence-header conflict (`ENG-23`), and
   test-lane defects (`ENG-24`)**, found while rewriting the storage, simulator and testing
   documents.
