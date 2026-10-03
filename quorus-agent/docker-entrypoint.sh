@@ -5,20 +5,24 @@
 
 set -e
 
+# The documented QUORUS_AGENT_* names win over the legacy unprefixed names, as in AgentConfig.
+agent_id="${QUORUS_AGENT_ID:-${AGENT_ID:-}}"
+controller_url="${QUORUS_AGENT_CONTROLLER_URL:-${CONTROLLER_URL:-}}"
+
 echo "Starting Quorus Agent..."
-echo "Agent ID: ${AGENT_ID:-not-set}"
+echo "Agent ID: ${agent_id:-not-set}"
 echo "Region: ${AGENT_REGION:-default}"
 echo "Datacenter: ${AGENT_DATACENTER:-default}"
-echo "Controller URL: ${CONTROLLER_URL:-http://localhost:8080/api/v1}"
+echo "Controller URL: ${controller_url:-not-set}"
 
 # Validate required environment variables
-if [ -z "$AGENT_ID" ]; then
-    echo "ERROR: AGENT_ID environment variable is required"
+if [ -z "$agent_id" ]; then
+    echo "ERROR: QUORUS_AGENT_ID (or legacy AGENT_ID) environment variable is required"
     exit 1
 fi
 
-if [ -z "$CONTROLLER_URL" ]; then
-    echo "ERROR: CONTROLLER_URL environment variable is required"
+if [ -z "$controller_url" ]; then
+    echo "ERROR: QUORUS_AGENT_CONTROLLER_URL (or legacy CONTROLLER_URL) environment variable is required"
     exit 1
 fi
 
@@ -51,11 +55,24 @@ echo "Supported Protocols: $SUPPORTED_PROTOCOLS"
 echo "Max Concurrent Transfers: $MAX_CONCURRENT_TRANSFERS"
 echo "Heartbeat Interval: ${HEARTBEAT_INTERVAL}ms"
 
-# Wait for controller to be available
-echo "Waiting for controller to be available..."
+# Wait for the controller, because the agent stops if its first registration fails. The controller
+# serves health at its root, not under the API base, so strip /api/v1 from the controller URL. A TLS
+# controller requires a client certificate at the handshake, so present the agent's own identity.
+controller_base="${controller_url%/}"
+controller_base="${controller_base%/api/v1}"
+health_url="$controller_base/health/live"
+set --
+case "$controller_base" in
+    https://*)
+        [ -n "${QUORUS_AGENT_TLS_TRUST_BUNDLE:-}" ] && set -- "$@" --cacert "$QUORUS_AGENT_TLS_TRUST_BUNDLE"
+        [ -n "${QUORUS_AGENT_TLS_CERTIFICATE:-}" ] && set -- "$@" --cert "$QUORUS_AGENT_TLS_CERTIFICATE"
+        [ -n "${QUORUS_AGENT_TLS_PRIVATE_KEY:-}" ] && set -- "$@" --key "$QUORUS_AGENT_TLS_PRIVATE_KEY"
+        ;;
+esac
+echo "Waiting for controller to be available at $health_url..."
 timeout=60
 counter=0
-while ! curl -f "$CONTROLLER_URL/health" >/dev/null 2>&1; do
+while ! curl -fsS --max-time 5 "$@" "$health_url" >/dev/null 2>&1; do
     if [ $counter -ge $timeout ]; then
         echo "ERROR: Controller not available after ${timeout} seconds"
         exit 1
