@@ -65,17 +65,17 @@ Write-Host "Configuration files created successfully!" -ForegroundColor Green
 
 # Start the logging stack
 Write-Host "Starting Grafana Loki logging stack..." -ForegroundColor Green
-docker-compose -f ../compose/docker-compose-loki.yml up -d
+docker compose -f ../compose/docker-compose-loki.yml up -d
 
 Write-Host ""
 Write-Host "Logging stack is starting up..." -ForegroundColor Green
 Write-Host "Services will be available at:" -ForegroundColor Yellow
-Write-Host "  - Grafana: http://localhost:3000 (admin/admin)" -ForegroundColor Cyan
-Write-Host "  - Loki: http://localhost:3100" -ForegroundColor Cyan
-Write-Host "  - Prometheus: http://localhost:9090" -ForegroundColor Cyan
+Write-Host "  - Grafana: http://localhost:3010 (admin/admin)" -ForegroundColor Cyan
+Write-Host "  - Loki: http://localhost:3110" -ForegroundColor Cyan
+Write-Host "  - Prometheus: http://localhost:9091" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "To view logs in Grafana:" -ForegroundColor Yellow
-Write-Host "  1. Open http://localhost:3000" -ForegroundColor White
+Write-Host "  1. Open http://localhost:3010" -ForegroundColor White
 Write-Host "  2. Login with admin/admin" -ForegroundColor White
 Write-Host "  3. Go to Explore -> Select Loki datasource" -ForegroundColor White
 Write-Host "  4. Use queries like: {service=`"quorus-controller1`"}" -ForegroundColor White

@@ -79,7 +79,7 @@ class AppConfigNodeIdentityTest {
 
     @Test
     @DisplayName("Configuration sources follow defaults, profile, environment, explicit precedence")
-    void configurationSourcesHavePeeGeeQPrecedence() {
+    void configurationSourcesHaveLayeredPrecedence() {
         AppConfig defaults = new AppConfig("default", new Properties(), Map.of());
         AppConfig profile = new AppConfig("precedence", new Properties(), Map.of());
         AppConfig environment = new AppConfig(

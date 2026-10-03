@@ -19,16 +19,18 @@ Set-Location $dockerDir
 
 if ($Clean) {
     Write-Host "Cleaning up existing containers and volumes..." -ForegroundColor Yellow
-    docker-compose -f compose/docker-compose-full-network.yml down -v --remove-orphans
+    docker compose -f compose/docker-compose-full-network.yml down -v --remove-orphans
     docker system prune -f
     Write-Host "Cleanup complete" -ForegroundColor Green
     Write-Host ""
 }
 
-# Build images if requested
+# Build images if requested. The images package jars built on the host, so build those first.
 if ($Build) {
+    Write-Host "Building the controller and agent jars on the host..." -ForegroundColor Yellow
+    & (Join-Path $PSScriptRoot "..\build-runtime.ps1")
     Write-Host "Building Docker images..." -ForegroundColor Yellow
-    docker-compose -f compose/docker-compose-full-network.yml build --no-cache
+    docker compose -f compose/docker-compose-full-network.yml build --no-cache
     Write-Host "Build complete" -ForegroundColor Green
     Write-Host ""
 }
@@ -41,35 +43,27 @@ try {
     
     # Phase 1: Controllers
     Write-Host "Phase 1: Starting controllers..." -ForegroundColor Cyan
-    docker-compose -f compose/docker-compose-full-network.yml up -d controller1 controller2 controller3
+    docker compose -f compose/docker-compose-full-network.yml up -d controller1 controller2 controller3
     
     # Wait for controllers to be ready
     Write-Host "Waiting for controllers to be ready..." -ForegroundColor Cyan
     Start-Sleep -Seconds 30
-    
-    # Phase 2: API Service
-    Write-Host "Phase 2: Starting API service..." -ForegroundColor Cyan
-    docker-compose -f compose/docker-compose-full-network.yml up -d api
-    
-    # Wait for API to be ready
-    Write-Host "Waiting for API service to be ready..." -ForegroundColor Cyan
-    Start-Sleep -Seconds 20
-    
-    # Phase 3: File Transfer Servers
-    Write-Host "Phase 3: Starting file transfer servers..." -ForegroundColor Cyan
-    docker-compose -f compose/docker-compose-full-network.yml up -d ftp-server sftp-server http-server
+
+    # Phase 2: File Transfer Servers (each controller serves the HTTP API itself)
+    Write-Host "Phase 2: Starting file transfer servers..." -ForegroundColor Cyan
+    docker compose -f compose/docker-compose-full-network.yml up -d ftp-server sftp-server http-server
     
     # Wait for servers to be ready
     Write-Host "Waiting for file servers to be ready..." -ForegroundColor Cyan
     Start-Sleep -Seconds 15
     
-    # Phase 4: Agents
-    Write-Host "Phase 4: Starting agents..." -ForegroundColor Cyan
-    docker-compose -f compose/docker-compose-full-network.yml up -d agent-nyc agent-london agent-tokyo
+    # Phase 3: Agents
+    Write-Host "Phase 3: Starting agents..." -ForegroundColor Cyan
+    docker compose -f compose/docker-compose-full-network.yml up -d agent-nyc agent-london agent-tokyo
     
-    # Phase 5: Utilities
-    Write-Host "Phase 5: Starting utilities..." -ForegroundColor Cyan
-    docker-compose -f compose/docker-compose-full-network.yml up -d file-generator
+    # Phase 4: Utilities
+    Write-Host "Phase 4: Starting utilities..." -ForegroundColor Cyan
+    docker compose -f compose/docker-compose-full-network.yml up -d file-generator
     
     Write-Host ""
     Write-Host "=== Quorus Network Started Successfully! ===" -ForegroundColor Green
@@ -81,7 +75,6 @@ try {
     Write-Host "    - Controller 1: http://localhost:8081"
     Write-Host "    - Controller 2: http://localhost:8082"
     Write-Host "    - Controller 3: http://localhost:8083"
-    Write-Host "  API Service:     http://localhost:8080"
     Write-Host "  File Servers:"
     Write-Host "    - FTP Server:    ftp://localhost:21 (testuser/testpass)"
     Write-Host "    - SFTP Server:   sftp://localhost:2222 (testuser/testpass)"
@@ -103,33 +96,35 @@ try {
     # Check service health
     Write-Host "Checking service health..." -ForegroundColor Cyan
     
-    # Check API health
-    try {
-        $apiHealth = Invoke-RestMethod -Uri "http://localhost:8080/health" -TimeoutSec 5
-        Write-Host "  ✓ API Service: Healthy" -ForegroundColor Green
-    } catch {
-        Write-Host "  ⚠ API Service: Not responding" -ForegroundColor Yellow
+    # Check each controller's readiness
+    foreach ($port in 8081..8083) {
+        try {
+            Invoke-RestMethod -Uri "http://localhost:$port/health/ready" -TimeoutSec 5 | Out-Null
+            Write-Host "  ✓ Controller on ${port}: Ready" -ForegroundColor Green
+        } catch {
+            Write-Host "  ⚠ Controller on ${port}: Not ready" -ForegroundColor Yellow
+        }
     }
-    
+
     # Check HTTP server
     try {
-        $httpHealth = Invoke-RestMethod -Uri "http://localhost:8090/health" -TimeoutSec 5
+        Invoke-RestMethod -Uri "http://localhost:8090/health" -TimeoutSec 5 | Out-Null
         Write-Host "  ✓ HTTP Server: Healthy" -ForegroundColor Green
     } catch {
         Write-Host "  ⚠ HTTP Server: Not responding" -ForegroundColor Yellow
     }
-    
+
     Write-Host ""
     Write-Host "Next Steps:" -ForegroundColor Yellow
-    Write-Host "  1. Check agent registration: .\scripts\check-agents.ps1"
+    Write-Host "  1. Check agent registration: .\test-data\check-agents.ps1"
     Write-Host "  2. Run transfer tests: .\scripts\test-transfers.ps1"
-    Write-Host "  3. Monitor logs: docker-compose -f compose/docker-compose-full-network.yml logs -f"
-    Write-Host "  4. Stop environment: docker-compose -f compose/docker-compose-full-network.yml down"
+    Write-Host "  3. Monitor logs: docker compose -f compose/docker-compose-full-network.yml logs -f"
+    Write-Host "  4. Stop environment: docker compose -f compose/docker-compose-full-network.yml down"
     Write-Host ""
     
 } catch {
     Write-Host "Error starting environment: $_" -ForegroundColor Red
     Write-Host "Checking container status..." -ForegroundColor Yellow
-    docker-compose -f compose/docker-compose-full-network.yml ps
+    docker compose -f compose/docker-compose-full-network.yml ps
     exit 1
 }

@@ -27,7 +27,7 @@ import java.util.Properties;
 /**
  * Configuration management for Quorus system.
  * Handles loading and providing access to Quorus configuration parameters.
- * Every instance is isolated and follows the PeeGeeQ precedence contract:
+ * Every instance is isolated and follows the layered precedence contract:
  * packaged defaults, optional profile, environment, explicit overrides.
  * JVM system properties and implicit filesystem searches are not configuration
  * channels.

@@ -1,5 +1,6 @@
 {
   "agentId": "test-agent-002",
+  "tenantId": "development",
   "timestamp": "2025-08-26T10:22:00Z",
   "sequenceNumber": 2,
   "status": "active",
