@@ -31,6 +31,7 @@
         <jacoco.version>0.8.15</jacoco.version>
         <raftlog.version>1.2.0</raftlog.version>
         <httpclient5.version>5.6.4</httpclient5.version>
+        <jackson.version>2.19.4</jackson.version>
         <!-- Shared timestamp for consolidated test log file across all modules -->
         <maven.build.timestamp.format>yyyy-MM-dd_HH-mm-ss</maven.build.timestamp.format>
     </properties>
@@ -42,6 +43,15 @@
                 <groupId>org.apache.httpcomponents.client5</groupId>
                 <artifactId>httpclient5</artifactId>
                 <version>${httpclient5.version}</version>
+            </dependency>
+            <!-- Jackson BOM. Imported before the Vert.x BOM, which manages an older Jackson: the
+                 first import wins, so every module resolves one Jackson version (register ENG-28). -->
+            <dependency>
+                <groupId>com.fasterxml.jackson</groupId>
+                <artifactId>jackson-bom</artifactId>
+                <version>${jackson.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
             </dependency>
             <!-- Vert.x 5 BOM -->
             <dependency>

@@ -41,14 +41,12 @@
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
-            <version>2.19.4</version>
         </dependency>
 
         <!-- YAML processing for tenant configuration -->
         <dependency>
             <groupId>com.fasterxml.jackson.dataformat</groupId>
             <artifactId>jackson-dataformat-yaml</artifactId>
-            <version>2.19.4</version>
         </dependency>
 
         <!-- Validation -->
