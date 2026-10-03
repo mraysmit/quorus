@@ -88,12 +88,27 @@ public final class CertificateTrustState {
                 secondsRemaining, alertState, revoked);
     }
 
+    /** Validates, normalizes and applies a replacement trust state in one step. */
     public Snapshot update(String trustBundleVersion, Set<String> revokedCertificateSerials) {
-        Snapshot updated = new Snapshot(requireVersion(trustBundleVersion), normalize(revokedCertificateSerials),
+        return apply(prepare(trustBundleVersion, revokedCertificateSerials));
+    }
+
+    /**
+     * Validates and normalizes a replacement trust state without applying it, so that the change can be
+     * audited before it takes effect (register item SEC-11).
+     */
+    public Snapshot prepare(String trustBundleVersion, Set<String> revokedCertificateSerials) {
+        return new Snapshot(requireVersion(trustBundleVersion), normalize(revokedCertificateSerials), Instant.now());
+    }
+
+    /** Replaces the active trust state with a prepared one and returns it as applied. */
+    public Snapshot apply(Snapshot prepared) {
+        Objects.requireNonNull(prepared, "prepared");
+        Snapshot applied = new Snapshot(prepared.trustBundleVersion(), prepared.revokedCertificateSerials(),
                 Instant.now());
-        snapshot.set(updated);
-        updateCounter.add(1, Attributes.of(TRUST_VERSION, updated.trustBundleVersion()));
-        return updated;
+        snapshot.set(applied);
+        updateCounter.add(1, Attributes.of(TRUST_VERSION, applied.trustBundleVersion()));
+        return applied;
     }
 
     public void recordRejection(String reason) {

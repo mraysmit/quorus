@@ -373,6 +373,156 @@ class SecurityBoundaryIntegrationTest {
         }
     }
 
+    /**
+     * Register item SEC-09: runtime revocation is node-local (decision DR-Q2), so an operator sends the
+     * update to every controller. A follower must apply it rather than reject it as a write that needs
+     * the leader, or it keeps accepting the revoked certificate.
+     */
+    @Test
+    void revocationUpdateAppliesOnAFollower(Vertx vertx) throws Exception {
+        TlsMaterial tls = TlsMaterial.create(tempDir.resolve("tls"));
+        SecurityIdentity identity = elevatedSecurityIdentity("security-administrator", tls.clientSubject());
+        SecurityConfig config = tls.config(Set.of(), Set.of(), Map.of(tls.clientSubject(), identity),
+                tempDir.resolve("follower-revocation-audit.jsonl"));
+        try (RunningCluster cluster = startServerOnFollower(vertx, config)) {
+            WebClient client = tls.authenticatedClient(vertx);
+            try {
+                int port = cluster.server().actualPort();
+                assertEquals(200, awaitSuccess(client.get(port, "localhost", "/api/v1/security/me").send(),
+                        TIMEOUT).statusCode());
+
+                HttpResponse<Buffer> update = awaitSuccess(client
+                        .put(port, "localhost", "/api/v1/security/trust/revocations")
+                        .sendJsonObject(new JsonObject()
+                                .put("trustBundleVersion", "follower-v2")
+                                .put("revokedCertificateSerials", new JsonArray().add(tls.clientSerial()))), TIMEOUT);
+                assertEquals(200, update.statusCode(), "A follower must apply a node-local revocation update");
+
+                assertEquals(401, awaitSuccess(client.get(port, "localhost", "/api/v1/security/me").send(),
+                        TIMEOUT).statusCode(), "The follower must reject the revoked certificate");
+            } finally {
+                client.close();
+            }
+        }
+    }
+
+    /**
+     * Register item SEC-11: the update replaces the whole revocation set, so a body without the serial list
+     * must be rejected. Treating it as an empty list would silently clear every revocation.
+     */
+    @Test
+    void revocationUpdateWithoutASerialListIsRejectedAndChangesNothing(Vertx vertx) throws Exception {
+        TlsMaterial tls = TlsMaterial.create(tempDir.resolve("tls"));
+        SecurityIdentity identity = elevatedSecurityIdentity("security-administrator", tls.clientSubject());
+        SecurityConfig config = tls.config(Set.of(), Set.of(tls.serverSerial()),
+                Map.of(tls.clientSubject(), identity), tempDir.resolve("missing-serials-audit.jsonl"));
+        RunningServer running = startServer(vertx, config, AuditSink.noOp());
+        WebClient client = tls.authenticatedClient(vertx);
+        try {
+            int port = running.server().actualPort();
+            HttpResponse<Buffer> update = awaitSuccess(client
+                    .put(port, "localhost", "/api/v1/security/trust/revocations")
+                    .sendJsonObject(new JsonObject().put("trustBundleVersion", "no-serials")), TIMEOUT);
+            assertEquals(400, update.statusCode());
+
+            JsonObject trust = awaitSuccess(client.get(port, "localhost", "/api/v1/security/trust").send(),
+                    TIMEOUT).bodyAsJsonObject();
+            assertEquals("configuration", trust.getString("trustBundleVersion"));
+            assertEquals(1, trust.getInteger("revokedCertificateCount"), "The configured revocation must remain");
+        } finally {
+            client.close();
+            running.close();
+        }
+    }
+
+    /** Register item SEC-11: the audit record of a revocation update must say which serials it revoked. */
+    @Test
+    void revocationAuditRecordsTheRevokedSerials(Vertx vertx) throws Exception {
+        TlsMaterial tls = TlsMaterial.create(tempDir.resolve("tls"));
+        List<AuditEvent> events = new java.util.concurrent.CopyOnWriteArrayList<>();
+        SecurityIdentity identity = elevatedSecurityIdentity("security-administrator", tls.clientSubject());
+        SecurityConfig config = tls.config(Set.of(), Set.of(), Map.of(tls.clientSubject(), identity),
+                tempDir.resolve("serials-audit.jsonl"));
+        RunningServer running = startServer(vertx, config, events::add);
+        WebClient client = tls.authenticatedClient(vertx);
+        try {
+            HttpResponse<Buffer> update = awaitSuccess(client
+                    .put(running.server().actualPort(), "localhost", "/api/v1/security/trust/revocations")
+                    .sendJsonObject(new JsonObject()
+                            .put("trustBundleVersion", "serials-v2")
+                            .put("revokedCertificateSerials", new JsonArray().add("00:0A:1B").add("ff01"))), TIMEOUT);
+            assertEquals(200, update.statusCode());
+            AuditEvent change = events.stream()
+                    .filter(event -> "SECURITY_CONFIGURATION_CHANGE".equals(event.eventType()))
+                    .findFirst().orElseThrow();
+            assertEquals("A1B,FF01", change.attributes().get("revokedCertificateSerials"));
+        } finally {
+            client.close();
+            running.close();
+        }
+    }
+
+    /**
+     * Register item SEC-11: a revocation change whose audit record cannot be made durable must not take
+     * effect, or the request reports failure for a change that has been applied.
+     */
+    @Test
+    void revocationUpdateIsNotAppliedWhenItsAuditFails(Vertx vertx) throws Exception {
+        TlsMaterial tls = TlsMaterial.create(tempDir.resolve("tls"));
+        SecurityIdentity identity = elevatedSecurityIdentity("security-administrator", tls.clientSubject());
+        SecurityConfig config = tls.config(Set.of(), Set.of(), Map.of(tls.clientSubject(), identity),
+                tempDir.resolve("failing-audit.jsonl"));
+        AuditSink failsConfigurationChanges = event -> {
+            if ("SECURITY_CONFIGURATION_CHANGE".equals(event.eventType())) {
+                throw new IllegalStateException("audit storage unavailable");
+            }
+        };
+        RunningServer running = startServer(vertx, config, failsConfigurationChanges);
+        WebClient client = tls.authenticatedClient(vertx);
+        try {
+            int port = running.server().actualPort();
+            HttpResponse<Buffer> update = awaitSuccess(client
+                    .put(port, "localhost", "/api/v1/security/trust/revocations")
+                    .sendJsonObject(new JsonObject()
+                            .put("trustBundleVersion", "unaudited")
+                            .put("revokedCertificateSerials", new JsonArray().add(tls.clientSerial()))), TIMEOUT);
+            assertTrue(update.statusCode() >= 500, "An unaudited change must fail, got " + update.statusCode());
+
+            assertEquals(200, awaitSuccess(client.get(port, "localhost", "/api/v1/security/me").send(),
+                    TIMEOUT).statusCode(), "The revocation must not have been applied");
+            assertEquals("configuration", awaitSuccess(client.get(port, "localhost", "/api/v1/security/trust")
+                    .send(), TIMEOUT).bodyAsJsonObject().getString("trustBundleVersion"));
+        } finally {
+            client.close();
+            running.close();
+        }
+    }
+
+    /**
+     * Register item SEC-09: an authorization check evaluates policy and changes nothing, so a follower
+     * answers it although it is a POST.
+     */
+    @Test
+    void authorizationCheckIsAnsweredByAFollower(Vertx vertx) throws Exception {
+        TlsMaterial tls = TlsMaterial.create(tempDir.resolve("tls"));
+        SecurityIdentity identity = elevatedSecurityIdentity("security-reviewer", tls.clientSubject());
+        SecurityConfig config = tls.config(Set.of(), Set.of(), Map.of(tls.clientSubject(), identity),
+                tempDir.resolve("follower-check-audit.jsonl"));
+        try (RunningCluster cluster = startServerOnFollower(vertx, config)) {
+            WebClient client = tls.authenticatedClient(vertx);
+            try {
+                HttpResponse<Buffer> check = awaitSuccess(client
+                        .post(cluster.server().actualPort(), "localhost", "/api/v1/security/authorization/check")
+                        .sendJsonObject(new JsonObject().put("method", "GET").put("path", "/api/v1/info")),
+                        TIMEOUT);
+                assertEquals(200, check.statusCode(), "A follower must answer a read-only authorization check");
+                assertEquals(true, check.bodyAsJsonObject().getBoolean("allowed"));
+            } finally {
+                client.close();
+            }
+        }
+    }
+
     @Test
     void overlappingHttpCertificatesPermitCutoverBeforeOldIdentityRevocation(Vertx vertx) throws Exception {
         TlsMaterial tls = TlsMaterial.create(tempDir.resolve("tls"));
@@ -530,6 +680,47 @@ class SecurityBoundaryIntegrationTest {
         return new RunningServer(server, node, state);
     }
 
+    /**
+     * Starts a three-node cluster and an HTTP server on one of its followers. The other two nodes have
+     * long election timeouts so that the leader is the fast node and the follower stays a follower.
+     */
+    private static RunningCluster startServerOnFollower(Vertx vertx, SecurityConfig config) {
+        config.validate();
+        String prefix = "security-follower-" + System.nanoTime() + "-";
+        String leaderId = prefix + "leader";
+        String followerId = prefix + "follower";
+        String otherId = prefix + "other";
+        Set<String> members = Set.of(leaderId, followerId, otherId);
+        QuorusStateStore followerState = new QuorusStateStore();
+        RaftNode follower = clusterNode(vertx, followerId, members, followerState, 30_000);
+        RaftNode other = clusterNode(vertx, otherId, members, new QuorusStateStore(), 45_000);
+        RaftNode leader = clusterNode(vertx, leaderId, members, new QuorusStateStore(), 400);
+        awaitSuccess(follower.start(), TIMEOUT);
+        awaitSuccess(other.start(), TIMEOUT);
+        awaitSuccess(leader.start(), TIMEOUT);
+        awaitSuccess(eventually(vertx, leader::isLeader, TIMEOUT), TIMEOUT.plusSeconds(1));
+        awaitSuccess(eventually(vertx, () -> leaderId.equals(follower.getLeaderId()), TIMEOUT),
+                TIMEOUT.plusSeconds(1));
+        HttpApiServer server = new HttpApiServer(vertx, "127.0.0.1", 0, follower, followerState, -1,
+                ControllerTestConfig.create(), config, AuditSink.noOp());
+        awaitSuccess(server.start(), TIMEOUT);
+        return new RunningCluster(server, List.of(leader, follower, other));
+    }
+
+    private static RaftNode clusterNode(Vertx vertx, String nodeId, Set<String> members, QuorusStateStore state,
+                                        long electionTimeoutMs) {
+        return RaftNode.builder()
+                .vertx(vertx)
+                .nodeId(nodeId)
+                .clusterNodes(members)
+                .transport(new InMemoryTransportSimulator(nodeId))
+                .stateMachine(state)
+                .mode(RaftNodeMode.volatileMode())
+                .electionTimeout(electionTimeoutMs)
+                .heartbeatInterval(100)
+                .build();
+    }
+
     private static SecurityIdentity directIdentity(String subject) {
         return new SecurityIdentity("payments-operator", IdentityType.HUMAN, "regulated-bank-a", "production",
                 Set.of(SecurityRole.OPERATOR), Set.of("*"), subject, Instant.now(),
@@ -547,6 +738,14 @@ class SecurityBoundaryIntegrationTest {
         public void close() {
             awaitSuccess(server.stop(), TIMEOUT);
             awaitSuccess(node.stop(), TIMEOUT);
+        }
+    }
+
+    private record RunningCluster(HttpApiServer server, List<RaftNode> nodes) implements AutoCloseable {
+        @Override
+        public void close() {
+            awaitSuccess(server.stop(), TIMEOUT);
+            nodes.forEach(node -> awaitSuccess(node.stop(), TIMEOUT));
         }
     }
 

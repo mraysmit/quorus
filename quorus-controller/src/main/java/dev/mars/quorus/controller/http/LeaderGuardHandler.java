@@ -22,6 +22,8 @@ import io.vertx.ext.web.RoutingContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Set;
+
 /**
  * HTTP middleware that guards write endpoints against non-leader nodes.
  *
@@ -36,6 +38,11 @@ import org.slf4j.LoggerFactory;
  * <p>Non-API paths (health probes, metrics, Raft status) are also passed through
  * regardless of HTTP method.</p>
  *
+ * <p>Two API writes never touch replicated state and are served by every node (register item
+ * SEC-09): the runtime revocation update, which changes this node's own trust state (decision
+ * DR-Q2: the operator sends it to every controller), and the authorization check, which only
+ * evaluates policy.</p>
+ *
  * <p>Dependency Inversion: depends on {@link RaftNode} abstraction for leader checks,
  * not on specific Raft implementation details.</p>
  *
@@ -45,6 +52,11 @@ import org.slf4j.LoggerFactory;
 public class LeaderGuardHandler implements Handler<RoutingContext> {
 
     private static final Logger logger = LoggerFactory.getLogger(LeaderGuardHandler.class);
+
+    /** API writes that change only node-local state or nothing at all, as "METHOD path". */
+    private static final Set<String> NODE_LOCAL_WRITES = Set.of(
+            "PUT /api/v1/security/trust/revocations",
+            "POST /api/v1/security/authorization/check");
 
     private final RaftNode raftNode;
 
@@ -57,7 +69,7 @@ public class LeaderGuardHandler implements Handler<RoutingContext> {
         String path = ctx.request().path();
 
         // Only guard API write paths — let health, metrics, raft status, and reads through
-        if (!isWriteMethod(ctx) || !isApiPath(path)) {
+        if (!isWriteMethod(ctx) || !isApiPath(path) || isNodeLocalWrite(ctx, path)) {
             ctx.next();
             return;
         }
@@ -95,5 +107,9 @@ public class LeaderGuardHandler implements Handler<RoutingContext> {
      */
     private static boolean isApiPath(String path) {
         return path.startsWith("/api/");
+    }
+
+    private static boolean isNodeLocalWrite(RoutingContext ctx, String path) {
+        return NODE_LOCAL_WRITES.contains(ctx.request().method().name() + " " + path);
     }
 }

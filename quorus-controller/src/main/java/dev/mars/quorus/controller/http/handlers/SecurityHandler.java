@@ -24,6 +24,7 @@ import java.security.cert.X509Certificate;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
@@ -101,10 +102,14 @@ public final class SecurityHandler {
             JsonObject body = context.body().asJsonObject();
             if (body == null) throw new IllegalArgumentException("Request body is required");
             String version = body.getString("trustBundleVersion");
-            JsonArray serials = body.getJsonArray("revokedCertificateSerials", new JsonArray());
+            // The update replaces the whole set, so a missing list must not be read as "revoke nothing".
+            if (!(body.getValue("revokedCertificateSerials") instanceof JsonArray serials)) {
+                throw new IllegalArgumentException("revokedCertificateSerials is required and must be an array");
+            }
             Set<String> revoked = serials.stream().map(String::valueOf).collect(Collectors.toUnmodifiableSet());
             CertificateTrustState.Snapshot previous = trustState.snapshot();
-            CertificateTrustState.Snapshot updated = trustState.update(version, revoked);
+            // The change is audited before it is applied, so a failed audit leaves the trust state unchanged.
+            CertificateTrustState.Snapshot updated = trustState.prepare(version, revoked);
             SecurityIdentity identity = SecurityContext.identity(context);
             CompletableFuture<Void> durable = auditSink.appendAsync(new AuditEvent(Instant.now(),
                     "SECURITY_CONFIGURATION_CHANGE", "SUCCESS",
@@ -117,11 +122,16 @@ public final class SecurityHandler {
                             "previousRevokedCertificateCount",
                             Integer.toString(previous.revokedCertificateSerials().size()),
                             "revokedCertificateCount",
-                            Integer.toString(updated.revokedCertificateSerials().size()))));
-            AuditContinuation.afterDurable(context, durable, () -> context.json(new JsonObject()
-                    .put("trustBundleVersion", updated.trustBundleVersion())
-                    .put("loadedAt", updated.loadedAt().toString())
-                    .put("revokedCertificateCount", updated.revokedCertificateSerials().size())));
+                            Integer.toString(updated.revokedCertificateSerials().size()),
+                            "revokedCertificateSerials",
+                            String.join(",", new TreeSet<>(updated.revokedCertificateSerials())))));
+            AuditContinuation.afterDurable(context, durable, () -> {
+                CertificateTrustState.Snapshot applied = trustState.apply(updated);
+                context.json(new JsonObject()
+                        .put("trustBundleVersion", applied.trustBundleVersion())
+                        .put("loadedAt", applied.loadedAt().toString())
+                        .put("revokedCertificateCount", applied.revokedCertificateSerials().size()));
+            });
         };
     }
 
