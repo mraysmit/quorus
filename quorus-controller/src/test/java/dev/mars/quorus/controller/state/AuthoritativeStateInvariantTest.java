@@ -29,6 +29,7 @@ import java.time.Instant;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Verifies invariants at the replicated state-machine boundary, not at HTTP handlers. */
 class AuthoritativeStateInvariantTest {
@@ -106,6 +107,51 @@ class AuthoritativeStateInvariantTest {
 
         assertRejected(store.apply(TransferJobCommand.delete("job-a")), "DEPENDENT_ENTITY_EXISTS");
         assertRejected(store.apply(AgentCommand.deregister("agent-a")), "DEPENDENT_ENTITY_EXISTS");
+    }
+
+    /** Register item ENG-25: only work in progress blocks deregistration, not finished work. */
+    @Test
+    void anAgentWithOnlyFinishedWorkDeregistersAndItsRecordIsKeptAsDeregistered() {
+        createValidAssignment("job-a", "agent-a", "tenant-a");
+        store.apply(JobAssignmentCommand.updateStatus(
+                "job-a:agent-a", JobAssignmentStatus.ASSIGNED, JobAssignmentStatus.ACCEPTED));
+        store.apply(JobAssignmentCommand.updateStatus(
+                "job-a:agent-a", JobAssignmentStatus.ACCEPTED, JobAssignmentStatus.IN_PROGRESS));
+        assertRejected(store.apply(AgentCommand.deregister("agent-a")), "DEPENDENT_ENTITY_EXISTS");
+        store.apply(JobAssignmentCommand.updateStatus(
+                "job-a:agent-a", JobAssignmentStatus.IN_PROGRESS, JobAssignmentStatus.COMPLETED));
+
+        assertInstanceOf(CommandResult.Success.class, store.apply(AgentCommand.deregister("agent-a")));
+
+        assertEquals(AgentStatus.DEREGISTERED, store.findAgent("agent-a").orElseThrow().getStatus(),
+                "The finished assignment still references the agent, so its record is kept, marked deregistered");
+        assertEquals("agent-a", store.getJobAssignment("job-a:agent-a").getAgentId());
+    }
+
+    @Test
+    void anAgentNothingReferencesIsRemovedOnDeregistration() {
+        store.apply(AgentCommand.register(agent("agent-a", "tenant-a", AgentStatus.HEALTHY)));
+
+        assertInstanceOf(CommandResult.Success.class, store.apply(AgentCommand.deregister("agent-a")));
+
+        assertTrue(store.findAgent("agent-a").isEmpty());
+    }
+
+    @Test
+    void aDeregisteredAgentGetsNoHeartbeatOrWorkUntilItRegistersAgain() {
+        createValidAssignment("job-a", "agent-a", "tenant-a");
+        store.apply(JobAssignmentCommand.cancel("job-a:agent-a", "test"));
+        assertInstanceOf(CommandResult.Success.class, store.apply(AgentCommand.deregister("agent-a")));
+
+        assertInstanceOf(CommandResult.NotFound.class, store.apply(AgentCommand.heartbeat("agent-a")));
+        store.apply(TransferJobCommand.create(job("job-b", 100), "tenant-a"));
+        assertRejected(store.apply(JobAssignmentCommand.assign(assignment("job-b", "agent-a", "tenant-a"))),
+                "AGENT_DEREGISTERED");
+
+        store.apply(AgentCommand.register(agent("agent-a", "tenant-a", AgentStatus.HEALTHY)));
+        assertEquals(AgentStatus.HEALTHY, store.findAgent("agent-a").orElseThrow().getStatus());
+        assertInstanceOf(CommandResult.Success.class,
+                store.apply(JobAssignmentCommand.assign(assignment("job-b", "agent-a", "tenant-a"))));
     }
 
     @Test

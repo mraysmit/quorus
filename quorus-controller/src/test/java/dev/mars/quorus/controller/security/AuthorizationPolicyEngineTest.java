@@ -28,6 +28,20 @@ class AuthorizationPolicyEngineTest {
                 policy.requiredScope("GET", "/api/v1/security-events"));
     }
 
+    /** Register item ENG-25: deregistration has its own scope, held by agents and operators. */
+    @Test
+    void agentDeregistrationHasItsOwnScopeHeldByAgentsAndOperators() {
+        assertEquals("agents:deregister", policy.requiredScope("DELETE", "/api/v1/agents/agent-1"));
+        assertEquals("agents:read", policy.requiredScope("GET", "/api/v1/agents"));
+        assertEquals("agents:jobs:read", policy.requiredScope("GET", "/api/v1/agents/agent-1/jobs"));
+        AuthorizationRequest request = new AuthorizationRequest("DELETE", "/api/v1/agents/agent-1",
+                "agents:deregister", "tenant-a", "production", null, null);
+        assertTrue(policy.evaluate(identity(Set.of(SecurityRole.AGENT), Set.of()), request).allowed());
+        assertTrue(policy.evaluate(identity(Set.of(SecurityRole.OPERATOR), Set.of()), request).allowed());
+        assertFalse(policy.evaluate(identity(Set.of(SecurityRole.SERVICE_INTEGRATION), Set.of()), request).allowed());
+        assertFalse(policy.evaluate(identity(Set.of(SecurityRole.AUDITOR), Set.of()), request).allowed());
+    }
+
     @Test
     void operatorMayControlTransfersWithinAuthenticatedTenant() {
         SecurityIdentity identity = identity(Set.of(SecurityRole.OPERATOR), Set.of());

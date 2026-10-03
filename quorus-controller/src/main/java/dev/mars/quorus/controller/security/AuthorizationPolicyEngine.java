@@ -56,6 +56,7 @@ public final class AuthorizationPolicyEngine {
         if (path.startsWith("/api/v1/agents/register")) return "agents:register";
         if (path.startsWith("/api/v1/agents/heartbeat")) return "agents:heartbeat";
         if (path.matches("/api/v1/agents/[^/]+/jobs.*")) return "agents:jobs:read";
+        if (verb.equals("DELETE") && path.matches("/api/v1/agents/[^/]+")) return "agents:deregister";
         if (path.startsWith("/api/v1/agents")) return "agents:read";
         if (path.startsWith("/api/v1/transfers")) return scope("transfers", verb);
         if (path.startsWith("/api/v1/jobs")) return "transfers:status:update";
@@ -88,13 +89,14 @@ public final class AuthorizationPolicyEngine {
         if (identity.roles().contains(SecurityRole.OPERATOR)) {
             return scope.startsWith("transfers:") || scope.startsWith("assignments:")
                     || scope.startsWith("routes:") || scope.startsWith("agents:read")
+                    || scope.equals("agents:deregister")
                     || scope.equals("service-connections:read") || scope.equals("security-events:read")
                     || scope.equals("telemetry:read") || scope.equals("system:read")
                     || scope.equals("security:self:read");
         }
         if (identity.roles().contains(SecurityRole.AGENT)) {
             return scope.equals("agents:register") || scope.equals("agents:heartbeat")
-                    || scope.equals("agents:jobs:read") || scope.equals("transfers:status:update")
+                    || scope.equals("agents:deregister") || scope.equals("agents:jobs:read") || scope.equals("transfers:status:update")
                     || scope.equals("security:self:read");
         }
         if (identity.roles().contains(SecurityRole.SERVICE_INTEGRATION)) {

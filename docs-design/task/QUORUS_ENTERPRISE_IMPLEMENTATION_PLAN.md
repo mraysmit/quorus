@@ -102,9 +102,10 @@ documentation work is in register Section H.
 - **Raft engine gaps (`ENG-22`), test-double defects and a licence-header conflict (`ENG-23`), and
   test-lane defects (`ENG-24`)**, found while rewriting the storage, simulator and testing
   documents.
-- **Agent deregistration does nothing (`ENG-25`).** The agent calls `DELETE /api/v1/agents/{agentId}`
-  on shutdown, the controller has no such route, and the agent treats the `404` as success, so the
-  agent record stays in replicated state.
+- **Agent deregistration did nothing (`ENG-25`, fixed 2026-10-03).** The agent called
+  `DELETE /api/v1/agents/{agentId}` on shutdown, the controller had no such route, and the agent
+  treated the `404` as success, so the agent record stayed in replicated state. The route now
+  exists; it is refused only while the agent holds active work.
 
 Decisions taken with the owner on 2026-10-03 (register §3) add two delivery items: `ENG-26`
 passes a defined set of workflow transfer options through and resolves nested variables

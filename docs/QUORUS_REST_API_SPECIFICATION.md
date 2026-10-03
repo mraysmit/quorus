@@ -228,7 +228,7 @@ Resource ownership, business-service scope, environment, and tenant policy furth
 | `routes.manage` | `routes:read`, `routes:write`, `routes:delete` |
 | `workflows.manage` | None: no workflow endpoints |
 | `agents.read` | `agents:read`; agents themselves use `agents:register`, `agents:heartbeat`, `agents:jobs:read` and `transfers:status:update` |
-| `agents.manage` | None: no agent lifecycle endpoints. Assignments use `assignments:read`, `assignments:write`, `assignments:delete` |
+| `agents.manage` | `agents:deregister` (`DELETE /api/v1/agents/{agentId}`, also held by agents for themselves); no other agent lifecycle endpoints. Assignments use `assignments:read`, `assignments:write`, `assignments:delete` |
 | `services.manage` | `service-connections:read/write/delete`, `secret-references:read/write/delete` |
 | `tenants.manage` | None: no tenant endpoints |
 | `security.audit.read` | `security-events:read`; `security:explain`, `security:self:read`, `security:trust:read`, `security:trust:write` cover the other security endpoints |
@@ -374,6 +374,7 @@ Agent transitions require the authenticated agent ID, assignment ID, transfer ID
 | `POST` | `/api/v1/agents/heartbeat` | Current | Alpha heartbeat; production requests require enrolled identity |
 | `GET` | `/api/v1/agents` | Current | Search agent inventory |
 | `GET` | `/api/v1/agents/{agentId}` | Required | Agent identity, health, capacity, version, posture, and state |
+| `DELETE` | `/api/v1/agents/{agentId}` | Current | Deregistration by the agent itself on shutdown, or by an operator; refused while the agent holds active work. Not the governed `:decommission` below |
 | `GET` | `/api/v1/agents/{agentId}/jobs` | Current | Agent work polling compatibility endpoint |
 | `GET` | `/api/v1/agents/{agentId}/capabilities` | Required | Protocol and execution capabilities |
 | `GET` | `/api/v1/agents/{agentId}/effective-policy` | Required | Redacted service, tenant, transfer, and egress policy |

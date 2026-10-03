@@ -183,14 +183,14 @@ class AgentRegistrationServiceTest {
     }
 
     @Test
-    @DisplayName("Should handle deregister 404 as success")
-    void testDeregister404AsSuccess() throws Exception {
+    @DisplayName("Should fail deregister on HTTP 404: it once hid a controller with no deregistration route (ENG-25)")
+    void testDeregister404IsAFailure() throws Exception {
         deregisterResponseStatus.set(404);
         AgentRegistrationService service = new AgentRegistrationService(client, config);
         service.register();
 
-        assertTrue(service.deregister(), "404 should be treated as success (already deregistered)");
-        assertFalse(service.isRegistered());
+        assertFalse(service.deregister(), "A 404 must be reported, not treated as success");
+        assertTrue(service.isRegistered(), "Should stay registered after a failed deregistration");
     }
 
     @Test

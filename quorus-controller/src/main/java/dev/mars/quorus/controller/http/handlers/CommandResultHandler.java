@@ -29,7 +29,7 @@ final class CommandResultHandler {
             case "DUPLICATE_ENTITY", "DEPENDENT_ENTITY_EXISTS", "INVALID_STATE_TRANSITION",
                     "STALE_FENCE", "STALE_REPORT_SEQUENCE", "REPORT_SEQUENCE_GAP",
                     "LEASE_EXPIRED", "LEASE_NOT_EXTENDED", "ACTIVE_ATTEMPT_MISMATCH",
-                    "INVALID_ATTEMPT_SEQUENCE" -> ErrorCode.CONFLICT;
+                    "INVALID_ATTEMPT_SEQUENCE", "AGENT_DEREGISTERED" -> ErrorCode.CONFLICT;
             default -> ErrorCode.VALIDATION_ERROR;
         };
         return new QuorusApiException(errorCode, rejected.message());

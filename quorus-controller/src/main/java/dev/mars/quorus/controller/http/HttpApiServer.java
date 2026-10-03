@@ -206,6 +206,7 @@ public class HttpApiServer {
         router.post("/api/v1/agents/heartbeat").handler(new HeartbeatHandler(raftNode, stateStore));
         router.get("/api/v1/agents").handler(new AgentListHandler(stateStore));
         router.get("/api/v1/agents/:agentId/jobs").handler(new AgentJobsHandler(stateStore));
+        router.delete("/api/v1/agents/:agentId").handler(new AgentDeregistrationHandler(raftNode, stateStore));
 
         // ==================== Transfer Endpoints ====================
         TransferHandler transferHandler = new TransferHandler(raftNode, stateStore, securityConfig.profile(), connectionAuthorizer);
