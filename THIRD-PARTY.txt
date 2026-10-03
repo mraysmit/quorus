@@ -1,16 +1,11 @@
-Lists of 104 third-party dependencies.
+Lists of 99 third-party dependencies.
      (Eclipse Public License - v 2.0) (GNU Lesser General Public License) Logback Classic Module (ch.qos.logback:logback-classic:1.5.32 - http://logback.qos.ch/logback-classic)
      (Eclipse Public License - v 2.0) (GNU Lesser General Public License) Logback Core Module (ch.qos.logback:logback-core:1.5.32 - http://logback.qos.ch/logback-core)
      (Apache License, Version 2.0) Internet Time Utility (com.ethlo.time:itu:1.14.0 - https://github.com/ethlo/itu)
-     (The Apache Software License, Version 2.0) Jackson-annotations (com.fasterxml.jackson.core:jackson-annotations:2.18.2 - https://github.com/FasterXML/jackson)
      (The Apache Software License, Version 2.0) Jackson-annotations (com.fasterxml.jackson.core:jackson-annotations:2.19.4 - https://github.com/FasterXML/jackson)
-     (The Apache Software License, Version 2.0) Jackson-core (com.fasterxml.jackson.core:jackson-core:2.18.2 - https://github.com/FasterXML/jackson-core)
      (The Apache Software License, Version 2.0) Jackson-core (com.fasterxml.jackson.core:jackson-core:2.19.4 - https://github.com/FasterXML/jackson-core)
-     (The Apache Software License, Version 2.0) jackson-databind (com.fasterxml.jackson.core:jackson-databind:2.18.2 - https://github.com/FasterXML/jackson)
      (The Apache Software License, Version 2.0) jackson-databind (com.fasterxml.jackson.core:jackson-databind:2.19.4 - https://github.com/FasterXML/jackson)
-     (The Apache Software License, Version 2.0) Jackson-dataformat-YAML (com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.18.2 - https://github.com/FasterXML/jackson-dataformats-text)
      (The Apache Software License, Version 2.0) Jackson-dataformat-YAML (com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.19.4 - https://github.com/FasterXML/jackson-dataformats-text)
-     (The Apache Software License, Version 2.0) Jackson datatype: JSR310 (com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.18.2 - https://github.com/FasterXML/jackson-modules-java8/jackson-datatype-jsr310)
      (The Apache Software License, Version 2.0) Jackson datatype: JSR310 (com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.19.4 - https://github.com/FasterXML/jackson-modules-java8/jackson-datatype-jsr310)
      (ISC) (Revised BSD) JSch (com.github.mwiede:jsch:0.2.26 - https://github.com/mwiede/jsch)
      (Apache 2.0) Google Android Annotations Library (com.google.android:annotations:4.1.1.4 - http://source.android.com/)
