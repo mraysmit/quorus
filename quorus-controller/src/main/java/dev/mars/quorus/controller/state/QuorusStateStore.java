@@ -312,18 +312,32 @@ public class QuorusStateStore implements RaftLogApplicator {
             case AgentCommand.Deregister deregister -> {
                 logger.debug("Deregistering agent: agentId={}", agentId);
                 logger.trace("Agent deregister command timestamp={}", deregister.timestamp());
-                if (jobAssignments.values().stream().anyMatch(a -> agentId.equals(a.getAgentId()))
-                        || transferAttempts.values().stream().anyMatch(a -> agentId.equals(a.getAgentId()))) {
-                    yield rejected("DEPENDENT_ENTITY_EXISTS", "Agent is still referenced by an assignment: " + agentId);
-                }
-                AgentInfo removedAgent = agents.remove(agentId);
-                if (removedAgent == null) {
+                AgentInfo leavingAgent = agents.get(agentId);
+                if (leavingAgent == null) {
                     logger.warn("Agent not found for deregistration: id={}", agentId);
                     yield new CommandResult.NotFound<>(agentId, "Agent");
                 }
-                logger.info("Deregistered agent: agentId={}, endpoint={}, totalAgents={}", 
-                    agentId, removedAgent.getEndpoint(), agents.size());
-                yield new CommandResult.Success<>(removedAgent);
+                // Work in progress blocks deregistration; finished work does not (ENG-25).
+                if (jobAssignments.values().stream()
+                                .anyMatch(a -> agentId.equals(a.getAgentId()) && !a.getStatus().isTerminal())
+                        || transferAttempts.values().stream()
+                                .anyMatch(a -> agentId.equals(a.getAgentId()) && !a.getStatus().isTerminal())) {
+                    yield rejected("DEPENDENT_ENTITY_EXISTS", "Agent still holds an active assignment: " + agentId);
+                }
+                // Finished assignments and attempts still name the agent, so its record is kept, marked
+                // deregistered; an agent nothing references is removed.
+                if (jobAssignments.values().stream().anyMatch(a -> agentId.equals(a.getAgentId()))
+                        || transferAttempts.values().stream().anyMatch(a -> agentId.equals(a.getAgentId()))) {
+                    AgentInfo deregistered = AgentInfo.copyOf(leavingAgent);
+                    deregistered.setStatus(AgentStatus.DEREGISTERED);
+                    agents.put(agentId, deregistered);
+                    logger.info("Deregistered agent, record kept for its transfer history: agentId={}", agentId);
+                    yield new CommandResult.Success<>(deregistered);
+                }
+                agents.remove(agentId);
+                logger.info("Deregistered agent: agentId={}, endpoint={}, totalAgents={}",
+                    agentId, leavingAgent.getEndpoint(), agents.size());
+                yield new CommandResult.Success<>(leavingAgent);
             }
             case AgentCommand.UpdateStatus cmd -> {
                 logger.debug("Updating agent status: agentId={}, newStatus={}", agentId, cmd.newStatus());
@@ -370,7 +384,8 @@ public class QuorusStateStore implements RaftLogApplicator {
             case AgentCommand.Heartbeat cmd -> {
                 logger.debug("Processing heartbeat: agentId={}", agentId);
                 AgentInfo agentForHeartbeat = agents.get(agentId);
-                if (agentForHeartbeat == null) {
+                // A deregistered agent must register again before it is heard from.
+                if (agentForHeartbeat == null || agentForHeartbeat.getStatus() == AgentStatus.DEREGISTERED) {
                     logger.warn("Agent not found for heartbeat: id={}", agentId);
                     yield new CommandResult.NotFound<>(agentId, "Agent");
                 }
@@ -444,6 +459,10 @@ public class QuorusStateStore implements RaftLogApplicator {
                 CommandResult<?> referenceValidation = validateAssignmentReferences(assignment);
                 if (referenceValidation != null) {
                     yield referenceValidation;
+                }
+                if (agents.get(assignment.getAgentId()).getStatus() == AgentStatus.DEREGISTERED) {
+                    yield rejected("AGENT_DEREGISTERED",
+                            "Agent is deregistered and cannot be assigned work: " + assignment.getAgentId());
                 }
                 TransferAttempt initialAttempt = null;
                 if ((cmd.attemptId() == null) != (cmd.leaseExpiresAt() == null)) {

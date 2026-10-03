@@ -216,7 +216,7 @@ Agents communicate with the controller via REST API at `{controller}/api/v1`:
 5. Status report: POST /jobs/{jobId}/status    → agentId, status, bytesTransferred, error details and attempt/fencing fields (tenant comes from the job, not the report)
 ```
 
-There is currently no agent deregistration route exposed by the controller, and no assignment scheduler: a job reaches an agent's poll only after a caller creates an assignment with `POST /assignments` (register item `ENG-01`). The [OpenAPI contract](../quorus-controller/src/main/resources/openapi/quorus-controller-v1.yaml) is the reference for every current endpoint.
+An agent deregisters with `DELETE /agents/{agentId}` on shutdown; the controller refuses it while the agent holds an active assignment. There is currently no assignment scheduler: a job reaches an agent's poll only after a caller creates an assignment with `POST /assignments` (register item `ENG-01`). The [OpenAPI contract](../quorus-controller/src/main/resources/openapi/quorus-controller-v1.yaml) is the reference for every current endpoint.
 
 ### Key Services (quorus-agent/service/)
 | Service | Responsibility | Interval |

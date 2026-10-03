@@ -4,6 +4,8 @@
  */
 package dev.mars.quorus.controller.http;
 
+import dev.mars.quorus.agent.AgentInfo;
+import dev.mars.quorus.agent.AgentStatus;
 import dev.mars.quorus.controller.config.ControllerTestConfig;
 import dev.mars.quorus.controller.raft.InMemoryTransportSimulator;
 import dev.mars.quorus.controller.raft.RaftNode;
@@ -16,6 +18,7 @@ import dev.mars.quorus.controller.security.SecurityProfile;
 import dev.mars.quorus.controller.security.SecurityRole;
 import dev.mars.quorus.controller.security.audit.AuditEvent;
 import dev.mars.quorus.controller.security.audit.AuditSink;
+import dev.mars.quorus.controller.state.AgentCommand;
 import dev.mars.quorus.controller.state.QuorusStateStore;
 import dev.mars.quorus.controller.state.TransferJobCommand;
 import dev.mars.quorus.core.TransferJob;
@@ -520,6 +523,59 @@ class SecurityBoundaryIntegrationTest {
             } finally {
                 client.close();
             }
+        }
+    }
+
+    /**
+     * Register item ENG-25: an agent identity may deregister only itself, an operator may deregister any
+     * agent of its tenant, an integration identity may deregister none, and each attempt is audited.
+     */
+    @Test
+    void agentDeregistrationIsSelfOnlyForAgentsAndAllowedForOperators(Vertx vertx) throws Exception {
+        TlsMaterial tls = TlsMaterial.create(tempDir.resolve("tls"));
+        List<AuditEvent> events = new java.util.concurrent.CopyOnWriteArrayList<>();
+        assertEquals(403, deregisterAs(vertx, tls, events, Set.of(SecurityRole.AGENT), IdentityType.AGENT,
+                "agent-self", "agent-other"), "An agent identity must not deregister another agent");
+        assertEquals(204, deregisterAs(vertx, tls, events, Set.of(SecurityRole.AGENT), IdentityType.AGENT,
+                "agent-self", "agent-self"), "An agent identity deregisters itself");
+        assertEquals(204, deregisterAs(vertx, tls, events, Set.of(SecurityRole.OPERATOR), IdentityType.HUMAN,
+                "payments-operator", "agent-other"), "An operator deregisters an agent of its tenant");
+        assertEquals(403, deregisterAs(vertx, tls, events, Set.of(SecurityRole.SERVICE_INTEGRATION),
+                IdentityType.SERVICE_INTEGRATION, "payments-batch", "agent-other"),
+                "An integration identity has no deregistration scope");
+
+        awaitSuccess(eventually(vertx, () -> events.stream().anyMatch(event ->
+                        "MUTATION".equals(event.eventType()) && "SUCCESS".equals(event.outcome())
+                                && "agent-self".equals(event.principalId())
+                                && "/api/v1/agents/agent-self".equals(event.path()))
+                && events.stream().anyMatch(event ->
+                        "MUTATION".equals(event.eventType()) && "FAILURE".equals(event.outcome())
+                                && "agent-self".equals(event.principalId())
+                                && "/api/v1/agents/agent-other".equals(event.path())), TIMEOUT),
+                TIMEOUT.plusSeconds(1));
+    }
+
+    /** Starts a server whose only client identity has the given roles, and deletes one registered agent. */
+    private int deregisterAs(Vertx vertx, TlsMaterial tls, List<AuditEvent> events, Set<SecurityRole> roles,
+                             IdentityType type, String principal, String agentId) {
+        SecurityIdentity identity = new SecurityIdentity(principal, type, "regulated-bank-a", "production",
+                roles, Set.of(), tls.clientSubject(), Instant.now(), Instant.now().plusSeconds(300), null);
+        SecurityConfig config = tls.config(Set.of(), Set.of(), Map.of(tls.clientSubject(), identity),
+                tempDir.resolve("deregistration-audit-" + System.nanoTime() + ".jsonl"));
+        RunningServer running = startServer(vertx, config, events::add);
+        WebClient client = tls.authenticatedClient(vertx);
+        try {
+            for (String registered : List.of("agent-self", "agent-other")) {
+                AgentInfo agent = new AgentInfo(registered, registered + ".example.test", "127.0.0.1", 8080);
+                agent.setTenantId("regulated-bank-a");
+                agent.setStatus(AgentStatus.HEALTHY);
+                running.state().apply(AgentCommand.register(agent));
+            }
+            return awaitSuccess(client.delete(running.server().actualPort(), "localhost",
+                    "/api/v1/agents/" + agentId).send(), TIMEOUT).statusCode();
+        } finally {
+            client.close();
+            running.close();
         }
     }
 

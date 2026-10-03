@@ -76,7 +76,8 @@ public class AgentRegistrationService {
     /**
      * Deregisters the agent from the controller. Does nothing, successfully, if it is not registered.
      *
-     * @return true if the agent is no longer registered (a 404 counts: already gone)
+     * @return true if the controller confirmed the deregistration; false on any other answer, including
+     *         a 404, or a transport failure
      * @throws InterruptedException if the calling thread is interrupted
      */
     public boolean deregister() throws InterruptedException {
@@ -88,7 +89,7 @@ public class AgentRegistrationService {
             ControllerClient.Response response = client.delete(
                     config.getControllerUrl() + "/agents/" + config.getAgentId());
             int statusCode = response.status();
-            if (statusCode == 200 || statusCode == 204 || statusCode == 404) {
+            if (statusCode == 200 || statusCode == 204) {
                 registered = false;
                 logger.info("Agent {} deregistered successfully", config.getAgentId());
                 return true;

@@ -1551,7 +1551,7 @@ A write that reaches a follower is rejected with `503 NOT_LEADER` rather than fo
 **Heartbeat Monitoring:**
 - **Heartbeat Interval (Current)**: 30 seconds by default (`QUORUS_AGENT_HEARTBEAT_INTERVAL_MS`)
 - **Timeout Threshold (Target)**: Nothing on the controller marks an agent unhealthy or unreachable when heartbeats stop; heartbeat age is a target telemetry signal ([specification §12.8](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md#128-infrastructure-telemetry))
-- **Agent shutdown (Current)**: The agent waits a bounded time for its job threads, stops its health endpoint and tries to deregister with `DELETE /api/v1/agents/{agentId}`. The controller registers no such route, so the call gets `404`, which the agent treats as success; the agent record stays in replicated state
+- **Agent shutdown (Current)**: The agent waits a bounded time for its job threads, stops its health endpoint and deregisters with `DELETE /api/v1/agents/{agentId}`. The controller commits the deregistration through Raft and refuses it (`409`) while the agent holds an active assignment or attempt. An agent that finished assignments still reference is kept with status `deregistered` and gets no work until it registers again; an agent nothing references is removed. The agent logs any other answer, including `404`, as a failure
 - **Health Checks (Target)**: The controller does not probe agents
 
 **Failure Scenarios:**
@@ -1634,7 +1634,7 @@ flowchart TB
 - **Idle**: No active jobs, available for new work
 - **Draining**: Graceful shutdown in progress, completing current jobs
 - **Unhealthy**: Failed health checks, not receiving new jobs
-- **Deregistered**: Removed from agent registry
+- **Deregistered**: Removed from agent registry, or kept with status `deregistered` while its transfer history references it
 
 ### Dynamic Scaling and Load Balancing
 
