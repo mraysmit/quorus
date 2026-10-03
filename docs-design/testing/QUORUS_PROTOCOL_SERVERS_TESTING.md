@@ -1,410 +1,182 @@
 # Protocol Server Testing Guide
 
-Real protocol servers (FTP, SFTP, SMB) running in Docker containers for integration testing of Quorus file transfer protocols.
+Real FTP, FTPS, SFTP and SMB servers in Docker containers, used to test the Quorus protocol adapters.
+Test lanes, tags and the full list of tests that need Docker are in the
+[Testing Guide](QUORUS_TESTING_README.md).
+
+There are two separate setups:
+
+1. **Testcontainers fixtures** in `quorus-core/src/test/resources/`, started automatically by the
+   upload integration tests in a default build (section 1).
+2. **A standalone compose stack**, `docker/compose/docker-compose-protocol-servers.yml`, for manual
+   testing and for `ProtocolServersLifecycleIT`, which never runs in a default build (sections 2 and 3).
 
 ---
 
 ## Table of Contents
 
-1. [Quick Start](#quick-start)
-2. [Architecture Overview](#architecture-overview)
-3. [Server Configuration](#server-configuration)
-4. [Connection URLs](#connection-urls)
-5. [Running Integration Tests](#running-integration-tests)
-6. [Manual Testing](#manual-connection-testing)
-7. [Troubleshooting](#troubleshooting)
-8. [Test Progress](#test-progress)
+1. [Testcontainers fixtures](#1-testcontainers-fixtures)
+2. [Standalone compose stack](#2-standalone-compose-stack)
+3. [ProtocolServersLifecycleIT](#3-protocolserverslifecycleit)
+4. [Manual connection testing](#4-manual-connection-testing)
+5. [Troubleshooting](#5-troubleshooting)
 
 ---
 
-## Quick Start
+## 1. Testcontainers fixtures
 
-### 1. Start Protocol Servers (30 seconds)
+`SharedTestContainers` (`quorus-core/src/test/java/dev/mars/quorus/protocol/SharedTestContainers.java`)
+is a lazy singleton. Each container starts the first time a test asks for it, is shared by every test
+class in the JVM, and is stopped by a JVM shutdown hook. Tests call
+`assumeTrue(SharedTestContainers.isDockerAvailable())` first, so they are skipped, not failed, when
+Docker is unavailable. No test class declares a `static @Container` field for these servers.
 
-```powershell
-cd docker\compose
-docker-compose -f docker-compose-protocol-servers.yml up -d
-```
+| Server | Compose file | Image | Credentials | Host ports |
+|---|---|---|---|---|
+| FTP | `docker-compose-ftp-test.yml` | Built from `ftp-docker/Dockerfile`: `delfer/alpine-ftp-server` (vsftpd) with a writable chroot and vsftpd in the foreground | `anonymous` / `anonymous@example.com` (the adapter's credential-free development fallback) | Control and one passive data port, chosen per run |
+| FTPS | `docker-compose-ftps-test.yml` | Built from `ftps-docker/Dockerfile` (`withBuild(true)`): `delfer/alpine-ftp-server` plus OpenSSL; `ftps-entrypoint.sh` generates a self-signed certificate at start. Explicit FTPS (`AUTH TLS`), TLS optional, `require_ssl_reuse=NO` | `testuser` / `testpass` | Control and one passive data port, chosen per run |
+| SFTP | `docker-compose-sftp-abort-test.yml` | `atmoz/sftp:alpine`, user directory `upload` | `testuser` / `testpass` | Dynamic, through the Testcontainers proxy |
 
-### 2. Verify Servers Running
+- **FTP and FTPS use direct port mappings, not the Testcontainers proxy.** vsftpd rejects a passive
+  data connection from a different source address than the control connection, and the proxy
+  changes it. `SharedTestContainers` reserves two free host ports, passes them to compose as
+  `FTP_CONTROL_PORT`/`FTP_DATA_PORT` (or the `FTPS_` equivalents) and advertises `127.0.0.1` in the
+  passive reply. Without those variables the files default to 2100/21100 (FTP) and 2121/30000 (FTPS)
+  for manual use.
+- **Readiness:** FTP and FTPS are ready after three consecutive `220` greetings on the control port,
+  not when Docker reports the container healthy. SFTP is ready when port 22 listens.
+- **SMB:** there is no SMB fixture. No default-lane test starts an SMB server.
 
-```powershell
-docker-compose -f docker-compose-protocol-servers.yml ps
-```
+Tests that use the fixtures:
 
-**Expected output:**
-```
-NAME                  IMAGE                     STATUS
-quorus-ftp-test       stilliard/pure-ftpd      Up (healthy)
-quorus-sftp-test      atmoz/sftp               Up (healthy)
-quorus-smb-test       dperson/samba            Up (healthy)
-```
+| Test | Servers |
+|---|---|
+| `FtpUploadIntegrationTest` | FTP |
+| `FtpsUploadIntegrationTest` | FTPS |
+| `SftpUploadIntegrationTest` | SFTP |
+| `AdapterProgressAndStopTest` | FTP and SFTP |
 
-### 3. Run Connectivity Tests
+Run one of them:
 
-```powershell
-cd quorus-core
-mvn test -Dtest=ProtocolServersLifecycleIT
-```
-
-### 4. Stop Servers (when done)
-
-```powershell
-cd docker\compose
-docker-compose -f docker-compose-protocol-servers.yml down -v
-```
-
-### Quick Reference
-
-| Protocol | Host Port | Credentials | Test Directory |
-|----------|-----------|-------------|----------------|
-| FTP      | 21        | testuser/testpass | `/` |
-| SFTP     | 2222      | testuser/testpass | `/upload` |
-| SMB      | 4445      | testuser/testpass | `testshare` |
-
----
-
-## Architecture Overview
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                          HOST MACHINE                                │
-│  ┌──────────────────────────────────────────────────────────────┐   │
-│  │     JUnit Integration Tests (ProtocolServersLifecycleIT)      │   │
-│  │        Uses: Apache Commons Net, JSch, jCIFS-ng              │   │
-│  └─────────────────────┬────────────────────────────────────────┘   │
-│                        │ (connects via localhost + mapped ports)     │
-├────────────────────────┼────────────────────────────────────────────┤
-│                        ▼                                             │
-│  ┌─────────────────────────────────────────────────────────────┐    │
-│  │               DOCKER NETWORK (protocol-test)                 │    │
-│  │   ┌─────────────┐  ┌────────────┐  ┌──────────────────┐     │    │
-│  │   │   FTP       │  │   SFTP     │  │       SMB        │     │    │
-│  │   │ pure-ftpd   │  │ atmoz/sftp │  │  dperson/samba   │     │    │
-│  │   │ Port 21     │  │ Port 22    │  │  Port 445        │     │    │
-│  │   │ PASV 30000+ │  │            │  │                  │     │    │
-│  │   └─────────────┘  └────────────┘  └──────────────────┘     │    │
-│  │        │                 │                   │               │    │
-│  │   [ftp-data]        [sftp-data]         [smb-data]          │    │
-│  └──────────────────────────────────────────────────────────────┘    │
-│                                                                       │
-│  Port Mappings (Host → Container):                                   │
-│    21    → 21       (FTP control)                                    │
-│    2222  → 22       (SFTP - avoids SSH conflict)                     │
-│    4445  → 445      (SMB - avoids Windows SMB conflict)              │
-│    30000-30009      (FTP passive data ports)                         │
-└─────────────────────────────────────────────────────────────────────┘
-```
-
-### Why Real Servers?
-
-| Benefit | Description |
-|---------|-------------|
-| **Realistic Testing** | Actual FTP/SFTP/SMB protocol implementations |
-| **No Mocks** | Catches real protocol edge cases and timing issues |
-| **Dual Access** | Host tests (Maven) + container tests (Docker agents) |
-| **Persistent Data** | Named volumes survive container restarts |
-
----
-
-## Server Configuration
-
-### Docker Compose File
-
-**Location:** `docker/compose/docker-compose-protocol-servers.yml`
-
-### FTP Server (Pure-FTPd)
-
-```yaml
-ftp:
-  image: stilliard/pure-ftpd:latest
-  container_name: quorus-ftp-test
-  ports:
-    - "21:21"
-    - "30000-30009:30000-30009"  # Passive mode
-  environment:
-    PUBLICHOST: "localhost"
-    FTP_USER_NAME: testuser
-    FTP_USER_PASS: testpass
-```
-
-**Key configuration:** Passive mode is required for Docker networking.
-
-### SFTP Server (OpenSSH)
-
-```yaml
-sftp:
-  image: atmoz/sftp:alpine
-  container_name: quorus-sftp-test
-  ports:
-    - "2222:22"
-  command: testuser:testpass:1001:100:upload
-```
-
-**Key configuration:** User home is `/home/testuser/upload`.
-
-### SMB Server (Samba)
-
-```yaml
-smb:
-  image: dperson/samba:latest
-  container_name: quorus-smb-test
-  ports:
-    - "4445:445"  # Non-standard port to avoid Windows conflict
-  environment:
-    USER: "testuser;testpass"
-    SHARE: "testshare;/share;yes;no;no;testuser;testuser;testuser"
-```
-
-**Key configuration:** Port 4445 avoids conflict with Windows built-in SMB.
-
----
-
-## Connection URLs
-
-### From Host Machine (Maven tests, manual testing)
-
-```
-ftp://testuser:testpass@localhost:21/path/to/file.txt
-sftp://testuser:testpass@localhost:2222/upload/path/to/file.txt
-smb://testuser:testpass@localhost:4445/testshare/path/to/file.txt
-```
-
-### From Docker Containers (Quorus agents)
-
-```
-ftp://testuser:testpass@ftp:21/path/to/file.txt
-sftp://testuser:testpass@sftp:22/upload/path/to/file.txt
-smb://testuser:testpass@smb:445/testshare/path/to/file.txt
-```
-
-> **Note:** Inside Docker, use service names (`ftp`, `sftp`, `smb`) and internal ports.
-
-### Java Test Code Examples
-
-```java
-// FTP (Apache Commons Net)
-FTPClient ftp = new FTPClient();
-ftp.connect("localhost", 21);
-ftp.login("testuser", "testpass");
-ftp.enterLocalPassiveMode();  // Required for Docker
-
-// SFTP (JSch)
-JSch jsch = new JSch();
-Session session = jsch.getSession("testuser", "localhost", 2222);
-session.setPassword("testpass");
-session.setConfig("StrictHostKeyChecking", "no");
-session.connect();
-
-// SMB (jCIFS-ng)
-String smbUrl = "smb://localhost:4445/testshare/";
-CIFSContext ctx = new BaseContext(new PropertyConfiguration(props))
-    .withCredentials(new NtlmPasswordAuthenticator(null, "testuser", "testpass"));
-SmbFile share = new SmbFile(smbUrl, ctx);
+```bash
+mvn test -pl quorus-core -Dtest=FtpsUploadIntegrationTest
 ```
 
 ---
 
-## Running Integration Tests
+## 2. Standalone compose stack
 
-### Prerequisites
+`docker/compose/docker-compose-protocol-servers.yml` defines three long-running servers on the network
+`quorus-protocol-test`, with named volumes `quorus-ftp-test-data`, `quorus-sftp-test-data` and
+`quorus-smb-test-data`.
 
-1. Docker Desktop running
-2. Maven dependencies resolved: `mvn dependency:resolve -pl quorus-core`
-3. Protocol servers started (see Quick Start)
+| Service | Container | Image | Host port | Credentials | Path |
+|---|---|---|---|---|---|
+| `ftp` | `quorus-ftp-test` | `delfer/alpine-ftp-server` | `127.0.0.1:21`; passive `30000-30009` | `testuser` / `testpass` (`USERS: "testuser\|testpass"`) | `/` (home `/home/testuser`) |
+| `sftp` | `quorus-sftp-test` | `atmoz/sftp:alpine` | `127.0.0.1:2222` | `testuser` / `testpass` | `/upload` |
+| `smb` | `quorus-smb-test` | `ghcr.io/servercontainers/samba:latest` | `127.0.0.1:4445` | `testuser` / `testpass` | share `testshare` (`/share`) |
 
-### Run Connectivity Validation
+The control ports are bound to `127.0.0.1`. The FTP passive range `30000-30009` has no address in the
+mapping, so Docker publishes it on all host interfaces. SMB uses host port 4445 so that it does not
+collide with the Windows SMB service on 445.
 
-```powershell
-cd quorus-core
-mvn test -Dtest=ProtocolServersLifecycleIT
+Start, check and stop:
+
+```bash
+cd docker/compose
+docker compose -f docker-compose-protocol-servers.yml up -d
+docker compose -f docker-compose-protocol-servers.yml ps
+docker compose -f docker-compose-protocol-servers.yml down -v
 ```
 
-**Expected result:** 5 tests pass in ~10 seconds.
+`down -v` also deletes the named volumes.
 
-### Test Class Details
+### Addresses
 
-**File:** `quorus-core/src/test/java/dev/mars/quorus/protocol/integration/ProtocolServersLifecycleIT.java`
+| Protocol | From the host | From a container on `quorus-protocol-test` |
+|---|---|---|
+| FTP | `localhost:21` | `ftp:21` (alias `ftp-server`) |
+| SFTP | `localhost:2222` | `sftp:22` (alias `sftp-server`) |
+| SMB | `localhost:4445` | `smb:445` (alias `smb-server`) |
 
-| Test | Description |
-|------|-------------|
-| `testFtpServerReachable` | Verify FTP host configured |
-| `testFtpConnection` | Full FTP lifecycle: connect → auth → PASV → list |
-| `testSftpConnection` | Full SFTP lifecycle: SSH session → SFTP channel → directory ops |
-| `testSmbConnection` | Full SMB lifecycle: NTLM auth → share access → enumeration |
-| `testAllServersOperational` | Summary validation |
+Quorus transfer requests must not carry credentials in the URI: the controller rejects
+credential-bearing source URIs (`CredentialBearingUriDetector`). Use `ftp://localhost:21/path` and
+supply credentials through the agent's runtime configuration. The `user:password@host` form is only for
+the manual clients in section 4.
 
-### Client Libraries Used
+---
 
-| Protocol | Library | Maven Artifact |
-|----------|---------|----------------|
+## 3. ProtocolServersLifecycleIT
+
+`quorus-core/src/test/java/dev/mars/quorus/protocol/integration/ProtocolServersLifecycleIT.java` checks
+that the standalone stack is reachable with the same client libraries the adapters use.
+
+**It never runs in a default build.** Surefire's default includes do not match `*IT`, and no module
+configures Failsafe (open decision DR-Q4 in the
+[register](../task/QUORUS_OUTSTANDING_WORK_REGISTER.md)). Run it by name:
+
+```bash
+mvn test -pl quorus-core -Dtest=ProtocolServersLifecycleIT
+```
+
+The class manages its own stack:
+
+- `@BeforeAll` runs `docker-compose -f docker-compose-protocol-servers.yml up -d` in `docker/compose`
+  and waits up to 30 seconds each for TCP ports 21, 2222 and 4445. It calls the standalone
+  `docker-compose` command, so that command must be on the `PATH`; the `docker compose` plugin alone is
+  not enough.
+- `@AfterAll` runs `docker-compose -f docker-compose-protocol-servers.yml down -v`, which also removes
+  a stack you started by hand, and its volumes.
+
+| Test | Checks |
+|---|---|
+| `testFtpServerReachable` | The FTP host is configured |
+| `testFtpConnection` | Connect, log in, passive mode, list |
+| `testSftpConnection` | SSH session, SFTP channel, directory operations |
+| `testSmbConnection` | NTLM authentication, share access, directory operations |
+| `testAllServersOperational` | Summary |
+
+| Protocol | Client library | Maven artifact |
+|---|---|---|
 | FTP | Apache Commons Net | `commons-net:commons-net` |
 | SFTP | JSch (mwiede fork) | `com.github.mwiede:jsch` |
 | SMB | jCIFS-ng | `eu.agno3.jcifs:jcifs-ng` |
 
 ---
 
-## Manual Connection Testing
+## 4. Manual connection testing
 
-### FTP Server
+With the standalone stack running:
 
-**FileZilla:**
-- Protocol: FTP
-- Host: localhost
-- Port: 21
-- User: testuser
-- Password: testpass
-- Transfer Mode: Passive
+```bash
+# FTP: list the home directory (passive mode)
+curl --list-only ftp://testuser:testpass@localhost:21/
 
-**PowerShell:**
-```powershell
-curl ftp://testuser:testpass@localhost:21/ --list-only
-```
-
-### SFTP Server
-
-**WinSCP:**
-- Protocol: SFTP
-- Host: localhost
-- Port: 2222
-- User: testuser
-- Password: testpass
-
-**PowerShell (requires OpenSSH):**
-```powershell
+# SFTP (OpenSSH client)
 sftp -P 2222 testuser@localhost
 ```
 
-### SMB Server
-
-**Windows Explorer:**
-- Cannot use `\\localhost\testshare` (port 4445 not supported in UNC)
-- Use programmatic access only
-
-**PowerShell (mount as drive):**
-```powershell
-# Note: Windows net use doesn't support custom ports
-# Use Java/jCIFS-ng for testing on port 4445
-```
+SMB on port 4445 cannot be reached through Windows Explorer or `net use`, which support only port 445.
+Use jCIFS-ng (as `ProtocolServersLifecycleIT` does) or `smbclient` with `-p 4445`.
 
 ---
 
-## Troubleshooting
+## 5. Troubleshooting
 
-### Common Issues
+| Symptom | Cause and fix |
+|---|---|
+| `Cannot connect to the Docker daemon` | Start Docker. The core fixture tests are skipped without Docker; the IT fails |
+| `port is already allocated` on 21, 2222 or 4445 | Another process or stack holds the port. Find it with `netstat -ano` (Windows) or `ss -ltnp` (Linux) |
+| FTP listing times out (standalone stack) | The passive ports `30000-30009` are blocked. Check `docker port quorus-ftp-test` |
+| `425 Security: Bad IP connecting` | A passive data connection arrived from a different address than the control connection, for example through a proxy. The fixtures avoid this with direct port mappings |
+| The IT fails in `@BeforeAll` because `docker-compose` cannot be started | Install the standalone `docker-compose` command; the IT always calls it, even when the stack is already running |
+| SMB access denied | Log in as `testuser`, not `WORKGROUP\testuser` |
 
-#### Docker Desktop Not Running
+Container logs:
 
-**Error:** `Cannot connect to the Docker daemon`
-
-**Fix:** Start Docker Desktop.
-
-#### Port Already in Use
-
-**Error:** `Bind for 0.0.0.0:21 failed: port is already allocated`
-
-**Fix:**
-```powershell
-netstat -ano | findstr :21
-# Kill conflicting process or change port in compose file
-```
-
-### FTP Issues
-
-#### Connection Timeout on Directory Listing
-
-**Cause:** Passive mode ports blocked.
-
-**Fix:** Ensure ports 30000-30009 are accessible. Check Docker port mappings:
-```powershell
-docker port quorus-ftp-test
-```
-
-#### "425 Can't open data connection"
-
-**Cause:** `PUBLICHOST` environment variable incorrect.
-
-**Fix:** For host access, ensure `PUBLICHOST: "localhost"` in compose file.
-
-### SFTP Issues
-
-#### Permission Denied
-
-**Cause:** User doesn't have write permissions.
-
-**Fix:** Check container logs:
-```powershell
-docker logs quorus-sftp-test
-```
-
-### SMB Issues
-
-#### Network Path Not Found
-
-**Cause:** Port 4445 not standard, Windows Explorer won't connect.
-
-**Fix:** Use programmatic access with jCIFS-ng. Standard Windows UNC paths don't support custom ports.
-
-#### Access Denied
-
-**Cause:** Credential format incorrect.
-
-**Fix:** Use username `testuser` (not `WORKGROUP\testuser`).
-
-### Container Won't Start
-
-**Fix:**
-```powershell
-# Check logs
+```bash
 docker logs quorus-ftp-test
 docker logs quorus-sftp-test
 docker logs quorus-smb-test
-
-# Remove and recreate
-docker-compose -f docker-compose-protocol-servers.yml down -v
-docker-compose -f docker-compose-protocol-servers.yml up -d
+docker compose -f docker/compose/docker-compose-protocol-servers.yml logs -f
 ```
-
-### View Real-Time Logs
-
-```powershell
-docker-compose -f docker-compose-protocol-servers.yml logs -f
-```
-
----
-
-## Test Progress
-
-### Phase Summary
-
-| Phase | Description | Status |
-|-------|-------------|--------|
-| Phase 0 | Prerequisites & Setup | ✅ Complete |
-| Phase 1 | Connectivity Validation | ✅ Complete |
-| Phase 2 | Test File Upload Utilities | 🔜 Next |
-| Phase 3 | First SFTP Integration Test | ⏳ Pending |
-| Phase 4 | Extend to FTP and SMB | ⏳ Pending |
-
-### Phase 1 Results
-
-**Completion Date:** 2026-01-20  
-**Result:** 5/5 tests passed ✅
-
-| Test | Result | Details |
-|------|--------|---------|
-| FTP Reachable | ✅ | Host validation successful |
-| FTP Connection | ✅ | Connect, auth, PASV, list all passed |
-| SFTP Connection | ✅ | SSH session, SFTP channel, directory ops passed |
-| SMB Connection | ✅ | NTLM auth, share access, enumeration passed |
-| All Operational | ✅ | Infrastructure validated |
-
-### Validated Capabilities
-
-- ✅ Apache Commons Net FTPClient working
-- ✅ JSch Session and ChannelSftp working
-- ✅ jCIFS-ng SmbFile with NtlmPasswordAuthenticator working
-- ✅ FTP passive mode configured (required for Docker)
-- ✅ SFTP host key verification disabled (test environment)
-- ✅ SMB 2.02-3.11 protocol negotiation successful
-- ✅ Docker Compose stack stable
-- ✅ All port mappings working (21, 2222, 4445)

@@ -13,7 +13,7 @@ Quorus is a Java 27 file transfer platform with two practical execution modes:
 - direct execution with `quorus-core` and `quorus-workflow`
 - distributed execution with `quorus-controller` and `quorus-agent`
 
-Only `quorus-controller` still uses Vert.x 5, while it migrates to plain Java under ADR-0012. The other modules use blocking APIs and virtual threads and have no Vert.x dependency.
+Of the modules in the default build, only `quorus-controller` still uses Vert.x 5, while it migrates to plain Java under ADR-0012. The others use blocking APIs and virtual threads and have no Vert.x dependency.
 
 The current implementation centers on a controller-first architecture with embedded HTTP, Raft-backed replicated state, blocking transfer execution on the calling thread (virtual threads in the agent), and YAML workflow parsing and execution.
 
@@ -48,8 +48,9 @@ controller from `GET /api/v1/openapi.yaml`.
 ## Important Implementation Boundaries
 
 - The repository build targets Java 27 (`maven.compiler.release`).
-- The active controller runtime is the embedded Vert.x HTTP server in `quorus-controller`, not the deprecated `quorus-api` Quarkus path.
+- The active controller runtime is the embedded Vert.x HTTP server in `quorus-controller`; the former `quorus-api` Quarkus module has been removed.
 - Route CRUD and route lifecycle endpoints are implemented, but controller startup does not currently show an autonomous route trigger evaluator being wired in.
+- The controller runs no assignment scheduler. A submitted transfer is assigned to an agent only through `POST /api/v1/assignments`.
 - Adapter-level resume support should be treated as not implemented in the current protocol adapters.
 - The workflow parser supports a narrower YAML vocabulary than older documentation claimed.
 
@@ -63,6 +64,7 @@ controller from `GET /api/v1/openapi.yaml`.
 | `quorus-agent` | Agent registration, heartbeat, job polling, execution reporting |
 | `quorus-tenant` | Tenant and quota related services |
 | `quorus-integration-examples` | Runnable examples for transfers, workflows, tenants, and agent models |
+| `quorus-benchmarks` | Benchmark harness, built only with `-Pbenchmarks` (see [the benchmark specification](docs-design/performance/QUORUS_PERFORMANCE_BENCHMARKS.md)); its Raft benchmark drives the controller's engine and so uses Vert.x |
 
 ## Build
 
@@ -111,12 +113,6 @@ sh docker/build-runtime.sh
 docker compose -f docker/compose/docker-compose-single-controller.yml up -d --build
 ```
 
-For a multi-node setup:
-
-```powershell
-docker compose -f docker/compose/docker-compose-controller-first.yml up -d --build
-```
-
 Then verify:
 
 ```powershell
@@ -125,6 +121,22 @@ curl http://localhost:8080/health/ready
 curl http://localhost:8080/raft/status
 curl http://localhost:8080/api/v1/info
 curl http://localhost:8080/metrics
+```
+
+For a multi-node setup:
+
+```powershell
+docker compose -f docker/compose/docker-compose-controller-first.yml up -d --build
+```
+
+In that topology port 8080 is an nginx load balancer, which passes each request to one controller. Check every controller directly on ports 8081 to 8083:
+
+```powershell
+8081..8083 | ForEach-Object { curl "http://localhost:$_/health/ready"; curl "http://localhost:$_/raft/status" }
+```
+
+```bash
+for port in 8081 8082 8083; do curl "http://localhost:$port/health/ready"; curl "http://localhost:$port/raft/status"; done
 ```
 
 ### Local mutual-TLS example
@@ -200,8 +212,7 @@ The architecture and REST API specifications are normative. The HTTP API referen
 - [docs/QUORUS_WORKFLOWS_README.md](docs/QUORUS_WORKFLOWS_README.md)
 - [docs/QUORUS_YAML_SYNTAX_GUIDE.md](docs/QUORUS_YAML_SYNTAX_GUIDE.md)
 - [docs/QUORUS_INTEGRATION_EXAMPLES_README.md](docs/QUORUS_INTEGRATION_EXAMPLES_README.md)
-- [docs/QUORUS_CLUSTER_STARTUP_GUIDE.md](docs/QUORUS_CLUSTER_STARTUP_GUIDE.md)
-- [docs/QUORUS-DOCKER-TESTING-README.md](docs/QUORUS-DOCKER-TESTING-README.md)
+- [Docker guide](docker/README.md): every Compose topology, building images, verification and helper scripts
 - [Target-state system design (non-normative)](docs-design/design/QUORUS_SYSTEM_DESIGN.md)
 - [Design and engineering document status](docs-design/README.md)
 

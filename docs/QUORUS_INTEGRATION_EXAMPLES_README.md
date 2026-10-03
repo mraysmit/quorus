@@ -2,8 +2,8 @@
 
 # Quorus Integration Examples
 
-**Version:** 2.2  
-**Date:** 2026-09-28  
+**Version:** 2.3  
+**Date:** 2026-10-03  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Scope:** Current direct-execution and model examples
@@ -50,13 +50,30 @@ The examples demonstrate APIs and parser behavior. They are not secure productio
 
 ## Running an Example
 
-Examples are executed with Maven and the `exec-maven-plugin`.
+Examples are executed with Maven and the `exec-maven-plugin`. With `-pl` alone, Maven takes `quorus-core`, `quorus-workflow` and `quorus-tenant` from the local repository, so install the reactor once first, and again after changing those modules:
 
 ```bash
+mvn clean install -DskipTests
 mvn compile exec:java -pl quorus-integration-examples -Dexec.mainClass="dev.mars.quorus.examples.BasicTransferExample"
 ```
 
-Replace the class name with any of the example entry points listed above.
+Replace the class name with any of the example entry points listed above. Without `-Dexec.mainClass`, the plugin runs its configured default, `SftpFtpRealImplementationDemo`.
+
+### Validating workflow files
+
+`WorkflowValidationCLI` runs schema validation (the rules in the [YAML Syntax Guide](QUORUS_YAML_SYNTAX_GUIDE.md#validation-requirements)) on files or a directory:
+
+```bash
+mvn compile exec:java -pl quorus-integration-examples \
+  -Dexec.mainClass="dev.mars.quorus.examples.WorkflowValidationCLI" \
+  -Dexec.args="--validate-directory quorus-integration-examples/src/main/resources/workflows --strict"
+```
+
+It accepts file paths and the options `--validate-directory <dir>`, `--strict` (warnings fail), `--quiet`, `--verbose`, `--schema-only`, `--help` and `--version`. `exec:java` runs inside the Maven process, so relative paths resolve against the directory you run Maven from.
+
+## Tests
+
+`CrossModuleIntegrationTest` exercises the transfer engine, workflow engine and tenant service together, and `ExamplesAreVertxFreeTest` keeps Vert.x out of the module. Both run in the default build. The module does not apply the parent's coverage gate.
 
 ## Java Baseline
 

@@ -2,8 +2,8 @@
 
 # Quorus Architecture Specification
 
-**Version:** 2.12
-**Date:** 2026-09-28
+**Version:** 2.13  
+**Date:** 2026-10-03  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Status:** Canonical and normative  
@@ -27,7 +27,7 @@ The terms **MUST**, **MUST NOT**, **SHOULD**, **SHOULD NOT**, and **MAY** descri
 
 ## 2. Product Boundary
 
-Quorus is a Java 27 file-transfer platform. It is moving off Vert.x 5 module by module ([ADR-0012](../docs-design/architecture-decisions/ADR-0012-JAVA-RUNTIME-AND-STRUCTURED-CONCURRENCY.md)): `quorus-core`, `quorus-workflow`, `quorus-tenant`, `quorus-agent` and `quorus-integration-examples` no longer use Vert.x, and only `quorus-controller` still does, until plan item RT-06 moves it. It has two execution modes:
+Quorus is a Java 27 file-transfer platform. It is moving off Vert.x 5 module by module ([ADR-0012](../docs-design/architecture-decisions/ADR-0012-JAVA-RUNTIME-AND-STRUCTURED-CONCURRENCY.md)): `quorus-core`, `quorus-workflow`, `quorus-tenant`, `quorus-agent` and `quorus-integration-examples` no longer use Vert.x, and only `quorus-controller` still does, until plan item RT-06 moves it. (The profile-only `quorus-benchmarks` module also uses Vert.x to drive the controller's Raft engine.) It has two execution modes:
 
 1. **Direct execution:** an application invokes `quorus-core` or `quorus-workflow` in-process.
 2. **Distributed execution:** controller nodes coordinate work through Raft-replicated metadata and agents execute transfers.
@@ -74,7 +74,7 @@ The status values in this table are normative:
 | Agent registration, heartbeat, polling, and reporting | Implemented | Agent control clients support certificate-authenticated HTTPS with hostname verification; enrollment and rotation lifecycle remains incomplete |
 | Transfer, assignment, and route CRUD | Implemented | CRUD does not imply autonomous route execution |
 | Transfer-process metrics | Partial | Aggregate metrics plus a tenant-checked per-transfer progress view now expose byte progress, real last-progress time, missing/stale telemetry, configured policy windows, active attempt, ownership, and deadline condition; continuous samples, calibrated prediction, and timelines remain incomplete |
-| Per-transfer operational telemetry and alerting | Partial | Submission persists operational ownership and deadline context; progress is governed and the first ordered submission event is queryable; the remaining lifecycle vocabulary, active stall boundary, queries, streaming, alert lifecycle, retention, and service reporting remain required |
+| Per-transfer operational telemetry and alerting | Partial | Submission persists operational ownership and deadline context; progress is governed; five ordered lifecycle events (submitted, assigned, accepted, started, progress) are queryable per transfer (§12.3); the progress resource reports the active stall boundary (§12.4). The remaining lifecycle vocabulary, durable stall detection, streaming, alert lifecycle, retention, and service reporting remain required |
 | Enterprise service connectivity controls | Implemented for production transfer submission | Tenant aliases, opaque Vault references, controller/agent default-deny enforcement, peer verification, and protocol-specific controls are active; later route/workflow activation must adopt the same authority |
 | Secure agent provisioning and deployment lifecycle | Planned | Unique identity enrollment, image signing, attestation, rotation, revocation, and controlled upgrade are required |
 | Authenticated tenant derivation and tenant checks | Partial | HTTP transfer, agent, assignment, and route access is constrained by the verified identity, and replicated mutations enforce reference and tenant invariants; tenant hierarchy, quotas, usage, and inherited policy remain incomplete |
@@ -140,6 +140,7 @@ Agents are operationally replaceable but are not entirely stateless while a tran
 | `quorus-controller` | HTTP control plane, consensus, durable metadata and assignment coordination |
 | `quorus-agent` | Controller communication and data-plane execution |
 | `quorus-integration-examples` | Demonstrations only; not a production runtime dependency |
+| `quorus-benchmarks` | Benchmark harness for the §13 publication rules, built only with `-Pbenchmarks`; not a runtime dependency |
 
 ## 5. Authoritative State and Consistency
 
@@ -176,7 +177,7 @@ Every replicated command MUST be deterministic and MUST enforce invariants at st
 - duplicate create requests MUST either be idempotent or return a deterministic conflict;
 - timestamps used for correctness MUST be supplied in the command rather than generated independently by each follower.
 
-### 5.4 Read consistency
+#### Registry keys and state schema version
 
 Service connections, opaque secret references and security events use registry key schema 2:
 `phase4.v2.<kind>.<tenant>:<resource>`. The separator is forbidden in both validated
@@ -198,6 +199,8 @@ required; mixed-version operation and binary-only rollback after new writes are 
 supported. Preserve all controller WALs and snapshots before upgrading; see the
 [Security Deployment Guide](QUORUS_SECURITY_DEPLOYMENT_GUIDE.md#11-registry-isolation-upgrade-and-recovery).
 
+### 5.4 Read consistency
+
 Committed Raft writes are strongly ordered. This does not make every HTTP read linearizable.
 
 - A read served from a follower is a **stale-tolerant read** and may lag the leader.
@@ -214,7 +217,7 @@ Committed Raft writes are strongly ordered. This does not make every HTTP read l
 - WAL prefix deletion MUST follow durable publication of a covering snapshot. Recovery MUST reject a missing or invalid snapshot when durable compaction evidence requires it. Snapshot installation MUST preserve only a matching log suffix, including after restart. The Quorus R1 sidecar implements snapshot coordination. RaftLog 1.2.0 from commit `1c5af80` now supplies verified prefix compaction; all 41 selected Quorus storage/snapshot/restart tests passed against it. Release remains subject to the reopened enterprise remediation checkpoint and deployment-specific durability validation, including actual power-loss behavior.
 - Backups MUST be validated by restore tests; copying a live directory without a storage-specific consistency procedure is not sufficient.
 
-The verified append semantics, snapshot ownership, and verified dependency are recorded in [External RaftLog Integration Contract, Appendix F.5](../docs-design/design/QUORUS_RAFT_WAL_DESIGN.md#f5-independently-verified-contract-and-dependency-requirements--2026-09-05). Quorus must not rely on automatic index deduplication during replay or treat a successful no-op as prefix compaction.
+The verified append semantics, snapshot ownership, and verified dependency are recorded in [Raft Storage Reference, RaftLog Integration Contract](../docs-design/reference/QUORUS_RAFT_STORAGE_REFERENCE.md#5-raftlog-integration-contract). Quorus must not rely on automatic index deduplication during replay or treat a successful no-op as prefix compaction.
 
 ### 5.6 Membership
 
@@ -291,18 +294,18 @@ Where atomic publication or fencing is unavailable, the adapter MUST declare wea
 
 ## 7. Canonical Data Plane
 
+The current distributed data plane is single-agent execution:
+
+1. A client or internal service creates a transfer job. The leader commits the job through Raft.
+2. A caller assigns the job to an agent with `POST /api/v1/assignments`, which the leader also commits through Raft. The controller runs no scheduler: it does not select an agent, assign a submitted job by itself, or time out an assignment (register item `ENG-01`, with `P2-01`).
+3. The assigned agent polls `GET /api/v1/agents/:agentId/jobs`.
+4. The agent accepts the assignment and executes source-to-destination transfer through its local protocol adapters.
+5. The agent reports status through the controller API.
+
 The current agent performs bounded status replay (three sends) for transient failures.
 If acknowledgement remains unresolved, it logs `Q-REPORT-UNRESOLVED` and does not start
 file I/O. Automatic durable report-outbox recovery and destination reconciliation
 remain Phase 2 work; operators must not equate a reporting timeout with a failed transfer.
-
-The current distributed data plane is single-agent execution:
-
-1. A client or internal service creates a transfer job.
-2. The leader commits the job and assignment through Raft.
-3. The assigned agent polls `GET /api/v1/agents/:agentId/jobs`.
-4. The agent accepts the assignment and executes source-to-destination transfer through its local protocol adapters.
-5. The agent reports status through the controller API.
 
 Controllers MUST NOT proxy file bytes. The active protocol does not include controller-initiated `/configure-monitor`, `/validate-location`, or `/initiate-transfer` calls to agents, and it does not include source-agent-to-destination-agent streaming.
 
@@ -423,7 +426,7 @@ Agents SHOULD use outbound-initiated connections to controllers and enterprise s
 
 Default-deny egress is the production baseline. A transfer to an unapproved endpoint, port, path, protocol, or network zone MUST fail before any service credential is retrieved or connection is opened. Denials MUST produce a security audit event without disclosing secret material.
 
-**Current Phase 4 boundary:** governed transfers are authorized twice: first by the controller and again by the executing agent against the committed policy version and digest. Agent selection and execution require the configured pool and network zone; local upload and download paths are confined to deployment-configured roots after canonical and symbolic-link checks. HTTPS, FTPS, and SFTP sockets connect to an agent-approved resolved address rather than re-resolving the service name; TLS retains the original hostname for SNI and hostname verification, and SFTP retains it for host-key verification. The optional validation route probe opens a bounded TCP connection to an approved address but deliberately does not retrieve a secret or claim service authentication. Submission records authorization; last-use evidence is recorded only after the agent has repeated policy checks and resolved secret authority. Time-expired secret references are durably transitioned to `EXPIRED` and audited before transfer denial.
+**Current Phase 4 boundary:** governed transfers are authorized twice: first by the controller and again by the executing agent against the committed policy version and digest. Submission requires an agent pool that the connection allows, and the executing agent checks its own pool and network zone against the committed policy before connecting. The controller does not select agents, and administrative assignment does not check pool or zone (`ENG-01`); local upload and download paths are confined to deployment-configured roots after canonical and symbolic-link checks. HTTPS, FTPS, and SFTP sockets connect to an agent-approved resolved address rather than re-resolving the service name; TLS retains the original hostname for SNI and hostname verification, and SFTP retains it for host-key verification. The optional validation route probe opens a bounded TCP connection to an approved address but deliberately does not retrieve a secret or claim service authentication. Submission records authorization; last-use evidence is recorded only after the agent has repeated policy checks and resolved secret authority. Time-expired secret references are durably transitioned to `EXPIRED` and audited before transfer denial.
 
 ### 10.4 Protocol security requirements
 
@@ -620,7 +623,7 @@ Every production transfer MUST have enough context for an operator to understand
 
 Secrets, credentials, access tokens, private keys, and secret-bearing URIs MUST NOT appear in this context.
 
-Business service, deadline, ownership, and escalation metadata are not complete in the current job model. They are production requirements, not current capability claims.
+The current job model carries business service, owner, criticality, environment, processing date, expected start, required completion time, runbook URL and labels, captured at submission (`TransferOperationalContext`). Escalation policy is not yet modelled, and the remaining identifiers above are not all present on every record; those parts are production requirements, not current capability claims.
 
 ### 12.3 Canonical transfer event timeline
 
@@ -736,12 +739,12 @@ Infrastructure telemetry MUST correlate to affected transfers where possible. Me
 
 ## 13. Release SLOs and Verification Gates
 
-These are acceptance gates, not claims about the current alpha. A gate must have a repeatable automated test and retained result before it can be marked achieved.
+These are acceptance gates, not claims about the current alpha. A gate must have a repeatable automated test, with its result recorded in the commit message of the slice that achieved it (plan §6.1), before it can be marked achieved.
 
 | Area | Required measurable gate | Current status |
 |---|---|---|
-| End-to-end lifecycle | 1,000 consecutive assigned test transfers reach exactly one valid terminal controller state | Not achieved; `IN_PROGRESS` gap |
-| Critical-transfer context | 100% of critical production transfer records include business service, owner, criticality, expected start, required completion time, and runbook | Not implemented in the current job model |
+| End-to-end lifecycle | 1,000 consecutive assigned test transfers reach exactly one valid terminal controller state | Not yet evidenced. The agent now reports `ACCEPTED` and `IN_PROGRESS` before completion; the 1,000-transfer run has not been performed |
+| Critical-transfer context | 100% of critical production transfer records include business service, owner, criticality, expected start, required completion time, and runbook | The fields exist in the job model and submission schema; enforcement that every critical record carries them has not been evidenced |
 | Lifecycle event completeness | 100% of committed assignment transitions emit one deduplicable, correlated operational event with job and attempt identity | Not yet evidenced |
 | Progress freshness | At least 99.9% of active critical transfers have a progress observation no older than `2 ×` their configured reporting interval | Not achieved end to end |
 | Stall detection | 100% of injected transfer stalls raise an operational event and alert within `stall threshold + one alert evaluation interval` | Not implemented |
@@ -760,7 +763,7 @@ These are acceptance gates, not claims about the current alpha. A gate must have
 | Agent artifact admission | 100% of production agents run an approved signed digest with verified provenance, SBOM, and vulnerability-policy result | Deployment-platform integration not implemented |
 | Secure readiness | 100% of agents missing mandatory identity, trust, policy, secret-manager, or audit-export controls remain ineligible for assignments | Not implemented |
 | Agent drain and upgrade | In 100 induced upgrades, draining agents accept zero new jobs and publish zero unauthorized partial final files | Not yet evidenced |
-| Revocation | 100% of revoked agents are rejected within the configured revocation propagation limit and cannot publish a newly fenced attempt | Not implemented |
+| Revocation | 100% of revoked agents are rejected within the configured revocation propagation limit and cannot publish a newly fenced attempt | Partial: runtime serial revocation takes effect at once on each controller that receives it, but is not propagated between controllers (decision `DR-Q2`), and on the Raft transport it is checked only for inbound calls (`SEC-10`) |
 | SFTP identity | Unknown and changed host keys fail in 100% of governed protocol tests | Achieved for governed production transfers with SHA-256 host-key pins; development-only direct URI compatibility remains explicitly outside the production authority |
 | Large HTTP transfer memory | Ten concurrent files larger than the agent heap complete with bounded streaming memory and no full-file buffering | The HTTP adapter streams downloads and uploads without buffering the payload (`RT-03b`, 2026-09-26); the ten-file measurement has not been run |
 | Static three-node formation | 100 consecutive clean starts elect exactly one leader and agree on membership | Test evidence required |
@@ -779,6 +782,7 @@ Capacity figures such as requests per second, heartbeats per second, concurrent 
 
 | ID | Status | Priority | Gap or delivered boundary | Release consequence |
 |---|---|---|---|---|
+| ARCH-01 | Closed | — | The agent reports `ACCEPTED` and `IN_PROGRESS` before its terminal report, and every attempt-aware report is applied atomically | No remaining consequence under this gap; the end-to-end lifecycle gate in §13 still needs its run |
 | ARCH-02 | Partial | Critical | Attempt leases, fencing, and atomic multi-entity lifecycle application exist, but automatic expiry/reassignment, destination enforcement, and reconciliation are incomplete | Blocks duplicate-safe automatic reassignment and publication |
 | ARCH-03 | Closed | — | HTTP requests have an mTLS or trusted-gateway identity boundary, tenant derivation, scope/role authorization, and hash-chained audit; production startup fails closed without trust material | No remaining consequence under this gap; fleet identity lifecycle remains ARCH-15 |
 | ARCH-11 | Partial | Critical | No complete per-transfer operational event, progress, deadline, stall, and alerting model | Blocks use for critical, highly time-sensitive production transfers |
@@ -831,7 +835,8 @@ The following decisions are effective with this specification:
 - [REST API specification](QUORUS_REST_API_SPECIFICATION.md) — complete normative control, operations, security, and administration contract
 - [Enterprise implementation plan](../docs-design/task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md) — phased delivery, verification, and exit gates
 - [OpenAPI contract](../quorus-controller/src/main/resources/openapi/quorus-controller-v1.yaml) — the current HTTP API, also served at `GET /api/v1/openapi.yaml`
-- [Cluster startup guide](QUORUS_CLUSTER_STARTUP_GUIDE.md) — supported startup and deployment guidance
-- [Codebase and documentation review, 2026-08-31](../docs-design/archive/QUORUS_CODEBASE_AND_DOCUMENTATION_REVIEW_2026-08-31.md) — point-in-time implementation review, with a finding-status annex
-- [Documentation review, 2026-09-24](../docs-design/reviews/QUORUS_DOCUMENTATION_REVIEW_2026-09-24.md) — point-in-time documentation and code cross-check
+- [Docker guide](../docker/README.md) — development topologies, startup and verification
+- [Outstanding work register](../docs-design/task/QUORUS_OUTSTANDING_WORK_REGISTER.md) — every open task, gap traceability (§14) and decision
+- [Security deployment guide](QUORUS_SECURITY_DEPLOYMENT_GUIDE.md) — implemented trust configuration
 - [Comprehensive system design](../docs-design/design/QUORUS_SYSTEM_DESIGN.md) — non-normative target-state vision
+- [Design and engineering document status](../docs-design/README.md) — how to read material under `docs-design`, including point-in-time reviews

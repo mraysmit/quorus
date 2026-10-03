@@ -1,268 +1,163 @@
 <img src="../docs/quorus-logo.png" alt="Quorus" width="120"/>
 
-# Docker Infrastructure for Quorus
+# Quorus Docker Guide
 
-**Version:** 2.1
-**Date:** 2026-09-25
+**Version:** 3.0  
+**Date:** 2026-10-03  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
-**Scope:** Development, integration-test, and observability assets
+**Scope:** Every Docker and Compose asset in the repository: building images, starting each topology, verifying it, and the helper scripts
 
-This directory contains all Docker-related configuration files, scripts, and test data for the Quorus distributed file transfer system.
+This is the single guide to the Docker assets. It replaces the former Cluster Startup Guide, Docker Testing README and controller Docker build note.
 
-The controller production profile implements TLS 1.3 mutual authentication, trusted identity resolution, authorization, and audit, but the ordinary Compose topologies in this directory explicitly select an insecure development profile. The generated-certificate TLS example exercises the implemented boundary locally; none of these assets is a production deployment baseline. See [Architecture Specification §3](../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md#3-capability-status), the [Security Deployment Guide](../docs/QUORUS_SECURITY_DEPLOYMENT_GUIDE.md), and the [current Docker testing guide](../docs/QUORUS-DOCKER-TESTING-README.md).
+## Security posture
 
-## Directory Structure
+The controller's production profile requires TLS 1.3 mutual authentication on HTTP and Raft, trusted identity resolution, authorization and audit. Every topology below except the TLS example explicitly selects the **insecure development profile**: request security and HTTP/Raft TLS are disabled with the required insecure-development opt-in. They are development and test assets, not production deployment templates. See [Architecture Specification §3](../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md#3-capability-status) and the [Security Deployment Guide](../docs/QUORUS_SECURITY_DEPLOYMENT_GUIDE.md).
+
+## Building images
+
+Images package jars built on the host; nothing is compiled inside Docker. The Dockerfiles are single-stage, based on `amazoncorretto:27.0.0-alpine3.24`, and copy `quorus-controller/target/quorus-controller-*.jar` (and, for the agent, `quorus-agent/target/lib/`). No `m2cache` build context, `M2_REPO` variable or Maven install is needed.
+
+Build the controller and agent jars with JDK 27, then start a topology with `--build` so its image picks up the jars you just built:
+
+```powershell
+./docker/build-runtime.ps1
+docker compose -f docker/compose/docker-compose-single-controller.yml up -d --build
+```
+
+```bash
+sh docker/build-runtime.sh
+docker compose -f docker/compose/docker-compose-single-controller.yml up -d --build
+```
+
+Without a prior build the image build fails at its `COPY` step; without `--build` Compose may reuse a stale image.
+
+## Compose topologies
+
+All files are in `docker/compose/`. Host ports are bound to `127.0.0.1`.
+
+| File | Topology | Host ports | Notes |
+|---|---|---|---|
+| `docker-compose-single-controller.yml` | One controller | 8080 | The quick start, and the target of the [HTTPie runbook](../scripts/httpie/RUNBOOK.txt) |
+| `docker-compose-controller-first.yml` | Three controllers behind an nginx load balancer | 8080 (nginx), 8081–8083 (controllers) | nginx answers its own `GET /health`; every other path, including `/health/live` and `/health/ready`, goes to one controller |
+| `docker-compose-cluster.yml` | Three controllers | 8081–8083 | |
+| `docker-compose.yml` | Five controllers | 8081–8085 | Static membership; do not scale it as a membership change |
+| `docker-compose-5node.yml` | Five controllers | 8081–8085 | |
+| `docker-compose-network-test.yml` | Five controllers for network-partition experiments | 8081–8085 | |
+| `docker-compose-full-network.yml` | Three controllers, three agents, FTP, SFTP and HTTP file servers, a test-file generator | 8081–8083, 21, 30000–30009, 2222, 8090 | No SMB server. See [Full network](#full-network) |
+| `docker-compose-tls-example.yml` | One controller with generated certificates and production HTTP and Raft mutual TLS | 8443 | Local demonstration PKI only; see the root [README](../README.md#local-mutual-tls-example) |
+| `docker-compose-protocol-servers.yml` | FTP, SFTP and SMB servers for protocol tests | 21, 30000–30009, 2222, 4445 | The `quorus-core` integration tests start their own stacks; use this for manual testing |
+| `docker-compose-observability.yml` | OTel Collector, Tempo, Prometheus, Loki, Grafana | 4317, 4318, 8888, 13133, 3200, 9095, 9090, 3100, 3000 | |
+| `docker-compose-observability-cluster.yml` | The observability stack plus three controllers | as above, plus 8081–8083 and 9464–9466 | |
+| `docker-compose-loki.yml` | Standalone Loki, Promtail, Prometheus and Grafana | 3110 (Loki), 3010 (Grafana), 9091 (Prometheus) | Ports chosen not to clash with the observability stacks |
+| `docker-compose-elk.yml` | Elasticsearch, Logstash, Filebeat, Kibana | 9200, 5601, 5044, 12201 | |
+| `docker-compose-fluentd.yml` | Fluentd, Elasticsearch, Kibana | 24224, 9200, 5601 | |
+
+Validate a file without starting it with `docker compose -f <file> config --quiet`.
+
+## Verifying a controller
+
+For the single controller:
+
+```powershell
+curl http://localhost:8080/health/live
+curl http://localhost:8080/health/ready
+curl http://localhost:8080/raft/status
+curl http://localhost:8080/api/v1/info
+curl http://localhost:8080/metrics
+```
+
+In a multi-controller topology, check every controller on its own port. Exactly one should report `"isLeader": true` in `/raft/status`, and all should report the same `leaderId`:
+
+```powershell
+8081..8083 | ForEach-Object { curl "http://localhost:$_/health/ready"; curl "http://localhost:$_/raft/status" }
+```
+
+Only the leader accepts writes; a follower answers a write with `503` and code `NOT_LEADER`.
+
+Controller startup brings up Raft storage, the Raft node, the gRPC server and the HTTP API. It starts no route trigger evaluator and no assignment scheduler: a submitted transfer runs only after a caller assigns it with `POST /api/v1/assignments`.
+
+## Agents
+
+An agent needs a tenant and a controller URL; it refuses to start without a tenant:
+
+```text
+QUORUS_AGENT_TENANT_ID=development
+QUORUS_AGENT_CONTROLLER_URL=http://controller1:8080/api/v1
+```
+
+The legacy names `AGENT_TENANT_ID` and `CONTROLLER_URL` are still read, but the `QUORUS_AGENT_*` names win. The agent image's entrypoint waits up to 60 seconds for the controller's `/health/live` before starting the agent, and presents the agent's client certificate when the controller URL is `https`. The agent stops if its first registration fails, so it must reach the leader.
+
+## Full network
+
+`docker-compose-full-network.yml` runs a larger development network. The agents register with `controller1` only; if `controller1` is not the leader, their registration is rejected and they stop and restart until it is. Start it with the helper, which builds the jars first when given `-Build`:
+
+```powershell
+cd docker
+.\scripts\start-full-network.ps1 -Build
+.\scripts\test-transfers.ps1
+docker compose -f compose/docker-compose-full-network.yml logs -f
+docker compose -f compose/docker-compose-full-network.yml down
+```
+
+`test-transfers.ps1` finds the leader, lists the `development` tenant's agents, submits HTTP transfers whose source is the in-network HTTP server, assigns each transfer to an agent explicitly, and polls until the transfers finish. FTP and SFTP transfers need a governed service connection with an external secret reference; credentials are never embedded in transfer URIs.
+
+| Service | URL | Credentials |
+|---|---|---|
+| Controllers 1–3 | http://localhost:8081 – 8083 | — |
+| HTTP file server | http://localhost:8090 (inside the network: `http://http-server`) | — |
+| FTP server | ftp://localhost:21 | testuser / testpass |
+| SFTP server | sftp://localhost:2222 | testuser / testpass |
+
+## Logging stack
+
+```powershell
+cd docker/scripts
+powershell -ExecutionPolicy Bypass -File setup-logging.ps1
+```
+
+The standalone stack serves Grafana on http://localhost:3010 (admin/admin), Loki on http://localhost:3110 and Prometheus on http://localhost:9091. Check collection with `docker logs quorus-logging-promtail`, and query Loki directly:
+
+```bash
+curl "http://localhost:3110/loki/api/v1/query_range?query={container_name=\"quorus-controller1\"}"
+```
+
+The demonstration scripts `demo-logging.ps1`, `log-extraction-demo.ps1` and `simple-log-demo.ps1` assume a controller on port 8081 and this stack.
+
+## Directory contents
 
 ```
 docker/
-├── compose/                          # Docker Compose configurations
-│   ├── docker-compose.yml           # 5-node development cluster
-│   ├── docker-compose-5node.yml     # 5-node cluster for testing
-│   ├── docker-compose-tls-example.yml # Local generated-certificate mTLS example
-│   ├── docker-compose-loki.yml      # Log aggregation stack (Grafana Loki)
-│   ├── docker-compose-elk.yml       # ELK stack alternative
-│   ├── docker-compose-fluentd.yml   # Fluentd alternative
-│   └── docker-compose-network-test.yml # Advanced network testing
-├── logging/                          # Log aggregation configurations
-│   ├── loki/config.yml              # Loki storage configuration
-│   ├── promtail/config.yml          # Log collection configuration
-│   ├── grafana/provisioning/        # Grafana datasources and dashboards
-│   └── prometheus/prometheus.yml    # Metrics collection configuration
-├── scripts/                          # Docker-related automation scripts
-│   ├── setup-logging.ps1           # Automated log aggregation setup
-│   ├── demo-logging.ps1            # Log aggregation demonstration
-│   ├── log-extraction-demo.ps1     # Detailed log pipeline demo
-│   └── simple-log-demo.ps1         # Simple logging demonstration
-└── test-data/                       # Test data and utilities
-    ├── test-heartbeat.json         # Sample heartbeat payload
-    ├── test-registration.json      # Sample agent registration
-    ├── send-heartbeat.ps1          # Heartbeat testing script
-    └── check-agents.ps1            # Agent status checking script
+├── build-runtime.ps1, build-runtime.sh   # build the controller and agent jars on the host
+├── start.ps1, start-quick.ps1            # older launchers for the single, cluster and controller-first
+├── start-observability.ps1               # topologies and the observability stack; they do not build the
+│                                         # jars first or pass --build, so run build-runtime and prefer
+│                                         # the docker compose commands above
+├── compose/                              # the Compose files above, with Grafana, Prometheus,
+│                                         # Loki, Tempo, OTel Collector and nginx configuration
+├── logging/                              # Loki, Promtail, Grafana and Prometheus configuration
+├── scripts/                              # start-full-network, test-transfers, logging setup and demos
+└── test-data/                            # sample registration and heartbeat payloads, check-agents.ps1,
+                                          # send-heartbeat.ps1, and the full network's HTTP server nginx.conf
 ```
 
-## Complete Test Network Environment
+`test-data/check-agents.ps1` and `test-data/send-heartbeat.ps1` default to the single controller on port 8080; pass `-BaseUrl` for another controller. A heartbeat is a write, so send it to the leader.
 
-### Full Network Test Environment
+## Docker-tagged tests
 
-The `docker-compose-full-network.yml` configuration provides a comprehensive test environment that simulates a realistic Quorus file transfer network:
-
-**Architecture:**
-- **Control Plane**: 3 Raft controllers, each with an embedded HTTP API
-- **Agent Network**: 3 agents in different regions (NYC, London, Tokyo)
-- **File Transfer Servers**: FTP, SFTP, HTTP, and SMB servers
-- **Test Utilities**: File generators and monitoring tools
-
-**Network Topology:**
-```
-Control Plane (172.20.0.0/16)
-└── Controller 1-3 (Raft cluster with embedded HTTP APIs)
-
-Agent Network (172.21.0.0/16)
-├── Agent NYC (US East)
-├── Agent London (EU West)
-└── Agent Tokyo (AP Northeast)
-
-Transfer Servers (172.22.0.0/16)
-├── FTP Server (port 21)
-├── SFTP Server (port 2222)
-├── HTTP Server (port 8090)
-└── File Generator (test data)
-```
-
-### Quick Start - Full Network
+The controller's Docker test suites (tags `docker` and `slow`) are excluded from a default build. They build a test image from the host-built controller jar, so build the jars first and do not run `clean` in the same command:
 
 ```powershell
-# Start the complete test environment
-.\scripts\start-full-network.ps1 -Build
-
-# Test agent registration and transfers
-.\scripts\test-transfers.ps1
-
-# Monitor the environment
-docker-compose -f compose/docker-compose-full-network.yml logs -f
-
-# Stop the environment
-docker-compose -f compose/docker-compose-full-network.yml down
+./docker/build-runtime.ps1
+mvn verify '-Dtest.excludedGroups='
 ```
 
-`test-transfers.ps1` submits credential-free HTTP fixtures through the current transfer
-request contract. FTP and SFTP tests require governed service connections with opaque
-external secret references; credentials must not be embedded in transfer URIs.
-
-### Service Endpoints
-
-| Service | URL | Credentials |
-|---------|-----|-------------|
-| Controller 1 | http://localhost:8081 | - |
-| Controller 2 | http://localhost:8082 | - |
-| Controller 3 | http://localhost:8083 | - |
-| HTTP Server | http://localhost:8090 | - |
-| FTP Server | ftp://localhost:21 | testuser/testpass |
-| SFTP Server | sftp://localhost:2222 | testuser/testpass |
-
-## Quick Start
-
-### 1. Basic Cluster Setup
-
-```bash
-# Start the main 5-node development cluster
-cd docker/compose
-docker-compose up -d
-
-# Check cluster health
-curl http://localhost:8081/health
-curl http://localhost:8082/health
-curl http://localhost:8083/health
-```
-
-### 2. Log Aggregation Setup
-
-```bash
-# Set up log aggregation (from project root)
-cd docker/scripts
-powershell -ExecutionPolicy Bypass -File setup-logging.ps1
-
-# Access Grafana dashboard
-# http://localhost:3000 (admin/admin)
-```
-
-### 3. Testing with Sample Data
-
-```bash
-# Register a test agent
-cd docker/test-data
-curl -X POST http://localhost:8080/api/v1/agents/register \
-  -H "Content-Type: application/json" \
-  -d @test-registration.json
-
-# Send heartbeats
-powershell -ExecutionPolicy Bypass -File send-heartbeat.ps1
-```
-
-## Available Configurations
-
-### Cluster Configurations
-
-| File | Description | Nodes | Use Case |
-|------|-------------|-------|----------|
-| `docker-compose.yml` | Main cluster | 5 | Development and static-membership testing |
-| `docker-compose-5node.yml` | Extended cluster | 5 | Advanced testing, fault tolerance |
-| `docker-compose-network-test.yml` | Network testing | 5 | Network partition testing |
-
-### Log Aggregation Options
-
-| File | Stack | Description |
-|------|-------|-------------|
-| `docker-compose-loki.yml` | Grafana Loki | **Recommended** - Lightweight, cost-effective |
-| `docker-compose-elk.yml` | ELK Stack | Full-featured, resource intensive |
-| `docker-compose-fluentd.yml` | Fluentd + ELK | CNCF standard, flexible |
-
-## Services and Ports
-
-### Core Services
-- **Load-balanced controller API**: http://localhost:8080 when using `docker-compose-controller-first.yml`
-- **Controller 1**: http://localhost:8081
-- **Controller 2**: http://localhost:8082
-- **Controller 3**: http://localhost:8083
-
-### Log Aggregation Services
-- **Grafana**: http://localhost:3000 (admin/admin)
-- **Loki**: http://localhost:3100
-- **Prometheus**: http://localhost:9090
-
-### Extended Cluster (5-node)
-- **Controller 4**: http://localhost:8084
-- **Controller 5**: http://localhost:8085
-
-## Common Commands
-
-### Cluster Management
-```bash
-# Start cluster
-docker-compose -f docker/compose/docker-compose.yml up -d
-
-# Stop cluster
-docker-compose -f docker/compose/docker-compose.yml down
-
-# View logs
-docker-compose -f docker/compose/docker-compose.yml logs -f
-
-# Controller membership is static; do not use service scaling as a membership change
-```
-
-### Log Aggregation
-```bash
-# Start logging stack
-docker compose -f docker/compose/docker-compose-loki.yml up -d
-
-# Standalone logging ports: Grafana 3010, Loki 3110, Prometheus 9091.
-# These do not clash with the full observability topology's 3000/3100/9090.
-
-# Check log collection
-docker logs quorus-promtail
-
-# Query logs directly
-curl "http://localhost:3100/loki/api/v1/query_range?query={container_name=\"quorus-controller1\"}"
-```
-
-### Testing and Debugging
-```bash
-# Check container status
-docker ps --filter "name=quorus-"
-
-# Inspect networks
-docker network ls | grep quorus
-
-# Execute commands in container
-docker exec -it quorus-controller1 /bin/sh
-
-# Check resource usage
-docker stats --filter "name=quorus-"
-```
-
-## Integration with Development
-
-### From Project Root
-```bash
-# Build and start everything
-mvn clean package -DskipTests
-docker-compose -f docker/compose/docker-compose.yml up -d
-docker compose -f docker/compose/docker-compose-loki.yml up -d
-
-# Run integration tests
-mvn test -Dtest=DockerRaftClusterTest
-```
-
-### Environment Variables
-Set these in your shell for easier access:
-```bash
-export QUORUS_DOCKER_DIR="./docker"
-export QUORUS_COMPOSE_DIR="$QUORUS_DOCKER_DIR/compose"
-export QUORUS_SCRIPTS_DIR="$QUORUS_DOCKER_DIR/scripts"
-```
+The [testing guide](../docs-design/testing/QUORUS_TESTING_README.md) describes the tags and lanes.
 
 ## Troubleshooting
 
-### Common Issues
-1. **Port conflicts**: Check if ports 8080-8085, 3000, 3100, 9090 are available
-2. **Memory issues**: Ensure at least 2GB RAM available for full stack
-3. **Network issues**: Check Docker daemon and network connectivity
-
-### Debug Commands
-```bash
-# Check Docker daemon
-docker version
-
-# Check available resources
-docker system df
-docker system prune  # Clean up if needed
-
-# Check specific service logs
-docker-compose -f docker/compose/docker-compose.yml logs controller1
-
-# Network debugging
-docker network inspect quorus_raft-cluster
-```
-
-For detailed documentation, see [README-DOCKER-TESTING.md](../docs/QUORUS-DOCKER-TESTING-README.md).
+- **Port conflicts:** check that the host ports in the table above are free.
+- **Image builds fail at `COPY`:** run `docker/build-runtime` first.
+- **An agent keeps restarting:** check that its tenant is set and that it can reach the leader.
+- **Writes return `503 NOT_LEADER`:** send them to the leader shown by `/raft/status`.
+- **Resources:** the full network and observability stacks need several GB of memory.

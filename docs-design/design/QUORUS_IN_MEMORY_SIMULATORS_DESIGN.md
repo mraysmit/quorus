@@ -2,2027 +2,1014 @@
 
 # Quorus In-Memory Simulators Design Document
 
-**Version:** 2.0  
-**Date:** 2026-01-28  
+**Version:** 2.1  
+**Date:** 2026-10-03  
 **Author:** Mark Ray-Smith — Cityline Ltd  
-**License:** Apache 2.0
+**License:** Apache 2.0  
 
 > [!IMPORTANT]
-> This is a non-normative simulator design and validation record. “Production ready” entries in simulator comparison tables describe test-double maturity, not Quorus product readiness. Current product requirements and gaps are defined in [QUORUS_ARCHITECTURE_SPECIFICATION.md](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md).
+> This is a non-normative design record for test tooling. Read it in three parts:
+>
+> - **Current, and used across the controller test suite: §1.** `InMemoryTransportSimulator`
+>   implements the production `RaftTransport` interface. Real `RaftNode` and `QuorusStateStore`
+>   instances run over it, and 33 controller test classes construct it. §1 also covers
+>   `MockRaftTransport`, the other in-memory `RaftTransport` used by controller tests.
+> - **Standalone test doubles: §2–7.** The six simulators in `quorus-core` test sources implement
+>   **no** production interface. They define their own request, result and exception types, and
+>   nothing outside their own package uses them. They cannot stand in for `TransferProtocol`,
+>   `TransferEngine`, `WorkflowEngine` or the agent's `ControllerClient`.
+> - **Proposals: anything marked _Proposal_.** This covers the protocol-specific builders, wiring
+>   the simulators to the controller state store or to agent services, and the full-stack examples
+>   in [Combining Simulators](#combining-simulators). None of it is implemented.
+>
+> "Production" in this document means the Quorus code a test double replaces. It never describes
+> Quorus product readiness, which is defined in
+> [QUORUS_ARCHITECTURE_SPECIFICATION.md](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md).
+> Version 2.0's validation report (Appendix C) and its "REAL PRODUCTION CODE" excerpts were wrong.
+> They are kept, with the superseded text of §2–7, in
+> [QUORUS_IN_MEMORY_SIMULATORS_ARCHIVED_SECTIONS.md](../archive/QUORUS_IN_MEMORY_SIMULATORS_ARCHIVED_SECTIONS.md).
 
 ---
 
 ## Table of Contents
 
-1. [Executive Summary](#executive-summary)
+1. [Summary](#summary)
 2. [Background](#background)
 3. [Architecture Overview](#architecture-overview)
 4. [Simulator Specifications](#simulator-specifications)
-   - [1. InMemoryTransportSimulator](#1-inmemorytransportsimulator-implemented)
+   - [1. InMemoryTransportSimulator](#1-inmemorytransportsimulator)
    - [2. InMemoryTransferProtocolSimulator](#2-inmemorytransferprotocolsimulator)
    - [3. InMemoryAgentSimulator](#3-inmemoryagentsimulator)
    - [4. InMemoryFileSystemSimulator](#4-inmemoryfilesystemsimulator)
    - [5. InMemoryTransferEngineSimulator](#5-inmemorytransferenginesimulator)
    - [6. InMemoryWorkflowEngineSimulator](#6-inmemoryworkflowenginesimulator)
    - [7. InMemoryControllerClientSimulator](#7-inmemorycontrollerclientsimulator)
-5. [Integration: Combining Simulators](#integration-combining-simulators)
-6. [Test Pyramid with Simulators](#test-pyramid-with-simulators)
-7. [Benefits Summary](#benefits-summary)
-8. [Appendices](#appendix-a-interface-summary)
-   - [Appendix A: Interface Summary](#appendix-a-interface-summary)
+5. [Combining Simulators](#combining-simulators)
+6. [Where the Simulators Fit](#where-the-simulators-fit)
+7. [Appendices](#appendix-a-simulator-summary)
+   - [Appendix A: Simulator Summary](#appendix-a-simulator-summary)
    - [Appendix B: Chaos Engineering Features Matrix](#appendix-b-chaos-engineering-features-matrix)
-   - [Appendix C: Implementation Validation Report](#appendix-c-implementation-validation-report)
+   - [Appendix C: Removed](#appendix-c-removed)
    - [Appendix D: Edge Case Test Coverage Analysis](#appendix-d-edge-case-test-coverage-analysis)
+8. [Revision History](#revision-history)
 
 ---
 
-## Executive Summary
+## Summary
 
-This document describes a suite of in-memory simulators for the Quorus distributed file transfer system. These simulators enable comprehensive testing without external dependencies (Docker containers, network services, file systems), providing faster test execution, deterministic behavior, and sophisticated chaos engineering capabilities.
+Quorus has two kinds of in-memory test tooling:
+
+| Kind | Classes | Replaces | Used by |
+|------|---------|----------|---------|
+| Raft transport doubles | `InMemoryTransportSimulator`, `MockRaftTransport` | `GrpcRaftTransport`, through the `RaftTransport` interface | 33 controller test classes construct `InMemoryTransportSimulator`; two construct `MockRaftTransport` |
+| Standalone test doubles | Six `InMemory*Simulator` classes in `quorus-core` test sources | Nothing. They imitate the shape of Quorus components but are not substitutable for them | Only their own tests in `dev.mars.quorus.simulator` |
+
+The transport doubles let the controller's Raft and HTTP tests run a real `RaftNode` cluster in one
+JVM with no network. The standalone doubles are self-contained models of protocols, agents, a file
+system, a transfer engine, a workflow engine and an HTTP client. They are tested, but no Quorus code
+or test outside their package uses them.
 
 ## Background
 
-### Current Testing Approach
+### Problem
 
-| Test Type | Dependencies | Execution Time | Determinism |
-|-----------|--------------|----------------|-------------|
-| Unit Tests | None | ~milliseconds | ✅ High |
-| In-Memory Integration | `InMemoryTransportSimulator` | ~seconds | ✅ High |
-| Docker Integration | Docker, TestContainers | ~30+ seconds | ⚠️ Medium |
-| Full E2E | Docker, Protocol Servers | ~minutes | ❌ Low |
+Testing Quorus end to end requires Docker containers for the FTP, SFTP and HTTP servers, real
+network connections and real file systems. That is slow to set up, timing-sensitive, and makes
+failure scenarios such as partitions or lost packets hard to produce on demand.
 
-### Problem Statement
+### Test layers in use
 
-Testing Quorus end-to-end currently requires:
-- Docker containers for FTP, SFTP, HTTP servers
-- Real network connections
-- Real file system operations
-- Significant setup/teardown time
+| Layer | What runs | Example |
+|-------|-----------|---------|
+| Unit | Single classes, no simulators | Most module tests |
+| In-memory Raft | Real `RaftNode` and `QuorusStateStore` over `InMemoryTransportSimulator`, sometimes with the real HTTP API | [`RaftChaosTest`](../../quorus-controller/src/test/java/dev/mars/quorus/controller/raft/RaftChaosTest.java), [`InfrastructureSmokeTest`](../../quorus-controller/src/test/java/dev/mars/quorus/controller/integration/InfrastructureSmokeTest.java) |
+| Standalone simulator | One simulator class, testing itself | [`InMemoryFileSystemSimulatorTest`](../../quorus-core/src/test/java/dev/mars/quorus/simulator/fs/InMemoryFileSystemSimulatorTest.java) |
+| Docker | Containers through Testcontainers | [`DockerRaftClusterTest`](../../quorus-controller/src/test/java/dev/mars/quorus/controller/raft/DockerRaftClusterTest.java) |
 
-This leads to:
-- Slow CI/CD pipelines
-- Flaky tests due to network/timing issues
-- Difficulty testing edge cases and failure scenarios
-- Resource-intensive test environments
-
-### Solution: In-Memory Simulator Suite
-
-A comprehensive suite of simulators that implement the same interfaces as production components, enabling:
-- **100x faster** test execution
-- **Deterministic** behavior
-- **Controllable** failure injection
-- **No external dependencies**
+No speed-up or determinism figures have been measured for these layers. The figures in version 2.0
+were not measured and are archived.
 
 ## Architecture Overview
 
 ```mermaid
 flowchart TB
-    subgraph TestCode["Test Code"]
-        Test["Integration Test"]
+    subgraph Controller["quorus-controller tests: substitutable"]
+        ITS["InMemoryTransportSimulator"]
+        MRT["MockRaftTransport"]
     end
-    
-    subgraph Simulators["In-Memory Simulators"]
-        ITS["InMemoryTransportSimulator<br/>(Raft Consensus)"]
-        IAS["InMemoryAgentSimulator<br/>(Agent Lifecycle)"]
-        ITPS["InMemoryTransferProtocolSimulator<br/>(FTP/SFTP/HTTP/SMB)"]
-        IFSS["InMemoryFileSystemSimulator<br/>(Virtual Files)"]
-        ITES["InMemoryTransferEngineSimulator<br/>(Transfer Management)"]
-        IWES["InMemoryWorkflowEngineSimulator<br/>(Workflow Execution)"]
-    end
-    
-    subgraph RealCode["Real Production Code"]
+
+    subgraph Prod["Production code exercised"]
+        RT["RaftTransport (interface)"]
         RN["RaftNode"]
-        SM["QuorusStateMachine"]
-        ASS["AgentSelectionService"]
-        WF["WorkflowDefinition"]
+        QSS["QuorusStateStore"]
     end
-    
-    Test --> Simulators
-    Simulators --> RealCode
-    
-    style Simulators fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
-    style RealCode fill:#e8f5e9,stroke:#4caf50,stroke-width:2px
+
+    subgraph Core["quorus-core tests: standalone, no production interface"]
+        ITPS["InMemoryTransferProtocolSimulator"]
+        IFSS["InMemoryFileSystemSimulator"]
+        IAS["InMemoryAgentSimulator"]
+        ITES["InMemoryTransferEngineSimulator"]
+        IWES["InMemoryWorkflowEngineSimulator"]
+        ICCS["InMemoryControllerClientSimulator"]
+    end
+
+    ITS -->|implements| RT
+    MRT -->|implements| RT
+    RN -->|calls| RT
+    RN -->|applies to| QSS
+    ITPS -->|reads and writes| IFSS
+
+    style Controller fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style Prod fill:#e8f5e9,stroke:#4caf50,stroke-width:2px
+    style Core fill:#f5f5f5,stroke:#666,stroke-width:1px
 ```
+
+The only link between the standalone simulators is that `InMemoryTransferProtocolSimulator` reads
+and writes an `InMemoryFileSystemSimulator`. The agent, transfer-engine and workflow simulators do
+not use the protocol or file-system simulators.
 
 ## Simulator Specifications
 
 ---
 
-## 1. InMemoryTransportSimulator (Implemented)
+## 1. InMemoryTransportSimulator
 
-**Status:** ✅ Implemented  
-**Location:** `quorus-controller/src/test/java/.../raft/InMemoryTransportSimulator.java`  
-**Interface:** `RaftTransport`
+**Status:** Implemented. Used by 33 controller test classes  
+**Location:** [`quorus-controller/src/test/java/dev/mars/quorus/controller/raft/InMemoryTransportSimulator.java`](../../quorus-controller/src/test/java/dev/mars/quorus/controller/raft/InMemoryTransportSimulator.java)  
+**Interface:** [`RaftTransport`](../../quorus-controller/src/main/java/dev/mars/quorus/controller/raft/RaftTransport.java)
 
 ### Overview
 
-`InMemoryTransportSimulator` is a sophisticated test utility that implements the `RaftTransport` interface for in-memory Raft node communication. It enables Raft nodes to communicate without real network connections, making it ideal for unit testing, integration testing, and chaos engineering scenarios.
+`InMemoryTransportSimulator` implements `RaftTransport` by handing requests directly to the target
+node's `RaftNode` in the same JVM. `RaftNode` cannot tell it apart from the production
+`GrpcRaftTransport`, so tests exercise the real election, replication, snapshot and state-machine
+code with no sockets. The simulator adds controls for latency, packet drop, partitions, message
+reordering, bandwidth throttling and four failure modes.
 
-### Purpose
+### The `RaftTransport` contract
 
-The primary purpose of `InMemoryTransportSimulator` is to provide:
-
-1. **Fast Testing** - Eliminates network overhead for rapid test execution
-2. **Deterministic Behavior** - Controlled message delivery without network variability
-3. **Chaos Engineering** - Simulate network failures, partitions, and Byzantine faults
-4. **Isolation** - Test Raft consensus logic independent of network infrastructure
-
-### Features Summary
-
-| Feature | Description |
-|---------|-------------|
-| Message Routing | Global registry for node-to-node communication |
-| Network Partitions | Simulate AWS AZ outages, switch failures |
-| Latency Simulation | Configurable min/max latency |
-| Packet Drop | Simulate lossy networks |
-| Message Reordering | Out-of-order delivery |
-| Bandwidth Throttling | Simulate slow WAN links |
-| Failure Modes | CRASH, BYZANTINE, SLOW, FLAKY |
-
-### Why It's Reliable for Testing Real Quorus Services
-
-#### Identical Contract Implementation
-
-The `InMemoryTransportSimulator` implements the **exact same `RaftTransport` interface** that production transports use:
+Current interface, without Javadoc:
 
 ```java
 public interface RaftTransport {
     void start(Consumer<RaftMessage> messageHandler);
-    void stop();
+    Future<Void> stop();
     Future<VoteResponse> sendVoteRequest(String targetId, VoteRequest request);
     Future<AppendEntriesResponse> sendAppendEntries(String targetId, AppendEntriesRequest request);
+    Future<InstallSnapshotResponse> sendInstallSnapshot(String targetId, InstallSnapshotRequest request);
     default void setRaftNode(RaftNode node) {}
 }
 ```
 
-> **Note:** The `RaftMessage` type is a **sealed interface** that provides compile-time type safety:
-> ```java
-> public sealed interface RaftMessage {
->     record Vote(VoteRequest request) implements RaftMessage {}
->     record AppendEntries(AppendEntriesRequest request) implements RaftMessage {}
-> }
-> ```
-> This enables exhaustive pattern matching in message handlers, ensuring all message types are handled.
+`Future` is `io.vertx.core.Future`. The request and response types are the protobuf classes in
+`dev.mars.quorus.controller.raft.grpc`. [`RaftMessage`](../../quorus-controller/src/main/java/dev/mars/quorus/controller/raft/RaftMessage.java)
+is a sealed interface with two records, `Vote(VoteRequest)` and `AppendEntries(AppendEntriesRequest)`.
+It has no install-snapshot variant.
 
-This means:
-- **RaftNode doesn't know the difference** - The Raft consensus implementation (`RaftNode`) interacts with the transport through the interface, completely unaware whether it's talking to `InMemoryTransportSimulator`, `GrpcRaftTransport`, or `HttpRaftTransport`.
-- **Same message types** - Uses the actual protobuf-generated `VoteRequest`, `VoteResponse`, `AppendEntriesRequest`, and `AppendEntriesResponse` classes.
-- **Same Future-based async model** - Returns Vert.x `Future` objects just like production transports.
+`RaftNode.start()` calls `transport.setRaftNode(this)`, recovers from storage, and then calls
+`transport.start(this::handleMessage)`. `RaftNode.stop()` calls `transport.stop()`.
 
-#### Real Raft Logic Execution
+### What is real and what is simulated
 
-When you test with `InMemoryTransportSimulator`, **all the real Raft code executes**:
+| Real production code | How the simulator reaches it |
+|----------------------|------------------------------|
+| `RaftNode.start()` / `stop()` | Called by the test |
+| Election (`startElection()` and `requestVotes()`, both private) | `requestVotes()` calls `transport.sendVoteRequest(...)` for each peer |
+| `RaftNode.handleVoteRequest(VoteRequest)` | Called on the target node by the simulator |
+| `RaftNode.handleAppendEntriesRequest(AppendEntriesRequest)` | Called on the target node by the simulator |
+| `RaftNode.handleInstallSnapshot(InstallSnapshotRequest)` | Called on the target node by the simulator |
+| `RaftNode.submitCommand(RaftCommand)` | Called by the test or by the HTTP API |
+| `QuorusStateStore.apply(RaftCommand)` (via `RaftLogApplicator`) | Called by `RaftNode` for committed entries |
 
-| Component | What Runs |
-|-----------|-----------|
-| ✅ `RaftNode.start()` | Real leader election timers |
-| ✅ `RaftNode.startElection()` | Real vote requesting logic |
-| ✅ `RaftNode.handleVoteRequest()` | Real vote granting logic |
-| ✅ `RaftNode.becomeLeader()` | Real state transition |
-| ✅ `RaftNode.sendHeartbeats()` | Real heartbeat scheduling |
-| ✅ `RaftNode.handleAppendEntries()` | Real log replication |
-| ✅ `RaftNode.submitCommand()` | Real command submission |
-| ✅ `QuorusStateMachine.apply()` | Real state machine updates |
+Simulated or absent:
 
-> 🔄 **Only the network layer is simulated**
+- **No serialisation.** Protobuf request and response objects are passed by reference. They are
+  never encoded.
+- **No gRPC, TLS or peer authorisation.** `GrpcRaftTransport`, `GrpcRaftServer` and
+  `RaftPeerAuthorizationInterceptor` are not exercised.
+- **Failures are immediate.** A dropped or partitioned message fails its `Future` at once with a
+  `RuntimeException`. On a real network the failure would show up as a slow error or a timeout.
 
-### Message Flow: How It Actually Works
+### Message path
 
-Let's trace a complete vote request from Node A to Node B, showing exactly what code executes and why this provides confidence in your tests.
+`sendVoteRequest` and `sendAppendEntries` do the following, in order, on the sending transport's own
+fixed pool of 10 threads:
 
-#### Step 1: Node A Starts an Election (REAL Production Code)
+1. **Crashed sender.** If this transport is in `CRASH` mode, the future fails with `Node crashed`.
+2. **Partition.** If the sender and target are partitioned, the future fails with `Network partition`.
+3. **Packet drop.** With probability `dropRate`, the future fails with `Network packet dropped (Chaos)`.
+4. **Lookup.** The target is looked up in the static registry. If it is missing or stopped, the
+   future fails with `Target node not available: <id>`.
+5. **Throttling.** If throttling is enabled, the request's serialised size is counted against this
+   transport's bytes-per-second budget, and the thread sleeps when the budget is exceeded.
+6. **Latency.** The thread sleeps for the delay returned by `calculateDelay()` (see
+   [Failure modes](#failure-modes)).
+7. **Reordering.** With probability `reorderProbability`, delivery is queued with an extra random
+   delay. A per-transport scheduler delivers queued messages, checking every 10 ms.
+8. **Delivery.** The target's `RaftNode` handler is called. If the target has no `RaftNode`, the
+   simulator passes the message to the target's message handler and returns a refusal (vote not
+   granted, or `success=false`).
+9. **Byzantine corruption.** If *this* transport is in `BYZANTINE` mode, the response it receives
+   is corrupted with probability `byzantineCorruptionRate`.
 
-When a follower's election timeout expires, `RaftNode` starts an election. This is **real production code** that runs identically in tests and production:
-
-```java
-// Inside RaftNode.startElection() - REAL PRODUCTION CODE
-private void startElection() {
-    state = State.CANDIDATE;
-    currentTerm++;
-    votedFor = nodeId;  // Vote for self
-    votesReceived.clear();
-    votesReceived.add(nodeId);
-    
-    logger.info("Starting election for node: {} at term {}", nodeId, currentTerm);
-    
-    // Build the vote request with our log state
-    VoteRequest voteRequest = VoteRequest.newBuilder()
-            .setTerm(currentTerm)
-            .setCandidateId(nodeId)
-            .setLastLogIndex(log.getLastIndex())
-            .setLastLogTerm(log.getLastLogTerm())
-            .build();
-    
-    // Send vote requests to ALL other nodes in the cluster
-    for (String targetNodeId : clusterNodes) {
-        if (!targetNodeId.equals(nodeId)) {
-            // THIS IS WHERE THE TRANSPORT IS CALLED
-            // RaftNode doesn't know or care if it's in-memory or real network!
-            Future<VoteResponse> future = transport.sendVoteRequest(targetNodeId, voteRequest);
-            
-            future.onSuccess(response -> handleVoteResponse(targetNodeId, response));
-            future.onFailure(err -> logger.warn("Vote request to {} failed: {}", targetNodeId, err.getMessage()));
-        }
-    }
-}
-```
-
-**Why this matters:** The `RaftNode` class has NO IDEA what transport implementation it's using. It just calls `transport.sendVoteRequest()`. Whether that goes over gRPC, HTTP, or in-memory - the Raft logic is identical.
-
-#### Step 2: InMemoryTransportSimulator Routes the Message
-
-The transport receives the request and must deliver it to the target node. Here's what happens inside `InMemoryTransportSimulator`:
-
-```java
-@Override
-public Future<VoteResponse> sendVoteRequest(String targetNodeId, VoteRequest request) {
-    Promise<VoteResponse> promise = Promise.promise();
-    
-    // Execute asynchronously (simulates real network async behavior)
-    executor.execute(() -> {
-        try {
-            // ═══════════════════════════════════════════════════════════════
-            // CHAOS CHECK 1: Is this node crashed?
-            // ═══════════════════════════════════════════════════════════════
-            // Simulates: Server process died, OS crash, power failure
-            if (crashed) {
-                promise.fail(new RuntimeException("Node crashed"));
-                return;
-            }
-            
-            // ═══════════════════════════════════════════════════════════════
-            // CHAOS CHECK 2: Network partition?
-            // ═══════════════════════════════════════════════════════════════
-            // Simulates: AWS AZ failure, switch failure, firewall rule
-            if (!canCommunicate(nodeId, targetNodeId)) {
-                logger.debug("Network partition prevents {} → {}", nodeId, targetNodeId);
-                promise.fail(new RuntimeException("Network partition"));
-                return;
-            }
-            
-            // ═══════════════════════════════════════════════════════════════
-            // CHAOS CHECK 3: Random packet drop?
-            // ═══════════════════════════════════════════════════════════════
-            // Simulates: Lossy network, congestion, UDP packet loss
-            if (dropRate > 0 && random.nextDouble() < dropRate) {
-                logger.debug("Dropped VoteRequest {} → {}", nodeId, targetNodeId);
-                promise.fail(new RuntimeException("Network packet dropped"));
-                return;
-            }
-
-            // ═══════════════════════════════════════════════════════════════
-            // LOOKUP: Find target node in global registry
-            // ═══════════════════════════════════════════════════════════════
-            // This is where in-memory transport differs from real network:
-            // Instead of TCP connection, we lookup the target's transport instance
-            InMemoryTransportSimulator targetTransport = transports.get(targetNodeId);
-            
-            if (targetTransport == null || !targetTransport.running) {
-                // Simulates: Target server not started, DNS failure, wrong port
-                promise.fail(new RuntimeException("Target node not available: " + targetNodeId));
-                return;
-            }
-
-            // ═══════════════════════════════════════════════════════════════
-            // CHAOS: Bandwidth throttling
-            // ═══════════════════════════════════════════════════════════════
-            // Simulates: Slow WAN link, bandwidth caps, traffic shaping
-            int messageSize = request.getSerializedSize();
-            applyThrottling(messageSize);
-
-            // ═══════════════════════════════════════════════════════════════
-            // CHAOS: Network latency simulation
-            // ═══════════════════════════════════════════════════════════════
-            // Simulates: Geographic distance, network hops, congestion
-            // calculateDelay() returns different values based on failure mode:
-            //   NORMAL: minLatencyMs to maxLatencyMs (e.g., 5-15ms)
-            //   SLOW:   10x normal latency (e.g., 50-150ms)
-            //   FLAKY:  50% chance of 5x latency
-            long delay = calculateDelay();
-            Thread.sleep(delay);
-
-            // ═══════════════════════════════════════════════════════════════
-            // CHAOS CHECK 4: Message reordering?
-            // ═══════════════════════════════════════════════════════════════
-            // Simulates: Out-of-order packet delivery, multi-path routing
-            if (reorderingEnabled && random.nextDouble() < reorderProbability) {
-                // Queue message for delayed delivery instead of immediate
-                int reorderDelay = random.nextInt(maxReorderDelayMs);
-                DelayedMessage delayed = new DelayedMessage(
-                    System.currentTimeMillis() + delay + reorderDelay,
-                    () -> deliverAndComplete(targetTransport, request, promise)
-                );
-                messageQueue.offer(delayed);
-                return;
-            }
-
-            // ═══════════════════════════════════════════════════════════════
-            // DELIVERY: Call target node's handler
-            // ═══════════════════════════════════════════════════════════════
-            // THIS IS THE KEY: We call the target's handleVoteRequest(),
-            // which delegates to the REAL RaftNode.handleVoteRequest()
-            VoteResponse response = targetTransport.handleVoteRequest(request);
-            
-            // ═══════════════════════════════════════════════════════════════
-            // CHAOS CHECK 5: Byzantine corruption?
-            // ═══════════════════════════════════════════════════════════════
-            // Simulates: Memory corruption, malicious node, bit flips
-            if (failureMode == FailureMode.BYZANTINE && 
-                random.nextDouble() < byzantineCorruptionRate) {
-                response = corruptVoteResponse(response);
-                logger.debug("Corrupted response (Byzantine) {} → {}", targetNodeId, nodeId);
-            }
-            
-            // Return the response to the caller
-            promise.complete(response);
-            
-        } catch (Exception e) {
-            promise.fail(e);
-        }
-    });
-    
-    return promise.future();
-}
-```
-
-**Why this matters:** Every check in this method simulates a real failure mode. The actual message delivery (`targetTransport.handleVoteRequest(request)`) uses the REAL Raft logic.
-
-#### Step 3: Target Transport Delegates to Real RaftNode
-
-When `handleVoteRequest()` is called on the target transport, it delegates to the **real RaftNode**:
-
-```java
-// Inside InMemoryTransportSimulator - delegates to REAL RaftNode
-private VoteResponse handleVoteRequest(VoteRequest request) {
-    if (raftNode != null) {
-        // ═══════════════════════════════════════════════════════════════
-        // THIS CALLS THE REAL PRODUCTION CODE!
-        // ═══════════════════════════════════════════════════════════════
-        // raftNode.handleVoteRequest() is the SAME method that runs
-        // in production with GrpcRaftTransport or HttpRaftTransport
-        return raftNode.handleVoteRequest(request)
-                       .toCompletionStage()
-                       .toCompletableFuture()
-                       .join();  // Block because transport is sync internally
-    }
-    
-    // Fallback for tests that don't set up RaftNode
-    logger.warn("RaftNode not set for transport {}, returning failure", nodeId);
-    return VoteResponse.newBuilder()
-            .setTerm(request.getTerm())
-            .setVoteGranted(false)
-            .build();
-}
-```
-
-**Why this matters:** The transport is just a thin routing layer. All actual consensus logic happens in `RaftNode.handleVoteRequest()`.
-
-#### Step 4: Real RaftNode Processes the Vote (REAL Production Code)
-
-This is the **actual production Raft implementation** that runs:
-
-```java
-// Inside RaftNode.handleVoteRequest() - REAL PRODUCTION CODE
-public Future<VoteResponse> handleVoteRequest(VoteRequest request) {
-    return vertx.executeBlocking(() -> {
-        synchronized (stateLock) {
-            // ═══════════════════════════════════════════════════════════════
-            // RAFT RULE: If request term > current term, become follower
-            // ═══════════════════════════════════════════════════════════════
-            // This is core Raft protocol - if we see a higher term,
-            // we know there's a more recent election happening
-            if (request.getTerm() > currentTerm) {
-                logger.info("Node {} stepping down: received higher term {} > {}", 
-                           nodeId, request.getTerm(), currentTerm);
-                currentTerm = request.getTerm();
-                state = State.FOLLOWER;
-                votedFor = null;  // Reset vote for new term
-            }
-            
-            // ═══════════════════════════════════════════════════════════════
-            // RAFT RULE: Decide whether to grant vote
-            // ═══════════════════════════════════════════════════════════════
-            boolean voteGranted = false;
-            
-            // Condition 1: Request term must be >= our term
-            // Condition 2: We haven't voted OR we already voted for this candidate
-            // Condition 3: Candidate's log must be at least as up-to-date as ours
-            if (request.getTerm() >= currentTerm && 
-                (votedFor == null || votedFor.equals(request.getCandidateId())) &&
-                isLogUpToDate(request.getLastLogIndex(), request.getLastLogTerm())) {
-                
-                votedFor = request.getCandidateId();
-                voteGranted = true;
-                resetElectionTimeout();  // They might become leader, reset our timeout
-                
-                logger.info("Node {} granted vote to {} for term {}", 
-                           nodeId, request.getCandidateId(), request.getTerm());
-            } else {
-                logger.debug("Node {} denied vote to {} (term={}, votedFor={}, logOk={})",
-                           nodeId, request.getCandidateId(), request.getTerm(), 
-                           votedFor, isLogUpToDate(request.getLastLogIndex(), request.getLastLogTerm()));
-            }
-            
-            // ═══════════════════════════════════════════════════════════════
-            // Build and return the response
-            // ═══════════════════════════════════════════════════════════════
-            return VoteResponse.newBuilder()
-                    .setTerm(currentTerm)
-                    .setVoteGranted(voteGranted)
-                    .build();
-        }
-    });
-}
-
-// Log comparison for election safety
-private boolean isLogUpToDate(long lastLogIndex, long lastLogTerm) {
-    long myLastTerm = log.getLastTerm();
-    long myLastIndex = log.getLastIndex();
-    
-    // Raft paper Section 5.4.1: Election restriction
-    // Candidate's log is up-to-date if:
-    // 1. Its last log term is greater than ours, OR
-    // 2. Terms are equal AND its log is at least as long as ours
-    if (lastLogTerm > myLastTerm) return true;
-    if (lastLogTerm == myLastTerm && lastLogIndex >= myLastIndex) return true;
-    return false;
-}
-```
-
-**Why this matters:** Every line of this code is production code. The term comparison, vote granting, log comparison - this is the heart of Raft consensus and it runs identically in tests.
-
-#### Step 5: Response Returns Through Transport Chain
+`sendInstallSnapshot` performs steps 1–4, 6 and 8 only. It ignores throttling and reordering, and
+never corrupts responses.
 
 ```mermaid
 sequenceDiagram
-    participant RaftB as Node B (RaftNode)
-    participant TransB as InMemoryTransportSimulator(B)
-    participant Registry as Global Registry
-    participant TransA as InMemoryTransportSimulator(A)
-    participant RaftA as Node A (RaftNode)
-    
-    RaftB->>TransB: VoteResponse{term=1, voteGranted=true}
-    Note over TransB: Optional: Byzantine corruption
-    Note over TransB: Apply return latency
-    TransB->>Registry: Lookup "nodeA"
-    Registry-->>TransA: Return transport instance
-    TransA->>TransA: promise.complete(response)
-    Note over TransA: Future<VoteResponse> completes
-    TransA->>RaftA: handleVoteResponse()
-    Note over RaftA: Count votes, maybe become leader
+    participant A as RaftNode A
+    participant TA as InMemoryTransportSimulator(A)
+    participant Reg as Static registry
+    participant TB as InMemoryTransportSimulator(B)
+    participant B as RaftNode B
+
+    A->>TA: sendVoteRequest("B", request)
+    Note over TA: crashed? partition? drop?
+    TA->>Reg: transports.get("B")
+    Reg-->>TA: TB (running)
+    Note over TA: throttle, sleep latency, maybe reorder
+    TA->>B: handleVoteRequest(request) via TB
+    B-->>TA: Future<VoteResponse>
+    Note over TA: BYZANTINE on A: maybe corrupt
+    TA-->>A: Future<VoteResponse> completes
 ```
 
-#### Step 6: Node A Becomes Leader (REAL Production Code)
+### Static state
+
+The registry of transports and the set of partitions are **static** and shared by every instance in
+the JVM:
 
 ```java
-// Inside RaftNode - REAL PRODUCTION CODE
-private void handleVoteResponse(String fromNode, VoteResponse response) {
-    synchronized (stateLock) {
-        // Only process if still a candidate
-        if (state != State.CANDIDATE) return;
-        
-        // If response has higher term, step down
-        if (response.getTerm() > currentTerm) {
-            currentTerm = response.getTerm();
-            state = State.FOLLOWER;
-            votedFor = null;
-            return;
-        }
-        
-        // Count the vote
-        if (response.getVoteGranted()) {
-            votesReceived.add(fromNode);
-            
-            // Check for majority
-            int majority = (clusterNodes.size() / 2) + 1;
-            if (votesReceived.size() >= majority) {
-                becomeLeader();
-            }
-        }
-    }
-}
-
-private void becomeLeader() {
-    state = State.LEADER;
-    leaderId = nodeId;
-    
-    // Initialize nextIndex and matchIndex for all followers
-    for (String node : clusterNodes) {
-        nextIndex.put(node, log.getLastIndex() + 1);
-        matchIndex.put(node, 0L);
-    }
-    
-    logger.info("Node {} became LEADER for term {}", nodeId, currentTerm);
-    
-    // Start sending heartbeats immediately
-    sendHeartbeats();
-}
-```
-
-### Complete Flow Diagram
-
-```mermaid
-flowchart TB
-    subgraph NodeA["NODE A - Candidate - REAL CODE"]
-        A1["RaftNode.startElection()"]
-        A2["• Become CANDIDATE<br/>• Increment term<br/>• Vote for self"]
-        A3["transport.sendVoteRequest()"]
-    end
-    
-    subgraph Transport1["IN-MEMORY TRANSPORT"]
-        T1["Global Registry Lookup"]
-        T2["CHAOS CHECKS:<br/>Crashed / Partition / Drop / Latency"]
-    end
-    
-    subgraph NodeB["NODE B - Follower - REAL CODE"]
-        B1["handleVoteRequest()"]
-        B2["• Check term<br/>• Check votedFor<br/>• Check log<br/>• Grant/deny"]
-        B3["VoteResponse {granted:true}"]
-    end
-    
-    subgraph Transport2["IN-MEMORY TRANSPORT"]
-        T3["BYZANTINE CHECK"]
-    end
-    
-    subgraph NodeA2["NODE A - REAL CODE"]
-        A4["handleVoteResponse()"]
-        A5["• Count vote<br/>• Check majority<br/>• Become LEADER"]
-    end
-    
-    A1 --> A2 --> A3
-    A3 -->|"VoteRequest"| T1
-    T1 --> T2
-    T2 -->|"Deliver"| B1
-    B1 --> B2 --> B3
-    B3 --> T3
-    T3 -->|"VoteResponse"| A4
-    A4 --> A5
-    
-    style NodeA fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
-    style NodeA2 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
-    style NodeB fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
-    style Transport1 fill:#fff3e0,stroke:#ff9800,stroke-width:2px
-    style Transport2 fill:#fff3e0,stroke:#ff9800,stroke-width:2px
-```
-
-**Legend:** 🔵 Blue = REAL CODE (runs identically in production) | 🟠 Orange = SIMULATED (network layer only)
-
-### Architecture
-
-```mermaid
-flowchart TB
-    subgraph Registry["Global Transport Registry"]
-        NodeA["Node A Transport"]
-        NodeB["Node B Transport"]
-        NodeC["Node C Transport"]
-    end
-    
-    NodeA ---|messages| NodeB
-    NodeB ---|messages| NodeC
-    NodeA ---|messages| NodeC
-    
-    Partitions["Network Partitions"]
-    
-    Registry --> Partitions
-```
-
-#### Global Registry: Cross-Node Communication
-
-The key to making in-memory testing work is the **global static registry**:
-
-```java
-// All transports register themselves on start
 private static final Map<String, InMemoryTransportSimulator> transports = new ConcurrentHashMap<>();
-
-@Override
-public void start(Consumer<RaftMessage> messageHandler) {
-    this.messageHandler = messageHandler;
-    this.running = true;
-    transports.put(nodeId, this);  // Register in global registry
-}
+private static final Set<Set<String>> networkPartitions = ConcurrentHashMap.newKeySet();
 ```
 
-This enables any node to find any other node:
-
-```mermaid
-flowchart LR
-    subgraph Registry["Global Registry"]
-        direction TB
-        node1 --> Transport1
-        node2 --> Transport2
-        node3 --> Transport3
-    end
-    
-    Transport1 --> RaftNode1
-    Transport2 --> RaftNode2
-    Transport3 --> RaftNode3
-```
-
-**When node1 sends to node2:**
-1. node1's transport looks up "node2" in registry
-2. Gets node2's transport instance
-3. Calls node2's `transport.handleVoteRequest()`
-4. node2's transport delegates to node2's RaftNode
-
-#### Key Components
-
-| Component | Description |
-|-----------|-------------|
-| **Global Registry** | Static `ConcurrentHashMap` storing all transport instances by node ID |
-| **Network Partitions** | Static set tracking isolated node groups |
-| **Message Queue** | `PriorityBlockingQueue` for message reordering simulation |
-| **Executor** | Cached thread pool for asynchronous message delivery |
+`start()` registers the transport under its node ID, and `stop()` removes it. Because the state is
+shared, tests must call `InMemoryTransportSimulator.clearAllTransports()` before and after each
+test, and test classes that use it must not run concurrently in one JVM. The controller's
+[`junit-platform.properties`](../../quorus-controller/src/test/resources/junit-platform.properties)
+runs classes and methods sequentially by default. Only the Docker test classes opt in to concurrency.
 
 ### Usage
 
-#### Basic Usage
+#### Three-node cluster
+
+Adapted from `RaftChaosTest` and `RaftFailureTest`. `vertx` comes from `VertxExtension`.
 
 ```java
-// Create transport for each node
-InMemoryTransportSimulator transport1 = new InMemoryTransportSimulator("node1");
-InMemoryTransportSimulator transport2 = new InMemoryTransportSimulator("node2");
-InMemoryTransportSimulator transport3 = new InMemoryTransportSimulator("node3");
+InMemoryTransportSimulator.clearAllTransports();
 
-// Create Raft nodes with the transports
 Set<String> clusterNodes = Set.of("node1", "node2", "node3");
-RaftNode node1 = new RaftNode(vertx, "node1", clusterNodes, transport1, stateMachine, 500, 100);
-RaftNode node2 = new RaftNode(vertx, "node2", clusterNodes, transport2, stateMachine, 500, 100);
-RaftNode node3 = new RaftNode(vertx, "node3", clusterNodes, transport3, stateMachine, 500, 100);
+List<RaftNode> cluster = new ArrayList<>();
+for (String nodeId : clusterNodes) {
+    cluster.add(RaftNode.builder()
+            .vertx(vertx)
+            .nodeId(nodeId)
+            .clusterNodes(clusterNodes)
+            .transport(new InMemoryTransportSimulator(nodeId))
+            .stateMachine(new QuorusStateStore())
+            .mode(RaftNodeMode.volatileMode())
+            .electionTimeout(1000)
+            .heartbeatInterval(200)
+            .build());
+}
+cluster.forEach(RaftNode::start);          // start() returns Future<Void>
 
-// Start nodes
-node1.start();
-node2.start();
-node3.start();
+await().atMost(Duration.ofSeconds(10))
+       .until(() -> cluster.stream().filter(RaftNode::isLeader).count() == 1);
 
-// Clean up after tests
+// Tear down
+cluster.forEach(RaftNode::stop);           // stop() returns Future<Void>
 InMemoryTransportSimulator.clearAllTransports();
 ```
 
-#### Single-Node Testing (Smoke Tests)
+`RaftNode` has a private constructor and is built only through `RaftNode.builder()`. `vertx`,
+`nodeId`, `clusterNodes`, `transport`, `stateMachine` and `mode` are required, and `build()` throws
+`IllegalStateException` if any is missing. `electionTimeout` defaults to 5000 ms and
+`heartbeatInterval` to 1000 ms. Tests use shorter values, such as 500/100, 600/120 and 1000/200.
 
-For quick infrastructure validation:
+#### Single-node cluster
+
+From [`InfrastructureSmokeTest`](../../quorus-controller/src/test/java/dev/mars/quorus/controller/integration/InfrastructureSmokeTest.java),
+which then starts the HTTP API on top of the node:
 
 ```java
-// Single-node cluster automatically becomes leader
 RaftTransport transport = new InMemoryTransportSimulator("smoke-test-node");
-Set<String> clusterNodes = Set.of("smoke-test-node");
-RaftNode raftNode = new RaftNode(vertx, "smoke-test-node", clusterNodes, transport, stateMachine, 500, 100);
-raftNode.start();
-
-// Wait for leader election
-await().atMost(Duration.ofSeconds(5)).until(raftNode::isLeader);
+raftNode = RaftNode.builder().vertx(vertx).nodeId("smoke-test-node").clusterNodes(clusterNodes)
+        .transport(transport).stateMachine(stateMachine).mode(RaftNodeMode.volatileMode())
+        .electionTimeout(500).heartbeatInterval(100).build();
 ```
 
-### Chaos Engineering Features
+A single-node cluster elects itself: `requestVotes()` calls `becomeLeader()` directly when the
+cluster has one member.
 
-#### 1. Network Latency Simulation
+### Chaos controls
+
+#### Latency and packet drop
 
 ```java
-// Configure random latency between 50-150ms
-transport.setChaosConfig(50, 150, 0.0);
+transport.setChaosConfig(100, 200, 0.0);   // 100–200 ms latency, no drops
+transport.setChaosConfig(5, 15, 0.25);     // 5–15 ms latency, 25% drop
 ```
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `minLatencyMs` | int | Minimum latency in milliseconds |
-| `maxLatencyMs` | int | Maximum latency in milliseconds |
-| `dropRate` | double | Probability of dropping a packet (0.0 to 1.0) |
+| Parameter | Default | Meaning |
+|-----------|---------|---------|
+| `minLatencyMs` | 5 | Minimum delay per message sent by this transport |
+| `maxLatencyMs` | 15 | Maximum delay per message sent by this transport |
+| `dropRate` | 0.0 | Probability that a message from this transport fails immediately |
 
-#### 2. Packet Drop Simulation
+All settings apply to messages *sent by* the transport they are set on.
 
-```java
-// 10% packet drop rate
-transport.setChaosConfig(5, 15, 0.1);
-```
-
-#### 3. Network Partitions
-
-Network partitions are the most critical failure scenario for distributed consensus. Here's how `InMemoryTransportSimulator` simulates them reliably:
+#### Network partitions
 
 ```java
-// Static partition state shared by ALL transport instances
-private static final Set<Set<String>> networkPartitions = ConcurrentHashMap.newKeySet();
-
-// Create partition: {node1, node2} cannot communicate with {node3}
-Set<String> partition1 = Set.of("node1", "node2");
-Set<String> partition2 = Set.of("node3");
-InMemoryTransportSimulator.createPartition(partition1, partition2);
-
-// Test cluster behavior during partition...
-
-// Heal partitions
+InMemoryTransportSimulator.createPartition(Set.of("node1"), Set.of("node2", "node3"));
+// ...
 InMemoryTransportSimulator.healPartitions();
 ```
 
-##### How Partition Checking Works
+`createPartition(a, b)` adds `a` and `b` as two groups to the static partition set. Two nodes can
+communicate only if **every** group contains both of them or neither of them. As a result:
+
+- Partitions are symmetric. They apply to all three RPCs and take effect on the next send.
+- Calls accumulate. Each `createPartition` adds more groups, and only `healPartitions()` (or
+  `clearAllTransports()`) removes them.
+- A node named in neither group can still reach other unnamed nodes, but cannot reach any node in
+  either group.
+
+#### Message reordering
 
 ```java
-/**
- * Check if two nodes can communicate (not partitioned).
- * This is called on EVERY message send.
- */
-private static boolean canCommunicate(String sourceId, String targetId) {
-    if (networkPartitions.isEmpty()) {
-        return true;  // No partitions = full connectivity
-    }
-    
-    // Check if nodes are in different partitions
-    for (Set<String> partition : networkPartitions) {
-        boolean sourceInPartition = partition.contains(sourceId);
-        boolean targetInPartition = partition.contains(targetId);
-        
-        // If one is in partition and other is not, they can't communicate
-        if (sourceInPartition != targetInPartition) {
-            return false;
-        }
-    }
-    
-    return true;  // Both in same partition or neither in any partition
-}
+transport.setReorderingConfig(true, 0.3, 50);   // 30% of messages delayed by up to 50 ms more
 ```
 
-##### Partition Scenarios
+| Parameter | Meaning |
+|-----------|---------|
+| `enabled` | Whether reordering is enabled |
+| `reorderProbability` | Probability that a vote or append-entries message is queued for later delivery |
+| `maxReorderDelayMs` | Upper bound (exclusive) on the extra delay. Must be greater than 0 when reordering is enabled |
 
-**Scenario 1: Majority Partition (3-2 Split)**
+Delivery order is not guaranteed even with reordering disabled. Each send is a separate task on a
+10-thread pool with its own random latency, so two messages from A to B can arrive in either order.
 
-```mermaid
-flowchart TB
-    subgraph Before["Before Partition"]
-        B1((node1)) & B2((node2)) & B3((node3)) & B4((node4)) & B5((node5))
-    end
-    
-    Before -->|"createPartition(...)"| After
-    
-    subgraph After["After Partition"]
-        subgraph Majority["MAJORITY - can elect leader"]
-            A1((node1))
-            A2((node2))
-            A3((node3))
-        end
-        
-        subgraph Minority["MINORITY - cannot elect"]
-            A4((node4))
-            A5((node5))
-        end
-    end
-    
-    style Before fill:#f5f5f5,stroke:#666
-    style Majority fill:#e8f5e9,stroke:#4caf50,stroke-width:2px
-    style Minority fill:#ffebee,stroke:#c62828,stroke-width:2px
-```
-
-**Expected behavior:**
-- Majority partition elects leader among node1/2/3
-- Minority partition has no quorum, nodes remain followers
-- Commands only succeed on majority side
-
----
-
-**Scenario 2: Even Split (2-2-1)**
-
-```mermaid
-flowchart TB
-    subgraph Setup["After createPartition"]
-        subgraph P1["Partition 1 - no quorum"]
-            N1((node1))
-            N2((node2))
-        end
-        
-        subgraph P2["Partition 2 - no quorum"]
-            N3((node3))
-            N4((node4))
-        end
-        
-        subgraph Isolated["Isolated"]
-            N5((node5))
-        end
-    end
-    
-    Result["No partition has quorum - need 3/5<br/>Cluster is unavailable<br/>THIS IS CORRECT BEHAVIOR"]
-    
-    Setup --> Result
-    
-    style P1 fill:#fff3e0,stroke:#ff9800,stroke-width:2px
-    style P2 fill:#fff3e0,stroke:#ff9800,stroke-width:2px
-    style Isolated fill:#ffebee,stroke:#c62828,stroke-width:2px
-    style Result fill:#f5f5f5,stroke:#666,stroke-width:1px
-```
-
-##### Why This Is Reliable
-
-1. **Symmetric Blocking** - If A can't reach B, B can't reach A
-2. **Immediate Effect** - Partition takes effect on next message send
-3. **Atomic Operations** - Partition state is thread-safe with `ConcurrentHashMap`
-4. **Heal Atomically** - `healPartitions()` removes all partitions at once
-
-#### 4. Message Reordering
+#### Bandwidth throttling
 
 ```java
-// Enable 20% message reordering with up to 200ms delay
-transport.setReorderingConfig(true, 0.2, 200);
+transport.setThrottlingConfig(true, 1000);   // about 1 KB/s for this sender
 ```
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `enabled` | boolean | Whether reordering is enabled |
-| `reorderProbability` | double | Probability a message will be reordered (0.0 to 1.0) |
-| `maxReorderDelayMs` | int | Maximum delay for reordered messages |
+The budget is per sending transport, shared across all its targets, and reset every second.
+Install-snapshot messages are not throttled.
 
-#### 5. Bandwidth Throttling
+#### Failure modes
 
 ```java
-// Limit to 1MB/second
-transport.setThrottlingConfig(true, 1_000_000);
-```
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `enabled` | boolean | Whether throttling is enabled |
-| `maxBytesPerSecond` | long | Maximum bytes per second |
-
-#### 6. Failure Modes
-
-```java
-// Set failure mode
-transport.setFailureMode(FailureMode.CRASH, 0.0);
-
-// Available failure modes:
-// - NONE: Normal operation
-// - CRASH: Node stops responding completely
-// - BYZANTINE: Node sends corrupted responses
-// - SLOW: Node responds with 10x latency
-// - FLAKY: Node intermittently fails (50% chance of high latency)
-
-// Recover from crash
+transport.setFailureMode(InMemoryTransportSimulator.FailureMode.BYZANTINE, 0.5);
 transport.recoverFromCrash();
 ```
 
-##### Failure Mode Details
+| Mode | Effect on the transport it is set on |
+|------|--------------------------------------|
+| `NONE` | Normal operation |
+| `CRASH` | Every message this node *sends* fails with `Node crashed`. Messages to this node are still delivered, and its `RaftNode` still answers them. To model a crashed process, stop the `RaftNode`, as `RaftFailureTest` does. `recoverFromCrash()`, or setting another mode, clears it |
+| `BYZANTINE` | Responses this node *receives* to its vote and append-entries requests are corrupted with the given probability. The corruption adds 0–9 to the term, flips `voteGranted` or `success`, and sets append-entries `matchIndex` to a random 0–99 |
+| `SLOW` | Latency × 10 |
+| `FLAKY` | 50% chance of latency × 5 per message. Messages are never failed |
 
-| Mode | Behavior | Use Case |
-|------|----------|----------|
-| `NONE` | Normal operation | Baseline testing |
-| `CRASH` | All requests fail with "Node crashed" | Test leader failover |
-| `BYZANTINE` | Responses have corrupted terms and flipped success flags | Test Byzantine fault tolerance |
-| `SLOW` | 10x normal latency | Test timeout handling |
-| `FLAKY` | 50% chance of 5x latency | Test unstable network conditions |
+### API reference
 
-##### Simulating Real-World Failure Scenarios
-
-The chaos engineering features in `InMemoryTransportSimulator` are designed to simulate **real production failures** that Quorus will encounter:
-
-| Real-World Failure | In-Memory Simulation | Why It Matters |
-|-------------------|---------------------|----------------|
-| **AWS AZ Outage** | `createPartition()` | Tests that majority partition continues operating |
-| **Network Switch Failure** | `createPartition()` | Tests split-brain prevention |
-| **Congested Network** | `setChaosConfig(100, 500, 0.0)` | Tests election timeout tuning |
-| **Lossy WiFi/VPN** | `setChaosConfig(5, 15, 0.1)` | Tests retry logic |
-| **Server Crash** | `setFailureMode(CRASH)` | Tests leader failover |
-| **Corrupted Memory** | `setFailureMode(BYZANTINE)` | Tests Byzantine fault tolerance |
-| **Overloaded Server** | `setFailureMode(SLOW)` | Tests timeout handling |
-| **Flapping Network** | `setFailureMode(FLAKY)` | Tests stability under instability |
-| **Out-of-Order Packets** | `setReorderingConfig()` | Tests message idempotency |
-| **Bandwidth Limit** | `setThrottlingConfig()` | Tests large cluster behavior |
-
-### API Reference
-
-#### Constructor
-
-```java
-public InMemoryTransportSimulator(String nodeId)
-```
-
-Creates a new transport instance for the specified node ID.
-
-#### RaftTransport Interface Methods
-
-| Method | Description |
+| Member | Description |
 |--------|-------------|
-| `start(Consumer<RaftMessage> messageHandler)` | Start the transport and register in global registry |
-| `stop()` | Stop the transport and unregister from global registry |
-| `sendVoteRequest(String targetId, VoteRequest request)` | Send a vote request to another node |
-| `sendAppendEntries(String targetId, AppendEntriesRequest request)` | Send append entries to another node |
-| `setRaftNode(RaftNode node)` | Set the associated RaftNode for message handling |
+| `InMemoryTransportSimulator(String nodeId)` | Creates the transport and starts its reorder scheduler. Registration happens in `start()` |
+| `start(Consumer<RaftMessage>)` | Registers the transport in the static registry and marks it running |
+| `Future<Void> stop()` | Unregisters the transport, stops the reorder scheduler, and returns a succeeded future |
+| `sendVoteRequest`, `sendAppendEntries`, `sendInstallSnapshot` | See [Message path](#message-path) |
+| `setRaftNode(RaftNode)` | Called by `RaftNode.start()` |
+| `isRunning()` | Whether `start()` has been called and `stop()` has not |
+| `setChaosConfig(int, int, double)` | Latency range and drop rate |
+| `setReorderingConfig(boolean, double, int)` | Reordering |
+| `setThrottlingConfig(boolean, long)` | Bandwidth limit |
+| `setFailureMode(FailureMode, double)` | Failure mode and Byzantine corruption rate |
+| `recoverFromCrash()` | Leaves `CRASH` mode |
+| `static createPartition(Set<String>, Set<String>)` | Adds a partition |
+| `static healPartitions()` | Removes all partitions |
+| `static getAllTransports()` | Copy of the registry |
+| `static clearAllTransports()` | Empties the registry and heals partitions. It does not stop the transports |
 
-#### Configuration Methods
+### Tests that use it
 
-| Method | Description |
-|--------|-------------|
-| `setChaosConfig(int min, int max, double dropRate)` | Configure latency and packet drop |
-| `setReorderingConfig(boolean, double, int)` | Configure message reordering |
-| `setThrottlingConfig(boolean, long)` | Configure bandwidth throttling |
-| `setFailureMode(FailureMode, double)` | Set failure mode and Byzantine corruption rate |
-| `recoverFromCrash()` | Recover from CRASH failure mode |
+All 33 users are in `quorus-controller` test sources. The tests below are written around the
+simulator itself:
 
-#### Static Methods
+| Test class | Tests | What it covers |
+|------------|------:|----------------|
+| [`RaftChaosTest`](../../quorus-controller/src/test/java/dev/mars/quorus/controller/raft/RaftChaosTest.java) | 2 | Five-node cluster replicating under 25% packet loss, and under 100–200 ms latency |
+| [`RaftFailureTest`](../../quorus-controller/src/test/java/dev/mars/quorus/controller/raft/RaftFailureTest.java) | 10 | Command submission to a follower, double start and stop, leader failure and recovery, loss of one node (by stopping it, not by `createPartition`), invalid configuration, transport start failure, state-machine failures, concurrent elections, message and node-ID validation |
+| [`EnhancedInMemoryTransportTest`](../../quorus-controller/src/test/java/dev/mars/quorus/controller/raft/EnhancedInMemoryTransportTest.java) | 8 | Each chaos control: partition, reordering, throttling, `CRASH`, `BYZANTINE`, `SLOW`, `FLAKY`, and a combined case |
+| [`InstallSnapshotTest`](../../quorus-controller/src/test/java/dev/mars/quorus/controller/raft/InstallSnapshotTest.java) | 7 | Snapshots sent to a follower left behind by `createPartition`, state restored from a snapshot, stale-term rejection, chunk reassembly and persistence |
+| [`InfrastructureSmokeTest`](../../quorus-controller/src/test/java/dev/mars/quorus/controller/integration/InfrastructureSmokeTest.java) | 14 | Single-node cluster with the HTTP API: health, Raft status, commands, metrics |
 
-| Method | Description |
-|--------|-------------|
-| `createPartition(Set<String>, Set<String>)` | Create a network partition between two node groups |
-| `healPartitions()` | Remove all network partitions |
-| `getAllTransports()` | Get a copy of all registered transports |
-| `clearAllTransports()` | Clear all transports and heal partitions |
+The other users are mostly HTTP API, job-assignment, lifecycle and durability tests in the
+controller's `http`, `integration`, `lifecycle`, `raft` and `service` test packages. They use the
+simulator to get a leader without a network.
 
-### Test Examples
+### MockRaftTransport
 
-#### Example 1: Basic Cluster Test
+**Location:** [`quorus-controller/src/test/java/dev/mars/quorus/controller/raft/MockRaftTransport.java`](../../quorus-controller/src/test/java/dev/mars/quorus/controller/raft/MockRaftTransport.java)  
+**Interface:** `RaftTransport`  
+**Used by:** `MetadataPersistenceTest`, `RaftLogClusterIntegrationTest`
 
-```java
-@Test
-void testLeaderElection() {
-    InMemoryTransportSimulator.clearAllTransports();
-    
-    Map<String, InMemoryTransportSimulator> transports = new HashMap<>();
-    Map<String, RaftNode> nodes = new HashMap<>();
-    
-    for (String nodeId : Set.of("node1", "node2", "node3")) {
-        transports.put(nodeId, new InMemoryTransportSimulator(nodeId));
-    }
-    
-    Set<String> clusterNodes = transports.keySet();
-    for (String nodeId : clusterNodes) {
-        RaftNode node = new RaftNode(vertx, nodeId, clusterNodes, 
-                                     transports.get(nodeId), new QuorusStateMachine(), 500, 100);
-        nodes.put(nodeId, node);
-        node.start();
-    }
-    
-    // Wait for leader election
-    await().atMost(Duration.ofSeconds(10))
-           .until(() -> nodes.values().stream().filter(RaftNode::isLeader).count() == 1);
-    
-    // Cleanup
-    nodes.values().forEach(RaftNode::stop);
-    InMemoryTransportSimulator.clearAllTransports();
-}
-```
+A simpler in-memory transport with no static state:
 
-#### Example 2: Network Partition Test
+- The test builds a `Map<String, MockRaftTransport>` and passes it to each transport with
+  `setTransports(map)`.
+- It has fixed random delays (10–30 ms for votes, 5–15 ms for append entries and install
+  snapshot) on a 10-thread pool.
+- It has no partition, drop, reordering, throttling or failure-mode controls. A stopped or missing
+  target fails the future.
+- If the target has no `RaftNode`, it **grants a vote 90% of the time and reports append success
+  95% of the time, at random**. A correctly wired test never reaches this path, because
+  `RaftNode.start()` sets the node. If the path is reached, results are random rather than failing,
+  so prefer `InMemoryTransportSimulator` for new tests.
 
-```java
-@Test
-void testNetworkPartition() {
-    // Setup 5-node cluster
-    // ...
-    
-    // Create partition: majority (3 nodes) vs minority (2 nodes)
-    InMemoryTransportSimulator.createPartition(
-        Set.of("node1", "node2", "node3"),
-        Set.of("node4", "node5")
-    );
-    
-    // Majority partition should elect new leader
-    // Note: Use short timeouts (5s) for in-memory simulations - operations complete in 100-500ms
-    await().atMost(Duration.ofSeconds(5))
-           .until(() -> hasMajorityLeader(Set.of("node1", "node2", "node3")));
-    
-    // Heal partition
-    InMemoryTransportSimulator.healPartitions();
-    
-    // Cluster should converge to single leader
-    await().atMost(Duration.ofSeconds(5))
-           .until(() -> exactlyOneLeader());
-}
-```
+### `RaftTransport` implementations
 
-#### Example 3: Chaos Engineering Test
+| Implementation | Where | Network | Chaos controls | Used for |
+|----------------|-------|---------|----------------|----------|
+| [`GrpcRaftTransport`](../../quorus-controller/src/main/java/dev/mars/quorus/controller/raft/GrpcRaftTransport.java) | main | gRPC over Netty, optional TLS | None | Production |
+| `InMemoryTransportSimulator` | test | None | Partition, drop, latency, reordering, throttling, failure modes | 33 controller test classes |
+| `MockRaftTransport` | test | None | None (fixed random delay) | Two controller test classes |
+| `RaftNodeIntegrationTest.TestRaftTransport` | test | None | None. Every RPC succeeds at once | `RaftNodeIntegrationTest` |
 
-```java
-@Test
-void testHighLatencyConditions() {
-    // Configure all transports with high latency
-    for (InMemoryTransportSimulator transport : transports.values()) {
-        transport.setChaosConfig(100, 500, 0.0);  // 100-500ms latency
-    }
-    
-    // Cluster should still reach consensus, just slower
-    await().atMost(Duration.ofMinutes(2))
-           .until(() -> hasExactlyOneLeader());
-}
+There is no HTTP Raft transport.
 
-@Test
-void testPacketLoss() {
-    // Configure 10% packet loss
-    for (InMemoryTransportSimulator transport : transports.values()) {
-        transport.setChaosConfig(5, 15, 0.1);  // 10% drop rate
-    }
-    
-    // Cluster should handle packet loss with retries
-    await().atMost(Duration.ofMinutes(1))
-           .until(() -> hasExactlyOneLeader());
-}
-```
+### Limits and known issues
 
-### Why Test Results Transfer to Production
+- **Docker tests are still needed** for process start and stop, port binding, health probes,
+  serialisation, gRPC, TLS and mTLS peer authorisation, and real latency.
+- **Threads are not released.** `stop()` shuts down the reorder scheduler but not the per-instance
+  10-thread send pool, so each instance leaves its pool threads alive until the JVM exits.
 
-| Aspect | In-Memory Transport | Production Transport | Same? |
-|--------|---------------------|---------------------|-------|
-| **Raft Algorithm** | Real `RaftNode` code | Real `RaftNode` code | ✅ Identical |
-| **State Machine** | Real `QuorusStateMachine` | Real `QuorusStateMachine` | ✅ Identical |
-| **Message Format** | Protobuf `VoteRequest`, etc. | Protobuf `VoteRequest`, etc. | ✅ Identical |
-| **Async Model** | Vert.x `Future` | Vert.x `Future` | ✅ Identical |
-| **Election Logic** | Real timers, real voting | Real timers, real voting | ✅ Identical |
-| **Log Replication** | Real append entries | Real append entries | ✅ Identical |
-| **Message Delivery** | In-memory direct call | TCP/gRPC/HTTP | ⚡ Faster |
-| **Network Failures** | Simulated (configurable) | Real failures | ✅ More Controllable |
+### Practices
 
-### What's Different (and Why It's Better for Testing)
-
-```mermaid
-flowchart TB
-    subgraph Production["Production Network Stack"]
-        direction TB
-        P1["RaftNode<br/>(SAME CODE)"]
-        P2["RaftTransport Interface"]
-        P3["GrpcRaftTransport<br/>or HttpTransport"]
-        P4["gRPC/HTTP Stack"]
-        P5["TCP/IP Stack"]
-        P6["Network Hardware"]
-        P1 --- P2 --- P3 --- P4 --- P5 --- P6
-        
-        PD["❌ Drawbacks:<br/>• Slow (real network)<br/>• Non-deterministic<br/>• Port binding issues<br/>• Flaky tests"]
-    end
-    
-    subgraph Test["Test In-Memory Stack"]
-        direction TB
-        T1["RaftNode<br/>(SAME CODE)"]
-        T2["RaftTransport Interface"]
-        T3["InMemoryTransportSimulator"]
-        T4["Direct Method Call<br/>(No Network)"]
-        T1 --- T2 --- T3 --- T4
-        
-        TB["✅ Benefits:<br/>• 100x faster<br/>• Deterministic<br/>• Controllable chaos<br/>• No port conflicts<br/>• Parallel test execution"]
-    end
-    
-    style Production fill:#ffebee,stroke:#c62828,stroke-width:2px
-    style Test fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
-    style PD fill:#ffcdd2,stroke:#c62828
-    style TB fill:#c8e6c9,stroke:#2e7d32
-```
-
-### Reliability Guarantees
-
-The `InMemoryTransportSimulator` provides these guarantees that match production behavior:
-
-1. **Message Ordering Within a Connection** - Messages from A→B are delivered in order (unless reordering is explicitly enabled for chaos testing)
-
-2. **Asynchronous Delivery** - Messages are delivered asynchronously via executor, simulating real network behavior
-
-3. **Failure Semantics** - Failed deliveries return failed `Future`, just like network failures in production
-
-4. **Concurrent Safety** - Uses `ConcurrentHashMap` and thread-safe patterns for multi-threaded access
-
-5. **Clean Shutdown** - `stop()` properly unregisters from global registry, preventing message delivery to stopped nodes
-
-### Test Coverage and Confidence
-
-#### What You CAN Confidently Test
-
-Using `InMemoryTransportSimulator`, you can fully validate:
-
-| Component | Coverage | Confidence |
-|-----------|----------|------------|
-| **Leader Election** | 100% | ✅ High - Same algorithm runs |
-| **Vote Granting Logic** | 100% | ✅ High - Real `handleVoteRequest()` |
-| **Log Replication** | 100% | ✅ High - Real `handleAppendEntries()` |
-| **State Machine Updates** | 100% | ✅ High - Real `QuorusStateMachine.apply()` |
-| **Command Submission** | 100% | ✅ High - Real `submitCommand()` |
-| **Partition Tolerance** | 100% | ✅ High - Accurate partition simulation |
-| **Failure Recovery** | 100% | ✅ High - Same recovery logic |
-| **Term Advancement** | 100% | ✅ High - Real term tracking |
-| **Commit Index** | 100% | ✅ High - Real commit tracking |
-
-#### What You Should ADDITIONALLY Test with Docker
-
-| Component | Why Docker | When |
-|-----------|-----------|------|
-| **Container Lifecycle** | Actual process start/stop | Before release |
-| **Port Binding** | Real network interfaces | Before release |
-| **Health Checks** | Docker health probes | Before release |
-| **Resource Limits** | Memory/CPU constraints | Performance testing |
-| **Real Latency** | Actual TCP/gRPC overhead | Performance testing |
-| **TLS/Security** | Certificate handling | Security testing |
-
-### Best Practices
-
-#### 1. Always Clean Up
-
-```java
-@BeforeEach
-void setUp() {
-    InMemoryTransportSimulator.clearAllTransports();
-}
-
-@AfterEach
-void tearDown() {
-    // Stop all nodes
-    nodes.values().forEach(RaftNode::stop);
-    InMemoryTransportSimulator.clearAllTransports();
-}
-```
-
-#### 2. Use Appropriate Timeouts
-
-The in-memory transport is fast, so use shorter timeouts for tests:
-
-```java
-// Good for testing: 500ms election timeout, 100ms heartbeat
-RaftNode node = new RaftNode(vertx, nodeId, clusterNodes, transport, stateMachine, 500, 100);
-
-// Awaitility timeouts: Use 5s for normal operations (they complete in 100-500ms)
-await().atMost(Duration.ofSeconds(5)).until(() -> node.isLeader());
-
-// For chaos scenarios with high latency, use 10s max
-await().atMost(Duration.ofSeconds(10)).until(() -> hasExactlyOneLeader());
-```
-
-**Timeout Guidelines:**
-| Scenario | Recommended Timeout |
-|----------|---------------------|
-| Normal in-memory operations | 5 seconds |
-| Chaos testing (latency, drops) | 10 seconds |
-| Extended chaos (byzantine, partition healing) | 30 seconds |
-
-> **Note:** Avoid 30+ second timeouts for in-memory simulators. If tests regularly hit timeouts, the test logic may have unreachable conditions.
-
-#### 3. Use SimulatorTestLoggingExtension
-
-The `SimulatorTestLoggingExtension` provides consistent test logging with configurable verbosity:
-
-```java
-@ExtendWith(SimulatorTestLoggingExtension.class)
-class MySimulatorTest {
-    // INFO level: Test start/complete (minimal output)
-    // DEBUG level: Failure details
-    // TRACE level: Per-test metrics (timing, throughput)
-}
-```
-
-#### 4. Isolate Tests
-
-Each test should:
-- Clear all transports before starting
-- Create fresh transport and node instances
-- Clean up after completion
-
-#### 4. Verify State Consistency
-
-After chaos tests, always verify:
-- Exactly one leader exists
-- All nodes have consistent committed state
-- No split-brain condition
-
-### Comparison with Other Transports
-
-| Feature | InMemoryTransportSimulator | GrpcRaftTransport | HttpRaftTransport |
-|---------|----------------------|-------------------|-------------------|
-| Network Required | ❌ No | ✅ Yes | ✅ Yes |
-| Chaos Testing | ✅ Built-in | ❌ No | ❌ No |
-| Production Ready | ❌ No | ✅ Yes | ✅ Yes |
-| Test Speed | ⚡ Fast | 🐢 Slow | 🐢 Slow |
-| Deterministic | ✅ Yes | ❌ No | ❌ No |
-| Partition Simulation | ✅ Yes | ⚠️ Manual | ⚠️ Manual |
-
-### File Location
-
-```
-quorus-controller/
-└── src/test/java/dev/mars/quorus/controller/raft/
-    └── InMemoryTransportSimulator.java
-```
-
-### Related Components
-
-- [RaftTransport](../../quorus-controller/src/main/java/dev/mars/quorus/controller/raft/RaftTransport.java) - Transport interface
-- [RaftNode](../../quorus-controller/src/main/java/dev/mars/quorus/controller/raft/RaftNode.java) - Raft consensus implementation
-- `RaftChaosTest` - Proposed chaos testing suite; no file with this name is currently present
-- `RaftFailureTest` - Proposed failure scenario tests; no file with this name is currently present
-- `InfrastructureSmokeTest` - Historical smoke-test reference; no file with this name is currently present
+1. Call `InMemoryTransportSimulator.clearAllTransports()` in `@BeforeEach` and `@AfterEach`, and
+   stop every `RaftNode` in `@AfterEach`.
+2. Create fresh transports and nodes for each test, because the registry is keyed by node ID.
+3. After chaos, assert that there is exactly one leader and that committed state agrees.
+4. Use timeouts suited to in-memory runs. `RaftChaosTest` waits up to 10 s, or 20 s for
+   high-latency cases. `EnhancedInMemoryTransportTest` waits up to 10 s.
 
 ---
 
 ## 2. InMemoryTransferProtocolSimulator
 
-**Status:** ✅ Implemented  
-**Location:** `quorus-core/src/test/java/dev/mars/quorus/simulator/protocol/InMemoryTransferProtocolSimulator.java`  
-**Interface:** `TransferProtocol`
+**Status:** Implemented as a standalone test double  
+**Location:** [`quorus-core/src/test/java/dev/mars/quorus/simulator/protocol/InMemoryTransferProtocolSimulator.java`](../../quorus-core/src/test/java/dev/mars/quorus/simulator/protocol/InMemoryTransferProtocolSimulator.java)  
+**Production interface:** None  
+**Tests:** `InMemoryTransferProtocolSimulatorTest` (40), `InMemoryFtpsProtocolSimulatorTest` (33), and the protocol group in `InMemorySimulatorTest`
 
 ### Purpose
 
-Simulates file transfer protocols (FTP, FTPS, SFTP, HTTP, SMB) without real network connections or protocol servers.
+Models a file transfer over FTP, FTPS, SFTP, HTTP or SMB as reads and writes on an
+`InMemoryFileSystemSimulator`, with latency, simulated bandwidth, progress callbacks, pause, resume
+and cancel, and injected failures.
 
-### Interface
+### Relationship to `TransferProtocol`
+
+The simulator uses the method names of the production
+[`TransferProtocol`](../../quorus-core/src/main/java/dev/mars/quorus/protocol/TransferProtocol.java)
+(`getProtocolName`, `canHandle`, `transfer`, `supportsResume`, `supportsPause`, `getMaxFileSize`),
+but it does **not** implement that interface:
+
+- Its `TransferRequest`, `TransferContext`, `TransferProgress`, `TransferResult` and
+  `TransferException` are nested types of the simulator, not the `dev.mars.quorus` types.
+- It adds `transferReactive(...)`, which returns a `java.util.concurrent.CompletableFuture`.
+  `transfer(...)` blocks on that future.
+
+The production `TransferProtocol.transfer` is a blocking call with no reactive variant and no
+Vert.x types.
+
+### Behaviour
+
+- **Factories.** `ftp(fs)`, `ftps(fs)`, `sftp(fs)`, `http(fs)` and `smb(fs)` return a simulator with
+  resume and pause enabled. The constructor `new InMemoryTransferProtocolSimulator(name, fs)` gives
+  the same result.
+- **Default latency per transfer.** FTP 50–200 ms, FTPS 80–300 ms, SFTP 30–150 ms, HTTP 10–100 ms,
+  SMB 5–50 ms. `setLatencyConfig(min, max)` overrides it.
+- **`canHandle`.** True when the source URI scheme matches the protocol name. In addition, the HTTP
+  simulator accepts `https`, FTPS accepts `ftp`, and FTP accepts `ftps`.
+- **Direction.** Taken from the URI schemes. A remote source with a `file:` destination is a
+  download, and a `file:` source with a remote destination is an upload. Both sides read and write
+  the same virtual file system by URI path. Remote-to-remote transfers throw `TransferException`.
+- **Speed.** By default the file moves in one chunk with no delay. `setSimulatedBytesPerSecond(n)`
+  moves it in chunks of about `n × progressUpdateIntervalMs / 1000` bytes, with a progress callback
+  and a sleep for each chunk.
+- **Resume.** Only explicit: `TransferRequest.builder().resumeFromBytes(n)` starts at byte `n` when
+  resume is supported, and the result reports `resumedFromBytes() == n`. Nothing is checkpointed
+  automatically between attempts.
+
+### Failure modes
+
+| `ProtocolFailureMode` | Effect |
+|-----------------------|--------|
+| `NONE` | Normal operation |
+| `AUTH_FAILURE`, `CONNECTION_TIMEOUT`, `CONNECTION_REFUSED`, `FILE_NOT_FOUND`, `PERMISSION_DENIED`, `DISK_FULL` | `TransferException` before any bytes move, with messages such as `Authentication failed for <host>` |
+| `TRANSFER_INTERRUPTED` | Only together with `setFailureAtPercent(p)`: `TransferException("Transfer interrupted at N%")` once progress reaches `p`. Nothing is written to the destination |
+| `CHECKSUM_MISMATCH` | `TransferException` after progress completes, before the destination is written |
+| `SLOW_TRANSFER` | Uses 1 KB chunks when a bandwidth is set. **It does not slow the transfer**: the total sleep is still size ÷ bandwidth, and in the default unlimited mode it has no effect |
+| `FLAKY_CONNECTION` | 10% chance per chunk of a 0.5–1.5 s stall. The transfer is never failed |
+
+`setFailureRate(r)` independently fails a transfer before it starts with probability `r`.
+
+### API reference
+
+| Method | Description |
+|--------|-------------|
+| `transfer(TransferRequest, TransferContext)` | Blocking transfer. Throws `TransferException` |
+| `transferReactive(TransferRequest, TransferContext)` | The same, as a `CompletableFuture` |
+| `pauseTransfer(id)`, `resumeTransfer(id)`, `cancelTransfer(id)` | Control an active transfer. The ID is the `transferId` reported in `TransferProgress` |
+| `setLatencyConfig(long, long)` | Connection latency range |
+| `setSimulatedBytesPerSecond(long)` | Simulated bandwidth |
+| `setProgressUpdateIntervalMs(int)` | Used to size chunks when a bandwidth is set |
+| `setFailureMode(ProtocolFailureMode)` | Failure mode |
+| `setFailureRate(double)` | Random pre-transfer failure probability |
+| `setFailureAtPercent(int)` | Trigger point for `TRANSFER_INTERRUPTED` |
+| `setMaxFileSize(long)`, `setSupportsResume(boolean)`, `setSupportsPause(boolean)` | Capabilities |
+| `reset()` | Clears the failure mode, failure rate and failure percentage. Latency and bandwidth are unchanged |
+| `getTotalTransfers()`, `getSuccessfulTransfers()`, `getFailedTransfers()`, `getTotalBytesTransferred()`, `resetStatistics()` | Statistics |
+| `shutdown()` | Stops the simulator's scheduler |
+
+### Example
+
+Adapted from `InMemoryTransferProtocolSimulatorTest`:
 
 ```java
-public interface TransferProtocol {
-    String getProtocolName();
-    boolean canHandle(TransferRequest request);
-    TransferResult transfer(TransferRequest request, TransferContext context);
-    Future<TransferResult> transferReactive(TransferRequest request, TransferContext context);
-    boolean supportsResume();
-    boolean supportsPause();
-    long getMaxFileSize();
-}
-```
-
-### Design
-
-```java
-public class InMemoryTransferProtocolSimulator implements TransferProtocol {
-    
-    // Configuration
-    private final String protocolName;
-    private final InMemoryFileSystemSimulator fileSystem;
-    
-    // Chaos Engineering
-    private long minLatencyMs = 0;
-    private long maxLatencyMs = 0;
-    private double failureRate = 0.0;
-    private long simulatedBytesPerSecond = Long.MAX_VALUE;
-    private ProtocolFailureMode failureMode = ProtocolFailureMode.NONE;
-    
-    // Transfer simulation
-    private int progressUpdateIntervalMs = 100;
-    private boolean supportsResume = true;
-    private boolean supportsPause = true;
-    
-    public enum ProtocolFailureMode {
-        NONE,                    // Normal operation
-        AUTH_FAILURE,            // Authentication fails
-        CONNECTION_TIMEOUT,      // Connection times out
-        CONNECTION_REFUSED,      // Server refuses connection
-        FILE_NOT_FOUND,          // Source file doesn't exist
-        PERMISSION_DENIED,       // No read/write permission
-        DISK_FULL,              // Destination disk full
-        TRANSFER_INTERRUPTED,    // Transfer interrupted mid-way
-        CHECKSUM_MISMATCH,      // File corruption detected
-        SLOW_TRANSFER,          // Very slow transfer speed
-        FLAKY_CONNECTION        // Intermittent disconnections
-    }
-}
-```
-
-### Key Features
-
-#### Virtual File System Integration
-
-```java
-// Simulator works with InMemoryFileSystemSimulator
 InMemoryFileSystemSimulator fs = new InMemoryFileSystemSimulator();
 fs.createFile("/source/test.txt", "Hello, World!".getBytes());
+InMemoryTransferProtocolSimulator sftp = InMemoryTransferProtocolSimulator.sftp(fs);
 
-InMemoryTransferProtocolSimulator protocol = new InMemoryTransferProtocolSimulator("sftp", fs);
-TransferRequest request = TransferRequest.builder()
-    .sourceUri(URI.create("sftp://server/source/test.txt"))
-    .destinationPath(Path.of("/dest/test.txt"))
-    .build();
+var request = InMemoryTransferProtocolSimulator.TransferRequest.builder()
+        .sourceUri(URI.create("sftp://host/source/test.txt"))
+        .destinationPath(Path.of("/destination/test.txt"))
+        .build();
 
-TransferResult result = protocol.transfer(request, context);
-// File now exists in virtual file system at /dest/test.txt
+var result = sftp.transfer(request, new InMemoryTransferProtocolSimulator.TransferContext());
+assertThat(result.isSuccessful()).isTrue();
+assertThat(result.bytesTransferred()).isEqualTo(13);
+assertThat(fs.exists("/destination/test.txt")).isTrue();
+
+sftp.setFailureMode(InMemoryTransferProtocolSimulator.ProtocolFailureMode.AUTH_FAILURE);
+assertThatThrownBy(() -> sftp.transfer(request, new InMemoryTransferProtocolSimulator.TransferContext()))
+        .isInstanceOf(InMemoryTransferProtocolSimulator.TransferException.class)
+        .hasMessageContaining("Authentication failed");
+
+sftp.shutdown();
 ```
 
-#### Realistic Progress Simulation
+### _Proposal_: protocol-specific builders
+
+Not implemented. The factories return a configured simulator directly, with no builder and no
+`with...` methods.
 
 ```java
-// Configure realistic transfer speed
-protocol.setSimulatedBytesPerSecond(10_000_000); // 10 MB/s
-protocol.setProgressUpdateIntervalMs(100);       // Update every 100ms
-
-// For a 100MB file, transfer takes ~10 seconds with progress events
-context.setProgressCallback(progress -> {
-    System.out.printf("Progress: %d%% (%d/%d bytes)%n",
-        progress.getPercentComplete(),
-        progress.getBytesTransferred(),
-        progress.getTotalBytes());
-});
-```
-
-#### Failure Injection
-
-```java
-// Simulate authentication failure
-protocol.setFailureMode(ProtocolFailureMode.AUTH_FAILURE);
-// Next transfer will fail with "Authentication failed"
-
-// Simulate transfer interrupted at 50%
-protocol.setFailureMode(ProtocolFailureMode.TRANSFER_INTERRUPTED);
-protocol.setFailureAtPercent(50);
-// Transfer fails at 50% with partial file
-
-// Simulate random failures
-protocol.setFailureRate(0.1); // 10% failure rate
-```
-
-#### Protocol-Specific Behavior
-
-```java
-// FTP-specific simulation
-InMemoryTransferProtocolSimulator ftpProtocol = 
+// PROPOSAL — does not compile against current code
+InMemoryTransferProtocolSimulator ftpProtocol =
     InMemoryTransferProtocolSimulator.ftp(fileSystem)
         .withActiveMode(true)
         .withBinaryMode(true)
         .build();
 
-// SFTP-specific simulation
-InMemoryTransferProtocolSimulator sftpProtocol = 
+InMemoryTransferProtocolSimulator sftpProtocol =
     InMemoryTransferProtocolSimulator.sftp(fileSystem)
         .withKeyAuthentication(true)
         .withCompression(true)
         .build();
 
-// FTPS-specific simulation (FTP over SSL/TLS)
-InMemoryTransferProtocolSimulator ftpsProtocol = 
-    InMemoryTransferProtocolSimulator.ftps(fileSystem);
-// FTPS defaults: resume=true, pause=true, latency 80-300ms (TLS overhead)
-// Cross-compatible: FTPS simulator also handles ftp:// URIs and vice versa
-
-// HTTP-specific simulation
-InMemoryTransferProtocolSimulator httpProtocol = 
+InMemoryTransferProtocolSimulator httpProtocol =
     InMemoryTransferProtocolSimulator.http(fileSystem)
         .withRangeRequests(true)
         .withCompression(true)
         .build();
 ```
 
-### API Reference
-
-| Method | Description |
-|--------|-------------|
-| `setFailureMode(ProtocolFailureMode)` | Set failure mode for next transfer |
-| `setFailureRate(double)` | Set random failure probability (0.0-1.0) |
-| `setFailureAtPercent(int)` | Fail transfer at specific progress percentage |
-| `setSimulatedBytesPerSecond(long)` | Set simulated transfer speed |
-| `setLatencyConfig(long min, long max)` | Set connection latency range |
-| `setProgressUpdateIntervalMs(int)` | Set progress callback interval |
-| `reset()` | Reset all chaos configuration |
-
-### Test Examples
-
-```java
-@Test
-void testSftpTransferSuccess() {
-    InMemoryFileSystemSimulator fs = new InMemoryFileSystemSimulator();
-    fs.createFile("/remote/data.csv", testData);
-    
-    InMemoryTransferProtocolSimulator sftp = new InMemoryTransferProtocolSimulator("sftp", fs);
-    sftp.setSimulatedBytesPerSecond(1_000_000); // 1 MB/s
-    
-    TransferResult result = sftp.transfer(request, context);
-    
-    assertThat(result.isSuccessful()).isTrue();
-    assertThat(fs.fileExists("/local/data.csv")).isTrue();
-    assertThat(result.getDuration()).isGreaterThan(Duration.ofMillis(100));
-}
-
-@Test
-void testTransferWithAuthFailure() {
-    InMemoryTransferProtocolSimulator sftp = new InMemoryTransferProtocolSimulator("sftp", fs);
-    sftp.setFailureMode(ProtocolFailureMode.AUTH_FAILURE);
-    
-    assertThatThrownBy(() -> sftp.transfer(request, context))
-        .isInstanceOf(TransferException.class)
-        .hasMessageContaining("Authentication failed");
-}
-
-@Test
-void testResumeAfterInterruption() {
-    InMemoryTransferProtocolSimulator http = new InMemoryTransferProtocolSimulator("http", fs);
-    http.setFailureMode(ProtocolFailureMode.TRANSFER_INTERRUPTED);
-    http.setFailureAtPercent(50);
-    
-    // First attempt fails at 50%
-    assertThatThrownBy(() -> http.transfer(request, context))
-        .isInstanceOf(TransferException.class);
-    
-    // Resume from checkpoint
-    http.setFailureMode(ProtocolFailureMode.NONE);
-    TransferResult result = http.transfer(request, context);
-    
-    assertThat(result.isSuccessful()).isTrue();
-    assertThat(result.getResumedFromBytes()).isEqualTo(fileSize / 2);
-}
-```
-
 ---
 
 ## 3. InMemoryAgentSimulator
 
-**Status:** ✅ Implemented  
-**Location:** `quorus-core/src/test/java/dev/mars/quorus/simulator/agent/InMemoryAgentSimulator.java`  
-**Simulates:** Complete Quorus Agent lifecycle
+**Status:** Implemented as a standalone test double  
+**Location:** [`quorus-core/src/test/java/dev/mars/quorus/simulator/agent/InMemoryAgentSimulator.java`](../../quorus-core/src/test/java/dev/mars/quorus/simulator/agent/InMemoryAgentSimulator.java)  
+**Production interface:** None  
+**Tests:** `InMemoryAgentSimulatorTest` (57), and the agent group in `InMemorySimulatorTest`
 
 ### Purpose
 
-Simulates a Quorus agent without HTTP communication, enabling testing of:
-- Agent registration and discovery
-- Job assignment and load balancing
-- Heartbeat monitoring
-- Agent failure scenarios
+Models an agent's lifecycle (registration, heartbeats, job polling, job execution and shutdown)
+against a controller that the test supplies.
 
-### Design
+### Relationship to Quorus
+
+The simulator talks to its own nested interface, not to the controller or the real agent:
 
 ```java
-public class InMemoryAgentSimulator {
-    
-    // Agent identity
-    private final String agentId;
-    private final AgentCapabilities capabilities;
-    private final AgentNetworkInfo networkInfo;
-    
-    // State
-    private AgentState state = AgentState.STOPPED;
-    private final Map<String, JobExecution> activeJobs = new ConcurrentHashMap<>();
-    private final AtomicLong lastHeartbeat = new AtomicLong();
-    
-    // Controller connection (in-memory)
-    private QuorusStateMachine stateMachine;
-    
-    // Chaos Engineering
-    private AgentFailureMode failureMode = AgentFailureMode.NONE;
-    private long jobExecutionDelayMs = 0;
-    private double jobFailureRate = 0.0;
-    
-    public enum AgentState {
-        STOPPED,
-        REGISTERING,
-        ACTIVE,
-        BUSY,
-        DRAINING,
-        CRASHED
-    }
-    
-    public enum AgentFailureMode {
-        NONE,                   // Normal operation
-        REGISTRATION_FAILURE,   // Cannot register with controller
-        HEARTBEAT_TIMEOUT,      // Stop sending heartbeats
-        JOB_REJECTION,          // Reject all job assignments
-        JOB_FAILURE,            // Fail all jobs
-        SLOW_EXECUTION,         // Execute jobs very slowly
-        CRASH_DURING_JOB,       // Crash mid-job execution
-        MEMORY_EXHAUSTED,       // Simulate OOM
-        NETWORK_PARTITION       // Cannot reach controller
-    }
+public interface ControllerConnection {
+    void registerAgent(AgentRegistration registration);
+    void unregisterAgent(String agentId);
+    void sendHeartbeat(HeartbeatInfo heartbeat);
+    List<JobAssignment> pollPendingJobs(String agentId);
+    void reportJobStatus(JobStatusUpdate update);
 }
 ```
 
-### Key Features
+The test implements `ControllerConnection`, usually as a stub or recorder. `AgentCapabilities`,
+`AgentRegistration`, `HeartbeatInfo`, `JobAssignment` and `JobStatusUpdate` are all nested types.
+No adapter connects the simulator to `QuorusStateStore`, the controller's HTTP API or
+`quorus-agent`. Job execution is timed only: no bytes move, and no protocol or file-system
+simulator is involved.
 
-#### Direct Controller Integration
+### Behaviour
 
-```java
-// Create agent that talks directly to state machine (no HTTP)
-InMemoryAgentSimulator agent = new InMemoryAgentSimulator("agent-001")
-    .withCapabilities(new AgentCapabilities()
-        .supportedProtocols(Set.of("sftp", "http", "ftp"))
-        .maxConcurrentTransfers(5)
-        .maxTransferSize(10_000_000_000L))
-    .withRegion("us-east-1")
-    .withDatacenter("dc-1");
+- **`start()`.** Fails with `AgentException` if the agent is already running or has no connection.
+  Otherwise it calls `registerAgent`, moves the agent to `ACTIVE`, and schedules heartbeats (every
+  5000 ms by default) and job polling (every 1000 ms by default).
+- **Jobs.** Jobs arrive from `pollPendingJobs` or a direct `assignJob(...)`. An assignment is
+  rejected, with an event, when the agent is not `ACTIVE` or `BUSY`, when it is at
+  `maxConcurrentTransfers` (the agent becomes `BUSY`), or when the acceptance filter refuses it.
+- **Execution.** A job runs in 10 progress steps spread over `jobExecutionDelayMs` (1000 ms by
+  default). Each step is reported through `reportJobStatus`.
+- **`stop()`.** Moves to `DRAINING`, waits up to 30 s for active jobs, unregisters, and moves to
+  `STOPPED`.
+- **`crash()`.** Fails all active jobs with `Agent crashed` and moves to `CRASHED`.
+  `recover()` restarts the agent.
+- **Unused setting.** `setProgressUpdateIntervalMs` is stored but has no effect.
 
-// Connect to controller's state machine
-agent.connectToController(stateMachine);
+`AgentState`: `STOPPED`, `REGISTERING`, `ACTIVE`, `BUSY`, `DRAINING`, `CRASHED`, `PARTITIONED`.
 
-// Start agent (registers with controller)
-agent.start();
+### Failure modes
 
-// Agent is now visible in stateMachine.getAgents()
-```
+| `AgentFailureMode` | Effect |
+|--------------------|--------|
+| `NONE` | Normal operation |
+| `REGISTRATION_FAILURE` | `start()` throws `AgentException` |
+| `HEARTBEAT_TIMEOUT` | No heartbeats are sent. If set while the agent is running, the heartbeat task is cancelled |
+| `JOB_REJECTION` | Every assignment is rejected |
+| `JOB_FAILURE` | Every job fails after its progress steps |
+| `SLOW_EXECUTION` | Job duration × 10 |
+| `CRASH_DURING_JOB` | The agent calls `crash()` at the sixth of the ten progress steps |
+| `MEMORY_EXHAUSTED` | Jobs fail at the fourth step with `Out of memory (simulated)`, and heartbeats report memory use of 0.95 |
+| `NETWORK_PARTITION` | Cancels polling and heartbeats, and sets the state to `PARTITIONED`. If set before `start()`, `start()` then fails with `Agent is already running`, because the agent is no longer `STOPPED` |
 
-#### Job Execution Simulation
+`setJobFailureRate(r)` fails jobs at random with probability `r`.
 
-```java
-// Configure job execution behavior
-agent.setJobExecutionDelayMs(5000);  // Jobs take 5 seconds
-agent.setProgressUpdateIntervalMs(1000); // Update every second
-
-// Agent automatically:
-// 1. Polls for pending jobs
-// 2. Accepts jobs
-// 3. Reports IN_PROGRESS with progress updates
-// 4. Reports COMPLETED or FAILED
-```
-
-#### Heartbeat Simulation
-
-```java
-// Normal heartbeat behavior
-agent.setHeartbeatIntervalMs(5000);
-agent.start();
-// Agent sends heartbeats every 5 seconds
-
-// Simulate heartbeat timeout (agent appears dead)
-agent.setFailureMode(AgentFailureMode.HEARTBEAT_TIMEOUT);
-// Controller will mark agent as unhealthy after timeout
-```
-
-#### Multi-Agent Testing
-
-```java
-// Create multiple agents with different capabilities
-List<InMemoryAgentSimulator> agents = List.of(
-    new InMemoryAgentSimulator("agent-us-east")
-        .withRegion("us-east-1")
-        .withCapabilities(sftpOnly),
-    new InMemoryAgentSimulator("agent-us-west")
-        .withRegion("us-west-2")
-        .withCapabilities(allProtocols),
-    new InMemoryAgentSimulator("agent-eu")
-        .withRegion("eu-west-1")
-        .withCapabilities(httpOnly)
-);
-
-// Start all agents
-agents.forEach(a -> a.connectToController(stateMachine).start());
-
-// Submit transfer job
-TransferRequest request = TransferRequest.builder()
-    .sourceUri(URI.create("sftp://server/file.txt"))
-    .build();
-
-// Agent selection service picks best agent based on:
-// - Protocol support (SFTP)
-// - Geographic proximity
-// - Current load
-```
-
-### API Reference
+### API reference
 
 | Method | Description |
 |--------|-------------|
-| `connectToController(QuorusStateMachine)` | Connect to controller (in-memory) |
-| `start()` | Start agent (register + heartbeats) |
-| `stop()` | Graceful shutdown |
-| `crash()` | Simulate sudden crash |
-| `setFailureMode(AgentFailureMode)` | Set failure mode |
-| `setJobExecutionDelayMs(long)` | Set simulated job duration |
-| `setJobFailureRate(double)` | Set random job failure rate |
-| `getActiveJobs()` | Get currently executing jobs |
-| `getState()` | Get agent state |
+| `InMemoryAgentSimulator(String agentId)` | Constructor |
+| `withHostname`, `withRegion`, `withDatacenter`, `withCapabilities`, `withTag`, `withEventCallback`, `withJobAcceptanceFilter` | Fluent configuration |
+| `connectToController(ControllerConnection)` | Sets the controller connection |
+| `start()`, `stop()`, `crash()`, `recover()`, `shutdown()` | Lifecycle |
+| `assignJob(JobAssignment)` | Pushes a job directly |
+| `setHeartbeatIntervalMs`, `setPollingIntervalMs`, `setJobExecutionDelayMs`, `setFailureMode`, `setJobFailureRate`, `reset()` | Behaviour and chaos |
+| `getState()`, `getActiveJobs()`, `getActiveJobCount()`, `getCompletedJobs()`, `getLastHeartbeat()` and the `getTotal...` counters | Inspection |
 
-### Test Examples
+### _Proposal_: connecting to the controller
 
-```java
-@Test
-void testAgentRegistrationAndJobAssignment() {
-    // Setup controller
-    QuorusStateMachine stateMachine = new QuorusStateMachine();
-    
-    // Create and start agent
-    InMemoryAgentSimulator agent = new InMemoryAgentSimulator("agent-001")
-        .withCapabilities(sftpCapabilities)
-        .connectToController(stateMachine);
-    agent.start();
-    
-    // Verify registration
-    await().atMost(Duration.ofSeconds(5))
-        .until(() -> stateMachine.getAgents().containsKey("agent-001"));
-    
-    // Create job
-    stateMachine.applyCommand(createTransferJobCommand("job-001"));
-    stateMachine.applyCommand(assignJobCommand("job-001", "agent-001"));
-    
-    // Verify job execution
-    await().atMost(Duration.ofSeconds(10))
-        .until(() -> stateMachine.getJobAssignment("job-001:agent-001")
-            .getStatus() == JobAssignmentStatus.COMPLETED);
-}
-
-@Test
-void testAgentFailover() {
-    // Start two agents
-    InMemoryAgentSimulator primaryAgent = new InMemoryAgentSimulator("primary");
-    InMemoryAgentSimulator backupAgent = new InMemoryAgentSimulator("backup");
-    
-    primaryAgent.connectToController(stateMachine).start();
-    backupAgent.connectToController(stateMachine).start();
-    
-    // Assign job to primary
-    stateMachine.applyCommand(assignJobCommand("job-001", "primary"));
-    
-    // Crash primary mid-execution
-    await().until(() -> primaryAgent.getActiveJobs().size() > 0);
-    primaryAgent.crash();
-    
-    // Job should be reassigned to backup
-    await().atMost(Duration.ofSeconds(30))
-        .until(() -> stateMachine.getJobAssignment("job-001:backup") != null);
-}
-```
+Not implemented: a `ControllerConnection` adapter over `QuorusStateStore`, so that agent
+simulators register, heartbeat and receive assignments through the real controller state machine.
+Without it, the agent simulator cannot test controller behaviour such as agent selection or
+reassigning a crashed agent's jobs. Those behaviours belong to the controller, not to this
+simulator.
 
 ---
 
 ## 4. InMemoryFileSystemSimulator
 
-**Status:** ✅ Implemented  
-**Location:** `quorus-core/src/test/java/dev/mars/quorus/simulator/fs/InMemoryFileSystemSimulator.java`  
-**Simulates:** File system operations
+**Status:** Implemented as a standalone test double  
+**Location:** [`quorus-core/src/test/java/dev/mars/quorus/simulator/fs/InMemoryFileSystemSimulator.java`](../../quorus-core/src/test/java/dev/mars/quorus/simulator/fs/InMemoryFileSystemSimulator.java)  
+**Production interface:** None (not a `java.nio.file.FileSystem`)  
+**Tests:** `InMemoryFileSystemSimulatorTest` (89), and the file-system group in `InMemorySimulatorTest`
 
 ### Purpose
 
-Provides a virtual file system for testing file transfers without touching real disk.
+A virtual file system of byte arrays, for the protocol simulator and for tests that must not touch
+the disk.
 
-### Design
+### Behaviour
 
-```java
-public class InMemoryFileSystemSimulator {
-    
-    // Virtual file system
-    private final Map<String, VirtualFile> files = new ConcurrentHashMap<>();
-    private final Map<String, VirtualDirectory> directories = new ConcurrentHashMap<>();
-    
-    // Chaos Engineering
-    private FileSystemFailureMode failureMode = FileSystemFailureMode.NONE;
-    private long availableSpace = Long.MAX_VALUE;
-    private long readDelayMs = 0;
-    private long writeDelayMs = 0;
-    
-    public enum FileSystemFailureMode {
-        NONE,
-        DISK_FULL,
-        READ_ONLY,
-        PERMISSION_DENIED,
-        IO_ERROR,
-        FILE_LOCKED,
-        CORRUPTED_DATA
-    }
-    
-    // Virtual file representation
-    public static class VirtualFile {
-        private byte[] content;
-        private long size;
-        private Instant created;
-        private Instant modified;
-        private Set<FilePermission> permissions;
-        private String owner;
-        private boolean locked;
-    }
-}
-```
+- **Paths.** Backslashes become `/`, a leading `/` is added, and a trailing `/` is removed. A
+  `null` or empty path means the root. `..` is **not** resolved or rejected.
+- **Directories.** Creating a file creates its parent directories. The root cannot be deleted, and
+  a non-empty directory cannot be deleted.
+- **Space.** `setAvailableSpace(n)` limits capacity. Writes that do not fit fail with
+  `IOException("Disk full: ...")`, and deleting files frees space.
+- **Locking.** `lockFile` gives exclusive locks: reading, writing, opening a stream on or deleting a
+  locked file fails with `File locked`, and locking an already locked file fails.
+- **Performance.** Fixed per-operation delays (`setReadDelayMs`, `setWriteDelayMs`) and bandwidth
+  limits (`setReadBytesPerSecond`, `setWriteBytesPerSecond`).
 
-### Key Features
+### Failure modes
 
-#### File Operations
+`FileSystemFailureMode` can be set for the whole file system (`setFailureMode`) or for one path
+(`setFileFailureMode`):
 
-```java
-InMemoryFileSystemSimulator fs = new InMemoryFileSystemSimulator();
+| Mode | Effect |
+|------|--------|
+| `NONE` | Normal operation |
+| `DISK_FULL` | `IOException("Disk full")` |
+| `READ_ONLY` | Writes fail with `File system is read-only` |
+| `PERMISSION_DENIED` | `IOException("Permission denied: <path>")` |
+| `IO_ERROR` | `IOException("I/O error on: <path>")` |
+| `FILE_LOCKED` | `IOException("File locked: <path>")` |
+| `CORRUPTED_DATA` | Reads return altered bytes of the same length |
+| `RANDOM_FAILURE` | Operations fail about half the time |
 
-// Create files
-fs.createFile("/data/test.txt", "Hello, World!".getBytes());
-fs.createFile("/data/large.bin", generateRandomBytes(100_000_000)); // 100MB
+`setFailureRate(r)` also fails operations at random with probability `r`. `resetChaos()` clears all
+of these settings.
 
-// Read files
-byte[] content = fs.readFile("/data/test.txt");
-InputStream stream = fs.openInputStream("/data/large.bin");
-
-// Write files
-fs.writeFile("/output/result.txt", resultBytes);
-OutputStream out = fs.openOutputStream("/output/streaming.bin");
-
-// Directory operations
-fs.createDirectory("/data/subdir");
-List<String> files = fs.listDirectory("/data");
-boolean exists = fs.exists("/data/test.txt");
-
-// File metadata
-FileMetadata meta = fs.getMetadata("/data/test.txt");
-// meta.size(), meta.created(), meta.modified(), meta.permissions()
-```
-
-#### Space Management
-
-```java
-// Simulate limited disk space
-fs.setAvailableSpace(1_000_000_000); // 1GB available
-
-// Large file write will fail with DISK_FULL
-assertThatThrownBy(() -> 
-    fs.writeFile("/huge.bin", new byte[2_000_000_000]))
-    .hasMessageContaining("Disk full");
-
-// Check available space
-long available = fs.getAvailableSpace();
-```
-
-#### I/O Performance Simulation
-
-```java
-// Simulate slow disk
-fs.setReadDelayMs(10);   // 10ms per read operation
-fs.setWriteDelayMs(20);  // 20ms per write operation
-
-// Simulate specific read/write speeds
-fs.setReadBytesPerSecond(100_000_000);   // 100 MB/s read
-fs.setWriteBytesPerSecond(50_000_000);   // 50 MB/s write
-```
-
-#### Failure Injection
-
-```java
-// Simulate disk full
-fs.setFailureMode(FileSystemFailureMode.DISK_FULL);
-
-// Simulate I/O error on specific file
-fs.setFileFailureMode("/data/corrupted.bin", FileSystemFailureMode.IO_ERROR);
-
-// Simulate file locking
-fs.lockFile("/data/locked.txt");
-assertThatThrownBy(() -> fs.openOutputStream("/data/locked.txt"))
-    .hasMessageContaining("File locked");
-```
-
-### API Reference
+### API reference
 
 | Method | Description |
 |--------|-------------|
-| `createFile(String path, byte[] content)` | Create a file with content |
-| `readFile(String path)` | Read file content |
-| `writeFile(String path, byte[] content)` | Write/overwrite file |
-| `deleteFile(String path)` | Delete a file |
-| `exists(String path)` | Check if file/directory exists |
-| `createDirectory(String path)` | Create directory |
-| `listDirectory(String path)` | List directory contents |
-| `getMetadata(String path)` | Get file metadata |
-| `setAvailableSpace(long bytes)` | Set available disk space |
-| `setFailureMode(FileSystemFailureMode)` | Set failure mode |
-| `lockFile(String path)` | Lock file for exclusive access |
-| `clear()` | Clear all files |
+| `createFile`, `readFile`, `writeFile`, `appendFile`, `deleteFile` | File operations, all throwing `IOException` |
+| `openInputStream`, `openOutputStream` | Streams over a virtual file |
+| `exists`, `isFile`, `isDirectory` | Queries |
+| `createDirectory`, `createDirectories`, `listDirectory`, `deleteDirectory` | Directory operations |
+| `getMetadata(path)` | `FileMetadata(path, size, created, modified, lastAccessed, permissions, owner, isDirectory)` |
+| `setPermissions(path, Set<FilePermission>)` | File permissions |
+| `lockFile`, `unlockFile`, `isLocked` | Locking |
+| `setAvailableSpace`, `getAvailableSpace`, `getTotalSpace`, `getUsedSpace` | Space |
+| `setReadDelayMs`, `setWriteDelayMs`, `setReadBytesPerSecond`, `setWriteBytesPerSecond` | Performance |
+| `setFailureMode`, `setFileFailureMode`, `clearFileFailureMode`, `setFailureRate`, `resetChaos` | Chaos |
+| `getReadOperations`, `getWriteOperations`, `getBytesRead`, `getBytesWritten`, `getFileCount`, `getDirectoryCount`, `resetStatistics` | Statistics |
+| `clear`, `getAllFilePaths`, `getAllDirectoryPaths` | Utilities |
+
+### Example
+
+```java
+InMemoryFileSystemSimulator fs = new InMemoryFileSystemSimulator();
+fs.createFile("/data/test.txt", "Hello, World!".getBytes());
+assertThat(fs.readFile("/data/test.txt")).isEqualTo("Hello, World!".getBytes());
+
+fs.setAvailableSpace(1_000);
+assertThatThrownBy(() -> fs.writeFile("/big.bin", new byte[2_000]))
+        .isInstanceOf(IOException.class)
+        .hasMessageContaining("Disk full");
+
+fs.lockFile("/data/test.txt");
+assertThatThrownBy(() -> fs.openOutputStream("/data/test.txt"))
+        .hasMessageContaining("File locked");
+```
 
 ---
 
 ## 5. InMemoryTransferEngineSimulator
 
-**Status:** ✅ Implemented  
-**Location:** `quorus-core/src/test/java/dev/mars/quorus/simulator/transfer/InMemoryTransferEngineSimulator.java`  
-**Interface:** `TransferEngine`
+**Status:** Implemented as a standalone test double  
+**Location:** [`quorus-core/src/test/java/dev/mars/quorus/simulator/transfer/InMemoryTransferEngineSimulator.java`](../../quorus-core/src/test/java/dev/mars/quorus/simulator/transfer/InMemoryTransferEngineSimulator.java)  
+**Production interface:** None  
+**Tests:** `InMemoryTransferEngineSimulatorTest` (55), and the engine group in `InMemorySimulatorTest`
 
 ### Purpose
 
-Simulates the transfer engine without real protocol implementations.
+Models a transfer engine's job lifecycle (queueing, concurrency, progress, pause, resume, cancel)
+and its statistics, with time standing in for transfers. No bytes move, and no protocol is used.
 
-### Interface
+### Relationship to `TransferEngine`
 
-```java
-public interface TransferEngine {
-    Future<TransferResult> submitTransfer(TransferRequest request);
-    TransferJob getTransferJob(String jobId);
-    boolean cancelTransfer(String jobId);
-    boolean pauseTransfer(String jobId);
-    boolean resumeTransfer(String jobId);
-    int getActiveTransferCount();
-    boolean shutdown(long timeoutSeconds);
-    TransferEngineHealthCheck getHealthCheck();
-    TransferMetrics getProtocolMetrics(String protocolName);
-    Map<String, TransferMetrics> getAllProtocolMetrics();
-}
-```
+The production
+[`TransferEngine`](../../quorus-core/src/main/java/dev/mars/quorus/transfer/TransferEngine.java)
+is blocking. `TransferResult transfer(TransferRequest) throws TransferException` runs on the
+caller's thread, and `shutdown(Duration)` waits for completion. The simulator does **not**
+implement it:
 
-### Design
+- It offers `submitTransfer(TransferRequest)`, which returns a `CompletableFuture`.
+- It has `shutdown(long timeoutSeconds)`.
+- Its `TransferRequest` (string URIs), `TransferJob`, `TransferResult`, `TransferStatus` and
+  `HealthCheck` are nested types.
 
-```java
-public class InMemoryTransferEngineSimulator implements TransferEngine {
-    
-    // Configuration
-    private int maxConcurrentTransfers = 10;
-    private final Map<String, SimulatedTransfer> transfers = new ConcurrentHashMap<>();
-    
-    // Chaos Engineering
-    private TransferEngineFailureMode failureMode = TransferEngineFailureMode.NONE;
-    private long defaultTransferDurationMs = 1000;
-    private double transferFailureRate = 0.0;
-    
-    public enum TransferEngineFailureMode {
-        NONE,
-        QUEUE_FULL,
-        ENGINE_OVERLOADED,
-        ALL_TRANSFERS_FAIL,
-        RANDOM_FAILURES,
-        SLOW_PROCESSING
-    }
-    
-    private class SimulatedTransfer {
-        String jobId;
-        TransferRequest request;
-        TransferStatus status;
-        long bytesTransferred;
-        Instant startTime;
-        ScheduledFuture<?> progressTask;
-    }
-}
-```
+### Behaviour
 
-### Key Features
+- **Submission.** A transfer starts at once if a concurrency permit is free. Otherwise it is
+  `QUEUED`, and a background loop starts it when a permit is released.
+- **Progress.** Ten progress updates over `defaultTransferDurationMs` (1000 ms by default), using
+  `expectedSizeBytes` or `defaultTransferSizeBytes` (10 MB by default) as the size.
+- **Completion.** Each transfer completes `defaultTransferDurationMs` after it starts.
+- **Pause and resume.** These change the status between `IN_PROGRESS` and `PAUSED`, and progress
+  updates stop while a transfer is paused. Completion is not rescheduled, so a paused transfer
+  still completes at its original time.
+- **Cancel.** Fails the future with `Transfer cancelled`. It returns false for a terminal transfer.
+- **Concurrency limit (defect).** The limit is fixed at **10**. The semaphore is created with 10
+  permits in the constructor. `setMaxConcurrentTransfers(n)` changes only the value reported by
+  `getHealthCheck()`, not the number of transfers that may run.
 
-#### Transfer Lifecycle Simulation
+`TransferStatus`: `PENDING`, `QUEUED`, `IN_PROGRESS`, `PAUSED`, `COMPLETED`, `FAILED`, `CANCELLED`.
 
-```java
-InMemoryTransferEngineSimulator engine = new InMemoryTransferEngineSimulator();
-engine.setMaxConcurrentTransfers(5);
-engine.setDefaultTransferDurationMs(5000); // 5 second transfers
+### Failure modes
 
-// Submit transfer
-Future<TransferResult> future = engine.submitTransfer(request);
+| `TransferEngineFailureMode` | Effect |
+|-----------------------------|--------|
+| `NONE` | Normal operation |
+| `QUEUE_FULL`, `ENGINE_OVERLOADED`, `SHUTTING_DOWN` | `submitTransfer` returns a failed future at once |
+| `ALL_TRANSFERS_FAIL` | Every transfer fails on completion |
+| `RANDOM_FAILURES` | Transfers fail with the probability set by `setTransferFailureRate` |
+| `SLOW_PROCESSING` | Duration × 10 |
 
-// Monitor progress
-TransferJob job = engine.getTransferJob(request.getRequestId());
-System.out.println("Status: " + job.getStatus());
-System.out.println("Progress: " + job.getBytesTransferred() + "/" + job.getTotalBytes());
+### API reference
 
-// Wait for completion
-TransferResult result = future.toCompletionStage().toCompletableFuture().join();
-```
+| Method | Description |
+|--------|-------------|
+| `submitTransfer(TransferRequest)` | Returns `CompletableFuture<TransferResult>` |
+| `getTransferJob(id)`, `getAllTransferJobs()`, `getTransfersByStatus(status)` | Inspection |
+| `cancelTransfer`, `pauseTransfer`, `resumeTransfer` | Control |
+| `getActiveTransferCount()` | Transfers started and not yet finished, including paused ones |
+| `setDefaultTransferDurationMs`, `setDefaultTransferSizeBytes`, `setFailureMode`, `setTransferFailureRate`, `setEventCallback`, `reset()` | Behaviour and chaos |
+| `setMaxConcurrentTransfers(int)` | See the concurrency defect above |
+| `getHealthCheck()`, `getProtocolMetrics(protocol)`, `getAllProtocolMetrics()` and the `getTotal...` counters | Metrics |
+| `shutdown(long)`, `shutdownNow()`, `clear()` | Shutdown |
 
-#### Concurrency Control
+### Example
 
 ```java
-// Limit concurrent transfers
-engine.setMaxConcurrentTransfers(3);
+InMemoryTransferEngineSimulator engine = new InMemoryTransferEngineSimulator()
+        .setDefaultTransferDurationMs(500);
 
-// Submit 10 transfers
-List<Future<TransferResult>> futures = new ArrayList<>();
-for (int i = 0; i < 10; i++) {
-    futures.add(engine.submitTransfer(requests.get(i)));
-}
+var request = InMemoryTransferEngineSimulator.TransferRequest.builder()
+        .jobId("job-1")
+        .sourceUri("sftp://host/file.txt")
+        .destinationPath("/dest/file.txt")
+        .build();
 
-// Only 3 execute at a time
-assertThat(engine.getActiveTransferCount()).isLessThanOrEqualTo(3);
-```
-
-#### Pause/Resume/Cancel
-
-```java
-// Start long transfer
-Future<TransferResult> future = engine.submitTransfer(largeFileRequest);
-
-// Pause at 50%
-await().until(() -> engine.getTransferJob(jobId).getProgress() >= 50);
-engine.pauseTransfer(jobId);
-assertThat(engine.getTransferJob(jobId).getStatus()).isEqualTo(TransferStatus.PAUSED);
-
-// Resume
-engine.resumeTransfer(jobId);
-assertThat(engine.getTransferJob(jobId).getStatus()).isEqualTo(TransferStatus.IN_PROGRESS);
-
-// Or cancel
-engine.cancelTransfer(jobId);
-assertThat(engine.getTransferJob(jobId).getStatus()).isEqualTo(TransferStatus.CANCELLED);
+CompletableFuture<InMemoryTransferEngineSimulator.TransferResult> future = engine.submitTransfer(request);
+assertThat(engine.getTransferJob("job-1").status())
+        .isEqualTo(InMemoryTransferEngineSimulator.TransferStatus.IN_PROGRESS);
+assertThat(future.get(5, TimeUnit.SECONDS).successful()).isTrue();
 ```
 
 ---
 
 ## 6. InMemoryWorkflowEngineSimulator
 
-**Status:** ✅ Implemented  
-**Location:** `quorus-core/src/test/java/dev/mars/quorus/simulator/workflow/InMemoryWorkflowEngineSimulator.java`  
-**Interface:** `WorkflowEngine`
+**Status:** Implemented as a standalone test double  
+**Location:** [`quorus-core/src/test/java/dev/mars/quorus/simulator/workflow/InMemoryWorkflowEngineSimulator.java`](../../quorus-core/src/test/java/dev/mars/quorus/simulator/workflow/InMemoryWorkflowEngineSimulator.java)  
+**Production interface:** None  
+**Tests:** `InMemoryWorkflowEngineSimulatorTest` (35), and the workflow group in `InMemorySimulatorTest`
 
 ### Purpose
 
-Simulates workflow execution without real transfers.
+Models workflow execution as a sequence of timed steps, with validation, dry runs, virtual runs,
+step callbacks and injected failures. No transfers run.
 
-### Interface
+### Relationship to `WorkflowEngine`
 
-```java
-public interface WorkflowEngine {
-    Future<WorkflowExecution> execute(WorkflowDefinition definition, ExecutionContext context);
-    Future<WorkflowExecution> dryRun(WorkflowDefinition definition, ExecutionContext context);
-    Future<WorkflowExecution> virtualRun(WorkflowDefinition definition, ExecutionContext context);
-    WorkflowStatus getStatus(String executionId);
-    boolean pause(String executionId);
-    boolean resume(String executionId);
-    boolean cancel(String executionId);
-    void shutdown();
-}
-```
+The production
+[`WorkflowEngine`](../../quorus-workflow/src/main/java/dev/mars/quorus/workflow/WorkflowEngine.java)
+is blocking. Its `execute`, `dryRun` and `virtualRun` methods return `WorkflowExecution` and throw
+`InterruptedException`. It also has `getStatus`, `cancel` and `shutdown`. It has no `pause` or
+`resume`; those were removed under `ENG-12`.
 
-### Design
+The simulator does **not** implement it:
 
-```java
-public class InMemoryWorkflowEngineSimulator implements WorkflowEngine {
-    
-    // Configuration
-    private long stepExecutionDelayMs = 100;
-    private final Map<String, WorkflowExecution> executions = new ConcurrentHashMap<>();
-    
-    // Chaos Engineering
-    private WorkflowFailureMode failureMode = WorkflowFailureMode.NONE;
-    private String failAtStep = null;
-    private double stepFailureRate = 0.0;
-    
-    public enum WorkflowFailureMode {
-        NONE,
-        VALIDATION_FAILURE,
-        STEP_FAILURE,
-        DEPENDENCY_FAILURE,
-        TIMEOUT,
-        RESOURCE_UNAVAILABLE
-    }
-}
-```
+- Its `execute`, `dryRun` and `virtualRun` methods return `CompletableFuture<WorkflowExecution>`.
+- It still has `pause` and `resume`.
+- Its `WorkflowDefinition`, `WorkflowStep`, `ExecutionContext`, `WorkflowExecution` and status
+  enums are nested types, not the `quorus-workflow` YAML model.
 
-### Key Features
+### Behaviour
 
-#### Step-by-Step Execution
+- **Validation first.** Every run starts with a validation phase (`VALIDATING`). It checks for a
+  name, at least one step, unique step names and known `dependsOn` targets. A dry run stops there
+  with `COMPLETED`.
+- **Step order.** Steps run one at a time, in list order. `dependsOn` is validated but does not
+  affect ordering. A failed required step (the default) fails the run. A failed optional step is
+  recorded and the run continues.
+- **Step duration.** A normal run sleeps each step's `estimatedDurationMs`, or
+  `setDefaultStepDurationMs` when that is not set. A virtual run sleeps `setStepExecutionDelayMs`
+  for each step instead.
+- **Callback.** `setStepCallback(BiConsumer<WorkflowStep, StepStatus>)` is called as steps change
+  status.
 
-```java
-InMemoryWorkflowEngineSimulator engine = new InMemoryWorkflowEngineSimulator();
-engine.setStepExecutionDelayMs(500); // Each step takes 500ms
+`WorkflowStatus`: `PENDING`, `VALIDATING`, `RUNNING`, `PAUSED`, `COMPLETED`, `FAILED`, `CANCELLED`.
+`StepStatus`: `PENDING`, `RUNNING`, `COMPLETED`, `FAILED`, `SKIPPED`.
 
-// Execute workflow with callbacks
-engine.setStepCallback((step, status) -> {
-    System.out.println("Step " + step.getName() + ": " + status);
-});
+### Failure modes
 
-Future<WorkflowExecution> future = engine.execute(workflowDef, context);
-// Step download-file: STARTED
-// Step download-file: COMPLETED
-// Step transform-data: STARTED
-// Step transform-data: COMPLETED
-// Step upload-result: STARTED
-// Step upload-result: COMPLETED
-```
+| `WorkflowFailureMode` | Effect |
+|-----------------------|--------|
+| `NONE` | Normal operation |
+| `VALIDATION_FAILURE` | The run fails in validation |
+| `STEP_FAILURE` | With `setFailAtStep(name)`, that step fails |
+| `RESOURCE_UNAVAILABLE` | Every step fails with `Resource unavailable (simulated)` |
+| `RANDOM_FAILURE` | Steps fail with the probability set by `setStepFailureRate` |
+| `DEPENDENCY_FAILURE`, `TIMEOUT` | Declared but **not implemented**: they have no effect |
 
-#### Failure at Specific Step
+`setStepFailureMode(stepName, mode)` makes one step fail whenever its mode is not `NONE`.
+
+### Example
 
 ```java
-// Fail at specific step
-engine.setFailAtStep("transform-data");
-engine.setFailureMode(WorkflowFailureMode.STEP_FAILURE);
+InMemoryWorkflowEngineSimulator engine = new InMemoryWorkflowEngineSimulator()
+        .setDefaultStepDurationMs(50)
+        .setFailAtStep("transform")
+        .setFailureMode(InMemoryWorkflowEngineSimulator.WorkflowFailureMode.STEP_FAILURE);
 
-Future<WorkflowExecution> future = engine.execute(workflowDef, context);
-// Step download-file: COMPLETED
-// Step transform-data: FAILED
-// Workflow: FAILED
+var definition = InMemoryWorkflowEngineSimulator.WorkflowDefinition.builder()
+        .name("pipeline")
+        .step(InMemoryWorkflowEngineSimulator.WorkflowStep.builder().name("download").type("transfer").build())
+        .step(InMemoryWorkflowEngineSimulator.WorkflowStep.builder().name("transform").build())
+        .build();
+
+var execution = engine.execute(definition, InMemoryWorkflowEngineSimulator.ExecutionContext.empty())
+        .get(5, TimeUnit.SECONDS);
+assertThat(execution.getStatus()).isEqualTo(InMemoryWorkflowEngineSimulator.WorkflowStatus.FAILED);
 ```
 
 ---
 
 ## 7. InMemoryControllerClientSimulator
 
-**Status:** ✅ Implemented  
-**Location:** `quorus-core/src/test/java/dev/mars/quorus/simulator/client/InMemoryControllerClientSimulator.java`  
-**Replaces:** HTTP clients in agent services
+**Status:** Implemented as a standalone test double  
+**Location:** [`quorus-core/src/test/java/dev/mars/quorus/simulator/client/InMemoryControllerClientSimulator.java`](../../quorus-core/src/test/java/dev/mars/quorus/simulator/client/InMemoryControllerClientSimulator.java)  
+**Production interface:** None  
+**Tests:** `InMemoryControllerClientSimulatorTest` (51), and the client group in `InMemorySimulatorTest`
 
 ### Purpose
 
-Replaces HTTP-based controller communication with direct method calls for testing agent services.
+A programmable fake HTTP client. Tests register handlers for method-and-path pairs, send requests,
+and inspect what was sent, with injected latency and failures.
 
-### Design
+### Relationship to Quorus
 
-```java
-public class InMemoryControllerClientSimulator {
-    
-    private QuorusStateMachine stateMachine;
-    private HttpApiServer httpServer; // For extracting handlers
-    
-    // Simulated HTTP responses
-    public CompletableFuture<HttpResponse> post(String path, Object body) {
-        // Route to appropriate handler
-        if (path.startsWith("/api/v1/agents/register")) {
-            return handleAgentRegistration(body);
-        } else if (path.equals("/api/v1/agents/heartbeat")) {
-            return handleHeartbeat(body);
-        }
-        // ...
-    }
-    
-    // Chaos Engineering
-    private ClientFailureMode failureMode = ClientFailureMode.NONE;
-    private long responseDelayMs = 0;
-    
-    public enum ClientFailureMode {
-        NONE,
-        CONNECTION_REFUSED,
-        TIMEOUT,
-        SERVER_ERROR_500,
-        SERVICE_UNAVAILABLE_503,
-        NETWORK_UNREACHABLE
-    }
-}
-```
+The agent's real client,
+[`ControllerClient`](../../quorus-agent/src/main/java/dev/mars/quorus/agent/service/ControllerClient.java),
+is a `final` class. `AgentRegistrationService`, `HeartbeatService` and `JobPollingService` take it
+directly, so this simulator cannot be passed to them. The simulator also has no link to the
+controller's `HttpApiServer` or state store. Every response comes from a handler registered by the
+test; an unmatched request returns 404.
 
-### Usage
+### Behaviour
+
+- **Requests.** `get`, `post`, `put`, `delete` and `patch` return
+  `CompletableFuture<HttpResponse>`.
+- **Handlers.** `registerHandler(method, path, (request, pathParams) -> response)` routes requests.
+  Paths may contain `{name}` templates. `registerSimpleHandler` returns a fixed status and body.
+- **Recording.** Requests are recorded by default (`getRecordedRequests`, `getLastRequest`,
+  `awaitRequests`).
+- **Latency.** `setDefaultLatencyMs` or `setLatencyRange`.
+
+### Failure modes
+
+`ClientFailureMode` can be set globally (`setFailureMode`) or for one path (`setPathFailureMode`).
+Each mode fails the request with a `ClientException` carrying a matching message:
+`CONNECTION_REFUSED`, `CONNECTION_TIMEOUT`, `REQUEST_TIMEOUT`, `SERVER_ERROR_500`,
+`SERVICE_UNAVAILABLE_503`, `BAD_GATEWAY_502`, `NETWORK_UNREACHABLE` and `SSL_ERROR`.
+`RANDOM_FAILURE` fails about half of all requests. `setFailureRate(r)` adds random failures with
+probability `r`. The failure modes do not return HTTP error responses.
+
+### Example
 
 ```java
-// Replace HTTP client with simulator
-InMemoryControllerClientSimulator client = new InMemoryControllerClientSimulator(stateMachine);
+InMemoryControllerClientSimulator client = new InMemoryControllerClientSimulator();
+client.registerSimpleHandler("GET", "/simple", 200, Map.of("simple", true));
 
-// Use in agent services
-AgentRegistrationService registrationService = new AgentRegistrationService(config, client);
-JobPollingService pollingService = new JobPollingService(config, client);
-HeartbeatService heartbeatService = new HeartbeatService(config, client);
-
-// Services now communicate directly with state machine
-registrationService.register();
-List<PendingJob> jobs = pollingService.pollForJobs();
+var response = client.get("/simple").get(5, TimeUnit.SECONDS);
+assertThat(response.isSuccessful()).isTrue();
+assertThat(client.getRecordedRequests()).hasSize(1);
 ```
+
+### _Proposal_: using the client simulator in agent services
+
+Not implemented. To use the simulator in agent services, `ControllerClient` would need an
+extracted interface, and the simulator would need handlers backed by the controller's real request
+handling.
 
 ---
 
-## Integration: Combining Simulators
+## Combining Simulators
 
-### Full Stack In-Memory Test
+### Current
+
+The only test that combines simulators is the "Simulator Integration" group in
+[`InMemorySimulatorTest`](../../quorus-core/src/test/java/dev/mars/quorus/simulator/InMemorySimulatorTest.java).
+Its two tests run a protocol simulator over a file-system simulator: one transfers a file, and one
+fails a transfer and then retries it. The
+`quorus-core/src/test/java/dev/mars/quorus/simulator/integration/` package exists but is empty.
+
+### _Proposal_: full-stack in-memory tests
+
+The two examples below are proposals. They do not compile against the current code, which lacks
+the following:
+
+- `InMemoryTransferEngineSimulator` has no `registerProtocol` and does not use a protocol simulator.
+- `InMemoryAgentSimulator` has no `withTransferEngine`, and `connectToController` takes the
+  simulator's own `ControllerConnection`, not a state machine.
+- There are no `createTransferJobCommand` or `assignJobCommand` helpers. `QuorusStateStore` is
+  driven through `apply(RaftCommand)`, normally by `RaftNode`.
+- `InMemoryTransportSimulator` partitions affect only Raft messages between controller nodes. An
+  agent is not a Raft node, so `createPartition` cannot isolate one. The agent simulator's
+  `NETWORK_PARTITION` mode is the nearest equivalent.
 
 ```java
+// PROPOSAL — end-to-end transfer through simulators
 @Test
 void testEndToEndFileTransfer() {
     // 1. Setup in-memory file system with source file
@@ -2069,9 +1056,8 @@ void testEndToEndFileTransfer() {
 }
 ```
 
-### Chaos Test: Network Partition During Transfer
-
 ```java
+// PROPOSAL — agent isolated from the controller during a transfer
 @Test
 void testTransferSurvivesNetworkPartition() {
     // Setup full stack with simulators
@@ -2107,633 +1093,174 @@ void testTransferSurvivesNetworkPartition() {
 
 ---
 
-## Test Pyramid with Simulators
+## Where the Simulators Fit
 
-```mermaid
-flowchart TB
-    subgraph E2E["E2E Tests (Docker)"]
-        E1["Real containers<br/>Real protocols<br/>~minutes"]
-    end
-    
-    subgraph Integration["Integration Tests (Simulators)"]
-        I1["Full simulator stack<br/>All components<br/>~seconds"]
-    end
-    
-    subgraph Component["Component Tests"]
-        C1["Single simulator<br/>One component<br/>~100ms"]
-    end
-    
-    subgraph Unit["Unit Tests"]
-        U1["No simulators<br/>Pure logic<br/>~ms"]
-    end
-    
-    E2E --> Integration --> Component --> Unit
-    
-    style E2E fill:#ffcdd2,stroke:#c62828
-    style Integration fill:#fff9c4,stroke:#f9a825
-    style Component fill:#c8e6c9,stroke:#2e7d32
-    style Unit fill:#bbdefb,stroke:#1976d2
-```
-
-| Level | Simulators Used | Coverage | Speed |
-|-------|-----------------|----------|-------|
-| **E2E** | None (real services) | Full system | ~minutes |
-| **Integration** | All simulators | Cross-component | ~seconds |
-| **Component** | Single simulator | One component | ~100ms |
-| **Unit** | None | Pure logic | ~milliseconds |
+| Level | Tooling | What it proves |
+|-------|---------|----------------|
+| Docker | Testcontainers, real servers | Real network, real protocols, container lifecycle |
+| In-memory Raft | `InMemoryTransportSimulator` or `MockRaftTransport` with real `RaftNode` and `QuorusStateStore` | Consensus, replication, snapshots and the HTTP API, without a network |
+| Standalone simulator | One `quorus-core` simulator | Only the simulator's own behaviour. These tests do not test Quorus production code |
+| Unit | No simulators | Pure logic |
 
 ---
 
-## Benefits Summary
+## Appendix A: Simulator Summary
 
-| Metric | Current (Docker) | With Simulators | Improvement |
-|--------|------------------|-----------------|-------------|
-| Test execution time | ~30 seconds | ~5 seconds | **6x faster** |
-| CI/CD pipeline | ~10 minutes | ~2 minutes | **5x faster** |
-| Test determinism | ~90% | ~99.9% | **More reliable** |
-| Failure scenario coverage | Limited | Comprehensive | **Better coverage** |
-| Resource requirements | High (Docker) | Low (memory only) | **Less resources** |
-| Parallel test execution | Limited | Full | **More parallelism** |
+| Class | Production interface | Location | Test classes (tests) | Used outside its own tests |
+|-------|----------------------|----------|-------------------|----------------------------|
+| `InMemoryTransportSimulator` | `RaftTransport` | `quorus-controller` test, `dev.mars.quorus.controller.raft` | `EnhancedInMemoryTransportTest` (8) and 32 others | Yes: 33 controller test classes |
+| `MockRaftTransport` | `RaftTransport` | `quorus-controller` test, `dev.mars.quorus.controller.raft` | None of its own | Yes: two controller test classes |
+| `InMemoryTransferProtocolSimulator` | None | `quorus-core` test, `dev.mars.quorus.simulator.protocol` | `InMemoryTransferProtocolSimulatorTest` (40), `InMemoryFtpsProtocolSimulatorTest` (33) | No |
+| `InMemoryAgentSimulator` | None | `quorus-core` test, `dev.mars.quorus.simulator.agent` | `InMemoryAgentSimulatorTest` (57) | No |
+| `InMemoryFileSystemSimulator` | None | `quorus-core` test, `dev.mars.quorus.simulator.fs` | `InMemoryFileSystemSimulatorTest` (89) | Only by the protocol simulator |
+| `InMemoryTransferEngineSimulator` | None | `quorus-core` test, `dev.mars.quorus.simulator.transfer` | `InMemoryTransferEngineSimulatorTest` (55) | No |
+| `InMemoryWorkflowEngineSimulator` | None | `quorus-core` test, `dev.mars.quorus.simulator.workflow` | `InMemoryWorkflowEngineSimulatorTest` (35) | No |
+| `InMemoryControllerClientSimulator` | None | `quorus-core` test, `dev.mars.quorus.simulator.client` | `InMemoryControllerClientSimulatorTest` (51) | No |
+| `SimulatorTestLoggingExtension` | JUnit `BeforeAllCallback`, `AfterAllCallback`, `BeforeEachCallback`, `AfterEachCallback`, `TestWatcher` | `quorus-core` test, `dev.mars.quorus.simulator` | — | Only by the `quorus-core` simulator tests. No controller test uses it |
 
----
-
-## Appendix A: Interface Summary
-
-| Simulator | Interface | Package |
-|-----------|-----------|---------|
-| `InMemoryTransportSimulator` | `RaftTransport` | `dev.mars.quorus.controller.raft` |
-| `InMemoryTransferProtocolSimulator` | `TransferProtocol` | `dev.mars.quorus.simulator.protocol` |
-| `InMemoryAgentSimulator` | (custom) | `dev.mars.quorus.simulator.agent` |
-| `InMemoryFileSystemSimulator` | (custom) | `dev.mars.quorus.simulator.fs` |
-| `InMemoryTransferEngineSimulator` | `TransferEngine` | `dev.mars.quorus.simulator.transfer` |
-| `InMemoryWorkflowEngineSimulator` | `WorkflowEngine` | `dev.mars.quorus.simulator.workflow` |
-| `InMemoryControllerClientSimulator` | (custom) | `dev.mars.quorus.simulator.client` |
-| `SimulatorTestLoggingExtension` | `BeforeEachCallback`, `AfterEachCallback` | `dev.mars.quorus.simulator` |
+`InMemorySimulatorTest` (39 tests) also covers all six `quorus-core` simulators.
 
 ---
 
 ## Appendix B: Chaos Engineering Features Matrix
 
-| Feature | Transport | Protocol | Agent | FileSystem | Engine | Workflow |
-|---------|:---------:|:--------:|:-----:|:----------:|:------:|:--------:|
-| Latency simulation | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Failure injection | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Network partition | ✅ | - | ✅ | - | - | - |
-| Random failures | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Bandwidth throttling | ✅ | ✅ | - | ✅ | - | - |
-| Message reordering | ✅ | - | - | - | - | - |
-| Byzantine faults | ✅ | ✅ | - | ✅ | - | - |
-| Resource exhaustion | - | - | ✅ | ✅ | ✅ | - |
+| Feature | Transport | Protocol | Agent | FileSystem | Engine | Workflow | Client |
+|---------|:---------:|:--------:|:-----:|:----------:|:------:|:--------:|:------:|
+| Latency or delay | ✅ | ✅ | ✅ job duration | ✅ | ✅ job duration | ✅ step duration | ✅ |
+| Named failure modes | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Network partition | ✅ | - | ✅ `NETWORK_PARTITION` | - | - | - | - |
+| Random failures | ✅ drop rate | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Bandwidth throttling | ✅ | ✅ | - | ✅ | - | - | - |
+| Message reordering | ✅ | - | - | - | - | - | - |
+| Corrupted data or responses | ✅ `BYZANTINE` | ⚠️ `CHECKSUM_MISMATCH` fails the transfer; no corrupt data is delivered | - | ✅ `CORRUPTED_DATA` | - | - | - |
+| Resource exhaustion | - | ✅ `DISK_FULL` | ✅ `MEMORY_EXHAUSTED` | ✅ space limit, `DISK_FULL` | ✅ `QUEUE_FULL`, `ENGINE_OVERLOADED` | ✅ `RESOURCE_UNAVAILABLE` | - |
+
+Known gaps, described in their sections:
+
+- Protocol `SLOW_TRANSFER` does not slow transfers.
+- Workflow `DEPENDENCY_FAILURE` and `TIMEOUT` have no effect.
+- The engine's concurrency limit cannot be changed from 10.
 
 ---
 
-## Appendix C: Implementation Validation Report
+## Appendix C: Removed
 
-**Validation Date:** 2026-02-03  
-**Validated By:** Automated Code Analysis  
-**Last Updated:** 2026-02-03
-
-### Executive Summary
-
-| Status | Description |
-|--------|-------------|
-| ✅ **VALIDATED** | The design document accurately reflects the implementation. All 7 simulators described exist in the codebase and match their documented specifications. Test infrastructure includes `SimulatorTestLoggingExtension` for consistent logging. |
-
-### Validation Methodology
-
-To validate this document, the following were examined:
-1. **Design document** - All 2,134 lines of this specification
-2. **Implementation source files** - The actual Java implementation of each simulator
-3. **Test files** - Verified active usage through test classes
-4. **Interface definitions** - Confirmed interface compliance
-
-### Simulator-by-Simulator Validation
-
-#### 1. InMemoryTransportSimulator
-
-| Aspect | Document Status | Implementation Status | Match |
-|--------|----------------|----------------------|-------|
-| Status | ✅ Implemented | ✅ EXISTS | ✅ |
-| Location | `quorus-controller/src/test/java/.../raft/InMemoryTransportSimulator.java` | Confirmed at exact path | ✅ |
-| Interface | `RaftTransport` | Implements `RaftTransport` (line 46) | ✅ |
-| Lines of Code | — | 547 lines | — |
-
-**Features Validated:**
-
-| Feature | Documented | Implemented (Line #) |
-|---------|-----------|---------------------|
-| Global Registry | ✅ | ✅ Line 51: `Map<String, InMemoryTransportSimulator> transports` |
-| Network Partitions | ✅ | ✅ Line 54: `Set<Set<String>> networkPartitions` |
-| Latency Simulation | ✅ | ✅ Lines 71-73: `minLatencyMs`, `maxLatencyMs` |
-| Packet Drop | ✅ | ✅ Line 74: `dropRate` |
-| Message Reordering | ✅ | ✅ Lines 77-79: `reorderingEnabled`, `reorderProbability`, `maxReorderDelayMs` |
-| Bandwidth Throttling | ✅ | ✅ Lines 83-86: `throttlingEnabled`, `maxBytesPerSecond` |
-| Failure Modes | ✅ | ✅ Lines 89-99: `FailureMode` enum with NONE, CRASH, BYZANTINE, SLOW, FLAKY |
-| `setChaosConfig()` | ✅ | ✅ Lines 114-118 |
-| `setReorderingConfig()` | ✅ | ✅ Lines 125-129 |
-| `setThrottlingConfig()` | ✅ | ✅ Lines 136-139 |
-| `setFailureMode()` | ✅ | ✅ Lines 146-153 |
-| `createPartition()` | ✅ | ✅ Lines 163-167 (static method) |
-| `healPartitions()` | ✅ | ✅ Lines 172-175 (static method) |
-| `clearAllTransports()` | ✅ | ✅ Lines 521-524 |
-
-**Test Files Using This Simulator:**
-- `InfrastructureSmokeTest.java` (line 23)
-- `RaftChaosTest.java` (line 50)
-- `RaftFailureTest.java` (line 49)
-
-#### 2. InMemoryTransferProtocolSimulator
-
-| Aspect | Document Status | Implementation Status | Match |
-|--------|----------------|----------------------|-------|
-| Status | ✅ Implemented | ✅ EXISTS | ✅ |
-| Location | `quorus-core/src/test/java/dev/mars/quorus/simulator/protocol/` | Confirmed at exact path | ✅ |
-| Lines of Code | — | 1,025 lines | — |
-
-**Features Validated:**
-
-| Feature | Documented | Implemented (Line #) |
-|---------|-----------|---------------------|
-| Protocol names (ftp, ftps, sftp, http, smb) | ✅ | ✅ Lines 140-185: Factory methods |
-| `ProtocolFailureMode` enum | ✅ | ✅ Lines 87-110: All modes present |
-| Latency simulation | ✅ | ✅ Lines 72-73 |
-| Bandwidth simulation | ✅ | ✅ Line 74 |
-| Progress callbacks | ✅ | ✅ Line 75 |
-| Resume/Pause support | ✅ | ✅ Lines 68-69 |
-| Failure injection | ✅ | ✅ Lines 78-80 |
-| Statistics tracking | ✅ | ✅ Lines 83-86 |
-
-**Test Files:** `InMemoryTransferProtocolSimulatorTest.java`, `InMemoryFtpsProtocolSimulatorTest.java`
-
-**FTPS-Specific Validation:**
-
-| Feature | Documented | Implemented |
-|---------|-----------|-------------|
-| `ftps()` factory method | ✅ | ✅ Creates simulator with protocol name "ftps" |
-| Cross-scheme `canHandle()` | ✅ | ✅ FTPS handles ftp:// and FTP handles ftps:// |
-| TLS latency defaults (80-300ms) | ✅ | ✅ Higher than FTP (50-200ms) to simulate handshake overhead |
-| Resume/Pause support | ✅ | ✅ Both enabled by default |
-| Chaos engineering (auth, timeout, interrupted) | ✅ | ✅ All ProtocolFailureMode values supported |
-
-#### 3. InMemoryAgentSimulator
-
-| Aspect | Document Status | Implementation Status | Match |
-|--------|----------------|----------------------|-------|
-| Status | ✅ Implemented | ✅ EXISTS | ✅ |
-| Location | `quorus-core/src/test/java/dev/mars/quorus/simulator/agent/` | Confirmed at exact path | ✅ |
-| Lines of Code | — | 1,115 lines | — |
-
-**Features Validated:**
-
-| Feature | Documented | Implemented (Line #) |
-|---------|-----------|---------------------|
-| `AgentState` enum | ✅ | ✅ Lines 113-124 |
-| `AgentFailureMode` enum | ✅ | ✅ Lines 129-145 |
-| Agent identity | ✅ | ✅ Lines 61-67 |
-| Capabilities | ✅ | ✅ Line 70 |
-| Job management | ✅ | ✅ Lines 76-77 |
-| Heartbeat configuration | ✅ | ✅ Lines 86-89 |
-| Builder methods | ✅ | ✅ Lines 175-200 |
-| Statistics tracking | ✅ | ✅ Lines 98-101 |
-
-**Test Files:** `InMemoryAgentSimulatorTest.java`, `InMemorySimulatorTest.java`
-
-#### 4. InMemoryFileSystemSimulator
-
-| Aspect | Document Status | Implementation Status | Match |
-|--------|----------------|----------------------|-------|
-| Status | ✅ Implemented | ✅ EXISTS | ✅ |
-| Location | `quorus-core/src/test/java/dev/mars/quorus/simulator/fs/` | Confirmed at exact path | ✅ |
-| Lines of Code | — | 970 lines | — |
-
-**Features Validated:**
-
-| Feature | Documented | Implemented (Line #) |
-|---------|-----------|---------------------|
-| `FileSystemFailureMode` enum | ✅ | ✅ Lines 89-106 |
-| Virtual files storage | ✅ | ✅ Line 56 |
-| Virtual directories | ✅ | ✅ Line 57 |
-| Space management | ✅ | ✅ Lines 61-62 |
-| I/O delay simulation | ✅ | ✅ Lines 65-68 |
-| File locking | ✅ | ✅ Line 58 |
-| File operations | ✅ | ✅ Lines 118-200+ |
-| Statistics tracking | ✅ | ✅ Lines 76-79 |
-
-**Test File:** `InMemoryFileSystemSimulatorTest.java`
-
-#### 5. InMemoryTransferEngineSimulator
-
-| Aspect | Document Status | Implementation Status | Match |
-|--------|----------------|----------------------|-------|
-| Status | ✅ Implemented | ✅ EXISTS | ✅ |
-| Location | `quorus-core/src/test/java/dev/mars/quorus/simulator/transfer/` | Confirmed at exact path | ✅ |
-| Lines of Code | — | 1,021 lines | — |
-
-**Features Validated:**
-
-| Feature | Documented | Implemented (Line #) |
-|---------|-----------|---------------------|
-| `TransferEngineFailureMode` enum | ✅ | ✅ Lines 93-106 |
-| `TransferStatus` enum | ✅ | ✅ Lines 111-118 |
-| Concurrency control | ✅ | ✅ Lines 59-60 |
-| `submitTransfer()` | ✅ | ✅ Lines 138-175 |
-| `getTransferJob()` | ✅ | ✅ Lines 183+ |
-| Pause/Resume/Cancel | ✅ | ✅ Methods exist |
-| Statistics tracking | ✅ | ✅ Lines 71-75 |
-| Protocol metrics | ✅ | ✅ Line 78 |
-
-**Test File:** `InMemoryTransferEngineSimulatorTest.java`
-
-#### 6. InMemoryWorkflowEngineSimulator
-
-| Aspect | Document Status | Implementation Status | Match |
-|--------|----------------|----------------------|-------|
-| Status | ✅ Implemented | ✅ EXISTS | ✅ |
-| Location | `quorus-core/src/test/java/dev/mars/quorus/simulator/workflow/` | Confirmed at exact path | ✅ |
-| Lines of Code | — | 1,048 lines | — |
-
-**Features Validated:**
-
-| Feature | Documented | Implemented (Line #) |
-|---------|-----------|---------------------|
-| `WorkflowFailureMode` enum | ✅ | ✅ Lines 84-96 |
-| `WorkflowStatus` enum | ✅ | ✅ Lines 101-103 |
-| `StepStatus` enum | ✅ | ✅ Lines 108-110 |
-| `execute()` method | ✅ | ✅ Lines 124-127 |
-| `dryRun()` method | ✅ | ✅ Lines 136-140 |
-| `virtualRun()` method | ✅ | ✅ Lines 149-153 |
-| `pause()`/`resume()`/`cancel()` | ✅ | ✅ Lines 176+ |
-| Step callback | ✅ | ✅ Line 74 |
-| Step execution delay config | ✅ | ✅ Lines 57-58 |
-| Fail at specific step | ✅ | ✅ Line 69 |
-
-**Test File:** `InMemoryWorkflowEngineSimulatorTest.java`
-
-#### 7. InMemoryControllerClientSimulator
-
-| Aspect | Document Status | Implementation Status | Match |
-|--------|----------------|----------------------|-------|
-| Status | ✅ Implemented | ✅ EXISTS | ✅ |
-| Location | `quorus-core/src/test/java/dev/mars/quorus/simulator/client/` | Confirmed at exact path | ✅ |
-| Lines of Code | — | 772 lines | — |
-
-**Features Validated:**
-
-| Feature | Documented | Implemented (Line #) |
-|---------|-----------|---------------------|
-| `ClientFailureMode` enum | ✅ | ✅ Lines 74-92 |
-| HTTP methods (GET, POST, PUT, DELETE) | ✅ | ✅ Lines 116-167 |
-| Endpoint handlers | ✅ | ✅ Line 55 |
-| Request recording | ✅ | ✅ Lines 58-59 |
-| Latency simulation | ✅ | ✅ Lines 50-51 |
-| Statistics tracking | ✅ | ✅ Lines 65-67 |
-
-**Test File:** `InMemoryControllerClientSimulatorTest.java`
-
-### Files Reviewed
-
-#### Implementation Files (7 files, 6,498 total lines)
-
-| File | Lines | Module |
-|------|-------|--------|
-| `InMemoryTransportSimulator.java` | 547 | quorus-controller |
-| `InMemoryTransferProtocolSimulator.java` | 1,025 | quorus-core |
-| `InMemoryAgentSimulator.java` | 1,115 | quorus-core |
-| `InMemoryFileSystemSimulator.java` | 970 | quorus-core |
-| `InMemoryTransferEngineSimulator.java` | 1,021 | quorus-core |
-| `InMemoryWorkflowEngineSimulator.java` | 1,048 | quorus-core |
-| `InMemoryControllerClientSimulator.java` | 772 | quorus-core |
-
-#### Test Files (10 files)
-
-| File | Module |
-|------|--------|
-| `InfrastructureSmokeTest.java` | quorus-controller |
-| `RaftChaosTest.java` | quorus-controller |
-| `RaftFailureTest.java` | quorus-controller |
-| `InMemoryTransferProtocolSimulatorTest.java` | quorus-core |
-| `InMemoryFileSystemSimulatorTest.java` | quorus-core |
-| `InMemoryAgentSimulatorTest.java` | quorus-core |
-| `InMemoryTransferEngineSimulatorTest.java` | quorus-core |
-| `InMemoryWorkflowEngineSimulatorTest.java` | quorus-core |
-| `InMemoryControllerClientSimulatorTest.java` | quorus-core |
-| `InMemorySimulatorTest.java` | quorus-core |
-
-#### Interface Files
-
-| File | Module |
-|------|--------|
-| `RaftTransport.java` | quorus-controller |
-| `RaftMessage.java` | quorus-controller |
-
-### Summary of Findings
-
-#### Status: All Validated ✅
-All 7 simulators are documented as **✅ Implemented** with correct file paths matching the actual codebase.
-
-#### Simulator Locations
-All simulators are consolidated under the `quorus-core/src/test/java/dev/mars/quorus/simulator/` package hierarchy:
-
-| Simulator | Package |
-|-----------|--------|
-| InMemoryTransportSimulator | `quorus-controller/.../raft/` (production test support) |
-| InMemoryTransferProtocolSimulator | `quorus-core/.../simulator/protocol/` |
-| InMemoryAgentSimulator | `quorus-core/.../simulator/agent/` |
-| InMemoryFileSystemSimulator | `quorus-core/.../simulator/fs/` |
-| InMemoryTransferEngineSimulator | `quorus-core/.../simulator/transfer/` |
-| InMemoryWorkflowEngineSimulator | `quorus-core/.../simulator/workflow/` |
-| InMemoryControllerClientSimulator | `quorus-core/.../simulator/client/` |
-
-### Conclusion
-
-The design document is **accurate and comprehensive**. All 7 documented simulators exist in the codebase (6,498 total lines of implementation code) with complete feature parity. All documented features are implemented with comprehensive test coverage (10 test files).
-
-**Document updated 2026-02-02** to correct status markers and file locations based on validation findings.
+Version 2.0's "Implementation Validation Report" said the document was "accurate and comprehensive"
+with "complete feature parity". That was false, and the appendix has been removed. It is archived
+verbatim in
+[QUORUS_IN_MEMORY_SIMULATORS_ARCHIVED_SECTIONS.md](../archive/QUORUS_IN_MEMORY_SIMULATORS_ARCHIVED_SECTIONS.md).
 
 ---
 
 ## Appendix D: Edge Case Test Coverage Analysis
 
-**Date:** 2026-02-03  
-**Scope:** InMemoryFileSystemSimulator (critical component for transfer testing)
+**Originally:** 2026-02-03. **Re-checked against the test source:** 2026-10-03  
+**Scope:** `InMemoryFileSystemSimulator`
 
-### Current Test Coverage Summary
+### Current test coverage
 
-| Category | Tests | Coverage |
-|----------|-------|----------|
-| File Operations | 11 | ✅ Good |
-| Directory Operations | 6 | ✅ Good |
-| File Metadata | 3 | ⚠️ Partial |
-| File Locking | 5 | ✅ Good |
-| Space Management | 4 | ⚠️ Partial |
-| Performance Simulation | 3 | ⚠️ Partial |
-| Chaos Engineering | 9 | ✅ Good |
-| Statistics | 8 | ✅ Good |
-| Utility Methods | 4 | ⚠️ Partial |
-| Concurrent Access | 1 | ⚠️ Minimal |
-| **Total** | **54** | **~75%** |
+`InMemoryFileSystemSimulatorTest` has 89 tests (88 `@Test` and one `@ParameterizedTest`), up from
+54:
 
-### Missing Edge Cases (Prioritized)
+| Group | Tests |
+|-------|------:|
+| File Operations | 10 |
+| Directory Operations | 6 |
+| File Metadata | 3 |
+| File Locking | 5 |
+| Space Management | 4 |
+| Performance Simulation | 3 |
+| Chaos Engineering | 8 |
+| Statistics | 7 |
+| Utility Methods | 4 |
+| Concurrent Access | 4 |
+| Security & Data Integrity Edge Cases | 14 |
+| Failure Mode Edge Cases | 11 |
+| Additional Edge Cases | 10 |
+| **Total** | **89** |
 
-#### HIGH Severity (Security/Data Integrity)
+### Edge cases
 
-| # | Test Case | Description | Risk |
-|---|-----------|-------------|------|
-| 1 | Empty file operations | Create/read/write 0-byte files | Transfer marker files, empty manifests |
-| 2 | Large file handling (>100MB) | Memory pressure, allocation limits | OOM in production, heap exhaustion |
-| 3 | Binary content integrity | Verify non-text byte[] preserved exactly | Image/PDF corruption, checksum failures |
-| 4 | Path traversal attacks | `../../../etc/passwd`, `..\\..\\windows` | Security breach, unauthorized file access |
-| 5 | Special characters in paths | Spaces, unicode (日本語), URL-encoded (%20) | Real-world filename failures |
-| 6 | Concurrent file locking | Multiple threads lock same file | Race conditions, deadlocks |
-| 7 | Concurrent directory creation | Same parent from multiple threads | Data corruption, inconsistent state |
-| 8 | Delete root directory | Attempt `deleteDirectory("/")` | System integrity violation |
-| 9 | Null path handling | Pass `null` to all methods | NPE crashes in production |
-| 10 | Empty path handling | Pass `""` to all methods | Undefined behavior |
+✅ means a test covering the case exists. ⬜ means the case is still open.
 
-#### MEDIUM Severity (Feature Completeness)
+#### HIGH severity (security and data integrity)
 
-| # | Test Case | Description | Risk |
-|---|-----------|-------------|------|
-| 11 | Write bandwidth throttling | `setWriteBytesPerSecond()` | Only read bandwidth tested |
-| 12 | CORRUPTED_DATA failure mode | Verify data corruption simulation | Feature documented but untested |
-| 13 | FILE_LOCKED failure mode | Verify lock simulation via failure mode | Feature documented but untested |
-| 14 | Append to non-existent file | `appendFile("/missing.txt", data)` | Error handling validation |
-| 15 | Lock non-existent file | `lockFile("/missing.txt")` | Error handling validation |
-| 16 | Deep directory nesting | `/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/...` | Stack overflow, path limits |
-| 17 | List non-existent directory | `listDirectory("/missing/")` | Error message validation |
-| 18 | Metadata for non-existent paths | `getMetadata("/missing")` | Error handling |
-| 19 | VirtualFileOutputStream partial write | Stream opened but not closed | Resource leak |
-| 20 | Interrupted thread during delays | Thread.interrupt() during sleep | Graceful interruption handling |
+| # | Case | Status |
+|---|------|--------|
+| 1 | Empty (0-byte) files | ✅ "Should handle empty file (0 bytes)", plus stream and append variants |
+| 2 | Large files (>100 MB) | ⬜ No test |
+| 3 | Binary content integrity | ✅ "Should preserve binary content integrity", "… with null bytes" |
+| 4 | Path traversal (`../`, `..\`) | ⬜ No test. The simulator neither resolves nor rejects `..` |
+| 5 | Special characters in paths | ✅ Spaces, Unicode and URL-encoded-style paths |
+| 6 | Concurrent locking of one file | ✅ "Should handle concurrent file locking correctly" (exactly one of 10 threads wins) |
+| 7 | Concurrent directory creation | ✅ "Should handle concurrent directory creation safely" |
+| 8 | Deleting the root directory | ✅ "Should prevent deleting root directory" |
+| 9 | `null` paths | ⬜ No test. The simulator treats `null` as the root rather than throwing |
+| 10 | Empty paths | ✅ "Should handle empty path as root" |
 
-#### LOW Severity (API Completeness)
+#### MEDIUM severity (feature completeness)
 
-| # | Test Case | Description | Risk |
-|---|-----------|-------------|------|
-| 21 | Set permissions on directory | `setPermissions("/dir", perms)` | API gap (may throw or silently ignore) |
-| 22 | `getTotalSpace()` method | Verify returns configured value | Method exists, no test coverage |
-| 23 | `clearFileFailureMode()` method | Reset file-specific chaos | Method exists, no test coverage |
+| # | Case | Status |
+|---|------|--------|
+| 11 | Write bandwidth throttling | ✅ "Should simulate write bandwidth throttling" |
+| 12 | `CORRUPTED_DATA` | ✅ "Should simulate CORRUPTED_DATA failure mode" |
+| 13 | `FILE_LOCKED` | ✅ "Should simulate FILE_LOCKED failure mode globally" |
+| 14 | Append to a missing file | ✅ "Should throw on append to non-existent file" |
+| 15 | Lock a missing file | ✅ "Should throw on locking non-existent file" |
+| 16 | Deep directory nesting | ✅ "Should handle very long file paths" (50 levels) and "… non-existent deep directory" |
+| 17 | List a missing directory | ✅ "Should throw on listing non-existent directory" |
+| 18 | Metadata for a missing path | ✅ "Should throw on metadata for non-existent path" |
+| 19 | Output stream opened and never closed | ⬜ No test |
+| 20 | Interrupting a thread during simulated delays | ⬜ No test |
 
-### Recommended Test Additions
+#### LOW severity (API completeness)
 
-#### Critical Security & Data Integrity
+| # | Case | Status |
+|---|------|--------|
+| 21 | `setPermissions` on a directory | ⬜ No test (only files are tested) |
+| 22 | `getTotalSpace()` | ✅ "Should return correct total space" |
+| 23 | `clearFileFailureMode()` | ✅ "Should clear file-specific failure mode" |
+
+### _Proposal_: remaining HIGH-severity tests
+
+These tests describe behaviour the simulator does not have yet. Path traversal is not rejected, and
+`null` is treated as the root. Each test needs the matching simulator change.
 
 ```java
-@Nested
-@DisplayName("Edge Cases - Security & Data Integrity")
-class SecurityEdgeCasesTests {
+// PROPOSAL — requires the simulator to reject ".." segments
+@Test
+@DisplayName("Should reject path traversal attacks")
+void testPathTraversalPrevention() {
+    assertThatThrownBy(() -> fs.createFile("../../../etc/passwd", "hack".getBytes()))
+        .isInstanceOf(SecurityException.class);
+    assertThatThrownBy(() -> fs.createFile("..\\..\\windows\\system32", "hack".getBytes()))
+        .isInstanceOf(SecurityException.class);
+}
 
-    @Test
-    @DisplayName("Should handle empty file (0 bytes)")
-    void testEmptyFile() throws IOException {
-        fs.createFile("/empty.txt", new byte[0]);
-        assertThat(fs.readFile("/empty.txt")).isEmpty();
-        assertThat(fs.getMetadata("/empty.txt").size()).isZero();
-    }
-
-    @Test
-    @DisplayName("Should reject path traversal attacks")
-    void testPathTraversalPrevention() {
-        assertThatThrownBy(() -> fs.createFile("../../../etc/passwd", "hack".getBytes()))
-            .isInstanceOf(SecurityException.class);
-        assertThatThrownBy(() -> fs.createFile("..\\..\\windows\\system32", "hack".getBytes()))
-            .isInstanceOf(SecurityException.class);
-    }
-
-    @Test
-    @DisplayName("Should handle special characters in paths")
-    void testSpecialCharacterPaths() throws IOException {
-        fs.createFile("/files with spaces/doc.txt", "a".getBytes());
-        fs.createFile("/unicode/日本語ファイル.txt", "b".getBytes());
-        fs.createFile("/encoded/%20file%20.txt", "c".getBytes());
-        
-        assertThat(fs.exists("/files with spaces/doc.txt")).isTrue();
-        assertThat(fs.exists("/unicode/日本語ファイル.txt")).isTrue();
-    }
-
-    @Test
-    @DisplayName("Should preserve binary content integrity")
-    void testBinaryContentIntegrity() throws IOException {
-        byte[] binary = new byte[256];
-        for (int i = 0; i < 256; i++) binary[i] = (byte) i;
-        
-        fs.createFile("/binary.bin", binary);
-        byte[] read = fs.readFile("/binary.bin");
-        
-        assertThat(read).isEqualTo(binary);
-    }
-
-    @Test
-    @DisplayName("Should prevent deleting root directory")
-    void testCannotDeleteRoot() {
-        assertThatThrownBy(() -> fs.deleteDirectory("/"))
-            .isInstanceOf(IOException.class)
-            .hasMessageContaining("root");
-    }
-
-    @Test
-    @DisplayName("Should handle null path gracefully")
-    void testNullPathHandling() {
-        assertThatThrownBy(() -> fs.createFile(null, "content".getBytes()))
-            .isInstanceOf(NullPointerException.class);
-    }
+// PROPOSAL — requires the simulator to reject null paths
+@Test
+@DisplayName("Should handle null path gracefully")
+void testNullPathHandling() {
+    assertThatThrownBy(() -> fs.createFile(null, "content".getBytes()))
+        .isInstanceOf(NullPointerException.class);
 }
 ```
 
-#### Concurrency & Race Conditions
+### Acceptance criteria
 
-```java
-@Nested
-@DisplayName("Edge Cases - Concurrency")
-class ConcurrencyEdgeCasesTests {
+- [ ] All HIGH-severity edge cases covered. Items 2, 4 and 9 are open.
+- [ ] Concurrent access tests pass 100 consecutive runs. Not recorded.
+- [ ] No path-traversal or null-handling weakness. Items 4 and 9 are open.
+- [ ] Binary data integrity verified with checksums. Content is compared byte for byte, not by
+  checksum.
+- [x] All documented failure modes have test coverage. Each `FileSystemFailureMode` except `NONE`
+  has a dedicated test.
 
-    @Test
-    @DisplayName("Should handle concurrent file locking correctly")
-    void testConcurrentFileLocking() throws Exception {
-        fs.createFile("/shared.txt", "content".getBytes());
-        
-        int threadCount = 10;
-        CountDownLatch startLatch = new CountDownLatch(1);
-        CountDownLatch doneLatch = new CountDownLatch(threadCount);
-        AtomicInteger lockSuccesses = new AtomicInteger(0);
-        
-        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
-        
-        for (int i = 0; i < threadCount; i++) {
-            executor.submit(() -> {
-                try {
-                    startLatch.await();
-                    fs.lockFile("/shared.txt");
-                    lockSuccesses.incrementAndGet();
-                } catch (IOException | InterruptedException e) {
-                    // Expected for all but one thread
-                } finally {
-                    doneLatch.countDown();
-                }
-            });
-        }
-        
-        startLatch.countDown();
-        doneLatch.await(10, TimeUnit.SECONDS);
-        executor.shutdown();
-        
-        // Exactly one thread should succeed
-        assertThat(lockSuccesses.get()).isEqualTo(1);
-    }
+---
 
-    @Test
-    @DisplayName("Should handle concurrent directory creation safely")
-    void testConcurrentDirectoryCreation() throws Exception {
-        int threadCount = 10;
-        CountDownLatch latch = new CountDownLatch(threadCount);
-        AtomicInteger errors = new AtomicInteger(0);
-        
-        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
-        
-        for (int i = 0; i < threadCount; i++) {
-            final int threadId = i;
-            executor.submit(() -> {
-                try {
-                    // All threads create same directory structure
-                    fs.createDirectories("/concurrent/test/path");
-                    fs.createFile("/concurrent/test/path/file" + threadId + ".txt", "data".getBytes());
-                } catch (Exception e) {
-                    errors.incrementAndGet();
-                } finally {
-                    latch.countDown();
-                }
-            });
-        }
-        
-        latch.await(30, TimeUnit.SECONDS);
-        executor.shutdown();
-        
-        assertThat(errors.get()).isZero();
-        assertThat(fs.listDirectory("/concurrent/test/path")).hasSize(threadCount);
-    }
-}
-```
+## Revision History
 
-#### Failure Modes & Error Handling
-
-```java
-@Nested
-@DisplayName("Edge Cases - Failure Modes")
-class FailureModeEdgeCasesTests {
-
-    @Test
-    @DisplayName("Should simulate CORRUPTED_DATA failure mode")
-    void testCorruptedDataFailure() throws IOException {
-        byte[] original = "This is original content".getBytes();
-        fs.createFile("/data.txt", original);
-        fs.setFileFailureMode("/data.txt", FileSystemFailureMode.CORRUPTED_DATA);
-        
-        byte[] corrupted = fs.readFile("/data.txt");
-        
-        // Content should be different due to corruption
-        assertThat(corrupted).isNotEqualTo(original);
-        assertThat(corrupted.length).isEqualTo(original.length);
-    }
-
-    @Test
-    @DisplayName("Should simulate FILE_LOCKED failure mode")
-    void testFileLockedFailureMode() throws IOException {
-        fs.createFile("/test.txt", "content".getBytes());
-        fs.setFailureMode(FileSystemFailureMode.FILE_LOCKED);
-        
-        assertThatThrownBy(() -> fs.readFile("/test.txt"))
-            .isInstanceOf(IOException.class)
-            .hasMessageContaining("locked");
-    }
-
-    @Test
-    @DisplayName("Should throw on append to non-existent file")
-    void testAppendToNonExistentFile() {
-        assertThatThrownBy(() -> fs.appendFile("/missing.txt", "data".getBytes()))
-            .isInstanceOf(NoSuchFileException.class);
-    }
-
-    @Test
-    @DisplayName("Should throw on locking non-existent file")
-    void testLockNonExistentFile() {
-        assertThatThrownBy(() -> fs.lockFile("/missing.txt"))
-            .isInstanceOf(NoSuchFileException.class);
-    }
-
-    @Test
-    @DisplayName("Should throw on listing non-existent directory")
-    void testListNonExistentDirectory() {
-        assertThatThrownBy(() -> fs.listDirectory("/missing/"))
-            .isInstanceOf(NoSuchFileException.class);
-    }
-
-    @Test
-    @DisplayName("Should simulate write bandwidth throttling")
-    void testWriteBandwidth() throws IOException {
-        fs.setWriteBytesPerSecond(5000); // 5KB/s
-        
-        long start = System.currentTimeMillis();
-        fs.createFile("/test.txt", new byte[10000]); // 10KB
-        long elapsed = System.currentTimeMillis() - start;
-        
-        // Should take at least 2 seconds for 10KB at 5KB/s
-        assertThat(elapsed).isGreaterThanOrEqualTo(2000);
-    }
-}
-```
-
-### Test Coverage Summary
-
-| Category | Tests | Risk Mitigated |
-|----------|-------|----------------|
-| Security & Data Integrity | 10 tests | Path traversal, null handling, binary content |
-| Concurrency | 5 tests | Race conditions, deadlocks |
-| Failure Modes | 8 tests | Feature completeness |
-| **Total** | **39 tests** | **Comprehensive coverage** |
-
-### Acceptance Criteria
-
-- [ ] All HIGH severity edge cases covered
-- [ ] Concurrent access tests pass 100 consecutive runs
-- [ ] No security vulnerabilities (path traversal, null handling)
-- [ ] Binary data integrity verified with checksums
-- [ ] All documented failure modes have test coverage
+| Version | Date | Changes |
+|---------|------|---------|
+| 2.1 | 2026-10-03 | DR-C7. Rewrote §1 against the code: the current `RaftTransport` (`Future<Void> stop()`, `sendInstallSnapshot`), `RaftNode.builder()`, `QuorusStateStore`, the actual message path and chaos semantics, `MockRaftTransport`, and links to `RaftChaosTest`, `RaftFailureTest` and `InfrastructureSmokeTest`. Relabelled §2–7 as standalone test doubles and rewrote them from the code, recording the simulator defects found. Marked the builder, wiring and full-stack examples as proposals. Re-checked Appendix D and ticked the delivered items. Removed and archived Appendix C, the "REAL PRODUCTION CODE" excerpts, the version 2.0 text of §2–7 and the unmeasured "Benefits Summary" |
+| 2.0 | 2026-01-28 | Previous version |

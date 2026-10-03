@@ -2,16 +2,18 @@
 
 # ADR-0012: Leave Vert.x for Java 27 Structured Concurrency
 
-**Version:** 1.3  
-**Date:** 2026-09-28  
+**Version:** 1.4  
+**Date:** 2026-10-03  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0
 
 **Status:** Accepted by project authority on 2026-09-26, including decisions `RT-Q1` to `RT-Q5` below. Delivery is workstream `RT` in the [enterprise implementation plan](../task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md#20-platform-migration-workstreams).
 
+**Delivery status, 2026-10-03:** the build is on Java 27 (`RT-01`), and `quorus-core`, `quorus-workflow`, `quorus-tenant`, `quorus-integration-examples` and `quorus-agent` have no Vert.x dependency (`RT-03` to `RT-05`), with guard tests that fail if it returns. `quorus-controller` still uses Vert.x for its HTTP server and Raft engine (`RT-06`, then `CE-10`), and the profile-only `quorus-benchmarks` module uses it to drive that engine. The build-wide `io.vertx` ban (`RT-08`) waits for the controller. The context below records the position when the decision was taken.
+
 ## Context
 
-Quorus is built on Java 25 and Vert.x 5. Vert.x types appear in 78 main-source files: 48 in `quorus-controller`, 12 in `quorus-core`, 10 in `quorus-agent`, 6 in `quorus-integration-examples` and 2 in `quorus-workflow`. They cover:
+At the time of the decision, Quorus was built on Java 25 and Vert.x 5. Vert.x types appear in 78 main-source files: 48 in `quorus-controller`, 12 in `quorus-core`, 10 in `quorus-agent`, 6 in `quorus-integration-examples` and 2 in `quorus-workflow`. They cover:
 - the controller HTTP server and middleware;
 - the agent's controller client;
 - the HTTP transfer protocol's `WebClient`;
@@ -141,6 +143,7 @@ Class files compiled with preview features only run on the exact Java feature re
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.4 | 2026-10-03 | Delivery status added after the status line; the context is marked as the position when the decision was taken (Java 25, pre-migration file counts). No decision changes |
 | 1.3 | 2026-09-28 | Decision 4 clarified: a `TaskScope` needs a deadline, so service loops and per-job work with no deadline run on lifecycle-owned virtual threads (concurrency conventions v1.3 §1), as the agent does since `RT-05` |
 | 1.2 | 2026-09-27 | Corrected `RT-Q4` to the delivered images: runtime option A (`amazoncorretto:27.0.0-alpine3.24`), single-stage images that copy host-built jars, and no builder stage or Maven in any image. Decision 4 names Apache HttpClient 5 for the HTTP transfer adapter (`RT-Q5`), and decision 3 no longer mentions Docker build images |
 

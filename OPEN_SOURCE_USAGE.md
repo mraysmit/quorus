@@ -54,16 +54,21 @@ All Java source files must include the following license header:
 
 ## Third-Party Dependencies
 
+This inventory is maintained by hand from the module poms (last checked 2026-10-03). Versions without a number are managed by a BOM in the root `pom.xml`.
+
 ### Runtime Dependencies
 
-#### Reactive & Async Processing
+#### Vert.x (`quorus-controller` only, until plan item `RT-06`)
 - **Eclipse Vert.x Core** (5.0.8) - Apache License 2.0 / EPL 2.0
 - **Vert.x Web** (5.0.8) - Apache License 2.0 / EPL 2.0
 - **Vert.x Web Client** (5.0.8) - Apache License 2.0 / EPL 2.0
-- **Vert.x PostgreSQL Client** (5.0.8) - Apache License 2.0 / EPL 2.0
 - **Vert.x gRPC Server** (5.0.8) - Apache License 2.0 / EPL 2.0
 - **Vert.x gRPC Client** (5.0.8) - Apache License 2.0 / EPL 2.0
 - **Vert.x OpenTelemetry** (5.0.8) - Apache License 2.0 / EPL 2.0
+- **Netty** (transitive, through Vert.x and gRPC Netty) - Apache License 2.0
+
+#### HTTP Client
+- **Apache HttpClient 5** (5.6.4), with **Apache HttpCore 5** (transitive) - Apache License 2.0; the HTTP transfer adapter in `quorus-core`
 
 #### JSON & YAML Processing
 - **Jackson Databind** (2.19.4) - Apache License 2.0
@@ -81,8 +86,7 @@ All Java source files must include the following license header:
 - **Protocol Buffers Java Util** (3.25.5) - BSD 3-Clause License
 
 #### Raft Consensus & Storage
-- **RaftLog Core** (1.1.0) - Apache License 2.0
-- **RocksDB JNI** (9.11.2) - Apache License 2.0
+- **RaftLog Core** (1.2.0, `io.github.mraysmit:raftlog-core`) - Apache License 2.0
 
 #### Observability
 - **OpenTelemetry API** (1.59.0) - Apache License 2.0
@@ -97,9 +101,9 @@ All Java source files must include the following license header:
 - **Logback Classic** (1.5.32) - EPL 1.0 / LGPL 2.1
 
 #### Protocol Adapters
-- **JSch** (0.2.26) - BSD 2-Clause License
-- **jCIFS-ng** (2.1.10) - LGPL 2.1
-- **Commons Net** (3.12.0) - Apache License 2.0
+- **JSch** (0.2.26, `com.github.mwiede`) - BSD 2-Clause License; the SFTP adapter
+
+The FTP/FTPS, SMB and NFS adapters use no third-party protocol library at runtime.
 
 #### Validation & Expression
 - **Jakarta Validation API** (3.0.2) - Apache License 2.0
@@ -108,6 +112,10 @@ All Java source files must include the following license header:
 
 #### Utilities
 - **Google Guava** (33.5.0-jre) - Apache License 2.0
+- **javax.annotation API** (1.3.2) - CDDL 1.1 / GPL 2.0 with Classpath Exception; used by the generated gRPC code in `quorus-controller`
+
+#### Container Base Image
+- **Amazon Corretto 27** (`amazoncorretto:27.0.0-alpine3.24`) - GPL 2.0 with Classpath Exception; the base of the controller and agent images, not a Maven dependency
 
 ### Test Dependencies
 
@@ -120,6 +128,8 @@ All Java source files must include the following license header:
 #### Integration Testing
 - **TestContainers** (2.0.3) - MIT License
 - **TestContainers JUnit Jupiter** (2.0.3) - MIT License
+- **Commons Net** (3.12.0) - Apache License 2.0; FTP and FTPS test clients
+- **jCIFS-ng** (2.1.10) - LGPL 2.1; SMB test utilities
 
 ## License Compatibility Matrix
 
@@ -130,7 +140,9 @@ All Java source files must include the following license header:
 | BSD 2-Clause | Yes | Permissive, compatible |
 | BSD 3-Clause | Yes | Permissive, compatible |
 | EPL 2.0 | Yes | Compatible with Apache 2.0 |
-| LGPL 2.1 | Conditional | Dynamic linking only |
+| CDDL 1.1 | Yes, as a binary dependency | Weak copyleft on the CDDL-licensed files themselves |
+| LGPL 2.1 | Conditional | Dynamic linking only; currently test scope only (jCIFS-ng) |
+| GPL 2.0 with Classpath Exception | Yes, for the JDK runtime | Applies to the container base image, not to Quorus code |
 
 ## Compliance Requirements
 
@@ -198,7 +210,7 @@ Use the provided script to ensure all files have proper headers:
 
 ### Maven License Plugin
 
-Consider adding the Maven License Plugin to your build:
+The build does not run a license plugin. If one is added, it needs a header template file (for example a new `LICENSE-HEADER.txt` holding the header shown above, which does not exist in the repository today):
 
 ```xml
 <plugin>

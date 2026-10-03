@@ -14,6 +14,30 @@ $activeRoots = @(
 $documents = $activeRoots | Where-Object { Test-Path -LiteralPath $_ } |
     ForEach-Object { Get-ChildItem -LiteralPath $_ -Filter '*.md' -File -Recurse }
 
+# Every live document is link-checked, including those without the standard header. Only
+# docs-design/archive is excluded: it is historical by declaration.
+$archiveRoot = (Join-Path $RepositoryRoot 'docs-design/archive') + [IO.Path]::DirectorySeparatorChar
+$linkCheckedDocuments = @(
+    @(Join-Path $RepositoryRoot 'README.md'),
+    @(Join-Path $RepositoryRoot 'docker/README.md'),
+    (Get-ChildItem -LiteralPath (Join-Path $RepositoryRoot 'docs') -Filter '*.md' -File -Recurse).FullName,
+    (Get-ChildItem -LiteralPath (Join-Path $RepositoryRoot 'docs-design') -Filter '*.md' -File -Recurse |
+        Where-Object { -not $_.FullName.StartsWith($archiveRoot) }).FullName
+) | ForEach-Object { $_ } | Where-Object { Test-Path -LiteralPath $_ } | Sort-Object -Unique
+
+foreach ($path in $linkCheckedDocuments) {
+    $text = Get-Content -LiteralPath $path -Raw
+    $relative = [IO.Path]::GetRelativePath($RepositoryRoot, $path)
+    foreach ($match in [regex]::Matches($text, '\[[^\]]+\]\((?!https?://|#|mailto:)([^)]+)\)')) {
+        $target = $match.Groups[1].Value.Split('#')[0]
+        if ([string]::IsNullOrWhiteSpace($target)) { continue }
+        $resolved = Join-Path (Split-Path -Parent $path) ([Uri]::UnescapeDataString($target))
+        if (-not (Test-Path -LiteralPath $resolved)) {
+            $failures.Add("Broken local link in ${relative}: $target")
+        }
+    }
+}
+
 foreach ($document in $documents) {
     $text = Get-Content -LiteralPath $document.FullName -Raw
     $lines = Get-Content -LiteralPath $document.FullName
@@ -27,15 +51,6 @@ foreach ($document in $documents) {
     $fenceCount = ($lines | Where-Object { $_ -match '^\s*```' }).Count
     if (($fenceCount % 2) -ne 0) {
         $failures.Add("Unbalanced fenced code block: $relative")
-    }
-
-    foreach ($match in [regex]::Matches($text, '\[[^\]]+\]\((?!https?://|#|mailto:)([^)]+)\)')) {
-        $target = $match.Groups[1].Value.Split('#')[0]
-        if ([string]::IsNullOrWhiteSpace($target)) { continue }
-        $resolved = Join-Path $document.DirectoryName ([Uri]::UnescapeDataString($target))
-        if (-not (Test-Path -LiteralPath $resolved)) {
-            $failures.Add("Broken local link in ${relative}: $target")
-        }
     }
 }
 

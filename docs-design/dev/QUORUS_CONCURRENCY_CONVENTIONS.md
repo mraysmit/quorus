@@ -2,8 +2,8 @@
 
 # Quorus Concurrency Conventions
 
-**Version:** 1.3  
-**Date:** 2026-09-28  
+**Version:** 1.4  
+**Date:** 2026-10-03  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Status:** Active. Applies to all code that has left Vert.x, and to all new code that does not need Vert.x types  
@@ -95,7 +95,8 @@ A subtask runs on a fresh virtual thread and starts with no per-thread state. `T
 | `ScopedValue` | **Only keys declared with `Builder.inherit(...)`**, captured when the scope opens | Declare every request or security context key a subtask needs. An undeclared key is silently unbound in the subtask, so cover each consumer with a test that reads its context inside a subtask |
 
 Request and security context (tenant, identity, request ID) belongs in `ScopedValue`, not in
-thread-locals. The MDC stays the bridge to logging, because logback reads only the MDC. The MDC keys in
+thread-locals. As of 2026-10-03 no production code binds a `ScopedValue` yet: the support exists in
+`TaskScope` and its tests, ready for the first consumer (the controller after `RT-06`). The MDC stays the bridge to logging, because logback reads only the MDC. The MDC keys in
 use are `requestId`, `traceId`, `spanId`, `nodeId`, `raftRole`, `raftTerm`, `rpcType` and `agentId`.
 
 ## 4. Migration to `StructuredTaskScope`
@@ -128,6 +129,10 @@ regression gate for the switch.
 ## 6. Asynchronous test standard
 
 This standard replaces the Vert.x test facilities for code that has left Vert.x (plan §6.1).
+
+It applies to new and changed tests. Many existing tests in `quorus-core` and `quorus-tenant` predate it
+and still use `Thread.sleep` or Awaitility (for example `TransferContextTest`, `ProgressTrackerTest` and
+`ResourceManagementConcurrencyTest`). Do not copy them; bring a test up to this standard when you change it.
 
 - **Test the blocking API directly**, from the test thread or a virtual thread. Do not wrap it in
   futures to "await".

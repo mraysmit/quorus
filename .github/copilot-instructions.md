@@ -1,7 +1,7 @@
 # Quorus Copilot Instructions
 
 ## Project Overview
-Quorus is an enterprise-grade distributed file transfer system built with **Java 27**. Only `quorus-controller` still uses **Vert.x 5**, until plan item `RT-06` moves it; every other module is plain Java on virtual threads. It uses a **controller-first architecture** with Raft consensus for distributed state management.
+Quorus is an enterprise-grade distributed file transfer system built with **Java 27**. Of the default-build modules, only `quorus-controller` still uses **Vert.x 5**, until plan item `RT-06` moves it; the others are plain Java on virtual threads. The profile-only `quorus-benchmarks` module also uses Vert.x, because it drives the controller's Raft engine. It uses a **controller-first architecture** with Raft consensus for distributed state management.
 
 **Direction of travel (accepted 2026-09-26; see plan §20):**
 - Quorus will consume consensus through the generic QRaft engine (`../qraft`), not through its own `RaftNode` or a direct `raftlog-core` dependency ([ADR-0011](../docs-design/architecture-decisions/ADR-0011-CONSENSUS-VIA-QRAFT-GENERIC-ENGINE.md)). The Quorus–QRaft interface must stay 100% generic: never add a Quorus concept (transfer, job, agent, tenant, route, role, HTTP resource) to QRaft.
@@ -27,6 +27,7 @@ Agents poll controller for jobs, execute transfers via protocol adapters
 | `quorus-agent` | Job polling, transfer execution, heartbeat to controller |
 | `quorus-tenant` | Multi-tenancy, quotas, resource management |
 | `quorus-integration-examples` | Runnable integration examples and workflow validation CLI |
+| `quorus-benchmarks` | Benchmark harness (B-08 controller API, B-09 Raft commit), built only with `-Pbenchmarks` |
 
 ## Key Conventions
 
@@ -44,13 +45,15 @@ Agents poll controller for jobs, execute transfers via protocol adapters
 ```
 
 ### Exception Hierarchy
-All exceptions extend `QuorusException`:
+Transfer and state exceptions in `quorus-core` extend `QuorusException`:
 - `TransferException` — includes `transferId` in message
-- `ChecksumMismatchException` — integrity verification failures
-- `WorkflowParseException` — YAML parsing errors
+- `ChecksumMismatchException` (extends `TransferException`) — integrity verification failures
+- `InvalidTransitionException` — illegal state transitions
+
+Not every exception does: `WorkflowParseException`, `ConnectionPolicyException`, `TenantServiceException` and `ResourceManagementException` extend `Exception`, and `QuorusApiException` (controller HTTP errors) extends `RuntimeException`. Follow the hierarchy of the module you are working in rather than assuming one root.
 
 ### Configuration
-Each module has `src/main/resources/<module>.properties` with override support.
+Packaged defaults are in `quorus-controller.properties`, `quorus-agent.properties` and, for the core engine, `quorus.properties`. `quorus-workflow` and `quorus-tenant` have no properties file.
 
 **Resolution order (highest to lowest priority):**
 1. Explicit `Properties` passed to the configuration constructor
@@ -92,7 +95,7 @@ mvn test jacoco:report
 
 ### Docker testing
 
-**Images package host-built jars only. Never compile Java or run Maven inside a Docker image.** Do not add builder stages, Maven installs, `m2cache` build contexts or dependency-download layers. Dockerfiles are single-stage: `FROM amazoncorretto:27.0.0-alpine3.24` plus `COPY <module>/target/<jar>`. `.dockerignore` admits only those jars.
+**Images package host-built jars only. Never compile Java or run Maven inside a Docker image.** Do not add builder stages, Maven installs, `m2cache` build contexts or dependency-download layers. Dockerfiles are single-stage: `FROM amazoncorretto:27.0.0-alpine3.24` plus `COPY <module>/target/<jar>`. `.dockerignore` admits only those jars and the agent's dependency directory `quorus-agent/target/lib/`.
 
 Docker-tagged tests run in Maven's `test` phase, before `package`, so build the jars first and do not `clean` in the same command:
 
@@ -109,14 +112,13 @@ docker compose -f docker/compose/docker-compose-tls-example.yml up -d --build
 # Docker and slow test groups (after build-runtime; no clean)
 mvn verify '-Dtest.excludedGroups='
 
-# Validate Raft consensus
-./scripts/prove-metadata-persistence.ps1
-./scripts/test-log-integrity.ps1
 ```
+
+Do not rely on `scripts/prove-metadata-persistence.ps1` or the `docker/scripts` helpers: they target ports, services or `/health` fields that no longer exist (register item `ENG-19`).
 
 ## Testing Patterns
 
-- Use **JUnit 5**. The default is the test standard in [docs-design/dev/QUORUS_CONCURRENCY_CONVENTIONS.md §6](../docs-design/dev/QUORUS_CONCURRENCY_CONVENTIONS.md#6-asynchronous-test-standard): call blocking APIs directly, bound each test with `@Timeout(threadMode = SEPARATE_THREAD)`, synchronise with handshakes, and never use sleeps or Awaitility
+- Use **JUnit 5**. The default is the test standard in [docs-design/dev/QUORUS_CONCURRENCY_CONVENTIONS.md §6](../docs-design/dev/QUORUS_CONCURRENCY_CONVENTIONS.md#6-asynchronous-test-standard): call blocking APIs directly, bound each test with `@Timeout(threadMode = SEPARATE_THREAD)`, synchronise with handshakes, and never use sleeps or Awaitility in new or changed tests. Many existing core and tenant tests still sleep or use Awaitility; do not copy them
 - `@ExtendWith(VertxExtension.class)` and `VertxTestContext` are for `quorus-controller` tests only
 - TestContainers for integration tests requiring Docker
 
@@ -139,7 +141,7 @@ class HttpApiServerHealthTest {
 
 ### Test-concurrency direction
 
-For every module except `quorus-controller`, use the asynchronous test standard in [docs-design/dev/QUORUS_CONCURRENCY_CONVENTIONS.md §6](../docs-design/dev/QUORUS_CONCURRENCY_CONVENTIONS.md#6-asynchronous-test-standard). It requires preemptive `@Timeout(threadMode = SEPARATE_THREAD)`, `CompletableFuture` handshakes and interruption for synchronisation, and no sleeps, Awaitility or polling. Spans are asserted through the real OpenTelemetry SDK with `InMemorySpanExporter`, MDC through logback events frozen with `prepareForDeferredProcessing()`, and concurrency tests are repeated as regression evidence. The paragraph below applies to `quorus-controller` tests only.
+For every module except `quorus-controller`, use the asynchronous test standard in [docs-design/dev/QUORUS_CONCURRENCY_CONVENTIONS.md §6](../docs-design/dev/QUORUS_CONCURRENCY_CONVENTIONS.md#6-asynchronous-test-standard). It requires preemptive `@Timeout(threadMode = SEPARATE_THREAD)`, `CompletableFuture` handshakes and interruption for synchronisation, and no sleeps, Awaitility or polling in new or changed tests (older core and tenant tests predate the standard). Spans are asserted through the real OpenTelemetry SDK with `InMemorySpanExporter`, MDC through logback events frozen with `prepareForDeferredProcessing()`, and concurrency tests are repeated as regression evidence. The paragraph below applies to `quorus-controller` tests only.
 
 The migration target for Vert.x asynchronous tests is to use Vert.x `Future`, `Promise`, timers,
 and `VertxTestContext`, with blocking work isolated through `executeBlocking`. Prefer these patterns
@@ -211,10 +213,10 @@ Agents communicate with the controller via REST API at `{controller}/api/v1`:
 2. Heartbeat:     POST /agents/heartbeat       → agentId, timestamp, sequenceNumber, status, currentJobs, availableCapacity, metrics
 3. Agent listing: GET  /agents                 → returns registered agents
 4. Job polling:   GET  /agents/{agentId}/jobs  → returns pendingJobs[]
-5. Status report: POST /jobs/{jobId}/status    → agentId, tenantId, status, bytesTransferred, error details and attempt/fencing fields
+5. Status report: POST /jobs/{jobId}/status    → agentId, status, bytesTransferred, error details and attempt/fencing fields (tenant comes from the job, not the report)
 ```
 
-There is currently no agent deregistration route exposed by the controller.
+There is currently no agent deregistration route exposed by the controller, and no assignment scheduler: a job reaches an agent's poll only after a caller creates an assignment with `POST /assignments` (register item `ENG-01`). The [OpenAPI contract](../quorus-controller/src/main/resources/openapi/quorus-controller-v1.yaml) is the reference for every current endpoint.
 
 ### Key Services (quorus-agent/service/)
 | Service | Responsibility | Interval |
@@ -261,7 +263,7 @@ LongCounter counter = meter.counterBuilder("quorus.module.operation.total")
 
 ### Metric Naming Convention
 - Format: `quorus.<module>.<metric>.<unit>`
-- Examples: `quorus.workflow.total`, `quorus.cluster.term`, `quorus.transfer.bytes`
+- Examples: `quorus.workflow.total`, `quorus.cluster.term`, `quorus.transfer.bytes.total`
 
 ### Endpoints
 - Prometheus metrics: `:9464/metrics` (controller), `:9465/metrics` (agent)
@@ -310,7 +312,7 @@ class IntegrationTest {
 - Create shared `Network.newNetwork()` for multi-container tests
 
 ### Performance
-- Use **static `@Container`** for shared state (faster)
+- Protocol tests in `quorus-core` share lazily started Compose stacks through `SharedTestContainers` rather than per-class `@Container` fields; reuse it instead of starting another server
 - Reuse containers: set `testcontainers.reuse.enable=true` in `~/.testcontainers.properties`
 - **Never** use `@DirtiesContext` unless absolutely necessary
 
@@ -365,7 +367,10 @@ Before writing any code, **identify the data flow end-to-end**: entry point → 
 Every feature must have at least one test that **exercises the full path a real request would take**. Unit tests of individual methods are not sufficient on their own. The test must prove the feature works from the perspective of the external caller (HTTP client, agent, etc.). Example: to test correlation ID propagation, send an HTTP request with `X-Request-ID`, trigger an error, and assert the JSON response `requestId` matches.
 
 ### 4. No Document Proliferation
-Do not create new standalone documents (markdown files, changelog files, example files) unless explicitly requested. Consolidate into existing working documents. The current delivery roadmap is `docs-design/task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md`; `QUORUS_ALPHA_IMPLEMENTATION_PLAN.md` is retained as historical evidence.
+Do not create new standalone documents (markdown files, changelog files, example files) unless explicitly requested. Consolidate into existing working documents. Every open task and decision is in `docs-design/task/QUORUS_OUTSTANDING_WORK_REGISTER.md`, the project's single task list: add work there and never start another list. The delivery roadmap is `docs-design/task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md`. `docs-design/README.md` says which documents are canonical; `docs-design/archive/` (including `QUORUS_ALPHA_IMPLEMENTATION_PLAN.md`) is historical only.
+
+### 5. Contract Changes Update Their Document
+A change to a public contract (an endpoint, configuration key, environment variable, Compose file or documented status) updates its canonical document in the same commit. Plans and the register cite a commit SHA only after that commit exists.
 
 ## Process Rules: Preventing Incomplete Work (MANDATORY)
 

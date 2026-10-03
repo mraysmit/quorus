@@ -2,8 +2,8 @@
 
 # Quorus Architecture Quickstart
 
-**Version:** 2.6
-**Date:** 2026-09-28
+**Version:** 2.7  
+**Date:** 2026-10-03  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Scope:** Current implementation snapshot
@@ -15,7 +15,7 @@ Quorus is a Java 27 file transfer platform with two practical execution modes:
 - **Direct execution** via `quorus-core`, where an application or workflow runs transfers in-process through `SimpleTransferEngine`
 - **Distributed execution** via `quorus-controller` and `quorus-agent`, where controller nodes replicate cluster state with Raft and agents execute transfer work
 
-Only `quorus-controller` still uses Vert.x 5, while it migrates to plain Java under [ADR-0012](../docs-design/architecture-decisions/ADR-0012-JAVA-RUNTIME-AND-STRUCTURED-CONCURRENCY.md). The other modules use blocking APIs and virtual threads and have no Vert.x dependency.
+Of the modules in the default build, only `quorus-controller` still uses Vert.x 5, while it migrates to plain Java under [ADR-0012](../docs-design/architecture-decisions/ADR-0012-JAVA-RUNTIME-AND-STRUCTURED-CONCURRENCY.md). The others use blocking APIs and virtual threads and have no Vert.x dependency.
 
 The core implementation anchors are:
 
@@ -24,6 +24,8 @@ The core implementation anchors are:
 - `quorus-controller` for the embedded HTTP API, Raft, and replicated state
 - `quorus-agent` for agent registration, heartbeat, polling, and job execution
 - `quorus-tenant` for tenant and quota related services
+- `quorus-integration-examples` for runnable transfer, workflow, tenant, and agent examples
+- `quorus-benchmarks` for the benchmark harness, built only with `-Pbenchmarks`; its Raft commit benchmark drives the controller's engine and so uses Vert.x
 
 ## Controller-First Design
 
@@ -41,17 +43,19 @@ The live startup sequence is implemented in `quorus-controller/src/main/java/dev
 
 Current controller defaults come from `AppConfig`:
 
+- HTTP bind address: `127.0.0.1` (the controller image sets `QUORUS_HTTP_HOST=0.0.0.0`)
 - HTTP port: `8080`
 - Raft port: `9080`
+- Security profile: `production`, so HTTP and Raft mutual TLS are required unless a development profile is selected explicitly (as the Compose topologies do)
 - Raft storage type: `raftlog` (external library only)
 - Snapshot enabled: `true`
 - Snapshot threshold: `10000` entries
 - Snapshot eligibility check interval: `60000` ms
 - Raft I/O pool size: `10`
 - Raft I/O queue size: `1000`
-- Reported application version default: `2.0-ext`
+These values are sourced from `quorus-controller/src/main/java/dev/mars/quorus/controller/config/AppConfig.java` and the packaged `quorus-controller.properties`.
 
-These values are sourced from `quorus-controller/src/main/java/dev/mars/quorus/controller/config/AppConfig.java`.
+The product version is not yet single-sourced (register decision `DR-Q5`). `quorus.version` (`2.0-ext`) is logged at startup and written to the initial Raft metadata, while `/api/v1/info` and `/health` report a hard-coded `1.0.0-alpha`, the OpenAPI contract says `1.3.2-alpha`, and the Maven version is `1.0-SNAPSHOT`.
 
 ## Operational Model
 
@@ -92,9 +96,11 @@ Conditions are parsed and variable-resolved today. The current workflow engine d
 The controller stores and replicates:
 
 - agents
-- transfer jobs
-- job assignments
+- transfer jobs, with their ordered event ledger
+- job assignments, transfer attempts and their fencing generations
+- the job queue
 - routes
+- the service-connection and secret-reference registry, with its security events
 - system metadata
 
 These mutations are applied in `QuorusStateStore` through Raft commands.
@@ -117,18 +123,7 @@ That means the route model and route HTTP API are live, while automatic route-tr
 
 ## HTTP Surface
 
-The embedded controller API currently exposes:
-
-- health and status endpoints
-- metrics
-- controller info
-- agent registration and heartbeat endpoints
-- transfer CRUD
-- job status updates
-- job assignment endpoints
-- route CRUD and lifecycle endpoints
-
-The routes are registered in `quorus-controller/src/main/java/dev/mars/quorus/controller/http/HttpApiServer.java`.
+The [OpenAPI contract](../quorus-controller/src/main/resources/openapi/quorus-controller-v1.yaml) is the reference for the current controller API; a running controller also serves it at `GET /api/v1/openapi.yaml`, and a test fails if it and the registered routes disagree. The routes are registered in `quorus-controller/src/main/java/dev/mars/quorus/controller/http/HttpApiServer.java`.
 
 ## Protocol Support
 
@@ -140,7 +135,7 @@ The protocol factory currently registers:
 - SMB and CIFS
 - NFS
 
-Adapter-level resume support is currently reported as disabled by the protocol implementations. HTTP reports pause support; the blocking adapters currently report pause support as disabled.
+Every adapter is blocking and runs on the calling thread. Adapter-level resume support is reported as disabled by every adapter. Only the HTTP adapter reports pause support.
 
 ## Observability
 
@@ -164,11 +159,11 @@ The enforcement path is:
 
 1. Agent registers with `tenantId` (required field — `400` if absent)
 2. Transfer job is created with `tenantId` (required field — `400` if absent)
-3. `AgentSelectionService` uses tenant as the first gate when selecting an agent for a job
+3. A caller assigns the job to an agent with `POST /api/v1/assignments`; the assignment reference and tenant invariants are enforced when it is committed
 4. `GET /api/v1/agents/:agentId/jobs` filters the assignment list to the agent's own tenant before returning
 5. `POST /api/v1/jobs/:jobId/status` verifies the submitting agent's tenant matches the job's tenant (`403` if not)
 
-These checks run inside the Vert.x controller against Raft-replicated state. The tenant model is stored as a field on `AgentInfo` and `TransferJobSnapshot` in `QuorusStateStore`.
+These checks run inside the Vert.x controller against Raft-replicated state. The controller runs no scheduler: `AgentSelectionService` and `JobAssignmentService` exist but are not started, so nothing selects an agent or assigns a submitted job automatically (register item `ENG-01`). The tenant model is stored as a field on `AgentInfo` and `TransferJobSnapshot` in `QuorusStateStore`.
 
 In the production profile, the API derives tenant authority from an authenticated mTLS or trusted-gateway identity, and assignment references and tenant invariants are enforced both at the handler boundary and during replicated state application. A supplied `tenantId` is not identity by itself, and the development Compose profiles intentionally disable this boundary. See [Architecture Specification §3](QUORUS_ARCHITECTURE_SPECIFICATION.md#3-capability-status) and the [Security Deployment Guide](QUORUS_SECURITY_DEPLOYMENT_GUIDE.md).
 
@@ -189,4 +184,5 @@ The repository root `pom.xml` sets:
 - `docs/QUORUS_USER_GUIDE.md`
 - `docs/QUORUS_WORKFLOWS_README.md`
 - `docs/QUORUS_YAML_SYNTAX_GUIDE.md`
-- `docs-design/archive/QUORUS_ALPHA_IMPLEMENTATION_PLAN.md`
+- `docs-design/task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md` — the delivery plan
+- `docs-design/task/QUORUS_OUTSTANDING_WORK_REGISTER.md` — every open task and decision

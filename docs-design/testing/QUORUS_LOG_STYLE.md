@@ -1,264 +1,28 @@
-# Quorus Log Style Guide
+# Quorus Simulator Test Log Style
 
-## Overview
+## 1. Scope
 
-Quorus uses a structured, hierarchical logging format designed for readability and traceability. This guide documents the conventions used across all modules.
+This guide describes the log output of `SimulatorTestLoggingExtension`
+(`quorus-core/src/test/java/dev/mars/quorus/simulator/SimulatorTestLoggingExtension.java`). The
+extension is used only by the eight simulator test classes in `quorus-core`:
 
----
+| Test class | Package (`dev.mars.quorus.simulator…`) |
+|---|---|
+| `InMemorySimulatorTest` | `simulator` |
+| `InMemoryAgentSimulatorTest` | `simulator.agent` |
+| `InMemoryControllerClientSimulatorTest` | `simulator.client` |
+| `InMemoryFileSystemSimulatorTest` | `simulator.fs` |
+| `InMemoryTransferProtocolSimulatorTest` | `simulator.protocol` |
+| `InMemoryFtpsProtocolSimulatorTest` | `simulator.protocol` |
+| `InMemoryTransferEngineSimulatorTest` | `simulator.transfer` |
+| `InMemoryWorkflowEngineSimulatorTest` | `simulator.workflow` |
 
-## Log Format
+No other module or test class uses it. Where test logs go (the consolidated
+`test-logs/quorus-test-<timestamp>.log`), each module's `logback-test.xml`, and the expected-error
+banners of `@ExpectsError` are described in the [Testing Guide](QUORUS_TESTING_README.md).
 
-### Pattern Structure
-```
-{timestamp} [{thread}] {level} [{simulator}/{testMethod}] {logger} - {message}
-```
+To use the extension in another simulator test:
 
-**Example:**
-```
-2026-02-03 13:28:17.569 [main] DEBUG [BasicTransferTests/testSubmitAndComplete] d.m.q.s.t.InMemoryTransferEngineSimulator - submitTransfer: Received request jobId=test-job-1
-```
-
----
-
-## Visual Hierarchy
-
-### Test Suite Banners
-```
-════════════════════════════════════════════════════════════════════════════════
-▶ SIMULATOR TEST SUITE: InMemoryTransferEngineSimulator
-  Display Name: InMemoryTransferEngineSimulator Tests
-  Test Class: InMemoryTransferEngineSimulatorTest
-════════════════════════════════════════════════════════════════════════════════
-```
-
-### Individual Test Markers
-```
-  ┌─ TEST: Should submit and complete transfer
-  │  Path: InMemoryTransferEngineSimulatorTest > BasicTransferTests > testSubmitAndComplete
-  │  Starting...
-  │  [DEBUG] SIMULATOR: BasicTransferTests
-  │  [DEBUG] TEST METHOD: testSubmitAndComplete
-  │  ✓ PASSED (102ms)
-  └─────────────────────────────────────
-```
-
-### Suite Completion
-```
-────────────────────────────────────────────────────────────
-◀ COMPLETED: BasicTransferTests test suite
-────────────────────────────────────────────────────────────
-```
-
----
-
-## MDC Context Keys
-
-| Key | Description | Example |
-|-----|-------------|---------|
-| `simulator` | Active simulator or test class name | `InMemoryTransferEngineSimulator` |
-| `testMethod` | Current test method name | `testSubmitAndComplete` |
-| `testPath` | Full hierarchical test path | `TestClass > Nested > method` |
-| `correlationId` | Unique ID for tracing test execution | `test-97670132-0547` |
-
----
-
-## Log Levels
-
-| Level | Usage |
-|-------|-------|
-| **ERROR** | Test failures (brief summary only: error type + truncated message) |
-| **WARN** | Simulated failures, chaos engineering events, test aborts |
-| **INFO** | Test lifecycle events, major operations (transfer complete) |
-| **DEBUG** | Per-test metrics, timing, resource deltas, completion status, failure details, **full stack traces**, nested exception chains |
-
-### Stack Trace Policy
-
-**Stack traces are logged at DEBUG level only** to keep ERROR output clean:
-- **ERROR level**: Brief failure summary (error type + first 100 chars of message)
-- **DEBUG level**: Error type, full message, root cause summary, complete stack trace with all nested causes
-
-This separation ensures:
-1. CI/CD logs remain scannable at default log levels
-2. DevOps can enable DEBUG for deep diagnostics when needed
-3. No stack trace pollution in normal test output
-
----
-
-## DEBUG Level: Environment Context
-
-Environment/OS information is logged at DEBUG level to reduce verbosity. Enable by setting `SimulatorTestRunner` logger to DEBUG in logback-test.xml.
-
-### Environment Context (logged at suite start, DEBUG level)
-```
-[DEBUG] ══════════════════════════ ENVIRONMENT ══════════════════════════
-[DEBUG] HOSTNAME: LAPTOP-T26VQQ26 (172.20.10.13)
-[DEBUG] JAVA VERSION: 25 (Oracle Corporation)
-[DEBUG] JAVA HOME: C:\Users\markr\.jdks\openjdk-25
-[DEBUG] JVM: OpenJDK 64-Bit Server VM 25+36-3489
-[DEBUG] OS: Windows 11 10.0 (amd64)
-[DEBUG] USER: markr @ C:\Users\markr\dev\java\corejava\quorus
-[DEBUG] PROCESSORS: 12
-[DEBUG] MAX MEMORY: 8152MB
-[DEBUG] INITIAL HEAP: 516MB
-[DEBUG] TIMEZONE: Asia/Shanghai
-[DEBUG] TEMP DIR: C:\Users\markr\AppData\Local\Temp\
-[DEBUG] FILE ENCODING: UTF-8
-[DEBUG] LINE SEPARATOR: \r\n
-[DEBUG] JVM ARGS: -Xmx8g -XX:+UseG1GC
-[DEBUG] PID: 27120
-[DEBUG] UPTIME: 0s
-[DEBUG] BUILD TOOL: Maven (/path/to/maven) | Gradle 8.x | IDE or direct execution
-[DEBUG] SUREFIRE VERSION: 3.2.2
-[DEBUG] PARALLEL CONFIG: forks=1, threads=4
-[DEBUG] ══════════════════════════════════════════════════════════════════
-```
-
----
-
-## DEBUG Level: Per-Test Diagnostics
-
-The DEBUG logging provides per-test metrics for troubleshooting.
-
-### Per-Test Metrics (logged at test start)
-```
-[DEBUG] ════════════════════════════════════════════════════════
-[DEBUG] CORRELATION ID: test-97882806-7094
-[DEBUG] SIMULATOR: ChaosEngineeringTests
-[DEBUG] TEST METHOD: testRandomFailure
-[DEBUG] FULL PATH: InMemoryFileSystemSimulatorTest > ChaosEngineeringTests > testRandomFailure
-[DEBUG] DISPLAY NAME: Should simulate random failures
-[DEBUG] START TIME: 2026-02-03 13:51:22.804 CST
-[DEBUG] ────────────────────────────────────────────────────────
-[DEBUG] THREAD: name=main, id=3, priority=5, group=main
-[DEBUG] MEMORY: heap=41MB, nonHeap=16MB, free=466MB, used=49MB
-[DEBUG] THREADS: active=9, peak=9, daemon=8
-[DEBUG] CLASSES: loaded=3342, total=3342, unloaded=0
-[DEBUG] ════════════════════════════════════════════════════════
-```
-
-### Completion Metrics (logged at test end)
-```
-[DEBUG] ════════════════════ COMPLETION METRICS ══════════════════
-[DEBUG] STATUS: PASSED
-[DEBUG] WALL TIME: 63ms
-[DEBUG] CPU TIME: 796ms (delta: +63ms)
-[DEBUG] END TIME: 2026-02-03 13:51:22.869 CST
-[DEBUG] ────────────────────────────────────────────────────────
-[DEBUG] MEMORY DELTA: -34MB (current: 15MB)
-[DEBUG] THREAD DELTA: +0 (current: 9)
-[DEBUG] CLASS DELTA: +227 (loaded: 3553)
-[DEBUG] GC COUNT: 1, GC TIME: 4ms
-[DEBUG] ══════════════════════════════════════════════════════════
-```
-
-### Failure Details (logged on test failure)
-
-**ERROR level** (always visible):
-```
-│  ✗ FAILED (63ms)
-│  Error: AssertionError - expected:<5> but was:<3>
-```
-
-**DEBUG level** (with -Dtest.loglevel=DEBUG):
-```
-[DEBUG] ════════════════════ FAILURE DETAILS ════════════════════
-[DEBUG] ERROR TYPE: java.lang.AssertionError
-[DEBUG] ERROR MESSAGE: expected:<5> but was:<3>
-[DEBUG] ROOT CAUSE: java.io.IOException - Connection refused
-[DEBUG] ══════════════════════════════════════════════════════════
-```
-
-**DEBUG level** (full stack traces with -Dtest.loglevel=DEBUG):
-```
-[DEBUG] ════════════════════ FULL STACK TRACE ════════════════════
-[DEBUG]   at org.junit.jupiter.api.AssertionUtils.fail(...)
-[DEBUG]   at dev.mars.quorus.simulator.TransferTest.test(...)
-[DEBUG]   at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(...)
-[DEBUG]   at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(...)
-[DEBUG]   at java.base/java.lang.reflect.Method.invoke(...)
-[DEBUG] Caused by: java.io.IOException: Connection refused
-[DEBUG]   at java.net.PlainSocketImpl.connect(...)
-[DEBUG]   at java.net.Socket.connect(...)
-[DEBUG] ══════════════════════════════════════════════════════════
-```
-
-### DevOps Diagnostic Fields Reference
-
-| Field | Source | Description |
-|-------|--------|-------------|
-| `HOSTNAME` | `InetAddress.getLocalHost()` | Machine hostname and IP |
-| `JAVA VERSION` | System property `java.version` | JDK version and vendor |
-| `JAVA HOME` | System property `java.home` | JDK installation path |
-| `JVM` | System property `java.vm.name` | JVM implementation details |
-| `OS` | System properties `os.*` | Operating system name, version, arch |
-| `PROCESSORS` | `Runtime.availableProcessors()` | CPU core count |
-| `MAX MEMORY` | `Runtime.maxMemory()` | JVM heap limit |
-| `INITIAL HEAP` | `Runtime.totalMemory()` | Initial heap allocation |
-| `PID` | `ProcessHandle.current().pid()` | OS process ID |
-| `UPTIME` | `RuntimeMXBean.getUptime()` | JVM uptime in seconds |
-| `BUILD TOOL` | System properties `maven.home`, `gradle.version` | Detected build tool |
-| `SUREFIRE VERSION` | System property `surefire.version` | Maven Surefire version |
-| `PARALLEL CONFIG` | System properties `surefire.forkCount`, `surefire.threadCount` | Parallel execution config |
-| `WALL TIME` | `Duration.between(start, end)` | Elapsed wall-clock time |
-| `CPU TIME` | `ThreadMXBean.getCurrentThreadCpuTime()` | CPU time consumed |
-| `MEMORY DELTA` | Runtime memory diff | Memory change during test |
-| `THREAD DELTA` | `ThreadMXBean.getThreadCount()` diff | Thread count change |
-| `CLASS DELTA` | `ClassLoadingMXBean.getLoadedClassCount()` diff | Classes loaded during test |
-| `GC COUNT` | `GarbageCollectorMXBeans` | Total garbage collections |
-| `GC TIME` | `GarbageCollectorMXBeans` | Total GC pause time (ms) |
-
----
-
-## Symbols Reference
-
-| Symbol | Meaning |
-|--------|---------|
-| `▶` | Suite/test starting |
-| `◀` | Suite/test completed |
-| `✓` | Test passed |
-| `✗` | Test failed |
-| `⊘` | Test aborted |
-| `⊖` | Test skipped |
-| `═` | Major section boundary |
-| `─` | Minor section boundary |
-| `┌─` | Test start |
-| `│` | Test in progress |
-| `└─` | Test end |
-
----
-
-## Graceful Error Recovery
-
-The `SimulatorTestLoggingExtension` is designed to **never interfere with test execution**:
-
-### Resilience Design
-- **All callback methods** (`beforeAll`, `afterAll`, `beforeEach`, `afterEach`, `testSuccessful`, `testFailed`, `testAborted`, `testDisabled`) are wrapped in try-catch blocks
-- **Logging failures are caught and suppressed** — a brief message is printed to stderr
-- **MDC cleanup always runs** — even if logging fails, MDC entries are cleared in `finally` blocks
-- **Internal exceptions logged at DEBUG** — extension errors are logged via `log.debug(msg, exception)` for debugging
-
-### Recovery Behavior
-```java
-// If logging fails, the extension prints a minimal warning and continues:
-// stderr: [SimulatorTestLoggingExtension] Failed in beforeEach: <error message>
-// DEBUG log: Full exception with stack trace for later diagnosis
-```
-
-### Why This Matters
-1. **Test isolation**: Logging infrastructure failures cannot cause test failures
-2. **CI/CD stability**: Build pipelines won't break due to logging issues
-3. **Observability**: When logging works, full diagnostic data is captured
-4. **Debuggability**: When logging fails, DEBUG logs capture what went wrong
-
----
-
-## Implementation
-
-- **Extension:** `SimulatorTestLoggingExtension.java`
-- **Config:** `logback-test.xml`
-- **Logger:** `SimulatorTestRunner` (test lifecycle)
-
-Add to test classes:
 ```java
 @ExtendWith(SimulatorTestLoggingExtension.class)
 @DisplayName("MySimulator Tests")
@@ -267,203 +31,154 @@ class MySimulatorTest { }
 
 ---
 
-## Logback Configuration
+## 2. Logger, levels and MDC
 
-Place `logback-test.xml` in `src/test/resources/`:
+The extension logs through a logger named `SimulatorTestRunner`. `quorus-core`'s `logback-test.xml`
+sets it to DEBUG, so INFO and DEBUG output appear by default and TRACE output does not.
+
+| Level | What is logged |
+|---|---|
+| INFO | Suite banner, one line per test start, pass line, disabled-test line, suite completion |
+| WARN | Aborted test (failed assumption) |
+| ERROR | Failed test: one line with duration, exception type and the first 80 characters of the message, with no stack trace |
+| DEBUG | Failure details for failed tests; a one-line resource summary for passed tests |
+| TRACE | Environment at suite start, per-test start metrics, full stack traces and nested causes, suite JVM statistics, the extension's own internal errors |
+
+There is no system property for the level. To see TRACE output, change the logger locally in
+`quorus-core/src/test/resources/logback-test.xml` and do not commit the change:
 
 ```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<configuration>
-    
-    <!-- Console appender -->
-    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
-        <encoder>
-            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
-        </encoder>
-    </appender>
-    
-    <!-- File appender with MDC context -->
-    <appender name="FILE" class="ch.qos.logback.core.FileAppender">
-        <file>target/test-logs/quorus-core-tests.log</file>
-        <append>false</append>  <!-- Overwrite each run -->
-        <encoder>
-            <!-- Pattern includes [simulator/testMethod] from MDC -->
-            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{simulator}/%X{testMethod}] %logger{40} - %msg%n</pattern>
-        </encoder>
-    </appender>
-    
-    <!-- Rolling file appender (size-based rotation) -->
-    <appender name="ROLLING_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>target/test-logs/quorus-core-tests-rolling.log</file>
-        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
-            <fileNamePattern>target/test-logs/quorus-core-tests.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
-            <maxFileSize>10MB</maxFileSize>
-            <maxHistory>5</maxHistory>
-            <totalSizeCap>50MB</totalSizeCap>
-        </rollingPolicy>
-        <encoder>
-            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{simulator}/%X{testMethod}] %logger{40} - %msg%n</pattern>
-        </encoder>
-    </appender>
-    
-    <!-- SimulatorTestRunner at DEBUG for detailed test context -->
-    <logger name="SimulatorTestRunner" level="DEBUG"/>
-    
-    <!-- Quorus simulator packages at DEBUG -->
-    <logger name="dev.mars.quorus.simulator" level="DEBUG"/>
-    
-    <!-- All Quorus packages at DEBUG -->
-    <logger name="dev.mars.quorus" level="DEBUG"/>
-    
-    <!-- Reduce noise from third-party libraries -->
-    <logger name="org.apache" level="WARN"/>
-    <logger name="io.vertx" level="WARN"/>
-    <logger name="io.netty" level="WARN"/>
-    
-    <root level="INFO">
-        <appender-ref ref="CONSOLE"/>
-        <appender-ref ref="FILE"/>
-    </root>
-    
-</configuration>
+<logger name="SimulatorTestRunner" level="TRACE"/>
 ```
 
-### Key Configuration Options
+The TRACE environment block records the host name and address, the user name, the working directory,
+`java.home` and the temporary directory. Do not paste it into shared documents or tickets.
 
-| Setting | Purpose |
-|---------|---------|
-| `<append>false</append>` | Overwrites log file each test run |
-| `<append>true</append>` | Appends to existing log file |
-| `%X{simulator}` | MDC key for current simulator name |
-| `%X{testMethod}` | MDC key for current test method |
-| `%logger{40}` | Logger name truncated to 40 chars |
+MDC keys set by the extension:
 
-### Log File Locations
+| Key | Value |
+|---|---|
+| `simulator` | Test class name without the `Test` suffix; for a `@Nested` class, the nested class name |
+| `testClass` | Test class simple name |
+| `testMethod` | Current test method name |
+| `testPath` | `TestClass > Nested > method` |
+| `correlationId` | `test-<digits>-<4 digits>`, unique per test |
+
+The `quorus-core` file pattern prints `[%X{simulator}/%X{testMethod}]` after the level, for example:
 
 ```
-target/test-logs/
-├── quorus-core-tests.log           # Main test log (overwritten each run)
-└── quorus-core-tests-rolling.log   # Rolling log with history
-```
-
-### Forcing Log File Creation
-
-The log file is created automatically when tests run. To ensure it exists:
-
-```bash
-# Run tests (creates log file)
-mvn test -pl quorus-core
-
-# View log file
-cat target/test-logs/quorus-core-tests.log
-
-# Run specific test class
-mvn test -pl quorus-core -Dtest="InMemoryAgentSimulatorTest"
-
-# Run with DEBUG output to console as well
-mvn test -pl quorus-core -Dtest="InMemoryAgentSimulatorTest" -X
+2026-10-03 09:15:42.123 [main] INFO  [BasicTransferTests/testSubmitAndComplete] SimulatorTestRunner -   >> Should submit and complete transfer
 ```
 
 ---
 
-## Message Conventions
+## 3. Output markers
 
-### Operation Logging
+All markers are ASCII except the disabled-test line, which uses `⊖`.
+
+Suite start (INFO), logged for the test class and again for each `@Nested` class:
+
+```
+================================================================================
+>> SIMULATOR TEST SUITE: InMemoryTransferEngineSimulator
+  Display Name: InMemoryTransferEngineSimulator Tests
+  Test Class: InMemoryTransferEngineSimulatorTest
+================================================================================
+```
+
+Per test:
+
+```
+  >> Should submit and complete transfer              (INFO, test start: display name)
+    [PASS] (102ms)                                    (INFO)
+    [FAIL] (63ms) - AssertionError - expected: <5> but was: <3>   (ERROR)
+    [SKIP] ABORTED (4ms) - Assumption failed: ...     (WARN)
+    ⊖ SKIPPED: Should retry - Disabled until RT-07    (INFO, @Disabled)
+```
+
+Suite end (INFO):
+
+```
+<< InMemoryTransferEngineSimulator complete
+```
+
+---
+
+## 4. DEBUG and TRACE detail
+
+A passed test adds one DEBUG line. Its text carries a `[TRACE]` label, but it is logged at DEBUG:
+
+```
+  |  [TRACE] PASSED in 102ms, mem=+1MB, threads=+0
+```
+
+A failed test adds a DEBUG block:
+
+```
+  |  [DEBUG] ==================== FAILURE DETAILS ====================
+  |  [DEBUG] ERROR TYPE: java.lang.AssertionError
+  |  [DEBUG] ERROR MESSAGE: expected: <5> but was: <3>
+  |  [DEBUG] ROOT CAUSE: java.io.IOException - Connection refused
+  |  [DEBUG] WALL TIME: 63ms, CPU: 796ms (delta: +63ms)
+  |  [DEBUG] MEMORY: +2MB (current: 15MB), THREADS: +0 (current: 9)
+  |  [DEBUG] CLASSES: +227 (loaded: 3553), GC: 1 collections, 4ms
+  |  [DEBUG] =================================================================
+```
+
+`ROOT CAUSE` appears only when the exception has a cause. The full stack trace, including every nested
+`Caused by:`, follows at TRACE under `FULL STACK TRACE`.
+
+At TRACE the extension also logs:
+
+- **At suite start**, an `ENVIRONMENT` block: `HOSTNAME`, `JAVA VERSION`, `JAVA HOME`, `JVM`, `OS`,
+  `USER`, `PROCESSORS`, `MAX MEMORY`, `INITIAL HEAP`, `TIMEZONE`, `TEMP DIR`, `FILE ENCODING`,
+  `LINE SEPARATOR`, `JVM ARGS`, `PID`, `UPTIME`, `BUILD TOOL`, and `SUREFIRE VERSION` and
+  `PARALLEL CONFIG` when Surefire sets the corresponding system properties.
+- **At each test start**: `CORRELATION ID`, `SIMULATOR`, `TEST METHOD`, `FULL PATH`, `START TIME`,
+  `THREAD`, `MEMORY`, `THREADS` and `CLASSES`.
+- **At suite end**: `JVM STATS (Suite End)` with heap, non-heap, thread count and GC count.
+
+| Field | Source |
+|---|---|
+| `HOSTNAME` | `InetAddress.getLocalHost()` |
+| `JAVA VERSION`, `JAVA HOME`, `JVM`, `OS`, `USER` | System properties |
+| `PROCESSORS`, `MAX MEMORY`, `INITIAL HEAP` | `Runtime` |
+| `JVM ARGS`, `PID`, `UPTIME` | `RuntimeMXBean`, `ProcessHandle` |
+| `BUILD TOOL` | `maven.home` or `gradle.version`, otherwise "IDE or direct execution" |
+| `WALL TIME` | Time between the extension's `beforeEach` and the test result |
+| `CPU` | `ThreadMXBean.getCurrentThreadCpuTime()` |
+| `MEMORY`, `THREADS`, `CLASSES` deltas | `Runtime`, `ThreadMXBean`, `ClassLoadingMXBean`, measured from test start |
+| `GC` | Sum over `GarbageCollectorMXBean`s |
+
+---
+
+## 5. Failure isolation
+
+Logging never changes a test result:
+
+- Every callback is wrapped in `try`/`catch`. A failure prints one line to standard error, for example
+  `[SimulatorTestLoggingExtension] Failed in beforeEach: <message>`, and the lifecycle callbacks log
+  the exception at TRACE.
+- MDC entries are removed in `afterEach` and, for the suite keys, in a `finally` block in `afterAll`.
+
+---
+
+## 6. Message conventions in simulators
+
+Simulators log as `operation: description key=value`, at DEBUG for steps and INFO for outcomes:
+
 ```java
-log.debug("methodName: Action description param={}", value);
-log.info("methodName: Outcome description key1={}, key2={}", v1, v2);
-```
-
-### Examples
-```
-submitTransfer: Received request jobId=test-job-1, source=sftp://host/file.txt
-submitTransfer: Created transfer jobId=test-job-1, size=1000 bytes
-completeTransfer: Transfer completed successfully jobId=test-job-1, bytes=1000, duration=102ms
+log.debug("submitTransfer: Received request jobId={}, source={}", jobId, source);
+log.info("submitTransfer: Created transfer jobId={}, size={} bytes", jobId, size);
 ```
 
 ---
 
-## DevOps Troubleshooting Guide
+## 7. Using the output
 
-### Common Issues and What to Look For
+- **Slow tests:** compare `WALL TIME` with `CPU`. High wall time and low CPU means waiting or I/O.
+- **Leaks:** a positive `THREADS` delta after a test usually means an executor was not shut down; a
+  large `MEMORY` delta means heavy allocation.
+- **Tracing one test:** search the log for its `correlationId` (TRACE only).
 
-#### Test Failures in CI/CD
-1. Check `ENVIRONMENT` section for differences from local:
-   - Different JDK version or vendor
-   - Memory limits (`MAX MEMORY` too low)
-   - Different `TIMEZONE` affecting date comparisons
-   - Missing temp directory access
-
-2. Compare `COMPLETION METRICS`:
-   - High `MEMORY DELTA` suggests memory leak
-   - Non-zero `THREAD DELTA` indicates thread leak
-   - Excessive `GC COUNT` shows memory pressure
-
-#### Memory Issues
-```bash
-# Find tests with highest memory delta
-grep "MEMORY DELTA" test.log | sort -t: -k5 -n | tail -10
-```
-
-- `MEMORY DELTA: +500MB` → Test allocating excessive objects
-- `heap > 80% MAX MEMORY` → Increase heap or optimize test
-
-#### Thread Leaks
-```bash
-# Find tests that leaked threads
-grep "THREAD DELTA: +[1-9]" test.log
-```
-
-- `THREAD DELTA: +2` after test → Async executors not shut down
-- Check `THREAD: group=` to identify thread pool source
-
-#### Slow Tests
-```bash
-# Find tests with wall time > 5s
-grep "WALL TIME:" test.log | awk -F: '{if ($NF > 5000) print}'
-```
-
-- High `WALL TIME`, low `CPU TIME` → I/O bound or waiting
-- High `CPU TIME` → Computation-heavy, may need optimization
-- High `CLASS DELTA` → First test loading many classes (normal)
-
-#### Flaky Tests
-Use `CORRELATION ID` to trace specific test runs across distributed logs:
-```bash
-grep "test-97882806-7094" *.log
-```
-
-### Log Aggregation Tips
-
-#### Structured Log Parsing (ELK/Loki)
-The MDC fields enable powerful queries:
-```
-{simulator="InMemoryTransferEngine"} |= "FAILED"
-```
-
-#### Key Fields for Dashboards
-| Field | Dashboard Use |
-|-------|--------------|
-| `WALL TIME` | Test duration histogram |
-| `MEMORY DELTA` | Memory trend over time |
-| `GC TIME / WALL TIME` | GC overhead percentage |
-| `CLASS DELTA` | Class loading spikes |
-| `STATUS` | Pass/fail rate |
-
-### Environment Comparison Checklist
-
-When tests pass locally but fail in CI:
-
-| Check | Local | CI |
-|-------|-------|-----|
-| JAVA VERSION | ? | ? |
-| PROCESSORS | ? | ? |
-| MAX MEMORY | ? | ? |
-| TIMEZONE | ? | ? |
-| FILE ENCODING | ? | ? |
-| TEMP DIR writable | ? | ? |
-| JVM ARGS | ? | ? |
-
----
-
-*Last updated: February 2026*
+*Last updated: 2026-10-03*

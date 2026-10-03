@@ -2,8 +2,8 @@
 
 # Quorus REST API Specification
 
-**Version:** 2.6
-**Date:** 2026-09-27  
+**Version:** 2.7  
+**Date:** 2026-10-03  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Scope:** Complete REST control, operations, security, and administration interface
@@ -54,6 +54,8 @@ The API MUST NOT:
 
 ## 3. Protocol Conventions
 
+Sections 3 and 4 define the **Required** conventions. The current controller implements only part of them. Each subsection below ends with a **Current position** line; where it and the requirement differ, the requirement stands and the gap is tracked in §20. The OpenAPI contract is authoritative for current behaviour.
+
 ### 3.1 Base path and representation
 
 - Versioned resources use `/api/v1`.
@@ -65,13 +67,15 @@ The API MUST NOT:
 - Enum values are uppercase snake case.
 - Unknown request fields are rejected by default. Forward-compatible extension objects MAY explicitly permit them.
 
+**Current position:** `/api/v1`, JSON, `application/problem+json` and UTC timestamps are current. Enum case is not uniform: transfer and assignment states are upper snake case, but agent statuses are lower case (`healthy`, `draining`, …). Unknown request fields are not rejected: agent registration and assignment creation, at least, ignore them.
+
 ### 3.2 Standard headers
 
 | Header | Direction | Requirement |
 |---|---|---|
 | `Authorization` | Request | Required for every production `/api/v1` request except explicitly public health probes |
 | `Idempotency-Key` | Request | Required for transfer submission and other safely repeatable creates/actions |
-| `X-Correlation-ID` | Both | Accepted from trusted callers or generated; returned and recorded on all events |
+| `X-Request-ID` | Both | Accepted from trusted callers or generated; returned and recorded on all events |
 | `traceparent` | Both | W3C trace context propagated through controller, agent, and supported protocol spans |
 | `If-Match` | Request | Required for updates, deletes, and state-transition actions on mutable resources |
 | `ETag` | Response | Returned for mutable resources and effective configuration |
@@ -79,6 +83,8 @@ The API MUST NOT:
 | `Retry-After` | Response | Required for throttling, transient unavailability, and non-leader responses when known |
 | `X-Quorus-Leader` | Response | Identifies the current leader endpoint when safely known; it is not a bearer credential |
 | `X-Quorus-Read-Consistency` | Both | Reports the applied read mode and observed Raft commit index |
+
+**Current position:** `X-Request-ID` is current (generated when absent, returned, and recorded in logs and audit). `traceparent` is propagated by the controller's OpenTelemetry tracing integration. `Retry-After` is sent only by drain-mode `503` responses. Identity does not use `Authorization`: the current contract is mutual TLS, with trusted-gateway `X-Quorus-*` assertion headers (see the OpenAPI `securitySchemes` and the [Security Deployment Guide](QUORUS_SECURITY_DEPLOYMENT_GUIDE.md)). `Idempotency-Key`, `If-Match`, `ETag`, `Prefer`, `X-Quorus-Leader` and `X-Quorus-Read-Consistency` are not implemented.
 
 ### 3.3 Resource representation
 
@@ -121,6 +127,8 @@ All errors MUST use a stable problem format:
 
 Error `code` values are stable API values. Human-readable text is not a machine contract.
 
+**Current position:** errors are `application/problem+json` with the fields `type` (`urn:quorus:problem:<code>`), `title`, `status`, `detail`, `instance`, `shortCode` (`Q-nnnn`), `code`, `timestamp`, `requestId`, and `traceId` when tracing is active; the OpenAPI `Problem` schema allows no other fields. `correlationId`, `retryable` and the field-level `errors` array are not implemented. Current codes are mapped to the required codes in §16.
+
 ### 3.5 Pagination, filtering, and sorting
 
 Collection responses MUST use opaque cursor pagination:
@@ -138,12 +146,16 @@ Collection responses MUST use opaque cursor pagination:
 
 The default and maximum limits MUST be documented in OpenAPI. Collections SHOULD support `filter`, named query parameters for common operational fields, `sort`, and `fields`. Filters MUST be bounded by authorization and indexed for the supported retention window. Invalid or unbounded filters return `400`.
 
+**Current position:** only `GET /api/v1/security-events` pages, with `limit` (1–1000) and an opaque `nextCursor`, in its own envelope. Other collections return every authorized item, without the `items`/`page` envelope, filtering or sorting.
+
 ### 3.6 Idempotency and concurrency
 
 - The server MUST persist an idempotency key with the authenticated principal, tenant, request fingerprint, response, and expiry.
 - Reuse with the same fingerprint returns the original result. Reuse with a different fingerprint returns `409 IDEMPOTENCY_KEY_REUSED`.
 - Mutable resources MUST return an `ETag`. Mutation without the required `If-Match` returns `428`; a stale value returns `412`.
 - Agent assignment transitions additionally require `expectedState`, `attemptId`, and the active lease or fencing token.
+
+**Current position:** idempotency keys, `ETag` and `If-Match` are not implemented. Agent reports already carry attempt identity, fencing generation and an ordered sequence, and an exact resend of the last report is accepted idempotently.
 
 The current agent report contract, including preparation failures and idempotent resends, is the `updateJobStatus` operation in the OpenAPI contract. The agent's bounded retry of reports and operator reconciliation are described in the [Security Deployment Guide](QUORUS_SECURITY_DEPLOYMENT_GUIDE.md).
 
@@ -153,9 +165,11 @@ Long-running validation, connection tests, exports, deployments, and administrat
 
 An operation contains `type`, `status`, `requestedBy`, `requestedAt`, `startedAt`, `completedAt`, `percentComplete`, `resource`, `result`, and `problem`. Operation states are `QUEUED`, `RUNNING`, `SUCCEEDED`, `FAILED`, and `CANCELLED`.
 
+**Current position:** not implemented; every current operation completes synchronously.
+
 ### 3.8 Leader routing and read consistency
 
-Writes are accepted only by the current Raft leader. A follower returns `503 NOT_LEADER`, `Retry-After`, and `X-Quorus-Leader` when known. Controllers MUST NOT issue automatic HTTP redirects for authenticated write requests.
+Writes are accepted only by the current Raft leader. A follower MUST return `503 NOT_LEADER`, with `Retry-After` and `X-Quorus-Leader` when known. Controllers MUST NOT issue automatic HTTP redirects for authenticated write requests. Writes that change only node-local state, such as the runtime revocation update, and policy evaluations that change nothing, such as the authorization check, are served by every controller.
 
 Reads support:
 
@@ -164,6 +178,8 @@ Reads support:
 - `consistency=local` only for explicitly documented diagnostics.
 
 The response reports the applied consistency and commit index. The default for security, assignment, and administrative state is `linearizable`.
+
+**Current position:** a follower rejects a replicated write with `503` and code `NOT_LEADER` (leader known; its ID is in `detail`) or `NO_LEADER`, without `Retry-After` or `X-Quorus-Leader`. No redirect is issued. The `consistency` and `maxStaleness` parameters are not read: every read is served from the receiving node's local state, so a follower read may be stale.
 
 ## 4. Authentication, Authorization, and Audit
 
@@ -201,6 +217,24 @@ The API MUST distinguish:
 
 Resource ownership, business-service scope, environment, and tenant policy further constrain every scope. Listing a resource requires the same authorization as reading it.
 
+**Current position:** the scopes above are the required vocabulary; none of them is enforced yet. The controller enforces colon-form scopes derived from the resource and method (`AuthorizationPolicyEngine.requiredScope`), and the OpenAPI contract declares the scope of every current operation. Roles grant scopes as well (for example, `SECURITY` grants every `security:*` scope). Elevation is additionally required for `security:trust:write`, `security:policy:write` and non-read service-connection and secret-reference scopes.
+
+| Required scope | Scopes enforced today |
+|---|---|
+| `transfers.read` | `transfers:read` |
+| `transfers.submit` | `transfers:write` |
+| `transfers.control` | `transfers:delete` (cancellation by `DELETE`) |
+| `operations.read` | No separate scope; covered by `transfers:read` |
+| `routes.manage` | `routes:read`, `routes:write`, `routes:delete` |
+| `workflows.manage` | None: no workflow endpoints |
+| `agents.read` | `agents:read`; agents themselves use `agents:register`, `agents:heartbeat`, `agents:jobs:read` and `transfers:status:update` |
+| `agents.manage` | None: no agent lifecycle endpoints. Assignments use `assignments:read`, `assignments:write`, `assignments:delete` |
+| `services.manage` | `service-connections:read/write/delete`, `secret-references:read/write/delete` |
+| `tenants.manage` | None: no tenant endpoints |
+| `security.audit.read` | `security-events:read`; `security:explain`, `security:self:read`, `security:trust:read`, `security:trust:write` cover the other security endpoints |
+| `cluster.read` | `cluster:read` (`/raft/status`), `telemetry:read` (`/metrics`), `system:read` (`/status`, `/api/v1/info`) |
+| `cluster.manage` | None: no administrative endpoints |
+
 ### 4.3 Audit contract
 
 Every authentication decision, authorization denial, mutation, privileged read, secret-reference use, agent identity change, service connection test, and administrative action MUST create an immutable audit event. Audit events include actor, subject, action, resource, tenant, business service, decision, reason, source address, correlation and trace identifiers, request fingerprint, timestamp, and resulting resource version. Secret values and sensitive payload fields MUST be redacted.
@@ -232,7 +266,7 @@ Health endpoints MUST distinguish process health from dependency readiness. A de
 | `POST` | `/api/v1/transfers` | Current | Submit a transfer; production contract requires idempotency and policy validation |
 | `GET` | `/api/v1/transfers` | Required | Search transfers by tenant, service, state, time, criticality, route, workflow, agent, and deadline risk |
 | `GET` | `/api/v1/transfers/{transferId}` | Current | Read authoritative transfer summary |
-| `DELETE` | `/api/v1/transfers/{transferId}` | Current | Compatibility cancellation; returns the resulting transfer or operation |
+| `DELETE` | `/api/v1/transfers/{transferId}` | Current | Compatibility cancellation; currently returns `{jobId, message}`, not the resulting transfer |
 | `POST` | `/api/v1/jobs/{jobId}/status` | Current | Attempt-aware agent report with expected state, fence, lease, ordered sequence, atomic multi-entity application, and legacy-assignment compatibility |
 | `POST` | `/api/v1/transfers/{transferId}:cancel` | Required | Explicit conditional cancellation with reason |
 | `POST` | `/api/v1/transfers/{transferId}:pause` | Required | Pause when the active adapter supports safe pause |
@@ -242,7 +276,7 @@ Health endpoints MUST distinguish process health from dependency readiness. A de
 | `GET` | `/api/v1/transfers/{transferId}/attempts` | Current | Immutable execution-attempt history and active fence |
 | `GET` | `/api/v1/transfers/{transferId}/attempts/{attemptId}` | Current | One attempt, lease, fence, sequence, agent, timings, and outcome |
 | `GET` | `/api/v1/transfers/{transferId}/progress` | Current | Tenant-checked ownership, bytes, size semantics, missing/stale telemetry, configured policy windows, attempt, deadline, condition, low-confidence rate, and ETA view; historical evidence and calibrated prediction remain required |
-| `GET` | `/api/v1/transfers/{transferId}/events` | Current | Initial ordered submission-event ledger; complete lifecycle vocabulary, pagination, replay, and retention remain required |
+| `GET` | `/api/v1/transfers/{transferId}/events` | Current | Ordered ledger of the submitted, assigned, accepted, started and progress events; complete lifecycle vocabulary, pagination, replay, and retention remain required |
 | `GET` | `/api/v1/transfers/{transferId}/timeline` | Required | Operator-oriented end-to-end timeline |
 | `GET` | `/api/v1/transfers/{transferId}/integrity` | Required | Configured and observed integrity evidence |
 | `GET` | `/api/v1/transfers/{transferId}/publication` | Required | Destination staging, commit, and publication state |
@@ -272,7 +306,7 @@ A production transfer submission MUST support:
 
 Raw credentials and credential-bearing URIs are rejected. `serviceConnectionId` resolves an authorized endpoint, trust policy, network policy, and secret reference without exposing the secret.
 
-The current submission contract is the `createTransfer` operation in the OpenAPI contract. Agent-side re-authorization of the committed policy is described in the [Service Connection Operations Runbook](QUORUS_SERVICE_CONNECTION_OPERATIONS_RUNBOOK.md).
+The example above is the required shape. The current submission contract is the `createTransfer` operation in the OpenAPI contract, which is flat rather than nested: one `serviceConnectionId` with `remotePath`, `direction` and `agentPool`, plus a local `sourceUri` or `destinationPath`. Integrity, publication and retry policies and `priority` are not yet accepted. Agent-side re-authorization of the committed policy is described in the [Service Connection Operations Runbook](QUORUS_SERVICE_CONNECTION_OPERATIONS_RUNBOOK.md).
 
 ### 6.3 Transfer states
 
@@ -283,6 +317,18 @@ The canonical summary state is one of:
 Operational condition is reported separately as `ON_TRACK`, `AT_RISK`, `LATE`, `STALLED`, `DEGRADED`, or `UNKNOWN`. A successful byte copy is not `SUCCEEDED` until required integrity verification and destination publication have completed.
 
 Each attempt has its own state and identity. Reassignment MUST create a new attempt and fencing token. Historical attempts are never overwritten.
+
+**Current position:** the states above are the required vocabulary. A transfer's current status is one of `PENDING`, `IN_PROGRESS`, `COMPLETED`, `FAILED`, `CANCELLED` or `PAUSED`, except that `GET /api/v1/transfers/{transferId}` reports the latest assignment status instead when the transfer has an assignment. The progress resource reports an operational `condition` separately. The mapping is approximate:
+
+| Required | Current |
+|---|---|
+| `SUBMITTED`, `VALIDATING`, `QUEUED` | `PENDING` |
+| `ASSIGNED` | the assignment status (`ASSIGNED`, `ACCEPTED`) |
+| `RUNNING` | `IN_PROGRESS` |
+| `PAUSING`, `PAUSED` | `PAUSED` (engine-level pause only) |
+| `SUCCEEDED` | `COMPLETED` (no separate verification or publication stage) |
+| `FAILED`, `CANCELLED` | `FAILED`, `CANCELLED` |
+| `CANCELLING`, `TIMED_OUT`, `RECONCILIATION_REQUIRED`, `QUARANTINED` | Not implemented |
 
 ### 6.4 Progress and deadline risk
 
@@ -388,7 +434,7 @@ queue time. Capacity exhaustion returns HTTP 503; deadline expiry returns HTTP 5
 A timed-out native lookup retains its slot until completion, and its late result
 MUST NOT authorize a transfer or initiate a validation probe. Changed registry
 authority during resolution returns HTTP 409. Defaults and configuration are documented
-in the [deployment guide](QUORUS_SECURITY_DEPLOYMENT_GUIDE.md#14-bounded-controller-dns-authorization).
+in the [Service Connection Operations Runbook](QUORUS_SERVICE_CONNECTION_OPERATIONS_RUNBOOK.md#33-controller-dns-authorization).
 
 The service-connection `remotePath` field is a literal absolute path, not a pre-encoded
 URI. Root scope `/` permits descendants. Filename punctuation (`#`, `?`, `%`, spaces)
@@ -544,6 +590,21 @@ Effective configuration MUST redact secrets and identify whether each field is s
 
 Stable error codes include at least `NOT_LEADER`, `QUORUM_UNAVAILABLE`, `AUTHENTICATION_REQUIRED`, `ACCESS_DENIED`, `TENANT_MISMATCH`, `AGENT_IDENTITY_MISMATCH`, `VALIDATION_FAILED`, `PRECONDITION_REQUIRED`, `PRECONDITION_FAILED`, `INVALID_STATE_TRANSITION`, `IDEMPOTENCY_KEY_REUSED`, `STALE_ATTEMPT`, `LEASE_EXPIRED`, `FENCING_TOKEN_REJECTED`, `QUOTA_EXCEEDED`, `SERVICE_POLICY_DENIED`, `SERVICE_IDENTITY_FAILED`, `SECRET_REFERENCE_INVALID`, `CAPABILITY_UNAVAILABLE`, `TELEMETRY_STALE`, and `RECONCILIATION_REQUIRED`.
 
+**Current position:** the codes above are the required vocabulary. Of them, only `NOT_LEADER` is emitted today. The current codes are defined in `ErrorCode` and carried in the problem `code` field with a `Q-nnnn` `shortCode`; `422`, `412` and `428` are not used. The closest current code for each required one is:
+
+| Required code | Current code |
+|---|---|
+| `NOT_LEADER` | `NOT_LEADER` (Q-5001) |
+| `QUORUM_UNAVAILABLE` | `NO_LEADER` (Q-5002), `CLUSTER_NOT_READY` (Q-5003) |
+| `AUTHENTICATION_REQUIRED` | `UNAUTHORIZED` (Q-1004) |
+| `ACCESS_DENIED`, `TENANT_MISMATCH`, `AGENT_IDENTITY_MISMATCH` | `FORBIDDEN` (Q-1005); the reason is in `detail`, and authorization decisions carry `Q-AUTHZ-*` codes in the audit log and the explain/check responses |
+| `VALIDATION_FAILED` | `VALIDATION_ERROR` (Q-1002), `BAD_REQUEST` (Q-1001), `MISSING_REQUIRED_FIELD` (Q-1003) and the resource-specific `*_INVALID` codes |
+| `INVALID_STATE_TRANSITION` | `TRANSFER_STATE_CONFLICT`, `ASSIGNMENT_STATE_CONFLICT`, `AGENT_STATE_CONFLICT`, `ROUTE_STATE_CONFLICT` |
+| `STALE_ATTEMPT`, `LEASE_EXPIRED`, `FENCING_TOKEN_REJECTED` | `ATTEMPT_STATE_CONFLICT` (Q-2006) |
+| `QUOTA_EXCEEDED` | `TENANT_QUOTA_EXCEEDED` (Q-8002) |
+| `SERVICE_POLICY_DENIED`, `SERVICE_IDENTITY_FAILED`, `SECRET_REFERENCE_INVALID` | `VALIDATION_ERROR` (Q-1002) on transfer submission, with the connection-policy reason in `detail` (see the [Service Connection Operations Runbook](QUORUS_SERVICE_CONNECTION_OPERATIONS_RUNBOOK.md)) |
+| `PRECONDITION_REQUIRED`, `PRECONDITION_FAILED`, `IDEMPOTENCY_KEY_REUSED`, `CAPABILITY_UNAVAILABLE`, `TELEMETRY_STALE`, `RECONCILIATION_REQUIRED` | None |
+
 ## 17. Retention, Query, and Export
 
 Transfer summaries, attempts, events, audit events, alerts, workflow executions, deployment evidence, and connectivity tests MUST have explicit tenant-aware retention policies. Deleting a definition or live resource MUST NOT delete evidence still subject to retention.
@@ -585,7 +646,7 @@ Release documentation MUST publish a generated endpoint coverage report with `Cu
 | API-01 | Closed | — | The canonical OpenAPI 3.1 contract is served at `GET /api/v1/openapi.yaml`; `OpenApiContractTest` verifies equality between declared operations and registered routes | No remaining impact under this gap; schema and example conformance remain part of the broader release gates |
 | API-02 | Closed | — | Protected routes use mTLS or trusted-gateway authentication, derive tenant identity, enforce role/scope policy, and write hash-chained audit records; production startup fails closed without trust configuration | No remaining impact under this gap; enrollment and identity lifecycle remain API-05 |
 | API-03 | Partial | Critical | Transfer API exposes attempt history and an initial dedicated progress view but lacks collection search, timeline, integrity, publication, retry, pause, resume, and reconciliation resources | Technology operations cannot fully run or investigate critical transfers through the API |
-| API-04 | Partial | Critical | Per-transfer progress applies configured freshness/stall windows and distinguishes missing and stale telemetry, but the active stall boundary, configurable deadline-risk policy, operational queries, alerts, durable events, timelines, and streaming are incomplete | Time-sensitive transfer failures cannot yet be detected, distributed, and actioned reliably at fleet scale |
+| API-04 | Partial | Critical | Per-transfer progress applies configured freshness/stall windows, distinguishes missing and stale telemetry, and reports the active stall boundary, its onset and duration; configurable deadline-risk policy, operational queries, alerts, durable stall events, timelines, and streaming are incomplete | Time-sensitive transfer failures cannot yet be detected, distributed, and actioned reliably at fleet scale |
 | API-05 | Partial | Critical | Agent registration is not a complete enrollment, rotation, quarantine, revocation, and decommissioning API | Enterprise agent trust lifecycle is incomplete |
 | API-06 | Closed | — | Service-connection, trust, egress, opaque-secret-reference, validation, and security-event APIs are active and represented in OpenAPI | Remaining asynchronous active test and per-resource projections are additive API work, not a production-transfer bypass |
 | API-07 | Partial | High | The attempt-aware status resource enforces attempt, lease, fencing, expected-state, sequence, monotonic progress, and atomic lifecycle rules, but specialized assignment actions, lease renewal, and integrity/publication completion evidence remain incomplete | Retry and reassignment remain unsafe until every mutation and destination commit uses the full contract |
@@ -593,8 +654,8 @@ Release documentation MUST publish a generated endpoint coverage report with `Cu
 | API-09 | Open | High | Tenant, hierarchy, quota, usage, and policy services have no controller REST resources | Administrative behavior requires internal integration rather than a supported contract |
 | API-10 | Partial | High | Route API exposes configuration without validation, trigger execution, or execution history | Route CRUD can be mistaken for an operating route service |
 | API-11 | Open | High | No immutable audit query and evidence-export API | Security and operational investigations lack supported evidence access |
-| API-12 | Partial | High | Errors use an RFC 9457 problem format and the security-event collection has bounded cursor pagination. Idempotency keys, ETag/preconditions, asynchronous operations, and general pagination and filtering are absent | Client retry and concurrent administration behavior is unsafe or inconsistent |
-| API-13 | Partial | High | Cluster and configuration endpoints do not expose complete consistency, replication, snapshot, and redacted effective-configuration state | Operators lack a supported administrative view of controller health and configuration |
+| API-12 | Partial | High | Errors use an RFC 9457 problem format and the security-event collection has bounded cursor pagination. Idempotency keys, ETag/preconditions, asynchronous operations, general pagination and filtering, the required error-code vocabulary (§16), and the `Retry-After`/`X-Quorus-Leader` headers on non-leader responses (§3.8) are absent | Client retry and concurrent administration behavior is unsafe or inconsistent |
+| API-13 | Partial | High | Cluster and configuration endpoints do not expose complete consistency, replication, snapshot, and redacted effective-configuration state, and reads have no selectable consistency mode (§3.8) | Operators lack a supported administrative view of controller health and configuration |
 | API-14 | Open | Medium | API/agent compatibility, deprecation, retention, export, and event-stream replay contracts are not implemented | Long-lived integrations and evidence handling remain fragile |
 
 Critical gaps block protected production use. High gaps block the affected production capability. A gap is closed only when implementation, OpenAPI, authorization, audit, persistence, and conformance tests are present.

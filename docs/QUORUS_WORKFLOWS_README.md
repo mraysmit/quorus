@@ -2,8 +2,8 @@
 
 # Quorus Workflow README
 
-**Version:** 2.1  
-**Date:** 2026-09-01  
+**Version:** 2.2  
+**Date:** 2026-10-03  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Scope:** Current in-process workflow parser and execution behavior
@@ -60,9 +60,9 @@ spec:
           source: "{{sourceBase}}/settlement-positions.csv"
           destination: "{{outputDir}}/settlement-positions.csv"
           protocol: https
-          options:
-            timeout: 30s
 ```
+
+Every metadata field shown is required by validation, and so is the `execution` block; the [YAML Syntax Guide](QUORUS_YAML_SYNTAX_GUIDE.md#validation-requirements) gives the exact rules. The engine validates a workflow before every run, so a workflow that fails validation never starts.
 
 ## Parser-Supported Fields
 
@@ -131,7 +131,10 @@ The parser supports:
 
 ## Important Current Limitations
 
-- `condition` values are parsed and variable-resolved, but the current workflow engine does not expose a dedicated condition evaluator in execution flow.
+- `condition` values are parsed and variable-resolved, but never evaluated: a guarded group or transfer always runs (register item `ENG-14`).
+- Transfer `options` are variable-resolved and then dropped; they are not passed to the transfer engine or protocol adapters, so they have no effect (register decision `DR-Q1`).
+- Variable references are resolved in a single pass. A reference inside a variable's value stays literal text.
+- `spec.variables` rank above the runtime variables a caller passes in the execution context, so a caller cannot override a value the YAML declares.
 - Older documentation that described rich workflow notifications, cleanup policies, SLA sections, or advanced credential models does not match the current parser.
 - The current parser does not accept a broad workflow spec vocabulary beyond the fields listed above.
 - The YAML model accepts URI strings, but production distributed execution must use approved service aliases and opaque secret references when that canonical connectivity contract is implemented. Credentials must not be embedded in workflow URIs.

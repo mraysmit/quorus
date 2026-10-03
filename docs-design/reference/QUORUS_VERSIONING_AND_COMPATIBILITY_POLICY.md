@@ -2,10 +2,11 @@
 
 # Quorus Versioning and Compatibility Policy
 
-**Version:** 1.1  
-**Date:** 2026-10-02  
+**Version:** 1.2  
+**Date:** 2026-10-03  
 **Author:** Mark Ray-Smith — Cityline Ltd  
-**License:** Apache 2.0
+**License:** Apache 2.0  
+**Status:** Current for the contract versions; the product-version rule is open (register decision `DR-Q5`)
 
 ## Purpose
 
@@ -15,12 +16,21 @@ This policy governs every contract that can outlive one process or be consumed b
 
 | Contract | Current | Compatibility rule | Phase 0 representation |
 |---|---:|---|---|
-| Raft command envelope | 1 | Readers accept legacy version 0 and current version 1; writers emit 1 | Protobuf `schema_version` |
-| State snapshot | 1 | Readers accept legacy missing/0 and current 1; writers emit 1 | JSON `schemaVersion` |
+| Raft command envelope | 3 | Readers accept versions 0 to 3; writers emit 3 | Protobuf `schema_version` |
+| State snapshot | 3 | Readers accept missing/0 to 3; writers emit 3 | JSON `schemaVersion` |
 | REST API | 1 | Additive changes remain in `/api/v1`; breaking changes require a new major path | OpenAPI 3.1 |
 | Configuration | 1 | Additive keys require safe defaults; renamed keys require an explicit migration window | properties and `QUORUS_*` environment variables |
 | Workflow definition | 1 | New optional fields are additive; changed meaning or required fields require migration | workflow schema/version field in the next workflow change |
 | Agent protocol | 1 | Controller and agent must negotiate compatible major versions before assignment | registration version/capability metadata |
+
+The table states the values in `SchemaVersionRegistry`; if they differ, the registry is right and this table is corrected.
+
+## Contract changes so far
+
+| Contract | Change | Commit | Upgrade consequence |
+|---|---|---|---|
+| Configuration | Layered configuration: packaged defaults, profile resource, `QUORUS_*` environment, explicit overrides. `AppConfig.get()`, `AgentConfig.get()` and JVM system properties as a configuration channel were removed | `b35fb25` (2026-09-03) | Breaking: a deployment that set Quorus configuration through `-D` system properties must move to `QUORUS_*` environment variables or properties files |
+| Raft command envelope, state snapshot | Version 3: the service-connection, secret-reference and security-event key format changed (R2 registry isolation) | `1a8f2b3` (2026-09-04) | Coordinated upgrade, not a rolling one: a version-2 binary rejects version-3 entries. See [Security Deployment Guide §11](../../docs/QUORUS_SECURITY_DEPLOYMENT_GUIDE.md#11-registry-isolation-upgrade-and-recovery) |
 
 ## Change rules
 
@@ -32,6 +42,7 @@ This policy governs every contract that can outlive one process or be consumed b
 6. Configuration values must have one canonical property, one canonical environment mapping and a documented precedence order.
 7. Compatibility evidence includes previous-reader/current-writer, current-reader/previous-writer, future-version rejection and restart recovery tests.
 8. Downgrade is allowed only when the target release can read every stored command and snapshot version present in the cluster.
+9. Quorus follows each six-monthly Java feature release within its update window (decision `RT-Q3`). A consensus engine that Quorus consumes, such as QRaft, must not require a newer Java release than Quorus itself.
 
 ## Ownership
 

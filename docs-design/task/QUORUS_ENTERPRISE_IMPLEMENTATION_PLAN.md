@@ -2,8 +2,8 @@
 
 # Quorus Enterprise Implementation Plan
 
-**Version:** 1.43
-**Date:** 2026-10-02
+**Version:** 1.44  
+**Date:** 2026-10-03  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Status:** Active — remediation checkpoint open; R1-1 container-recreation acceptance closed 2026-09-07 while R1-2 and R1-3 remain open; Phase 0 functionally complete with M0 durability acceptance reopened until R1-2 and R1-3 close; Phase 1 complete; Phase 4 complete (the acceptance reopened on 2026-09-04 was restored by R2–R6 on 2026-09-05), with hardening follow-up `SEC-07` open; Phases 2 and 3 in progress; Phases 5–12 not started; platform migration (Section 20) in progress. CI has never passed; its repair is deferred (`ENG-07`, `SEQ-01`, Section 4)  
@@ -15,7 +15,7 @@ This plan defines the phased implementation path from the current Quorus alpha b
 
 - [Quorus Architecture Specification](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md)
 - [Quorus REST API Specification](../../docs/QUORUS_REST_API_SPECIFICATION.md)
-- [Quorus Comprehensive System Design](../design/QUORUS_SYSTEM_DESIGN.md) — non-normative and substantially stale (see the [2026-09-24 documentation review](../reviews/QUORUS_DOCUMENTATION_REVIEW_2026-09-24.md) §4.7); use it for target-state intent only
+- [Quorus Comprehensive System Design](../design/QUORUS_SYSTEM_DESIGN.md) — non-normative; since v4.0 (2026-10-03) each section is badged Current, Partly current or Target, and its superseded sections are archived
 - [Quorus OpenAPI contract](../../quorus-controller/src/main/resources/openapi/quorus-controller-v1.yaml) — the current HTTP API
 
 The architecture and REST API specifications remain normative. This plan controls delivery order and exit evidence; it does not weaken a canonical requirement. Historical completion markers in older plans do not close current conformance gaps.
@@ -57,9 +57,68 @@ The current baseline provides:
 - health, Raft status, aggregate metrics, and selected OpenTelemetry instrumentation;
 - tenant models, quota services, route models, and supporting examples.
 
-The baseline does not yet justify protected enterprise production use. Phase 1 established the authenticated identity and TLS/mTLS foundation, and the completed Phase 2 slices established authoritative attempt fencing and atomic report application. Critical blockers still include certificate lifecycle automation, automatic lease expiry and safe reassignment, destination-side fencing and reconciliation, incomplete transfer operations telemetry, uncontrolled service connectivity, incomplete agent trust lifecycle, and incomplete REST coverage.
+The baseline does not yet justify protected enterprise production use. Phase 1 established the authenticated identity and TLS/mTLS foundation, and the completed Phase 2 slices established authoritative attempt fencing and atomic report application. Phase 4 brought service connectivity under governed aliases, egress policy and opaque secret references. Critical blockers still include certificate lifecycle automation, automatic assignment, lease expiry and safe reassignment (the controller runs no assignment scheduler, `ENG-01`), destination-side fencing and reconciliation, incomplete transfer operations telemetry, incomplete agent trust lifecycle, and incomplete REST coverage.
 
 ## 4. Target Release Milestones
+
+| Milestone | Completed phases | Release meaning |
+|---|---|---|
+| **M0 — Reproducible Alpha Baseline** | Phase 0 — historically complete; durability acceptance reopened by R1 | Clean, repeatable functional baseline with corrected lifecycle and durability defects. The M0 verification at `07195f6` (two clean builds, 2,212 tests) showed green verification, not test-first sequencing; its tests are retrospective characterization under the approved historical process deviation. |
+| **M1 — Secure Transfer Core** | Phases 1–2 | Authenticated control plane and explainable, fenced transfer attempts |
+| **M2 — Operational Beta** | Phases 3–5 | Critical transfers are observable; services and agents have governed trust lifecycles |
+| **M3 — Enterprise Control Plane** | Phases 6–8 | Complete API, automated route/workflow operation, and evidenced recovery behavior |
+| **M4 — Enterprise Operations Candidate** | Phases 9–11 | Governance, integrations, supportability, and role-specific user interfaces are available |
+| **M5 — Enterprise Release Candidate** | Phase 12 | All release gates pass in a representative pilot environment |
+
+No milestone may be described as production ready solely because its feature list is complete.
+
+What is open and next is kept in the [Outstanding Work Register](QUORUS_OUTSTANDING_WORK_REGISTER.md) §2. The dated checkpoints below record findings and decisions, newest first.
+
+### Documentation review findings — 2026-10-02
+
+A re-review of every live document against the tree at `6a8acb1` found these code and
+configuration defects. Each is delivered under Section 6.1 and carried in register Section I; the
+documentation work is in register Section H.
+
+- **Runtime revocation cannot reach a follower (`SEC-09`).** The revocation update changes
+  node-local trust state, and the incident procedure sends it to every controller, but the leader
+  guard rejects every API write on a follower. Followers keep accepting a revoked certificate.
+  This contradicts decision `DR-Q2` and is taken first.
+- **Raft revocation is inbound-only (`SEC-10`).** A leader still replicates to a peer whose
+  certificate is revoked. Expected to close through `CE-08` with `SEC-04`.
+- **The revocation update is unsafe to get slightly wrong (`SEC-11`).** An omitted serial list
+  clears every revocation, the change applies before its audit record is durable, and the audit
+  event does not record the serials.
+- **The agent image cannot start against a controller (`ENG-17`).** Its entrypoint waits for a
+  health path the controller does not serve, without the client certificate a TLS controller
+  requires.
+- **The load balancer answers controller health checks itself (`ENG-18`).**
+- **The Docker helper scripts do not work (`ENG-19`), and the controller's entrypoint script is
+  never run (`ENG-20`).**
+- **Raft peer RPCs may be served before recovery completes (`ENG-21`, reported, to be verified
+  first).** If confirmed, a node could grant a second vote in a term, which breaks election
+  safety.
+- **Raft engine gaps (`ENG-22`), test-double defects and a licence-header conflict (`ENG-23`), and
+  test-lane defects (`ENG-24`)**, found while rewriting the storage, simulator and testing
+  documents.
+- **Agent deregistration does nothing (`ENG-25`).** The agent calls `DELETE /api/v1/agents/{agentId}`
+  on shutdown, the controller has no such route, and the agent treats the `404` as success, so the
+  agent record stays in replicated state.
+
+Decisions taken with the owner on 2026-10-03 (register §3) add two delivery items: `ENG-26`
+passes a defined set of workflow transfer options through and resolves nested variables
+(`DR-Q1`), and `ENG-27` makes agents follow leader hints, with the controller sending
+`X-Quorus-Leader` (`ENG-Q3`). The order of the work is decision `SEQ-05`.
+- **No assignment scheduler runs in the controller.** Neither `JobAssignmentService` nor
+  `AgentSelectionService` is constructed, so an assignment exists only through
+  `POST /api/v1/assignments`. This is the existing `ENG-01`, settled with `P2-01`; the documents
+  that present the scheduler as live are corrected under register DR-A9.
+
+Delivery items recorded only in the register until now are also part of this plan: `ENG-13`
+(workflow execution flags, closed), `ENG-14` (workflow conditions are never evaluated; a
+decision is needed between evaluating and rejecting them), `ENG-15` (the benchmark module,
+Phase 12 and the `RT-06`/`CE-07` baselines), `ENG-16` (audit group commit, closed), `OBS-15`
+and the `STATUS-01` wording decision.
 
 ### Findings and sequencing decisions — 2026-09-27
 
@@ -81,7 +140,10 @@ The consequences are:
 - Phase 0's CI verification items have not been shown in CI: a clean checkout build that passes
   twice, and documentation checks that run in CI.
 - No phase can close while `ENG-07` is open, because step 5 of Section 6.1 requires every
-  applicable lane to pass, including documentation.
+  applicable lane to pass, including documentation. Phases 1 and 4 closed on 2026-09-02 and
+  2026-09-03, before this rule was recorded; they keep their status, but their exit evidence
+  does not include a passing CI run, which `ENG-07` still owes them. The documentation lane's
+  header and link checks pass locally since 2026-10-03 (decision `DR-Q10`).
 
 **Governed TLS trust anchors (`SEC-07`, decision `SEQ-02`).** This was found during `RT-03b`
 on 2026-09-26.
@@ -279,17 +341,6 @@ and destination reconciliation work in Phase 2. At that checkpoint R4 was the ne
 remediation slice; the R4–R6 completion entries above supersede that sequence. The
 remaining R1 release gates are not waived.
 
-| Milestone | Completed phases | Release meaning |
-|---|---|---|
-| **M0 — Reproducible Alpha Baseline** | Phase 0 — historically complete; durability acceptance reopened by R1 | Clean, repeatable functional baseline with corrected lifecycle and durability defects. The M0 verification at `07195f6` (two clean builds, 2,212 tests) showed green verification, not test-first sequencing; its tests are retrospective characterization under the approved historical process deviation. |
-| **M1 — Secure Transfer Core** | Phases 1–2 | Authenticated control plane and explainable, fenced transfer attempts |
-| **M2 — Operational Beta** | Phases 3–5 | Critical transfers are observable; services and agents have governed trust lifecycles |
-| **M3 — Enterprise Control Plane** | Phases 6–8 | Complete API, automated route/workflow operation, and evidenced recovery behavior |
-| **M4 — Enterprise Operations Candidate** | Phases 9–11 | Governance, integrations, supportability, and role-specific user interfaces are available |
-| **M5 — Enterprise Release Candidate** | Phase 12 | All release gates pass in a representative pilot environment |
-
-No milestone may be described as production ready solely because its feature list is complete.
-
 ## 5. Phase Dependency Map
 
 ```mermaid
@@ -333,6 +384,7 @@ A capability is complete only when all applicable items are satisfied:
 - referential, tenant, state, and authorization invariants are enforced during authoritative state application;
 - safe migration and rollback behavior is documented and tested;
 - OpenAPI 3.1 paths, schemas, scopes, examples, and problem responses are updated;
+- every changed public contract (an endpoint, configuration key, environment variable, Compose file, or documented status) is corrected in its canonical document in the same commit, and plans and the register cite a commit SHA only once that commit exists (register DR-D5);
 - idempotency, concurrency, leader, quorum-loss, and retry behavior is tested;
 - unit, component, integration, protocol, multi-node, security, and failure tests pass as applicable;
 - metrics, traces, domain events, audit events, alert conditions, and redaction are implemented;
@@ -531,7 +583,7 @@ Every production trust-boundary connection is authenticated, encrypted, peer-ver
 
 **Size:** XL  
 **Milestone:** M1  
-**Primary gaps:** `ARCH-02`, `ARCH-05`, `ARCH-06`, `ARCH-17`, `API-03`, `API-07`, `API-12`
+**Primary gaps:** `ARCH-02`, `ARCH-05`, `API-03`, `API-07`, `API-12` (`ARCH-06` and `ARCH-17`, originally listed here, are closed)  
 **Status:** In progress — authoritative attempts, atomic assignment, the fenced agent poll/report protocol, and atomic multi-entity lifecycle reporting implemented on 2026-09-02; lease automation, integrity, publication, idempotent submission, retry policy, and reconciliation remain open  
 
 ### Objective
@@ -1160,7 +1212,7 @@ The enterprise release candidate is approved only when all critical canonical ga
 
 ## 20. Platform Migration Workstreams
 
-**Status:** In progress. Direction accepted on 2026-09-26. `RT-01` to `RT-05` are complete, so only `quorus-controller` still uses Vert.x; `RT-06` waits for `CE-07` to `CE-11`, and workstream `CE` has not started. The state of both engines and the work per `CE` item are assessed in the [QRaft integration assessment](../design/QUORUS_QRAFT_INTEGRATION_ASSESSMENT.md) (2026-09-28), with open decisions `CE-Q1` to `CE-Q5`. Item status is kept in [register Section J](QUORUS_OUTSTANDING_WORK_REGISTER.md#13-section-j--platform-migration-workstreams)
+**Status:** In progress. Direction accepted on 2026-09-26. `RT-01` to `RT-05` are complete, so of the default-build modules only `quorus-controller` still uses Vert.x. `RT-06` no longer waits for QRaft (`SEQ-03`, 2026-09-28) and starts with `RT-06a`; its prerequisite benchmark baselines B-08 and B-09 were recorded on 2026-09-28 (`ENG-15`). Workstream `CE` has not started. The state of both engines and the work per `CE` item are assessed in the [QRaft integration assessment](../design/QUORUS_QRAFT_INTEGRATION_ASSESSMENT.md) (2026-09-28), with open decisions `CE-Q1` to `CE-Q5`. Item status is kept in [register Section J](QUORUS_OUTSTANDING_WORK_REGISTER.md#13-section-j--platform-migration-workstreams)
 **Decisions:** [ADR-0011](../architecture-decisions/ADR-0011-CONSENSUS-VIA-QRAFT-GENERIC-ENGINE.md) (consensus through the generic QRaft engine) and [ADR-0012](../architecture-decisions/ADR-0012-JAVA-RUNTIME-AND-STRUCTURED-CONCURRENCY.md) (leave Vert.x for Java 27 structured concurrency)
 
 These two workstreams change the platform beneath the phases rather than adding enterprise capability. Each item is delivered under Section 6.1 and must keep every delivered phase's boundary tests green. Neither workstream may weaken a delivered exit gate. In particular, Phase 1's controller-to-controller mutual TLS, peer rejection and revocation behaviour must pass unchanged through the new engine.
@@ -1177,7 +1229,7 @@ Quorus stops owning a Raft engine and consumes QRaft's engine through a 100% gen
 | **CE-04** | QRaft | Observability interface | Generic metrics and event listener with no application names |
 | **CE-05** | QRaft | Genericity enforcement | QRaft's catalog and key/value state use only the public engine API. A build check fails if the engine dependency tree contains `dev.mars:quorus*` or `io.vertx` |
 | **CE-06** | QRaft | Versioned artifacts | Engine artifacts published to a repository Quorus builds can resolve, with a compatibility and deprecation policy |
-| **CE-07** | Quorus | Engine adapter | `QuorusStateStore` implements the state-machine contract; the versioned protobuf command codec implements `CommandCodec`; engine errors map to the existing HTTP leader and conflict behaviour. At most one temporary class converts JDK futures to Vert.x futures, and it is removed by `RT-06` |
+| **CE-07** | Quorus | Engine adapter | `QuorusStateStore` implements the state-machine contract; the versioned protobuf command codec implements `CommandCodec`; engine errors map to the existing HTTP leader and conflict behaviour. It replaces the implementation behind the consensus interface that `RT-06a` introduces, so the controller's callers do not change |
 | **CE-08** | Quorus | Security wiring | `CertificateTrustState` and the Phase 1 trust configuration supply the TLS material and peer authorizer. Every Phase 1 Raft trust test passes through QRaft, and certificate-to-node-ID binding closes register item `SEC-04` |
 | **CE-09** | Quorus | Raft state migration | Establish on-disk compatibility between raftlog 1.2.0 and QRaft's raftlog version, and between Quorus's snapshot sidecar and QRaft's `SnapshotStore`. Deliver a tested coordinated cutover with rollback; no mixed-engine cluster |
 | **CE-10** | Quorus | Remove the in-repository engine | Delete Quorus's `RaftNode`, Raft gRPC server and transport, `RaftLogStorageAdapter`, the snapshot sidecar and the direct `raftlog-core` dependency. Keep the command protobuf schemas |
@@ -1198,7 +1250,7 @@ Quorus stops owning a Raft engine and consumes QRaft's engine through a 100% gen
 | **RT-Q5** | Decision: HTTP client for the HTTP transfer adapter | ✅ Decided 2026-09-26: Apache HttpClient 5 (classic API). Measured on JDK 27 GA: `java.net.http` cannot connect to an approved address while keeping SNI, `Host` and hostname verification on the service's hostname (ADR-0012) |
 | **RT-04** | `quorus-workflow` and `quorus-integration-examples` | No Vert.x types. Workflow execution uses structured scopes |
 | **RT-05** | `quorus-agent` | Transfers run on virtual threads, so cancellation interrupts blocked I/O at once. Controller client on `java.net.http.HttpClient` with mutual TLS and hostname verification. Registration, heartbeat and polling run as structured loops with bounded shutdown. The Phase 1 agent trust tests and R3 reporting tests pass. Delivered in slices: `RT-05a` moves the controller client to `java.net.http` (with a JDK PEM loader in core) and makes the registration, heartbeat, polling and status-reporting services blocking; `RT-05b` replaces the agent runtime (Vert.x timers, futures, the transfer service, the health endpoint and the tracing integration) and leaves no `io.vertx` dependency in the `quorus-agent` pom |
-| **RT-06** | `quorus-controller` | HTTP API on the `RT-Q2` server with TLS 1.3 and required client certificates. Authentication, authorization and audit middleware preserved. `OpenApiContractTest` stays equal. The `CE-07` bridge is removed. Throughput is compared with benchmark B-08 measured on the Vert.x controller first (`ENG-15`). Delivered in slices, re-sequenced on 2026-09-28 so that it no longer waits for QRaft: `RT-06a` puts the controller's consensus calls (the 30 `submitCommand` sites and the leadership queries) behind one Quorus-owned interface with JDK types, backed by today's `RaftNode` (the single bridge class ADR-0011 allows; `CE-07` later replaces its implementation); `RT-06b` moves the HTTP API to the JDK `HttpsServer`; `RT-06c` moves the controller's services and timers to virtual threads; `RT-06d` removes the remaining Vert.x other than the in-repository Raft engine, which `CE-10` deletes. Before `RT-06b`, `ENG-15` measures B-08 on the Vert.x controller |
+| **RT-06** | `quorus-controller` | HTTP API on the `RT-Q2` server with TLS 1.3 and required client certificates. Authentication, authorization and audit middleware preserved. `OpenApiContractTest` stays equal. Throughput is compared with benchmark B-08 measured on the Vert.x controller first (`ENG-15`). Delivered in slices, re-sequenced on 2026-09-28 so that it no longer waits for QRaft: `RT-06a` puts the controller's consensus calls (the 30 `submitCommand` sites and the leadership queries) behind one Quorus-owned interface with JDK types, backed by today's `RaftNode` (the single bridge class ADR-0011 allows; `CE-07` later replaces its implementation); `RT-06b` moves the HTTP API to the JDK `HttpsServer`; `RT-06c` moves the controller's services and timers to virtual threads; `RT-06d` removes the remaining Vert.x other than the in-repository Raft engine, which `CE-10` deletes. Before `RT-06b`, `ENG-15` measures B-08 on the Vert.x controller |
 | **RT-07** | Observability | OpenTelemetry traces, metrics and log correlation for the new HTTP server and client, replacing Vert.x tracing integration. The agent's part was delivered in `RT-05b`: its controller client makes client spans and sends W3C trace context. What remains is the controller's HTTP server and outbound clients, and log correlation |
 | **RT-08** | Vert.x removal gate | No `io.vertx` artifact in any module. A build check fails if one is reintroduced. Per-module guard tests already enforce this for core, workflow, tenant, the examples and the agent (`CoreIsVertxFreeTest` and its siblings); `RT-08` adds the controller once `RT-06` lands and removes the `vertx-dependencies` BOM import from the root pom |
 | **RT-09** | Java release cadence (recurring) | Each Java GA feature release is adopted within its update window: toolchain, CI and images; full reactor and coverage gates; Docker, slow, Raft durability and restart lanes on the new runtime. When `StructuredTaskScope` is final in an adopted release, the task-scope implementation switches to it with its tests as the gate |
@@ -1206,8 +1258,8 @@ Quorus stops owning a Raft engine and consumes QRaft's engine through a 100% gen
 ### Sequencing
 
 1. `RT-01` can start at once and has no dependency on QRaft. `RT-02` delivers the task-scope abstraction before any module migration uses it.
-2. `CE-01` to `CE-06` (QRaft) run in parallel with `RT-01` to `RT-05`.
-3. `CE-07` to `CE-11` follow `CE-06`. Adopting QRaft removes Quorus's largest Vert.x-coupled component, the Raft node and its gRPC transport, before the controller HTTP migration.
+2. `CE-01` to `CE-06` are QRaft deliverables and run independently of Quorus. They were planned to run alongside `RT-01` to `RT-05`; those are complete and `CE` has not started.
+3. `CE-07` to `CE-11` follow `CE-06`. Adopting QRaft removes Quorus's largest remaining Vert.x-coupled component, the Raft node and its gRPC transport. Since `SEQ-03` this happens after the controller HTTP migration (`RT-06`), not before it: `CE-07` swaps the implementation behind the `RT-06a` consensus interface.
 4. `RT-06` no longer waits for `CE-07` to `CE-11` (decided 2026-09-28): the consensus interface of `RT-06a` separates the HTTP and service migration from the engine, so only the in-repository Raft engine stays on Vert.x until `CE-10` removes it. `RT-06` should still precede the bulk of Phase 6 so that new REST resources are written once. Before it, and before `CE-07`, the benchmark module (`ENG-15`) measures the Vert.x controller's HTTP API (B-08) and Raft commit latency (B-09), because `RT-Q2` and the QRaft adoption are judged against them. `RT-05` does not wait for QRaft: the agent has no Raft code and depends on no `CE` item, so it follows `RT-04` directly (decided 2026-09-27).
 5. Phase 8 durability work and the R1-2 and R1-3 acceptance runs should follow `CE-11`, so that production-filesystem and power-loss evidence describes the engine that will ship.
 
@@ -1314,6 +1366,7 @@ The plan is revised when requirements or implementation evidence change. Revisio
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.44 | 2026-10-03 | §4: findings of the 2026-10-02 documentation review added as delivery items `SEC-09` to `SEC-11` and `ENG-17` to `ENG-25`, with `SEC-09` taken first; the §1 description of the System Design updated after its split (DR-C5); `ENG-01` restated (no assignment scheduler runs); `ENG-13` to `ENG-16`, `OBS-15` and `STATUS-01` brought into the plan. Corrections (register DR-B9): the §20 status line said `RT-06` waits for `CE-07` to `CE-11`, contradicting `SEQ-03`; the `CE-07` acceptance and §20 sequencing steps 2 and 3 described a Vert.x bridge and an order that `SEQ-03` replaced; §3 still listed uncontrolled service connectivity as a blocker after Phase 4; Phase 2 listed the closed `ARCH-06` and `ARCH-17`; §4 now states how `SEQ-01` applies to Phases 1 and 4, which closed before it. §4 now opens with the milestone table, followed by the dated checkpoints, and points to register §2 for what is open. §6 Definition of Done gains the contract-documentation rule (register DR-D5). Scope note on v1.43: its removal of the retained-digest Definition of Done bullet and the Phase 0 release-manifest deliverable was a scope change, not a simplification |
 | 1.43 | 2026-10-02 | §6 Definition of Done, §6.1, the Phase 0 deliverables and §24 simplified: a slice's record is its commit message (`DR-Q6`); checkpoint wording tidied |
 | 1.42 | 2026-09-28 | §20: `RT-06` re-sequenced to proceed before QRaft, in slices `RT-06a` (consensus interface) to `RT-06d`; only the in-repository Raft engine stays on Vert.x until `CE-10` |
 | 1.41 | 2026-09-28 | §20 links the QRaft integration assessment and its open decisions `CE-Q1` to `CE-Q5` |
