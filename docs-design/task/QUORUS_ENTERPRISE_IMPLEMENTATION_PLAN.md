@@ -108,7 +108,8 @@ documentation work is in register Section H.
 Decisions taken with the owner on 2026-10-03 (register §3) add two delivery items: `ENG-26`
 passes a defined set of workflow transfer options through and resolves nested variables
 (`DR-Q1`), and `ENG-27` makes agents follow leader hints, with the controller sending
-`X-Quorus-Leader` (`ENG-Q3`). The order of the work is decision `SEQ-05`.
+`X-Quorus-Leader` (`ENG-Q3`). The order of the work is decision `SEQ-05`. The generated dependency
+inventory then showed that modules resolve different Jackson versions (`ENG-28`).
 - **No assignment scheduler runs in the controller.** Neither `JobAssignmentService` nor
   `AgentSelectionService` is constructed, so an assignment exists only through
   `POST /api/v1/assignments`. This is the existing `ENG-01`, settled with `P2-01`; the documents

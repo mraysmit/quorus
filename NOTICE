@@ -6,11 +6,12 @@ This product includes software developed by Mark Andrew Ray-Smith Cityline Ltd.
 ================================================================================
 
 This software contains the following third-party components at runtime.
-Test-only dependencies are listed in OPEN_SOURCE_USAGE.md and are not
-distributed with Quorus.
+THIRD-PARTY.txt is the complete, generated list of runtime dependencies and
+their licenses (scripts/generate-third-party-inventory.ps1). Test-only
+dependencies are not distributed with Quorus.
 
 Eclipse Vert.x (io.vertx:vertx-core, vertx-web, vertx-web-client,
-vertx-grpc-server, vertx-grpc-client, vertx-opentelemetry: 5.0.8)
+vertx-opentelemetry: 5.0.8)
   Used by quorus-controller only.
   License: Apache License 2.0 and Eclipse Public License 2.0
   Copyright (c) 2011-2024 The original author or authors
