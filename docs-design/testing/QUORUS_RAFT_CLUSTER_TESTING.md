@@ -307,7 +307,7 @@ Invoke-RestMethod http://localhost:8081/health | ConvertTo-Json
 ```json
 {
   "status": "UP",
-  "version": "1.0.0-alpha",
+  "version": "1.0-SNAPSHOT",
   "timestamp": "2026-10-03T09:15:42.123Z",
   "nodeId": "controller1",
   "raft": {

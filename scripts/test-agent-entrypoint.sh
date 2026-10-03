@@ -18,6 +18,7 @@ EOF
 cat > "$work/bin/java" <<'EOF'
 #!/bin/sh
 echo "started" >> "$JAVA_LOG"
+env >> "$JAVA_LOG"
 exit 0
 EOF
 cat > "$work/bin/sleep" <<'EOF'
@@ -45,6 +46,9 @@ run AGENT_ID=a1 CONTROLLER_URL=http://controller1:8080/api/v1,http://controller2
 grep -q started "$work/java.log" || fail 'the agent was not started'
 [ -s "$work/curl.log" ] && fail 'the entrypoint must not probe the controller; the agent retries registration itself'
 echo 'PASS: starts the agent without waiting for a controller'
+
+grep -q '^AGENT_VERSION=' "$work/java.log" && fail 'the product version is not a setting; AGENT_VERSION must not be exported (DR-Q5)'
+echo 'PASS: exports no agent version'
 
 run AGENT_ID=a1 QUORUS_AGENT_CONTROLLER_URL=http://canonical:8080/api/v1 CONTROLLER_URL=http://legacy:8080/api/v1 \
   || fail 'canonical controller URL'

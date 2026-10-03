@@ -17,6 +17,7 @@
 package dev.mars.quorus.controller.http;
 
 import dev.mars.quorus.controller.http.handlers.*;
+import dev.mars.quorus.config.ProductVersion;
 import dev.mars.quorus.controller.config.AppConfig;
 import dev.mars.quorus.controller.raft.RaftNode;
 import dev.mars.quorus.controller.security.AuthenticationHandler;
@@ -67,7 +68,6 @@ import java.util.Objects;
 public class HttpApiServer {
 
     private static final Logger logger = LoggerFactory.getLogger(HttpApiServer.class);
-    private static final String VERSION = "1.0.0-alpha";
 
     private final Vertx vertx;
     private final String host;
@@ -161,7 +161,7 @@ public class HttpApiServer {
         router.get("/metrics").handler(new MetricsHandler(vertx, metricsPort));
 
         // ==================== Health Endpoints ====================
-        this.healthHandler = new HealthHandler(raftNode, VERSION);
+        this.healthHandler = new HealthHandler(raftNode, ProductVersion.get());
         healthHandler.startPeriodicChecks(vertx);
         router.get("/health/live").handler(new LivenessHandler());
         router.get("/health/ready").handler(new ReadinessHandler(raftNode));
@@ -170,7 +170,7 @@ public class HttpApiServer {
 
         // ==================== Cluster / Info Endpoints ====================
         router.get("/raft/status").handler(new ClusterHandler(raftNode));
-        router.get("/api/v1/info").handler(new InfoHandler(raftNode, VERSION));
+        router.get("/api/v1/info").handler(new InfoHandler(raftNode, ProductVersion.get()));
         router.get("/api/v1/openapi.yaml").handler(new OpenApiHandler());
 
         // ==================== Security Endpoints ====================

@@ -111,7 +111,8 @@ Decisions taken with the owner on 2026-10-03 (register §3) add two delivery ite
 passes a defined set of workflow transfer options through and resolves nested variables
 (`DR-Q1`), and `ENG-27` makes agents follow leader hints, with the controller sending
 `X-Quorus-Leader` (`ENG-Q3`; delivered 2026-10-03). The order of the work is decision `SEQ-05`. The generated dependency
-inventory then showed that modules resolve different Jackson versions (`ENG-28`).
+inventory then showed that modules resolve different Jackson versions (`ENG-28`). Checking the built
+jars for `DR-Q5` showed that the agent image ships test-only libraries (`ENG-29`).
 - **No assignment scheduler runs in the controller.** Neither `JobAssignmentService` nor
   `AgentSelectionService` is constructed, so an assignment exists only through
   `POST /api/v1/assignments`. This is the existing `ENG-01`, settled with `P2-01`; the documents

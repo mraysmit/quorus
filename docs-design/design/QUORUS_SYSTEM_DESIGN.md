@@ -1437,7 +1437,7 @@ upstream quorus_controllers {
 ```json
 {
   "status": "UP",
-  "version": "1.0.0-alpha",
+  "version": "1.0-SNAPSHOT",
   "timestamp": "2026-10-03T10:30:00Z",
   "nodeId": "controller1",
   "raft": {

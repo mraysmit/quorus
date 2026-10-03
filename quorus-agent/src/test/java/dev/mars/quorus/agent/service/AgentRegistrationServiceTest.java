@@ -65,7 +65,6 @@ class AgentRegistrationServiceTest {
                 .hostname("test-host")
                 .address("192.168.1.100")
                 .agentPort(9090)
-                .version("1.0.0-TEST")
                 .maxConcurrentTransfers(10)
                 .supportedProtocols(Set.of("HTTP", "SFTP"))
                 .build();
@@ -143,7 +142,7 @@ class AgentRegistrationServiceTest {
         assertEquals("test-host", request.get("hostname").asText());
         assertEquals("192.168.1.100", request.get("address").asText());
         assertEquals(9090, request.get("port").asInt());
-        assertEquals("1.0.0-TEST", request.get("version").asText());
+        assertEquals(dev.mars.quorus.config.ProductVersion.get(), request.get("version").asText());
         assertEquals("test-region", request.get("region").asText());
         assertEquals("test-dc", request.get("datacenter").asText());
 

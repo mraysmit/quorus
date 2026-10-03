@@ -147,10 +147,7 @@ public class QuorusControllerVerticle extends AbstractVerticle {
                                  Set<String> clusterNodeIds) {
         try {
             // 5. Create Raft Node with storage
-            Map<String, String> initialMetadata = new HashMap<>();
-            initialMetadata.put("version", config.getVersion());
-
-            QuorusStateStore stateMachine = new QuorusStateStore(initialMetadata);
+            QuorusStateStore stateMachine = new QuorusStateStore();
 
             // Use the builder with storage and snapshot configuration
             RaftNode node = RaftNode.builder()

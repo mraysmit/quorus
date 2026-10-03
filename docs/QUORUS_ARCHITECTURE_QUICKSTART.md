@@ -55,7 +55,7 @@ Current controller defaults come from `AppConfig`:
 - Raft I/O queue size: `1000`
 These values are sourced from `quorus-controller/src/main/java/dev/mars/quorus/controller/config/AppConfig.java` and the packaged `quorus-controller.properties`.
 
-The product version is not yet single-sourced (register decision `DR-Q5`). `quorus.version` (`2.0-ext`) is logged at startup and written to the initial Raft metadata, while `/api/v1/info` and `/health` report a hard-coded `1.0.0-alpha`, the OpenAPI contract says `1.3.2-alpha`, and the Maven version is `1.0-SNAPSHOT`.
+The product version is the root pom version (`1.0-SNAPSHOT` today), written into the build and reported by the controller at `/api/v1/info` and `/health` and by the agent in its registration and `/status`. It is not a setting. The OpenAPI contract's `info.version` (`1.3.2-alpha`) is the API contract version, a separate thing. See the [versioning policy](../docs-design/reference/QUORUS_VERSIONING_AND_COMPATIBILITY_POLICY.md#product-version).
 
 ## Operational Model
 

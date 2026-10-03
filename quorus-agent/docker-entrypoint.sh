@@ -33,7 +33,6 @@ export SUPPORTED_PROTOCOLS=${SUPPORTED_PROTOCOLS:-HTTP,HTTPS}
 export MAX_CONCURRENT_TRANSFERS=${MAX_CONCURRENT_TRANSFERS:-5}
 export HEARTBEAT_INTERVAL=${HEARTBEAT_INTERVAL:-30000}
 export AGENT_PORT=${AGENT_PORT:-8080}
-export AGENT_VERSION=${AGENT_VERSION:-1.0.0}
 
 # Agent configuration is supplied through exported environment values. JVM
 # system properties are reserved for JVM and logging concerns only.

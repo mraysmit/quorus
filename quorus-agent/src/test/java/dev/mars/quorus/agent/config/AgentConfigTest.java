@@ -81,7 +81,6 @@ class AgentConfigTest {
         assertFalse(config.getRegion().isEmpty());
         assertFalse(config.getDatacenter().isEmpty());
         assertFalse(config.getSupportedProtocols().isEmpty());
-        assertTrue(config.getVersion().matches("\\d+\\.\\d+\\.\\d+.*"));
         assertTrue(config.isTelemetryEnabled());
     }
 

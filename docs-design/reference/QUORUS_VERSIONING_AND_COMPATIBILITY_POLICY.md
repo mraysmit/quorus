@@ -2,15 +2,27 @@
 
 # Quorus Versioning and Compatibility Policy
 
-**Version:** 1.2  
+**Version:** 1.3  
 **Date:** 2026-10-03  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
-**Status:** Current for the contract versions; the product-version rule is open (register decision `DR-Q5`)
+**Status:** Current
 
 ## Purpose
 
 This policy governs every contract that can outlive one process or be consumed by another component. The executable registry is `SchemaVersionRegistry`; this document defines how its values may change.
+
+## Product version
+
+The product version is the root `pom.xml` version (register decision `DR-Q5`). There is one, and it is not a setting:
+
+- The build writes it into `quorus-build.properties` in `quorus-core`, the only filtered resource, and `ProductVersion.get()` reads it. A build that did not filter the resource fails at first use instead of reporting a placeholder.
+- The controller reports it at `/api/v1/info` (`api.quorusVersion`) and `/health` (`version`) and logs it at startup. The agent reports it in its registration, at its `/status` endpoint and in its startup log.
+- `quorus.version`, `quorus.agent.version` and `AGENT_VERSION` are no longer read. Setting them has no effect.
+- It is not written into replicated state. The state machine's `version` metadata key keeps its own default and is a state value, not the version of any node's binary: nodes of one cluster may run different builds during an upgrade, and they must still hold identical state.
+- The OpenAPI `info.version` is the version of the API contract, a different thing, and changes only when the contract does.
+
+Tests compare what each component reports with the pom (`ProductVersionTest`, `ProductVersionReportingTest`, `AgentProductVersionTest`).
 
 ## Controlled contracts
 

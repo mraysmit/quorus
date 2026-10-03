@@ -133,6 +133,24 @@
     </dependencies>
 
     <build>
+        <resources>
+            <!-- Only quorus-build.properties is filtered: it receives the product version (DR-Q5).
+                 The other resources are copied as they are. -->
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>true</filtering>
+                <includes>
+                    <include>quorus-build.properties</include>
+                </includes>
+            </resource>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>false</filtering>
+                <excludes>
+                    <exclude>quorus-build.properties</exclude>
+                </excludes>
+            </resource>
+        </resources>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

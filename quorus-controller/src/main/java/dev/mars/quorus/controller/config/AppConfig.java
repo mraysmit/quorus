@@ -17,6 +17,7 @@
 package dev.mars.quorus.controller.config;
 
 import dev.mars.quorus.config.LayeredProperties;
+import dev.mars.quorus.config.ProductVersion;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -313,12 +314,6 @@ public final class AppConfig {
         return getLong("quorus.jobs.attempt.lease-duration-ms", 300000);
     }
 
-    // ==================== Application Info ====================
-
-    public String getVersion() {
-        return getString("quorus.version", "2.0-ext");
-    }
-
     // ==================== Core Property Accessors ====================
 
     /**
@@ -466,7 +461,7 @@ public final class AppConfig {
         logger.info("  Raft Port:            {}", getRaftPort());
         logger.info("  Cluster Nodes:        {}", getClusterNodes());
         logger.info("  Service Name:         {}", getServiceName());
-        logger.info("  Version:              {}", getVersion());
+        logger.info("  Version:              {}", ProductVersion.get());
         logger.info("  --- Thread Pools ---");
         logger.info("  Raft I/O Pool Size:   {}", getRaftIoPoolSize());
         logger.info("  Raft I/O Queue Size:  {}", getRaftIoQueueSize());

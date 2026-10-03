@@ -294,7 +294,6 @@ class QuorusAgentTest {
                 .jobPollingInitialDelayMs(1)
                 .jobPollingIntervalMs(20)
                 .registrationRetryIntervalMs(20)
-                .version("1.0.0-TEST")
                 .build();
     }
 

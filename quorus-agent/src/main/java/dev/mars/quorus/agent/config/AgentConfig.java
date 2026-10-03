@@ -17,6 +17,7 @@
 package dev.mars.quorus.agent.config;
 
 import dev.mars.quorus.config.LayeredProperties;
+import dev.mars.quorus.config.ProductVersion;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,7 +59,6 @@ public final class AgentConfig {
             Map.entry("quorus.agent.heartbeat.interval-ms", "HEARTBEAT_INTERVAL"),
             Map.entry("quorus.agent.http.connection-timeout-ms", "HTTP_CONNECTION_TIMEOUT_MS"),
             Map.entry("quorus.agent.http.idle-timeout-ms", "HTTP_IDLE_TIMEOUT_MS"),
-            Map.entry("quorus.agent.version", "AGENT_VERSION"),
             Map.entry("quorus.agent.protocols", "SUPPORTED_PROTOCOLS"));
 
     private final String profile;
@@ -114,10 +114,6 @@ public final class AgentConfig {
                     "Tenant ID not configured. Set quorus.agent.tenant.id or AGENT_TENANT_ID env var.");
         }
         return tenantId;
-    }
-
-    public String getVersion() {
-        return getString("quorus.agent.version", "1.0.0");
     }
 
     // ==================== Controller Connection ====================
@@ -377,7 +373,7 @@ public final class AgentConfig {
         logger.info("  Region:               {}", getRegion());
         logger.info("  Datacenter:           {}", getDatacenter());
         logger.info("  Supported Protocols:  {}", getSupportedProtocols());
-        logger.info("  Version:              {}", getVersion());
+        logger.info("  Version:              {}", ProductVersion.get());
         logger.info("  --- Transfer ---");
         logger.info("  Max Concurrent:       {}", getMaxConcurrentTransfers());
         logger.info("  --- Heartbeat ---");

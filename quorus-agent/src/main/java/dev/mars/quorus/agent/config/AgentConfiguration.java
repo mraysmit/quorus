@@ -19,6 +19,7 @@ package dev.mars.quorus.agent.config;
 import dev.mars.quorus.agent.AgentCapabilities;
 import dev.mars.quorus.agent.AgentSystemInfo;
 import dev.mars.quorus.agent.AgentNetworkInfo;
+import dev.mars.quorus.config.ProductVersion;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -52,7 +53,6 @@ public class AgentConfiguration {
     private final long heartbeatInterval;
     private final int httpConnectionTimeout;
     private final int httpIdleTimeout;
-    private final String version;
     private final String tenantId;
     private final String securityProfile;
     private final boolean allowInsecure;
@@ -91,7 +91,6 @@ public class AgentConfiguration {
         this.heartbeatInterval = builder.heartbeatInterval;
         this.httpConnectionTimeout = builder.httpConnectionTimeout;
         this.httpIdleTimeout = builder.httpIdleTimeout;
-        this.version = builder.version;
         this.tenantId = builder.tenantId;
         this.securityProfile = builder.securityProfile;
         this.allowInsecure = builder.allowInsecure;
@@ -195,7 +194,8 @@ public class AgentConfiguration {
     public long getHeartbeatInterval() { return heartbeatInterval; }
     public int getHttpConnectionTimeout() { return httpConnectionTimeout; }
     public int getHttpIdleTimeout() { return httpIdleTimeout; }
-    public String getVersion() { return version; }
+    /** The product version of this build; not a setting (DR-Q5). */
+    public String getVersion() { return ProductVersion.get(); }
     public String getSecurityProfile() { return securityProfile; }
     public boolean isAllowInsecure() { return allowInsecure; }
     public boolean isControllerTlsEnabled() { return controllerTlsEnabled; }
@@ -235,7 +235,6 @@ public class AgentConfiguration {
         private long heartbeatInterval;
         private int httpConnectionTimeout;
         private int httpIdleTimeout;
-        private String version;
         private String securityProfile;
         private boolean allowInsecure;
         private boolean controllerTlsEnabled;
@@ -274,7 +273,6 @@ public class AgentConfiguration {
             this.heartbeatInterval(config.getHeartbeatIntervalMs());
             this.httpConnectionTimeout(config.getHttpConnectionTimeoutMs());
             this.httpIdleTimeout(config.getHttpIdleTimeoutMs());
-            this.version(config.getVersion());
             this.securityProfile(config.getSecurityProfile());
             this.allowInsecure(config.isAllowInsecure());
             this.controllerTlsEnabled(config.isControllerTlsEnabled());
@@ -318,7 +316,6 @@ public class AgentConfiguration {
         public Builder heartbeatInterval(long heartbeatInterval) { this.heartbeatInterval = heartbeatInterval; return this; }
         public Builder httpConnectionTimeout(int httpConnectionTimeout) { this.httpConnectionTimeout = httpConnectionTimeout; return this; }
         public Builder httpIdleTimeout(int httpIdleTimeout) { this.httpIdleTimeout = httpIdleTimeout; return this; }
-        public Builder version(String version) { this.version = version; return this; }
         public Builder securityProfile(String securityProfile) { this.securityProfile = securityProfile; return this; }
         public Builder allowInsecure(boolean allowInsecure) { this.allowInsecure = allowInsecure; return this; }
         public Builder controllerTlsEnabled(boolean enabled) { this.controllerTlsEnabled = enabled; return this; }

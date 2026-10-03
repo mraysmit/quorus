@@ -79,7 +79,6 @@ class TransferExecutionServiceTest {
                 .controllerUrl("http://localhost:8080/api/v1")
                 .maxConcurrentTransfers(2)
                 .heartbeatInterval(1000L)
-                .version("1.0.0-TEST")
                 .build();
     }
 }
