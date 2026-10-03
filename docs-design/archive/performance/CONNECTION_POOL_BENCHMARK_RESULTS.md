@@ -1,3 +1,5 @@
+> **Archived 2026-10-03.** Measured `ConnectionPoolService`, which was never used by a transfer and was deleted in `5a4274f` (RT-03a, 2026-09-26). The benchmark class it names no longer exists, and its framing draws on another project (PeeGeeQ). Current benchmarks: [QUORUS_PERFORMANCE_BENCHMARKS.md](../../performance/QUORUS_PERFORMANCE_BENCHMARKS.md).
+
 # Connection Pool Optimization - Benchmark Results
 
 **Date**: 2025-12-17  

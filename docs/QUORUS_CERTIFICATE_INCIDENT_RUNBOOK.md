@@ -2,8 +2,8 @@
 
 # Quorus Certificate and Trust Incident Runbook
 
-**Version:** 1.2
-**Date:** 2026-09-25
+**Version:** 1.3  
+**Date:** 2026-10-03  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Status:** Phase 1 operational runbook  
@@ -44,9 +44,9 @@ Do not infer that a transfer failed merely because its agent lost control connec
 
 ### 4.1 Gateway certificate
 
-1. Use a separately authenticated, actively elevated `SECURITY` identity to replace the runtime revocation set through `PUT /api/v1/security/trust/revocations` on **every controller**, retaining all earlier serials and adding the compromised serial under a new trust-policy version. Runtime revocation is node-local, in-memory state: it is not replicated and is lost on restart. Leading zeroes and colon separators in certificate serials are ignored.
+1. Use a separately authenticated, actively elevated `SECURITY` identity to replace the runtime revocation set through `PUT /api/v1/security/trust/revocations` on **every controller**, leader and followers alike, retaining all earlier serials and adding the compromised serial under a new trust-policy version. Runtime revocation is node-local, in-memory state: it is not replicated and is lost on restart. Leading zeroes and colon separators in certificate serials are ignored. See [§4.5](#45-revocation-request) for the request.
 2. Add the complete revoked-serial set to `quorus.security.revoked-certificate-serials` in the configuration supplied to every controller before restarting any controller.
-3. Confirm the old certificate is rejected on its next request to every controller, including over existing TLS connections, and preserve each `SECURITY_CONFIGURATION_CHANGE` audit event.
+3. Confirm the old certificate is rejected on its next request to every controller, including over existing TLS connections, and preserve each `SECURITY_CONFIGURATION_CHANGE` audit event. Each event lists the complete revoked-serial set that controller applied.
 4. Remove the compromised subject from the configured trusted gateway list and revoke the certificate in PKI.
 5. Deploy a trust bundle or CRL that rejects it, then rolling-restart controllers so the subject and PEM/CRL changes take effect.
 6. Confirm requests using the old certificate fail before identity headers are evaluated.
@@ -83,7 +83,25 @@ Do not infer that a transfer failed merely because its agent lost control connec
 7. Remove the old CA from trust bundles through another one-at-a-time rolling restart.
 8. Verify the revoked or old certificate can no longer join.
 
+Runtime serial revocation on the Raft transport is checked only when a peer calls in. A node whose certificate is revoked cannot send votes or entries to the others, but the leader still sends entries to it and counts its replies (register item `SEC-10`). Stop an affected node rather than relying on revocation to exclude it from replication.
+
 Do not perform concurrent majority restarts. Certificate and PEM trust-bundle reload still requires process restart. The Phase 1 suite proves old/new Raft certificate overlap and runtime old-peer revocation while the rotated peer remains trusted; the deployment team must repeat the controlled sequence against its selected PKI and topology.
+
+### 4.5 Revocation request
+
+The request replaces the controller's whole runtime revocation set. Send the complete set every time:
+
+```json
+{
+  "trustBundleVersion": "incident-2026-0142",
+  "revokedCertificateSerials": ["01:AF:44", "3C9D02"]
+}
+```
+
+- `revokedCertificateSerials` is required. A request without it, or with a value that is not an array, is rejected with `400` and changes nothing. An empty array clears every runtime and configured revocation on that controller.
+- The caller needs the `security:trust:write` scope with active elevation. Only gateway-asserted identities can hold elevation: the trusted gateway sends `X-Quorus-Elevation-Expires-At` with the other `X-Quorus-*` assertion headers.
+- The controller applies the change only after its `SECURITY_CONFIGURATION_CHANGE` audit record is durable. If the audit write fails, the request fails and the previous set stays in force. Retry on that controller.
+- A `200` response reports `trustBundleVersion`, `loadedAt` and `revokedCertificateCount`. Check the count against the set you sent.
 
 ## 5. Expiry and hostname incidents
 

@@ -2,8 +2,8 @@
 
 # Quorus Performance Benchmarks
 
-**Version:** 2.2  
-**Date:** 2026-09-28  
+**Version:** 2.3  
+**Date:** 2026-10-03  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Status:** Specification. B-08 (four scenarios) and B-09 (commit latency) are implemented and have recorded baselines; the other benchmarks are not yet implemented. Results are
@@ -68,7 +68,7 @@ Levels: **micro** (one method, JMH), **component** (one module against real loca
 | **B-05** | component | Workflow scheduling and control latency | `SimpleWorkflowEngine` against a local HTTP server | 10 groups × 5 transfers of 1 MB; `parallelism` 1, 2, 5; dependency chains | wall time; transfers/s; cancel and timeout latency | Baseline for `RT-04`; Phase 7 |
 | **B-06** | component | Agent cancellation and shutdown latency | `QuorusAgent` shutdown with transfers blocked in socket reads | 1, 10, 50 stalled transfers | time from shutdown to last transfer ended | The `RT-05` claim that a blocked transfer stops at once |
 | **B-07** | process | Agent footprint | Agent process | idle; 10 and 50 concurrent 100 MB transfers | platform and virtual thread counts; heap; RSS; CPU | Baseline; capacity planning |
-| **B-08** | process | Controller HTTP API throughput and latency | Controller processes from the host-built jar: `POST /api/v1/transfers`, heartbeats, agent job polling, transfer reads and (later) status reports, over TLS 1.3 with required client certificates, authentication, authorization and audit | 10, 100, 500 concurrent clients; 60 s steady state | requests/s; p50, p95, p99; error rate | `RT-Q2`: `RT-06` must prove the JDK `HttpsServer` on throughput. Run on the Vert.x controller **before** `RT-06`, then after |
+| **B-08** | process | Controller HTTP API throughput and latency | Controller processes from the host-built jar: `POST /api/v1/transfers`, heartbeats, agent job polling, transfer reads and (later) status reports, over TLS 1.3 with required client certificates, authentication, authorization and audit | 10, 100, 500 concurrent clients; 30 s steady state after a 5 s warm-up (harness defaults, `--duration-seconds` and `--warmup-seconds`) | requests/s; p50, p95, p99; error rate | `RT-Q2`: `RT-06` must prove the JDK `HttpsServer` on throughput. Run on the Vert.x controller **before** `RT-06`, then after |
 | **B-09** | component | Raft command commit latency and failover | Three engine nodes in one JVM over real gRPC with TLS 1.3 mutual authentication on loopback, durable raftlog WALs, the controller's state machine | 2,000 small commands per concurrency level (1, 10, 50); 100 induced leader failures | submit-to-commit p50, p95, p99; write-resume time | Architecture Specification §13 *Leader failover*; baseline for `CE-07` to `CE-11` (QRaft) |
 | **B-10** | process | End-to-end transfer throughput and correctness | Controller cluster, N agents, file servers | 1,000 consecutive assigned transfers; mixed sizes and protocols | transfers/s; submit-to-terminal p50, p95, p99; terminal-state correctness; progress freshness | Architecture Specification §13 *End-to-end lifecycle* and *Progress freshness*; Phase 12 |
 | **B-11** | process | Soak | As B-10 | 24 hours at 50% of the B-10 peak | throughput drift; heap, RSS and thread trends; error rate | Phase 12 soak report |
@@ -77,8 +77,10 @@ Levels: **micro** (one method, JMH), **component** (one module against real loca
 
 - **Micro (B-01):** JMH, with forks, warm-up and measurement iterations stated in the result.
 - **Component (B-02 to B-06):** the benchmark drives the Quorus API directly against real local servers
-  (the JDK HTTP(S) server, Testcontainers for FTP, SFTP, SMB and Vault). It records latencies in an
-  HDR histogram and samples heap, RSS and threads.
+  (the JDK HTTP(S) server, Testcontainers for FTP, SFTP, SMB and Vault). The target is to record
+  latencies in an HDR histogram and sample heap, RSS and threads. The one component benchmark built so far,
+  B-09, keeps every sample in a sorted array (`Latencies`) and does not yet sample heap, RSS or threads;
+  the module has no HdrHistogram or JMH dependency.
 - **Process (B-07 to B-11):** a harness starts the controller and agent processes from their host-built
   jars (or the host-built images), generates load through the public API, and collects the same
   measurements from each process. Correctness is checked from controller state, not assumed.

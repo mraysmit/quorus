@@ -1,3 +1,5 @@
+> **Archived 2026-10-03.** Investigation notes for a pure-ftpd test fixture that has since been replaced: the FTPS tests now use a locally built `delfer/alpine-ftp-server` image with dynamic ports (`quorus-core/src/test/resources/docker-compose-ftps-test.yml`) and the commons-net `FTPSClient`. Its "In Progress" status is historical.
+
 # FTPS Integration Test Investigation Notes
 
 **Date:** 2026-02-12  

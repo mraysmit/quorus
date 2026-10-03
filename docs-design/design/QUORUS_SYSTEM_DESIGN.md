@@ -2,64 +2,75 @@
 
 # Quorus Comprehensive System Design
 
-**Version:** 3.8
-**Date:** 2026-09-28  
+**Version:** 4.0  
+**Date:** 2026-10-03  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
-**Updated:** 2026-09-28
-**Status:** Non-normative target-state vision  
-**Scope:** Historical design material, current concepts, and future architecture
+**Status:** Non-normative target-state vision, with current sections marked  
+**Scope:** Design rationale and target-state architecture; current behaviour is summarised only where it explains the design
 
 > [!IMPORTANT]
-> This document contains implemented features, historical design material, and future concepts. It is not the current runtime contract and its performance, security, compliance, scaling, and delivery statements are not guarantees. The canonical architecture and release requirements are defined in [Quorus Architecture Specification](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md), and the complete normative API contract is defined in [Quorus REST API Specification](../../docs/QUORUS_REST_API_SPECIFICATION.md). Endpoint examples below are target-state illustrations unless explicitly identified as current. Where the documents conflict, the canonical specifications take precedence.
+> This document is a design narrative, not the runtime contract. The canonical description of current behaviour is the [Quorus Architecture Specification](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md) (normative, including the capability status in its §3), and the current HTTP API is defined by the [OpenAPI contract](../../quorus-controller/src/main/resources/openapi/quorus-controller-v1.yaml); the [REST API Specification](../../docs/QUORUS_REST_API_SPECIFICATION.md) defines the target API. Where this document and those documents conflict, the canonical specifications take precedence. Nothing here is a performance, security, compliance, scaling or delivery guarantee.
+>
+> Each top-level section carries a status badge:
+>
+> - **Current** — checked against the source tree on 2026-10-03 and matches it;
+> - **Partly current** — the parts written in the present tense match the source; the parts marked *Target* do not exist yet;
+> - **Target** — planned, not built. Where a register or plan item exists, the badge names it.
+>
+> What is current, in one paragraph: each controller is one JVM running `QuorusControllerVerticle`, which starts an embedded Vert.x `HttpApiServer`, a gRPC Raft transport and server, and a `RaftNode` whose committed commands are applied to `QuorusStateStore` (the `RaftLogApplicator`); the Raft log and metadata are stored by `raftlog-core` 1.2.0 through `RaftLogStorageAdapter`, and membership is static. The controller does **not** run the workflow engine, the tenant service or the transfer engine, runs **no** assignment scheduler (`JobAssignmentService` and `AgentSelectionService` are never constructed; register `ENG-01`) and **no** route-trigger evaluator (`ARCH-04`); a submitted transfer is assigned only by `POST /api/v1/assignments`. Agents poll for their assignments and execute transfers through the `quorus-core` protocol adapters. Consensus is moving to the generic QRaft engine ([ADR-0011](../architecture-decisions/ADR-0011-CONSENSUS-VIA-QRAFT-GENERIC-ENGINE.md)) and the controller off Vert.x ([ADR-0012](../architecture-decisions/ADR-0012-JAVA-RUNTIME-AND-STRUCTURED-CONCURRENCY.md), plan item `RT-06`).
 
 > [!NOTE]
-> Phase 1 now includes a fail-closed production security foundation: TLS 1.3 mutual authentication for controller HTTP and Raft, certificate-authenticated agent HTTP clients, trusted gateway and direct-workload identity resolution, tenant-aware policy middleware, effective-identity and authorization-explanation REST resources, runtime revocation shared by HTTP and Raft, certificate-expiry and trust-version telemetry, controlled certificate-overlap tests, and separately persisted tamper-evident operational and retained audit chains. The repository technical gate is complete. Governed service-connection security is delivered in Phase 4. Corporate PKI accreditation, secure agent enrollment and deployment entitlement binding, searchable/WORM evidence services, and full enterprise release validation remain later-phase or deployment responsibilities.
-
-> [!NOTE]
-> The current Phase 2 checkpoint includes immutable authoritative transfer attempts, monotonically increasing fencing generations and report sequences, leases, atomic assignment and first-attempt creation, attempt-aware polling and reporting, tenant-checked attempt-history APIs, and one replicated lifecycle command that atomically updates attempt, assignment, transfer status, and progress. Exact terminal report retries are idempotent through the HTTP boundary. Phase 2 remains open for automatic lease expiry and reassignment, external lease renewal, submission idempotency, retry policy, integrity verification, governed publication, and reconciliation.
-
-> [!NOTE]
-> Phase 4 is implemented. Production submissions require a tenant-scoped service connection alias, remote path, and agent pool; downloads bind the alias to the remote source and uploads bind it to the remote destination while preserving the agent-local endpoint. Direct URIs are development-only and URI user-info is rejected for both endpoints in the core model and at controller ingress. Raft-backed service connections and opaque Vault KV v2 references carry ownership, service identity, protocol, path, direction, pool, network-zone, DNS/CIDR/port, and trust policy. The controller authorizes before submission; scheduling binds pool and zone to the registered agent; and the executing agent independently verifies its configured identity attributes, policy version, digest, DNS pins, path, and direction before retrieving a short-lived secret. Agent-local paths are confined to separate upload and download roots with canonical and symbolic-link escape checks. HTTPS, FTPS, and SFTP sockets connect to the agent-approved DNS address while retaining the service hostname for TLS/SNI or SSH identity verification. SFTP host keys are pinned, HTTPS and FTPS enforce PKIX with approved trust-anchor and optional leaf pins, FTP passive bounce is prevented, and governed Kerberos SMB/NFS mounts fail closed without encrypted-authenticated mount attestation. Policy-only and active route validation, accurate authorization/use/expiry events, migration scanning, redaction, and snapshot restoration are covered by tests written first.
-
-> [!NOTE]
-> The current Phase 3 TDD checkpoint persists business service, owner, criticality, environment, processing date, expected start, required completion, and runbook context through Raft and exposes a tenant-checked per-transfer progress API with real last-progress time, explicit missing/stale telemetry, governed freshness/stall windows, stable stall-onset and duration semantics, known/unknown size semantics, active attempt and agent, deadline condition, and explicitly qualified rate/ETA output. The ordered event resource now covers the canonical submission, assignment, acceptance, start, and progress prefix, carries attempt/agent/progress correlation, and has explicit snapshot reset/restore proof. This is still an initial operator read model: durable stall event detection, remaining lifecycle events, configurable deadline-risk prediction, queries, timelines, streaming, alert lifecycle, retention, and service reporting remain open.
+> **Archived sections.** Version 4.0 moved the sections that were superseded, had no basis in the code, duplicated the Architecture Specification, or described technology Quorus does not use (PostgreSQL, Redis, etcd, Kubernetes, SQL schemas, LDAP/SAML/Kerberos, the changelog and the file-organisation tree) to [QUORUS_SYSTEM_DESIGN_ARCHIVED_SECTIONS.md](../archive/QUORUS_SYSTEM_DESIGN_ARCHIVED_SECTIONS.md), verbatim. The former Phase 1–4 status notes moved there too; the specification's §3 is the status of record.
 
 ## Technology Stack
 
+**Status: Current.** Versions checked against the root and module `pom.xml` files on 2026-10-03.
+
 | Technology | Version | Purpose |
 |------------|---------|---------|
-| **Java** | 27 | Runtime platform and repository build baseline (`maven.compiler.release` 27) |
-| **Vert.x** | 5.0.8 | `quorus-controller` only: HTTP server and async operations, until plan item RT-06 moves the controller off it ([ADR-0012](../architecture-decisions/ADR-0012-JAVA-RUNTIME-AND-STRUCTURED-CONCURRENCY.md)); no other module uses Vert.x |
-| **gRPC** | 1.68.1 | High-performance RPC for Raft consensus transport |
-| **Protocol Buffers** | 3.25.5 | Binary serialization for Raft messages |
-| **Jackson** | 2.18.2 | JSON serialization for REST API |
-| **JUnit** | 5.10.1 | Testing framework |
-| **TestContainers** | 2.0.2 | Docker-based integration testing |
-| **Maven** | 3.9+ | Build and dependency management |
+| **Java** | 27 | Runtime platform and repository build baseline (`java.version` 27) |
+| **Vert.x** | 5.0.8 | `quorus-controller` only (and the profile-only `quorus-benchmarks`, which drives the controller's Raft engine): HTTP server and the in-repository Raft engine, until plan item RT-06 moves the controller off it ([ADR-0012](../architecture-decisions/ADR-0012-JAVA-RUNTIME-AND-STRUCTURED-CONCURRENCY.md)); `quorus-core`, `quorus-workflow`, `quorus-tenant`, `quorus-agent` and `quorus-integration-examples` have no Vert.x |
+| **raftlog-core** | 1.2.0 | Raft write-ahead log and metadata storage (`io.github.mraysmit`, from Maven Central), used through `RaftLogStorageAdapter`. Consensus is to move to the generic QRaft engine ([ADR-0011](../architecture-decisions/ADR-0011-CONSENSUS-VIA-QRAFT-GENERIC-ENGINE.md)) |
+| **gRPC** | 1.68.1 | Raft RPC transport between controllers |
+| **Protocol Buffers** | 3.25.5 | Raft messages and replicated command encoding |
+| **Jackson** | 2.19.4 | JSON serialization for the REST API and snapshots |
+| **OpenTelemetry** | 1.59.0 | Metrics and tracing; Prometheus exporter |
+| **JUnit** | 5.14.3 | Testing framework |
+| **Testcontainers** | 2.0.3 | Docker-based integration testing |
+| **Maven** | — | Build and dependency management (the repository pins no Maven version) |
+
+There is no PostgreSQL, Redis, etcd or other database in any module: the Raft log and its snapshots are the only controller state authority ([specification §5.1](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md#51-source-of-truth-rule)).
 
 ## Overview
 
-This document describes a target-state enterprise file-transfer system designed for high reliability, scalability, and multi-tenant operation within corporate network environments. The current Quorus runtime has route configuration and lifecycle APIs, but autonomous route-trigger evaluation, complete tenant security, and agent-to-agent transfer semantics are not implemented. Current capabilities and release blockers are defined only by the canonical architecture specification.
+**Status: Partly current.**
+
+This document describes a target-state enterprise file-transfer system designed for high reliability, scalability, and multi-tenant operation within corporate network environments. The current Quorus runtime has route configuration and lifecycle APIs, but autonomous route-trigger evaluation, automatic assignment, complete tenant security, and agent-to-agent transfer semantics are not implemented. Current capabilities and release blockers are defined only by the canonical architecture specification.
 
 ## Executive Synopsis
 
-- **Mission & Scope**: Provide secure, controller-first orchestration for high-throughput, internal corporate transfers spanning data-center sync, departmental distribution, ETL staging, and compliance-driven backups. Transfers are orchestrated through predefined routes that define source and destination agents, with multiple trigger mechanisms (event-based, time-based, interval-based, batch-based). Reliability is anchored by Raft consensus, while extensibility comes from REST APIs plus declarative YAML workflows and route configurations.
+**Status: Partly current.** The mission, pillars and use cases are target state; the controller and module descriptions are current.
+
+- **Mission & Scope (Target)**: Provide secure, controller-first orchestration for high-throughput, internal corporate transfers spanning data-center sync, departmental distribution, ETL staging, and compliance-driven backups. In the target design, transfers are orchestrated through predefined routes that define source and destination agents, with multiple trigger mechanisms (event-based, time-based, interval-based, batch-based); today routes are stored configuration only and no trigger is evaluated (`ARCH-04`). Reliability is anchored by Raft consensus, while extensibility comes from REST APIs plus declarative YAML workflows and route configurations.
 - **Target-State Platform Pillars**: (1) Workflow engine with dependency graphs, dry/virtual runs, and templating. (2) Multi-tenant governance with hierarchical quotas and policy inheritance. (3) Transfer-process observability supported by metrics, traces, logs, predictive ETAs, deadline risk, stall detection, alerts, and operator timelines. (4) Explicit enterprise trust boundaries using authenticated identity, authorization, encryption, peer verification, secret references, and audit. These are requirements, not current compliance or implementation claims.
-- **Controller-First Architecture**: Every controller node embeds the HTTP API, Raft engine, scheduler, and state machine—removing the API-first bottleneck. The current Raft membership is static; adding or removing controllers live is not supported. Leader failover timing is configuration-dependent and should not be treated as a fixed sub-second guarantee.
-- **Module Snapshot**:
+- **Controller-First Architecture (Current)**: Every controller node embeds the HTTP API, the Raft engine and the replicated state store (`QuorusStateStore`) in one JVM, so there is no separate API tier. There is no assignment scheduler in the controller (`ENG-01`). The current Raft membership is static; adding or removing controllers live is not supported. Leader failover timing is configuration-dependent and should not be treated as a fixed sub-second guarantee.
+- **Module Snapshot (Current)**:
 
   | Module | Purpose | Key Classes |
   |--------|---------|-------------|
-  | `quorus-core` | Transfer primitives, protocol adapters (`HttpTransferProtocol`, `SftpTransferProtocol`, `FtpTransferProtocol`, `SmbTransferProtocol`), blocking `SimpleTransferEngine` that runs each transfer on the calling thread under a concurrency limit, with retries | `TransferEngine`, `ProtocolFactory`, `TransferJob`, `TransferRequest` |
-  | `quorus-workflow` | YAML parsing via `YamlWorkflowDefinitionParser`, validation with `WorkflowSchemaValidator`, dependency resolution via `DependencyGraph` | `WorkflowEngine`, `SimpleWorkflowEngine`, `WorkflowDefinition`, `TransferGroup` |
-  | `quorus-tenant` | Tenant registry, quotas via `ResourceManagementService`, hierarchical tenant model | `TenantService`, `SimpleTenantService`, `Tenant`, `TenantConfiguration` |
-  | `quorus-controller` | Vert.x 5 verticle runtime with gRPC Raft transport, `RaftNode` consensus, embedded `HttpApiServer` | `QuorusControllerVerticle`, `GrpcRaftTransport`, `GrpcRaftServer`, `QuorusStateMachine` |
-  | `quorus-agent` | Distributed transfer worker that polls controller for jobs, executes file transfers via protocol adapters, sends heartbeats and status reports | `QuorusAgent`, `JobPollingService`, `TransferExecutionService`, `HeartbeatService`, `AgentRegistrationService` |
+  | `quorus-core` | Transfer primitives, protocol adapters (`HttpTransferProtocol`, `SftpTransferProtocol`, `FtpTransferProtocol`, `SmbTransferProtocol`, `NfsTransferProtocol`), blocking `SimpleTransferEngine` that runs each transfer on the calling thread under a concurrency limit, with retries | `TransferEngine`, `ProtocolFactory`, `TransferJob`, `TransferRequest` |
+  | `quorus-workflow` | YAML parsing via `YamlWorkflowDefinitionParser`, validation with `WorkflowSchemaValidator`, dependency ordering via `DependencyGraph`; runs in-process, not in the controller | `WorkflowEngine`, `SimpleWorkflowEngine`, `WorkflowDefinition`, `TransferGroup` |
+  | `quorus-tenant` | In-process tenant model with hierarchy, and usage and quota checks via `ResourceManagementService`; not used by the controller | `TenantService`, `SimpleTenantService`, `Tenant`, `TenantConfiguration` |
+  | `quorus-controller` | Vert.x 5 verticle runtime with gRPC Raft transport, `RaftNode` consensus, embedded `HttpApiServer` | `QuorusControllerVerticle`, `GrpcRaftTransport`, `GrpcRaftServer`, `RaftNode`, `QuorusStateStore` |
+  | `quorus-agent` | Distributed transfer worker that polls the controller for its assignments, executes file transfers via protocol adapters, sends heartbeats and status reports | `QuorusAgent`, `JobPollingService`, `TransferExecutionService`, `HeartbeatService`, `AgentRegistrationService` |
   | `quorus-integration-examples` | Runnable demos for transfers, workflows, validation scenarios | Generates representative corporate datasets for testing |
-  | `docker/agents`, `docker/compose/*` | Production-like agent fleet, transfer servers, and observability stack | Validates multi-region agents, real protocols (FTP/SFTP/HTTP/SMB), and failover |
+  | `quorus-benchmarks` | Benchmark harness, built only with `-Pbenchmarks` | Not a runtime dependency |
+  | `docker/compose/*` | Compose topologies for controller clusters, protocol test servers and the observability stack | There is no `docker/agents` directory |
 
 ### Primary Use Cases
+
+**Status: Target.**
 
 Quorus is designed primarily for **internal corporate network file transfers**, including:
 
@@ -74,6 +85,8 @@ Quorus is designed primarily for **internal corporate network file transfers**, 
 The target design assumes high-bandwidth, low-latency corporate networks while requiring explicit security at every trust boundary. Internal placement is not itself trusted and does not establish enterprise reliability, monitoring, governance, or compliance.
 
 ## Enterprise Capability Requirements
+
+**Status: Target.** These are requirements, not implementation claims; the third column of the summary gives the current position, and the [Architecture Specification §3](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md#3-capability-status) is the status of record. Delivery is sequenced by the [Enterprise Implementation Plan](../task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md). Requirements the specification already states normatively are listed in [Requirements held by the Architecture Specification](#requirements-held-by-the-architecture-specification) rather than repeated.
 
 An administration or operations user interface is only a presentation and control client. It does not create enterprise capability by itself. The platform services beneath it MUST provide trustworthy identity, authorization, transfer state, telemetry, security controls, audit evidence, recovery behavior, and complete APIs. The canonical implementation status and release consequences remain defined by the [Quorus Architecture Specification](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md) and [Quorus REST API Specification](../../docs/QUORUS_REST_API_SPECIFICATION.md).
 
@@ -90,7 +103,7 @@ An administration or operations user interface is only a presentation and contro
 | Audit, evidence, and data governance | Immutable evidence with retention, integrity, export, classification, residency, and controlled deletion | Required; complete evidence services are not implemented |
 | Tenant and resource governance | Authenticated isolation, hierarchy, quotas, reservations, usage, and inherited policy | Partial; tenant fields are not identities |
 | High availability and disaster recovery | Proven durability, backup, restore, failover, compatibility, RPO, and RTO | Partial; important durability and recovery evidence remains required |
-| Route and workflow operations | Validated, versioned, schedulable, observable, controllable executions | Partial; route triggers and workflow REST resources remain incomplete |
+| Route and workflow operations | Validated, versioned, schedulable, observable, controllable executions | Partial; route CRUD and in-process workflows exist, but no route trigger is evaluated (`ARCH-04`) and there are no workflow REST resources |
 | Protocol and large-file readiness | Secure peer verification, bounded memory, capability discovery, and safe protocol-specific behavior | Partial; adapter limitations remain |
 | Configuration and release governance | Reproducible configuration, drift control, signed releases, safe rollout, and measurable release gates | Required |
 | Enterprise integrations | Events, alert delivery, ITSM, SIEM, schedulers, CMDB, secrets, PKI, KMS, and support tooling | Required for enterprise operations |
@@ -115,87 +128,14 @@ Required capabilities are:
 
 High-risk actions SHOULD require four-eyes approval. This includes production route activation, trust-policy changes, secret-reference changes, agent quarantine release, forced retry after an uncertain external outcome, overwrite publication, evidence deletion, and emergency configuration changes. Approval records MUST identify requester, approver, scope, reason, expiry, resulting version, and audit event.
 
-### Agent Trust, Build, Deployment, and Fleet Lifecycle
+### Requirements held by the Architecture Specification
 
-Every production agent MUST have a controlled lifecycle:
+The Architecture Specification already states the following requirements normatively, so this document no longer repeats them; the former text is in the [archived sections](../archive/QUORUS_SYSTEM_DESIGN_ARCHIVED_SECTIONS.md) (B–E):
 
-1. **Build:** produce a reproducible artifact with a pinned digest, software bill of materials, provenance, vulnerability result, and trusted signature.
-2. **Admission:** reject unsigned, unapproved, incompatible, critically vulnerable, or policy-noncompliant artifacts.
-3. **Enrollment:** use short-lived, single-purpose bootstrap authority to issue a unique workload identity bound to tenant, environment, agent pool, and permitted capabilities.
-4. **Attestation:** record artifact digest, runtime posture, configuration version, host or workload identity, and security-policy result.
-5. **Operation:** report health, capacity, version, capabilities, active attempts, effective policy, certificate expiry, and telemetry freshness.
-6. **Rotation:** renew identities and trust material before expiry without losing control of active work.
-7. **Drain:** stop new assignments, allow governed completion or cancellation of active attempts, and expose drain progress.
-8. **Upgrade:** use canary or staged rollout with compatibility checks, health gates, failure thresholds, pause, and resume.
-9. **Rollback:** return to an approved signed version while preserving assignment and audit evidence.
-10. **Quarantine and revocation:** immediately prevent new work, block service access, revoke credentials, and preserve incident evidence.
-11. **Decommission:** verify drain, revoke all authority, remove inventory eligibility, and retain the required lifecycle history.
-
-Agents SHOULD run as non-root workloads with a read-only filesystem where practical, restricted temporary storage, bounded resources, default-deny network policy, minimal image content, and no embedded credentials. Fleet operations MUST be available through the canonical API and must not depend on direct host access.
-
-### Service Connectivity, Trust, Egress, and Secret Management
-
-Production transfers MUST reference approved service connections rather than arbitrary credential-bearing URIs. A service connection defines:
-
-- tenant, environment, business owner, technical owner, criticality, and data classification;
-- protocol, hostname or service identity, port, and permitted network zone;
-- permitted source or destination paths, shares, buckets, prefixes, and operations;
-- allowed agent pools and transfer directions;
-- TLS certificate, CA, hostname, SSH host key, or pinned fingerprint policy;
-- approved protocol versions, algorithms, ciphers, redirect behavior, and authentication mechanism;
-- opaque secret reference and secrets-provider metadata, never the secret value;
-- timeouts, retry constraints, throughput limits, and maintenance windows;
-- DNS and resolved-address policy that prevents rebinding into forbidden networks;
-- validation, connection-test, last-success, last-failure, and rotation status.
-
-The agent and controller MUST independently enforce the authorized connection policy before secret retrieval and again before connection. The selected agent's registered pool and network zone MUST match the connection. Agent-local upload sources and download destinations MUST remain under separately configured roots after canonical path and symbolic-link resolution. Network adapters MUST bind the actual socket to an address in the approved DNS set while retaining the configured hostname for peer verification. Default-deny egress, service identity verification, remote and local path constraints, and audit MUST prevent an agent from becoming a generic route to enterprise services or its host filesystem.
-
-Secrets SHOULD integrate with enterprise Vault, cloud secrets managers, KMS, or HSM-backed services. Quorus stores only opaque references and redacted metadata. Retrieval, use, failure, rotation, and revocation are audited. Secret values MUST NOT appear in controller state, URIs, workflow definitions, logs, traces, metrics, support bundles, container images, or API responses.
-
-The implemented service-connection authority is tenant-scoped and Raft replicated. Its REST representation includes `serviceConnectionId`, protocol, credential-free endpoint, network zone, allowed path roots, allowed directions, agent pools, owner, environment, classification, opaque `secretReferenceId`, non-secret service identity, authentication type, trust policy, egress policy, policy version, lifecycle status, and timestamps. Secret-reference resources expose provider, path, key, version, expiry, rotation time, and status but can never accept a secret value.
-
-For every governed assignment, the controller resolves DNS through the default-deny hostname, CIDR, and port policy and commits the resolved address set plus a deterministic policy digest. The scheduler admits only an agent whose registered pool and network zone match the connection. The agent receives the redacted authority through its authenticated polling endpoint, recomputes the decision against its own DNS result and deployment-configured pool/zone, and refuses stale versions, changed digests, rebinding, disallowed paths, directions, placement, or local filesystem roots before the provider is invoked. The remote endpoint used by the adapter is reconstructed exclusively from the agent authorization, never from a queued URI. Vault material exists only in closeable agent memory, is injected outside serializable metadata, and is wiped when the transfer future completes.
-
-Protocol enforcement is fail closed: SFTP uses managed SHA-256 host-key pins with password or ephemeral private-key authentication; HTTPS disables redirects and permits Basic or Bearer authentication; FTPS protects control and data channels and permits password authentication. HTTPS, FTPS, and SFTP bind their sockets to an agent-approved address; TLS retains the original hostname for SNI and verification. HTTPS and FTPS perform normal PKIX and hostname verification, restrict the validated chain including a locally selected root normally omitted by servers to approved SHA-256 CA fingerprints, optionally enforce leaf pins, and enforce the configured TLS floor. Clear FTP is not a production service-connection protocol; SMB and NFS require Kerberos policy and explicit encrypted-authenticated mount attestation. Validation results use the fixed stages `POLICY`, `DNS`, `ROUTE`, `NEGOTIATION`, `IDENTITY`, `AUTHENTICATION`, and `AUTHORIZATION`; `probeNetwork=true` performs a bounded active route probe to an approved address, while controller validation never resolves secrets.
-
-### Transfer Correctness, Attempts, Publication, and Reconciliation
-
-Enterprise transfer reliability requires more than a final job status. Each execution MUST have an immutable `attemptId`, assigned agent identity, lease, fencing generation, start and end times, progress sequence, protocol observations, integrity outcome, publication outcome, and terminal reason.
-
-Required behavior includes:
-
-- explicit `SUBMITTED`, validation, queue, assignment, acceptance, running, pause, cancellation, success, failure, timeout, quarantine, and reconciliation states;
-- a required `IN_PROGRESS` acknowledgement before successful completion;
-- monotonic progress reports protected from replay and stale attempts;
-- attempt leases and fencing tokens that reject delayed or superseded agents;
-- idempotent transfer submission and state-changing client operations;
-- classified retry policy with maximum attempts, maximum elapsed time, backoff, jitter, and non-retriable failure categories;
-- destination staging followed by integrity verification and atomic or otherwise explicitly governed publication;
-- overwrite, versioning, duplicate, and partial-file policies;
-- source and destination checksum or digest evidence when required;
-- reconciliation for ambiguous timeouts, lost acknowledgements, expired leases, controller failover, and publication uncertainty;
-- immutable history for every attempt and operator intervention.
-
-Quorus MUST NOT claim exactly-once external execution. A transfer is successful only when the required bytes, integrity verification, and destination publication have completed. Automatic reassignment remains conservative until leases, fencing, idempotent publication, and reconciliation are implemented.
-
-### Transfer Operations Monitoring, Telemetry, and Alerting
-
-File-transfer process health is the primary operational observability outcome. JVM, container, Raft, network, and infrastructure signals are supporting evidence.
-
-For every critical or time-sensitive transfer, operations teams require:
-
-- tenant, business service, operational owner, criticality, processing date, environment, and runbook;
-- expected start, actual start, required completion time, current ETA, time remaining, and risk confidence;
-- source and destination service aliases without exposed credentials;
-- active attempt, assigned agent, queue duration, connection duration, bytes transferred, total bytes, percent complete, rolling throughput, and average throughput;
-- last-progress time, last-telemetry time, freshness state, and explicit unknown-size behavior;
-- retry count, failure classification, next action, and reconciliation state;
-- integrity verification and destination publication state;
-- an ordered end-to-end timeline covering submission through final publication;
-- operational conditions `ON_TRACK`, `AT_RISK`, `LATE`, `STALLED`, `DEGRADED`, and `UNKNOWN` independently of lifecycle state;
-- actionable alerts containing evidence, affected resources, deadline impact, owner, severity, runbook, acknowledgement, suppression, escalation, notification delivery, and resolution.
-
-The platform MUST provide durable event queries and a resumable filtered event stream. Stream consumers use cursor or event identifiers, bounded replay, gap notification, authorization re-evaluation, and backpressure protection. Loss of telemetry is itself an observable condition and MUST NOT be represented as zero progress.
+- agent trust, build, deployment and fleet lifecycle — [specification §10.7](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md#107-secure-agent-build-and-deployment-lifecycle);
+- service connectivity, trust, egress and secret management — [specification §10.2–§10.6](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md#102-trust-zones-and-connection-flows);
+- transfer correctness, attempts, publication and reconciliation — [specification §6](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md#6-distributed-transfer-contract);
+- transfer operations monitoring, telemetry and alerting — [specification §12](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md#12-transfer-operations-monitoring-observability-and-telemetry).
 
 ### Complete REST, Event, and Automation Contract
 
@@ -289,20 +229,7 @@ Creating a route definition does not mean an autonomous route service is operati
 
 ### Protocol Security, Capability, and Large-File Readiness
 
-Every protocol adapter MUST publish its verified capabilities and fail closed when a requested control is unsupported. Capability metadata includes upload, download, pause, resume, known-size behavior, checksums, atomic publication, overwrite modes, proxy support, authentication mechanisms, maximum tested object size, bounded-memory behavior, and retry safety.
-
-Required protocol controls include:
-
-- HTTPS hostname and certificate verification, approved roots, minimum TLS policy, restricted redirects, and bounded streaming;
-- SFTP strict host-key verification, managed known-hosts or pinned fingerprints, approved keys and algorithms;
-- FTPS peer verification, explicit mode policy, bounded data connections, and secure fallback behavior;
-- SMB/CIFS signing and encryption requirements, share and path constraints, and domain authentication policy;
-- NFS export and mount policy, path enforcement, identity mapping, and network-zone restrictions;
-- streaming transfer with bounded buffers and backpressure for large files;
-- protocol-specific interruption, partial-file, cleanup, and safe-resume semantics;
-- conformance and interoperability tests against supported server versions.
-
-Cloud-storage adapters such as S3, Azure Blob, and Google Cloud Storage require separate implementation, security, identity, multipart, integrity, retry, and publication contracts before being advertised as supported.
+Stated normatively in [specification §10.4](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md#104-protocol-security-requirements); the former text is archived section F. Cloud-storage adapters (S3, Azure Blob, Google Cloud Storage) are not registered by `ProtocolFactory` and remain planned.
 
 ### Configuration, Change, Release, and Environment Promotion
 
@@ -370,6 +297,8 @@ The interface is sequenced after the identity, transfer correctness, telemetry, 
 
 ## System Architecture
 
+**Status: Partly current.** The controller, request flow, replicated state and module structure are current; the regional agent placement is an illustration.
+
 ### Controller-First Architecture
 
 Quorus follows a **controller-first architecture** where each Quorus Controller is a self-contained process with an embedded `HttpApiServer`. A correctly configured static quorum is designed to tolerate the supported node failures. This does not provide live membership scaling or remove the need to prove storage, routing, quorum, and recovery behavior.
@@ -377,10 +306,10 @@ Quorus follows a **controller-first architecture** where each Quorus Controller 
 #### Core Design Principles
 
 1. **Controller Ownership**: Each Quorus Controller owns its `HttpApiServer` as an embedded capability
-2. **Self-Contained Processes**: Each Quorus Controller container is independently deployable and scalable
-3. **Distributed Consensus**: Raft consensus (via `RaftNode` and `GrpcRaftTransport`) ensures data consistency across the 3-node Quorus Controller cluster
+2. **Self-Contained Processes**: Each Quorus Controller container is independently deployable; the cluster size is fixed at startup
+3. **Distributed Consensus**: Raft consensus (via `RaftNode` and `GrpcRaftTransport`) keeps the committed controller state consistent across the static controller membership (three nodes in the reference topology)
 4. **Static Membership Scaling**: Size controller membership before startup; live add/remove operations require a future dynamic-membership design
-5. **No Single Point of Failure**: Any single Quorus Controller can fail; the remaining 2 maintain quorum
+5. **No Single Point of Failure for metadata coordination**: Any single controller of three can fail and the other two keep quorum. Load balancers, storage mounts, DNS and certificate authorities need their own availability design ([specification §11](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md#11-availability-and-failure-model))
 
 ### High-Level Distributed Architecture
 
@@ -390,47 +319,53 @@ The diagram below shows how Quorus organizes its distributed file transfer syste
 
 | Tier | Components | Responsibility |
 |------|------------|----------------|
-| **Clients** | CLI, REST API, Web Dashboard, YAML workflows | Submit transfer requests and workflow definitions to the Quorus Controller cluster |
-| **Control Plane** | 3-node Quorus Controller cluster (`quorus-controller1`, `quorus-controller2`, `quorus-controller3`) | Leader election via `RaftNode`, state replication via `GrpcRaftTransport`, workflow orchestration, agent coordination |
-| **Agent Fleet** | Quorus Agents deployed across regions (APAC-East, APAC-West, EU, etc.) | Execute file transfers using protocol adapters (`HttpTransferProtocol`, `SftpTransferProtocol`, `FtpTransferProtocol`, `SmbTransferProtocol`) |
+| **Clients** | HTTP clients of the controller API (operators, automation, gateways). There is no Quorus CLI or web dashboard; YAML workflows run in-process through `quorus-workflow`, not through the controller | Submit transfer requests, assignments, routes and service connections to the controller cluster |
+| **Control Plane** | 3-node Quorus Controller cluster (compose containers `quorus-controller1`–`3`, node IDs `controller1`–`3`) | Leader election via `RaftNode`, state replication via `GrpcRaftTransport`, the HTTP API, and the replicated state in `QuorusStateStore` |
+| **Agent Fleet** | Quorus Agents deployed where the data is (the regions below are illustrative) | Execute file transfers using protocol adapters (`HttpTransferProtocol`, `SftpTransferProtocol`, `FtpTransferProtocol`, `SmbTransferProtocol`, `NfsTransferProtocol`) |
 
 #### Request Flow
 
-1. **Client Request**: A CLI command, REST API call, or YAML workflow submission arrives at the `nginx` load balancer (port 8080)
-2. **Load Balancer Routing**: `nginx` forwards the request to one of the three Quorus Controllers (`quorus-controller1:8080`, `quorus-controller2:8080`, or `quorus-controller3:8080`)
-3. **Leader Handling**: If a current write request reaches a FOLLOWER, its `HttpApiServer` returns `503 NOT_LEADER`. The implementation does not issue an HTTP redirect. Only the LEADER's `RaftNode` can accept write operations.
-4. **State Replication**: The LEADER appends the operation to its Raft log and replicates it to `quorus-controller2` and `quorus-controller3` via `GrpcRaftTransport` (port 9080)
-5. **Commit & Apply**: Once 2 of 3 controllers acknowledge the entry, the LEADER commits it. `QuorusStateMachine.apply()` updates the replicated state stores.
-6. **Agent Assignment**: The Workflow Engine (`YamlWorkflowDefinitionParser`, `DependencyGraph`) assigns transfer jobs to Quorus Agents based on region, available capacity, and protocol support
-7. **Transfer Execution**: Quorus Agents poll for jobs via `GET /api/v1/agents/{agentId}/jobs`, execute transfers using `SimpleTransferEngine`, and report compatibility status via `POST /api/v1/jobs/{jobId}/status`
+1. **Client Request**: A REST API call arrives at the `nginx` load balancer (port 8080 in the `controller-first` compose topology)
+2. **Load Balancer Routing**: `nginx` forwards the request to one of the three controllers (upstreams `controller1:8080`, `controller2:8080`, `controller3:8080`)
+3. **Leader Handling**: `LeaderGuardHandler` rejects a write (`POST`/`PUT`/`DELETE`/`PATCH` under `/api/`) on a FOLLOWER with `503 NOT_LEADER` and the known leader ID, or `503 NO_LEADER`. The implementation does not issue an HTTP redirect. Only the LEADER's `RaftNode` accepts commands.
+4. **State Replication**: The LEADER's handler calls `RaftNode.submitCommand(RaftCommand)`; the leader appends the command to its Raft log and replicates it to the followers via `GrpcRaftTransport` (port 9080)
+5. **Commit & Apply**: Once a majority (2 of 3) has the entry, the LEADER commits it and every node applies it through `QuorusStateStore.apply()`, which updates the replicated maps.
+6. **Agent Assignment**: A caller assigns the job with `POST /api/v1/assignments`, which is also committed through Raft. The controller runs no scheduler: nothing selects an agent or assigns a submitted job by itself (`ENG-01`, with `P2-01`). The workflow engine is not involved.
+7. **Transfer Execution**: The assigned agent polls `GET /api/v1/agents/{agentId}/jobs`, executes the transfer with its local `SimpleTransferEngine`, and reports `ACCEPTED`, `IN_PROGRESS` and the terminal state via `POST /api/v1/jobs/{jobId}/status`
 
 #### Embedded Services (Inside Each Quorus Controller)
 
-Each Quorus Controller container runs `QuorusControllerVerticle`, which starts both `HttpApiServer` (port 8080) and `GrpcRaftServer` (port 9080). The embedded services share the same JVM:
+Each controller JVM runs `QuorusControllerVerticle` (started by `QuorusControllerApplication`), which builds the Raft storage, `QuorusStateStore`, `RaftNode`, `GrpcRaftTransport` and `GrpcRaftServer` (port 9080), and then `HttpApiServer` (port 8080). Nothing else runs in the process:
 
-| Service | Class/Module | Purpose |
-|---------|--------------|---------|
-| Workflow Engine | `YamlWorkflowDefinitionParser`, `DependencyGraph` (`quorus-workflow`) | Parses YAML workflow definitions, resolves transfer dependencies |
-| Transfer Orchestration | `SimpleTransferEngine` (`quorus-core`) | Coordinates transfer execution, tracks progress |
-| Agent Management | `AgentRegistryService` | Tracks registered Quorus Agents, assigns jobs based on region/capacity |
-| Tenant Management | `SimpleTenantService` (`quorus-tenant`) | Multi-tenancy, quota enforcement, resource isolation |
-| Monitoring & Metrics | `TelemetryConfig`, OpenTelemetry | Prometheus metrics (`:9464/metrics`), OTLP tracing |
+| Service | Class | Purpose |
+|---------|-------|---------|
+| HTTP API | `HttpApiServer` and the handlers in `controller.http.handlers` | REST API, health, readiness, status and metrics endpoints |
+| Security | `AuthenticationHandler`, `AuthorizationHandler`, `AuthorizationPolicyEngine`, `CertificateTrustState`, `HashChainedAuditLog` | mTLS identity, policy decisions, runtime revocation, hash-chained audit |
+| Consensus | `RaftNode`, `GrpcRaftTransport`, `GrpcRaftServer` | Leader election, log replication, snapshots |
+| Raft storage | `RaftLogStorageAdapter` (`raftlog-core` 1.2.0), `FileSnapshotStore` | Durable log, term and vote; snapshots |
+| Replicated state | `QuorusStateStore` | Applies committed commands; serves reads |
+| Monitoring & Metrics | `TelemetryConfig`, `RaftMetrics`, OpenTelemetry | Prometheus metrics (`:9464/metrics`), OTLP tracing |
+
+The controller does **not** run the workflow engine (`quorus-workflow`), the tenant service (`quorus-tenant`) or a transfer engine: it declares Maven dependencies on those modules but its main code imports none of them. `JobAssignmentService` and `AgentSelectionService` exist in `controller.service` but are never constructed (`ENG-01`).
 
 #### Replicated State (Raft Consensus)
 
-The following state stores are replicated across all three Quorus Controllers via `QuorusStateMachine`:
+`QuorusStateStore` (which implements `RaftLogApplicator`) holds these maps on every controller. They are materialised views of committed commands; the Raft log and snapshots are the authority ([specification §5.2](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md#52-state-ownership)). Each command type is a sealed interface of records:
 
-| State Store | Field in `QuorusStateMachine` | Contents | Updated By |
-|-------------|------------------------------|----------|------------|
-| Transfer Jobs | `transferJobs` | `Map<String, TransferJobSnapshot>` — job ID, status, source URI, destination path | `TransferJobCommand.CREATE`, `TransferJobCommand.UPDATE_STATUS` |
-| Agents | `agents` | `Map<String, AgentInfo>` — agent ID, endpoint, region, protocols, capacity | `AgentCommand.REGISTER`, `AgentCommand.UPDATE_HEARTBEAT` |
-| Job Assignments | `jobAssignments` | `Map<String, JobAssignment>` — assignment ID, job ID, agent ID, status | `JobAssignmentCommand.ASSIGN`, `JobAssignmentCommand.COMPLETE` |
-| Job Queue | `jobQueue` | `Map<String, QueuedJob>` — queued jobs with priority | `JobQueueCommand.ENQUEUE`, `JobQueueCommand.DEQUEUE` |
-| System Metadata | `systemMetadata` | `Map<String, String>` — version, environment, configuration | `SystemMetadataCommand.SET` |
+| State | Field in `QuorusStateStore` | Contents | Updated by |
+|-------|-----------------------------|----------|------------|
+| Transfer jobs | `transferJobs` | `TransferJobSnapshot` — job ID, source URI, destination path, status, progress, tenant, operational context, service connection and policy digest | `TransferJobCommand.Create`, `UpdateStatus`, `UpdateProgress`, `Delete` |
+| Transfer attempts | `transferAttempts`, `activeAttemptByJob` | Immutable attempts with fencing generation, lease and report sequence | `TransferAttemptCommand.Offer`, `Report`, `LifecycleReport`, `RenewLease` |
+| Transfer events | `transferEvents` | Ordered per-transfer operational events | Derived while applying the commands above |
+| Agents | `agents` | `AgentInfo` — agent ID, tenant, host and port, region, datacenter, pool, network zone, capabilities, status, last heartbeat | `AgentCommand.Register`, `Deregister`, `UpdateStatus`, `UpdateCapabilities`, `Heartbeat` |
+| Job assignments | `jobAssignments` | `JobAssignment` — assignment ID, job ID, agent ID, status | `JobAssignmentCommand.Assign`, `Accept`, `Reject`, `UpdateStatus`, `Timeout`, `Cancel`, `Remove` |
+| Job queue | `jobQueue` | `QueuedJob` — queued jobs with priority | `JobQueueCommand.Enqueue`, `Dequeue`, `Prioritize`, `Remove`, `Expedite`, `UpdateRequirements` |
+| Routes | `routes` | `RouteConfiguration` | `RouteCommand.Create`, `Update`, `Delete`, `Suspend`, `Resume`, `UpdateStatus` |
+| System metadata | `systemMetadata` | Key–value metadata, including the versioned service-connection and secret-reference registry | `SystemMetadataCommand.Set`, `Delete` |
 
 #### Agent Fleet (Geo-Distributed)
 
-Quorus Agents are stateless workers deployed close to data sources/destinations. The diagram shows agents in three regions:
+**Illustrative.** Quorus Agents are deployed close to data sources/destinations; they are replaceable but hold local state while a transfer is active ([specification §4.2](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md#42-agent-responsibilities)). The diagram shows agents in three regions:
 
 | Region | Example Agents | Purpose |
 |--------|----------------|---------|
@@ -442,21 +377,22 @@ Agents communicate with the Quorus Controller cluster via:
 - **Registration**: `POST /api/v1/agents/register` (alpha startup registration)
 - **Heartbeat**: `POST /api/v1/agents/heartbeat` (periodic via `HeartbeatService`)
 - **Job Polling**: `GET /api/v1/agents/{agentId}/jobs` (via `JobPollingService`)
-- **Status Reporting**: `POST /api/v1/jobs/{jobId}/status` (compatibility status via `JobStatusReportingService`)
+- **Status Reporting**: `POST /api/v1/jobs/{jobId}/status` (attempt-aware status and progress reports via `JobStatusReportingService`)
 
 ##### Figure 1: Quorus System Overview
 
 ```mermaid
 flowchart TD
     subgraph System[Quorus Distributed Transfer System]
-        CLI[CLI Client] & API[REST API] & WEB[Web UI] --> LB[Load Balancer]
+        CL[HTTP API clients] --> LB[Load Balancer]
         LB --> C1[Controller-1 LEADER]
         LB --> C2[Controller-2]
         LB --> C3[Controller-3]
         C1 -.Raft.- C2 -.Raft.- C3
-        C1 --> WF[Workflow Engine] & JA[Job Assignment] & TS[Tenant Service]
-        WF & JA & TS --> SM[(State Machine)]
-        JA <--> AE[Agent APAC-East] & AW[Agent APAC-West] & EU[Agent EU-West]
+        C1 --> API[HttpApiServer]
+        API -->|submitCommand| RN[RaftNode]
+        RN -->|apply committed| SM[(QuorusStateStore)]
+        AE[Agent APAC-East] & AW[Agent APAC-West] & EU[Agent EU-West] -->|register, heartbeat, poll, report| LB
     end
 
     style C1 fill:#ff6b6b,color:#fff
@@ -471,16 +407,15 @@ The following table maps each component in Figure 1 to its concrete implementati
 | Figure 1 Component | Implementation Class | Module | Description |
 |--------------------|---------------------|--------|-------------|
 | Controller-1/2/3 | `QuorusControllerVerticle` | `quorus-controller` | Raft node with embedded HTTP API |
-| Workflow Engine | `SimpleWorkflowEngine` | `quorus-workflow` | YAML parsing, dependency resolution, execution |
-| Job Assignment | `JobAssignmentService` | `quorus-controller` | Assigns transfer jobs to available agents |
-| Tenant Service | `SimpleTenantService` | `quorus-tenant` | Multi-tenant quotas and isolation |
-| State Machine | `QuorusStateMachine` | `quorus-controller` | Raft-replicated state (agents, jobs, assignments) |
-| Agent APAC-East/West/EU | `QuorusAgent` | `quorus-agent` | Polls controller, executes transfers via protocol adapters |
-| Load Balancer | nginx (external) | — | Routes requests to controller cluster |
+| HttpApiServer | `HttpApiServer` | `quorus-controller` | REST API; writes are leader-only |
+| RaftNode | `RaftNode` | `quorus-controller` | Election, replication, commit, snapshots |
+| QuorusStateStore | `QuorusStateStore` | `quorus-controller` | Raft-replicated state (jobs, attempts, events, agents, assignments, queue, routes, metadata) |
+| Agent APAC-East/West/EU | `QuorusAgent` | `quorus-agent` | Polls the controller for its assignments, executes transfers via protocol adapters |
+| Load Balancer | nginx (external) | — | Routes requests to the controller cluster |
 
 ### Module Structure
 
-The system is organized into multiple Maven modules with **controller-first architecture**:
+The system is organized into multiple Maven modules with **controller-first architecture**. The arrows are Maven dependencies; a dashed arrow is a dependency the main code does not use.
 
 ##### Figure 2: Module Dependencies
 
@@ -493,26 +428,30 @@ graph TB
     
     subgraph "Libraries"
         QW[quorus-workflow<br/>YAML Workflow Engine]
-        QT[quorus-tenant<br/>Multi-Tenant Management]
+        QT[quorus-tenant<br/>Tenant Model and Quotas]
     end
     
     subgraph "Foundation"
         QC[quorus-core<br/>Core Transfer Engine]
     end
     
-    subgraph "Examples"
+    subgraph "Examples and benchmarks"
         QIE[quorus-integration-examples]
-        QWE[quorus-workflow-examples]
+        QB[quorus-benchmarks<br/>-Pbenchmarks only]
     end
     
-    QCT --> QW
-    QCT --> QT
-    QCT -.->|assigns jobs| QAG
+    QCT --> QC
+    QCT -.-> QW
+    QCT -.-> QT
     QAG --> QC
+    QAG --> QW
     QW --> QC
     QT --> QC
+    QT --> QW
     QIE --> QC
-    QWE --> QW
+    QIE --> QW
+    QIE --> QT
+    QB --> QCT
 
     style QCT fill:#ff6b6b,color:#fff
     style QAG fill:#4ecdc4,color:#fff
@@ -520,139 +459,93 @@ graph TB
     style QT fill:#e8f5e8
     style QC fill:#f3e5f5
     style QIE fill:#fce4ec
-    style QWE fill:#f1f8e9
+    style QB fill:#f1f8e9
 ```
 
 #### Module Responsibilities
 
 **Applications** (standalone processes with `main()`):
 - **quorus-controller**: Main executable application with embedded HTTP API and Raft consensus
-- **quorus-agent**: Distributed transfer worker that polls controller for jobs, executes SFTP/FTP/HTTP/SMB transfers, sends heartbeats
+- **quorus-agent**: Distributed transfer worker that polls the controller for its assignments, executes HTTP/HTTPS, FTP/FTPS, SFTP, SMB/CIFS and NFS transfers, sends heartbeats
 
-**Libraries** (embedded in applications):
+**Libraries** (embedded in applications or called in-process):
 - **quorus-core**: Core transfer engine and protocol adapters
-- **quorus-workflow**: YAML-based workflow parsing and execution engine
-- **quorus-tenant**: Multi-tenant management, quotas, and isolation
+- **quorus-workflow**: YAML-based workflow parsing and in-process execution engine
+- **quorus-tenant**: In-process tenant model, hierarchy and quota checks; not an identity boundary
 
-**Examples**:
-- **quorus-integration-examples**: Usage examples and integration patterns
-- **quorus-workflow-examples**: Workflow definition examples
+**Examples and benchmarks**:
+- **quorus-integration-examples**: Usage examples and integration patterns, including the workflow examples (there is no separate `quorus-workflow-examples` module)
+- **quorus-benchmarks**: Benchmark harness, built only with the `benchmarks` profile
 
 ## Module Configuration Architecture
 
-Each Quorus module follows a standardized configuration pattern with externalized properties files that support environment variable overrides. This design ensures consistent configuration management across the system while allowing deployment-specific customization.
+**Status: Current.** Checked against `AppConfig`, `AgentConfig`, `QuorusConfiguration` and `LayeredProperties` on 2026-10-03. The former text of this section (a singleton `AppConfig.get()` and file-system locations) is archived section G.
 
-### Configuration Design Principles
+### Configuration classes
 
-1. **Module-Specific Properties**: Each module has its own properties file in `src/main/resources/`
-2. **Environment Variable Override**: All properties can be overridden via environment variables
-3. **Sensible Defaults**: Missing configuration files fall back to reasonable defaults
-4. **Startup Logging**: All configuration properties are logged at startup for debugging
+| Module | Packaged resource | Config class | Covers |
+|--------|-------------------|--------------|--------|
+| `quorus-core` | `quorus.properties` | `QuorusConfiguration` | Transfer engine, network timeouts, file handling, protocol settings |
+| `quorus-controller` | `quorus-controller.properties` | `AppConfig` | Node identity, HTTP, security and TLS, Raft cluster and storage, snapshots, telemetry |
+| `quorus-agent` | `quorus-agent.properties` | `AgentConfig` | Agent identity and tenant, controller URL, transfers, heartbeat, job polling |
 
-### Configuration Files by Module
+Each class is an ordinary per-instance object, not a singleton: callers construct it with a profile name and a `Properties` of explicit overrides, for example `new AppConfig(profile, overrides)`. Instances are isolated from each other, which is what lets tests run several controllers in one JVM.
 
-| Module | Properties File | Config Class | Description |
-|--------|-----------------|--------------|-------------|
-| `quorus-core` | `quorus.properties` | `QuorusConfiguration` | Core transfer engine, protocols, network settings |
-| `quorus-controller` | `quorus-controller.properties` | `AppConfig` | Raft consensus, HTTP API, cluster coordination, telemetry |
-| `quorus-agent` | `quorus-agent.properties` | `AgentConfig` | Agent identity, controller connection, job polling, heartbeat |
+### Loading order
 
-### Configuration Class Pattern
+Each instance applies four layers; a later layer wins:
 
-Each module implements a singleton configuration class following this pattern:
+1. the packaged resource on the classpath (`quorus-controller.properties`, `quorus-agent.properties` or `quorus.properties`; required);
+2. the optional profile resource on the classpath (`quorus-controller-<profile>.properties`, `quorus-agent-<profile>.properties` or `quorus-<profile>.properties`), loaded only when the profile is not `default`;
+3. environment variables;
+4. the explicit overrides passed to the constructor.
 
-```java
-public final class AppConfig {
-    private static final AppConfig INSTANCE = new AppConfig();
-    
-    public static AppConfig get() {
-        return INSTANCE;
-    }
-    
-    public String getString(String key, String defaultValue) {
-        // 1. Check QUORUS_XXX environment variable
-        // 2. Check properties file
-        // 3. Return default value
-    }
-    
-    public int getInt(String key, int defaultValue) { ... }
-    public boolean getBoolean(String key, boolean defaultValue) { ... }
-}
-```
+There are no file-system search locations (no working-directory, `~/.quorus/` or `/etc/quorus/` files), and JVM system properties are deliberately not a configuration source. The shipped `QuorusControllerApplication` and `QuorusAgent` start with the `default` profile and no overrides, so a deployed process is configured by its packaged resource plus environment variables.
 
-### Key Configuration Categories
+### Environment variable names
 
-#### Controller Configuration (`quorus-controller.properties`)
-- **Node Identity**: Unique cluster node identifier
-- **HTTP Server**: Port and host bindings for REST API
-- **Raft Cluster**: Consensus port and cluster node topology
-- **Job Assignment**: Timing intervals for job processing
-- **Telemetry**: OpenTelemetry and Prometheus endpoints
+A property's environment name is the key in upper case with `.` and `-` replaced by `_` (`LayeredProperties.environmentKey`):
 
-#### Agent Configuration (`quorus-agent.properties`)
-- **Agent Identity**: Unique agent identifier, region, datacenter
-- **Controller Connection**: URL for controller API communication
-- **Transfer Settings**: Max concurrent transfers, supported protocols
-- **Heartbeat**: Interval for health reporting to controller
-- **Job Polling**: Timing for job queue polling
+| Property | Environment variable | Packaged default |
+|----------|---------------------|------------------|
+| `quorus.node.id` | `QUORUS_NODE_ID` | empty; required for a multi-node cluster |
+| `quorus.http.port` | `QUORUS_HTTP_PORT` | `8080` |
+| `quorus.raft.port` | `QUORUS_RAFT_PORT` | `9080` |
+| `quorus.cluster.nodes` | `QUORUS_CLUSTER_NODES` | empty (single node) |
+| `quorus.raft.election-timeout-ms` | `QUORUS_RAFT_ELECTION_TIMEOUT_MS` | `5000` |
+| `quorus.raft.heartbeat-interval-ms` | `QUORUS_RAFT_HEARTBEAT_INTERVAL_MS` | `1000` |
+| `quorus.raft.storage.path` | `QUORUS_RAFT_STORAGE_PATH` | empty (`./data/raft/<nodeId>`) |
+| `quorus.security.profile` | `QUORUS_SECURITY_PROFILE` | `production` |
+| `quorus.agent.heartbeat.interval-ms` | `QUORUS_AGENT_HEARTBEAT_INTERVAL_MS` | `30000` |
 
-#### Core Configuration (`quorus.properties`)
-- **Transfer Engine**: Concurrent transfers, retries, buffer sizes
-- **Network**: Connection and read timeouts
-- **File Handling**: Max file size, checksum algorithm, temp directory
-- **Protocol Settings**: SFTP/FTP/SMB port and buffer configurations
+There is no Raft bind-host property. `AgentConfig` also accepts a fixed set of legacy unprefixed names (for example `AGENT_ID`, `CONTROLLER_URL`, `HEARTBEAT_INTERVAL`); the documented `QUORUS_AGENT_*` name wins when both are set. The controller's `AppConfig` has no legacy names; `quorus-controller/docker-entrypoint.sh`, which mapped some, was removed on 2026-10-03 because the image never ran it (register `ENG-20`).
 
-### Environment Variable Override Pattern
+### Validation
 
-Properties are converted to environment variables using this pattern:
-- Convert to uppercase
-- Replace dots (`.`) with underscores (`_`)
-
-| Property | Environment Variable |
-|----------|---------------------|
-| `quorus.http.port` | `QUORUS_HTTP_PORT` |
-| `quorus.node.id` | `QUORUS_NODE_ID` |
-| `quorus.cluster.nodes` | `QUORUS_CLUSTER_NODES` |
-| `quorus.agent.heartbeat.interval-ms` | `QUORUS_AGENT_HEARTBEAT_INTERVAL_MS` |
-
-### Configuration Loading Order
-
-1. **Classpath** - Packaged in JAR (`src/main/resources/`)
-2. **Working directory** - Runtime override files
-3. **Home directory** - User-specific settings (`~/.quorus/`)
-4. **System directory** - System-wide settings (`/etc/quorus/`)
-
-Later sources override earlier ones, enabling flexible deployment customization without modifying packaged JARs.
-
-### Backward Compatibility
-
-The configuration system maintains backward compatibility:
-- Environment variables always override properties files
-- Missing config files fall back to sensible defaults
-- No breaking changes to existing deployments
+`AppConfig.validate()` fails startup on inconsistent values, for example a non-positive interval, a stall window not greater than the freshness window, or a Raft storage type other than `raftlog`. The production security profile additionally refuses to start without its TLS and identity material (see the [Security Deployment Guide](../../docs/QUORUS_SECURITY_DEPLOYMENT_GUIDE.md)).
 
 ## Deployment Configurations
 
-Quorus supports multiple deployment configurations to meet different operational requirements:
+**Status: Current.** Checked against `docker/compose/` on 2026-10-03. Both topologies below set `QUORUS_SECURITY_PROFILE=development` with TLS and security disabled; they are development topologies, not production ones. `docker/compose/docker-compose-tls-example.yml` shows the production profile with mutual TLS. The [Docker guide](../../docker/README.md) is the supported reference for building the jars on the host, choosing a compose topology and starting it. (`docker/start.ps1` is an older launcher that does not build the jars; prefer the commands in the Docker guide.)
 
-### Development Configuration
+### Single-Controller Development Configuration
 ```bash
-# Single-node development setup
-.\start.ps1 cluster
+# Build the jars on the host first (docker/build-runtime.ps1 or .sh), then:
+docker compose -f docker/compose/docker-compose-single-controller.yml up -d --build
 ```
 - **Single controller** with embedded HTTP API
 - **Minimal resource usage** for development
 - **Quick startup** and testing
 - **Port**: http://localhost:8080
 
-### Production Configuration
+### Three-Controller Configuration
 ```bash
-# Controller-first cluster with load balancing
-.\start.ps1 controllers
+# Build the jars on the host first, then the controller-first cluster with load balancing:
+docker compose -f docker/compose/docker-compose-controller-first.yml up -d --build
 ```
-- **3 Quorus Controllers** (`quorus-controller1`, `quorus-controller2`, `quorus-controller3`) with embedded `HttpApiServer`
-- **`nginx` load balancer** for high availability (routes to healthy Quorus Controllers)
-- **Raft consensus** via `GrpcRaftTransport` (port 9080) for data consistency
+- **3 Quorus Controllers** (containers `quorus-controller1`–`3`, node IDs `controller1`–`3`) with embedded `HttpApiServer`
+- **`nginx` load balancer** in front of the three controllers. `GET /health` on port 8080 is answered by nginx itself and says nothing about the controllers (`docker/compose/nginx/nginx.conf`; register `ENG-18`)
+- **Raft consensus** via `GrpcRaftTransport` (port 9080) for data consistency, with `QUORUS_RAFT_ELECTION_TIMEOUT_MS=3000` and `QUORUS_RAFT_HEARTBEAT_INTERVAL_MS=500`
 - **Fault tolerance**: Any single Quorus Controller can fail; remaining 2 maintain quorum
 - **Endpoints**:
   - `nginx` Load Balancer: http://localhost:8080
@@ -662,16 +555,20 @@ Quorus supports multiple deployment configurations to meet different operational
 
 ## Controller-First Architecture
 
+**Status: Partly current.** The controller structure, Raft transport, leader election, controller functions, data protection and HTTP–Raft coupling are current except where marked; routes are partly current.
+
 ### Core Design Philosophy
 
 The controller-first architecture places the Quorus Controller at the center of the system, with the HTTP API embedded directly inside each controller.
 
 **Controller-First Design:**
 ```
-QuorusControllerVerticle (Main) ─┬─ HttpApiServer (Embedded HTTP Interface, port 8080)
-                                 ├─ GrpcRaftServer (Raft Protocol, port 9080)
-                                 └─ RaftNode (Consensus State Machine)
+QuorusControllerVerticle ─┬─ HttpApiServer (Embedded HTTP Interface, port 8080)
+                          ├─ GrpcRaftServer + GrpcRaftTransport (Raft Protocol, port 9080)
+                          └─ RaftNode (Consensus) ── QuorusStateStore (RaftLogApplicator)
 ```
+
+`QuorusControllerApplication.main` builds the configuration and deploys `QuorusControllerVerticle`.
 
 Each Quorus Controller (`quorus-controller1`, `quorus-controller2`, `quorus-controller3`) is a self-contained process running `QuorusControllerVerticle`, which starts both the HTTP API and the Raft consensus engine in the same JVM.
 
@@ -683,511 +580,17 @@ Each Quorus Controller (`quorus-controller1`, `quorus-controller2`, `quorus-cont
 4. **Operational Simplicity**: Single Docker container per Quorus Controller
 5. **Interface Flexibility**: `HttpApiServer` can be extended with gRPC, WebSocket, etc.
 
-### Route-Based Architecture
+### Routes
 
-Quorus implements a **route-based transfer orchestration** model where predefined routes are stored in the central controller's configuration repository.
+**Status: Partly current.** The 500-line route-trigger design that stood here (route principles, startup validation, trigger evaluation flow, controller-agent-route architecture and the route-based transfer sequence) is archived section H: none of it runs.
 
-#### Core Route Principles
+**Current.** A route is replicated configuration. `RouteConfiguration` (`quorus-core`) carries a route ID, name, description, source agent ID and location, destination agent ID and location, a `TriggerConfiguration`, a `RouteStatus` and string options. The controller stores routes in `QuorusStateStore` through `RouteCommand` (`Create`, `Update`, `Delete`, `Suspend`, `Resume`, `UpdateStatus`) and serves them at `POST`/`GET /api/v1/routes`, `GET`/`PUT`/`DELETE /api/v1/routes/{routeId}`, and `PUT /api/v1/routes/{routeId}/suspend` and `/resume`. `TriggerType` declares `EVENT`, `TIME`, `INTERVAL`, `BATCH`, `SIZE` and `COMPOSITE`; `RouteStatus` declares `CONFIGURED`, `ACTIVE`, `TRIGGERED`, `TRANSFERRING`, `SUSPENDED`, `DEGRADED`, `FAILED` and `DELETED`.
 
-1. **Route Definitions**: Routes define source agent, destination agent, and trigger conditions
-2. **Controller Repository**: Central configuration repository stores all route definitions
-3. **Startup Validation**: Controller validates all agents in routes are active before route activation
-4. **Multiple Trigger Types**: Routes support diverse trigger mechanisms:
-   - **Event-based**: File appearance/modification in monitored locations
-   - **Time-based**: Scheduled transfers with cron expressions
-   - **Interval-based**: Periodic transfers (every N minutes/hours)
-   - **Batch-based**: Transfer when N files accumulate
-   - **Size-based**: Transfer when cumulative file size reaches threshold
-   - **Manual**: On-demand triggers via API or command
-   - **External**: Triggered by external systems or events
-   - **Composite**: Multiple conditions with AND/OR logic
-5. **Automatic Orchestration**: Files transferred automatically when trigger conditions met
-6. **Health Monitoring**: Continuous monitoring of route status and agent health
-7. **Failover Support**: Automatic failover to backup agents when primary agents fail
-
-#### Route Configuration Example
-
-```yaml
-apiVersion: v1
-kind: RouteConfiguration
-metadata:
-  name: crm-to-warehouse
-  description: CRM data export to data warehouse
-  
-spec:
-  source:
-    agent: agent-crm-001
-    location: /corporate-data/crm/export/
-    
-  destination:
-    agent: agent-warehouse-001
-    location: /corporate-data/warehouse/import/
-    
-  trigger:
-    type: EVENT_BASED
-    events:
-      - FILE_CREATED
-      - FILE_MODIFIED
-    filters:
-      pattern: "*.json"
-      minSize: 1KB
-      
-  options:
-    validation:
-      checksumAlgorithm: SHA-256
-      verifyIntegrity: true
-    retry:
-      maxAttempts: 3
-      backoff: EXPONENTIAL
-    monitoring:
-      alertOnFailure: true
-      logLevel: INFO
-```
-
-#### Route Lifecycle
-
-The following state diagram shows how a route transitions through its lifecycle, from initial configuration to active operation, including failure handling and administrative controls.
-
-##### Figure 3: Route Lifecycle State Machine
-
-```mermaid
-stateDiagram-v2
-    [*] --> Configured: Route Loaded from Repository
-    
-    state "Startup Validation" as validation_group {
-        Configured --> Validating: Controller Startup
-        Validating --> ValidatingSource: Check Source Agent
-        ValidatingSource --> ValidatingDest: Source Agent OK
-        ValidatingSource --> Failed: Source Agent Unreachable
-        ValidatingDest --> Active: Destination Agent OK
-        ValidatingDest --> Failed: Destination Agent Unreachable
-    }
-    
-    state "Normal Operation" as operation_group {
-        Active --> Evaluating: Trigger Check
-        Evaluating --> Active: Conditions Not Met
-        Evaluating --> Triggered: Conditions Met
-        Triggered --> Transferring: Initiate Transfer
-        Transferring --> Active: Transfer Complete
-        Transferring --> Retrying: Transfer Error
-        Retrying --> Transferring: Retry Attempt
-        Retrying --> Failed: Max Retries Exceeded
-    }
-    
-    state "Degraded Operation" as degraded_group {
-        Active --> Degraded: Agent Health Issue
-        Degraded --> FailoverCheck: Check Backup Agent
-        FailoverCheck --> FailoverActive: Backup Available
-        FailoverCheck --> Failed: No Backup Available
-        FailoverActive --> Active: Backup Agent Activated
-        Degraded --> Active: Primary Agent Recovered
-    }
-    
-    state "Administrative" as admin_group {
-        Active --> Suspended: Manual Suspension
-        Suspended --> Active: Manual Resume
-        Failed --> Configured: Configuration Update
-        Failed --> Suspended: Manual Intervention
-    }
-    
-    Failed --> [*]: Route Disabled
-```
-
-##### Lifecycle Stages Explained
-
-**1. Startup Validation** — When `QuorusControllerVerticle` starts on any Quorus Controller (`quorus-controller1`, `quorus-controller2`, `quorus-controller3`), it loads route definitions from workflow YAML files via `YamlWorkflowDefinitionParser`. Each route is validated before activation:
-
-| State | Description | Transition Conditions |
-|-------|-------------|----------------------|
-| `Configured` | Route definition loaded from workflow YAML file | Automatically transitions to `Validating` on controller startup |
-| `Validating` | Controller begins validation sequence | — |
-| `ValidatingSource` | Controller checks if the source Quorus Agent (e.g., `agent-crm-001`) is registered and responsive via `HeartbeatService` | `Source Agent OK` → proceed; `Source Agent Unreachable` → `Failed` |
-| `ValidatingDest` | Controller checks if the destination Quorus Agent (e.g., `agent-warehouse-001`) is registered and responsive | `Destination Agent OK` → `Active`; `Destination Agent Unreachable` → `Failed` |
-
-**2. Normal Operation** — Once validated, the route enters the active trigger evaluation loop:
-
-| State | Description | Transition Conditions |
-|-------|-------------|----------------------|
-| `Active` | Route is operational; trigger conditions are continuously evaluated | Trigger check runs at configured interval (e.g., every 10 seconds) |
-| `Evaluating` | Trigger engine checks if conditions are met (file appeared, cron matched, batch threshold reached, etc.) | `Conditions Met` → `Triggered`; `Conditions Not Met` → return to `Active` |
-| `Triggered` | Conditions satisfied; route initiates transfer job | Immediately transitions to `Transferring` |
-| `Transferring` | Transfer in progress via `SimpleTransferEngine` on the assigned Quorus Agent | `Transfer Complete` → `Active`; `Transfer Error` → `Retrying` |
-| `Retrying` | Transfer failed; controller schedules retry with exponential backoff | `Retry Attempt` → `Transferring`; `Max Retries Exceeded` → `Failed` |
-
-**3. Degraded Operation** — When agent health issues are detected:
-
-| State | Description | Transition Conditions |
-|-------|-------------|----------------------|
-| `Degraded` | Source or destination Quorus Agent stopped sending heartbeats (missed 3+ consecutive heartbeats) | Controller checks for backup agent |
-| `FailoverCheck` | Controller looks for a configured backup agent in the route's `failover.backupAgent` field | `Backup Available` → `FailoverActive`; `No Backup Available` → `Failed` |
-| `FailoverActive` | Backup Quorus Agent is now handling transfers for this route | Transitions to `Active` once backup is confirmed healthy |
-
-**4. Administrative Controls** — Manual intervention states:
-
-| State | Description | Transition Conditions |
-|-------|-------------|----------------------|
-| `Suspended` | Route paused by operator via REST API (`PUT /routes/{id}/suspend`) | `Manual Resume` via `PUT /routes/{id}/resume` → `Active` |
-| `Failed` | Route cannot operate (agent unreachable, max retries exceeded, no backup available) | `Configuration Update` (fix and redeploy) → `Configured`; `Manual Intervention` → `Suspended` |
-
-##### Example: CRM Export Route Lifecycle
-
-1. **Startup**: `quorus-controller1` (LEADER) loads route `crm-to-warehouse` from workflow YAML via `YamlWorkflowDefinitionParser`
-2. **Validation**: Controller pings `agent-crm-001` (source) — ✅ healthy; pings `agent-warehouse-001` (destination) — ✅ healthy
-3. **Active**: Route enters trigger evaluation loop (EVENT type — watching `/corporate-data/crm/export/`)
-4. **Trigger**: New file `customers-2026-02-01.json` appears in source directory
-5. **Transfer**: Controller assigns job to `agent-crm-001`; agent transfers file via `SftpTransferProtocol` to `agent-warehouse-001`
-6. **Complete**: Transfer verified; route returns to `Active` state, waiting for next file event
-
-#### Route Trigger Evaluation Flow
-
-The Trigger Evaluation Engine runs inside the LEADER Quorus Controller (`quorus-controller1`, `quorus-controller2`, or `quorus-controller3` — whichever is currently LEADER). It continuously evaluates trigger conditions for all active routes and initiates transfers when conditions are met.
-
-##### Trigger Types
-
-| Trigger Type | Evaluator | Description | Example Use Case |
-|--------------|-----------|-------------|------------------|
-| **EVENT** | Event Monitor | Watches source directory for file system events (create, modify, delete) | Real-time CRM export: transfer each new file immediately |
-| **TIME** | Cron Scheduler | Triggers at specific times using cron expressions | Nightly backup: `0 2 * * *` (2:00 AM daily) |
-| **INTERVAL** | Interval Timer | Triggers after a fixed time period elapses | Log collection: every 15 minutes |
-| **BATCH** | File Counter | Triggers when file count reaches threshold (with optional max wait timeout) | Report distribution: when 100 files accumulate or 1 hour passes |
-| **SIZE** | Size Accumulator | Triggers when cumulative file size reaches threshold (with optional max wait timeout) | Data warehouse load: when 1 GB of data accumulates or 4 hours pass |
-| **COMPOSITE** | Composite Logic | Combines multiple conditions with AND/OR logic | Complex workflows: (TIME AND EVENT) OR MANUAL |
-
-##### Evaluation Flow by Trigger Type
-
-**EVENT Trigger** (Real-time file watching)
-```
-Event Monitor → File Event Detected? → (No) → continue monitoring
-                     ↓ (Yes)
-              Matches Filters? → (No) → continue monitoring
-                     ↓ (Yes)
-              TRIGGER TRANSFER
-```
-The Event Monitor uses file system watchers (via Quorus Agent's `JobPollingService`) to detect new files. Filter patterns (e.g., `*.json`, `customer-*.csv`) are applied before triggering.
-
-**TIME Trigger** (Cron-based scheduling)
-```
-Cron Scheduler → Cron Match? → (No) → wait until next check
-                      ↓ (Yes)
-               TRIGGER TRANSFER
-```
-The Cron Scheduler evaluates cron expressions (e.g., `0 2 * * *` for 2:00 AM daily). Standard cron syntax is supported with second-level precision.
-
-**INTERVAL Trigger** (Fixed period)
-```
-Interval Timer → Interval Elapsed? → (No) → continue waiting
-                       ↓ (Yes)
-                TRIGGER TRANSFER
-```
-Simple periodic transfers. Example: `intervalMinutes: 15` triggers every 15 minutes regardless of file activity.
-
-**BATCH Trigger** (File count threshold)
-```
-File Counter → File Count >= Threshold? → (Yes) → TRIGGER TRANSFER
-                       ↓ (No)
-              Max Wait Exceeded? → (Yes) → TRIGGER TRANSFER
-                       ↓ (No)
-              continue accumulating
-```
-Batches files until either the count threshold is met OR the maximum wait time expires (prevents indefinite accumulation).
-
-**SIZE Trigger** (Cumulative size threshold)
-```
-Size Accumulator → Total Size >= Threshold? → (Yes) → TRIGGER TRANSFER
-                          ↓ (No)
-                  Max Wait Exceeded? → (Yes) → TRIGGER TRANSFER
-                          ↓ (No)
-                  continue accumulating
-```
-Similar to BATCH, but based on cumulative file size (e.g., `sizeThresholdMB: 1024` for 1 GB).
-
-**COMPOSITE Trigger** (Combined conditions)
-```
-Composite Logic → Composite Logic Met? → (Yes) → TRIGGER TRANSFER
-                         ↓ (No)
-                 continue evaluating
-```
-Combines multiple conditions. Example: `(TIME:weekday AND EVENT:*.csv) OR MANUAL` — triggers on weekdays when CSV files appear, or on manual request.
-
-##### Configuration Examples
-
-**EVENT Trigger Configuration:**
-```yaml
-trigger:
-  type: EVENT
-  event:
-    patterns: ["*.json", "*.csv"]
-    excludePatterns: ["*.tmp", "*.partial"]
-    debounceMs: 500  # Wait 500ms after last event before triggering
-```
-
-**TIME Trigger Configuration:**
-```yaml
-trigger:
-  type: TIME
-  schedule:
-    cron: "0 2 * * *"      # 2:00 AM daily
-    timezone: "GMT"
-```
-
-**BATCH Trigger Configuration:**
-```yaml
-trigger:
-  type: BATCH
-  batch:
-    fileCountThreshold: 100
-    maxWaitMinutes: 60     # Trigger after 1 hour even if threshold not reached
-```
-
-**COMPOSITE Trigger Configuration:**
-```yaml
-trigger:
-  type: COMPOSITE
-  composite:
-    operator: OR
-    conditions:
-      - type: TIME
-        schedule:
-          cron: "0 6 * * 1-5"  # 6 AM on weekdays
-      - type: EVENT
-        event:
-          patterns: ["urgent-*.json"]
-```
-
-##### Figure 4: Trigger Evaluation Flow
-
-```mermaid
-flowchart TD
-    subgraph "Trigger Evaluation Engine"
-        START([Route Active]) --> CHECK{Trigger Type?}
-        
-        CHECK -->|EVENT| EVENT_EVAL["Event Monitor"]
-        CHECK -->|TIME| TIME_EVAL["Cron Scheduler"]
-        CHECK -->|INTERVAL| INT_EVAL["Interval Timer"]
-        CHECK -->|BATCH| BATCH_EVAL["File Counter"]
-        CHECK -->|SIZE| SIZE_EVAL["Size Accumulator"]
-        CHECK -->|COMPOSITE| COMP_EVAL["Composite Logic"]
-        
-        EVENT_EVAL --> EVENT_CHECK{"File Event<br/>Detected?"}
-        EVENT_CHECK -->|Yes| FILTER_CHECK{"Matches<br/>Filters?"}
-        EVENT_CHECK -->|No| EVENT_EVAL
-        FILTER_CHECK -->|Yes| TRIGGER
-        FILTER_CHECK -->|No| EVENT_EVAL
-        
-        TIME_EVAL --> TIME_CHECK{"Cron<br/>Match?"}
-        TIME_CHECK -->|Yes| TRIGGER
-        TIME_CHECK -->|No| TIME_EVAL
-        
-        INT_EVAL --> INT_CHECK{"Interval<br/>Elapsed?"}
-        INT_CHECK -->|Yes| TRIGGER
-        INT_CHECK -->|No| INT_EVAL
-        
-        BATCH_EVAL --> BATCH_CHECK{"File Count<br/>>= Threshold?"}
-        BATCH_CHECK -->|Yes| TRIGGER
-        BATCH_CHECK -->|No| TIMEOUT_CHECK{"Max Wait<br/>Exceeded?"}
-        TIMEOUT_CHECK -->|Yes| TRIGGER
-        TIMEOUT_CHECK -->|No| BATCH_EVAL
-        
-        SIZE_EVAL --> SIZE_CHECK{"Total Size<br/>>= Threshold?"}
-        SIZE_CHECK -->|Yes| TRIGGER
-        SIZE_CHECK -->|No| SIZE_TIMEOUT{"Max Wait<br/>Exceeded?"}
-        SIZE_TIMEOUT -->|Yes| TRIGGER
-        SIZE_TIMEOUT -->|No| SIZE_EVAL
-        
-        COMP_EVAL --> COMP_CHECK{"Composite<br/>Logic Met?"}
-        COMP_CHECK -->|Yes| TRIGGER
-        COMP_CHECK -->|No| COMP_EVAL
-        
-        TRIGGER([Trigger Route Transfer])
-    end
-    
-    style TRIGGER fill:#90EE90
-    style START fill:#87CEEB
-```
-
-#### Controller-Agent-Route Architecture
-
-The diagram below shows the complete Quorus architecture: the 3-node Quorus Controller cluster (Control Plane), the workflow definitions (loaded from YAML files), and the geo-distributed Quorus Agent fleet executing transfers.
-
-##### Control Plane Components
-
-| Component | Description |
-|-----------|-------------|
-| **Controller Cluster** | Three Quorus Controllers (`quorus-controller1`, `quorus-controller2`, `quorus-controller3`) running Raft consensus. Only the LEADER evaluates triggers and assigns jobs; FOLLOWERs replicate state and can become LEADER if the current LEADER fails. |
-| **Workflow Definitions** | Transfer routes are defined in YAML workflow files and parsed by `YamlWorkflowDefinitionParser`. When a workflow is submitted, it creates transfer jobs that are stored in `QuorusStateMachine.transferJobs`. |
-
-##### Example Workflow Routes
-
-The diagram shows four example routes defined in workflow YAML files:
-
-| Route | Trigger Type | Source Agent | Destination Agent | Description |
-|-------|--------------|--------------|-------------------|-------------|
-| `CRM→Warehouse` | ⚡ EVENT | `agent-crm-001` (APAC-East) | `agent-warehouse-001` (APAC-East) | Real-time export: transfers each new file from CRM system to data warehouse |
-| `App→Backup` | 🕐 TIME (2AM) | `agent-app-001` (APAC-East) | `agent-backup-001` (APAC-West) | Nightly backup: transfers application data to backup site at 2:00 AM |
-| `Logs→Archive` | 🔄 INTERVAL (15m) | `agent-logs-001` (APAC-West) | `agent-archive-001` (EU-West) | Periodic collection: transfers collected logs to archive every 15 minutes |
-| `Reports→Dist` | 📦 BATCH (100) | `agent-reports-001` (EU-West) | `agent-dist-001` (EU-West) | Batch distribution: transfers reports when 100 files accumulate |
-
-##### Agent Fleet (Geo-Distributed)
-
-Quorus Agents are deployed close to data sources and destinations to minimize transfer latency and respect data residency requirements:
-
-| Region | Agents | Watched Directories | Purpose |
-|--------|--------|---------------------|---------|
-| **APAC-East** | `agent-crm-001`, `agent-warehouse-001`, `agent-app-001` | `/crm/export/`, `/warehouse/import/`, `/app/data/` | Primary business applications — CRM exports, warehouse imports, application data |
-| **APAC-West** | `agent-backup-001`, `agent-logs-001` | `/backup/nightly/`, `/logs/collected/` | Disaster recovery and log aggregation site |
-| **EU-West** | `agent-archive-001`, `agent-reports-001`, `agent-dist-001` | `/archive/logs/`, `/reports/generated/`, `/distribution/` | European data-residency example; compliance requires separate control evidence |
-
-##### Route-to-Agent Mapping
-
-Each route connects exactly one source agent to one destination agent:
-
-```
-Route: CRM→Warehouse
-  Source:      agent-crm-001       (/crm/export/)        [APAC-East]
-  Destination: agent-warehouse-001 (/warehouse/import/)  [APAC-East]
-  
-Route: App→Backup
-  Source:      agent-app-001       (/app/data/)          [APAC-East]
-  Destination: agent-backup-001    (/backup/nightly/)    [APAC-West]  ← Cross-region for DR
-  
-Route: Logs→Archive
-  Source:      agent-logs-001      (/logs/collected/)    [APAC-West]
-  Destination: agent-archive-001   (/archive/logs/)      [EU-West]  ← Cross-region for compliance
-  
-Route: Reports→Dist
-  Source:      agent-reports-001   (/reports/generated/) [EU-West]
-  Destination: agent-dist-001      (/distribution/)      [EU-West]
-```
-
-##### Communication Flow
-
-1. **Raft Consensus (gRPC, port 9080)**: `quorus-controller1` ↔ `quorus-controller2` ↔ `quorus-controller3` — Leader election, log replication, route configuration sync
-2. **Agent Heartbeats (HTTP, port 8080)**: Each Quorus Agent sends `POST /api/v1/agents/heartbeat` to the controller cluster via `HeartbeatService`
-3. **Job Assignment (HTTP, port 8080)**: The agent fetches assigned work via `GET /api/v1/agents/{agentId}/jobs`. Automatic route-trigger evaluation is target-state behavior and is not wired in the current controller startup path.
-4. **Transfer Execution**: Source agent reads file, transfers via `SimpleTransferEngine` using the appropriate protocol adapter (`SftpTransferProtocol`, `HttpTransferProtocol`, etc.)
-5. **Status Reporting (HTTP, port 8080)**: The agent reports `ACCEPTED`, `IN_PROGRESS`, and terminal state through `POST /api/v1/jobs/{jobId}/status` using attempt identity, expected state, fencing generation, and ordered report sequence. The controller applies attempt, assignment, transfer status, and progress atomically; legacy assignments retain a compatibility path.
-
-In the current R3 remediation, authorization, secret, local-path and request-preparation
-rejections report `FAILED` directly from acknowledged `ACCEPTED`; the pending transfer
-also becomes `FAILED` atomically, without synthetic start/use evidence. Transient lost
-acknowledgements are reconciled by bounded exact-report replay, and an unresolved start
-does not authorize transfer execution. Repeated polls for the same fenced attempt are
-suppressed within the running agent. Durable agent report-outbox recovery and destination
-reconciliation remain Phase 2 work; consult the current
-[implementation checkpoint](../task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md#remediation-checkpoint--2026-09-04)
-and [operator procedure](../../docs/QUORUS_SECURITY_DEPLOYMENT_GUIDE.md#12-pre-execution-failure-and-acknowledgement-reconciliation).
-
-##### Figure 5: Controller-Agent-Route Architecture
-
-```mermaid
-flowchart TD
-    subgraph CP["Control Plane"]
-        C1["Controller 1\n(LEADER)"]
-        C2["Controller 2"]
-        C3["Controller 3"]
-        C1 -.Raft.- C2
-        C1 -.Raft.- C3
-        C2 -.Raft.- C3
-    end
-    
-    subgraph WD["Workflow Definitions"]
-        R1["CRM→Warehouse"]
-        R2["App→Backup"]
-        R3["Logs→Archive"]
-        R4["Reports→Dist"]
-    end
-    
-    CP --> WD
-    
-    subgraph AF["Agent Fleet"]
-        subgraph AE["APAC-East"]
-            A1["agent-crm-001"]
-            A2["agent-warehouse-001"]
-            A3["agent-app-001"]
-        end
-        subgraph AW["APAC-West"]
-            A4["agent-backup-001"]
-            A5["agent-logs-001"]
-        end
-        subgraph EU["EU-West"]
-            A6["agent-archive-001"]
-            A7["agent-reports-001"]
-            A8["agent-dist-001"]
-        end
-    end
-    
-    WD --> AF
-```
-
-#### Route-Based Transfer Sequence
-
-##### Figure 6: Route-Based Transfer Sequence
-
-```mermaid
-sequenceDiagram
-    autonumber
-    participant WD as Workflow Definition
-    participant CTL as Controller
-    participant SA as Source Agent<br/>(agent-crm-001)
-    participant DA as Dest Agent<br/>(agent-warehouse-001)
-    participant FS_S as Source Location<br/>(/crm/export/)
-    participant FS_D as Dest Location<br/>(/warehouse/import/)
-    
-    rect rgb(230, 240, 255)
-        Note over WD,FS_D: Phase 1: Controller Startup & Route Validation
-        WD->>CTL: Load Route Configuration
-        CTL->>CTL: Parse Route Definition
-        CTL->>SA: POST /health (Validation Ping)
-        SA-->>CTL: 200 OK {status: HEALTHY}
-        CTL->>SA: POST /validate-location
-        SA->>FS_S: Check Access Permissions
-        FS_S-->>SA: Access OK
-        SA-->>CTL: 200 OK {location: accessible}
-        CTL->>DA: POST /health (Validation Ping)
-        DA-->>CTL: 200 OK {status: HEALTHY}
-        CTL->>DA: POST /validate-location
-        DA->>FS_D: Check Write Permissions
-        FS_D-->>DA: Write OK
-        DA-->>CTL: 200 OK {location: writable}
-        CTL->>CTL: Route Status → ACTIVE
-        CTL->>SA: POST /configure-monitor {location, patterns, events}
-        SA-->>CTL: 200 OK {monitoring: started}
-    end
-    
-    rect rgb(255, 245, 230)
-        Note over REPO,FS_D: Phase 2: Trigger Detection
-        FS_S->>SA: File System Event: FILE_CREATED
-        SA->>SA: Evaluate: customer-export-2026.json
-        SA->>SA: Check Filters: *.json ✓, size > 1KB ✓
-        SA->>CTL: POST /trigger {routeId, event, file}
-        CTL->>CTL: Evaluate Route Conditions
-        CTL->>CTL: Route Status → TRIGGERED
-    end
-    
-    rect rgb(230, 255, 230)
-        Note over REPO,FS_D: Phase 3: Transfer Execution
-        CTL->>SA: POST /initiate-transfer {jobId, destination}
-        SA->>FS_S: Open File Stream
-        SA->>DA: Stream: File Data (chunked)
-        DA->>FS_D: Write File Chunks
-        DA->>DA: Calculate Checksum
-        DA-->>SA: ACK {checksum: abc123...}
-        SA->>SA: Verify Checksum Match
-        SA-->>CTL: POST /transfer-complete {jobId, success, metrics}
-    end
-    
-    rect rgb(245, 230, 255)
-        Note over REPO,FS_D: Phase 4: Completion & Monitoring
-        CTL->>CTL: Update Route Statistics
-        CTL->>CTL: Route Status → ACTIVE
-        CTL->>CTL: Log: Transfer Metrics
-        Note right of CTL: Files: 1, Bytes: 2.4MB<br/>Duration: 1.2s<br/>Throughput: 2MB/s
-    end
-```
+**Target** (register `ARCH-04`; [specification §8.1](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md#81-routes)). Nothing evaluates a trigger: no evaluator, cron scheduler, file watcher or batch accumulator is wired into controller startup, no route is validated against live agents at startup, and no backup-agent failover exists. A route's source and destination agent fields do not create an agent-to-agent data channel; the current data plane is single-agent execution ([specification §7](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md#7-canonical-data-plane)), and agent-to-agent streaming is a non-goal until it has its own specification. A route evaluator, when built, must run on the leader only, deduplicate triggers, survive leader change, and use the governed service-connection authority that production transfers already use.
 
 ### Raft Consensus Implementation
 
-The Quorus controller implements a distributed consensus system based on the Raft algorithm to ensure high availability, consistency, and fault tolerance across the controller cluster. Route configurations are replicated across the controller quorum to ensure consistency.
+The Quorus controller implements a distributed consensus system based on the Raft algorithm to ensure high availability, consistency, and fault tolerance across the controller cluster. Every controller-managed record, including route configurations, is replicated across the controller quorum. The engine is the in-repository `RaftNode` on Vert.x, with `raftlog-core` 1.2.0 as its write-ahead log; [ADR-0011](../architecture-decisions/ADR-0011-CONSENSUS-VIA-QRAFT-GENERIC-ENGINE.md) replaces it with the generic QRaft engine (plan items `CE-01` to `CE-11`).
 
 ##### Figure 7: Raft Cluster Architecture
 
@@ -1220,12 +623,12 @@ graph TB
         C1_RAFT -.->|Raft Consensus| C3_RAFT
         C2_RAFT -.->|Raft Consensus| C3_RAFT
 
-        subgraph "QuorusStateMachine"
+        subgraph "QuorusStateStore"
             RS1[transferJobs]
-            RS2[agents]
-            RS3[jobAssignments]
-            RS4[jobQueue]
-            RS5[systemMetadata]
+            RS2[transferAttempts / transferEvents]
+            RS3[agents]
+            RS4[jobAssignments / jobQueue]
+            RS5[routes / systemMetadata]
         end
 
         C1_RAFT --> RS1
@@ -1245,62 +648,62 @@ graph TB
         A3[Agent EU-West]
     end
 
-    C1_HTTP -->|Job Assignment| A1
-    C1_HTTP -->|Job Assignment| A2
-    C1_HTTP -->|Job Assignment| A3
-
-    A1 -->|Heartbeat/Status| LB
-    A2 -->|Heartbeat/Status| LB
-    A3 -->|Heartbeat/Status| LB
+    A1 -->|Register/Heartbeat/Poll/Status| LB
+    A2 -->|Register/Heartbeat/Poll/Status| LB
+    A3 -->|Register/Heartbeat/Poll/Status| LB
 
     style C1_RAFT fill:#ff6b6b,color:#fff
     style C2_RAFT fill:#ff9999
     style C3_RAFT fill:#ff9999
 ```
 
+Every node applies committed entries to its own `QuorusStateStore`; the diagram draws the arrows from the leader only. Agents pull their work; the controller never pushes to an agent.
+
 **Key Features:**
 - **Leader Election**: Automatic leader election using Raft consensus algorithm
 - **Log Replication**: All state changes replicated across quorum members
-- **Fault Tolerance**: Tolerates (N-1)/2 failures in N-node cluster
+- **Fault Tolerance**: Tolerates ⌊(N−1)/2⌋ failures in an N-node cluster
 - **Split-Brain Prevention**: Quorum-based decision making prevents split-brain scenarios
-- **Consistent State**: Strong consistency guarantees for all cluster operations
+- **Consistent State**: Committed writes are strongly ordered; reads served by a follower may be stale ([specification §5.4](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md#54-read-consistency))
+- **Snapshots and catch-up**: `RaftNode` takes snapshots of `QuorusStateStore`, compacts the log, and sends `InstallSnapshot` to followers that are too far behind
 
 **Quorum Configuration:**
 - **Minimum Nodes**: 3 controllers for basic HA (tolerates 1 failure)
-- **Recommended**: 5 controllers for production environments (tolerates 2 failures)
+- **Five nodes** tolerate 2 failures; this needs a separately configured static five-node cluster (`docker/compose/docker-compose-5node.yml` is an example)
 - **Odd Numbers**: Always use odd number of controllers for proper quorum
-- **Geographic Distribution**: Controllers distributed across availability zones
-- **Network Partitioning**: Handles network partitions gracefully with majority rule
+- **Geographic Distribution (Target)**: Controllers distributed across availability zones; not evidenced
+- **Network Partitioning**: The majority partition can elect a leader and accept writes; a minority partition cannot
 
 **Controller Services:**
 
 | Service | Implementation | Module | Description |
 |---------|----------------|--------|-------------|
-| Workflow | `SimpleWorkflowEngine` | `quorus-workflow` | YAML parsing, validation, execution |
-| Job Assignment | `JobAssignmentService` | `quorus-controller` | Job-to-agent assignment and scheduling |
-| Agent Selection | `AgentSelectionService` | `quorus-controller` | Selects best agent based on capacity, region, protocols |
-| Tenant | `SimpleTenantService` | `quorus-tenant` | Multi-tenant configuration and isolation |
 | HTTP API | `HttpApiServer` | `quorus-controller` | REST endpoints for agents and clients |
-| Raft Consensus | `RaftNode` | `quorus-controller` | Leader election, log replication |
-| State Machine | `QuorusStateMachine` | `quorus-controller` | Replicated state storage |
+| Raft Consensus | `RaftNode` | `quorus-controller` | Leader election, log replication, snapshots |
+| Replicated state | `QuorusStateStore` | `quorus-controller` | Applies committed commands; implements `RaftLogApplicator` |
+| Job Assignment (not running) | `JobAssignmentService` | `quorus-controller` | Scheduler and assignment-timeout monitor; never constructed (`ENG-01`) |
+| Agent Selection (not running) | `AgentSelectionService` | `quorus-controller` | Tenant, pool and zone-aware agent selection; never constructed (`ENG-01`) |
 
-### Raft Transport Layer (v2.3)
+The workflow engine (`SimpleWorkflowEngine`) and tenant service (`SimpleTenantService`) are not controller services; they run in-process wherever an application calls them.
 
-> **Updated in v2.3**: The Raft transport layer uses type-safe sealed interfaces with pattern matching under the current Java 27 baseline.
+### Raft Transport Layer
 
 The `RaftTransport` interface defines the communication layer for Raft consensus messages between controller nodes:
 
 ```java
 public interface RaftTransport {
     void start(Consumer<RaftMessage> messageHandler);
-    void stop();
+    Future<Void> stop();
     Future<VoteResponse> sendVoteRequest(String targetId, VoteRequest request);
     Future<AppendEntriesResponse> sendAppendEntries(String targetId, AppendEntriesRequest request);
+    Future<InstallSnapshotResponse> sendInstallSnapshot(String targetId, InstallSnapshotRequest request);
     default void setRaftNode(RaftNode node) {}
 }
 ```
 
-#### RaftMessage Sealed Interface (v2.3)
+`Future` here is the Vert.x `io.vertx.core.Future`; the interface goes with the in-repository engine when QRaft replaces it ([ADR-0011](../architecture-decisions/ADR-0011-CONSENSUS-VIA-QRAFT-GENERIC-ENGINE.md)).
+
+#### RaftMessage Sealed Interface
 
 The `RaftMessage` sealed interface provides compile-time type safety for Raft protocol messages:
 
@@ -1326,6 +729,8 @@ private void handleMessage(RaftMessage message) {
 }
 ```
 
+`InstallSnapshot` is not a `RaftMessage` variant: `GrpcRaftServer` calls `RaftNode.handleInstallSnapshot` directly.
+
 #### Transport Implementation Status
 
 | Transport | Status | Class | Description |
@@ -1341,29 +746,34 @@ The `GrpcRaftTransport` provides high-performance, type-safe communication using
 - **Protocol Buffers**: Strongly-typed message definitions via `raft.proto`
 - **gRPC Netty Client**: High-performance HTTP/2 transport
 - **Connection Pooling**: Reuses gRPC channels for cluster nodes via `ConcurrentHashMap`
+- **TLS**: TLS 1.3 mutual authentication when `quorus.security.raft.tls.enabled` is true (the packaged default), configured by `RaftTlsConfig`; `RaftPeerAuthorizationInterceptor` checks inbound peers. Peer certificates are not yet bound to the configured node identities (`SEC-04`), and revocation is checked on inbound RPCs only (`SEC-10`)
 - **Vert.x Integration**: Converts gRPC `ListenableFuture` to Vert.x `Future` using Guava callbacks
 
 **Server Component:** `GrpcRaftServer` handles incoming Raft RPC requests and delegates to `RaftNode`.
 
-**Proto Definition (`quorus-controller/src/main/proto/raft.proto`):**
+**Proto Definition (`quorus-controller/src/main/proto/raft.proto`, abridged):**
 ```protobuf
 service RaftService {
-  rpc RequestVote (VoteRequest) returns (VoteResponse);
-  rpc AppendEntries (AppendEntriesRequest) returns (AppendEntriesResponse);
+  rpc RequestVote (VoteRequest) returns (VoteResponse) {}
+  rpc AppendEntries (AppendEntriesRequest) returns (AppendEntriesResponse) {}
+  rpc InstallSnapshot (InstallSnapshotRequest) returns (InstallSnapshotResponse) {}
 }
 
 message LogEntry {
   int64 term = 1;
   int64 index = 2;
-  bytes data = 3;  // Command payload serialized
+  bytes data = 3; // Command payload serialized
 }
 ```
+
+Replicated commands are encoded by `ProtobufCommandCodec` using `commands.proto`.
 
 **Usage:**
 ```java
 // In QuorusControllerVerticle
-GrpcRaftTransport transport = new GrpcRaftTransport(vertx, nodeId, peerAddresses);
-GrpcRaftServer server = new GrpcRaftServer(vertx, raftPort, raftNode);
+GrpcRaftTransport transport = new GrpcRaftTransport(vertx, nodeId, peerAddresses,
+        raftPoolSize, raftQueueSize, raftTlsConfig);
+GrpcRaftServer server = new GrpcRaftServer(vertx, raftPort, node, raftTlsConfig, trustState);
 server.start();
 ```
 
@@ -1388,7 +798,7 @@ The `InMemoryTransportSimulator` (in test folder) provides fast, deterministic t
 
 ### Leader Election Process
 
-The 3-node Quorus Controller cluster (`quorus-controller1`, `quorus-controller2`, `quorus-controller3`) implements the Raft consensus algorithm for leader election, ensuring strong consistency and fault tolerance. The leader election process is critical for maintaining cluster coordination and preventing split-brain scenarios.
+The 3-node Quorus Controller cluster (`quorus-controller1`, `quorus-controller2`, `quorus-controller3`) implements the Raft consensus algorithm for leader election, ensuring strong consistency and fault tolerance. The leader election process is critical for maintaining cluster coordination and preventing split-brain scenarios. The walkthrough below was checked against `RaftNode` on 2026-10-03; the optimisation strategies and most of the metric names further down are target state and are marked so.
 
 #### Election States and Transitions
 
@@ -1400,16 +810,16 @@ Each Quorus Controller's `RaftNode` operates in one of three states:
 
 #### Election Timing and Randomization
 
-**Election Timeout Configuration (set via `ELECTION_TIMEOUT_MS` and `HEARTBEAT_INTERVAL_MS`):**
+**Election Timeout Configuration (set via `QUORUS_RAFT_ELECTION_TIMEOUT_MS` and `QUORUS_RAFT_HEARTBEAT_INTERVAL_MS`, properties `quorus.raft.election-timeout-ms` and `quorus.raft.heartbeat-interval-ms`):**
 - Election timeout is deployment-specific
-- Repository examples commonly use `3000ms` election timeout and `500ms` heartbeat interval in compose-based cluster startup
-- Controller container defaults use `5000ms` election timeout and `1000ms` heartbeat interval
+- The repository compose topologies use a `3000ms` election timeout and a `500ms` heartbeat interval
+- The packaged defaults, and the controller image's environment defaults, are a `5000ms` election timeout and a `1000ms` heartbeat interval
 - Purpose: Prevent simultaneous elections and reduce split votes
 
 **Timeout Behavior:**
 - FOLLOWER Quorus Controllers reset their election timer on each valid `AppendEntries` heartbeat
-- If no heartbeat received within `ELECTION_TIMEOUT_MS`, the FOLLOWER's `RaftNode` transitions to CANDIDATE
-- Random jitter ensures elections are staggered across `quorus-controller1`, `quorus-controller2`, `quorus-controller3`
+- Each timer is drawn at random between the configured election timeout and twice that value (`RaftNode.resetElectionTimer`); if it expires without a heartbeat, the FOLLOWER's `RaftNode` transitions to CANDIDATE
+- The random spread staggers elections across `quorus-controller1`, `quorus-controller2`, `quorus-controller3`
 
 #### Detailed Election Algorithm
 
@@ -1418,7 +828,8 @@ Each Quorus Controller's `RaftNode` operates in one of three states:
 2. **State Transition**: The `RaftNode` transitions from FOLLOWER to CANDIDATE
 3. **Term Increment**: Current Raft term is incremented by 1
 4. **Self-Vote**: The CANDIDATE Quorus Controller votes for itself
-5. **Timer Reset**: New randomized election timeout is set
+5. **Durable Vote**: The new term and self-vote are persisted to Raft storage before any `RequestVote` is sent; if the write fails the node falls back to FOLLOWER
+6. **Timer Reset**: New randomized election timeout is set
 
 **Phase 2: Vote Request Process**
 1. **Vote Request Creation**: The CANDIDATE's `RaftNode` creates a `RequestVote` message with:
@@ -1444,6 +855,8 @@ Each Quorus Controller receiving a `RequestVote` evaluates:
 4. **State Initialization**: The new LEADER's `RaftNode` initializes `nextIndex` and `matchIndex` for the two FOLLOWER Quorus Controllers
 
 #### Election Scenarios and Edge Cases
+
+The two diagrams below use a five-node cluster (a separately configured static membership, as in `docker-compose-5node.yml`) to show majorities more clearly; with three nodes the majority is two.
 
 **Successful Election:**
 ```mermaid
@@ -1512,13 +925,13 @@ sequenceDiagram
 
 **Network Partition Handling:**
 - **Majority Partition**: Continues normal operations with new leader if needed
-- **Minority Partition**: Cannot elect leader, enters read-only mode
+- **Minority Partition**: Cannot elect a leader or commit; its API rejects writes with `503 NOT_LEADER` or `NO_LEADER`, and any reads it serves may be stale (there is no explicit read-only mode)
 - **Partition Healing**: Minority nodes automatically rejoin majority partition
 - **Split-Brain Prevention**: Quorum requirement prevents dual leadership
 
 **Node Recovery Process:**
-1. **Rejoining Cluster**: Recovered node starts as follower
-2. **Log Synchronization**: Receives missing log entries from current leader
+1. **Rejoining Cluster**: Recovered node recovers its term, vote, log and latest snapshot from local Raft storage and starts as follower
+2. **Log Synchronization**: Receives missing log entries from current leader, or an `InstallSnapshot` if the leader has compacted them
 3. **State Reconciliation**: Updates local state to match cluster consensus
 4. **Full Participation**: Resumes normal voting and operation handling
 
@@ -1530,7 +943,7 @@ sequenceDiagram
 - **Throughput**: No impact on read operations, brief pause for writes during leader transition
 - **Scalability**: Election behavior depends on quorum size, timing configuration, and network stability
 
-**Optimization Strategies:**
+**Optimization Strategies (Target; none is implemented in `RaftNode`):**
 - **Pre-Vote Phase**: Optional pre-election to reduce disruptions
 - **Priority Elections**: Higher priority nodes can trigger faster elections
 - **Lease-Based Leadership**: Reduce election frequency with leader leases
@@ -1538,14 +951,14 @@ sequenceDiagram
 
 #### Monitoring and Observability
 
-**Key Metrics for Leader Election:**
-- `raft.election.count`: Total number of elections initiated
-- `raft.election.duration_ms`: Time taken for successful elections
-- `raft.leader.changes`: Frequency of leadership changes
-- `raft.vote.requests_sent`: Number of vote requests sent per election
-- `raft.vote.requests_received`: Number of vote requests received
-- `raft.heartbeat.missed`: Count of missed heartbeats per follower
-- `raft.term.current`: Current term number across cluster
+**Metrics recorded today** (OpenTelemetry instrument names; Prometheus shows them with `_` for `.`):
+- `quorus.cluster.state`, `quorus.cluster.is_leader`: Raft role of this node
+- `quorus.cluster.term`: Current term
+- `quorus.cluster.commit_index`, `quorus.cluster.last_applied`, `quorus.cluster.log_size`: Replication progress
+- `quorus.raft.rpc.vote_requests`, `quorus.raft.rpc.append_entries`, `quorus.raft.rpc.total`: Raft RPC counts
+- `quorus.raft.snapshot.total`, `quorus.raft.snapshot.duration`, `quorus.raft.install_snapshot.sent.total`, `quorus.raft.install_snapshot.received.total`: Snapshot activity
+
+**Target metrics** (not recorded today): election count and duration, leader changes, and missed heartbeats per follower.
 
 **Health Indicators:**
 - **Stable Leadership**: Low frequency of leader changes indicates healthy cluster
@@ -1560,45 +973,46 @@ sequenceDiagram
 
 **Troubleshooting Guide:**
 1. **Frequent Elections**: Check network connectivity and node health
-2. **Split Votes**: Verify clock synchronization across nodes
+2. **Split Votes**: Repeated split votes suggest an election timeout too close to network or storage latency; Raft does not depend on synchronized clocks
 3. **Slow Elections**: Investigate network latency and node performance
 4. **Failed Elections**: Check quorum size (need 2 of 3 Quorus Controllers) and container availability
 
 ### Quorus Controller Functions and Responsibilities
 
-The Quorus Controller (`quorus-controller` module) serves as the **distributed coordination engine** for the entire Quorus file transfer system. Each Quorus Controller (e.g., `quorus-controller1`) is a self-contained Docker container that combines `RaftNode` consensus, `QuorusStateMachine` state management, and `HttpApiServer` API capabilities.
+The Quorus Controller (`quorus-controller` module) serves as the **distributed coordination engine** for the entire Quorus file transfer system. Each Quorus Controller (e.g., `quorus-controller1`) is a self-contained Docker container that combines `RaftNode` consensus, `QuorusStateStore` replicated state, and `HttpApiServer` API capabilities.
 
 #### Core Quorus Controller Functions
 
 **1. Distributed Consensus (`RaftNode` + `GrpcRaftTransport`)**
 - **Leader Election**: Automatically elects a LEADER from `quorus-controller1`, `quorus-controller2`, `quorus-controller3`
 - **Log Replication**: Ensures all Quorus Controllers have consistent Raft command logs via `AppendEntries`
-- **Consensus**: Guarantees majority (2 of 3) agreement before applying changes to `QuorusStateMachine`
+- **Consensus**: Guarantees majority (2 of 3) agreement before a command is committed and applied to `QuorusStateStore`
 - **Fault Tolerance**: Continues operating if 1 Quorus Controller fails (2 of 3 = quorum)
 
-**2. State Machine Management (`QuorusStateMachine`)**
-- **Transfer Job Management**: Creates, updates, and tracks Quorus file transfer jobs
-- **Quorus Agent Fleet Management**: Registers, monitors, and coordinates Quorus Agents
-- **System Metadata**: Maintains cluster configuration and settings
-- **State Persistence**: Takes snapshots and handles recovery
+**2. Replicated State (`QuorusStateStore`)**
+- **Transfer Job Management**: Creates, updates, and tracks transfer jobs, their attempts and their ordered events
+- **Quorus Agent Records**: Registrations, capabilities, status and heartbeat timestamps
+- **Assignments, Queue and Routes**: Job assignments, the job queue, and route configurations
+- **System Metadata**: Key–value metadata, including the service-connection and secret-reference registry
+- **State Persistence**: Supplies snapshots to `RaftNode` and restores from them
 
-**3. Job Scheduling & Coordination**
-- **Job Assignment**: Assigns transfer jobs to appropriate Quorus Agents
-- **Load Balancing**: Distributes work across available Quorus Agents
-- **Progress Tracking**: Monitors transfer job status and progress via `JobStatusReportingService`
-- **Failure Handling**: Reschedules failed transfers
+**3. Job Scheduling & Coordination (Target, register `ENG-01` with `P2-01`)**
+- **Job Assignment**: Today a caller assigns a job with `POST /api/v1/assignments`; no controller component assigns jobs by itself
+- **Load Balancing**: Not implemented; `AgentSelectionService` exists but is never constructed
+- **Progress Tracking (Current)**: Records transfer status and progress from agents' reports to `POST /api/v1/jobs/{jobId}/status` (sent by the agent's `JobStatusReportingService`)
+- **Failure Handling**: Lease expiry, reassignment and rescheduling are not automated (`P2-01`, `P2-08`)
 
 **4. Quorus Agent Fleet Management**
-- **Agent Registration**: Onboards new Quorus Agents via `AgentRegistrationService`
-- **Heartbeat Processing**: Monitors Quorus Agent health via `HeartbeatService`
-- **Capability Management**: Tracks what protocols each Quorus Agent supports (SFTP, FTP, HTTP, SMB)
-- **Fleet Coordination**: Manages the entire Quorus Agent ecosystem
+- **Agent Registration (Current)**: Commits registrations sent by the agent's `AgentRegistrationService`
+- **Heartbeat Processing (Current)**: Commits heartbeats sent by the agent's `HeartbeatService`; nothing on the controller yet marks an agent unhealthy when heartbeats stop
+- **Capability Management (Current)**: Records the protocols and limits each agent declares
+- **Fleet Coordination (Target)**: Enrollment, drain, upgrade, quarantine and revocation ([specification §10.7](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md#107-secure-agent-build-and-deployment-lifecycle))
 
 **5. `HttpApiServer`**
-- **Health Monitoring**: `/health` endpoint provides Quorus Controller cluster health and Raft state
-- **API Endpoints**: REST APIs for workflow submission, agent registration, job management
-- **Cluster Status**: current deployments expose `/raft/status`; the richer `/api/v1/cluster` resource is required by the canonical REST specification but is not implemented today
-- **Metrics**: `/metrics` provides Prometheus metrics (`quorus_cluster_*`, `quorus_raft_*`)
+- **Health Monitoring**: `/health`, `/health/live` and `/health/ready` report node health and Raft state
+- **API Endpoints**: REST APIs for transfers, attempts, progress and events, assignments, agents, routes, service connections, secret references and security; there are no workflow resources
+- **Cluster Status**: `/status` and `/raft/status`; the richer `/api/v1/cluster` resource is required by the canonical REST specification but is not implemented today
+- **Metrics**: `/metrics` serves Prometheus metrics (`quorus_cluster_*`, `quorus_raft_*`, `quorus_jobs_*`, `quorus_agents_*`, `quorus_routes_*`)
 
 #### Quorus Controller Architecture Diagram
 
@@ -1606,45 +1020,42 @@ The Quorus Controller (`quorus-controller` module) serves as the **distributed c
 graph TB
     subgraph "Quorus Controller Core Functions"
         RAFT[RaftNode + GrpcRaftTransport]
-        SM[QuorusStateMachine]
+        SM[QuorusStateStore]
         API[HttpApiServer]
 
-        RAFT --> SM
-        SM --> API
+        API -->|submitCommand| RAFT
+        RAFT -->|apply committed| SM
+        SM -->|reads| API
     end
 
-    subgraph "State Management"
-        TJ[Transfer Jobs]
-        AG[Agent Fleet]
+    subgraph "Replicated State"
+        TJ[Transfer Jobs, Attempts, Events]
+        AG[Agents]
+        AS[Assignments and Queue]
+        RT[Routes]
         SYS[System Metadata]
-        WF[Workflows]
 
         SM --> TJ
         SM --> AG
+        SM --> AS
+        SM --> RT
         SM --> SYS
-        SM --> WF
     end
 
     subgraph "Operations"
-        SCHED[Job Scheduling]
-        COORD[Agent Coordination]
-        MON[Health Monitoring]
+        MON[Health and Metrics]
         SNAP[Snapshotting]
 
-        TJ --> SCHED
-        AG --> COORD
         API --> MON
-        SM --> SNAP
+        RAFT --> SNAP
     end
 
     subgraph "External Interfaces"
-        AGENTS[Agents]
-        APISVR[API Server]
-        CLI[CLI Tools]
+        AGENTS[Agents: register, heartbeat, poll, report]
+        CLIENTS[HTTP API clients]
 
-        COORD --> AGENTS
-        MON --> APISVR
-        API --> CLI
+        AGENTS --> API
+        CLIENTS --> API
     end
 
     style RAFT fill:#c8e6c9
@@ -1654,49 +1065,53 @@ graph TB
 
 ### Data Protection and Consistency Guarantees
 
-The controller implements comprehensive data protection through Raft consensus, ensuring no loss of critical operational metadata while maintaining strong consistency across the distributed cluster.
+The controller protects its coordination metadata through Raft consensus: committed commands are ordered, replicated to a majority and durable on each node's Raft storage. This is not an unconditional no-loss guarantee (see the end of this section). Which state Raft owns is defined normatively in [specification §5.2](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md#52-state-ownership).
 
 #### Data Classification and Protection Levels
 
 ```mermaid
 graph TB
-    subgraph "STRONGLY CONSISTENT DATA (Raft Protected)"
-        TJ[Transfer Jobs<br/>• Job ID, Status<br/>• Source/Destination<br/>• Progress, Errors<br/>• Assignment Info]
-        SM[System Metadata<br/>• Configuration<br/>• Version Info<br/>• Cluster Settings]
-        WF[Workflow Definitions<br/>• YAML Configs<br/>• Dependencies<br/>• Execution State]
-        TC[Tenant Config<br/>• Permissions<br/>• Quotas<br/>• Settings]
+    subgraph "RAFT-REPLICATED STATE (QuorusStateStore)"
+        TJ[Transfer Jobs, Attempts, Events<br/>• Job ID, Status, Progress<br/>• Source/Destination<br/>• Fencing generation, lease<br/>• Operational context]
+        AG[Agents and Heartbeats<br/>• Registration, Capabilities<br/>• Status, Last heartbeat]
+        AS[Assignments, Queue, Routes]
+        SM[System Metadata<br/>• Service-connection and<br/>secret-reference registry]
     end
 
-    subgraph "EVENTUALLY CONSISTENT DATA (Not Raft Protected)"
-        AH[Agent Heartbeats<br/>• Health Status<br/>• Capacity Info<br/>• Performance Metrics]
-        RT[Real-time Metrics<br/>• Transfer Rates<br/>• Resource Usage<br/>• Temporary Stats]
+    subgraph "NOT IN RAFT"
+        WF[Workflow definitions and executions<br/>in-process only]
+        TC[Tenant model and quotas<br/>quorus-tenant, in-process only]
+        RT[Metrics, traces, logs<br/>observability backend]
+        AUD[Security audit chains<br/>per-node hash-chained files]
     end
 
     subgraph "Raft Consensus Engine"
-        LOG[Raft Log<br/>Replicated Commands]
-        SNAP[Snapshots<br/>Periodic State Backup]
+        LOG[Raft Log<br/>raftlog-core WAL]
+        SNAP[Snapshots<br/>FileSnapshotStore]
     end
 
     TJ --> LOG
+    AG --> LOG
+    AS --> LOG
     SM --> LOG
-    WF --> LOG
-    TC --> LOG
 
     LOG --> SNAP
 
     style TJ fill:#c8e6c9
+    style AG fill:#c8e6c9
+    style AS fill:#c8e6c9
     style SM fill:#c8e6c9
-    style WF fill:#c8e6c9
-    style TC fill:#c8e6c9
-    style AH fill:#fff3e0
+    style WF fill:#fff3e0
+    style TC fill:#fff3e0
     style RT fill:#fff3e0
+    style AUD fill:#fff3e0
     style LOG fill:#e1f5fe
     style SNAP fill:#e1f5fe
 ```
 
-#### Strongly Consistent Data (Raft Protected)
+#### Raft-Replicated Data
 
-**Transfer Job Data:**
+**Transfer Job Data** (`TransferJobSnapshot`, abridged; the class has further fields for the governed service connection, policy digest, agent pool and resolved addresses):
 ```java
 public class TransferJobSnapshot implements Serializable {
     private final String jobId;
@@ -1706,62 +1121,62 @@ public class TransferJobSnapshot implements Serializable {
     private final long bytesTransferred;
     private final long totalBytes;
     private final Instant startTime;
+    private final Instant lastUpdateTime;
+    private final Instant lastProgressAt;
     private final String errorMessage;
+    private final String tenantId;
+    private final TransferOperationalContext operationalContext;
 }
 ```
 
 **Protected Information:**
-- **Job Assignments**: Which agent is handling which transfer
-- **Transfer Status**: PENDING, IN_PROGRESS, COMPLETED, FAILED
-- **Progress Tracking**: Bytes transferred, completion percentage
-- **Error Information**: Failure reasons and recovery state
-- **Metadata**: Source/destination paths, timing information
+- **Job Assignments and Attempts**: Which agent is handling which transfer, under which attempt, fencing generation and lease
+- **Transfer Status**: `PENDING`, `IN_PROGRESS`, `COMPLETED`, `FAILED`, `CANCELLED`, `PAUSED`
+- **Progress Tracking**: Bytes transferred, last-progress time
+- **Error Information**: Failure reasons
+- **Metadata**: Source/destination paths, timing information, operational context
+- **Agent Records**: Registration, capabilities, status and heartbeat timestamps — heartbeats are committed through Raft today ([specification §5.2](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md#52-state-ownership))
+- **Routes**: Route configurations and lifecycle status
 
 **System Metadata:**
-- **Configuration**: Cluster settings and operational parameters
-- **Version Information**: System version and compatibility data
-- **Cluster Settings**: Node configurations and network topology
+- **Registry**: Versioned service connections and opaque secret references (never secret values)
+- **Other metadata**: Key–value settings supplied at startup or by commands
 
-**Workflow Definitions:**
-- **YAML Configurations**: Complete workflow specifications
-- **Dependencies**: Inter-job dependencies and sequencing
-- **Execution State**: Current workflow execution status
+Workflow definitions, workflow executions and tenant configuration are **not** replicated: the workflow engine and tenant service run in-process and the controller does not use them.
 
 #### Data Loss Prevention Mechanisms
 
 **1. Raft Log Replication**
-```java
-// PERSISTENT STATE - In production, persisted to stable storage
-private final AtomicLong currentTerm = new AtomicLong(0);
-private volatile String votedFor = null;
-private final List<LogEntry> log = new CopyOnWriteArrayList<>();
-```
+
+`RaftNode` keeps the current term, vote and log in memory and persists them through `RaftStorage`, implemented by `RaftLogStorageAdapter` over `raftlog-core` 1.2.0 (fsync on by default, `quorus.raft.storage.fsync`). On restart it recovers term, vote and log from that storage.
 
 **Process:**
-1. **Command Submission**: All state changes go through Raft as commands
-2. **Log Replication**: Commands are replicated to majority of nodes (3 out of 5)
+1. **Command Submission**: All state changes go through Raft as commands (`RaftNode.submitCommand`)
+2. **Log Replication**: Commands are replicated to a majority of nodes (2 of 3, or 3 of 5)
 3. **Commit Confirmation**: Only committed when majority acknowledges
-4. **State Application**: Commands applied to state machine only after commit
+4. **State Application**: Commands applied to `QuorusStateStore` only after commit
 
 **2. Snapshot Protection**
+
+`QuorusStateStore.takeSnapshot()` serialises every map (jobs, agents, metadata, assignments, queue, routes, attempts, active attempts, events) and the last applied index into a `QuorusSnapshot` with Jackson:
 ```java
 @Override
 public byte[] takeSnapshot() {
     QuorusSnapshot snapshot = new QuorusSnapshot();
     snapshot.setTransferJobs(new ConcurrentHashMap<>(transferJobs));
+    snapshot.setAgents(new ConcurrentHashMap<>(agents));
     snapshot.setSystemMetadata(new ConcurrentHashMap<>(systemMetadata));
+    // ... job assignments, job queue, routes, transfer attempts,
+    //     active attempt by job, transfer events
     snapshot.setLastAppliedIndex(lastAppliedIndex.get());
-
-    byte[] data = objectMapper.writeValueAsBytes(snapshot);
-    logger.info("Created snapshot with " + transferJobs.size() + " transfer jobs");
-    return data;
+    return objectMapper.writeValueAsBytes(snapshot);
 }
 ```
 
 **Benefits:**
-- **Periodic Backups**: Complete state snapshots taken regularly
-- **Fast Recovery**: New nodes can catch up quickly
-- **Log Compaction**: Reduces storage requirements
+- **Periodic snapshots**: `RaftNode` takes a snapshot when more than `quorus.raft.snapshot.threshold` entries (default 10000) have been applied since the last one
+- **Fast Recovery**: Lagging or new followers receive an `InstallSnapshot`
+- **Log Compaction**: Reduces storage requirements; WAL prefix deletion follows durable snapshot publication ([specification §5.5](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md#55-persistence-requirements))
 - **Consistency**: Snapshots are point-in-time consistent
 
 #### Failure Scenarios and Data Protection
@@ -1776,7 +1191,7 @@ Result:         No committed metadata loss, assuming durable correctly mounted s
 **Scenario 2: Network Partition**
 ```
 Partition A: 2 Quorus Controllers (majority) - Can continue operations
-Partition B: 1 Quorus Controller (minority) - Becomes read-only
+Partition B: 1 Quorus Controller (minority) - Rejects writes; any reads it serves may be stale
 Result:      Majority partition can preserve committed metadata consistency under the stated storage assumptions
 ```
 
@@ -1789,6 +1204,8 @@ Result:      Majority partition can preserve committed metadata consistency unde
 Result: Committed metadata remains recoverable under the stated quorum and durable-storage assumptions
 ```
 
+The client in Scenario 3 sees a failure or timeout although the change committed. Retrying safely needs idempotency keys, which do not exist yet (`ARCH-05`, `P2-04`).
+
 #### What Data is NOT Protected
 
 **Important Clarification: File Content is NOT Stored in Quorus Controllers**
@@ -1797,27 +1214,24 @@ The Quorus Controllers do **NOT** store the actual file data being transferred. 
 - **Coordination** information
 - **Status** and progress tracking
 
-**Eventually Consistent Data (Not Raft Protected):**
-- **Quorus Agent Heartbeats**: Can be lost and recovered through re-registration via `AgentRegistrationService`
-- **Real-time Performance Metrics**: Can be regenerated from current state
-- **Temporary Status Information**: Rebuilt during normal operations
-- **Cache Data**: Reconstructed as needed
+**Not Raft Protected:**
+- **Real-time Performance Metrics**: Exported to the observability backend; can be regenerated from current state
+- **Agent-local state**: Active protocol sessions and staging files on the agent
+- **Security audit records**: Written by each controller to its own hash-chained files, not replicated
+- **Runtime revocations**: Node-local and volatile (`DR-Q2`)
 
 #### Business Impact of Data Protection
 
-**With Raft Protection (via `RaftNode` and `QuorusStateMachine`):**
-- ✅ No lost transfer jobs
-- ✅ No duplicate transfers
-- ✅ Consistent job assignments to Quorus Agents
-- ✅ Reliable progress tracking
-- ✅ Audit trail preservation
+**With Raft Protection (via `RaftNode` and `QuorusStateStore`):**
+- ✅ No lost committed transfer jobs, under the quorum and durable-storage assumptions
+- ✅ Consistent job assignment records across controllers
+- ✅ Reliable progress records for what agents have reported
+- ⚠️ Duplicate transfers are still possible: consensus protects the assignment metadata but not the external side effect, and automatic reassignment, destination fencing and reconciliation are incomplete ([specification §6.2](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md#62-delivery-semantics))
 
 **Without Raft Protection:**
 - ❌ Transfer jobs could disappear
 - ❌ Duplicate transfers possible
 - ❌ Inconsistent job assignments
-- ❌ Lost progress information
-- ❌ Broken audit trails
 
 The Quorus Controller cluster is intended to preserve committed coordination metadata through quorum replication. This is not an unconditional no-loss guarantee: durable storage, correct volume mounting, snapshots, restore testing, quorum, and the release gates in the canonical architecture specification are required.
 
@@ -1830,8 +1244,8 @@ The Quorus architecture implements a **loosely coupled** relationship between th
 ```mermaid
 graph TB
     subgraph "External Clients"
-        CLI[CLI Client]
-        WEB[Web UI]
+        CLI[HTTP API clients]
+        WEB[Gateway]
         AGENT[Quorus Agents]
     end
 
@@ -1881,51 +1295,65 @@ graph TB
 
 **1. Leader Discovery**
 
-When `HttpApiServer` receives a current write request on a FOLLOWER, it rejects the request and allows the client or trusted routing tier to retry against the leader:
+When `HttpApiServer` receives a write request on a FOLLOWER, the `LeaderGuardHandler` in its router chain rejects it, and the client or trusted routing tier retries against the leader. Abridged from `LeaderGuardHandler`:
 
 ```java
-/**
- * HttpApiServer checks if local RaftNode is LEADER before processing writes.
- * If not LEADER, returns 503 NOT_LEADER. No authenticated redirect is issued.
- */
-private void handleWriteRequest(RoutingContext ctx) {
-    if (raftNode.getState() != RaftNode.State.LEADER) {
-        ctx.response()
-            .setStatusCode(503)
-            .putHeader("Content-Type", "application/problem+json")
-            .putHeader("Retry-After", "1")
-            .end("{\"code\":\"NOT_LEADER\",\"retryable\":true}");
+@Override
+public void handle(RoutingContext ctx) {
+    String path = ctx.request().path();
+    // Only API writes are guarded; health, metrics, Raft status and reads pass,
+    // as do the two node-local security writes
+    if (!isWriteMethod(ctx) || !isApiPath(path) || isNodeLocalWrite(ctx, path)) {
+        ctx.next();
         return;
     }
-    // Process write on LEADER
-    raftNode.propose(command).onComplete(ar -> { ... });
+    if (raftNode.isLeader()) {
+        ctx.next();
+        return;
+    }
+    String leaderId = raftNode.getLeaderId();
+    if (leaderId != null && !leaderId.isEmpty()) {
+        ctx.fail(QuorusApiException.notLeader(leaderId));   // 503, code NOT_LEADER
+    } else {
+        ctx.fail(QuorusApiException.noLeader());            // 503, code NO_LEADER
+    }
 }
 ```
 
+`GlobalErrorHandler` turns the failure into an `application/problem+json` body carrying the code and the leader ID. No redirect and no `Retry-After` header is sent. On the leader, the handler builds a `RaftCommand` and calls `raftNode.submitCommand(command)`, which completes when the command is committed and applied.
+
+The node-local exemption means `PUT /api/v1/security/trust/revocations` and `POST /api/v1/security/authorization/check` work on followers, which the per-node revocation procedure needs (register `SEC-09`).
+
 **2. Automatic Failover**
 
-When the LEADER fails, `RaftNode` on each Quorus Controller detects the missing heartbeats and triggers an election:
+When the LEADER fails, each follower's election timer stops being reset by heartbeats and fires. Abridged from `RaftNode`:
 
 ```java
-// Inside RaftNode election timeout handler
-private void onElectionTimeout() {
-    if (state == State.FOLLOWER && !receivedHeartbeat) {
-        logger.info("No heartbeat from LEADER, starting election for term {}", currentTerm + 1);
-        becomeCandidate();
-        requestVotes();  // via GrpcRaftTransport to other controllers
+private void resetElectionTimer() {
+    if (electionTimerId != -1) {
+        vertx.cancelTimer(electionTimerId);
     }
+    long timeout = electionTimeoutMs + (long) (Math.random() * electionTimeoutMs);
+    electionTimerId = vertx.setTimer(timeout, id -> startElection());
+}
+
+private void startElection() {
+    state = State.CANDIDATE;
+    currentTerm++;
+    votedFor = nodeId;
+    // Persist term + self vote, then requestVotes() via GrpcRaftTransport
 }
 ```
 
 **3. Request Routing via nginx**
 
-The `nginx` load balancer at port 8080 distributes requests across all three Quorus Controllers:
+The `nginx` load balancer at port 8080 distributes requests across all three Quorus Controllers (`docker/compose/nginx/nginx.conf`, abridged). It is not leader-aware, so writes that reach a follower get `503 NOT_LEADER` ([specification §9.2](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md#92-client-and-load-balancer-requirements)):
 
 ```nginx
 upstream quorus_controllers {
-    server quorus-controller1:8080;
-    server quorus-controller2:8080;
-    server quorus-controller3:8080;
+    server controller1:8080 max_fails=3 fail_timeout=30s;
+    server controller2:8080 max_fails=3 fail_timeout=30s;
+    server controller3:8080 max_fails=3 fail_timeout=30s;
 }
 ```
 
@@ -1938,7 +1366,7 @@ upstream quorus_controllers {
 
 **Scalability:**
 - Size the static controller membership before startup; live add/remove operations require a future dynamic-membership design
-- `nginx` automatically routes to healthy controllers
+- `nginx` passively stops routing to a controller after repeated failures (`max_fails=3`); it is not leader-aware
 - Each controller handles both HTTP and Raft traffic
 
 **Simplicity:**
@@ -1956,6 +1384,7 @@ upstream quorus_controllers {
 **Intra-Cluster (Raft Protocol via gRPC, port 9080):**
 - `AppendEntries` — LEADER replicates log entries to FOLLOWERs
 - `RequestVote` — CANDIDATEs request votes during elections
+- `InstallSnapshot` — LEADER sends a snapshot to a follower whose missing entries were compacted
 - Handled by `GrpcRaftTransport` and `GrpcRaftServer`
 
 **Client-to-Controller (HTTP REST, port 8080):**
@@ -1967,270 +1396,118 @@ upstream quorus_controllers {
 - `POST /api/v1/agents/register` — Alpha agent registration at startup
 - `POST /api/v1/agents/heartbeat` — Periodic heartbeats from `HeartbeatService`
 - `GET /api/v1/agents/{agentId}/jobs` — Job polling by `JobPollingService`
-- `POST /api/v1/jobs/{jobId}/status` — Compatibility status reporting by `JobStatusReportingService`
+- `POST /api/v1/jobs/{jobId}/status` — Attempt-aware status and progress reports by `JobStatusReportingService`
 
 ## Reliability and Health Monitoring
 
-### System Reliability Improvements
-
-The controller-first architecture includes several critical reliability improvements that address common failure modes in distributed systems:
-
-#### Health Check Configuration
-**Problem Resolved**: Docker health checks were using incorrect endpoints (`/q/health` vs `/health`)
-**Solution**: Standardized health endpoints across all components
-**Impact**: Accurate container health reporting and proper load balancer routing
-
-```yaml
-# Corrected health check configuration
-healthcheck:
-  test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-  interval: 10s
-  timeout: 5s
-  retries: 3
-  start_period: 30s
-```
-
-#### Sequence Number Persistence
-**Problem Resolved**: In-memory sequence number tracking caused heartbeat rejection after restarts
-**Solution**: Enhanced sequence number validation with restart detection
-**Impact**: Graceful handling of controller restarts without agent re-registration
-
-```java
-// Enhanced sequence number validation
-if (lastSeqNum == null) {
-    // First heartbeat from this agent since server startup
-    logger.info("First heartbeat received from agent " + agentId +
-               " since server startup, sequence: " + request.getSequenceNumber());
-}
-```
-
-#### Load Balancer Integration
-**Problem Resolved**: Single point of failure with single API endpoint
-**Solution**: Nginx load balancer with health-aware routing
-**Impact**: High availability with automatic failover to healthy controllers
-
-```nginx
-upstream quorus_controllers {
-    server controller1:8080 max_fails=3 fail_timeout=30s;
-    server controller2:8080 max_fails=3 fail_timeout=30s;
-    server controller3:8080 max_fails=3 fail_timeout=30s;
-}
-```
+**Status: Partly current.** The endpoints, health JSON and metric names are current (checked against `HealthHandler`, `ReadinessHandler` and the OpenTelemetry instruments on 2026-10-03); the fault-tolerance patterns are mostly target. The former "System Reliability Improvements" changelog is archived section I.
 
 ### Health Monitoring Architecture
 
 #### Multi-Level Health Checks
 
-**Application Level:**
-- `/health` - Overall application health
-- `/health/ready` - Readiness for traffic
+**Application Level (controller):**
+- `/health` - Overall node health: Raft running, free disk space (at least 100 MB) and memory; `503` with status `DEGRADED` otherwise
+- `/health/ready` - Readiness: Raft running and a leader known; `503` otherwise
 - `/health/live` - Process liveness
+- `/status` and `/raft/status` - Node and Raft status
 
 **Infrastructure Level:**
-- Docker container health checks
-- Load balancer health probes
-- Kubernetes readiness/liveness probes (when applicable)
+- Docker container health checks (the image and compose files probe `/health/live`)
+- Load balancer health probes (see the nginx caveat under [Deployment Configurations](#deployment-configurations))
+- Kubernetes probes: none are shipped; Quorus provides no Kubernetes manifests
 
 **Cluster Level:**
 - Raft consensus health
 - Leader election status
-- Node connectivity
+- Node connectivity (Target: not reported by any endpoint today)
 
 #### Health Check Response Format
 
+`GET /health` (from `HealthHandler`; disk and memory are refreshed every 30 seconds on a worker thread):
+
 ```json
 {
   "status": "UP",
-  "timestamp": "2025-08-26T10:30:00Z",
+  "version": "1.0.0-alpha",
+  "timestamp": "2026-10-03T10:30:00Z",
+  "nodeId": "controller1",
+  "raft": {
+    "state": "LEADER",
+    "term": 3,
+    "commitIndex": 1287,
+    "isLeader": true,
+    "leaderId": "controller1"
+  },
   "checks": {
-    "raft": {
-      "status": "UP",
-      "nodeId": "controller1",
-      "state": "LEADER",
-      "clusterSize": 3,
-      "healthyNodes": 3
-    },
-    "database": {
-      "status": "UP",
-      "connectionPool": "healthy"
-    },
-    "storage": {
-      "status": "UP",
-      "diskSpace": "85% available"
-    }
+    "raftCluster": "UP",
+    "diskSpace": "UP",
+    "memory": "UP"
   }
 }
 ```
 
-#### Transfer Engine Health Monitoring (v2.1)
+There is no database check: the controller has no database. `diskSpace` and `memory` report `WARNING` rather than `DOWN` when low.
 
-> **New in v2.1**: Enhanced health check capabilities with protocol-level monitoring and transfer metrics.
+#### Transfer Engine Health Monitoring
 
-**TransferEngineHealthCheck:**
-Aggregates health status from all transfer protocols and provides system-level diagnostics:
+**Current, in-process only.** `TransferEngine.getHealthCheck()` returns a `TransferEngineHealthCheck` (`quorus-core`, package `monitoring`) that aggregates a `ProtocolHealthCheck` per registered protocol, with status `UP`, `DOWN` or `DEGRADED`:
 
 ```java
 TransferEngineHealthCheck healthCheck = transferEngine.getHealthCheck();
-// Returns: UP, DOWN, or DEGRADED status with per-protocol details
+// Overall status plus per-protocol ProtocolHealthCheck entries and system metrics
 ```
 
-**Response Format:**
-```json
-{
-  "status": "UP",
-  "timestamp": "2026-01-11T10:30:00Z",
-  "message": "Transfer engine operational",
-  "protocols": [
-    {
-      "protocol": "http",
-      "status": "UP",
-      "message": "HTTP protocol healthy"
-    },
-    {
-      "protocol": "sftp",
-      "status": "DEGRADED",
-      "message": "High failure rate: 15%"
-    }
-  ],
-  "summary": {
-    "totalProtocols": 4,
-    "healthyProtocols": 3,
-    "unhealthyProtocols": 1
-  }
-}
-```
-
-**ProtocolHealthCheck:**
-Per-protocol health status with diagnostic details:
-- `UP` - Protocol is healthy and operational
-- `DOWN` - Protocol is not operational
-- `DEGRADED` - Protocol is operational but experiencing issues
-
-**TransferMetrics:**
-Thread-safe metrics collection for each protocol:
-- Transfer counts (total, successful, failed, active)
-- Byte throughput and transfer rates
-- Duration statistics (min, max, average)
-- Error breakdown by type
-- Success rate calculation
-
-```java
-TransferMetrics metrics = transferEngine.getProtocolMetrics("sftp");
-Map<String, Object> metricsMap = metrics.toMap();
-// Includes: totalTransfers, successRate, bytesPerSecond, averageDurationMs, etc.
-```
+The controller does not run a transfer engine, so this is not part of its `/health`. The per-protocol statistics behind it come from the JVM-wide `TransferTelemetryMetrics` singleton, so engines that share a JVM see each other's protocols (register `ENG-11`). There is no `TransferMetrics` class and no `getProtocolMetrics` method.
 
 #### Monitoring Integration
 
-**Prometheus Metrics:**
-- `quorus_controller_health_status`
-- `quorus_raft_leader_elections_total`
-- `quorus_heartbeat_processing_duration`
-- `quorus_agent_registration_total`
-- `quorus_transfer_total` (v2.1)
-- `quorus_transfer_bytes_total` (v2.1)
-- `quorus_protocol_health_status` (v2.1)
+**Metrics recorded today** (OpenTelemetry instrument names; the Prometheus exporter shows them with `_` for `.` and may add unit suffixes):
+- Controller cluster and Raft: `quorus.cluster.state`, `quorus.cluster.term`, `quorus.cluster.is_leader`, `quorus.cluster.commit_index`, `quorus.raft.rpc.*`, `quorus.raft.snapshot.*`
+- Controller state: `quorus.jobs.total`, `quorus.jobs.queued`, `quorus.jobs.assignments`, `quorus.agents.total`, `quorus.routes.total`
+- Security: `quorus.security.certificate.seconds_remaining`, `quorus.security.certificate.rejection.total`, `quorus.security.trust_bundle.update.total`
+- Agent: `quorus.agent.heartbeats.total`, `quorus.agent.registrations.total`, `quorus.agent.jobs.polled`, `quorus.agent.jobs.completed`, `quorus.agent.jobs.failed`, `quorus.agent.transfers.bytes.total`
+- Transfer engine: `quorus.transfer.total`, `quorus.transfer.completed`, `quorus.transfer.failed`, `quorus.transfer.bytes.total`, `quorus.transfer.duration.seconds`, `quorus.transfer.throughput.bytes_per_second`, `quorus.transfer.active`
 
-**Grafana Dashboards:**
-- Controller cluster overview
-- Agent fleet status
-- Transfer job metrics
-- System performance
-- Protocol health dashboard (v2.1)
+**Target metrics** (not recorded today): a controller health-status gauge, leader-election counts, heartbeat-processing duration and a protocol-health gauge.
+
+**Grafana Dashboards:** the compose observability stacks provision Grafana with Prometheus, Tempo and Loki data sources (see the [Docker guide](../../docker/README.md)); the dashboard set is development material, not a supported operations view.
 
 **Log Aggregation:**
-- Structured logging with correlation IDs
+- Structured logging with correlation IDs (`CorrelationIdHandler`)
 - Centralized log collection via Promtail
 - Log analysis and alerting via Loki
 
 ### Fault Tolerance Patterns
 
 #### Circuit Breaker Pattern
-Implemented for external service calls to prevent cascade failures.
+**Target.** No circuit breaker is implemented.
 
 #### Bulkhead Pattern
-Resource isolation between different types of operations (heartbeats, transfers, registrations).
+**Partly current.** Raft gRPC I/O runs on a bounded pool (`quorus.raft.io.pool-size`), and the transfer engine limits concurrent transfers. Broader isolation between heartbeats, transfers and registrations is target.
 
-#### Retry with Exponential Backoff
-Automatic retry for transient failures with intelligent backoff strategies.
+#### Retry with Backoff
+**Current, limited.** `SimpleTransferEngine` retries a failed transfer up to its configured maximum, waiting `n × retryDelayMs` before attempt `n` (linear, not exponential, and without jitter). Classified retry policy is target (`P2-05`).
 
 #### Graceful Degradation
-System continues operating with reduced functionality during partial failures.
+**Target.** Beyond quorum tolerance and the health statuses above, no degraded operating mode is defined.
 
 ## Agent-Controller Communication Protocol
 
-### Agent Registration Protocol
+**Status: Partly current.** Endpoints, intervals and the pull model are current (checked against `HttpApiServer` and the agent services on 2026-10-03); controller-side failure detection is target.
 
-Agents must register with the controller quorum before participating in transfer operations. The registration process establishes agent capabilities, resources, and location information.
+### Agent Endpoints
 
-```yaml
-# Agent Registration Message
-registration:
-  agentId: "agent-001"
-  hostname: "transfer-agent-001.corp.com"
-  version: "1.0.0"
-  capabilities:
-    protocols: ["http", "https", "sftp", "smb", "ftp"]
-    maxConcurrentTransfers: 10
-    maxBandwidthMbps: 1000
-    supportedFeatures: ["chunked-transfer", "resume", "compression"]
-  resources:
-    cpu:
-      cores: 4
-      architecture: "x86_64"
-    memory:
-      totalMB: 8192
-      availableMB: 6144
-    storage:
-      totalGB: 1024
-      availableGB: 512
-    network:
-      interfaces: ["eth0", "eth1"]
-      totalBandwidthMbps: 1000
-  location:
-    datacenter: "dc-east-1"
-    zone: "zone-a"
-    region: "apac-east"
-    tags: ["production", "high-bandwidth"]
-  security:
-    certificateFingerprint: "sha256:abc123..."
-    supportedAuthMethods: ["certificate", "token"]
-```
+The agent talks to the controller over HTTP(S) only; the controller never calls the agent. The request and response schemas are defined by the [OpenAPI contract](../../quorus-controller/src/main/resources/openapi/quorus-controller-v1.yaml), not by this document; the YAML payload sketches that stood here are archived section J.
 
-### Heartbeat Protocol
+| Purpose | Endpoint | Agent class |
+|---|---|---|
+| Registration at startup | `POST /api/v1/agents/register` | `AgentRegistrationService` |
+| Heartbeat (default every 30 s, `QUORUS_AGENT_HEARTBEAT_INTERVAL_MS`) | `POST /api/v1/agents/heartbeat` | `HeartbeatService` |
+| Polling for assigned work (default every 10 s) | `GET /api/v1/agents/{agentId}/jobs` | `JobPollingService` |
+| Status and progress reports | `POST /api/v1/jobs/{jobId}/status` | `JobStatusReportingService` |
 
-Agents send regular heartbeat messages to maintain their registration and report current status, capacity, and health metrics.
-
-```yaml
-# Heartbeat Message (every 30 seconds)
-heartbeat:
-  agentId: "agent-001"
-  timestamp: "2024-01-15T10:30:00Z"
-  sequenceNumber: 12345
-  status: "active"  # active, busy, draining, unhealthy
-  currentJobs: 3
-  availableCapacity: 7
-  metrics:
-    cpu:
-      usage: 45.2
-      loadAverage: [1.2, 1.5, 1.8]
-    memory:
-      usage: 62.1
-      available: 3072
-    network:
-      utilization: 23.4
-      bytesTransferred: 1073741824
-    transfers:
-      active: 3
-      completed: 127
-      failed: 2
-  health:
-    diskSpace: "healthy"
-    networkConnectivity: "healthy"
-    systemLoad: "normal"
-  lastJobCompletion: "2024-01-15T10:28:45Z"
-  nextMaintenanceWindow: "2024-01-16T02:00:00Z"
-```
+Registration and each heartbeat are committed through Raft as `AgentCommand.Register` and `AgentCommand.Heartbeat`, so agent records and heartbeat timestamps are replicated state. The heartbeat handler echoes a supplied `sequenceNumber` as `acknowledgedSequenceNumber`; it does not validate or persist sequence numbers.
 
 ### Communication Flow
 
@@ -2240,58 +1517,63 @@ sequenceDiagram
     participant LB as Load Balancer
     participant C1 as Controller Leader
     participant C2 as Controller Follower
-    participant AR as Agent Registry
+    participant SS as QuorusStateStore
 
-    Note over A,AR: Agent Registration & Heartbeat
-    A->>LB: Register Agent (capabilities, resources)
+    Note over A,SS: Agent Registration & Heartbeat
+    A->>LB: POST /api/v1/agents/register (capabilities, tenant, pool, zone)
     LB->>C1: Forward Registration
-    C1->>AR: Store Agent Info
-    C1->>C2: Replicate Agent State
-    C1->>A: Registration ACK
+    C1->>C2: Replicate AgentCommand.Register
+    C1->>SS: Apply when committed
+    C1->>A: Registration response
 
-    loop Every 30 seconds
-        A->>LB: Heartbeat (status, metrics, capacity)
+    loop Every 30 seconds (default)
+        A->>LB: POST /api/v1/agents/heartbeat
         LB->>C1: Forward Heartbeat
-        C1->>AR: Update Agent Status
+        C1->>SS: Commit AgentCommand.Heartbeat
         C1->>A: Heartbeat ACK
     end
 
-    Note over A,AR: Work Assignment
-    C1->>A: Assign Transfer Job
-    A->>C1: Job Status Updates
-    A->>C1: Job Completion
-
-    Note over A,AR: Failure Detection
-    A--xLB: Heartbeat Timeout
-    C1->>AR: Mark Agent Unhealthy
-    C1->>C1: Mark work for reconciliation
+    Note over A,SS: Work Assignment (the agent pulls)
+    Note over C1: A caller has created the assignment with POST /api/v1/assignments
+    loop Every 10 seconds (default)
+        A->>LB: GET /api/v1/agents/{agentId}/jobs
+        LB->>C1: Forward poll
+        C1->>A: Assigned work with attempt, fence and lease
+    end
+    A->>C1: POST /api/v1/jobs/{jobId}/status ACCEPTED, then IN_PROGRESS
+    A->>C1: Progress and terminal report
 ```
+
+A write that reaches a follower is rejected with `503 NOT_LEADER` rather than forwarded; the diagram shows the leader for simplicity.
 
 ### Failure Detection and Recovery
 
 **Heartbeat Monitoring:**
-- **Heartbeat Interval**: 30 seconds
-- **Timeout Threshold**: 90 seconds (3 missed heartbeats)
-- **Grace Period**: 30 seconds for graceful shutdown
-- **Health Checks**: Active health probes every 60 seconds
+- **Heartbeat Interval (Current)**: 30 seconds by default (`QUORUS_AGENT_HEARTBEAT_INTERVAL_MS`)
+- **Timeout Threshold (Target)**: Nothing on the controller marks an agent unhealthy or unreachable when heartbeats stop; heartbeat age is a target telemetry signal ([specification §12.8](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md#128-infrastructure-telemetry))
+- **Agent shutdown (Current)**: The agent waits a bounded time for its job threads, stops its health endpoint and tries to deregister with `DELETE /api/v1/agents/{agentId}`. The controller registers no such route, so the call gets `404`, which the agent treats as success; the agent record stays in replicated state
+- **Health Checks (Target)**: The controller does not probe agents
 
 **Failure Scenarios:**
 - **Agent Failure**: Active work requires reconciliation; duplicate-safe automatic redistribution is not implemented
-- **Network Partition**: Agents continue current jobs, new jobs queued
-- **Controller Failure**: Automatic leader election, minimal disruption
-- **Partial Failure**: Degraded mode operation with reduced capacity
+- **Network Partition**: An agent continues its current transfer; its reports fail until it can reach the leader again, and it retries an unacknowledged report at most three times before logging `Q-REPORT-UNRESOLVED`
+- **Controller Failure**: Automatic leader election; writes pause until a new leader is elected
+- **Partial Failure (Target)**: No degraded operating mode is defined
 
 **Recovery Mechanisms:**
-- **Automatic Recovery**: Attempt leases and fencing are implemented, but automatic duplicate-safe redistribution remains blocked until expiry scheduling, safe reassignment, destination enforcement, and reconciliation are implemented
-- **Graceful Shutdown**: 30-second drain period for active transfers
-- **State Persistence**: Job state persisted in `QuorusStateMachine` for recovery after failures
-- **Backpressure**: Automatic throttling when Quorus Agents are overloaded
+- **Automatic Recovery**: Attempt leases and fencing are implemented, but automatic duplicate-safe redistribution remains blocked until expiry scheduling, safe reassignment, destination enforcement, and reconciliation are implemented (`P2-01`, `P2-07`, `P2-08`)
+- **State Persistence**: Job, attempt and assignment state is replicated in `QuorusStateStore` and survives controller failures under the quorum and storage assumptions
+- **Backpressure (Target)**: No automatic throttling of overloaded agents; each agent bounds its own concurrent transfers
 
 ## Quorus Agent Fleet Management
 
-Quorus Agents (`quorus-agent` module) are the transfer workers in the Quorus system. They poll the Quorus Controller cluster for jobs, execute file transfers via protocol adapters (SFTP, FTP, HTTP, SMB), and report status back. The Quorus Controller cluster manages the fleet and assigns jobs to Quorus Agents based on capabilities, location, and health status.
+**Status: Target**, apart from registration, heartbeats, polling and reporting described above. Fleet lifecycle requirements are in [specification §10.7](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md#107-secure-agent-build-and-deployment-lifecycle); automatic assignment is register `ENG-01`.
+
+Quorus Agents (`quorus-agent` module) are the transfer workers in the Quorus system. They poll the Quorus Controller cluster for their assignments, execute file transfers via protocol adapters (HTTP/HTTPS, FTP/FTPS, SFTP, SMB/CIFS, NFS), and report status back. In the target design the controller cluster manages the fleet and assigns jobs to agents based on capabilities, location, and health status; today it records the fleet and a caller makes each assignment.
 
 ### Quorus Agent Lifecycle Management
+
+The diagram is the target lifecycle. The states actually recorded are the `AgentStatus` values `REGISTERING`, `HEALTHY`, `ACTIVE`, `IDLE`, `DEGRADED`, `OVERLOADED`, `MAINTENANCE`, `DRAINING`, `UNREACHABLE` and `FAILED`, reported by the agent itself; no controller logic moves an agent between them.
 
 ```mermaid
 flowchart TB
@@ -2344,7 +1626,7 @@ flowchart TB
     style REG fill:#81C784,stroke:#4CAF50,color:#000
 ```
 
-**Agent States:**
+**Agent States (target lifecycle):**
 - **Initializing**: Agent starting up, loading configuration
 - **Registering**: Attempting registration with controller quorum
 - **Active**: Ready to receive and execute transfer jobs
@@ -2355,6 +1637,8 @@ flowchart TB
 - **Deregistered**: Removed from agent registry
 
 ### Dynamic Scaling and Load Balancing
+
+**Target** (register `ENG-01`): no controller component distributes work today; `AgentSelectionService`, which would apply tenant, pool, zone, capacity and protocol rules, is never constructed.
 
 **Intelligent Work Distribution:**
 - **Route Assignment**: Agents assigned to routes based on capabilities and location
@@ -2379,6 +1663,8 @@ flowchart TB
 
 ## Scalability Architecture
 
+**Status: Target.** Measured results, where they exist, are in the [benchmark specification](../performance/QUORUS_PERFORMANCE_BENCHMARKS.md) and its results log, not here.
+
 ### Performance Targets
 
 **Quorus Agent Fleet Capacity:**
@@ -2386,15 +1672,15 @@ flowchart TB
 The figures below are target workloads that require reproducible benchmark and failure evidence; they are not current supported-scale guarantees.
 - **Agent Support**: 100+ Quorus Agents per Quorus Controller cluster
 - **Concurrent Transfers**: 10,000+ simultaneous transfers across fleet
-- **Heartbeat Processing**: 1,000+ heartbeats/second via `HeartbeatService`
+- **Heartbeat Processing**: 1,000+ heartbeats/second through `POST /api/v1/agents/heartbeat` (each heartbeat is a Raft commit today)
 - **Job Throughput**: 100+ jobs/second assignment and completion
 - **Geographic Distribution**: Multi-region Quorus Agent deployment support
 
 **Quorus Controller Cluster Performance:**
 - **Request Throughput**: 10,000+ requests/second via `HttpApiServer`
 - **State Replication**: Sub-100ms replication latency via `GrpcRaftTransport`
-- **Leader Election**: Sub-5 second failover time (`ELECTION_TIMEOUT_MS`)
-- **Memory Usage**: Efficient in-memory state management in `QuorusStateMachine`
+- **Leader Election**: Sub-5 second failover time (bounded below by `QUORUS_RAFT_ELECTION_TIMEOUT_MS`; the timer is drawn between one and two times that value)
+- **Memory Usage**: Efficient in-memory state management in `QuorusStateStore`
 - **Disk I/O**: Optimized persistent storage for Raft logs
 
 ### Horizontal Scaling Strategies
@@ -2420,671 +1706,95 @@ The figures below are target workloads that require reproducible benchmark and f
 ### Network Architecture
 
 **High Availability Networking:**
-- **Load Balancers**: `nginx` load balancer with failover to healthy Quorus Controllers
+- **Load Balancers**: `nginx` load balancer that stops routing to a controller after repeated failures (current in the compose topology); leader-aware routing is target
 - **Network Redundancy**: Multiple network paths between Quorus Controllers and Quorus Agents
 - **Bandwidth Aggregation**: Combine multiple network interfaces
 - **Quality of Service**: Network QoS for transfer prioritization
 
 **Security and Isolation:**
-- **Network Segmentation**: Isolated Docker networks for different tenants
+- **Network Segmentation (Target)**: Isolated networks per tenant; the compose topologies use one shared network
 - **Implemented control-plane encryption**: the production profile requires TLS 1.3 mutual authentication for controller HTTP and Raft, and agents support certificate-authenticated HTTPS
 - **Implemented identity boundary**: trusted gateway subjects and direct certificate bindings resolve callers before tenant, role, and scope policy is evaluated
 - **Remaining deployment boundary**: corporate PKI accreditation, agent enrollment and rotation, peer-to-node binding, and complete telemetry/evidence transport validation remain open; see [Architecture Specification §3](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md#3-capability-status) and the [Security Deployment Guide](../../docs/QUORUS_SECURITY_DEPLOYMENT_GUIDE.md)
 
 ## Core Components
 
+**Status: Partly current.** Classes checked against the source on 2026-10-03; features marked *Target* do not exist yet.
+
 ### 1. Transfer Engine (`quorus-core`)
 
-The `quorus-core` module provides the foundation for file transfer capabilities.
+The `quorus-core` module provides the foundation for file transfer capabilities. It runs in the agent (and in any application that calls it directly), not in the controller.
 
 **Key Components:**
-- `TransferEngine` / `SimpleTransferEngine`: Main interface for transfer operations
-- `TransferProtocol`: Pluggable protocol implementations (`HttpTransferProtocol`, `SftpTransferProtocol`, `FtpTransferProtocol`, `SmbTransferProtocol`)
-- `ProgressTracker`: Real-time progress monitoring
-- `ChecksumCalculator`: File integrity verification
+- `TransferEngine` / `SimpleTransferEngine`: Main interface for transfer operations; blocking, one transfer per calling thread under a concurrency limit
+- `TransferProtocol`: Pluggable protocol implementations registered by `ProtocolFactory` (`HttpTransferProtocol` for `http`/`https`, `FtpTransferProtocol` for `ftp`/`ftps`, `SftpTransferProtocol`, `SmbTransferProtocol` for `smb`/`cifs`, `NfsTransferProtocol`)
+- `ProgressTracker`: Progress monitoring
+- `ChecksumCalculator`: Checksum calculation
+- `TransferEngineHealthCheck`, `ProtocolHealthCheck`: In-process health reporting
 
 **Features:**
-- **Internal network protocols** (HTTP/HTTPS, SMB/CIFS, NFS, FTP/SFTP)
-- **High-throughput transfers** optimized for corporate network bandwidth
-- **Concurrent transfer management** with intelligent scheduling
-- **Retry mechanisms** with exponential backoff for network resilience
-- **Progress tracking** with rate calculation and bandwidth utilization
-- **SHA-256 integrity verification** for data consistency
-- **Thread-safe operations** for multi-tenant environments
-- **Network-aware routing** for optimal internal path selection
+- **Internal network protocols** (HTTP/HTTPS, SMB/CIFS, NFS, FTP/FTPS, SFTP)
+- **Concurrent transfer management** under a configured concurrency limit
+- **Retry mechanisms** with linear backoff (`n × retryDelayMs`)
+- **Progress tracking** with bytes transferred and rate
+- **Integrity verification before success (Target, `P2-06`)**: checksums can be calculated, but a transfer is not yet refused success on a mismatch
+- **Network-aware routing (Target)** for internal path selection
 
 ### 2. Multi-Tenant Management (quorus-tenant)
 
-Target-state enterprise multi-tenancy with authenticated isolation and resource management. Current tenant fields and selected checks do not yet establish this boundary.
+**Partly current.** Target-state enterprise multi-tenancy with authenticated isolation and resource management. Today `quorus-tenant` is an in-process library the controller does not use; the controller's tenant boundary is the identity-derived tenant check (see [Multi-Tenancy and YAML Workflow Schemas](#multi-tenancy-and-yaml-workflow-schemas)).
 
-**Key Components:**
-- `TenantService`: Tenant lifecycle management
-- `ResourceManagementService`: Quota and usage tracking
-- `TenantSecurityService`: Authentication and authorization
-- `TenantAwareStorageService`: Storage isolation
+**Key Components (current):**
+- `TenantService` / `SimpleTenantService`: Tenant lifecycle, hierarchy, effective configuration
+- `ResourceManagementService` / `SimpleResourceManagementService`: Usage tracking and transfer-request validation against quotas
+- `Tenant`, `TenantConfiguration`, `ResourceUsage`: Model
 
 **Features:**
-- Hierarchical tenant structure
-- Resource quotas and limits
-- Data isolation strategies
-- Cross-tenant security controls
-- Compliance and governance
+- Hierarchical tenant structure (current, in-process)
+- Resource quotas and limits (current, in-process; not enforced by the controller)
+- Data isolation strategies (Target)
+- Cross-tenant security controls (Target)
+- Compliance and governance (Target)
 
 ### 3. YAML Workflow Engine (quorus-workflow)
 
-Declarative workflow definition and execution system.
+**Current.** Declarative workflow definition and in-process execution system.
 
 **Key Components:**
-- `WorkflowDefinitionParser`: YAML parsing and validation
-- `WorkflowEngine`: Workflow execution orchestration
-- `DependencyResolver`: Dependency analysis and planning
-- `VariableResolver`: Variable substitution and templating
+- `WorkflowDefinitionParser` / `YamlWorkflowDefinitionParser`: YAML parsing and validation, with `WorkflowSchemaValidator`
+- `WorkflowEngine` / `SimpleWorkflowEngine`: Workflow execution orchestration
+- `DependencyGraph`: Dependency analysis, cycle detection and topological ordering
+- `VariableResolver`: `{{name}}` substitution
 
 **Features:**
 - Declarative YAML definitions
-- Complex dependency management
-- Conditional execution
+- Group dependencies with `parallelism`-bounded rounds
+- Conditional execution (Target: `condition` expressions are parsed and variable-resolved but never evaluated, register `ENG-14`)
 - Dry run and virtual run modes
-- Variable substitution and templating
+- Variable substitution
 
-## Multi-Tenancy Architecture
+## Multi-Tenancy and YAML Workflow Schemas
 
-### Core Multi-Tenancy Concepts
+**Status: Target** for multi-tenancy beyond the current checks; **Current** reference elsewhere for YAML.
 
-#### 1. Tenant
-A logical isolation boundary representing an organization, department, or business unit with its own:
-- Configuration and policies
-- Resource quotas and limits
-- Security boundaries
-- Workflow definitions
-- Execution history and metrics
-
-#### 2. Tenant Hierarchy
-Support for nested tenants (e.g., Company → Department → Team) with inheritance of policies and quotas.
-
-#### 3. Tenant Isolation Levels
-- **Logical Isolation**: Shared infrastructure with data separation
-- **Physical Isolation**: Dedicated resources per tenant
-- **Hybrid Isolation**: Mix of shared and dedicated resources
-
-### Multi-Tenant System Architecture
-
-```mermaid
-graph TB
-    subgraph "Multi-Tenant Quorus System"
-        subgraph "Tenant Management Layer"
-            TS[Tenant Service]
-            RMS[Resource Management Service]
-            TSS[Tenant Security Service]
-            TASS[Tenant Aware Storage Service]
-        end
-
-        subgraph "Tenant Hierarchy"
-            ET[Enterprise Tenant]
-            AT1[ACME Corp]
-            AT2[Partner Corp]
-            NT1[Finance Namespace]
-            NT2[HR Namespace]
-            NT3[Shared Data Namespace]
-        end
-
-        subgraph "Resource Isolation"
-            DB[(Tenant Database)]
-            FS[File System]
-            NET[Network Policies]
-            COMP[Compute Resources]
-        end
-
-        subgraph "Cross-Tenant Operations"
-            DSA[Data Sharing Agreements]
-            FA[Federated Auth]
-            CTW[Cross-Tenant Workflows]
-        end
-    end
-
-    TS --> ET
-    ET --> AT1
-    ET --> AT2
-    AT1 --> NT1
-    AT1 --> NT2
-    AT2 --> NT3
-
-    RMS --> COMP
-    TSS --> FA
-    TASS --> FS
-
-    TS --> DB
-    TSS --> NET
-
-    CTW --> DSA
-    CTW --> FA
-
-    style ET fill:#e3f2fd
-    style AT1 fill:#e8f5e8
-    style AT2 fill:#fff3e0
-    style NT1 fill:#f3e5f5
-    style NT2 fill:#f3e5f5
-    style NT3 fill:#fce4ec
-```
-
-#### 1. Tenant Management Service
-```java
-// New package: dev.mars.quorus.tenant
-public interface TenantService {
-    // Tenant lifecycle
-    Tenant createTenant(TenantConfiguration config);
-    Tenant updateTenant(String tenantId, TenantConfiguration config);
-    void deleteTenant(String tenantId);
-    
-    // Tenant discovery
-    Tenant getTenant(String tenantId);
-    List<Tenant> getChildTenants(String parentTenantId);
-    TenantHierarchy getTenantHierarchy(String tenantId);
-    
-    // Resource management
-    ResourceQuota getResourceQuota(String tenantId);
-    ResourceUsage getResourceUsage(String tenantId);
-    boolean checkResourceLimit(String tenantId, ResourceType type, long amount);
-}
-```
-
-#### 2. Multi-Tenant Workflow Engine
-```java
-public interface MultiTenantWorkflowEngine extends WorkflowEngine {
-    // Tenant-aware execution
-    WorkflowExecution execute(WorkflowDefinition definition, TenantContext context);
-    
-    // Cross-tenant operations
-    WorkflowExecution executeCrossTenant(WorkflowDefinition definition, 
-                                       List<TenantContext> tenants);
-    
-    // Tenant isolation
-    List<WorkflowExecution> getExecutions(String tenantId);
-    WorkflowMetrics getMetrics(String tenantId, TimeRange range);
-}
-```
-
-#### 3. Tenant-Aware Security Service
-```java
-public interface TenantSecurityService {
-    // Authentication
-    TenantPrincipal authenticate(String tenantId, AuthenticationToken token);
-    
-    // Authorization
-    boolean authorize(TenantPrincipal principal, String resource, String action);
-    
-    // Data protection
-    EncryptionKey getTenantEncryptionKey(String tenantId);
-    String encryptForTenant(String tenantId, String data);
-    String decryptForTenant(String tenantId, String encryptedData);
-    
-    // Cross-tenant security
-    boolean isCrossTenantAllowed(String sourceTenant, String targetTenant);
-    DataSharingAgreement getDataSharingAgreement(String tenant1, String tenant2);
-}
-```
-
-#### 4. Resource Management Service
-```java
-public interface ResourceManagementService {
-    // Quota management
-    boolean reserveResources(String tenantId, ResourceRequest request);
-    void releaseResources(String tenantId, ResourceRequest request);
-    
-    // Usage tracking
-    void recordUsage(String tenantId, ResourceUsage usage);
-    ResourceMetrics getUsageMetrics(String tenantId, TimeRange range);
-    
-    // Billing and cost allocation
-    CostReport generateCostReport(String tenantId, TimeRange range);
-    void allocateCosts(String tenantId, TransferExecution execution);
-}
-```
-
-## YAML Workflow System
-
-### Core Concepts
-
-#### 1. Transfer Definition
-A single file transfer operation with source, destination, and metadata.
-
-#### 2. Transfer Group
-A collection of related transfers that can be executed with dependencies, sequencing, and shared configuration.
-
-#### 3. Transfer Workflow
-A higher-level orchestration of transfer groups with complex dependency trees, triggers, and conditional execution.
-
-#### 4. Transfer Plan
-The resolved execution plan after dependency analysis and validation.
-
-### YAML Schema Design
-
-#### Single Transfer Definition
-
-```yaml
-# transfer-internal-data.yaml
-apiVersion: quorus.dev/v1
-kind: Transfer
-metadata:
-  name: internal-data-sync
-  description: "Sync customer data from CRM to data warehouse"
-  tenant: acme-corp              # Tenant identifier
-  namespace: finance             # Sub-tenant/namespace
-  labels:
-    environment: production
-    priority: high
-    team: data-ops
-    dataClassification: confidential
-    costCenter: "CC-12345"
-    networkZone: "internal-dmz"
-  annotations:
-    created-by: "john.doe@company.com"
-    ticket: "JIRA-12345"
-
-spec:
-  source:
-    # Internal corporate API endpoint
-    uri: "https://crm-internal.acme-corp.local/api/customers/export"
-    protocol: https
-    authentication:
-      type: service-account      # Internal service account
-      serviceAccount: "quorus-data-sync"
-    headers:
-      X-Internal-Service: "quorus"
-      X-Data-Classification: "${metadata.labels.dataClassification}"
-      X-Network-Zone: "${metadata.labels.networkZone}"
-    timeout: 300s
-    # Internal network optimization
-    networkOptimization:
-      useInternalRouting: true
-      preferredDataCenter: "dc-east-1"
-
-  destination:
-    # Internal corporate storage path
-    path: "/corporate-storage/data-warehouse/customers/customers-${date:yyyy-MM-dd}.json"
-    protocol: nfs                # Internal NFS mount
-    createDirectories: true
-    permissions: "640"           # Corporate security standard
-    # Corporate encryption standards
-    encryption:
-      enabled: true
-      algorithm: "AES-256-GCM"
-      keySource: "corporate-kms"
-      keyId: "${tenant.security.keyManagement.keyId}"
-
-  validation:
-    expectedSize:
-      min: 10MB                  # Larger internal datasets
-      max: 5GB
-    checksum:
-      algorithm: "SHA-256"
-      required: true
-    # Internal data quality checks
-    dataQuality:
-      validateSchema: true
-      schemaVersion: "v2.1"
-      rejectOnValidationFailure: true
-
-  retry:
-    maxAttempts: 5               # More retries for internal reliability
-    backoff: exponential
-    initialDelay: 500ms          # Faster retry for internal network
-    maxDelay: 10s
-
-  # Corporate monitoring integration
-  monitoring:
-    enabled: true
-    progressReporting: true
-    metricsEnabled: true
-    alertOnFailure: true
-    # Corporate monitoring systems
-    integrations:
-      splunk: true
-      datadog: true
-      corporateSOC: true
-    tags:
-      tenant: "${tenant.id}"
-      namespace: "${metadata.namespace}"
-      costCenter: "${metadata.labels.costCenter}"
-      networkZone: "${metadata.labels.networkZone}"
-      dataClassification: "${metadata.labels.dataClassification}"
-```
-
-#### Transfer Group Definition
-
-```yaml
-# backup-workflow.yaml
-apiVersion: quorus.dev/v1
-kind: TransferGroup
-metadata:
-  name: daily-backup-workflow
-  description: "Daily backup workflow for critical data"
-  tenant: acme-corp
-  namespace: finance
-  labels:
-    schedule: daily
-    criticality: high
-
-spec:
-  # Execution strategy
-  execution:
-    strategy: sequential  # sequential, parallel, mixed
-    maxConcurrency: 3
-    timeout: 3600s
-    continueOnError: false
-    
-  # Shared configuration
-  defaults:
-    retry:
-      maxAttempts: 3
-      backoff: exponential
-    monitoring:
-      progressReporting: true
-      
-  # Variable definitions
-  variables:
-    BACKUP_DATE: "${date:yyyy-MM-dd}"
-    BACKUP_ROOT: "${tenant.storage.root}/backup/${BACKUP_DATE}"
-    AUTH_TOKEN: "${env:API_TOKEN}"
-    
-  # Transfer definitions
-  transfers:
-    - name: user-data
-      source:
-        uri: "https://api.company.com/users/export"
-        headers:
-          Authorization: "${AUTH_TOKEN}"
-      destination:
-        path: "${BACKUP_ROOT}/users.json"
-      dependsOn: []
-      
-    - name: order-data
-      source:
-        uri: "https://api.company.com/orders/export"
-        headers:
-          Authorization: "${AUTH_TOKEN}"
-      destination:
-        path: "${BACKUP_ROOT}/orders.json"
-      dependsOn: ["user-data"]  # Wait for user-data to complete
-      
-    - name: analytics-data
-      source:
-        uri: "https://analytics.company.com/export"
-      destination:
-        path: "${BACKUP_ROOT}/analytics.json"
-      dependsOn: ["user-data", "order-data"]
-      condition: "${user-data.success} && ${order-data.success}"
-      
-  # Post-execution actions
-  onSuccess:
-    - action: notify
-      target: "symphony://data-ops-channel"
-      message: "Daily backup completed successfully"
-    - action: cleanup
-      target: "/backup"
-      retentionDays: 30
-      
-  onFailure:
-    - action: notify
-      target: "email://ops-team@company.com"
-      message: "Daily backup failed: ${error.message}"
-    - action: rollback
-      strategy: deletePartial
-```
-
-#### Multi-Tenant Workflow Definition
-
-```yaml
-# multi-tenant-workflow.yaml
-apiVersion: quorus.dev/v1
-kind: TransferWorkflow
-metadata:
-  name: cross-tenant-data-sync
-  tenant: enterprise            # Parent tenant
-
-spec:
-  # Multi-tenant execution
-  tenants:
-    - name: acme-corp
-      namespace: finance
-      role: source              # source, destination, both
-
-    - name: partner-corp
-      namespace: shared-data
-      role: destination
-
-  # Tenant-specific execution policies
-  execution:
-    isolation: logical          # logical, physical, hybrid
-    crossTenantAllowed: true
-    approvalRequired: true
-    dryRun: false
-    virtualRun: false
-    parallelism: 5
-    timeout: 7200s
-
-  # Cross-tenant security
-  security:
-    # Data sharing agreements
-    dataSharing:
-      agreements: ["DSA-2024-001"]
-      dataClassification: "internal"
-      retentionPolicy: "30d"
-
-    # Cross-tenant authentication
-    authentication:
-      federatedAuth: true
-      trustedTenants: ["partner-corp"]
-
-  # Environment-specific variables
-  environments:
-    production:
-      SOURCE_DB: "prod-db.company.com"
-      TARGET_STORAGE: "s3://prod-backup"
-    staging:
-      SOURCE_DB: "staging-db.company.com"
-      TARGET_STORAGE: "s3://staging-backup"
-
-  groups:
-    - name: extract-acme-data
-      tenant: acme-corp
-      namespace: finance
-      transferGroup:
-        spec:
-          transfers:
-            - name: customer-export
-              source:
-                uri: "${acme-corp.api.endpoint}/customers"
-                authentication:
-                  type: tenant-oauth2
-              destination:
-                path: "${shared.storage}/acme-customers.json"
-
-    - name: sync-to-partner
-      tenant: partner-corp
-      namespace: shared-data
-      dependsOn: ["extract-acme-data"]
-      condition: "${acme-corp.dataSharing.approved}"
-      transferGroup:
-        spec:
-          transfers:
-            - name: partner-import
-              source:
-                path: "${shared.storage}/acme-customers.json"
-              destination:
-                uri: "${partner-corp.api.endpoint}/import"
-                authentication:
-                  type: tenant-oauth2
-
-  # Workflow triggers
-  triggers:
-    - name: schedule
-      type: cron
-      schedule: "0 2 * * *"  # Daily at 2 AM
-      timezone: "GMT"
-
-    - name: file-watcher
-      type: fileSystem
-      path: "/incoming/trigger.flag"
-      action: create
-
-  # Validation rules
-  validation:
-    - name: source-connectivity
-      type: connectivity
-      targets: ["${SOURCE_DB}"]
-
-    - name: storage-capacity
-      type: diskSpace
-      path: "/staging"
-      required: 10GB
-
-    - name: dependency-check
-      type: yamlDependencies
-      recursive: true
-```
-
-### Tenant Configuration
-
-```yaml
-# tenant-config.yaml
-apiVersion: quorus.dev/v1
-kind: TenantConfiguration
-metadata:
-  name: acme-corp
-  namespace: enterprise
-  labels:
-    tier: premium
-    region: apac-east-1
-    industry: finance
-
-spec:
-  # Tenant hierarchy
-  hierarchy:
-    parent: null  # Root tenant
-    children: ["acme-corp-finance", "acme-corp-hr", "acme-corp-it"]
-
-  # Resource quotas and limits
-  resources:
-    quotas:
-      # Transfer limits
-      maxConcurrentTransfers: 50
-      maxDailyTransfers: 1000
-      maxMonthlyDataTransfer: 10TB
-      maxFileSize: 5GB
-
-      # Storage limits
-      maxStorageUsage: 1TB
-      maxRetentionDays: 365
-
-      # Compute limits
-      maxCpuCores: 16
-      maxMemoryGB: 64
-      maxBandwidthMbps: 1000
-
-    # Resource allocation strategy
-    allocation:
-      strategy: shared  # shared, dedicated, hybrid
-      priority: high    # low, medium, high, critical
-
-  # Security policies
-  security:
-    # Network access controls
-    networking:
-      allowedSourceCIDRs: ["10.0.0.0/8", "192.168.0.0/16"]
-      allowedDestinations: ["s3://acme-corp-*", "/data/acme-corp/*"]
-      requireVPN: true
-      allowCrossRegion: false
-
-    # Authentication and authorization
-    authentication:
-      provider: "oauth2"  # oauth2, saml, ldap, api-key
-      endpoint: "https://auth.acme-corp.com"
-
-    authorization:
-      rbac:
-        enabled: true
-        defaultRole: "transfer-user"
-        adminRole: "transfer-admin"
-
-    # Data protection
-    dataProtection:
-      encryptionAtRest: true
-      encryptionInTransit: true
-      encryptionAlgorithm: "AES-256"
-      keyManagement: "aws-kms"  # aws-kms, azure-kv, vault
-
-  # Compliance and governance
-  governance:
-    # Data classification
-    dataClassification:
-      defaultLevel: "internal"
-      allowedLevels: ["public", "internal", "confidential"]
-
-    # Audit and compliance
-    audit:
-      enabled: true
-      retentionDays: 2555  # 7 years
-      exportFormat: "json"
-
-    compliance:
-      frameworks: ["SOX", "GDPR", "HIPAA"]
-      dataResidency: "apac-east-1"
-      crossBorderTransfer: false
-
-  # Monitoring and alerting
-  monitoring:
-    # Metrics collection
-    metrics:
-      enabled: true
-      granularity: "1m"
-      retention: "90d"
-
-    # Alerting configuration
-    alerting:
-      channels:
-        - type: "symphony"
-          webhook: "https://hooks.symphony.com/acme-corp"
-        - type: "email"
-          recipients: ["ops@acme-corp.com"]
-        - type: "webhook"
-          endpoint: "https://monitoring.acme-corp.com/alerts"
-
-      thresholds:
-        errorRate: 5%
-        quotaUsage: 80%
-        transferLatency: 30s
-
-  # Workflow defaults
-  defaults:
-    # Default retry policy
-    retry:
-      maxAttempts: 3
-      backoff: exponential
-      initialDelay: 1s
-
-    # Default validation
-    validation:
-      checksumRequired: true
-      sizeValidation: true
-
-    # Default monitoring
-    monitoring:
-      progressReporting: true
-      metricsEnabled: true
-```
+- **Multi-tenancy.** The multi-tenant architecture that stood here (tenant, workflow, security and storage service interfaces, cross-tenant workflows, data-sharing agreements) is archived section K; most of its interfaces do not exist. What exists: `quorus-tenant` holds the `Tenant` and `TenantConfiguration` model with a parent–child hierarchy, `TenantService`/`SimpleTenantService` and `ResourceManagementService`/`SimpleResourceManagementService`, all in-process and used by no controller code. Tenant enforcement in the controller is the identity-derived tenant check on transfers, agents, assignments and routes ([specification §3](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md#3-capability-status), "Authenticated tenant derivation and tenant checks"). The tenant-governance requirements are in [Tenant, Quota, Policy, and Resource Governance](#tenant-quota-policy-and-resource-governance) above.
+- **YAML schemas.** The workflow YAML examples that stood here (`kind: Transfer`, `kind: TransferGroup`, tenant blocks, `${date:…}` and `${env:…}` built-ins) are archived section L because the parser does not accept them. The accepted syntax is documented in the [YAML Syntax Guide](../../docs/QUORUS_YAML_SYNTAX_GUIDE.md).
 
 ## Workflow Engine Architecture
+
+**Status: Current**, except where marked. Checked against `quorus-workflow` on 2026-10-03. The engine runs in-process in whatever application calls it (today the integration examples); the controller does not run it and has no workflow REST resources, and durable distributed workflow execution is target ([specification §8.2](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md#82-workflows)). The former "Transfer Process Flow" sequence diagrams are archived section M.
 
 ### Core Components
 
 #### 1. YAML Parser & Validator
 ```java
-// New package: dev.mars.quorus.workflow
+// Package dev.mars.quorus.workflow; implemented by YamlWorkflowDefinitionParser
 public interface WorkflowDefinitionParser {
     WorkflowDefinition parse(Path yamlFile) throws WorkflowParseException;
+    WorkflowDefinition parseFromString(String yamlContent) throws WorkflowParseException;
     ValidationResult validate(WorkflowDefinition definition);
-    DependencyGraph buildDependencyGraph(List<WorkflowDefinition> definitions);
+    DependencyGraph buildDependencyGraph(List<WorkflowDefinition> definitions) throws WorkflowParseException;
+    ValidationResult validateSchema(String yamlContent);
 }
 ```
 
@@ -3103,26 +1813,20 @@ public interface WorkflowEngine {
 }
 ```
 
-#### 3. Dependency Resolver
-```java
-public interface DependencyResolver {
-    ExecutionPlan resolve(List<WorkflowDefinition> definitions);
-    ValidationResult validateDependencies(DependencyGraph graph);
-    List<WorkflowDefinition> getExecutionOrder(DependencyGraph graph);
-}
-```
+#### 3. Dependency Graph
+
+There is no `DependencyResolver` interface. `DependencyGraph` (a class) holds the transfer groups and their `dependsOn` edges and provides `addGroup`, `getDependencies`, `hasCycles` and `topologicalSort()`; `SimpleWorkflowEngine` runs the sorted groups in rounds of at most `parallelism` groups whose dependencies have run.
 
 #### 4. Variable Resolver
-```java
-public interface VariableResolver {
-    String resolve(String expression, ExecutionContext context);
-    Map<String, String> resolveAll(Map<String, String> variables, ExecutionContext context);
 
-    // Built-in functions
-    // ${date:yyyy-MM-dd} -> current date
-    // ${env:VAR_NAME} -> environment variable
-    // ${file:path/to/file} -> file content
-    // ${transfer.result.checksum} -> result from previous transfer
+`VariableResolver` is a class, not an interface. It substitutes `{{name}}` in strings, transfer definitions, groups and whole workflow definitions. A name is looked up in the context variables, then the global variables (the workflow's `variables`), then the process environment, then JVM system properties. There are no built-in functions such as `${date:…}`, `${env:…}` or `${file:…}`, and nested references are resolved in one pass only (a reference inside a variable's value stays literal) and references to earlier transfer results are not supported.
+
+```java
+public class VariableResolver {
+    public VariableResolver(Map<String, Object> globalVariables) { ... }
+    public VariableResolver withContext(Map<String, Object> contextVariables) { ... }
+    public String resolve(String template) throws VariableResolutionException { ... }
+    public WorkflowDefinition resolve(WorkflowDefinition workflow) throws VariableResolutionException { ... }
 }
 ```
 
@@ -3141,21 +1845,15 @@ graph TD
     subgraph "Normal Execution Path"
         NE --> RTO[Real Transfer<br/>Operations]
         NE --> FSM[File System<br/>Modifications]
-        NE --> CML[Complete Monitoring<br/>& Logging]
     end
 
     subgraph "Dry Run Execution Path"
-        DRE --> VSV[Validate Syntax<br/>& Semantics]
-        DRE --> CDC[Check Dependencies<br/>& Connectivity]
-        DRE --> SE[Simulate<br/>Execution]
-        DRE --> RWE[Report What<br/>Would Execute]
+        DRE --> VSV[Validate and resolve<br/>variables and dependencies]
+        DRE --> RWE[Mock successful result<br/>per transfer]
     end
 
     subgraph "Virtual Execution Path"
-        VE --> STM[Simulate Transfers<br/>with Mock Data]
-        VE --> TWL[Test Workflow<br/>Logic]
-        VE --> PE[Performance<br/>Estimation]
-        VE --> RUP[Resource Usage<br/>Prediction]
+        VE --> STM[Run groups in dependency order<br/>with simulated transfers]
     end
 
     %% Styling
@@ -3167,878 +1865,34 @@ graph TD
     style NE fill:#e8f5e8
     style RTO fill:#e8f5e8
     style FSM fill:#e8f5e8
-    style CML fill:#e8f5e8
 
     style DRE fill:#fff3e0
     style VSV fill:#fff3e0
-    style CDC fill:#fff3e0
-    style SE fill:#fff3e0
     style RWE fill:#fff3e0
 
     style VE fill:#e3f2fd
     style STM fill:#e3f2fd
-    style TWL fill:#e3f2fd
-    style PE fill:#e3f2fd
-    style RUP fill:#e3f2fd
 ```
+
+A definition's `execution.dryRun` or `execution.virtualRun` flag can only make a run safer: a dry run wins over a virtual run, and both over a normal run.
 
 #### 1. Normal Execution
-- Full transfer execution with real network operations
+- Full transfer execution through the core transfer engine with real network operations
 - File system modifications
-- Complete monitoring and logging
+- Workflow metrics and logging
 
 #### 2. Dry Run
-- Validate YAML syntax and semantics
-- Check dependencies and connectivity
-- Simulate execution without actual transfers
-- Report what would be executed
+- Parse, validate, resolve variables and order dependencies
+- Record a mock successful result for every transfer without starting any transfer
+- Connectivity checks (Target): a dry run does not contact any endpoint
 
 #### 3. Virtual Run
-- Simulate transfers with mock data
-- Test workflow logic and dependencies
-- Performance estimation
-- Resource usage prediction
-
-## Transfer Process Flow
-
-### Route-Based Transfer Flow
-
-```mermaid
-sequenceDiagram
-    participant RC as Route Configuration
-    participant CTL as Controller
-    participant SA as Source Agent
-    participant DA as Destination Agent
-    participant FS_S as Source File System
-    participant FS_D as Dest File System
-    participant MS as Monitoring Service
-
-    Note over RC,MS: Controller Startup - Route Validation
-    RC->>CTL: Load Route Definitions
-    CTL->>SA: Validate Agent (Ping/Health Check)
-    SA-->>CTL: Agent ACTIVE
-    CTL->>DA: Validate Agent (Ping/Health Check)
-    DA-->>CTL: Agent ACTIVE
-    CTL->>CTL: Activate Route
-    CTL->>SA: Configure Location Monitoring
-    SA->>FS_S: Start Watching Location
-    
-    Note over RC,MS: Trigger Condition Met
-    FS_S->>SA: File Created Event
-    SA->>CTL: Trigger Event: New File Detected
-    CTL->>CTL: Evaluate Route Conditions
-    CTL->>SA: Initiate Transfer
-    SA->>FS_S: Read Source File
-    FS_S-->>SA: File Data
-    SA->>DA: Stream File Data
-    DA->>FS_D: Write Destination File
-    FS_D-->>DA: Write Complete
-    DA->>DA: Calculate Checksum
-    DA-->>SA: Transfer ACK
-    SA->>CTL: Transfer Complete
-    CTL->>MS: Report Transfer Metrics
-    CTL->>CTL: Update Route Statistics
-```
-
-### Workflow-Based Transfer Flow
-
-```mermaid
-sequenceDiagram
-    participant U as User/System
-    participant WE as Workflow Engine
-    participant TE as Transfer Engine
-    participant TS as Tenant Service
-    participant PS as Protocol Service
-    participant FS as File System
-    participant MS as Monitoring Service
-
-    U->>WE: Submit YAML Workflow
-    WE->>WE: Parse & Validate YAML
-    WE->>TS: Validate Tenant Permissions
-    TS-->>WE: Permissions OK
-    WE->>WE: Resolve Dependencies
-    WE->>WE: Create Execution Plan
-
-    loop For Each Transfer in Plan
-        WE->>TE: Submit Transfer Request
-        TE->>TS: Check Resource Quotas
-        TS-->>TE: Quota Available
-        TE->>PS: Execute Transfer
-        PS->>FS: Read Source File
-        FS-->>PS: File Data
-        PS->>FS: Write Destination File
-        FS-->>PS: Write Complete
-        PS->>PS: Calculate Checksum
-        PS-->>TE: Transfer Complete
-        TE->>MS: Report Progress
-        TE-->>WE: Transfer Result
-    end
-
-    WE->>MS: Report Workflow Complete
-    WE-->>U: Workflow Result
-```
-
-## Data Models
-
-### Route Configuration Models
-
-#### Route Definition
-```java
-public class RouteConfiguration {
-    private String routeId;
-    private String name;
-    private String description;
-    private AgentEndpoint source;
-    private AgentEndpoint destination;
-    private RouteTrigger trigger;
-    private RouteOptions options;
-    private RouteStatus status;
-    private String tenantId;
-    // ... other fields
-}
-
-public class AgentEndpoint {
-    private String agentId;
-    private String location;  // Path or URL to monitor/target
-    private Map<String, String> parameters;
-}
-
-public class RouteTrigger {
-    private TriggerType type;  // EVENT, TIME, INTERVAL, BATCH, SIZE, MANUAL, EXTERNAL, COMPOSITE
-    private Map<String, Object> configuration;
-    // Event-based: file patterns, events (CREATE, MODIFY, DELETE)
-    // Time-based: cron expression
-    // Interval-based: period duration
-    // Batch-based: file count threshold
-    // Size-based: size threshold
-}
-
-public enum RouteStatus {
-    CONFIGURED,
-    VALIDATING,
-    ACTIVE,
-    TRIGGERED,
-    TRANSFERRING,
-    DEGRADED,
-    SUSPENDED,
-    FAILED
-}
-```
-
-### Core Domain Models
-
-#### Transfer Request
-```java
-public class TransferRequest {
-    private String requestId;
-    private URI sourceUri;
-    private Path destinationPath;
-    private String protocol;
-    private String tenantId;
-    private String namespace;
-    private Map<String, String> metadata;
-    private long expectedSize;
-    private String expectedChecksum;
-    // ... other fields
-}
-```
-
-#### Transfer Job
-```java
-public class TransferJob {
-    private String jobId;
-    private TransferRequest request;
-    private TransferStatus status;
-    private long bytesTransferred;
-    private long totalBytes;
-    private Instant startTime;
-    private String actualChecksum;
-    private String tenantId;
-    // ... other fields
-}
-```
-
-### Multi-Tenant Models
-
-#### Tenant Configuration
-```java
-public class TenantConfiguration {
-    private String tenantId;
-    private String parentTenantId;
-    private ResourceQuota resourceQuota;
-    private SecurityPolicy securityPolicy;
-    private ComplianceSettings compliance;
-    private Map<String, String> variables;
-    // ... other fields
-}
-```
-
-### Workflow Models
-
-#### Workflow Definition
-```java
-public class WorkflowDefinition {
-    private String name;
-    private String tenantId;
-    private String namespace;
-    private ExecutionStrategy execution;
-    private List<TransferGroupDefinition> groups;
-    private Map<String, String> variables;
-    private List<TenantContext> tenants;
-    // ... other fields
-}
-```
-
-## Data Isolation Strategies
-
-### 1. Database-Level Isolation
-```sql
--- Tenant-aware schema design
-CREATE TABLE transfers (
-    id UUID PRIMARY KEY,
-    tenant_id VARCHAR(255) NOT NULL,
-    namespace VARCHAR(255),
-    request_data JSONB,
-    status VARCHAR(50),
-    created_at TIMESTAMP DEFAULT NOW(),
-
-    -- Tenant isolation constraints
-    CONSTRAINT fk_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(id),
-    INDEX idx_tenant_namespace (tenant_id, namespace)
-);
-
--- Row-level security
-CREATE POLICY tenant_isolation ON transfers
-    FOR ALL TO application_role
-    USING (tenant_id = current_setting('app.current_tenant'));
-```
-
-### 2. Storage Isolation
-```java
-public class TenantAwareStorageService {
-    private final String getTenantStorageRoot(String tenantId) {
-        return String.format("/data/tenants/%s", tenantId);
-    }
-
-    private final void validateTenantAccess(String tenantId, Path path) {
-        String tenantRoot = getTenantStorageRoot(tenantId);
-        if (!path.startsWith(tenantRoot)) {
-            throw new SecurityException("Cross-tenant storage access denied");
-        }
-    }
-}
-```
-
-### 3. Network Isolation
-```yaml
-# Kubernetes NetworkPolicy example
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: tenant-isolation
-spec:
-  podSelector:
-    matchLabels:
-      tenant: acme-corp
-  policyTypes:
-  - Ingress
-  - Egress
-  ingress:
-  - from:
-    - podSelector:
-        matchLabels:
-          tenant: acme-corp
-  egress:
-  - to:
-    - podSelector:
-        matchLabels:
-          tenant: acme-corp
-```
-
-## Enterprise Features
-
-The snippets in this section are illustrative target-state policy concepts, not schemas accepted by the current workflow parser or proof of implemented controls. The complete capability requirements and delivery dependencies are defined in [Enterprise Capability Requirements](#enterprise-capability-requirements); canonical implementation status remains in the architecture and REST API specifications.
-
-### 1. Governance & Compliance
-```yaml
-governance:
-  approvals:
-    required: true
-    approvers: ["data-ops-lead", "security-team"]
-
-  compliance:
-    dataClassification: confidential
-    retentionPolicy: 7years
-    encryptionRequired: true
-    auditLogging: true
-
-  security:
-    allowedSources: ["*.company.com", "trusted-partner.com"]
-    allowedDestinations: ["s3://company-*", "/backup/*"]
-    requiresVPN: true
-```
-
-### 2. Resource Management
-```yaml
-resources:
-  limits:
-    maxConcurrentTransfers: 10
-    maxBandwidth: 100MB/s
-    maxDiskUsage: 1TB
-
-  quotas:
-    dailyTransferLimit: 1TB
-    monthlyTransferLimit: 30TB
-
-  scheduling:
-    priority: high
-    preferredHours: "02:00-06:00"
-    blackoutWindows: ["12:00-13:00"]
-```
-
-### 3. Monitoring & Alerting
-```yaml
-monitoring:
-  metrics:
-    - transferRate
-    - errorRate
-    - queueDepth
-    - resourceUtilization
-
-  alerts:
-    - name: transfer-failure
-      condition: "errorRate > 5%"
-      severity: critical
-      channels: ["symphony", "email", "xmatters"]
-
-    - name: slow-transfer
-      condition: "transferRate < 1MB/s"
-      severity: warning
-      channels: ["symphony"]
-```
-
-## Security Architecture
-
-### Authentication
-- **Enterprise directory integration** (Active Directory, LDAP)
-- **Single Sign-On (SSO)** with corporate identity providers (SAML, OAuth2)
-- **Service account authentication** for automated internal systems
-- **Certificate-based authentication** for high-security internal transfers
-- **Tenant-specific authentication** configuration for multi-tenant deployments
-
-### Authorization
-- **Role-based access control (RBAC)** integrated with corporate directory
-- **Department and team-based** access controls
-- **Data classification-aware** permissions (confidential, internal, public)
-- **Network segment-based** access controls for internal zones
-- **Fine-grained resource access** controls for sensitive data
-
-### Data Protection
-- **Encryption at rest** using corporate key management systems
-- **TLS encryption** optimized for internal network performance
-- **Data classification** and handling policies for corporate data
-- **Network-level encryption** for high-security internal transfers
-- **Tenant-specific encryption** keys for multi-tenant isolation
-
-### Internal Network Security
-- **Network segmentation** awareness and routing
-- **Corporate firewall** integration and rule management
-- **VPN and private network** support for remote sites
-- **Internal certificate authority** integration
-- **Network monitoring** and intrusion detection integration
-
-### Audit & Compliance
-- **Corporate audit system** integration
-- **Compliance framework** support (SOX, GDPR, HIPAA, PCI-DSS)
-- **Data lineage tracking** for internal data movement
-- **Regulatory reporting** for internal data governance
-- **Tenant-isolated audit trails** for multi-tenant compliance
-
-## Configuration Management
-
-### Hierarchical Configuration
-```yaml
-# Global defaults (system-level)
-global:
-  defaults:
-    retry:
-      maxAttempts: 3
-    security:
-      encryptionRequired: true
-
-# Tenant-level overrides
-tenant:
-  acme-corp:
-    defaults:
-      retry:
-        maxAttempts: 5  # Override global
-      security:
-        encryptionAlgorithm: "AES-256-GCM"  # Add tenant-specific
-
-    # Namespace-level overrides
-    namespaces:
-      finance:
-        defaults:
-          retry:
-            maxAttempts: 7  # Override tenant
-          validation:
-            checksumRequired: true  # Add namespace-specific
-```
-
-### Variable Resolution with Tenancy
-```yaml
-variables:
-  # System variables
-  system:
-    version: "1.0.0"
-    region: "apac-east-1"
-
-  # Tenant variables
-  tenant:
-    id: "acme-corp"
-    name: "ACME Corporation"
-    storage:
-      root: "/data/tenants/acme-corp"
-      backup: "s3://acme-corp-backup"
-    api:
-      endpoint: "https://api.acme-corp.com"
-
-  # Namespace variables
-  namespace:
-    name: "finance"
-    costCenter: "CC-12345"
-    approver: "finance-lead@acme-corp.com"
-```
-
-## Deployment Architecture
-
-> [!CAUTION]
-> The database, Redis, and etcd topology retained in this target-state section is a superseded legacy alternative, not the canonical Quorus controller architecture. Current authoritative controller state is the Raft log and snapshots; PostgreSQL, Redis, and etcd are not controller state authorities. Static Raft membership, current security gaps, and measurable availability requirements are defined in the canonical architecture specification.
-
-### Corporate Network Deployment with Controller Quorum
-
-```mermaid
-graph TD
-    %% External Access Layer
-    CORP[Corporate Network<br/>Internal Traffic] --> VIP[Virtual IP<br/>Failover]
-    VIP --> LB[Internal Load Balancer<br/>F5/HAProxy Cluster]
-
-    %% Controller Quorum Layer
-    subgraph "Controller Quorum (Multi-AZ)"
-        direction TB
-        LB --> C1[Controller Leader<br/>AZ-1]
-        LB --> C2[Controller Follower<br/>AZ-2]
-        LB --> C3[Controller Follower<br/>AZ-3]
-
-        C1 -.->|Raft Consensus| C2
-        C1 -.->|Raft Consensus| C3
-        C2 -.->|Raft Consensus| C3
-    end
-
-    %% Distributed State Layer
-    subgraph "Distributed State (Multi-AZ)"
-        PG[(PostgreSQL Cluster<br/>Primary + 2 Replicas)]
-        REDIS[(Redis Cluster<br/>6 Nodes)]
-        ETCD[(etcd Cluster<br/>Agent Registry)]
-    end
-
-    %% Agent Fleet
-    subgraph "Agent Fleet (Geographic Distribution)"
-        subgraph "DC-East Agents"
-            AE1[Agent E1<br/>HTTP/SFTP]
-            AE2[Agent E2<br/>SMB/FTP]
-            AE3[Agent EN...<br/>Multi-Protocol]
-        end
-
-        subgraph "DC-West Agents"
-            AW1[Agent W1<br/>HTTP/SFTP]
-            AW2[Agent W2<br/>SMB/FTP]
-            AW3[Agent WN...<br/>Multi-Protocol]
-        end
-
-        subgraph "Cloud Agents"
-            AC1[Agent C1<br/>HTTP/SFTP]
-            AC2[Agent C2<br/>SMB/FTP]
-            AC3[Agent CN...<br/>Multi-Protocol]
-        end
-    end
-
-    %% Controller to State connections
-    C1 --> PG
-    C1 --> REDIS
-    C1 --> ETCD
-    C2 --> PG
-    C2 --> REDIS
-    C2 --> ETCD
-    C3 --> PG
-    C3 --> REDIS
-    C3 --> ETCD
-
-    %% Controller to Agent connections
-    C1 -.->|Work Distribution| AE1
-    C1 -.->|Work Distribution| AE2
-    C1 -.->|Work Distribution| AE3
-    C1 -.->|Work Distribution| AW1
-    C1 -.->|Work Distribution| AW2
-    C1 -.->|Work Distribution| AW3
-    C1 -.->|Work Distribution| AC1
-    C1 -.->|Work Distribution| AC2
-    C1 -.->|Work Distribution| AC3
-
-    %% Agent heartbeats
-    AE1 -.->|Heartbeat| LB
-    AE2 -.->|Heartbeat| LB
-    AE3 -.->|Heartbeat| LB
-    AW1 -.->|Heartbeat| LB
-    AW2 -.->|Heartbeat| LB
-    AW3 -.->|Heartbeat| LB
-    AC1 -.->|Heartbeat| LB
-    AC2 -.->|Heartbeat| LB
-    AC3 -.->|Heartbeat| LB
-
-    %% Corporate Integration
-    subgraph "Corporate Services"
-        AD[Active Directory<br/>Corporate LDAP]
-        VAULT[Corporate Vault<br/>Key Management]
-        CA[Corporate PKI<br/>Certificate Authority]
-        NAS[Corporate NAS<br/>File Storage]
-        NFS[NFS Mounts<br/>Department Shares]
-    end
-
-    %% Corporate Monitoring
-    subgraph "Corporate Monitoring"
-        PROM[Prometheus<br/>Corporate Monitoring]
-        SPLUNK[Splunk<br/>Corporate SIEM]
-        GRAF[Grafana<br/>Corporate Dashboards]
-        ALERT[AlertManager]
-        EMAIL[Corporate Email<br/>Exchange/O365]
-    end
-
-    %% Integration connections
-    C1 --> AD
-    C1 --> VAULT
-    C1 --> CA
-    AE1 --> NAS
-    AE2 --> NFS
-    AW1 --> NAS
-    AW2 --> NFS
-    AC1 --> NAS
-    AC2 --> NFS
-
-    %% Monitoring connections
-    PROM --> C1
-    PROM --> C2
-    PROM --> C3
-    PROM --> AE1
-    PROM --> AW1
-    PROM --> AC1
-    SPLUNK --> PROM
-    GRAF --> PROM
-    ALERT --> PROM
-    ALERT --> EMAIL
-
-    %% Styling
-    style C1 fill:#e3f2fd
-    style C2 fill:#e8f5e8
-    style C3 fill:#e8f5e8
-    style AE1 fill:#fff3e0
-    style AE2 fill:#fff3e0
-    style AE3 fill:#fff3e0
-    style AW1 fill:#fff3e0
-    style AW2 fill:#fff3e0
-    style AW3 fill:#fff3e0
-    style AC1 fill:#fff3e0
-    style AC2 fill:#fff3e0
-    style AC3 fill:#fff3e0
-    style CORP fill:#f0f0f0
-    style LB fill:#f0f0f0
-    style PG fill:#f3e5f5
-    style REDIS fill:#f3e5f5
-    style ETCD fill:#f3e5f5
-    style PROM fill:#fce4ec
-    style SPLUNK fill:#fce4ec
-    style GRAF fill:#fce4ec
-    style ALERT fill:#fce4ec
-    style VAULT fill:#f1f8e9
-    style CA fill:#f1f8e9
-    style AD fill:#fff8e1
-    style NAS fill:#fff8e1
-    style NFS fill:#fff8e1
-    style EMAIL fill:#fff8e1
-```
-```yaml
-# Kubernetes deployment example
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: quorus-engine
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: quorus-engine
-  template:
-    metadata:
-      labels:
-        app: quorus-engine
-    spec:
-      containers:
-      - name: quorus-engine
-        image: quorus/engine:latest
-        resources:
-          requests:
-            memory: "512Mi"
-            cpu: "500m"
-          limits:
-            memory: "1Gi"
-            cpu: "1000m"
-        env:
-        - name: QUORUS_TENANT_ID
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.labels['tenant']
-```
-
-### Distributed State Management
-
-The enhanced Quorus architecture implements distributed state management to ensure consistency, availability, and partition tolerance across the controller quorum and agent fleet.
-
-#### State Distribution Strategy
-
-```mermaid
-graph TB
-    subgraph "Controller Quorum State"
-        CL[Controller Leader]
-        CF1[Controller Follower 1]
-        CF2[Controller Follower 2]
-
-        subgraph "Replicated State"
-            RS[Raft Log<br/>Strong Consistency]
-            AS[Agent State<br/>Eventually Consistent]
-            JS[Job State<br/>Strong Consistency]
-            TS[Tenant Config<br/>Strong Consistency]
-        end
-    end
-
-    subgraph "Distributed Storage"
-        PG[(PostgreSQL<br/>Persistent State)]
-        REDIS[(Redis<br/>Cache Layer)]
-        ETCD[(etcd<br/>Agent Registry)]
-        TS_DB[(Time Series DB<br/>Metrics)]
-    end
-
-    subgraph "Agent Fleet State"
-        A1[Agent 1<br/>Local State]
-        A2[Agent 2<br/>Local State]
-        AN[Agent N<br/>Local State]
-    end
-
-    CL --> RS
-    CF1 --> RS
-    CF2 --> RS
-
-    RS --> PG
-    AS --> REDIS
-    JS --> PG
-    TS --> PG
-
-    AS --> ETCD
-
-    CL -.->|Heartbeat Processing| AS
-    A1 -.->|Status Updates| AS
-    A2 -.->|Status Updates| AS
-    AN -.->|Status Updates| AS
-
-    style CL fill:#e3f2fd
-    style CF1 fill:#e8f5e8
-    style CF2 fill:#e8f5e8
-```
-
-**State Categories:**
-
-1. **Strongly Consistent State** (Raft Consensus):
-   - Job assignments and status
-   - Tenant configurations
-   - Workflow definitions
-   - System configuration
-
-2. **Eventually Consistent State** (Gossip/Cache):
-   - Agent heartbeats and status
-   - Performance metrics
-   - Capacity information
-   - Health status
-
-3. **Local State** (Agent-specific):
-   - Active transfer progress
-   - Local resource utilization
-   - Temporary file state
-   - Protocol-specific state
-
-#### High Availability Configuration
-
-**Controller Quorum:**
-- **Minimum**: 3 controllers (tolerates 1 failure)
-- **Recommended**: 5 controllers (tolerates 2 failures)
-- **Geographic Distribution**: Controllers across availability zones
-- **Network Partitioning**: Majority quorum required for operations
-
-**Data Persistence:**
-- **PostgreSQL Cluster**: Primary + 2 synchronous replicas
-- **Redis Cluster**: 6 nodes (3 masters + 3 replicas)
-- **etcd Cluster**: 3-5 nodes for agent registry
-- **Backup Strategy**: Automated backups with point-in-time recovery
-
-**Failure Scenarios:**
-- **Single Controller Failure**: Automatic leader election, <5s downtime
-- **Database Failure**: Automatic failover to replica, <30s downtime
-- **Network Partition**: Majority partition continues operation
-- **Agent Failure**: Duplicate-safe redistribution is not a current guarantee; leases and fencing exist, but automatic expiry/reassignment, destination enforcement, and reconciliation are still required
-
-### Database Schema
-
-```mermaid
-erDiagram
-    TENANTS {
-        varchar id PK
-        varchar parent_id FK
-        jsonb configuration
-        timestamp created_at
-        timestamp updated_at
-    }
-
-    TRANSFERS {
-        uuid id PK
-        varchar tenant_id FK
-        varchar namespace
-        jsonb request_data
-        varchar status
-        bigint bytes_transferred
-        bigint total_bytes
-        varchar checksum
-        timestamp created_at
-        timestamp completed_at
-    }
-
-    WORKFLOW_EXECUTIONS {
-        uuid id PK
-        varchar tenant_id FK
-        varchar namespace
-        jsonb workflow_definition
-        jsonb execution_plan
-        varchar status
-        timestamp created_at
-        timestamp completed_at
-    }
-
-    TRANSFER_GROUPS {
-        uuid id PK
-        uuid workflow_execution_id FK
-        varchar name
-        jsonb group_definition
-        varchar status
-        timestamp created_at
-    }
-
-    RESOURCE_USAGE {
-        uuid id PK
-        varchar tenant_id FK
-        varchar resource_type
-        bigint amount_used
-        bigint quota_limit
-        timestamp recorded_at
-    }
-
-    AUDIT_LOGS {
-        uuid id PK
-        varchar tenant_id FK
-        varchar action
-        varchar resource_type
-        varchar resource_id
-        jsonb details
-        timestamp created_at
-    }
-
-    TENANTS ||--o{ TENANTS : "parent-child"
-    TENANTS ||--o{ TRANSFERS : "owns"
-    TENANTS ||--o{ WORKFLOW_EXECUTIONS : "owns"
-    TENANTS ||--o{ RESOURCE_USAGE : "tracks"
-    TENANTS ||--o{ AUDIT_LOGS : "logs"
-    WORKFLOW_EXECUTIONS ||--o{ TRANSFER_GROUPS : "contains"
-    TRANSFER_GROUPS ||--o{ TRANSFERS : "includes"
-```
-
-```sql
--- Core tables
-CREATE TABLE tenants (
-    id VARCHAR(255) PRIMARY KEY,
-    parent_id VARCHAR(255),
-    configuration JSONB,
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW(),
-    FOREIGN KEY (parent_id) REFERENCES tenants(id)
-);
-
-CREATE TABLE transfers (
-    id UUID PRIMARY KEY,
-    tenant_id VARCHAR(255) NOT NULL,
-    namespace VARCHAR(255),
-    request_data JSONB,
-    status VARCHAR(50),
-    bytes_transferred BIGINT DEFAULT 0,
-    total_bytes BIGINT,
-    checksum VARCHAR(255),
-    created_at TIMESTAMP DEFAULT NOW(),
-    completed_at TIMESTAMP,
-    FOREIGN KEY (tenant_id) REFERENCES tenants(id)
-);
-
-CREATE TABLE workflow_executions (
-    id UUID PRIMARY KEY,
-    tenant_id VARCHAR(255) NOT NULL,
-    namespace VARCHAR(255),
-    workflow_definition JSONB,
-    execution_plan JSONB,
-    status VARCHAR(50),
-    created_at TIMESTAMP DEFAULT NOW(),
-    completed_at TIMESTAMP,
-    FOREIGN KEY (tenant_id) REFERENCES tenants(id)
-);
-
-CREATE TABLE transfer_groups (
-    id UUID PRIMARY KEY,
-    workflow_execution_id UUID NOT NULL,
-    name VARCHAR(255),
-    group_definition JSONB,
-    status VARCHAR(50),
-    created_at TIMESTAMP DEFAULT NOW(),
-    FOREIGN KEY (workflow_execution_id) REFERENCES workflow_executions(id)
-);
-
-CREATE TABLE resource_usage (
-    id UUID PRIMARY KEY,
-    tenant_id VARCHAR(255) NOT NULL,
-    resource_type VARCHAR(100),
-    amount_used BIGINT,
-    quota_limit BIGINT,
-    recorded_at TIMESTAMP DEFAULT NOW(),
-    FOREIGN KEY (tenant_id) REFERENCES tenants(id)
-);
-
-CREATE TABLE audit_logs (
-    id UUID PRIMARY KEY,
-    tenant_id VARCHAR(255) NOT NULL,
-    action VARCHAR(100),
-    resource_type VARCHAR(100),
-    resource_id VARCHAR(255),
-    details JSONB,
-    created_at TIMESTAMP DEFAULT NOW(),
-    FOREIGN KEY (tenant_id) REFERENCES tenants(id)
-);
-```
-
-
+- Run the groups in dependency order, honouring `parallelism`, with each transfer simulated (about 100 ms) and no transfer started
+- Performance estimation and resource-usage prediction (Target): not implemented
 
 ## Design Principles
+
+**Status: Target.** Principles for the target design. Modularity and declarative YAML workflows exist today; the corporate integrations named below (directory services, SIEM, corporate monitoring and notification systems) do not.
 
 ### 1. Internal Network Optimization
 - **High-throughput transfers** leveraging corporate network bandwidth
@@ -4077,272 +1931,57 @@ CREATE TABLE audit_logs (
 - **Alerting** through corporate notification systems (Exchange, Teams)
 - **Compliance reporting** for corporate audit requirements
 
-## Security Architecture
-
-```mermaid
-graph TD
-    USER[User/System] --> AUTH{Authentication}
-
-    AUTH -->|OAuth2/SAML/LDAP| AUTHZ[Authorization<br/>RBAC & Policies]
-
-    AUTHZ --> APP[Application Layer<br/>Quorus Services]
-
-    APP --> DATA[Data Layer<br/>Encrypted Storage]
-
-    subgraph "Security Controls"
-        NET[Network Security<br/>TLS, VPN, Firewall]
-        TENANT[Tenant Isolation<br/>Multi-Tenant Security]
-        AUDIT[Audit & Compliance<br/>Logging & Monitoring]
-    end
-
-    APP -.-> NET
-    APP -.-> TENANT
-    APP -.-> AUDIT
-
-    subgraph "External Security Services"
-        VAULT[HashiCorp Vault<br/>Key Management]
-        SIEM[SIEM System<br/>Security Monitoring]
-        CA[Certificate Authority<br/>PKI Management]
-    end
-
-    DATA -.-> VAULT
-    AUDIT -.-> SIEM
-    NET -.-> CA
-
-    style USER fill:#f0f0f0
-    style AUTH fill:#e8f5e8
-    style AUTHZ fill:#fff3e0
-    style APP fill:#e3f2fd
-    style DATA fill:#f3e5f5
-    style NET fill:#fce4ec
-    style TENANT fill:#f1f8e9
-    style AUDIT fill:#fff8e1
-    style VAULT fill:#e0f2f1
-    style SIEM fill:#f9fbe7
-    style CA fill:#fef7ff
-```
-
-### Security Layer Details
-
-#### Authentication Layer
-- **OAuth2 Provider** - Modern token-based authentication
-- **SAML Provider** - Enterprise SSO integration
-- **LDAP Provider** - Directory service authentication
-- **API Key Authentication** - Service-to-service authentication
-
-#### Authorization Layer
-- **Role-Based Access Control (RBAC)** - User role management
-- **Attribute-Based Access Control (ABAC)** - Fine-grained permissions
-- **Policy Engine** - Centralized policy management
-- **Permission Manager** - Access control enforcement
-
-#### Data Protection Layer
-- **Encryption at Rest** - Database and file encryption
-- **Encryption in Transit Requirement** - TLS/mTLS and verified peer identity for all applicable communications; not fully implemented today
-- **Key Management Service** - Centralized key management
-- **Hardware Security Module** - Secure key storage
-
-#### Network Security Layer
-- **TLS/mTLS** - Secure communication protocols
-- **VPN Gateway** - Secure network access
-- **Firewall Rules** - Network traffic filtering
-- **Network Policies** - Kubernetes network isolation
-
-#### Audit & Compliance Layer
-- **Audit Logging** - Comprehensive activity logging
-- **Compliance Monitor** - Regulatory compliance tracking
-- **Data Residency** - Geographic data controls
-- **Retention Policies** - Data lifecycle management
-
-#### Tenant Isolation Layer
-- **Tenant Isolation** - Multi-tenant data separation
-- **Row Level Security** - Database-level isolation
-- **Namespace Isolation** - Kubernetes namespace separation
-- **Quota Management** - Resource usage controls
-
-## Internal Network Optimizations
-
-### Corporate Network Characteristics
-
-Quorus is designed to leverage the unique characteristics of internal corporate networks:
-
-#### **High Bandwidth Availability**
-- **Gigabit/10Gb Ethernet** standard in corporate environments
-- **Dedicated network segments** for data transfer operations
-- **Quality of Service (QoS)** policies for prioritizing transfer traffic
-- **Network bandwidth reservation** for critical transfer operations
-
-#### **Low Latency Communications**
-- **Sub-millisecond latency** within data centers
-- **Predictable network paths** through corporate routing
-- **Optimized TCP window sizing** for internal network characteristics
-- **Connection pooling** for frequently accessed internal services
-
-#### **Trusted Network Environment**
-- **Reduced encryption overhead** where appropriate within secure zones
-- **Certificate-based authentication** for internal service-to-service communication
-- **Network-level security** through corporate firewalls and VLANs
-- **Simplified authentication** using corporate directory services
-
-### Internal Protocol Optimizations
-
-#### **SMB/CIFS Protocol Support**
-```yaml
-source:
-  uri: "smb://fileserver.corp.local/shares/data/export.csv"
-  protocol: smb
-  authentication:
-    type: kerberos
-    domain: "CORP"
-  options:
-    smbVersion: "3.1.1"
-    directIO: true
-    largeBuffers: true
-```
-
-#### **NFS Protocol Support**
-```yaml
-source:
-  uri: "nfs://storage.corp.local/exports/data"
-  protocol: nfs
-  options:
-    nfsVersion: "4.1"
-    rsize: 1048576      # 1MB read buffer
-    wsize: 1048576      # 1MB write buffer
-    tcp: true
-```
-
-#### **Internal HTTP Optimizations**
-```yaml
-source:
-  uri: "http://internal-api.corp.local/data/export"
-  protocol: http
-  options:
-    keepAlive: true
-    connectionPoolSize: 50
-    tcpNoDelay: true
-    bufferSize: 65536
-    compressionEnabled: false  # Skip compression on fast internal networks
-```
-
-### Corporate Integration Features
-
-#### **Active Directory Integration**
-- **Seamless authentication** using corporate credentials
-- **Group-based authorization** aligned with corporate structure
-- **Service account management** for automated transfers
-- **Audit trail integration** with corporate security systems
-
-#### **Corporate Storage Integration**
-- **SAN/NAS connectivity** for high-performance storage access
-- **Storage tiering** awareness for optimal placement
-- **Backup integration** with corporate backup systems
-- **Disaster recovery** coordination with corporate DR plans
-
-#### **Network Monitoring Integration**
-- **SNMP integration** with corporate network monitoring
-- **Bandwidth utilization** reporting to network operations
-- **Network path optimization** based on corporate topology
-- **Traffic shaping** coordination with network QoS policies
-
-## Scalability & Performance
-
-### Horizontal Scaling
-- Stateless service design
-- Load balancing across instances
-- Distributed execution coordination
-
-### Resource Management
-- Configurable concurrency limits
-- Resource quotas per tenant
-- Dynamic resource allocation
-
-### Performance Optimization
-- Efficient buffer management
-- Connection pooling
-- Asynchronous I/O operations
-
-## Monitoring & Observability
-
-### Metrics
-- Transfer performance metrics
-- Resource utilization tracking
-- Error rates and latency measurements
-
-### Logging
-- Structured logging with correlation IDs
-- Tenant-scoped log aggregation
-- Configurable log levels
-
-### Alerting
-- Threshold-based alerting
-- Tenant-specific notification channels
-- Integration with external monitoring systems
-
-## Error Handling & Recovery
-
-### Retry Mechanisms
-- Exponential backoff strategies
-- Configurable retry limits
-- Circuit breaker patterns
-
-### Failure Recovery
-- Graceful degradation
-- Automatic failover
-- Manual recovery procedures
-
-### Error Reporting
-- Structured error messages
-- Error categorization and classification
-- Integration with monitoring systems
-
 ## Operational Improvements
+
+**Status: Partly current.** Build, image, environment variables, endpoints and log commands checked on 2026-10-03; the [Docker guide](../../docker/README.md) is the operational reference and wins where this section is briefer.
 
 ### Deployment Automation
 
 #### Docker Compose Configurations
 
-**Controller-First Production Setup:**
-```bash
-# Start production cluster with load balancing
-.\start.ps1 controllers
+Build the jars on the host first; images copy the host-built jar and never run Maven ([Docker guide](../../docker/README.md#building-images)):
 
-# Services started:
-# - 3 Controller nodes (ports 8081-8083)
-# - Nginx load balancer (port 8080)
-# - Health monitoring enabled
-# - Automatic failover configured
+```bash
+./docker/build-runtime.ps1        # or: sh docker/build-runtime.sh
 ```
 
-**Development Setup:**
+**Three-controller cluster with load balancing (development security profile):**
 ```bash
-# Start single-node development environment
-.\start.ps1 cluster
+docker compose -f docker/compose/docker-compose-controller-first.yml up -d --build
 
 # Services started:
-# - Single controller with embedded API
-# - Minimal resource usage
-# - Quick startup for development
+# - 3 controller nodes (ports 8081-8083)
+# - nginx load balancer (port 8080); not leader-aware
+# - Container health checks on /health/live
 ```
 
-**Logging and Monitoring:**
+**Single-controller development setup:**
 ```bash
-# Start comprehensive logging stack
-.\start.ps1 logging
+docker compose -f docker/compose/docker-compose-single-controller.yml up -d --build
+
+# Services started:
+# - Single controller with embedded API on port 8080
+```
+
+**Logging stack:**
+```bash
+docker compose -f docker/compose/docker-compose-loki.yml up -d
 
 # Services started:
 # - Loki for log aggregation
 # - Promtail for log collection
-# - Grafana for visualization
+# - Grafana for visualization (port 3010)
 # - Prometheus for metrics
 ```
+
+The compose files list every topology, including the five-node, full-network, mutual-TLS and observability stacks. `docker/start.ps1` is an older launcher that does not build the jars; prefer the commands above.
 
 #### Build and Deployment Pipeline
 
 **Maven Build Configuration:**
 - **Shade Plugin**: Creates executable JAR with all dependencies
 - **Main Class**: `dev.mars.quorus.controller.QuorusControllerApplication`
-- **Health Checks**: Integrated Docker health monitoring
+- **Health Checks**: Integrated Docker health monitoring on `/health/live`
 - **Single-Stage Image**: The image copies the jar built on the host; Java and Maven never run inside Docker
 
 **Docker Configuration:**
@@ -4374,23 +2013,26 @@ HEALTHCHECK --interval=10s --timeout=5s --start-period=15s --retries=3 \
 CMD ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
 ```
 
-The full file, including the environment defaults, is `quorus-controller/Dockerfile`.
+The full file, including the environment defaults, is `quorus-controller/Dockerfile`. It has no `ENTRYPOINT`.
 
 ### Configuration Management
 
 #### Environment Variables
 
-**Controller Configuration:**
+**Controller Configuration** (as set by `docker-compose-controller-first.yml` for `controller1`, abridged; names follow [Module Configuration Architecture](#module-configuration-architecture)):
 ```bash
 QUORUS_NODE_ID=controller1              # Unique node identifier
-QUORUS_RAFT_HOST=0.0.0.0               # Raft gRPC binding host
-QUORUS_RAFT_PORT=9080                   # Raft gRPC communication port
+QUORUS_RAFT_PORT=9080                   # Raft gRPC port (there is no Raft bind-host variable)
 QUORUS_HTTP_PORT=8080                   # HTTP API port (HttpApiServer)
 QUORUS_CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080
-ELECTION_TIMEOUT_MS=3000               # Raft election timeout
-HEARTBEAT_INTERVAL_MS=500              # Raft heartbeat interval
-JAVA_OPTS=-Xmx512m -Xms256m            # JVM configuration
+QUORUS_RAFT_ELECTION_TIMEOUT_MS=3000    # Raft election timeout (packaged default 5000)
+QUORUS_RAFT_HEARTBEAT_INTERVAL_MS=500   # Raft heartbeat interval (packaged default 1000)
+QUORUS_RAFT_STORAGE_PATH=/app/data/raft # Mounted durable volume
+QUORUS_SECURITY_PROFILE=development     # The packaged default is production
+JAVA_OPTS=-Xmx512m -Xms256m             # JVM configuration
 ```
+
+The unprefixed `ELECTION_TIMEOUT_MS` and `HEARTBEAT_INTERVAL_MS` are not read by the controller.
 
 **Load Balancer Configuration:**
 ```nginx
@@ -4407,69 +2049,57 @@ upstream quorus_controllers {
 
 **Health Check Endpoints (served by `HttpApiServer`):**
 - `/health` - Quorus Controller health including Raft state (LEADER/FOLLOWER/CANDIDATE)
-- `/health/ready` - Service readiness
+- `/health/ready` - Service readiness (Raft running and a leader known)
 - `/health/live` - Process liveness
 - `/status` - Detailed status information
-- `/metrics` - Prometheus metrics (`quorus_cluster_*`, `quorus_raft_*`)
+- `/raft/status` - Raft state
+- `/metrics` - Prometheus metrics (`quorus_cluster_*`, `quorus_raft_*`); with telemetry enabled the Prometheus exporter also listens on port 9464
 
 **Key Metrics Tracked:**
 - Quorus Controller cluster health (`quorus_cluster_state`, `quorus_cluster_is_leader`)
 - Raft consensus status (`quorus_cluster_term`, `quorus_cluster_commit_index`)
-- Quorus Agent heartbeat processing
-- Transfer job throughput
-- System resource utilization
+- Controller state counts (`quorus_jobs_*`, `quorus_agents_total`, `quorus_routes_total`)
+- Agent and transfer metrics, exported by the agent process (`quorus_agent_*`, `quorus_transfer_*`)
 
 #### Log Aggregation
 
 **Structured Logging:**
-- JSON format for machine parsing
+- Pattern-formatted console logs with MDC fields (node ID, Raft role and term, request ID)
+- A JSON rolling-file appender at `/app/logs/controller.json` for machine parsing
 - Correlation IDs for request tracing
-- Contextual information for debugging
-- Performance metrics embedded
 
 **Centralized Collection:**
-- Promtail agents on all nodes
+- Promtail collects container logs labelled `logging=promtail`
 - Loki for log storage and indexing
 - Grafana for log visualization
-- Alert rules for critical events
+- Alert rules for critical events (Target)
 
 ### Operational Scripts
 
 #### Management Commands
 
-**Service Management:**
+Use `docker compose` directly (see the [Docker guide](../../docker/README.md)):
+
 ```bash
-# Start services
-.\start.ps1 controllers    # Production cluster
-.\start.ps1 cluster       # Development
-.\start.ps1 logging       # Monitoring stack
-
-# Service status
-.\start.ps1 status        # Show all service status
-
-# Stop services
-.\start.ps1 stop          # Stop all services
+docker compose -f docker/compose/docker-compose-controller-first.yml ps       # status
+docker compose -f docker/compose/docker-compose-controller-first.yml logs -f  # logs
+docker compose -f docker/compose/docker-compose-controller-first.yml down     # stop
 ```
 
-**Testing and Validation:**
-```bash
-# Test scripts in docker/test-data/
-.\send-heartbeat.ps1      # Send test heartbeats
-.\check-agents.ps1        # Check agent status
-.\demo-logging.ps1        # Demonstrate logging
-```
+The PowerShell helpers under `docker/scripts/` and `docker/test-data/` (`send-heartbeat.ps1`, `check-agents.ps1`, `demo-logging.ps1`, `test-transfers.ps1`, `start-full-network.ps1`) do not work against the current topologies (register `ENG-19`).
 
 #### Troubleshooting Tools
 
 **Health Validation:**
 ```bash
-# Check individual controller health
+# Check individual controller health (development topology, plain HTTP)
 curl http://localhost:8081/health
 curl http://localhost:8082/health
 curl http://localhost:8083/health
 
-# Check load balancer
-curl http://localhost:8080/health
+# Through the load balancer: /health is answered by nginx itself (ENG-18);
+# /health/ready reaches a controller
+curl http://localhost:8080/health/ready
 ```
 
 **Log Analysis:**
@@ -4483,6 +2113,8 @@ docker logs quorus-loadbalancer --tail 50
 
 ### Performance Optimization
 
+**Target.** General guidance, not measured configuration; measured baselines are in the [benchmark specification](../performance/QUORUS_PERFORMANCE_BENCHMARKS.md).
+
 #### Resource Configuration
 
 **JVM Tuning:**
@@ -4491,16 +2123,18 @@ docker logs quorus-loadbalancer --tail 50
 - JIT compilation optimization
 
 **Network Optimization:**
-- Connection pooling for Raft communication
+- Connection pooling for Raft communication (current: one gRPC channel per peer, bounded I/O pool)
 - HTTP keep-alive for API connections
 - Load balancer connection limits
 
 **Storage Optimization:**
-- Persistent volumes for data durability
+- Persistent volumes for data durability (current: named volumes at `/app/data` in the compose files)
 - Log rotation and cleanup policies
 - Backup and recovery procedures
 
 ## Future Enhancements
+
+**Status: Target.** None of the items below is planned in the implementation plan unless the plan says so.
 
 **Advanced Protocol Support:**
 - Additional protocols (S3, Azure Blob, Google Cloud Storage) *(expanded from "FTP, SFTP, S3")*
@@ -4541,115 +2175,32 @@ docker logs quorus-loadbalancer --tail 50
 - Service mesh integration (Istio, Linkerd)
 - Cloud provider native integrations
 - Serverless transfer execution options
-- Container-based agent deployment
-
-## File Organization
-
-### Project Structure Overview
-
-```mermaid
-graph TD
-    subgraph "Quorus Project Structure"
-        ROOT[quorus/<br/>Parent Project]
-
-        subgraph "Core Modules"
-            CORE[quorus-core/<br/>Core Transfer Engine]
-            TENANT[quorus-tenant/<br/>Multi-Tenant Management]
-            WORKFLOW[quorus-workflow/<br/>YAML Workflow Engine]
-        end
-
-        subgraph "Example Modules"
-            EXAMPLES[quorus-integration-examples/<br/>Usage Examples]
-            WEXAMPLES[quorus-workflow-examples/<br/>Workflow Examples]
-        end
-
-        subgraph "Documentation"
-            DOCS[docs/<br/>Documentation]
-        end
-    end
-
-    ROOT --> CORE
-    ROOT --> TENANT
-    ROOT --> WORKFLOW
-    ROOT --> EXAMPLES
-    ROOT --> WEXAMPLES
-    ROOT --> DOCS
-
-    style ROOT fill:#e1f5fe
-    style CORE fill:#e8f5e8
-    style TENANT fill:#fff3e0
-    style WORKFLOW fill:#e3f2fd
-    style EXAMPLES fill:#fce4ec
-    style WEXAMPLES fill:#f1f8e9
-    style DOCS fill:#f3e5f5
-```
-
-### Module Details
-
-#### Core Modules
-```
-quorus-core/                    # Core transfer engine
-├── src/main/java/dev/mars/quorus/
-│   ├── core/                   # Domain models
-│   ├── transfer/               # Transfer engine
-│   ├── protocol/               # Protocol handlers
-│   ├── storage/                # File management
-│   └── config/                 # Configuration
-└── src/test/java/              # Unit tests
-
-quorus-tenant/                  # Multi-tenant management
-├── src/main/java/dev/mars/quorus/tenant/
-│   ├── model/                  # Tenant models
-│   ├── service/                # Tenant services
-│   ├── security/               # Multi-tenant security
-│   └── resource/               # Resource management
-└── src/test/java/              # Unit tests
-
-quorus-workflow/                # YAML workflow engine
-├── src/main/java/dev/mars/quorus/workflow/
-│   ├── definition/             # YAML models
-│   ├── parser/                 # YAML parsing
-│   ├── engine/                 # Workflow engine
-│   └── resolver/               # Dependency resolution
-└── src/test/java/              # Unit tests
-```
-
-#### Example Modules
-```
-quorus-integration-examples/    # Usage examples
-├── src/main/java/dev/mars/quorus/examples/
-│   └── BasicTransferExample.java
-└── README.md
-
-quorus-workflow-examples/       # Workflow examples
-├── basic/                      # Simple examples
-├── enterprise/                 # Complex workflows
-└── templates/                  # Reusable templates
-```
-
-#### Documentation
-```
-docs/                           # Documentation
-├── quorus-comprehensive-system-design.md
-├── quorus-implementation-plan.md
-└── README.md
-```
+- Governed container-based agent deployment (an agent image exists for development topologies today)
 
 ## Related Documents
+
+**Status: Current.**
 
 - **[Canonical Architecture Specification](../../docs/QUORUS_ARCHITECTURE_SPECIFICATION.md)** - Current guarantees, boundaries, and release requirements
 - **[Canonical REST API Specification](../../docs/QUORUS_REST_API_SPECIFICATION.md)** - Complete control, operations, security, and administration API contract
 - **[Enterprise Implementation Plan](../task/QUORUS_ENTERPRISE_IMPLEMENTATION_PLAN.md)** - Phased delivery, dependencies, verification, and exit gates
+- **[Outstanding Work Register](../task/QUORUS_OUTSTANDING_WORK_REGISTER.md)** - Every open task cited here (`ENG-*`, `SEC-*`, `ARCH-*`, `P2-*`, `RT-*`, `CE-*`)
 - **[OpenAPI contract](../../quorus-controller/src/main/resources/openapi/quorus-controller-v1.yaml)** - The current HTTP API, also served at `GET /api/v1/openapi.yaml`
+- **[YAML Syntax Guide](../../docs/QUORUS_YAML_SYNTAX_GUIDE.md)** - Accepted workflow syntax
+- **[Docker guide](../../docker/README.md)** - Building images and running the compose topologies
+- **[ADR-0011](../architecture-decisions/ADR-0011-CONSENSUS-VIA-QRAFT-GENERIC-ENGINE.md)** and **[ADR-0012](../architecture-decisions/ADR-0012-JAVA-RUNTIME-AND-STRUCTURED-CONCURRENCY.md)** - Consensus via QRaft; the controller off Vert.x
+- **[Archived sections](../archive/QUORUS_SYSTEM_DESIGN_ARCHIVED_SECTIONS.md)** - Sections removed from this document in version 4.0, kept verbatim
 
 ## Conclusion
+
+**Status: Partly current.**
 
 The Quorus comprehensive system design describes a target foundation for enterprise file-transfer operations with:
 
 ### Core Architectural Strengths
 
 - **Controller-First Architecture**: Self-contained nodes with static membership in the current runtime
-- **Distributed Consensus**: Raft-based coordination for strong consistency
+- **Distributed Consensus**: Raft-based coordination; committed writes are strongly ordered, follower reads may be stale
 - **High Availability Target**: Load-balanced deployment, leader election, proven durable storage, and recovery gates
 - **Multi-tenant Target**: Authenticated isolation, organizational hierarchy, quotas, and policy
 - **Declarative Workflows**: YAML-based infrastructure-as-code approach
@@ -4667,7 +2218,8 @@ The Quorus comprehensive system design describes a target foundation for enterpr
 - **Controller Scaling**: Static membership sized before startup; live membership change remains future work
 - **Quorus Agent Fleet Management**: Target capacity must be supported by measured scheduling, telemetry, identity, and rollout evidence
 - **Fault Recovery**: Controller recovery plus conservative transfer reconciliation until duplicate-safe reassignment is implemented
-- **Load Distribution**: `nginx` load balancer routes to healthy Quorus Controllers
-- **Data Consistency**: Strong consistency guarantees via `RaftNode` and `QuorusStateMachine` across `quorus-controller1`, `quorus-controller2`, `quorus-controller3`
+- **Load Distribution**: `nginx` load balancer spreads requests across the controllers; leader-aware routing is target
+- **Data Consistency**: Strongly ordered committed state via `RaftNode` and `QuorusStateStore` across `quorus-controller1`, `quorus-controller2`, `quorus-controller3`
+- **Work Distribution (Target)**: No assignment scheduler runs yet (`ENG-01`); assignments are made through `POST /api/v1/assignments`
 
 The modular design is intended to scale from simple single-tenant deployments to complex multi-tenant enterprise scenarios. Current guarantees, supported scale, and production release gates are defined only by the canonical architecture specification and its verification evidence.

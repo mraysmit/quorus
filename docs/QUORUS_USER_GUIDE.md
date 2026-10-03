@@ -2,8 +2,8 @@
 
 # Quorus User Guide
 
-**Version:** 2.5
-**Date:** 2026-09-28
+**Version:** 2.6  
+**Date:** 2026-10-03  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Scope:** Current implementation guide
@@ -61,19 +61,22 @@ The workflow module supports:
 - dry run execution
 - virtual run execution
 
-The workflow engine currently executes transfer groups after validation and dependency sorting. YAML `condition` values are parsed and resolved, but the current workflow engine does not expose a separate condition evaluation subsystem in its execution path.
+The workflow engine validates every workflow before running it, then executes transfer groups in dependency order. YAML `condition` values are parsed and resolved but never evaluated, and transfer `options` have no effect; the [YAML Syntax Guide](QUORUS_YAML_SYNTAX_GUIDE.md) lists the validation rules and these limits.
 
 ### Controller API
 
-The embedded controller HTTP API currently provides:
+The [OpenAPI contract](../quorus-controller/src/main/resources/openapi/quorus-controller-v1.yaml) describes every current endpoint; a running controller serves it at `GET /api/v1/openapi.yaml`. In outline, the API provides:
 
-- health and readiness endpoints
-- metrics and status endpoints
-- agent registration and heartbeat endpoints
-- transfer CRUD
-- job status updates
-- assignment CRUD and lifecycle operations
+- health, readiness, status and metrics endpoints
+- agent registration, heartbeat and job polling
+- transfer submission, lookup and removal, with progress, events and attempts
+- job status reporting
+- assignment creation, acceptance, rejection, status and cancellation
 - route CRUD and suspend/resume operations
+- service connections, secret references and security events
+- identity, authorization explanation and trust endpoints
+
+The controller does not assign transfers to agents by itself: a submitted transfer runs only after a caller assigns it with `POST /api/v1/assignments`.
 
 ### Routes
 
@@ -110,7 +113,7 @@ Use controller plus agents when you need:
 - controller-managed state
 - multi-node Raft-backed coordination
 - agent registration and polling
-- transfer assignment distribution
+- transfer assignment to agents through the API
 - route CRUD through the controller API
 
 ## Current Protocol Guidance
@@ -120,8 +123,9 @@ Use controller plus agents when you need:
 Current implementation supports:
 
 - direct HTTP download and upload paths
-- custom request options carried through transfer definitions
 - streaming execution on Apache HttpClient 5, with governed address pinning
+
+Workflow transfer `options` are not passed to the adapter.
 
 Do **not** assume the current implementation provides:
 
@@ -155,6 +159,14 @@ Current implementation supports SMB and CIFS registration in the protocol factor
 
 Do **not** assume adapter-level resume or pause support. The current adapter reports both as disabled.
 
+### NFS
+
+The NFS adapter does not speak the NFS protocol. It reads and writes an export that the operating system has already mounted, translating `nfs://server/export/path` to `<mount root>/server/export/path`. The mount root is the agent setting `quorus.agent.nfs.mount-root` (environment `QUORUS_AGENT_NFS_MOUNT_ROOT`); when it is empty the adapter uses `/mnt`, or `C:\nfs` on Windows.
+
+A governed transfer that carries a service credential is refused over NFS unless the agent attests that the mount is encrypted and authenticated, with `quorus.agent.nfs.encrypted-authenticated-mount=true` (environment `QUORUS_AGENT_NFS_ENCRYPTED_AUTHENTICATED_MOUNT`). Quorus cannot check that attestation; it is the deployment's responsibility.
+
+Do **not** assume adapter-level resume or pause support. The current adapter reports both as disabled.
+
 ## Observability
 
 Current controller observability endpoints:
@@ -169,7 +181,9 @@ Current controller observability endpoints:
 
 Current core and workflow modules also emit OpenTelemetry-backed metrics through their observability components.
 
-These endpoints and aggregate metrics provide infrastructure evidence, but they do not yet constitute the complete transfer-operations capability required for critical and highly time-sensitive processing. Continuous per-transfer progress, telemetry freshness, attempt history, expected and required completion times, deadline risk, stall detection, actionable alerts, and an end-to-end operator timeline are required by the canonical architecture and REST API specifications and remain conformance gaps where not implemented.
+Each transfer also has three operator resources: `GET /api/v1/transfers/{jobId}/progress` (bytes and percentage, average rate, estimated completion, telemetry freshness, stall state, and time remaining against the required completion time), `GET /api/v1/transfers/{jobId}/events` (the ordered submitted, assigned, accepted, started and progress events), and `GET /api/v1/transfers/{jobId}/attempts` (attempt history). Agents report progress while a transfer runs.
+
+These do not yet make up the complete transfer-operations capability that critical and time-sensitive processing needs. Actionable alerts and escalation on stalls and deadline risk, and a complete end-to-end operator timeline, are required by the canonical architecture and REST API specifications and are still conformance gaps.
 
 ## Tenant Isolation
 
@@ -179,19 +193,15 @@ The production controller authenticates callers through mTLS or a trusted gatewa
 
 ### Agent Configuration
 
-Each agent must declare its tenant at startup. Two configuration paths are supported:
-
-**Environment variable (takes priority):**
+Each agent must declare its tenant; it refuses to start without one. Set it in the agent's environment:
 
 ```bash
-export AGENT_TENANT_ID=acme-corp
+export QUORUS_AGENT_TENANT_ID=acme-corp
 ```
 
-**Properties file (`quorus-agent.properties`):**
+The legacy name `AGENT_TENANT_ID` is still read, but `QUORUS_AGENT_TENANT_ID` wins when both are set. The property `quorus.agent.tenant.id` in `quorus-agent.properties` is packaged inside the agent jar, so it is not an operator setting.
 
-```properties
-quorus.agent.tenant.id=acme-corp
-```
+The agent defaults to the production security profile: it requires an `https` controller URL, its own client certificate and key, and a trust bundle for the controller (see the [Security Deployment Guide](QUORUS_SECURITY_DEPLOYMENT_GUIDE.md#5-agent-production-configuration)). The development Compose topologies select the development profile explicitly.
 
 If `tenantId` is absent from the agent registration payload, the controller returns `400 Bad Request`.
 
@@ -214,7 +224,7 @@ Every transfer job must declare a `tenantId` at creation time. Polling filters j
 When reading older Quorus material, keep these distinctions in mind:
 
 - **Implemented now:** controller-first API, Raft-backed state, transfer execution, workflows, route CRUD, tenant-agent isolation
-- **Modeled but not fully wired for autonomous runtime execution:** automatic route trigger evaluation
+- **Modeled but not fully wired for autonomous runtime execution:** automatic route trigger evaluation, automatic agent selection and assignment
 - **Not supported by current adapter code:** adapter-level resume, broad OAuth2 claims, workflow notification/cleanup/SLA YAML sections
 
 ## Recommended Next Documents
@@ -225,4 +235,4 @@ When reading older Quorus material, keep these distinctions in mind:
 - `quorus-controller/src/main/resources/openapi/quorus-controller-v1.yaml` — the OpenAPI contract for the current API, also served at `GET /api/v1/openapi.yaml`
 - `docs/QUORUS_WORKFLOWS_README.md`
 - `docs/QUORUS_YAML_SYNTAX_GUIDE.md`
-- `docs/QUORUS_CLUSTER_STARTUP_GUIDE.md`
+- `docker/README.md` — the Docker guide: topologies, startup and verification

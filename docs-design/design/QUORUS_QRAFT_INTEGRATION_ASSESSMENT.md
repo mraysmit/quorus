@@ -2,8 +2,8 @@
 
 # Quorus and QRaft: Integration Assessment
 
-**Version:** 1.0  
-**Date:** 2026-09-28  
+**Version:** 1.1  
+**Date:** 2026-10-03  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Status:** Assessment, read-only on the QRaft side. It records where both engines stand and what workstream
@@ -11,7 +11,26 @@
 and tracked as items `CE-01` to `CE-11` and decisions `CE-Q1` to `CE-Q5` in the
 [register](../task/QUORUS_OUTSTANDING_WORK_REGISTER.md).  
 **Observed:** QRaft `main` at `1bab473` (with uncommitted test changes; the owner is still changing it) and
-Quorus after `RT-05`.
+Quorus after `RT-05`. Sections 1 to 5 describe that snapshot; the update below records what has changed since.
+
+## Update, 2026-10-03
+
+QRaft `main` is now at `caf101b`, eleven commits later. Changes that affect this assessment:
+
+- **Dynamic membership is implemented in QRaft** (`MembershipService`, `RaftConfigurationCodec`, durable server
+  identity, join, removal and rejoin, with `RaftNodeMembershipTest` and `MembershipServiceTest`). "Static
+  membership in both engines" (§1, §2, §5 item 3) no longer holds for QRaft. Decision `CE-Q3` should be
+  re-read: the question is now whether Quorus adopts QRaft's membership in its first QRaft release, not
+  whether QRaft has it. Quorus itself is still static (`ARCH-10`).
+- **raftlog is 1.4.1**, not 1.4.0. `CE-Q4` and `CE-09` concern 1.2.0 files under 1.4.1.
+- **`qraft-controller` is no longer shaded.** That moves `CE-Q5` forward but does not by itself make
+  `qraft-raft-engine` a standalone engine artifact.
+- **Still true:** QRaft's Raft transport is plaintext (`GrpcRaftTransport` uses `usePlaintext()`), so `CE-03`
+  stands as written.
+
+On the Quorus side, the §6 baselines are done: B-09 (Raft commit latency) and B-08 (controller API) were
+recorded on 2026-09-28 (`ENG-15a`, `ENG-15b`), and `ENG-16` removed the audit cap that B-08 exposed. `RT-06` was
+re-sequenced to proceed before QRaft (`SEQ-03`), starting with the narrow engine boundary described in §6.
 
 ---
 

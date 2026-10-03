@@ -5,17 +5,37 @@ This product includes software developed by Mark Andrew Ray-Smith Cityline Ltd.
 
 ================================================================================
 
-This software contains the following third-party components:
+This software contains the following third-party components at runtime.
+Test-only dependencies are listed in OPEN_SOURCE_USAGE.md and are not
+distributed with Quorus.
 
-Eclipse Vert.x (io.vertx:vertx-core:5.0.8)
+Eclipse Vert.x (io.vertx:vertx-core, vertx-web, vertx-web-client,
+vertx-grpc-server, vertx-grpc-client, vertx-opentelemetry: 5.0.8)
+  Used by quorus-controller only.
   License: Apache License 2.0 and Eclipse Public License 2.0
   Copyright (c) 2011-2024 The original author or authors
   https://github.com/eclipse-vertx/vert.x
 
-Jackson JSON Processing (com.fasterxml.jackson.core:jackson-databind:2.19.4)
+Netty (io.netty, transitive through Vert.x and gRPC)
+  License: Apache License 2.0
+  Copyright The Netty Project
+  https://github.com/netty/netty
+
+Apache HttpClient 5 (org.apache.httpcomponents.client5:httpclient5:5.6.4)
+and Apache HttpCore 5 (org.apache.httpcomponents.core5, transitive)
+  License: Apache License 2.0
+  Copyright The Apache Software Foundation
+  This product includes software developed at The Apache Software
+  Foundation (https://www.apache.org/).
+  https://hc.apache.org/
+
+Jackson JSON Processing (com.fasterxml.jackson.core:jackson-databind,
+jackson-core, jackson-annotations; com.fasterxml.jackson.datatype:
+jackson-datatype-jsr310; com.fasterxml.jackson.dataformat:
+jackson-dataformat-yaml: 2.19.4)
   License: Apache License 2.0
   Copyright (c) 2007- Tatu Saloranta, tatu.saloranta@iki.fi
-  https://github.com/FasterXML/jackson-databind
+  https://github.com/FasterXML/jackson
 
 SnakeYAML (org.yaml:snakeyaml:2.5)
   License: Apache License 2.0
@@ -32,17 +52,21 @@ Spring Expression Language (org.springframework:spring-expression:6.2.16)
   Copyright (c) 2002-2024 Pivotal, Inc.
   https://github.com/spring-projects/spring-framework
 
-OpenTelemetry (io.opentelemetry:opentelemetry-api:1.59.0)
+OpenTelemetry (io.opentelemetry:opentelemetry-api, opentelemetry-sdk,
+opentelemetry-exporter-otlp: 1.59.0; opentelemetry-exporter-prometheus:
+1.59.0-alpha; io.opentelemetry.instrumentation:
+opentelemetry-logback-appender-1.0: 2.14.0-alpha)
   License: Apache License 2.0
   Copyright The OpenTelemetry Authors
   https://github.com/open-telemetry/opentelemetry-java
 
-gRPC (io.grpc:grpc-core:1.68.1)
+gRPC (io.grpc:grpc-protobuf, grpc-stub, grpc-netty: 1.68.1)
   License: Apache License 2.0
   Copyright 2014 gRPC authors
   https://github.com/grpc/grpc-java
 
-Protocol Buffers (com.google.protobuf:protobuf-java:3.25.5)
+Protocol Buffers (com.google.protobuf:protobuf-java,
+protobuf-java-util: 3.25.5)
   License: BSD 3-Clause License
   Copyright 2008 Google Inc.
   https://github.com/protocolbuffers/protobuf
@@ -51,6 +75,12 @@ Google Guava (com.google.guava:guava:33.5.0-jre)
   License: Apache License 2.0
   Copyright (C) 2010 The Guava Authors
   https://github.com/google/guava
+
+javax.annotation API (javax.annotation:javax.annotation-api:1.3.2)
+  License: Common Development and Distribution License 1.1, or GNU General
+  Public License 2.0 with the Classpath Exception
+  Copyright (c) 2005-2018 Oracle and/or its affiliates
+  https://github.com/javaee/javax.annotation
 
 RaftLog (io.github.mraysmit:raftlog-core:1.2.0)
   License: Apache License 2.0
@@ -62,17 +92,7 @@ JSch (com.github.mwiede:jsch:0.2.26)
   Copyright (c) 2002-2015 Atsuhiko Yamanaka, JCraft, Inc.
   https://github.com/mwiede/jsch
 
-jCIFS-ng (eu.agno3.jcifs:jcifs-ng:2.1.10)
-  License: GNU Lesser General Public License 2.1
-  Copyright (C) 2004 Michael B. Allen, (C) 2017 Moritz Bechler
-  https://github.com/AgNO3/jcifs-ng
-
-Commons Net (commons-net:commons-net:3.12.0)
-  License: Apache License 2.0
-  Copyright 2001-2024 The Apache Software Foundation
-  https://github.com/apache/commons-net
-
-SLF4J Logging API (org.slf4j:slf4j-api:2.0.17)
+SLF4J Logging API (org.slf4j:slf4j-api, jul-to-slf4j: 2.0.17)
   License: MIT License
   Copyright (c) 2004-2024 QOS.ch Sarl (Switzerland)
   https://github.com/qos-ch/slf4j
@@ -87,30 +107,15 @@ Jakarta Validation API (jakarta.validation:jakarta.validation-api:3.0.2)
   Copyright (c) 2017-2024 Eclipse Foundation
   https://github.com/jakartaee/validation
 
-AssertJ (org.assertj:assertj-core:3.27.7)
-  License: Apache License 2.0
-  Copyright 2014-2024 the original author or authors
-  https://github.com/assertj/assertj
-
-Awaitility (org.awaitility:awaitility:4.3.0)
-  License: Apache License 2.0
-  Copyright 2010-2024 the original author or authors
-  https://github.com/awaitility/awaitility
-
-JUnit 5 (org.junit.jupiter:junit-jupiter:5.14.3)
-  License: Eclipse Public License 2.0
-  Copyright 2015-2024 the original author or authors
-  https://github.com/junit-team/junit5
-
-TestContainers (org.testcontainers:testcontainers:2.0.3)
-  License: MIT License
-  Copyright (c) 2015-2024 Richard North and other authors
-  https://github.com/testcontainers/testcontainers-java
-
 ================================================================================
 
-For complete license texts, see the respective project repositories or the
-licenses directory in this distribution.
+The Quorus container images are built on Amazon Corretto 27
+(amazoncorretto:27.0.0-alpine3.24), which is licensed under the GNU General
+Public License 2.0 with the Classpath Exception, and on Alpine Linux packages
+under their own licenses.
+
+For complete license texts, see the respective project repositories. This
+distribution does not include a separate licenses directory.
 
 This software is provided "AS IS" without warranty of any kind. See the
 LICENSE file for complete terms and conditions.

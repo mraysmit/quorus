@@ -1,3 +1,5 @@
+> **Archived 2026-10-03.** Superseded by the external `raftlog-core` library (1.2.0), which is Quorus's only WAL, and by the [Raft Storage Reference](../reference/QUORUS_RAFT_STORAGE_REFERENCE.md), which now holds the current storage contract, including the former Appendix F.5. The "✅ Complete" tables and the implementation roadmap below describe a design that was not built: there is no `FileRaftWAL`, no Quorus `AppendPlan`, no soft log limit, no `LogCapacityExceededException` and no `quorus.cluster.log_utilization` metric. Read this document only as history.
+
 <img src="../../docs/quorus-logo.png" alt="Quorus" width="120"/>
 
 # Minimal Write-Ahead Log (WAL) for Raft

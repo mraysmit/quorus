@@ -2,8 +2,8 @@
 
 # ADR-0003: Enterprise Identity Boundary
 
-**Version:** 1.1  
-**Date:** 2026-09-01  
+**Version:** 1.2  
+**Date:** 2026-10-03  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0
 
@@ -21,7 +21,9 @@ During Phase 0, HTTP was bound and published only on loopback because authentica
 
 The Phase 1 foundation implements this decision with TLS 1.3 mutual authentication, exact trusted-gateway certificate subjects, exact direct-workload certificate bindings, tenant/environment derivation, stable policy decisions, effective-identity and authorization-explanation APIs, and hash-chained security-decision audit. The packaged production profile is fail-closed. Plaintext compatibility constructors are restricted to explicit development/test use and emit a warning.
 
-Certificate enrollment, automated overlap rotation, revocation propagation, and expiry monitoring remain required before this ADR's operational consequences are fully satisfied.
+Certificate enrollment, automated overlap rotation, and revocation propagation remain required before this ADR's operational consequences are fully satisfied. Expiry monitoring is implemented: each authenticated request records the caller certificate's remaining lifetime as a metric, a certificate inside the warning threshold produces a `CERTIFICATE_EXPIRY_WARNING` audit event, and `GET /api/v1/security/trust` reports the caller's expiry state. Runtime serial revocation is implemented per controller; it is not propagated between controllers (decision `DR-Q2`).
+
+Raft peer certificates are trusted by issuer and hostname but not yet bound to configured node IDs (register item `SEC-04`), and Raft revocation is checked only on inbound calls (`SEC-10`).
 
 ## Consequences
 

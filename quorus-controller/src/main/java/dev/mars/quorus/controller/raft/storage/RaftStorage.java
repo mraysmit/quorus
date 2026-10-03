@@ -40,7 +40,7 @@ import java.util.Optional;
  * @author Mark Andrew Ray-Smith Cityline Ltd
  * @version 1.0
  * @since 2026-01-29
- * @see <a href="docs-design/design/QUORUS_RAFT_WAL_DESIGN.md">WAL Design Document</a>
+ * @see <a href="docs-design/reference/QUORUS_RAFT_STORAGE_REFERENCE.md">Raft Storage Reference</a>
  */
 public interface RaftStorage {
 

@@ -2,8 +2,8 @@
 
 # Quorus YAML Syntax Guide
 
-**Version:** 2.3  
-**Date:** 2026-09-28  
+**Version:** 2.4  
+**Date:** 2026-10-03  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0
 
@@ -34,20 +34,28 @@ spec:               # required — variables, execution config, transfer groups
   ...
 ```
 
-The parser also supports a legacy form where `variables`, `execution`, and `transferGroups` appear at the root instead of inside `spec`, but new YAML should always use the explicit `spec` block.
+The parser also reads a legacy form where `variables`, `execution`, and `transferGroups` appear at the root instead of inside `spec`, but schema validation rejects a document without `spec`. Always use the explicit `spec` block.
 
 ---
 
 ## Minimal Workflow
 
-The smallest valid workflow needs only `metadata.name` and at least one transfer group with one transfer:
+The parser accepts much less than validation does, and the workflow engine validates every definition before it runs it. The smallest workflow that passes both validation paths is:
 
 ```yaml
 metadata:
   name: "minimal-workflow"
   version: "1.0.0"
+  description: "Download one file over HTTPS"
+  type: "download-workflow"
+  author: "ops@example.com"
+  created: "2026-10-03"
+  tags: ["example"]
 
 spec:
+  execution:
+    strategy: sequential
+
   transferGroups:
     - name: download
       transfers:
@@ -56,6 +64,34 @@ spec:
           destination: "/data/file.csv"
           protocol: https
 ```
+
+---
+
+## Validation Requirements
+
+There are two validation paths, and a workflow should pass both:
+
+- **Engine validation**, `YamlWorkflowDefinitionParser.validate(definition)`. `SimpleWorkflowEngine` runs it before every execution, dry run and virtual run, and fails the execution on the first error.
+- **Schema validation**, `YamlWorkflowDefinitionParser.validateSchema(yamlContent)`, which works on the raw YAML. The validation CLI and examples use it.
+
+Both require all seven metadata fields below; schema validation also requires `spec` and `spec.execution`.
+
+| Field | Rule | Checked by |
+|-------|------|------------|
+| `metadata.name` | 2 to 100 characters: letters, digits, `-` and `_`, starting and ending with a letter or digit. No spaces. | Both |
+| `metadata.version` | Semantic version, such as `1.0.0` or `2.1.0-beta` | Both |
+| `metadata.description` | 10 to 500 characters | Both |
+| `metadata.type` | Lower case, at most 50 characters, letters, digits and `-`. A type outside the recommended list is a warning, not an error: `transfer-workflow`, `data-pipeline-workflow`, `download-workflow`, `validation-test-workflow`, `external-data-config`, `etl-workflow`, `backup-workflow`, `sync-workflow` | Both |
+| `metadata.author` | An email address, or a name of letters and spaces only, at most 100 characters | Both |
+| `metadata.created` | A quoted `YYYY-MM-DD` date. Quote it: YAML reads an unquoted date as a timestamp, which fails this check. A future date is a warning | Both |
+| `metadata.tags` | 1 to 20 unique tags; each lower case, 2 to 30 characters, letters, digits and `-` | Both |
+| `spec` | Present | Schema |
+| `spec.execution` | Present (it may contain only defaults) | Schema |
+| `spec.execution.strategy` | `sequential` or `parallel` | Engine |
+| `spec.transferGroups` | Group names unique | Engine |
+| `spec.transferGroups` | An empty or missing list is a warning | Both |
+
+Validation does not check option keys, protocol names, or `retryCount` bounds. The JSON schema file in `quorus-workflow/src/main/resources/schema/` is not loaded by any code, so its stricter rules are not enforced.
 
 ---
 
@@ -71,17 +107,17 @@ spec:
 
 ## `metadata`
 
-All metadata fields are parsed as strings. Only `name` is required.
+All metadata fields are parsed as strings. The parser itself requires only `name`, and fills the defaults below for the rest, but validation requires `name`, `version`, `description`, `type`, `author`, `created` and `tags` (see [Validation Requirements](#validation-requirements)). A parser default does not satisfy validation.
 
-| Field | Required | Default | Description |
+| Field | Required for validation | Parser default | Description |
 |-------|----------|---------|-------------|
 | `name` | **Yes** | — | Workflow identifier. Parser throws `WorkflowParseException` if empty. |
-| `version` | No | `"1.0.0"` | Semantic version string. |
-| `description` | No | `null` | Free-text description. |
-| `type` | No | `"workflow"` | Workflow type label (e.g., `"download-workflow"`, `"etl-workflow"`, `"data-pipeline-workflow"`). |
-| `author` | No | `null` | Author identifier. |
-| `created` | No | `null` | Creation date string (e.g., `"2025-08-21"`). Not parsed as a date object. |
-| `tags` | No | `[]` | List of string tags for categorization. |
+| `version` | **Yes** | `"1.0.0"` | Semantic version string. |
+| `description` | **Yes** | `null` | Free-text description. |
+| `type` | **Yes** | `"workflow"` | Workflow type label (e.g., `"download-workflow"`, `"etl-workflow"`, `"data-pipeline-workflow"`). |
+| `author` | **Yes** | `null` | Author identifier. |
+| `created` | **Yes** | `null` | Creation date as a quoted string (e.g., `"2025-08-21"`). |
+| `tags` | **Yes** | `[]` | List of string tags for categorization. |
 | `labels` | No | `{}` | Key-value map of string labels. |
 
 **Example from `financial-reporting.yaml`:**
@@ -112,7 +148,7 @@ The spec block contains three sections:
 | Section | Required | Description |
 |---------|----------|-------------|
 | `variables` | No | Global variables available to all transfer groups. |
-| `execution` | No | Execution configuration (parallelism, timeout, strategy). |
+| `execution` | **Yes** for schema validation (its fields all have defaults) | Execution configuration (parallelism, timeout, strategy). |
 | `transferGroups` | No (but an empty list triggers a validation warning) | Ordered list of transfer groups. |
 
 ---
@@ -131,18 +167,7 @@ spec:
     chunkSize: "2048"
 ```
 
-Variables can also be used for path construction with embedded references:
-
-```yaml
-# From financial-reporting.yaml:
-spec:
-  variables:
-    reportMonth: "{{current_month}}"
-    reportYear: "{{current_year}}"
-    fiscalQuarter: "{{current_quarter}}"
-```
-
-Variable values that themselves contain `{{...}}` references are resolved when the variable is used, not when it is declared. Variables referencing other variables or environment variables will be resolved by `VariableResolver` at execution time.
+A variable's value is inserted as it is written: references inside a variable's value are not resolved. See [Variable Nesting](#variable-nesting).
 
 ---
 
@@ -211,7 +236,7 @@ An ordered list of transfer groups. Each group contains transfers and can declar
 | `condition` | No | `null` | string | Condition expression. Parsed and variable-resolved, but the current engine does not evaluate conditions — it carries the resolved string through execution. |
 | `variables` | No | `null` | map | Group-scoped variables. These are merged on top of global variables during resolution (group variables take precedence). |
 | `continueOnError` | No | `false` | boolean | When `true`, workflow continues to dependent groups even if this group fails. |
-| `retryCount` | No | `0` | integer | How many more times each failed transfer of the group is run before it counts as failed (0 to 10). Each run is a full transfer, with the transfer engine's own retries inside it. |
+| `retryCount` | No | `0` | integer | How many more times each failed transfer of the group is run before it counts as failed. A negative value is treated as 0; there is no upper bound. Each run is a full transfer, with the transfer engine's own retries inside it. |
 | `transfers` | No | `[]` | list | List of transfer definitions within this group. |
 
 ### Dependency Graph
@@ -309,7 +334,7 @@ Individual transfer definitions within a group.
 | `source` | **Yes** | — | string | Source URI or path. Supports `{{variable}}` substitution. |
 | `destination` | **Yes** | — | string | Destination path or URI. Supports `{{variable}}` substitution. |
 | `protocol` | No | `"http"` | string | Protocol identifier used by `ProtocolFactory` to select the adapter. |
-| `options` | No | `{}` | map | Arbitrary key-value options map. String values are variable-resolved. Non-string values are passed through as-is. |
+| `options` | No | `{}` | map | Arbitrary key-value options map. String values are variable-resolved. **Options currently have no effect**: they are not passed to the transfer engine or protocol adapter (see [Options Map](#options-map)). |
 | `condition` | No | `null` | string | Condition expression. Parsed and variable-resolved but not evaluated by the current engine. |
 
 ### Protocol Values Used in Real YAML
@@ -328,14 +353,16 @@ The actually registered protocol adapters in `ProtocolFactory.registerDefaultPro
 
 ### Options Map
 
-The `options` map is freeform — the parser does not validate option keys. String values go through variable resolution; all others are passed through unchanged. These are the option keys used in the real YAML files:
+The `options` map is freeform — the parser does not validate option keys. String values go through variable resolution, so an option that names an undefined variable still fails the run. After that, the options are dropped: `TransferGroup.toTransferRequest()` builds the transfer request from `source`, `destination` and `protocol` only. Setting `timeout`, `chunkSize`, `maxRetries` or any other option therefore changes nothing. Whether options will be passed through is open decision `DR-Q1` in the [Outstanding Work Register](../docs-design/task/QUORUS_OUTSTANDING_WORK_REGISTER.md).
+
+These are the option keys used in the real YAML files:
 
 | Option Key | Example Value | Appears In |
 |------------|---------------|------------|
 | `timeout` | `"30s"`, `"{{timeout}}"` | `simple-download.yaml`, `data-pipeline.yaml` |
 | `chunkSize` | `256`, `"{{chunkSize}}"` | `simple-download.yaml`, `data-pipeline.yaml` |
 | `maxRetries` | `5`, `"{{maxRetries}}"` | `simple-workflow.yaml`, `data-pipeline.yaml` |
-| `batchSize` | `"1000"` | `schema-compliant-example.yaml` |
+| `batchSize` | `"{{batchSize}}"` | `ecommerce-order-processing.yaml` |
 | `validateCertificate` | `true` | `schema-compliant-example.yaml` |
 | `executable` | `true` | `schema-compliant-example.yaml` |
 | `query` | SQL string | `financial-reporting.yaml` |
@@ -350,7 +377,7 @@ The `options` map is freeform — the parser does not validate option keys. Stri
 | `compress` | `true` | `financial-reporting.yaml` |
 | `subject` | email subject string | `financial-reporting.yaml` |
 
-These options are carried through to the protocol adapter. Their interpretation (if any) depends entirely on the adapter implementation. The parser and workflow engine do not validate or act on specific option keys.
+None of these keys has any effect today. Treat them as documentation of intent in the example files.
 
 **Example — transfer with options from `simple-download.yaml`:**
 
@@ -380,12 +407,15 @@ transfers:
 
 ## Variable Resolution
 
-Variables use `{{variableName}}` syntax (double curly braces). The `VariableResolver` resolves variables in the following precedence order (highest to lowest):
+Variables use `{{variableName}}` syntax (double curly braces). When the workflow engine runs a workflow, `VariableResolver` resolves variables in the following precedence order (highest to lowest):
 
-1. **Context variables** — group-scoped variables (from `transferGroups[].variables`)
-2. **Global variables** — workflow-scoped variables (from `spec.variables`)
-3. **Environment variables** — `System.getenv(variableName)`
-4. **System properties** — `System.getProperty(variableName)`
+1. **Group variables** — from `transferGroups[].variables`
+2. **Workflow variables** — from `spec.variables`
+3. **Runtime variables** — the `ExecutionContext` variables the caller passes to the engine
+4. **Environment variables** — `System.getenv(variableName)`
+5. **System properties** — `System.getProperty(variableName)`
+
+Because workflow variables rank above runtime variables, a caller cannot override a value that the YAML declares in `spec.variables`. To make a value overridable at run time, leave it out of `spec.variables` and supply it through the execution context.
 
 If a variable is not found in any of these sources, `VariableResolver` throws `VariableResolutionException`.
 
@@ -396,7 +426,7 @@ The resolver processes these fields:
 - `transfers[].source`
 - `transfers[].destination`
 - `transfers[].condition`
-- `transfers[].options` (string values only — non-string values are passed through)
+- `transfers[].options` (string values only; options have no effect after resolution)
 - `transferGroups[].condition`
 
 Variables in `metadata` fields, group `name`, and transfer `name` are **not** resolved.
@@ -426,23 +456,15 @@ spec:
 
 ### Variable Nesting
 
-Variables can reference other variables. Resolution happens at the point of use:
+Resolution is a single pass. A reference in a field is replaced by the variable's value exactly as written, and any `{{...}}` inside that value is left as literal text, with no error. For example, `financial-reporting.yaml` declares:
 
 ```yaml
-# From financial-reporting.yaml:
 spec:
   variables:
-    reportMonth: "{{current_month}}"    # expects current_month from env or runtime context
-    reportYear: "{{current_year}}"
-
-  transferGroups:
-    - name: extract-financial-data
-      transfers:
-        - name: extract-general-ledger
-          source: "{{financialDb}}/general_ledger"
-          destination: "{{reportPath}}/raw/general-ledger-{{reportMonth}}.csv"
-          protocol: database
+    reportMonth: "{{current_month}}"
 ```
+
+A destination of `"{{reportPath}}/raw/general-ledger-{{reportMonth}}.csv"` therefore resolves to a path containing the literal text `{{current_month}}`, even if `current_month` is set in the environment. Supply the final value directly, for example through the execution context or the environment, and reference that variable in the field. Whether nested references will be resolved is open decision `DR-Q1`.
 
 ---
 
@@ -455,15 +477,15 @@ Condition patterns used in real YAML files:
 | Pattern | Example | Source File |
 |---------|---------|-------------|
 | `success(group-or-transfer-name)` | `"success(download-base-files)"` | `simple-workflow.yaml` |
-| `file_exists('path')` | `"file_exists('{{configDir}}/postgresql.conf')"` | `schema-compliant-example.yaml` |
+| `file_exists('path')` | `"file_exists('{{configDir}}/postgresql.conf')"` | `schema-compliant-example.yaml`, `data-pipeline.yaml`, `ecommerce-order-processing.yaml` |
 
-These are conventions in the YAML files, not evaluated expressions. If condition evaluation is needed, it would require implementing a condition evaluator in the workflow engine.
+These are conventions in the YAML files, not evaluated expressions: a guarded transfer runs whether or not its condition would hold. Whether conditions will be evaluated or rejected is open item `ENG-14` in the [Outstanding Work Register](../docs-design/task/QUORUS_OUTSTANDING_WORK_REGISTER.md).
 
 ---
 
 ## Complete Real-World Example
 
-This is `simple-download.yaml` from `quorus-integration-examples`, reproduced in full:
+This is `simple-download.yaml` from `quorus-integration-examples`, with its comments omitted. It passes both validation paths:
 
 ```yaml
 metadata:
@@ -542,10 +564,12 @@ Recommended validation order:
 
 1. Parse YAML with `YamlWorkflowDefinitionParser`
 2. Run schema validation via `validateSchema(yamlContent)`
-3. Run semantic validation via `validate(definition)`
+3. Run engine validation via `validate(definition)`; the engine also runs it before every execution
 4. Resolve variables with `VariableResolver`
 5. Build the dependency graph via `buildDependencyGraph(definitions)`
 6. Execute in `DRY_RUN` or `VIRTUAL_RUN` before normal execution
+
+The examples module's `WorkflowValidationCLI` runs schema validation from the command line; see the [integration examples guide](QUORUS_INTEGRATION_EXAMPLES_README.md) for how to run it.
 
 ---
 
@@ -557,7 +581,8 @@ Recommended validation order:
 | `simple-workflow.yaml` | Dependency chains | 3 | `dependsOn`, group variables, conditions, `maxRetries` |
 | `data-pipeline.yaml` | Multi-stage ETL | 5+ | Parallel strategy, group-scoped variables, `continueOnError` |
 | `schema-compliant-example.yaml` | Database config setup | 4 | HTTPS with `validateCertificate`, `condition` with `file_exists` |
-| `financial-reporting.yaml` | Monthly reporting | 6 | Nested variable references, compliance options, multi-format output |
+| `ecommerce-order-processing.yaml` | Order processing pipeline | 5+ | `batchSize` option from a variable, `file_exists` conditions |
+| `financial-reporting.yaml` | Monthly reporting | 6 | Nested variable references (left literal; see [Variable Nesting](#variable-nesting)), compliance options, non-adapter protocols |
 
 These files are in `quorus-integration-examples/src/main/resources/workflows/` and `quorus-workflow/src/test/resources/`.
 

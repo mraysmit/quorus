@@ -1,3 +1,5 @@
+> **Archived 2026-10-03.** Implementation summary of `ConnectionPoolService`, which was never used by a transfer and was deleted in `5a4274f` (RT-03a, 2026-09-26).
+
 # Connection Pool Optimization - Implementation Summary
 
 **Date**: 2025-12-17  

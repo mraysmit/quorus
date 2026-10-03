@@ -2,8 +2,8 @@
 
 # Quorus Performance Validation Results
 
-**Version:** 2.3  
-**Date:** 2026-09-28  
+**Version:** 2.4  
+**Date:** 2026-10-03  
 **Author:** Mark Ray-Smith — Cityline Ltd  
 **License:** Apache 2.0  
 **Status:** Results log. Baselines are recorded for the current code: B-09 (commit latency) and B-08 (controller API). The benchmarks are defined in
@@ -33,9 +33,9 @@ of it is not recorded.
 
 | Benchmark | Commit | Date | Result | Gate outcome |
 |---|---|---|---|---|
-| B-09 (commit latency) | `8946faa` plus the uncommitted `quorus-benchmarks` module; engine code unchanged | 2026-09-28 | About 270 commits/s at every concurrency; p50 3.7 ms at 1 client (§2.1) | No gate; baseline for `CE-07` |
-| B-08 (controller API) | `23bcb6f` plus the uncommitted B-08 harness; controller code unchanged | 2026-09-28 | About 100 requests/s for reads and 70 for writes at every concurrency, no errors (§2.2) | No gate; baseline for `RT-06` (`RT-Q2`). Found `ENG-16` |
-| B-08 (controller API) | `d3ceb67` plus the uncommitted `ENG-16` fix | 2026-09-28 | Reads 530 requests/s at 10 clients to about 8,000 at 500; writes about 170 at every concurrency; no errors (§2.3) | No gate; the `RT-06` comparison baseline, with `ENG-16` fixed |
+| B-09 (commit latency) | `8946faa` plus the `quorus-benchmarks` module, committed afterwards as `c96c46a`/`23bcb6f`; engine code unchanged | 2026-09-28 | About 270 commits/s at every concurrency; p50 3.7 ms at 1 client (§2.1) | No gate; baseline for `CE-07` |
+| B-08 (controller API) | `23bcb6f` plus the B-08 harness, committed afterwards as `d3ceb67`; controller code unchanged | 2026-09-28 | About 100 requests/s for reads and 70 for writes at every concurrency, no errors (§2.2) | No gate; baseline for `RT-06` (`RT-Q2`). Found `ENG-16` |
+| B-08 (controller API) | `d3ceb67` plus the `ENG-16` fix, committed afterwards as `7b7eb3d` | 2026-09-28 | Reads 530 requests/s at 10 clients to about 8,000 at 500; writes about 170 at every concurrency; no errors (§2.3) | No gate; the `RT-06` comparison baseline, with `ENG-16` fixed |
 
 ### 2.1 B-09 baseline: in-repository Vert.x engine, 2026-09-28
 
@@ -55,9 +55,9 @@ of it is not recorded.
 
 **Reading.** Throughput does not rise with concurrency and latency grows in proportion to the queue:
 the engine replicates and syncs one command at a time, with no batching of concurrent commands. This is
-the engine's own ceiling on this machine, before HTTP. The commit is recorded with an uncommitted working
-tree (the benchmark module itself), so the measurement should be repeated from a clean commit before it is
-used in a published comparison.
+the engine's own ceiling on this machine, before HTTP. The run used a working tree whose benchmark module was
+committed afterwards (`c96c46a`/`23bcb6f`), so the measurement should still be repeated from a clean commit
+before it is used in a published comparison.
 
 ### 2.2 B-08 baseline: Vert.x controller, 2026-09-28
 
@@ -166,7 +166,7 @@ with estimated "traditional" figures that were never measured.
 > Vert.x WebClient HTTP adapter was replaced in `RT-03b`, and the reactive engine and workflow engine
 > were replaced in `RT-03c` and `RT-04`. The documentation review of 2026-09-24 also found that its
 > "before (blocking)" and "after (reactive)" connection-pool figures were the default-versus-production
-> pool preset comparison from `CONNECTION_POOL_BENCHMARK_RESULTS.md`, relabelled. Recorded environment:
+> pool preset comparison from [`CONNECTION_POOL_BENCHMARK_RESULTS.md`](../archive/performance/CONNECTION_POOL_BENCHMARK_RESULTS.md) (archived 2026-10-03), relabelled. Recorded environment:
 > Windows 11, Java 24, Intel i7 with 24 cores and 32 GB. Kept below for the record.
 
 ### Recorded figures
