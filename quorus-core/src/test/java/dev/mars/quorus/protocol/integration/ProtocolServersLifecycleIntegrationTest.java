@@ -32,27 +32,35 @@ import static org.assertj.core.api.Assertions.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Integration Test - Protocol Server Connectivity Validation
+ * Protocol server connectivity check: connects to the FTP, SFTP and SMB servers of
+ * {@code docker/compose/docker-compose-protocol-servers.yml} with the client libraries the transfer
+ * adapters use. It is the only test with an SMB server.
  * <p>
- * Tests establish connections to FTP, SFTP, and SMB protocol servers
- * to validate infrastructure is operational before running full transfer tests.
+ * The test starts the stack itself, under its own compose project name, and removes its containers
+ * and network afterwards. It leaves the volumes: the compose file gives them fixed names, so they are
+ * shared with a stack started by hand, whose data {@code down -v} would delete. The stack publishes
+ * fixed host ports (21, 2222, 4445 and 30000-30009) and fixed container names, so it cannot run
+ * beside a stack started by hand: stop that one first.
  * <p>
- * Prerequisite: Docker Compose stack must be running
- * Start with: docker-compose -f docker-compose-protocol-servers.yml up -d
+ * Tagged {@code docker}: it needs Docker and is excluded from the default build. Run it in the Docker
+ * lane, {@code mvn verify '-Dtest.excludedGroups='} (register decision DR-Q4).
  */
+@Tag("docker")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-class ProtocolServersLifecycleIT {
+class ProtocolServersLifecycleIntegrationTest {
+
+    /** The test's own compose project, so that its teardown stops only what it started. */
+    private static final String COMPOSE_PROJECT = "quorus-protocol-lifecycle-test";
 
     private static final String TEST_USERNAME = "testuser";
     private static final String TEST_PASSWORD = "testpass";
 
-    // Using manually started containers
-    // FTP on localhost:21, SFTP on localhost:2222, SMB on localhost:4445
-    private static final String FTP_HOST = "localhost";
+    // Host ports published by the compose file, on 127.0.0.1 only: "localhost" may resolve to ::1
+    private static final String FTP_HOST = "127.0.0.1";
     private static final int FTP_PORT = 21;
-    private static final String SFTP_HOST = "localhost";
+    private static final String SFTP_HOST = "127.0.0.1";
     private static final int SFTP_PORT = 2222;
-    private static final String SMB_HOST = "localhost";
+    private static final String SMB_HOST = "127.0.0.1";
     private static final int SMB_PORT = 4445;
 
     @BeforeAll
@@ -72,9 +80,9 @@ class ProtocolServersLifecycleIT {
                 "Docker compose directory not found: " + composeDir.getAbsolutePath());
         }
 
-        System.out.println("Starting protocol servers via docker-compose...");
+        System.out.println("Starting protocol servers via docker compose...");
         ProcessBuilder pb = new ProcessBuilder(
-            "docker-compose", "-f", "docker-compose-protocol-servers.yml", "up", "-d"
+            "docker", "compose", "-p", COMPOSE_PROJECT, "-f", "docker-compose-protocol-servers.yml", "up", "-d", "--wait"
         );
         pb.directory(composeDir);
         pb.redirectErrorStream(true);
@@ -90,7 +98,8 @@ class ProtocolServersLifecycleIT {
 
         int exitCode = process.waitFor();
         if (exitCode != 0) {
-            throw new IllegalStateException("docker-compose up -d failed with exit code: " + exitCode);
+            throw new IllegalStateException("docker compose up -d failed with exit code " + exitCode
+                    + "; if the stack is already running, stop it first");
         }
 
         System.out.println("Waiting for protocol servers to become ready...");
@@ -419,18 +428,17 @@ class ProtocolServersLifecycleIT {
                 throw new IllegalStateException("Docker compose directory not found: " + composeDir.getAbsolutePath());
             }
             
-            // Build the docker-compose down command
+            // Build the docker compose down command
             ProcessBuilder pb = new ProcessBuilder(
-                "docker-compose",
+                "docker", "compose", "-p", COMPOSE_PROJECT,
                 "-f", "docker-compose-protocol-servers.yml",
-                "down",
-                "-v"
+                "down"
             );
             
             pb.directory(composeDir);
             pb.redirectErrorStream(true);
             
-            System.out.println("Executing: docker-compose -f docker-compose-protocol-servers.yml down -v");
+            System.out.println("Executing: docker compose -p " + COMPOSE_PROJECT + " -f docker-compose-protocol-servers.yml down");
             System.out.println("Working directory: " + composeDir.getAbsolutePath());
             
             Process process = pb.start();
@@ -447,17 +455,17 @@ class ProtocolServersLifecycleIT {
             int exitCode = process.waitFor();
             
             if (exitCode == 0) {
-                System.out.println("\n[PASS] All protocol servers stopped and volumes removed");
+                System.out.println("\n[PASS] All protocol servers stopped");
             } else {
-                System.out.println("\n[WARN] docker-compose down exited with code: " + exitCode);
-                System.out.println("Manual cleanup: cd docker/compose && docker-compose -f docker-compose-protocol-servers.yml down -v");
+                System.out.println("\n[WARN] docker compose down exited with code: " + exitCode);
+                System.out.println("Manual cleanup: cd docker/compose && docker compose -p " + COMPOSE_PROJECT + " -f docker-compose-protocol-servers.yml down");
             }
             
         } catch (Exception e) {
             System.out.println("\n[WARN] Failed to automatically stop containers: " + e.getMessage());
             System.out.println("Manual cleanup required:");
             System.out.println("  cd docker/compose");
-            System.out.println("  docker-compose -f docker-compose-protocol-servers.yml down -v");
+            System.out.println("  docker compose -p " + COMPOSE_PROJECT + " -f docker-compose-protocol-servers.yml down");
         }
         
         System.out.println("=".repeat(80) + "\n");

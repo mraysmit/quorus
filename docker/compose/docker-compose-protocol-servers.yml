@@ -1,6 +1,6 @@
 # Protocol servers for integration testing (standalone)
 # These can be started independently for manual testing and debugging
-# Usage: docker-compose -f docker-compose-protocol-servers.yml up
+# Usage: docker compose -f docker-compose-protocol-servers.yml up
 
 networks:
   protocol-test:
@@ -32,7 +32,8 @@ services:
       - ftp-data:/home/testuser
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "nc -z localhost 21 || exit 1"]
+      # 127.0.0.1, not localhost: in the container localhost resolves to ::1 and vsftpd listens on IPv4 only
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 21 || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -113,6 +114,6 @@ volumes:
 #   smb://testuser:testpass@smb:445/...  (internal port is still 445)
 # 
 # Manual Testing:
-#   docker-compose -f docker-compose-protocol-servers.yml up -d
-#   docker-compose -f docker-compose-protocol-servers.yml logs -f
-#   docker-compose -f docker-compose-protocol-servers.yml down -v
+#   docker compose -f docker-compose-protocol-servers.yml up -d
+#   docker compose -f docker-compose-protocol-servers.yml logs -f
+#   docker compose -f docker-compose-protocol-servers.yml down -v

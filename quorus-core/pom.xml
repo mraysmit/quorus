@@ -16,6 +16,12 @@
     <name>Quorus Core</name>
     <description>Core file transfer engine with HTTP/HTTPS support, progress tracking, and integrity verification</description>
 
+    <properties>
+        <!-- Default: skip the tests that drive a fixed-port compose stack. Override with
+             -Dtest.excludedGroups= to run all -->
+        <test.excludedGroups>docker</test.excludedGroups>
+    </properties>
+
     <dependencies>
         <!-- HTTP transfer adapter client: per-client DNS pinning with correct SNI, Host and
              hostname verification (ADR-0012 RT-Q5) -->
@@ -154,7 +160,21 @@
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <version>3.3.1</version>
+                <configuration>
+                    <!-- Encoding of the filtered quorus-build.properties -->
+                    <propertiesEncoding>ISO-8859-1</propertiesEncoding>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <!-- Tests tagged docker start a compose stack on fixed host ports. They run in the
+                         Docker lane: mvn verify '-Dtest.excludedGroups=' -->
+                    <excludedGroups>${test.excludedGroups}</excludedGroups>
+                </configuration>
             </plugin>
             <!-- Publish test classes (ExpectsError, ExpectsErrorExtension) for use by other modules -->
             <plugin>

@@ -46,7 +46,7 @@ All files are in `docker/compose/`. Host ports are bound to `127.0.0.1`.
 | `docker-compose-network-test.yml` | Five controllers for network-partition experiments | 8081–8085 | |
 | `docker-compose-full-network.yml` | Three controllers, three agents, FTP, SFTP and HTTP file servers, a test-file generator | 8081–8083, 21, 30000–30009, 2222, 8090 | No SMB server. See [Full network](#full-network) |
 | `docker-compose-tls-example.yml` | One controller with generated certificates and production HTTP and Raft mutual TLS | 8443 | Local demonstration PKI only; see the root [README](../README.md#local-mutual-tls-example) |
-| `docker-compose-protocol-servers.yml` | FTP, SFTP and SMB servers for protocol tests | 21, 30000–30009, 2222, 4445 | The `quorus-core` integration tests start their own stacks; use this for manual testing |
+| `docker-compose-protocol-servers.yml` | FTP, SFTP and SMB servers for protocol tests | 21, 30000–30009, 2222, 4445 | For manual testing, and started by `ProtocolServersLifecycleIntegrationTest` in the Docker lane. The other `quorus-core` integration tests start their own stacks |
 | `docker-compose-observability.yml` | OTel Collector, Tempo, Prometheus, Loki, Grafana | 4317, 4318, 8888, 13133, 3200, 9095, 9090, 3100, 3000 | |
 | `docker-compose-observability-cluster.yml` | The observability stack plus three controllers | as above, plus 8081–8083 and 9464–9466 | |
 | `docker-compose-loki.yml` | Standalone Loki, Promtail, Prometheus and Grafana | 3110 (Loki), 3010 (Grafana), 9091 (Prometheus) | Ports chosen not to clash with the observability stacks |

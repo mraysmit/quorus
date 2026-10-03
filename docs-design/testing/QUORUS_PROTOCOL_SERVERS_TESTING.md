@@ -9,7 +9,8 @@ There are two separate setups:
 1. **Testcontainers fixtures** in `quorus-core/src/test/resources/`, started automatically by the
    upload integration tests in a default build (section 1).
 2. **A standalone compose stack**, `docker/compose/docker-compose-protocol-servers.yml`, for manual
-   testing and for `ProtocolServersLifecycleIT`, which never runs in a default build (sections 2 and 3).
+   testing and for `ProtocolServersLifecycleIntegrationTest`, which runs in the Docker lane (sections 2
+   and 3).
 
 ---
 
@@ -17,7 +18,7 @@ There are two separate setups:
 
 1. [Testcontainers fixtures](#1-testcontainers-fixtures)
 2. [Standalone compose stack](#2-standalone-compose-stack)
-3. [ProtocolServersLifecycleIT](#3-protocolserverslifecycleit)
+3. [ProtocolServersLifecycleIntegrationTest](#3-protocolserverslifecycleintegrationtest)
 4. [Manual connection testing](#4-manual-connection-testing)
 5. [Troubleshooting](#5-troubleshooting)
 
@@ -106,27 +107,31 @@ the manual clients in section 4.
 
 ---
 
-## 3. ProtocolServersLifecycleIT
+## 3. ProtocolServersLifecycleIntegrationTest
 
-`quorus-core/src/test/java/dev/mars/quorus/protocol/integration/ProtocolServersLifecycleIT.java` checks
-that the standalone stack is reachable with the same client libraries the adapters use.
+`quorus-core/src/test/java/dev/mars/quorus/protocol/integration/ProtocolServersLifecycleIntegrationTest.java`
+checks that the standalone stack is reachable with the same client libraries the adapters use. It is the
+only test with an SMB server.
 
-**It never runs in a default build.** Surefire's default includes do not match `*IT`, and no module
-configures Failsafe (open decision DR-Q4 in the
-[register](../task/QUORUS_OUTSTANDING_WORK_REGISTER.md)). Run it by name:
+It is tagged `docker` and excluded from the default build, because the stack publishes fixed host ports
+(decision DR-Q4 in the [register](../task/QUORUS_OUTSTANDING_WORK_REGISTER.md)). It runs in the Docker
+lane, or on its own:
 
 ```bash
-mvn test -pl quorus-core -Dtest=ProtocolServersLifecycleIT
+mvn test -pl quorus-core -Dtest=ProtocolServersLifecycleIntegrationTest '-Dtest.excludedGroups='
 ```
 
-The class manages its own stack:
+The class manages its own stack, with the `docker compose` plugin:
 
-- `@BeforeAll` runs `docker-compose -f docker-compose-protocol-servers.yml up -d` in `docker/compose`
-  and waits up to 30 seconds each for TCP ports 21, 2222 and 4445. It calls the standalone
-  `docker-compose` command, so that command must be on the `PATH`; the `docker compose` plugin alone is
-  not enough.
-- `@AfterAll` runs `docker-compose -f docker-compose-protocol-servers.yml down -v`, which also removes
-  a stack you started by hand, and its volumes.
+- `@BeforeAll` runs `docker compose -p quorus-protocol-lifecycle-test -f docker-compose-protocol-servers.yml
+  up -d --wait` in `docker/compose`, which returns when every service's health check passes.
+- `@AfterAll` runs `down` for the same project, removing the containers and the network it started. It
+  leaves the volumes: the compose file gives them fixed names, so they are shared with a stack started
+  by hand, whose data `down -v` would delete.
+- It cannot run beside a stack started by hand, because the container names and host ports are fixed.
+  Stop that stack first; otherwise the test fails at start and changes nothing.
+- It connects to `127.0.0.1`, not `localhost`: the ports are published on `127.0.0.1` only, and
+  `localhost` can resolve to `::1`.
 
 | Test | Checks |
 |---|---|
@@ -157,7 +162,7 @@ sftp -P 2222 testuser@localhost
 ```
 
 SMB on port 4445 cannot be reached through Windows Explorer or `net use`, which support only port 445.
-Use jCIFS-ng (as `ProtocolServersLifecycleIT` does) or `smbclient` with `-p 4445`.
+Use jCIFS-ng (as `ProtocolServersLifecycleIntegrationTest` does) or `smbclient` with `-p 4445`.
 
 ---
 

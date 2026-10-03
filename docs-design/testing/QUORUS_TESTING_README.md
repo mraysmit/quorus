@@ -42,17 +42,17 @@ publishes `ExpectsError` and `ExpectsErrorExtension` (section 6).
 
 | Tag | Classes | Default behaviour |
 |---|---|---|
-| `docker` | `quorus-controller`: `DockerRaftClusterTest`, `ConfigurableRaftClusterTest`, `AdvancedNetworkTest`, `NetworkPartitionTest`, `ContainerRecreationDurabilityTest`, `ContainerImageBaselineTest` | Excluded: the controller's surefire uses `<excludedGroups>${test.excludedGroups}</excludedGroups>` with `test.excludedGroups=docker,slow` |
+| `docker` | `quorus-core`: `ProtocolServersLifecycleIntegrationTest` (a compose stack on fixed host ports; excluded by `test.excludedGroups=docker` in the core pom). `quorus-controller`: `DockerRaftClusterTest`, `ConfigurableRaftClusterTest`, `AdvancedNetworkTest`, `NetworkPartitionTest`, `ContainerRecreationDurabilityTest`, `ContainerImageBaselineTest` | Excluded: the controller's surefire uses `<excludedGroups>${test.excludedGroups}</excludedGroups>` with `test.excludedGroups=docker,slow` |
 | `slow` | `quorus-controller`: `MetadataPersistenceTest`, `RaftChaosTest`, `RaftLogClusterIntegrationTest` (timing-sensitive in-process Raft clusters) | Excluded, as above |
-| `negative` | `quorus-core`: `ProtocolErrorHandlingTestBase` and its `Ftp`, `Sftp` and `Smb` `*ErrorHandlingTest` subclasses | **Run by default**: `quorus-core` has no `excludedGroups` |
+| `negative` | `quorus-core`: `ProtocolErrorHandlingTestBase` and its `Ftp`, `Sftp` and `Smb` `*ErrorHandlingTest` subclasses | **Run by default**: `quorus-core` excludes only `docker` |
 
-There is no `flaky` tag. Only `quorus-controller` excludes groups.
+There is no `flaky` tag. `quorus-core` and `quorus-controller` exclude groups, both through the `test.excludedGroups` property, so `'-Dtest.excludedGroups='` runs the excluded tests of both. The `quorus-core` upload tests that start Testcontainers fixtures on free ports are untagged and still run by default.
 
 | Naming | Meaning |
 |---|---|
 | `*Test` | Run by Surefire in the default build, unless tagged as above |
 | `*IntegrationTest` | Also run by default. Some need Docker (section 4); most do not (for example the controller's HTTP integration tests start in-process servers) |
-| `*IT` | **Never run in a default build.** Surefire's default includes do not match `*IT`, and no module configures Failsafe. The only such class is `ProtocolServersLifecycleIT`. How `*IT` classes should run is open decision DR-Q4 in the [register](../task/QUORUS_OUTSTANDING_WORK_REGISTER.md) |
+| `*IT` | **Not used.** Surefire's default includes do not match `*IT` and no module configures Failsafe, so such a class would compile and never run. `TestNamingConventionTest` (in `quorus-core`) fails the build if any class that declares a test has a name Surefire does not select. Keep a heavy test out of the default build with a tag, not with its name (decision DR-Q4 in the [register](../task/QUORUS_OUTSTANDING_WORK_REGISTER.md)) |
 
 ---
 
@@ -129,14 +129,14 @@ in-JVM engine nodes over gRPC with mutual TLS). `ControllerApiBenchmarkTest` run
 against a real controller process started from the host-built controller jar. Running the benchmarks
 themselves is described in [QUORUS_PERFORMANCE_BENCHMARKS.md](../performance/QUORUS_PERFORMANCE_BENCHMARKS.md).
 
-### 3.6 Protocol server lifecycle check (`*IT`)
+### 3.6 Protocol server lifecycle check
 
 ```bash
-mvn test -pl quorus-core -Dtest=ProtocolServersLifecycleIT
+mvn test -pl quorus-core -Dtest=ProtocolServersLifecycleIntegrationTest '-Dtest.excludedGroups='
 ```
 
-Naming a class with `-Dtest` overrides Surefire's include patterns, so this runs the class. It starts
-and stops its own Docker Compose stack; see
+The class is tagged `docker`, so it needs the exclusion cleared; it also runs in the Docker lane. It
+starts and stops its own Docker Compose stack; see
 [QUORUS_PROTOCOL_SERVERS_TESTING.md](QUORUS_PROTOCOL_SERVERS_TESTING.md).
 
 ---
