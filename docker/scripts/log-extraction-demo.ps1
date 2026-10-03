@@ -95,7 +95,7 @@ Write-Host ""
 # 6. Show Loki query results
 Write-Host "6. LOKI AGGREGATED LOGS (Via API)" -ForegroundColor Yellow
 try {
-    $lokiQuery = "http://localhost:3100/loki/api/v1/query_range?query={container_name=`"quorus-controller1`"}&limit=3"
+    $lokiQuery = "http://localhost:3110/loki/api/v1/query_range?query={container_name=`"quorus-controller1`"}&limit=3"
     $lokiResponse = Invoke-RestMethod -Uri $lokiQuery -ErrorAction Stop
     if ($lokiResponse.data.result -and $lokiResponse.data.result.Count -gt 0) {
         Write-Host "   Recent aggregated logs:" -ForegroundColor Cyan
@@ -133,7 +133,7 @@ Write-Host ""
 
 Write-Host "8. ACCESS POINTS" -ForegroundColor Yellow
 Write-Host "   - Raw Docker logs: docker logs quorus-controller1" -ForegroundColor Cyan
-Write-Host "   - Loki API: http://localhost:3100/loki/api/v1/query" -ForegroundColor Cyan
+Write-Host "   - Loki API: http://localhost:3110/loki/api/v1/query" -ForegroundColor Cyan
 Write-Host "   - Grafana UI: http://localhost:3000 (admin/admin)" -ForegroundColor Cyan
 Write-Host ""
 

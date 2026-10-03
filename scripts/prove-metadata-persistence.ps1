@@ -9,7 +9,8 @@ param(
 Write-Host "=== PROOF: METADATA PERSISTENCE DURING LEADER CHANGES ===" -ForegroundColor Cyan
 Write-Host ""
 
-# Test configuration
+# Test configuration: the five-controller development topology (docker/compose/docker-compose.yml,
+# host ports 8081-8085). For a three-controller topology, remove controller4 and controller5.
 $CONTROLLERS = @(
     @{Name="controller1"; Port=8081},
     @{Name="controller2"; Port=8082},
@@ -42,11 +43,12 @@ function Get-NodeState {
     param([int]$Port)
     
     try {
-        $response = Invoke-RestMethod -Uri "http://localhost:$Port/health" -Method GET -TimeoutSec 5
+        # /raft/status reports the node's Raft role; /health has no checks.raft object.
+        $response = Invoke-RestMethod -Uri "http://localhost:$Port/raft/status" -Method GET -TimeoutSec 5
         return @{
             Available = $true
-            State = $response.checks.raft.state
-            NodeId = $response.checks.raft.nodeId
+            State = $response.state
+            NodeId = $response.nodeId
         }
     } catch {
         return @{

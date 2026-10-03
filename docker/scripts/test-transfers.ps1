@@ -1,249 +1,134 @@
-# Test File Transfers in Quorus Network
-# This script demonstrates various file transfer scenarios
+# Test File Transfers in the Quorus full-network topology (docker-compose-full-network.yml)
+#
+# Development-only: the topology disables request security and TLS. The script:
+#   1. finds the Raft leader among the three controllers (host ports 8081-8083), because only
+#      the leader accepts writes;
+#   2. lists the registered agents of the topology's tenant;
+#   3. submits HTTP transfers whose source is the in-network HTTP server, as the agents see it;
+#   4. assigns each transfer to an agent explicitly - the controller runs no assignment
+#      scheduler (register item ENG-01), so an unassigned transfer stays PENDING;
+#   5. polls the transfers until they finish or the timeout expires.
 
 param(
-    [string]$TestType = "all"
+    [string]$TenantId = "development",
+    [int]$TimeoutSeconds = 120
 )
 
 $ErrorActionPreference = "Stop"
 
 Write-Host "=== Quorus Network Transfer Tests ===" -ForegroundColor Green
-Write-Host "Testing file transfers across the network" -ForegroundColor Green
 Write-Host ""
 
-# Test configuration
-$apiUrl = "http://localhost:8080/api/v1"
-$httpServerUrl = "http://localhost:8090"
+$controllerPorts = 8081..8083
+# The agents reach the HTTP server by its Compose hostname, not through the host port 8090.
+$inNetworkHttpServer = "http://http-server"
+$hostHttpServer = "http://localhost:8090"
 
-function Test-ServiceHealth {
-    param([string]$Url, [string]$Name)
-    
-    try {
-        $response = Invoke-RestMethod -Uri "$Url/health" -TimeoutSec 5
-        Write-Host "  ✓ ${Name}: Healthy" -ForegroundColor Green
-        return $true
-    } catch {
-        Write-Host "  ✗ ${Name}: Not responding" -ForegroundColor Red
-        return $false
-    }
-}
-
-function Test-AgentRegistration {
-    Write-Host "Testing agent registration..." -ForegroundColor Cyan
-    
-    try {
-        $agents = Invoke-RestMethod -Uri "$apiUrl/agents" -TimeoutSec 10
-        
-        if ($agents.Count -gt 0) {
-            Write-Host "  ✓ Found $($agents.Count) registered agents:" -ForegroundColor Green
-            foreach ($agent in $agents) {
-                $status = if ($agent.status -eq "HEALTHY") { "✓" } else { "⚠" }
-                Write-Host "    $status $($agent.agentId) - $($agent.region) ($($agent.status))" -ForegroundColor $(if ($agent.status -eq "HEALTHY") { "Green" } else { "Yellow" })
-            }
-            return $true
-        } else {
-            Write-Host "  ⚠ No agents registered" -ForegroundColor Yellow
-            return $false
-        }
-    } catch {
-        Write-Host "  ✗ Failed to check agent registration: $_" -ForegroundColor Red
-        return $false
-    }
-}
-
-function Test-FileAvailability {
-    Write-Host "Testing file server availability..." -ForegroundColor Cyan
-    
-    # Test HTTP server file listing
-    try {
-        $httpResponse = Invoke-WebRequest -Uri "$httpServerUrl/shared/" -TimeoutSec 5
-        if ($httpResponse.StatusCode -eq 200) {
-            Write-Host "  ✓ HTTP Server: File listing available" -ForegroundColor Green
-        }
-    } catch {
-        Write-Host "  ⚠ HTTP Server: File listing not available" -ForegroundColor Yellow
-    }
-    
-    # Test specific test files
-    $testFiles = @(
-        "$httpServerUrl/shared/random-1mb.bin",
-        "$httpServerUrl/shared/random-10mb.bin",
-        "$httpServerUrl/shared/timestamp.txt"
-    )
-    
-    foreach ($file in $testFiles) {
+function Find-Leader {
+    foreach ($port in $controllerPorts) {
         try {
-            $response = Invoke-WebRequest -Uri $file -Method Head -TimeoutSec 5
-            if ($response.StatusCode -eq 200) {
-                $fileName = Split-Path $file -Leaf
-                $size = if ($response.Headers.'Content-Length') { 
-                    [math]::Round($response.Headers.'Content-Length'[0] / 1MB, 2) 
-                } else { "Unknown" }
-                Write-Host "  ✓ $fileName available (${size}MB)" -ForegroundColor Green
-            }
+            $status = Invoke-RestMethod -Uri "http://localhost:$port/raft/status" -TimeoutSec 5
+            if ($status.isLeader) { return "http://localhost:$port" }
         } catch {
-            $fileName = Split-Path $file -Leaf
-            Write-Host "  ⚠ $fileName not available" -ForegroundColor Yellow
+            Write-Host "  ⚠ Controller on ${port}: not responding" -ForegroundColor Yellow
         }
     }
+    return $null
 }
 
-function Submit-TransferRequest {
-    param(
-        [string]$SourceUri,
-        [string]$DestinationPath,
-        [string]$Protocol,
-        [string]$Description
-    )
-    
-    Write-Host "  Testing: $Description" -ForegroundColor Cyan
-    Write-Host "    Source: $SourceUri" -ForegroundColor Gray
-    Write-Host "    Destination: $DestinationPath" -ForegroundColor Gray
-    Write-Host "    Protocol: $Protocol" -ForegroundColor Gray
-    
-    $transferRequest = @{
-        jobId = "network-test-$([guid]::NewGuid().ToString('N'))"
-        tenantId = "network-test"
-        sourceUri = $SourceUri
-        destinationPath = $DestinationPath
-        totalBytes = 1
-        metadata = @{
-            testType = "automated"
-            description = $Description
-        }
-    } | ConvertTo-Json
-    
-    try {
-        $response = Invoke-RestMethod -Uri "$apiUrl/transfers" -Method POST -Body $transferRequest -ContentType "application/json" -TimeoutSec 10
-        
-        if ($response.success) {
-            Write-Host "    ✓ Transfer submitted: $($response.jobId)" -ForegroundColor Green
-            return $response.jobId
-        } else {
-            Write-Host "    ✗ Transfer failed: $($response.message)" -ForegroundColor Red
-            return $null
-        }
-    } catch {
-        Write-Host "    ✗ Transfer submission failed: $_" -ForegroundColor Red
-        return $null
-    }
-}
-
-function Test-TransferScenarios {
-    Write-Host "Testing transfer scenarios..." -ForegroundColor Cyan
-    
-    $scenarios = @(
-        @{
-            Source = "$httpServerUrl/shared/timestamp.txt"
-            Destination = "/tmp/downloads/http-timestamp.txt"
-            Protocol = "http"
-            Description = "HTTP small file transfer"
-        },
-        @{
-            Source = "$httpServerUrl/shared/random-1mb.bin"
-            Destination = "/tmp/downloads/http-1mb.bin"
-            Protocol = "http"
-            Description = "HTTP 1MB file transfer"
-        }
-    )
-
-    Write-Host "  Governed FTP/SFTP scenarios require a service connection and an external secret-provider reference; credentials are never embedded in URIs." -ForegroundColor Gray
-    
-    $transferIds = @()
-    
-    foreach ($scenario in $scenarios) {
-        $transferId = Submit-TransferRequest -SourceUri $scenario.Source -DestinationPath $scenario.Destination -Protocol $scenario.Protocol -Description $scenario.Description
-        if ($transferId) {
-            $transferIds += $transferId
-        }
-        Start-Sleep -Seconds 2
-    }
-    
-    if ($transferIds.Count -gt 0) {
-        Write-Host ""
-        Write-Host "Monitoring transfer progress..." -ForegroundColor Cyan
-        
-        # Monitor transfers for up to 2 minutes
-        $timeout = 120
-        $elapsed = 0
-        
-        while ($elapsed -lt $timeout) {
-            $allComplete = $true
-            
-            foreach ($transferId in $transferIds) {
-                try {
-                    $status = Invoke-RestMethod -Uri "$apiUrl/transfers/$transferId" -TimeoutSec 5
-                    
-                    switch ($status.status) {
-                        "COMPLETED" { 
-                            Write-Host "    ✓ ${transferId}: Completed" -ForegroundColor Green
-                        }
-                        "FAILED" { 
-                            Write-Host "    ✗ ${transferId}: Failed - $($status.errorMessage)" -ForegroundColor Red
-                        }
-                        "IN_PROGRESS" { 
-                            Write-Host "    ⏳ ${transferId}: In Progress ($($status.progress)%)" -ForegroundColor Yellow
-                            $allComplete = $false
-                        }
-                        "PENDING" { 
-                            Write-Host "    ⏳ ${transferId}: Pending" -ForegroundColor Yellow
-                            $allComplete = $false
-                        }
-                        default { 
-                            Write-Host "    ? ${transferId}: $($status.status)" -ForegroundColor Gray
-                            $allComplete = $false
-                        }
-                    }
-                } catch {
-                    Write-Host "    ⚠ ${transferId}: Status check failed" -ForegroundColor Yellow
-                }
-            }
-            
-            if ($allComplete) {
-                break
-            }
-            
-            Start-Sleep -Seconds 5
-            $elapsed += 5
-        }
-        
-        if ($elapsed -ge $timeout) {
-            Write-Host "  ⚠ Transfer monitoring timed out after $timeout seconds" -ForegroundColor Yellow
-        }
-    }
-}
-
-# Main test execution
-Write-Host "Checking service health..." -ForegroundColor Cyan
-$apiHealthy = Test-ServiceHealth -Url $apiUrl -Name "API Service"
-$httpHealthy = Test-ServiceHealth -Url $httpServerUrl -Name "HTTP Server"
-
-if (-not $apiHealthy) {
-    Write-Host "API service is not healthy. Cannot proceed with tests." -ForegroundColor Red
+Write-Host "Finding the Raft leader..." -ForegroundColor Cyan
+$leader = Find-Leader
+if (-not $leader) {
+    Write-Host "  ✗ No controller reports itself leader. Cannot proceed." -ForegroundColor Red
     exit 1
 }
-
+Write-Host "  ✓ Leader: $leader" -ForegroundColor Green
+$apiUrl = "$leader/api/v1"
 Write-Host ""
 
-# Test agent registration
-$agentsRegistered = Test-AgentRegistration
+Write-Host "Checking registered agents..." -ForegroundColor Cyan
+$agents = @((Invoke-RestMethod -Uri "$apiUrl/agents" -TimeoutSec 10).agents | Where-Object { $_.tenantId -eq $TenantId })
+if ($agents.Count -eq 0) {
+    Write-Host "  ✗ No agents registered for tenant '$TenantId'. Check the agent containers' logs." -ForegroundColor Red
+    exit 1
+}
+foreach ($agent in $agents) {
+    Write-Host "  ✓ $($agent.agentId) - $($agent.region) ($($agent.status))" -ForegroundColor Green
+}
 Write-Host ""
 
-# Test file availability
-Test-FileAvailability
+Write-Host "Checking the HTTP file server from the host..." -ForegroundColor Cyan
+try {
+    Invoke-WebRequest -Uri "$hostHttpServer/shared/timestamp.txt" -Method Head -TimeoutSec 5 | Out-Null
+    Write-Host "  ✓ $hostHttpServer/shared/timestamp.txt is available" -ForegroundColor Green
+} catch {
+    Write-Host "  ⚠ $hostHttpServer/shared/timestamp.txt is not available yet (the file generator may still be running)" -ForegroundColor Yellow
+}
 Write-Host ""
 
-# Test transfer scenarios
-if ($agentsRegistered) {
-    Test-TransferScenarios
-} else {
-    Write-Host "Skipping transfer tests - no agents registered" -ForegroundColor Yellow
+$scenarios = @(
+    @{ File = "timestamp.txt"; Description = "HTTP small file transfer" },
+    @{ File = "random-1mb.bin"; Description = "HTTP 1MB file transfer" }
+)
+Write-Host "Governed FTP/SFTP scenarios require a service connection and an external secret-provider reference; credentials are never embedded in URIs." -ForegroundColor Gray
+
+$jobIds = @()
+$agentIndex = 0
+foreach ($scenario in $scenarios) {
+    $jobId = "network-test-$([guid]::NewGuid().ToString('N'))"
+    $agent = $agents[$agentIndex % $agents.Count]
+    $agentIndex++
+    Write-Host "  $($scenario.Description) -> $($agent.agentId)" -ForegroundColor Cyan
+
+    $transfer = @{
+        jobId = $jobId
+        tenantId = $TenantId
+        sourceUri = "$inNetworkHttpServer/shared/$($scenario.File)"
+        destinationPath = "/app/transfers/$($scenario.File)"
+        description = $scenario.Description
+    } | ConvertTo-Json
+    $assignment = @{
+        assignmentId = "assign-$jobId"
+        jobId = $jobId
+        agentId = $agent.agentId
+        status = "ASSIGNED"
+    } | ConvertTo-Json
+
+    try {
+        Invoke-RestMethod -Uri "$apiUrl/transfers" -Method POST -Body $transfer -ContentType "application/json" -TimeoutSec 10 | Out-Null
+        Invoke-RestMethod -Uri "$apiUrl/assignments" -Method POST -Body $assignment -ContentType "application/json" -TimeoutSec 10 | Out-Null
+        Write-Host "    ✓ Submitted and assigned: $jobId" -ForegroundColor Green
+        $jobIds += $jobId
+    } catch {
+        Write-Host "    ✗ Submission failed: $_" -ForegroundColor Red
+    }
+}
+Write-Host ""
+
+if ($jobIds.Count -gt 0) {
+    Write-Host "Monitoring transfers (up to $TimeoutSeconds s)..." -ForegroundColor Cyan
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    $pending = [System.Collections.Generic.List[string]]::new([string[]]$jobIds)
+    while ($pending.Count -gt 0 -and (Get-Date) -lt $deadline) {
+        foreach ($jobId in @($pending)) {
+            try {
+                $status = (Invoke-RestMethod -Uri "$apiUrl/transfers/$jobId" -TimeoutSec 5).status
+            } catch {
+                $status = "UNKNOWN"
+            }
+            switch ($status) {
+                "COMPLETED" { Write-Host "    ✓ ${jobId}: COMPLETED" -ForegroundColor Green; $pending.Remove($jobId) | Out-Null }
+                "FAILED"    { Write-Host "    ✗ ${jobId}: FAILED" -ForegroundColor Red; $pending.Remove($jobId) | Out-Null }
+                "CANCELLED" { Write-Host "    ✗ ${jobId}: CANCELLED" -ForegroundColor Red; $pending.Remove($jobId) | Out-Null }
+                default     { }
+            }
+        }
+        if ($pending.Count -gt 0) { Start-Sleep -Seconds 5 }
+    }
+    foreach ($jobId in $pending) {
+        Write-Host "    ⚠ ${jobId}: not finished within $TimeoutSeconds s; see GET $apiUrl/transfers/$jobId/events" -ForegroundColor Yellow
+    }
 }
 
 Write-Host ""
 Write-Host "=== Transfer Tests Complete ===" -ForegroundColor Green
-Write-Host ""
-Write-Host "Additional Commands:" -ForegroundColor Yellow
-Write-Host "  - View logs: docker-compose -f compose/docker-compose-full-network.yml logs -f"
-Write-Host "  - Check agents: .\scripts\check-agents.ps1"
-Write-Host "  - Stop environment: docker-compose -f compose/docker-compose-full-network.yml down"

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # License Header Addition Script
-# Adds Apache License 2.0 headers to Java files in the PeeGeeQ project.
+# Adds Apache License 2.0 headers to Java files in the Quorus project.
 #
 # Usage:
 #   ./add-license-headers.sh [--dry-run] [--force]
@@ -50,7 +50,7 @@ while [[ $# -gt 0 ]]; do
         -h|--help)
             echo "Usage: $0 [--dry-run] [--force]"
             echo ""
-            echo "Adds Apache License 2.0 headers to Java files in the PeeGeeQ project."
+            echo "Adds Apache License 2.0 headers to Java files in the Quorus project."
             echo ""
             echo "Options:"
             echo "  --dry-run    Show what changes would be made without modifying files"

@@ -67,7 +67,7 @@ Write-Host ""
 Write-Host "   Access points:" -ForegroundColor White
 Write-Host "   - Docker logs: docker logs quorus-controller1" -ForegroundColor Gray
 Write-Host "   - Grafana UI: http://localhost:3000" -ForegroundColor Gray
-Write-Host "   - Loki API: http://localhost:3100" -ForegroundColor Gray
+Write-Host "   - Loki API: http://localhost:3110" -ForegroundColor Gray
 
 Write-Host ""
 Write-Host "Log extraction pipeline is operational!" -ForegroundColor Green

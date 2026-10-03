@@ -207,7 +207,8 @@ function Show-RaftSummary {
     foreach ($controller in $CONTROLLERS) {
         try {
             $response = Invoke-RestMethod -Uri "http://localhost:808$($CONTROLLERS.IndexOf($controller) + 1)/health" -Method GET -TimeoutSec 3
-            $raftInfo = $response.checks.raft
+            # /health reports Raft at the top level: raft.state, raft.term, raft.leaderId.
+            $raftInfo = $response.raft
             
             $stateColor = switch ($raftInfo.state) {
                 "LEADER" { "Green" }

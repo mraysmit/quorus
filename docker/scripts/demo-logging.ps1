@@ -13,7 +13,7 @@ Write-Host "2. Generating log activity..." -ForegroundColor Yellow
 
 # Register an agent
 Write-Host "   - Registering agent..." -ForegroundColor Cyan
-$regResponse = Invoke-RestMethod -Uri "http://localhost:8080/api/v1/agents/register" -Method POST -Body (Get-Content ../test-data/test-registration.json) -ContentType "application/json" -ErrorAction SilentlyContinue
+$regResponse = Invoke-RestMethod -Uri "http://localhost:8081/api/v1/agents/register" -Method POST -Body (Get-Content ../test-data/test-registration.json) -ContentType "application/json" -ErrorAction SilentlyContinue
 if ($regResponse) {
     Write-Host "     Agent registered: $($regResponse.agentId)" -ForegroundColor Green
 }
@@ -43,7 +43,7 @@ for ($i = 1; $i -le 3; $i++) {
         }
     } | ConvertTo-Json -Depth 3
 
-    $response = Invoke-RestMethod -Uri "http://localhost:8080/api/v1/agents/heartbeat" -Method POST -Body $json -ContentType "application/json" -ErrorAction SilentlyContinue
+    $response = Invoke-RestMethod -Uri "http://localhost:8081/api/v1/agents/heartbeat" -Method POST -Body $json -ContentType "application/json" -ErrorAction SilentlyContinue
     if ($response -and $response.success) {
         Write-Host "     Heartbeat $i acknowledged" -ForegroundColor Green
     }
@@ -52,7 +52,7 @@ for ($i = 1; $i -le 3; $i++) {
 
 # Get statistics
 Write-Host "   - Getting agent statistics..." -ForegroundColor Cyan
-$stats = Invoke-RestMethod -Uri "http://localhost:8080/api/v1/agents/heartbeat/stats" -ErrorAction SilentlyContinue
+$stats = Invoke-RestMethod -Uri "http://localhost:8081/api/v1/agents/heartbeat/stats" -ErrorAction SilentlyContinue
 if ($stats) {
     Write-Host "     Total agents: $($stats.totalAgents), Healthy: $($stats.healthyAgents)" -ForegroundColor Green
 }
@@ -62,7 +62,7 @@ Write-Host ""
 # 3. Show log aggregation endpoints
 Write-Host "3. Log Aggregation Services:" -ForegroundColor Yellow
 Write-Host "   - Grafana Dashboard: http://localhost:3000 (admin/admin)" -ForegroundColor Cyan
-Write-Host "   - Loki API: http://localhost:3100" -ForegroundColor Cyan
+Write-Host "   - Loki API: http://localhost:3110" -ForegroundColor Cyan
 Write-Host "   - Prometheus Metrics: http://localhost:9090" -ForegroundColor Cyan
 Write-Host ""
 
@@ -77,7 +77,7 @@ Write-Host ""
 # 5. Show recent logs via Loki API
 Write-Host "5. Recent Logs from Loki:" -ForegroundColor Yellow
 try {
-    $lokiQuery = "http://localhost:3100/loki/api/v1/query_range?query={container_name=`"quorus-controller1`"}&limit=5"
+    $lokiQuery = "http://localhost:3110/loki/api/v1/query_range?query={container_name=`"quorus-controller1`"}&limit=5"
     $lokiResponse = Invoke-RestMethod -Uri $lokiQuery -ErrorAction Stop
     if ($lokiResponse.data.result) {
         Write-Host "   Recent log entries:" -ForegroundColor Cyan
