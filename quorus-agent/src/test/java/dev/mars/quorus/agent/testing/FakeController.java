@@ -183,6 +183,7 @@ public final class FakeController implements AutoCloseable {
             if (!reply.body().isEmpty()) {
                 exchange.getResponseHeaders().add("Content-Type", "application/json");
             }
+            reply.headers().forEach(exchange.getResponseHeaders()::add);
             exchange.sendResponseHeaders(reply.status(), body.length == 0 ? -1 : body.length);
             if (body.length > 0) {
                 try (OutputStream out = exchange.getResponseBody()) {
@@ -235,21 +236,28 @@ public final class FakeController implements AutoCloseable {
         }
     }
 
-    /** A reply: a status and an optional JSON body. */
-    public record Reply(int status, String body) {
+    /** A reply: a status, an optional JSON body and optional response headers. */
+    public record Reply(int status, String body, Map<String, String> headers) {
         private static final int DROP = -1;
 
         /** No response at all: the connection is closed, so the client sees a transport failure. */
         public static Reply drop() {
-            return new Reply(DROP, "");
+            return new Reply(DROP, "", Map.of());
         }
 
         public static Reply status(int status) {
-            return new Reply(status, "");
+            return new Reply(status, "", Map.of());
         }
 
         public static Reply json(int status, String body) {
-            return new Reply(status, body);
+            return new Reply(status, body, Map.of());
+        }
+
+        /** This reply with one more response header. */
+        public Reply header(String name, String value) {
+            Map<String, String> extended = new java.util.LinkedHashMap<>(headers);
+            extended.put(name, value);
+            return new Reply(status, body, Map.copyOf(extended));
         }
 
         /** Answers every request with this reply. */

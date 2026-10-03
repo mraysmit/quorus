@@ -57,7 +57,8 @@ import java.util.stream.Stream;
  *
  * <p>Runtime (RT-05b): everything runs on virtual threads owned by the agent, with no framework.
  * <ul>
- *   <li>A runtime thread registers; if registration fails, the agent shuts down.</li>
+ *   <li>A runtime thread registers. While no controller can take the registration it tries again at
+ *       the configured interval; if a controller rejects the registration, the agent shuts down.</li>
  *   <li>A heartbeat loop and a job-polling loop then run at their configured intervals.</li>
  *   <li>Each accepted assignment runs on its own job thread: start acknowledgements, the transfer,
  *       periodic progress reports (on a reporter thread) and the final report.</li>
@@ -212,18 +213,28 @@ public class QuorusAgent {
     }
 
     private void registerAndRun() {
-        boolean registered;
         try {
-            registered = registrationService.register();
+            // A cluster with no leader yet, or a controller that is restarting, is not fatal (ENG-27).
+            AgentRegistrationService.Registration registration;
+            while ((registration = registrationService.tryRegister())
+                    == AgentRegistrationService.Registration.UNAVAILABLE) {
+                metrics.recordRegistration(false);
+                logger.warn("Controller unavailable for registration; trying again in {}ms",
+                        config.getRegistrationRetryIntervalMs());
+                if (stopSignal.await(config.getRegistrationRetryIntervalMs(), TimeUnit.MILLISECONDS)) {
+                    return; // shutting down
+                }
+            }
+            boolean registered = registration == AgentRegistrationService.Registration.REGISTERED;
+            metrics.recordRegistration(registered);
+            if (!registered) {
+                metrics.setStatusError();
+                logger.error("The controller rejected this agent's registration");
+                shutdown();
+                return;
+            }
         } catch (InterruptedException e) {
             return; // shutting down
-        }
-        metrics.recordRegistration(registered);
-        if (!registered) {
-            metrics.setStatusError();
-            logger.error("Failed to register with controller");
-            shutdown();
-            return;
         }
         logger.info("Agent registered successfully with controller");
         startBackgroundServices();

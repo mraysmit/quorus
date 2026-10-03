@@ -56,20 +56,39 @@ public class AgentRegistrationService {
      * @throws InterruptedException if the calling thread is interrupted
      */
     public boolean register() throws InterruptedException {
-        logger.info("Registering agent {} with controller at {}", config.getAgentId(), config.getControllerUrl());
+        return tryRegister() == Registration.REGISTERED;
+    }
+
+    /** The outcome of one registration attempt. */
+    public enum Registration {
+        REGISTERED,
+        /** The controller could not take the registration now: no leader, unreachable, or a server error. */
+        UNAVAILABLE,
+        /** The controller refused the registration; trying again cannot succeed. */
+        REJECTED
+    }
+
+    /**
+     * Makes one registration attempt.
+     *
+     * @throws InterruptedException if the calling thread is interrupted
+     */
+    public Registration tryRegister() throws InterruptedException {
+        logger.info("Registering agent {} with controller at {}", config.getAgentId(), config.getControllerUrls());
         try {
-            ControllerClient.Response response = client.postJson(config.getControllerUrl() + "/agents/register",
+            ControllerClient.Response response = client.postJson("/agents/register",
                     JSON.writeValueAsString(createRegistrationRequest()));
-            if (response.status() == 201 || response.status() == 200) {
+            int status = response.status();
+            if (status == 201 || status == 200) {
                 registered = true;
                 logger.info("Agent {} registered successfully", config.getAgentId());
-                return true;
+                return Registration.REGISTERED;
             }
-            logger.error("Failed to register agent {}: HTTP {}", config.getAgentId(), response.status());
-            return false;
+            logger.error("Failed to register agent {}: HTTP {}", config.getAgentId(), status);
+            return status >= 500 || status == 408 || status == 429 ? Registration.UNAVAILABLE : Registration.REJECTED;
         } catch (IOException e) {
             logger.error("Error registering agent {}: {}", config.getAgentId(), e.getMessage());
-            return false;
+            return Registration.UNAVAILABLE;
         }
     }
 
@@ -86,8 +105,7 @@ public class AgentRegistrationService {
         }
         logger.info("Deregistering agent {} from controller", config.getAgentId());
         try {
-            ControllerClient.Response response = client.delete(
-                    config.getControllerUrl() + "/agents/" + config.getAgentId());
+            ControllerClient.Response response = client.delete("/agents/" + config.getAgentId());
             int statusCode = response.status();
             if (statusCode == 200 || statusCode == 204) {
                 registered = false;

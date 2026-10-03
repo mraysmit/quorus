@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @Timeout(value = 30, unit = SECONDS, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
 class ControllerClientTlsTest {
-    private static final String PATH = "/api/v1/agents/security-check";
+    private static final String PATH = "/agents/security-check";
 
     @TempDir
     Path tempDir;
@@ -42,7 +42,7 @@ class ControllerClientTlsTest {
                 tls.clientCertificate(), "TLSv1.3");
              ControllerClient client = ControllerClient.create(tls.productionConfig(controller.port()))) {
 
-            assertEquals(204, client.get(controller.url() + PATH).status());
+            assertEquals(204, client.get(PATH).status());
         }
     }
 
@@ -54,7 +54,7 @@ class ControllerClientTlsTest {
                 tls.clientCertificate(), "TLSv1.3");
              ControllerClient client = ControllerClient.create(tls.productionConfig(controller.port()))) {
 
-            IOException failure = assertThrows(IOException.class, () -> client.get(controller.url() + PATH));
+            IOException failure = assertThrows(IOException.class, () -> client.get(PATH));
 
             assertCausedBy(failure, SSLHandshakeException.class);
             assertTrue(controller.requests().isEmpty(), "no request may reach an untrusted controller");
@@ -74,7 +74,7 @@ class ControllerClientTlsTest {
              ControllerClient client = ControllerClient.create(tls.productionConfig(controller.port(),
                      tls.clientCertificate(), tls.clientPrivateKey(), trustsControllerCertificate))) {
 
-            IOException failure = assertThrows(IOException.class, () -> client.get(controller.url() + PATH));
+            IOException failure = assertThrows(IOException.class, () -> client.get(PATH));
 
             assertChainMentions(failure, "no name matching localhost");
             assertTrue(controller.requests().isEmpty());
@@ -88,7 +88,7 @@ class ControllerClientTlsTest {
                 tls.clientCertificate(), "TLSv1.2");
              ControllerClient client = ControllerClient.create(tls.productionConfig(controller.port()))) {
 
-            IOException failure = assertThrows(IOException.class, () -> client.get(controller.url() + PATH));
+            IOException failure = assertThrows(IOException.class, () -> client.get(PATH));
 
             assertCausedBy(failure, SSLHandshakeException.class);
             assertTrue(controller.requests().isEmpty());
@@ -108,8 +108,8 @@ class ControllerClientTlsTest {
              ControllerClient rotatedClient = ControllerClient.create(tls.productionConfig(controller.port(),
                      tls.serverCertificate(), tls.serverPrivateKey(), tls.serverCertificate()))) {
 
-            assertEquals(204, oldClient.get(controller.url() + PATH).status());
-            assertEquals(204, rotatedClient.get(controller.url() + PATH).status());
+            assertEquals(204, oldClient.get(PATH).status());
+            assertEquals(204, rotatedClient.get(PATH).status());
         }
     }
 
@@ -118,7 +118,7 @@ class ControllerClientTlsTest {
                                              String protocol) throws Exception {
         FakeController controller = FakeController.startTls(PemTls.sslContext(certificate, privateKey, clientTrust),
                 true, protocol);
-        return controller.on("GET", PATH, Reply.status(204).always());
+        return controller.on("GET", "/api/v1" + PATH, Reply.status(204).always());
     }
 
     private static void assertCausedBy(Throwable failure, Class<? extends Throwable> type) {

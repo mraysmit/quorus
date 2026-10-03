@@ -543,6 +543,9 @@ class SecurityBoundaryIntegrationTest {
         assertEquals(403, deregisterAs(vertx, tls, events, Set.of(SecurityRole.SERVICE_INTEGRATION),
                 IdentityType.SERVICE_INTEGRATION, "payments-batch", "agent-other"),
                 "An integration identity has no deregistration scope");
+        assertEquals(403, deregisterAs(vertx, tls, events, Set.of(SecurityRole.OPERATOR), IdentityType.HUMAN,
+                "other-bank-operator", "regulated-bank-b", "agent-other"),
+                "An operator must not deregister another tenant's agent");
 
         awaitSuccess(eventually(vertx, () -> events.stream().anyMatch(event ->
                         "MUTATION".equals(event.eventType()) && "SUCCESS".equals(event.outcome())
@@ -558,7 +561,13 @@ class SecurityBoundaryIntegrationTest {
     /** Starts a server whose only client identity has the given roles, and deletes one registered agent. */
     private int deregisterAs(Vertx vertx, TlsMaterial tls, List<AuditEvent> events, Set<SecurityRole> roles,
                              IdentityType type, String principal, String agentId) {
-        SecurityIdentity identity = new SecurityIdentity(principal, type, "regulated-bank-a", "production",
+        return deregisterAs(vertx, tls, events, roles, type, principal, "regulated-bank-a", agentId);
+    }
+
+    /** The registered agents belong to {@code regulated-bank-a}; the caller belongs to {@code tenant}. */
+    private int deregisterAs(Vertx vertx, TlsMaterial tls, List<AuditEvent> events, Set<SecurityRole> roles,
+                             IdentityType type, String principal, String tenant, String agentId) {
+        SecurityIdentity identity = new SecurityIdentity(principal, type, tenant, "production",
                 roles, Set.of(), tls.clientSubject(), Instant.now(), Instant.now().plusSeconds(300), null);
         SecurityConfig config = tls.config(Set.of(), Set.of(), Map.of(tls.clientSubject(), identity),
                 tempDir.resolve("deregistration-audit-" + System.nanoTime() + ".jsonl"));

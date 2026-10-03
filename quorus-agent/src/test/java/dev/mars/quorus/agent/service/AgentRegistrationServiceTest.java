@@ -182,6 +182,28 @@ class AgentRegistrationServiceTest {
         assertFalse(service.isRegistered());
     }
 
+    /** Register item ENG-27: which failed registrations are worth trying again. */
+    @Test
+    @DisplayName("Classifies a failed registration as unavailable or rejected")
+    void testRegistrationOutcomeClassification() throws Exception {
+        AtomicInteger status = new AtomicInteger();
+        controller.on("POST", REGISTER, request -> Reply.status(status.get()));
+        AgentRegistrationService service = new AgentRegistrationService(client, config);
+
+        for (int unavailable : new int[]{500, 503, 408, 429}) {
+            status.set(unavailable);
+            assertEquals(AgentRegistrationService.Registration.UNAVAILABLE, service.tryRegister(), "HTTP " + unavailable);
+        }
+        for (int rejected : new int[]{400, 401, 403, 409}) {
+            status.set(rejected);
+            assertEquals(AgentRegistrationService.Registration.REJECTED, service.tryRegister(), "HTTP " + rejected);
+        }
+        assertFalse(service.isRegistered());
+        status.set(201);
+        assertEquals(AgentRegistrationService.Registration.REGISTERED, service.tryRegister());
+        assertTrue(service.isRegistered());
+    }
+
     @Test
     @DisplayName("Should fail deregister on HTTP 404: it once hid a controller with no deregistration route (ENG-25)")
     void testDeregister404IsAFailure() throws Exception {

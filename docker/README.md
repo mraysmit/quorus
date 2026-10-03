@@ -73,7 +73,7 @@ In a multi-controller topology, check every controller on its own port. Exactly 
 8081..8083 | ForEach-Object { curl "http://localhost:$_/health/ready"; curl "http://localhost:$_/raft/status" }
 ```
 
-Only the leader accepts writes; a follower answers a write with `503` and code `NOT_LEADER`.
+Only the leader accepts writes; a follower answers a write with `503`, code `NOT_LEADER` and `Retry-After`. Set `QUORUS_CLUSTER_API_ENDPOINTS` on each controller (`controller1=http://controller1:8080,...`) and the follower also names the leader's API endpoint in `X-Quorus-Leader`.
 
 Controller startup brings up Raft storage, the Raft node, the gRPC server and the HTTP API. It starts no route trigger evaluator and no assignment scheduler: a submitted transfer runs only after a caller assigns it with `POST /api/v1/assignments`.
 
@@ -86,11 +86,19 @@ QUORUS_AGENT_TENANT_ID=development
 QUORUS_AGENT_CONTROLLER_URL=http://controller1:8080/api/v1
 ```
 
-The legacy names `AGENT_TENANT_ID` and `CONTROLLER_URL` are still read, but the `QUORUS_AGENT_*` names win. The agent image's entrypoint waits up to 60 seconds for the controller's `/health/live` before starting the agent, and presents the agent's client certificate when the controller URL is `https`. The agent stops if its first registration fails, so it must reach the leader.
+The legacy names `AGENT_TENANT_ID` and `CONTROLLER_URL` are still read, but the `QUORUS_AGENT_*` names win.
+
+For a multi-controller cluster, list every controller, comma-separated. The agent sends a write that a follower refuses to the leader the follower names, if that is one of the listed controllers, or else to the next listed one, and it stays with the controller that answered:
+
+```text
+QUORUS_AGENT_CONTROLLER_URL=http://controller1:8080/api/v1,http://controller2:8080/api/v1,http://controller3:8080/api/v1
+```
+
+The agent image's entrypoint does not wait for a controller. When no controller can take the registration (unreachable, no leader, or a server error), the agent tries again every `QUORUS_AGENT_REGISTRATION_RETRY_INTERVAL_MS` (5000). It stops only when the controller rejects the registration (a `4xx`).
 
 ## Full network
 
-`docker-compose-full-network.yml` runs a larger development network. The agents register with `controller1` only; if `controller1` is not the leader, their registration is rejected and they stop and restart until it is. Start it with the helper, which builds the jars first when given `-Build`:
+`docker-compose-full-network.yml` runs a larger development network. Each agent lists all three controllers and each controller knows the others' API endpoints, so the agents register with whichever controller is the leader. Start it with the helper, which builds the jars first when given `-Build`:
 
 ```powershell
 cd docker
@@ -158,6 +166,7 @@ The [testing guide](../docs-design/testing/QUORUS_TESTING_README.md) describes t
 
 - **Port conflicts:** check that the host ports in the table above are free.
 - **Image builds fail at `COPY`:** run `docker/build-runtime` first.
-- **An agent keeps restarting:** check that its tenant is set and that it can reach the leader.
+- **An agent stops at startup:** check that its tenant is set and that the controller did not reject its registration.
+- **An agent logs "Controller unavailable for registration":** no listed controller is the leader or reachable yet; the agent keeps trying. Check that its controller URL lists every controller.
 - **Writes return `503 NOT_LEADER`:** send them to the leader shown by `/raft/status`.
 - **Resources:** the full network and observability stacks need several GB of memory.

@@ -129,6 +129,26 @@ class AuthoritativeStateInvariantTest {
     }
 
     @Test
+    void anUnknownAgentCanNeitherDeregisterNorHeartbeat() {
+        assertInstanceOf(CommandResult.NotFound.class, store.apply(AgentCommand.deregister("agent-unknown")));
+        assertInstanceOf(CommandResult.NotFound.class, store.apply(AgentCommand.heartbeat("agent-unknown")));
+    }
+
+    @Test
+    void anActiveAttemptBlocksDeregistrationEvenWhenItsAssignmentHasEnded() {
+        store.apply(TransferJobCommand.create(job("job-a", 100), "tenant-a"));
+        store.apply(AgentCommand.register(agent("agent-a", "tenant-a", AgentStatus.HEALTHY)));
+        Instant now = Instant.parse("2026-09-01T00:00:00Z");
+        assertInstanceOf(CommandResult.Success.class, store.apply(new JobAssignmentCommand.Assign(
+                "job-a:agent-a", assignment("job-a", "agent-a", "tenant-a"), "attempt-1",
+                now.plusSeconds(300), now)));
+        store.apply(JobAssignmentCommand.cancel("job-a:agent-a", "test"));
+        assertTrue(store.getJobAssignment("job-a:agent-a").getStatus().isTerminal());
+
+        assertRejected(store.apply(AgentCommand.deregister("agent-a")), "DEPENDENT_ENTITY_EXISTS");
+    }
+
+    @Test
     void anAgentNothingReferencesIsRemovedOnDeregistration() {
         store.apply(AgentCommand.register(agent("agent-a", "tenant-a", AgentStatus.HEALTHY)));
 

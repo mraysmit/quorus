@@ -171,6 +171,11 @@ public final class AgentConfig {
         return getLong("quorus.agent.jobs.progress-report-interval-ms", 15000);
     }
 
+    /** How long the agent waits before it tries a failed registration again. */
+    public long getRegistrationRetryIntervalMs() {
+        return getLong("quorus.agent.registration.retry-interval-ms", 5000);
+    }
+
     /**
      * Number of foreign-assignment mismatches allowed before fail-fast shutdown.
      * Default is 3 to tolerate transient routing issues while still detecting persistent problems.
@@ -282,10 +287,10 @@ public final class AgentConfig {
      */
     public void validate() {
         // Validate controller URL is reachable format
-        String controllerUrl = getControllerUrl();
-        if (!controllerUrl.startsWith("http://") && !controllerUrl.startsWith("https://")) {
-            throw new IllegalStateException(
-                    "Controller URL must start with http:// or https://, got: " + controllerUrl);
+        try {
+            AgentConfiguration.parseControllerUrls(getControllerUrl());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalStateException(e.getMessage(), e);
         }
 
         // Validate port ranges
@@ -307,6 +312,10 @@ public final class AgentConfig {
         if (getProgressReportIntervalMs() <= 0) {
             throw new IllegalStateException(
                     "Progress report interval must be positive, got: " + getProgressReportIntervalMs());
+        }
+        if (getRegistrationRetryIntervalMs() <= 0) {
+            throw new IllegalStateException(
+                    "Registration retry interval must be positive, got: " + getRegistrationRetryIntervalMs());
         }
         if (getMaxConcurrentTransfers() <= 0) {
             throw new IllegalStateException(
@@ -377,6 +386,7 @@ public final class AgentConfig {
         logger.info("  Initial Delay:        {}ms", getJobPollingInitialDelayMs());
         logger.info("  Poll Interval:        {}ms", getJobPollingIntervalMs());
         logger.info("  Progress Interval:    {}ms", getProgressReportIntervalMs());
+        logger.info("  Registration Retry:   {}ms", getRegistrationRetryIntervalMs());
         logger.info("  --- Security ---");
         logger.info("  Foreign Assignment Threshold: {}", getForeignAssignmentMismatchThreshold());
         logger.info("  --- Telemetry ---");

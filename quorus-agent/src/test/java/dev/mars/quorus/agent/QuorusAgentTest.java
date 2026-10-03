@@ -33,6 +33,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.jupiter.api.Assertions.*;
@@ -138,23 +139,52 @@ class QuorusAgentTest {
         assertTrue(agent.awaitShutdown(WAIT));
     }
 
+    /** Register item ENG-27: a cluster with no leader yet, or a restarting controller, is not fatal. */
     @Test
-    @DisplayName("Shuts down when controller registration fails")
-    void testShutdownOnRegistrationFailure() throws Exception {
-        agent = new QuorusAgent(new AgentConfiguration.Builder()
-                .securityProfile("development").allowInsecure(true).controllerTlsEnabled(false)
-                .foreignAssignmentMismatchThreshold(3)
-                .agentId("test-agent-unreachable")
-                .tenantId("test-tenant")
-                .controllerUrl("http://localhost:1/api/v1")
-                .agentPort(0)
-                .httpConnectionTimeout(250)
-                .build());
+    @DisplayName("Keeps retrying registration until the controller accepts it")
+    void testRegistrationIsRetriedUntilAccepted() throws Exception {
+        AtomicInteger attempts = new AtomicInteger();
+        controller.on("POST", REGISTER, request -> switch (attempts.incrementAndGet()) {
+            case 1 -> Reply.json(503, "{\"code\":\"NO_LEADER\",\"status\":503}");
+            case 2 -> Reply.drop();
+            default -> Reply.json(201, "{\"status\":\"registered\"}");
+        });
+        agent = new QuorusAgent(config(3));
 
         agent.start();
 
-        assertTrue(agent.awaitShutdown(WAIT), "A registration failure should trigger a clean fail-fast shutdown");
-        assertFalse(agent.isRunning(), "Agent should stop after registration fails");
+        controller.awaitRequests("POST", HEARTBEAT, 1, WAIT);
+        assertEquals(3, controller.requests("POST", REGISTER).size(), "registered on the third attempt");
+        assertTrue(agent.isRunning());
+    }
+
+    @Test
+    @DisplayName("Can be shut down while it is still retrying registration")
+    void testShutdownWhileRetryingRegistration() throws Exception {
+        controller.on("POST", REGISTER, Reply.drop().always());
+        agent = new QuorusAgent(config(3));
+
+        agent.start();
+        controller.awaitRequests("POST", REGISTER, 3, WAIT);
+        assertTrue(agent.isRunning(), "an unreachable controller does not stop the agent");
+        agent.shutdown();
+
+        assertTrue(agent.awaitShutdown(WAIT));
+        assertTrue(controller.requests("POST", HEARTBEAT).isEmpty(), "an unregistered agent sends no heartbeat");
+        assertTrue(controller.requests("DELETE", DEREGISTER).isEmpty(), "and has nothing to deregister");
+    }
+
+    @Test
+    @DisplayName("Shuts down when the controller rejects its registration")
+    void testShutdownWhenRegistrationIsRejected() throws Exception {
+        controller.on("POST", REGISTER, Reply.json(403, "{\"code\":\"FORBIDDEN\",\"status\":403}").always());
+        agent = new QuorusAgent(config(3));
+
+        agent.start();
+
+        assertTrue(agent.awaitShutdown(WAIT), "a rejected registration cannot succeed by retrying");
+        assertFalse(agent.isRunning());
+        assertEquals(1, controller.requests("POST", REGISTER).size());
     }
 
     @Test
@@ -263,6 +293,7 @@ class QuorusAgentTest {
                 .heartbeatInterval(50L)
                 .jobPollingInitialDelayMs(1)
                 .jobPollingIntervalMs(20)
+                .registrationRetryIntervalMs(20)
                 .version("1.0.0-TEST")
                 .build();
     }

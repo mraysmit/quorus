@@ -145,7 +145,7 @@ public class JobStatusReportingService {
                     .put("reportSequence", reportSequence);
         }
 
-        String url = config.getControllerUrl() + "/jobs/" + jobId + "/status";
+        String url = "/jobs/" + jobId + "/status";
 
         // Reconciliation by exact replay: retries retain the original fence, sequence,
         // expected state and payload. Only attempt-aware reports are idempotent.

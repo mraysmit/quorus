@@ -22,6 +22,7 @@ import io.vertx.ext.web.RoutingContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -58,10 +59,21 @@ public class LeaderGuardHandler implements Handler<RoutingContext> {
             "PUT /api/v1/security/trust/revocations",
             "POST /api/v1/security/authorization/check");
 
-    private final RaftNode raftNode;
+    /** Response header naming the leader's HTTP API base URL. */
+    public static final String LEADER_HEADER = "X-Quorus-Leader";
+    private static final String RETRY_AFTER = "Retry-After";
+    private static final String RETRY_AFTER_SECONDS = "1";
 
-    public LeaderGuardHandler(RaftNode raftNode) {
+    private final RaftNode raftNode;
+    private final Map<String, String> apiEndpoints;
+
+    /**
+     * @param apiEndpoints the HTTP API base URL of each controller by node ID; a node missing from it
+     *                     is never named as leader
+     */
+    public LeaderGuardHandler(RaftNode raftNode, Map<String, String> apiEndpoints) {
         this.raftNode = raftNode;
+        this.apiEndpoints = Map.copyOf(apiEndpoints);
     }
 
     @Override
@@ -84,7 +96,13 @@ public class LeaderGuardHandler implements Handler<RoutingContext> {
         logger.debug("Rejecting write request on non-leader node: {} {} (leader={})",
                 ctx.request().method(), path, leaderId);
 
+        // REST Spec §3.8: say when to retry and, when known, where the leader is. No redirect.
+        ctx.response().putHeader(RETRY_AFTER, RETRY_AFTER_SECONDS);
         if (leaderId != null && !leaderId.isEmpty()) {
+            String leaderEndpoint = apiEndpoints.get(leaderId);
+            if (leaderEndpoint != null) {
+                ctx.response().putHeader(LEADER_HEADER, leaderEndpoint);
+            }
             ctx.fail(QuorusApiException.notLeader(leaderId));
         } else {
             ctx.fail(QuorusApiException.noLeader());

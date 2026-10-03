@@ -139,7 +139,9 @@ QUORUS_AGENT_TLS_PRIVATE_KEY=/run/secrets/agent.key
 QUORUS_AGENT_TLS_TRUST_BUNDLE=/run/secrets/controller-ca.crt
 ```
 
-The agent ID must equal the principal in the agent's certificate binding (§4.2), and the agent refuses to start without a tenant ID. The legacy names `AGENT_ID`, `AGENT_TENANT_ID` and `CONTROLLER_URL` are still read, but the `QUORUS_AGENT_*` names win when both are set. The agent image's entrypoint waits for the controller's `/health/live` before starting the agent, presenting the certificate, key and trust bundle above when the controller URL is `https`.
+The agent ID must equal the principal in the agent's certificate binding (§4.2), and the agent refuses to start without a tenant ID. The legacy names `AGENT_ID`, `AGENT_TENANT_ID` and `CONTROLLER_URL` are still read, but the `QUORUS_AGENT_*` names win when both are set. 
+
+For a multi-controller cluster, `QUORUS_AGENT_CONTROLLER_URL` lists every controller, comma-separated; in the production profile every entry must be `https`. A follower that refuses a write names the leader in `X-Quorus-Leader`, and the agent follows that name only to a controller in its own list, so a response can never direct an agent to an address the operator did not configure. Every controller in the list is verified against the same trust bundle and hostname rules. The agent image's entrypoint does not wait for a controller: the agent retries registration until a controller accepts it, and stops only if the controller rejects it.
 
 The agent client uses TLS 1.3 only, validates the controller's certificate chain against the trust bundle, and verifies its hostname. A production build does not silently fall back to HTTP or an untrusted certificate.
 

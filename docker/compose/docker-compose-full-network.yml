@@ -28,6 +28,8 @@ services:
       - QUORUS_SECURITY_RAFT_TLS_ENABLED=false
       - QUORUS_RAFT_STORAGE_PATH=/app/data/raft
       - QUORUS_CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080
+      # Lets a follower name the leader in X-Quorus-Leader when it refuses a write (ENG-27)
+      - QUORUS_CLUSTER_API_ENDPOINTS=controller1=http://controller1:8080,controller2=http://controller2:8080,controller3=http://controller3:8080
       - QUORUS_RAFT_ELECTION_TIMEOUT_MS=3000
       - QUORUS_RAFT_HEARTBEAT_INTERVAL_MS=500
       - JAVA_OPTS=-Xmx256m -Xms128m
@@ -66,6 +68,8 @@ services:
       - QUORUS_SECURITY_RAFT_TLS_ENABLED=false
       - QUORUS_RAFT_STORAGE_PATH=/app/data/raft
       - QUORUS_CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080
+      # Lets a follower name the leader in X-Quorus-Leader when it refuses a write (ENG-27)
+      - QUORUS_CLUSTER_API_ENDPOINTS=controller1=http://controller1:8080,controller2=http://controller2:8080,controller3=http://controller3:8080
       - QUORUS_RAFT_ELECTION_TIMEOUT_MS=3000
       - QUORUS_RAFT_HEARTBEAT_INTERVAL_MS=500
       - JAVA_OPTS=-Xmx256m -Xms128m
@@ -104,6 +108,8 @@ services:
       - QUORUS_SECURITY_RAFT_TLS_ENABLED=false
       - QUORUS_RAFT_STORAGE_PATH=/app/data/raft
       - QUORUS_CLUSTER_NODES=controller1=controller1:9080,controller2=controller2:9080,controller3=controller3:9080
+      # Lets a follower name the leader in X-Quorus-Leader when it refuses a write (ENG-27)
+      - QUORUS_CLUSTER_API_ENDPOINTS=controller1=http://controller1:8080,controller2=http://controller2:8080,controller3=http://controller3:8080
       - QUORUS_RAFT_ELECTION_TIMEOUT_MS=3000
       - QUORUS_RAFT_HEARTBEAT_INTERVAL_MS=500
       - JAVA_OPTS=-Xmx256m -Xms128m
@@ -144,7 +150,7 @@ services:
       - QUORUS_AGENT_TLS_ENABLED=false
       - AGENT_REGION=us-east-1
       - AGENT_DATACENTER=nyc-dc1
-      - CONTROLLER_URL=http://controller1:8080/api/v1
+      - CONTROLLER_URL=http://controller1:8080/api/v1,http://controller2:8080/api/v1,http://controller3:8080/api/v1
       - SUPPORTED_PROTOCOLS=HTTP,HTTPS,FTP,SFTP
       - MAX_CONCURRENT_TRANSFERS=5
       - HEARTBEAT_INTERVAL=30000
@@ -177,7 +183,7 @@ services:
       - QUORUS_AGENT_TLS_ENABLED=false
       - AGENT_REGION=eu-west-1
       - AGENT_DATACENTER=lon-dc1
-      - CONTROLLER_URL=http://controller1:8080/api/v1
+      - CONTROLLER_URL=http://controller1:8080/api/v1,http://controller2:8080/api/v1,http://controller3:8080/api/v1
       - SUPPORTED_PROTOCOLS=HTTP,HTTPS,SFTP,SMB
       - MAX_CONCURRENT_TRANSFERS=3
       - HEARTBEAT_INTERVAL=30000
@@ -210,7 +216,7 @@ services:
       - QUORUS_AGENT_TLS_ENABLED=false
       - AGENT_REGION=ap-northeast-1
       - AGENT_DATACENTER=tky-dc1
-      - CONTROLLER_URL=http://controller1:8080/api/v1
+      - CONTROLLER_URL=http://controller1:8080/api/v1,http://controller2:8080/api/v1,http://controller3:8080/api/v1
       - SUPPORTED_PROTOCOLS=HTTP,HTTPS,FTP
       - MAX_CONCURRENT_TRANSFERS=4
       - HEARTBEAT_INTERVAL=30000

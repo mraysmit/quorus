@@ -4,6 +4,7 @@
  */
 package dev.mars.quorus.agent.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.mars.quorus.agent.config.AgentConfiguration;
 import dev.mars.quorus.security.PemTls;
 import io.opentelemetry.api.GlobalOpenTelemetry;
@@ -25,6 +26,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.security.GeneralSecurityException;
 import java.time.Duration;
+import java.util.List;
+import java.util.function.UnaryOperator;
 
 /**
  * The agent's one approved client for its controller (RT-05a), on the JDK HTTP client. It replaces the
@@ -38,7 +41,14 @@ import java.time.Duration;
  * the agent's HTTP idle timeout as its response deadline, as documented in the Security Deployment
  * Guide. Calls block the calling thread; the agent calls them from virtual threads.
  *
- * <p>Each request is an OpenTelemetry client span, and the current trace context is sent in the
+ * <p>Request paths are relative to the controller API base URL. The agent is configured with every
+ * controller of its cluster (ENG-27). A write a follower refuses with {@code 503 NOT_LEADER} is sent
+ * again to the leader it names in {@code X-Quorus-Leader}, if that is a configured controller, or
+ * else to the next configured one; each controller is asked at most once per request, and later
+ * requests go straight to the controller that answered. A transport failure is not resent, because
+ * the request may have been applied; the next request goes to the next configured controller.
+ *
+ * <p>Each attempt is an OpenTelemetry client span, and the current trace context is sent in the
  * request headers using the globally registered propagators. This replaces the Vert.x tracing
  * integration the agent had before RT-05b.
  */
@@ -46,13 +56,18 @@ public final class ControllerClient implements AutoCloseable {
     private static final Logger logger = LoggerFactory.getLogger(ControllerClient.class);
     private static final String USER_AGENT = "Quorus-Agent/1.0";
     private static final String INSTRUMENTATION = "dev.mars.quorus.agent.controller-client";
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     private final HttpClient client;
     private final Duration responseDeadline;
+    private static final String LEADER_HEADER = "X-Quorus-Leader";
 
-    private ControllerClient(HttpClient client, Duration responseDeadline) {
+    private final ControllerEndpoints endpoints;
+
+    private ControllerClient(HttpClient client, Duration responseDeadline, List<String> controllerUrls) {
         this.client = client;
         this.responseDeadline = responseDeadline;
+        this.endpoints = new ControllerEndpoints(controllerUrls);
     }
 
     /**
@@ -79,27 +94,64 @@ public final class ControllerClient implements AutoCloseable {
         } else {
             logger.warn("INSECURE DEVELOPMENT MODE: agent-to-controller traffic is plaintext");
         }
-        return new ControllerClient(builder.build(), Duration.ofMillis(config.getHttpIdleTimeout()));
+        return new ControllerClient(builder.build(), Duration.ofMillis(config.getHttpIdleTimeout()),
+                config.getControllerUrls());
     }
 
-    public Response get(String url) throws IOException, InterruptedException {
-        return send("GET", url, request(url).header("Accept", "application/json").GET());
+    /** Sends a GET to {@code path}, which is relative to the controller API base URL, e.g. {@code /agents}. */
+    public Response get(String path) throws IOException, InterruptedException {
+        return send("GET", path, request -> request.header("Accept", "application/json").GET());
     }
 
-    public Response postJson(String url, String json) throws IOException, InterruptedException {
-        return send("POST", url, request(url).header("Content-Type", "application/json")
+    /** Sends a JSON POST to {@code path}, which is relative to the controller API base URL. */
+    public Response postJson(String path, String json) throws IOException, InterruptedException {
+        return send("POST", path, request -> request.header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(json, StandardCharsets.UTF_8)));
     }
 
-    public Response delete(String url) throws IOException, InterruptedException {
-        return send("DELETE", url, request(url).DELETE());
+    /** Sends a DELETE to {@code path}, which is relative to the controller API base URL. */
+    public Response delete(String path) throws IOException, InterruptedException {
+        return send("DELETE", path, HttpRequest.Builder::DELETE);
     }
 
-    private HttpRequest.Builder request(String url) {
-        return HttpRequest.newBuilder(URI.create(url)).timeout(responseDeadline).header("User-Agent", USER_AGENT);
+    private Response send(String method, String path, UnaryOperator<HttpRequest.Builder> shape)
+            throws IOException, InterruptedException {
+        // A refused write was not applied, so it is safe to send again. Each controller is tried at most once.
+        for (int attempt = 1; ; attempt++) {
+            String base = endpoints.current();
+            String url = base + path;
+            Exchange exchange;
+            try {
+                exchange = sendTo(method, url, shape.apply(HttpRequest.newBuilder(URI.create(url))
+                        .timeout(responseDeadline).header("User-Agent", USER_AGENT)));
+            } catch (IOException e) {
+                endpoints.leaveUnreachable(base);
+                throw e;
+            }
+            if (!refusedByFollower(exchange.response()) || attempt >= endpoints.size()
+                    || !endpoints.leaveFollower(base, exchange.leaderHint())) {
+                return exchange.response();
+            }
+            logger.info("Controller {} is not the leader; retrying on {}", base, endpoints.current());
+        }
     }
 
-    private Response send(String method, String url, HttpRequest.Builder request)
+    /** Whether the controller refused the request because it is a follower: 503 with code NOT_LEADER. */
+    private static boolean refusedByFollower(Response response) {
+        if (response.status() != 503) {
+            return false;
+        }
+        try {
+            return "NOT_LEADER".equals(JSON.readTree(response.body()).path("code").asText());
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    /** A response and the leader's API base URL it named in {@code X-Quorus-Leader}, if any. */
+    private record Exchange(Response response, String leaderHint) { }
+
+    private Exchange sendTo(String method, String url, HttpRequest.Builder request)
             throws IOException, InterruptedException {
         URI uri = URI.create(url);
         Span span = GlobalOpenTelemetry.getTracer(INSTRUMENTATION).spanBuilder(method)
@@ -118,7 +170,8 @@ public final class ControllerClient implements AutoCloseable {
             if (response.statusCode() >= 500) {
                 span.setStatus(StatusCode.ERROR);
             }
-            return new Response(response.statusCode(), response.body());
+            return new Exchange(new Response(response.statusCode(), response.body()),
+                    response.headers().firstValue(LEADER_HEADER).orElse(null));
         } catch (IOException | RuntimeException e) {
             span.recordException(e);
             span.setStatus(StatusCode.ERROR);

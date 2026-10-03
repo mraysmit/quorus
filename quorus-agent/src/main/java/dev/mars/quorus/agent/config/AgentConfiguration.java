@@ -22,8 +22,10 @@ import dev.mars.quorus.agent.AgentNetworkInfo;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -44,7 +46,7 @@ public class AgentConfiguration {
     private final int agentPort;
     private final String region;
     private final String datacenter;
-    private final String controllerUrl;
+    private final List<String> controllerUrls;
     private final Set<String> supportedProtocols;
     private final int maxConcurrentTransfers;
     private final long heartbeatInterval;
@@ -68,6 +70,7 @@ public class AgentConfiguration {
     private final long jobPollingInitialDelayMs;
     private final long jobPollingIntervalMs;
     private final long progressReportIntervalMs;
+    private final long registrationRetryIntervalMs;
     private final int foreignAssignmentMismatchThreshold;
     private final boolean telemetryEnabled;
     private final int prometheusPort;
@@ -82,7 +85,7 @@ public class AgentConfiguration {
         this.agentPort = builder.agentPort;
         this.region = builder.region;
         this.datacenter = builder.datacenter;
-        this.controllerUrl = builder.controllerUrl;
+        this.controllerUrls = parseControllerUrls(builder.controllerUrl);
         this.supportedProtocols = builder.supportedProtocols;
         this.maxConcurrentTransfers = builder.maxConcurrentTransfers;
         this.heartbeatInterval = builder.heartbeatInterval;
@@ -106,6 +109,7 @@ public class AgentConfiguration {
         this.jobPollingInitialDelayMs = builder.jobPollingInitialDelayMs;
         this.jobPollingIntervalMs = builder.jobPollingIntervalMs;
         this.progressReportIntervalMs = builder.progressReportIntervalMs;
+        this.registrationRetryIntervalMs = builder.registrationRetryIntervalMs;
         this.foreignAssignmentMismatchThreshold = builder.foreignAssignmentMismatchThreshold;
         this.telemetryEnabled = builder.telemetryEnabled;
         this.prometheusPort = builder.prometheusPort;
@@ -166,7 +170,26 @@ public class AgentConfiguration {
     public int getAgentPort() { return agentPort; }
     public String getRegion() { return region; }
     public String getDatacenter() { return datacenter; }
-    public String getControllerUrl() { return controllerUrl; }
+    /** Every configured controller API base URL, in the configured order. */
+    public List<String> getControllerUrls() { return controllerUrls; }
+
+    /**
+     * Splits the controller URL setting, a comma-separated list of API base URLs.
+     *
+     * @throws IllegalArgumentException if the list is empty or an entry is not an http(s) URL
+     */
+    public static List<String> parseControllerUrls(String setting) {
+        List<String> urls = new ArrayList<>();
+        for (String entry : setting.split(",", -1)) {
+            String url = entry.trim();
+            if (!url.startsWith("http://") && !url.startsWith("https://")) {
+                throw new IllegalArgumentException(
+                        "Each controller URL must start with http:// or https://, got: '" + url + "'");
+            }
+            urls.add(url.endsWith("/") ? url.substring(0, url.length() - 1) : url);
+        }
+        return List.copyOf(urls);
+    }
     public Set<String> getSupportedProtocols() { return supportedProtocols; }
     public int getMaxConcurrentTransfers() { return maxConcurrentTransfers; }
     public long getHeartbeatInterval() { return heartbeatInterval; }
@@ -189,6 +212,8 @@ public class AgentConfiguration {
     public long getJobPollingInitialDelayMs() { return jobPollingInitialDelayMs; }
     public long getJobPollingIntervalMs() { return jobPollingIntervalMs; }
     public long getProgressReportIntervalMs() { return progressReportIntervalMs; }
+    /** How long the agent waits before it tries a failed registration again. */
+    public long getRegistrationRetryIntervalMs() { return registrationRetryIntervalMs; }
     public int getForeignAssignmentMismatchThreshold() { return foreignAssignmentMismatchThreshold; }
     public boolean isTelemetryEnabled() { return telemetryEnabled; }
     public int getPrometheusPort() { return prometheusPort; }
@@ -227,6 +252,7 @@ public class AgentConfiguration {
         private long jobPollingInitialDelayMs;
         private long jobPollingIntervalMs;
         private long progressReportIntervalMs = 15000;
+        private long registrationRetryIntervalMs;
         private int foreignAssignmentMismatchThreshold;
         private boolean telemetryEnabled;
         private int prometheusPort;
@@ -265,6 +291,7 @@ public class AgentConfiguration {
             this.jobPollingInitialDelayMs(config.getJobPollingInitialDelayMs());
             this.jobPollingIntervalMs(config.getJobPollingIntervalMs());
             this.progressReportIntervalMs(config.getProgressReportIntervalMs());
+            this.registrationRetryIntervalMs(config.getRegistrationRetryIntervalMs());
             this.foreignAssignmentMismatchThreshold(config.getForeignAssignmentMismatchThreshold());
             this.telemetryEnabled(config.isTelemetryEnabled());
             this.prometheusPort(config.getPrometheusPort());
@@ -308,6 +335,7 @@ public class AgentConfiguration {
         public Builder jobPollingInitialDelayMs(long value) { this.jobPollingInitialDelayMs = value; return this; }
         public Builder jobPollingIntervalMs(long value) { this.jobPollingIntervalMs = value; return this; }
         public Builder progressReportIntervalMs(long value) { this.progressReportIntervalMs = value; return this; }
+        public Builder registrationRetryIntervalMs(long value) { this.registrationRetryIntervalMs = value; return this; }
         public Builder foreignAssignmentMismatchThreshold(int value) { this.foreignAssignmentMismatchThreshold = value; return this; }
         public Builder telemetryEnabled(boolean value) { this.telemetryEnabled = value; return this; }
         public Builder prometheusPort(int value) { this.prometheusPort = value; return this; }
@@ -319,6 +347,7 @@ public class AgentConfiguration {
             if (agentId == null) throw new IllegalArgumentException("agentId is required");
             if (tenantId == null) throw new IllegalArgumentException("tenantId is required (AGENT_TENANT_ID)");
             if (controllerUrl == null) throw new IllegalArgumentException("controllerUrl is required");
+            List<String> controllerUrls = parseControllerUrls(controllerUrl);
             if (uploadRoot == null) throw new IllegalArgumentException("uploadRoot is required");
             if (downloadRoot == null) throw new IllegalArgumentException("downloadRoot is required");
             if (nfsMountRoot == null) throw new IllegalArgumentException("nfsMountRoot is required");
@@ -327,6 +356,9 @@ public class AgentConfiguration {
             if (jobPollingInitialDelayMs < 0) throw new IllegalArgumentException("jobPollingInitialDelayMs must not be negative");
             if (jobPollingIntervalMs <= 0) throw new IllegalArgumentException("jobPollingIntervalMs must be positive");
             if (progressReportIntervalMs <= 0) throw new IllegalArgumentException("progressReportIntervalMs must be positive");
+            if (registrationRetryIntervalMs <= 0) {
+                throw new IllegalArgumentException("registrationRetryIntervalMs must be positive");
+            }
             if (foreignAssignmentMismatchThreshold <= 0) {
                 throw new IllegalArgumentException("foreignAssignmentMismatchThreshold must be positive");
             }
@@ -341,7 +373,8 @@ public class AgentConfiguration {
                 throw new IllegalArgumentException("securityProfile must be development or production");
             }
             if (production) {
-                if (allowInsecure || !controllerTlsEnabled || !controllerUrl.startsWith("https://")) {
+                if (allowInsecure || !controllerTlsEnabled
+                        || !controllerUrls.stream().allMatch(url -> url.startsWith("https://"))) {
                     throw new IllegalArgumentException(
                             "Production agents require HTTPS mutual TLS and forbid insecure transport");
                 }
