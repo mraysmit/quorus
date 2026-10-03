@@ -1,2 +1,6 @@
+# Store text with LF line endings, whatever each developer's core.autocrlf setting. The index
+# already holds LF only, so this rule changes no file content.
+* text=auto
+
 # Linux entrypoints and shell acceptance fixtures must survive Windows checkout.
 *.sh text eol=lf

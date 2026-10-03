@@ -54,68 +54,23 @@ All Java source files must include the following license header:
 
 ## Third-Party Dependencies
 
-This inventory is maintained by hand from the module poms (last checked 2026-10-03). Versions without a number are managed by a BOM in the root `pom.xml`.
-
 ### Runtime Dependencies
 
-#### Vert.x (`quorus-controller` only, until plan item `RT-06`)
-- **Eclipse Vert.x Core** (5.0.8) - Apache License 2.0 / EPL 2.0
-- **Vert.x Web** (5.0.8) - Apache License 2.0 / EPL 2.0
-- **Vert.x Web Client** (5.0.8) - Apache License 2.0 / EPL 2.0
-- **Vert.x gRPC Server** (5.0.8) - Apache License 2.0 / EPL 2.0
-- **Vert.x gRPC Client** (5.0.8) - Apache License 2.0 / EPL 2.0
-- **Vert.x OpenTelemetry** (5.0.8) - Apache License 2.0 / EPL 2.0
-- **Netty** (transitive, through Vert.x and gRPC Netty) - Apache License 2.0
+The complete list of third-party runtime dependencies, with versions and licenses as Maven resolves them, is the generated [THIRD-PARTY.txt](./THIRD-PARTY.txt). Do not maintain it by hand. Regenerate it after any dependency change and commit it with that change:
 
-#### HTTP Client
-- **Apache HttpClient 5** (5.6.4), with **Apache HttpCore 5** (transitive) - Apache License 2.0; the HTTP transfer adapter in `quorus-core`
+```powershell
+./scripts/generate-third-party-inventory.ps1          # regenerate
+./scripts/generate-third-party-inventory.ps1 -Check   # fail if it is out of date
+```
 
-#### JSON & YAML Processing
-- **Jackson Databind** (2.19.4) - Apache License 2.0
-- **Jackson Core** (2.19.4) - Apache License 2.0
-- **Jackson Annotations** (2.19.4) - Apache License 2.0
-- **Jackson Datatype JSR310** (2.19.4) - Apache License 2.0
-- **Jackson Dataformat YAML** (2.19.4) - Apache License 2.0
-- **SnakeYAML** (2.5) - Apache License 2.0
+The [NOTICE](./NOTICE) file carries the attribution notices that distribution requires; THIRD-PARTY.txt is the full inventory.
 
-#### gRPC & Protocol Buffers
-- **gRPC Protobuf** (1.68.1) - Apache License 2.0
-- **gRPC Stub** (1.68.1) - Apache License 2.0
-- **gRPC Netty** (1.68.1) - Apache License 2.0
-- **Protocol Buffers Java** (3.25.5) - BSD 3-Clause License
-- **Protocol Buffers Java Util** (3.25.5) - BSD 3-Clause License
+Points the generated list does not show:
 
-#### Raft Consensus & Storage
-- **RaftLog Core** (1.2.0, `io.github.mraysmit:raftlog-core`) - Apache License 2.0
-
-#### Observability
-- **OpenTelemetry API** (1.59.0) - Apache License 2.0
-- **OpenTelemetry SDK** (1.59.0) - Apache License 2.0
-- **OpenTelemetry OTLP Exporter** (1.59.0) - Apache License 2.0
-- **OpenTelemetry Prometheus Exporter** (1.59.0-alpha) - Apache License 2.0
-- **OpenTelemetry Logback Appender** (2.14.0-alpha) - Apache License 2.0
-
-#### Logging
-- **SLF4J API** (2.0.17) - MIT License
-- **SLF4J JUL Bridge** (2.0.17) - MIT License
-- **Logback Classic** (1.5.32) - EPL 1.0 / LGPL 2.1
-
-#### Protocol Adapters
-- **JSch** (0.2.26, `com.github.mwiede`) - BSD 2-Clause License; the SFTP adapter
-
-The FTP/FTPS, SMB and NFS adapters use no third-party protocol library at runtime.
-
-#### Validation & Expression
-- **Jakarta Validation API** (3.0.2) - Apache License 2.0
-- **JSON Schema Validator** (1.5.9) - Apache License 2.0
-- **Spring Expression Language** (6.2.16) - Apache License 2.0
-
-#### Utilities
-- **Google Guava** (33.5.0-jre) - Apache License 2.0
-- **javax.annotation API** (1.3.2) - CDDL 1.1 / GPL 2.0 with Classpath Exception; used by the generated gRPC code in `quorus-controller`
-
-#### Container Base Image
-- **Amazon Corretto 27** (`amazoncorretto:27.0.0-alpine3.24`) - GPL 2.0 with Classpath Exception; the base of the controller and agent images, not a Maven dependency
+- **Vert.x** is used only by `quorus-controller` until plan item `RT-06`, and by the profile-only `quorus-benchmarks` module.
+- **javax.annotation API** (CDDL 1.1 / GPL 2.0 with Classpath Exception) is used by the generated gRPC code in `quorus-controller`.
+- **The container base image**, Amazon Corretto 27 (`amazoncorretto:27.0.0-alpine3.24`, GPL 2.0 with Classpath Exception), is not a Maven dependency.
+- The FTP/FTPS, SMB and NFS adapters use no third-party protocol library at runtime; Commons Net and jCIFS-ng are test dependencies.
 
 ### Test Dependencies
 
